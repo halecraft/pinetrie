@@ -51,7 +51,7 @@ import {
   idleNow,
   join,
   lanesOf,
-  moveRootTo,
+  moveTaskTo,
   rootRecordsOf,
   START_AGENT,
   setUpAccepted,
@@ -1122,7 +1122,7 @@ async function mainSection(
             "commit_id",
           ) !== "",
       )
-    if (rootOne !== null) await moveRootTo(wu, entryId(rootOne), "archive")
+    if (rootOne !== null) await moveTaskTo(wu, entryId(rootOne), "archive")
     await wh.quiet()
     const kept = before.filter(
       r => r.snapshot !== null && snapshotExists(project, r.snapshot),
@@ -1148,7 +1148,7 @@ async function mainSection(
         offeredInRootOne.every(lane => !readOffers(wh.session).has(lane)),
       `${JSON.stringify({ offered: offeredInRootOne, left: offerBookmarks() })}`,
     )
-    if (rootOne !== null) await moveRootTo(wu, entryId(rootOne), "open")
+    if (rootOne !== null) await moveTaskTo(wu, entryId(rootOne), "open")
     const rebuilt = await waitFor(
       () =>
         offeredInRootOne.length > 0 &&

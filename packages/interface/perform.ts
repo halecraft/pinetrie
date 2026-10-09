@@ -6,7 +6,7 @@ import type { AttentionStore, SessionClient } from "@pinetrie/session"
 import { afterKeep } from "./card-intents.ts"
 import type { Effect } from "./effects.ts"
 import type { Identity } from "./identity.ts"
-import { afterRootMove, type Intent } from "./intent.ts"
+import { afterTaskMove, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
 import type { ListWidth } from "./list-width.ts"
 import type { PageName } from "./page.ts"
@@ -18,8 +18,6 @@ export interface AppPorts {
     SessionClient,
     | "request"
     | "offer"
-    | "mark"
-    | "retitle"
     | "createCard"
     | "moveCard"
     | "queueCard"
@@ -87,28 +85,25 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "list": {
       const { openThreads } = ports.session
       const { act } = effect
-      if (act.kind === "ensure") openThreads.ensure(act.root)
-      else if (act.kind === "place") openThreads.open(act.root, act.before)
-      else openThreads.close(act.root)
+      if (act.kind === "ensure") openThreads.ensure(act.task)
+      else if (act.kind === "place") openThreads.open(act.task, act.before)
+      else openThreads.close(act.task)
       return
     }
     case "spinOff":
       void ports.session
         .request(effect.request)
         .then(outcome =>
-          perform(afterSpinOff(outcome, effect.thread, effect.sidebar), ports),
+          perform(
+            afterSpinOff(outcome, effect.request.task, effect.sidebar),
+            ports,
+          ),
         )
       return
-    case "moveRoot":
+    case "moveTask":
       void ports.session
         .request(effect.move)
-        .then(outcome => perform(afterRootMove(outcome, effect.moved), ports))
-      return
-    case "mark":
-      void ports.session.mark(effect.root, effect.title)
-      return
-    case "retitle":
-      void ports.session.retitle(effect.root)
+        .then(outcome => perform(afterTaskMove(outcome, effect.moved), ports))
       return
     case "notNeeded":
       if (effect.raised.kind === "verdict")
@@ -121,7 +116,12 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "moveCard":
       if (effect.fly) ports.fly(effect.move.card)
-      void ports.session.moveCard(effect.move, effect.how, effect.queuedBy)
+      void ports.session.moveCard(
+        effect.move,
+        effect.how,
+        effect.queuedBy,
+        effect.here,
+      )
       return
     case "queueCard":
       // A card made in the queue comes from nowhere on the page.
@@ -142,12 +142,12 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "keep":
       for (const { move } of effect.moves) ports.fly(move.card)
       void ports.session
-        .moveCards(effect.moves, effect.actedAt)
+        .moveCards(effect.moves, effect.actedAt, effect.here)
         .then(answer => perform(afterKeep(answer, effect.close), ports))
       return
     case "undoMoves":
       void ports.session
-        .undoMoves(effect.root, effect.direction)
+        .undoMoves(effect.task, effect.direction)
         .then(outcome => ports.intent({ kind: "undoAnswered", outcome }))
       return
     case "undoSwap":

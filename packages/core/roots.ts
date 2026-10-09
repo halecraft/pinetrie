@@ -6,7 +6,7 @@
 // A root is found by walking up (`rootOf`), and a thread started at the root
 // is rooted at its first message (S30), so a root's id is its tab's key.
 
-import type { EntryId, WriterId } from "./index.ts"
+import type { EntryId, ThreadId, WriterId } from "./index.ts"
 import {
   firstLine,
   isBusy,
@@ -89,6 +89,24 @@ export function rootWork(
     const was = work.get(root)
     if (was === undefined || WORK_RANK[now] > WORK_RANK[was])
       work.set(root, now)
+  }
+  return work
+}
+
+/**
+ * The agent's work among `threads`' lanes (ADR-0116): a task's, whatever
+ * roots its threads are in. Undefined when none is busy. The one rule for
+ * when a task cannot be archived.
+ */
+export function threadsWork(
+  lanes: readonly LaneView[],
+  threads: ReadonlySet<ThreadId>,
+): RootWork | undefined {
+  let work: RootWork | undefined
+  for (const lane of lanes) {
+    if (!threads.has(lane.name) || !isBusy(lane)) continue
+    const now = laneWork(lane)
+    if (work === undefined || WORK_RANK[now] > WORK_RANK[work]) work = now
   }
   return work
 }

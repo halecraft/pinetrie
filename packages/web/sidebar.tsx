@@ -10,7 +10,12 @@
 // starts is not added here. An item holding an unsent card of yours carries a
 // pip (ADR-0048, `cardMarks`), and before its label, its status (ADR-0077).
 
-import { MAX_TITLE, type TreeIndex, type WriterId } from "@pinetrie/core"
+import {
+  MAX_TITLE,
+  type TaskId,
+  type TreeIndex,
+  type WriterId,
+} from "@pinetrie/core"
 import {
   dropProps,
   dropsWords,
@@ -28,7 +33,7 @@ import {
   rootGroupProps,
   type SidebarView,
 } from "@pinetrie/interface"
-import { ROOT_BUSY_REASON } from "@pinetrie/rules"
+import { TASK_BUSY_REASON } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import {
   type DragEvent,
@@ -83,20 +88,20 @@ export function Sidebar({
   order: readonly WriterId[]
   nameOf: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
-  /** A root's drag, by its root entry, or null when it has no id yet. */
-  dragOf: (root: string) => RootDrag | null
+  /** A task's drag. */
+  dragOf: (task: TaskId) => RootDrag
 }) {
   const pip = <CardPip color={colorOf(session.writer)} />
-  // The root whose item is a title field now. Never stored.
-  const [renaming, setRenaming] = useState<string | null>(null)
-  // The root whose item takes focus once its field has gone.
-  const [refocus, setRefocus] = useState<string | null>(null)
+  // The task whose item is a title field now. Never stored.
+  const [renaming, setRenaming] = useState<TaskId | null>(null)
+  // The task whose item takes focus once its field has gone.
+  const [refocus, setRefocus] = useState<TaskId | null>(null)
   const nav = useRef<HTMLElement>(null)
   useEffect(() => {
     if (refocus === null) return
     nav.current
       ?.querySelector<HTMLElement>(
-        `.open-root[data-root="${CSS.escape(refocus)}"]`,
+        `.open-root[data-task="${CSS.escape(refocus)}"]`,
       )
       ?.focus()
     setRefocus(null)
@@ -123,24 +128,24 @@ export function Sidebar({
                 key={key}
                 nameOf={nameOf}
                 onIntent={onIntent}
-                onRename={root => setRenaming(root)}
+                onRename={task => setRenaming(task)}
                 pip={pip}
                 readers={readers}
                 rename={
-                  item.kind === "root" && renaming === item.root
+                  item.kind === "task" && renaming === item.task
                     ? {
                         onEnd: focusItem => {
                           setRenaming(null)
-                          if (focusItem) setRefocus(item.root)
+                          if (focusItem) setRefocus(item.task)
                         },
                         onSend: title =>
-                          onIntent(renameIntent(item.root, title)),
+                          onIntent(renameIntent(item.task, title)),
                       }
                     : null
                 }
                 startDrag={
-                  item.kind === "root"
-                    ? startRootDrag(dragOf(item.root))
+                  item.kind === "task"
+                    ? startRootDrag(dragOf(item.task))
                     : undefined
                 }
               />
@@ -172,8 +177,9 @@ export function Sidebar({
                 </button>
               </span>
             )
-          const { root } = item
-          if (renaming === root)
+          const { task } = item
+          const root = item.head.entry
+          if (renaming === task)
             return (
               <span
                 className="sidebar-item"
@@ -183,9 +189,9 @@ export function Sidebar({
                 <TitleField
                   onEnd={focusItem => {
                     setRenaming(null)
-                    if (focusItem) setRefocus(root)
+                    if (focusItem) setRefocus(task)
                   }}
-                  onSend={title => onIntent(renameIntent(root, title))}
+                  onSend={title => onIntent(renameIntent(task, title))}
                   placeholder={item.line}
                   stored={item.title}
                 />
@@ -196,17 +202,18 @@ export function Sidebar({
               className="sidebar-item"
               data-selected={item.selected || undefined}
               key={key}
-              {...rootDropProps({ kind: "list", before: root })}
-              {...dropProps({ kind: "sidebar", before: root })}
+              {...rootDropProps({ kind: "list", before: task })}
+              {...dropProps({ kind: "sidebar", before: task })}
             >
               <button
                 aria-current={item.selected || undefined}
                 className={["open-root", item.archived ? "archived" : ""]
                   .filter(c => c !== "")
                   .join(" ")}
-                data-root={root}
+                data-root={root ?? undefined}
+                data-task={task}
                 draggable
-                onDragStart={startRootDrag(dragOf(root))}
+                onDragStart={startRootDrag(dragOf(task))}
                 onClick={() => onIntent(item.show)}
                 title={item.label}
                 type="button"
@@ -219,7 +226,7 @@ export function Sidebar({
                   nameOf={nameOf}
                   pip={pip}
                 />
-                <Readers {...readers} roots={[root]} />
+                <Readers {...readers} roots={root === null ? [] : [root]} />
               </button>
               {item.menu.length > 0 && (
                 <Menu
@@ -228,7 +235,7 @@ export function Sidebar({
                     {
                       key: "root",
                       items: item.menu.map(m =>
-                        menuItem(m, () => setRenaming(root), onIntent),
+                        menuItem(m, () => setRenaming(task), onIntent),
                       ),
                     },
                   ]}
@@ -325,7 +332,7 @@ function FoldedItem({
 }: {
   item: SidebarView["items"][number]
   onIntent: (intent: Intent) => void
-  onRename: (root: string) => void
+  onRename: (task: TaskId) => void
   /** While this root is renamed, what its field does; else null. */
   rename: {
     readonly onSend: (title: string | null) => void
@@ -353,32 +360,33 @@ function FoldedItem({
     key: "close",
     className: "open-close-item",
     title:
-      item.kind === "root"
+      item.kind === "task"
         ? "close for you; open it again from the board"
         : "close this new thread; nothing has been written",
     label: "Close",
     onChoose: () => onIntent(item.close),
   }
   const items =
-    item.kind === "root"
+    item.kind === "task"
       ? [
           ...item.menu.map(m =>
-            menuItem(m, () => onRename(item.root), onIntent),
+            menuItem(m, () => onRename(item.task), onIntent),
           ),
           close,
         ]
       : [close]
-  const root = item.kind === "root" ? item.root : undefined
+  const task = item.kind === "task" ? item.task : undefined
+  const root = item.kind === "task" ? (item.head.entry ?? undefined) : undefined
   return (
     <span
       className="sidebar-item"
       data-selected={item.selected || undefined}
       ref={wrap}
-      {...(root === undefined
+      {...(task === undefined
         ? {}
         : {
-            ...rootDropProps({ kind: "list", before: root }),
-            ...dropProps({ kind: "sidebar", before: root }),
+            ...rootDropProps({ kind: "list", before: task }),
+            ...dropProps({ kind: "sidebar", before: task }),
           })}
     >
       <Menu
@@ -389,7 +397,7 @@ function FoldedItem({
         trigger={
           <span className="open-icon">
             <IconFace icon={item.icon} />
-            {item.kind === "root" && (
+            {item.kind === "task" && (
               <RootStatus
                 arrived={item.arrived}
                 done={item.done}
@@ -412,7 +420,8 @@ function FoldedItem({
           ...(item.kind === "new"
             ? { "data-new": item.key }
             : {
-                "data-root": item.root,
+                "data-root": item.head.entry ?? undefined,
+                "data-task": item.task,
                 draggable: true,
                 onDragStart: startDrag,
               }),
@@ -433,7 +442,7 @@ function FoldedItem({
           {root !== undefined && <Readers {...readers} roots={[root]} />}
         </span>
       )}
-      {at !== null && rename !== null && item.kind === "root" && (
+      {at !== null && rename !== null && item.kind === "task" && (
         <span
           className="open-rename"
           style={{ left: at.right + 6, top: at.top }}
@@ -494,7 +503,7 @@ function menuItem(
           <>
             Move to {item.name}
             {item.busy !== null && (
-              <span className="why"> · {ROOT_BUSY_REASON[item.busy]}</span>
+              <span className="why"> · {TASK_BUSY_REASON[item.busy]}</span>
             )}
             {drops !== null && <span className="why drops"> · {drops}</span>}
           </>

@@ -5,9 +5,9 @@
 // (`intent.ts`).
 
 import {
-  type CardId,
   type EntryId,
   parseMentions,
+  type TextCardId,
   THE_AGENT,
   type ThreadLane,
   type TranscriptMessage,
@@ -69,7 +69,7 @@ export type MessageAct =
    */
   | {
       readonly kind: "takeCopyIntoInventory"
-      readonly card: CardId
+      readonly card: TextCardId
       readonly text: string
     }
 

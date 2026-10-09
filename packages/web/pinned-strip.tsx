@@ -7,7 +7,7 @@
 // in the column's header until the strip has a card (`newPinAt`), and in the
 // strip after; the box it opens is drawn last in the strip.
 
-import type { CardId, CardRecord, PinnedView } from "@pinetrie/core"
+import type { CardId, PinnedView, TextCard } from "@pinetrie/core"
 import {
   type CardFrameFacts,
   type CatchUps,
@@ -29,7 +29,7 @@ export function PinnedStrip(p: {
    * The thread's pinned cards, in order (`cardsAt`), but the one the open
    * box shows.
    */
-  cards: readonly CardRecord[]
+  cards: readonly TextCard[]
   /** What the agent reads of them now (`pinnedInView` at the thread's end). */
   inView: PinnedView | null
   /** The column's key, where a drop pins; null for a column that cannot be written. */

@@ -5,12 +5,13 @@ What the session document says, read once, by the host and the client alike.
 ## Which document a read takes (ADR-0063)
 
 - **A root's reads take its `RootDocHandle`**: `readTreeIndex`,
-  `readRenderableEntries`, `readLatestPrompt`, `readRevisions`, `readMarks`,
+  `readRenderableEntries`, `readLatestPrompt`, `readRevisions`,
   `readStops`, `readDigests`, and `readRootRecord`, the root's directory
   record as the host writes it.
 - **The session's reads take its `SessionDocHandle`**: every record read
   across roots (`readLaneRecords`, `readNames`, `readOffers`, `readWorkflow`,
-  `readBoardPlaces`, `readArchived`,
+  `readBoardPlaces`, `readArchived`, `readMarks` and `readTasks`, each by
+  task (ADR-0116), `readThreads`,
   `readRoots`, the singletons…), `readRunningLanes` with `pinetrie:live`, and
   `readReferencedBlobs`, which takes each root's images from its directory
   record, so no root is opened to sweep.
@@ -41,9 +42,11 @@ behind it, `promptAuthor`, ADR-0080),
 `readParticipantNames`, `readParticipantPictures` (ADR-0098), `readParticipants`, `readReading`, `readTyping`,
 `readTypingIn` and `readQueueHolds` (ADR-0048 step 7), `readAgentActivity`,
 `readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059), `readWorkflow`,
-`readBoardPlaces` and `readArchived` (the board, ADR-0122: the roots in the
+`readBoardPlaces` and `readArchived` (the board, ADR-0122: the tasks in the
 archive, derived and kept while the same, since every write to the
-session's values wakes it), `readMarks` (ADR-0045), `readStops` and
+session's values wakes it), `readMarks` (each task's title, ADR-0045,
+ADR-0116), `readTasks`, `readReadingTasks` (each followed end's task, from
+presence), `readStops` and
 `readDigests` (ADR-0106), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (the project's root, written only by a host with tools).
@@ -145,7 +148,7 @@ Kyneta has let go.
 - **Build a `Record<EntryId, …>` from each entry's own `id`.** `Object.entries`
   and `Object.keys` give back `string`, which cannot index it (TS7053), so
   `renderableEntries` walks `Object.values` and keys by `entry.id`.
-- **A map keyed by an entry, a root or a lane says so in its type** (`readArchived`,
+- **A map keyed by an entry, a root, a task or a lane says so in its type** (`readArchived`,
   `readRevisions`, `readOffers`…). A `string`-keyed map still accepts an
   `EntryId`, so a key type left `string` compiles and leaves its lookups
   unchecked (S95).

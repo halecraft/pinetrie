@@ -1,10 +1,11 @@
 import {
   atEntry,
   type CardRecord,
-  cardId,
   entryId,
   rootIdFor,
   runId,
+  type TextCard,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -19,7 +20,7 @@ import {
 import { expect, test } from "vitest"
 import { readLanes, readTreeIndex } from "./index.ts"
 
-const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const row = (id: string, parentId: string | null): StoredEntryRow => ({
   id,
@@ -53,7 +54,7 @@ test("a compaction carries the newest cards entry of its retained tail; one with
   const lane = threadIdFor("0123456789abcdef")
   const view = (text: string) => ({
     lane,
-    cards: [{ id: cardId("c-1"), text, by: writerId("ada@x.io") }],
+    cards: [{ id: textCardId("c-1"), text, by: writerId("ada@x.io") }],
     retired: [],
   })
   const compaction = (id: string, retainedTail: unknown[]): StoredEntryRow => ({
@@ -87,15 +88,15 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
   const lane = threadIdFor("0123456789abcdef")
   writeEntry(doc, row("e1", null))
   writeLaneTip(doc, lane, entryId("e1"))
-  const queued = (id: string, order: string, email: string): CardRecord => ({
-    id: cardId(id),
+  const queued = (id: string, order: string, email: string): TextCard => ({
+    kind: "text",
+    id: textCardId(id),
     owner: writerId("ada@x.io"),
     placer: writerId("ada@x.io"),
     place: {
       kind: "queued",
-      root: TEST_ROOT,
       at: atEntry(entryId("e1")),
-      lane,
+      thread: lane,
       order,
       by: writerId(email),
       seen: "",
@@ -104,14 +105,14 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     unsent: null,
   })
   const atEnd: CardRecord = {
-    id: cardId("c-0"),
+    kind: "text" as const,
+    id: textCardId("c-0"),
     owner: writerId("cy@x.io"),
     placer: writerId("cy@x.io"),
     place: {
       kind: "composing",
-      root: TEST_ROOT,
       at: atEntry(entryId("e1")),
-      lane,
+      thread: lane,
     },
     carries: { kind: "message", command: null },
     unsent: null,
@@ -151,7 +152,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
       readTreeIndex(doc),
       cards,
       new Map(),
-      new Set([cardId("c-2")]),
+      new Set([textCardId("c-2")]),
     ).find(l => l.name === lane),
   ).toMatchObject({ waiting: 1, lastWaiting: writerId("ada@x.io") })
   expect(
@@ -160,7 +161,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
       readTreeIndex(doc),
       cards,
       new Map(),
-      new Set([cardId("c-1"), cardId("c-2")]),
+      new Set([textCardId("c-1"), textCardId("c-2")]),
     ).find(l => l.name === lane),
   ).toMatchObject({ waiting: 0, askedBy: null, lastWaiting: null })
   // A held queue names who holds it (ADR-0048 step 7).

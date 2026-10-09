@@ -16,16 +16,18 @@
 // take into the inventory chose is an intent until the take is answered
 // (`intentsOf`): the repair leaves it alone (`inventory.ts`).
 
-import type {
-  CardCommand,
-  CardId,
-  CardPlace,
-  CardRecord,
-  Move,
-  MoveRefusal,
-  PlaceKey,
-  Reorder,
-  WriterId,
+import {
+  type CardCommand,
+  type CardId,
+  type CardPlace,
+  type CardRecord,
+  isTextCardId,
+  type Move,
+  type MoveRefusal,
+  type PlaceKey,
+  placed,
+  type Reorder,
+  type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { planReorder } from "@pinetrie/rules"
@@ -327,7 +329,8 @@ const LAST = "\uffff"
 /**
  * A key as the place it is drawn as. A queued or pinned one waits for the
  * host to give it an order, so it is drawn last among its kind, a queued one
- * queued by you; a gone one is gone by you.
+ * queued by you, a canvas card one column wide; a gone one is gone by you,
+ * in no history until the host names it one (`historyOf`).
  */
 export function drawnPlace(key: PlaceKey, me: WriterId): CardPlace {
   switch (key.kind) {
@@ -335,8 +338,10 @@ export function drawnPlace(key: PlaceKey, me: WriterId): CardPlace {
       return { ...key, order: LAST, by: me }
     case "pinned":
       return { ...key, order: LAST }
+    case "canvas":
+      return { ...key, order: LAST, width: 1 }
     case "gone":
-      return { ...key, by: me }
+      return { ...key, task: null, by: me }
     default:
       return key
   }
@@ -351,17 +356,21 @@ export const queuedDraft = (
   move: Move,
   me: WriterId,
   command: CardCommand | null,
-): CardRecord | null =>
-  move.from === null
-    ? {
+): CardRecord | null => {
+  if (move.from !== null || !isTextCardId(move.card)) return null
+  const place = drawnPlace(move.to, me)
+  return place.kind === "canvas"
+    ? null
+    : {
+        kind: "text",
         id: move.card,
         owner: me,
-        place: drawnPlace(move.to, me),
+        place,
         placer: me,
         carries: { kind: "message", command },
         unsent: null,
       }
-    : null
+}
 
 /**
  * The host's records, with this tab's moves its copy does not yet hold drawn
@@ -376,7 +385,9 @@ export function withPending(
 ): readonly CardRecord[] {
   const shown = state.pending.filter(p => drawn(p, state.rev))
   if (shown.length === 0) return records
-  const cards = new Map(records.map(c => [c.id, c] as const))
+  const cards = new Map<CardId, CardRecord>(
+    records.map(c => [c.id, c] as const),
+  )
   for (const p of shown) {
     if (p.kind === "create") {
       if (!cards.has(p.draft.id)) cards.set(p.draft.id, p.draft)
@@ -398,7 +409,7 @@ export function withPending(
     }
     const now = cards.get(p.move.card)
     if (now === undefined) continue
-    cards.set(p.move.card, { ...now, place: drawnPlace(p.move.to, me) })
+    cards.set(p.move.card, placed(now, drawnPlace(p.move.to, me)) ?? now)
   }
   return [...cards.values()].sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,

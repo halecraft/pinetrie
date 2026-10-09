@@ -16,14 +16,18 @@ import {
   methods,
   NO_BLANK_CARDS,
   putLane,
+  putTask,
   putValue,
-  ROOT_ID,
   record,
   row,
+  TASK_ID,
   writeDirectory,
   writesOf,
 } from "../fakes.ts"
-import { type BoardDeps, handleRootMove, handleWorkflow } from "./board.ts"
+import { type BoardDeps, handleTaskMove, handleWorkflow } from "./board.ts"
+
+/** The task's one thread. */
+const THREAD_1 = threadIdFor("0123456789abcdef")
 
 const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
 const WORKFLOW_NOW: Workflow = {
@@ -32,17 +36,18 @@ const WORKFLOW_NOW: Workflow = {
 }
 const ADA = writerId("ada@example.com")
 
-/** A root with one message, in Doing, on a board with Doing and Done. */
+/** A task of one root with one message, in Doing, on a board with Doing and Done. */
 function setUp() {
   const b = basics()
   const root = entryId("e-1")
   writeEntry(b.root, row(root, null))
   writeDirectory(b)
+  putTask(b, THREAD_1)
   putValue(b, setRecord(WORKFLOW, WORKFLOW_NOW))
   putValue(
     b,
     setRecord(BOARD, {
-      root: ROOT_ID,
+      task: TASK_ID,
       state: DOING,
       rank: "a",
       by: ADA,
@@ -65,30 +70,30 @@ function setUp() {
 }
 
 const toDone = {
-  kind: "move-root",
-  root: ROOT_ID,
+  kind: "move-task",
+  task: TASK_ID,
   from: DOING,
   to: DONE,
   before: null,
 } as const
 
-test("a root the agent works in is not archived, and nothing is written", async () => {
+test("a task an agent of its threads works in is not archived, and nothing is written", async () => {
   const { b, root, records, deps } = setUp()
-  const lane = threadIdFor("0123456789abcdef")
+  const lane = THREAD_1
   putLane(b, lane, root)
   writeLaneTip(b.root, lane, root)
   beginRun(b.live, lane, runId("r-1"))
-  const out = await handleRootMove(deps, ADA, toDone)
-  expect(out).toMatchObject({ kind: "refused", code: ERR.ROOT_BUSY })
+  const out = await handleTaskMove(deps, ADA, toDone)
+  expect(out).toMatchObject({ kind: "refused", code: ERR.TASK_BUSY })
   expect(records.calls).toEqual([])
 })
 
-test("an idle root moved to Done: its place written, then torn down and unloaded", async () => {
+test("an idle task moved to Done: its place written, then torn down and unloaded", async () => {
   const { records, work, deps } = setUp()
-  const out = await handleRootMove(deps, ADA, toDone)
-  expect(out).toEqual({ kind: "moved-root" })
+  const out = await handleTaskMove(deps, ADA, toDone)
+  expect(out).toEqual({ kind: "moved-task" })
   expect(writesOf(records.calls)).toMatchObject([
-    { namespace: "pinetrie.board", key: ROOT_ID, value: { state: DONE } },
+    { namespace: "pinetrie.board", key: TASK_ID, value: { state: DONE } },
   ])
   expect(methods(work.calls)).toEqual(["teardown"])
 })
@@ -103,8 +108,8 @@ test("a move within open states writes only the place, and opens no root", async
       open: [...WORKFLOW_NOW.open, { id: review, name: "Review" }],
     }),
   )
-  const out = await handleRootMove(deps, ADA, { ...toDone, to: review })
-  expect(out).toEqual({ kind: "moved-root" })
+  const out = await handleTaskMove(deps, ADA, { ...toDone, to: review })
+  expect(out).toEqual({ kind: "moved-task" })
   expect(writesOf(records.calls)).toHaveLength(1)
   expect(work.calls).toEqual([])
 })

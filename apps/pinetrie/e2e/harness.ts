@@ -19,18 +19,18 @@ import {
   type CardId,
   type CardRecord,
   type ChatMode,
-  cardId,
   type EntryId,
   entryId,
   type LaneView,
   moveOf,
   noteOf,
   type Position,
-  queueRoot,
   ROOT,
   type RootId,
+  type TaskId,
   type ThreadId,
   type TreeIndex,
+  textCardId,
   threadAt,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
@@ -40,14 +40,14 @@ import {
   readBoardPlaces,
   readHeld,
   readHeldIndex,
-  readLaneRecords,
   readLanes,
   readPlaces,
   readQueueHolds,
   readRoots,
+  readThreads,
   readWorkflow,
 } from "@pinetrie/reads"
-import { NONE_BLANK } from "@pinetrie/rules"
+import { indexTasks, NONE_BLANK } from "@pinetrie/rules"
 import {
   hasLaneRecord,
   type LiveDocHandle,
@@ -64,6 +64,7 @@ import {
   type ConnectOptions,
   chatAtOf,
   connectSession,
+  newTaskId,
   newThreadId,
   type SessionClient,
 } from "@pinetrie/session"
@@ -82,6 +83,24 @@ export type ScenarioHow = ChatHow & {
   readonly mode?: ChatMode
   /** The thread it starts or continues; else a new one, or its entry's. */
   readonly thread?: ThreadId
+  /**
+   * The task a thread it starts goes in; else a new one at the root, or the
+   * task of the thread its entry is in (ADR-0116).
+   */
+  readonly task?: TaskId
+}
+
+/** The task of the thread `entry` is in, as `client` holds the places. */
+export function taskAt(
+  client: Pick<SessionClient, "session" | "cards" | "roots" | "live">,
+  entry: EntryId,
+): TaskId | undefined {
+  const thread = threadAt(treeOf(client), entry)
+  if (thread === null) return undefined
+  return indexTasks(
+    client.cards.current(),
+    readThreads(client.session),
+  ).taskOfThread.get(thread)
 }
 
 /** How the two starts send at the root (ADR-0021), and a branch's. */
@@ -180,7 +199,7 @@ export const join = async (
     at.kind === "root"
       ? Promise.resolve(undefined)
       : rootHeldWithin(client, at.id, 10_000)
-  const { chat, mark } = client
+  const { chat } = client
   return Object.assign(client, {
     /**
      * A message as a column sends it, from where a scenario reads: a branch
@@ -193,24 +212,45 @@ export const join = async (
       how: ScenarioHow = {},
     ): Promise<Outcome> => {
       await holds(at)
-      const { mode, thread, ...rest } = how
+      const { mode, thread, task, ...rest } = how
       const branch = mode === "branch" || at.kind === "root"
       const resolved =
         thread ??
         (branch
           ? newThreadId()
           : (threadAt(treeOf(client), at.id) ?? newThreadId()))
+      // A thread's task comes with its card, which can reach this copy of
+      // the places after its first message reaches the tree.
+      if (task === undefined && at.kind === "entry")
+        await waitFor(() => taskAt(client, at.id) !== undefined, 5_000)
+      const into =
+        task ??
+        (at.kind === "root"
+          ? newTaskId()
+          : (taskAt(client, at.id) ?? newTaskId()))
       return chat(
         text,
-        chatAtOf(branch ? "branch" : "reply", resolved, at),
+        chatAtOf(branch ? "branch" : "reply", resolved, at, into),
         rest,
       )
     },
-    mark: async (...args: Parameters<SessionClient["mark"]>) => {
-      await holds({ kind: "entry", id: args[0] })
-      return mark(...args)
+    /** Title the task the thread `entry` is in, or clear it with null. */
+    mark: async (entry: EntryId, title: string | null) => {
+      await holds({ kind: "entry", id: entry })
+      await waitFor(() => taskAt(client, entry) !== undefined, 5_000)
+      const task = taskAt(client, entry)
+      return task === undefined
+        ? NO_TASK
+        : client.request({ kind: "mark", task, title })
     },
   })
+}
+
+/** A scenario's mark at an entry in no task: refused before anything is sent. */
+const NO_TASK: Outcome = {
+  kind: "refused",
+  code: "unknown_target",
+  message: "no task holds that entry",
 }
 
 /** A session client whose `chat` sends as a column would (`join`). */
@@ -220,6 +260,7 @@ export type ScenarioClient = Omit<SessionClient, "chat"> & {
     at: Position,
     how?: ScenarioHow,
   ) => Promise<Outcome>
+  readonly mark: (entry: EntryId, title: string | null) => Promise<Outcome>
 }
 
 /**
@@ -402,26 +443,27 @@ function drawnCard(
 }
 
 /**
- * Move the root whose root entry is `entry` to the archive, or
- * out of it to the first open one, as the board does (ADR-0122): archive or
+ * Move the task holding the thread `entry` is in to the archive, or out of
+ * it to the first open one, as the board does (ADR-0122): archive or
  * restore it. The state it is in is read from `client`'s copy of the board.
  */
-export function moveRootTo(
-  client: Pick<SessionClient, "session" | "request">,
+export function moveTaskTo(
+  client: Pick<
+    SessionClient,
+    "session" | "request" | "cards" | "roots" | "live"
+  >,
   entry: EntryId,
   to: "archive" | "open",
 ): Promise<Outcome> {
   const workflow = readWorkflow(client.session)
-  const root = [...readRoots(client.session).values()].find(
-    r => r.entry === entry,
-  )?.root
+  const task = taskAt(client, entry)
   const first = workflow?.open[0]
-  if (workflow === null || root === undefined || first === undefined)
+  if (workflow === null || task === undefined || first === undefined)
     throw new Error(`no board place for ${entry}`)
-  const from = readBoardPlaces(client.session).get(root)?.state ?? first.id
+  const from = readBoardPlaces(client.session).get(task)?.state ?? first.id
   return client.request({
-    kind: "move-root",
-    root,
+    kind: "move-task",
+    task,
     from,
     to: to === "archive" ? workflow.archive.id : first.id,
     before: null,
@@ -429,9 +471,9 @@ export function moveRootTo(
 }
 
 /**
- * Queue `id` on `lane` from where it is, as a column's queue does: in its
- * lane's root (`queueRoot`), at the card's own position, with its text's
- * version as `client` has it (S96). Throws for a card with no position.
+ * Queue `id` on `lane` from where it is, as a column's queue does: at the
+ * card's own position, with its text's version as `client` has it (S96).
+ * Throws for a card with no position.
  */
 export function queueCard(
   client: Omit<SessionClient, "chat">,
@@ -442,10 +484,8 @@ export function queueCard(
   if (!("at" in card.place))
     throw new Error(`${id} has no position to queue from`)
   const { at } = card.place
-  const root = queueRoot(lane, card, readLaneRecords(client.session))
-  if (root === undefined) throw new Error(`no root to queue ${id} in`)
   return client.queueCard(
-    moveOf(card, { kind: "queued", root, at, lane, seen: "" }),
+    moveOf(card, { kind: "queued", at, thread: lane, seen: "" }),
     "keep",
   )
 }
@@ -518,6 +558,30 @@ export function rootHolding(
   return root
 }
 
+/** The thread `entry` is in, as the host holds the tree (ADR-0117). */
+export function threadHolding(
+  host: Parameters<typeof treeOf>[0],
+  entry: EntryId | null,
+): ThreadId {
+  const thread = entry === null ? null : threadAt(treeOf(host), entry)
+  if (thread === null) throw new Error(`no thread holds the entry ${entry}`)
+  return thread
+}
+
+/** The task the thread `entry` is in holds, as the host reads it (ADR-0116). */
+export function taskHolding(
+  host: Parameters<typeof treeOf>[0] & Pick<RunningHost, "places">,
+  entry: EntryId | null,
+): TaskId {
+  const thread = threadHolding(host, entry)
+  const task = indexTasks(
+    readPlaces(host.places),
+    readThreads(host.session),
+  ).taskOfThread.get(thread)
+  if (task === undefined) throw new Error(`no task holds the thread ${thread}`)
+  return task
+}
+
 /**
  * The root holding `entry` in the client's copy, waiting up to `timeoutMs`
  * for the copy to have it; undefined when it never does. A client gets the
@@ -556,7 +620,10 @@ export async function waitForRootHolding(
  * (`queueCard`) when the card is to be sent.
  */
 export async function composeAt(
-  client: Pick<SessionClient, "rootOf" | "createCard">,
+  client: Pick<
+    SessionClient,
+    "rootOf" | "createCard" | "session" | "roots" | "live"
+  >,
   place: {
     readonly entry: EntryId | null
     readonly lane: ThreadId | null
@@ -566,17 +633,15 @@ export async function composeAt(
 ): Promise<CardId> {
   const { entry } = place
   if (entry === null) throw new Error("no entry to compose a card at")
-  const root = await waitForRootHolding(client, entry)
-  const id = cardId(crypto.randomUUID())
+  await waitForRootHolding(client, entry)
+  // A lane is named by its thread (ADR-0117); with none, the entry's thread.
+  const thread = place.lane ?? threadAt(treeOf(client), entry)
+  if (thread === null) throw new Error("no thread to compose a card in")
+  const id = textCardId(crypto.randomUUID())
   void client.createCard(
     {
       id,
-      place: {
-        kind: "composing",
-        root,
-        at: atEntry(entry),
-        lane: place.lane,
-      },
+      place: { kind: "composing", at: atEntry(entry), thread },
       carries: { kind: "message", command: place.command ?? null },
       unsent: null,
     },

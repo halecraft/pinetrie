@@ -10,13 +10,29 @@ import {
   type RootId,
   rootIdFor,
   type Target,
+  type TaskId,
   type ThreadId,
+  taskIdFor,
   type ValueWrite,
   writerId,
 } from "@pinetrie/core"
 import type { ThreadLaneHandle, WriteOutcome } from "@pinetrie/pi"
-import { readLaneRecords, readRootRecord, readRoots } from "@pinetrie/reads"
-import { byTarget, encodeChat, LANE, ROOT, setRecord } from "@pinetrie/rules"
+import {
+  readLaneRecords,
+  readPlaces,
+  readRootRecord,
+  readRoots,
+} from "@pinetrie/reads"
+import {
+  byTarget,
+  encodeChat,
+  LANE,
+  ROOT,
+  setRecord,
+  TASK,
+  THREAD,
+  threadCardOf,
+} from "@pinetrie/rules"
 import {
   applyRecordWrites,
   type LiveDocHandle,
@@ -35,6 +51,7 @@ import {
 } from "@pinetrie/schema/fixtures"
 import type { Basics } from "./basics.ts"
 import type { HostDocuments } from "./docs.ts"
+import { applyPlaceSteps } from "./places.ts"
 
 export interface Call {
   readonly method: string
@@ -317,3 +334,34 @@ export function basics(
 export const NO_BLANK_CARDS = {
   blankQueued: async () => new Set<CardId>(),
 } as const
+
+/** The task the test's root's threads are in (ADR-0116), unless it makes another. */
+export const TASK_ID: TaskId = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+
+/**
+ * A task as a thread's first message makes one (`planThreadStart`): its
+ * record, the thread's, and the thread's card on its canvas, in `root`.
+ */
+export function putTask(
+  b: WriteDocs & Pick<FakeBasics, "places">,
+  thread: ThreadId,
+  task: TaskId = TASK_ID,
+  root: RootId = ROOT_ID,
+): void {
+  putValue(b, setRecord(TASK, { task, by: STARTER, createdAt: 0 }))
+  putValue(
+    b,
+    setRecord(THREAD, { thread, root, by: STARTER, createdAt: 0, fork: null }),
+  )
+  applyPlaceSteps(b.places, [
+    {
+      kind: "write",
+      record: threadCardOf({
+        thread,
+        task,
+        by: STARTER,
+        cards: readPlaces(b.places),
+      }),
+    },
+  ])
+}

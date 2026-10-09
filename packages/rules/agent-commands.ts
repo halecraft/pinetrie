@@ -5,14 +5,13 @@
 
 import {
   CATCH_UP_TOOL,
-  type CardId,
   type CardRecord,
   type CatchUpCommand,
   type CommitId,
   type CopyFacts,
   commandOf,
   type Position,
-  type RootId,
+  type TextCardId,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
@@ -200,8 +199,7 @@ export function planSplitCall(input: {
   readonly prompt: string | undefined
   readonly running: boolean
   readonly by: WriterId
-  readonly id: CardId
-  readonly root: RootId
+  readonly id: TextCardId
   readonly at: Position
 }):
   | { readonly kind: "queue"; readonly step: PlaceStep }
@@ -217,13 +215,13 @@ export function planSplitCall(input: {
     step: {
       kind: "write",
       record: {
+        kind: "text",
         id: input.id,
         owner: input.by,
         place: {
           kind: "queued",
-          root: input.root,
           at: input.at,
-          lane: input.lane,
+          thread: input.lane,
           order: orderAfter(queued),
           by: input.by,
           seen: "",

@@ -68,7 +68,11 @@ describe("settleSend", () => {
     ).toBe("You already asked the agent here.")
     expect(
       settleSend(
-        { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },
+        {
+          kind: "refused",
+          code: ERR.TASK_ARCHIVED,
+          message: "archived by Bea",
+        },
         "hi",
         READER,
       ),

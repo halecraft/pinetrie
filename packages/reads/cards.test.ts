@@ -1,9 +1,10 @@
 import {
   atEntry,
-  type CardRecord,
-  cardId,
   entryId,
   rootIdFor,
+  type TextCard,
+  textCardId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { encodeCard } from "@pinetrie/rules"
@@ -11,17 +12,18 @@ import { newPlacesDoc } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { readPlaces, readPlacesRev } from "./index.ts"
 
-const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const TEST_THREAD = threadIdFor("e")
+const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
-const card = (id: string, owner = "p-ada"): CardRecord => ({
-  id: cardId(id),
+const card = (id: string, owner = "p-ada"): TextCard => ({
+  kind: "text",
+  id: textCardId(id),
   owner: writerId(owner),
   placer: writerId(owner),
   place: {
     kind: "composing",
-    root: TEST_ROOT,
     at: atEntry(entryId("e1")),
-    lane: null,
+    thread: TEST_THREAD,
   },
   carries: { kind: "message", command: null },
   unsent: null,
@@ -40,7 +42,10 @@ test("readPlaces: oldest first, malformed ones left out, an unchanged card the s
   expect(second.map(c => c.id)).toEqual(["c-1", "c-2", "c-4"])
   expect(second[0]).toBe(first[0])
   expect(second[1]).toBe(first[1])
-  doc.cards.set("c-1", { ...encodeCard(card("c-1")), lane: "elsewhere" })
+  doc.cards.set("c-1", {
+    ...encodeCard(card("c-1")),
+    lane: threadIdFor("elsewhere"),
+  })
   const third = readPlaces(doc)
   expect(third[0]).not.toBe(first[0])
   expect(third[1]).toBe(first[1])

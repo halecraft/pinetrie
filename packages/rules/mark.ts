@@ -1,21 +1,20 @@
-// mark — a title on an entry (ADR-0045). A root's mark titles its tab.
+// mark — a task's title (ADR-0045, ADR-0116).
 //
-// The record is a host-written `pinetrie.mark` value keyed by the entry's id.
-// The last write wins, since nobody types a title together (ADR-0023), and
-// clearing a title deletes its record.
+// The record is a host-written `pinetrie.mark` value in the session, keyed by
+// the task's id. The last write wins, since nobody types a title together
+// (ADR-0023), and clearing a title deletes its record.
 
 import {
   type AgentId,
-  type EntryId,
   ERR,
   type MarkRecord,
   type Refusal,
   refused,
-  type TreeIndex,
+  type TaskId,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, entryKey } from "./decode.ts"
+import { decodeAt, taskKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 // The shape only: the host is the session's one writer, and stores only
@@ -26,15 +25,15 @@ const MarkSchema = Type.Object({
   at: Type.Number(),
 })
 
-/** Each entry's mark, at the entry's id. */
-export const MARK: RecordSpec<MarkRecord, EntryId, "root"> = {
+/** Each task's title, at the task's id. */
+export const MARK: RecordSpec<MarkRecord, TaskId, "session"> = {
   namespace: "pinetrie.mark",
-  home: "root",
-  keyOf: r => r.entry,
-  encode: ({ entry, ...contents }) => contents,
+  home: "session",
+  keyOf: r => r.task,
+  encode: ({ task, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(MarkSchema, contents, entryKey(key), (r, entry) => ({
-      entry,
+    decodeAt(MarkSchema, contents, taskKey(key), (r, task) => ({
+      task,
       title: r.title,
       // A writer id always starts `w-` (`writerId`), so neither is read as the other.
       by: r.by as WriterId | AgentId,
@@ -47,26 +46,27 @@ type MarkPlan =
   /** The title is already stored, or there is none to clear: nothing is written. */
   | { readonly kind: "unchanged" }
   | { readonly kind: "write"; readonly record: MarkRecord }
-  | { readonly kind: "remove"; readonly entry: EntryId }
+  | { readonly kind: "remove"; readonly task: TaskId }
 
-/** Decide a mark: set `entry`'s title, or clear it with null. */
+/** Decide a mark: set `task`'s title, or clear it with null. */
 export function planMark(input: {
-  readonly entry: EntryId
+  readonly task: TaskId
   readonly title: string | null
   readonly by: WriterId | AgentId
   readonly now: number
-  readonly index: TreeIndex
-  readonly marks: ReadonlyMap<EntryId, MarkRecord>
+  /** Every task the session holds. */
+  readonly tasks: ReadonlySet<TaskId>
+  readonly marks: ReadonlyMap<TaskId, MarkRecord>
 }): MarkPlan {
-  const { entry, title } = input
-  if (input.index.entries[entry] === undefined)
-    return refused(ERR.UNKNOWN_TARGET, "no such entry to title")
-  const stored = input.marks.get(entry)?.title ?? null
+  const { task, title } = input
+  if (!input.tasks.has(task))
+    return refused(ERR.UNKNOWN_TARGET, "no such task to title")
+  const stored = input.marks.get(task)?.title ?? null
   if (stored === title) return { kind: "unchanged" }
   return title === null
-    ? { kind: "remove", entry }
+    ? { kind: "remove", task }
     : {
         kind: "write",
-        record: { entry, title, by: input.by, at: input.now },
+        record: { task, title, by: input.by, at: input.now },
       }
 }

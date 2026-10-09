@@ -1,9 +1,9 @@
 import {
-  cardId,
   commitId,
   ERR,
   entryId,
   NOBODY,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -191,7 +191,9 @@ describe("a run's pinned cards (ADR-0048)", () => {
   const pinned = encodePinned(
     {
       lane: LANE,
-      cards: [{ id: cardId("c-1"), text: "ship it", by: writerId("a@x.io") }],
+      cards: [
+        { id: textCardId("c-1"), text: "ship it", by: writerId("a@x.io") },
+      ],
       retired: [],
     },
     () => "Ada",
@@ -208,7 +210,7 @@ describe("a run's pinned cards (ADR-0048)", () => {
         return pinned
       },
     )
-    const seen = [{ id: cardId("c-1"), seen: "v-1" }]
+    const seen = [{ id: textCardId("c-1"), seen: "v-1" }]
     runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: seen })
     lane.finish({ kind: "ok" })
     await ended

@@ -35,7 +35,7 @@ export {
   archivedIn,
   type Crossing,
   planArchive,
-  ROOT_BUSY_REASON,
+  TASK_BUSY_REASON,
   writesIn,
 } from "./archive.ts"
 export {
@@ -82,12 +82,12 @@ export {
   type BoardColumn,
   boardOf,
   placeStarted,
-  planRootMove,
+  planTaskMove,
   planWorkflowEdit,
   planWorkflowSeed,
-  type RootMovePlan,
   stateIn,
   statesOf,
+  type TaskMovePlan,
   type Transition,
   transitionOf,
   WORKFLOW,
@@ -100,12 +100,14 @@ export {
   cardEnd,
   cardsAt,
   cardsOfParts,
+  type Discards,
   decodeCard,
   encodeCard,
   historyOf,
   type MoveStep,
   type MovesStep,
   type NextQueuedCardPopStep,
+  NO_DISCARDS,
   NONE_BLANK,
   type PlaceStep,
   placeEnd,
@@ -163,6 +165,7 @@ export {
   promptAuthor,
   renderableMessage,
   settleRun,
+  type ThreadStarts,
   withChatImages,
 } from "./chat.ts"
 export {
@@ -331,6 +334,21 @@ export {
   planStop,
   STOP,
 } from "./stop.ts"
+export {
+  type CanvasCard,
+  canvasOf,
+  indexTasks,
+  NO_TASK_INDEX,
+  planThreadStart,
+  rootOfPlace,
+  rootsHeld,
+  TASK,
+  type TaskIndex,
+  type ThreadStart,
+  taskOfCard,
+  taskOfPlace,
+  threadCardOf,
+} from "./task.ts"
 export { THREAD } from "./thread.ts"
 export {
   decodeTitleConfig,

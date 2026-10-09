@@ -175,8 +175,9 @@ readers need, as the stream row's, lives here. It still imports no pi.
 wins per field. Its records are flat, and every key starts with its seat's
 `seatKey`, `${writer}:${seat}` (ADR-0037): `reading` is keyed
 `readingKey(seatKey, columnKey)` (every column of the tab a person is on
-reports its thread's end), and so is `readingRoot` (the root entry of that
-thread, ADR-0063, for a window that does not hold the root); `typing` (a
+reports its thread's end), and so are `readingRoot` (the root entry of
+that thread, ADR-0063, for a window that does not hold the root) and
+`readingTask` (the task it is in, ADR-0116); `typing` (a
 thread end) and `typingIn` (the card typed in: the host pops no queued card
 while someone types in it, ADR-0048 step 7) are keyed by `seatKey`, and
 decay after `typingMs`. A person on
@@ -232,7 +233,8 @@ document.
 `PlacesDoc` holds every card's record, keyed by card id: `yjs.bind` of a
 record of flat string rows (`owner`, `kind`, `root`, `at`, `lane`,
 `column`, `order`, `by`, `seen`, `command`, `unsent`, `placer`,
-`holder`, "" for none), decoded in `@pinetrie/rules` (`decodeCard`),
+`holder`, `task`, `width`, "" for none; `task` and `width` from migration
+`0005-tasks`, ADR-0116), decoded in `@pinetrie/rules` (`decodeCard`),
 and `rev`. Its id is `pinetrie:card-places` (`PLACES_DOC_ID`). Only the host
 writes it, through `applyPlaceSteps` (`apps/pinetrie/host/places.ts`).
 
@@ -249,11 +251,17 @@ would refuse each whole undo of a move (S82).
   over 10,000 moves, accepted.
 - **A new id, not the old one** (ADR-0066), so a store's `json` places and
   the Yjs schema never meet under one id.
-- **A fresh row names its root and its branch point** (`root`, `at`, "" at
-  for a new tab), as a note or a message does (ADR-0066). One without a root does
-  not decode.
+- **A fresh row names its root, its task and its branch point** (`root`,
+  `task`, `at`, "" at for a new tab, ADR-0066, ADR-0116). One without a
+  root or a task does not decode.
+- **A row at a thread names its thread in `lane`, and no root** (your
+  message, a note, a pinned or a queued card, ADR-0116): the root is the
+  thread's record's, so the two cannot disagree.
+- **A canvas row** (`canvas`, ADR-0116) names its task, its rank in
+  `order` and its width (`"1"` or `"2"`): a thread's card on its task's
+  canvas. A gone row names the task whose history it is in, or "".
 - **A pinned row carries `order`**, as a queued one does, and no `by` or
-  `seen`: `kind`, `at` and `lane` are a note's. No new field.
+  `seen`: `kind`, `at` and `lane` are a note's.
 - **Your message is stored as kind `drafting`**, the kind every card at a
   thread's end had before notes (ADR-0113); a note as `note`, with a
   message's fields. So no stored row changed with the split.
@@ -333,12 +341,13 @@ panel draws a slot whose card is not held as empty.
   the `ledger.source` whose offer, was marked "not needed".
 - A key that is no lane name is left out when read.
 
-`OpenDoc` is the roots the person has open, their list (ADR-0122): each
-root's `RootId` to an order key, read by `readOpenKeys` (a key that is no
-root is left out) and ordered by `orderOpen` (by key, then id, in
-`packages/session/open-repair.ts`). A record,
-not a list: two devices reordering at once merge per root, and a list could
-hold a root twice.
+`OpenDoc` is the tasks the person has open, their list (ADR-0122,
+ADR-0116): `{ tasks }`, each task's `TaskId` to an order key, read by
+`readOpenKeys` (a key that is no task is left out) and ordered by
+`orderOpen` (by key, then id, in `packages/session/open-repair.ts`). A
+record, not a list: two devices reordering at once merge per task, and a
+list could hold a task twice. `OpenDocBeforeTasks` is the schema before,
+keyed by root, frozen for migration `0005-tasks` and deleted with it.
 
 ## A document per root (ADR-0063)
 

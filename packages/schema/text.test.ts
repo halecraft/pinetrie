@@ -5,7 +5,7 @@ import {
   merge,
   unwrap,
 } from "@kyneta/schema"
-import { cardId, writerId } from "@pinetrie/core"
+import { textCardId, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { cardDocId, cardIdOfDoc } from "./places.ts"
 import { seatOf, TextDoc, textClients, textHolds, textVersion } from "./text.ts"
@@ -50,7 +50,7 @@ test("textClients: every seat that wrote in a text, never Kyneta's seed", () => 
 })
 
 test("a card's document id names its card, and no other document does", () => {
-  const id = cardId("0199-card")
+  const id = textCardId("0199-card")
   expect(cardIdOfDoc(cardDocId(id))).toBe(id)
   expect(cardIdOfDoc("card:")).toBeUndefined()
   expect(cardIdOfDoc("note:0199-card")).toBeUndefined()

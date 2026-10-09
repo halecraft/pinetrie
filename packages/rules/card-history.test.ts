@@ -5,14 +5,17 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
-  cardId,
   type EntryId,
   entryId,
   keyOf,
   PLAIN,
   type PlaceKey,
   rootIdFor,
+  type TextCard,
+  type TextPlace,
   type TraceRecord,
+  taskIdFor,
+  textCardId,
   threadIdFor,
   type WriterId,
   writerId,
@@ -30,53 +33,58 @@ import {
   verbOf,
 } from "./card-history.ts"
 
+const TEST_THREAD = threadIdFor("e")
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const LANE = threadIdFor("x")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const END = entryId("e-end")
-const C1 = cardId("c-1")
+const C1 = textCardId("c-1")
 const at = atEntry(entryId("e-1"))
 
 const DRAFTING: CardPlace = {
   kind: "note",
-  root: ROOT,
   at,
-  lane: LANE,
+  thread: LANE,
   cell: 0,
 }
 const QUEUED: CardPlace = {
   kind: "queued",
-  root: ROOT,
   at,
-  lane: LANE,
+  thread: LANE,
   order: "1",
   by: ADA,
   seen: "",
 }
 const PINNED: CardPlace = {
   kind: "pinned",
-  root: ROOT,
   at,
-  lane: LANE,
+  thread: LANE,
   order: "1",
 }
-const FRESH: CardPlace = { kind: "fresh", column: "k", root: ROOT, at }
+const FRESH: CardPlace = {
+  kind: "fresh",
+  column: "k",
+  root: ROOT,
+  task: TEST_TASK,
+  at,
+}
 const BEAS: CardPlace = { kind: "inventory", holder: BEA }
 const ADAS: CardPlace = { kind: "inventory", holder: ADA }
 const ELSEWHERE: CardPlace = {
   kind: "note",
-  root: ROOT,
   at: atEntry(entryId("e-2")),
-  lane: null,
+  thread: TEST_THREAD,
   cell: 0,
 }
 
 const card = (
-  place: CardPlace,
+  place: TextPlace,
   placer: WriterId = ADA,
-  over: Partial<CardRecord> = {},
-): CardRecord => ({
+  over: Partial<TextCard> = {},
+): TextCard => ({
+  kind: "text",
   id: C1,
   owner: ADA,
   place,
@@ -223,8 +231,8 @@ describe("planProvenance: traces", () => {
         for: ADA,
         card: C1,
         by: BEA,
-        from: { kind: "note", root: ROOT, at, lane: LANE, cell: 0 },
-        to: { kind: "queued", root: ROOT, at, lane: LANE, seen: "" },
+        from: { kind: "note", at, thread: LANE, cell: 0 },
+        to: { kind: "queued", at, thread: LANE, seen: "" },
         message: null,
         at: 7,
       },
@@ -290,8 +298,8 @@ describe("planProvenance: traces", () => {
       for: ADA,
       card: C1,
       by: BEA,
-      from: { kind: "note", root: ROOT, at, lane: LANE, cell: 0 },
-      to: { kind: "queued", root: ROOT, at, lane: LANE, seen: "" },
+      from: { kind: "note", at, thread: LANE, cell: 0 },
+      to: { kind: "queued", at, thread: LANE, seen: "" },
       message: null,
       at: 1,
     }
@@ -322,9 +330,9 @@ test.each([
     p === null
       ? null
       : p.kind === "queued"
-        ? { kind: "queued", root: p.root, at: p.at, lane: p.lane, seen: p.seen }
+        ? { kind: "queued", at: p.at, thread: p.thread, seen: p.seen }
         : p.kind === "pinned"
-          ? { kind: "pinned", root: p.root, at: p.at, lane: p.lane }
+          ? { kind: "pinned", at: p.at, thread: p.thread }
           : p
   expect(verbOf(key(from), key(to))).toBe(verb)
 })
@@ -336,8 +344,8 @@ describe("movedBackBy", () => {
       {
         kind: "moved",
         by,
-        from: { kind: "queued", root: ROOT, at, lane: LANE, seen: "" },
-        to: { kind: "note", root: ROOT, at, lane: LANE, cell: 0 },
+        from: { kind: "queued", at, thread: LANE, seen: "" },
+        to: { kind: "note", at, thread: LANE, cell: 0 },
         at: 1,
       },
     ],
@@ -359,13 +367,13 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
     for: ADA,
     card: C1,
     by: BEA,
-    from: { kind: "note", root: ROOT, at, lane: LANE, cell: 0 },
+    from: { kind: "note", at, thread: LANE, cell: 0 },
     to: null,
     message: null,
     at: when,
   })
   const now = TRACE_MAX_AGE_MS + 10
-  const gone = cardId("c-gone")
+  const gone = textCardId("c-gone")
   expect(
     planTraceSweep({
       traces: [trace("old", 1), trace("new", now)],
@@ -385,7 +393,7 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
 test("planGoneSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere", () => {
   const discarded: CardPlace = {
     kind: "gone",
-    root: ROOT,
+    task: TEST_TASK,
     by: ADA,
     why: { kind: "discarded" },
   }
@@ -397,9 +405,9 @@ test("planGoneSweep: a card discarded a week ago or more, or with no history to 
     at: when,
   })
   const now = GONE_KEEP_MS + 100
-  const old = cardId("c-old")
-  const fresh = cardId("c-fresh")
-  const silent = cardId("c-silent")
+  const old = textCardId("c-old")
+  const fresh = textCardId("c-fresh")
+  const silent = textCardId("c-silent")
   expect(
     planGoneSweep({
       cards: [

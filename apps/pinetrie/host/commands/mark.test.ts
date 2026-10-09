@@ -1,26 +1,42 @@
-import { entryId, writerId } from "@pinetrie/core"
+import { threadIdFor, writerId } from "@pinetrie/core"
 import { deleteRecord, MARK, setRecord } from "@pinetrie/rules"
-import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
-import { basics, putValue, ROOT_ID, record, row, writesOf } from "../fakes.ts"
+import {
+  basics,
+  putTask,
+  putValue,
+  record,
+  TASK_ID,
+  writesOf,
+} from "../fakes.ts"
 import { handleMark, type MarkDeps } from "./mark.ts"
 
-test("clearing a root's title removes its mark", async () => {
+test("clearing a task's title removes its mark (ADR-0116)", async () => {
   const b = basics()
-  const root = entryId("e-1")
   const ada = writerId("ada@example.com")
-  writeEntry(b.root, row(root, null))
+  putTask(b, threadIdFor("t"))
   putValue(
     b,
-    setRecord(MARK, { entry: root, title: "Plans", by: ada, at: 1 }, ROOT_ID),
+    setRecord(MARK, { task: TASK_ID, title: "Plans", by: ada, at: 1 }),
   )
   const scribe = record<MarkDeps["records"]>({ writeValues: async () => {} })
   const out = await handleMark({ basics: b, records: scribe.port }, ada, {
     kind: "mark",
-    root: ROOT_ID,
-    entry: root,
+    task: TASK_ID,
     title: null,
   })
   expect(out).toEqual({ kind: "marked" })
-  expect(writesOf(scribe.calls)).toEqual([deleteRecord(MARK, root, ROOT_ID)])
+  expect(writesOf(scribe.calls)).toEqual([deleteRecord(MARK, TASK_ID)])
+})
+
+test("a task the session does not hold takes no title", async () => {
+  const b = basics()
+  const scribe = record<MarkDeps["records"]>({ writeValues: async () => {} })
+  const out = await handleMark(
+    { basics: b, records: scribe.port },
+    writerId("ada@example.com"),
+    { kind: "mark", task: TASK_ID, title: "Plans" },
+  )
+  expect(out).toMatchObject({ kind: "refused", code: "unknown_target" })
+  expect(scribe.calls).toEqual([])
 })

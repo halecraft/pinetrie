@@ -1,16 +1,17 @@
-import { type CardRecord, cardId, writerId } from "@pinetrie/core"
+import { type TextCard, textCardId, writerId } from "@pinetrie/core"
 import { NO_INTENTS, type Slots, settleSlots } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import { inventoryView, slotKey } from "./inventory-view.ts"
 
 const ADA = writerId("ada@x.io")
-const A = cardId("c-a")
-const B = cardId("c-b")
+const A = textCardId("c-a")
+const B = textCardId("c-b")
 const slotsOf = (o: Record<string, string>): Slots =>
-  Object.fromEntries(Object.entries(o).map(([s, c]) => [s, cardId(c)]))
+  Object.fromEntries(Object.entries(o).map(([s, c]) => [s, textCardId(c)]))
 
 describe("inventoryView", () => {
-  const record = (id: typeof A): CardRecord => ({
+  const record = (id: typeof A): TextCard => ({
+    kind: "text",
     id,
     owner: ADA,
     placer: ADA,

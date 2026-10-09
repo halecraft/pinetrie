@@ -1,39 +1,39 @@
 import {
   atEntry,
-  cardId,
   entryId,
   type PlaceKey,
   rootIdFor,
   type TraceRecord,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { keptTraces, seenBatches, traceGroups, tracesAt } from "./traces.ts"
 
-const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const TEST_THREAD = threadIdFor("e")
+
+const _ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const CAL = writerId("cal@x.io")
 const HERE = entryId("e-here")
 const at = (id: string): PlaceKey => ({
   kind: "note",
-  root: ROOT,
   at: atEntry(entryId(id)),
-  lane: null,
+  thread: TEST_THREAD,
   cell: 0,
 })
 const queued: PlaceKey = {
   kind: "queued",
-  root: ROOT,
   at: atEntry(HERE),
-  lane: threadIdFor("x"),
+  thread: threadIdFor("x"),
   seen: "",
 }
 const trace = (over: Partial<TraceRecord>): TraceRecord => ({
   id: "t",
   for: ADA,
-  card: cardId("c-1"),
+  card: textCardId("c-1"),
   by: BEA,
   from: at("e-here"),
   to: queued,

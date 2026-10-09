@@ -13,7 +13,7 @@ import type {
   WorkflowState,
   WriterId,
 } from "@pinetrie/core"
-import { commandOf } from "@pinetrie/core"
+import { commandOf, isFact } from "@pinetrie/core"
 import { displayName, type PinnedStatus } from "@pinetrie/rules"
 import { reorderOf } from "./card-intents.ts"
 import {
@@ -158,7 +158,7 @@ const moveItems = (
       return [
         {
           to: "note",
-          act: { kind: "unqueue", card: id, lane: place.lane, by: place.by },
+          act: { kind: "unqueue", card: id, lane: place.thread, by: place.by },
         },
         pin,
         take,
@@ -167,8 +167,10 @@ const moveItems = (
       return [{ to: "note", act: { kind: "unpin", card: id } }, ...queue, take]
     case "fresh":
       return [take]
-    // Put is an inventory card's move, × discards it, and a drag moves it anywhere.
+    // Put is an inventory card's move, × discards it, and a drag moves it
+    // anywhere; a card on a canvas is no text card.
     case "inventory":
+    case "canvas":
     case "gone":
       return []
   }
@@ -187,7 +189,7 @@ const stateOf = (
   }
   if (tone === "pinned" && facts.pinned != null)
     return { kind: "pinned", status: facts.pinned }
-  return card.unsent === null
+  return card.kind !== "text" || card.unsent === null
     ? { kind: "none" }
     : { kind: "unsent", reason: card.unsent }
 }
@@ -227,7 +229,7 @@ export function cardFrame(
       moves: [],
       discards: false,
     }
-  const movable = !facts.readOnly && card.carries.kind !== "fact"
+  const movable = !facts.readOnly && !isFact(card)
   const among = facts.among ?? null
   return {
     tone,

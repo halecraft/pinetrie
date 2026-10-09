@@ -91,10 +91,9 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   has it.
 - **A write names its root**: `chat` and `mark` find it from the held
   document with the entry (`rootOf`), and a send at the root mints one
-  (`newRootId`); a card's place at an entry carries it. A queued card
-  takes its lane's root (`queueRoot`, in core), since the host pops it
-  into a chat in `place.root`; only a lane with no record yet falls back to
-  the card's own root.
+  (`newRootId`) and its task (`newTaskId`). A card's place at a thread
+  names its thread and no root (ADR-0116): the thread's record names the
+  root, which the host reads as it pops a queued card into a chat.
 
 ## Reads go through one index
 
@@ -173,14 +172,18 @@ function is proven by a unit test in a second.
 
 ## The sidebar and the layout (`layout.ts`, ADR-0029, ADR-0030, ADR-0122)
 
-The stored layout is `{ active, roots, newTabs, board }`, and
-`layoutReducer` is pure. `active` is a `Here`: a root (by its root entry: a
-thread started at the root is rooted at its first message, S30), a new tab,
-or nothing. The sidebar is not the layout's: it is your own document
-(`openThreads`, `@pinetrie/session`), keyed by `RootId`, which `App` maps to root
-entries through the directory and passes in as `LayoutFacts.list`.
-`summarizeRoots` and `rootWork` (`packages/core/roots.ts`) give the roots
-and each item's signals.
+The stored layout is `{ v: 7, active, tasks, newTabs, board }`, and
+`layoutReducer` is pure; an older version restores nothing. `active` is a
+`Here`: a task (ADR-0116), a new tab, or nothing. Each task's columns are
+kept by its `TaskId`, its first column at its first root's root entry
+(`columnsOf(layout, task, entry)`, `LayoutFacts.entries`). The sidebar is
+not the layout's: it is your own document (`openThreads`,
+`@pinetrie/session`), keyed by `TaskId`, which `App` passes in as
+`LayoutFacts.list`. `tasksOf` (`tasks.ts`) is the page's `Tasks`: the
+rules' `TaskIndex`, each task's threads, roots and first root entry
+(`byId`), and each root entry's task (`ofEntry`). In Phase 2 a task holds
+one root's threads, so an item's signals are still its root entry's
+(`summarizeRoots`, `rootWork`).
 
 - **`Layout.open` is drawn, never stored** (`drawnList`): the sidebar, less
   the archived roots but the one you are on, and the root you are on
@@ -196,11 +199,11 @@ and each item's signals.
   The session's repair deletes archived roots but the one the page reports
   it is on (`openThreads.here`), so a restore brings a root back only for
   whoever restores it.
-- **A root's label is `labelsOf`'s** (`root-label.ts`, ADR-0045, ADR-0074):
-  its title; else `CHAT_LABEL` for a root no lane works in, read from the
-  session's lane records, so a root only people wrote in needs no field of
-  its own; else its first line (`firstLinesOf`), from its directory record
-  (ADR-0063). `App` builds both maps once per directory change, and every
+- **A task's label is `labelsOf`'s** (`root-label.ts`, ADR-0045, ADR-0074,
+  ADR-0116): its title (its `MARK`); else, from its first root,
+  `CHAT_LABEL` for a root no lane works in, read from the session's lane
+  records, so a root only people wrote in needs no field of its own; else
+  its first line (`firstLinesOf`), from its directory record (ADR-0063). `App` builds both maps once per directory change, and every
   place that names a root looks one up: the sidebar, the board, the activity
   menu, the inbox. The first lines are also the rename field's placeholder:
   what clearing a title brings back.
@@ -233,8 +236,8 @@ and each item's signals.
   the root element, and the CSS sets `--side` from that, so the body's
   grid, the footer's corner and the board follow. Folded, `Sidebar` draws
   each item as `FoldedItem`: `sidebarView` decides its `ItemIcon` (a
-  sprite from `rootSprites`, else `initialsOf` its label on its root's slot
-  (`rootSlot`), which `Sidebar` draws in `slotColor`,
+  sprite from `rootSprites`, else `initialsOf` its label on a slot seeded
+  by its `TaskId` (`taskSlot`), which `Sidebar` draws in `slotColor`,
   else a new tab's hollow tile). The icon is the trigger of a `Menu` opened
   by `contextmenu` (`Popover`'s `opensOn`), whose click shows the root;
   the tooltip and the rename field are fixed to the window beside it, since
@@ -1068,9 +1071,11 @@ composer*).
   `releases`, which `queueWords` words "send all (n)"; else `keep`.
 - **A discard is a move to gone** (ADR-0111): the `discard` act (a card's
   ×, or Ctrl+Shift+Backspace in its box, `cardKeyAct`) and the inventory's
-  `discard` intent plan `planDiscard`: `discardedOf` the card's place, in
-  the history of the root you are on when the card is in none, so the undo
-  key there brings it back. The close ask's discard is the same move per
+  `discard` intent plan `planDiscard`: `DISCARDED`, which names no
+  task. The host names its history (ADR-0066, ADR-0116): the task the card
+  leaves, or for a card in your inventory the task you are on, which the
+  move carries (`here`, `taskOfTab`), so the undo key there brings it
+  back. The close ask's discard is the same move per
   card. The session keeps your accepted discard as a notice where you made
   it (`CardNotice`, `noticeWords`), as it keeps a refusal.
 - **A queued or pinned card moves one place** with its ↑ and ↓

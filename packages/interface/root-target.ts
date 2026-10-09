@@ -1,7 +1,7 @@
-// interface/root-target — where a root moves to, by drag or by key (ADR-0122).
-// Pure.
+// interface/root-target — where a task moves to, by drag or by key
+// (ADR-0122, ADR-0116). Pure.
 //
-// A root is dragged from the board or from the sidebar. A drop names a target
+// A task is dragged from the board or from the sidebar. A drop names a target
 // by the attributes the drop code marks it with (`rootDropProps`), and
 // `planRootDrop` turns it into an intent: on the board, the one a board
 // item's Move to ▸, Move up or Move down (`stepsIn`) sends; on the sidebar, a
@@ -9,23 +9,20 @@
 // lands is `landingIn`'s.
 
 import {
-  type EntryId,
-  entryId,
-  isRootId,
+  isTaskId,
   isWorkflowStateId,
-  type RootId,
+  type TaskId,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import type { Intent } from "./intent.ts"
 import { gapAt } from "./reorder.ts"
 
-/** The drag data type a root travels under, pinetrie's own; never a card's. */
+/** The drag data type a task travels under, pinetrie's own; never a card's. */
 export const ROOT_MIME = "application/x-pinetrie-root"
 
-/** A root being dragged: which, the state it is in, and where from. */
+/** A task being dragged: which, and the state it is in. */
 export interface RootDrag {
-  readonly root: RootId
-  readonly entry: EntryId
+  readonly task: TaskId
   readonly state: WorkflowStateId | null
 }
 
@@ -34,15 +31,15 @@ export type RootTarget =
   | {
       readonly kind: "state"
       readonly state: WorkflowStateId
-      readonly before: RootId | null
+      readonly before: TaskId | null
     }
   /** The sidebar: before `before`, or at its end. */
-  | { readonly kind: "list"; readonly before: EntryId | null }
+  | { readonly kind: "list"; readonly before: TaskId | null }
 
 const ROOT_STATE = "data-root-state"
 const ROOT_BEFORE = "data-root-before"
 const LIST_BEFORE = "data-list-before"
-/** What a list's end carries, where there is no root to go before. */
+/** What a list's end carries, where there is no task to go before. */
 const END = "end"
 
 const ROOT_GROUP = "data-root-group"
@@ -80,12 +77,13 @@ export function rootTargetOfElement(el: {
     return {
       kind: "state",
       state,
-      before: before !== null && isRootId(before) ? before : null,
+      before: before !== null && isTaskId(before) ? before : null,
     }
   }
   const list = el.getAttribute(LIST_BEFORE)
   if (list === null || list === "") return null
-  return { kind: "list", before: list === END ? null : entryId(list) }
+  if (list === END) return { kind: "list", before: null }
+  return isTaskId(list) ? { kind: "list", before: list } : null
 }
 
 /** Whether two targets are the same place. */
@@ -161,21 +159,20 @@ export function parseRootDrag(text: string): RootDrag | null {
     return null
   }
   if (typeof raw !== "object" || raw === null) return null
-  const { root, entry, state } = raw as Record<string, unknown>
-  if (typeof root !== "string" || !isRootId(root)) return null
-  if (typeof entry !== "string" || entry === "") return null
+  const { task, state } = raw as Record<string, unknown>
+  if (typeof task !== "string" || !isTaskId(task)) return null
   if (
     state !== null &&
     (typeof state !== "string" || !isWorkflowStateId(state))
   )
     return null
-  return { root, entry: entryId(entry), state }
+  return { task, state }
 }
 
 /**
  * What a drop of `drag` on `target` asks: a move on the board, for a state
  * other than its own or a place in it; a place in the sidebar. Null when it
- * would do nothing: a root dropped before itself, or on `home`, the place
+ * would do nothing: a task dropped before itself, or on `home`, the place
  * just after it where it was dragged from (null when not known).
  */
 export function planRootDrop(
@@ -186,13 +183,13 @@ export function planRootDrop(
 ): Intent | null {
   if (home !== null && sameTarget(target, home)) return null
   if (target.kind === "list")
-    return target.before === drag.entry
+    return target.before === drag.task
       ? null
-      : { kind: "moveInList", root: drag.entry, before: target.before }
-  if (drag.state === null || target.before === drag.root) return null
+      : { kind: "moveInList", task: drag.task, before: target.before }
+  if (drag.state === null || target.before === drag.task) return null
   return {
-    kind: "moveRoot",
-    root: drag.root,
+    kind: "moveTask",
+    task: drag.task,
     from: drag.state,
     to: target.state,
     before: target.before,

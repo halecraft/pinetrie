@@ -1,9 +1,9 @@
 import {
   atEntry,
-  cardId,
   ERR,
   entryId,
   type Intent,
+  textCardId,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -21,9 +21,11 @@ import {
   applyWrites,
   basics,
   NO_BLANK_CARDS,
+  putTask,
   putValue,
   ROOT_ID,
   record,
+  TASK_ID,
   threadRow,
   writeDirectory,
 } from "../fakes.ts"
@@ -32,6 +34,8 @@ import { applyPlaceSteps } from "../places.ts"
 import { createProvenance } from "../provenance.ts"
 import type { YourRepo } from "../work/index.ts"
 import { type CommandDeps, createCommands, placeOfCommand } from "./index.ts"
+
+const TEST_THREAD = threadIdFor("e")
 
 const ALICE = writerId("alice@example.com")
 const ROOT_ENTRY = entryId("e-1")
@@ -43,6 +47,8 @@ const THREAD = threadIdFor("root")
 
 /** The test's root in `state` on a board of Doing and Done (ADR-0122). */
 const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
+  // The task THREAD is in (ADR-0116), on the board.
+  putTask(b, THREAD)
   putValue(
     b,
     setRecord(WORKFLOW, {
@@ -52,7 +58,7 @@ const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
   )
   putValue(
     b,
-    setRecord(BOARD, { root: ROOT_ID, state, rank: "a", by: ALICE, at: 1 }),
+    setRecord(BOARD, { task: TASK_ID, state, rank: "a", by: ALICE, at: 1 }),
   )
 }
 
@@ -147,7 +153,7 @@ test.each([
   ["a squash", { kind: "offer", action: "squash" }, "repo"],
   ["a description again", { kind: "offer", action: "describe" }, "repo"],
   ["a publish", { kind: "publish" }, "repo"],
-  ["a move on the board", { kind: "move-root" }, "board"],
+  ["a move on the board", { kind: "move-task" }, "board"],
   ["a workflow edit", { kind: "workflow" }, "documents"],
   ["a chat", { kind: "chat" }, "documents"],
   ["a move", { kind: "move" }, "documents"],
@@ -193,8 +199,8 @@ test("a move into Done holds the keeper only for its place and its unload: a com
   })
   const archive = commands.handle(sender, ALICE, {
     id: "a-1",
-    kind: "move-root",
-    root: ROOT_ID,
+    kind: "move-task",
+    task: TASK_ID,
     text: JSON.stringify({ from: DOING, to: DONE, before: null }),
   })
   await new Promise(r => setTimeout(r, 5))
@@ -210,7 +216,7 @@ test("a move into Done holds the keeper only for its place and its unload: a com
   ])
   teardown.resolve()
   await archive
-  expect(replies.at(-1)).toMatchObject({ id: "a-1", outcome: "moved-root" })
+  expect(replies.at(-1)).toMatchObject({ id: "a-1", outcome: "moved-task" })
   expect(b.docs.loaded()).not.toContain(ROOT_ID)
 })
 
@@ -239,14 +245,14 @@ test("a chat command spends its card once written, record then text, answering w
       {
         kind: "write",
         record: {
-          id: cardId(id),
+          kind: "text" as const,
+          id: textCardId(id),
           owner: ALICE,
           placer: ALICE,
           place: {
             kind: "composing",
-            root: ROOT_ID,
             at: atEntry(ROOT_ENTRY),
-            lane: null,
+            thread: TEST_THREAD,
           },
           carries: { kind: "message", command: null },
           unsent: null,
@@ -261,10 +267,10 @@ test("a chat command spends its card once written, record then text, answering w
     cardId: "card-2",
   })
   expect(replies.map(r => [r.outcome, r.rev])).toEqual([
-    ["appended", 3],
+    ["appended", 4],
     ["refused", 0],
   ])
-  expect(readPlaces(b.places).map(c => c.id)).toEqual(["card-2"])
+  expect(readPlaces(b.places).map(c => c.id)).toEqual(["card-2", THREAD])
   expect(
     cards.calls.filter(c => c.method === "destroy").map(c => c.args[0]),
   ).toEqual(["card-1"])
@@ -284,7 +290,7 @@ test("a popped queued card in an archived root is refused, and the agent is neve
     base: null,
     state: null,
   })
-  expect(out).toMatchObject({ kind: "refused", code: ERR.ARCHIVED })
+  expect(out).toMatchObject({ kind: "refused", code: ERR.TASK_ARCHIVED })
   expect(pi.calls).toEqual([])
 })
 
@@ -323,19 +329,19 @@ test("a reservation is answered reserved, and refused for a lane pi holds (ADR-0
   await reserve("c-5", HELD)
   expect(replies.map(r => [r.id, r.outcome, r.errorCode])).toEqual([
     ["c-4", "reserved", ""],
-    ["c-5", "refused", "lane_id_in_use"],
+    ["c-5", "refused", "thread_taken"],
   ])
 })
 
-test("a retitle asks for its root's title as its sender, and answers retitling", async () => {
+test("a retitle asks for its task's title as its sender, and answers retitling", async () => {
   const { commands, replies, sender, titles } = setUp()
   await commands.handle(sender, ALICE, {
     id: "c-6",
     kind: "retitle",
-    root: ROOT_ID,
+    task: TASK_ID,
   } as never)
   expect(titles.calls.map(c => [c.method, ...c.args])).toEqual([
-    ["asked", ROOT_ID, ALICE],
+    ["asked", TASK_ID, ALICE],
   ])
   expect(replies.map(r => [r.id, r.outcome])).toEqual([["c-6", "retitling"]])
 })

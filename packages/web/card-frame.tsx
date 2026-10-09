@@ -10,7 +10,12 @@
 // (`card-editor.tsx`), so the frame's wrappers are the same with a card and
 // without one, and only the header's contents change.
 
-import type { CardId, CardRecord, WriterId } from "@pinetrie/core"
+import {
+  type CardId,
+  type CardRecord,
+  isTextCard,
+  type WriterId,
+} from "@pinetrie/core"
 import {
   CARD_MIME,
   type CardFaceView,
@@ -171,7 +176,9 @@ export function CardFrame(p: {
       </div>
       <div className="card-body">
         {p.children}
-        {history && card !== null && <CardHistory card={card.id} />}
+        {history && card !== null && isTextCard(card) && (
+          <CardHistory card={card.id} />
+        )}
       </div>
       <div className="card-foot">
         {view.tools.length > 0 && (

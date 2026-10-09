@@ -74,7 +74,7 @@ test("split_offer queues a split card by the person behind the run, once (ADR-00
   })
   expect(readPlaces(b.places)).toMatchObject([
     {
-      place: { kind: "queued", lane: LANE },
+      place: { kind: "queued", thread: LANE },
       carries: { kind: "message", command: "split" },
     },
   ])
@@ -97,7 +97,9 @@ test("a split asked as its run is stopped is popped by the run's end: its step c
   const asked = askSplit(LANE)
   let found: unknown[] = []
   await keeper.once(`drain:${LANE}`, async () => {
-    found = readPlaces(b.places).map(c => c.carries)
+    found = readPlaces(b.places).flatMap(c =>
+      c.kind === "text" ? [c.carries] : [],
+    )
   })
   expect(found).toEqual([{ kind: "message", command: "split" }])
   expect(await asked).toMatchObject({ text: SPLIT_QUEUED })

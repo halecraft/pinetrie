@@ -1,4 +1,10 @@
-import { movesDocId, rootDocId, rootIdFor, writerId } from "@pinetrie/core"
+import {
+  movesDocId,
+  rootDocId,
+  rootIdFor,
+  taskIdFor,
+  writerId,
+} from "@pinetrie/core"
 import { expect, test } from "vitest"
 import {
   HOST_PRINCIPAL,
@@ -50,7 +56,7 @@ test("mayWrite: the session, the places, now, every root and every stack of move
     PLACES_DOC_ID,
     LIVE_DOC_ID,
     rootDocId(rootIdFor("01a0ffd2-4e7a-71c8-a970-306fa07d7f09")),
-    movesDocId(ADA, rootIdFor("01a0ffd2-4e7a-71c8-a970-306fa07d7f09")),
+    movesDocId(ADA, taskIdFor("01a0ffd2-4e7a-71c8-a970-306fa07d7f09")),
   ]) {
     expect(mayWrite(doc, HOST_PRINCIPAL)).toBe(true)
     expect(mayWrite(doc, "ada@x.io")).toBe(false)

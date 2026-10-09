@@ -17,6 +17,8 @@ import {
   type EntryId,
   type RootId,
   rootOf,
+  type TaskId,
+  type ThreadId,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
@@ -24,6 +26,7 @@ import { placeEnd } from "@pinetrie/rules"
 import { needsCard } from "./card-state.ts"
 import { hereOfColumn, type Layout, unlisted } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
+import type { Tasks } from "./tasks.ts"
 
 /**
  * The cards that are yours, as the marks count them: those you own. Cards you
@@ -67,8 +70,8 @@ export interface CardMarks {
   /** Thread ends holding your message or a note of yours: dots on the rail. */
   readonly ends: ReadonlySet<EntryId>
   /**
-   * A root in `roots` is not in the sidebar and not archived: ▦ is marked
-   * (ADR-0122).
+   * A task holding a root in `roots` is not in the sidebar and not
+   * archived: ▦ is marked (ADR-0122).
    */
   readonly elsewhere: boolean
 }
@@ -79,8 +82,10 @@ export function cardMarks(input: {
   /** Cards that hold text (`holdsText`), by id. */
   readonly filled: ReadonlySet<CardId>
   readonly layout: Layout
-  /** Roots in the archive (ADR-0029, ADR-0122), by root entry. */
-  readonly archived: ReadonlySet<EntryId>
+  /** Tasks in the archive (ADR-0029, ADR-0122). */
+  readonly archived: ReadonlySet<TaskId>
+  /** Every task: a fresh card marks its task's first root, and ▦ counts tasks. */
+  readonly tasks: Tasks
   readonly index: TreeIndex
   /**
    * Each root's root entry, by its id, from the directory: a message or a
@@ -89,6 +94,10 @@ export function cardMarks(input: {
   readonly rootEntries: ReadonlyMap<RootId, EntryId>
 }): CardMarks {
   const roots = new Set<EntryId>()
+  const rootEntryOf = (thread: ThreadId) => {
+    const root = input.tasks.index.rootOfThread.get(thread)
+    return root === undefined ? undefined : input.rootEntries.get(root)
+  }
   const newTabs = new Set<string>()
   const ends = new Set<EntryId>()
   for (const card of input.mine) {
@@ -99,7 +108,7 @@ export function cardMarks(input: {
         const end = placeEnd(card.place, input.index)
         const root =
           (end === null ? null : rootOf(input.index, end)) ??
-          input.rootEntries.get(card.place.root) ??
+          rootEntryOf(card.place.thread) ??
           null
         if (root === null) break
         if (end !== null) ends.add(end)
@@ -111,14 +120,18 @@ export function cardMarks(input: {
         // browser tab, and is marked nowhere here.
         const tab = hereOfColumn(input.layout, card.place.column)
         if (tab?.kind === "new") newTabs.add(tab.key)
-        if (tab?.kind === "root") roots.add(tab.root)
+        if (tab?.kind === "task") {
+          const entry = input.tasks.byId.get(tab.task)?.entry ?? null
+          if (entry !== null) roots.add(entry)
+        }
         break
       }
-      // The inventory is no tab, and a pinned card is a thread's direction,
-      // not unsent work (ADR-0048).
+      // The inventory is no tab, a pinned card is a thread's direction, not
+      // unsent work (ADR-0048), and a canvas holds no text card.
       case "queued":
       case "pinned":
       case "inventory":
+      case "canvas":
       case "gone":
         break
     }
@@ -127,6 +140,14 @@ export function cardMarks(input: {
     roots,
     newTabs,
     ends,
-    elsewhere: unlisted(input.layout, input.archived, roots).length > 0,
+    elsewhere:
+      unlisted(
+        input.layout,
+        input.archived,
+        [...roots].flatMap(r => {
+          const task = input.tasks.ofEntry.get(r)
+          return task === undefined ? [] : [task]
+        }),
+      ).length > 0,
   }
 }

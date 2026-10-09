@@ -2,10 +2,9 @@ import { createInMemoryStore, Exchange } from "@kyneta/exchange"
 import { batch, createDocAs, exportEntirety, merge } from "@kyneta/schema"
 import {
   atEntry,
-  type CardRecord,
-  cardId,
   entryId,
-  rootIdFor,
+  type TextCard,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -20,7 +19,7 @@ function setUp() {
   const store = createInMemoryStore()
   const exchange = new Exchange({ principal: "pinetrie-host", store })
   const cards = startCards({ exchange, store, session: newSessionDoc() })
-  const id = cardId("c-1")
+  const id = textCardId("c-1")
   const ada = createDocAs("0f3c9a2b7d1e4f60a8b9c0d1e2f3a4b5", TextDoc)
   batch(ada, d => d.text.insert(0, "ship it"))
   const arrive = () =>
@@ -57,15 +56,15 @@ test("an aborted whenHolds resolves, and a signal aborted first resolves at once
 
 test("blankQueued: a queued card made empty is blank; one queued with text is not, before its text arrives or after (ADR-0113)", async () => {
   const { cards, id, seen, arrive } = setUp()
-  const queuedAs = (card: string, s: string): CardRecord => ({
-    id: cardId(card),
+  const queuedAs = (card: string, s: string): TextCard => ({
+    kind: "text",
+    id: textCardId(card),
     owner: ADA,
     placer: ADA,
     place: {
       kind: "queued",
-      root: rootIdFor("01a0ffd2-0000-7000-8000-00000000000a"),
       at: atEntry(entryId("e-1")),
-      lane: threadIdFor("x"),
+      thread: threadIdFor("x"),
       order: "a",
       by: ADA,
       seen: s,
@@ -74,7 +73,7 @@ test("blankQueued: a queued card made empty is blank; one queued with text is no
     unsent: null,
   })
   const queue = [queuedAs("c-0", ""), queuedAs(id, seen)]
-  expect([...(await cards.blankQueued(queue))]).toEqual([cardId("c-0")])
+  expect([...(await cards.blankQueued(queue))]).toEqual([textCardId("c-0")])
   arrive()
-  expect([...(await cards.blankQueued(queue))]).toEqual([cardId("c-0")])
+  expect([...(await cards.blankQueued(queue))]).toEqual([textCardId("c-0")])
 })

@@ -2,10 +2,10 @@ import {
   type BoardPlace,
   type EntryId,
   entryId,
-  type RootId,
   type RootSummary,
   type RootWork,
-  rootIdFor,
+  type TaskId,
+  taskIdFor,
   threadIdFor,
   type Workflow,
   type WriterId,
@@ -32,9 +32,9 @@ import {
   parseSearch,
   readyWords,
   removeWords,
-  rootsWords,
   searchWords,
   stateWords,
+  tasksWords,
 } from "./board-view.ts"
 import type { KeyLike } from "./inventory-keys.ts"
 import { threadCardHeads } from "./thread-card.ts"
@@ -53,12 +53,13 @@ const WORKFLOW: Workflow = {
   ],
   archive: { id: DONE, name: "Done" },
 }
+/** Task `n`, holding task `n`'s threads (ADR-0116). */
 const ID = (n: number) =>
-  rootIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
+  taskIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
 const E = (n: number) => entryId(`${n}-r`)
 const keys = orderKeys(4)
 const place = (n: number, state: typeof DOING, rank = 0): BoardPlace => ({
-  root: ID(n),
+  task: ID(n),
   state,
   rank: keys[rank] ?? "",
   by: ADA,
@@ -94,11 +95,9 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
         place(3, BACKLOG),
         place(4, DONE),
         place(5, DONE, 1),
-      ].map(p => [p.root, p]),
+      ].map(p => [p.task, p]),
     ),
-    rootEntries: new Map<RootId, EntryId>(
-      [1, 2, 3, 4, 5].map(n => [ID(n), E(n)]),
-    ),
+    entries: new Map<TaskId, EntryId>([1, 2, 3, 4, 5].map(n => [ID(n), E(n)])),
     summaries: [
       summary(1, [ADA], "1"),
       summary(2, [BEA], "2"),
@@ -119,25 +118,26 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
     lines: new Map([[E(5), "can we try warmer colours?"]]),
     ...over,
   }
-  const board = boardOf(f.workflow, f.places, f.rootEntries.keys())
+  const board = boardOf(f.workflow, f.places, f.entries.keys())
+  const taskOf = new Map([...f.entries].map(([t, e]) => [e, t] as const))
   return {
     workflow: f.workflow,
     places: f.places,
-    rootEntries: f.rootEntries,
+    entries: f.entries,
     summaries: f.summaries,
     search: f.search,
     me: f.me,
     lines: f.lines,
-    heads: threadCardHeads(f.rootEntries.values(), {
+    heads: threadCardHeads(f.entries.keys(), {
       workflow: f.workflow,
-      rootIds: new Map([...f.rootEntries].map(([id, e]) => [e, id])),
-      stateOf: new Map(
-        [...f.rootEntries].flatMap(([id, e]) => {
-          const state = board.stateOf.get(id)
-          return state === undefined ? [] : [[e, state] as const]
+      entries: f.entries,
+      stateOf: board.stateOf,
+      labels: new Map(
+        [...f.labels].flatMap(([e, label]) => {
+          const task = taskOf.get(e)
+          return task === undefined ? [] : [[task, label] as const]
         }),
       ),
-      labels: f.labels,
       status: f.status,
       pips: f.cardRoots,
       offered: f.ready,
@@ -171,7 +171,7 @@ describe("boardView", () => {
     ])
   })
 
-  test("an item holds your card exactly when its root does; ＋ on a column lands in its state", () => {
+  test("an item holds your card exactly when its task does; ＋ on a column lands in its state", () => {
     const view = boardView(input({ cardRoots: new Set([E(1)]) }))
     const doing = view.open[1]
     expect(doing?.items.map(t => t.pip)).toEqual([false, true])
@@ -182,7 +182,7 @@ describe("boardView", () => {
     })
   })
 
-  test("a column's mark and the strip's are its roots' highest; the archive has none", () => {
+  test("a column's mark and the strip's are its tasks' highest; the archive has none", () => {
     const item = {
       lane: threadIdFor("a"),
       root: E(1),
@@ -228,8 +228,8 @@ describe("boardView", () => {
 
   test("stateWords and readyWords: what a state's ◌ and ⇡ and an item's ⇡ say", () => {
     expect(stateWords({ working: 1, ready: 2 })).toEqual({
-      working: "the agent is working in 1 root",
-      ready: "2 roots with work ready to accept",
+      working: "the agent is working in 1 task",
+      ready: "2 tasks with work ready to accept",
     })
     expect(readyWords(["amber-fox", "cozy-mallard"])).toBe(
       "ready to accept: amber-fox, cozy-mallard",
@@ -244,8 +244,8 @@ describe("boardView", () => {
       ["Done", true, "running"],
     ])
     expect(first?.moves[1]?.intent).toEqual({
-      kind: "moveRoot",
-      root: ID(2),
+      kind: "moveTask",
+      task: ID(2),
       from: DOING,
       to: DONE,
       before: null,
@@ -257,16 +257,16 @@ describe("boardView", () => {
     const [first, second] = boardView(input()).open[1]?.items ?? []
     expect(first?.up).toBeNull()
     expect(first?.down).toEqual({
-      kind: "moveRoot",
-      root: ID(2),
+      kind: "moveTask",
+      task: ID(2),
       from: DOING,
       to: DOING,
       before: null,
       closes: false,
     })
     expect(second?.up).toEqual({
-      kind: "moveRoot",
-      root: ID(1),
+      kind: "moveTask",
+      task: ID(1),
       from: DOING,
       to: DOING,
       before: ID(2),
@@ -275,7 +275,7 @@ describe("boardView", () => {
     expect(second?.down).toBeNull()
   })
 
-  test("a column moves left or right one place; one holding a root, or the only open one, says why it cannot be removed", () => {
+  test("a column moves left or right one place; one holding a task, or the only open one, says why it cannot be removed", () => {
     const [backlog, doing] = boardView(input()).open
     expect(backlog?.left).toBeNull()
     expect(backlog?.right).toEqual({
@@ -289,10 +289,10 @@ describe("boardView", () => {
     expect(doing?.right).toBeNull()
     expect(backlog?.addBefore).toEqual({ left: BACKLOG, right: DOING })
     expect(doing?.addBefore).toEqual({ left: DOING, right: null })
-    expect(backlog?.remove.why).toBe("holds a root: move it first")
+    expect(backlog?.remove.why).toBe("holds a task: move it first")
     expect(removeWords(0, 1)).toBe("the board needs one open state")
     expect(removeWords(0, 2)).toBeNull()
-    expect(removeWords(3, 2)).toBe("holds 3 roots: move them first")
+    expect(removeWords(3, 2)).toBe("holds 3 tasks: move them first")
   })
 })
 
@@ -324,24 +324,24 @@ describe("the board's search (ADR-0109)", () => {
   const find = (query: string, mine = false) => ({
     search: parseSearch(query, mine),
   })
-  test("with none, every root shows, the archive's newest first, and every count is of all", () => {
+  test("with none, every task shows, the archive's newest first, and every count is of all", () => {
     expect(kept({})).toEqual([[E(3)], [E(2), E(1)], [E(5), E(4)]])
     const view = boardView(input())
     expect(view.shown).toEqual({ kind: "all", total: 5 })
     expect(view.open.map(c => c.count.kind)).toEqual(["all", "all"])
   })
-  test("it keeps, in every state and in place, the roots whose label holds every word, case-insensitively, in any order (labels, not messages: ADR-0063)", () => {
+  test("it keeps, in every state and in place, the tasks whose label holds every word, case-insensitively, in any order (labels, not messages: ADR-0063)", () => {
     expect(kept(find("SEARCH"))).toEqual([[E(3)], [E(1)], [E(5)]])
     expect(kept(find(" design  board "))).toEqual([[], [E(1)], []])
     expect(kept(find("board nothing"))).toEqual([[], [], []])
     expect(kept(find("sqlite"))).toEqual([[], [], [E(4)]])
   })
-  test("mine keeps the roots you wrote in, in every state", () => {
+  test("mine keeps the tasks you wrote in, in every state", () => {
     expect(kept(find("", true))).toEqual([[E(3)], [E(1)], [E(4)]])
     expect(kept({ ...find("", true), me: BEA })).toEqual([[], [E(2)], [E(5)]])
     expect(kept(find("palette", true))).toEqual([[], [], []])
   })
-  test("a filtered head counts what it shows; its mark, Remove and the strip count every root", () => {
+  test("a filtered head counts what it shows; its mark, Remove and the strip count every task", () => {
     const status = new Map<EntryId, Status>([
       [E(1), { kind: "working" }],
       [E(2), { kind: "working" }],
@@ -379,7 +379,7 @@ describe("the board's search (ADR-0109)", () => {
       [2, 0, 0],
     ])
   })
-  test("Move up and Move down step among the items shown, and only shown roots have cards", () => {
+  test("Move up and Move down step among the items shown, and only shown tasks have cards", () => {
     const view = boardView(input({ labels, ...find("board") }))
     const [only, ...rest] = view.open[1]?.items ?? []
     expect([only?.up, only?.down, rest]).toEqual([null, null, []])
@@ -463,34 +463,34 @@ describe("board words", () => {
   ) => ({ kind: "filtered" as const, search: { words, mine }, kept, total })
   // Named by the words, so a mutant that changes them fails its own test.
   const said: readonly (readonly [string, string])[] = [
-    [rootsWords(1), "1 root"],
-    [rootsWords(41), "41 roots"],
+    [tasksWords(1), "1 task"],
+    [tasksWords(41), "41 tasks"],
     [keptWords({ kind: "kept", kept: 12, total: 96 }), "12 of 96"],
     [keptWords({ kind: "kept", kept: 96, total: 96 }), "96 of 96"],
     [keptWords({ kind: "all", total: 96 }), "96"],
-    [searchWords(1), "search 1 root…"],
-    [searchWords(140), "search 140 roots…"],
+    [searchWords(1), "search 1 task…"],
+    [searchWords(140), "search 140 tasks…"],
     [
       filterWords(filtered(["parser"], true, 14, 140)),
-      'Filtered by "parser" and mine: 14 of 140 roots',
+      'Filtered by "parser" and mine: 14 of 140 tasks',
     ],
     [
       filterWords(filtered(["parser", "plan"], false, 1, 140)),
-      'Filtered by "parser plan": 1 of 140 roots',
+      'Filtered by "parser plan": 1 of 140 tasks',
     ],
     [
       filterWords(filtered([], true, 3, 140)),
-      "Filtered to roots you wrote in: 3 of 140 roots",
+      "Filtered to tasks you wrote in: 3 of 140 tasks",
     ],
     [
       filterWords(filtered(["parser"], false, 0, 140)),
-      'No roots match "parser"',
+      'No tasks match "parser"',
     ],
     [
       filterWords(filtered(["parser"], true, 0, 140)),
-      'No roots you wrote in match "parser"',
+      'No tasks you wrote in match "parser"',
     ],
-    [filterWords(filtered([], true, 0, 1)), "You wrote in none of 1 root"],
+    [filterWords(filtered([], true, 0, 1)), "You wrote in none of 1 task"],
     [
       filterTitle({ words: ["parser"], mine: true }),
       'filtered: "parser", mine',

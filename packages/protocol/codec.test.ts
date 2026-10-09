@@ -7,16 +7,18 @@
 import assert from "node:assert/strict"
 import {
   atEntry,
-  cardId,
   commitId,
   ERR,
   entryId,
+  type Intent,
   type Move,
   ROOT,
   rootIdFor,
   runId,
   type Sha256,
   THE_AGENT,
+  taskIdFor,
+  textCardId,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -34,8 +36,12 @@ import {
   type Outcome,
   revOfReply,
 } from "./codec.ts"
+import { Command } from "./line.ts"
 import { command, EMPTY_COMMAND, OUTCOME_KINDS, reply } from "./messages.ts"
 
+const NEW_TASK = taskIdFor("01a0ffd2-4e7a-71c8-a970-306fa07d7f0a")
+const TEST_THREAD = threadIdFor("e")
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const TEST_ROOT = rootIdFor("test-root")
 const NEW_ROOT = rootIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
 
@@ -56,12 +62,14 @@ test('decode: parentId "" is the root, where only a branch starts a thread', () 
     parentId: "",
     root: NEW_ROOT,
     mode: "branch",
+    task: NEW_TASK,
     lane: NEW_THREAD,
   })
   assert.deepEqual(branch.kind === "chat" ? branch.at : null, {
     kind: "branch",
     thread: NEW_THREAD,
     at: null,
+    task: NEW_TASK,
   })
   assert.equal(
     refusalCode(
@@ -101,6 +109,7 @@ test("decode: a chat names its root (ADR-0063): a new one, minted, at the root; 
       parentId,
       root,
       mode: "branch",
+      task: NEW_TASK,
       lane: NEW_THREAD,
     })
   assert.equal(at("", NEW_ROOT).kind, "chat")
@@ -181,7 +190,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "chat",
       text: "hi @agent",
       root: NEW_ROOT,
-      at: { kind: "branch", thread: NEW_THREAD, at: null },
+      at: { kind: "branch", thread: NEW_THREAD, at: null, task: NEW_TASK },
       asksAgent: true,
       mentions: [{ kind: "agent", agent: THE_AGENT }],
       card: null,
@@ -196,10 +205,10 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       at: { kind: "end", thread: threadIdFor("abc"), seen: entryId("e-5") },
       asksAgent: false,
       mentions: [{ kind: "person", name: "bob" }],
-      card: { id: cardId("c-7"), seen: "v-1" },
+      card: { id: textCardId("c-7"), seen: "v-1" },
       pinned: [
-        { id: cardId("c-8"), seen: "v-2" },
-        { id: cardId("c-9"), seen: "" },
+        { id: textCardId("c-8"), seen: "v-2" },
+        { id: textCardId("c-9"), seen: "" },
       ],
       base: null,
       state: null,
@@ -208,7 +217,12 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "chat",
       text: "aside",
       root: TEST_ROOT,
-      at: { kind: "branch", thread: NEW_THREAD, at: entryId("e-3") },
+      at: {
+        kind: "branch",
+        thread: NEW_THREAD,
+        at: entryId("e-3"),
+        task: NEW_TASK,
+      },
       asksAgent: false,
       mentions: [],
       card: null,
@@ -222,18 +236,18 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "stop", lane: threadIdFor("abc") },
     { kind: "carry-on", lane: threadIdFor("abc") },
     {
-      kind: "move-root",
-      root: TEST_ROOT,
+      kind: "move-task",
+      task: TEST_TASK,
       from: workflowStateIdFor("a"),
       to: workflowStateIdFor("b"),
       before: null,
     },
     {
-      kind: "move-root",
-      root: TEST_ROOT,
+      kind: "move-task",
+      task: TEST_TASK,
       from: workflowStateIdFor("a"),
       to: workflowStateIdFor("a"),
-      before: NEW_ROOT,
+      before: NEW_TASK,
     },
     {
       kind: "workflow",
@@ -250,12 +264,11 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     {
       kind: "mark",
-      root: TEST_ROOT,
-      entry: entryId("e-1"),
+      task: TEST_TASK,
       title: "Tab names",
     },
-    { kind: "mark", root: TEST_ROOT, entry: entryId("e-1"), title: null },
-    { kind: "retitle", root: TEST_ROOT },
+    { kind: "mark", task: TEST_TASK, title: null },
+    { kind: "retitle", task: TEST_TASK },
     {
       kind: "offer",
       lane: threadIdFor("abc"),
@@ -284,27 +297,32 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "move",
       moves: [
         {
-          card: cardId("c-7"),
+          card: textCardId("c-7"),
           from: null,
-          to: { kind: "fresh", column: "k-1", root: TEST_ROOT, at: ROOT },
+          to: {
+            kind: "fresh",
+            column: "k-1",
+            root: TEST_ROOT,
+            task: TEST_TASK,
+            at: ROOT,
+          },
         },
       ],
+      here: null,
     },
     {
       kind: "queue-card",
       move: {
-        card: cardId("c-7"),
+        card: textCardId("c-7"),
         from: {
           kind: "composing",
-          root: TEST_ROOT,
           at: atEntry(entryId("e-5")),
-          lane: threadIdFor("abc"),
+          thread: threadIdFor("abc"),
         },
         to: {
           kind: "queued",
-          root: TEST_ROOT,
           at: atEntry(entryId("e-5")),
-          lane: threadIdFor("abc"),
+          thread: threadIdFor("abc"),
           seen: "v-2",
         },
       },
@@ -314,13 +332,12 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "queue-card",
       move: {
-        card: cardId("c-8"),
+        card: textCardId("c-8"),
         from: null,
         to: {
           kind: "queued",
-          root: TEST_ROOT,
           at: atEntry(entryId("e-5")),
-          lane: threadIdFor("abc"),
+          thread: threadIdFor("abc"),
           seen: "",
         },
       },
@@ -331,30 +348,29 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "move",
       moves: [
         {
-          card: cardId("c-7"),
+          card: textCardId("c-7"),
           from: {
             kind: "composing",
-            root: TEST_ROOT,
             at: atEntry(entryId("e-5")),
-            lane: null,
+            thread: TEST_THREAD,
           },
-          to: { kind: "gone", root: TEST_ROOT, why: { kind: "discarded" } },
+          to: { kind: "gone", why: { kind: "discarded" } },
         },
         {
-          card: cardId("c-8"),
+          card: textCardId("c-8"),
           from: { kind: "inventory", holder: writerId("ada@example.com") },
-          to: { kind: "gone", root: null, why: { kind: "discarded" } },
+          to: { kind: "gone", why: { kind: "discarded" } },
         },
       ],
+      here: TEST_TASK,
     },
     {
       kind: "spin-off",
       move: {
-        card: cardId("c-9"),
+        card: textCardId("c-9"),
         from: { kind: "inventory", holder: writerId("ada@example.com") },
         to: {
           kind: "gone",
-          root: TEST_ROOT,
           why: {
             kind: "spun",
             into: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
@@ -362,32 +378,52 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
           },
         },
       },
+      task: NEW_TASK,
       state: null,
+      here: TEST_TASK,
     },
     {
       kind: "move",
       moves: [
         {
-          card: cardId("c-7"),
-          from: { kind: "fresh", column: "k-1", root: TEST_ROOT, at: ROOT },
+          card: textCardId("c-7"),
+          from: {
+            kind: "fresh",
+            column: "k-1",
+            root: TEST_ROOT,
+            task: TEST_TASK,
+            at: ROOT,
+          },
           to: { kind: "inventory", holder: writerId("ada@example.com") },
         },
       ],
+      here: null,
     },
     {
       kind: "move",
       moves: ["c-7", "c-8"].map(
         (id): Move => ({
-          card: cardId(id),
-          from: { kind: "fresh", column: "k-1", root: TEST_ROOT, at: ROOT },
+          card: textCardId(id),
+          from: {
+            kind: "fresh",
+            column: "k-1",
+            root: TEST_ROOT,
+            task: TEST_TASK,
+            at: ROOT,
+          },
           to: { kind: "inventory", holder: writerId("ada@example.com") },
         }),
       ),
+      here: null,
     },
-    { kind: "undo-move", root: TEST_ROOT, direction: "undo" },
-    { kind: "undo-move", root: TEST_ROOT, direction: "redo" },
-    { kind: "set-command", card: cardId("c-7"), command: "bring-up-to-date" },
-    { kind: "set-command", card: cardId("c-7"), command: null },
+    { kind: "undo-move", task: TEST_TASK, direction: "undo" },
+    { kind: "undo-move", task: TEST_TASK, direction: "redo" },
+    {
+      kind: "set-command",
+      card: textCardId("c-7"),
+      command: "bring-up-to-date",
+    },
+    { kind: "set-command", card: textCardId("c-7"), command: null },
     { kind: "traces-seen", traces: ["t-1", "t-2"] },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: true },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: false },
@@ -395,33 +431,31 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "reorder",
       reorder: {
-        card: cardId("c-7"),
+        card: textCardId("c-7"),
         at: {
           kind: "queued",
-          root: TEST_ROOT,
           at: atEntry(entryId("e-1")),
-          lane: threadIdFor("abc"),
+          thread: threadIdFor("abc"),
           seen: "v1",
         },
-        after: cardId("c-6"),
+        after: textCardId("c-6"),
         before: null,
       },
     },
     {
       kind: "reorder",
       reorder: {
-        card: cardId("c-7"),
+        card: textCardId("c-7"),
         at: {
           kind: "pinned",
-          root: TEST_ROOT,
           at: atEntry(entryId("e-1")),
-          lane: null,
+          thread: TEST_THREAD,
         },
         after: null,
-        before: cardId("c-8"),
+        before: textCardId("c-8"),
       },
     },
-  ] as const
+  ] as const satisfies readonly Intent[]
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
   }
@@ -496,7 +530,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "named" },
     { kind: "pictured" },
     { kind: "stopped" },
-    { kind: "moved-root" },
+    { kind: "moved-task" },
     { kind: "workflow-changed" },
     { kind: "marked" },
     { kind: "retitling" },
@@ -513,17 +547,29 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
       kind: "undone",
       cards: [
         {
-          card: cardId("c-1"),
-          place: { kind: "fresh", column: "k-1", root: TEST_ROOT, at: ROOT },
+          card: textCardId("c-1"),
+          place: {
+            kind: "fresh",
+            column: "k-1",
+            root: TEST_ROOT,
+            task: TEST_TASK,
+            at: ROOT,
+          },
         },
-        { card: cardId("c-2"), place: null },
+        { card: textCardId("c-2"), place: null },
       ],
     },
     { kind: "nothing" },
     {
       kind: "unmoved",
       code: "moved",
-      place: { kind: "fresh", column: "k-1", root: TEST_ROOT, at: ROOT },
+      place: {
+        kind: "fresh",
+        column: "k-1",
+        root: TEST_ROOT,
+        task: TEST_TASK,
+        at: ROOT,
+      },
       by: writerId("bea@example.com"),
     },
     { kind: "unmoved", code: "gone", place: null, by: null },
@@ -535,8 +581,8 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
       by: writerId("bea@example.com"),
     },
     { kind: "unmoved", code: "full", place: null, by: null },
-    { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },
-    { kind: "refused", code: ERR.ROOT_BUSY, message: "busy" },
+    { kind: "refused", code: ERR.TASK_ARCHIVED, message: "archived by Bea" },
+    { kind: "refused", code: ERR.TASK_BUSY, message: "busy" },
     { kind: "failed", message: "writeValues is not in this port" },
   ]
   for (const outcome of outcomes) {
@@ -555,9 +601,8 @@ test("a note's key carries its cell, and none as none (ADR-0113)", () => {
   for (const cell of [3, null]) {
     const note = {
       kind: "note",
-      root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
-      lane: null,
+      thread: TEST_THREAD,
       cell,
     } as const
     assert.deepEqual(decodeKey(encodeKey(note)), note)
@@ -578,25 +623,26 @@ test('decodeKey: "" is none; anything malformed is undefined', () => {
     kind: "fresh",
     column: "k",
     root: TEST_ROOT,
+    task: TEST_TASK,
     at: ROOT,
   } as const
   assert.deepEqual(decodeKey(encodeKey(fresh)), fresh)
   const pinned = {
     kind: "pinned",
-    root: TEST_ROOT,
     at: atEntry(entryId("e-1")),
-    lane: threadIdFor("x"),
+    thread: threadIdFor("x"),
   } as const
   assert.deepEqual(decodeKey(encodeKey(pinned)), pinned)
   // A fresh key with no root names no place the host can record.
   assert.equal(decodeKey('{"kind":"fresh","column":"k"}'), undefined)
 })
 
-test("decode: a move needs its cards, each with a place; set-command a known command; an undo a root and a direction", () => {
+test("decode: a move needs its cards, each with a place, and its sender's task a task or none; set-command a known command; an undo a root and a direction", () => {
   const fresh = {
     kind: "fresh",
     column: "k",
     root: TEST_ROOT,
+    task: TEST_TASK,
     at: ROOT,
   } as const
   for (const wire of [
@@ -611,9 +657,14 @@ test("decode: a move needs its cards, each with a place; set-command a known com
     {
       kind: "move",
       moves: encodeMoves([
-        { card: cardId("c-1"), from: null, to: fresh },
-        { card: cardId("c-2"), from: null, to: null as never },
+        { card: textCardId("c-1"), from: null, to: fresh },
+        { card: textCardId("c-2"), from: null, to: null as never },
       ]),
+    },
+    {
+      kind: "move",
+      moves: encodeMoves([{ card: textCardId("c-1"), from: null, to: fresh }]),
+      here: "r-not-a-task",
     },
     { kind: "set-command", cardId: "c-1", mode: "pull" },
     { kind: "set-command", cardId: "" },
@@ -648,21 +699,37 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
 test("decode: a spin-off names one move, into a new thread, and a known state or none (ADR-0111)", () => {
   const spunTo = {
     kind: "spun",
-    root: TEST_ROOT,
+    task: TEST_TASK,
     column: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
     lane: NEW_THREAD,
   }
   const from = { kind: "inventory", holder: "ada@example.com" }
   const moves = (to: unknown) => JSON.stringify([{ card: "c-1", from, to }])
   assert.equal(
-    decodeCommand({ kind: "spin-off", moves: moves(spunTo) }).kind,
+    decodeCommand({ kind: "spin-off", moves: moves(spunTo), task: NEW_TASK })
+      .kind,
     "spin-off",
   )
   for (const wire of [
-    { kind: "spin-off", moves: moves({ ...spunTo, kind: "discarded" }) },
-    { kind: "spin-off", moves: moves({ ...spunTo, column: "" }) },
-    { kind: "spin-off", moves: moves({ ...spunTo, lane: "" }) },
-    { kind: "spin-off", moves: moves(spunTo), state: "not a state" },
+    {
+      kind: "spin-off",
+      moves: moves({ ...spunTo, kind: "discarded" }),
+      task: NEW_TASK,
+    },
+    {
+      kind: "spin-off",
+      moves: moves({ ...spunTo, column: "" }),
+      task: NEW_TASK,
+    },
+    { kind: "spin-off", moves: moves({ ...spunTo, lane: "" }), task: NEW_TASK },
+    {
+      kind: "spin-off",
+      moves: moves(spunTo),
+      state: "not a state",
+      task: NEW_TASK,
+    },
+    // A spin-off starts a new task, under the id its tab minted.
+    { kind: "spin-off", moves: moves(spunTo), task: "" },
   ])
     assert.equal(decodeCommand(wire).kind, "refused")
 })
@@ -670,7 +737,6 @@ test("decode: a spin-off names one move, into a new thread, and a known state or
 test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", () => {
   const queued = {
     kind: "queued",
-    root: TEST_ROOT,
     at: "e-1",
     lane: threadIdFor("abc"),
     seen: "",
@@ -698,9 +764,9 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
   const moved = encodeIntent("c", {
     kind: "queue-card",
     move: {
-      card: cardId("c-1"),
-      from: { kind: "composing", root: TEST_ROOT, at, lane },
-      to: { kind: "queued", root: TEST_ROOT, at, lane, seen: "" },
+      card: textCardId("c-1"),
+      from: { kind: "composing", at, thread: lane },
+      to: { kind: "queued", at, thread: lane, seen: "" },
     },
     hold: "keep",
     command: "split",
@@ -733,7 +799,7 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
   )
   assert.equal(
     reorder("c-1", {
-      at: { kind: "composing", root: TEST_ROOT, at: "e-1", lane: "" },
+      at: { kind: "composing", at: "e-1", thread: "" },
       after: "c-2",
     }),
     "refused",
@@ -770,6 +836,7 @@ test("decode: a chat's card is its id and its text's version, or none", () => {
       kind: "chat",
       text: "hi",
       mode: "branch",
+      task: NEW_TASK,
       root: NEW_ROOT,
       lane: NEW_THREAD,
       cardId,
@@ -782,19 +849,19 @@ test("decode: a chat's card is its id and its text's version, or none", () => {
   assert.equal(card(chat("  ")), null)
 })
 
-test("a move on the board names its root and its states; a workflow change, a known action and its state", () => {
-  const move = (text: string, root: string = TEST_ROOT) =>
-    refusalCode(decodeCommand({ kind: "move-root", root, text }))
+test("a move on the board names its task and its states; a workflow change, a known action and its state", () => {
+  const move = (text: string, task: string = TEST_TASK) =>
+    refusalCode(decodeCommand({ kind: "move-task", task, text }))
   const states = { from: workflowStateIdFor("a"), to: workflowStateIdFor("b") }
   assert.equal(
-    move(JSON.stringify({ ...states, before: null }), "e-1"),
+    move(JSON.stringify({ ...states, before: null }), TEST_ROOT),
     ERR.UNKNOWN_TARGET,
   )
   for (const bad of [
     "",
     "{",
     JSON.stringify({ from: "a", to: states.to, before: null }),
-    JSON.stringify({ ...states, before: "e-1" }),
+    JSON.stringify({ ...states, before: TEST_ROOT }),
     JSON.stringify({ ...states }),
   ])
     assert.equal(move(bad), ERR.UNKNOWN_STATE, bad)
@@ -814,6 +881,7 @@ test("a chat's workflow state must be one", () => {
       parentId: "",
       root: NEW_ROOT,
       mode: "branch",
+      task: NEW_TASK,
       lane: NEW_THREAD,
       state,
     })
@@ -821,48 +889,36 @@ test("a chat's workflow state must be one", () => {
   assert.equal(refusalCode(chat("")), "not refused: chat")
 })
 
-test("a mark names its entry; its title is trimmed, blank clears, and a line break or 81 characters is refused", () => {
+test("a mark names its task; its title is trimmed, blank clears, and a line break or 81 characters is refused", () => {
   assert.deepEqual(
-    decodeCommand({
-      kind: "mark",
-      root: TEST_ROOT,
-      targetId: "e-1",
-      text: "  Tab names ",
-    }),
-    {
-      kind: "mark",
-      root: TEST_ROOT,
-      entry: entryId("e-1"),
-      title: "Tab names",
-    },
+    decodeCommand({ kind: "mark", task: TEST_TASK, text: "  Tab names " }),
+    { kind: "mark", task: TEST_TASK, title: "Tab names" },
   )
-  assert.deepEqual(
-    decodeCommand({ kind: "mark", root: TEST_ROOT, targetId: "e-1", text: "" }),
-    {
-      kind: "mark",
-      root: TEST_ROOT,
-      entry: entryId("e-1"),
-      title: null,
-    },
-  )
+  assert.deepEqual(decodeCommand({ kind: "mark", task: TEST_TASK, text: "" }), {
+    kind: "mark",
+    task: TEST_TASK,
+    title: null,
+  })
   for (const text of ["two\nlines", "x".repeat(81)])
     assert.equal(
-      refusalCode(
-        decodeCommand({ kind: "mark", root: TEST_ROOT, targetId: "e-1", text }),
-      ),
+      refusalCode(decodeCommand({ kind: "mark", task: TEST_TASK, text })),
       ERR.INVALID_TITLE,
     )
   assert.equal(
-    refusalCode(decodeCommand({ kind: "mark", targetId: "", text: "x" })),
+    refusalCode(decodeCommand({ kind: "mark", task: TEST_ROOT, text: "x" })),
     ERR.UNKNOWN_TARGET,
   )
 })
 
-test("a retitle names its root; anything else is refused", () => {
+test("a retitle names its task; anything else is refused", () => {
   assert.equal(
-    refusalCode(decodeCommand({ kind: "retitle", root: "e-1" })),
+    refusalCode(decodeCommand({ kind: "retitle", task: TEST_ROOT })),
     ERR.UNKNOWN_TARGET,
   )
+  assert.deepEqual(decodeCommand({ kind: "retitle", task: TEST_TASK }), {
+    kind: "retitle",
+    task: TEST_TASK,
+  })
 })
 
 test("decode: a branch's thread, and a reserved one, is a new thread's id, t- and a uuidv7 (ADR-0057, ADR-0117)", () => {
@@ -871,6 +927,7 @@ test("decode: a branch's thread, and a reserved one, is a new thread's id, t- an
       kind: "chat",
       text: "hi",
       mode: "branch",
+      task: NEW_TASK,
       root: NEW_ROOT,
       lane,
     })
@@ -888,4 +945,11 @@ test("decode: a branch's thread, and a reserved one, is a new thread's id, t- an
     assert.equal(refusalCode(chat(bad)), ERR.UNKNOWN_TARGET, bad)
     assert.equal(refusalCode(reserve(bad)), ERR.UNKNOWN_TARGET, bad)
   }
+})
+
+test("the Line carries every field of a command, and no other: a field the wire's schema lacked would be dropped on the way", () => {
+  assert.deepEqual(
+    Object.keys(Command.fields).sort(),
+    Object.keys(EMPTY_COMMAND).sort(),
+  )
 })

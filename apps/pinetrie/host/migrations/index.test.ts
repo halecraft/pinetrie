@@ -65,7 +65,7 @@ describe("planOpen", () => {
   })
 
   test("a migration from a stored hash runs on each document of its kind there, in the registry's order", () => {
-    const rootMove: Migration = {
+    const taskMove: Migration = {
       name: "2",
       kind: "root",
       from: "h-old",
@@ -80,13 +80,13 @@ describe("planOpen", () => {
           "root:r-1": "h-old",
           "root:r-3": "h-root",
         },
-        [live, rootMove],
+        [live, taskMove],
       ),
     ).toEqual({
       kind: "open",
       run: [
         { migration: live, docIds: ["pinetrie:live"] },
-        { migration: rootMove, docIds: ["root:r-1", "root:r-2"] },
+        { migration: taskMove, docIds: ["root:r-1", "root:r-2"] },
       ],
       unknown: [],
     })

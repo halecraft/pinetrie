@@ -6,7 +6,7 @@
 // after it (`packages/keeper/TECHNICAL.md`), even when a Stop ends the run
 // while the step waits.
 
-import { atEntry, cardId, type ThreadId } from "@pinetrie/core"
+import { atEntry, type ThreadId, textCardId } from "@pinetrie/core"
 import {
   readLatestPrompt,
   readOffers,
@@ -61,8 +61,7 @@ export const createSplitCall =
         prompt: readLatestPrompt(doc, lane)?.role,
         running: readRunning(live, lane),
         by,
-        id: cardId(newId()),
-        root,
+        id: textCardId(newId()),
         at: atEntry(tip),
       })
       if (planned.kind === "refused")

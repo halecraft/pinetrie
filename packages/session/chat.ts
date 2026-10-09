@@ -2,8 +2,6 @@
 // (`ChatHow`), and what sending it does (`planChatRequest`). Pure.
 
 import {
-  type CardId,
-  type CardRecord,
   type ChatAt,
   type ChatMode,
   type Intent,
@@ -11,6 +9,9 @@ import {
   parseMentions,
   type RootId,
   type SentCard,
+  type TaskId,
+  type TextCard,
+  type TextCardId,
   type ThreadId,
   type WorkflowStateId,
 } from "@pinetrie/core"
@@ -24,12 +25,12 @@ export interface ChatHow {
   /** The send's id, minted by a fresh column so it can find its message. */
   readonly id?: string
   /** The card the text is sent from, which the host spends once it is sent. */
-  readonly card?: CardId
+  readonly card?: TextCardId
   /**
    * The cards pinned at the column's thread end: the run waits for each as
    * this client has it (ADR-0048).
    */
-  readonly pinned?: readonly CardId[]
+  readonly pinned?: readonly TextCardId[]
   /** The column it is sent from, where a refusal of its card's move is said. */
   readonly column?: string
   /** The root a new tab minted as it opened: where its first send starts (ADR-0066). */
@@ -45,16 +46,18 @@ export interface ChatHow {
 
 /**
  * Where a send from a column goes (`ChatAt`): a fresh column's starts its
- * thread at its fork; any other continues its thread from the end it shows.
+ * thread at its fork, its card in `task`, the task the column is on; any
+ * other continues its thread from the end it shows.
  */
 export const chatAtOf = (
   mode: ChatMode,
   thread: ThreadId,
   at: Position,
+  task: TaskId,
 ): ChatAt =>
   mode === "reply" && at.kind === "entry"
     ? { kind: "end", thread, seen: at.id }
-    : { kind: "branch", thread, at: at.kind === "entry" ? at.id : null }
+    : { kind: "branch", thread, at: at.kind === "entry" ? at.id : null, task }
 
 /** A chat as the host is asked for it: `how`'s defaults filled in. */
 function chatIntent(input: {
@@ -107,7 +110,7 @@ export function planChatRequest(input: {
   readonly root: RootId
   /** The card `how.card` names as drawn, with its text's version now; null when none is drawn. */
   readonly card: {
-    readonly record: CardRecord
+    readonly record: TextCard
     readonly seen: string
   } | null
   /** Each of `how.pinned` with its text's version now. */

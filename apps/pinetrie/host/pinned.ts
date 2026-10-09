@@ -6,6 +6,7 @@
 // result, so a run's lifecycle knows nothing of cards.
 
 import {
+  isTextCardId,
   pinnedInView,
   type SentCard,
   type ThreadId,
@@ -99,7 +100,9 @@ export function createPinned(deps: {
     // plan
     const view = planPinnedRead({
       inView: pinnedInView(after.index, after.tip),
-      now: pinnedReads(after.pinned, id => cards.textNow(id)),
+      now: pinnedReads(after.pinned, id =>
+        isTextCardId(id) ? cards.textNow(id) : "",
+      ),
       lane,
     })
     return view === null ? null : encodePinned(view, nameOf, now())

@@ -5,7 +5,7 @@
 // redraws nothing that reads it.
 
 import { subscribe } from "@kyneta/schema"
-import type { CardId, CardRecord } from "@pinetrie/core"
+import { type CardId, type CardRecord, isTextCard } from "@pinetrie/core"
 import { blankQueued } from "@pinetrie/rules"
 import { textHolds } from "@pinetrie/schema"
 import type { SessionClient } from "@pinetrie/session"
@@ -19,7 +19,7 @@ export function useBlankQueued(
   cards: readonly CardRecord[],
 ): ReadonlySet<CardId> {
   const queued = useMemo(
-    () => cards.filter(c => c.place.kind === "queued"),
+    () => cards.filter(isTextCard).filter(c => c.place.kind === "queued"),
     [cards],
   )
   const read = () =>

@@ -10,11 +10,13 @@ import {
   type LaneView,
   PLAIN,
   type StopRecord,
+  type TextCard,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { entry, indexOf, TEST_ROOT } from "./fixtures.ts"
+import { entry, indexOf } from "./fixtures.ts"
 import {
   type Next,
   type NextFacts,
@@ -52,15 +54,15 @@ const lane = (over: Partial<LaneView> = {}): LaneView => ({
   ...over,
 })
 
-const queued = (id: string, order: string): CardRecord => ({
-  id: cardId(id),
+const queued = (id: string, order: string): TextCard => ({
+  kind: "text",
+  id: textCardId(id),
   owner: ADA,
   placer: ADA,
   place: {
     kind: "queued",
-    root: TEST_ROOT,
     at: atEntry(entryId("2")),
-    lane: A,
+    thread: A,
     order,
     by: ADA,
     seen: "",
@@ -68,8 +70,8 @@ const queued = (id: string, order: string): CardRecord => ({
   carries: PLAIN,
   unsent: null,
 })
-const C1 = cardId("c-1")
-const C2 = cardId("c-2")
+const C1 = textCardId("c-1")
+const C2 = textCardId("c-2")
 const two = [queued("c-1", "a"), queued("c-2", "b")]
 
 const facts = (

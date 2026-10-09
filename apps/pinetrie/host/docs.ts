@@ -4,7 +4,6 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import {
-  type ArchivedRoot,
   type EntryId,
   type RootId,
   type RootRecord,
@@ -65,7 +64,7 @@ export interface HostDocuments {
 
 /**
  * What a starting host says it opened: `opened` of the directory's `total`
- * roots; every other root is archived (`planLoads`).
+ * roots; every other root is in archived tasks alone (`planLoads`).
  */
 export const rootsOpenedWords = (counts: {
   readonly opened: number
@@ -78,16 +77,16 @@ export const rootsOpenedWords = (counts: {
 }
 
 /**
- * The roots a starting host opens: every root in the directory that is not
- * archived, in the archive. A busy root cannot be closed
- * (`planArchive`), so these hold every lane a crash could have interrupted.
- * Pure.
+ * The roots a starting host opens (ADR-0116): every root in the directory
+ * with a thread in a task outside the archive, or in an inventory
+ * (`rootsHeld`). A busy task cannot be archived (`planArchive`), so these
+ * hold every lane a crash could have interrupted. Pure.
  */
 export function planLoads(
   roots: ReadonlyMap<RootId, RootRecord>,
-  archived: ReadonlyMap<RootId, ArchivedRoot>,
+  held: ReadonlySet<RootId>,
 ): readonly RootId[] {
-  return [...roots.keys()].filter(r => !archived.has(r))
+  return [...roots.keys()].filter(r => held.has(r))
 }
 
 export function hostDocuments(input: {

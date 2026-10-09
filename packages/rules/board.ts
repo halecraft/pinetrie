@@ -1,24 +1,24 @@
-// board — the session's workflow and each root's place on the board
-// (ADR-0122).
+// board — the session's workflow and each task's place on the board
+// (ADR-0122, ADR-0116).
 //
 // The workflow is one host-written singleton: the open states in order, then
-// the archive, which is always there and always last. A root's place is
-// a host-written value keyed by its `RootId`: its state and its rank there.
-// A root in the archive is archived (ADR-0029); `archive.ts` decides
+// the archive, which is always there and always last. A task's place is
+// a host-written value keyed by its `TaskId`: its state and its rank there.
+// A task in the archive is archived (ADR-0029); `archive.ts` decides
 // what crossing that state's edge does.
 //
-// The board is total: a root with no place, or a place in a state the
+// The board is total: a task with no place, or a place in a state the
 // workflow no longer holds, is read at the end of the first open state, so a
-// missing or stale record never hides a root.
+// missing or stale record never hides a task.
 
 import {
-  type ArchivedRoot,
+  type ArchivedTask,
   type BoardPlace,
   ERR,
   isWorkflowStateId,
   type Refusal,
-  type RootId,
   refused,
+  type TaskId,
   type ValueWrite,
   type Workflow,
   type WorkflowEdit,
@@ -28,7 +28,7 @@ import {
   workflowStateIdFor,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, fixedKey, rootKey } from "./decode.ts"
+import { decodeAt, fixedKey, taskKey } from "./decode.ts"
 import { keyAfter, orderBetween, orderKeys } from "./order.ts"
 import { displayName } from "./participant.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
@@ -74,16 +74,16 @@ const PlaceSchema = Type.Object({
   at: Type.Number(),
 })
 
-/** Each root's place on the board, at its `RootId`. */
-export const BOARD: RecordSpec<BoardPlace, RootId, "session"> = {
+/** Each task's place on the board, at its `TaskId`. */
+export const BOARD: RecordSpec<BoardPlace, TaskId, "session"> = {
   namespace: "pinetrie.board",
   home: "session",
-  keyOf: p => p.root,
-  encode: ({ root, ...contents }) => contents,
+  keyOf: p => p.task,
+  encode: ({ task, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(PlaceSchema, contents, rootKey(key), (p, root) =>
+    decodeAt(PlaceSchema, contents, taskKey(key), (p, task) =>
       isWorkflowStateId(p.state)
-        ? { root, state: p.state, rank: p.rank, by: p.by as WriterId, at: p.at }
+        ? { task, state: p.state, rank: p.rank, by: p.by as WriterId, at: p.at }
         : undefined,
     ),
 }
@@ -99,7 +99,7 @@ export const defaultWorkflow = (newId: () => string): Workflow => ({
 
 /**
  * A store with no workflow gets the default one: a new store's first start
- * (ADR-0122). Nothing else writes the first workflow, and a root started
+ * (ADR-0122). Nothing else writes the first workflow, and a task started
  * before there is one gets no place. Pure.
  */
 export const planWorkflowSeed = (
@@ -120,21 +120,21 @@ export const stateIn = (
   id: WorkflowStateId,
 ): WorkflowState | undefined => statesOf(w).find(s => s.id === id)
 
-/** A column of the board: a state and its roots, in order. */
+/** A column of the board: a state and its tasks, in order. */
 export interface BoardColumn {
   readonly state: WorkflowState
-  readonly roots: readonly RootId[]
+  readonly tasks: readonly TaskId[]
 }
 
-/** Every root in its state, in order. */
+/** Every task in its state, in order. */
 export interface Board {
   readonly open: readonly BoardColumn[]
   readonly archive: BoardColumn
-  /** Each root's state. */
-  readonly stateOf: ReadonlyMap<RootId, WorkflowStateId>
+  /** Each task's state. */
+  readonly stateOf: ReadonlyMap<TaskId, WorkflowStateId>
 }
 
-/** The place a root has, or the end of the first open state's. */
+/** The place a task has, or the end of the first open state's. */
 const effectiveState = (
   w: Workflow,
   place: BoardPlace | undefined,
@@ -144,28 +144,28 @@ const effectiveState = (
     : (w.open[0]?.id ?? w.archive.id)
 
 /**
- * Every root in `roots` on the board: in its place's state, by rank, then by
- * id; a root with no place, or one in a state the workflow lacks, after them
+ * Every task in `tasks` on the board: in its place's state, by rank, then by
+ * id; a task with no place, or one in a state the workflow lacks, after them
  * at the end of the first open state. Pure.
  */
 export function boardOf(
   workflow: Workflow,
-  places: ReadonlyMap<RootId, BoardPlace>,
-  roots: Iterable<RootId>,
+  places: ReadonlyMap<TaskId, BoardPlace>,
+  tasks: Iterable<TaskId>,
 ): Board {
-  const byState = new Map<WorkflowStateId, RootId[]>()
-  const stateOfRoot = new Map<RootId, WorkflowStateId>()
-  for (const root of roots) {
-    const state = effectiveState(workflow, placed(workflow, places, root))
-    stateOfRoot.set(root, state)
+  const byState = new Map<WorkflowStateId, TaskId[]>()
+  const stateOfTask = new Map<TaskId, WorkflowStateId>()
+  for (const task of tasks) {
+    const state = effectiveState(workflow, placed(workflow, places, task))
+    stateOfTask.set(task, state)
     const list = byState.get(state) ?? []
-    list.push(root)
+    list.push(task)
     byState.set(state, list)
   }
   const column = (state: WorkflowState): BoardColumn => ({
     state,
-    roots: (byState.get(state.id) ?? []).toSorted((a, b) =>
-      compareRoots(
+    tasks: (byState.get(state.id) ?? []).toSorted((a, b) =>
+      compareTasks(
         placed(workflow, places, a),
         placed(workflow, places, b),
         a,
@@ -176,26 +176,26 @@ export function boardOf(
   return {
     open: workflow.open.map(column),
     archive: column(workflow.archive),
-    stateOf: stateOfRoot,
+    stateOf: stateOfTask,
   }
 }
 
-/** A root's place when its state is the workflow's; else none. */
+/** A task's place when its state is the workflow's; else none. */
 const placed = (
   w: Workflow,
-  places: ReadonlyMap<RootId, BoardPlace>,
-  root: RootId,
+  places: ReadonlyMap<TaskId, BoardPlace>,
+  task: TaskId,
 ): BoardPlace | undefined => {
-  const p = places.get(root)
+  const p = places.get(task)
   return p !== undefined && stateIn(w, p.state) !== undefined ? p : undefined
 }
 
-/** Placed roots by rank, then the unplaced ones; each tie by id. */
-const compareRoots = (
+/** Placed tasks by rank, then the unplaced ones; each tie by id. */
+const compareTasks = (
   pa: BoardPlace | undefined,
   pb: BoardPlace | undefined,
-  a: RootId,
-  b: RootId,
+  a: TaskId,
+  b: TaskId,
 ): number => {
   if (pa !== undefined && pb === undefined) return -1
   if (pa === undefined && pb !== undefined) return 1
@@ -205,15 +205,15 @@ const compareRoots = (
   return a < b ? -1 : a > b ? 1 : 0
 }
 
-/** The roots in the archive: archived (ADR-0029). Pure. */
+/** The tasks in the archive: archived (ADR-0029). Pure. */
 export function archivedOf(
   workflow: Workflow,
-  places: ReadonlyMap<RootId, BoardPlace>,
-): ReadonlyMap<RootId, ArchivedRoot> {
-  const out = new Map<RootId, ArchivedRoot>()
+  places: ReadonlyMap<TaskId, BoardPlace>,
+): ReadonlyMap<TaskId, ArchivedTask> {
+  const out = new Map<TaskId, ArchivedTask>()
   for (const p of places.values())
     if (p.state === workflow.archive.id)
-      out.set(p.root, { root: p.root, by: p.by, at: p.at })
+      out.set(p.task, { task: p.task, by: p.by, at: p.at })
   return out
 }
 
@@ -231,78 +231,78 @@ export function transitionOf(
   return "within"
 }
 
-/** A root moved on the board, as the host plans it. */
-export type RootMovePlan =
+/** A task moved on the board, as the host plans it. */
+export type TaskMovePlan =
   | Refusal
   /** Already there: nothing is written, and the answer is the same. */
   | { readonly kind: "unchanged" }
   | {
       readonly kind: "write"
-      /** The moved root's place, and any of its new state's renumbered. */
+      /** The moved task's place, and any of its new state's renumbered. */
       readonly places: readonly BoardPlace[]
       readonly transition: Transition
     }
 
 /**
- * Decide a move of a root on the board, over the board alone. The sender
- * names the state it saw the root in; if the root has left it, the move is
- * refused, naming who moved it and where. `before` is the root it goes
- * before in `to`, null (or a root no longer there) for its end. A root moved
+ * Decide a move of a task on the board, over the board alone. The sender
+ * names the state it saw the task in; if the task has left it, the move is
+ * refused, naming who moved it and where. `before` is the task it goes
+ * before in `to`, null (or a task no longer there) for its end. A task moved
  * within the archive keeps who archived it and when. Pure.
  */
-export function planRootMove(input: {
-  readonly root: RootId
+export function planTaskMove(input: {
+  readonly task: TaskId
   readonly from: WorkflowStateId
   readonly to: WorkflowStateId
-  readonly before: RootId | null
+  readonly before: TaskId | null
   readonly by: WriterId
   readonly now: number
   readonly workflow: Workflow
-  readonly places: ReadonlyMap<RootId, BoardPlace>
-  /** Every root the board shows (`boardOf`'s `roots`). */
-  readonly roots: readonly RootId[]
+  readonly places: ReadonlyMap<TaskId, BoardPlace>
+  /** Every task the board shows (`boardOf`'s `tasks`). */
+  readonly tasks: readonly TaskId[]
   readonly names: ReadonlyMap<WriterId, string>
-}): RootMovePlan {
-  const { workflow, places, root, to } = input
+}): TaskMovePlan {
+  const { workflow, places, task, to } = input
   const target = stateIn(workflow, to)
   if (target === undefined)
     return refused(ERR.UNKNOWN_STATE, "that workflow state is gone")
-  if (!input.roots.includes(root))
-    return refused(ERR.UNKNOWN_TARGET, "no such root")
-  const board = boardOf(workflow, places, input.roots)
-  const now = board.stateOf.get(root) ?? workflow.archive.id
+  if (!input.tasks.includes(task))
+    return refused(ERR.UNKNOWN_TARGET, "no such task")
+  const board = boardOf(workflow, places, input.tasks)
+  const now = board.stateOf.get(task) ?? workflow.archive.id
   if (now !== input.from) {
     const where = stateIn(workflow, now)?.name ?? ""
-    const mover = places.get(root)?.by
+    const mover = places.get(task)?.by
     return refused(
-      ERR.ROOT_MOVED,
+      ERR.TASK_MOVED,
       mover === undefined
         ? `not moved: it is in ${where} now`
         : `not moved: ${displayName(mover, input.names.get(mover))} moved it to ${where} first`,
     )
   }
   const column =
-    [...board.open, board.archive].find(c => c.state.id === to)?.roots ?? []
-  const others = column.filter(r => r !== root)
+    [...board.open, board.archive].find(c => c.state.id === to)?.tasks ?? []
+  const others = column.filter(r => r !== task)
   const at =
     input.before === null || !others.includes(input.before)
       ? others.length
       : others.indexOf(input.before)
-  const order = [...others.slice(0, at), root, ...others.slice(at)]
+  const order = [...others.slice(0, at), task, ...others.slice(at)]
   if (now === to && order.every((r, i) => column[i] === r))
     return { kind: "unchanged" }
 
-  const was = places.get(root)
+  const was = places.get(task)
   const keep = now === workflow.archive.id && to === workflow.archive.id
   const moved = (rank: string): BoardPlace => ({
-    root,
+    task,
     state: to,
     rank,
     by: keep && was !== undefined ? was.by : input.by,
     at: keep && was !== undefined ? was.at : input.now,
   })
   const transition = transitionOf(workflow, input.from, to)
-  const rankOf = (r: RootId | undefined) =>
+  const rankOf = (r: TaskId | undefined) =>
     r === undefined ? null : (placed(workflow, places, r)?.rank ?? undefined)
   const low = rankOf(order[at - 1])
   const high = rankOf(order[at + 1])
@@ -317,23 +317,23 @@ export function planRootMove(input: {
     transition,
     places: order.map((r, i) => {
       const rank = keys[i] ?? ""
-      if (r === root) return moved(rank)
+      if (r === task) return moved(rank)
       const p = places.get(r)
       return p !== undefined && p.state === to
         ? { ...p, rank }
-        : { root: r, state: to, rank, by: input.by, at: input.now }
+        : { task: r, state: to, rank, by: input.by, at: input.now }
     }),
   }
 }
 
-/** A new root's place: the end of `state`, or of the first open state. Pure. */
+/** A new task's place: the end of `state`, or of the first open state. Pure. */
 export function placeStarted(input: {
-  readonly root: RootId
+  readonly task: TaskId
   readonly state: WorkflowStateId | null
   readonly by: WriterId
   readonly now: number
   readonly workflow: Workflow
-  readonly places: ReadonlyMap<RootId, BoardPlace>
+  readonly places: ReadonlyMap<TaskId, BoardPlace>
 }): BoardPlace {
   const { workflow } = input
   const open = workflow.open.find(s => s.id === input.state)
@@ -342,7 +342,7 @@ export function placeStarted(input: {
     .filter(p => p.state === state)
     .map(p => p.rank)
   return {
-    root: input.root,
+    task: input.task,
     state,
     rank: keyAfter(ranks),
     by: input.by,
@@ -358,7 +358,7 @@ export type WorkflowPlan =
 
 /**
  * Decide a change to the workflow. Names are trimmed and may repeat. The
- * archive is renamed, never moved or removed; a state holding a root is
+ * archive is renamed, never moved or removed; a state holding a task is
  * not removed, nor the only open state. Pure.
  */
 export function planWorkflowEdit(
@@ -422,11 +422,11 @@ export function planWorkflowEdit(
       if (isArchive)
         return refused(ERR.STATE_ARCHIVE, `${archive.name} cannot be removed`)
       const held =
-        board.open.find(c => c.state.id === target.id)?.roots.length ?? 0
+        board.open.find(c => c.state.id === target.id)?.tasks.length ?? 0
       if (held > 0)
         return refused(
           ERR.STATE_NOT_EMPTY,
-          `${target.name} holds ${held === 1 ? "a root" : `${held} roots`}: move ${held === 1 ? "it" : "them"} first`,
+          `${target.name} holds ${held === 1 ? "a task" : `${held} tasks`}: move ${held === 1 ? "it" : "them"} first`,
         )
       if (open.length === 1)
         return refused(ERR.LAST_STATE, "the board needs one open state")

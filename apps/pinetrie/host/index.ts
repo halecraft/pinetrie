@@ -13,7 +13,12 @@ import {
 } from "@kyneta/exchange"
 import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
-import type { BlobStore, CardId, ThreadId } from "@pinetrie/core"
+import {
+  type BlobStore,
+  type CardId,
+  isTextCardId,
+  type ThreadId,
+} from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import {
   configJson,
@@ -41,9 +46,11 @@ import {
 import { writersPolicy } from "@pinetrie/protocol/writers"
 import {
   readArchived,
+  readPlaces,
   readRoots,
   readRunning,
   readThreadName,
+  readThreads,
 } from "@pinetrie/reads"
 import {
   decodeBannerConfig,
@@ -51,6 +58,7 @@ import {
   decodeDigestConfig,
   decodeTitleConfig,
   type QueuedCard,
+  rootsHeld,
 } from "@pinetrie/rules"
 import {
   cardDocId,
@@ -124,6 +132,7 @@ import { createSplitCall } from "./split-call.ts"
 import { recover } from "./startup.ts"
 import { agentReadyLine, configLine } from "./startup-lines.ts"
 import { openStore } from "./store.ts"
+import { tasksNow } from "./tasks.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
 import { findProject } from "./work/runtime.ts"
@@ -360,7 +369,11 @@ export async function startHost({
   // Before a root's document goes, what holds it lets go: the scribe closes
   // the agent's harness over it, then its session (ADR-0063).
   docs.onReleasing(root => scribe.release(root))
-  docs.onReleasing(root => histories.unloadRoot(root))
+  // So do the stacks of moves of the tasks holding its threads.
+  docs.onReleasing(async root => {
+    const tasks = tasksNow({ places, session }).tasksOfRoot.get(root) ?? []
+    for (const task of tasks) await histories.unloadTask(task)
+  })
   const projectRoot = found?.project.root ?? project?.dir ?? null
   const bannerConfig = decodeBannerConfig(userJson)
   const titleConfig = decodeTitleConfig(userJson)
@@ -388,7 +401,14 @@ export async function startHost({
   const directoryNow = readRoots(session)
   // The roots that are not archived, opened before anything reads one: every
   // lane that could be running is in one of them (`planLoads`).
-  const roots = planLoads(directoryNow, readArchived(session))
+  const roots = planLoads(
+    directoryNow,
+    rootsHeld(
+      readPlaces(places),
+      readThreads(session),
+      new Set(readArchived(session).keys()),
+    ),
+  )
   for (const root of roots) await docs.root(root)
   log(
     `[host] ${rootsOpenedWords({ opened: roots.length, total: directoryNow.size })}`,
@@ -544,12 +564,16 @@ export async function startHost({
         agent,
         work,
         start: runs.start,
-        send: popped =>
-          commands.sendPoppedQueuedCard(
-            popped.card.place.by,
-            newId(),
-            chatOfPoppedQueuedCard(popped),
-          ),
+        send: async popped => {
+          const root = readThreads(session).get(popped.card.place.thread)?.root
+          return root === undefined
+            ? { kind: "failed", message: "its thread has no record" }
+            : commands.sendPoppedQueuedCard(
+                popped.card.place.by,
+                newId(),
+                chatOfPoppedQueuedCard(popped, root),
+              )
+        },
         presence,
         behind,
         typing,
@@ -693,7 +717,8 @@ export async function startHost({
     live,
     presence,
     places,
-    cardText: (id: CardId) => exchange.get(cardDocId(id), TextDoc).text(),
+    cardText: (id: CardId) =>
+      isTextCardId(id) ? exchange.get(cardDocId(id), TextDoc).text() : "",
     records,
     key,
     invites: server.invites,

@@ -4,10 +4,13 @@
 // it as `@pinetrie/interface/fixtures`.
 
 import {
+  type EntryId,
   type EntryLike,
   indexTree,
   rootIdFor,
+  type TaskId,
   type TreeIndex,
+  taskIdFor,
   threadIdFor,
 } from "@pinetrie/core"
 import { entriesOf, entry, withThreads } from "@pinetrie/core/fixtures"
@@ -19,6 +22,8 @@ export {
   threadOfEntry,
   withThreads,
 } from "@pinetrie/core/fixtures"
+
+import { NO_TASKS, type Tasks } from "./tasks.ts"
 
 /**
  * The index of `list`, keyed by each entry's own id as the reads key them,
@@ -51,3 +56,26 @@ export const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 export const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 /** A thread a fresh column minted as it opened (ADR-0117), in the shape the host accepts. */
 export const NEW_THREAD = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
+
+/** The task a new tab's first send starts, in `parseNewTask`'s shape (ADR-0116). */
+export const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
+
+/** A task the fixtures' threads are in. */
+export const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+
+/**
+ * The page's tasks for a test (ADR-0116): each task named with its first
+ * root's root entry, holding no thread cards the index needs.
+ */
+export const tasksFor = (
+  ...pairs: readonly (readonly [TaskId, EntryId])[]
+): Tasks => ({
+  ...NO_TASKS,
+  byId: new Map(
+    pairs.map(([task, entry]) => [
+      task,
+      { task, threads: [], roots: [], entry },
+    ]),
+  ),
+  ofEntry: new Map(pairs.map(([task, entry]) => [entry, task])),
+})

@@ -40,14 +40,14 @@ import {
   nameStateIntent,
   rootDropProps,
   rootGroupProps,
-  rootsWords,
   type StateSignals,
   type StripState,
   searchWords,
   stateWords,
   type ThreadCard,
+  tasksWords,
 } from "@pinetrie/interface"
-import { ROOT_BUSY_REASON } from "@pinetrie/rules"
+import { TASK_BUSY_REASON } from "@pinetrie/rules"
 import { type RefObject, useEffect, useRef, useState } from "react"
 import { Menu, type MenuItem } from "./menu.tsx"
 import {
@@ -393,16 +393,16 @@ export function Board({
       </div>
     ) : null
   // An open column's item is a place to drop before; an archive row is not,
-  // since the archive shows its roots by activity, not by place.
+  // since the archive shows its tasks by activity, not by place.
   const item = (t: ThreadCard, place: boolean) => (
     <ItemCard
       drop={
         place
-          ? rootDropProps({ kind: "state", state: t.state, before: t.root })
+          ? rootDropProps({ kind: "state", state: t.state, before: t.task })
           : {}
       }
       item={t}
-      key={t.root}
+      key={t.task}
       onIntent={onIntent}
       pip={pip}
       readers={readers}
@@ -413,7 +413,7 @@ export function Board({
     <span
       className="board-count"
       data-kept={count.kind === "kept" || undefined}
-      title={rootsWords(count.total)}
+      title={tasksWords(count.total)}
     >
       {keptWords(count)}
     </span>
@@ -590,18 +590,14 @@ function ItemCard({
     <div
       className="thread-card"
       data-entry={item.entry}
-      data-root={item.root}
+      data-task={item.task}
       {...drop}
     >
       <button
         className="board-open"
         draggable
         onClick={() => onIntent(item.show)}
-        onDragStart={startRootDrag({
-          root: item.root,
-          entry: item.entry,
-          state: item.state,
-        })}
+        onDragStart={startRootDrag({ task: item.task, state: item.state })}
         title={item.label}
         type="button"
       >
@@ -667,7 +663,7 @@ function ItemCard({
                 <>
                   Move to {m.name}
                   {m.busy !== null && (
-                    <span className="why"> · {ROOT_BUSY_REASON[m.busy]}</span>
+                    <span className="why"> · {TASK_BUSY_REASON[m.busy]}</span>
                   )}
                 </>
               ),

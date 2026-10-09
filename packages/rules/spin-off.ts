@@ -13,11 +13,13 @@ import {
   type MoveRefusal,
   parseMentions,
   type RootId,
+  type TaskId,
   type ThreadId,
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
 import { type MoveStep, planMove } from "./card.ts"
+import { rootOfPlace, type TaskIndex } from "./task.ts"
 
 /**
  * A spin-off as its sender asks it: the card's move to gone, spun into
@@ -26,7 +28,11 @@ import { type MoveStep, planMove } from "./card.ts"
  */
 export interface SpinOff {
   readonly move: Move
+  /** The new task the thread is put in (ADR-0116). */
+  readonly task: TaskId
   readonly state: WorkflowStateId | null
+  /** The task its sender will be on: the move's history from an inventory. */
+  readonly here: TaskId | null
 }
 
 /** What a spin-off writes: the new root's first message, then the card's move. */
@@ -61,6 +67,7 @@ export function planSpinOff(input: {
   readonly cards: readonly CardRecord[]
   readonly request: SpinOff
   readonly sender: WriterId
+  readonly tasks: TaskIndex
   /** The card's text, as the host holds it. */
   readonly text: string
   /** Every root the directory names. */
@@ -74,7 +81,10 @@ export function planSpinOff(input: {
   if (input.roots.has(into)) return { kind: "root-in-use" }
   const text = input.text.trim()
   if (text === "") return { kind: "blank" }
-  const step = planMove(input.cards, move, input.sender)
+  const step = planMove(input.cards, move, input.sender, {
+    tasks: input.tasks,
+    here: input.request.here,
+  })
   if (step.kind === "refused") return { kind: "refused", code: step.code }
   if (step.kind !== "write") return { kind: "refused", code: "moved" }
   return {
@@ -97,8 +107,18 @@ export interface SpunThread {
 }
 
 export type LiftPlan =
-  /** Undo, then delete these threads, each holding its first message alone. */
-  | { readonly kind: "lift"; readonly delete: readonly RootId[] }
+  /**
+   * Undo, then delete these roots, each holding its first message alone,
+   * with the thread a card was spun into there: read before the undo, which
+   * moves the card back.
+   */
+  | {
+      readonly kind: "lift"
+      readonly delete: readonly {
+        readonly root: RootId
+        readonly thread: ThreadId
+      }[]
+    }
   /** Someone wrote in the thread, or the agent works there: no undo. */
   | { readonly kind: "replied"; readonly by: WriterId | null }
 
@@ -114,6 +134,8 @@ export function planLiftRoot(input: {
   readonly cards: readonly CardRecord[]
   readonly threads: ReadonlyMap<RootId, SpunThread>
   readonly lanes: readonly LaneRecord[]
+  /** Each recorded thread's root (`TaskIndex`): a card at a thread names no root. */
+  readonly rootOfThread: ReadonlyMap<ThreadId, RootId>
 }): LiftPlan {
   const spun = input.cards.filter(
     c =>
@@ -121,7 +143,7 @@ export function planLiftRoot(input: {
       c.place.kind === "gone" &&
       c.place.why.kind === "spun",
   )
-  const deleting: RootId[] = []
+  const deleting: { root: RootId; thread: ThreadId }[] = []
   for (const card of spun) {
     if (card.place.kind !== "gone" || card.place.why.kind !== "spun") continue
     const thread = input.threads.get(card.place.why.into)
@@ -131,12 +153,11 @@ export function planLiftRoot(input: {
     const others = input.cards.some(
       c =>
         !input.lifting.includes(c.id) &&
-        "root" in c.place &&
-        c.place.root === thread.thread,
+        rootOfPlace(c.place, input.rootOfThread) === thread.thread,
     )
     const lane = input.lanes.some(l => l.root === thread.thread)
     if (others || lane) return { kind: "replied", by: null }
-    deleting.push(thread.thread)
+    deleting.push({ root: thread.thread, thread: card.place.why.thread })
   }
   return { kind: "lift", delete: deleting }
 }

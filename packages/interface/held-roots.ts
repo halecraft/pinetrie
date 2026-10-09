@@ -1,13 +1,14 @@
 // interface/held-roots — which roots this tab asks its session to hold
-// (ADR-0063). Pure.
+// (ADR-0063, ADR-0116). Pure.
 //
-// A tab loads only what it shows: the roots of the sidebar and the one you are
-// on, archived or not. Every other root is read from the directory alone,
-// the board's included. What holding them opens and lets go is
-// `planHold` (`root-hold.ts`).
+// A tab loads only what it shows: the roots of every thread in the tasks of
+// the sidebar and the task you are on, archived or not. Every other root is
+// read from the directory alone, the board's included. What holding them
+// opens and lets go is `planHold` (`root-hold.ts`).
 
 import type { EntryId, RootId, RootRecord } from "@pinetrie/core"
 import type { Layout } from "./layout.ts"
+import type { Tasks } from "./tasks.ts"
 
 /** Each root's root entry, by its id, from the directory; a root with no message has none. */
 export const rootEntriesOf = (
@@ -22,20 +23,12 @@ export const rootEntriesOf = (
 /** The roots to hold, for `layout`. */
 export function planHeldRoots(input: {
   readonly layout: Pick<Layout, "open" | "active">
-  readonly directory: ReadonlyMap<RootId, RootRecord>
+  readonly tasks: Tasks
 }): ReadonlySet<RootId> {
-  const ids = new Map(
-    [...rootEntriesOf(input.directory)].map(([root, entry]) => [entry, root]),
-  )
   const { active } = input.layout
-  const entries = [
+  const shown = [
     ...input.layout.open,
-    ...(active?.kind === "root" ? [active.root] : []),
+    ...(active?.kind === "task" ? [active.task] : []),
   ]
-  return new Set(
-    entries.flatMap(entry => {
-      const root = ids.get(entry)
-      return root === undefined ? [] : [root]
-    }),
-  )
+  return new Set(shown.flatMap(task => input.tasks.byId.get(task)?.roots ?? []))
 }

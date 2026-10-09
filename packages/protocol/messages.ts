@@ -50,7 +50,7 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     it (`release`), ADR-0048 step 7.
  *   - `unqueue-all` takes every message card queued on that thread back
  *     below the line.
- *   - `move-root` moves the root `root` on the board (ADR-0122): `text` is
+ *   - `move-task` moves the root `root` on the board (ADR-0122): `text` is
  *     JSON `{ from, to, before }`, the state its sender saw it in, the state
  *     it goes to, and the root it goes before there, or null for the end.
  *   - `workflow` changes the board's states (ADR-0122): `mode` names the
@@ -96,7 +96,7 @@ export const COMMAND_KINDS = [
   "picture",
   "stop",
   "carry-on",
-  "move-root",
+  "move-task",
   "workflow",
   "mark",
   "retitle",
@@ -136,11 +136,21 @@ export interface Command {
    */
   readonly parentId: string
   /**
-   * `chat`, `mark` and `retitle`: the root it writes in (ADR-0063); for a
-   * chat at the root, a new root's id the sender's tab minted. `undo-move`:
-   * the root whose history it acts on. `""` otherwise.
+   * `chat`: the root it writes in (ADR-0063); for a chat at the root, a new
+   * root's id the sender's tab minted. `""` otherwise.
    */
   readonly root: string
+  /**
+   * `chat` and `spin-off`: the task a thread it starts goes in, for a new
+   * root a new task's id the sender's tab minted (ADR-0116); `move-task`,
+   * `mark`, `retitle` and `undo-move`: the task it acts on. `""` otherwise.
+   */
+  readonly task: string
+  /**
+   * `move` and `spin-off`: the task its sender is on, which names a
+   * discard's history for a card in an inventory (ADR-0116). `""` for none.
+   */
+  readonly here: string
   /**
    * `chat`: `reply` or `branch`; `offer` and `workflow`: the action;
    * `set-command`: the command; `undo-move`: `undo` or `redo`; `""`
@@ -156,7 +166,7 @@ export interface Command {
   /** `chat`: a Start Agent column, where no mention asks the agent. */
   readonly asksAgent: boolean
   /**
-   * `mark`: the entry; `offer` `accept`: the destination bookmark, `""`
+   * `offer` `accept`: the destination bookmark, `""`
    * for the default; `workflow`: the state; `queue-card`: the command of
    * the card it creates, `""` for none. Separate from `parentId` on
    * purpose.
@@ -188,7 +198,7 @@ export interface Command {
    */
   readonly base: string
   /**
-   * `chat` and `spin-off`: the workflow state a root it starts lands in,
+   * `chat` and `spin-off`: the workflow state a task it starts lands in,
    * or `""` for the first open state (ADR-0122).
    */
   readonly state: string
@@ -207,7 +217,7 @@ export const OUTCOME_KINDS = [
   "reserved",
   "pictured",
   "stopped",
-  "moved-root",
+  "moved-task",
   "workflow-changed",
   "marked",
   "retitling",
@@ -267,6 +277,8 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   text: "",
   parentId: "",
   root: "",
+  task: "",
+  here: "",
   mode: "",
   lane: "",
   asksAgent: false,

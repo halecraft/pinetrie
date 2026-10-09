@@ -3,11 +3,11 @@
 
 import type {
   CardId,
-  CardPlace,
-  CardRecord,
   CommandSummary,
   EntryId,
   Position,
+  TextCard,
+  TextPlace,
   ThreadLane,
 } from "@pinetrie/core"
 import {
@@ -37,9 +37,9 @@ import { useTypingAt } from "./use-presence.ts"
 export function Composer(p: {
   session: SessionClient
   /** Your message here, once it exists. */
-  card: CardRecord | undefined
+  card: TextCard | undefined
   /** Where a card made here goes; undefined where none may be made. */
-  place: CardPlace | undefined
+  place: TextPlace | undefined
   at: Position
   lane: ThreadLane
   how: ColumnHow

@@ -40,7 +40,7 @@ words they were written with.
 | **the line** | What divides a thread's queued cards, which the agent reads, from its notes and your message, which it does not. | | |
 | **notes board** | A thread's notes laid out in a grid, in its column's pane (ADR-0113). | | |
 | **the dock** | A column's foot: the queue, the line and your message (ADR-0113). | | |
-| **the sidebar** | The column down the left of the page, of your open threads. | `Sidebar`, `sidebarView` | your list |
+| **the sidebar** | The column down the left of the page, of your open tasks. | `Sidebar`, `sidebarView`, `OpenThreads` | your list |
 | **your open threads** | The roots in the sidebar, yours on every device. | `open:<you>` (stored) | your list |
 
 ## Threads
@@ -53,7 +53,8 @@ words they were written with.
 
 | word | what it is | in code | retired |
 |---|---|---|---|
-| **workflow state** | A column of the board: Backlog, Doing, or any a team makes. Every root is in one. | `WorkflowState`, `Workflow`, `BoardPlace` | |
+| **task** | The board's card: a piece of work in one workflow state, holding the cards needed to do it. Each holds the threads of one root, for now. | `TaskId`, `TaskRecord`, `TaskIndex` (ADR-0116) | the root as what the board holds; "the root you are on" |
+| **workflow state** | A column of the board: Backlog, Doing, or any a team makes. Every task is in one. | `WorkflowState`, `Workflow`, `BoardPlace` | |
 | **the archive** | The board's last workflow state, always there, named Done in a new session and renamed as any state is. | `Workflow.archive` | the closed state, the Archive tab |
 | **archived** | In the archive: read-only for everyone, unloaded by the host, its threads' offers withdrawn, until moved out (**restore**). | `archivedOf`, `archivedIn`, `planArchive`, `readArchived` | closed |
 
@@ -64,7 +65,6 @@ code uses them yet; each becomes current as its part is built.
 
 | word | what it is | ADR | replaces |
 |---|---|---|---|
-| **task** | The board's card: a piece of work in one workflow state, holding the cards needed to do it. | ADR-0116 | the root as what the board holds; "the root you are on" |
 | **canvas** | Where a task opens: its cards laid out as columns, in an order everyone shares. | ADR-0116 | |
 | **column** | A card opened on the canvas: a thread's path, a note column, a file or a medium. | ADR-0116 | a column as only a thread's path |
 | **fold** (a column) | Hide a column for yourself; it keeps its place as a narrow strip with its title. | ADR-0116 | close (a column) |
@@ -82,7 +82,7 @@ code uses them yet; each becomes current as its part is built.
 As they are built, these current words change: **thread card** is a thread,
 not a root; **note** is a note column's, not a thread's, and the **notes
 board** goes; **the dock** is the queue, the line and your message, without
-the notes line; **the sidebar** holds **your open tasks**; **the line**
+the notes line; **the line**
 divides a thread's queued cards from your message; and the **inventory**
 holds any card.
 

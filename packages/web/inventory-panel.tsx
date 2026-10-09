@@ -5,7 +5,7 @@
 // `inventoryView`; every click and drop here is an intent, planned like any
 // other.
 
-import type { CardRecord, WriterId } from "@pinetrie/core"
+import { type CardRecord, isTextCard, type WriterId } from "@pinetrie/core"
 import {
   cardFrame,
   type Dock,
@@ -48,7 +48,7 @@ export function InventoryPanel(p: {
 }) {
   const texts = useCardTexts(
     p.session,
-    p.held.map(c => c.id),
+    p.held.filter(isTextCard).map(c => c.id),
   )
   const view = inventoryView({
     held: p.held,
@@ -114,42 +114,44 @@ export function InventoryPanel(p: {
           }
           onSelect={slot => p.onIntent({ kind: "selectSlot", slot })}
           reader={p.reader}
-          renderOpen={card => (
-            <BoundCardEditor
-              among={null}
-              card={card}
-              catchUps={null}
-              foot={
-                <button
-                  className="put primary"
-                  disabled={p.column === null}
-                  onClick={() => {
-                    if (p.column !== null)
-                      p.onIntent({
-                        kind: "put",
-                        card: card.id,
-                        target: { kind: "column", key: p.column },
-                      })
-                  }}
-                  title={PUT_TITLE}
-                  type="button"
-                >
-                  {PUT}
-                </button>
-              }
-              key={card.id}
-              onDiscard={() => p.onIntent({ kind: "discard", card: card.id })}
-              onTyping={() => {}}
-              readOnly={false}
-              reader={p.reader}
-              rows={4}
-              session={p.session}
-              view={cardFrame(card, "inventory", {
-                me: p.reader.me,
-                readOnly: false,
-              })}
-            />
-          )}
+          renderOpen={card =>
+            !isTextCard(card) ? null : (
+              <BoundCardEditor
+                among={null}
+                card={card}
+                catchUps={null}
+                foot={
+                  <button
+                    className="put primary"
+                    disabled={p.column === null}
+                    onClick={() => {
+                      if (p.column !== null)
+                        p.onIntent({
+                          kind: "put",
+                          card: card.id,
+                          target: { kind: "column", key: p.column },
+                        })
+                    }}
+                    title={PUT_TITLE}
+                    type="button"
+                  >
+                    {PUT}
+                  </button>
+                }
+                key={card.id}
+                onDiscard={() => p.onIntent({ kind: "discard", card: card.id })}
+                onTyping={() => {}}
+                readOnly={false}
+                reader={p.reader}
+                rows={4}
+                session={p.session}
+                view={cardFrame(card, "inventory", {
+                  me: p.reader.me,
+                  readOnly: false,
+                })}
+              />
+            )
+          }
           targetOf={slot => ({ kind: "inventory", slot })}
           view={view.grid}
         />

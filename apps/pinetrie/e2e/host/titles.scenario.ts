@@ -6,10 +6,10 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { ROOT } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
-import { readRoots } from "@pinetrie/reads"
+import { readMarks, readRoots } from "@pinetrie/reads"
 import { TITLE_REQUEST_HEAD } from "@pinetrie/rules"
 import type { Checks } from "../checks.ts"
-import { at, START_AGENT, waitFor } from "../harness.ts"
+import { at, START_AGENT, taskHolding, waitFor } from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 import { idOfIn } from "./support.ts"
@@ -49,7 +49,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     userConfig,
   })
   const record = () => [...readRoots(th.session).values()][0]
-  const title = () => record()?.title ?? null
+  // The root's task's title (ADR-0116): the one task the scenario opens.
+  const title = () => [...readMarks(th.session).values()][0]?.title ?? null
 
   // 1. The first message to the agent titles its root while the run goes.
   const planning = script.pause("plan the parser")
@@ -73,7 +74,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     mode: "reply",
   })
   await idle()
-  const answer = await tu.retitle(entry)
+  const answer = await tu.request({
+    kind: "retitle",
+    task: taskHolding(th, entry),
+  })
   const replaced = (await waitFor(() => title() === "Lexer work", 10_000)) >= 0
   check(
     "Auto-update title replaces a person's title with one from the thread's messages",

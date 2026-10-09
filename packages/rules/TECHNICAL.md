@@ -112,13 +112,17 @@ cannot reach the wrong document and needs no guard at run time.
 - **`LANE`** is written for every lane as it is created, naming its root;
   `work` is null for a lane with no work of its own.
 - **`WORKFLOW` and `BOARD`** (`board.ts`, ADR-0122): the session's workflow
-  states, a singleton, and each root's place on the board, keyed by its
-  `RootId`.
+  states, a singleton, and each task's place on the board, keyed by its
+  `TaskId` (ADR-0116).
+- **`TASK`** (`task.ts`, ADR-0116): a task's record, in the session: who
+  opened it and when, nothing more. What it holds is the places
+  document's.
 - **`QUEUE_HOLD`** (`queue-hold.ts`, ADR-0048 step 7): a thread's queue
   held, keyed by lane, in the session: who held it and when.
-- **The archive gate** reads the roots a command writes in (`writesIn`) and
+- **The archive gate** reads the tasks a command writes in (`writesIn`) and
   looks each up among the archived (`archivedIn`, over `archivedOf`): a
-  command carries its roots, so no root's document is opened to check.
+  command carries its tasks, or its places and cards, which the
+  `TaskIndex` maps to tasks, so no root's document is opened to check.
 
 Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
 `encode` and `decode`, exported beside its type (`MARK` in `mark.ts`,
@@ -288,10 +292,11 @@ which are swept.
   `decodeCard`, total). Where a card is goes through core's `placeFields`
   and `placeOfFields`, which the wire's key codec uses too, so the two
   cannot drift. A card's place at a thread's end, or queued, has an `at`
-  that is never the root; a fresh
-  card's `column` is never "", and it carries its root and its branch
-  point (a `Spot`, ADR-0066), the root for a new tab; a queued card has its `lane`, `order` and
-  `by`, and `seen`, its text's version as its queuer had it (S96), which
+  that is never the root, and its thread (stored in `lane`), and no root:
+  the thread's record names it (ADR-0116); a fresh card's `column` is
+  never "", and it carries its root, its task and its branch point (a
+  `Spot`, ADR-0066), the root for a new tab; a canvas card its task, rank
+  and width; a queued card has its `order` and `by`, and `seen`, its text's version as its queuer had it (S96), which
   the queue's key carries from the client. Every field is required: the
   host writes a record whole. A
   `command` this build does not know makes the card malformed. A card
@@ -301,24 +306,25 @@ which are swept.
   `fact`, and is a message. Every move of a fact's card is refused
   `fact`: it is the host's. Your message (`composing`, ADR-0113) is stored
   under the kind `drafting` it had before notes, so no row changed with
-  the split; a note is stored as `note`. A message or note whose lane fails
-  `isThreadId` keeps its place with no lane: dropped,
-  it would be swept with its text at the next start (`planCardSweep`), and
-  the lane only says which thread it follows. A queued card with such a
-  lane does not decode: its lane is where it runs.
+  the split; a note is stored as `note`. A card at a thread whose stored
+  `lane` is no thread's id does not decode: migration `0005-tasks` gave
+  every such row its thread.
 - **A handoff is a compare-and-set on where a card is** (`planMove`, pure):
   accepted only if the card is still where its sender saw it, its `PlaceKey`
-  (`sameKey`, over its kind, `at` and lane, or an inventory's holder). A
+  (`sameKey`, over its kind, `at` and thread, or an inventory's holder). A
   key leaves out a queue's order and queuer, so a reorder does not make
-  someone else's unqueue fail. It leaves out a queue's `seen` and `root`
-  too. Every move, on
-  the host and on a client, is built by core's `moveOf` (from where the
-  card is); an unqueue's or an unpin's target is `noteOf`, and a queue's root
-  `queueRoot`, its lane's. No `from` creates the card, its sender its
-  owner. Nobody removes a card: `Move.to` is never null. A discard is a move
-  to `gone` (`discardedOf`, ADR-0111), from any place the sender may move
-  out of, recorded in the history of the root it names: the card's own, or
-  for a card in no root the one its discarder was on. A gone card keeps its
+  someone else's unqueue fail. It leaves out a queue's `seen` too. Every
+  move, on the host and on a client, is built by core's `moveOf` (from
+  where the card is); an unqueue's or an unpin's target is `noteOf`. No
+  `from` creates the card, its sender its owner. Nobody removes a card:
+  `Move.to` is never null. A discard is a move to `gone` (`DISCARDED`,
+  ADR-0111), from any place the sender may move out of. Its key names no
+  task: the host names its history (`placeAt`, `historyOf`, over
+  `Discards`), the task the card leaves (`taskOfPlace`), or for a card in
+  an inventory the task its sender is on (`here`, which a `move` carries).
+  A spin-off's `here` is the task its sender will be on: the new one for a
+  drop in the sidebar, else the tab's. A queueing passes `NO_DISCARDS`,
+  since its target is a queue. A gone card keeps its
   record and text, is drawn nowhere (every read of a place names the kinds
   it draws), and moves only by an undo:
   a handoff from gone is refused `gone`. `planGoneSweep`
@@ -371,18 +377,20 @@ which are swept.
   each one a card ends queued on, when it is not running.
 - **Which history a move enters is `historyOf`'s** (ADR-0066): none for a
   creation (a composer's new card, a copy) or a send, which is no move;
-  else the root the card goes to, when it is in one, else the root it
-  leaves, read from its record, since a move is accepted only from there.
-  Every place in a root names it, so no tree is read. An inventory is in no
-  root.
+  else the task the card goes to, when it goes to one, else the task it
+  leaves, read from its record, since a move is accepted only from there;
+  a discard's is `discardHistory`'s. A place is in a task by `taskOfPlace`,
+  so no tree is read. An inventory is in no task.
 - **`undoAnswer`** reads what a whole undo did: the cards its step wrote,
   from their footprints in the places document (`["cards", <id>]`), each
   with its place now; or, refused, the first card it could not undo as it is
   now, `moved` (its placer names who) or `gone`; or `nothing`.
-- **`planHistorySweep`** gives the histories of moves to retire: a root's
+- **`planHistorySweep`** gives the histories of moves to retire: a task's
   `ARCHIVED_HISTORY_MS` (7 days) after it was archived, and, at startup
-  only, those of a root the directory does not name. After a run's end that
-  second rule would retire a new tab's history while it is open.
+  only, those of a task the session does not hold. After a run's end that
+  second rule would retire a new tab's history while it is open. An id
+  that names no task is left: the histories once kept by root were
+  retired by migration `0005-tasks`.
 - **A card at a thread's end is resolved, never stored as an end**: your
   message, a note, a pinned card. `placeEnd` takes the thread its place's
   entry is in (`threadAt`) and that thread's end (`threadEnd`), so the card
@@ -482,7 +490,8 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
 # A card made a thread (`spin-off.ts`, `root.ts`, ADR-0111)
 
 - **`planSpinOff`** checks a spin-off before anything is written: its move
-  must be to gone, spun into a root (`GoneWhy` `spun`, the thread in it);
+  must be to gone, spun into a root (`GoneWhy` `spun`, the thread in it),
+  in a new task the request names;
   that root's id must be free; the card's text, trimmed, not blank; and the
   move as `planMove` decides it, so a card someone moved first, or one in
   another's inventory, is refused as any move is. It returns the thread's
@@ -493,12 +502,16 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   thread the directory still names must hold its first message alone (its
   tree's writers, oldest first), with no lane and no card in it but those
   the undo moves; otherwise `replied`, naming who wrote second (null for
-  the agent, a lane or a card). A thread already gone lifts nothing.
+  the agent, a lane or a card). A card is in the root by `rootOfPlace`. A
+  thread already gone lifts nothing; `delete` names each root and its
+  thread, read before the undo reverts the card.
 - **`planRootDelete`** (`root.ts`) is what deleting a lifted thread
-  writes: its directory record (`ROOT`) and board place (`BOARD`) deleted,
-  every card still in it removed, its document named for destruction, and
-  its root for its stacks to be unloaded; `planHistorySweep` retires those
-  stacks at the next start, as for any root the directory lacks.
+  writes: its directory record (`ROOT`), its thread's (`THREAD`), and its
+  task's record, board place and title deleted, every card still in the
+  root or on the task's canvas removed, its document named for
+  destruction, and the task for its stacks to be unloaded;
+  `planHistorySweep` retires those stacks at the next start, as for any
+  task the session lacks.
 - **The history's verb is `spun`** (`verbOf`): "spun off into a thread by
   Ada", and a trace "Ada made a thread of this".
 
@@ -560,96 +573,124 @@ contents: Yjs derives it from the peer, which this package cannot.
   A seat stored under its `clientID` before ADR-0062 reads with that text as
   its `peer`, which is its address, so the delete finds it.
 
+# Tasks (`task.ts`, ADR-0116)
+
+A task is the board's card. Its record (`TASK`) says who opened it and
+when; what it holds is where the places document puts each card: a
+`canvas` place names the task, a rank and a width, so a card has one place
+by construction.
+
+- **One `TaskIndex`** (`indexTasks(cards, threads)`): each task's canvas in
+  order, each thread's task (`taskOfThread`), each task's threads and
+  roots, each root's tasks, each recorded thread's root (`rootOfThread`).
+  The host (`tasksNow`) and the page (`tasksOf`) both read it, so they
+  cannot disagree on where something is.
+- **A place at a thread names its thread and no root** (composing, note,
+  pinned, queued; the thread in the row's `lane`). Its task is its
+  thread's (`taskOfPlace`), and its root its thread's record's
+  (`rootOfPlace`): one field per fact, so the two cannot disagree.
+- **`planThreadStart`**: a thread's record, its card at the end of its
+  task's canvas, and for a task the session does not hold, the task's
+  record and its board place (`placeStarted`). `planChat` decides that a
+  send starts one (`starts: ThreadStarts`); `sendChat` plans it with the
+  send, and `executeChat` writes it before the message.
+- **`rootsHeld`**: the roots with a thread on the canvas of a task outside
+  the archive, or in an inventory: what a starting host loads, and what
+  archiving keeps.
+
 # The board (`board.ts`, ADR-0122)
 
-Every root is in one workflow state. The workflow is a host-written
+Every task is in one workflow state. The workflow is a host-written
 singleton (`WORKFLOW`): the open states in board order, then the closed
-state, always there and always last. A root's place is a host-written
-value keyed by its `RootId` (`BOARD`): its state, its rank there, who moved
+state, always there and always last. A task's place is a host-written
+value keyed by its `TaskId` (`BOARD`): its state, its rank there, who moved
 it, and when.
 
-- **The board is total** (`boardOf`): every root it is given, in its
-  place's state, by rank, then by id; a root with no place, or one in a
+- **The board is total** (`boardOf`): every task it is given, in its
+  place's state, by rank, then by id; a task with no place, or one in a
   state the workflow no longer holds, at the end of the first open state.
-  A missing or stale record never hides a root.
-- **Archived is derived, never stored** (`archivedOf`): the roots whose
+  A missing or stale record never hides a task.
+- **Archived is derived, never stored** (`archivedOf`): the tasks whose
   place is the archive, with who moved them there and when
-  (`ArchivedRoot`), keyed by `RootId`. Every former reader of the archive
+  (`ArchivedTask`), keyed by `TaskId`. Every former reader of the archive
   record reads it (`readArchived`).
-- **`planRootMove` decides a move over the board alone.** The sender names
-  the state it saw the root in; one that has left it is refused
-  `root_moved`, naming who moved it and where. `before` is the root it goes
+- **`planTaskMove` decides a move over the board alone.** The sender names
+  the state it saw the task in; one that has left it is refused
+  `task_moved`, naming who moved it and where. `before` is the task it goes
   before, or the end. The new rank is `orderBetween` its neighbours; with no
   room, or a neighbour with no place yet, the whole state is renumbered,
   the others keeping who put them there. A reorder within the archive
-  keeps `by` and `at`, which say when the root was archived and so when its
+  keeps `by` and `at`, which say when the task was archived and so when its
   move histories retire (`planHistorySweep`).
 - **`transitionOf` says whether a move crosses the archive's edge**:
-  `within`, `close` or `reopen`. The host gathers a root's document only to
-  cross it (`apps/pinetrie/host/commands/board.ts`).
+  `within`, `close` or `reopen`. The host gathers the task's roots'
+  documents only to cross it (`apps/pinetrie/host/commands/board.ts`).
 - **`planWorkflowEdit`**: add (before a state, or after every open one),
   rename (trimmed; names may repeat), move, remove. The archive is
-  renamed only; a state holding a root is not removed, nor the only open
+  renamed only; a state holding a task is not removed, nor the only open
   state.
-- **`placeStarted`** puts a new root at the end of the state its chat names,
+- **`placeStarted`** puts a new task at the end of the state its chat names,
   or of the first open state when it names none, one gone, or the closed
   one.
 - **Order keys are `order.ts`'s**, shared with cards' queues and pins:
   fixed-width base-36, so string order is numeric order; `keyAfter`,
   `orderBetween` (null with no room), `orderKeys`.
 
-# The archive (`archive.ts`, ADR-0029, ADR-0122)
+# The archive (`archive.ts`, ADR-0029, ADR-0122, ADR-0116)
 
-A root put aside for everyone: one in the archive. Moving it
-there or out writes only its board place: entries are immutable, so a root
-is hidden and made read-only, never removed.
+A task put aside for everyone: one in the archive. Moving it there or out
+writes only its board place: entries are immutable, so a task is hidden
+and made read-only, never removed.
 
 - **`planArchive` decides what crossing the edge does**, pure, for a
-  `Crossing` (`close` or `reopen`). A root is anything `rootOf` maps to
-  itself (a root is always a message, S30). Closing is refused `root_busy`
-  while `rootWork` lists the root: a lane with its tip there runs, or has
-  messages waiting. `ROOT_BUSY_REASON` is the one wording, which your
-  list's and the board's Move to ▸ show too. Reopening is never busy.
+  `Crossing` (`close` or `reopen`). Closing is refused `task_busy` while
+  any lane of the task's threads runs or has cards queued (`threadsWork`).
+  `TASK_BUSY_REASON` is the one wording, which your list's and the board's
+  Move to ▸ show too. Reopening is never busy.
 - **A crossing is planned whole, in three parts** (ADR-0065): the place,
   written on the documents' keeper; the `teardown`, carried out off it
-  (lanes to forget and remove, their refs in your repo, null on close and
-  each tip's nearest revision's commit on reopen, and `planRetention`'s
-  snapshots); and `unload`, for a close, on the keeper again. The host
-  passes its lanes of their own (`own`, empty on a host without them) and
-  the root's revision records, so no part decides anything when it runs.
-- **The gate keys on the roots a command writes in** (ADR-0063). `writesIn`
-  names them for every intent (a chat's root, a mark's, an undo of moves',
-  an offer's lane's, a queue hold's and an unqueue all's lane's, a
-  reorder's place's, each root a move's cards go to), or none for one that
-  writes in no root (a new root, a name, a stop, a move on the board or a
-  change to its states, a reservation, a move into an inventory), so a
-  closed root can always be reopened. `archivedIn` finds an archived one by
-  its `RootId`. One rule, applied by the host before dispatch
-  (`apps/pinetrie/host/commands/index.ts`); `sendChat` needs no copy, since
-  only the `chat` command calls it. No card moves into an archived root,
-  a fresh column's included (ADR-0066); a command on a card writes nowhere,
-  and the pop's own gate stops a card with one.
+  (the task's threads' own lanes to forget and remove, their refs in your
+  repo, null on close and each tip's nearest revision's commit on reopen,
+  and `planRetention`'s snapshots); and `unload`, for a close, on the
+  keeper again: the task's roots no task outside the archive, and no
+  inventory, still holds a thread of (`stillHeld`). The host passes its
+  lanes of their own (`own`, each with its root's index) and the revision
+  records, so no part decides anything when it runs.
+- **The gate keys on the tasks a command writes in** (ADR-0063). `writesIn`
+  names them for every intent (a chat's thread's task or a branch's, a
+  mark's, a retitle's, an undo of moves', an offer's lane's, a queue hold's
+  and an unqueue all's lane's, a reorder's place's, and for a move the task
+  each card goes to and the one it leaves), or none for one that writes in
+  no task (a name, a stop, a move on the board or a change to its states,
+  a reservation, a command on a card, traces seen), so an archived task can
+  always be restored, and nothing moves out of one (`task_archived`,
+  "restore the task first"). `archivedIn` finds an archived one by its
+  `TaskId`. One rule, applied by the host before dispatch
+  (`apps/pinetrie/host/commands/index.ts`); the pop's own gate stops a
+  queued card whose thread's task is archived.
 - **Yjs writes are not refused for archiving.** A card's text in an archived
-  root stays writable to the host's policy (a refused write cannot be
+  task stays writable to the host's policy (a refused write cannot be
   recovered from, S28); the composer there is read-only.
 - **Every planner refuses with core's `Refusal`** (`refused(code, message)`),
   the shape the codec decodes to and the host answers as its `Outcome`
   unchanged, so no package spells it out.
 
-# Marks (`mark.ts`, ADR-0045)
+# Marks (`mark.ts`, ADR-0045, ADR-0116)
 
-A title on an entry. The record is a host-written `pinetrie.mark` value keyed
-by the entry's id, so an entry has at most one by construction. A root's mark
-titles its tab; the page offers marks only on roots, while the host accepts
-one on any entry, since the rule is the same everywhere.
+A task's title. The record is a host-written `pinetrie.mark` value in the
+session, keyed by the task's id, so a task has at most one by
+construction. A mark once kept in a root's document, on its root entry, is
+deleted at startup (`planUndeclaredSweep`: stored outside its spec's
+home).
 
-- **`planMark` decides**, pure: an entry the index lacks is refused
-  `unknown_target`; the title already stored, or clearing an entry with none,
-  is `unchanged` and writes nothing; otherwise `write`, or `remove` for a
-  cleared title. The last write wins: nobody types a title together.
+- **`planMark` decides**, pure: a task the session does not hold is
+  refused `unknown_target`; the title already stored, or clearing a task
+  with none, is `unchanged` and writes nothing; otherwise `write`, or
+  `remove` for a cleared title. The last write wins: nobody types a title
+  together.
 - **Clearing deletes the record.** A stored empty title would read as chosen.
-- **A mark in an archived root is refused by the archive's gate:** `writesIn`
-  names a mark's root, so `planMark` has no check of its own.
+- **A mark in an archived task is refused by the archive's gate:**
+  `writesIn` names a mark's task, so `planMark` has no check of its own.
 - **`by` is a writer, or the agent for a title it made unasked**
   (ADR-0074). A writer id always starts `w-`, so the two never collide, and
   nothing decides by it.
@@ -762,16 +803,17 @@ default.
 
 # Titles (`title.ts`, ADR-0074)
 
-A model's few words for a root, written as its mark (`MARK`), so Rename
-edits it and every place a title shows reads it.
+A model's few words for a task, written as its mark (`MARK`, ADR-0116),
+so Rename edits it and every place a title shows reads it. Titling still
+reads a root's tree: Phase 2 holds one root a task.
 
 - **`decodeTitleConfig`**: on unless `enabled` is `false`, as digests are
   (banners are off unless `true`); `model` is `modelRef`, or null for the
   run's.
 - **`planTitling` is the decision and the request's lines.** Unasked (a
   lane just created, `trigger.kind` `lane`): only for the root's first lane
-  (no other lane record names the root), with titles on, no mark on the
-  root entry, and none in flight; the lines are the path to where the lane
+  (no other lane record names the root), with titles on, the task unmarked
+  (`marked`), and none in flight; the lines are the path to where the lane
   starts and its prompt, which the tree does not hold yet. Asked: always,
   from the path to the root's newest message; refused for a root with no
   message. It also names the mark's author: the agent, or the person who
@@ -780,7 +822,7 @@ edits it and every place a title shows reads it.
   thread began usually says what it is for, then the newest that fit
   (`fitNewest`).
 - **`titleOf` refuses rather than cuts**: more than `TITLE_WORDS` words, or
-  what `parseTitle` refuses, is null, and the root keeps its label. It
+  what `parseTitle` refuses, is null, and the task keeps its label. It
   unwraps quotes and trailing punctuation with `bareLine` (`request.ts`),
   as a digest's headline is.
 - **`titleStillWanted`**: an asked title is always written; an unasked one

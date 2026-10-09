@@ -21,8 +21,15 @@ const Command = Schema.struct({
   text: Schema.string(),
   /** Where the sender was reading, or "" for the root (schemas are total). */
   parentId: Schema.string(),
-  /** A chat's, a mark's or an undo of moves' root, or "" for other kinds (ADR-0063). */
+  /** A chat's root, or "" for other kinds (ADR-0063). */
   root: Schema.string(),
+  /**
+   * A branch's or a spin-off's task, or the task a move on the board, a
+   * mark, a retitle or an undo of moves acts on; "" for other kinds (ADR-0116).
+   */
+  task: Schema.string(),
+  /** A move's or a spin-off's sender's task, or "" (ADR-0116). */
+  here: Schema.string(),
   /** A chat's mode, or "" for other kinds. */
   mode: Schema.string(),
   lane: Schema.string(),

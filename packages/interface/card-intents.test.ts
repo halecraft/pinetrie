@@ -1,11 +1,12 @@
 import {
   atEntry,
-  type CardPlace,
   type CardRecord,
-  cardId,
   entryId,
   indexAsks,
   rootIdFor,
+  type TextCard,
+  type TextPlace,
+  textCardId,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -14,9 +15,17 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import { describe, expect, test } from "vitest"
 import { afterKeep } from "./card-intents.ts"
 import type { CardFacts, IntentState } from "./effects.ts"
-import { NEW_ROOT, NEW_THREAD, tree } from "./fixtures.ts"
+import {
+  NEW_ROOT,
+  NEW_TASK,
+  NEW_THREAD,
+  TEST_TASK,
+  tasksFor,
+  tree,
+} from "./fixtures.ts"
 import { type Intent, planIntent } from "./intent.ts"
 import {
+  columnsOf,
   initialLayout,
   type Layout,
   layoutReducer,
@@ -25,47 +34,54 @@ import {
 import type { ComposerSpot } from "./put-target.ts"
 import { afterSpinOff } from "./spin-off.ts"
 
+const TEST_THREAD = threadIdFor("e")
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("ada@x.io")
-const C1 = cardId("c-1")
-const C2 = cardId("c-2")
+const C1 = textCardId("c-1")
+const C2 = textCardId("c-2")
 const index = tree({ "1-r1": null, "2-a": "1-r1" })
 const R1 = entryId("1-r1")
 const A = entryId("2-a")
 const inventory = { kind: "inventory", holder: ADA } as const
 const atEnd = {
   kind: "composing",
-  root: TEST_ROOT,
   at: atEntry(A),
-  lane: null,
+  thread: TEST_THREAD,
 } as const
 const note = { ...atEnd, kind: "note", cell: 0 } as const
 /** A move's note target: the host gives it the first empty cell. */
 const toNote = { ...note, cell: null } as const
 const pinnedKey = {
   kind: "pinned",
-  root: TEST_ROOT,
   at: atEntry(A),
-  lane: null,
+  thread: TEST_THREAD,
 } as const
 const pinnedAtA = { ...pinnedKey, order: "a" } as const
 const freshF1 = {
   kind: "fresh",
   column: "f-1",
   root: TEST_ROOT,
+  task: TEST_TASK,
   at: atEntry(A),
 } as const
 const onR1: Layout = resolveLayout(
   layoutReducer(initialLayout(), {
     kind: "show",
-    here: { kind: "root", root: R1 },
+    here: { kind: "task", task: TEST_TASK },
   }),
-  { index, lanes: [], archived: new Set(), list: [R1] },
+  {
+    index,
+    lanes: [],
+    archived: new Set(),
+    list: [TEST_TASK],
+    entries: new Map([[TEST_TASK, R1]]),
+  },
 )
 const withFresh: Layout = layoutReducer(onR1, {
   kind: "columns",
-  root: R1,
+  task: TEST_TASK,
+  entry: R1,
   action: {
     kind: "openFresh",
     key: "f-1",
@@ -74,9 +90,10 @@ const withFresh: Layout = layoutReducer(onR1, {
     after: 0,
   },
 })
-const threadKey = onR1.roots.get(R1)?.[0]?.key ?? ""
+const threadKey = columnsOf(onR1, TEST_TASK, R1)[0]?.key ?? ""
 
-const card = (id: typeof C1, place: CardPlace): CardRecord => ({
+const card = (id: typeof C1, place: TextPlace): TextCard => ({
+  kind: "text",
   id,
   owner: ADA,
   placer: ADA,
@@ -106,13 +123,17 @@ const state = (
   index,
   asks: indexAsks(index),
   cards: facts(cards),
-  rootEntries: new Map([[TEST_ROOT, R1]]),
-  rootIds: new Map([[R1, TEST_ROOT]]),
+  tasks: tasksFor([TEST_TASK, R1]),
   listWidth: "full",
   page: null,
 })
 const plan = (intent: Intent, s: IntentState) =>
-  planIntent(intent, s, { key: "new-k", root: NEW_ROOT, thread: NEW_THREAD })
+  planIntent(intent, s, {
+    key: "new-k",
+    root: NEW_ROOT,
+    task: NEW_TASK,
+    thread: NEW_THREAD,
+  })
 const inColumn = (
   act: Extract<Intent, { kind: "column" }>["act"],
   key = "f-1",
@@ -130,6 +151,7 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
         how: { actedAt: { kind: "inventory" }, slot: 4 },
         queuedBy: null,
         fly: true,
+        here: null,
       },
     ])
     const intoInventory = plan(
@@ -141,7 +163,7 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
 
   test("full: refused at once, in the inventory", () => {
     const slots = Object.fromEntries(
-      Array.from({ length: 18 }, (_, n) => [String(n), cardId(`h-${n}`)]),
+      Array.from({ length: 18 }, (_, n) => [String(n), textCardId(`h-${n}`)]),
     )
     expect(
       plan(
@@ -169,6 +191,7 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
     ).toEqual({
       kind: "createCard",
       card: {
+        kind: "text" as const,
         id: C2,
         owner: ADA,
         placer: ADA,
@@ -198,6 +221,7 @@ describe("put", () => {
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
         fly: true,
+        here: null,
       },
     ])
   })
@@ -239,12 +263,12 @@ describe("put", () => {
 })
 
 describe("your message (ADR-0113)", () => {
-  const MSG = cardId("c-9")
+  const MSG = textCardId("c-9")
   const withMessage = (
     filled: boolean,
     cards: readonly CardRecord[],
     key = threadKey,
-    place: CardPlace = atEnd,
+    place: TextPlace = atEnd,
   ) =>
     state({
       cards: [...cards, card(MSG, place)],
@@ -269,6 +293,7 @@ describe("your message (ADR-0113)", () => {
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
         fly: true,
+        here: null,
       },
     ])
   })
@@ -283,6 +308,7 @@ describe("your message (ADR-0113)", () => {
         ],
         actedAt: { kind: "column", key: threadKey },
         close: [],
+        here: null,
       },
     ])
   })
@@ -341,13 +367,14 @@ describe("your message (ADR-0113)", () => {
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
         fly: true,
+        here: null,
       },
     ])
   })
 })
 
 describe("a notes board's cells (ADR-0113)", () => {
-  const C3 = cardId("c-3")
+  const C3 = textCardId("c-3")
   const inCell = (cell: number) => ({ ...note, cell })
   const board = (cards: readonly CardRecord[], cells: [number, typeof C1][]) =>
     state({
@@ -389,6 +416,7 @@ describe("a notes board's cells (ADR-0113)", () => {
         ],
         actedAt: { kind: "column", key: threadKey },
         close: [],
+        here: null,
       },
     ])
   })
@@ -423,6 +451,7 @@ describe("pin and unpin (ADR-0048 step 5)", () => {
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
         fly: true,
+        here: null,
       },
     ])
   })
@@ -463,7 +492,7 @@ describe("keep on close (ADR-0066)", () => {
   test("one move of every card into successive slots, then the close", () => {
     const s = state({
       cards: [card(C1, freshF1), card(C2, freshF1)],
-      slots: { "0": cardId("x") },
+      slots: { "0": textCardId("x") },
     })
     const [keep] = plan(inColumn({ kind: "keep", cards: [C1, C2] }), s)
     expect(keep).toMatchObject({
@@ -479,6 +508,7 @@ describe("keep on close (ADR-0066)", () => {
           action: { kind: "columns", action: { kind: "close", index: 1 } },
         },
       ],
+      here: null,
     })
   })
 
@@ -504,23 +534,24 @@ describe("keep on close (ADR-0066)", () => {
 describe("undo and redo of moves (ADR-0066)", () => {
   const undo: Intent = { kind: "undoMove", direction: "undo", inPanel: false }
 
-  test("in a root's tab: that root's history, by its id", () => {
+  test("on a task: that task's history", () => {
     expect(plan(undo, state({}, onR1))).toEqual([
-      { kind: "undoMoves", root: TEST_ROOT, direction: "undo" },
+      { kind: "undoMoves", task: TEST_TASK, direction: "undo" },
     ])
   })
 
-  test("in a new tab: the root it minted as it opened", () => {
+  test("in a new tab: the task it minted as it opened", () => {
     const newTab = layoutReducer(onR1, {
       kind: "newTab",
       key: "n",
       root: NEW_ROOT,
+      task: NEW_TASK,
       thread: NEW_THREAD,
       asksAgent: false,
     })
     expect(
       plan({ ...undo, direction: "redo" } as Intent, state({}, newTab)),
-    ).toEqual([{ kind: "undoMoves", root: NEW_ROOT, direction: "redo" }])
+    ).toEqual([{ kind: "undoMoves", task: NEW_TASK, direction: "redo" }])
   })
 
   test("with the inventory panel focused: this tab's swaps", () => {
@@ -529,13 +560,12 @@ describe("undo and redo of moves (ADR-0066)", () => {
     ])
   })
 
-  test("on nothing, or a root the directory does not name: nothing", () => {
+  test("on nothing: nothing", () => {
     const nothing = layoutReducer(onR1, {
       kind: "show",
       here: { kind: "nothing" },
     })
     expect(plan(undo, state({}, nothing))).toEqual([])
-    expect(plan(undo, { ...state({}, onR1), rootIds: new Map() })).toEqual([])
   })
 })
 
@@ -563,9 +593,8 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
           card: C1,
           place: {
             kind: "queued",
-            root: TEST_ROOT,
             at: atEntry(A),
-            lane: threadIdFor("x"),
+            thread: threadIdFor("x"),
             seen: "",
           },
         },
@@ -581,7 +610,7 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
     ).toEqual([{ kind: "showInventory", brief: false }])
   })
 
-  test("back in a fresh column the layout holds: its root shown, once for a keep's cards", () => {
+  test("back in a fresh column the layout holds: its task shown, once for a keep's cards", () => {
     expect(
       answered(
         {
@@ -596,26 +625,27 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
     ).toEqual([
       {
         kind: "layout",
-        action: { kind: "show", here: { kind: "root", root: R1 } },
+        action: { kind: "show", here: { kind: "task", task: TEST_TASK } },
       },
-      { kind: "list", act: { kind: "ensure", root: TEST_ROOT } },
+      { kind: "list", act: { kind: "ensure", task: TEST_TASK } },
     ])
   })
 
-  test("back in a fresh column it no longer holds: opened again at the end of its root's columns", () => {
+  test("back in a fresh column it no longer holds: opened again at the end of its task's columns", () => {
     expect(
       answered({ kind: "undone", cards: [{ card: C1, place: freshF1 }] }),
     ).toEqual([
       {
         kind: "layout",
-        action: { kind: "show", here: { kind: "root", root: R1 } },
+        action: { kind: "show", here: { kind: "task", task: TEST_TASK } },
       },
-      { kind: "list", act: { kind: "ensure", root: TEST_ROOT } },
+      { kind: "list", act: { kind: "ensure", task: TEST_TASK } },
       {
         kind: "layout",
         action: {
           kind: "columns",
-          root: R1,
+          task: TEST_TASK,
+          entry: R1,
           action: {
             kind: "openFresh",
             key: "f-1",
@@ -696,34 +726,34 @@ describe("openTrace: where a trace leads (ADR-0048, Other people)", () => {
 
 describe("a card made a thread (ADR-0111)", () => {
   const S1 = workflowStateIdFor("s-1")
-  const spun = (root: typeof TEST_ROOT | null) => ({
+  // The host names the move's history (ADR-0116): the page names none.
+  const spun = {
     kind: "gone",
-    root,
     why: { kind: "spun", into: NEW_ROOT, thread: NEW_THREAD },
-  })
+  } as const
   test.each([
     [
-      "a note dropped on a state: its thread there, the move in the note's root",
+      "a note dropped on a state: its thread there, sent with the task you are on",
       card(C1, note),
       { kind: "state", state: S1 },
-      { from: note, history: TEST_ROOT, state: S1, sidebar: null },
+      { from: note, state: S1, sidebar: null, here: TEST_TASK },
     ],
     [
-      "an inventory card dropped in the sidebar: the move in the new root, placed before the root it was dropped on",
+      "an inventory card dropped in the sidebar: placed before the task it was dropped on, sent with the new task, which you will be on",
       card(C1, { kind: "inventory", holder: ADA }),
-      { kind: "sidebar", before: R1 },
+      { kind: "sidebar", before: TEST_TASK },
       {
         from: inventory,
-        history: NEW_ROOT,
         state: null,
-        sidebar: { before: TEST_ROOT },
+        sidebar: { before: TEST_TASK },
+        here: NEW_TASK,
       },
     ],
     [
-      "an inventory card dropped on a state: the move in the root you are on",
+      "an inventory card dropped on a state, sent with the task you are on",
       card(C1, { kind: "inventory", holder: ADA }),
       { kind: "state", state: S1 },
-      { from: inventory, history: TEST_ROOT, state: S1, sidebar: null },
+      { from: inventory, state: S1, sidebar: null, here: TEST_TASK },
     ],
   ] as const)("%s", (_, c, target, want) => {
     expect(
@@ -733,10 +763,11 @@ describe("a card made a thread (ADR-0111)", () => {
         kind: "spinOff",
         request: {
           kind: "spin-off",
-          move: { card: C1, from: want.from, to: spun(want.history) },
+          move: { card: C1, from: want.from, to: spun },
+          task: NEW_TASK,
           state: want.state,
+          here: want.here,
         },
-        thread: NEW_ROOT,
         sidebar: want.sidebar,
       },
     ])
@@ -761,27 +792,27 @@ describe("a card made a thread (ADR-0111)", () => {
     ).toEqual([])
   })
 
-  test("afterSpinOff: a sidebar drop places and shows the new root once its first message is written; nothing else", () => {
-    const sidebar = { before: TEST_ROOT }
+  test("afterSpinOff: a sidebar drop places and shows the new task once its first message is written; nothing else", () => {
+    const sidebar = { before: TEST_TASK }
     expect(
-      afterSpinOff({ kind: "appended", id: entryId("t-1") }, NEW_ROOT, sidebar),
+      afterSpinOff({ kind: "appended", id: entryId("t-1") }, NEW_TASK, sidebar),
     ).toEqual([
       {
         kind: "list",
-        act: { kind: "place", root: NEW_ROOT, before: TEST_ROOT },
+        act: { kind: "place", task: NEW_TASK, before: TEST_TASK },
       },
       {
         kind: "layout",
-        action: { kind: "show", here: { kind: "root", root: entryId("t-1") } },
+        action: { kind: "show", here: { kind: "task", task: NEW_TASK } },
       },
     ])
     expect(
-      afterSpinOff({ kind: "appended", id: entryId("t-1") }, NEW_ROOT, null),
+      afterSpinOff({ kind: "appended", id: entryId("t-1") }, NEW_TASK, null),
     ).toEqual([])
     expect(
       afterSpinOff(
         { kind: "refused", code: "refused", message: "no" },
-        NEW_ROOT,
+        NEW_TASK,
         sidebar,
       ),
     ).toEqual([])
@@ -797,6 +828,7 @@ describe("a new note on the notes board (ADR-0113)", () => {
       {
         kind: "createCard",
         card: {
+          kind: "text" as const,
           id: C1,
           owner: ADA,
           placer: ADA,

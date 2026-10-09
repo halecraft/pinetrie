@@ -64,8 +64,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "spentCards ignores the records",
     file: "packages/session/card-copies.ts",
-    from: "): CardId[] => [...letGo].filter(id => !live(id))",
-    to: "): CardId[] => [...letGo]",
+    from: "): Id[] => [...letGo].filter(id => !live(id))",
+    to: "): Id[] => [...letGo]",
     command: unit,
     expect: "spentCards: only the cards let go of",
   },

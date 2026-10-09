@@ -2,12 +2,15 @@ import {
   type AskIndex,
   atEntry,
   type CardRecord,
-  cardId,
   type EntryId,
   entryId,
   indexAsks,
-  type RootId,
   rootIdFor,
+  type TaskId,
+  type TextCard,
+  type TextPlace,
+  taskIdFor,
+  textCardId,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -15,9 +18,9 @@ import {
 import { describe, expect, test } from "vitest"
 import { BOARD_SEARCH } from "./board-view.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"
-import { NEW_ROOT, NEW_THREAD, tree } from "./fixtures.ts"
+import { NEW_ROOT, NEW_TASK, NEW_THREAD, tasksFor, tree } from "./fixtures.ts"
 import {
-  afterRootMove,
+  afterTaskMove,
   claimFocus,
   type Intent,
   nameEffects,
@@ -31,16 +34,19 @@ import {
   resolveLayout,
 } from "./layout.ts"
 
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-/** Each root's id, by its root entry: the sidebar's key. */
-const R1_ID = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
-const R2_ID = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a2")
-const R9_ID = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a9")
-const ROOT_IDS = new Map<EntryId, RootId>([
+/** Each root's task, by its root entry: the sidebar's key (ADR-0116). */
+const R1_ID = taskIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const R2_ID = taskIdFor("01a0ffd2-0000-7000-8000-0000000000a2")
+const R9_ID = taskIdFor("01a0ffd2-0000-7000-8000-0000000000a9")
+const ROOT_IDS = new Map<EntryId, TaskId>([
   [entryId("1-r1"), R1_ID],
   [entryId("5-r2"), R2_ID],
   [entryId("8-r9"), R9_ID],
 ])
+const TASK_OF = (root: string): TaskId => ROOT_IDS.get(entryId(root)) ?? R9_ID
 
 // r1 -> a -> b, with a branch a -> c; and r2 -> d.
 const index = tree({
@@ -56,14 +62,21 @@ const onRoot = (root: string): Layout =>
   resolveLayout(
     layoutReducer(initialLayout(), {
       kind: "show",
-      here: { kind: "root", root: entryId(root) },
+      here: { kind: "task", task: TASK_OF(root) },
     }),
-    { index, lanes: [], archived: new Set(), list: [entryId(root)] },
+    {
+      index,
+      lanes: [],
+      archived: new Set(),
+      list: [TASK_OF(root)],
+      entries: new Map([...ROOT_IDS].map(([e, t]) => [t, e] as const)),
+    },
   )
 const onNewTab: Layout = layoutReducer(initialLayout(), {
   kind: "newTab",
   key: "t",
   root: NEW_ROOT,
+  task: NEW_TASK,
   thread: NEW_THREAD,
   asksAgent: false,
 })
@@ -76,18 +89,17 @@ const at = (
   index,
   asks,
   cards,
-  rootEntries: new Map([...ROOT_IDS].map(([e, r]) => [r, e] as const)),
-  rootIds: ROOT_IDS,
+  tasks: tasksFor(...[...ROOT_IDS].map(([e, t]) => [t, e] as const)),
   listWidth: "full",
   page: null,
 })
 /** A root shown: the root you are on, and in the sidebar, at its end if it was not. */
-const shown = (root: string, id: RootId): Effect[] => [
+const shown = (root: string, id: TaskId): Effect[] => [
   {
     kind: "layout",
-    action: { kind: "show", here: { kind: "root", root: entryId(root) } },
+    action: { kind: "show", here: { kind: "task", task: TASK_OF(root) } },
   },
-  { kind: "list", act: { kind: "ensure", root: id } },
+  { kind: "list", act: { kind: "ensure", task: id } },
 ]
 const ME = writerId("ada@x.io")
 const NO_CARDS: CardFacts = {
@@ -102,7 +114,12 @@ const NO_CARDS: CardFacts = {
 }
 const R1 = at(onRoot("1-r1"))
 const plan = (intent: Intent, state: IntentState = R1) =>
-  planIntent(intent, state, { key: "k", root: NEW_ROOT, thread: NEW_THREAD })
+  planIntent(intent, state, {
+    key: "k",
+    root: NEW_ROOT,
+    task: NEW_TASK,
+    thread: NEW_THREAD,
+  })
 const column = (
   act: Extract<Intent, { kind: "column" }>["act"],
   position = 0,
@@ -111,10 +128,10 @@ const column = (
 describe("planIntent", () => {
   test("× on a root closes it for you: it leaves the sidebar, and nothing shared is written", () => {
     expect(
-      plan({ kind: "close", here: { kind: "root", root: entryId("1-r1") } }),
+      plan({ kind: "close", here: { kind: "task", task: TASK_OF("1-r1") } }),
     ).toEqual([
-      { kind: "list", act: { kind: "close", root: R1_ID } },
-      { kind: "layout", action: { kind: "closeRoot", root: "1-r1" } },
+      { kind: "list", act: { kind: "close", task: R1_ID } },
+      { kind: "layout", action: { kind: "closeTask", task: TASK_OF("1-r1") } },
     ])
   })
 
@@ -127,7 +144,7 @@ describe("planIntent", () => {
 
   test("showing a root opens it in the sidebar; reordering the sidebar places it by id (ADR-0122)", () => {
     expect(
-      plan({ kind: "show", here: { kind: "root", root: entryId("5-r2") } }),
+      plan({ kind: "show", here: { kind: "task", task: TASK_OF("5-r2") } }),
     ).toEqual(shown("5-r2", R2_ID))
     expect(plan({ kind: "show", here: { kind: "nothing" } })).toEqual([
       { kind: "layout", action: { kind: "show", here: { kind: "nothing" } } },
@@ -135,40 +152,43 @@ describe("planIntent", () => {
     expect(
       plan({
         kind: "moveInList",
-        root: entryId("5-r2"),
-        before: entryId("1-r1"),
+        task: TASK_OF("5-r2"),
+        before: TASK_OF("1-r1"),
       }),
     ).toEqual([
-      { kind: "list", act: { kind: "place", root: R2_ID, before: R1_ID } },
+      { kind: "list", act: { kind: "place", task: R2_ID, before: R1_ID } },
     ])
     expect(
-      plan({ kind: "moveInList", root: entryId("5-r2"), before: null }),
+      plan({ kind: "moveInList", task: TASK_OF("5-r2"), before: null }),
     ).toEqual([
-      { kind: "list", act: { kind: "place", root: R2_ID, before: null } },
+      { kind: "list", act: { kind: "place", task: R2_ID, before: null } },
     ])
   })
 
   test("a move on the board asks the host; into the archive it closes the root for you once accepted (ADR-0122)", () => {
     const [from, to] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
     const move = (closes: boolean) =>
-      plan({ kind: "moveRoot", root: R1_ID, from, to, before: null, closes })
+      plan({ kind: "moveTask", task: R1_ID, from, to, before: null, closes })
     const request = {
-      kind: "move-root",
-      root: R1_ID,
+      kind: "move-task",
+      task: R1_ID,
       from,
       to,
       before: null,
     } as const
     expect(move(false)).toEqual([
-      { kind: "moveRoot", move: request, moved: [] },
+      { kind: "moveTask", move: request, moved: [] },
     ])
     expect(move(true)).toEqual([
       {
-        kind: "moveRoot",
+        kind: "moveTask",
         move: request,
         moved: [
-          { kind: "list", act: { kind: "close", root: R1_ID } },
-          { kind: "layout", action: { kind: "closeRoot", root: "1-r1" } },
+          { kind: "list", act: { kind: "close", task: R1_ID } },
+          {
+            kind: "layout",
+            action: { kind: "closeTask", task: TASK_OF("1-r1") },
+          },
         ],
       },
     ])
@@ -207,6 +227,7 @@ describe("planIntent", () => {
         kind: "newTab",
         key: "k",
         root: NEW_ROOT,
+        task: NEW_TASK,
         thread: NEW_THREAD,
         asksAgent: true,
         state,
@@ -231,7 +252,8 @@ describe("planIntent", () => {
         kind: "layout",
         action: {
           kind: "columns",
-          root: "1-r1",
+          task: TASK_OF("1-r1"),
+          entry: "1-r1",
           action: {
             kind: "openFresh",
             key: "k",
@@ -245,7 +267,7 @@ describe("planIntent", () => {
   })
 
   test("branch here, after a conflict, opens a fresh column holding the text", () => {
-    const pending = { text: "hi", card: cardId("c") }
+    const pending = { text: "hi", card: textCardId("c") }
     expect(
       plan(column({ kind: "branchInstead", at: entryId("3-b"), pending }, 2)),
     ).toEqual([
@@ -254,7 +276,8 @@ describe("planIntent", () => {
         kind: "layout",
         action: {
           kind: "columns",
-          root: "1-r1",
+          task: TASK_OF("1-r1"),
+          entry: "1-r1",
           action: {
             kind: "openFresh",
             key: "k",
@@ -278,6 +301,7 @@ describe("planIntent", () => {
           kind: "newTab",
           key: "k",
           root: NEW_ROOT,
+          task: NEW_TASK,
           thread: NEW_THREAD,
           asksAgent: true,
           prefill,
@@ -295,6 +319,7 @@ describe("planIntent", () => {
           kind: "newTab",
           key: "k",
           root: NEW_ROOT,
+          task: NEW_TASK,
           thread: NEW_THREAD,
           asksAgent: false,
         },
@@ -303,15 +328,17 @@ describe("planIntent", () => {
   })
 
   test("closing a column discards its card first; a new tab's closes the tab", () => {
-    const close = column({ kind: "close", discard: [cardId("c")] }, 1)
+    const close = column({ kind: "close", discard: [textCardId("c")] }, 1)
     const place = {
       kind: "fresh",
       column: "col-k",
       root: TEST_ROOT,
+      task: TEST_TASK,
       at: atEntry(entryId("2-a")),
     } as const
     const held: CardRecord = {
-      id: cardId("c"),
+      kind: "text" as const,
+      id: textCardId("c"),
       owner: ME,
       placer: ME,
       place,
@@ -320,12 +347,14 @@ describe("planIntent", () => {
     }
     const holding = { ...NO_CARDS, cards: [held] }
     const R1 = at(onRoot("1-r1"), undefined, holding)
-    const discard = {
+    // Sent with the task you are on, or the new tab's: from no task, a
+    // discard's history is its sender's (ADR-0116).
+    const discard = (task: TaskId) => ({
       kind: "moveCard",
       move: {
         card: "c",
         from: place,
-        to: { kind: "gone", root: TEST_ROOT, why: { kind: "discarded" } },
+        to: { kind: "gone", why: { kind: "discarded" } },
       },
       how: {
         actedAt: { kind: "column", key: "col-k" },
@@ -333,20 +362,22 @@ describe("planIntent", () => {
       },
       queuedBy: null,
       fly: false,
-    }
+      here: task,
+    })
     expect(plan(close, R1)).toEqual([
-      discard,
+      discard(R1_ID),
       {
         kind: "layout",
         action: {
           kind: "columns",
-          root: "1-r1",
+          task: TASK_OF("1-r1"),
+          entry: "1-r1",
           action: { kind: "close", index: 1 },
         },
       },
     ])
     expect(plan(close, at(onNewTab, undefined, holding))).toEqual([
-      discard,
+      discard(NEW_TASK),
       { kind: "layout", action: { kind: "closeNewTab", key: "t" } },
     ])
     expect(plan(column({ kind: "close", discard: [] }), at(onNewTab))).toEqual([
@@ -360,7 +391,12 @@ describe("planIntent", () => {
     expect(plan(column(action))).toEqual([
       {
         kind: "layout",
-        action: { kind: "columns", root: "1-r1", action },
+        action: {
+          kind: "columns",
+          task: TASK_OF("1-r1"),
+          entry: "1-r1",
+          action,
+        },
       },
     ])
     expect(plan(column(action), at(onNewTab))).toEqual([
@@ -382,7 +418,15 @@ describe("planIntent", () => {
   ] as const)("a column's %s is set by its key, on its root's tab or its new tab", (_, act, action) => {
     expect(readerAction(act, "col-k")).toEqual(action)
     expect(plan(column(act, 2))).toEqual([
-      { kind: "layout", action: { kind: "columns", root: "1-r1", action } },
+      {
+        kind: "layout",
+        action: {
+          kind: "columns",
+          task: TASK_OF("1-r1"),
+          entry: "1-r1",
+          action,
+        },
+      },
     ])
     expect(plan(column(act), at(onNewTab))).toEqual([
       { kind: "layout", action: { kind: "newTabColumn", key: "t", action } },
@@ -400,7 +444,8 @@ describe("planIntent", () => {
         kind: "layout",
         action: {
           kind: "columns",
-          root: "1-r1",
+          task: TASK_OF("1-r1"),
+          entry: "1-r1",
           action: { kind: "move", from: 2, to: 0 },
         },
       },
@@ -424,7 +469,8 @@ describe("planIntent", () => {
         kind: "layout",
         action: {
           kind: "columns",
-          root: "1-r1",
+          task: TASK_OF("1-r1"),
+          entry: "1-r1",
           action: { kind: "open", key: "k", after: 0, anchor: "4-c" },
         },
       })
@@ -457,13 +503,13 @@ describe("planIntent", () => {
 
     test("openIn: an entry this tab holds opens as openAt does; another root is shown, archived or not, and the entry once it arrives (ADR-0063)", () => {
       expect(
-        plan({ kind: "openIn", entry: entryId("3-b"), root: entryId("1-r1") }),
+        plan({ kind: "openIn", entry: entryId("3-b"), task: TASK_OF("1-r1") }),
       ).toEqual(plan({ kind: "openAt", entry: entryId("3-b") }))
       expect(
         plan({
           kind: "openIn",
           entry: entryId("9-far"),
-          root: entryId("8-r9"),
+          task: TASK_OF("8-r9"),
         }),
       ).toEqual([
         ...shown("8-r9", R9_ID),
@@ -484,12 +530,13 @@ describe("planIntent", () => {
     const lane = threadIdFor("x")
     const where = atEntry(entryId("3-b"))
     const ada = writerId("ada@x.test")
-    const c = cardId("c-1")
-    const fresh: CardRecord = {
-      id: cardId("c-new"),
+    const c = textCardId("c-1")
+    const fresh: TextCard = {
+      kind: "text",
+      id: textCardId("c-new"),
       owner: ada,
       placer: ada,
-      place: { kind: "composing", root: TEST_ROOT, at: where, lane },
+      place: { kind: "composing", at: where, thread: lane },
       carries: { kind: "message", command: null },
       unsent: null,
     }
@@ -501,26 +548,24 @@ describe("planIntent", () => {
     ])
     const atEnd = {
       kind: "composing",
-      root: TEST_ROOT,
       at: where,
-      lane,
+      thread: lane,
     } as const
     const queuedPlace = {
       kind: "queued",
-      root: TEST_ROOT,
       at: where,
-      lane,
+      thread: lane,
       order: "a",
       by: ada,
       seen: "v",
     } as const
-    const withCard = (place: CardRecord["place"], records = laneRecords) =>
+    const withCard = (place: TextPlace, records = laneRecords) =>
       ({
         ...NO_CARDS,
         cards: [{ ...fresh, id: c, place }],
         laneRecords: records,
       }) satisfies CardFacts
-    test("a queue is one queueCard, into its lane's root, with the hold change asked, said in the column; with no root, or no card, nothing", () => {
+    test("a queue is one queueCard, onto its lane, with the hold change asked, said in the column; with no card, nothing", () => {
       const queue = column({
         kind: "queue",
         card: c,
@@ -533,7 +578,7 @@ describe("planIntent", () => {
         const move = {
           card: c,
           from: atEnd,
-          to: { kind: "queued", root: OTHER_ROOT, at: where, lane, seen: "" },
+          to: { kind: "queued", at: where, thread: lane, seen: "" },
         }
         expect(plan(queue, state)).toEqual([
           {
@@ -545,11 +590,6 @@ describe("planIntent", () => {
           },
         ])
       }
-      const fresh = withCard(
-        { kind: "fresh", column: "f", root: TEST_ROOT, at: where },
-        new Map(),
-      )
-      expect(plan(queue, at(onNewTab, undefined, fresh))).toEqual([])
       expect(plan(queue)).toEqual([])
     })
     test("an unqueue puts the card back where it was queued, saying who queued it; a card not queued, nothing", () => {
@@ -557,7 +597,7 @@ describe("planIntent", () => {
       const state = at(onRoot("1-r1"), undefined, withCard(queuedPlace))
       const move = {
         card: c,
-        from: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "v" },
+        from: { kind: "queued", at: where, thread: lane, seen: "v" },
         to: { ...atEnd, kind: "note", cell: null },
       }
       expect(plan(unqueue, state)).toEqual([
@@ -567,6 +607,7 @@ describe("planIntent", () => {
           how: inColumn,
           queuedBy: ada,
           fly: false,
+          here: null,
         },
       ])
       expect(
@@ -577,7 +618,7 @@ describe("planIntent", () => {
       const q = (id: string, order: string) =>
         ({
           ...fresh,
-          id: cardId(id),
+          id: textCardId(id),
           place: { ...queuedPlace, order },
         }) satisfies CardRecord
       const [a, b] = [q("c-a", "a"), q("c-b", "b")]
@@ -600,7 +641,7 @@ describe("planIntent", () => {
           kind: "reorderCard",
           reorder: {
             card: b.id,
-            at: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "v" },
+            at: { kind: "queued", at: where, thread: lane, seen: "v" },
             after: null,
             before: a.id,
           },
@@ -638,7 +679,6 @@ describe("planIntent", () => {
           column({
             kind: "queueNew",
             card: fresh.id,
-            root: TEST_ROOT,
             command: "bring-up-to-date",
             hold: "keep",
             lane,
@@ -651,7 +691,7 @@ describe("planIntent", () => {
           move: {
             card: fresh.id,
             from: null,
-            to: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "" },
+            to: { kind: "queued", at: where, thread: lane, seen: "" },
           },
           hold: "keep",
           command: "bring-up-to-date",
@@ -670,7 +710,6 @@ describe("planIntent", () => {
           column({
             kind: "queueNew",
             card: fresh.id,
-            root: TEST_ROOT,
             command: "continue-on-accepted",
             hold: "keep",
             lane,
@@ -688,23 +727,25 @@ describe("planIntent", () => {
     ])
   })
 
-  test("rename and retitle are one write each", () => {
-    const root = entryId("1-r1")
-    expect(plan({ kind: "rename", root, title: "T" })).toEqual([
-      { kind: "mark", root, title: "T" },
+  test("rename and retitle are one request each, by task", () => {
+    const task = TASK_OF("1-r1")
+    expect(plan({ kind: "rename", task, title: "T" })).toEqual([
+      { kind: "request", intent: { kind: "mark", task, title: "T" } },
     ])
-    expect(plan({ kind: "retitle", root })).toEqual([{ kind: "retitle", root }])
+    expect(plan({ kind: "retitle", task })).toEqual([
+      { kind: "request", intent: { kind: "retitle", task } },
+    ])
   })
 })
 
-test("afterRootMove: what follows a move runs only once the host accepts it", () => {
+test("afterTaskMove: what follows a move runs only once the host accepts it", () => {
   const moved: Effect[] = [
-    { kind: "layout", action: { kind: "closeRoot", root: entryId("1-r1") } },
+    { kind: "layout", action: { kind: "closeTask", task: TASK_OF("1-r1") } },
   ]
-  expect(afterRootMove({ kind: "moved-root" }, moved)).toBe(moved)
+  expect(afterTaskMove({ kind: "moved-task" }, moved)).toBe(moved)
   expect(
-    afterRootMove(
-      { kind: "refused", code: "root_moved", message: "no" },
+    afterTaskMove(
+      { kind: "refused", code: "task_moved", message: "no" },
       moved,
     ),
   ).toEqual([])
@@ -741,7 +782,7 @@ describe("a page over the workspace (ADR-0098)", () => {
   const leave: Effect = { kind: "page", to: null }
   const r2: Intent = {
     kind: "show",
-    here: { kind: "root", root: entryId("5-r2") },
+    here: { kind: "task", task: TASK_OF("5-r2") },
   }
   test("opening and leaving a page are the page effect", () => {
     expect(plan({ kind: "page", to: "profile" })).toEqual([
@@ -764,7 +805,7 @@ describe("a page over the workspace (ADR-0098)", () => {
     const inbox: Intent = {
       kind: "openIn",
       entry: entryId("9-unheld"),
-      root: entryId("5-r2"),
+      task: TASK_OF("5-r2"),
     }
     expect(plan(inbox, onPage)[0]).toEqual(leave)
   })

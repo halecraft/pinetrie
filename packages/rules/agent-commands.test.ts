@@ -1,12 +1,12 @@
 import {
   atEntry,
   type CardRecord,
-  cardId,
   commitId,
   entryId,
   type OfferRecord,
   rootIdFor,
   type ThreadName,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -191,7 +191,7 @@ describe("catchUpAnswer", () => {
 })
 
 describe("planSplitCall (ADR-0080)", () => {
-  const ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+  const _ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
   const open = {
     kind: "open",
     record: {} as OfferRecord,
@@ -204,20 +204,19 @@ describe("planSplitCall (ADR-0080)", () => {
       prompt: "chat",
       running: true,
       by: ADA,
-      id: cardId("s-1"),
-      root: ROOT_ID,
+      id: textCardId("s-1"),
       at: atEntry(entryId("e-1")),
       ...over,
     })
   const queuedSplit: CardRecord = {
-    id: cardId("q-1"),
+    kind: "text",
+    id: textCardId("q-1"),
     owner: ADA,
     placer: ADA,
     place: {
       kind: "queued",
-      root: ROOT_ID,
       at: atEntry(entryId("e-1")),
-      lane: LANE,
+      thread: LANE,
       order: "0000000001",
       by: ADA,
       seen: "",
@@ -233,8 +232,9 @@ describe("planSplitCall (ADR-0080)", () => {
         step: {
           kind: "write",
           record: {
+            kind: "text",
             owner: ADA,
-            place: { kind: "queued", lane: LANE, by: ADA, seen: "" },
+            place: { kind: "queued", thread: LANE, by: ADA, seen: "" },
             carries: { kind: "message", command: "split" },
           },
         },

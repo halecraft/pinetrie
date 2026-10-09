@@ -10,7 +10,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { encodeChat, MARK, PARTICIPANT, setRecord } from "@pinetrie/rules"
+import { encodeChat, PARTICIPANT } from "@pinetrie/rules"
 import {
   applyRecordWrites,
   type RecordsDocHandle,
@@ -103,24 +103,11 @@ describe("readRootRecord", () => {
       entry: "e1",
       first: "e1",
       firstLine: "plan the rail",
-      title: null,
       newest: "e2",
       writers: [ADA],
       mentions: [{ id: "e2", by: ADA, text: "@bea look" }],
       images: [SHA],
     })
-  })
-
-  test("a root's title is its root entry's mark", () => {
-    const doc = rootWith(row("e1", null, chat("plan")))
-    const w = setRecord(
-      MARK,
-      { entry: entryId("e1"), title: "Plans", by: ADA, at: 1 },
-      ROOT,
-    )
-    if (w.kind !== "set") throw new Error("a set")
-    put(doc, w.namespace, w.key, w.value)
-    expect(readRootRecord(ROOT, doc).title).toBe("Plans")
   })
 
   test("each thread's writers are those on its path, in order of first message (ADR-0077)", () => {

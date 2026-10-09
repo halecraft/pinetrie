@@ -1,26 +1,29 @@
-// host/commands/board — move a root on the board, or change its workflow
-// states (ADR-0122).
+// host/commands/board — move a task on the board, or change its workflow
+// states (ADR-0122, ADR-0116).
 //
 // A move runs in up to three parts (ADR-0065). On the documents' keeper:
-// gather the workflow and the places, plan the move (`planRootMove`); if it
-// crosses the archive's edge, gather the root's document and plan the
-// crossing (`planArchive`); then write the place, from which moment the
-// archive gate refuses writes into an archived root. Off the keeper: the
-// crossing's teardown (its lanes' containers, their refs in your repo through
-// the owner, snapshots). Then, on archiving, the root's document unloaded on
-// the keeper again. The sender's reply comes after all of it.
+// gather the workflow and the places, plan the move (`planTaskMove`); if it
+// crosses the archive's edge, gather the documents of the task's roots and
+// plan the crossing (`planArchive`); then write the place, from which moment
+// the archive gate refuses writes into the archived task. Off the keeper:
+// the crossing's teardown (its lanes' containers, their refs in your repo
+// through the owner, snapshots). Then, on archiving, the roots nothing else
+// holds unloaded on the keeper again. The sender's reply comes after all of
+// it.
 
 import {
   type EntryId,
   ERR,
   type Intent,
+  type RevisionRecord,
   type RootId,
   refused,
-  type ThreadId,
+  type TaskId,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
+  readArchived,
   readBoardPlaces,
   readLaneRecords,
   readLanes,
@@ -28,7 +31,8 @@ import {
   readPlaces,
   readQueueHolds,
   readRevisions,
-  readRoots,
+  readTasks,
+  readThreads,
   readTreeIndex,
   readWorkflow,
 } from "@pinetrie/reads"
@@ -38,15 +42,17 @@ import {
   boardOf,
   type Crossing,
   planArchive,
-  planRootMove,
+  planTaskMove,
   planWorkflowEdit,
+  rootsHeld,
   setRecord,
   WORKFLOW,
 } from "@pinetrie/rules"
-import { readLaneTip, type SessionDocHandle } from "@pinetrie/schema"
+import { readLaneTip } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { Records } from "../records.ts"
+import { tasksNow } from "../tasks.ts"
 import type { LaneWork } from "../work/index.ts"
 
 export interface BoardDeps {
@@ -61,17 +67,10 @@ export interface BoardDeps {
   readonly cards: Pick<CardPort, "blankQueued">
 }
 
-/** The lanes of their own that work in `root`, from their records. */
-const lanesIn = (session: SessionDocHandle, root: RootId): ThreadId[] =>
-  [...readLaneRecords(session).values()]
-    .filter(r => r.root === root && r.ownCopy)
-    .map(r => r.lane)
-
-/** The roots the board shows: every root in the directory with a message. */
-const boardRoots = (session: SessionDocHandle): readonly RootId[] =>
-  [...readRoots(session).values()].flatMap(r =>
-    r.entry === null ? [] : [r.root],
-  )
+/** The tasks the board shows: every task the session holds. */
+const boardTasks = (basics: Pick<Basics, "session">): readonly TaskId[] => [
+  ...readTasks(basics.session).keys(),
+]
 
 /** What the keeper's first step decided: the answer, and what follows it. */
 type Recorded =
@@ -80,23 +79,25 @@ type Recorded =
       readonly kind: "follow"
       readonly outcome: Outcome
       readonly teardown: ArchiveTeardown
-      readonly unload: RootId | null
+      readonly unload: readonly RootId[]
     }
 
-const MOVED: Outcome = { kind: "moved-root" }
+const MOVED: Outcome = { kind: "moved-task" }
 
-export async function handleRootMove(
+export async function handleTaskMove(
   deps: BoardDeps,
   writer: WriterId,
-  intent: Extract<Intent, { kind: "move-root" }>,
+  intent: Extract<Intent, { kind: "move-task" }>,
 ): Promise<Outcome> {
   const recorded = await deps.keeper.run(() => record(deps, writer, intent))
   if (recorded.kind === "done") return recorded.outcome
   // Off the keeper: no other seat's command waits on containers or your repo.
   await deps.keeper.track(deps.work.teardown(recorded.teardown))
   const { unload } = recorded
-  if (unload !== null)
-    await deps.keeper.run(() => deps.basics.docs.unload(unload))
+  if (unload.length > 0)
+    await deps.keeper.run(async () => {
+      for (const root of unload) await deps.basics.docs.unload(root)
+    })
   return recorded.outcome
 }
 
@@ -104,7 +105,7 @@ export async function handleRootMove(
 async function record(
   deps: BoardDeps,
   writer: WriterId,
-  intent: Extract<Intent, { kind: "move-root" }>,
+  intent: Extract<Intent, { kind: "move-task" }>,
 ): Promise<Recorded> {
   const { session, now } = deps.basics
   // gather: the board
@@ -112,8 +113,8 @@ async function record(
   if (workflow === null)
     return done(refused(ERR.UNKNOWN_STATE, "the board has no states yet"))
   // plan the move (pure)
-  const moved = planRootMove({
-    root: intent.root,
+  const moved = planTaskMove({
+    task: intent.task,
     from: intent.from,
     to: intent.to,
     before: intent.before,
@@ -121,7 +122,7 @@ async function record(
     now: now(),
     workflow,
     places: readBoardPlaces(session),
-    roots: boardRoots(session),
+    tasks: boardTasks(deps.basics),
     names: readParticipantNames(session),
   })
   if (moved.kind === "refused") return done(moved)
@@ -132,9 +133,7 @@ async function record(
     return done(MOVED)
   }
   // gather what crossing the archive's edge needs, and plan it (pure)
-  const entry = readRoots(session).get(intent.root)?.entry ?? null
-  if (entry === null) return done(refused(ERR.UNKNOWN_TARGET, "no such root"))
-  const crossed = await planCrossing(deps, intent.root, entry, moved.transition)
+  const crossed = await planCrossing(deps, intent.task, moved.transition)
   if (crossed.kind === "refused") return done(crossed)
   // execute
   await deps.records.writeValues(writes)
@@ -142,41 +141,55 @@ async function record(
     kind: "follow",
     outcome: MOVED,
     teardown: crossed.teardown,
-    unload: crossed.unload ? intent.root : null,
+    unload: crossed.unload,
   }
 }
 
-/** The root's own document (ADR-0063), opened if it is not, and `planArchive` over it. */
+/**
+ * The documents of the task's roots (ADR-0063), opened if they are not, and
+ * `planArchive` over them: the task's threads' lanes, its lanes of their
+ * own with their tips, their revisions, and which of its roots another task
+ * or an inventory still holds.
+ */
 async function planCrossing(
   deps: BoardDeps,
-  root: RootId,
-  entry: EntryId,
+  task: TaskId,
   crossing: Crossing,
 ): Promise<ReturnType<typeof planArchive>> {
   const { session, docs, live, places } = deps.basics
-  const doc = await docs.root(root)
-  const blank = await deps.cards.blankQueued(readPlaces(places))
-  const index = readTreeIndex(doc)
-  const own =
-    deps.work.repo === null
-      ? []
-      : lanesIn(session, root).map(lane => ({
-          lane,
-          tip: readLaneTip(doc, lane),
-        }))
+  const cards = readPlaces(places)
+  const tasks = tasksNow(deps.basics)
+  const threads = tasks.threadsOf.get(task) ?? []
+  const roots = tasks.rootsOf.get(task) ?? []
+  const blank = await deps.cards.blankQueued(cards)
+  const records = readLaneRecords(session)
+  const holds = readQueueHolds(session)
+  const lanes = []
+  const own = []
+  const revisions = new Map<EntryId, RevisionRecord>()
+  for (const root of roots) {
+    const doc = await docs.root(root)
+    const index = readTreeIndex(doc)
+    lanes.push(...readLanes({ doc, live }, index, cards, holds, blank))
+    for (const [entry, r] of readRevisions(doc)) revisions.set(entry, r)
+    if (deps.work.repo !== null)
+      for (const lane of threads) {
+        const r = records.get(lane)
+        if (r?.root === root && r.ownCopy)
+          own.push({ lane, tip: readLaneTip(doc, lane), index })
+      }
+  }
+  // The roots another live task or an inventory holds a thread of, this
+  // one counted as archived.
+  const archived = new Set([...readArchived(session).keys(), task])
   return planArchive({
     crossing,
-    root: entry,
-    index,
-    lanes: readLanes(
-      { doc, live },
-      index,
-      readPlaces(places),
-      readQueueHolds(session),
-      blank,
-    ),
+    threads,
+    lanes,
     own,
-    revisions: readRevisions(doc),
+    revisions,
+    roots,
+    stillHeld: rootsHeld(cards, readThreads(session), archived),
   })
 }
 
@@ -194,7 +207,11 @@ export async function handleWorkflow(
   const workflow = readWorkflow(session)
   if (workflow === null)
     return refused(ERR.UNKNOWN_STATE, "the board has no states yet")
-  const board = boardOf(workflow, readBoardPlaces(session), boardRoots(session))
+  const board = boardOf(
+    workflow,
+    readBoardPlaces(session),
+    boardTasks(deps.basics),
+  )
   const planned = planWorkflowEdit(workflow, board, intent.edit, newId)
   if (planned.kind === "refused") return planned
   if (planned.kind === "write")

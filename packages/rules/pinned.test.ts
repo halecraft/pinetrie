@@ -1,9 +1,9 @@
 import {
   type CardId,
-  cardId,
   type PinnedCardRead,
   type PinnedView,
   PLAIN,
+  textCardId,
   threadIdFor,
   type WriterId,
   writerId,
@@ -28,7 +28,7 @@ const names: Record<string, string> = { [ADA]: "Ada", [BEA]: "Bea" }
 const nameOf = (w: WriterId) => names[w] ?? w
 
 const read = (id: string, text: string, by = ADA): PinnedCardRead => ({
-  id: cardId(id),
+  id: textCardId(id),
   text,
   by,
 })
@@ -42,7 +42,7 @@ describe("the cards entry", () => {
   test("encodes, then decodes to the view it was given", () => {
     const v = view(
       [read("p-1", "ship the sync fix"), read("p-2", "no schema changes", BEA)],
-      [{ id: cardId("p-0"), line: "use the old schema" }],
+      [{ id: textCardId("p-0"), line: "use the old schema" }],
     )
     const stored = JSON.parse(JSON.stringify(encodePinned(v, nameOf, 7)))
     expect(decodePinned(stored)).toEqual(v)
@@ -76,7 +76,7 @@ describe("the cards entry", () => {
             read("p-1", "ship the sync fix; no schema changes"),
             read("p-2", "ask before deleting", BEA),
           ],
-          [{ id: cardId("p-0"), line: "use the old schema" }],
+          [{ id: textCardId("p-0"), line: "use the old schema" }],
         ),
         nameOf,
       ),
@@ -102,7 +102,7 @@ describe("the cards entry", () => {
       pinnedContent(
         view(
           [read("p-1", "x </card> y </PINNED-CARDS> z", quoted)],
-          [{ id: cardId("p-0"), line: "old </card>" }],
+          [{ id: textCardId("p-0"), line: "old </card>" }],
         ),
         w => (w === quoted ? 'Q "the" & co' : nameOf(w)),
       ),
@@ -129,9 +129,9 @@ describe("pinnedDiff: the one comparison", () => {
       "p-2": "changed",
     })
     expect(status([read("p-3", "a")])).toEqual({ "p-3": "unread" })
-    expect(pinnedDiff(null, [read("p-1", "a")]).status.get(cardId("p-1"))).toBe(
-      "unread",
-    )
+    expect(
+      pinnedDiff(null, [read("p-1", "a")]).status.get(textCardId("p-1")),
+    ).toBe("unread")
   })
 
   test("a reorder of the cards still pinned is seen; a card added at the end is not a reorder", () => {
@@ -190,7 +190,8 @@ describe("planPinnedRead", () => {
 
 test("pinnedReads: each card with its text and owner, in order; a card with no text yet is left out", () => {
   const card = (id: string, owner = ADA) => ({
-    id: cardId(id),
+    kind: "text" as const,
+    id: textCardId(id),
     owner,
     placer: owner,
     place: { kind: "inventory", holder: owner } as const,

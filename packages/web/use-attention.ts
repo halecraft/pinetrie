@@ -11,6 +11,7 @@ import {
   type RootId,
   type RootRecord,
   type RootWork,
+  type TaskId,
   type ThreadId,
   type VerdictRecord,
   type WriterId,
@@ -61,7 +62,12 @@ export function useAttention(input: {
   /** The held roots' lanes, with their queues. */
   readonly lanes: readonly LaneView[]
   readonly laneRoots: ReadonlyMap<ThreadId, EntryId>
+  /** The root entries of archived tasks' roots. */
   readonly archived: ReadonlySet<EntryId>
+  /** The archived tasks themselves (ADR-0116). */
+  readonly archivedTasks: ReadonlySet<TaskId>
+  /** Each root entry's task: ▦ marks the roots of tasks not in the sidebar. */
+  readonly ofEntry: ReadonlyMap<EntryId, TaskId>
   /** Roots whose agent works, held or not (`workAnywhere`). */
   readonly work: ReadonlyMap<EntryId, RootWork>
   readonly layout: Pick<Layout, "open">
@@ -120,10 +126,22 @@ export function useAttention(input: {
       }),
     [items, input.work, input.verdicts, input.laneRoots],
   )
-  const elsewhere = useMemo(
-    () => markOf(status, unlisted(input.layout, input.archived, status.keys())),
-    [input.layout, input.archived, status],
-  )
+  const elsewhere = useMemo(() => {
+    const away = new Set(
+      unlisted(
+        input.layout,
+        input.archivedTasks,
+        [...status.keys()].flatMap(e => input.ofEntry.get(e) ?? []),
+      ),
+    )
+    return markOf(
+      status,
+      [...status.keys()].filter(e => {
+        const task = input.ofEntry.get(e)
+        return task !== undefined && away.has(task)
+      }),
+    )
+  }, [input.layout, input.archivedTasks, input.ofEntry, status])
   return {
     items,
     status,

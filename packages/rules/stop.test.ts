@@ -1,7 +1,6 @@
 import {
   type AgentMessageLike,
   atEntry,
-  cardId,
   type EntryId,
   type EntryLike,
   ERR,
@@ -9,8 +8,8 @@ import {
   indexAsks,
   indexTree,
   type LaneView,
-  rootIdFor,
   type StopRecord,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -64,14 +63,14 @@ describe("planStop", () => {
   test("with a message card queued, a stop holds the queue, so the run's end sends nothing (ADR-0048 step 7)", () => {
     const name = threadIdFor("s")
     const queued: QueuedCard = {
-      id: cardId("c-1"),
+      kind: "text",
+      id: textCardId("c-1"),
       owner: ada,
       placer: ada,
       place: {
         kind: "queued",
-        root: rootIdFor("01a0ffd2-0000-7000-8000-00000000000a"),
         at: atEntry(entryId("2-a")),
-        lane: name,
+        thread: name,
         order: "a",
         by: ada,
         seen: "",

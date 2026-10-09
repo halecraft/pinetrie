@@ -1,9 +1,10 @@
 import {
   atEntry,
   type CardRecord,
-  cardId,
   entryId,
   rootIdFor,
+  taskIdFor,
+  textCardId,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -12,8 +13,10 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import type { MoveAnswer, MoveHow } from "@pinetrie/session"
 import { expect, test, vi } from "vitest"
 import type { Effect } from "./effects.ts"
-import { TEST_ROOT } from "./fixtures.ts"
+import { NEW_TASK } from "./fixtures.ts"
 import { type AppPorts, perform } from "./perform.ts"
+
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const accepted: MoveAnswer = { kind: "accepted", rev: 1 }
 const how: MoveHow = { actedAt: { kind: "inventory" }, slot: null }
@@ -24,8 +27,6 @@ const ports = () => {
     session: {
       request: vi.fn(async (): Promise<Outcome> => answer),
       offer: vi.fn(async (): Promise<Outcome> => answer),
-      mark: vi.fn(async () => answer),
-      retitle: vi.fn(async () => answer),
       createCard: vi.fn(async () => accepted),
       moveCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
       queueCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
@@ -36,7 +37,7 @@ const ports = () => {
       undoSwap: vi.fn(async () => {}),
       refuse: vi.fn(),
       openThreads: {
-        roots: { current: () => [], subscribe: () => () => {} },
+        tasks: { current: () => [], subscribe: () => () => {} },
         open: vi.fn(),
         ensure: vi.fn(),
         close: vi.fn(),
@@ -62,22 +63,22 @@ const ports = () => {
 }
 type Ports = ReturnType<typeof ports>
 
-const root = entryId("r")
 const identity = { email: "a@x.test", name: "Ada" }
 const show = { kind: "show", here: { kind: "nothing" } } as const
 const lane = threadIdFor("x")
 const at = atEntry(entryId("e"))
 const ada = writerId("ada@x.test")
 const move = {
-  card: cardId("c"),
+  card: textCardId("c"),
   from: null,
   to: { kind: "inventory", holder: ada },
 } as const
 const card: CardRecord = {
-  id: cardId("c"),
+  kind: "text" as const,
+  id: textCardId("c"),
   owner: ada,
   placer: ada,
-  place: { kind: "composing", root: TEST_ROOT, at, lane },
+  place: { kind: "composing", at, thread: lane },
   carries: { kind: "message", command: "bring-up-to-date" },
   unsent: null,
 }
@@ -105,24 +106,14 @@ test.each<Row>([
     args: [lane, "accept", "wip/x"],
   },
   {
-    effect: { kind: "mark", root, title: "T" },
-    port: p => p.session.mark,
-    args: [root, "T"],
-  },
-  {
-    effect: { kind: "retitle", root },
-    port: p => p.session.retitle,
-    args: [root],
-  },
-  {
     effect: { kind: "reveal", entry: entryId("e") },
     port: p => p.reveal,
     args: ["e"],
   },
   {
-    effect: { kind: "revealCard", card: cardId("c") },
+    effect: { kind: "revealCard", card: textCardId("c") },
     port: p => p.revealCard,
-    args: [cardId("c")],
+    args: [textCardId("c")],
   },
   {
     effect: { kind: "openWhenHeld", entry: entryId("e") },
@@ -135,22 +126,22 @@ test.each<Row>([
     args: ["a"],
   },
   {
-    effect: { kind: "list", act: { kind: "ensure", root: TEST_ROOT } },
+    effect: { kind: "list", act: { kind: "ensure", task: TEST_TASK } },
     port: p => p.session.openThreads.ensure,
-    args: [TEST_ROOT],
+    args: [TEST_TASK],
   },
   {
     effect: {
       kind: "list",
-      act: { kind: "place", root: TEST_ROOT, before: null },
+      act: { kind: "place", task: TEST_TASK, before: null },
     },
     port: p => p.session.openThreads.open,
-    args: [TEST_ROOT, null],
+    args: [TEST_TASK, null],
   },
   {
-    effect: { kind: "list", act: { kind: "close", root: TEST_ROOT } },
+    effect: { kind: "list", act: { kind: "close", task: TEST_TASK } },
     port: p => p.session.openThreads.close,
-    args: [TEST_ROOT],
+    args: [TEST_TASK],
   },
   { effect: { kind: "armFocus", key: "k" }, port: p => p.arm, args: ["k"] },
   {
@@ -176,12 +167,26 @@ test.each<Row>([
     args: [card, "t", how],
   },
   {
-    effect: { kind: "moveCard", move, how, queuedBy: ada, fly: false },
+    effect: {
+      kind: "moveCard",
+      move,
+      how,
+      queuedBy: ada,
+      fly: false,
+      here: TEST_TASK,
+    },
     port: p => p.session.moveCard,
-    args: [move, how, ada],
+    args: [move, how, ada, TEST_TASK],
   },
   {
-    effect: { kind: "moveCard", move, how, queuedBy: null, fly: true },
+    effect: {
+      kind: "moveCard",
+      move,
+      how,
+      queuedBy: null,
+      fly: true,
+      here: null,
+    },
     port: p => p.fly,
     args: ["c"],
   },
@@ -196,9 +201,9 @@ test.each<Row>([
     args: ["redo"],
   },
   {
-    effect: { kind: "undoMoves", root: TEST_ROOT, direction: "undo" },
+    effect: { kind: "undoMoves", task: TEST_TASK, direction: "undo" },
     port: p => p.session.undoMoves,
-    args: [TEST_ROOT, "undo"],
+    args: [TEST_TASK, "undo"],
   },
   {
     effect: { kind: "showInventory", brief: true },
@@ -220,13 +225,23 @@ test("a keep is one move of every card, and closes its column only once accepted
   const close = { kind: "layout", action: show } as const
   const moves = [
     { move, slot: 1 },
-    { move: { ...move, card: cardId("d") }, slot: 2 },
+    { move: { ...move, card: textCardId("d") }, slot: 2 },
   ] as const
   const actedAt = { kind: "column", key: "f" } as const
-  const keep: Effect = { kind: "keep", moves, actedAt, close: [close] }
+  const keep: Effect = {
+    kind: "keep",
+    moves,
+    actedAt,
+    close: [close],
+    here: TEST_TASK,
+  }
   const p = ports()
   perform([keep], p)
-  expect(p.session.moveCards).toHaveBeenCalledExactlyOnceWith(moves, actedAt)
+  expect(p.session.moveCards).toHaveBeenCalledExactlyOnceWith(
+    moves,
+    actedAt,
+    TEST_TASK,
+  )
   await vi.waitFor(() => expect(p.dispatch).toHaveBeenCalledWith(show))
   const q = ports()
   q.session.moveCards.mockImplementationOnce(async () => ({
@@ -242,7 +257,7 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
   const p = ports()
   const outcome: Outcome = { kind: "undone", cards: [] }
   p.session.undoMoves.mockImplementationOnce(async () => outcome)
-  perform([{ kind: "undoMoves", root: TEST_ROOT, direction: "undo" }], p)
+  perform([{ kind: "undoMoves", task: TEST_TASK, direction: "undo" }], p)
   await vi.waitFor(() =>
     expect(p.intent).toHaveBeenCalledWith({ kind: "undoAnswered", outcome }),
   )
@@ -250,27 +265,27 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
 
 test("a move on the board runs what follows it only once the host accepts it (ADR-0122)", async () => {
   const request = {
-    kind: "move-root",
-    root: TEST_ROOT,
+    kind: "move-task",
+    task: TEST_TASK,
     from: workflowStateIdFor("d"),
     to: workflowStateIdFor("x"),
     before: null,
   } as const
-  const closed = { kind: "closeRoot", root } as const
+  const closed = { kind: "closeTask", task: TEST_TASK } as const
   const effect: Effect = {
-    kind: "moveRoot",
+    kind: "moveTask",
     move: request,
     moved: [{ kind: "layout", action: closed }],
   }
   const p = ports()
-  p.session.request.mockImplementationOnce(async () => ({ kind: "moved-root" }))
+  p.session.request.mockImplementationOnce(async () => ({ kind: "moved-task" }))
   perform([effect], p)
   expect(p.session.request).toHaveBeenCalledWith(request)
   await vi.waitFor(() => expect(p.dispatch).toHaveBeenCalledWith(closed))
   const q = ports()
   q.session.request.mockImplementationOnce(async () => ({
     kind: "refused",
-    code: "root_moved",
+    code: "task_moved",
     message: "not moved",
   }))
   perform([effect], q)
@@ -283,20 +298,20 @@ test("a spin-off into the sidebar places and shows its thread only once the host
   const request = {
     kind: "spin-off",
     move: {
-      card: cardId("c"),
+      card: textCardId("c"),
       from: { kind: "inventory", holder: writerId("ada@x.io") },
       to: {
         kind: "gone",
-        root: thread,
         why: { kind: "spun", into: thread, thread: threadIdFor("spun") },
       },
     },
+    task: NEW_TASK,
     state: null,
+    here: NEW_TASK,
   } as const
   const effect: Effect = {
     kind: "spinOff",
     request,
-    thread,
     sidebar: { before: null },
   }
   const p = ports()
@@ -307,13 +322,16 @@ test("a spin-off into the sidebar places and shows its thread only once the host
   perform([effect], p)
   expect(p.session.request).toHaveBeenCalledWith(request)
   await vi.waitFor(() =>
-    expect(p.session.openThreads.open).toHaveBeenCalledWith(thread, null),
+    expect(p.session.openThreads.open).toHaveBeenCalledWith(NEW_TASK, null),
   )
 })
 
 test("a move flies only when its plan says so", () => {
   const p = ports()
-  perform([{ kind: "moveCard", move, how, queuedBy: null, fly: false }], p)
+  perform(
+    [{ kind: "moveCard", move, how, queuedBy: null, fly: false, here: null }],
+    p,
+  )
   expect(p.fly).not.toHaveBeenCalled()
   expect(p.session.moveCard).toHaveBeenCalledOnce()
 })

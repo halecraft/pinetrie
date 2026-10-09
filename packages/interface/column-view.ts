@@ -9,7 +9,6 @@ import {
   type BannerRecord,
   type BaseRecord,
   blobUrl,
-  type CardPlace,
   type CardRecord,
   type CommandSummary,
   commandOf,
@@ -29,6 +28,8 @@ import {
   promptOf,
   type RevisionRecord,
   type RootId,
+  type TaskId,
+  type TextPlace,
   type ThreadId,
   type ThreadLane,
   type ThreadName,
@@ -829,36 +830,29 @@ export function joinWords(join: LaneJoin): string {
 
 /**
  * Where a column takes a card (ADR-0048): a fresh column's own key, at its
- * branch point or a new tab's root, else your message at its end with its
- * lane (ADR-0113).
- * `root` is the root `at` is in (ADR-0063); a new tab's is the one it
- * minted (`fresh.root`). The composer creates its card here, and a drop on
- * it lands here (`placeOfTarget`). None where the root is not known, nor at the root but in
- * a new tab: a column there has no end yet.
+ * branch point or a new tab's root, in the task it is on, else your message
+ * at its end (ADR-0113). `root` is the root `at` is in (ADR-0063), and
+ * `task` the task the column is on; a new tab's are the ones it minted
+ * (`fresh.root`, `fresh.task`). The composer creates its card here, and a
+ * drop on it lands here (`placeOfTarget`). None where the root is not known,
+ * nor a fresh column's task, nor the thread of a column at an end, nor at
+ * the root but in a new tab: a column there has no end yet.
  */
 export function composerPlace(
   column: Pick<Column, "key" | "fresh" | "thread">,
   at: Position,
   root: RootId | undefined,
-  lanes: readonly LaneView[],
-): CardPlace | null {
+  task: TaskId | null,
+): TextPlace | null {
   if (column.fresh !== undefined) {
     const its = column.fresh.root ?? root
-    return its === undefined
+    const in_ = column.fresh.task ?? task
+    return its === undefined || in_ === null
       ? null
-      : { kind: "fresh", column: column.key, root: its, at }
+      : { kind: "fresh", column: column.key, root: its, task: in_, at }
   }
-  return at.kind === "entry" && root !== undefined
-    ? {
-        kind: "composing",
-        root,
-        at,
-        lane:
-          column.thread !== undefined &&
-          lanes.some(l => l.name === column.thread)
-            ? column.thread
-            : null,
-      }
+  return at.kind === "entry" && column.thread !== undefined
+    ? { kind: "composing", at, thread: column.thread }
     : null
 }
 

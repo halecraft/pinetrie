@@ -11,6 +11,7 @@ import {
   parseMentions,
   type QueueHoldChange,
   sendWaits,
+  type TaskId,
   type ThreadId,
   type ThreadLane,
   type WriterId,
@@ -35,6 +36,12 @@ export type ColumnHow = Pick<ChatHow, "base" | "root" | "pinned"> & {
    * thread that entry is in: nothing is sent from it meanwhile.
    */
   readonly thread: ThreadId | null
+  /**
+   * The task the column is on (ADR-0116), where a thread its send starts
+   * goes; a new tab's, minted as it opened. Null before it is known:
+   * nothing is sent meanwhile.
+   */
+  readonly task: TaskId | null
 }
 
 /**

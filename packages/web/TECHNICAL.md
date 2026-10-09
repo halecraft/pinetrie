@@ -819,8 +819,8 @@ the session sends moves and draws them until its copy holds them
 `packages/session/TECHNICAL.md`.
 
 - **A move is planned once.** `planIntent` builds each `Move` with core's
-  `moveOf` (an unqueue's target is `noteOf`, a queue's root
-  `queueRoot`), from the cards as drawn, and the session sends it.
+  `moveOf` (an unqueue's target is `noteOf`), from the cards as drawn, and
+  the session sends it.
 - **Refusals are worded here** (`refusalWords`), from the session's
   `CardRefusal`: an unqueue the pop beat says "already sent", a move
   someone made first names them. A column draws its own, and the panel the
@@ -1207,8 +1207,10 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   disabled item: it returns false, so the check expecting the item fails and
   the suite goes on.
 
-- **Selectors for the sidebar and the board:** a root in the sidebar is
-  `#sidebar .open-root[data-root="…"]`, the one you are on has
+- **Selectors for the sidebar and the board:** a task in the sidebar is
+  `#sidebar .open-root[data-task="…"]`, which also carries its first
+  root's root entry as `data-root`, which the browser suite reads
+  (ADR-0116); the one you are on has
   `aria-current="true"` and its wrap `data-selected`, its × is the
   `.open-close` after it, its `⋯` (`.open-menu`) holds `.rename-root`,
   `.retitle-root` and `.move-to` (`.closes` for
@@ -1220,7 +1222,7 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   rename field sits in `.open-rename`; the fold control is `.list-fold`, and
   the inventory's toggle is the account menu's `.account-inventory`. The board is `#board`: a `.board-column[data-state]`
   per open state and `.board-archive` for the archive, each item a
-  `.thread-card[data-root][data-entry]` with `.board-open`, `.board-label`,
+  `.thread-card[data-task][data-entry]` with `.board-open`, `.board-label`,
   `.reader-trigger` per reader (its menu `.reader`, `.open` while open),
   `.root-ready` when a thread has work ready, and `.item-menu`; the states
   scroll in `.board-states`, a head's count is `.board-count` (`[data-kept]`

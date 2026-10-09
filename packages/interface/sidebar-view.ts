@@ -8,6 +8,7 @@ import type {
   LaneView,
   MarkRecord,
   Sha256,
+  TaskId,
   ThreadId,
   ThreadName,
   TreeIndex,
@@ -19,19 +20,19 @@ import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
 import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
 import { type PageName, pageWords } from "./page.ts"
-import { type ColorSlot, rootSlot } from "./palette.ts"
+import { type ColorSlot, taskSlot } from "./palette.ts"
 import { initialsOf, NO_TEXT } from "./root-label.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 
-/** What a root's ⋯ in the sidebar offers. */
+/** What a task's ⋯ in the sidebar offers. */
 export type ItemMenuItem =
   | { readonly kind: "rename" }
-  /** What the root raises is not needed (ADR-0077). */
+  /** What the task raises is not needed (ADR-0077). */
   | { readonly kind: "notNeeded"; readonly intent: Intent }
-  /** Ask a model for a title from the root's messages (ADR-0074). */
+  /** Ask a model for a title from the task's first thread (ADR-0074). */
   | { readonly kind: "retitle"; readonly intent: Intent }
   /**
-   * Move the root on the board to another workflow state (ADR-0122), its
+   * Move the task on the board to another workflow state (ADR-0122), its
    * thread card's (`ThreadMove`). Into the archive it is archived:
    * refused while its agent works there (`busy`), and it withdraws the
    * offers of its threads named in `drops` (ADR-0061).
@@ -40,8 +41,8 @@ export type ItemMenuItem =
 
 /**
  * What an item draws while the sidebar is folded (ADR-0088): the sprite of the
- * root's earliest thread with one (`rootSprites`), else its initials on its
- * colour (ADR-0089). A new tab has neither yet: a hollow tile, as its rail
+ * task's earliest thread with one (`rootSprites`), else its initials on a
+ * colour seeded by its id (ADR-0089). A new tab has neither yet: a hollow tile, as its rail
  * has a hollow dot where its first message will be.
  */
 export type ItemIcon =
@@ -67,8 +68,8 @@ interface ItemCommon {
 export type ItemView =
   | (ItemCommon & { readonly kind: "new"; readonly key: string })
   | (ItemCommon & {
-      readonly kind: "root"
-      readonly root: EntryId
+      readonly kind: "task"
+      readonly task: TaskId
       /** Its thread card's header, the board's too (`threadCardHead`). */
       readonly head: ThreadCardHead
       /** Its first line: the rename field's placeholder. */
@@ -84,9 +85,9 @@ export type ItemView =
       readonly arrived: number | null
       /** When its agent last stopped with a run you follow done, or null: a ✓ fades. */
       readonly done: number | null
-      /** Only the root you are on can be archived and still in the sidebar. */
+      /** Only the task you are on can be archived and still in the sidebar. */
       readonly archived: boolean
-      /** On every root not archived, the one you are on or not. */
+      /** On every task not archived, the one you are on or not. */
       readonly menu: readonly ItemMenuItem[]
     })
 
@@ -102,16 +103,16 @@ export interface SidebarView {
 export interface SidebarViewInput {
   readonly layout: Layout
   readonly active: Here
-  /** Each root's thread card header (`threadCardHeads`), which the board reads too. */
-  readonly heads: ReadonlyMap<EntryId, ThreadCardHead>
-  /** Each root's first line (`firstLinesOf`). */
+  /** Each task's thread card header (`threadCardHeads`), which the board reads too. */
+  readonly heads: ReadonlyMap<TaskId, ThreadCardHead>
+  /** Each root's first line, by root entry (`firstLinesOf`). */
   readonly lines: ReadonlyMap<EntryId, string>
-  readonly marks: ReadonlyMap<EntryId, MarkRecord>
-  /** Roots in the archive, by root entry. */
-  readonly archived: ReadonlySet<EntryId>
+  readonly marks: ReadonlyMap<TaskId, MarkRecord>
+  /** Tasks in the archive. */
+  readonly archived: ReadonlySet<TaskId>
   /** Your unsent text: a new tab's pip. */
   readonly unsent: CardMarks
-  /** When each root's mark last arrived as you watched (`useAttention`). */
+  /** When each root's mark last arrived as you watched (`useAttention`), by root entry. */
   readonly arrivals: Moments
   /** Each root's sprite, by root entry (`rootSprites`). */
   readonly sprites: ReadonlyMap<EntryId, Sha256>
@@ -152,34 +153,36 @@ function itemView(here: Here, input: SidebarViewInput): ItemView {
         pip: here.kind === "new" && input.unsent.newTabs.has(here.key),
         icon: { kind: "fresh" },
       }
-    case "root": {
-      const { root } = here
-      const archived = input.archived.has(root)
-      const head = input.heads.get(root) ?? noHead(root)
+    case "task": {
+      const { task } = here
+      const archived = input.archived.has(task)
+      const head = input.heads.get(task) ?? noHead(task)
+      const { entry } = head
       return {
         ...common,
-        kind: "root",
-        root,
+        kind: "task",
+        task,
         head,
         label: head.label,
         icon: iconOf(head, input),
-        line: input.lines.get(root) ?? NO_TEXT,
-        title: input.marks.get(root)?.title ?? null,
+        line: (entry === null ? undefined : input.lines.get(entry)) ?? NO_TEXT,
+        title: input.marks.get(task)?.title ?? null,
         status: head.status,
-        arrived: input.arrivals.arrived.get(root) ?? null,
-        done: input.arrivals.done.get(root) ?? null,
+        arrived:
+          entry === null ? null : (input.arrivals.arrived.get(entry) ?? null),
+        done: entry === null ? null : (input.arrivals.done.get(entry) ?? null),
         archived,
-        menu: archived ? [] : menuOf(root, head),
+        menu: archived ? [] : menuOf(task, head),
         pip: head.pip,
       }
     }
   }
 }
 
-/** A root the heads lack: drawn with no signals, as a root not yet in the directory. */
-const noHead = (entry: EntryId): ThreadCardHead => ({
-  root: null,
-  entry,
+/** A task the heads lack: drawn with no signals, as a task not yet in the session. */
+const noHead = (task: TaskId): ThreadCardHead => ({
+  task,
+  entry: null,
   label: NO_TEXT,
   status: null,
   ready: [],
@@ -189,12 +192,12 @@ const noHead = (entry: EntryId): ThreadCardHead => ({
 })
 
 function iconOf(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
-  const sprite = input.sprites.get(head.entry)
+  const sprite = head.entry === null ? undefined : input.sprites.get(head.entry)
   if (sprite !== undefined) return { kind: "sprite", src: blobUrl(sprite) }
   return {
     kind: "initials",
     letters: initialsOf(head.label),
-    slot: head.root === null ? "pending" : rootSlot(head.root),
+    slot: taskSlot(head.task),
   }
 }
 
@@ -222,7 +225,7 @@ export function rootSprites(
   return sprites
 }
 
-function menuOf(root: EntryId, head: ThreadCardHead): readonly ItemMenuItem[] {
+function menuOf(task: TaskId, head: ThreadCardHead): readonly ItemMenuItem[] {
   const { status } = head
   return [
     ...(status === null || status.kind === "working"
@@ -238,18 +241,18 @@ function menuOf(root: EntryId, head: ThreadCardHead): readonly ItemMenuItem[] {
           } as const,
         ]),
     { kind: "rename" },
-    { kind: "retitle", intent: { kind: "retitle", root } },
+    { kind: "retitle", intent: { kind: "retitle", task } },
     ...head.moves.map(m => ({ kind: "moveTo", ...m }) as const),
   ]
 }
 
 /** An item's key in the sidebar: its React key, and what the list scrolls to. */
 export const listKey = (item: ItemView): string =>
-  item.kind === "new" ? `new:${item.key}` : `root:${item.root}`
+  item.kind === "new" ? `new:${item.key}` : `task:${item.task}`
 
 /**
  * The window's title: what needs you (`inboxCount`, your inbox's badge),
- * then the page over the workspace (ADR-0098), else the root you are on.
+ * then the page over the workspace (ADR-0098), else the task you are on.
  * `here` is null on nothing, and before anything is chosen.
  */
 export const pageTitle = (
@@ -279,13 +282,13 @@ export function offeredByRoot(
   return byRoot
 }
 
-/** What archiving a root does to its threads' offers, beside its item. */
+/** What archiving a task does to its threads' offers, beside its item. */
 export const dropsWords = (drops: readonly string[]): string | null =>
   drops.length === 0 ? null : `work not accepted goes: ${drops.join(", ")}`
 
-/** What a root's rename field sends, once planned (`planTitle`). */
-export const renameIntent = (root: EntryId, title: string | null): Intent => ({
+/** What a task's rename field sends, once planned (`planTitle`). */
+export const renameIntent = (task: TaskId, title: string | null): Intent => ({
   kind: "rename",
-  root,
+  task,
   title,
 })

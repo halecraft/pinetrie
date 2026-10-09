@@ -7,8 +7,7 @@ import {
   ERR,
   errorText,
   type Intent,
-  type RootId,
-  type SendAt,
+  type TaskId,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -17,18 +16,11 @@ import {
   type Outcome,
   type WireCommand,
 } from "@pinetrie/protocol/codec"
-import {
-  readArchived,
-  readBoardPlaces,
-  readParticipantNames,
-  readWorkflow,
-} from "@pinetrie/reads"
+import { readArchived, readParticipantNames, readPlaces } from "@pinetrie/reads"
 import {
   archivedIn,
-  BOARD,
   displayName,
   PARTICIPANT,
-  placeStarted,
   setRecord,
   writesIn,
 } from "@pinetrie/rules"
@@ -36,8 +28,9 @@ import { type Basics, failed, type HostKeeper } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
 import type { Records } from "../records.ts"
+import { tasksNow } from "../tasks.ts"
 import type { Titles } from "../titles.ts"
-import { type BoardDeps, handleRootMove, handleWorkflow } from "./board.ts"
+import { type BoardDeps, handleTaskMove, handleWorkflow } from "./board.ts"
 import {
   type CardCommandDeps,
   createCardCommands,
@@ -86,7 +79,7 @@ export interface CommandDeps {
 /**
  * Where a command runs (ADR-0065). An offer action and a setup or publish act
  * on your repo only: they go straight to its owner, and hold no other
- * command. A move on the board is up to three parts (`handleRootMove`).
+ * command. A move on the board is up to three parts (`handleTaskMove`).
  * Everything else is one step on the documents' keeper.
  */
 export function placeOfCommand(intent: Intent): "documents" | "repo" | "board" {
@@ -95,7 +88,7 @@ export function placeOfCommand(intent: Intent): "documents" | "repo" | "board" {
     case "setup":
     case "publish":
       return "repo"
-    case "move-root":
+    case "move-task":
       return "board"
     default:
       return "documents"
@@ -181,7 +174,7 @@ export function createCommands(deps: CommandDeps): Commands {
   ): Promise<Settled> {
     const archived = refuseInArchive(
       deps.basics,
-      writesIn(intent, deps.basics.docs.rootOfLane),
+      writesIn(intent, tasksNow(deps.basics), readPlaces(deps.basics.places)),
     )
     if (archived !== null) return settled(archived)
     switch (intent.kind) {
@@ -189,10 +182,6 @@ export function createCommands(deps: CommandDeps): Commands {
         // The command's id is the send's id: its column finds its message by it.
         const sendId = id === "" ? newId() : id
         const sent = await sendChat(deps, writer, sendId, intent)
-        // A thread at the root that was written started a root: it takes its
-        // place on the board in the same step (ADR-0122).
-        if (startsRoot(intent.at) && spendsCard(sent))
-          await placeNewRoot(deps, writer, intent)
         const card = intent.card
         if (card === null) return settled(sent)
         if (spendsCard(sent))
@@ -208,14 +197,11 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(sent)
       }
       case "move":
-        return cardCommands.move(writer, intent.moves)
+        return cardCommands.move(writer, intent.moves, intent.here)
       case "spin-off":
-        return cardCommands.spinOff(writer, intent, async chat => {
-          const sent = await sendChat(deps, writer, newId(), chat)
-          // Its board place, as a chat that starts a root takes (ADR-0122).
-          if (spendsCard(sent)) await placeNewRoot(deps, writer, chat)
-          return sent
-        })
+        return cardCommands.spinOff(writer, intent, chat =>
+          sendChat(deps, writer, newId(), chat),
+        )
       case "queue-card":
         return cardCommands.queueCard(
           writer,
@@ -232,7 +218,7 @@ export function createCommands(deps: CommandDeps): Commands {
           await handleQueueHold(deps, intent.lane, intent.held, writer),
         )
       case "undo-move":
-        return cardCommands.undoMove(writer, intent.root, intent.direction)
+        return cardCommands.undoMove(writer, intent.task, intent.direction)
       case "set-command":
         return cardCommands.setCommand(intent.card, intent.command)
       case "traces-seen":
@@ -248,14 +234,14 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(await handleStop(deps, intent.lane, writer))
       case "carry-on":
         return settled(await handleCarryOn(deps, intent.lane, writer))
-      case "move-root":
-        return settled(await handleRootMove(deps, writer, intent))
+      case "move-task":
+        return settled(await handleTaskMove(deps, writer, intent))
       case "workflow":
         return settled(await handleWorkflow(deps, intent))
       case "mark":
         return settled(await handleMark(deps, writer, intent))
       case "retitle":
-        return settled(await deps.titles.asked(intent.root, writer))
+        return settled(await deps.titles.asked(intent.task, writer))
       case "offer":
         return settled(await actOnOffer(deps, intent, writer))
       case "setup":
@@ -266,7 +252,7 @@ export function createCommands(deps: CommandDeps): Commands {
           (await deps.names.reserve(intent.lane)) === "held"
             ? {
                 kind: "refused",
-                code: ERR.LANE_ID_IN_USE,
+                code: ERR.THREAD_TAKEN,
                 message: "that thread has started",
               }
             : { kind: "reserved" },
@@ -278,61 +264,40 @@ export function createCommands(deps: CommandDeps): Commands {
     handle,
     async sendPoppedQueuedCard(writer, sendId, chat) {
       return (
-        refuseInArchive(deps.basics, startsRoot(chat.at) ? [] : [chat.root]) ??
-        (await sendChat(deps, writer, sendId, chat))
+        refuseInArchive(
+          deps.basics,
+          chat.at.kind === "queue"
+            ? [tasksNow(deps.basics).taskOfThread.get(chat.at.thread)].filter(
+                (t): t is TaskId => t !== undefined,
+              )
+            : [],
+        ) ?? (await sendChat(deps, writer, sendId, chat))
       )
     },
   }
 }
 
-/** Whether a send starts a root: a branch at no entry. */
-const startsRoot = (at: SendAt): boolean =>
-  at.kind === "branch" && at.at === null
-
-/** A root a chat started, put at the end of the state its sender chose (ADR-0122). */
-async function placeNewRoot(
-  deps: Pick<CommandDeps, "basics" | "records">,
-  writer: WriterId,
-  chat: Chat,
-): Promise<void> {
-  const { session, now } = deps.basics
-  const workflow = readWorkflow(session)
-  if (workflow === null) return
-  await deps.records.writeValues([
-    setRecord(
-      BOARD,
-      placeStarted({
-        root: chat.root,
-        state: chat.state,
-        by: writer,
-        now: now(),
-        workflow,
-        places: readBoardPlaces(session),
-      }),
-    ),
-  ])
-}
-
 /**
- * A command that would write in an archived root, one in the closed
- * workflow state, is refused, naming who moved it there (ADR-0029, ADR-0122). `sendChat`'s only callers are this dispatcher and
- * `sendPoppedQueuedCard`, both behind it, so it needs no check of its own.
- * `root` is the roots the command writes in (`writesIn`), which names them,
- * so no root's document is opened to check. Null when the command may go on.
+ * A command that would write in an archived task, or move a card out of
+ * one, is refused, naming who archived it (ADR-0029, ADR-0122, ADR-0116).
+ * `sendChat`'s only callers are this dispatcher and `sendPoppedQueuedCard`,
+ * both behind it, so it needs no check of its own. `tasks` is the tasks the
+ * command writes in (`writesIn`), so no root's document is opened to check.
+ * Null when the command may go on.
  */
 function refuseInArchive(
   basics: Pick<Basics, "session">,
-  roots: readonly RootId[],
+  tasks: readonly TaskId[],
 ): Outcome | null {
   const { session } = basics
   const archived = readArchived(session)
   if (archived.size === 0) return null
-  const record = archivedIn(roots, archived)
+  const record = archivedIn(tasks, archived)
   if (record === null) return null
   const names = readParticipantNames(session)
   return {
     kind: "refused",
-    code: ERR.ARCHIVED,
-    message: `archived by ${displayName(record.by, names.get(record.by))}`,
+    code: ERR.TASK_ARCHIVED,
+    message: `archived by ${displayName(record.by, names.get(record.by))}: restore the task first`,
   }
 }

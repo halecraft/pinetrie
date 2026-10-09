@@ -3,9 +3,11 @@ import {
   type LaneRecord,
   type RootRecord,
   rootIdFor,
+  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { threadCardOf } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import {
   CHAT_LABEL,
@@ -18,17 +20,17 @@ import {
   renameKey,
   summariesOf,
 } from "./root-label.ts"
+import { tasksOf } from "./tasks.ts"
 
 const record = (
   n: string,
   firstLine: string,
-  title: string | null,
+  _title: string | null,
 ): RootRecord => ({
   root: rootIdFor(n),
   entry: entryId(`e-${n}`),
   first: entryId(`e-${n}`),
   firstLine,
-  title,
   messages: 2,
   newest: entryId(`f-${n}`),
   writers: [writerId("p-ada")],
@@ -43,6 +45,37 @@ const directory = new Map(
     { ...record("3", "", null), entry: null, first: null, messages: 0 },
   ].map(r => [r.root, r] as const),
 )
+
+/** Each root's task, one a root, its thread `t-<n>` (ADR-0116); task 1 titled. */
+const K = (n: string) => taskIdFor(n)
+const thread = (n: string) => threadIdFor(`thread-${n}`)
+const tasks = tasksOf({
+  known: ["1", "2", "3"].map(K),
+  cards: ["1", "2", "3"].map(n =>
+    threadCardOf({
+      thread: thread(n),
+      task: K(n),
+      by: writerId("p-ada"),
+      cards: [],
+    }),
+  ),
+  threads: new Map(
+    ["1", "2", "3"].map(n => [
+      thread(n),
+      {
+        thread: thread(n),
+        root: rootIdFor(n),
+        by: writerId("p-ada"),
+        createdAt: 0,
+        fork: null,
+      },
+    ]),
+  ),
+  directory,
+})
+const marks = new Map([
+  [K("1"), { task: K("1"), title: "Tab names", by: writerId("p-ada"), at: 1 }],
+])
 
 describe("labels and summaries, from the directory (ADR-0063)", () => {
   const laneIn = (n: string): [LaneRecord["lane"], LaneRecord] => {
@@ -60,20 +93,25 @@ describe("labels and summaries, from the directory (ADR-0063)", () => {
   }
   const worked = new Map([laneIn("1"), laneIn("2")])
 
-  test("a titled root is called by its title, another by its first line; a root with no message by neither", () => {
-    const labels = labelsOf(directory, worked)
-    expect(labels.get(entryId("e-1"))).toBe("Tab names")
-    expect(labels.get(entryId("e-2"))).toBe("Plan the release")
-    expect(labels.size).toBe(2)
+  test("a titled task is called by its title, another by its first root's first line; a task whose root has no message yet by neither", () => {
+    const labels = labelsOf({ tasks, marks, directory, lanes: worked })
+    expect(labels.get(K("1"))).toBe("Tab names")
+    expect(labels.get(K("2"))).toBe("Plan the release")
+    expect(labels.get(K("3"))).toBe(CHAT_LABEL)
     expect(firstLinesOf(directory).get(entryId("e-1"))).toBe(
       "I'd like to start talking about a change",
     )
   })
 
-  test("an untitled root no lane works in is a chat; a title still names it", () => {
-    const labels = labelsOf(directory, new Map([laneIn("3")]))
-    expect(labels.get(entryId("e-1"))).toBe("Tab names")
-    expect(labels.get(entryId("e-2"))).toBe(CHAT_LABEL)
+  test("an untitled task no lane works in is a chat; a title still names it", () => {
+    const labels = labelsOf({
+      tasks,
+      marks,
+      directory,
+      lanes: new Map([laneIn("3")]),
+    })
+    expect(labels.get(K("1"))).toBe("Tab names")
+    expect(labels.get(K("2"))).toBe(CHAT_LABEL)
   })
 
   test("the header's count: the held roots' messages, of every root's", () => {

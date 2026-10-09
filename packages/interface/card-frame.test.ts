@@ -1,9 +1,11 @@
 import {
   atEntry,
-  type CardPlace,
   type CardRecord,
-  cardId,
   entryId,
+  type TextCard,
+  type TextPlace,
+  taskIdFor,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -19,18 +21,18 @@ import {
 } from "./card-frame.ts"
 import { TEST_ROOT } from "./fixtures.ts"
 
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+
 const ME = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
 const CATCH_UPS = { base: { kind: "accepted" }, parent: null } as const
 const LANE = threadIdFor("x")
 const at = atEntry(entryId("e-1"))
-const C1 = cardId("c-1")
+const C1 = textCardId("c-1")
 
-const card = (
-  place: CardPlace,
-  over: Partial<CardRecord> = {},
-): CardRecord => ({
+const card = (place: TextPlace, over: Partial<TextCard> = {}): TextCard => ({
+  kind: "text",
   id: C1,
   owner: ME,
   placer: ME,
@@ -45,33 +47,29 @@ const FACTS: CardFrameFacts = {
   readOnly: false,
 }
 
-const composing: CardPlace = {
+const composing: TextPlace = {
   kind: "composing",
-  root: TEST_ROOT,
   at,
-  lane: LANE,
+  thread: LANE,
 }
-const note: CardPlace = {
+const note: TextPlace = {
   kind: "note",
-  root: TEST_ROOT,
   at,
-  lane: LANE,
+  thread: LANE,
   cell: 0,
 }
-const queued: CardPlace = {
+const queued: TextPlace = {
   kind: "queued",
-  root: TEST_ROOT,
   at,
-  lane: LANE,
+  thread: LANE,
   order: "a",
   by: BEA,
   seen: "",
 }
-const pinned: CardPlace = {
+const pinned: TextPlace = {
   kind: "pinned",
-  root: TEST_ROOT,
   at,
-  lane: LANE,
+  thread: LANE,
   order: "a",
 }
 const queue = {
@@ -85,7 +83,7 @@ const pin = { kind: "pin", card: C1 } as const
 const take = { kind: "takeIntoInventory", card: C1 } as const
 
 describe("cardFrame (ADR-0111)", () => {
-  test.each<[string, CardPlace, CardTone, readonly unknown[]]>([
+  test.each<[string, TextPlace, CardTone, readonly unknown[]]>([
     [
       "your message: the notes, the queue, pinned, your inventory",
       composing,
@@ -133,7 +131,7 @@ describe("cardFrame (ADR-0111)", () => {
     ],
     [
       "in a fresh column: your inventory",
-      { kind: "fresh", column: "k", root: TEST_ROOT, at },
+      { kind: "fresh", column: "k", root: TEST_ROOT, task: TEST_TASK, at },
       "composing",
       [{ to: "inventory", act: take }],
     ],
@@ -216,7 +214,7 @@ describe("cardFrame (ADR-0111)", () => {
   })
 
   test("↑ and ↓ in a list, each off at its edge", () => {
-    const other = { ...card(queued), id: cardId("c-2") }
+    const other = { ...card(queued), id: textCardId("c-2") }
     const view = cardFrame(card(queued), "queued", {
       ...FACTS,
       among: [card(queued), other],
@@ -243,7 +241,7 @@ describe("cardFrameWords", () => {
       CATCH_UPS,
       [],
     )
-  const second = { ...card(queued), id: cardId("c-0") }
+  const second = { ...card(queued), id: textCardId("c-0") }
 
   test.each([
     ["the top of the queue is next", [card(queued)], false, "next", "1"],
@@ -332,6 +330,7 @@ describe("cardFrameWords", () => {
 describe("cardFace (ADR-0113)", () => {
   test("its first three lines, leading blank lines left out; a short command chip; whose", () => {
     const c = card(note, {
+      kind: "text" as const,
       owner: BEA,
       carries: { kind: "message", command: "bring-up-to-date" },
     })

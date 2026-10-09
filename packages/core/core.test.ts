@@ -9,15 +9,17 @@ import {
   type CardRecord,
   type ChatAt,
   cardId,
-  discardedOf,
+  DISCARDED,
   emailLocalPart,
   entryId,
   findSeqKeys,
   handleOf,
   indexTree,
+  keyFieldsFrom,
+  keyFieldsOf,
   keyOf,
   keyOfFields,
-  type LaneRecord,
+  kindOfCard,
   latestTip,
   messageText,
   moveOf,
@@ -33,14 +35,16 @@ import {
   placeFields,
   placeOfFields,
   projectTranscript,
-  queueRoot,
   ROOT,
   rootIdFor,
   sameKey,
   seenAt,
   shellWord,
+  type TextPlace,
   THE_AGENT,
   type ThreadId,
+  taskIdFor,
+  textCardId,
   threadIdFor,
   writerId,
   writerOfPrincipal,
@@ -48,6 +52,8 @@ import {
 import { describe, expect, test } from "vitest"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const TEST_THREAD = threadIdFor("e")
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 describe("who a principal is (ADR-0037)", () => {
   test("an email is trimmed and lower-cased", () => {
@@ -319,32 +325,30 @@ describe("a card's place as flat fields (ADR-0059)", () => {
   const places: CardPlace[] = [
     {
       kind: "note",
-      root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
-      lane: null,
+      thread: TEST_THREAD,
       cell: 0,
     },
     {
       kind: "queued",
-      root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
-      lane: threadIdFor("x"),
+      thread: threadIdFor("x"),
       order: "a",
       by: ADA,
       seen: "v",
     },
     {
       kind: "pinned",
-      root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
-      lane: threadIdFor("x"),
+      thread: threadIdFor("x"),
       order: "b",
     },
-    { kind: "fresh", column: "k", root: TEST_ROOT, at: ROOT },
+    { kind: "fresh", column: "k", root: TEST_ROOT, task: TEST_TASK, at: ROOT },
     {
       kind: "fresh",
       column: "k",
       root: TEST_ROOT,
+      task: TEST_TASK,
       at: atEntry(entryId("e-1")),
     },
     { kind: "inventory", holder: ADA },
@@ -357,16 +361,68 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     }
   })
 
-  test("a pinned card needs its order; its key has none, and keeps its lane", () => {
+  test("a pinned card needs its order and its thread; its key has no order, and keeps its thread", () => {
     const pinned = places[2] as CardPlace
     const f = placeFields(pinned)
     expect(placeOfFields({ ...f, order: "" })).toBeUndefined()
+    expect(placeOfFields({ ...f, lane: "" })).toBeUndefined()
     expect(keyOf(pinned)).toEqual({
       kind: "pinned",
-      root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
-      lane: threadIdFor("x"),
+      thread: threadIdFor("x"),
     })
+  })
+
+  test("a canvas card needs its task, its order and its width; its key is its task", () => {
+    const canvas = {
+      kind: "canvas",
+      task: TEST_TASK,
+      order: "m",
+      width: 2,
+    } as const
+    const f = placeFields(canvas)
+    expect(f).toMatchObject({ kind: "canvas", task: TEST_TASK, width: "2" })
+    expect(placeOfFields(f)).toEqual(canvas)
+    expect(placeOfFields({ ...f, width: "3" })).toBeUndefined()
+    expect(placeOfFields({ ...f, task: "r-x" })).toBeUndefined()
+    expect(keyOf(canvas)).toEqual({ kind: "canvas", task: TEST_TASK })
+    expect(keyOfFields(keyFieldsFrom(k => f[k]))).toEqual(keyOf(canvas))
+  })
+
+  test("a key's fields on the wire are the table's: no width, no order but a note's, no task but a canvas's and a fresh one's", () => {
+    const f = placeFields({
+      kind: "canvas",
+      task: TEST_TASK,
+      order: "m",
+      width: 2,
+    })
+    expect(keyFieldsOf(f)).not.toHaveProperty("width")
+    expect(keyFieldsOf(f)).not.toHaveProperty("order")
+    expect(keyFieldsOf(f)).toHaveProperty("task", TEST_TASK)
+    const note = placeFields({
+      kind: "note",
+      at: atEntry(entryId("e-1")),
+      thread: TEST_THREAD,
+      cell: 4,
+    })
+    expect(keyFieldsOf(note)).toHaveProperty("order", "4")
+    const gone = placeFields({
+      kind: "gone",
+      task: TEST_TASK,
+      by: writerId("ada@example.com"),
+      why: { kind: "discarded" },
+    })
+    expect(keyFieldsOf(gone)).not.toHaveProperty("task")
+  })
+
+  test("a card's kind is its id's prefix: a bare uuidv7 is a text card", () => {
+    expect(kindOfCard(textCardId("01a0ffd2-0000-7000-8000-00000000000a"))).toBe(
+      "text",
+    )
+    expect(kindOfCard(threadIdFor("x"))).toBe("thread")
+    expect(kindOfCard(cardId("n-1"))).toBe("note-column")
+    expect(kindOfCard(cardId("m-1"))).toBe("media")
+    expect(kindOfCard(cardId("f-1"))).toBe("file")
   })
 
   test("sameKey leaves out the pinned cards' order, and tells pinned from a note", () => {
@@ -383,6 +439,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       kind: "fresh",
       column: "k",
       root: TEST_ROOT,
+      task: TEST_TASK,
       at: ROOT,
     })
     expect(placeOfFields({ ...f, root: "" })).toBeUndefined()
@@ -411,17 +468,26 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(
       sameKey(
         { kind: "inventory", holder: ADA },
-        { kind: "fresh", column: "k", root: TEST_ROOT, at: ROOT },
+        {
+          kind: "fresh",
+          column: "k",
+          root: TEST_ROOT,
+          task: TEST_TASK,
+          at: ROOT,
+        },
       ),
     ).toBe(false)
   })
 
-  test("sameKey leaves out a queue's root and text version", () => {
+  test("sameKey leaves out a queue's text version, not its thread", () => {
     const queued = keyOf(places[1] as CardPlace)
     expect(
-      queued.kind === "queued" &&
-        sameKey(queued, { ...queued, seen: "", root: rootIdFor("other") }),
+      queued.kind === "queued" && sameKey(queued, { ...queued, seen: "" }),
     ).toBe(true)
+    expect(
+      queued.kind === "queued" &&
+        sameKey(queued, { ...queued, thread: threadIdFor("other") }),
+    ).toBe(false)
   })
 })
 
@@ -430,43 +496,33 @@ describe("moves, built once (ADR-0059)", () => {
   const LANE = threadIdFor("x")
   const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
   const at = atEntry(entryId("e-1"))
-  const card = (place: CardPlace): CardRecord => ({
-    id: cardId("c-1"),
+  const card = (place: TextPlace): CardRecord => ({
+    kind: "text",
+    id: textCardId("c-1"),
     owner: ADA,
     place,
     placer: ADA,
     carries: { kind: "message", command: null },
     unsent: null,
   })
-  const atEnd = card({ kind: "note", root: TEST_ROOT, at, lane: LANE, cell: 0 })
-  const lanes = (
-    root: typeof TEST_ROOT,
-  ): ReadonlyMap<typeof LANE, LaneRecord> =>
-    new Map([
-      [LANE, { lane: LANE, root, ownCopy: false, by: ADA, createdAt: 0 }],
-    ])
-
-  test("a move goes from where the card is; a discard is gone in its root, or the one you are on", () => {
-    const gone = discardedOf(atEnd.place, OTHER)
-    expect(moveOf(atEnd, gone)).toEqual({
-      card: cardId("c-1"),
-      from: { kind: "note", root: TEST_ROOT, at, lane: LANE, cell: 0 },
-      to: { kind: "gone", root: TEST_ROOT, why: { kind: "discarded" } },
+  const atEnd = card({
+    kind: "note",
+    at,
+    thread: LANE,
+    cell: 0,
+  })
+  test("a move goes from where the card is; a discard names no history: the host's to name", () => {
+    expect(moveOf(atEnd, DISCARDED)).toEqual({
+      card: textCardId("c-1"),
+      from: { kind: "note", at, thread: LANE, cell: 0 },
+      to: { kind: "gone", why: { kind: "discarded" } },
     })
-    expect(discardedOf({ kind: "inventory", holder: ADA }, OTHER)).toEqual({
-      kind: "gone",
-      root: OTHER,
-      why: { kind: "discarded" },
-    })
-    expect(discardedOf({ kind: "inventory", holder: ADA }, null)).toMatchObject(
-      { root: null },
-    )
   })
 
   test("a gone place is stored under its reason, with who discarded it", () => {
     const place = {
       kind: "gone",
-      root: TEST_ROOT,
+      task: TEST_TASK,
       by: ADA,
       why: { kind: "discarded" },
     } as const
@@ -474,19 +530,16 @@ describe("moves, built once (ADR-0059)", () => {
     expect(fields).toMatchObject({ kind: "discarded", holder: ADA })
     expect(placeOfFields(fields)).toEqual(place)
     expect(keyOfFields({ ...fields, holder: "" })).toEqual(keyOf(place))
-    expect(placeOfFields({ ...fields, root: "" })).toMatchObject({ root: null })
+    expect(placeOfFields({ ...fields, task: "" })).toMatchObject({ task: null })
     expect(placeOfFields({ ...fields, holder: "" })).toBeUndefined()
-    expect(
-      sameKey(keyOf(place), { kind: "gone", root: OTHER, why: place.why }),
-    ).toBe(false)
+    expect(keyOfFields(fields)).toEqual({ kind: "gone", why: place.why })
   })
 
   test("seenAt: a note seen with no cell is anywhere on its board; one seen in a cell is where it is only in that cell", () => {
     const note = {
       kind: "note",
-      root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
-      lane: null,
+      thread: TEST_THREAD,
     } as const
     const now = { ...note, cell: 3 }
     expect(seenAt(now, { ...note, cell: null })).toBe(true)
@@ -501,7 +554,7 @@ describe("moves, built once (ADR-0059)", () => {
     const thread = threadIdFor("spun")
     const place = {
       kind: "gone",
-      root: TEST_ROOT,
+      task: TEST_TASK,
       by: ADA,
       why: { kind: "spun", into: OTHER, thread },
     } as const
@@ -519,59 +572,40 @@ describe("moves, built once (ADR-0059)", () => {
     expect(
       sameKey(keyOf(place), {
         kind: "gone",
-        root: TEST_ROOT,
         why: { kind: "spun", into: TEST_ROOT, thread },
       }),
     ).toBe(false)
   })
 
-  test("an unqueue puts a card back where it was queued, in its root", () => {
+  test("an unqueue puts a card back where it was queued, at its thread", () => {
     expect(
       noteOf({
         kind: "queued",
-        root: OTHER,
         at,
-        lane: LANE,
+        thread: LANE,
         order: "a",
         by: ADA,
         seen: "v",
       }),
-    ).toEqual({ kind: "note", root: OTHER, at, lane: LANE, cell: null })
+    ).toEqual({ kind: "note", at, thread: LANE, cell: null })
   })
 
   test("a pin pins a card below the line or queued, at the same thread end", () => {
-    const pinned = { kind: "pinned", root: OTHER, at, lane: LANE }
-    expect(
-      pinnedOf({ kind: "note", root: OTHER, at, lane: LANE, cell: 0 }),
-    ).toEqual(pinned)
+    const pinned = { kind: "pinned", at, thread: LANE }
+    expect(pinnedOf({ kind: "note", at, thread: LANE, cell: 0 })).toEqual(
+      pinned,
+    )
     expect(
       pinnedOf({
         kind: "queued",
-        root: OTHER,
         at,
-        lane: LANE,
+        thread: LANE,
         order: "a",
         by: ADA,
         seen: "v",
       }),
     ).toEqual(pinned)
     expect(pinnedOf({ kind: "inventory", holder: ADA })).toBeNull()
-  })
-
-  test("a queued card's root is its lane's, else its own; a card at no thread has none", () => {
-    expect(queueRoot(LANE, atEnd, lanes(OTHER))).toBe(OTHER)
-    expect(queueRoot(LANE, atEnd, new Map())).toBe(TEST_ROOT)
-    const pinned = card({
-      kind: "pinned",
-      root: OTHER,
-      at,
-      lane: LANE,
-      order: "a",
-    })
-    expect(queueRoot(LANE, pinned, new Map())).toBe(OTHER)
-    expect(
-      queueRoot(LANE, card({ kind: "inventory", holder: ADA }), new Map()),
-    ).toBeUndefined()
   })
 })
 

@@ -152,10 +152,15 @@ runtime keeps them). A suite's own helpers are beside its scenarios:
 - **The host's `docs.rootOfEntry` is another lookup**
   (`apps/pinetrie/host/docs.ts`): the root whose *root entry* is the entry,
   not the root holding it. A card's root is `rootHolding`'s.
+- **A thread's task can arrive after its first message**: the card that
+  puts the thread on its task's canvas is in the places document, the
+  message in its root's, and Kyneta keeps no order between documents. The
+  harness's `chat` (a branch at an entry) and `mark` wait for the entry's
+  task (`taskAt`) before they name it (ADR-0116).
 - **A scenario queues and unqueues through the harness** (`queueCard`,
   `unqueueCard`), as a column's plan does: each finds the card as its client
-  draws it, builds the move with core's `moveOf` (into its lane's root,
-  `queueRoot`), and sends it with `moveCard`. Each throws if the card is not
+  draws it, builds the move with core's `moveOf` (onto its lane's thread),
+  and sends it with `moveCard`. Each throws if the card is not
   where it expects. An offer action and a line action are `client.offer`
   and `client.line`, which the session tracks (`acting`); anything else
   that moves no card is `client.request({ kind, … })`, one of core's

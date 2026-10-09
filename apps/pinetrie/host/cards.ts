@@ -10,7 +10,13 @@
 
 import { type Exchange, type Store, whenHydrated } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
-import type { CardId, CardRecord, WriterId } from "@pinetrie/core"
+import {
+  type CardId,
+  type CardRecord,
+  isTextCard,
+  type TextCardId,
+  type WriterId,
+} from "@pinetrie/core"
 import { readSeats } from "@pinetrie/reads"
 import { blankQueued, writersOfClients } from "@pinetrie/rules"
 import {
@@ -23,7 +29,7 @@ import {
 
 /** A card's text, as the sweeps need it. */
 export interface GatheredText {
-  readonly id: CardId
+  readonly id: TextCardId
   readonly text: string
   /** The `clientID`s that wrote in it (`textClients`). */
   readonly clients: readonly number[]
@@ -31,31 +37,31 @@ export interface GatheredText {
 
 export interface CardPort {
   /** The people who wrote in the card: its `clientID`s through the seat records. */
-  writers(id: CardId): Promise<readonly WriterId[]>
+  writers(id: TextCardId): Promise<readonly WriterId[]>
   /**
    * Destroy its text: it was sent or removed, and its record is gone first.
    * Each client destroys its own copy once it has seen both (S64).
    */
-  destroy(id: CardId): Promise<void>
+  destroy(id: TextCardId): Promise<void>
   /** Load these cards' texts, so `textNow` reads each whole. */
-  hydrate(ids: readonly CardId[]): Promise<void>
+  hydrate(ids: readonly TextCardId[]): Promise<void>
   /** A card's text as the host holds it now, with no wait: after `hydrate`. */
-  textNow(id: CardId): string
+  textNow(id: TextCardId): string
   /**
    * Whether the host's copy of a card's text holds `seen` (`textHolds`): what
    * its queuer had when they queued it.
    */
-  holds(id: CardId, seen: string): boolean
+  holds(id: TextCardId, seen: string): boolean
   /**
    * Resolves once the host's copy holds `seen`, or once `signal` aborts:
    * either way it unsubscribes, so a wait given up leaves nothing behind.
    */
-  whenHolds(id: CardId, seen: string, signal?: AbortSignal): Promise<void>
+  whenHolds(id: TextCardId, seen: string, signal?: AbortSignal): Promise<void>
   /**
    * Resolves once a card's text holds more than whitespace, or once
    * `signal` aborts, unsubscribing either way.
    */
-  whenWritten(id: CardId, signal?: AbortSignal): Promise<void>
+  whenWritten(id: TextCardId, signal?: AbortSignal): Promise<void>
   /**
    * The queued cards that are blank messages (`blankQueued`), each queued
    * card's text loaded first, so one whose text has not arrived is never
@@ -63,7 +69,7 @@ export interface CardPort {
    */
   blankQueued(cards: readonly CardRecord[]): Promise<ReadonlySet<CardId>>
   /** These cards' texts, with who wrote in each. */
-  texts(ids: readonly CardId[]): Promise<readonly GatheredText[]>
+  texts(ids: readonly TextCardId[]): Promise<readonly GatheredText[]>
   /** Every stored card text document, by id. */
   stored(): Promise<readonly string[]>
   /** Destroy these stored documents, loaded first. */
@@ -116,7 +122,9 @@ export function startCards(input: {
       return until(t, () => t.text().trim() !== "", signal)
     },
     async blankQueued(cards) {
-      const queued = cards.filter(c => c.place.kind === "queued")
+      const queued = cards
+        .filter(isTextCard)
+        .filter(c => c.place.kind === "queued")
       for (const c of queued) await text(cardDocId(c.id))
       return blankQueued(queued, {
         holds: (id, seen) =>

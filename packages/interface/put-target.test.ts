@@ -3,12 +3,14 @@ import {
   entryId,
   ROOT,
   rootIdFor,
+  taskIdFor,
   threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { composerPlace } from "./column-view.ts"
+import { NEW_TASK } from "./fixtures.ts"
 import {
   composerPlacesStore,
   dropProps,
@@ -17,6 +19,8 @@ import {
   placeOfTarget,
   targetOfElement,
 } from "./put-target.ts"
+
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
@@ -27,18 +31,6 @@ const marked = (attrs: Readonly<Record<string, string>>) => ({
   getAttribute: (name: string) => attrs[name] ?? null,
 })
 const LANE = threadIdFor("x")
-/** Thread `LANE` has a lane, named by its id. */
-const LANES = [
-  {
-    name: LANE,
-    tip: entryId("e-1"),
-    running: false,
-    waiting: 0,
-    askedBy: null,
-    lastWaiting: null,
-    heldBy: null,
-  },
-]
 const E1 = atEntry(entryId("e-1"))
 
 describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
@@ -47,13 +39,13 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     { key: "k-thread", thread: LANE },
     E1,
     TEST_ROOT,
-    LANES,
+    TEST_TASK,
   )
   const fresh = composerPlace(
     { key: "k-fresh", fresh: {} },
     E1,
     TEST_ROOT,
-    LANES,
+    TEST_TASK,
   )
   store.set(
     "k-thread",
@@ -74,7 +66,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     { kind: "pinned", key: "k-fresh" },
     { kind: "cell", key: "k-thread", cell: 6 },
     { kind: "state", state: workflowStateIdFor("s-1") },
-    { kind: "sidebar", before: entryId("1-r1") },
+    { kind: "sidebar", before: TEST_TASK },
     { kind: "sidebar", before: null },
   ]
 
@@ -88,7 +80,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
 
   test("a column lands as a note at its end, its composer as your message; a fresh column as its message; a slot as your inventory; a column no store holds as nothing", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
-    const end = { root: TEST_ROOT, at: E1, lane: LANE }
+    const end = { at: E1, thread: LANE }
     expect(at(targets[0] as PutTarget)).toEqual({
       kind: "note",
       ...end,
@@ -98,6 +90,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
       kind: "fresh",
       column: "k-fresh",
       root: TEST_ROOT,
+      task: TEST_TASK,
       at: E1,
     })
     expect(at(targets[2] as PutTarget)).toEqual({ kind: "composing", ...end })
@@ -112,9 +105,8 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
     expect(at(targets[6] as PutTarget)).toEqual({
       kind: "pinned",
-      root: TEST_ROOT,
       at: E1,
-      lane: LANE,
+      thread: LANE,
     })
     expect(at(targets[7] as PutTarget)).toBeNull()
   })
@@ -131,42 +123,67 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   })
 })
 
-test("composerPlace: your message at the end with its thread's lane, in its root; fresh by key, in its root; none at the root, nor in no root", () => {
+test("composerPlace: your message at the end of its thread; fresh by key, in its root and the task it is on; none at the root, nor a fresh one in no root, nor with no thread yet", () => {
   expect(
-    composerPlace({ key: "k", thread: LANE }, E1, TEST_ROOT, LANES),
+    composerPlace({ key: "k", thread: LANE }, E1, TEST_ROOT, TEST_TASK),
   ).toEqual({
     kind: "composing",
-    root: TEST_ROOT,
     at: E1,
-    lane: LANE,
+    thread: LANE,
   })
-  expect(composerPlace({ key: "k" }, E1, TEST_ROOT, LANES)).toEqual({
-    kind: "composing",
-    root: TEST_ROOT,
-    at: E1,
-    lane: null,
-  })
-  // A branch: its tab's root, at its branch point.
-  expect(composerPlace({ key: "k", fresh: {} }, E1, TEST_ROOT, LANES)).toEqual({
+  // A column opened at an entry, before it settles on its thread.
+  expect(composerPlace({ key: "k" }, E1, TEST_ROOT, TEST_TASK)).toBeNull()
+  // A branch: its tab's root, at its branch point, on the task you are on.
+  expect(
+    composerPlace({ key: "k", fresh: {} }, E1, TEST_ROOT, TEST_TASK),
+  ).toEqual({
     kind: "fresh",
     column: "k",
     root: TEST_ROOT,
+    task: TEST_TASK,
     at: E1,
   })
-  // A new tab: the root it minted as it opened (ADR-0066).
+  // A new tab: the root and the task it minted as it opened (ADR-0066).
+  expect(
+    composerPlace(
+      { key: "k", fresh: { root: NEW_ROOT, task: NEW_TASK } },
+      { kind: "root" },
+      undefined,
+      null,
+    ),
+  ).toEqual({
+    kind: "fresh",
+    column: "k",
+    root: NEW_ROOT,
+    task: NEW_TASK,
+    at: ROOT,
+  })
+  expect(
+    composerPlace(
+      { key: "k", fresh: {} },
+      { kind: "root" },
+      undefined,
+      TEST_TASK,
+    ),
+  ).toBeNull()
   expect(
     composerPlace(
       { key: "k", fresh: { root: NEW_ROOT } },
       { kind: "root" },
       undefined,
-      LANES,
+      null,
     ),
-  ).toEqual({ kind: "fresh", column: "k", root: NEW_ROOT, at: ROOT })
-  expect(
-    composerPlace({ key: "k", fresh: {} }, { kind: "root" }, undefined, LANES),
   ).toBeNull()
   expect(
-    composerPlace({ key: "k" }, { kind: "root" }, undefined, LANES),
+    composerPlace(
+      { key: "k", thread: LANE },
+      { kind: "root" },
+      undefined,
+      TEST_TASK,
+    ),
   ).toBeNull()
-  expect(composerPlace({ key: "k" }, E1, undefined, LANES)).toBeNull()
+  // A thread's place needs no root: the thread's record names it.
+  expect(
+    composerPlace({ key: "k", thread: LANE }, E1, undefined, TEST_TASK),
+  ).toEqual({ kind: "composing", at: E1, thread: LANE })
 })

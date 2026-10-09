@@ -13,6 +13,7 @@ import {
   type Sha256,
   snapshotId,
   type ThreadName,
+  taskIdFor,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -46,6 +47,7 @@ import {
   STOP,
   setIfChanged,
   setRecord,
+  TASK,
   TRACE,
   VERDICT,
   WORKFLOW,
@@ -88,6 +90,8 @@ const sample = <R, K extends string>(
   keyField: (keyof R & string) | null,
 ): Sample => [name, spec as RecordSpec<unknown, string>, record, keyField]
 
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const TEST_THREAD = threadIdFor("e")
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 /** A record's write to the document its home names: the test's root for a root's. */
@@ -101,7 +105,6 @@ const rootRecord: RootRecord = {
   entry: E,
   first: E,
   firstLine: "Plans",
-  title: null,
   messages: 1,
   newest: E,
   writers: [ADA],
@@ -124,15 +127,21 @@ const SAMPLES: readonly Sample[] = [
     "board",
     BOARD,
     {
-      root: TEST_ROOT,
+      task: TEST_TASK,
       state: workflowStateIdFor("1"),
       rank: "0a",
       by: ADA,
       at: 1,
     },
-    "root",
+    "task",
   ),
-  sample("mark", MARK, { entry: E, title: "Plans", by: ADA, at: 1 }, "entry"),
+  sample(
+    "mark",
+    MARK,
+    { task: TEST_TASK, title: "Plans", by: ADA, at: 1 },
+    "task",
+  ),
+  sample("task", TASK, { task: TEST_TASK, by: ADA, createdAt: 1 }, "task"),
   sample("stop", STOP, { prompt: E, by: ADA, at: 1 }, "prompt"),
   sample(
     "digest",
@@ -240,13 +249,17 @@ const SAMPLES: readonly Sample[] = [
           kind: "created",
           by: ADA,
           from: null,
-          to: { kind: "composing", root: TEST_ROOT, at: atEntry(E), lane: L },
+          to: { kind: "composing", at: atEntry(E), thread: L },
           at: 1,
         },
         {
           kind: "moved",
           by: null,
-          from: { kind: "composing", root: TEST_ROOT, at: atEntry(E), lane: L },
+          from: {
+            kind: "composing",
+            at: atEntry(E),
+            thread: L,
+          },
           to: { kind: "inventory", holder: ADA },
           at: 2,
         },
@@ -262,7 +275,11 @@ const SAMPLES: readonly Sample[] = [
       for: ADA,
       card: cardId("c-1"),
       by: writerId("bea@x.io"),
-      from: { kind: "pinned", root: TEST_ROOT, at: atEntry(E), lane: null },
+      from: {
+        kind: "pinned",
+        at: atEntry(E),
+        thread: TEST_THREAD,
+      },
       to: null,
       message: entryId("e-3"),
       at: 3,
@@ -357,7 +374,8 @@ test("each record lives where it is read (ADR-0063): across roots in the session
   expect(homes).toEqual({
     workflow: "session",
     board: "session",
-    mark: "root",
+    mark: "session",
+    task: "session",
     stop: "root",
     digest: "root",
     seat: "session",
@@ -383,22 +401,40 @@ test("each record lives where it is read (ADR-0063): across roots in the session
 test("a write goes to the document its home names", () => {
   expect(setRecord(OFFER, offer).target).toEqual({ kind: "session" })
   expect(
-    setRecord(MARK, { entry: E, title: "Plans", by: ADA, at: 1 }, TEST_ROOT)
-      .target,
+    setRecord(STOP, { prompt: E, by: ADA, at: 1 }, TEST_ROOT).target,
   ).toEqual({ kind: "root", root: TEST_ROOT })
   // @ts-expect-error a root's record names its root
-  setRecord(MARK, { entry: E, title: "Plans", by: ADA, at: 1 })
+  setRecord(STOP, { prompt: E, by: ADA, at: 1 })
   // @ts-expect-error a session's record names none
   setRecord(OFFER, offer, TEST_ROOT)
 })
 
 test("deleteRecord names the spec's namespace and the key", () => {
-  expect(deleteRecord(MARK, E, TEST_ROOT)).toEqual({
+  expect(deleteRecord(STOP, E, TEST_ROOT)).toEqual({
     kind: "delete",
     target: { kind: "root", root: TEST_ROOT },
-    namespace: "pinetrie.mark",
+    namespace: "pinetrie.stop",
     key: E,
   })
+})
+
+test("planUndeclaredSweep deletes a record stored outside its spec's home: a root's mark, from before tasks (ADR-0116)", () => {
+  const root = rootIdFor("r-1")
+  expect(
+    planUndeclaredSweep([
+      {
+        target: { kind: "root", root },
+        namespaces: new Map([["pinetrie.mark", ["e-1"]]]),
+      },
+    ]),
+  ).toEqual([
+    {
+      kind: "delete",
+      target: { kind: "root", root },
+      namespace: "pinetrie.mark",
+      key: "e-1",
+    },
+  ])
 })
 
 describe("setIfChanged", () => {
@@ -471,7 +507,8 @@ describe("every spec, and writes by document", () => {
     expect(
       planUndeclaredSweep(
         RECORD_SPECS.map(spec => ({
-          target: SESSION_TARGET,
+          target:
+            spec.home === "session" ? SESSION_TARGET : { kind: "root", root },
           namespaces: new Map([[spec.namespace, ["k"]]]),
         })),
       ),
@@ -485,14 +522,9 @@ describe("every spec, and writes by document", () => {
       name: "amber-fox" as ThreadName,
       at: 1,
     })
-    const mark = {
-      entry: entryId("e-1"),
-      title: "Plans",
-      by: writerId("a"),
-      at: 1,
-    }
-    const marked = setRecord(MARK, mark, root)
-    const unmarked = deleteRecord(MARK, entryId("e-1"), root)
+    const stop = { prompt: entryId("e-1"), by: writerId("a"), at: 1 }
+    const marked = setRecord(STOP, stop, root)
+    const unmarked = deleteRecord(STOP, entryId("e-1"), root)
     expect(byTarget([marked, name, unmarked])).toEqual([
       [{ kind: "root", root }, [marked, unmarked]],
       [{ kind: "session" }, [name]],

@@ -19,6 +19,7 @@ import {
   type OfferFact,
   PLAIN,
   parseMentions,
+  type RootId,
   type ThreadId,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
@@ -106,11 +107,17 @@ export function popNextQueuedCard(
   return { kind: "popped", popped: { card, text } }
 }
 
-/** A popped card's text as its queuer's message, in the queue's own mode. */
-export const chatOfPoppedQueuedCard = (popped: PoppedQueuedCard): Chat => ({
+/**
+ * A popped card's text as its queuer's message, in the queue's own mode, in
+ * `root`, its thread's (`THREAD`).
+ */
+export const chatOfPoppedQueuedCard = (
+  popped: PoppedQueuedCard,
+  root: RootId,
+): Chat => ({
   text: popped.text,
-  root: popped.card.place.root,
-  at: { kind: "queue", thread: popped.card.place.lane },
+  root,
+  at: { kind: "queue", thread: popped.card.place.thread },
   asksAgent: false,
   mentions: parseMentions(popped.text),
   card: { id: popped.card.id, seen: popped.card.place.seen },
@@ -360,7 +367,7 @@ function unsent(
   const { session, places, log } = deps.basics
   applyPlaceSteps(places, [planUnsent(readPlaces(places), card, reason)])
   log(
-    `[host] ${readThreadName(session, card.place.lane)}: a queued card was not sent: ${reason}`,
+    `[host] ${readThreadName(session, card.place.thread)}: a queued card was not sent: ${reason}`,
   )
 }
 
@@ -374,7 +381,7 @@ export const givenUp = (
   awaited: Iterable<CardId>,
   cards: readonly CardRecord[],
 ): CardId[] => {
-  const queued = new Set(
+  const queued = new Set<CardId>(
     cards.filter(c => c.place.kind === "queued").map(c => c.id),
   )
   return [...awaited].filter(id => !queued.has(id))
@@ -411,7 +418,7 @@ export function createWaits(deps: {
         unwatch?.()
         unwatch = null
       }
-      if (!stop.signal.aborted) deps.drain(card.place.lane)
+      if (!stop.signal.aborted) deps.drain(card.place.thread)
     })
   }
 }

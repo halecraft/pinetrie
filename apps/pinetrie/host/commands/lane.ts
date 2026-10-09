@@ -6,7 +6,6 @@
 import {
   type AcceptedAction,
   atEntry,
-  cardId,
   ERR,
   type ErrCode,
   type Intent,
@@ -16,6 +15,7 @@ import {
   type RootId,
   type ThreadId,
   type TreeIndex,
+  textCardId,
   type WriterId,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
@@ -259,9 +259,8 @@ export async function recordFact(
   applyPlaceSteps(places, [
     planFactCard({
       cards: readPlaces(places),
-      id: cardId(newId()),
+      id: textCardId(newId()),
       fact,
-      root,
       at: atEntry(tip),
     }),
   ])

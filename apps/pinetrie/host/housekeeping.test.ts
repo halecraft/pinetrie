@@ -1,5 +1,5 @@
 import type { Exchange } from "@kyneta/exchange"
-import { cardId, rootDocId, rootIdFor, type Sha256 } from "@pinetrie/core"
+import { rootDocId, rootIdFor, type Sha256, textCardId } from "@pinetrie/core"
 import {
   LIVE_DOC_ID,
   PLACES_DOC_ID,
@@ -29,7 +29,7 @@ test("an image only a card's text shows is kept past its grace", async () => {
     grace: 0,
     texts: async () => [
       {
-        id: cardId("c-1"),
+        id: textCardId("c-1"),
         text: `pasted ![y](/blob/${inCard.sha256})`,
         clients: [],
       },

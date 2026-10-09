@@ -1,9 +1,10 @@
 import {
   atEntry,
-  cardId,
   entryId,
   PLAIN,
   rootIdFor,
+  textCardId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { readPlaces, readPlacesRev } from "@pinetrie/reads"
@@ -11,18 +12,20 @@ import { newPlacesDoc } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { applyPlaceSteps } from "./places.ts"
 
-const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const TEST_THREAD = threadIdFor("e")
+
+const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const ada = writerId("ada@x.io")
 const record = (id: string) =>
   ({
-    id: cardId(id),
+    kind: "text" as const,
+    id: textCardId(id),
     owner: ada,
     placer: ada,
     place: {
       kind: "composing",
-      root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
-      lane: null,
+      thread: TEST_THREAD,
     },
     carries: PLAIN,
     unsent: null,

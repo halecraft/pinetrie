@@ -4,7 +4,6 @@ import {
   atEntry,
   CATCH_UP_TOOL,
   CONFLICT_TOOL,
-  cardId,
   commitId,
   ERR,
   entryId,
@@ -14,12 +13,14 @@ import {
   type Position,
   parseMentions,
   type Responder,
-  rootIdFor,
   type SendAt,
   type Sha256,
   THE_AGENT,
   type ThreadLane,
+  taskIdFor,
+  textCardId,
   threadIdFor,
+  type WorkflowStateId,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
@@ -107,6 +108,7 @@ const plan = (over: Partial<PlanInput>) => {
     sendId: "s-1",
     news: "nothing",
     caughtUp: false,
+    state: null,
     ...over,
   }
   const { end, race, lane: l, mode, at, ...rest } = i
@@ -118,6 +120,7 @@ const plan = (over: Partial<PlanInput>) => {
             kind: "branch",
             thread: NEW,
             at: at.kind === "entry" ? at.id : null,
+            task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
           }
         : { kind: "end", thread: LANE, seen: at.kind === "entry" ? at.id : E1 }
   return planChat({
@@ -285,6 +288,22 @@ describe("planChat: a compelled message", () => {
     expect(starts(plan({}))).toBeUndefined()
     expect(starts(plan({ mentions: ASK }))).toBeUndefined()
     expect(starts(plan({ lane: lane() }))).toBeUndefined()
+  })
+  test("a branch's decision carries the thread it starts, its task and its board state, in one value; no other does (ADR-0116)", () => {
+    const startsOf = (d: ReturnType<typeof plan>) =>
+      d.kind === "appendToTree" || d.kind === "createAndRun" ? d.starts : d.kind
+    const state = "s-doing" as WorkflowStateId
+    const want = {
+      thread: NEW,
+      task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
+      state,
+    }
+    expect(startsOf(plan({ mode: "branch", state }))).toEqual(want)
+    expect(startsOf(plan({ mode: "branch", mentions: ASK, state }))).toEqual(
+      want,
+    )
+    expect(startsOf(plan({}))).toBeNull()
+    expect(startsOf(plan({ mentions: ASK }))).toBeNull()
   })
   test("a thread with a lane, or a Start Agent column, compels without a mention", () => {
     expect(kind(plan({ lane: lane() }))).toBe("run")
@@ -506,14 +525,14 @@ describe("settling and starting up", () => {
   const LANE1 = threadIdFor("1")
   const LANE2 = threadIdFor("2")
   const queuedOn = (lane: typeof LANE1, id: string) => ({
-    id: cardId(id),
+    kind: "text" as const,
+    id: textCardId(id),
     owner: ALICE,
     placer: ALICE,
     place: {
       kind: "queued" as const,
-      root: rootIdFor("test-root"),
       at: atEntry(E1),
-      lane,
+      thread: lane,
       order: "a",
       by: ALICE,
       seen: "",

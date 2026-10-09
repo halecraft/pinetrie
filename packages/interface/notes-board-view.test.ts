@@ -1,24 +1,26 @@
 import {
   atEntry,
-  type CardRecord,
-  cardId,
   entryId,
+  type TextCard,
+  textCardId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { TEST_ROOT } from "./fixtures.ts"
 import { notesBoardView, notesPlaced } from "./notes-board-view.ts"
 
+const TEST_THREAD = threadIdFor("e")
+
 const ADA = writerId("ada@x.io")
-const note = (id: string, cell: number | null): CardRecord => ({
-  id: cardId(id),
+const note = (id: string, cell: number | null): TextCard => ({
+  kind: "text",
+  id: textCardId(id),
   owner: ADA,
   placer: ADA,
   place: {
     kind: "note",
-    root: TEST_ROOT,
     at: atEntry(entryId("e-1")),
-    lane: null,
+    thread: TEST_THREAD,
     cell,
   },
   carries: { kind: "message", command: null },
@@ -49,7 +51,7 @@ describe("notesBoardView (ADR-0113)", () => {
     const view = notesBoardView({
       notes: [note("c-1", 5)],
       selected: 5,
-      texts: new Map([[cardId("c-1"), "one\ntwo\nthree\nfour"]]),
+      texts: new Map([[textCardId("c-1"), "one\ntwo\nthree\nfour"]]),
     })
     expect(view.rows).toBe(3)
     expect(view.cells).toHaveLength(12)

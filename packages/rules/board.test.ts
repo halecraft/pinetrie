@@ -1,8 +1,8 @@
 import {
   type BoardPlace,
   ERR,
-  type RootId,
-  rootIdFor,
+  type TaskId,
+  taskIdFor,
   type Workflow,
   type WorkflowEdit,
   workflowStateIdFor,
@@ -14,7 +14,7 @@ import {
   boardOf,
   defaultWorkflow,
   placeStarted,
-  planRootMove,
+  planTaskMove,
   planWorkflowEdit,
   planWorkflowSeed,
   transitionOf,
@@ -26,7 +26,7 @@ import { setRecord } from "./records.ts"
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const R = (n: number) =>
-  rootIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
+  taskIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
 const [BACKLOG, DOING, DONE] = ["b", "d", "x"].map(workflowStateIdFor) as [
   ReturnType<typeof workflowStateIdFor>,
   ReturnType<typeof workflowStateIdFor>,
@@ -40,20 +40,20 @@ const WORKFLOW: Workflow = {
   archive: { id: DONE, name: "Done" },
 }
 const place = (
-  root: RootId,
+  task: TaskId,
   state: typeof DOING,
   rank: number,
   by = BEA,
   at = 1,
-): BoardPlace => ({ root, state, rank: orderKey(rank), by, at })
-const placesOf = (...ps: BoardPlace[]) => new Map(ps.map(p => [p.root, p]))
+): BoardPlace => ({ task, state, rank: orderKey(rank), by, at })
+const placesOf = (...ps: BoardPlace[]) => new Map(ps.map(p => [p.task, p]))
 const columns = (board: ReturnType<typeof boardOf>) =>
   Object.fromEntries(
-    [...board.open, board.archive].map(c => [c.state.name, c.roots]),
+    [...board.open, board.archive].map(c => [c.state.name, c.tasks]),
   )
 
 describe("boardOf", () => {
-  test("by rank, then id; a root with no place, or in a state gone, at the end of the first open state", () => {
+  test("by rank, then id; a task with no place, or in a state gone, at the end of the first open state", () => {
     const places = placesOf(
       place(R(1), DOING, 20),
       place(R(2), DOING, 10),
@@ -69,20 +69,20 @@ describe("boardOf", () => {
       Done: [R(3)],
     })
   })
-  test("a place for a root the board is not given shows nowhere", () => {
+  test("a place for a task the board is not given shows nowhere", () => {
     expect(
       columns(boardOf(WORKFLOW, placesOf(place(R(1), DOING, 1)), [])),
     ).toEqual({ Backlog: [], Doing: [], Done: [] })
   })
 })
 
-test("archivedOf: only the archive's roots, with who archived them and when", () => {
+test("archivedOf: only the archive's tasks, with who archived them and when", () => {
   expect(
     archivedOf(
       WORKFLOW,
       placesOf(place(R(1), DOING, 1), place(R(2), DONE, 1, ADA, 7)),
     ),
-  ).toEqual(new Map([[R(2), { root: R(2), by: ADA, at: 7 }]]))
+  ).toEqual(new Map([[R(2), { task: R(2), by: ADA, at: 7 }]]))
 })
 
 test.each([
@@ -94,16 +94,16 @@ test.each([
   expect(transitionOf(WORKFLOW, from, to)).toBe(want)
 })
 
-describe("planRootMove", () => {
-  const roots = [R(1), R(2), R(3)]
+describe("planTaskMove", () => {
+  const tasks = [R(1), R(2), R(3)]
   const places = placesOf(
     place(R(1), DOING, 10),
     place(R(2), DOING, 20),
     place(R(3), DONE, 5, ADA, 3),
   )
-  const move = (over: Partial<Parameters<typeof planRootMove>[0]>) =>
-    planRootMove({
-      root: R(1),
+  const move = (over: Partial<Parameters<typeof planTaskMove>[0]>) =>
+    planTaskMove({
+      task: R(1),
       from: DOING,
       to: BACKLOG,
       before: null,
@@ -111,7 +111,7 @@ describe("planRootMove", () => {
       now: 9,
       workflow: WORKFLOW,
       places,
-      roots,
+      tasks,
       names: new Map([[BEA, "Bea"]]),
       ...over,
     })
@@ -120,11 +120,11 @@ describe("planRootMove", () => {
     expect(move({})).toMatchObject({
       kind: "write",
       transition: "within",
-      places: [{ root: R(1), state: BACKLOG, by: ADA, at: 9 }],
+      places: [{ task: R(1), state: BACKLOG, by: ADA, at: 9 }],
     })
   })
-  test("before a root: between its neighbours", () => {
-    const plan = move({ root: R(2), to: DOING, before: R(1) })
+  test("before a task: between its neighbours", () => {
+    const plan = move({ task: R(2), to: DOING, before: R(1) })
     expect(plan.kind).toBe("write")
     if (plan.kind !== "write") return
     expect(plan.places).toHaveLength(1)
@@ -132,39 +132,39 @@ describe("planRootMove", () => {
   })
   test("into the archive archives it, and out of it restores it", () => {
     expect(move({ to: DONE })).toMatchObject({ transition: "archive" })
-    expect(move({ root: R(3), from: DONE, to: DOING })).toMatchObject({
+    expect(move({ task: R(3), from: DONE, to: DOING })).toMatchObject({
       transition: "restore",
-      places: [{ root: R(3), by: ADA, at: 9 }],
+      places: [{ task: R(3), by: ADA, at: 9 }],
     })
   })
   test("a reorder within the archive keeps who archived it and when", () => {
     const archived = placesOf(...places.values(), place(R(2), DONE, 9, BEA, 4))
     expect(
       move({
-        root: R(3),
+        task: R(3),
         from: DONE,
         to: DONE,
         before: null,
         places: archived,
       }),
-    ).toMatchObject({ places: [{ root: R(3), by: ADA, at: 3 }] })
+    ).toMatchObject({ places: [{ task: R(3), by: ADA, at: 3 }] })
   })
   test("moved first: refused, naming who moved it and where", () => {
     expect(move({ from: BACKLOG })).toEqual({
       kind: "refused",
-      code: ERR.ROOT_MOVED,
+      code: ERR.TASK_MOVED,
       message: "not moved: Bea moved it to Doing first",
     })
   })
-  test("an unknown state, or a root the board lacks, is refused", () => {
+  test("an unknown state, or a task the board lacks, is refused", () => {
     expect(move({ to: workflowStateIdFor("gone") })).toMatchObject({
       code: ERR.UNKNOWN_STATE,
     })
-    expect(move({ root: R(9) })).toMatchObject({ code: ERR.UNKNOWN_TARGET })
+    expect(move({ task: R(9) })).toMatchObject({ code: ERR.UNKNOWN_TARGET })
   })
   test("where it already is: unchanged", () => {
     expect(move({ to: DOING, before: R(2) })).toEqual({ kind: "unchanged" })
-    expect(move({ root: R(2), to: DOING })).toEqual({ kind: "unchanged" })
+    expect(move({ task: R(2), to: DOING })).toEqual({ kind: "unchanged" })
   })
   test("no room between its neighbours: the state renumbered, the others keeping who put them there", () => {
     const tight = placesOf(
@@ -173,7 +173,7 @@ describe("planRootMove", () => {
       place(R(3), BACKLOG, 1),
     )
     const plan = move({
-      root: R(3),
+      task: R(3),
       from: BACKLOG,
       to: DOING,
       before: R(2),
@@ -181,7 +181,7 @@ describe("planRootMove", () => {
     })
     expect(plan.kind).toBe("write")
     if (plan.kind !== "write") return
-    expect(plan.places.map(p => p.root)).toEqual([R(1), R(3), R(2)])
+    expect(plan.places.map(p => p.task)).toEqual([R(1), R(3), R(2)])
     expect(plan.places.map(p => p.rank)).toEqual(
       plan.places.map(p => p.rank).toSorted(),
     )
@@ -255,7 +255,7 @@ describe("planWorkflowEdit", () => {
       ERR.STATE_ARCHIVE,
     ],
     [
-      "removing a state that holds a root",
+      "removing a state that holds a task",
       { action: "remove", state: DOING },
       ERR.STATE_NOT_EMPTY,
     ],
@@ -285,7 +285,7 @@ describe("placeStarted", () => {
   const places = placesOf(place(R(1), DOING, 10))
   const start = (state: typeof DOING | null) =>
     placeStarted({
-      root: R(2),
+      task: R(2),
       state,
       by: ADA,
       now: 4,

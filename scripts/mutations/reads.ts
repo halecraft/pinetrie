@@ -29,14 +29,6 @@ export const mutations: readonly Mutation[] = [
       "in a thread that works in its own copy, your working copy's paths are stored as the lane sees them",
   },
   {
-    name: "a root's title is not its mark",
-    file: "packages/reads/index.ts",
-    from: "    title: entry === null ? null : (readMarks(doc).get(entry)?.title ?? null),",
-    to: "    title: null,",
-    command: unit,
-    expect: "a root's title is its root entry's mark",
-  },
-  {
     name: "a root's images are not recorded",
     file: "packages/reads/index.ts",
     from: "        messages: Object.values(readEntries(doc)).map(rowMessage),\n        texts: [],\n        banners: [],",
@@ -178,8 +170,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the reported roots are a new map on every presence write",
     file: "packages/reads/index.ts",
-    from: "    return now\n  },\n  sameMap,",
-    to: "    return now\n  },\n  () => false,",
+    from: "        now.set(entryId(end), entryId(root))\n    }\n    return now\n  },\n  sameMap,",
+    to: "        now.set(entryId(end), entryId(root))\n    }\n    return now\n  },\n  () => false,",
     command: unit,
     expect: "each followed end's root, as its column reported it",
   },

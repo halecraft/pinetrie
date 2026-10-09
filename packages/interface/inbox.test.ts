@@ -31,7 +31,6 @@ const record = (
   entry: entry === null ? null : entryId(entry),
   first: entry === null ? null : entryId(entry),
   firstLine: "",
-  title: null,
   messages: mentions.length,
   newest: newest === null ? null : entryId(newest),
   writers: [],

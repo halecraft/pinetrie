@@ -164,10 +164,12 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   `docOfLane`, which answer only for a loaded root; an async one asks
   `root` or `laneDoc`.
 - **A starting host opens the roots `planLoads` names**: every root in the
-  directory that is not archived, before `recover`. A busy root cannot be
-  archived, so these hold every lane a crash could have interrupted. Which
-  roots are archived is the board's (`readArchived`, ADR-0122).
-  Archiving `unload`s a root (`work/archive.ts`); restoring opens it.
+  directory with a thread on the canvas of a task outside the archive, or
+  in an inventory (`rootsHeld`, ADR-0116), before `recover`. A busy task
+  cannot be archived, so these hold every lane a crash could have
+  interrupted. Which tasks are archived is the board's (`readArchived`,
+  ADR-0122). Archiving `unload`s the task's roots nothing else holds
+  (`work/archive.ts`); restoring opens them.
   `unload` first runs its `onReleasing` listeners: the scribe's `release`
   closes the agent's harness over the root, then the root's pi session
   (`packages/pi/TECHNICAL.md`, ADR-0092), and the root's histories of moves
@@ -189,9 +191,13 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   it runs after every refresh queued before it starts, and the records it
   compacts are current. A write after a compaction only lands in the next
   one's log.
-- **A command names its root** (`Command.root`, ADR-0063): a chat or a mark
-  writes in it, and a chat at the root starts it, under the id the sender's
-  tab minted, refused `root_id_in_use` when the directory holds it already.
+- **A command names its root and its task** (`Command.root`,
+  `Command.task`, ADR-0063, ADR-0116): a chat writes in its root, and a
+  chat at the root starts it, under the root and task ids the sender's tab
+  minted, refused `root_id_in_use` or `task_id_in_use` when the session
+  holds either already; a branch elsewhere names a task the session holds.
+  The host's `TaskIndex` is `tasksNow(basics)` (`tasks.ts`), from the
+  places and the threads' records.
 
 ## The stored schemas (`migrations/`, ADR-0096)
 
@@ -218,9 +224,23 @@ until the next compaction (S120), and the host compacts at startup. So
   planned the same way next time.
 - **One file per migration**, deleted once Duane's store has passed it; a
   store still on its hash is then refused. A change that moves no data is a
-  migration with no `run`: registering it is the acknowledgement. None is
-  registered now: `0001-live-row` and `0002-records` (ADR-0095) ran, and
-  were deleted.
+  migration with no `run`: registering it is the acknowledgement.
+  `0005-tasks` (ADR-0116) is registered: a `places` migration, an `open`
+  one and a record migration, which agree without reading each other's
+  writes because each root's task is `k-` and the root's own uuidv7
+  (`taskOfRoot`). The places: each thread with a record gets its card on
+  its root's task's canvas, in rail order; every card at a thread names
+  its thread (from the tree, `threadAt`, where its stored lane is no
+  thread's) and no root; a fresh or gone card names its task. The
+  sidebars: each `open:` document destroyed and made again under
+  `{ tasks }` (S120), read through a frozen `OpenDocBeforeTasks`. The
+  records: a `TASK` per root with a thread, its `BOARD` place re-keyed,
+  its root entry's mark the task's session `MARK`; and the histories of
+  moves kept by root destroyed (`historiesByRoot`), dropped rather than
+  migrated. A card at a thread whose thread the tree cannot name is
+  logged and left; it then does not decode. `MigrationRun` carries
+  `storedIds`, every stored document, and `log`. `0001-live-row` and
+  `0002-records` (ADR-0095) ran, and were deleted.
 - **A change to a record's contents moves no hash**: records are JSON in a
   document's `records`. A `RecordMigration` (`RECORD_MIGRATIONS`) is
   one-time: `migrate` runs each one's reads with the hash migrations', and
@@ -228,9 +248,10 @@ until the next compaction (S120), and the host compacts at startup. So
   second start finds nothing to do. It writes under the document's current
   schema, so its hash stays. The backup is taken after the reads, before
   the first write. Each is deleted, with its mutations, once Duane's store
-  has run it. None is registered now: `0003-workflow-archive` (the
-  workflow's `closed` state renamed `archive`) and `0004-threads` (each
-  thread named in its first message, ADR-0117) ran, and were deleted.
+  has run it. `0005-tasks`' records are registered (above), and skip
+  once any task is recorded. `0003-workflow-archive` (the workflow's
+  `closed` state renamed `archive`) and `0004-threads` (each thread named
+  in its first message, ADR-0117) ran, and were deleted.
 
 ## Startup
 
@@ -372,17 +393,22 @@ rejects `shutdown()`.
 - **A command's id is its send's id.** The column that sent a chat finds its
   message by it (`TreeIndex.bySend`).
 - **The archive gate is in the dispatcher** (`refuseInArchive`), over
-  `readArchived`: a root in the archive. Only the
-  `chat` command and `sendPoppedQueuedCard` call `sendChat`, both behind the gate, so
-  `sendChat` has no gate of its own.
-- **A root a chat starts takes its place on the board in the same step**
-  (`placeNewRoot`, `placeStarted`): at the end of the state the chat names
-  (`Command.state`, a board column's ＋), else of the first open state.
-- **A move on the board** (`handleRootMove`): `planRootMove` over the
+  `readArchived` and `writesIn`: a task in the archive. Only the `chat`
+  command and `sendPoppedQueuedCard` call `sendChat`, both behind the
+  gate, so `sendChat` has no gate of its own.
+- **A thread's start is planned with its send** (ADR-0116, ADR-0117):
+  `planChat`'s decision names the thread a branch starts (`starts`), and
+  `sendChat`, after its last await, plans what it writes
+  (`planThreadStart`): the thread's record, its card at the end of its
+  task's canvas, and for a new task its record and its board place, at the
+  end of the state the chat names (`Command.state`, a board column's ＋),
+  else of the first open state. `executeChat` writes that before the
+  message and reads nothing for it.
+- **A move on the board** (`commands/board.ts`): `planTaskMove` over the
   workflow and the places; a move within open states writes its place and
-  answers; one that crosses the archive's edge gathers the root's
-  document (`docs.root` loads an unloaded one, S86) and `planArchive`s the
-  crossing first. **A change to the states** (`handleWorkflow`) is one
+  answers; one that crosses the archive's edge gathers the task's roots'
+  documents (`docs.root` loads an unloaded one, S86) and `planArchive`s
+  the crossing first. **A change to the states** (`handleWorkflow`) is one
   keeper step, `planWorkflowEdit` over the workflow and the board.
 - **A message sent from a card spends it** (ADR-0048): `sendChat` names the
   card's other writers as contributors, through the card port, and spends
@@ -397,7 +423,9 @@ rejects `shutdown()`.
 - **A chat carries its sender's pinned versions** (`pinned`, each card
   pinned at the sender's thread end with its text version): `executeChat`
   passes them to `start` for a `run` or `createAndRun`, and the run waits
-  for them. A popped queued card's chat (`chatOfPoppedQueuedCard`) carries none: its thread's
+  for them. A popped queued card's chat (`chatOfPoppedQueuedCard`), in
+  its thread's root (its `THREAD` record's: a queued place names no root;
+  `failed` with none), carries none: its thread's
   cards were edited long before.
 - **A busy lane answers a chat from a card `queued`** (ADR-0059): the
   dispatcher queues the card behind the others in the same step
@@ -412,7 +440,9 @@ rejects `shutdown()`.
   every later write changes would refuse every whole undo of it (S82).
 - **`move` and `set-command` are handoffs** (`commands/cards.ts`): gather
   the places and whether the lane runs, plan (`planMoveCommand` over
-  several moves, `planSetCommand`), then write. A move's list is accepted
+  several moves, `planSetCommand`), then write. A discard's history is the
+  host's to name (ADR-0066, ADR-0116): `Discards` is the tasks now and the
+  `here` the `move` carries, the task its sender is on. A move's list is accepted
   whole or refused by its first refusal (`planMoves`): a keep's cards are
   one command. An accepted move answers `moved` with its `rev`; a refusal
   answers `unmoved` with its code, where the card is now, who put it there,
@@ -441,7 +471,7 @@ rejects `shutdown()`.
   never fitted at all.
 - **`traces-seen` deletes the sender's own traces**, ignoring any other
   id, and answers `seen`. A client sends it for the traces a column drew.
-- **`undo-move` undoes or redoes the sender's newest move in a root**
+- **`undo-move` undoes or redoes the sender's newest move in a task**
   (§ Moves' history). It answers `undone` with each card it moved and its
   place now, `unmoved` (shaped as a refused move) when someone moved a card
   since, or `nothing`. An undo first reads the cards its step moves
@@ -449,18 +479,20 @@ rejects `shutdown()`.
   back (`planLiftRoot`) only while it holds its first message alone, with
   no lane and no other card; else it answers `unmoved` `replied`, naming
   who wrote second, and reverts nothing. A lift deletes the thread after
-  the revert (`deleteRoot`, `planRootDelete`): its directory record and
-  board place, any card in it, its document (`HostDocuments.destroy`, which
-  tells every peer), and its stacks, unloaded for the startup sweep to
+  the revert (`deleteRoot`, `planRootDelete`): its directory record, its
+  thread's, its task's record, board place and title, any card in it or on
+  the task's canvas, its document (`HostDocuments.destroy`, which tells
+  every peer), and the task's stacks, unloaded for the startup sweep to
   retire. A redo after a lift moves the card back to gone, its thread
   deleted: a discard in all but name.
 - **`spin-off` makes a text card a thread** (ADR-0111, `spinOff`), in one
   keeper step: the card's text loaded whole, `planSpinOff` (refused for a
   blank card, a root id in use, or as `planMove` refuses the move), then a
-  chat at the root of the new root its tab minted (`sendChat`, never asking
-  the agent, the card's writers its contributors) and its board place
-  (`placeNewRoot`), then the card's move to gone, spun into it, in the
-  history its move names. The answer is the chat's: `appended`, with the
+  chat at the root of the new root its tab minted, in the new task it
+  names (`sendChat`, never asking the agent, the card's writers its
+  contributors, which plans the task's start), then the card's move to
+  gone, spun into it, in the history of the task it leaves, or from an
+  inventory the new task's. The answer is the chat's: `appended`, with the
   first message's id.
 - **A person's documents are clients' documents the host only keeps**
   (ADR-0059, ADR-0077, ADR-0122): their inventory, their attention and
@@ -484,31 +516,33 @@ rejects `shutdown()`.
 
 ## Moves' history (`move-history.ts`, ADR-0066)
 
-- **One Kyneta undo stack per person and root**, `moves:<writer>:<RootId>`,
-  key `moves`, scope the places document, made on first use and kept in the
-  store. Kyneta undoes only its own runtime's writes, and only the host
-  writes `places`, so the stacks are the host's: `policy.ts` shares them
-  with no one and rejects one a client announces, and `writersPolicy` gives
-  them to the host alone.
-- **Which history a move enters is the host's** (`historyOf`): the root the
-  card goes to, else the one it leaves, read from its record; a creation or
-  a removal enters none. `move` writes inside that stack's `gesture`. The
-  host's own writes (a queued card's pop, a spend, an unsent card, a fresh column's
-  followers, the sweep) are outside every gesture, so every stack rebases
-  over them, and an undo of a move the host overtook is refused.
+- **One Kyneta undo stack per person and task**, `moves:<writer>:<TaskId>`
+  (ADR-0116), key `moves`, scope the places document, made on first use
+  and kept in the store. Kyneta undoes only its own runtime's writes, and
+  only the host writes `places`, so the stacks are the host's: `policy.ts`
+  shares them with no one and rejects one a client announces, and
+  `writersPolicy` gives them to the host alone.
+- **Which history a move enters is the host's** (`historyOf`): the task the
+  card goes to, else the one it leaves, read from its record; a discard's,
+  the task it leaves, else, from an inventory, the task its sender is on
+  (`here`); a creation or a removal enters none. `move` writes inside that
+  stack's `gesture`. The host's own writes (a queued card's pop, a spend,
+  an unsent card, a fresh column's followers, the sweep) are outside every
+  gesture, so every stack rebases over them, and an undo of a move the
+  host overtook is refused.
 - **Every undo is `whole`.** Without it a step someone else's move broke is
   skipped and an older one undone out of sight (S82). With it, a card's row
   (its place and its placer) changed by anyone since refuses the undo.
 - **`rev` is raised after an undo too** (`raiseRev`), apart from the
   revert, which Kyneta writes itself.
-- **Retired 7 days after their root is archived** (`planHistorySweep`,
+- **Retired 7 days after their task is archived** (`planHistorySweep`,
   `ARCHIVED_HISTORY_MS`), at startup and after each run's end; and at
-  startup only, those of a root the directory does not name (a new tab that
+  startup only, those of a task the session does not hold (a new tab that
   never sent). The stored ids come from the store's listing by `moves:`;
   `retire` destroys a stack loaded or not (S91).
 - **Unloaded when nobody can use them:** a person's when their last seat
-  leaves (the seats step, `idleWriters`), a root's when it is archived
-  (one of `docs.unload`'s `onReleasing` listeners). The next move loads one again (S91).
+  leaves (the seats step, `idleWriters`), a task's when it is archived
+  (`unloadTask`). The next move loads one again (S91).
 - **Shutdown disposes them, then flushes,** so a stack's open step is
   stored before the Exchange stops.
 
@@ -711,15 +745,14 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   (`planTitling`) without a step of its own, and only the request goes out.
 - **The prompt is given, not read**: the run writes it after `executeChat`
   returns, so `laneStarted` takes its author and text from the chat's
-  details. A new root has no entry yet, so the request, outside the keeper,
-  waits for the root's first entry (`whenRooted`, at most 30 s) before its
-  title is settled as the root's mark.
-- **The settle checks again**: an archived root takes nothing, and an
+  details. The title is settled as the task's mark (ADR-0116), keyed by
+  the task, so nothing waits for the root's first entry.
+- **The settle checks again**: an archived task takes nothing, and an
   unasked title gives way to any mark written meanwhile
   (`titleStillWanted`). `planMark` writes it, so an unchanged title writes
   nothing.
 - **Only an unasked request is `held`**: a person's Auto-update goes out
-  even while an unasked one is out for the same root.
+  even while an unasked one is out for the same task.
 - A missing `tab-title` skill, or a reply `titleOf` refuses, is logged, and
   nothing is written.
 

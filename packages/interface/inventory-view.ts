@@ -25,7 +25,9 @@ export function inventoryView(input: {
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>
 }): InventoryView {
-  const byId = new Map(input.held.map(c => [c.id, c] as const))
+  const byId = new Map<CardId, CardRecord>(
+    input.held.map(c => [c.id, c] as const),
+  )
   const settled = settleSlots(
     input.held.map(c => c.id),
     input.slots,

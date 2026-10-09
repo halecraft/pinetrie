@@ -1,12 +1,12 @@
 // interface/board-view — what the board shows and offers (ADR-0122), decided.
 // PURE: `Board` and `BoardStrip` (`board.tsx`) draw it.
 //
-// The board is everyone's: every root with a message, in its workflow state.
-// Its strip, in the footer, says each state's name, count and highest mark,
-// and how many of its roots the agent works in and have work ready to
-// accept (ADR-0091); opened, each open state is a column of cards, each ⇡
-// when a thread of it has work ready, whose head says what the strip's
-// button did, and the archive is a count and its most recent roots.
+// The board is everyone's: every task with a message, in its workflow state
+// (ADR-0116). Its strip, in the footer, says each state's name, count and
+// highest mark, and how many of its tasks the agent works in and have work
+// ready to accept (ADR-0091); opened, each open state is a column of cards,
+// each ⇡ when a thread of it has work ready, whose head says what the
+// strip's button did, and the archive is a count and its most recent tasks.
 // One search over labels, and "mine", filter every state in place
 // (ADR-0109), and what the board shows says whether a filter is on
 // (`BoardShown`, ADR-0115).
@@ -14,8 +14,8 @@
 import type {
   BoardPlace,
   EntryId,
-  RootId,
   RootSummary,
+  TaskId,
   Workflow,
   WorkflowState,
   WorkflowStateId,
@@ -30,15 +30,15 @@ import { NO_TEXT } from "./root-label.ts"
 import { stepsIn } from "./root-target.ts"
 import type { ThreadCardHead } from "./thread-card.ts"
 
-/** A root on the board. */
 /**
- * A root on the board, a thread card (ADR-0111): its header, the one the
+ * A task on the board, its card (ADR-0111, ADR-0116): its header, the one the
  * sidebar draws too (`ThreadCardHead`), spread here and kept whole as
  * `head`, with what only the board adds.
  */
-export interface ThreadCard extends Omit<ThreadCardHead, "root" | "state"> {
+export interface ThreadCard extends Omit<ThreadCardHead, "entry" | "state"> {
   readonly head: ThreadCardHead
-  readonly root: RootId
+  /** Its first root's root entry: a task on the board has a message. */
+  readonly entry: EntryId
   /** The state it is in: what its drag carries. */
   readonly state: WorkflowStateId
   /** Everyone who wrote a chat in it, in order of first message. */
@@ -142,13 +142,13 @@ export const BOARD_SEARCH = "board-search"
 
 export interface BoardViewInput {
   readonly workflow: Workflow
-  readonly places: ReadonlyMap<RootId, BoardPlace>
-  /** Each root's root entry, by its id: every root with a message (`rootEntriesOf`). */
-  readonly rootEntries: ReadonlyMap<RootId, EntryId>
+  readonly places: ReadonlyMap<TaskId, BoardPlace>
+  /** Each task's first root's root entry: every task with a message (`entriesOf`). */
+  readonly entries: ReadonlyMap<TaskId, EntryId>
   /** Each root, by its root entry (`summariesOf`). */
   readonly summaries: readonly RootSummary[]
-  /** Each root's thread card header (`threadCardHeads`), which the sidebar reads too. */
-  readonly heads: ReadonlyMap<EntryId, ThreadCardHead>
+  /** Each task's thread card header (`threadCardHeads`), which the sidebar reads too. */
+  readonly heads: ReadonlyMap<TaskId, ThreadCardHead>
   /** Each root's first line (`firstLinesOf`): a titled card's body. */
   readonly lines: ReadonlyMap<EntryId, string>
   /** The board's filter (`parseSearch`), or null for none. */
@@ -162,13 +162,13 @@ const bodyOf = (label: string, line: string | undefined): string | null =>
 
 export function boardView(input: BoardViewInput): BoardView {
   const { workflow, search } = input
-  const board = boardOf(workflow, input.places, input.rootEntries.keys())
+  const board = boardOf(workflow, input.places, input.entries.keys())
   const summaries = new Map(input.summaries.map(s => [s.root, s]))
   const keeps = search === null ? null : boardFilter(search, input.me)
   const _states = [...workflow.open, workflow.archive]
-  const headOf = (entry: EntryId): ThreadCardHead =>
-    input.heads.get(entry) ?? {
-      root: null,
+  const headOf = (task: TaskId, entry: EntryId): ThreadCardHead =>
+    input.heads.get(task) ?? {
+      task,
       entry,
       label: NO_TEXT,
       status: null,
@@ -177,82 +177,91 @@ export function boardView(input: BoardViewInput): BoardView {
       state: null,
       moves: [],
     }
-  const labelOf = (entry: EntryId) => headOf(entry).label
   const status = new Map(
-    [...input.heads].flatMap(([entry, head]) =>
-      head.status === null ? [] : [[entry, head.status] as const],
+    [...input.heads.values()].flatMap(head =>
+      head.status === null || head.entry === null
+        ? []
+        : [[head.entry, head.status] as const],
+    ),
+  )
+  const readyAt = new Set(
+    [...input.heads.values()].flatMap(head =>
+      head.ready.length === 0 || head.entry === null ? [] : [head.entry],
     ),
   )
   const writersOf = (entry: EntryId) => summaries.get(entry)?.writers ?? []
   /** A move within `state`, before `before` there, or to its end. */
   const within = (
-    root: RootId,
+    task: TaskId,
     state: WorkflowStateId,
-    before: RootId | null,
+    before: TaskId | null,
   ): Intent => ({
-    kind: "moveRoot",
-    root,
+    kind: "moveTask",
+    task,
     from: state,
     to: state,
     before,
     closes: false,
   })
-  /** The signals of the roots `entries`, from each root's status and offers. */
+  /** The signals of the tasks whose first root entries are `entries`, from each one's status and offers. */
   const stateSignals = (entries: readonly EntryId[]): StateSignals => ({
     working: entries.filter(e => status.get(e)?.kind === "working").length,
-    ready: entries.filter(e => headOf(e).ready.length > 0).length,
+    ready: entries.filter(e => readyAt.has(e)).length,
     roots: entries,
   })
-  /** A kept root's card, whose Move up and Move down step among the roots `isShown` keeps. */
+  /** A kept task's card, whose Move up and Move down step among the tasks `isShown` keeps. */
   const cardOf = (
-    root: RootId,
+    task: TaskId,
     entry: EntryId,
     state: WorkflowStateId,
-    column: readonly RootId[],
-    isShown: (root: RootId) => boolean,
+    column: readonly TaskId[],
+    isShown: (task: TaskId) => boolean,
   ): ThreadCard => {
-    const steps = stepsIn(column, root, isShown)
-    const head = headOf(entry)
+    const steps = stepsIn(column, task, isShown)
+    const head = headOf(task, entry)
     return {
       ...head,
       head,
-      root,
+      entry,
       state,
       writers: writersOf(entry),
       body: bodyOf(head.label, input.lines.get(entry)),
-      show: { kind: "show", here: { kind: "root", root: entry } },
-      up: steps.up === null ? null : within(root, state, steps.up.before),
-      down: steps.down === null ? null : within(root, state, steps.down.before),
+      show: { kind: "show", here: { kind: "task", task } },
+      up: steps.up === null ? null : within(task, state, steps.up.before),
+      down: steps.down === null ? null : within(task, state, steps.down.before),
     }
   }
   /**
-   * A state's roots: the entry of every one, which its mark, Remove and the
+   * A state's tasks: the entry of every one, which its mark, Remove and the
    * strip count, and a card for each the search keeps, which is drawn.
    */
-  const rootsOf = (column: {
-    roots: readonly RootId[]
+  const tasksOf = (column: {
+    tasks: readonly TaskId[]
     state: WorkflowState
   }): {
     entries: readonly EntryId[]
     cards: readonly ThreadCard[]
     count: Count
   } => {
-    const all = column.roots.flatMap(root => {
-      const entry = input.rootEntries.get(root)
-      return entry === undefined ? [] : [{ root, entry }]
+    const all = column.tasks.flatMap(task => {
+      const entry = input.entries.get(task)
+      return entry === undefined ? [] : [{ task, entry }]
     })
     const kept =
       keeps === null
         ? all
         : all.filter(r =>
-            keeps({ label: labelOf(r.entry), writers: writersOf(r.entry) }),
+            keeps({
+              label: headOf(r.task, r.entry).label,
+              writers: writersOf(r.entry),
+            }),
           )
-    const shown = new Set(kept.map(r => r.root))
+    const shown = new Set(kept.map(r => r.task))
     return {
       entries: all.map(r => r.entry),
       cards: kept.map(r =>
-        cardOf(r.root, r.entry, column.state.id, column.roots, root =>
-          shown.has(root),
+        cardOf(r.task, r.entry, column.state.id, column.tasks, task =>
+          shown.has(task),
         ),
       ),
       count:
@@ -262,7 +271,7 @@ export function boardView(input: BoardViewInput): BoardView {
     }
   }
   const columns = board.open.map((column, i) => {
-    const { entries, cards, count } = rootsOf(column)
+    const { entries, cards, count } = tasksOf(column)
     const { state } = column
     const before = (to: WorkflowStateId | null): Intent => ({
       kind: "editWorkflow",
@@ -303,7 +312,7 @@ export function boardView(input: BoardViewInput): BoardView {
     }
     return { view, strip }
   })
-  const archiveRoots = rootsOf(board.archive)
+  const archiveRoots = tasksOf(board.archive)
   const archive: ArchiveView = {
     state: board.archive.state,
     count: archiveRoots.count,
@@ -350,7 +359,7 @@ export function parseSearch(query: string, mine: boolean): BoardSearch | null {
 }
 
 /**
- * What `search` keeps: the roots whose label (`labelsOf`, so a title is
+ * What `search` keeps: the tasks whose label (`labelsOf`, so a title is
  * found) holds every word, in any order, and with `mine`, those `me` wrote a
  * chat in. Labels, not messages: a search of every message would hold every
  * root's document (ADR-0063).
@@ -369,7 +378,7 @@ function boardFilter(
 }
 
 /**
- * The archive's rows, of the roots the search kept: newest activity
+ * The archive's rows, of the tasks the search kept: newest activity
  * first, and with no words to search (none, or "mine" alone) only the most
  * recent few.
  */
@@ -420,9 +429,9 @@ export function boardKeyAct(
 }
 
 /** Why an open state cannot be removed, or null when it can (ADR-0122). */
-export function removeWords(roots: number, openStates: number): string | null {
-  if (roots > 0)
-    return `holds ${roots === 1 ? "a root" : `${roots} roots`}: move ${roots === 1 ? "it" : "them"} first`
+export function removeWords(tasks: number, openStates: number): string | null {
+  if (tasks > 0)
+    return `holds ${tasks === 1 ? "a task" : `${tasks} tasks`}: move ${tasks === 1 ? "it" : "them"} first`
   if (openStates === 1) return "the board needs one open state"
   return null
 }
@@ -463,24 +472,24 @@ export const addStateIntent = (
 export const stateWords = (
   signals: Pick<StateSignals, "working" | "ready">,
 ): { readonly working: string; readonly ready: string } => ({
-  working: `the agent is working in ${rootsWords(signals.working)}`,
-  ready: `${rootsWords(signals.ready)} with work ready to accept`,
+  working: `the agent is working in ${tasksWords(signals.working)}`,
+  ready: `${tasksWords(signals.ready)} with work ready to accept`,
 })
 
 /** A thread card's ⇡: the threads it names. */
 export const readyWords = (threads: readonly string[]): string =>
   `ready to accept: ${threads.join(", ")}`
 
-/** A number of roots: a state's count's title, and the filter's. */
-export const rootsWords = (n: number): string => count(n, "root", "roots")
+/** A number of tasks: a state's count's title, and the filter's. */
+export const tasksWords = (n: number): string => count(n, "task", "tasks")
 
-/** A state's count in its head: "12 of 96" while a filter keeps some of its roots. */
+/** A state's count in its head: "12 of 96" while a filter keeps some of its tasks. */
 export const keptWords = (count: Count): string =>
   count.kind === "kept" ? `${count.kept} of ${count.total}` : `${count.total}`
 
 /** The search's placeholder. */
 export const searchWords = (total: number): string =>
-  `search ${rootsWords(total)}…`
+  `search ${tasksWords(total)}…`
 
 /** The words searched for, quoted as the banner and ▦'s title say them. */
 const quoted = (search: BoardSearch): string => `"${search.words.join(" ")}"`
@@ -493,10 +502,10 @@ export function filterWords(
   const words = search.words.length > 0
   if (kept === 0)
     return words
-      ? `No roots${search.mine ? " you wrote in" : ""} match ${quoted(search)}`
-      : `You wrote in none of ${rootsWords(total)}`
-  const of = `${kept} of ${rootsWords(total)}`
-  if (!words) return `Filtered to roots you wrote in: ${of}`
+      ? `No tasks${search.mine ? " you wrote in" : ""} match ${quoted(search)}`
+      : `You wrote in none of ${tasksWords(total)}`
+  const of = `${kept} of ${tasksWords(total)}`
+  if (!words) return `Filtered to tasks you wrote in: ${of}`
   return `Filtered by ${quoted(search)}${search.mine ? " and mine" : ""}: ${of}`
 }
 

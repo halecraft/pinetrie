@@ -619,8 +619,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new root takes the page to it",
     file: "packages/web/app.tsx",
-    from: "  }, [layout, stored, index, lanes, archivedRoots, list])",
-    to: '  }, [layout, stored, index, lanes, archivedRoots, list])\n  const othersRoots = [...directory.values()].filter(r => r.entry !== null && !r.writers.includes(session.writer)).length\n  useEffect(() => {\n    const newest = [...directory.values()].flatMap(r => (r.entry === null || r.writers.includes(session.writer) ? [] : [r.entry])).at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "root", root: newest } })\n  }, [othersRoots])',
+    from: "  }, [layout, stored, index, lanes, archivedTasks, list, entries])\n",
+    to: '  }, [layout, stored, index, lanes, archivedTasks, list, entries])\n  const othersTasks = tasks.byId.size\n  useEffect(() => {\n    const newest = [...tasks.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "task", task: newest } })\n  }, [othersTasks])\n',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1065,8 +1065,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the layout drawn is the stored one, a render behind the document",
     file: "packages/web/app.tsx",
-    from: '  const layout = useMemo(\n    () =>\n      resolveLayout(stored, { index, lanes, archived: archivedRoots, list }),\n    [stored, index, lanes, archivedRoots, list],\n  )\n  useEffect(() => {\n    if (layout !== stored)\n      dispatch({ kind: "resolve", index, lanes, archived: archivedRoots, list })\n  }, [layout, stored, index, lanes, archivedRoots, list])',
-    to: '  const layout = stored\n  useEffect(\n    () => dispatch({ kind: "resolve", index, lanes, archived: archivedRoots, list }),\n    [index, lanes, archivedRoots, list],\n  )',
+    from: '  const layout = useMemo(\n    () =>\n      resolveLayout(stored, {\n        index,\n        lanes,\n        archived: archivedTasks,\n        list,\n        entries,\n      }),\n    [stored, index, lanes, archivedTasks, list, entries],\n  )\n  useEffect(() => {\n    if (layout !== stored)\n      dispatch({\n        kind: "resolve",\n        index,\n        lanes,\n        archived: archivedTasks,\n        list,\n        entries,\n      })\n  }, [layout, stored, index, lanes, archivedTasks, list, entries])',
+    to: '  const layout = stored\n  useEffect(\n    () => dispatch({ kind: "resolve", index, lanes, archived: archivedTasks, list, entries }),\n    [index, lanes, archivedTasks, list, entries],\n  )',
     suite: "browser",
     scenario: "tools",
     expect: "no branch chip is painted in the agent's column while it works",
@@ -1488,10 +1488,10 @@ export const mutations: readonly Mutation[] = [
     expect: "a card emptied marks nothing, though its record stays",
   },
   {
-    name: "the marks are given no archived roots",
+    name: "the marks are given no archived tasks",
     file: "packages/web/app.tsx",
-    from: "        archived: archivedRoots,\n        index,\n        rootEntries,",
-    to: "        archived: new Set(),\n        index,\n        rootEntries,",
+    from: "        archived: archivedTasks,\n        tasks,\n        index,\n        rootEntries,",
+    to: "        archived: new Set(),\n        tasks,\n        index,\n        rootEntries,",
     suite: "browser",
     scenario: "page",
     expect: "an archived root holding your card marks its thread card, not ▦",
@@ -1499,8 +1499,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher answers a move on the board without moving",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "        return settled(await handleRootMove(deps, writer, intent))",
-    to: '        return settled({ kind: "moved-root" })',
+    from: "        return settled(await handleTaskMove(deps, writer, intent))",
+    to: '        return settled({ kind: "moved-task" })',
     suite: "host",
     scenario: "board",
     expect:
@@ -1508,9 +1508,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a started root is never placed",
-    file: "apps/pinetrie/host/commands/index.ts",
-    from: "        if (startsRoot(intent.at) && spendsCard(sent))",
-    to: "        if (startsRoot(intent.at) && spendsCard(sent) && false)",
+    file: "packages/rules/task.ts",
+    from: "    if (input.workflow !== null)\n      records.push(",
+    to: "    if (input.workflow !== null && false)\n      records.push(",
     suite: "host",
     scenario: "board",
     expect:
@@ -1533,7 +1533,7 @@ export const mutations: readonly Mutation[] = [
     to: '        return settled({ kind: "marked" })',
     suite: "host",
     scenario: "board",
-    expect: "a root is titled, by its writer",
+    expect: "a task is titled, by its writer",
   },
   {
     name: "a column's reading is never written",
@@ -1689,8 +1689,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column never asks for its thread's name",
     file: "packages/web/column.tsx",
-    from: '      void p.session.request({ kind: "reserve", lane: step.lane })\n',
-    to: "",
+    from: '    if (step.kind === "ask")\n      void p.session.request({ kind: "reserve", lane: step.lane })\n',
+    to: "    void step\n",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1757,8 +1757,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a popped queued card is sent as the card's owner, not who queued it",
     file: "apps/pinetrie/host/index.ts",
-    from: "            popped.card.place.by,\n            newId(),",
-    to: "            popped.card.owner,\n            newId(),",
+    from: "                popped.card.place.by,\n                newId(),",
+    to: "                popped.card.owner,\n                newId(),",
     suite: "host",
     scenario: "cards",
     expect:
@@ -1777,8 +1777,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an unqueue is never sent",
     file: "packages/session/connect.ts",
-    from: "      return sendMove(move, how, queuedBy, null)",
-    to: '      return move.from?.kind === "queued" ? Promise.resolve({ kind: "refused", refusal: null }) : sendMove(move, how, queuedBy, null)',
+    from: "      return sendMove(move, how, queuedBy, null, here)",
+    to: '      return move.from?.kind === "queued" ? Promise.resolve({ kind: "refused", refusal: null }) : sendMove(move, how, queuedBy, null, here)',
     suite: "host",
     scenario: "cards",
     expect:
@@ -1896,9 +1896,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the wire carries no holder",
-    file: "packages/protocol/codec.ts",
-    from: "  return { kind, root, at, lane, column, order, seen, holder }",
-    to: "  return { kind, root, at, lane, column, order, seen }",
+    file: "packages/core/index.ts",
+    from: '  holder: { key: "always" },',
+    to: '  holder: { key: "never" },',
     suite: "host",
     scenario: "cards",
     expect: "a move out of someone else's inventory is refused, as not theirs",
@@ -1934,9 +1934,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the page undoes no move",
-    file: "packages/web/app.tsx",
-    from: "            composers: composers.current(),\n          },\n          rootEntries,",
-    to: "            composers: composers.current(),\n          },\n          rootEntries: new Map(),",
+    file: "packages/interface/perform.ts",
+    from: '    case "undoMoves":\n      void ports.session\n',
+    to: '    case "undoMoves":\n      return\n      void ports.session\n',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1981,8 +1981,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a session's undo of moves redoes",
     file: "packages/session/connect.ts",
-    from: '        kind: "undo-move",\n        root,\n        direction,',
-    to: '        kind: "undo-move",\n        root,\n        direction: "redo",',
+    from: '        kind: "undo-move",\n        task,\n        direction,',
+    to: '        kind: "undo-move",\n        task,\n        direction: "redo",',
     suite: "host",
     scenario: "cards",
     expect:
@@ -1991,8 +1991,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a keep sends its first card only",
     file: "packages/session/connect.ts",
-    from: '        { kind: "move", moves: moves.map(m => m.move) },',
-    to: '        { kind: "move", moves: moves.slice(0, 1).map(m => m.move) },',
+    from: '        { kind: "move", moves: moves.map(m => m.move), here },',
+    to: '        { kind: "move", moves: moves.slice(0, 1).map(m => m.move), here },',
     suite: "host",
     scenario: "cards",
     expect:
@@ -2001,8 +2001,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a starting host retires every history of moves",
     file: "apps/pinetrie/host/housekeeping.ts",
-    from: "    roots: readRoots(session),",
-    to: "    roots: new Map(),",
+    from: "    tasks: new Set(readTasks(session).keys()),\n    archived: readArchived(session),",
+    to: "    tasks: new Set(),\n    archived: readArchived(session),",
     suite: "host",
     scenario: "cards",
     expect:
@@ -2047,10 +2047,10 @@ export const mutations: readonly Mutation[] = [
       "a new root's first lane titles it from its first message, before its run ends",
   },
   {
-    name: "a client's retitle never reaches the host",
-    file: "packages/session/connect.ts",
-    from: '    retitle: entry => inRootOf(entry, root => ({ kind: "retitle", root })),',
-    to: '    retitle: () => Promise.resolve({ kind: "retitling" as const }),',
+    name: "a retitle is answered without asking the model",
+    file: "apps/pinetrie/host/commands/index.ts",
+    from: "        return settled(await deps.titles.asked(intent.task, writer))",
+    to: '        return settled({ kind: "retitling" })',
     suite: "host",
     scenario: "titles",
     expect:
@@ -2176,8 +2176,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a starting host sweeps every hold",
     file: "apps/pinetrie/host/housekeeping.ts",
-    from: "    rootOf: lane => lanes.get(lane)?.root ?? null,",
-    to: "    rootOf: () => null,",
+    from: "    whereIs: lane => {\n      const card = cards.find(c => c.id === lane)",
+    to: "    whereIs: lane => {\n      if (lane) return null\n      const card = cards.find(c => c.id === lane)",
     suite: "host",
     scenario: "cards",
     expect:

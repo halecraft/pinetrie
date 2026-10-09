@@ -38,6 +38,7 @@ import {
 import { readLaneTip } from "@pinetrie/schema"
 import type { Basics } from "../basics.ts"
 import type { Records } from "../records.ts"
+import { tasksNow } from "../tasks.ts"
 
 /** What the documents say of a lane, for what your repo cannot say. */
 export interface OfferDocs {
@@ -101,8 +102,13 @@ export function createOfferDeps(input: {
   const offerDocs: OfferDocs = {
     nameOf,
     archived(lane) {
-      const root = docs.rootOfLane(lane)
-      return archivedIn(root === null ? [] : [root], readArchived(doc)) !== null
+      const task = tasksNow({
+        places: basics.places,
+        session: doc,
+      }).taskOfThread.get(lane)
+      return (
+        archivedIn(task === undefined ? [] : [task], readArchived(doc)) !== null
+      )
     },
     input: lane => ({
       lane,

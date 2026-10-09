@@ -24,7 +24,12 @@ export interface PresenceSeat {
    * This seat's column `columnKey` follows the thread ending at `end`, in
    * the root whose root entry is `root` (null: not yet known).
    */
-  setReading(columnKey: string, end: string, root: string | null): void
+  setReading(
+    columnKey: string,
+    end: string,
+    root: string | null,
+    task: string | null,
+  ): void
   /** The column closed: its entry is deleted, not left to decay. */
   clearReading(columnKey: string): void
   /**
@@ -46,11 +51,12 @@ export function presenceSeat(
   const mine = seatKey(me, exchange.peerId)
   return {
     handle: presence,
-    setReading(columnKey, end, root) {
+    setReading(columnKey, end, root, task) {
       const key = readingKey(mine, columnKey)
       batch(presence, d => {
         d.reading.set(key, end)
         d.readingRoot.set(key, root)
+        d.readingTask.set(key, task)
       })
     },
     clearReading(columnKey) {
@@ -59,6 +65,7 @@ export function presenceSeat(
         batch(presence, d => {
           d.reading.delete(key)
           d.readingRoot.delete(key)
+          d.readingTask.delete(key)
         })
     },
     setTyping(end, card) {

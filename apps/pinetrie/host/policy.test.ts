@@ -1,8 +1,9 @@
 import {
-  cardId,
   movesDocId,
   rootDocId,
   rootIdFor,
+  taskIdFor,
+  textCardId,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -32,7 +33,7 @@ import {
   storedKind,
 } from "./policy.ts"
 
-const CARD = cardDocId(cardId("c-1"))
+const CARD = cardDocId(textCardId("c-1"))
 const UNDO = "undo:seat-a"
 const INVENTORY = personDocId("inventory", writerId("ada@x.io"))
 const ATTENTION = personDocId("attention", writerId("ada@x.io"))
@@ -114,7 +115,10 @@ test.each([
 })
 
 test("a stack of moves is the host's: shared with no one, taken from no one, and rejected when a client announces one (ADR-0066)", () => {
-  const MOVES = movesDocId(writerId("ada@x.io"), KNOWN)
+  const MOVES = movesDocId(
+    writerId("ada@x.io"),
+    taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
+  )
   const peer = {
     peerId: "seat-a",
     principal: "ada@x.io",
@@ -143,7 +147,14 @@ test("storedKind: each stored document's kind, by which its schema is checked at
     expect(storedKind(id)).toBe(kind)
     expect(SCHEMA_OF[kind]).toBe(schema)
   }
-  expect(storedKind(movesDocId(writerId("ada@x.io"), KNOWN))).toBe("kyneta")
+  expect(
+    storedKind(
+      movesDocId(
+        writerId("ada@x.io"),
+        taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
+      ),
+    ),
+  ).toBe("kyneta")
   for (const other of [
     "pinetrie:cards",
     "line:pinetrie.control:a→host",

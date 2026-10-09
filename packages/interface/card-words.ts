@@ -152,6 +152,7 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
         ? "not lifted back: its thread has more in it"
         : `not lifted back: ${who(by, reader)} replied`
     case "exists":
+    case "no-place":
       return "not moved"
   }
 }

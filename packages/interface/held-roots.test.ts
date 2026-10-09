@@ -1,13 +1,21 @@
-import { entryId, type RootRecord, rootIdFor } from "@pinetrie/core"
+import {
+  entryId,
+  type RootRecord,
+  rootIdFor,
+  taskIdFor,
+  threadIdFor,
+  writerId,
+} from "@pinetrie/core"
+import { threadCardOf } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { planHeldRoots } from "./held-roots.ts"
+import { tasksOf } from "./tasks.ts"
 
 const record = (n: string): RootRecord => ({
   root: rootIdFor(`r${n}`),
   entry: entryId(`e${n}`),
   first: entryId(`e${n}`),
   firstLine: n,
-  title: null,
   messages: 1,
   newest: entryId(`e${n}`),
   writers: [],
@@ -18,28 +26,51 @@ const record = (n: string): RootRecord => ({
 const directory = new Map(
   ["1", "2", "3", "4"].map(n => [rootIdFor(`r${n}`), record(n)] as const),
 )
+/** Task `k-<n>` holds the thread `t-<n>`, in root `r<n>` (ADR-0116). */
+const K = (n: string) => taskIdFor(n)
+const tasks = tasksOf({
+  known: ["1", "2", "3", "4"].map(K),
+  cards: ["1", "2", "3", "4"].map(n =>
+    threadCardOf({
+      thread: threadIdFor(n),
+      task: K(n),
+      by: writerId("a"),
+      cards: [],
+    }),
+  ),
+  threads: new Map(
+    ["1", "2", "3", "4"].map(n => [
+      threadIdFor(n),
+      {
+        thread: threadIdFor(n),
+        root: rootIdFor(`r${n}`),
+        by: writerId("a"),
+        createdAt: 0,
+        fork: null,
+      },
+    ]),
+  ),
+  directory,
+})
 const held = (input: Parameters<typeof planHeldRoots>[0]) =>
   [...planHeldRoots(input)].sort()
 
-describe("planHeldRoots", () => {
-  test("the sidebar's roots and the one you are on, and no other", () => {
+describe("planHeldRoots (ADR-0116)", () => {
+  test("the roots of the sidebar's tasks and the one you are on, and no other", () => {
     expect(
       held({
         layout: {
-          open: [entryId("e1"), entryId("e2")],
-          active: { kind: "root", root: entryId("e3") },
+          open: [K("1"), K("2")],
+          active: { kind: "task", task: K("3") },
         },
-        directory,
+        tasks,
       }),
     ).toEqual([rootIdFor("r1"), rootIdFor("r2"), rootIdFor("r3")])
   })
 
-  test("a root the directory does not name is held by no one", () => {
-    expect(
-      held({
-        layout: { open: [entryId("e9")], active: null },
-        directory,
-      }),
-    ).toEqual([])
+  test("a task the session does not hold holds no root", () => {
+    expect(held({ layout: { open: [K("9")], active: null }, tasks })).toEqual(
+      [],
+    )
   })
 })

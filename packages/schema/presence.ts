@@ -48,6 +48,11 @@ export const presenceSchema = (d: PresenceDecay) =>
      * and open it.
      */
     readingRoot: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
+    /**
+     * Keyed as `reading`: the task the column is on (ADR-0116), so the
+     * sidebar and the board name readers by task.
+     */
+    readingTask: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
     /** Keyed by writer: the thread end whose composer they are typing in. */
     typing: Schema.record(Schema.string().nullable().decay(d.typingMs)),
     /**

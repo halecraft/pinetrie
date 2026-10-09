@@ -3,6 +3,8 @@ import {
   entryId,
   indexTree,
   type LaneView,
+  type TaskId,
+  taskIdFor,
   threadIdFor,
   workflowStateIdFor,
 } from "@pinetrie/core"
@@ -11,6 +13,7 @@ import {
   entriesOf,
   entry,
   NEW_ROOT,
+  NEW_TASK,
   NEW_THREAD,
   threadOfEntry,
   tree,
@@ -41,26 +44,40 @@ const parents = {
   "6-d": "5-r2",
 }
 const index = tree(parents)
-const R1: Here = { kind: "root", root: entryId("1-r1") }
+/**
+ * Each root's task, one a root (ADR-0116): `7-r3` is the root a new tab's
+ * first send writes, so its task is the one the tab minted.
+ */
+const TK = (root: string): TaskId =>
+  root === "7-r3" ? NEW_TASK : taskIdFor(root)
+const ROOTS = ["1-r1", "5-r2", "7-r3", "9-r", "9-x"]
+/** Each task's first root's root entry: where its first column is. */
+const ENTRIES: ReadonlyMap<TaskId, EntryId> = new Map(
+  ROOTS.map(r => [TK(r), entryId(r)] as const),
+)
+const OF_ENTRY: ReadonlyMap<EntryId, TaskId> = new Map(
+  ROOTS.map(r => [entryId(r), TK(r)] as const),
+)
+const R1: Here = { kind: "task", task: TK("1-r1") }
 const at = (l: Layout, here: Here = R1): Layout =>
   layoutReducer(l, { kind: "show", here })
 /** The sidebar, as the session's document holds it, by root entry. */
-const listed = (...roots: string[]) => roots.map(entryId)
+const listed = (...roots: string[]) => roots.map(TK)
 const resolve = (
   l: Layout,
   i = index,
-  archived: ReadonlySet<EntryId> = new Set(),
+  archived: ReadonlySet<TaskId> = new Set(),
   lanes: readonly LaneView[] = [],
-  list: readonly EntryId[] = [],
-) => resolveLayout(l, { index: i, lanes, archived, list })
+  list: readonly TaskId[] = [],
+) => resolveLayout(l, { index: i, lanes, archived, list, entries: ENTRIES })
 const sync = (l: Layout, i = index) => resolve(l, i)
 /** `l` drawn with `list` as the sidebar. */
-const drawn = (l: Layout, list: readonly EntryId[]) =>
+const drawn = (l: Layout, list: readonly TaskId[]) =>
   resolve(l, index, new Set(), [], list)
 const prune = (
   l: Layout,
-  list: readonly EntryId[] = [],
-  archived: ReadonlySet<EntryId> = new Set(),
+  list: readonly TaskId[] = [],
+  archived: ReadonlySet<TaskId> = new Set(),
   i = index,
 ) =>
   layoutReducer(l, {
@@ -69,47 +86,52 @@ const prune = (
     lanes: [],
     archived,
     list,
-    known: new Set(i.roots),
+    entries: ENTRIES,
+    known: new Set(i.roots.map(r => TK(r))),
   })
-const R2: Here = { kind: "root", root: entryId("5-r2") }
+const R2: Here = { kind: "task", task: TK("5-r2") }
 
 describe("layoutReducer", () => {
   test("a column action changes only its root's columns", () => {
     const r2 = layoutReducer(at(initialLayout()), {
       kind: "columns",
-      root: entryId("5-r2"),
+      task: TK("5-r2"),
+      entry: entryId("5-r2"),
       action: { kind: "open", key: "j", after: 0, anchor: entryId("6-d") },
     })
     const l = layoutReducer(r2, {
       kind: "columns",
-      root: entryId("1-r1"),
+      task: TK("1-r1"),
+      entry: entryId("1-r1"),
       action: { kind: "open", key: "k", after: 0, anchor: entryId("4-c") },
     })
-    expect(columnsOf(l, entryId("1-r1")).map(c => c.anchor)).toEqual([
-      "1-r1",
-      "4-c",
-    ])
-    expect(columnsOf(l, entryId("5-r2"))).toBe(columnsOf(r2, entryId("5-r2")))
-    expect(columnsOf(l, entryId("7-r3"))).toEqual([
-      { key: "first-7-r3", anchor: entryId("7-r3") },
+    expect(
+      columnsOf(l, TK("1-r1"), entryId("1-r1")).map(c => c.anchor),
+    ).toEqual(["1-r1", "4-c"])
+    expect(columnsOf(l, TK("5-r2"), entryId("5-r2"))).toBe(
+      columnsOf(r2, TK("5-r2"), entryId("5-r2")),
+    )
+    expect(columnsOf(l, TK("7-r3"), entryId("7-r3"))).toEqual([
+      { key: `first-${TK("7-r3")}`, anchor: entryId("7-r3") },
     ])
   })
 
   test("a root's first column has a key with no colon, as a presence key needs", () => {
-    expect(columnsOf(initialLayout(), entryId("1-r1"))[0]?.key).not.toContain(
-      ":",
-    )
+    expect(
+      columnsOf(initialLayout(), TK("1-r1"), entryId("1-r1"))[0]?.key,
+    ).not.toContain(":")
   })
 
   test("closing a root's last column gives it its first column again", () => {
     const l = layoutReducer(initialLayout(), {
       kind: "columns",
-      root: entryId("1-r1"),
+      task: TK("1-r1"),
+      entry: entryId("1-r1"),
       action: { kind: "close", index: 0 },
     })
-    expect(l.roots.has(entryId("1-r1"))).toBe(false)
-    expect(columnsOf(l, entryId("1-r1"))).toEqual([
-      { key: "first-1-r1", anchor: entryId("1-r1") },
+    expect(l.tasks.has(TK("1-r1"))).toBe(false)
+    expect(columnsOf(l, TK("1-r1"), entryId("1-r1"))).toEqual([
+      { key: `first-${TK("1-r1")}`, anchor: entryId("1-r1") },
     ])
   })
 
@@ -118,6 +140,7 @@ describe("layoutReducer", () => {
     const opened = layoutReducer(before, {
       kind: "newTab",
       key: "n",
+      task: NEW_TASK,
       root: NEW_ROOT,
       thread: NEW_THREAD,
       asksAgent: true,
@@ -128,7 +151,7 @@ describe("layoutReducer", () => {
         key: "n",
         anchor: null,
         thread: NEW_THREAD,
-        fresh: { root: NEW_ROOT },
+        fresh: { root: NEW_ROOT, task: NEW_TASK },
         asksAgent: true,
       },
     ])
@@ -142,6 +165,7 @@ describe("layoutReducer", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
+      task: NEW_TASK,
       root: NEW_ROOT,
       thread: NEW_THREAD,
       asksAgent: true,
@@ -152,7 +176,7 @@ describe("layoutReducer", () => {
         key: "n",
         anchor: null,
         thread: NEW_THREAD,
-        fresh: { root: NEW_ROOT, prefill },
+        fresh: { root: NEW_ROOT, task: NEW_TASK, prefill },
         asksAgent: true,
       },
     ])
@@ -162,6 +186,7 @@ describe("layoutReducer", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
+      task: NEW_TASK,
       root: NEW_ROOT,
       thread: NEW_THREAD,
       asksAgent: false,
@@ -175,19 +200,41 @@ describe("layoutReducer", () => {
     const written = tree({ ...parents, "7-r3": null }, { "7-r3": "s" })
     const synced = sync(sent, written)
     expect(synced.newTabs).toEqual([])
-    expect(synced.active).toEqual({ kind: "root", root: "7-r3" })
+    expect(synced.active).toEqual({ kind: "task", task: TK("7-r3") })
     // The session puts it in the sidebar as its send is answered; until then
     // it is drawn as the root you are on.
-    expect(synced.open).toEqual(["7-r3"])
-    expect(columnsOf(synced, entryId("7-r3"))).toEqual([
+    expect(synced.open).toEqual([TK("7-r3")])
+    expect(columnsOf(synced, TK("7-r3"), entryId("7-r3"))).toEqual([
       { key: "n", anchor: entryId("7-r3"), thread: NEW_THREAD },
     ])
+  })
+
+  test("a sent new tab you have left becomes its task's columns, and you stay where you went", () => {
+    const opened = layoutReducer(at(initialLayout()), {
+      kind: "newTab",
+      key: "n",
+      task: NEW_TASK,
+      root: NEW_ROOT,
+      thread: NEW_THREAD,
+      asksAgent: false,
+    })
+    const sent = layoutReducer(opened, {
+      kind: "newTabColumn",
+      key: "n",
+      action: { kind: "sent", key: "n", sendId: "s" },
+    })
+    const left = at(sent, R1)
+    const written = tree({ ...parents, "7-r3": null }, { "7-r3": "s" })
+    const synced = sync(left, written)
+    expect(synced.newTabs).toEqual([])
+    expect(synced.active).toEqual(R1)
   })
 
   test("a new tab's column takes the reader's settings, and keeps them as it becomes its root's (ADR-0073)", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
+      task: NEW_TASK,
       root: NEW_ROOT,
       thread: NEW_THREAD,
       asksAgent: true,
@@ -204,15 +251,16 @@ describe("layoutReducer", () => {
       action: { kind: "sent", key: "n", sendId: "s" },
     })
     const written = tree({ ...parents, "7-r3": null }, { "7-r3": "s" })
-    expect(columnsOf(sync(sent, written), entryId("7-r3"))[0]?.details).toBe(
-      true,
-    )
+    expect(
+      columnsOf(sync(sent, written), TK("7-r3"), entryId("7-r3"))[0]?.details,
+    ).toBe(true)
   })
 
   test("a new tab whose thread starts becomes that root's tab, in every browser tab holding it (ADR-0117)", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
+      task: NEW_TASK,
       root: NEW_ROOT,
       thread: NEW_THREAD,
       asksAgent: true,
@@ -240,7 +288,7 @@ describe("layoutReducer", () => {
     })
     const synced = resolve(opened, started)
     expect(synced.newTabs).toEqual([])
-    expect(columnsOf(synced, entryId("7-r3"))).toEqual([
+    expect(columnsOf(synced, TK("7-r3"), entryId("7-r3"))).toEqual([
       {
         key: "n",
         anchor: entryId("7-r3"),
@@ -255,7 +303,8 @@ describe("layoutReducer", () => {
   const withColumn = (l: Layout) =>
     layoutReducer(l, {
       kind: "columns",
-      root: entryId("1-r1"),
+      task: TK("1-r1"),
+      entry: entryId("1-r1"),
       action: { kind: "open", key: "k", after: 0, anchor: entryId("4-c") },
     })
 
@@ -269,33 +318,42 @@ describe("layoutReducer", () => {
       listed("1-r1"),
     )
     expect(grown).not.toBe(l)
-    expect(grown.open).toEqual(["1-r1"])
+    expect(grown.open).toEqual([TK("1-r1")])
   })
 
   test("the sidebar is the facts', in its order, and the root you are on wherever it lacks it", () => {
     const l = at(initialLayout(), R2)
-    expect(drawn(l, listed("1-r1", "5-r2")).open).toEqual(["1-r1", "5-r2"])
-    expect(drawn(l, listed("5-r2", "1-r1")).open).toEqual(["5-r2", "1-r1"])
+    expect(drawn(l, listed("1-r1", "5-r2")).open).toEqual([
+      TK("1-r1"),
+      TK("5-r2"),
+    ])
+    expect(drawn(l, listed("5-r2", "1-r1")).open).toEqual([
+      TK("5-r2"),
+      TK("1-r1"),
+    ])
     // Another device's repair took it out: it stays on the screen you are on.
-    expect(drawn(l, listed("1-r1")).open).toEqual(["1-r1", "5-r2"])
-    expect(drawn(at(l, NOTHING), listed("1-r1")).open).toEqual(["1-r1"])
+    expect(drawn(l, listed("1-r1")).open).toEqual([TK("1-r1"), TK("5-r2")])
+    expect(drawn(at(l, NOTHING), listed("1-r1")).open).toEqual([TK("1-r1")])
   })
 
   test("a root that leaves the sidebar keeps its columns, and opening it again brings them back", () => {
     const withColumn = layoutReducer(at(initialLayout()), {
       kind: "columns",
-      root: entryId("1-r1"),
+      task: TK("1-r1"),
+      entry: entryId("1-r1"),
       action: { kind: "open", key: "k", after: 0, anchor: entryId("3-b") },
     })
     const closed = drawn(
-      layoutReducer(withColumn, { kind: "closeRoot", root: entryId("1-r1") }),
+      layoutReducer(withColumn, { kind: "closeTask", task: TK("1-r1") }),
       [],
     )
-    expect(closed.roots.get(entryId("1-r1"))?.map(c => c.key)).toEqual(
-      withColumn.roots.get(entryId("1-r1"))?.map(c => c.key),
+    expect(closed.tasks.get(TK("1-r1"))?.map(c => c.key)).toEqual(
+      withColumn.tasks.get(TK("1-r1"))?.map(c => c.key),
     )
-    expect(columnsOf(at(closed), entryId("1-r1")).map(c => c.key)).toEqual(
-      columnsOf(withColumn, entryId("1-r1")).map(c => c.key),
+    expect(
+      columnsOf(at(closed), TK("1-r1"), entryId("1-r1")).map(c => c.key),
+    ).toEqual(
+      columnsOf(withColumn, TK("1-r1"), entryId("1-r1")).map(c => c.key),
     )
   })
 
@@ -303,29 +361,28 @@ describe("layoutReducer", () => {
     const list = listed("1-r1", "5-r2", "9-r")
     const middle = drawn(at(initialLayout(), R2), list)
     expect(
-      layoutReducer(middle, { kind: "closeRoot", root: entryId("5-r2") })
-        .active,
-    ).toEqual({ kind: "root", root: "9-r" })
+      layoutReducer(middle, { kind: "closeTask", task: TK("5-r2") }).active,
+    ).toEqual({ kind: "task", task: TK("9-r") })
     const last = drawn(
-      at(initialLayout(), { kind: "root", root: entryId("9-r") }),
+      at(initialLayout(), { kind: "task", task: TK("9-r") }),
       list,
     )
     expect(
-      layoutReducer(last, { kind: "closeRoot", root: entryId("9-r") }).active,
+      layoutReducer(last, { kind: "closeTask", task: TK("9-r") }).active,
     ).toEqual(R2)
     const one = drawn(at(initialLayout()), listed("1-r1"))
     expect(
-      layoutReducer(one, { kind: "closeRoot", root: entryId("1-r1") }).active,
+      layoutReducer(one, { kind: "closeTask", task: TK("1-r1") }).active,
     ).toEqual(NOTHING)
     // A tab you are not on closes without moving you.
     expect(
-      layoutReducer(middle, { kind: "closeRoot", root: entryId("1-r1") })
-        .active,
+      layoutReducer(middle, { kind: "closeTask", task: TK("1-r1") }).active,
     ).toEqual(R2)
     // An unsent new tab, likewise: its neighbour.
     const withNew = layoutReducer(drawn(at(initialLayout()), listed("1-r1")), {
       kind: "newTab",
       key: "n",
+      task: NEW_TASK,
       root: NEW_ROOT,
       thread: NEW_THREAD,
       asksAgent: false,
@@ -340,7 +397,7 @@ describe("layoutReducer", () => {
     const archived = new Set(list)
     const l = at(initialLayout(), R2)
     const forgotten = resolve(l, index, archived, [], list)
-    expect(forgotten.open).toEqual(["5-r2"])
+    expect(forgotten.open).toEqual([TK("5-r2")])
     expect(resolve(forgotten, index, archived, [], list)).toBe(forgotten)
     expect(
       resolve(at(forgotten, NOTHING), index, archived, [], list).open,
@@ -359,6 +416,7 @@ describe("layoutReducer", () => {
       layoutReducer(open, {
         kind: "newTab",
         key: "n",
+        task: NEW_TASK,
         root: NEW_ROOT,
         thread: NEW_THREAD,
         asksAgent: true,
@@ -369,21 +427,21 @@ describe("layoutReducer", () => {
   test("sync moves every stored root's columns on, not only the active one's", () => {
     const l = layoutReducer(at(initialLayout(), NOTHING), {
       kind: "columns",
-      root: entryId("5-r2"),
+      task: TK("5-r2"),
+      entry: entryId("5-r2"),
       action: { kind: "open", key: "k", after: 0, anchor: entryId("5-r2") },
     })
     // Both columns of r2 end at its newest leaf, which a reply then moves on.
     const grown = sync(l, tree({ ...parents, "8-e": "6-d" }))
-    expect(columnsOf(grown, entryId("5-r2")).map(c => c.anchor)).toEqual([
-      "8-e",
-      "8-e",
-    ])
+    expect(
+      columnsOf(grown, TK("5-r2"), entryId("5-r2")).map(c => c.anchor),
+    ).toEqual(["8-e", "8-e"])
   })
 
   test("resolve is idempotent, and the stored state catches up to what it drew", () => {
     const l = withColumn(at(initialLayout()))
     const grown = tree({ ...parents, "8-e": "4-c" })
-    const archived = new Set([entryId("5-r2")])
+    const archived = new Set([TK("5-r2")])
     const list = listed("1-r1", "5-r2")
     const shown = resolve(at(l, R2), grown, archived, [], list)
     expect(resolve(shown, grown, archived, [], list)).toBe(shown)
@@ -393,19 +451,20 @@ describe("layoutReducer", () => {
       lanes: [],
       archived,
       list,
+      entries: ENTRIES,
     })
     expect(stored).toEqual(shown)
   })
 
   test("a column's anchor moves with its thread's end in the layout drawn", () => {
     const drawn = resolve(withColumn(at(initialLayout())), index)
-    expect(columnsOf(drawn, entryId("1-r1"))[1]).toMatchObject({
+    expect(columnsOf(drawn, TK("1-r1"), entryId("1-r1"))[1]).toMatchObject({
       anchor: entryId("4-c"),
       thread: threadOfEntry("4-c"),
     })
     const replied = tree({ ...parents, "8-e": "4-c" })
     const next = resolve(drawn, replied)
-    expect(columnsOf(next, entryId("1-r1"))[1]?.anchor).toBe("8-e")
+    expect(columnsOf(next, TK("1-r1"), entryId("1-r1"))[1]?.anchor).toBe("8-e")
   })
 
   test("prune with nothing stored lands on nothing, with the board open: nothing opens a root by itself", () => {
@@ -419,20 +478,21 @@ describe("layoutReducer", () => {
     const archivedR1 = prune(
       onR1,
       listed("5-r2", "1-r1"),
-      new Set([entryId("1-r1")]),
+      new Set([TK("1-r1")]),
     )
     expect(archivedR1.active).toEqual(R2)
     expect(archivedR1.board).toBe(false)
     const gone = layoutReducer(
-      at(initialLayout(), { kind: "root", root: entryId("9-x") }),
+      at(initialLayout(), { kind: "task", task: TK("9-x") }),
       {
         kind: "columns",
-        root: entryId("9-x"),
+        task: TK("9-x"),
+        entry: entryId("9-x"),
         action: { kind: "open", key: "k", after: 0, anchor: entryId("9-y") },
       },
     )
     const pruned = prune(gone, listed("1-r1"))
-    expect(pruned.roots.has(entryId("9-x"))).toBe(false)
+    expect(pruned.tasks.has(TK("9-x"))).toBe(false)
     expect(pruned.active).toEqual(R1)
     expect(prune(gone).active).toEqual(NOTHING)
   })
@@ -467,6 +527,7 @@ describe("listOf", () => {
       {
         kind: "newTab",
         key: "n",
+        task: NEW_TASK,
         root: NEW_ROOT,
         thread: NEW_THREAD,
         asksAgent: false,
@@ -477,42 +538,39 @@ describe("listOf", () => {
   })
 })
 
-test("unlisted: the roots not in the sidebar, and not archived (ADR-0077, ADR-0122)", () => {
-  const open = { open: [entryId("1-r1")] }
+test("unlisted: the tasks not in the sidebar, and not archived (ADR-0077, ADR-0122)", () => {
+  const open = { open: [TK("1-r1")] }
   expect(
-    unlisted(open, new Set([entryId("7-r3")]), [
-      entryId("1-r1"),
-      entryId("5-r2"),
-      entryId("7-r3"),
-    ]),
-  ).toEqual([entryId("5-r2")])
+    unlisted(open, new Set([TK("7-r3")]), [TK("1-r1"), TK("5-r2"), TK("7-r3")]),
+  ).toEqual([TK("5-r2")])
 })
 
 describe("planOpen", () => {
   const l = at(initialLayout())
   test("scrolls to a message a column of its root already shows", () => {
     // The root's first column follows its thread, through 2-a to 3-b.
-    expect(planOpen(l, index, entryId("2-a"))).toEqual({
+    expect(planOpen(l, index, entryId("2-a"), OF_ENTRY)).toEqual({
       kind: "scroll",
-      root: "1-r1",
+      task: TK("1-r1"),
       key: expect.any(String),
     })
   })
   test("opens beside the column sharing most of its path, in its own root", () => {
     // 4-c is a branch at 2-a: another thread, which no column shows.
-    expect(planOpen(l, index, entryId("4-c"))).toEqual({
+    expect(planOpen(l, index, entryId("4-c"), OF_ENTRY)).toEqual({
       kind: "open",
-      root: "1-r1",
+      task: TK("1-r1"),
+      entry: "1-r1",
       after: 0,
     })
-    expect(planOpen(l, index, entryId("6-d"))).toEqual({
+    expect(planOpen(l, index, entryId("6-d"), OF_ENTRY)).toEqual({
       kind: "scroll",
-      root: "5-r2",
+      task: TK("5-r2"),
       key: expect.any(String),
     })
   })
   test("an entry the index lacks has no plan", () => {
-    expect(planOpen(l, index, entryId("nope"))).toBeNull()
+    expect(planOpen(l, index, entryId("nope"), OF_ENTRY)).toBeNull()
   })
 })
 
@@ -526,9 +584,9 @@ describe("encodeLayout / decodeLayout", () => {
       active: { kind: "new", key: "n" },
       open: [],
       board: true,
-      roots: new Map([
+      tasks: new Map([
         [
-          entryId("1-r1"),
+          TK("1-r1"),
           [
             { key: "a", anchor: entryId("1-r1") },
             { key: "b", anchor: entryId("2-a"), thread: T },
@@ -547,23 +605,27 @@ describe("encodeLayout / decodeLayout", () => {
           anchor: null,
           thread: NEW_THREAD,
           asksAgent: true,
-          fresh: { root: NEW_ROOT, state: workflowStateIdFor("d") },
+          fresh: {
+            root: NEW_ROOT,
+            task: NEW_TASK,
+            state: workflowStateIdFor("d"),
+          },
         },
       ],
     }
     expect(trip(l)).toEqual(l)
-    expect(trip({ ...l, open: [entryId("1-r1")] })?.open).toEqual([])
+    expect(trip({ ...l, open: [TK("1-r1")] })?.open).toEqual([])
     expect(trip(initialLayout())).toEqual(initialLayout())
   })
 
   test("a column's density and open details are kept (ADR-0106, ADR-0073)", () => {
     const l: Layout = {
-      active: { kind: "root", root: entryId("1-r1") },
+      active: { kind: "task", task: TK("1-r1") },
       open: [],
       board: false,
-      roots: new Map([
+      tasks: new Map([
         [
-          entryId("1-r1"),
+          TK("1-r1"),
           [
             { key: "a", anchor: entryId("1-r1"), density: "outline" },
             { key: "b", anchor: entryId("2-a"), details: true },
@@ -578,9 +640,9 @@ describe("encodeLayout / decodeLayout", () => {
   test("a message waiting to be sent is never stored, nor restored: it would be sent again", () => {
     const stored = encodeLayout({
       ...initialLayout(),
-      roots: new Map([
+      tasks: new Map([
         [
-          entryId("1-r1"),
+          TK("1-r1"),
           [
             {
               key: "a",
@@ -594,10 +656,10 @@ describe("encodeLayout / decodeLayout", () => {
     })
     expect(JSON.stringify(stored)).not.toContain("hello")
     const raw = {
-      v: 6,
+      v: 7,
       active: null,
-      roots: {
-        "1-r1": [
+      tasks: {
+        [TK("1-r1")]: [
           {
             key: "a",
             anchor: entryId("1-r1"),
@@ -609,7 +671,7 @@ describe("encodeLayout / decodeLayout", () => {
       newTabs: [],
       board: false,
     }
-    expect(decodeLayout(raw)?.roots.get(entryId("1-r1"))).toEqual([
+    expect(decodeLayout(raw)?.tasks.get(TK("1-r1"))).toEqual([
       { key: "a", anchor: entryId("1-r1"), thread: NEW_THREAD, fresh: {} },
     ])
   })
@@ -617,9 +679,9 @@ describe("encodeLayout / decodeLayout", () => {
   test("a prefill, blank or content, is stored and restored: only pending sends on opening", () => {
     const l = {
       ...initialLayout(),
-      roots: new Map([
+      tasks: new Map([
         [
-          entryId("1-r1"),
+          TK("1-r1"),
           [
             { key: "a", anchor: entryId("1-r1") },
             {
@@ -651,36 +713,60 @@ describe("encodeLayout / decodeLayout", () => {
       // v5 named a column's lane and reserved id (ADR-0117); one in v6's
       // shape under v5 is dropped too.
       { v: 5, active: null, roots: { r: [good] }, newTabs: [], board: false },
-      { v: 6, active: null, roots: { r: [] }, newTabs: [], board: false },
-      {
-        v: 6,
-        active: { kind: "archive" },
-        roots: {},
-        newTabs: [],
-        board: false,
-      },
+      // v6 kept columns per root (ADR-0116): a good v6 layout is dropped.
+      { v: 6, active: null, roots: { r: [good] }, newTabs: [], board: false },
+      // One in v7's shape under v6 is dropped too.
       {
         v: 6,
         active: null,
-        roots: { r: [good, { key: 3 }] },
+        tasks: { [TK("1-r1")]: [good] },
         newTabs: [],
         board: false,
       },
       {
-        v: 6,
+        v: 7,
         active: null,
-        roots: { r: [{ ...good, thread: "w-someone" }] },
+        tasks: { [TK("1-r1")]: [] },
         newTabs: [],
         board: false,
       },
-      { v: 6, active: null, roots: {}, newTabs: [] },
+      {
+        v: 7,
+        active: { kind: "root", root: "1-r1" },
+        tasks: {},
+        newTabs: [],
+        board: false,
+      },
+      {
+        v: 7,
+        active: null,
+        tasks: { [TK("1-r1")]: [good, { key: 3 }] },
+        newTabs: [],
+        board: false,
+      },
+      {
+        v: 7,
+        active: null,
+        tasks: { [TK("1-r1")]: [{ ...good, thread: "w-someone" }] },
+        newTabs: [],
+        board: false,
+      },
+      // A task's columns keyed by something that is no task.
+      {
+        v: 7,
+        active: null,
+        tasks: { "1-r1": [good] },
+        newTabs: [],
+        board: false,
+      },
+      { v: 7, active: null, tasks: {}, newTabs: [] },
       "layout",
       null,
     ])
       expect(decodeLayout(raw)).toBeUndefined()
   })
 
-  test("a fresh column with no thread, or a new tab with no root of its own, restores nothing (ADR-0066, ADR-0117)", () => {
+  test("a fresh column with no thread, or a new tab with no root or task of its own, restores nothing (ADR-0066, ADR-0117, ADR-0116)", () => {
     const stored = (column: object) => ({
       ...encodeLayout(initialLayout()),
       newTabs: [column],
@@ -691,14 +777,22 @@ describe("encodeLayout / decodeLayout", () => {
           key: "n",
           anchor: null,
           thread: NEW_THREAD,
-          fresh: { root: NEW_ROOT },
+          fresh: { root: NEW_ROOT, task: NEW_TASK },
         }),
-      )?.newTabs[0]?.fresh?.root,
-    ).toBe(NEW_ROOT)
+      )?.newTabs[0]?.fresh,
+    ).toEqual({ root: NEW_ROOT, task: NEW_TASK })
     for (const column of [
-      { key: "n", anchor: null, fresh: { root: NEW_ROOT } },
+      { key: "n", anchor: null, fresh: { root: NEW_ROOT, task: NEW_TASK } },
       { key: "n", anchor: null, thread: NEW_THREAD, fresh: {} },
       { key: "n", anchor: null, thread: NEW_THREAD, fresh: { root: "r-x" } },
+      // A new tab with no task of its own (ADR-0116).
+      { key: "n", anchor: null, thread: NEW_THREAD, fresh: { root: NEW_ROOT } },
+      {
+        key: "n",
+        anchor: null,
+        thread: NEW_THREAD,
+        fresh: { root: NEW_ROOT, task: "k-x" },
+      },
     ])
       expect(decodeLayout(stored(column))).toBeUndefined()
   })

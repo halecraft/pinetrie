@@ -1,12 +1,14 @@
 import {
   atEntry,
   type CardId,
-  type CardRecord,
-  cardId,
   entryId,
+  isTextCard,
   ROOT,
   rootIdFor,
   runId,
+  type TextCard,
+  taskIdFor,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -34,6 +36,7 @@ import {
   applyWrites,
   basics,
   NO_BLANK_CARDS,
+  putTask,
   record,
   row,
   threadRow,
@@ -43,18 +46,19 @@ import { createProvenance } from "../provenance.ts"
 import { popNextQueuedCard } from "../queued-card-pop.ts"
 import { type CardCommandDeps, createCardCommands } from "./cards.ts"
 
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const LANE = threadIdFor("0123456789abcdef")
 const E1 = entryId("e-1")
-const C1 = cardId("c-1")
+const C1 = textCardId("c-1")
 const atEnd = {
   kind: "note",
-  root: TEST_ROOT,
   at: atEntry(E1),
-  lane: LANE,
+  thread: LANE,
   cell: 0,
 } as const
 /** Texts the host holds whole. */
@@ -63,16 +67,21 @@ const held = { textNow: () => "x", holds: () => true }
 const idle = { running: false, held: false, typing: new Set<CardId>() }
 const queuedKey = {
   kind: "queued",
-  root: TEST_ROOT,
   at: atEntry(E1),
-  lane: LANE,
+  thread: LANE,
   seen: "",
 } as const
+
+/** The places' text cards: a task's thread card is the fixture's (`putTask`). */
+const textsIn = (places: ReturnType<typeof setUp>["b"]["places"]) =>
+  readPlaces(places).filter(isTextCard)
 
 function setUp() {
   const b = basics()
   writeEntry(b.root, threadRow(E1, null, LANE))
   writeLaneTip(b.root, LANE, E1)
+  // The lane's thread's card, on the task a move's history is in (ADR-0116).
+  putTask(b, LANE, TEST_TASK)
   // Each card's text as the host holds it.
   const texts = new Map<string, string>()
   const cards = record<CardCommandDeps["cards"]>({
@@ -99,7 +108,7 @@ function setUp() {
     // The step an undo would try: the one it answers with.
     top: async () =>
       (undoing.kind === "none" ? undefined : undoing.step) as never,
-    unloadRoot: async () => {},
+    unloadTask: async () => {},
   })
   const presence = newPresenceDoc()
   const provenance = createProvenance({
@@ -119,11 +128,12 @@ function setUp() {
     undoing = result
     reverting = revert
   }
-  const put = (over: Partial<CardRecord> = {}) =>
+  const put = (over: Partial<TextCard> = {}) =>
     applyPlaceSteps(b.places, [
       {
         kind: "write",
         record: {
+          kind: "text" as const,
           id: C1,
           owner: ADA,
           placer: ADA,
@@ -152,16 +162,20 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
   test("a queue on an idle lane asks for its drain, and answers with the rev of its write", async () => {
     const { b, drains, commands, put } = setUp()
     put()
-    const done = await commands.move(BEA, [
-      {
-        card: C1,
-        from: atEnd,
-        to: queuedKey,
-      },
-    ])
-    expect(done).toEqual({ outcome: { kind: "moved" }, rev: 2 })
+    const done = await commands.move(
+      BEA,
+      [
+        {
+          card: C1,
+          from: atEnd,
+          to: queuedKey,
+        },
+      ],
+      null,
+    )
+    expect(done).toEqual({ outcome: { kind: "moved" }, rev: 3 })
     expect(drains).toEqual([LANE])
-    expect(readPlaces(b.places)[0]?.place).toMatchObject({
+    expect(textsIn(b.places)[0]?.place).toMatchObject({
       kind: "queued",
       by: BEA,
     })
@@ -170,16 +184,20 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
   test("the pop, then an unqueue: answered gone, with the current rev", async () => {
     const { b, commands, put } = setUp()
     put()
-    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }])
+    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }], null)
     const top = popNextQueuedCard(b.places, LANE, idle, held)
     expect(top.kind === "popped" ? top.popped.card.id : top.kind).toBe(C1)
-    const done = await commands.move(ADA, [
-      {
-        card: C1,
-        from: queuedKey,
-        to: atEnd,
-      },
-    ])
+    const done = await commands.move(
+      ADA,
+      [
+        {
+          card: C1,
+          from: queuedKey,
+          to: atEnd,
+        },
+      ],
+      null,
+    )
     expect(done).toEqual({
       outcome: { kind: "unmoved", code: "gone", place: null, by: null },
       rev: readPlacesRev(b.places),
@@ -189,21 +207,25 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
   test("an unqueue, then the pop: nothing is popped", async () => {
     const { b, commands, put } = setUp()
     put()
-    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }])
-    await commands.move(ADA, [{ card: C1, from: queuedKey, to: atEnd }])
+    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }], null)
+    await commands.move(ADA, [{ card: C1, from: queuedKey, to: atEnd }], null)
     expect(popNextQueuedCard(b.places, LANE, idle, held).kind).toBe("idle")
   })
 
   test("a move someone else made first: answered moved, naming them", async () => {
     const { commands, put } = setUp()
     put({ place: { ...queuedKey, order: "a", by: BEA }, placer: BEA })
-    const done = await commands.move(ADA, [
-      {
-        card: C1,
-        from: atEnd,
-        to: queuedKey,
-      },
-    ])
+    const done = await commands.move(
+      ADA,
+      [
+        {
+          card: C1,
+          from: atEnd,
+          to: queuedKey,
+        },
+      ],
+      null,
+    )
     expect(done.outcome).toEqual({
       kind: "unmoved",
       code: "moved",
@@ -212,22 +234,45 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     })
   })
 
-  test("a discard keeps the card, gone, in the discarder's history of its root: no text is destroyed, and its placer gets a trace", async () => {
+  test("the host names a discard's history: from your inventory, the task you are on, whatever task you are on when it leaves a thread (ADR-0116)", async () => {
+    const elsewhere = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
+    const gone = { kind: "gone", why: { kind: "discarded" } } as const
+    const mine = { kind: "inventory", holder: ADA } as const
+    const held = setUp()
+    held.put({ place: mine })
+    await held.commands.move(
+      ADA,
+      [{ card: C1, from: mine, to: gone }],
+      elsewhere,
+    )
+    expect(textsIn(held.b.places)[0]?.place).toMatchObject({ task: elsewhere })
+    expect(held.recorded).toEqual([[ADA, elsewhere]])
+    const atThread = setUp()
+    atThread.put()
+    await atThread.commands.move(
+      ADA,
+      [{ card: C1, from: atEnd, to: gone }],
+      elsewhere,
+    )
+    expect(textsIn(atThread.b.places)[0]?.place).toMatchObject({
+      task: TEST_TASK,
+    })
+    expect(atThread.recorded).toEqual([[ADA, TEST_TASK]])
+  })
+
+  test("a discard keeps the card, gone, in the discarder's history of its task: no text is destroyed, and its placer gets a trace", async () => {
     const { b, cards, commands, put, recorded } = setUp()
     put({ placer: BEA })
-    const gone = {
-      kind: "gone",
-      root: TEST_ROOT,
-      why: { kind: "discarded" },
-    } as const
+    const gone = { kind: "gone", why: { kind: "discarded" } } as const
     expect(
-      (await commands.move(ADA, [{ card: C1, from: atEnd, to: gone }])).outcome,
+      (await commands.move(ADA, [{ card: C1, from: atEnd, to: gone }], null))
+        .outcome,
     ).toEqual({ kind: "moved" })
-    expect(readPlaces(b.places).map(c => c.place)).toEqual([
-      { ...gone, by: ADA },
+    expect(textsIn(b.places).map(c => c.place)).toEqual([
+      { ...gone, task: TEST_TASK, by: ADA },
     ])
     expect(cards.calls).toEqual([])
-    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+    expect(recorded).toEqual([[ADA, TEST_TASK]])
     expect([...readTraces(b.session).values()]).toMatchObject([
       { for: BEA, by: ADA, from: atEnd },
     ])
@@ -247,12 +292,12 @@ describe("queue-card (ADR-0113)", () => {
     )
     expect(done.outcome).toEqual({ kind: "moved" })
     expect(readQueueHolds(b.session).has(LANE)).toBe(false)
-    expect(readPlaces(b.places)[0]?.place).toMatchObject({
+    expect(textsIn(b.places)[0]?.place).toMatchObject({
       kind: "queued",
       by: ADA,
     })
     expect(drains).toEqual([LANE])
-    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+    expect(recorded).toEqual([[ADA, TEST_TASK]])
   })
 
   test("hold-if-idle holds an idle queue before the drain; a refused move changes no hold", async () => {
@@ -286,8 +331,9 @@ test("a card made in the queue is written there with its command, never in anoth
     "bring-up-to-date",
   )
   expect(done.outcome).toEqual({ kind: "moved" })
-  expect(readPlaces(b.places)).toMatchObject([
+  expect(textsIn(b.places)).toMatchObject([
     {
+      kind: "text" as const,
       id: C1,
       place: { kind: "queued", by: ADA },
       carries: { kind: "message", command: "bring-up-to-date" },
@@ -303,11 +349,13 @@ describe("moves' history (ADR-0066)", () => {
   test("a take into the inventory is one step of the taker's history in the root it left; a creation is in none", async () => {
     const { commands, put, recorded } = setUp()
     put()
-    await commands.move(ADA, [{ card: C1, from: atEnd, to: inventory }])
-    await commands.move(ADA, [
-      { card: cardId("c-2"), from: null, to: inventory },
-    ])
-    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+    await commands.move(ADA, [{ card: C1, from: atEnd, to: inventory }], null)
+    await commands.move(
+      ADA,
+      [{ card: textCardId("c-2"), from: null, to: inventory }],
+      null,
+    )
+    expect(recorded).toEqual([[ADA, TEST_TASK]])
   })
 
   test("several moves are one, refused whole: nothing written when one has moved", async () => {
@@ -316,16 +364,21 @@ describe("moves' history (ADR-0066)", () => {
       kind: "fresh",
       column: "k",
       root: TEST_ROOT,
+      task: TEST_TASK,
       at: ROOT,
     } as const
     put({ place: fresh })
-    const before = readPlaces(b.places)
-    const done = await commands.move(ADA, [
-      { card: C1, from: fresh, to: inventory },
-      { card: cardId("c-9"), from: fresh, to: inventory },
-    ])
+    const before = textsIn(b.places)
+    const done = await commands.move(
+      ADA,
+      [
+        { card: C1, from: fresh, to: inventory },
+        { card: textCardId("c-9"), from: fresh, to: inventory },
+      ],
+      null,
+    )
     expect(done.outcome).toMatchObject({ kind: "unmoved", code: "gone" })
-    expect(readPlaces(b.places)).toEqual(before)
+    expect(textsIn(b.places)).toEqual(before)
   })
 
   test("an undo answers each card it moved and where it is now, with a rev raised after it", async () => {
@@ -336,12 +389,12 @@ describe("moves' history (ADR-0066)", () => {
       kind: "undone",
       step: { parts: [{ docId: PLACES_DOC_ID, footprint: [["cards", C1]] }] },
     })
-    const done = await commands.undoMove(ADA, TEST_ROOT, "undo")
+    const done = await commands.undoMove(ADA, TEST_TASK, "undo")
     expect(done).toEqual({
       outcome: { kind: "undone", cards: [{ card: C1, place: atEnd }] },
       rev: rev + 1,
     })
-    expect(histories.calls.at(-1)?.args).toEqual([ADA, TEST_ROOT, "undo"])
+    expect(histories.calls.at(-1)?.args).toEqual([ADA, TEST_TASK, "undo"])
   })
 
   test("a refused undo names who moved the card; one with nothing to undo is nothing", async () => {
@@ -349,14 +402,14 @@ describe("moves' history (ADR-0066)", () => {
     put({ placer: BEA })
     const part = { docId: PLACES_DOC_ID, footprint: [["cards", C1]] }
     undoes({ kind: "refused", step: { parts: [part] }, stale: [part] })
-    expect((await commands.undoMove(ADA, TEST_ROOT, "undo")).outcome).toEqual({
+    expect((await commands.undoMove(ADA, TEST_TASK, "undo")).outcome).toEqual({
       kind: "unmoved",
       code: "moved",
       place: atEnd,
       by: BEA,
     })
     undoes({ kind: "none" })
-    expect(await commands.undoMove(ADA, TEST_ROOT, "redo")).toEqual({
+    expect(await commands.undoMove(ADA, TEST_TASK, "redo")).toEqual({
       outcome: { kind: "nothing" },
       rev: null,
     })
@@ -373,7 +426,8 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
       {
         kind: "write",
         record: {
-          id: cardId("c-2"),
+          kind: "text" as const,
+          id: textCardId("c-2"),
           owner: ADA,
           placer: ADA,
           place: queuedAt("0000000300"),
@@ -383,7 +437,7 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
       },
     ])
     const done = await commands.reorder(ADA, {
-      card: cardId("c-2"),
+      card: textCardId("c-2"),
       at: queuedKey,
       after: null,
       before: C1,
@@ -392,10 +446,10 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
       outcome: { kind: "moved" },
       rev: readPlacesRev(b.places),
     })
-    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+    expect(recorded).toEqual([[ADA, TEST_TASK]])
     expect(drains).toEqual([])
-    const order = readPlaces(b.places).map(c => c.id)
-    const queue = readPlaces(b.places)
+    const order = textsIn(b.places).map(c => c.id)
+    const queue = textsIn(b.places)
       .filter(c => c.place.kind === "queued")
       .sort((x, y) =>
         (x.place as { order: string }).order <
@@ -419,7 +473,8 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
       {
         kind: "write",
         record: {
-          id: cardId("c-2"),
+          kind: "text" as const,
+          id: textCardId("c-2"),
           owner: BEA,
           placer: BEA,
           place: queuedAt("b"),
@@ -430,11 +485,8 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
     ])
     const done = await commands.unqueueAll(ADA, LANE)
     expect(done.outcome).toEqual({ kind: "moved" })
-    expect(readPlaces(b.places).map(c => c.place.kind)).toEqual([
-      "note",
-      "note",
-    ])
-    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+    expect(textsIn(b.places).map(c => c.place.kind)).toEqual(["note", "note"])
+    expect(recorded).toEqual([[ADA, TEST_TASK]])
   })
 })
 
@@ -456,10 +508,10 @@ describe("a chat from a card that found its lane busy", () => {
     put()
     beginRun(b.live, LANE, runId("r-1"))
     const done = await commands.queueBusy(ADA, chat)
-    expect(done).toEqual({ outcome: { kind: "queued" }, rev: 2 })
-    expect(readPlaces(b.places)[0]?.place).toMatchObject({
+    expect(done).toEqual({ outcome: { kind: "queued" }, rev: 3 })
+    expect(textsIn(b.places)[0]?.place).toMatchObject({
       kind: "queued",
-      lane: LANE,
+      thread: LANE,
       by: ADA,
     })
     // The lane runs: its end drains it.
@@ -477,8 +529,8 @@ test("setCommand: the command set, its place and placer kept", async () => {
   const { b, commands, put } = setUp()
   put({ placer: BEA })
   const done = await commands.setCommand(C1, "bring-up-to-date")
-  expect(done).toEqual({ outcome: { kind: "moved" }, rev: 2 })
-  expect(readPlaces(b.places)[0]).toMatchObject({
+  expect(done).toEqual({ outcome: { kind: "moved" }, rev: 3 })
+  expect(textsIn(b.places)[0]).toMatchObject({
     carries: { kind: "message", command: "bring-up-to-date" },
     placer: BEA,
     place: atEnd,
@@ -501,9 +553,9 @@ test("spend: the record goes, then its text; a card already gone answers the cur
   const { b, cards, commands, put } = setUp()
   put()
   const sent = { sendId: "s-1", chat: sentChat }
-  expect(await commands.spend(ADA, C1, sent)).toBe(2)
-  expect(await commands.spend(ADA, C1, sent)).toBe(2)
-  expect(readPlaces(b.places)).toEqual([])
+  expect(await commands.spend(ADA, C1, sent)).toBe(3)
+  expect(await commands.spend(ADA, C1, sent)).toBe(3)
+  expect(textsIn(b.places)).toEqual([])
   expect(cards.calls.map(c => c.method)).toEqual(["destroy", "destroy"])
 })
 
@@ -513,11 +565,12 @@ test("spend: a fresh column's first send leaves its other cards notes at the new
     kind: "fresh",
     column: "k",
     root: TEST_ROOT,
+    task: TEST_TASK,
     at: ROOT,
   } as const
   put({ place: fresh })
-  const C2 = cardId("c-2")
-  const C3 = cardId("c-3")
+  const C2 = textCardId("c-2")
+  const C3 = textCardId("c-3")
   put({ id: C2, owner: BEA, placer: BEA, place: fresh })
   put({
     id: C3,
@@ -525,6 +578,7 @@ test("spend: a fresh column's first send leaves its other cards notes at the new
       kind: "fresh",
       column: "other",
       root: TEST_ROOT,
+      task: TEST_TASK,
       at: ROOT,
     } as const,
   })
@@ -538,19 +592,23 @@ test("spend: a fresh column's first send leaves its other cards notes at the new
     sendId: "s-1",
     chat: {
       ...sentChat,
-      at: { kind: "branch", thread: threadIdFor("new"), at: E1 },
+      at: {
+        kind: "branch",
+        thread: threadIdFor("new"),
+        at: E1,
+        task: TEST_TASK,
+      },
     },
   })
   expect(rev).toBe(readPlacesRev(b.places))
-  expect(readPlaces(b.places)).toEqual([
+  expect(textsIn(b.places)).toEqual([
     expect.objectContaining({
       id: C2,
       placer: BEA,
       place: {
         kind: "note",
-        root: TEST_ROOT,
         at: atEntry(sent),
-        lane: null,
+        thread: threadIdFor("new"),
         cell: 0,
       },
     }),
@@ -560,6 +618,7 @@ test("spend: a fresh column's first send leaves its other cards notes at the new
         kind: "fresh",
         column: "other",
         root: TEST_ROOT,
+        task: TEST_TASK,
         at: ROOT,
       } as const,
     }),
@@ -582,7 +641,7 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
   test("a move: an event; and a trace for the card's placer, who was not reading its thread", async () => {
     const { b, commands, put } = setUp()
     put()
-    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }])
+    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }], null)
     expect(eventsOf(b)).toEqual([["moved", BEA, "queued"]])
     expect(tracesOf(b)).toMatchObject([{ for: ADA, by: BEA, card: C1 }])
   })
@@ -591,14 +650,14 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
     const s = setUp()
     s.put()
     reading(s, ADA)
-    await s.commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }])
+    await s.commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }], null)
     expect(tracesOf(s.b)).toEqual([])
   })
 
   test("an undo, whose revert Kyneta writes: an event, and the trace it makes moot goes", async () => {
     const { b, commands, put, undoes } = setUp()
     put()
-    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }])
+    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }], null)
     undoes(
       {
         kind: "undone",
@@ -606,7 +665,7 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
       },
       () => void put(),
     )
-    await commands.undoMove(BEA, TEST_ROOT, "undo")
+    await commands.undoMove(BEA, TEST_TASK, "undo")
     expect(eventsOf(b).at(-1)).toEqual(["undone", BEA, "note"])
     expect(tracesOf(b)).toEqual([])
   })
@@ -614,8 +673,8 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
   test("a spend: the history goes with the card, and the trace carries the message", async () => {
     const { b, commands, put } = setUp()
     put()
-    await commands.move(ADA, [{ card: C1, from: atEnd, to: queuedKey }])
-    await commands.move(ADA, [{ card: C1, from: queuedKey, to: atEnd }])
+    await commands.move(ADA, [{ card: C1, from: atEnd, to: queuedKey }], null)
+    await commands.move(ADA, [{ card: C1, from: queuedKey, to: atEnd }], null)
     expect(eventsOf(b)).toHaveLength(2)
     const sent = entryId("e-2")
     writeEntry(
@@ -640,7 +699,7 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
   test("traces seen: only the sender's go", async () => {
     const { b, commands, put } = setUp()
     put()
-    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }])
+    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }], null)
     const [trace] = tracesOf(b)
     await commands.tracesSeen(BEA, [trace?.id ?? ""])
     expect(tracesOf(b)).toHaveLength(1)
@@ -655,9 +714,10 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
 describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
   const THREAD = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
   const STARTS = threadIdFor("spun")
+  /** The task the thread was spun into: a new one. */
+  const SPUN_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000fe")
   const spun = {
     kind: "gone",
-    root: TEST_ROOT,
     why: { kind: "spun", into: THREAD, thread: STARTS },
   } as const
   const spinMove = { card: C1, from: atEnd, to: spun }
@@ -672,7 +732,6 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
         entry: entryId("t-1"),
         first: entryId("t-1"),
         firstLine: "plan",
-        title: null,
         messages: writers.length,
         newest: null,
         writers: [...writers],
@@ -681,13 +740,14 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
         images: [],
       }),
       setRecord(BOARD, {
-        root: THREAD,
+        task: SPUN_TASK,
         state: "s-1" as never,
         rank: "m",
         by: ADA,
         at: 1,
       }),
     ])
+    putTask(b, STARTS, SPUN_TASK, THREAD)
     const doc = await b.docs.root(THREAD)
     for (const [i, w] of writers.entries())
       writeEntry(
@@ -700,14 +760,14 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
       )
   }
 
-  test("the thread is started with the card's text, never asking the agent; the card goes gone, spun, in its root's history", async () => {
+  test("the thread is started with the card's text, never asking the agent; the card goes gone, spun, in the history of the task it leaves", async () => {
     const { b, commands, put, texts, recorded } = setUp()
     put()
     texts.set(C1, "  plan this @agent with @Bea ")
     const chats: unknown[] = []
     const done = await commands.spinOff(
       ADA,
-      { move: spinMove, state: null },
+      { move: spinMove, task: SPUN_TASK, state: null, here: null },
       async chat => {
         chats.push(chat)
         return { kind: "appended", id: entryId("t-1") }
@@ -718,15 +778,19 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
       {
         text: "plan this @agent with @Bea",
         root: THREAD,
-        at: { kind: "branch", thread: STARTS, at: null },
+        at: { kind: "branch", thread: STARTS, at: null, task: SPUN_TASK },
         asksAgent: false,
         mentions: [{ kind: "person", name: "Bea" }],
         card: { id: C1 },
         state: null,
       },
     ])
-    expect(readPlaces(b.places)[0]?.place).toEqual({ ...spun, by: ADA })
-    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+    expect(textsIn(b.places)[0]?.place).toEqual({
+      ...spun,
+      task: TEST_TASK,
+      by: ADA,
+    })
+    expect(recorded).toEqual([[ADA, TEST_TASK]])
   })
 
   test("a thread that is not started leaves the card where it was; a blank card starts none", async () => {
@@ -735,16 +799,16 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
     texts.set(C1, "plan")
     const refused = await commands.spinOff(
       ADA,
-      { move: spinMove, state: null },
+      { move: spinMove, task: SPUN_TASK, state: null, here: null },
       async () => ({ kind: "refused", code: "refused", message: "no" }),
     )
     expect(refused.outcome.kind).toBe("refused")
-    expect(readPlaces(b.places)[0]?.place).toEqual(atEnd)
+    expect(textsIn(b.places)[0]?.place).toEqual(atEnd)
     texts.set(C1, " ")
     let started = false
     const blank = await commands.spinOff(
       ADA,
-      { move: spinMove, state: null },
+      { move: spinMove, task: SPUN_TASK, state: null, here: null },
       async () => {
         started = true
         return { kind: "appended", id: entryId("t-1") }
@@ -761,28 +825,29 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
 
   test("an undo while the thread holds its first message alone lifts it back: the card where it was, the thread deleted", async () => {
     const { b, commands, put, undoes } = setUp()
-    put({ place: { ...spun, by: ADA } })
+    put({ place: { ...spun, task: TEST_TASK, by: ADA } })
     await thread(b, [ADA])
     undoes(spunStep, () => put())
-    const done = await commands.undoMove(ADA, TEST_ROOT, "undo")
+    const done = await commands.undoMove(ADA, TEST_TASK, "undo")
     expect(done.outcome).toEqual({
       kind: "undone",
       cards: [{ card: C1, place: atEnd }],
     })
     expect(readRoots(b.session).has(THREAD)).toBe(false)
-    expect(readBoardPlaces(b.session).has(THREAD)).toBe(false)
+    expect(readBoardPlaces(b.session).has(SPUN_TASK)).toBe(false)
+    expect(readPlaces(b.places).some(c => c.id === STARTS)).toBe(false)
     expect(b.docs.loaded()).not.toContain(THREAD)
   })
 
   test("once someone replied, the undo is refused, naming them, and nothing is reverted", async () => {
     const { b, commands, put, undoes } = setUp()
-    put({ place: { ...spun, by: ADA } })
+    put({ place: { ...spun, task: TEST_TASK, by: ADA } })
     await thread(b, [ADA, BEA])
     let reverted = false
     undoes(spunStep, () => {
       reverted = true
     })
-    expect((await commands.undoMove(ADA, TEST_ROOT, "undo")).outcome).toEqual({
+    expect((await commands.undoMove(ADA, TEST_TASK, "undo")).outcome).toEqual({
       kind: "unmoved",
       code: "replied",
       place: null,

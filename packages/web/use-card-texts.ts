@@ -2,7 +2,7 @@
 // inventory's and a notes board's (ADR-0113).
 
 import { subscribe } from "@kyneta/schema"
-import type { CardId } from "@pinetrie/core"
+import type { TextCardId } from "@pinetrie/core"
 import type { SessionClient } from "@pinetrie/session"
 import { useEffect, useState } from "react"
 
@@ -12,9 +12,9 @@ import { useEffect, useState } from "react"
  */
 export function useCardTexts(
   session: Pick<SessionClient, "cardText">,
-  ids: readonly CardId[],
-): ReadonlyMap<CardId, string> {
-  const [texts, setTexts] = useState<ReadonlyMap<CardId, string>>(new Map())
+  ids: readonly TextCardId[],
+): ReadonlyMap<TextCardId, string> {
+  const [texts, setTexts] = useState<ReadonlyMap<TextCardId, string>>(new Map())
   const key = ids.join(" ")
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the ids, not the array
   useEffect(() => {

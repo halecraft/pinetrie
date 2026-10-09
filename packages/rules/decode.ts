@@ -10,8 +10,10 @@ import {
   type EntryId,
   entryId,
   isRootId,
+  isTaskId,
   isThreadId,
   type RootId,
+  type TaskId,
   THREAD_PATTERN,
   type ThreadId,
   type ThreadName,
@@ -67,6 +69,9 @@ export const threadKey = (key: string): ThreadId | undefined =>
 
 export const rootKey = (key: string): RootId | undefined =>
   isRootId(key) ? key : undefined
+
+export const taskKey = (key: string): TaskId | undefined =>
+  isTaskId(key) ? key : undefined
 
 /** A singleton's address: only `expected` names it. */
 export const fixedKey = <K extends string>(

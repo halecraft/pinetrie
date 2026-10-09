@@ -16,7 +16,8 @@ import {
   type OfferAction,
   type Position,
   type QueueHoldChange,
-  type RootId,
+  type TaskId,
+  type TextCardId,
   type ThreadId,
   type TraceRecord,
   type WorkflowEdit,
@@ -50,12 +51,13 @@ import {
 import type { Minted, Pending, Prefill, ReaderAction } from "./columns.ts"
 import {
   type Effect,
+  entryOfTask,
   type IntentState,
   layout,
   list,
   planOpenAt,
   show,
-  showRoot,
+  showTask,
 } from "./effects.ts"
 import type { NameStep } from "./identity.ts"
 import { type Here, type LayoutAction, showsWorkspace } from "./layout.ts"
@@ -111,7 +113,11 @@ export type ColumnAct =
   /** Your message to the notes at its thread's end (ADR-0113). */
   | { readonly kind: "toNote"; readonly card: CardId }
   /** A new, empty note in `cell` of this column's notes board (ADR-0113). */
-  | { readonly kind: "newNote"; readonly card: CardId; readonly cell: number }
+  | {
+      readonly kind: "newNote"
+      readonly card: TextCardId
+      readonly cell: number
+    }
   /** A card into this column's composer, as your message (`planPut`). */
   | { readonly kind: "toMessage"; readonly card: CardId }
   /** A card made a new thread in `state` on the board (ADR-0111). */
@@ -162,9 +168,7 @@ export type ColumnAct =
    */
   | {
       readonly kind: "queueNew"
-      readonly card: CardId
-      /** The column's root, for a lane whose record has not arrived. */
-      readonly root: RootId
+      readonly card: TextCardId
       readonly lane: ThreadId
       readonly at: Position
       readonly command: CardCommand | null
@@ -186,33 +190,33 @@ export type Intent =
       readonly key: string
       readonly act: ColumnAct
     }
-  /** Show a root, opening it in the sidebar, or a new tab, or nothing. */
+  /** Show a task, opening it in the sidebar, or a new tab, or nothing. */
   | { readonly kind: "show"; readonly here: Here }
   | {
       readonly kind: "newTab"
       readonly asksAgent: boolean
       readonly prefill?: Prefill
-      /** The workflow state its root lands in: the board column it came from (ADR-0122). */
+      /** The workflow state its task lands in: the board column it came from (ADR-0122). */
       readonly state?: WorkflowStateId
     }
-  /** Close a root of the sidebar, or a new tab, for you: nothing shared is written. */
+  /** Close a task of the sidebar, or a new tab, for you: nothing shared is written. */
   | { readonly kind: "close"; readonly here: Here }
-  /** Move a root of the sidebar before `before`, or to its end (ADR-0122). */
+  /** Move a task of the sidebar before `before`, or to its end (ADR-0122). */
   | {
       readonly kind: "moveInList"
-      readonly root: EntryId
-      readonly before: EntryId | null
+      readonly task: TaskId
+      readonly before: TaskId | null
     }
   /**
-   * Move a root on the board (ADR-0122). Into the archive it is archived,
+   * Move a task on the board (ADR-0122). Into the archive it is archived,
    * and closed for you once the host accepts; out of it, restored.
    */
   | {
-      readonly kind: "moveRoot"
-      readonly root: RootId
+      readonly kind: "moveTask"
+      readonly task: TaskId
       readonly from: WorkflowStateId
       readonly to: WorkflowStateId
-      readonly before: RootId | null
+      readonly before: TaskId | null
       /** `to` is the archive. */
       readonly closes: boolean
     }
@@ -232,11 +236,11 @@ export type Intent =
   | { readonly kind: "page"; readonly to: PageName | null }
   | {
       readonly kind: "rename"
-      readonly root: EntryId
+      readonly task: TaskId
       readonly title: string | null
     }
-  /** Ask a model for the root's title (ADR-0074). */
-  | { readonly kind: "retitle"; readonly root: EntryId }
+  /** Ask a model for the task's title (ADR-0074). */
+  | { readonly kind: "retitle"; readonly task: TaskId }
   /** What `lane` raised for you is not needed (ADR-0077): it clears on every device. */
   | {
       readonly kind: "notNeeded"
@@ -246,10 +250,10 @@ export type Intent =
   /** Show entry `entry`, wherever it is (`planOpen`). */
   | { readonly kind: "openAt"; readonly entry: EntryId }
   /**
-   * Show entry `entry` of the root whose root entry is `root`, which this
-   * tab may not hold (ADR-0063): what the header and the inbox open.
+   * Show entry `entry` of task `task`, whose root this tab may not hold
+   * (ADR-0063): what the header and the inbox open.
    */
-  | { readonly kind: "openIn"; readonly entry: EntryId; readonly root: EntryId }
+  | { readonly kind: "openIn"; readonly entry: EntryId; readonly task: TaskId }
   | { readonly kind: "signOut" }
   /** Take `card` into your inventory: by key, wherever it is. */
   | { readonly kind: "takeIntoInventory"; readonly card: CardId }
@@ -260,7 +264,7 @@ export type Intent =
   /** Select an inventory slot. */
   | { readonly kind: "selectSlot"; readonly slot: number }
   /**
-   * Undo or redo your newest move in the root you are on, or, with the
+   * Undo or redo your newest move in the task you are on, or, with the
    * inventory panel focused, your newest swap (ADR-0066).
    */
   | {
@@ -273,8 +277,8 @@ export type Intent =
   /** Follow a trace to where its card is now, or the message it became. */
   | { readonly kind: "openTrace"; readonly trace: TraceRecord }
 
-/** A column action on one root's columns, as `LayoutAction` carries it. */
-type RootColumnAction = Extract<LayoutAction, { kind: "columns" }>["action"]
+/** A column action on one task's columns, as `LayoutAction` carries it. */
+type TaskColumnAction = Extract<LayoutAction, { kind: "columns" }>["action"]
 
 /**
  * The effects of `intent`. `minted` holds the ids the shell made for it
@@ -317,7 +321,7 @@ function planOf(
     case "column":
       return planColumn(intent.position, intent.key, intent.act, state, minted)
     case "show":
-      return show(intent.here, state)
+      return show(intent.here)
     case "newTab":
       return [
         { kind: "armFocus", key: fresh },
@@ -325,6 +329,7 @@ function planOf(
           kind: "newTab",
           key: fresh,
           root: minted.root,
+          task: minted.task,
           thread: minted.thread,
           asksAgent: intent.asksAgent,
           ...(intent.prefill === undefined ? {} : { prefill: intent.prefill }),
@@ -333,44 +338,31 @@ function planOf(
       ]
     case "close":
       switch (intent.here.kind) {
-        case "root":
-          return closeRoot(intent.here.root, state)
+        case "task":
+          return closeTask(intent.here.task)
         case "new":
           return [layout({ kind: "closeNewTab", key: intent.here.key })]
         case "nothing":
           return []
       }
       return []
-    case "moveInList": {
-      const root = state.rootIds.get(intent.root)
-      if (root === undefined) return []
-      const before =
-        intent.before === null
-          ? null
-          : (state.rootIds.get(intent.before) ?? null)
-      return [list({ kind: "place", root, before })]
-    }
-    case "moveRoot": {
+    case "moveInList":
+      return [list({ kind: "place", task: intent.task, before: intent.before })]
+    case "moveTask":
       // Into the archive: it leaves the sidebar once the host accepts.
-      const entry = state.rootEntries.get(intent.root)
       return [
         {
-          kind: "moveRoot",
+          kind: "moveTask",
           move: {
-            kind: "move-root",
-            root: intent.root,
+            kind: "move-task",
+            task: intent.task,
             from: intent.from,
             to: intent.to,
             before: intent.before,
           },
-          moved: !intent.closes
-            ? []
-            : entry === undefined
-              ? [list({ kind: "close", root: intent.root })]
-              : closeRoot(entry, state),
+          moved: intent.closes ? closeTask(intent.task) : [],
         },
       ]
-    }
     case "editWorkflow":
       return [
         { kind: "request", intent: { kind: "workflow", edit: intent.edit } },
@@ -387,15 +379,22 @@ function planOf(
     case "page":
       return [{ kind: "page", to: intent.to }]
     case "rename":
-      return [{ kind: "mark", root: intent.root, title: intent.title }]
+      return [
+        {
+          kind: "request",
+          intent: { kind: "mark", task: intent.task, title: intent.title },
+        },
+      ]
     case "retitle":
-      return [{ kind: "retitle", root: intent.root }]
+      return [
+        { kind: "request", intent: { kind: "retitle", task: intent.task } },
+      ]
     case "notNeeded":
       return [{ kind: "notNeeded", lane: intent.lane, raised: intent.raised }]
     case "openAt":
       return planOpenAt(intent.entry, state, fresh)
     case "openIn":
-      return planOpenIn(intent.entry, intent.root, state, fresh)
+      return planOpenIn(intent.entry, intent.task, state, fresh)
     case "signOut":
       return [{ kind: "forgetIdentity" }, { kind: "reload" }]
     case "takeIntoInventory":
@@ -436,8 +435,8 @@ export function readerAction(act: ColumnAct, key: string): ReaderAction | null {
 
 /**
  * A column's act. One that changes the columns is the column action of the
- * root whose tab you are on; a new tab's one column can only send, take a
- * reader's setting, and close, which closes the tab.
+ * task you are on; a new tab's one column can only send, take a reader's
+ * setting, and close, which closes the tab.
  */
 function planColumn(
   position: number,
@@ -448,9 +447,16 @@ function planColumn(
 ): readonly Effect[] {
   const fresh = minted.key
   const active = state.layout.active
-  const onRoot = (action: RootColumnAction): readonly Effect[] =>
-    active?.kind === "root"
-      ? [layout({ kind: "columns", root: active.root, action })]
+  const onRoot = (action: TaskColumnAction): readonly Effect[] =>
+    active?.kind === "task"
+      ? [
+          layout({
+            kind: "columns",
+            task: active.task,
+            entry: entryOfTask(state, active.task),
+            action,
+          }),
+        ]
       : []
   /** An action on the column itself, which may be a new tab's one column. */
   const onColumn = (
@@ -524,13 +530,12 @@ function planColumn(
       return onColumn({ kind: "sent", key: act.key, sendId: act.sendId })
     case "queue": {
       const now = cardOf(state.cards, act.card)
-      const move = now === undefined ? null : queueMove(now, act, state.cards)
-      return move === null
+      return now === undefined
         ? []
         : [
             {
               kind: "queueCard",
-              move,
+              move: queueMove(now, act),
               hold: act.hold,
               command: null,
               how: IN_COLUMN(key),
@@ -594,7 +599,7 @@ function planColumn(
       return [
         {
           kind: "queueCard",
-          move: queueNew(act.card, act.root, act, state.cards),
+          move: queueNew(act.card, act),
           hold: act.hold,
           command: act.command,
           how: IN_COLUMN(key),
@@ -606,47 +611,41 @@ function planColumn(
 }
 
 /**
- * Show `entry`, in the root whose root entry is `root` (ADR-0063). One this
- * tab holds opens as `planOpenAt`. Else the root is shown, which holds it,
- * archived or not, and the entry is shown once it has arrived.
+ * Show `entry`, in task `task` (ADR-0063). One this tab holds opens as
+ * `planOpenAt`. Else the task is shown, which holds its roots, archived or
+ * not, and the entry is shown once it has arrived.
  */
 function planOpenIn(
   entry: EntryId,
-  root: EntryId,
+  task: TaskId,
   state: IntentState,
   fresh: string,
 ): readonly Effect[] {
   if (state.index.entries[entry] !== undefined)
     return planOpenAt(entry, state, fresh)
-  return [...showRoot(root, state), { kind: "openWhenHeld", entry }]
+  return [...showTask(task), { kind: "openWhenHeld", entry }]
 }
 
 /** A column opened with `key` takes focus; nothing opened, nothing armed. */
 const opened = (key: string, effects: readonly Effect[]): readonly Effect[] =>
   effects.length === 0 ? [] : [{ kind: "armFocus", key }, ...effects]
 
-/** `root` leaves the sidebar, and if you are on it, its neighbour is shown. */
-function closeRoot(
-  root: EntryId,
-  state: Pick<IntentState, "rootIds">,
-): readonly Effect[] {
-  const id = state.rootIds.get(root)
-  return [
-    ...(id === undefined ? [] : [list({ kind: "close", root: id })]),
-    layout({ kind: "closeRoot", root }),
-  ]
-}
+/** `task` leaves the sidebar, and if you are on it, its neighbour is shown. */
+const closeTask = (task: TaskId): readonly Effect[] => [
+  list({ kind: "close", task }),
+  layout({ kind: "closeTask", task }),
+]
 
 /**
  * After a move on the board is answered (ADR-0122): `moved` runs only once
- * the host accepts. A root you move into the archive leaves the sidebar,
- * the one you are on too; only a root someone else archives stays while you
+ * the host accepts. A task you move into the archive leaves the sidebar,
+ * the one you are on too; only a task someone else archives stays while you
  * are on it (`resolveLayout`). A refusal changes nothing.
  */
-export const afterRootMove = (
+export const afterTaskMove = (
   outcome: Outcome,
   moved: readonly Effect[],
-): readonly Effect[] => (outcome.kind === "moved-root" ? moved : [])
+): readonly Effect[] => (outcome.kind === "moved-task" ? moved : [])
 
 /** `reconcileName`'s step, as effects. */
 export function nameEffects(step: NameStep | null): readonly Effect[] {

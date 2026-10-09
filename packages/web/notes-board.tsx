@@ -6,7 +6,13 @@
 // note is a `NoteCardEditor`. A narrow pane scrolls the grid sideways rather
 // than reflowing it.
 
-import type { CardId, CardRecord, SeatRecord, WriterId } from "@pinetrie/core"
+import {
+  type CardId,
+  isTextCard,
+  type SeatRecord,
+  type TextCard,
+  type WriterId,
+} from "@pinetrie/core"
 import {
   type CatchUps,
   type ColumnAct,
@@ -25,7 +31,7 @@ import { useCardTexts } from "./use-card-texts.ts"
 export function NotesBoard(p: {
   session: SessionClient
   /** The thread's notes (`cardsAt("note", …)`). */
-  notes: readonly CardRecord[]
+  notes: readonly TextCard[]
   /** The column's key: where a drop on a cell lands. */
   columnKey: string
   queueOn: QueueOn | null
@@ -65,20 +71,22 @@ export function NotesBoard(p: {
       }
       onSelect={setSelected}
       reader={p.reader}
-      renderOpen={card => (
-        <NoteCardEditor
-          card={card}
-          catchUps={p.catchUps}
-          key={card.id}
-          onAct={p.onAct}
-          onTyping={p.onTyping}
-          queueOn={p.queueOn}
-          readOnly={p.readOnly}
-          reader={p.reader}
-          seats={p.seats}
-          session={p.session}
-        />
-      )}
+      renderOpen={card =>
+        !isTextCard(card) ? null : (
+          <NoteCardEditor
+            card={card}
+            catchUps={p.catchUps}
+            key={card.id}
+            onAct={p.onAct}
+            onTyping={p.onTyping}
+            queueOn={p.queueOn}
+            readOnly={p.readOnly}
+            reader={p.reader}
+            seats={p.seats}
+            session={p.session}
+          />
+        )
+      }
       targetOf={cell => ({ kind: "cell", key: p.columnKey, cell })}
       view={view}
     />

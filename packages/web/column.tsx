@@ -6,6 +6,7 @@ import {
   type AskIndex,
   atEntry,
   type CardId,
+  type CardPlace,
   type CardRecord,
   conflictsAt,
   type DigestRecord,
@@ -22,6 +23,8 @@ import {
   type SeatRecord,
   type StopRecord,
   type StreamRecord,
+  type TaskId,
+  type TextPlace,
   type ThreadLane,
   type TraceRecord,
   type TreeIndex,
@@ -140,6 +143,8 @@ export interface ColumnProps {
   session: SessionClient
   /** The column as the reducer holds it: its lane, and whether it is fresh. */
   column: ColumnSpec
+  /** The task it is on (ADR-0116): a new tab's, minted as it opened; null before it is known. */
+  task: TaskId | null
   position: number
   /** How many columns the strip holds: with two or more, a column can move. */
   count: number
@@ -222,6 +227,10 @@ export interface ColumnProps {
   /** Each column's composer, which a put on the column reads (`put-target.ts`). */
   composers: ComposerPlacesStore
 }
+
+/** A place a text card may be in; undefined for a canvas. */
+const textPlaceOf = (place: CardPlace): TextPlace | undefined =>
+  place.kind === "canvas" ? undefined : place
 
 export function Column(p: ColumnProps) {
   const { view, index } = p
@@ -496,6 +505,7 @@ export function Column(p: ColumnProps) {
     column: p.column.key,
     asksAgent: p.column.asksAgent === true,
     thread,
+    task: p.task,
     ...(p.column.fresh?.root === undefined
       ? {}
       : { root: p.column.fresh.root }),
@@ -563,12 +573,9 @@ export function Column(p: ColumnProps) {
     )
       return act({ kind: "offer", lane: lane.name, action: button, to: null })
     if (at.kind !== "entry") return
-    const root = p.session.rootOf(at.id)
-    if (root === undefined) return
     act({
       kind: "queueNew",
       card: newCardId(),
-      root,
       hold: "keep",
       command:
         button === "continue"
@@ -602,7 +609,7 @@ export function Column(p: ColumnProps) {
       p.column,
       at,
       at.kind === "entry" ? p.session.rootOf(at.id) : undefined,
-      p.lanes,
+      p.task,
     ) ?? undefined
   // Where this composer creates your message, and the message there: what
   // a put here reads (`ComposerSpot`). A column that can be written
@@ -630,12 +637,6 @@ export function Column(p: ColumnProps) {
   // Where a queue from a card's ⋯ puts it: on this thread's lane, at its end.
   const queueOn =
     lane.kind === "lane" && at.kind === "entry" ? { lane: lane.name, at } : null
-  // Where "+ add to queue" makes its card: this thread's end, in its root.
-  const queueRoot = at.kind === "entry" ? p.session.rootOf(at.id) : undefined
-  const queueAt =
-    queueOn === null || queueRoot === undefined
-      ? null
-      : { at: queueOn.at, root: queueRoot }
   // Where a drop lands: exactly where a put can.
   const putColumn = writable && place !== undefined ? key : null
   const pinKey = writable && place !== undefined ? pinnedOf(place) : null
@@ -882,7 +883,7 @@ export function Column(p: ColumnProps) {
                     onTyping={p.onTyping}
                     participants={p.participants}
                     pending={undefined}
-                    place={drawnPlace(pinKey, p.session.writer)}
+                    place={textPlaceOf(drawnPlace(pinKey, p.session.writer))}
                     prefill={undefined}
                     readOnly={p.readOnly}
                     reader={reader}
@@ -1027,7 +1028,7 @@ export function Column(p: ColumnProps) {
             ))}
             onAct={act}
             onTyping={p.onTyping}
-            queueAt={queueAt}
+            queueAt={queueOn}
             queued={queued}
             readOnly={p.readOnly}
             reader={reader}

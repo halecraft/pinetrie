@@ -26,7 +26,7 @@ export const hostLetGo = (input: {
  * the host let go of waits for its record to go: until then, a render may
  * still read its text, and would make a new copy.
  */
-export const spentCards = (
-  letGo: Iterable<CardId>,
+export const spentCards = <Id extends CardId>(
+  letGo: Iterable<Id>,
   live: (id: CardId) => boolean,
-): CardId[] => [...letGo].filter(id => !live(id))
+): Id[] => [...letGo].filter(id => !live(id))

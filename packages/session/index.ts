@@ -25,7 +25,7 @@ export {
   type HostRequest,
   type SessionClient,
 } from "./connect.ts"
-export { newCardId, newRootId, newThreadId } from "./ids.ts"
+export { newCardId, newRootId, newTaskId, newThreadId } from "./ids.ts"
 export {
   firstEmpty,
   heldBy,

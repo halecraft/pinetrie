@@ -1,12 +1,13 @@
-// interface/thread-card — what a thread card shows in its header (ADR-0111):
-// a root on the board, or in the sidebar, is one card, its header built once
-// per root (`threadCardHeads`) and read by both views. Neutral: never in the
-// thread's colour. PURE.
+// interface/thread-card — what a task's card shows in its header (ADR-0111,
+// ADR-0116): a task on the board, or in the sidebar, is one card, its header
+// built once per task (`threadCardHeads`) and read by both views. Its signals
+// are its first root's, the one root a task holds until a task's canvas
+// holds several. Neutral: never in the thread's colour. PURE.
 
 import type {
   EntryId,
-  RootId,
   RootWork,
+  TaskId,
   Workflow,
   WorkflowStateId,
 } from "@pinetrie/core"
@@ -17,7 +18,7 @@ import { NO_TEXT } from "./root-label.ts"
 /** A move to another workflow state, as a thread card's ⋯ offers it. */
 export interface ThreadMove {
   readonly name: string
-  /** To the archive: it archives the root. */
+  /** To the archive: it archives the task. */
   readonly closes: boolean
   /** Why it is refused now (`ROOT_BUSY_REASON`'s key), into the archive only. */
   readonly busy: RootWork | null
@@ -28,9 +29,9 @@ export interface ThreadMove {
 
 /** A thread card's header: its signals, and its ⋯'s Move to ▸. */
 export interface ThreadCardHead {
-  /** Its id; null for a root whose directory record has not arrived. */
-  readonly root: RootId | null
-  readonly entry: EntryId
+  readonly task: TaskId
+  /** Its first root's root entry; null before that root has a message. */
+  readonly entry: EntryId | null
   readonly label: string
   /** What its mark draws (`rootStatus`), or null for none. */
   readonly status: Status | null
@@ -48,12 +49,12 @@ export interface ThreadCardHead {
 export interface ThreadCardFacts {
   /** The board's states, or null before the host wrote them. */
   readonly workflow: Workflow | null
-  /** Each root's id, by root entry. */
-  readonly rootIds: ReadonlyMap<EntryId, RootId>
-  /** Each root's state on the board, by root entry (`boardOf`). */
-  readonly stateOf: ReadonlyMap<EntryId, WorkflowStateId>
-  /** Each root's label (`labelsOf`). */
-  readonly labels: ReadonlyMap<EntryId, string>
+  /** Each task's first root's root entry (`entriesOf`). */
+  readonly entries: ReadonlyMap<TaskId, EntryId>
+  /** Each task's state on the board (`boardOf`). */
+  readonly stateOf: ReadonlyMap<TaskId, WorkflowStateId>
+  /** Each task's label (`labelsOf`). */
+  readonly labels: ReadonlyMap<TaskId, string>
   /** Each root's status (`rootStatus`, ADR-0077). */
   readonly status: ReadonlyMap<EntryId, Status>
   /** Roots holding an unsent card of yours (`CardMarks.roots`). */
@@ -64,34 +65,36 @@ export interface ThreadCardFacts {
   readonly work: ReadonlyMap<string, RootWork>
 }
 
-/** The header of the root whose root entry is `entry`. */
+/** The header of `task`. */
 export function threadCardHead(
-  entry: EntryId,
+  task: TaskId,
   facts: ThreadCardFacts,
 ): ThreadCardHead {
-  const root = facts.rootIds.get(entry) ?? null
-  const state = facts.stateOf.get(entry) ?? null
+  const entry = facts.entries.get(task) ?? null
+  const state = facts.stateOf.get(task) ?? null
+  const of = <T>(m: ReadonlyMap<EntryId | string, T>): T | undefined =>
+    entry === null ? undefined : m.get(entry)
   return {
-    root,
+    task,
     entry,
-    label: facts.labels.get(entry) ?? NO_TEXT,
-    status: facts.status.get(entry) ?? null,
-    ready: facts.offered.get(entry) ?? [],
-    pip: facts.pips.has(entry),
+    label: facts.labels.get(task) ?? NO_TEXT,
+    status: of(facts.status) ?? null,
+    ready: of(facts.offered) ?? [],
+    pip: entry !== null && facts.pips.has(entry),
     state,
-    moves: movesOf(root, entry, state, facts),
+    moves: movesOf(task, entry, state, facts),
   }
 }
 
 /** "Move to ▸" each state but `from`. */
 function movesOf(
-  root: RootId | null,
-  entry: EntryId,
+  task: TaskId,
+  entry: EntryId | null,
   from: WorkflowStateId | null,
   facts: ThreadCardFacts,
 ): readonly ThreadMove[] {
   const { workflow } = facts
-  if (workflow === null || root === null || from === null) return []
+  if (workflow === null || from === null) return []
   return [...workflow.open, workflow.archive].flatMap(to => {
     if (to.id === from) return []
     const closes = to.id === workflow.archive.id
@@ -99,11 +102,11 @@ function movesOf(
       {
         name: to.name,
         closes,
-        busy: closes ? (facts.work.get(entry) ?? null) : null,
-        drops: closes ? (facts.offered.get(entry) ?? []) : [],
+        busy: closes && entry !== null ? (facts.work.get(entry) ?? null) : null,
+        drops: closes && entry !== null ? (facts.offered.get(entry) ?? []) : [],
         intent: {
-          kind: "moveRoot",
-          root,
+          kind: "moveTask",
+          task,
           from,
           to: to.id,
           before: null,
@@ -114,12 +117,12 @@ function movesOf(
   })
 }
 
-/** Every root's header, once, by root entry: what the board and the sidebar both read. */
+/** Every task's header, once: what the board and the sidebar both read. */
 export function threadCardHeads(
-  entries: Iterable<EntryId>,
+  tasks: Iterable<TaskId>,
   facts: ThreadCardFacts,
-): ReadonlyMap<EntryId, ThreadCardHead> {
-  const heads = new Map<EntryId, ThreadCardHead>()
-  for (const entry of entries) heads.set(entry, threadCardHead(entry, facts))
+): ReadonlyMap<TaskId, ThreadCardHead> {
+  const heads = new Map<TaskId, ThreadCardHead>()
+  for (const task of tasks) heads.set(task, threadCardHead(task, facts))
   return heads
 }

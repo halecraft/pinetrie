@@ -10,6 +10,7 @@
 // host gathers and writes (`apps/pinetrie/host/provenance.ts`). Pure.
 
 import {
+  asPlaceFields,
   type CardEvent,
   type CardHistoryRecord,
   type CardId,
@@ -50,6 +51,9 @@ const FieldsSchema = Type.Object({
   by: Str,
   seen: Str,
   holder: Str,
+  /** Absent from an event stored before tasks (ADR-0116): read as "". */
+  task: Type.Optional(Str),
+  width: Type.Optional(Str),
 })
 const OrNull = <T extends ReturnType<typeof Type.Object>>(t: T) =>
   Type.Union([t, Type.Null()])
@@ -82,8 +86,10 @@ const TraceSchema = Type.Object({
 
 const keyFields = (k: PlaceKey | null): PlaceFields | null =>
   k === null ? null : placeFields(k)
-const keyOrNull = (f: PlaceFields | null): PlaceKey | null | undefined =>
-  f === null ? null : keyOfFields(f)
+const keyOrNull = (
+  f: Partial<PlaceFields> | null,
+): PlaceKey | null | undefined =>
+  f === null ? null : keyOfFields(asPlaceFields(f))
 
 /**
  * Each card's history, at the card's id. An event whose place this build
@@ -105,7 +111,7 @@ export const CARD_HISTORY: RecordSpec<CardHistoryRecord, CardId, "session"> = {
       card: cardId(card),
       events: r.events.flatMap(e => {
         const from = keyOrNull(e.from)
-        const to = keyOfFields(e.to)
+        const to = keyOfFields(asPlaceFields(e.to))
         return from === undefined || to === undefined
           ? []
           : [{ ...e, by: e.by as WriterId | null, from, to }]
@@ -125,7 +131,7 @@ export const TRACE: RecordSpec<TraceRecord, string, "session"> = {
   }),
   decode: (contents, key) =>
     decodeAt(TraceSchema, contents, textKey(key), (r, id) => {
-      const from = keyOfFields(r.from)
+      const from = keyOfFields(asPlaceFields(r.from))
       const to = keyOrNull(r.to)
       return from === undefined || to === undefined
         ? undefined
@@ -178,9 +184,8 @@ function movedBack(
   // In whichever cell the host gave it.
   const below: PlaceKey = {
     kind: "note",
-    root: from.root,
     at: from.at,
-    lane: from.lane,
+    thread: from.thread,
     cell: to.cell,
   }
   if (!sameKey(below, to)) return null
@@ -256,7 +261,12 @@ function eventKind(
   if (cause.kind !== "host") return "moved"
   if (before.place.kind === "fresh" && after.place.kind === "note")
     return "followed"
-  if (after.unsent !== null && before.place.kind === "queued") return "unsent"
+  if (
+    after.kind === "text" &&
+    after.unsent !== null &&
+    before.place.kind === "queued"
+  )
+    return "unsent"
   return "moved"
 }
 
@@ -405,7 +415,7 @@ export function planTraceSweep(input: {
   readonly cards: readonly CardRecord[]
   readonly now: number
 }): ProvenanceSteps {
-  const live = new Set(input.cards.map(c => c.id))
+  const live = new Set<CardId>(input.cards.map(c => c.id))
   return {
     traces: input.traces
       .filter(t => input.now - t.at > TRACE_MAX_AGE_MS)

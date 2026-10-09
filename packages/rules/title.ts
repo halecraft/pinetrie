@@ -5,7 +5,6 @@
 
 import {
   type AgentId,
-  type EntryId,
   ERR,
   type LaneRecord,
   type MarkRecord,
@@ -90,7 +89,8 @@ type TitlingPlan =
 export function planTitling(input: {
   readonly index: TreeIndex
   readonly root: RootId
-  readonly marks: ReadonlyMap<EntryId, MarkRecord>
+  /** Whether the task has a title already (ADR-0116). */
+  readonly marked: boolean
   /** Every lane's record: which lanes work in `root`. */
   readonly lanes: Iterable<LaneRecord>
   readonly trigger: TitleTrigger
@@ -111,9 +111,7 @@ export function planTitling(input: {
   const first = [...input.lanes].every(
     l => l.root !== input.root || l.lane === trigger.lane,
   )
-  const marked =
-    summary !== undefined && input.marks.get(summary.root) !== undefined
-  if (!input.enabled || !first || marked || input.inFlight)
+  if (!input.enabled || !first || input.marked || input.inFlight)
     return { kind: "skip" }
   const above = projectTranscript(
     index,

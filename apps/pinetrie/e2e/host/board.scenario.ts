@@ -6,24 +6,17 @@
 // it, a new root lands where its chat says, and the records reach another
 // client.
 
-import { entryId, ROOT, type RootId } from "@pinetrie/core"
+import { entryId, ROOT, type TaskId } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readArchived,
   readBoardPlaces,
   readMarks,
-  readRoots,
   readWorkflow,
 } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
-import {
-  join,
-  rootRecordsOf,
-  START_CHAT,
-  waitFor,
-  withHost,
-} from "../harness.ts"
+import { join, START_CHAT, taskHolding, waitFor, withHost } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 export const scenario: Scenario = {
@@ -48,11 +41,19 @@ async function run(check: Checks["check"]): Promise<void> {
         await ada.chat("first root", ROOT, { ...START_CHAT, state: doing.id }),
       )
       const r2 = appended(await ada.chat("second root", ROOT, START_CHAT))
-      const idOf = (entry: string): RootId =>
-        [...readRoots(host.session).values()].find(r => r.entry === entry)
-          ?.root ?? ("" as RootId)
+      // Each root's task, which its first message opened (ADR-0116).
+      const idOf = (entry: string): TaskId | "" => {
+        try {
+          return taskHolding(host, entryId(entry))
+        } catch {
+          return ""
+        }
+      }
       await waitFor(() => idOf(r1) !== "" && idOf(r2) !== "", 10_000)
-      const [id1, id2] = [idOf(r1), idOf(r2)]
+      const [id1, id2] = [
+        taskHolding(host, entryId(r1)),
+        taskHolding(host, entryId(r2)),
+      ]
       const places = readBoardPlaces(host.session)
       check(
         "a new root lands in the state its chat names, else the first open one",
@@ -62,8 +63,8 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       const closed = await ada.request({
-        kind: "move-root",
-        root: id1,
+        kind: "move-task",
+        task: id1,
         from: doing.id,
         to: done.id,
         before: null,
@@ -75,7 +76,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const refused = await bea.chat("too late", { kind: "entry", id: r1 })
       check(
         "a root moved to Done is archived for another client, and a chat into it is refused naming the mover",
-        closed.kind === "moved-root" &&
+        closed.kind === "moved-task" &&
           readArchived(host.session).get(id1)?.by === ada.writer &&
           seen >= 0 &&
           refused.kind === "refused" &&
@@ -84,15 +85,15 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       const late = await bea.request({
-        kind: "move-root",
-        root: id1,
+        kind: "move-task",
+        task: id1,
         from: doing.id,
         to: backlog.id,
         before: null,
       })
       const reopened = await bea.request({
-        kind: "move-root",
-        root: id1,
+        kind: "move-task",
+        task: id1,
         from: done.id,
         to: backlog.id,
         before: null,
@@ -102,15 +103,15 @@ async function run(check: Checks["check"]): Promise<void> {
         "a move from a state the root has left is refused naming who moved it; moved out of Done, it takes writes again",
         late.kind === "refused" &&
           late.message === "not moved: ada moved it to Done first" &&
-          reopened.kind === "moved-root" &&
+          reopened.kind === "moved-task" &&
           accepted.kind === "appended",
         `${late.kind} ${reopened.kind} ${accepted.kind}`,
       )
 
       const titled = await bea.mark(entryId(r2), "Tab names")
-      const mark = rootRecordsOf(host, readMarks).get(r2)
+      const mark = readMarks(host.session).get(id2)
       check(
-        "a root is titled, by its writer",
+        "a task is titled, by its writer",
         titled.kind === "marked" &&
           mark?.title === "Tab names" &&
           mark.by === bea.writer,

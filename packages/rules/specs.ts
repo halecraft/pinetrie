@@ -20,6 +20,7 @@ import type { RecordSpec } from "./records.ts"
 import { ROOT } from "./roots.ts"
 import { SEAT } from "./seat.ts"
 import { STOP } from "./stop.ts"
+import { TASK } from "./task.ts"
 import { THREAD } from "./thread.ts"
 import { VERDICT } from "./verdict.ts"
 import { LANE, PROJECT, REVISION } from "./work.ts"
@@ -52,13 +53,15 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   ROOT,
   SEAT,
   STOP,
+  TASK,
   TRACE,
   VERDICT,
   WORKFLOW,
 ]
 
-const DECLARED: ReadonlySet<string> = new Set(
-  RECORD_SPECS.map(spec => spec.namespace),
+/** Each declared namespace's home. */
+const DECLARED: ReadonlyMap<string, AnyRecordSpec["home"]> = new Map(
+  RECORD_SPECS.map(spec => [spec.namespace, spec.home]),
 )
 
 /** The namespaces a document holds, with each one's keys, where it is. */
@@ -68,16 +71,17 @@ export interface StoredRecords {
 }
 
 /**
- * Deletes for every record whose namespace no spec declares (ADR-0100): a
- * renamed or retired record type leaves nothing behind once a host starts.
- * Pure.
+ * Deletes for every record whose namespace no spec declares (ADR-0100), or
+ * that is stored outside its spec's home: a renamed, retired or rehomed
+ * record type (a mark, once a root's, now a task's in the session)
+ * leaves nothing behind once a host starts. Pure.
  */
 export const planUndeclaredSweep = (
   stored: readonly StoredRecords[],
 ): ValueWrite[] =>
   stored.flatMap(({ target, namespaces }) =>
     [...namespaces].flatMap(([namespace, keys]) =>
-      DECLARED.has(namespace)
+      DECLARED.get(namespace) === target.kind
         ? []
         : keys.map(key => ({
             kind: "delete" as const,

@@ -88,12 +88,12 @@ export {
   nameStateIntent,
   parseSearch,
   readyWords,
-  rootsWords,
   type StateSignals,
   type StripState,
   searchWords,
   stateWords,
   type ThreadCard,
+  tasksWords,
 } from "./board-view.ts"
 export {
   type CardFaceView,
@@ -465,6 +465,13 @@ export {
   type SidebarView,
   sidebarView,
 } from "./sidebar-view.ts"
+export {
+  entriesOf,
+  NO_TASKS,
+  type Tasks,
+  type TaskView,
+  tasksOf,
+} from "./tasks.ts"
 export {
   type ThreadCardHead,
   type ThreadMove,

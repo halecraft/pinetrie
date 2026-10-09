@@ -1,8 +1,6 @@
 import {
-  type EntryId,
   entryId,
-  type RootId,
-  rootIdFor,
+  taskIdFor,
   type Workflow,
   workflowStateIdFor,
   writerId,
@@ -19,7 +17,7 @@ import {
 } from "./thread-card.ts"
 
 const R1 = entryId("r1")
-const ID1 = rootIdFor("01a0ffd2-0000-7000-8000-000000000001")
+const K1 = taskIdFor("01a0ffd2-0000-7000-8000-000000000001")
 const [BACKLOG, DOING, DONE] = ["b", "d", "x"].map(workflowStateIdFor) as [
   ReturnType<typeof workflowStateIdFor>,
   ReturnType<typeof workflowStateIdFor>,
@@ -34,9 +32,9 @@ const WORKFLOW: Workflow = {
 }
 const facts = (over: Partial<ThreadCardFacts> = {}): ThreadCardFacts => ({
   workflow: WORKFLOW,
-  rootIds: new Map([[R1, ID1]]),
-  stateOf: new Map([[R1, DOING]]),
-  labels: new Map([[R1, "Tab names"]]),
+  entries: new Map([[K1, R1]]),
+  stateOf: new Map([[K1, DOING]]),
+  labels: new Map([[K1, "Tab names"]]),
   status: new Map(),
   pips: new Set([R1]),
   offered: new Map([[R1, ["amber-fox"]]]),
@@ -44,11 +42,11 @@ const facts = (over: Partial<ThreadCardFacts> = {}): ThreadCardFacts => ({
   ...over,
 })
 
-describe("threadCardHead (ADR-0111)", () => {
+describe("threadCardHead (ADR-0111, ADR-0116)", () => {
   test("its label, ⇡, your pip, and Move to ▸ each other state; into the archive refused while the agent works, naming the offers it withdraws", () => {
-    const head = threadCardHead(R1, facts())
+    const head = threadCardHead(K1, facts())
     expect(head).toMatchObject({
-      root: ID1,
+      task: K1,
       entry: R1,
       label: "Tab names",
       status: null,
@@ -61,8 +59,8 @@ describe("threadCardHead (ADR-0111)", () => {
       ["Done", true, "running", ["amber-fox"]],
     ])
     expect(head.moves[1]?.intent).toEqual({
-      kind: "moveRoot",
-      root: ID1,
+      kind: "moveTask",
+      task: K1,
       from: DOING,
       to: DONE,
       before: null,
@@ -70,26 +68,33 @@ describe("threadCardHead (ADR-0111)", () => {
     })
   })
 
-  test("a root with no id yet, or no place: its signals, and no moves", () => {
-    expect(threadCardHead(R1, facts({ rootIds: new Map() }))).toMatchObject({
-      root: null,
-      moves: [],
+  test("a task with no message yet has no signals; one with no place, no moves", () => {
+    expect(threadCardHead(K1, facts({ entries: new Map() }))).toMatchObject({
+      entry: null,
+      ready: [],
+      pip: false,
     })
-    expect(threadCardHead(R1, facts({ stateOf: new Map() })).moves).toEqual([])
+    expect(threadCardHead(K1, facts({ stateOf: new Map() })).moves).toEqual([])
   })
 
-  test("the board and the sidebar draw a root from the same header", () => {
-    const heads = threadCardHeads([R1], facts())
+  test("the board and the sidebar draw a task from the same header", () => {
+    const heads = threadCardHeads([K1], facts())
     const layout = resolveLayout(
       layoutReducer(initialLayout(), {
         kind: "show",
-        here: { kind: "root", root: R1 },
+        here: { kind: "task", task: K1 },
       }),
-      { index: tree({ r1: null }), lanes: [], archived: new Set(), list: [R1] },
+      {
+        index: tree({ r1: null }),
+        lanes: [],
+        archived: new Set(),
+        list: [K1],
+        entries: new Map([[K1, R1]]),
+      },
     )
     const sidebar = sidebarView({
       layout,
-      active: { kind: "root", root: R1 },
+      active: { kind: "task", task: K1 },
       heads,
       lines: new Map(),
       marks: new Map(),
@@ -106,7 +111,7 @@ describe("threadCardHead (ADR-0111)", () => {
     const board = boardView({
       workflow: WORKFLOW,
       places: new Map(),
-      rootEntries: new Map<RootId, EntryId>([[ID1, R1]]),
+      entries: new Map([[K1, R1]]),
       summaries: [],
       heads,
       lines: new Map(),
@@ -115,7 +120,7 @@ describe("threadCardHead (ADR-0111)", () => {
     })
     const item = sidebar.items[0]
     const card = board.open.flatMap(c => c.items)[0]
-    expect(item?.kind === "root" ? item.head : null).toBe(heads.get(R1))
-    expect(card?.head).toBe(heads.get(R1))
+    expect(item?.kind === "task" ? item.head : null).toBe(heads.get(K1))
+    expect(card?.head).toBe(heads.get(K1))
   })
 })

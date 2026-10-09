@@ -5,10 +5,11 @@ import {
   entryId,
   type LaneView,
   type MarkRecord,
-  rootIdFor,
   type Sha256,
+  type TaskId,
   type ThreadId,
   type ThreadName,
+  taskIdFor,
   threadIdFor,
   type Workflow,
   workflowStateIdFor,
@@ -17,7 +18,7 @@ import {
 import { describe, expect, test } from "vitest"
 import type { Item, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
-import { NEW_ROOT, NEW_THREAD, tree } from "./fixtures.ts"
+import { NEW_ROOT, NEW_TASK, NEW_THREAD, tree } from "./fixtures.ts"
 import {
   type Here,
   initialLayout,
@@ -25,7 +26,7 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
-import { rootSlot } from "./palette.ts"
+import { taskSlot } from "./palette.ts"
 import {
   dropsWords,
   listKey,
@@ -37,9 +38,11 @@ import {
 } from "./sidebar-view.ts"
 import { type ThreadCardFacts, threadCardHeads } from "./thread-card.ts"
 
-const R1: Here = { kind: "root", root: entryId("r1") }
-const R2: Here = { kind: "root", root: entryId("r2") }
-const R3: Here = { kind: "root", root: entryId("r3") }
+/** Each root's task, one a root (ADR-0116): `K("r1")` holds root r1's threads. */
+const K = (root: string) => taskIdFor(root)
+const R1: Here = { kind: "task", task: K("r1") }
+const R2: Here = { kind: "task", task: K("r2") }
+const R3: Here = { kind: "task", task: K("r3") }
 const reduce = (l: Layout, ...actions: Parameters<typeof layoutReducer>[1][]) =>
   actions.reduce(layoutReducer, l)
 // The sidebar: r1, r2, r3, then a new agent tab "t"; you are on r1.
@@ -50,6 +53,7 @@ const layout = resolveLayout(
       kind: "newTab",
       key: "t",
       root: NEW_ROOT,
+      task: NEW_TASK,
       thread: NEW_THREAD,
       asksAgent: true,
     },
@@ -59,7 +63,8 @@ const layout = resolveLayout(
     index: tree({ r1: null, r2: null, r3: null }),
     lanes: [],
     archived: new Set(),
-    list: [entryId("r1"), entryId("r2"), entryId("r3")],
+    list: [K("r1"), K("r2"), K("r3")],
+    entries: new Map(["r1", "r2", "r3"].map(r => [K(r), entryId(r)] as const)),
   },
 )
 const none: CardMarks = {
@@ -69,7 +74,7 @@ const none: CardMarks = {
   elsewhere: false,
 }
 const mark: MarkRecord = {
-  entry: entryId("r1"),
+  task: K("r1"),
   title: "Tab names",
   by: writerId("a@x.test"),
   at: 1,
@@ -86,23 +91,22 @@ const WORKFLOW: Workflow = {
   ],
   archive: { id: DONE, name: "Done" },
 }
-const ID = (n: number) => rootIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`)
 /** What the sidebar's items are read from, its thread cards' facts among them. */
 type Facts = Omit<SidebarViewInput, "heads"> &
-  Omit<ThreadCardFacts, "pips"> & { readonly entries: readonly EntryId[] }
+  Omit<ThreadCardFacts, "pips"> & { readonly shown: readonly TaskId[] }
 const input = (over: Partial<Facts> = {}): SidebarViewInput => {
   const f: Facts = {
     layout,
     active: R1,
     labels: new Map([
-      [entryId("r1"), "Tab names"],
-      [entryId("r2"), "second"],
+      [K("r1"), "Tab names"],
+      [K("r2"), "second"],
     ]),
     lines: new Map([
       [entryId("r1"), "first"],
       [entryId("r2"), "second"],
     ]),
-    marks: new Map([[entryId("r1"), mark]]),
+    marks: new Map([[K("r1"), mark]]),
     archived: new Set(),
     work: new Map(),
     offered: new Map(),
@@ -111,23 +115,19 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
     arrivals: { arrived: new Map(), done: new Map() },
     workflow: WORKFLOW,
     stateOf: new Map([
-      [entryId("r1"), DOING],
-      [entryId("r2"), DOING],
-      [entryId("r3"), BACKLOG],
+      [K("r1"), DOING],
+      [K("r2"), DOING],
+      [K("r3"), BACKLOG],
     ]),
-    rootIds: new Map([
-      [entryId("r1"), ID(1)],
-      [entryId("r2"), ID(2)],
-      [entryId("r3"), ID(3)],
-    ]),
+    entries: new Map(["r1", "r2", "r3"].map(r => [K(r), entryId(r)] as const)),
     sprites: new Map(),
-    entries: [entryId("r1"), entryId("r2"), entryId("r3")],
+    shown: [K("r1"), K("r2"), K("r3")],
     ...over,
   }
   return {
     layout: f.layout,
     active: f.active,
-    heads: threadCardHeads(f.entries, { ...f, pips: f.unsent.roots }),
+    heads: threadCardHeads(f.shown, { ...f, pips: f.unsent.roots }),
     lines: f.lines,
     marks: f.marks,
     archived: f.archived,
@@ -141,17 +141,17 @@ const kinds = (
   r:
     | (typeof items extends (...a: never) => infer T ? T : never)[number]
     | undefined,
-) => (r?.kind === "root" ? r.menu.map(i => i.kind) : null)
+) => (r?.kind === "task" ? r.menu.map(i => i.kind) : null)
 
 describe("sidebarView", () => {
   test("your roots, then new tabs, in listOf's order", () => {
-    expect(items().map(t => t.kind)).toEqual(["root", "root", "root", "new"])
+    expect(items().map(t => t.kind)).toEqual(["task", "task", "task", "new"])
     expect(items().map(t => t.selected)).toEqual([true, false, false, false])
   })
 
   test("a root is labelled, and its rename field starts from its title", () => {
     expect(items()[0]).toMatchObject({
-      kind: "root",
+      kind: "task",
       label: "Tab names",
       line: "first",
       title: "Tab names",
@@ -159,7 +159,7 @@ describe("sidebarView", () => {
   })
 
   test("every root not archived offers ⋯, not only the one you are on", () => {
-    const menus = items({ archived: new Set([entryId("r1")]) }).map(kinds)
+    const menus = items({ archived: new Set([K("r1")]) }).map(kinds)
     expect(menus).toEqual([
       [],
       ["rename", "retitle", "moveTo", "moveTo"],
@@ -170,24 +170,24 @@ describe("sidebarView", () => {
 
   test("Auto-update title asks for the root's own", () => {
     const [r1] = items()
-    expect(r1?.kind === "root" && r1.menu[1]).toEqual({
+    expect(r1?.kind === "task" && r1.menu[1]).toEqual({
       kind: "retitle",
-      intent: { kind: "retitle", root: entryId("r1") },
+      intent: { kind: "retitle", task: K("r1") },
     })
   })
 
   test("Move to ▸ offers every state but its own, each a move on the board for everyone", () => {
     const [r1] = items()
     const moves =
-      r1?.kind === "root" ? r1.menu.filter(i => i.kind === "moveTo") : []
+      r1?.kind === "task" ? r1.menu.filter(i => i.kind === "moveTo") : []
     expect(moves.map(m => m.kind === "moveTo" && [m.name, m.closes])).toEqual([
       ["Backlog", false],
       ["Done", true],
     ])
     expect(moves[1]).toMatchObject({
       intent: {
-        kind: "moveRoot",
-        root: ID(1),
+        kind: "moveTask",
+        task: K("r1"),
         from: DOING,
         to: DONE,
         before: null,
@@ -199,7 +199,7 @@ describe("sidebarView", () => {
   test("Move to Done is refused while the agent works in the root", () => {
     const [r1] = items({ work: new Map([["r1", "running"]]) })
     const done =
-      r1?.kind === "root"
+      r1?.kind === "task"
         ? r1.menu.find(i => i.kind === "moveTo" && i.closes)
         : null
     expect(done).toMatchObject({ busy: "running", drops: [] })
@@ -209,7 +209,7 @@ describe("sidebarView", () => {
     const amber = "amber-fox" as ThreadName
     const [r1, r2] = items({ offered: new Map([[entryId("r1"), [amber]]]) })
     const done = (r: typeof r1) =>
-      r?.kind === "root"
+      r?.kind === "task"
         ? r.menu.find(i => i.kind === "moveTo" && i.closes)
         : null
     expect(done(r1)).toMatchObject({ drops: [amber] })
@@ -289,14 +289,14 @@ describe("sidebarView", () => {
     const [raised] = items({
       status: new Map([[entryId("r1"), { kind: "worthARead", item }]]),
     })
-    expect(raised?.kind === "root" && raised.menu[0]).toEqual({
+    expect(raised?.kind === "task" && raised.menu[0]).toEqual({
       kind: "notNeeded",
       intent: { kind: "notNeeded", lane: item.lane, raised: item.raised },
     })
     const [working] = items({
       status: new Map([[entryId("r1"), { kind: "working" }]]),
     })
-    expect(working?.kind === "root" && working.menu[0]).toEqual({
+    expect(working?.kind === "task" && working.menu[0]).toEqual({
       kind: "rename",
     })
   })
@@ -321,15 +321,15 @@ test("＋'s main action starts agent work; its menu, a conversation", () => {
 
 test("selected is the item you are on, and each item has its own key", () => {
   const view = sidebarView(input({ active: R2 }))
-  expect(view.selected).toMatchObject({ kind: "root", root: entryId("r2") })
+  expect(view.selected).toMatchObject({ kind: "task", task: K("r2") })
   expect(view.items.map(listKey)).toEqual([
-    "root:r1",
-    "root:r2",
-    "root:r3",
+    `task:${K("r1")}`,
+    `task:${K("r2")}`,
+    `task:${K("r3")}`,
     "new:t",
   ])
   expect(sidebarView(input({ active: R3 })).selected).toMatchObject({
-    root: "r3",
+    task: K("r3"),
   })
 })
 
@@ -352,24 +352,20 @@ describe("pageTitle", () => {
 
 describe("icons (ADR-0088)", () => {
   const SHA = "b".repeat(64) as Sha256
-  test("a root with a sprite draws it; one without, its initials on its colour; a new tab, a hollow tile", () => {
+  test("a task with a sprite draws it; one without, its initials on a colour its id seeds; a new tab, a hollow tile", () => {
     const [r1, r2, r3, fresh] = items({
       sprites: new Map([[entryId("r2"), SHA]]),
-      rootIds: new Map([
-        [entryId("r1"), ID(1)],
-        [entryId("r2"), ID(2)],
-      ]),
     })
     expect(r1?.icon).toEqual({
       kind: "initials",
       letters: "TN",
-      slot: rootSlot(ID(1)),
+      slot: taskSlot(K("r1")),
     })
     expect(r2?.icon).toEqual({ kind: "sprite", src: blobUrl(SHA) })
     expect(r3?.icon).toEqual({
       kind: "initials",
       letters: "NT",
-      slot: "pending",
+      slot: taskSlot(K("r3")),
     })
     expect(fresh?.icon).toEqual({ kind: "fresh" })
   })

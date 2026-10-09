@@ -11,6 +11,7 @@ import type {
   CardRecord,
   EntryId,
   RootId,
+  ThreadId,
   TreeIndex,
   WriterId,
 } from "@pinetrie/core"
@@ -18,6 +19,7 @@ import {
   readCardHistories,
   readPlaces,
   readReading,
+  readThreads,
   readTraces,
   readTreeIndex,
 } from "@pinetrie/reads"
@@ -61,13 +63,14 @@ export interface ProvenanceDeps {
 }
 
 /**
- * Each card's thread end, from its loaded root, for a card at one: your
- * message, a note, a queued or a pinned card;
- * a card in a root not loaded is left out, and counts as unwatched.
+ * Each card's thread end, from its thread's loaded root, for a card at
+ * one: your message, a note, a queued or a pinned card; a card in a root
+ * not loaded, or at a thread with no record, is left out, and counts as
+ * unwatched.
  */
 export function endsOf(
   cards: readonly CardRecord[],
-  view: (root: RootId) => TreeIndex | null,
+  view: (thread: ThreadId) => TreeIndex | null,
 ): ReadonlyMap<CardId, EntryId | null> {
   const ends = new Map<CardId, EntryId | null>()
   for (const c of cards) {
@@ -79,7 +82,7 @@ export function endsOf(
       p.kind !== "pinned"
     )
       continue
-    const index = view(p.root)
+    const index = view(p.thread)
     if (index !== null) ends.set(c.id, placeEnd(p, index))
   }
   return ends
@@ -109,7 +112,10 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
       const cards = readPlaces(places)
       // One index per root, however many cards it holds.
       const roots = new Map<RootId, TreeIndex | null>()
-      const view = (root: RootId) => {
+      const threads = readThreads(session)
+      const view = (thread: ThreadId) => {
+        const root = threads.get(thread)?.root
+        if (root === undefined) return null
         if (!roots.has(root)) {
           const held = docs.view(root)
           roots.set(root, held === null ? null : readTreeIndex(held.doc))

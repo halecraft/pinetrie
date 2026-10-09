@@ -19,15 +19,15 @@ import { subscribe } from "@kyneta/schema"
 import type {
   AcceptedRecord,
   CardId,
-  CardPlace,
   CardRecord,
   CommandSummary,
   PinnedView,
   Position,
   SeatRecord,
+  TextPlace,
   ThreadLane,
 } from "@pinetrie/core"
-import { commandOf } from "@pinetrie/core"
+import { commandOf, type TextCard, type TextCardId } from "@pinetrie/core"
 import {
   baseChoices,
   type CardFrameFacts,
@@ -97,7 +97,7 @@ import { useStable } from "./use-stable.ts"
  */
 function bindText(
   session: SessionClient,
-  id: CardId,
+  id: TextCardId,
   el: HTMLTextAreaElement,
   onText: (text: string) => void,
 ): () => void {
@@ -142,9 +142,9 @@ export interface Where {
 export function CardEditor(p: {
   session: SessionClient
   /** The card this edits: your message here (`yourCard`), once it exists. */
-  card: CardRecord | undefined
+  card: TextCard | undefined
   /** Where a card made from this box goes; undefined where none may be made. */
-  place: CardPlace | undefined
+  place: TextPlace | undefined
   /** Where the message attaches: the column's end, or its branch point. */
   at: Position
   /** The thread's lane (`laneOf`): whether the agent is busy there. */
@@ -249,7 +249,7 @@ export function CardEditor(p: {
   useEffect(() => onShows?.(state), [state, onShows])
 
   /** Bind the box to a card's text, keeping the caret where it is. */
-  const bind = (id: CardId) => {
+  const bind = (id: TextCardId) => {
     const el = box.current
     if (el === null) return
     detach.current?.()
@@ -355,7 +355,7 @@ export function CardEditor(p: {
    * queue when the plan says so (ADR-0113). False when there is no card or
    * no lane to queue on: nothing was queued.
    */
-  const queueHere = (from: CardId | null): boolean => {
+  const queueHere = (from: TextCardId | null): boolean => {
     if (from === null || p.lane.kind !== "lane" || p.at.kind !== "entry")
       return false
     p.onAct({
@@ -370,7 +370,7 @@ export function CardEditor(p: {
   const send = async (
     message: string,
     as: ComposerMode,
-    from: CardId | null,
+    from: TextCardId | null,
   ) => {
     step({ kind: "send" })
     setConflict(null)
@@ -380,21 +380,25 @@ export function CardEditor(p: {
       setStatus("")
       return
     }
-    const { thread, ...how } = p.how
+    const { thread, task, ...how } = p.how
     // A column opened at an entry settles on its thread at once: until then
     // there is no thread to send in.
-    if (thread === null) {
+    if (thread === null || task === null) {
       step({ kind: "settled", spent: false })
       return
     }
     setStatus("sending…")
     const id = p.onSend()
-    const outcome = await session.chat(message, chatAtOf(as, thread, p.at), {
-      ...how,
-      ...(id === undefined ? {} : { id }),
-      ...(plan.createsLane && base !== null ? { base } : {}),
-      ...(from === null ? {} : { card: from }),
-    })
+    const outcome = await session.chat(
+      message,
+      chatAtOf(as, thread, p.at, task),
+      {
+        ...how,
+        ...(id === undefined ? {} : { id }),
+        ...(plan.createsLane && base !== null ? { base } : {}),
+        ...(from === null ? {} : { card: from }),
+      },
+    )
     step({ kind: "settled", spent: spent(outcome) })
     const settled = settleSend(outcome, message, p.reader)
     setConflict(settled.conflict)
@@ -688,7 +692,7 @@ export function CardEditor(p: {
  */
 export function BoundCardEditor(p: {
   session: SessionClient
-  card: CardRecord
+  card: TextCard
   view: CardFrameView
   reader: Reader
   /** What a command catches up with at its thread; null in your inventory. */
@@ -789,7 +793,7 @@ const keyOfBox = (e: KeyboardEvent<HTMLTextAreaElement>) => ({
  */
 export function NoteCardEditor(p: {
   session: SessionClient
-  card: CardRecord
+  card: TextCard
   /** Where a queue from its column puts it; null where nothing can be queued. */
   queueOn: CardFrameFacts["queueOn"]
   reader: Reader
@@ -881,7 +885,7 @@ export function QueuedCardEditor(p: {
  */
 export function PinnedCardEditor(p: {
   session: SessionClient
-  card: CardRecord
+  card: TextCard
   /** What the agent reads of the thread's pinned cards now (`pinnedInView`). */
   inView: PinnedView | null
   /** The thread's pinned cards as drawn: what a reorder moves it among. */

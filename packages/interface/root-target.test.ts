@@ -1,4 +1,4 @@
-import { entryId, rootIdFor, workflowStateIdFor } from "@pinetrie/core"
+import { taskIdFor, workflowStateIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   encodeRootDrag,
@@ -14,9 +14,9 @@ import {
 } from "./root-target.ts"
 
 const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
-const R1 = rootIdFor("01a0ffd2-0000-7000-8000-000000000001")
-const R2 = rootIdFor("01a0ffd2-0000-7000-8000-000000000002")
-const drag: RootDrag = { root: R1, entry: entryId("1-r"), state: DOING }
+const R1 = taskIdFor("01a0ffd2-0000-7000-8000-000000000001")
+const R2 = taskIdFor("01a0ffd2-0000-7000-8000-000000000002")
+const drag: RootDrag = { task: R1, state: DOING }
 const element = (attrs: Readonly<Record<string, string>>) => ({
   getAttribute: (name: string) => attrs[name] ?? null,
 })
@@ -26,7 +26,7 @@ describe("a root's drop lands where a key could move it", () => {
     ["a column's end", { kind: "state", state: DONE, before: null }],
     ["before a root in a column", { kind: "state", state: DOING, before: R2 }],
     ["the sidebar's end", { kind: "list", before: null }],
-    ["before a root in the sidebar", { kind: "list", before: entryId("2-r") }],
+    ["before a root in the sidebar", { kind: "list", before: R2 }],
   ])("%s: the attributes read back as the target", (_, target) => {
     expect(rootTargetOfElement(element(rootDropProps(target)))).toEqual(target)
   })
@@ -41,8 +41,8 @@ describe("a root's drop lands where a key could move it", () => {
         null,
       ),
     ).toEqual({
-      kind: "moveRoot",
-      root: R1,
+      kind: "moveTask",
+      task: R1,
       from: DOING,
       to: DONE,
       before: null,
@@ -50,13 +50,13 @@ describe("a root's drop lands where a key could move it", () => {
     })
     // Before another in the sidebar.
     expect(
-      planRootDrop(drag, { kind: "list", before: entryId("2-r") }, DONE, null),
-    ).toEqual({ kind: "moveInList", root: "1-r", before: "2-r" })
+      planRootDrop(drag, { kind: "list", before: R2 }, DONE, null),
+    ).toEqual({ kind: "moveInList", task: R1, before: R2 })
   })
 
   test("a root dropped before itself does nothing", () => {
     expect(
-      planRootDrop(drag, { kind: "list", before: entryId("1-r") }, DONE, null),
+      planRootDrop(drag, { kind: "list", before: R1 }, DONE, null),
     ).toBeNull()
     expect(
       planRootDrop(
@@ -90,13 +90,13 @@ describe("a root's drop lands where a key could move it", () => {
     ).not.toBeNull()
   })
 
-  test("an element with no mark, or a drag that is no root's, lands nowhere", () => {
+  test("an element with no mark, or a drag that is no task's, lands nowhere", () => {
     expect(rootTargetOfElement(element({}))).toBeNull()
     expect(parseRootDrag(encodeRootDrag(drag))).toEqual(drag)
     for (const bad of [
       "",
       "{",
-      JSON.stringify({ ...drag, root: "x" }),
+      JSON.stringify({ ...drag, task: "x" }),
       JSON.stringify({ ...drag, state: "doing" }),
     ])
       expect(parseRootDrag(bad)).toBeNull()

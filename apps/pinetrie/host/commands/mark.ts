@@ -1,14 +1,15 @@
-// host/commands/mark — a root's title (ADR-0045): gather, `planMark`, execute.
+// host/commands/mark — a task's title (ADR-0045, ADR-0116): gather,
+// `planMark`, execute.
 
 import type { Intent, WriterId } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { readMarks, readTreeIndex } from "@pinetrie/reads"
+import { readMarks, readTasks } from "@pinetrie/reads"
 import { deleteRecord, MARK, planMark, setRecord } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
 import type { Records } from "../records.ts"
 
 export interface MarkDeps {
-  readonly basics: Pick<Basics, "docs" | "now">
+  readonly basics: Pick<Basics, "session" | "now">
   readonly records: Pick<Records, "writeValues">
 }
 
@@ -18,29 +19,25 @@ export async function handleMark(
   intent: Extract<Intent, { kind: "mark" }>,
 ): Promise<Outcome> {
   const { records } = deps
-  const { docs, now } = deps.basics
-  const { root } = intent
-  // gather: the entry's root's document (ADR-0063)
-  const doc = await docs.root(root)
-  const index = readTreeIndex(doc)
-  // plan (pure)
+  const { session, now } = deps.basics
+  // plan (pure), over the session's tasks and titles
   const planned = planMark({
-    entry: intent.entry,
+    task: intent.task,
     title: intent.title,
     by: writer,
     now: now(),
-    index,
-    marks: readMarks(doc),
+    tasks: new Set(readTasks(session).keys()),
+    marks: readMarks(session),
   })
   // execute
   switch (planned.kind) {
     case "refused":
       return planned
     case "write":
-      await records.writeValues([setRecord(MARK, planned.record, root)])
+      await records.writeValues([setRecord(MARK, planned.record)])
       break
     case "remove":
-      await records.writeValues([deleteRecord(MARK, planned.entry, root)])
+      await records.writeValues([deleteRecord(MARK, planned.task)])
       break
     case "unchanged":
       break

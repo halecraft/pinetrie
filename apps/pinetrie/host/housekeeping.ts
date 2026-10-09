@@ -7,6 +7,8 @@
 import type { Exchange, Store } from "@kyneta/exchange"
 import {
   type BlobStore,
+  isTextCard,
+  isTextCardId,
   MOVES_DOC_PREFIX,
   type RootId,
   rootDocId,
@@ -20,11 +22,10 @@ import {
   planSweep,
   readArchived,
   readCardHistories,
-  readLaneRecords,
   readPlaces,
   readQueueHolds,
   readReferencedBlobs,
-  readRoots,
+  readTasks,
 } from "@pinetrie/reads"
 import {
   deleteRecord,
@@ -87,7 +88,9 @@ export async function sweepBlobs(input: {
 }): Promise<void> {
   const { session: doc, log } = input.basics
   const { blobs } = input
-  const ids = readPlaces(input.basics.places).map(c => c.id)
+  const ids = readPlaces(input.basics.places)
+    .filter(isTextCard)
+    .map(c => c.id)
   const texts = (await input.texts(ids)).map(t => t.text)
   const doomed = planSweep({
     stored: blobs.list(),
@@ -120,7 +123,7 @@ export async function sweepHistories(input: {
   // plan
   const retired = planHistorySweep({
     stored,
-    roots: readRoots(session),
+    tasks: new Set(readTasks(session).keys()),
     archived: readArchived(session),
     now: now(),
     startup: input.startup,
@@ -138,18 +141,25 @@ export async function sweepHistories(input: {
  * a hold swept holds nothing.
  */
 export async function sweepHolds(input: {
-  readonly basics: Pick<Basics, "session" | "log">
+  readonly basics: Pick<Basics, "session" | "log" | "places">
   readonly records: Pick<Records, "writeValues">
 }): Promise<void> {
-  const { session, log } = input.basics
+  const { session, places, log } = input.basics
   // gather
-  const lanes = readLaneRecords(session)
+  const cards = readPlaces(places)
   const archived = readArchived(session)
   // plan
   const swept = planHoldSweep({
     holds: readQueueHolds(session),
-    rootOf: lane => lanes.get(lane)?.root ?? null,
-    archived: root => archived.has(root),
+    whereIs: lane => {
+      const card = cards.find(c => c.id === lane)
+      return card?.place.kind === "canvas"
+        ? card.place.task
+        : card?.place.kind === "inventory"
+          ? "inventory"
+          : null
+    },
+    archived: task => archived.has(task),
   })
   // execute
   if (swept.length === 0) return
@@ -181,6 +191,6 @@ export async function sweepGone(input: {
     places,
     doomed.map(id => ({ kind: "remove", id })),
   )
-  for (const id of doomed) await input.cards.destroy(id)
+  for (const id of doomed) if (isTextCardId(id)) await input.cards.destroy(id)
   log(`[host] deleted ${doomed.length} card(s) discarded over a week ago`)
 }

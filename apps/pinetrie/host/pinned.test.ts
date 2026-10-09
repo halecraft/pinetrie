@@ -2,9 +2,10 @@ import {
   atEntry,
   type CardId,
   type CardRecord,
-  cardId,
   entryId,
   type SentCard,
+  type TextCard,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -17,29 +18,21 @@ import {
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
-import {
-  basics,
-  putLane,
-  putValue,
-  ROOT_ID,
-  record,
-  row,
-  threadRow,
-} from "./fakes.ts"
+import { basics, putLane, putValue, record, row, threadRow } from "./fakes.ts"
 import { createPinned, waitFor } from "./pinned.ts"
 import { applyPlaceSteps } from "./places.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
 const ADA = writerId("ada@x.io")
-const pinnedCard = (id: string, order: string): CardRecord => ({
-  id: cardId(id),
+const pinnedCard = (id: string, order: string): TextCard => ({
+  kind: "text",
+  id: textCardId(id),
   owner: ADA,
   placer: ADA,
   place: {
     kind: "pinned",
-    root: ROOT_ID,
     at: atEntry(entryId("e-1")),
-    lane: LANE,
+    thread: LANE,
     order,
   },
   carries: { kind: "message", command: null },
@@ -100,7 +93,7 @@ describe("readPinned: what a run reads of its pinned cards", () => {
     const read = encodePinned(
       {
         lane: LANE,
-        cards: [{ id: cardId("c-1"), text: "ship it", by: ADA }],
+        cards: [{ id: textCardId("c-1"), text: "ship it", by: ADA }],
         retired: [],
       },
       () => "Ada",
@@ -123,8 +116,8 @@ describe("readPinned: what a run reads of its pinned cards", () => {
     const { pin, readPinned, waits } = setUp({ "c-1": "ship it" })
     pin(pinnedCard("c-1", "a"))
     const seen: SentCard[] = [
-      { id: cardId("c-1"), seen: "v-1" },
-      { id: cardId("c-9"), seen: "v-9" },
+      { id: textCardId("c-1"), seen: "v-1" },
+      { id: textCardId("c-9"), seen: "v-9" },
     ]
     await readPinned(LANE, seen, signal())
     expect(waits).toEqual([["c-1", "v-1"]])
@@ -143,7 +136,7 @@ describe("readPinned: what a run reads of its pinned cards", () => {
     pin(pinnedCard("c-1", "a"))
     const message = await readPinned(
       LANE,
-      [{ id: cardId("c-1"), seen: "v-1" }],
+      [{ id: textCardId("c-1"), seen: "v-1" }],
       signal(),
     )
     expect(decodePinned(message)?.cards.map(c => c.text)).toEqual(["ship it"])
@@ -162,7 +155,7 @@ test("waitFor: an aborted signal ends the wait at once, whatever is left", async
           giveUp?.addEventListener("abort", () => resolve())
         }),
     },
-    [{ id: cardId("c-1"), seen: "v-1" }],
+    [{ id: textCardId("c-1"), seen: "v-1" }],
     60_000,
     stop.signal,
   )

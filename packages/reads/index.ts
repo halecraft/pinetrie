@@ -20,7 +20,7 @@ import {
   type AcceptedRecord,
   type AgentMessageLike,
   type AgentRun,
-  type ArchivedRoot,
+  type ArchivedTask,
   agentActivity,
   ancestry,
   type BannerRecord,
@@ -37,6 +37,7 @@ import {
   entryId,
   firstLineOf,
   indexTree,
+  isTaskId,
   type LaneRecord,
   type LaneView,
   type MarkRecord,
@@ -57,6 +58,8 @@ import {
   type SnapshotId,
   type StopRecord,
   summarizeRoots,
+  type TaskId,
+  type TaskRecord,
   type ThreadId,
   type ThreadLane,
   type ThreadName,
@@ -103,6 +106,7 @@ import {
   renderableMessage,
   SEAT,
   STOP,
+  TASK,
   THREAD,
   TRACE,
   threadNameOf,
@@ -528,6 +532,24 @@ export const readReadingRoots = keptWhileSame(
   sameMap,
 )
 
+/**
+ * Each followed thread end's task (ADR-0116), from the column that reports
+ * it. Kept while unchanged, as `presenceField`'s reads are.
+ */
+export const readReadingTasks = keptWhileSame(
+  (doc: PresenceDocHandle): ReadonlyMap<EntryId, TaskId> => {
+    const tasks = doc.readingTask()
+    const now = new Map<EntryId, TaskId>()
+    for (const [key, end] of Object.entries(doc.reading())) {
+      const task = tasks[key]
+      if (end !== null && typeof task === "string" && isTaskId(task))
+        now.set(entryId(end), task)
+    }
+    return now
+  },
+  sameMap,
+)
+
 /** One entry per seat typing: its writer, and the thread end. */
 export const readTyping = presenceField(doc => doc.typing())
 
@@ -608,19 +630,24 @@ export const readPlacesRev = (places: PlacesDocHandle): number => places.rev()
 export const readWorkflow = (doc: SessionDocHandle): Workflow | null =>
   readRecords(doc, WORKFLOW).get(WORKFLOW_KEY) ?? null
 
-/** Each root's place on the board (`pinetrie.board`, ADR-0122), by its id. */
+/** Each task's place on the board (`pinetrie.board`, ADR-0122), by its id. */
 export const readBoardPlaces = (
   doc: SessionDocHandle,
-): ReadonlyMap<RootId, BoardPlace> => readRecords(doc, BOARD)
+): ReadonlyMap<TaskId, BoardPlace> => readRecords(doc, BOARD)
+
+/** Every task (`pinetrie.task`, ADR-0116), by its id. */
+export const readTasks = (
+  doc: SessionDocHandle,
+): ReadonlyMap<TaskId, TaskRecord> => readRecords(doc, TASK)
 
 /**
- * The roots in the archive, archived (ADR-0029, ADR-0122), by
+ * The tasks in the archive, archived (ADR-0029, ADR-0122), by
  * id; none before a host wrote the workflow. The same map while the same
- * roots are archived by the same writers at the same times: every write to
+ * tasks are archived by the same writers at the same times: every write to
  * the session's values wakes it, the directory's included.
  */
 export const readArchived = keptWhileSame(
-  (doc: SessionDocHandle): ReadonlyMap<RootId, ArchivedRoot> => {
+  (doc: SessionDocHandle): ReadonlyMap<TaskId, ArchivedTask> => {
     const workflow = readWorkflow(doc)
     return workflow === null
       ? new Map()
@@ -634,10 +661,10 @@ export const readArchived = keptWhileSame(
     }),
 )
 
-/** Every entry's mark (`pinetrie.mark`, ADR-0045), keyed by entry: a root's titles its tab. */
+/** Every task's title (`pinetrie.mark`, ADR-0045, ADR-0116), by task. */
 export const readMarks = (
-  doc: RootDocHandle,
-): ReadonlyMap<EntryId, MarkRecord> => readRecords(doc, MARK)
+  doc: SessionDocHandle,
+): ReadonlyMap<TaskId, MarkRecord> => readRecords(doc, MARK)
 
 /** Each ask's digest (`pinetrie.digest`, ADR-0106), by its prompt. */
 export const readDigests = (
@@ -796,7 +823,7 @@ export const readReferencedBlobs = (
 
 /**
  * A root's directory record, read from its document (ADR-0063): its first
- * message and that message's first line, its title, its messages, newest
+ * message and that message's first line, its messages, newest
  * entry and writers (`summarizeRoots`), each thread's writers on its path
  * (ADR-0077), its chats that name someone, and every image it shows. What
  * the host writes as `pinetrie.root`.
@@ -819,7 +846,6 @@ export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
     entry,
     first,
     firstLine: firstLineOf(index, first),
-    title: entry === null ? null : (readMarks(doc).get(entry)?.title ?? null),
     messages: summary?.messages ?? 0,
     newest: summary?.newest ?? null,
     writers: summary?.writers ?? [],

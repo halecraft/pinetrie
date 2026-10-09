@@ -10,6 +10,7 @@ import type {
   CardHistoryRecord,
   CardId,
   SeatRecord,
+  TextCardId,
   WriterId,
 } from "@pinetrie/core"
 import {
@@ -39,7 +40,7 @@ const time = (at: number): string =>
   new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 
 /** A card's history: its events, oldest first, and who has text in it. */
-export function CardHistory({ card }: { card: CardId }) {
+export function CardHistory({ card }: { card: TextCardId }) {
   const facts = useContext(CardHistories)
   if (facts === null) return null
   const events = facts.histories.get(card)?.events ?? []

@@ -5,10 +5,11 @@
 // (ADR-0027, ADR-0029). Pure: a reducer over values, tested without a DOM.
 
 import {
-  type CardId,
   type EntryId,
   type LaneView,
   type RootId,
+  type TaskId,
+  type TextCardId,
   type ThreadId,
   type TreeIndex,
   threadAt,
@@ -33,17 +34,18 @@ export interface Prefill {
  */
 export interface Pending {
   readonly text: string
-  readonly card?: CardId
+  readonly card?: TextCardId
 }
 
 /**
  * What the shell mints for one intent, as `columnsReducer` takes keys in its
- * actions: a column key, a root a new tab keeps (ADR-0066), and the thread a
- * fresh column's first send starts (ADR-0117).
+ * actions: a column key, the root and the task a new tab keeps (ADR-0066,
+ * ADR-0116), and the thread a fresh column's first send starts (ADR-0117).
  */
 export interface Minted {
   readonly key: string
   readonly root: RootId
+  readonly task: TaskId
   readonly thread: ThreadId
 }
 
@@ -82,14 +84,17 @@ export interface Column {
    * conflict), sent by the column's own composer so its outcome shows there.
    * `prefill` is what its composer starts with. `root` is a new tab's
    * root, minted as it opens (ADR-0066): its cards and its first send name
-   * it. A branch's root is its tab's. `state` is the workflow state a new
-   * tab opened from a board column lands its root in (ADR-0122).
+   * it. A branch's root is its tab's. `task` is a new tab's task, minted
+   * with its root (ADR-0116): its first send starts it, and its cards'
+   * places and their moves' history name it. `state` is the workflow state
+   * a new tab opened from a board column lands its task in (ADR-0122).
    */
   readonly fresh?: {
     readonly sendId?: string
     readonly pending?: Pending
     readonly prefill?: Prefill
     readonly root?: RootId
+    readonly task?: TaskId
     readonly state?: WorkflowStateId
   }
 }
@@ -179,7 +184,14 @@ export function columnsReducer(
     case "sent":
       return state.map(c =>
         c.key === action.key && c.fresh !== undefined
-          ? { ...c, fresh: { sendId: action.sendId } }
+          ? {
+              ...c,
+              // A new tab keeps its task: once written, it is that task's.
+              fresh: {
+                sendId: action.sendId,
+                ...(c.fresh.task === undefined ? {} : { task: c.fresh.task }),
+              },
+            }
           : c,
       )
     case "close":

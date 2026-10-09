@@ -15,13 +15,18 @@ import type {
   Move,
   QueueHold,
   QueueHoldChange,
-  RootId,
+  TaskId,
   ThreadId,
   ValueWrite,
   WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { type MovesStep, planMoveCommand, type QueuedCard } from "./card.ts"
+import {
+  type MovesStep,
+  NO_DISCARDS,
+  planMoveCommand,
+  type QueuedCard,
+} from "./card.ts"
 import { decodeAt, threadKey } from "./decode.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
@@ -90,7 +95,14 @@ export function planQueueCard(input: {
   readonly holds: readonly ValueWrite[]
 } {
   const { move, hold } = input
-  const planned = planMoveCommand(input.cards, [move], input.by, input.running)
+  // A queueing discards nothing: its target is a queue.
+  const planned = planMoveCommand(
+    input.cards,
+    [move],
+    input.by,
+    input.running,
+    NO_DISCARDS,
+  )
   const { drain } = planned
   const step =
     move.from === null && input.command !== null
@@ -98,7 +110,7 @@ export function planQueueCard(input: {
       : planned.step
   if (step.kind === "refused" || move.to.kind !== "queued" || hold === "keep")
     return { step, drain, holds: [] }
-  const { lane } = move.to
+  const lane = move.to.thread
   const held = hold === "hold-if-idle"
   if (held && input.running(lane)) return { step, drain, holds: [] }
   const holds = planQueueHold({
@@ -118,7 +130,9 @@ const withCommand = (step: MovesStep, command: CardCommand): MovesStep =>
     : {
         kind: "steps",
         steps: step.steps.map(s =>
-          s.kind === "write" && s.record.carries.kind === "message"
+          s.kind === "write" &&
+          s.record.kind === "text" &&
+          s.record.carries.kind === "message"
             ? {
                 kind: "write",
                 record: { ...s.record, carries: { kind: "message", command } },
@@ -147,17 +161,19 @@ export function holdOnStop(input: {
 }
 
 /**
- * The holds to delete: each whose lane no root holds, or whose root is
- * archived. Archiving is refused while cards are queued, so a hold swept
- * holds nothing. Pure.
+ * The holds to delete: each whose lane's thread has no card, or whose card
+ * is in an archived task (ADR-0116). A thread in an inventory keeps its
+ * hold. Archiving is refused while cards are queued, so a hold swept holds
+ * nothing. Pure.
  */
 export function planHoldSweep(input: {
   readonly holds: ReadonlyMap<ThreadId, QueueHold>
-  readonly rootOf: (lane: ThreadId) => RootId | null
-  readonly archived: (root: RootId) => boolean
+  /** Where a lane's thread's card is: a task, an inventory, or nowhere. */
+  readonly whereIs: (lane: ThreadId) => TaskId | "inventory" | null
+  readonly archived: (task: TaskId) => boolean
 }): readonly ThreadId[] {
   return [...input.holds.keys()].filter(lane => {
-    const root = input.rootOf(lane)
-    return root === null || input.archived(root)
+    const where = input.whereIs(lane)
+    return where === null || (where !== "inventory" && input.archived(where))
   })
 }

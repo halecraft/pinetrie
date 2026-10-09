@@ -1,9 +1,9 @@
 import {
   atEntry,
-  cardId,
   entryId,
   runId,
   type ThreadId,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -146,14 +146,14 @@ test("a stop with a message card queued holds the queue in the same write as its
   b.places.cards.set(
     "c-1",
     encodeCard({
-      id: cardId("c-1"),
+      kind: "text" as const,
+      id: textCardId("c-1"),
       owner: bea,
       placer: bea,
       place: {
         kind: "queued",
-        root: ROOT_ID,
         at: atEntry(entryId("e-2")),
-        lane,
+        thread: lane,
         order: "a",
         by: bea,
         seen: "",
@@ -253,11 +253,12 @@ test("an offer's fact is queued as a card at the thread's end, after the cards t
   )
   expect(readPlaces(b.places)).toMatchObject([
     {
+      kind: "text" as const,
       owner: ada,
       placer: ada,
       place: {
         kind: "queued",
-        lane,
+        thread: lane,
         at: atEntry(entryId("e-2")),
         by: ada,
         seen: "",

@@ -2,12 +2,12 @@ import {
   atEntry,
   type CardCommand,
   type CardId,
-  cardId,
   commitId,
   ERR,
   entryId,
   rootIdFor,
   runId,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -27,7 +27,7 @@ import { newPlacesDoc, newPresenceDoc, seatKey } from "@pinetrie/schema"
 import { beginRun } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
-import { applyWrites, basics, putValue, record } from "./fakes.ts"
+import { applyWrites, basics, putValue, ROOT_ID, record } from "./fakes.ts"
 import { createProvenance } from "./provenance.ts"
 import {
   chatOfPoppedQueuedCard,
@@ -41,7 +41,7 @@ import {
   untilNotTyped,
 } from "./queued-card-pop.ts"
 
-const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const LANE = threadIdFor("0123456789abcdef")
 const ADA = writerId("ada@x.io")
@@ -57,14 +57,14 @@ const queue = (
   cards.cards.set(
     id,
     encodeCard({
-      id: cardId(id),
+      kind: "text" as const,
+      id: textCardId(id),
       owner: ADA,
       placer: ADA,
       place: {
         kind: "queued",
-        root: TEST_ROOT,
         at: atEntry(E1),
-        lane: LANE,
+        thread: LANE,
         order,
         by: BEA,
         seen: "",
@@ -185,14 +185,15 @@ test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from th
       held(() => "@agent go"),
     ),
   )
-  expect(popped === null ? null : chatOfPoppedQueuedCard(popped)).toMatchObject(
-    {
-      text: "@agent go",
-      at: { kind: "queue", thread: LANE },
-      card: { id: "c-1", seen: "" },
-      mentions: [{ kind: "agent" }],
-    },
-  )
+  expect(
+    popped === null ? null : chatOfPoppedQueuedCard(popped, ROOT_ID),
+  ).toMatchObject({
+    root: ROOT_ID,
+    text: "@agent go",
+    at: { kind: "queue", thread: LANE },
+    card: { id: "c-1", seen: "" },
+    mentions: [{ kind: "agent" }],
+  })
 })
 
 function setUp(
@@ -353,7 +354,10 @@ describe("drain", () => {
   test("a card popped and sent leaves no history (ADR-0048 step 6)", async () => {
     const { b, deps } = setUp({ "c-1": "first" }, [])
     queue(b.places, "c-1", "a")
-    putValue(b, setRecord(CARD_HISTORY, { card: cardId("c-1"), events: [] }))
+    putValue(
+      b,
+      setRecord(CARD_HISTORY, { card: textCardId("c-1"), events: [] }),
+    )
     await drain(deps, LANE)
     expect(readCardHistories(b.session).size).toBe(0)
   })
@@ -414,9 +418,8 @@ describe("drain", () => {
         id: "c-1",
         place: {
           kind: "note",
-          root: TEST_ROOT,
           at: atEntry(E1),
-          lane: LANE,
+          thread: LANE,
           cell: 0,
         },
         unsent: "no such image",
@@ -449,9 +452,8 @@ describe("drain", () => {
         id: "c-1",
         place: {
           kind: "note",
-          root: TEST_ROOT,
           at: atEntry(E1),
-          lane: LANE,
+          thread: LANE,
           cell: 0,
         },
         unsent: "the host failed: store closed",
@@ -528,14 +530,14 @@ describe("drain: bring up to date (ADR-0108)", () => {
     await drain(deps, LANE)
     expect(readPlaces(b.places)).toEqual([
       expect.objectContaining({
+        kind: "text" as const,
         id: "c-1",
         carries: { kind: "message", command: CMD },
         unsent: "the lane has no copy of its own",
         place: {
           kind: "note",
-          root: TEST_ROOT,
           at: atEntry(E1),
-          lane: LANE,
+          thread: LANE,
           cell: 0,
         },
       }),
@@ -579,16 +581,17 @@ describe("drain: bring up to date (ADR-0108)", () => {
 describe("the drain's waits for its top card", () => {
   const queuedCard = (places: ReturnType<typeof newPlacesDoc>, id: string) => {
     const card = readPlaces(places).find(c => c.id === id)
-    if (card?.place.kind !== "queued") throw new Error("not queued")
+    if (card?.kind !== "text" || card.place.kind !== "queued")
+      throw new Error("not queued")
     return { ...card, place: card.place }
   }
 
   test("givenUp: the awaited cards no longer queued, and no other", () => {
     const places = newPlacesDoc()
     queue(places, "c-1", "a")
-    expect(givenUp([cardId("c-1"), cardId("c-2")], readPlaces(places))).toEqual(
-      ["c-2"],
-    )
+    expect(
+      givenUp([textCardId("c-1"), textCardId("c-2")], readPlaces(places)),
+    ).toEqual(["c-2"])
   })
 
   test("a card that leaves the queue gives its wait up, and drains nothing; one whose wait ends drains its lane", async () => {
@@ -629,7 +632,7 @@ describe("the drain's waits for its top card", () => {
     let done = false
     void untilNotTyped(
       presence,
-      cardId("c-1"),
+      textCardId("c-1"),
       new AbortController().signal,
     ).then(() => {
       done = true
@@ -637,7 +640,11 @@ describe("the drain's waits for its top card", () => {
     presence.typingIn.set(seat, "c-2")
     await Promise.resolve()
     expect(done).toBe(true)
-    await untilNotTyped(presence, cardId("c-9"), new AbortController().signal)
+    await untilNotTyped(
+      presence,
+      textCardId("c-9"),
+      new AbortController().signal,
+    )
   })
 })
 
@@ -655,14 +662,14 @@ describe("drain: a fact (ADR-0080)", () => {
     b.places.cards.set(
       "c-1",
       encodeCard({
-        id: cardId("c-1"),
+        kind: "text" as const,
+        id: textCardId("c-1"),
         owner: ADA,
         placer: ADA,
         place: {
           kind: "queued",
-          root: TEST_ROOT,
           at: atEntry(E1),
-          lane: LANE,
+          thread: LANE,
           order: "a",
           by: ADA,
           seen: "",
@@ -711,6 +718,7 @@ describe("drain: a split (ADR-0080)", () => {
     expect(events).toContain("send c-2: next")
     expect(readPlaces(b.places)).toEqual([
       expect.objectContaining({
+        kind: "text" as const,
         id: "c-1",
         carries: { kind: "message", command: "split" },
         unsent: "nothing to split",

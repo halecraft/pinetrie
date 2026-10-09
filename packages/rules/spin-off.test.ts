@@ -1,36 +1,46 @@
 import {
   atEntry,
   type CardRecord,
-  cardId,
   entryId,
   type LaneRecord,
   rootIdFor,
+  type TextCard,
+  taskIdFor,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { planRootDelete } from "./root.ts"
 import { planLiftRoot, planSpinOff, type SpunThread } from "./spin-off.ts"
+import {
+  indexTasks,
+  NO_TASK_INDEX,
+  type TaskIndex,
+  threadCardOf,
+} from "./task.ts"
 
-const ROOT_A = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const TEST_THREAD = threadIdFor("e")
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
+const _ROOT_A = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const THREAD = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
 const STARTS = threadIdFor("spun")
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
-const C1 = cardId("c-1")
+const C1 = textCardId("c-1")
 const note = {
   kind: "note",
-  root: ROOT_A,
   at: atEntry(entryId("e1")),
-  lane: null,
+  thread: TEST_THREAD,
   cell: 0,
 } as const
 const spun = {
   kind: "gone",
-  root: ROOT_A,
   why: { kind: "spun", into: THREAD, thread: STARTS },
 } as const
-const card = (over: Partial<CardRecord> = {}): CardRecord => ({
+const card = (over: Partial<TextCard> = {}): TextCard => ({
+  kind: "text",
   id: C1,
   owner: ADA,
   placer: ADA,
@@ -47,12 +57,19 @@ describe("planSpinOff (ADR-0111)", () => {
       text?: string
       roots?: Set<typeof THREAD>
       sender?: typeof ADA
+      tasks?: TaskIndex
     } = {},
   ) =>
     planSpinOff({
       cards: over.cards ?? [card()],
-      request: { move: { card: C1, from: note, to: spun }, state: null },
+      request: {
+        move: { card: C1, from: note, to: spun },
+        task: NEW_TASK,
+        state: null,
+        here: TEST_TASK,
+      },
       sender: over.sender ?? ADA,
+      tasks: over.tasks ?? NO_TASK_INDEX,
       text: over.text ?? " plan it @agent ",
       roots: over.roots ?? new Set(),
     })
@@ -66,9 +83,21 @@ describe("planSpinOff (ADR-0111)", () => {
       mentions: [],
       step: {
         kind: "write",
-        record: { ...card(), place: { ...spun, by: ADA } },
+        record: { ...card(), place: { ...spun, task: TEST_TASK, by: ADA } },
       },
     })
+  })
+
+  test("its history is the task the card leaves; from no task, the one its sender will be on", () => {
+    const placeOf = (p: ReturnType<typeof plan>) =>
+      p.kind === "spin" ? p.step.record.place : null
+    const other = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
+    const tasks = indexTasks(
+      [threadCardOf({ thread: TEST_THREAD, task: other, by: ADA, cards: [] })],
+      new Map(),
+    )
+    expect(placeOf(plan({ tasks }))).toMatchObject({ task: other })
+    expect(placeOf(plan())).toMatchObject({ task: TEST_TASK })
   })
 
   test.each([
@@ -92,7 +121,7 @@ describe("planSpinOff (ADR-0111)", () => {
 })
 
 describe("planLiftRoot (S139)", () => {
-  const gone = card({ place: { ...spun, by: ADA } })
+  const gone = card({ place: { ...spun, task: TEST_TASK, by: ADA } })
   const thread = (
     writers: SpunThread["writers"],
     known = true,
@@ -110,6 +139,7 @@ describe("planLiftRoot (S139)", () => {
       cards: over.cards ?? [gone],
       threads: new Map([[THREAD, t]]),
       lanes: over.lanes ?? [],
+      rootOfThread: new Map([[STARTS, THREAD]]),
     })
 
   test.each([
@@ -119,7 +149,7 @@ describe("planLiftRoot (S139)", () => {
       {},
       {
         kind: "lift",
-        delete: [THREAD],
+        delete: [{ root: THREAD, thread: STARTS }],
       },
     ],
     [
@@ -147,8 +177,8 @@ describe("planLiftRoot (S139)", () => {
         cards: [
           gone,
           card({
-            id: cardId("c-2"),
-            place: { ...note, root: THREAD },
+            id: textCardId("c-2"),
+            place: { ...note, thread: STARTS },
           }),
         ],
       },
@@ -187,16 +217,41 @@ describe("planLiftRoot (S139)", () => {
         cards: [card()],
         threads: new Map(),
         lanes: [],
+        rootOfThread: new Map(),
       }),
     ).toEqual({ kind: "lift", delete: [] })
   })
 })
 
-test("planRootDelete: its directory record and board place, the cards in it, its document and its stacks", () => {
-  const inThread = card({ id: cardId("c-2"), place: { ...note, root: THREAD } })
-  const plan = planRootDelete(THREAD, [card(), inThread])
-  expect(plan.values.map(v => v.kind)).toEqual(["delete", "delete"])
-  expect(plan.cards).toEqual([{ kind: "remove", id: cardId("c-2") }])
+test("planRootDelete: its directory record, its thread's, its task's record, board place and title, the cards in it and on its task's canvas, its document and the task's stacks", () => {
+  const inThread = card({
+    id: textCardId("c-2"),
+    place: { ...note, thread: STARTS },
+  })
+  const onCanvas = threadCardOf({
+    thread: STARTS,
+    task: TEST_TASK,
+    by: ADA,
+    cards: [],
+  })
+  const plan = planRootDelete(
+    THREAD,
+    STARTS,
+    TEST_TASK,
+    [card(), inThread, onCanvas],
+    new Map([[STARTS, THREAD]]),
+  )
+  expect(plan.values.map(v => v.namespace)).toEqual([
+    "pinetrie.root",
+    "pinetrie.thread",
+    "pinetrie.task",
+    "pinetrie.board",
+    "pinetrie.mark",
+  ])
+  expect(plan.cards).toEqual([
+    { kind: "remove", id: textCardId("c-2") },
+    { kind: "remove", id: STARTS },
+  ])
   expect(plan.doc).toBe(`root:${THREAD}`)
-  expect(plan.histories).toBe(THREAD)
+  expect(plan.histories).toBe(TEST_TASK)
 })

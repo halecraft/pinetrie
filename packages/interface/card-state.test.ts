@@ -1,4 +1,4 @@
-import { type CardId, cardId } from "@pinetrie/core"
+import { type CardId, textCardId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   type EditorEvent,
@@ -10,7 +10,7 @@ import {
 import { sendable } from "./send.ts"
 
 const AGENT = { text: "@agent ", blank: true }
-const C1: CardId = cardId("c-1")
+const C1: CardId = textCardId("c-1")
 const local: EditorState = { kind: "local" }
 const bound: EditorState = { kind: "bound", card: C1 }
 const step = (s: EditorState, e: EditorEvent) => editorState(s, e, AGENT)
@@ -51,7 +51,7 @@ describe("editorState", () => {
     })
     // Bound, typing is the binding's: nothing to decide.
     expect(
-      step(bound, { kind: "input", text: "", card: cardId("c-2") }),
+      step(bound, { kind: "input", text: "", card: textCardId("c-2") }),
     ).toEqual({ state: bound, acts: [] })
   })
 
@@ -60,7 +60,7 @@ describe("editorState", () => {
       state: bound,
       acts: ["attach"],
     })
-    expect(step(bound, { kind: "found", card: cardId("c-2") }).state).toBe(
+    expect(step(bound, { kind: "found", card: textCardId("c-2") }).state).toBe(
       bound,
     )
     expect(step(bound, { kind: "gone" })).toEqual({
@@ -74,7 +74,7 @@ describe("editorState", () => {
     // `gone` does, when it is sent or removed.
     expect(step(bound, { kind: "found", card: C1 }).state).toBe(bound)
     expect(
-      step(bound, { kind: "input", text: "", card: cardId("c-2") }),
+      step(bound, { kind: "input", text: "", card: textCardId("c-2") }),
     ).toEqual({ state: bound, acts: [] })
   })
 

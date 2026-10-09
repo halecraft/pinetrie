@@ -5,7 +5,7 @@
 // Every client takes the same slots; each draws a slot in its own colours
 // (the page's are `colors.ts`). Pure.
 
-import type { RootId } from "@pinetrie/core"
+import type { RootId, TaskId } from "@pinetrie/core"
 import { PENDING_TRACK } from "./column-paths.ts"
 
 /** How many colours a client draws the tracks in. */
@@ -32,6 +32,9 @@ export const rootSeed = (root: RootId): number => stringHash(root) % SLOTS
 export const trackSlot = (seed: number, track: number): ColorSlot =>
   track === PENDING_TRACK ? "pending" : (seed + STRIDE * track) % SLOTS
 
-/** A root's slot: its trunk's, on the rail and in its first column. */
-export const rootSlot = (root: RootId): ColorSlot =>
-  trackSlot(rootSeed(root), 0)
+/**
+ * A task's slot (ADR-0116): what its initials are drawn on, seeded by its
+ * id as a root's trunk is by its root's.
+ */
+export const taskSlot = (task: TaskId): ColorSlot =>
+  trackSlot(stringHash(task) % SLOTS, 0)

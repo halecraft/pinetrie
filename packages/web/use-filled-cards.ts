@@ -8,7 +8,12 @@
 // state.
 
 import { subscribe } from "@kyneta/schema"
-import type { CardId, CardRecord } from "@pinetrie/core"
+import {
+  type CardId,
+  type CardRecord,
+  isTextCard,
+  type TextCardId,
+} from "@pinetrie/core"
 import { holdsText, withFilled } from "@pinetrie/interface"
 import type { SessionClient } from "@pinetrie/session"
 import { useEffect, useState } from "react"
@@ -26,9 +31,12 @@ export function useFilledCards(
   const [filled, setFilled] = useState<ReadonlySet<CardId>>(() => new Set())
   // Keyed on the ids, not the array: `readPlaces` keeps unchanged records, but
   // the filtered list is new whenever any card changes.
-  const ids = mine.map(c => c.id).join(" ")
+  const ids = mine
+    .filter(isTextCard)
+    .map(c => c.id)
+    .join(" ")
   useEffect(() => {
-    const cards = ids === "" ? [] : (ids.split(" ") as CardId[])
+    const cards = ids === "" ? [] : (ids.split(" ") as TextCardId[])
     const stops = cards.map(id => {
       const doc = session.cardText(id)
       const read = () =>
@@ -38,7 +46,7 @@ export function useFilledCards(
     })
     // A card no longer yours, or gone, is no longer counted.
     setFilled(prev => {
-      const kept = [...prev].filter(id => cards.includes(id))
+      const kept = [...prev].filter(id => cards.some(c => c === id))
       return kept.length === prev.size ? prev : new Set(kept)
     })
     return () => {

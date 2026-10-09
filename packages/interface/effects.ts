@@ -17,7 +17,8 @@ import type {
   OfferAction,
   QueueHoldChange,
   Reorder,
-  RootId,
+  TaskId,
+  TextCard,
   ThreadId,
   TreeIndex,
   WriterId,
@@ -41,6 +42,7 @@ import {
 import type { ListWidth } from "./list-width.ts"
 import type { PageName } from "./page.ts"
 import type { ComposerPlaces } from "./put-target.ts"
+import type { Tasks } from "./tasks.ts"
 
 export type Effect =
   | { readonly kind: "layout"; readonly action: LayoutAction }
@@ -60,32 +62,25 @@ export type Effect =
   | { readonly kind: "list"; readonly act: ListAct }
   /**
    * Make a card a thread (ADR-0111); `afterSpinOff` decides from its
-   * answer what follows: for the sidebar, the new root placed and shown.
+   * answer what follows: for the sidebar, the new task placed and shown.
    */
   | {
       readonly kind: "spinOff"
       readonly request: Extract<HostRequest, { kind: "spin-off" }>
-      readonly thread: RootId
-      readonly sidebar: { readonly before: RootId | null } | null
+      readonly sidebar: { readonly before: TaskId | null } | null
     }
   /**
-   * Move a root on the board; `afterRootMove` decides from its answer
+   * Move a task on the board; `afterTaskMove` decides from its answer
    * whether `moved` runs.
    */
   | {
-      readonly kind: "moveRoot"
-      readonly move: Extract<HostRequest, { kind: "move-root" }>
+      readonly kind: "moveTask"
+      readonly move: Extract<HostRequest, { kind: "move-task" }>
       readonly moved: readonly Effect[]
     }
   | {
-      readonly kind: "mark"
-      readonly root: EntryId
-      readonly title: string | null
-    }
-  | { readonly kind: "retitle"; readonly root: EntryId }
-  | {
       readonly kind: "createCard"
-      readonly card: CardRecord
+      readonly card: TextCard
       readonly text: string
       readonly how: MoveHow
     }
@@ -98,6 +93,8 @@ export type Effect =
       readonly queuedBy: WriterId | null
       /** Whether the card animates to where it lands (`ports.fly`). */
       readonly fly: boolean
+      /** The task you are on, for a discard: its history, from your inventory (ADR-0116). */
+      readonly here: TaskId | null
     }
   /**
    * A card queued, and its queue's hold changed with it (ADR-0113). A move
@@ -130,11 +127,13 @@ export type Effect =
       readonly moves: readonly [SlotMove, ...SlotMove[]]
       readonly actedAt: ActedAt
       readonly close: readonly Effect[]
+      /** As `moveCard`'s. */
+      readonly here: TaskId | null
     }
-  /** Undo or redo your newest move in `root`, on the host (ADR-0066). */
+  /** Undo or redo your newest move in `task`, on the host (ADR-0066). */
   | {
       readonly kind: "undoMoves"
-      readonly root: RootId
+      readonly task: TaskId
       readonly direction: MoveDirection
     }
   /** Undo or redo this tab's newest swap in your inventory. */
@@ -165,16 +164,16 @@ export type Effect =
   | { readonly kind: "forgetIdentity" }
   | { readonly kind: "reload" }
 
-/** A change to the sidebar, by root id: your document's key (ADR-0122). */
+/** A change to the sidebar, by task: your document's key (ADR-0122, ADR-0116). */
 export type ListAct =
   /** At its end, unless it is in the sidebar already. */
-  | { readonly kind: "ensure"; readonly root: RootId }
+  | { readonly kind: "ensure"; readonly task: TaskId }
   | {
       readonly kind: "place"
-      readonly root: RootId
-      readonly before: RootId | null
+      readonly task: TaskId
+      readonly before: TaskId | null
     }
-  | { readonly kind: "close"; readonly root: RootId }
+  | { readonly kind: "close"; readonly task: TaskId }
 
 export interface IntentState {
   readonly layout: Layout
@@ -183,12 +182,10 @@ export interface IntentState {
   readonly asks: AskIndex
   readonly cards: CardFacts
   /**
-   * Each root's root entry, by its id, from the directory (ADR-0063): an
-   * undo names its tab's root, and a fresh column reopens in its root's tab.
+   * Every task (ADR-0116): an entry opens in the task its root's thread is
+   * in, and a task's first column at its first root's root entry.
    */
-  readonly rootEntries: ReadonlyMap<RootId, EntryId>
-  /** Each root's id, by its root entry: the sidebar's key. */
-  readonly rootIds: ReadonlyMap<EntryId, RootId>
+  readonly tasks: Tasks
   /** What the sidebar shows now (`shownWidth`). */
   readonly listWidth: ListWidth
   /** The page over the workspace, if any (ADR-0098). */
@@ -220,22 +217,21 @@ export const layout = (action: LayoutAction): Effect => ({
 })
 export const list = (act: ListAct): Effect => ({ kind: "list", act })
 
-/** Show `here`; a root shown is opened in the sidebar, at its end if it was not there. */
-export function show(
-  here: Here,
-  state: Pick<IntentState, "rootIds">,
-): readonly Effect[] {
+/** Show `here`; a task shown is opened in the sidebar, at its end if it was not there. */
+export function show(here: Here): readonly Effect[] {
   const shown = layout({ kind: "show", here })
-  if (here.kind !== "root") return [shown]
-  const id = state.rootIds.get(here.root)
-  return id === undefined
-    ? [shown]
-    : [shown, list({ kind: "ensure", root: id })]
+  return here.kind === "task"
+    ? [shown, list({ kind: "ensure", task: here.task })]
+    : [shown]
 }
-export const showRoot = (
-  root: EntryId,
-  state: Pick<IntentState, "rootIds">,
-): readonly Effect[] => show({ kind: "root", root }, state)
+export const showTask = (task: TaskId): readonly Effect[] =>
+  show({ kind: "task", task })
+
+/** A task's first root's root entry, where its first column is; null for none. */
+export const entryOfTask = (
+  state: Pick<IntentState, "tasks">,
+  task: TaskId,
+): EntryId | null => state.tasks.byId.get(task)?.entry ?? null
 
 /**
  * Show entry `id` (`planOpen`): in view in the column that shows it, or in a
@@ -248,26 +244,23 @@ export function planOpenAt(
   state: IntentState,
   fresh: string,
 ): readonly Effect[] {
-  const plan = planOpen(state.layout, state.index, id)
+  const plan = planOpen(state.layout, state.index, id, state.tasks.ofEntry)
   if (plan === null) return []
   const ask = state.asks.askOf.get(id)
   const fold: readonly Effect[] =
     ask === undefined ? [] : [{ kind: "openFold", ask }]
   switch (plan.kind) {
     case "scroll":
-      return [
-        ...fold,
-        { kind: "reveal", entry: id },
-        ...showRoot(plan.root, state),
-      ]
+      return [...fold, { kind: "reveal", entry: id }, ...showTask(plan.task)]
     case "open":
       return [
         ...fold,
         { kind: "reveal", entry: id },
-        ...showRoot(plan.root, state),
+        ...showTask(plan.task),
         layout({
           kind: "columns",
-          root: plan.root,
+          task: plan.task,
+          entry: plan.entry,
           action: { kind: "open", key: fresh, after: plan.after, anchor: id },
         }),
       ]

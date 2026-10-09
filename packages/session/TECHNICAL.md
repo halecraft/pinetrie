@@ -52,7 +52,7 @@ it.
 | one `snapshotStore<LocalState>` | the host's records, this tab's moves, the cards drawn | `localStep` (`card-moves.ts`) |
 | `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeIntoInventoryWrites`, `swapWrites` (`inventory.ts`) |
 | `attentionStore` (`attention-doc.ts`) | what you have dealt with, the read marks' alarm | `readStep` (`read-marks.ts`) |
-| `openThreads` (`open-threads.ts`) | the sidebar: the roots you have open, in your order (ADR-0122) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
+| `openThreads` (`open-threads.ts`) | the sidebar: the tasks you have open, in your order (ADR-0122, ADR-0116) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
 | `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
 | `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
 | one `snapshotStore<ActingState>` | your offer and setup and publish commands out | `nextActing` (`acting.ts`) |
@@ -79,9 +79,8 @@ it.
 - **`exchange` is the one way past the session.** `ExchangeProvider`
   renders from it, and a host-suite check reads `exchange.has`; nothing
   else should reach past the session's own methods.
-- **`mark` and `retitle` find their root** (`inRootOf`): both name an entry,
-  and the session sends it in the held root that has it (`rootOf`), else
-  refuses with `NO_ROOT` before sending.
+- **A mark and a retitle are plain `request`s**: each names its task
+  (ADR-0116), so the session finds no root for them.
 - **`versionOf` is the one read of a card's text version** this client
   makes: a move into a queue is stamped with it (`stampSeen`), and a chat's
   card and pinned cards are gathered by it before `planChatRequest` (S96).
@@ -114,8 +113,9 @@ so a refusal added to the plan must move the minting after it.
 A chat goes to a `ChatAt` (ADR-0117): the end of a thread its sender saw, or
 a branch starting a thread its column minted (`newThreadId`, `ids.ts`, the
 one minter of a thread's id). `chatAtOf` makes one from a column's mode, its
-thread and where it is: a reply continues its thread from the end it shows;
-a branch, or a send at the root, starts it.
+thread, where it is and its task: a reply continues its thread from the end
+it shows; a branch, or a send at the root, starts it in the task it names
+(ADR-0116), a new tab's minted with it (`newTaskId`).
 
 ## This tab's moves (`card-moves.ts`, ADR-0048, ADR-0059)
 
@@ -159,6 +159,10 @@ session or someone else's inventory throws before it is made.
 - **Several cards move as one** (`moveCards`, a keep): never none. A keep
   with no card left is the page's to settle (`planKeep` closes the column),
   so the session's moves always name a card.
+- **A discard names no history** (ADR-0116): `moveCard` and `moveCards`
+  take `here`, the task the tab is on, which the `move` carries; the host
+  names the history from it for a card leaving your inventory. Until the
+  host answers, a gone card is drawn in no history (`drawnPlace`).
 - **Notices are values** (`CardNotice`, kept by `movesStep` until your
   next move where you acted): a refusal, or a discard the host accepted
   (ADR-0111), which says the undo key brings it back. The page words them
@@ -250,20 +254,21 @@ the two merge (S101), so a writer asks `ready()` first.
 
 ## The sidebar (`open-threads.ts`, `open-repair.ts`, ADR-0122)
 
-- **The sidebar is `OpenThreads`**: your `OpenDoc` read in order (`roots`, the
-  same array until the document changes, since the page reads it in
-  render), `open` (before a root, or at the end; one in it moves),
-  `ensure` (at the end, unless it is there), `close`, and `here`, the root
-  the page shows. Every write waits for `ready()` (S101).
-- **The repair deletes archived roots but the one you are on**
+- **The sidebar is `OpenThreads`**, keyed by `TaskId` (ADR-0116): your
+  `OpenDoc` read in order (`tasks`, the same array until the document
+  changes, since the page reads it in render), `open` (before a task, or
+  at the end; one in it moves), `ensure` (at the end, unless it is there),
+  `close`, and `here`, the task the page shows. Every write waits for
+  `ready()` (S101).
+- **The repair deletes archived tasks but the one you are on**
   (`planOpenRepair`), on every change to your document, to the session's
-  records, and to `here`: a restore then brings a root back only for whoever
+  records, and to `here`: a restore then brings a task back only for whoever
   restores it (ADR-0030). It writes nothing when nothing differs.
-- **A root you start is in the sidebar**: `chat` ensures it once its answer
-  says the send at the root was written (`startsRoot`: `appended` or
-  `started`). A refused or failed send writes nothing.
+- **A task you start is in the sidebar**: `chat` ensures it once its
+  answer says the send that started it was written (`startsRoot`:
+  `appended` or `started`). A refused or failed send writes nothing.
 - **`placeInList` renumbers** when `orderBetween` finds no room between a
-  root's neighbours, as the board does.
+  task's neighbours, as the board does.
 
 ## Your offer and setup and publish commands (`acting.ts`)
 

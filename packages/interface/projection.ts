@@ -14,7 +14,7 @@
 
 import {
   type AgentRun,
-  type ArchivedRoot,
+  type ArchivedTask,
   type AskIndex,
   type BoardPlace,
   type CardHistoryRecord,
@@ -28,7 +28,10 @@ import {
   type RootId,
   type SeatRecord,
   type StopRecord,
+  type TaskId,
+  type TaskRecord,
   type ThreadId,
+  type ThreadRecord,
   type TraceRecord,
   type TreeIndex,
   type VerdictRecord,
@@ -57,6 +60,8 @@ import {
   readRunningLanes,
   readSeats,
   readStops,
+  readTasks,
+  readThreads,
   readTraces,
   readVerdicts,
   readWorkflow,
@@ -98,12 +103,16 @@ export interface SessionFacts {
   readonly seats: readonly SeatRecord[]
   /** The board's workflow states (ADR-0122), or null before the host wrote them. */
   readonly workflow: Workflow | null
-  /** Each root's place on the board, by its id. */
-  readonly places: ReadonlyMap<RootId, BoardPlace>
-  /** The roots in the archive, by id (`readArchived`). */
-  readonly archived: ReadonlyMap<RootId, ArchivedRoot>
-  /** Each entry's title (ADR-0045); a root's is its label. */
-  readonly marks: ReadonlyMap<EntryId, MarkRecord>
+  /** Each task's place on the board, by its id. */
+  readonly places: ReadonlyMap<TaskId, BoardPlace>
+  /** The tasks in the archive, by id (`readArchived`). */
+  readonly archived: ReadonlyMap<TaskId, ArchivedTask>
+  /** Each task's title (ADR-0045, ADR-0116): its label. */
+  readonly marks: ReadonlyMap<TaskId, MarkRecord>
+  /** Every task (ADR-0116), by id. */
+  readonly tasks: ReadonlyMap<TaskId, TaskRecord>
+  /** Every thread (ADR-0117), by id: each one's root. */
+  readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
   /** Each thread's last run's verdict, in any root (ADR-0077), by lane. */
   readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
   /** Each card's history (ADR-0048 step 6), by card. */
@@ -178,7 +187,9 @@ function readFacts(view: HeldView): SessionFacts {
     workflow: readWorkflow(doc),
     places: readBoardPlaces(doc),
     archived: readArchived(doc),
-    marks: readHeld(roots, readMarks),
+    marks: readMarks(doc),
+    tasks: readTasks(doc),
+    threads: readThreads(doc),
     verdicts: readVerdicts(doc),
     histories: readCardHistories(doc),
     traces: readTraces(doc),

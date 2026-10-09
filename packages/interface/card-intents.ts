@@ -13,7 +13,8 @@
 import {
   type CardId,
   type CardRecord,
-  discardedOf,
+  DISCARDED,
+  isFact,
   keyOf,
   type Move,
   type MoveDirection,
@@ -22,10 +23,10 @@ import {
   type PlaceKey,
   type Position,
   pinnedOf,
-  queueRoot,
   type Reorder,
-  type RootId,
   sameKey,
+  type TaskId,
+  type TextCardId,
   type ThreadId,
   type TraceRecord,
   type WriterId,
@@ -52,50 +53,39 @@ import { intoMessage, type PutTarget, placeOfTarget } from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
 import { planSpinOff } from "./spin-off.ts"
 
-/** A move to send; `fly`: whether its card animates to where it lands. */
+/**
+ * A move to send; `fly`: whether its card animates to where it lands;
+ * `here`, for a discard, the task you are on.
+ */
 export const moveCard = (
   move: Move,
   how: MoveHow,
   fly: boolean,
   queuedBy: WriterId | null = null,
-): Effect => ({ kind: "moveCard", move, how, queuedBy, fly })
+  here: TaskId | null = null,
+): Effect => ({ kind: "moveCard", move, how, queuedBy, fly, here })
 
 /**
- * `card` queued on `to.lane` from `to.at`, in its lane's root (`queueRoot`);
- * null for a card that can take no root. Its text's version is left empty:
- * the session reads it as it sends (S96).
+ * `card` queued on `to.lane` from `to.at`. Its text's version is left
+ * empty: the session reads it as it sends (S96).
  */
-export function queueMove(
+export const queueMove = (
   card: CardRecord,
   to: { readonly lane: ThreadId; readonly at: Position },
-  facts: Pick<CardFacts, "laneRecords">,
-): Move | null {
-  const root = queueRoot(to.lane, card, facts.laneRecords)
-  return root === undefined
-    ? null
-    : moveOf(card, { kind: "queued", root, at: to.at, lane: to.lane, seen: "" })
-}
+): Move =>
+  moveOf(card, { kind: "queued", at: to.at, thread: to.lane, seen: "" })
 
 /**
  * A card made in `to.lane`'s queue (ADR-0113): a move with no `from`, so
- * it is never drawn anywhere before the queue. `root` is the column's, for
- * a lane whose record has not arrived.
+ * it is never drawn anywhere before the queue.
  */
 export const queueNew = (
   card: CardId,
-  root: RootId,
   to: { readonly lane: ThreadId; readonly at: Position },
-  facts: Pick<CardFacts, "laneRecords">,
 ): Move => ({
   card,
   from: null,
-  to: {
-    kind: "queued",
-    root: facts.laneRecords.get(to.lane)?.root ?? root,
-    at: to.at,
-    lane: to.lane,
-    seen: "",
-  },
+  to: { kind: "queued", at: to.at, thread: to.lane, seen: "" },
 })
 
 /**
@@ -114,8 +104,7 @@ export function reorderOf(
   const from = among.findIndex(c => c.id === card.id)
   const to = from + step
   const passed = among[to]
-  if (from < 0 || passed === undefined || passed.carries.kind === "fact")
-    return null
+  if (from < 0 || passed === undefined || isFact(passed)) return null
   const rest = among.filter(c => c.id !== card.id)
   return {
     card: card.id,
@@ -189,7 +178,7 @@ function takeIntoInventoryAt(
  * inventory. A creation, so it enters no history: discarding removes it.
  */
 export function planTakeCopyIntoInventory(
-  card: CardId,
+  card: TextCardId,
   text: string,
   state: IntentState,
 ): readonly Effect[] {
@@ -202,6 +191,7 @@ export function planTakeCopyIntoInventory(
     {
       kind: "createCard",
       card: {
+        kind: "text",
         id: card,
         owner: facts.me,
         placer: facts.me,
@@ -281,13 +271,14 @@ function putInMessage(
   if (message === undefined)
     return [moveCard(into.move, { actedAt, slot: null }, true)]
   if (!facts.filled.has(message.id)) {
-    const away = moveOf(message, discardedOf(message.place, rootOfTab(state)))
+    const away = moveOf(message, DISCARDED)
     return [
       {
         kind: "keep",
         moves: [into, { move: away, slot: null }],
         actedAt,
         close: [],
+        here: taskOfTab(state),
       },
     ]
   }
@@ -302,7 +293,7 @@ function putInMessage(
     move: moveOf(message, from),
     slot: now.place.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
   }
-  return [{ kind: "keep", moves: [into, back], actedAt, close: [] }]
+  return [{ kind: "keep", moves: [into, back], actedAt, close: [], here: null }]
 }
 
 /**
@@ -342,6 +333,7 @@ function putInCell(
       moves: [{ move: moveOf(now, to), slot: null }, back],
       actedAt,
       close: [],
+      here: null,
     },
   ]
 }
@@ -365,7 +357,7 @@ export function planToNote(
  * for a column with no thread end: a fresh column has no notes board.
  */
 export function planNewNote(
-  card: CardId,
+  card: TextCardId,
   cell: number,
   key: string,
   state: IntentState,
@@ -376,6 +368,7 @@ export function planNewNote(
     {
       kind: "createCard",
       card: {
+        kind: "text",
         id: card,
         owner: state.cards.me,
         placer: state.cards.me,
@@ -429,13 +422,11 @@ export function planDiscard(
   state: IntentState,
 ): readonly Effect[] {
   const now = cardOf(state.cards, card)
-  if (now === undefined || now.carries.kind === "fact") return []
+  if (now === undefined || isFact(now)) return []
   // Someone else's inventory is theirs to empty (ADR-0059).
   if (now.place.kind === "inventory" && state.cards.me !== now.place.holder)
     return []
-  return [
-    moveCard(moveOf(now, discardedOf(now.place, rootOfTab(state))), how, false),
-  ]
+  return [moveCard(moveOf(now, DISCARDED), how, false, null, taskOfTab(state))]
 }
 
 /**
@@ -464,7 +455,13 @@ export function planKeep(
   // Every card already gone: nothing to ask the host, so the column closes.
   if (first === undefined) return close
   return [
-    { kind: "keep", moves: [first, ...rest], actedAt: atColumn(key), close },
+    {
+      kind: "keep",
+      moves: [first, ...rest],
+      actedAt: atColumn(key),
+      close,
+      here: null,
+    },
   ]
 }
 
@@ -475,22 +472,22 @@ export const afterKeep = (
 ): readonly Effect[] => (answer.kind === "accepted" ? close : [])
 
 /**
- * The root an undo of moves acts in: the root you are on, or the one a new
- * tab minted as it opened (ADR-0066). None on nothing, or for a root the
- * directory does not name yet.
+ * The task an undo of moves acts in, and a discard's history: the task you
+ * are on, or the one a new tab minted as it opened (ADR-0066, ADR-0116).
+ * None on nothing.
  */
-export function rootOfTab(state: IntentState): RootId | null {
+export function taskOfTab(state: IntentState): TaskId | null {
   const active = state.layout.active
   if (active === null || active.kind === "nothing") return null
   if (active.kind === "new")
     return (
-      state.layout.newTabs.find(c => c.key === active.key)?.fresh?.root ?? null
+      state.layout.newTabs.find(c => c.key === active.key)?.fresh?.task ?? null
     )
-  return state.rootIds.get(active.root) ?? null
+  return active.task
 }
 
 /**
- * Undo or redo your newest move in the root you are on, which the host does
+ * Undo or redo your newest move in the task you are on, which the host does
  * whole or refuses (ADR-0066); with the inventory panel focused, this tab's
  * newest swap.
  */
@@ -500,8 +497,8 @@ export function planUndoMove(
   state: IntentState,
 ): readonly Effect[] {
   if (inPanel) return [{ kind: "undoSwap", direction }]
-  const root = rootOfTab(state)
-  return root === null ? [] : [{ kind: "undoMoves", root, direction }]
+  const task = taskOfTab(state)
+  return task === null ? [] : [{ kind: "undoMoves", task, direction }]
 }
 
 /**

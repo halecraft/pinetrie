@@ -244,20 +244,19 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new root takes an id another holds",
     file: "apps/pinetrie/host/commands/chat.ts",
-    from: "    readRoots(session).has(chat.root)\n  )",
-    to: "    readRoots(session).has(chat.root) &&\n    false\n  )",
+    from: "    if (chat.at.at === null && readRoots(session).has(chat.root))",
+    to: "    if (chat.at.at === null && readRoots(session).has(chat.root) && false)",
     command: unit,
     expect:
       "a thread at the root under a root id in use is refused, and nothing is written",
   },
   {
-    name: "an archived root is unloaded at startup",
+    name: "a root held is not loaded at startup",
     file: "apps/pinetrie/host/docs.ts",
-    from: "  return [...roots.keys()].filter(r => !archived.has(r))",
-    to: "  return [...roots.keys()].filter(r => archived.has(r))",
+    from: "  return [...roots.keys()].filter(r => held.has(r))",
+    to: "  return [...roots.keys()].filter(r => !held.has(r))",
     command: unit,
-    expect:
-      "planLoads: every root but the archived ones, a root with no message among them (ADR-0063)",
+    expect: "planLoads: every root something still holds a thread of",
   },
   {
     name: "accepted work's preview runs no git",
@@ -669,10 +668,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a cleared title is never removed",
     file: "apps/pinetrie/host/commands/mark.ts",
-    from: "      await records.writeValues([deleteRecord(MARK, planned.entry, root)])\n",
+    from: "      await records.writeValues([deleteRecord(MARK, planned.task)])\n",
     to: "",
     command: unit,
-    expect: "clearing a root's title removes its mark",
+    expect: "clearing a task's title removes its mark",
   },
   {
     name: "the sweep reads no typed texts",
@@ -1023,8 +1022,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a popped queued card skips the archive gate",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "        refuseInArchive(deps.basics, startsRoot(chat.at) ? [] : [chat.root]) ??",
-    to: "        null ??",
+    from: '          chat.at.kind === "queue"\n            ? [tasksNow(deps.basics)',
+    to: '          chat.at.kind === ("never" as string)\n            ? [tasksNow(deps.basics)',
     command: unit,
     expect: "a popped queued card in an archived root is refused",
   },
@@ -1088,7 +1087,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lifted thread is kept",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "          for (const thread of lift.delete) await deleteRoot(thread)\n",
+    from: "          for (const { root, thread } of lift.delete)\n            await deleteRoot(root, thread)\n",
     to: "",
     command: unit,
     expect:
@@ -1097,7 +1096,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a spent card keeps its text",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '      if (s.kind === "remove") await deps.cards.destroy(s.id)',
+    from: '      if (s.kind === "remove" && isTextCardId(s.id))\n        await deps.cards.destroy(s.id)\n',
     to: "",
     command: unit,
     expect: "spend: the record goes, then its text",
@@ -1161,13 +1160,13 @@ export const mutations: readonly Mutation[] = [
       "an undo is refused, and nothing reverted, after someone else moved the card",
   },
   {
-    name: "one history of moves for every root",
+    name: "one history of moves for every task",
     file: "apps/pinetrie/host/move-history.ts",
-    from: "    const docId = movesDocId(writer, root)\n    const held = stacks.get(docId)",
-    to: "    const docId = movesDocId(writer, root.slice(0, 2) as RootId)\n    const held = stacks.get(docId)",
+    from: "    const docId = movesDocId(writer, task)\n",
+    to: "    const docId = movesDocId(writer, task.slice(0, 2) as TaskId)\n",
     command: unit,
     expect:
-      "another root's history, and another writer's, are untouched by an undo",
+      "another task's history, and another writer's, are untouched by an undo",
   },
   {
     name: "a retired history is kept in the store",
@@ -1354,7 +1353,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archived root stays loaded",
     file: "apps/pinetrie/host/commands/board.ts",
-    from: "  if (unload !== null)",
+    from: "  if (unload.length > 0)",
     to: "  if (false)",
     command: unit,
     expect:
@@ -1363,24 +1362,15 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an unasked title is written over a mark written meanwhile",
     file: "apps/pinetrie/host/titles.ts",
-    from: "        if (!titleStillWanted(marks.get(entry), by)) return\n",
+    from: "        if (!titleStillWanted(marks.get(task), by)) return\n",
     to: "",
     command: unit,
     expect: "a mark written while the title was asked wins over it",
   },
   {
-    name: "an unasked title does not wait for its root's first entry",
+    name: "an archived task takes a title",
     file: "apps/pinetrie/host/titles.ts",
-    from: "        const entry = await whenRooted(doc, deps.rootedWait ?? ROOTED_WAIT)",
-    to: "        const entry = rootEntryOf(doc)",
-    command: unit,
-    expect:
-      "a new root's first lane: titled by the agent once the run writes its prompt",
-  },
-  {
-    name: "an archived root takes a title",
-    file: "apps/pinetrie/host/titles.ts",
-    from: "        if (archivedIn([root], readArchived(session)) !== null) return",
+    from: "        if (archivedIn([task], readArchived(session)) !== null) return",
     to: "        if (false) return",
     command: unit,
     expect:
@@ -1407,10 +1397,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a retitle is answered without asking",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "        return settled(await deps.titles.asked(intent.root, writer))",
+    from: "        return settled(await deps.titles.asked(intent.task, writer))",
     to: '        return settled({ kind: "retitling" })',
     command: unit,
-    expect: "a retitle asks for its root's title as its sender",
+    expect: "a retitle asks for its task's title as its sender",
   },
   {
     name: "a run reads no pinned cards",
@@ -1496,8 +1486,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a wait given up drains its lane anyway",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "      if (!stop.signal.aborted) deps.drain(card.place.lane)",
-    to: "      deps.drain(card.place.lane)",
+    from: "      if (!stop.signal.aborted) deps.drain(card.place.thread)",
+    to: "      deps.drain(card.place.thread)",
     command: unit,
     expect: "a card that leaves the queue gives its wait up",
   },
@@ -1751,8 +1741,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread's record is never written with its first message",
     file: "apps/pinetrie/host/commands/chat.ts",
-    from: "    planned.details.starts !== undefined\n  ) {",
-    to: "    planned.details.starts !== undefined &&\n    false\n  ) {",
+    from: "  if (start !== null) {\n    await deps.records.writeValues(start.records)",
+    to: "  if (start !== null && false) {\n    await deps.records.writeValues(start.records)",
     command: unit,
     expect: "its record is written with it",
   },
@@ -1779,5 +1769,37 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "its record is written with it, then named",
+  },
+  {
+    name: "the migration keeps a root on a card at a thread",
+    file: "apps/pinetrie/host/migrations/0005-tasks.ts",
+    from: '        rows[id] = thread === null ? base : { ...base, root: "", lane: thread }',
+    to: "        rows[id] = thread === null ? base : { ...base, lane: thread }",
+    command: unit,
+    expect: "names its thread and no root",
+  },
+  {
+    name: "the migration gives a thread no canvas card",
+    file: "apps/pinetrie/host/migrations/0005-tasks.ts",
+    from: '        kind: "canvas",\n        root: "",',
+    to: '        kind: "fresh",\n        root: "",',
+    command: unit,
+    expect: "each thread a card on its root's task's canvas",
+  },
+  {
+    name: "the migration leaves the histories kept by root",
+    file: "apps/pinetrie/host/migrations/0005-tasks.ts",
+    from: "    id => id.startsWith(MOVES_DOC_PREFIX) && movesOfDocId(id) === undefined,",
+    to: "    id => id.startsWith(MOVES_DOC_PREFIX) && movesOfDocId(id) === null,",
+    command: unit,
+    expect: "historiesByRoot",
+  },
+  {
+    name: "the host's discard history ignores the sender's task",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "    const discards = { tasks: tasksNow(deps.basics), here }\n",
+    to: "    const discards = { tasks: tasksNow(deps.basics), here: null }\n",
+    command: unit,
+    expect: "the host names a discard's history",
   },
 ]

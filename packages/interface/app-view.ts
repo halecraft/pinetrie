@@ -6,7 +6,7 @@
 // memoised child new props (S54, S59).
 
 import {
-  type ArchivedRoot,
+  type ArchivedTask,
   type EntryId,
   type LaneRecord,
   type LaneView,
@@ -15,6 +15,7 @@ import {
   type RailRow,
   type RootId,
   type RootWork,
+  type TaskId,
   type ThreadId,
   type TreeIndex,
   type Workflow,
@@ -37,12 +38,12 @@ export interface ReadOnly {
   readonly action: { readonly title: string; readonly intent: Intent } | null
 }
 
-/** One column of the root you are on, or of a new tab, as the strip draws it. */
+/** One column of the task you are on, or of a new tab, as the strip draws it. */
 export interface ColumnSlot {
   readonly key: string
   readonly position: number
   /**
-   * Whether × shows: not on a root's only column, which the root would
+   * Whether × shows: not on a task's only column, which the task would
    * give back at once (`columnsOf`). A new tab's one column closes the tab.
    */
   readonly closable: boolean
@@ -52,11 +53,11 @@ export interface ColumnSlot {
 export type Workspace =
   /** Before the first `prune`: nothing is chosen yet. */
   | { readonly kind: "connecting" }
-  /** No root and no new tab: the board, and ＋ (ADR-0122). */
+  /** No task and no new tab: the board, and ＋ (ADR-0122). */
   | { readonly kind: "nothing" }
   | {
-      readonly kind: "root"
-      readonly root: EntryId
+      readonly kind: "task"
+      readonly task: TaskId
       readonly readOnly: ReadOnly | null
       readonly slots: readonly ColumnSlot[]
     }
@@ -74,8 +75,8 @@ export interface AppViewInput {
   readonly columns: readonly Column[]
   /** `branchColors(rail, views).track`, memoised by `App`. */
   readonly tracks: readonly number[]
-  /** The roots in the archive, by root entry (ADR-0122). */
-  readonly archived: ReadonlyMap<EntryId, ArchivedRoot>
+  /** The tasks in the archive (ADR-0122). */
+  readonly archived: ReadonlyMap<TaskId, ArchivedTask>
   readonly workflow: Workflow | null
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly offers: ReadonlyMap<ThreadId, OfferRecord>
@@ -161,11 +162,11 @@ function workspaceOf(input: AppViewInput): Workspace {
       return { kind: "nothing" }
     case "new":
       return { kind: "new", key: active.key, slots: slots(true) }
-    case "root": {
-      const archived = input.archived.get(active.root)
+    case "task": {
+      const archived = input.archived.get(active.task)
       return {
-        kind: "root",
-        root: active.root,
+        kind: "task",
+        task: active.task,
         readOnly:
           archived === undefined
             ? null
@@ -194,19 +195,23 @@ const openOffers = (input: AppViewInput): readonly OpenOffer[] =>
       : [{ lane: o.lane, root, end: held.tip, source }]
   })
 
-/** The rows the rail draws: the root you are on's only, and none off a root. */
+/**
+ * The rows the rail draws: the task you are on's root's only (`entry`, its
+ * first root's root entry), and none off a task.
+ */
 export const hereRail = (
   index: TreeIndex,
   active: Here | null,
+  entry: EntryId | null,
 ): readonly RailRow[] =>
-  active?.kind === "root" ? projectRail(index, active.root) : []
+  active?.kind === "task" && entry !== null ? projectRail(index, entry) : []
 
 /**
- * What an archived root's column says and offers (ADR-0122): who moved it to
+ * What an archived task's column says and offers (ADR-0122): who moved it to
  * the archive, and Restore, which moves it to the first open state.
  */
 export function readOnlyWords(
-  archived: ArchivedRoot,
+  archived: ArchivedTask,
   workflow: Workflow | null,
   nameOf: ReadonlyMap<WriterId, string>,
 ): ReadOnly {
@@ -219,8 +224,8 @@ export function readOnlyWords(
         : {
             title: "Restore",
             intent: {
-              kind: "moveRoot",
-              root: archived.root,
+              kind: "moveTask",
+              task: archived.task,
               from: workflow.archive.id,
               to: to.id,
               before: null,

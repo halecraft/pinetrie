@@ -511,7 +511,11 @@ describe("lanes in a harness", () => {
     const first = await setUp(new Map())
     const lane = await first.newLane(where(before))
     first.script.use([{ tool: "bash", args: { command: "sleep 2" } }])
-    void first.agent.lane(lane).run(prompt("crash"), [])
+    // It ends only as the harness closes under it, below.
+    const crashed = first.agent
+      .lane(lane)
+      .run(prompt("crash"), [])
+      .catch(() => {})
     await new Promise(r => setTimeout(r, 300))
     // The next process, over the same document: a second agent.
     const wheres = new Map([[lane, where(after)]])
@@ -548,6 +552,9 @@ describe("lanes in a harness", () => {
     expect(results.some(r => r.trim() === after)).toBe(true)
     expect(await second.interrupted([ONE_ROOT])).toEqual([])
     await second.close()
+    // The crashed process would be gone: its tool call must not write after.
+    await first.agent.close()
+    await crashed
   })
 
   test("a run's last turn is recorded at its newest entry, however it ends: a Stop, or a model that fails (S104)", async () => {

@@ -1,16 +1,19 @@
-// interface/root-label — what a root is called on screen (ADR-0045), and the
-// tab's rename field's submit. Pure.
+// interface/root-label — what a task is called on screen (ADR-0045,
+// ADR-0116), and the rename field's submit. Pure.
 
 import {
   type EntryId,
   type LaneRecord,
+  type MarkRecord,
   NO_TEXT,
   parseTitle,
   type RootId,
   type RootRecord,
   type RootSummary,
+  type TaskId,
   type ThreadId,
 } from "@pinetrie/core"
+import type { Tasks } from "./tasks.ts"
 
 export { NO_TEXT }
 
@@ -74,25 +77,37 @@ export const firstLinesOf = (
 ): ReadonlyMap<EntryId, string> =>
   new Map(withEntries(directory).map(r => [r.entry, r.firstLine]))
 
-/** What an untitled root no agent has worked in is called (ADR-0074). */
+/** What an untitled task no agent has worked in is called (ADR-0074). */
 export const CHAT_LABEL = "Chat"
 
 /**
- * Every root's label, by its root entry: its title; else, for a root no lane
- * works in (only people have written there), `CHAT_LABEL`; else its first
- * line. `App` builds it once per change, and the sidebar, the board and your
- * inbox look labels up in it.
+ * Every task's label: its title (ADR-0045); else its first card's: for a
+ * thread no lane works in (only people have written there) `CHAT_LABEL`,
+ * else its root's first line. `App` builds it once per change, and the
+ * sidebar, the board and your inbox look labels up in it.
  */
-export function labelsOf(
-  directory: ReadonlyMap<RootId, RootRecord>,
-  lanes: ReadonlyMap<ThreadId, LaneRecord>,
-): ReadonlyMap<EntryId, string> {
-  const worked = new Set([...lanes.values()].map(l => l.root))
+export function labelsOf(input: {
+  readonly tasks: Tasks
+  readonly marks: ReadonlyMap<TaskId, MarkRecord>
+  readonly directory: ReadonlyMap<RootId, RootRecord>
+  readonly lanes: ReadonlyMap<ThreadId, LaneRecord>
+}): ReadonlyMap<TaskId, string> {
+  const worked = new Set([...input.lanes.values()].map(l => l.root))
   return new Map(
-    withEntries(directory).map(r => [
-      r.entry,
-      r.title ?? (worked.has(r.root) ? r.firstLine : CHAT_LABEL),
-    ]),
+    [...input.tasks.byId.values()].map(t => {
+      const title = input.marks.get(t.task)?.title
+      if (title !== undefined) return [t.task, title] as const
+      const root = t.roots[0]
+      const record = root === undefined ? undefined : input.directory.get(root)
+      return [
+        t.task,
+        record === undefined
+          ? NO_TEXT
+          : worked.has(record.root)
+            ? record.firstLine
+            : CHAT_LABEL,
+      ] as const
+    }),
   )
 }
 
@@ -101,7 +116,7 @@ export type TitlePlan =
   | { readonly kind: "unchanged" }
   | { readonly kind: "send"; readonly title: string | null }
 
-/** The rename field's submit. `stored` is the root's title, null when it has none. */
+/** The rename field's submit. `stored` is the task's title, null when it has none. */
 export function planTitle(typed: string, stored: string | null): TitlePlan {
   const input = parseTitle(typed)
   switch (input.kind) {

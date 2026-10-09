@@ -1,11 +1,11 @@
 import {
   atEntry,
   type CardEvent,
-  cardId,
   entryId,
   type PlaceKey,
   rootIdFor,
   type ThreadName,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -32,7 +32,7 @@ const BEA = writerId("bea@x.test")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
 type MoveRefused = Extract<CardNotice, { fromQueue: boolean }>
 const refusal = (over: Partial<MoveRefused>): CardNotice => ({
-  card: cardId("c-1"),
+  card: textCardId("c-1"),
   actedAt: { kind: "inventory" },
   code: "gone",
   by: null,
@@ -139,7 +139,7 @@ describe("card words", () => {
 })
 
 describe("pinned card words (ADR-0048 step 5)", () => {
-  const card = { id: cardId("p-1"), text: "x", by: ME }
+  const card = { id: textCardId("p-1"), text: "x", by: ME }
   test.each([
     ["read", pinnedStatusWords("read"), "read by the agent"],
     [
@@ -176,19 +176,17 @@ describe("pinned card words (ADR-0048 step 5)", () => {
 })
 
 describe("history and traces (ADR-0048 step 6)", () => {
-  const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+  const _ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
   const atEnd: PlaceKey = {
     kind: "note",
-    root: ROOT,
     at: atEntry(entryId("e-1")),
-    lane: threadIdFor("x"),
+    thread: threadIdFor("x"),
     cell: 0,
   }
   const queued: PlaceKey = {
     kind: "queued",
-    root: ROOT,
     at: atEntry(entryId("e-1")),
-    lane: threadIdFor("x"),
+    thread: threadIdFor("x"),
     seen: "",
   }
   const event = (over: Partial<CardEvent>): CardEvent => ({
@@ -220,7 +218,7 @@ describe("history and traces (ADR-0048 step 6)", () => {
   const trace = (to: PlaceKey | null) => ({
     id: "t",
     for: ME,
-    card: cardId("c-1"),
+    card: textCardId("c-1"),
     by: BEA,
     from: atEnd,
     to,

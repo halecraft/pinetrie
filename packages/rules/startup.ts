@@ -25,7 +25,7 @@ export function planStartup(input: {
   const resume = [...new Set(input.interrupted)]
   const lanes = new Set<ThreadId>()
   for (const c of input.cards)
-    if (c.place.kind === "queued") lanes.add(c.place.lane)
+    if (c.place.kind === "queued") lanes.add(c.place.thread)
   const drain = [...lanes]
     .filter(lane => queuedOn(input.cards, lane).length > 0)
     .filter(lane => !resume.includes(lane))

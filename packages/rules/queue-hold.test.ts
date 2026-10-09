@@ -1,10 +1,11 @@
 import {
   atEntry,
   type CardRecord,
-  cardId,
   entryId,
   PLAIN,
   rootIdFor,
+  taskIdFor,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -22,8 +23,10 @@ import { deleteRecord, setRecord } from "./records.ts"
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const L = threadIdFor("1")
-const ROOT_A = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const ROOT_B = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+const _ROOT_A = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const _ROOT_B = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+const TASK_A = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const TASK_B = taskIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 const held = new Map([[L, { lane: L, by: ADA, at: 1 }]])
 
 describe("planQueueHold", () => {
@@ -59,9 +62,8 @@ describe("holdOnStop", () => {
       placer: ADA,
       place: {
         kind: "queued",
-        root: ROOT_A,
         at: { kind: "entry", id: "e1" },
-        lane: L,
+        thread: L,
         order: "a",
         by: ADA,
         seen: "",
@@ -92,10 +94,12 @@ describe("holdOnStop", () => {
   })
 })
 
-test("planHoldSweep: a hold whose lane no root holds, or whose root is archived, goes; a live one stays", () => {
+test("planHoldSweep: a hold whose thread has no card, or whose task is archived, goes; a live one, or one in an inventory, stays", () => {
   const L2 = threadIdFor("2")
   const L3 = threadIdFor("3")
+  const L4 = threadIdFor("4")
   const holds = new Map([
+    [L4, { lane: L4, by: ADA, at: 1 }],
     [L, { lane: L, by: ADA, at: 1 }],
     [L2, { lane: L2, by: ADA, at: 1 }],
     [L3, { lane: L3, by: ADA, at: 1 }],
@@ -103,17 +107,25 @@ test("planHoldSweep: a hold whose lane no root holds, or whose root is archived,
   expect(
     planHoldSweep({
       holds,
-      rootOf: lane => (lane === L ? ROOT_A : lane === L2 ? ROOT_B : null),
-      archived: root => root === ROOT_B,
+      whereIs: lane =>
+        lane === L
+          ? TASK_A
+          : lane === L2
+            ? TASK_B
+            : lane === L4
+              ? "inventory"
+              : null,
+      archived: task => task === TASK_B,
     }),
   ).toEqual([L2, L3])
 })
 
 describe("planQueueCard (ADR-0113)", () => {
   const at = atEntry(entryId("e1"))
-  const atEnd = { kind: "composing", root: ROOT_A, at, lane: L } as const
+  const atEnd = { kind: "composing", at, thread: L } as const
   const card: CardRecord = {
-    id: cardId("c-1"),
+    kind: "text",
+    id: textCardId("c-1"),
     owner: ADA,
     placer: ADA,
     place: atEnd,
@@ -123,7 +135,7 @@ describe("planQueueCard (ADR-0113)", () => {
   const move = {
     card: card.id,
     from: atEnd,
-    to: { kind: "queued", root: ROOT_A, at, lane: L, seen: "" },
+    to: { kind: "queued", at, thread: L, seen: "" },
   } as const
   const plan = (
     hold: "keep" | "hold-if-idle" | "release",
@@ -185,14 +197,14 @@ describe("planQueueCard (ADR-0113)", () => {
           {
             kind: "write",
             record: {
+              kind: "text",
               id: card.id,
               owner: BEA,
               placer: BEA,
               place: {
                 kind: "queued",
-                root: ROOT_A,
                 at,
-                lane: L,
+                thread: L,
                 order: expect.any(String),
                 by: BEA,
                 seen: "",

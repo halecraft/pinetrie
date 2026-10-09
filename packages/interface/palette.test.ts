@@ -1,7 +1,7 @@
-import { newRootId } from "@pinetrie/session"
+import { newRootId, newTaskId } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import { PENDING_TRACK } from "./column-paths.ts"
-import { rootSeed, rootSlot, SLOTS, STRIDE, trackSlot } from "./palette.ts"
+import { rootSeed, SLOTS, STRIDE, taskSlot, trackSlot } from "./palette.ts"
 
 const size = SLOTS
 const seeds = Array.from({ length: size }, (_, i) => i)
@@ -17,9 +17,10 @@ describe("rootSeed", () => {
     expect(used.size).toBe(size)
   })
 
-  test("a root's slot is its trunk's", () => {
-    const root = newRootId()
-    expect(rootSlot(root)).toBe(trackSlot(rootSeed(root), 0))
+  test("a task's slot is seeded by its id, the same on every device (ADR-0116)", () => {
+    const task = newTaskId()
+    expect(taskSlot(task)).toBe(taskSlot(task))
+    expect(taskSlot(task)).not.toBe("pending")
   })
 })
 

@@ -1,6 +1,11 @@
 // host/startup — what a starting host does before it accepts a command.
 
-import { type RootId, SESSION_TARGET, type ThreadId } from "@pinetrie/core"
+import {
+  isTextCard,
+  type RootId,
+  SESSION_TARGET,
+  type ThreadId,
+} from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import type { Agent, PiSetup } from "@pinetrie/pi"
 import {
@@ -179,7 +184,11 @@ async function sweepTexts(deps: StartupDeps): Promise<void> {
   const { cards } = deps
   const { session: doc, places, log } = deps.basics
   // gather
-  const texts = await cards.texts(readPlaces(places).map(c => c.id))
+  const texts = await cards.texts(
+    readPlaces(places)
+      .filter(isTextCard)
+      .map(c => c.id),
+  )
   const stored = await cards.stored()
   const records = readPlaces(places)
   const seats = readSeats(doc)

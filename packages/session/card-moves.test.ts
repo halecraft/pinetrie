@@ -1,8 +1,10 @@
 import {
   atEntry,
   type CardRecord,
-  cardId,
   entryId,
+  type TextCard,
+  taskIdFor,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -24,23 +26,24 @@ import {
   stampSeen,
   withPending,
 } from "./card-moves.ts"
-import { TEST_ROOT } from "./fixtures.ts"
+
+const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const ME = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const LANE = threadIdFor("x")
-const C1 = cardId("c-1")
+const C1 = textCardId("c-1")
 const at = atEntry(entryId("e-1"))
-const atEnd = { kind: "composing", root: TEST_ROOT, at, lane: LANE } as const
+const atEnd = { kind: "composing", at, thread: LANE } as const
 const queuedKey = {
   kind: "queued",
-  root: TEST_ROOT,
   at,
-  lane: LANE,
+  thread: LANE,
   seen: "",
 } as const
 
-const card = (over: Partial<CardRecord> = {}): CardRecord => ({
+const card = (over: Partial<TextCard> = {}): TextCard => ({
+  kind: "text",
   id: C1,
   owner: ME,
   placer: ME,
@@ -80,7 +83,7 @@ describe("the tab's moves (ADR-0059)", () => {
   const host = [card()]
 
   test("sent: a creation, a move and a move out are drawn at once", () => {
-    const draft = card({ id: cardId("c-2") })
+    const draft = card({ id: textCardId("c-2") })
     const s = run([
       sent({ ...sentAs, id: "m-0", kind: "create", draft }),
       sent(queueIt),
@@ -135,11 +138,7 @@ describe("the tab's moves (ADR-0059)", () => {
   })
 
   test("an accepted discard is kept as a notice where you made it, until your next move there; drawn gone until then", () => {
-    const gone = {
-      kind: "gone",
-      root: TEST_ROOT,
-      why: { kind: "discarded" },
-    } as const
+    const gone = { kind: "gone", why: { kind: "discarded" } } as const
     const discard = {
       ...sentAs,
       id: "d-1",
@@ -150,7 +149,12 @@ describe("the tab's moves (ADR-0059)", () => {
     expect(s.notices).toEqual([
       { card: C1, actedAt: COLUMN, code: "discarded" },
     ])
-    expect(withPending(host, s, ME)[0]?.place).toEqual({ ...gone, by: ME })
+    // In no history until the host names one.
+    expect(withPending(host, s, ME)[0]?.place).toEqual({
+      ...gone,
+      task: null,
+      by: ME,
+    })
     expect(movesStep(s, sent(queueIt)).notices).toEqual([])
   })
 
@@ -184,6 +188,7 @@ describe("the tab's moves (ADR-0059)", () => {
     const made = { card: C1, from: null, to: queuedKey } as const
     const draft = queuedDraft(made, ME, "split")
     expect(draft).toEqual({
+      kind: "text" as const,
       id: C1,
       owner: ME,
       placer: ME,
@@ -202,16 +207,16 @@ describe("the tab's moves (ADR-0059)", () => {
     const key = (n: number) => n.toString(36).padStart(10, "0")
     const q = (id: string, n: number) =>
       card({
-        id: cardId(id),
+        id: textCardId(id),
         place: { ...queuedKey, order: key(n), by: BEA },
         placer: BEA,
       })
     const records = [q("c-a", 100), q("c-b", 200), q("c-c", 300)]
     const reorder = {
-      card: cardId("c-c"),
+      card: textCardId("c-c"),
       at: queuedKey,
-      after: cardId("c-a"),
-      before: cardId("c-b"),
+      after: textCardId("c-a"),
+      before: textCardId("c-b"),
     }
     const s = run([
       sent({ ...sentAs, id: "r-1", kind: "reorder", reorder }),
@@ -292,7 +297,7 @@ describe("answerOf", () => {
 })
 
 describe("a command of several moves: a keep (ADR-0066)", () => {
-  const C2 = cardId("c-2")
+  const C2 = textCardId("c-2")
   const inventory = { kind: "inventory", holder: ME } as const
   const keeping = (card: typeof C1, slot: number): Pending => ({
     ...sentAs,
@@ -367,7 +372,7 @@ describe("intentsOf", () => {
       ...sentAs,
       id: "m-2",
       kind: "create",
-      draft: card({ id: cardId("c-2") }),
+      draft: card({ id: textCardId("c-2") }),
       slot: 7,
     }
     const s = run([
@@ -378,11 +383,11 @@ describe("intentsOf", () => {
     expect(intentsOf(s)).toEqual(
       new Map([
         [C1, 3],
-        [cardId("c-2"), 7],
+        [textCardId("c-2"), 7],
       ]),
     )
     expect(intentsOf(run([accepted("m-1", 5), changed(5)], s))).toEqual(
-      new Map([[cardId("c-2"), 7]]),
+      new Map([[textCardId("c-2"), 7]]),
     )
   })
 })

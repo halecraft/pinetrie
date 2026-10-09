@@ -3,7 +3,6 @@ import {
   type AgentMessageLike,
   type BaseRecord,
   type CardCommand,
-  cardId,
   commitId,
   type EntryId,
   entryId,
@@ -20,6 +19,7 @@ import {
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -1051,7 +1051,11 @@ describe("startedWords", () => {
 })
 
 describe("where the agent read pinned cards (ADR-0048)", () => {
-  const card = (id: string, text: string) => ({ id: cardId(id), text, by: ADA })
+  const card = (id: string, text: string) => ({
+    id: textCardId(id),
+    text,
+    by: ADA,
+  })
   const read = (
     lane: ThreadId,
     cards: PinnedView["cards"],
@@ -1063,7 +1067,7 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
     const entry = read(
       A,
       [card("c-2", "new")],
-      [{ id: cardId("c-1"), line: "old" }],
+      [{ id: textCardId("c-1"), line: "old" }],
     )
     expect(pinnedMarker(entry, before)).toEqual({
       cards: entry.cards,
@@ -1071,11 +1075,14 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
     })
     // A branch's first run retires its parent's cards, read by another lane.
     expect(
-      pinnedMarker(read(B, [], [{ id: cardId("c-1"), line: "old" }]), before),
+      pinnedMarker(
+        read(B, [], [{ id: textCardId("c-1"), line: "old" }]),
+        before,
+      ),
     ).toBeNull()
     expect(
       pinnedMarker(
-        read(B, [card("c-3", "x")], [{ id: cardId("c-1"), line: "old" }]),
+        read(B, [card("c-3", "x")], [{ id: textCardId("c-1"), line: "old" }]),
         before,
       ),
     ).toEqual({ cards: [card("c-3", "x")], retired: [] })
@@ -1103,7 +1110,8 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
 
 test("pinnedStatus: read, changed or unread against what the agent reads, by the host's comparison; none for a card with no text", () => {
   const card = {
-    id: cardId("c-1"),
+    kind: "text" as const,
+    id: textCardId("c-1"),
     owner: ADA,
     placer: ADA,
     place: { kind: "inventory", holder: ADA } as const,
@@ -1112,7 +1120,7 @@ test("pinnedStatus: read, changed or unread against what the agent reads, by the
   }
   const inView: PinnedView = {
     lane: A,
-    cards: [{ id: cardId("c-1"), text: "ship it", by: ADA }],
+    cards: [{ id: textCardId("c-1"), text: "ship it", by: ADA }],
     retired: [],
   }
   expect(pinnedStatus(card, "ship it", inView)).toBe("read")

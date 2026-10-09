@@ -7,6 +7,7 @@ import {
   cardId,
   entryId,
   handleOf,
+  isTextCard,
   keyOf,
   pinnedOf,
   projectRail,
@@ -44,11 +45,11 @@ import {
   idleNow,
   join,
   lanesOf,
-  moveRootTo,
+  moveTaskTo,
   queueCard,
-  rootRecordsOf,
   startSuiteHost,
   suiteModel,
+  taskHolding,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -865,16 +866,19 @@ async function run(check: Checks["check"]): Promise<void> {
         () =>
           readPlaces(host.places).some(
             c =>
+              c.kind === "text" &&
               c.place.kind === "queued" &&
               host.cardText(c.id) === "@agent after Bea",
           ),
         15_000,
       )
-      const yours = readPlaces(host.places).find(
-        c =>
-          c.place.kind === "queued" &&
-          host.cardText(c.id) === "@agent after Bea",
-      )
+      const yours = readPlaces(host.places)
+        .filter(isTextCard)
+        .find(
+          c =>
+            c.place.kind === "queued" &&
+            host.cardText(c.id) === "@agent after Bea",
+        )
       if (yours !== undefined) {
         const theirs = other.cardText(yours.id)
         await waitFor(() => theirs.text() === "@agent after Bea", 15_000)
@@ -1539,7 +1543,7 @@ async function run(check: Checks["check"]): Promise<void> {
         ms.at(-1)?.getAttribute("data-entry"),
       )
       await componentRenders(page)
-      if (onPath != null) api.setReading("presence-check", onPath, null)
+      if (onPath != null) api.setReading("presence-check", onPath, null, null)
       const beaHere = `${col(0)} .column-head .avatar[data-writer="${api.writer}"]`
       const beaShown = await page
         .waitForSelector(beaHere, { timeout: 15_000 })
@@ -1791,7 +1795,8 @@ async function run(check: Checks["check"]): Promise<void> {
           )
           .catch(() => null)
         await tb.click(itemSel(firstRoot))
-        const setAt = rootRecordsOf(host, readMarks).get(thirdRoot)?.at
+        const thirdTask = taskHolding(host, thirdRoot)
+        const setAt = readMarks(host.session).get(thirdTask)?.at
         await rename("not this", "Escape")
         // Long enough for a rename sent by mistake to come back.
         await waitFor(() => false, 1_000)
@@ -1799,7 +1804,7 @@ async function run(check: Checks["check"]): Promise<void> {
           "Escape leaves a root's title as it was, and sends nothing",
           (await labelIs(page, thirdRoot, TITLE)) &&
             (await page.locator(".open-title-input").count()) === 0 &&
-            rootRecordsOf(host, readMarks).get(thirdRoot)?.at === setAt,
+            readMarks(host.session).get(thirdTask)?.at === setAt,
         )
         await rename("", "Enter")
 
@@ -1836,9 +1841,7 @@ async function run(check: Checks["check"]): Promise<void> {
               () => true,
               () => false,
             )
-          const id = [...readRoots(host.session).values()].find(
-            r => r.entry === firstRoot,
-          )?.root
+          const id = firstRoot === "" ? undefined : taskHolding(host, firstRoot)
           check(
             "dragging a thread card to another state moves it for the other window",
             theirs &&
@@ -3420,7 +3423,9 @@ async function run(check: Checks["check"]): Promise<void> {
         () => spunInto() !== undefined && placeOf(parked)?.kind === "gone",
         15_000,
       )
-      const thread = spunInto()?.root
+      const into = spunInto()
+      const thread =
+        into?.entry == null ? undefined : taskHolding(host, into.entry)
       const landed =
         thread === undefined
           ? undefined
@@ -3432,8 +3437,8 @@ async function run(check: Checks["check"]): Promise<void> {
       const lifted = await waitFor(
         () =>
           placeOf(parked)?.kind === "inventory" &&
-          thread !== undefined &&
-          !readRoots(host.session).has(thread),
+          into !== undefined &&
+          !readRoots(host.session).has(into.root),
         15_000,
       )
       check(
@@ -3906,7 +3911,7 @@ async function run(check: Checks["check"]): Promise<void> {
         "a reload keeps the root you were on",
         (await selectedRoot(page)) === downRoot,
       )
-      await moveRootTo(api, entryId(downRoot), "archive")
+      await moveTaskTo(api, entryId(downRoot), "archive")
       await page.reload({ waitUntil: "domcontentloaded" })
       await page
         .waitForFunction(

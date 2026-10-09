@@ -37,9 +37,11 @@ import {
   type SendAt,
   type Sha256,
   sendWaits,
+  type TaskId,
   THE_AGENT,
   type ThreadId,
   type ThreadLane,
+  type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
@@ -363,12 +365,26 @@ export const settleRun = (
   ran: { readonly kind: "ok" } | { readonly kind: "refused" },
 ): "done" | "keep" => (ran.kind === "refused" ? "keep" : "done")
 
+/**
+ * A thread a send starts (ADR-0116, ADR-0117): the task its card goes on,
+ * and the board state a new task lands in, null for the first open one.
+ */
+export interface ThreadStarts {
+  readonly thread: ThreadId
+  readonly task: TaskId
+  readonly state: WorkflowStateId | null
+}
+
 export type ChatDecision =
-  /** No lane at this thread: append with no lane, parented at exactly `parent`. */
+  /**
+   * No lane at this thread: append with no lane, parented at exactly
+   * `parent`; first, on a branch, the thread it `starts`.
+   */
   | {
       readonly kind: "appendToTree"
       readonly parent: Position
       readonly details: ChatDetails
+      readonly starts: ThreadStarts | null
     }
   /** The thread's lane is idle: append through it. */
   | {
@@ -384,13 +400,15 @@ export type ChatDecision =
     }
   /**
    * The agent is compelled here for the first time: create the thread's lane
-   * at `at`, named by the thread's id, then run.
+   * at `at`, named by the thread's id, then run; first, on a branch, the
+   * thread it `starts`.
    */
   | {
       readonly kind: "createAndRun"
       readonly at: Position
       readonly lane: ThreadId
       readonly details: ChatDetails
+      readonly starts: ThreadStarts | null
     }
   /**
    * The lane runs, or has cards queued: nothing is written, and the sender's
@@ -513,6 +531,8 @@ export function planChat(input: {
    */
   readonly news: BaseNews["kind"]
   readonly caughtUp: boolean
+  /** The board state a branch's new task lands in; null for the first open one. */
+  readonly state: WorkflowStateId | null
 }): ChatDecision {
   const { lane, end, race } = input.thread
   const { at } = input
@@ -553,16 +573,24 @@ export function planChat(input: {
   const compelled = compels.kind === "agent"
 
   if (branch) {
+    const starts = { thread: at.thread, task: at.task, state: input.state }
     return compelled
-      ? { kind: "createAndRun", at: end, lane: at.thread, details }
-      : { kind: "appendToTree", parent: end, details }
+      ? { kind: "createAndRun", at: end, lane: at.thread, details, starts }
+      : { kind: "appendToTree", parent: end, details, starts }
   }
 
   if (lane.kind === "none") {
-    if (!compelled) return { kind: "appendToTree", parent: end, details }
+    if (!compelled)
+      return { kind: "appendToTree", parent: end, details, starts: null }
     if (mode === "reply" && race !== null)
       return { kind: "conflict", by: race.by }
-    return { kind: "createAndRun", at: end, lane: at.thread, details }
+    return {
+      kind: "createAndRun",
+      at: end,
+      lane: at.thread,
+      details,
+      starts: null,
+    }
   }
 
   const name: ThreadId = lane.name

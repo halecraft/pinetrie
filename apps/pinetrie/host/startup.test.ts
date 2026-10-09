@@ -1,12 +1,12 @@
 import {
   atEntry,
-  cardId,
   entryId,
   type ProjectRecord,
   rootIdFor,
   runId,
   SESSION_TARGET,
   type ThreadId,
+  textCardId,
   threadIdFor,
   type ValueWrite,
   writerId,
@@ -28,7 +28,9 @@ import { expect, test } from "vitest"
 import { basics, putValue, ROOT_ID, record, writesOf } from "./fakes.ts"
 import { recover, type StartupDeps } from "./startup.ts"
 
-const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const TEST_THREAD = threadIdFor("e")
+
+const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 /** The agent, the scribe and the setup in one record, so the order of their calls shows. */
 type FakePi = StartupDeps["agent"] &
@@ -80,14 +82,14 @@ test("recover resumes each interrupted lane before it settles the others, and na
   placesDoc.cards.set(
     "c-1",
     encodeCard({
-      id: cardId("c-1"),
+      kind: "text" as const,
+      id: textCardId("c-1"),
       owner: writerId("ada@x.io"),
       placer: writerId("ada@x.io"),
       place: {
         kind: "queued",
-        root: TEST_ROOT,
         at: atEntry(entryId("e-1")),
-        lane: OTHER,
+        thread: OTHER,
         order: "a",
         by: writerId("ada@x.io"),
         seen: "",
@@ -226,14 +228,14 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
   const b = basics(undefined, placesDoc)
   const card = (id: string) =>
     encodeCard({
-      id: cardId(id),
+      kind: "text" as const,
+      id: textCardId(id),
       owner: writerId("ada@x.io"),
       placer: writerId("ada@x.io"),
       place: {
         kind: "composing",
-        root: TEST_ROOT,
         at: atEntry(entryId("e-1")),
-        lane: null,
+        thread: TEST_THREAD,
       },
       carries: { kind: "message", command: null },
       unsent: null,
@@ -253,8 +255,8 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
   const agent = fakePi()
   const cards = record<StartupDeps["cards"]>({
     texts: async () => [
-      { id: cardId("c-full"), text: "keep me", clients: [11] },
-      { id: cardId("c-empty"), text: "", clients: [] },
+      { id: textCardId("c-full"), text: "keep me", clients: [11] },
+      { id: textCardId("c-empty"), text: "", clients: [] },
     ],
     stored: async () => ["card:c-full", "card:c-empty", "card:c-gone"],
     destroyDocs: async () => {},

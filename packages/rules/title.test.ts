@@ -9,6 +9,7 @@ import {
   rootIdFor,
   THE_AGENT,
   type TreeIndex,
+  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -53,12 +54,6 @@ const lane = (l: typeof L1, root = R): LaneRecord => ({
   by: ADA,
   createdAt: 0,
 })
-const mark: MarkRecord = {
-  entry: entryId("c-0"),
-  title: "Rail",
-  by: ADA,
-  at: 1,
-}
 
 describe("decodeTitleConfig: titles, on unless enabled is false, total", () => {
   test("on, with the run's model, unless turned off", () => {
@@ -88,7 +83,7 @@ describe("planTitling", () => {
     planTitling({
       index: indexOf(),
       root: R,
-      marks: new Map(),
+      marked: false,
       lanes: [lane(L1)],
       trigger: started,
       enabled: true,
@@ -123,16 +118,14 @@ describe("planTitling", () => {
   test("nothing when off, titled already, or asked already", () => {
     expect(plan({ enabled: false })).toEqual({ kind: "skip" })
     expect(plan({ inFlight: true })).toEqual({ kind: "skip" })
-    expect(plan({ index: chat, marks: new Map([[mark.entry, mark]]) })).toEqual(
-      { kind: "skip" },
-    )
+    expect(plan({ index: chat, marked: true })).toEqual({ kind: "skip" })
   })
 
   test("asked: the path to the newest message, whatever is stored, as the person", () => {
     expect(
       plan({
         index: chat,
-        marks: new Map([[mark.entry, mark]]),
+        marked: true,
         lanes: [lane(L2), lane(L1)],
         enabled: false,
         inFlight: true,
@@ -186,6 +179,12 @@ describe("titleOf", () => {
 })
 
 test("titleStillWanted: an asked one always; an unasked one only over no mark", () => {
+  const mark: MarkRecord = {
+    task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
+    title: "Rail",
+    by: ADA,
+    at: 1,
+  }
   expect(titleStillWanted(mark, ADA)).toBe(true)
   expect(titleStillWanted(undefined, THE_AGENT)).toBe(true)
   expect(titleStillWanted(mark, THE_AGENT)).toBe(false)

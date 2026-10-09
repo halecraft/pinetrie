@@ -20,6 +20,7 @@ import {
   type Undone,
   type UndoStack,
   whenPeer,
+  whenSettled,
 } from "@kyneta/exchange"
 import { type CommitOptions, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
@@ -32,6 +33,8 @@ import {
   commandOf,
   type EntryId,
   type Intent,
+  isTextCard,
+  isTextCardId,
   keyOf,
   type Move,
   type MoveDirection,
@@ -40,6 +43,9 @@ import {
   type QueueHoldChange,
   type Reorder,
   type RootId,
+  type TaskId,
+  type TextCard,
+  type TextCardId,
   type ThreadId,
   type WriterId,
   writerOfPrincipal,
@@ -183,18 +189,29 @@ export interface SessionClient {
    */
   readonly cards: Readable<readonly CardRecord[]>
   /**
+   * Once this client's copy of the places has settled: what a task holds
+   * is there (ADR-0116), so the roots of the sidebar's tasks can be held.
+   */
+  placesSettled(): Promise<void>
+  /**
    * This tab's undo stack, narrowed to one card: undo and redo take only the
    * steps that wrote its text, its creation among them (ADR-0052). The stack
    * itself is not exposed: its own `undo()` takes the tab's last step,
    * wherever that is. It is in memory, so it lasts until the tab reloads or
    * closes (ADR-0048). Each undo and redo says what it did (`Undone`).
    */
-  undoFor(id: CardId): CardUndo
+  undoFor(id: TextCardId): CardUndo
   /**
    * This window's column `columnKey` shows the thread ending at `end`,
-   * in the root whose root entry is `root` (null: not yet known).
+   * in the root whose root entry is `root` and the task `task` (null: not
+   * yet known).
    */
-  setReading(columnKey: string, end: string, root: string | null): void
+  setReading(
+    columnKey: string,
+    end: string,
+    root: string | null,
+    task: string | null,
+  ): void
   /** The column closed: its entry is deleted, not left to decay. */
   clearReading(columnKey: string): void
   /**
@@ -221,7 +238,7 @@ export interface SessionClient {
    * destroys its copy (`hostLetGo`, `spentCards`), and a call then would make
    * a new, empty one.
    */
-  cardText(id: CardId): TextDocHandle
+  cardText(id: TextCardId): TextDocHandle
   /**
    * Create a card holding `text`: its text in one undo step, so undoing past
    * the first keystroke empties it, and a request that the host place it
@@ -236,12 +253,14 @@ export interface SessionClient {
    * accepts, before the answer is recorded, so the repair never sees the
    * card held without its slot. `queuedBy`, for an unqueue, is who queued
    * the card: if the host popped it first, the refusal says it was sent, as
-   * theirs. Resolves with the host's answer.
+   * theirs. `here`, the task this tab is on, names the history of a
+   * discard from your inventory (ADR-0116). Resolves with the host's answer.
    */
   moveCard(
     move: Move,
     how?: MoveHow,
     queuedBy?: WriterId | null,
+    here?: TaskId | null,
   ): Promise<MoveAnswer>
   /**
    * Ask the host to queue a card (ADR-0113): `move` into a queue, sent with
@@ -265,17 +284,19 @@ export interface SessionClient {
   reorderCard(reorder: Reorder, how?: MoveHow): Promise<MoveAnswer>
   /**
    * Hand several cards at once, as one move the host accepts or refuses
-   * whole (a keep, ADR-0066), each with the slot it takes.
+   * whole (a keep, ADR-0066), each with the slot it takes; `here`, as
+   * `moveCard`'s.
    */
   moveCards(
     moves: readonly [SlotMove, ...SlotMove[]],
     actedAt: ActedAt,
+    here?: TaskId | null,
   ): Promise<MoveAnswer>
   /**
    * Undo or redo your newest move in `root`: the host's history of your
    * moves there, from any of your tabs (ADR-0066).
    */
-  undoMoves(root: RootId, direction: MoveDirection): Promise<Outcome>
+  undoMoves(task: TaskId, direction: MoveDirection): Promise<Outcome>
   /**
    * Swap two slots of your inventory, in one write, as one step of this
    * tab's swaps; no host is asked.
@@ -310,16 +331,6 @@ export interface SessionClient {
    */
   readonly openThreads: OpenThreads
   /**
-   * Title the entry `entry`, or clear its title with null (ADR-0045), in
-   * the held root that has it.
-   */
-  mark(entry: EntryId, title: string | null): Promise<Outcome>
-  /**
-   * Ask a model for the title of the held root whose root entry is `root`
-   * (ADR-0074): it arrives as the root's mark.
-   */
-  retitle(root: EntryId): Promise<Outcome>
-  /**
    * An offer action on a lane's offer in your repo; an acceptance names its
    * destination bookmark, null for the default, and the offer as this tab's
    * record shows it (`offerSeen`). Tracked in `acting`.
@@ -340,9 +351,8 @@ export interface SessionClient {
 /**
  * What the host is asked for that is neither tracked nor needs a root found:
  * a chat, a move and a reorder are tracked in `moves`, an undo of moves
- * waits for this tab's copy of the places, an offer action and set up or
- * publish are tracked in `acting`, and a mark and a retitle need their
- * entry's root (`inRootOf`).
+ * waits for this tab's copy of the places, and an offer action and set up
+ * or publish are tracked in `acting`.
  */
 export type HostRequest = Exclude<
   Intent,
@@ -352,8 +362,6 @@ export type HostRequest = Exclude<
       | "move"
       | "reorder"
       | "undo-move"
-      | "mark"
-      | "retitle"
       | "offer"
       | "setup"
       | "publish"
@@ -361,7 +369,7 @@ export type HostRequest = Exclude<
 >
 
 /** A card to create: the session makes you its owner and placer. */
-export type NewCard = Pick<CardRecord, "id" | "place" | "carries" | "unsent">
+export type NewCard = Pick<TextCard, "id" | "place" | "carries" | "unsent">
 
 /**
  * One card's undo, as its box binds it (`@kyneta/react`'s `attach`), saying
@@ -492,18 +500,6 @@ export async function connectSession(
     line.request(intent).then(r => r.outcome)
 
   /**
-   * Send what names `entry` in the held root that has it; refused before
-   * anything is sent when no held root does.
-   */
-  const inRootOf = (
-    entry: EntryId,
-    intent: (root: RootId) => Intent,
-  ): Promise<Outcome> => {
-    const root = roots.rootOf(entry)
-    return root === undefined ? Promise.resolve(NO_ROOT) : send(intent(root))
-  }
-
-  /**
    * Send a request that moves cards: each drawn at once as one of `pending`,
    * which share its id, until this tab's copy holds what the host did, and
    * answered as the host answers it. `queuedBy`: who queued the card a
@@ -539,7 +535,8 @@ export async function connectSession(
    * a card's document this client does not hold yet, so it is called while
    * gathering, never from a plan.
    */
-  const versionOf = (id: CardId): string => textVersion(texts.text(id))
+  const versionOf = (id: CardId): string =>
+    isTextCardId(id) ? textVersion(texts.text(id)) : ""
 
   /**
    * A move, tracked; with `draft`, a creation, drawn as that record. Never
@@ -550,9 +547,10 @@ export async function connectSession(
     how: MoveHow,
     queuedBy: WriterId | null,
     draft: CardRecord | null,
+    here: TaskId | null,
   ): Promise<MoveAnswer> {
     return tracked(
-      { kind: "move", moves: [move] },
+      { kind: "move", moves: [move], here },
       [pendingOf(crypto.randomUUID(), move, how, draft)],
       queuedBy,
     ).then(r => r.answer)
@@ -572,6 +570,7 @@ export async function connectSession(
     holdRoots: roots.hold,
     rootOf: roots.rootOf,
     cards,
+    placesSettled: () => whenSettled(places).then(() => {}),
     moves,
     slots: inventory.slots,
     attention,
@@ -593,7 +592,10 @@ export async function connectSession(
       const record =
         how.card === undefined
           ? undefined
-          : cards.current().find(c => c.id === how.card)
+          : cards
+              .current()
+              .filter(isTextCard)
+              .find(c => c.id === how.card)
       const plan = planChatRequest({
         text,
         at,
@@ -609,15 +611,13 @@ export async function connectSession(
           ? line.request(plan.intent, plan.id)
           : tracked(plan.intent, [plan.pending], null)
       return sent.then(({ outcome }) => {
-        // A root you start is in the sidebar (ADR-0122).
-        if (startsRoot(at, outcome)) open.ensure(root)
+        // A task you start is in the sidebar (ADR-0122, ADR-0116).
+        if (at.kind === "branch" && startsRoot(at, outcome))
+          open.ensure(at.task)
         return outcome
       })
     },
     request: send,
-    mark: (entry, title) =>
-      inRootOf(entry, root => ({ kind: "mark", root, entry, title })),
-    retitle: entry => inRootOf(entry, root => ({ kind: "retitle", root })),
     createCard(card, text, how = OFF_PAGE) {
       undo.gesture(() => {
         texts.text(card.id).text.insert(0, text)
@@ -628,14 +628,15 @@ export async function connectSession(
         { card: card.id, from: null, to: keyOf(card.place) },
         how,
         null,
-        { ...card, owner: me, placer: me, carries: PLAIN },
+        { ...card, kind: "text", owner: me, placer: me, carries: PLAIN },
+        null,
       )
       if (command !== null)
         void send({ kind: "set-command", card: card.id, command })
       return answer
     },
-    moveCard(move, how = OFF_PAGE, queuedBy = null) {
-      return sendMove(move, how, queuedBy, null)
+    moveCard(move, how = OFF_PAGE, queuedBy = null, here = null) {
+      return sendMove(move, how, queuedBy, null, here)
     },
     queueCard(planned, hold, how = OFF_PAGE, command = null) {
       const move = stampSeen(planned, versionOf(planned.card))
@@ -664,21 +665,21 @@ export async function connectSession(
         r => r.answer,
       )
     },
-    moveCards(moves, actedAt) {
+    moveCards(moves, actedAt, here = null) {
       const id = crypto.randomUUID()
       const pending = ({ move, slot }: SlotMove) =>
         pendingOf(id, move, { actedAt, slot }, null)
       const [first, ...rest] = moves
       return tracked(
-        { kind: "move", moves: moves.map(m => m.move) },
+        { kind: "move", moves: moves.map(m => m.move), here },
         [pending(first), ...rest.map(pending)],
         null,
       ).then(r => r.answer)
     },
-    async undoMoves(root, direction) {
+    async undoMoves(task, direction) {
       const { outcome, rev } = await line.request({
         kind: "undo-move",
-        root,
+        task,
         direction,
       })
       // Drawn as the host left it: wait for this tab's copy to hold the undo.

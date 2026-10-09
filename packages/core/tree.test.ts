@@ -28,6 +28,7 @@ import {
   type ThreadId,
   TOOL_IDS,
   tailEdit,
+  taskIdFor,
   threadAt,
   threadEnd,
   threadIdFor,
@@ -253,6 +254,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     kind: "branch",
     thread: threadIdFor(thread),
     at: from === null ? null : entryId(from),
+    task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
   })
 
   test("threadEnd steps down the child that starts no thread, past a newer branch", () => {

@@ -3,18 +3,26 @@ import {
   type CardId,
   type CardRecord,
   cardId,
-  type EntryId,
   type EntryLike,
   entryId,
   ROOT,
   rootIdFor,
+  type TaskId,
+  type TextCard,
   type TreeIndex,
+  taskIdFor,
+  textCardId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { cardMarks, holdsText, ownCards, withFilled } from "./card-marks.ts"
 import { entry, indexOf } from "./fixtures.ts"
 import { hereOfColumn, initialLayout, type Layout } from "./layout.ts"
+import { NO_TASKS, type Tasks } from "./tasks.ts"
+
+const TEST_THREAD = threadIdFor("e")
+const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 /** A root this tab does not hold: its root entry is f1. */
@@ -28,53 +36,73 @@ const said = (id: string, parentId: string | null): EntryLike =>
 /** Two roots: e1 -> e2, and g1. */
 const tree = (...more: EntryLike[]): TreeIndex =>
   indexOf([said("e1", null), said("e2", "e1"), said("g1", null), ...more])
-const atEnd = (id: string, at: string, owner = ADA): CardRecord => ({
-  id: cardId(id),
+const atEnd = (id: string, at: string, owner = ADA): TextCard => ({
+  kind: "text",
+  id: textCardId(id),
   owner,
   placer: owner,
   place: {
     kind: "composing",
-    root: TEST_ROOT,
     at: atEntry(entryId(at)),
-    lane: null,
+    thread: TEST_THREAD,
   },
   carries: { kind: "message", command: null },
   unsent: null,
 })
-const fresh = (id: string, column: string): CardRecord => ({
-  id: cardId(id),
+const fresh = (id: string, column: string): TextCard => ({
+  kind: "text",
+  id: textCardId(id),
   owner: ADA,
   placer: ADA,
-  place: { kind: "fresh", column, root: TEST_ROOT, at: ROOT },
+  place: { kind: "fresh", column, root: TEST_ROOT, task: TEST_TASK, at: ROOT },
   carries: { kind: "message", command: null },
   unsent: null,
 })
-/** e1's tab open, holding a branch column; a new tab; g1's tab closed. */
+/** Each root's task, one a root (ADR-0116): e1's, g1's and the far f1's. */
+const K = (root: string) => taskIdFor(root)
+/** Thread `far` is recorded in the far root. */
+const FAR_THREAD = threadIdFor("far")
+const tasks: Tasks = {
+  ...NO_TASKS,
+  index: {
+    ...NO_TASKS.index,
+    rootOfThread: new Map([[FAR_THREAD, FAR_ROOT]]),
+  },
+  byId: new Map(
+    ["e1", "g1", "f1"].map(r => [
+      K(r),
+      { task: K(r), threads: [], roots: [], entry: entryId(r) },
+    ]),
+  ),
+  ofEntry: new Map(["e1", "g1", "f1"].map(r => [entryId(r), K(r)])),
+}
+/** e1's task open, holding a branch column; a new tab; g1's task closed. */
 const layout: Layout = {
   ...initialLayout(),
-  open: [entryId("e1")],
-  roots: new Map([
+  open: [K("e1")],
+  tasks: new Map([
     [
-      entryId("e1"),
+      K("e1"),
       [
         { key: "first-e1", anchor: entryId("e1") },
         { key: "branch", anchor: entryId("e1"), fresh: {} },
       ],
     ],
-    [entryId("g1"), [{ key: "first-g1", anchor: entryId("g1") }]],
+    [K("g1"), [{ key: "first-g1", anchor: entryId("g1") }]],
   ]),
   newTabs: [{ key: "new-1", anchor: null, fresh: {} }],
 }
 const marks = (
   cards: readonly CardRecord[],
   filled: readonly string[] = cards.map(c => c.id),
-  over: { layout?: Layout; index?: TreeIndex; archived?: Set<EntryId> } = {},
+  over: { layout?: Layout; index?: TreeIndex; archived?: Set<TaskId> } = {},
 ) =>
   cardMarks({
     mine: ownCards(ADA, cards),
     filled: new Set(filled.map(cardId)),
     layout: over.layout ?? layout,
     archived: over.archived ?? new Set(),
+    tasks,
     index: over.index ?? tree(),
     rootEntries: new Map([[FAR_ROOT, entryId("f1")]]),
   })
@@ -93,7 +121,7 @@ test("holdsText: what would make a card, a bare @agent nothing", () => {
 })
 
 test("withFilled: the same set unless the card flips", () => {
-  const C: CardId = cardId("c")
+  const C: CardId = textCardId("c")
   const none: ReadonlySet<CardId> = new Set()
   const some: ReadonlySet<CardId> = new Set([C])
   expect(withFilled(some, C, true)).toBe(some)
@@ -102,12 +130,15 @@ test("withFilled: the same set unless the card flips", () => {
   expect([...withFilled(some, C, false)]).toEqual([])
 })
 
-test("hereOfColumn: a new tab's column, a root's open or closed, or none", () => {
+test("hereOfColumn: a new tab's column, a task's open or closed, or none", () => {
   expect(hereOfColumn(layout, "new-1")).toEqual({ kind: "new", key: "new-1" })
-  expect(hereOfColumn(layout, "branch")).toEqual({ kind: "root", root: "e1" })
+  expect(hereOfColumn(layout, "branch")).toEqual({
+    kind: "task",
+    task: K("e1"),
+  })
   expect(hereOfColumn(layout, "first-g1")).toEqual({
-    kind: "root",
-    root: "g1",
+    kind: "task",
+    task: K("g1"),
   })
   expect(hereOfColumn(layout, "elsewhere")).toBeUndefined()
 })
@@ -127,9 +158,8 @@ describe("cardMarks", () => {
       ...atEnd("c", "e2"),
       place: {
         kind: "note",
-        root: TEST_ROOT,
         at: atEntry(entryId("e2")),
-        lane: null,
+        thread: TEST_THREAD,
         cell: 0,
       },
     }
@@ -147,9 +177,8 @@ describe("cardMarks", () => {
       // In a root this tab does not hold, which your message would mark.
       place: {
         kind: "pinned",
-        root: FAR_ROOT,
         at: atEntry(entryId("e2")),
-        lane: null,
+        thread: TEST_THREAD,
         order: "a",
       },
     }
@@ -163,7 +192,7 @@ describe("cardMarks", () => {
 
   test("your message in a root this tab does not hold marks that root, from the directory (ADR-0063)", () => {
     const far = atEnd("c", "f2")
-    const card = { ...far, place: { ...far.place, root: FAR_ROOT } }
+    const card = { ...far, place: { ...far.place, thread: FAR_THREAD } }
     const m = marks([card])
     expect([...m.roots]).toEqual(["f1"])
     expect(m.elsewhere).toBe(true)
@@ -205,9 +234,9 @@ describe("cardMarks", () => {
     )
   })
 
-  test("an archived root marks its row, never ▦", () => {
+  test("an archived task marks its row, never ▦", () => {
     const m = marks([atEnd("c", "g1")], ["c"], {
-      archived: new Set([entryId("g1")]),
+      archived: new Set([K("g1")]),
     })
     expect([...m.roots]).toEqual(["g1"])
     expect(m.elsewhere).toBe(false)

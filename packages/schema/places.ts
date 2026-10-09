@@ -17,7 +17,7 @@ import {
   Schema,
 } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
-import { type CardId, cardId } from "@pinetrie/core"
+import { type TextCardId, textCardId } from "@pinetrie/core"
 
 /**
  * A card's record as flat strings, "" for none, decoded in
@@ -26,13 +26,13 @@ import { type CardId, cardId } from "@pinetrie/core"
  */
 const StoredCard = Schema.struct.json({
   owner: Schema.string(),
-  /** `drafting`, `queued`, `fresh` or `inventory`: the place's kind (`CardPlace`). */
+  /** `drafting`, `note`, `pinned`, `queued`, `fresh`, `canvas`, `inventory`, or why it is gone: the place's kind (`CardPlace`). */
   kind: Schema.string(),
   /** A drafting, queued or fresh card's root (ADR-0063). */
   root: Schema.string(),
   /** A drafting or queued card's entry; a fresh card's branch point, "" for a new tab. */
   at: Schema.string(),
-  /** A drafting or queued card's lane. */
+  /** A queued card's lane; a spun card's thread. */
   lane: Schema.string(),
   /** A fresh card's column key. */
   column: Schema.string(),
@@ -55,6 +55,10 @@ const StoredCard = Schema.struct.json({
   placer: Schema.string(),
   /** Whose inventory holds it. */
   holder: Schema.string(),
+  /** A canvas card's, a fresh column's or a gone card's task (ADR-0116). */
+  task: Schema.string(),
+  /** A canvas card's width: `1` or `2` columns (ADR-0116). */
+  width: Schema.string(),
 })
 
 const placesSchema = Schema.struct({
@@ -80,11 +84,11 @@ export const newPlacesDoc = (): PlacesDocHandle => createDoc(PlacesDoc)
 
 const CARD_PREFIX = "card:"
 
-/** The document holding a card's text. */
-export const cardDocId = (id: CardId): string => `${CARD_PREFIX}${id}`
+/** The document holding a text card's text. */
+export const cardDocId = (id: TextCardId): string => `${CARD_PREFIX}${id}`
 
-/** A document id -> the card whose text it holds, or undefined for any other document. */
-export const cardIdOfDoc = (docId: string): CardId | undefined =>
+/** A document id -> the text card whose text it holds, or undefined for any other document. */
+export const cardIdOfDoc = (docId: string): TextCardId | undefined =>
   docId.startsWith(CARD_PREFIX) && docId.length > CARD_PREFIX.length
-    ? cardId(docId.slice(CARD_PREFIX.length))
+    ? textCardId(docId.slice(CARD_PREFIX.length))
     : undefined

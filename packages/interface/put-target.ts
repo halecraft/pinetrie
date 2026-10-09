@@ -10,14 +10,14 @@
 import {
   type CardId,
   type CardPlace,
-  type EntryId,
-  entryId,
+  isTaskId,
   isWorkflowStateId,
   keyOf,
   noteOf,
   type PlaceKey,
   pinnedOf,
   sameKey,
+  type TaskId,
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
@@ -35,8 +35,8 @@ export type PutTarget =
   | { readonly kind: "inventory"; readonly slot: number }
   /** A workflow state, on the board or the footer's strip: a new thread there (ADR-0111). */
   | { readonly kind: "state"; readonly state: WorkflowStateId }
-  /** A place in the sidebar, before a root's entry or at its end: a new thread there. */
-  | { readonly kind: "sidebar"; readonly before: EntryId | null }
+  /** A place in the sidebar, before a task or at its end: a new thread there. */
+  | { readonly kind: "sidebar"; readonly before: TaskId | null }
 
 /** The drag data type a card's id travels under, pinetrie's own. */
 export const CARD_MIME = "application/x-pinetrie-card"
@@ -53,7 +53,7 @@ const PUT_SLOT = "data-put-slot"
 const PUT_CELL = "data-put-cell"
 /** The attribute a workflow state carries, on the board and the footer's strip: its id. */
 const PUT_STATE = "data-put-state"
-/** The attribute a place in the sidebar carries: the root entry it goes before, or `end`. */
+/** The attribute a place in the sidebar carries: the task it goes before, or `end`. */
 const PUT_SIDEBAR = "data-put-sidebar"
 const END = "end"
 
@@ -95,8 +95,8 @@ export function targetOfElement(el: {
   if (state !== null && isWorkflowStateId(state))
     return { kind: "state", state }
   const before = el.getAttribute(PUT_SIDEBAR)
-  if (before !== null && before !== "")
-    return { kind: "sidebar", before: before === END ? null : entryId(before) }
+  if (before === END) return { kind: "sidebar", before: null }
+  if (before !== null && isTaskId(before)) return { kind: "sidebar", before }
   const cell = /^(.+):(\d+)$/.exec(el.getAttribute(PUT_CELL) ?? "")
   if (cell?.[1] !== undefined && cell[2] !== undefined)
     return { kind: "cell", key: cell[1], cell: Number(cell[2]) }

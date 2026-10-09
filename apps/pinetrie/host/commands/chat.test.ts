@@ -1,5 +1,4 @@
 import {
-  cardId,
   commitId,
   ERR,
   type ErrCode,
@@ -11,10 +10,14 @@ import {
   runId,
   type SentCard,
   type Sha256,
+  taskIdFor,
+  textCardId,
   threadIdFor,
+  type ValueWrite,
   writerId,
 } from "@pinetrie/core"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
+import { readPlaces } from "@pinetrie/reads"
 import {
   ACCEPTED,
   BASE,
@@ -24,6 +27,7 @@ import {
   PARTICIPANT,
   PROJECT,
   setRecord,
+  TASK,
   THREAD,
 } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
@@ -33,10 +37,12 @@ import {
   methods,
   NO_BLANK_CARDS,
   putLane,
+  putTask,
   putValue,
   ROOT_ID,
   record,
   row,
+  TASK_ID,
   threadRow,
   writeDirectory,
 } from "../fakes.ts"
@@ -47,6 +53,9 @@ import {
   sendChat,
   spendsCard,
 } from "./chat.ts"
+
+/** A new tab's task: in no store yet (ADR-0116). */
+const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
 
 const ALICE = writerId("alice@example.com")
 const LANE = threadIdFor("0123456789abcdef")
@@ -99,6 +108,7 @@ function setUp(begin: ErrCode | null = null) {
     writer: ALICE,
     base: null,
     pinned: [],
+    start: null,
   }
   return { b, pi, work, started, seen, titles, deps, context }
 }
@@ -108,7 +118,7 @@ describe("executeChat", () => {
     const { pi, work, started, titles, deps, context } = setUp()
     const out = await executeChat(
       deps,
-      { kind: "createAndRun", at: ROOT, lane: LANE, details },
+      { kind: "createAndRun", at: ROOT, lane: LANE, details, starts: null },
       context,
     )
     expect(out).toEqual({ kind: "started", runId: "r-1" })
@@ -131,7 +141,7 @@ describe("executeChat", () => {
 
   test("a run carries the sender's pinned versions, for it to wait for", async () => {
     const { seen, deps, context } = setUp()
-    const pinned = [{ id: cardId("c-1"), seen: "v-1" }]
+    const pinned = [{ id: textCardId("c-1"), seen: "v-1" }]
     await executeChat(
       deps,
       { kind: "run", lane: LANE, details },
@@ -142,7 +152,7 @@ describe("executeChat", () => {
     )
     await executeChat(
       deps,
-      { kind: "createAndRun", at: ROOT, lane: LANE, details },
+      { kind: "createAndRun", at: ROOT, lane: LANE, details, starts: null },
       { ...context, pinned },
     )
     expect(seen).toEqual([pinned, pinned])
@@ -152,7 +162,7 @@ describe("executeChat", () => {
     const { pi, started, deps, context } = setUp(ERR.BAD_BASE)
     const out = await executeChat(
       deps,
-      { kind: "createAndRun", at: ROOT, lane: LANE, details },
+      { kind: "createAndRun", at: ROOT, lane: LANE, details, starts: null },
       { ...context, base: "wip/gone" },
     )
     expect(out).toMatchObject({ kind: "refused", code: ERR.BAD_BASE })
@@ -192,6 +202,8 @@ describe("sendChat", () => {
   ) {
     const b = basics()
     writeEntry(b.root, threadRow(E1, null, LANE))
+    // The thread's task, which a branch from it is put in (ADR-0116).
+    putTask(b, LANE)
     if (project !== null) putValue(b, setRecord(PROJECT, project))
     const cards = record<ChatDeps["cards"]>({
       writers: async () => [ALICE, BEA],
@@ -245,7 +257,7 @@ describe("sendChat", () => {
     writeDirectory(b)
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("do it", true),
-      at: { kind: "branch", thread: NEW, at: null },
+      at: { kind: "branch", thread: NEW, at: null, task: NEW_TASK },
     })
     expect(out).toMatchObject({ kind: "refused", code: ERR.ROOT_ID_IN_USE })
     expect([pi.calls, started]).toEqual([[], []])
@@ -260,7 +272,7 @@ describe("sendChat", () => {
 
   test("the chat command's pinned versions reach its run", async () => {
     const { seen, deps } = setUp()
-    const pinned = [{ id: cardId("c-1"), seen: "v-1" }]
+    const pinned = [{ id: textCardId("c-1"), seen: "v-1" }]
     await sendChat(deps, ALICE, "s-1", { ...chat("do it", true), pinned })
     expect(seen).toEqual([pinned])
   })
@@ -270,7 +282,7 @@ describe("sendChat", () => {
     await sendChat(deps, ALICE, "s-1", chat("do it", true))
     await sendChat(deps, ALICE, "s-2", {
       ...chat("do it", true),
-      at: { kind: "branch", thread: NEW, at: E1 },
+      at: { kind: "branch", thread: NEW, at: E1, task: TASK_ID },
     })
     expect(
       pi.calls.filter(c => c.method === "createThreadLane").map(c => c.args[1]),
@@ -281,7 +293,7 @@ describe("sendChat", () => {
     const { pi, records, names, deps } = setUp()
     await sendChat(deps, ALICE, "s-1", {
       ...chat("aside"),
-      at: { kind: "branch", thread: NEW, at: E1 },
+      at: { kind: "branch", thread: NEW, at: E1, task: TASK_ID },
     })
     await sendChat(deps, ALICE, "s-2", chat("on"))
     const appended = pi.calls
@@ -302,13 +314,31 @@ describe("sendChat", () => {
     expect(names.calls.map(c => c.method)).toEqual(["ensure"])
   })
 
+  test("a thread's start is planned with its send and written before it: its card on its task's canvas, and a new task's record (ADR-0116)", async () => {
+    const { b, records, deps } = setUp()
+    await sendChat(deps, ALICE, "s-1", {
+      ...chat("a new task"),
+      at: { kind: "branch", thread: NEW, at: null, task: NEW_TASK },
+    })
+    expect(readPlaces(b.places).find(c => c.id === NEW)?.place).toMatchObject({
+      kind: "canvas",
+      task: NEW_TASK,
+      width: 1,
+    })
+    const written = records.calls.flatMap(c => c.args[0] as ValueWrite[])
+    expect(written.map(w => w.namespace)).toEqual([
+      THREAD.namespace,
+      TASK.namespace,
+    ])
+  })
+
   test("a branch naming a thread that has started is refused, and nothing is written", async () => {
     const { pi, deps } = setUp()
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("again"),
-      at: { kind: "branch", thread: LANE, at: E1 },
+      at: { kind: "branch", thread: LANE, at: E1, task: TASK_ID },
     })
-    expect(out).toMatchObject({ kind: "refused", code: ERR.LANE_ID_IN_USE })
+    expect(out).toMatchObject({ kind: "refused", code: ERR.THREAD_TAKEN })
     expect(pi.calls.filter(c => c.method === "appendToTree")).toEqual([])
   })
 
@@ -451,6 +481,7 @@ describe("sendChat", () => {
         writer: ALICE,
         base: null,
         pinned: [],
+        start: null,
       },
     )
     expect(out).toEqual({ kind: "conflict", by: BEA })
@@ -460,7 +491,7 @@ describe("sendChat", () => {
     const { pi, cards, deps } = setUp()
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("from the card"),
-      card: { id: cardId("c-1"), seen: "" },
+      card: { id: textCardId("c-1"), seen: "" },
     })
     expect(out).toEqual({ kind: "appended", id: "e-2" })
     const appended = pi.calls.find(c => c.method === "appendToTree")
@@ -493,7 +524,7 @@ describe("sendChat", () => {
     // Refused before it is planned: an image the host does not store.
     const early = await sendChat(deps, ALICE, "s-1", {
       ...chat(`look ![a](/blob/${missing})`),
-      card: { id: cardId("c-1"), seen: "" },
+      card: { id: textCardId("c-1"), seen: "" },
     })
     // Refused as it is written: pi will not append it.
     const late = await sendChat(
@@ -505,7 +536,7 @@ describe("sendChat", () => {
       },
       ALICE,
       "s-2",
-      { ...chat("from the card"), card: { id: cardId("c-1"), seen: "" } },
+      { ...chat("from the card"), card: { id: textCardId("c-1"), seen: "" } },
     )
     expect([early.kind, late.kind]).toEqual(["refused", "refused"])
   })
@@ -517,7 +548,7 @@ describe("sendChat", () => {
     putValue(b, setRecord(PARTICIPANT, { writer: BEA, name: "Bea" }))
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("@bea when it is done"),
-      card: { id: cardId("c-1"), seen: "" },
+      card: { id: textCardId("c-1"), seen: "" },
     })
     expect(out).toEqual({ kind: "busy" })
     expect(pi.calls).toEqual([])

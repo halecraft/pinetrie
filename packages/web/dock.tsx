@@ -16,7 +16,6 @@ import type {
   EntryId,
   LaneView,
   Position,
-  RootId,
   StopRecord,
   TreeIndex,
 } from "@pinetrie/core"
@@ -55,7 +54,7 @@ export function Dock(p: {
   asks: AskIndex
   stops: ReadonlyMap<EntryId, StopRecord>
   /** Where "+ add to queue" makes its card: the thread's end and root. */
-  queueAt: { readonly at: Position; readonly root: RootId } | null
+  queueAt: { readonly at: Position } | null
   reader: Reader
   readOnly: ReadOnly | null
   catchUps: CatchUps
@@ -100,7 +99,6 @@ export function Dock(p: {
     p.onAct({
       kind: "queueNew",
       card,
-      root: p.queueAt.root,
       lane: lane.name,
       at: p.queueAt.at,
       command: null,

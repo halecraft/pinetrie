@@ -9,7 +9,8 @@
 // (`seat.ts`).
 
 import {
-  type ArchivedRoot,
+  type ArchivedTask,
+  asPlaceFields,
   atEntry,
   CARD_COMMANDS,
   type CardCarries,
@@ -21,8 +22,14 @@ import {
   cardId,
   type EntryId,
   firstEmpty,
+  fitsPlace,
   INVENTORY_SLOTS,
+  isFact,
+  isTextCard,
+  isTextCardId,
+  isThreadId,
   keyOf,
+  kindOfCard,
   type Move,
   type MoveRefusal,
   moveOf,
@@ -33,13 +40,16 @@ import {
   PLAIN,
   type PlaceKey,
   type Position,
+  placed,
   placeFields,
   placeOfFields,
   type Reorder,
   type RootId,
-  type RootRecord,
   sameKey,
   seenAt,
+  type TaskId,
+  type TextCard,
+  type TextCardId,
   type ThreadId,
   type TreeIndex,
   threadAt,
@@ -50,6 +60,7 @@ import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { decodeOfferFact, encodeOfferFact } from "./fact.ts"
 import { orderAfter, orderBetween, respace } from "./order.ts"
+import { NO_TASK_INDEX, type TaskIndex, taskOfPlace } from "./task.ts"
 
 /**
  * A card as the places document stores it: flat strings, "" for none. The
@@ -71,6 +82,10 @@ const StoredCard = Type.Object({
   unsent: Type.String(),
   placer: Type.String({ minLength: 1 }),
   holder: Type.String(),
+  /** A canvas, fresh or gone card's task (ADR-0116); absent before tasks. */
+  task: Type.Optional(Type.String()),
+  /** A canvas card's width; absent before tasks. */
+  width: Type.Optional(Type.String()),
 })
 
 /** The flat value the places document stores under a card's id. */
@@ -89,22 +104,27 @@ interface StoredCardFields {
   readonly unsent: string
   readonly placer: string
   readonly holder: string
+  readonly task: string
+  readonly width: string
 }
 
-/** A card record -> the flat value the places document stores under its id. */
-export const encodeCard = ({
-  owner,
-  place,
-  placer,
-  carries,
-  unsent,
-}: CardRecord): StoredCardFields => ({
-  owner,
-  ...placeFields(place),
-  command: carries.kind === "message" ? (carries.command ?? "") : "",
-  fact: carries.kind === "fact" ? encodeOfferFact(carries.fact) : "",
-  unsent: unsent ?? "",
-  placer,
+/**
+ * A card record -> the flat value the places document stores under its id.
+ * A thread's card has no text, so no command, fact or reason unsent.
+ */
+export const encodeCard = (card: CardRecord): StoredCardFields => ({
+  owner: card.owner,
+  ...placeFields(card.place),
+  command:
+    card.kind === "text" && card.carries.kind === "message"
+      ? (card.carries.command ?? "")
+      : "",
+  fact:
+    card.kind === "text" && card.carries.kind === "fact"
+      ? encodeOfferFact(card.carries.fact)
+      : "",
+  unsent: card.kind === "text" ? (card.unsent ?? "") : "",
+  placer: card.placer,
 })
 
 const isCommand = (s: string): s is CardCommand =>
@@ -124,26 +144,37 @@ function carriesOf(command: string, fact: string): CardCarries | undefined {
 }
 
 /**
- * A stored card -> its record; undefined for one that is malformed, a
+ * A stored card -> its record, of the kind its id says (`kindOfCard`);
+ * undefined for one that is malformed, in a place its kind is never in, a
  * command or a fact this build does not know among them, or a fact with a
  * command. Total. Where it is is read by core's `placeOfFields`, as a move's
  * key on the wire is by `keyOfFields`. A record stored before facts has no
- * `fact`, and is a message.
+ * `fact`, and is a message. A kind of card this build does not hold yet is
+ * left out.
  */
 export const decodeCard = (
   id: string,
   value: unknown,
 ): CardRecord | undefined =>
   decodeWith(StoredCard, value, c => {
-    const place = placeOfFields(c)
+    const place = placeOfFields(asPlaceFields(c))
     if (place === undefined) return undefined
+    const card = cardId(id)
+    const owner = c.owner as WriterId
+    const placer = c.placer as WriterId
+    if (isThreadId(card))
+      return place.kind === "canvas" || place.kind === "inventory"
+        ? { kind: "thread", id: card, owner, place, placer }
+        : undefined
+    if (!isTextCardId(card) || place.kind === "canvas") return undefined
     const carries = carriesOf(c.command, c.fact ?? "")
     if (carries === undefined) return undefined
     return {
-      id: cardId(id),
-      owner: c.owner as WriterId,
+      kind: "text",
+      id: card,
+      owner,
       place,
-      placer: c.placer as WriterId,
+      placer,
       carries,
       unsent: c.unsent === "" ? null : c.unsent,
     }
@@ -185,8 +216,9 @@ export function cardsAt(
   end: EntryId,
   cards: readonly CardRecord[],
   index: TreeIndex,
-): readonly CardRecord[] {
+): readonly TextCard[] {
   return cards
+    .filter(isTextCard)
     .filter(c => c.place.kind === kind && placeEnd(c.place, index) === end)
     .sort(byOrder)
 }
@@ -207,21 +239,13 @@ const byOrder = (a: CardRecord, b: CardRecord): number => {
 type NotePlace = Extract<CardPlace, { kind: "note" }>
 
 /**
- * The board a note's cell is on, as the host can tell without the tree:
- * its lane's, which is its thread's, else its root and where it was made.
- * Two notes of one lane-less thread made at different ends are counted on
- * two boards: the page draws a cell two notes claim in one of them
- * (`notesBoardView`).
+ * The board a note's cell is on, as the host can tell without the tree: its
+ * thread's, which its place names.
  */
-const boardOf = (p: {
-  readonly root: RootId
-  readonly at: Position
-  readonly lane: ThreadId | null
-}): string => `${p.root} ${p.lane ?? (p.at.kind === "entry" ? p.at.id : "")}`
+const boardOf = (p: { readonly thread: ThreadId }): string => p.thread
 
-const isNote = (
-  c: CardRecord,
-): c is CardRecord & { readonly place: NotePlace } => c.place.kind === "note"
+const isNote = (c: CardRecord): c is TextCard & { readonly place: NotePlace } =>
+  c.kind === "text" && c.place.kind === "note"
 
 /** The cells taken on `place`'s board. */
 const cellsTaken = (
@@ -295,9 +319,9 @@ export function yourCard(
   where: CardWhere,
   cards: readonly CardRecord[],
   index: TreeIndex,
-): CardRecord | undefined {
-  let found: CardRecord | undefined
-  for (const c of cards) {
+): TextCard | undefined {
+  let found: TextCard | undefined
+  for (const c of cards.filter(isTextCard)) {
     if (c.owner !== me) continue
     const here =
       where.kind === "end"
@@ -310,12 +334,13 @@ export function yourCard(
 
 // ── the queue (ADR-0048 step 3, S69) ──────────────────────────────────────
 
-/** A queued card, with its place narrowed. */
-export type QueuedCard = CardRecord & {
+/** A queued card, with its place narrowed: only a text card is queued. */
+export type QueuedCard = TextCard & {
   readonly place: Extract<CardPlace, { kind: "queued" }>
 }
 
-const isQueued = (c: CardRecord): c is QueuedCard => c.place.kind === "queued"
+const isQueued = (c: CardRecord): c is QueuedCard =>
+  c.place.kind === "queued" && isTextCard(c)
 
 const isPinned = (
   c: CardRecord,
@@ -330,7 +355,7 @@ export function queuedOn(
 ): QueuedCard[] {
   return cards
     .filter(isQueued)
-    .filter(c => c.place.lane === lane)
+    .filter(c => c.place.thread === lane)
     .sort(byOrder)
 }
 
@@ -354,7 +379,7 @@ export type NextQueuedCardPopStep =
  * to queue"'s card before anyone writes in it. The drain passes over it,
  * leaving it where it is, rather than send nothing.
  */
-export const isBlankMessage = (card: CardRecord, text: string): boolean =>
+export const isBlankMessage = (card: TextCard, text: string): boolean =>
   card.carries.kind === "message" &&
   card.carries.command === null &&
   text.trim() === ""
@@ -371,20 +396,22 @@ export function blankQueued(
   cards: readonly CardRecord[],
   texts: {
     /** Whether the text held here has `seen`, the queuer's version. */
-    readonly holds: (card: CardId, seen: string) => boolean
-    readonly text: (card: CardId) => string
+    readonly holds: (card: TextCardId, seen: string) => boolean
+    readonly text: (card: TextCardId) => string
   },
 ): ReadonlySet<CardId> {
   return new Set(
-    cards.flatMap(c =>
-      c.place.kind === "queued" &&
-      c.carries.kind === "message" &&
-      c.carries.command === null &&
-      texts.holds(c.id, c.place.seen) &&
-      isBlankMessage(c, texts.text(c.id))
-        ? [c.id]
-        : [],
-    ),
+    cards
+      .filter(isTextCard)
+      .flatMap(c =>
+        c.place.kind === "queued" &&
+        c.carries.kind === "message" &&
+        c.carries.command === null &&
+        texts.holds(c.id, c.place.seen) &&
+        isBlankMessage(c, texts.text(c.id))
+          ? [c.id]
+          : [],
+      ),
   )
 }
 
@@ -456,9 +483,8 @@ export const planUnsent = (
     ...card,
     place: withCell(cards, {
       kind: "note",
-      root: card.place.root,
       at: card.place.at,
-      lane: card.place.lane,
+      thread: card.place.thread,
       cell: null,
     }),
     unsent: reason,
@@ -473,22 +499,21 @@ export const planUnsent = (
  */
 export function planFactCard(input: {
   readonly cards: readonly CardRecord[]
-  readonly id: CardId
+  readonly id: TextCardId
   readonly fact: OfferFact
-  readonly root: RootId
   readonly at: Position
 }): PlaceStep {
   const { fact } = input
   return {
     kind: "write",
     record: {
+      kind: "text",
       id: input.id,
       owner: fact.by,
       place: {
         kind: "queued",
-        root: input.root,
         at: input.at,
-        lane: fact.lane,
+        thread: fact.lane,
         order: orderAfter(queuedOn(input.cards, fact.lane)),
         by: fact.by,
         seen: "",
@@ -519,7 +544,7 @@ export type CarryPlan =
   | { readonly kind: "send" }
 
 /** A popped card and its text -> what the drain does with it. Pure. */
-export function planCarry(card: CardRecord, text: string): CarryPlan {
+export function planCarry(card: TextCard, text: string): CarryPlan {
   if (card.carries.kind === "fact")
     return { kind: "fact", fact: card.carries.fact }
   const blank = text.trim() === ""
@@ -548,8 +573,29 @@ export type MoveStep =
     }
 
 /**
+ * What names a discard's history (ADR-0066, ADR-0116), the host's to decide:
+ * the tasks, and the task the sender is on, for a card that leaves no task.
+ */
+export interface Discards {
+  readonly tasks: TaskIndex
+  readonly here: TaskId | null
+}
+
+/** For moves that discard nothing: a queueing, whose target is a queue. */
+export const NO_DISCARDS: Discards = { tasks: NO_TASK_INDEX, here: null }
+
+/**
+ * The history a card leaving `from` for gone is in: the task it leaves,
+ * else, from an inventory, the task its sender is on. Pure.
+ */
+export const discardHistory = (
+  from: CardPlace,
+  discards: Discards,
+): TaskId | null => taskOfPlace(discards.tasks, from) ?? discards.here
+
+/**
  * A key as the place it becomes, with what the host assigns to a queued or
- * pinned one. A pinned card goes after every pinned card in the session, not
+ * pinned one, and a gone one's history (`discardHistory`). A pinned card goes after every pinned card in the session, not
  * only its thread's: a thread is found through the tree, which a handoff
  * does not read, and an order only has to grow within a thread.
  */
@@ -557,18 +603,43 @@ function placeAt(
   key: PlaceKey,
   cards: readonly CardRecord[],
   sender: WriterId,
+  now: CardRecord | undefined,
+  discards: Discards,
 ): CardPlace {
   switch (key.kind) {
+    // At the canvas's end, as wide as it was on a canvas, else one column.
+    case "canvas":
+      return {
+        ...key,
+        order: orderAfter(
+          cards.filter(
+            (
+              c,
+            ): c is CardRecord & { place: { kind: "canvas"; order: string } } =>
+              c.place.kind === "canvas" &&
+              c.place.task === key.task &&
+              c.id !== now?.id,
+          ),
+        ),
+        width: now?.place.kind === "canvas" ? now.place.width : 1,
+      }
     case "queued":
       return {
         ...key,
-        order: orderAfter(queuedOn(cards, key.lane)),
+        order: orderAfter(queuedOn(cards, key.thread)),
         by: sender,
       }
     case "pinned":
       return { ...key, order: orderAfter(cards.filter(isPinned)) }
     case "gone":
-      return { ...key, by: sender }
+      return {
+        ...key,
+        task:
+          now === undefined
+            ? discards.here
+            : discardHistory(now.place, discards),
+        by: sender,
+      }
     case "note":
       return withCell(cards, key)
     default:
@@ -590,6 +661,7 @@ function refuseInto(
   card: CardId,
   sender: WriterId,
 ): MoveRefusal | null {
+  if (!fitsPlace(kindOfCard(card), to.kind)) return "no-place"
   if (!ownsPlace(to, sender)) return "not-yours"
   if (to.kind !== "inventory") return null
   const held = cards.filter(
@@ -625,18 +697,25 @@ export function planMove(
   cards: readonly CardRecord[],
   move: Move,
   sender: WriterId,
+  discards: Discards,
 ): MoveStep {
   const now = cards.find(c => c.id === move.card)
   if (move.from === null) {
     if (now !== undefined) return { kind: "refused", code: "exists", now }
     const refusal = refuseInto(move.to, cards, move.card, sender)
     if (refusal !== null) return { kind: "refused", code: refusal, now: null }
+    const place = placeAt(move.to, cards, sender, undefined, discards)
+    // Only a text card is made by a move: a thread's card is the host's to
+    // make, with its thread's first message.
+    if (!isTextCardId(move.card) || place.kind === "canvas")
+      return { kind: "refused", code: "no-place", now: null }
     return {
       kind: "write",
       record: {
+        kind: "text",
         id: move.card,
         owner: sender,
-        place: placeAt(move.to, cards, sender),
+        place,
         placer: sender,
         carries: PLAIN,
         unsent: null,
@@ -646,7 +725,7 @@ export function planMove(
   if (now === undefined || now.place.kind === "gone")
     return { kind: "refused", code: "gone", now: null }
   // A fact is the host's, on its way into the thread: nobody moves it.
-  if (now.carries.kind === "fact") return { kind: "refused", code: "fact", now }
+  if (isFact(now)) return { kind: "refused", code: "fact", now }
   if (!seenAt(keyOf(now.place), move.from))
     return { kind: "refused", code: "moved", now }
   // A move to where the card is would requeue it last, under its sender's
@@ -657,14 +736,18 @@ export function planMove(
     return { kind: "refused", code: "not-yours", now }
   const refusal = refuseInto(move.to, cards, move.card, sender)
   if (refusal !== null) return { kind: "refused", code: refusal, now }
+  const record = placed(now, placeAt(move.to, cards, sender, now, discards))
+  if (record === undefined) return { kind: "refused", code: "no-place", now }
   return {
     kind: "write",
-    record: {
-      ...now,
-      place: placeAt(move.to, cards, sender),
-      placer: sender,
-      unsent: move.to.kind === "queued" ? null : now.unsent,
-    },
+    record:
+      record.kind === "text"
+        ? {
+            ...record,
+            placer: sender,
+            unsent: move.to.kind === "queued" ? null : record.unsent,
+          }
+        : { ...record, placer: sender },
   }
 }
 
@@ -680,14 +763,14 @@ const siblingsOf = (
   card: CardRecord,
 ): readonly CardRecord[] =>
   (card.place.kind === "queued"
-    ? queuedOn(cards, card.place.lane)
+    ? queuedOn(cards, card.place.thread)
     : cards.filter(isPinned).sort(byOrder)
   ).filter(c => c.id !== card.id)
 
 /** `card` with order `order`, everything else as it is. */
 const withOrder = (card: CardRecord, order: string): CardRecord =>
   card.place.kind === "queued" || card.place.kind === "pinned"
-    ? { ...card, place: { ...card.place, order } }
+    ? (placed(card, { ...card.place, order }) ?? card)
     : card
 
 /**
@@ -713,7 +796,7 @@ export function planReorder(
 ): MovesStep | MoveStep {
   const now = cards.find(c => c.id === reorder.card)
   if (now === undefined) return { kind: "refused", code: "gone", now: null }
-  if (now.carries.kind === "fact") return { kind: "refused", code: "fact", now }
+  if (isFact(now)) return { kind: "refused", code: "fact", now }
   if (!sameKey(keyOf(now.place), reorder.at))
     return { kind: "refused", code: "moved", now }
   const changed: MoveStep = { kind: "refused", code: "order-changed", now }
@@ -739,8 +822,7 @@ export function planReorder(
     const from = was < 0 ? siblings.length : was
     const passed =
       index < from ? siblings.slice(index, from) : siblings.slice(from, index)
-    if (passed.some(c => c.carries.kind === "fact"))
-      return { kind: "refused", code: "fact", now }
+    if (passed.some(isFact)) return { kind: "refused", code: "fact", now }
   }
   const bound = (i: number | null): string | null => {
     const c = i === null ? undefined : siblings[i]
@@ -776,13 +858,13 @@ export function planFreshFollow(
   sent: CardId,
   root: RootId,
   at: EntryId,
-  lane: ThreadId | null,
+  thread: ThreadId,
 ): readonly PlaceStep[] {
   const place = cards.find(c => c.id === sent)?.place
   if (place?.kind !== "fresh" || place.root !== root) return []
   const steps: PlaceStep[] = []
   let now = cards
-  for (const c of cards) {
+  for (const c of cards.filter(isTextCard)) {
     if (
       c.id === sent ||
       c.place.kind !== "fresh" ||
@@ -795,9 +877,8 @@ export function planFreshFollow(
         ...c,
         place: withCell(now, {
           kind: "note",
-          root,
           at: atEntry(at),
-          lane,
+          thread,
           cell: null,
         }),
       },
@@ -824,15 +905,15 @@ export function planStoredCardRepair(
   const kept = new Set<string>()
   const steps: PlaceStep[] = []
   // Newest first: `yourCard` takes the newest at an end (ids are uuidv7).
-  const newest = [...cards].sort((a, b) =>
-    a.id < b.id ? 1 : a.id > b.id ? -1 : 0,
-  )
+  const newest = cards
+    .filter(isTextCard)
+    .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
   for (const c of newest) {
     const { place } = c
     if (place.kind !== "composing") continue
     const end =
       ends.get(c.id) ??
-      `${place.root} ${place.at.kind === "entry" ? place.at.id : ""} ${place.lane ?? ""}`
+      `${place.thread} ${place.at.kind === "entry" ? place.at.id : ""}`
     const key = `${c.owner} ${end}`
     if (!kept.has(key)) {
       kept.add(key)
@@ -886,11 +967,12 @@ export function planMoves(
   cards: readonly CardRecord[],
   moves: readonly Move[],
   sender: WriterId,
+  discards: Discards,
 ): MovesStep {
   const steps: PlaceStep[] = []
   let now = cards
   for (const move of moves) {
-    const step = planMove(now, move, sender)
+    const step = planMove(now, move, sender, discards)
     if (step.kind === "refused") return step
     steps.push(step)
     now = afterStep(now, step)
@@ -914,12 +996,13 @@ export function planMoveCommand(
   moves: readonly Move[],
   sender: WriterId,
   running: (lane: ThreadId) => boolean,
+  discards: Discards,
 ): { readonly step: MovesStep; readonly drain: readonly ThreadId[] } {
-  const step = planMoves(cards, moves, sender)
+  const step = planMoves(cards, moves, sender, discards)
   if (step.kind === "refused") return { step, drain: [] }
   const lanes = step.steps.flatMap(s =>
     s.kind === "write" && s.record.place.kind === "queued"
-      ? [s.record.place.lane]
+      ? [s.record.place.thread]
       : [],
   )
   return { step, drain: [...new Set(lanes)].filter(l => !running(l)) }
@@ -927,56 +1010,61 @@ export function planMoveCommand(
 
 // ── moves' history (ADR-0066) ─────────────────────────────────────────────
 
-/** The root a place is in; null for an inventory, or a card gone in none. */
-const rootOfPlace = (place: CardPlace | PlaceKey): RootId | null =>
-  place.kind === "inventory" ? null : place.root
-
 /**
- * The root whose history of the sender's moves `moves` enter, or null for
- * none (ADR-0066). A creation enters none: a composer's new card, a copy.
- * Otherwise the root the card goes to, when it goes to one, else the root it
- * leaves, read from its record, since the host accepts a move only from
- * where the card is. So a take into the inventory is recorded where it
- * left, a put where it went, a drag across roots where it went, and a
- * discard in the root its gone place names (`discardedOf`). Of several, the
- * first that names a root names the step's. Pure.
+ * The task whose history of the sender's moves `moves` enter, or null for
+ * none (ADR-0066, ADR-0116). A creation enters none: a composer's new card,
+ * a copy. Otherwise the task the card goes to, when it goes to one, else the
+ * task it leaves, read from its record, since the host accepts a move only
+ * from where the card is. So a take into the inventory is recorded where it
+ * left, a put where it went, a drag across tasks where it went, and a
+ * discard where its gone place goes (`discardHistory`), which the page does not
+ * name (ADR-0066). Of several, the first that names a task names the
+ * step's. A place at a thread is in its thread's task (`taskOfPlace`). Pure.
  */
 export function historyOf(
   moves: readonly Move[],
   cards: readonly CardRecord[],
-): RootId | null {
+  discards: Discards,
+): TaskId | null {
+  const taskOf = (place: CardPlace | PlaceKey) =>
+    taskOfPlace(discards.tasks, place)
   for (const move of moves) {
     if (move.from === null) return null
     const from = cards.find(c => c.id === move.card)?.place
-    const root =
-      rootOfPlace(move.to) ?? (from === undefined ? null : rootOfPlace(from))
-    if (root !== null) return root
+    const task =
+      from === undefined
+        ? null
+        : move.to.kind === "gone"
+          ? discardHistory(from, discards)
+          : (taskOf(move.to) ?? taskOf(from))
+    if (task !== null) return task
   }
   return null
 }
 
-/** How long an archived root's histories are kept (ADR-0066). */
+/** How long an archived task's histories are kept (ADR-0066). */
 const ARCHIVED_HISTORY_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
- * The histories of moves to retire (ADR-0066): those of a root archived
+ * The histories of moves to retire (ADR-0066): those of a task archived
  * `ARCHIVED_HISTORY_MS` ago or longer; and, at startup only, those of a
- * root the directory does not name: a new tab that never sent, or a root
- * gone. After a run's end that second rule would retire the history of a new
- * tab open now. `stored` is every stored `moves:` document. Pure.
+ * task the session does not hold (a new tab that never sent, or a task
+ * gone). An id that names no task is left. After a run's end that second
+ * rule would retire the history of a new tab open now. `stored` is every
+ * stored `moves:` document. Pure.
  */
 export function planHistorySweep(input: {
   readonly stored: readonly string[]
-  readonly roots: ReadonlyMap<RootId, RootRecord>
-  readonly archived: ReadonlyMap<RootId, ArchivedRoot>
+  readonly tasks: ReadonlySet<TaskId>
+  readonly archived: ReadonlyMap<TaskId, ArchivedTask>
   readonly now: number
   readonly startup: boolean
 }): readonly string[] {
   return input.stored.filter(docId => {
     const of = movesOfDocId(docId)
     if (of === undefined) return false
-    if (!input.roots.has(of.root)) return input.startup
-    const archived = input.archived.get(of.root)
+    if (!input.tasks.has(of.task)) return input.startup
+    const archived = input.archived.get(of.task)
     return (
       archived !== undefined && input.now - archived.at >= ARCHIVED_HISTORY_MS
     )
@@ -1070,14 +1158,14 @@ export function planSetCommand(
   command: CardCommand | null,
 ): MoveStep {
   const now = cards.find(c => c.id === card)
-  return now === undefined
-    ? { kind: "refused", code: "gone", now: null }
-    : now.carries.kind === "fact"
-      ? { kind: "refused", code: "fact", now }
-      : {
-          kind: "write",
-          record: { ...now, carries: { kind: "message", command } },
-        }
+  if (now === undefined) return { kind: "refused", code: "gone", now: null }
+  if (now.kind !== "text") return { kind: "refused", code: "no-place", now }
+  return now.carries.kind === "fact"
+    ? { kind: "refused", code: "fact", now }
+    : {
+        kind: "write",
+        record: { ...now, carries: { kind: "message", command } },
+      }
 }
 
 /**
@@ -1092,7 +1180,9 @@ export function planCardSweep(input: {
   readonly stored: readonly string[]
   readonly cardOfDoc: (docId: string) => CardId | undefined
 }): { readonly records: CardId[]; readonly docs: string[] } {
+  // A thread's card has no text, and is never swept for its lack of one.
   const records = input.cards
+    .filter(isTextCard)
     .filter(
       c =>
         c.carries.kind === "message" &&
@@ -1101,7 +1191,7 @@ export function planCardSweep(input: {
     )
     .map(c => c.id)
   const live = new Set<string>(
-    input.cards.map(c => c.id).filter(id => !records.includes(id)),
+    input.cards.map(c => c.id).filter(id => !records.some(r => r === id)),
   )
   const docs = input.stored.filter(docId => {
     const id = input.cardOfDoc(docId)

@@ -2,11 +2,14 @@ import { createInMemoryStore, Exchange, whenHydrated } from "@kyneta/exchange"
 import {
   atEntry,
   type CardRecord,
-  cardId,
   entryId,
   movesDocId,
-  type RootId,
   rootIdFor,
+  type TaskId,
+  type TextCard,
+  taskIdFor,
+  textCardId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
@@ -16,16 +19,19 @@ import { expect, test } from "vitest"
 import { createMoveHistories } from "./move-history.ts"
 import { applyPlaceSteps } from "./places.ts"
 
+const TEST_THREAD = threadIdFor("e")
+
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
-const R1 = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const R2 = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
-const atEnd = (root: RootId) =>
+/** Two tasks, each with its own history (ADR-0116); their cards in one root. */
+const R1 = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const R2 = taskIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+const _ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const atEnd = (_task: TaskId) =>
   ({
     kind: "note",
-    root,
     at: atEntry(entryId("e-1")),
-    lane: null,
+    thread: TEST_THREAD,
     cell: 0,
   }) as const
 const inventory = { kind: "inventory", holder: ADA } as const
@@ -36,8 +42,9 @@ async function setUp() {
   const places = exchange.get(PLACES_DOC_ID, PlacesDoc)
   await whenHydrated(places)
   const histories = createMoveHistories(exchange)
-  const card = (id: string, root: RootId): CardRecord => ({
-    id: cardId(id),
+  const card = (id: string, root: TaskId): TextCard => ({
+    kind: "text",
+    id: textCardId(id),
     owner: ADA,
     placer: ADA,
     place: atEnd(root),
@@ -50,9 +57,9 @@ async function setUp() {
   /** `writer` moves `c` to `place`, as one step of their history in `root`. */
   const move = async (
     writer: typeof ADA,
-    root: RootId,
-    c: CardRecord,
-    place: CardRecord["place"],
+    root: TaskId,
+    c: TextCard,
+    place: TextCard["place"],
   ) =>
     applyPlaceSteps(
       places,
@@ -65,7 +72,7 @@ async function setUp() {
   return { store, exchange, histories, card, seed, move, placeOf, recordOf }
 }
 
-test("a move is one step of its writer's history in its root, and undoes whole after rev was raised (S82)", async () => {
+test("a move is one step of its writer's history in its task, and undoes whole after rev was raised (S82)", async () => {
   const { histories, card, seed, move, placeOf } = await setUp()
   const a = card("a", R1)
   seed(a)
@@ -79,7 +86,7 @@ test("a move is one step of its writer's history in its root, and undoes whole a
   histories.dispose()
 })
 
-test("another root's history, and another writer's, are untouched by an undo", async () => {
+test("another task's history, and another writer's, are untouched by an undo", async () => {
   const { histories, card, seed, move, placeOf } = await setUp()
   const [a, b, c] = [card("a", R1), card("b", R2), card("c", R1)]
   for (const x of [a, b, c]) seed(x)

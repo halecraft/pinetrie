@@ -5,7 +5,6 @@ import {
   type RootRecord,
   rootDocId,
   rootIdFor,
-  writerId,
 } from "@pinetrie/core"
 import { newLiveDoc, newPlacesDoc } from "@pinetrie/schema"
 import { newSessionDoc } from "@pinetrie/schema/fixtures"
@@ -17,7 +16,6 @@ const record = (n: string, entry: string | null): RootRecord => ({
   entry: entry === null ? null : entryId(entry),
   first: null,
   firstLine: "",
-  title: null,
   messages: 0,
   newest: null,
   writers: [],
@@ -26,21 +24,17 @@ const record = (n: string, entry: string | null): RootRecord => ({
   images: [],
 })
 
-test("planLoads: every root but the archived ones, a root with no message among them (ADR-0063)", () => {
+test("planLoads: every root something still holds a thread of, a root with no message among them (ADR-0063, ADR-0116)", () => {
   const roots = new Map(
     [record("a", "ea"), record("b", "eb"), record("c", null)].map(
       r => [r.root, r] as const,
     ),
   )
-  const archive = new Map([
-    [rootIdFor("b"), { root: rootIdFor("b"), by: writerId("x@y.z"), at: 1 }],
-  ])
-  expect(planLoads(roots, archive)).toEqual([rootIdFor("a"), rootIdFor("c")])
-  expect(planLoads(roots, new Map())).toEqual([
+  expect(planLoads(roots, new Set([rootIdFor("a"), rootIdFor("c")]))).toEqual([
     rootIdFor("a"),
-    rootIdFor("b"),
     rootIdFor("c"),
   ])
+  expect(planLoads(roots, new Set())).toEqual([])
 })
 
 test("rootsOpenedWords: how many roots a starting host opened, and how many it left archived", () => {

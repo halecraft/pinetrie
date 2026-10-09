@@ -3,14 +3,21 @@
 //
 // The host answers an undo with each card it moved and where it is now, so
 // the place is shown as the undo acts. A fresh column the layout no longer
-// holds is opened again from its place alone, in its root's tab: its key,
-// its root and its branch point are in the place (`openFresh`).
+// holds is opened again from its place alone, in its task: its key, its
+// task and its branch point are in the place (`openFresh`).
 
 import type { CardId, PlaceKey } from "@pinetrie/core"
 import { placeEnd } from "@pinetrie/rules"
 import { type ActedAt, AT_INVENTORY } from "@pinetrie/session"
 import type { Minted } from "./columns.ts"
-import { type Effect, type IntentState, planOpenAt, show } from "./effects.ts"
+import {
+  type Effect,
+  entryOfTask,
+  type IntentState,
+  planOpenAt,
+  show,
+  showTask,
+} from "./effects.ts"
 import { columnsOf, hereOfColumn, planOpen } from "./layout.ts"
 
 const at = (key: string): ActedAt => ({ kind: "column", key })
@@ -18,10 +25,10 @@ const at = (key: string): ActedAt => ({ kind: "column", key })
 /**
  * The effects that show `place`, and where a refusal there is said: your
  * inventory's panel; a thread's end, as `openAt` shows an entry; or a fresh
- * column, shown where it is, or opened again at the end of its root's
- * columns. A fresh column whose root the directory does not name belongs to
- * a new tab, whose history only that tab reaches while it is open, so the
- * layout holds it. A queued `card` is scrolled to in its column's dock,
+ * column, shown where it is, or opened again at the end of its task's
+ * columns. A fresh column whose task has no message yet belongs to a new
+ * tab, whose history only that tab reaches while it is open, so the layout
+ * holds it. A queued `card` is scrolled to in its column's dock,
  * which scrolls apart from the thread (ADR-0113).
  */
 export function revealOf(
@@ -39,24 +46,26 @@ export function revealOf(
     case "fresh": {
       const here = hereOfColumn(state.layout, place.column)
       if (here !== undefined)
-        return { effects: show(here, state), actedAt: at(place.column) }
-      const root = state.rootEntries.get(place.root)
-      if (root === undefined || place.at.kind !== "entry")
+        return { effects: show(here), actedAt: at(place.column) }
+      const { task } = place
+      const entry = entryOfTask(state, task)
+      if (entry === null || place.at.kind !== "entry")
         return { effects: [], actedAt: at(place.column) }
       return {
         effects: [
-          ...show({ kind: "root", root }, state),
+          ...showTask(task),
           {
             kind: "layout",
             action: {
               kind: "columns",
-              root,
+              task,
+              entry,
               action: {
                 kind: "openFresh",
                 key: place.column,
                 thread: minted.thread,
                 at: place.at.id,
-                after: columnsOf(state.layout, root).length - 1,
+                after: columnsOf(state.layout, task, entry).length - 1,
               },
             },
           },
@@ -64,6 +73,9 @@ export function revealOf(
         actedAt: at(place.column),
       }
     }
+    // A card on a canvas: its task comes into view.
+    case "canvas":
+      return { effects: showTask(place.task), actedAt: AT_INVENTORY }
     // Discarded: drawn nowhere, so nothing comes into view.
     case "gone":
       return { effects: [], actedAt: AT_INVENTORY }
@@ -75,7 +87,7 @@ export function revealOf(
         placeEnd(place, state.index) ??
         (place.at.kind === "entry" ? place.at.id : null)
       if (end === null) return { effects: [], actedAt: AT_INVENTORY }
-      const plan = planOpen(state.layout, state.index, end)
+      const plan = planOpen(state.layout, state.index, end, state.tasks.ofEntry)
       return {
         effects: [
           ...planOpenAt(end, state, minted.key),

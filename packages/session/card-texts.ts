@@ -10,13 +10,13 @@
 // `spentCards`, `card-copies.ts`).
 
 import { type Exchange, sync } from "@kyneta/exchange"
-import type { CardId } from "@pinetrie/core"
+import type { CardId, TextCardId } from "@pinetrie/core"
 import { cardDocId, TextDoc, type TextDocHandle } from "@pinetrie/schema"
 import { hostLetGo, spentCards } from "./card-copies.ts"
 
 export interface CardTexts {
   /** A card's text: the same document for every caller. */
-  text(id: CardId): TextDocHandle
+  text(id: TextCardId): TextDocHandle
   /** Destroy each copy the host let go of whose card's record has gone. */
   sweep(): void
   /** Stop watching every copy. */
@@ -29,8 +29,8 @@ export function cardTexts(
   /** Whether a card's record is live in this client's copy of the places. */
   isLive: (id: CardId) => boolean,
 ): CardTexts {
-  const watched = new Map<CardId, () => void>()
-  const letGo = new Set<CardId>()
+  const watched = new Map<TextCardId, () => void>()
+  const letGo = new Set<TextCardId>()
   const hostIn = (states: readonly { peer: { peerId: string } }[]) =>
     states.some(s => s.peer.peerId === host)
   const sweep = () => {

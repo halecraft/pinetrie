@@ -9,7 +9,7 @@
 // `editorState` decides each step and names what the component must do;
 // `card-editor.tsx` does it. Pure.
 
-import type { CardId, CardRecord } from "@pinetrie/core"
+import type { CardRecord, TextCardId } from "@pinetrie/core"
 import type { Pending, Prefill } from "./columns.ts"
 import { sendable } from "./send.ts"
 
@@ -30,15 +30,15 @@ export type EditorState =
    */
   | { readonly kind: "local" }
   /** The element is bound to this card's text. */
-  | { readonly kind: "bound"; readonly card: CardId }
+  | { readonly kind: "bound"; readonly card: TextCardId }
   /** A send is in flight, from this card or, with null, from the box alone. */
-  | { readonly kind: "sending"; readonly card: CardId | null }
+  | { readonly kind: "sending"; readonly card: TextCardId | null }
 
 export type EditorEvent =
   /** The person typed. `card` is the id a new card would take. */
-  | { readonly kind: "input"; readonly text: string; readonly card: CardId }
+  | { readonly kind: "input"; readonly text: string; readonly card: TextCardId }
   /** Your card here exists: found on opening, or made by another of your tabs. */
-  | { readonly kind: "found"; readonly card: CardId }
+  | { readonly kind: "found"; readonly card: TextCardId }
   /**
    * Your card here is gone: someone sent it, or it was discarded. An undo
    * past its creation only empties it (ADR-0059), so it is not gone.
@@ -72,7 +72,7 @@ const LOCAL: EditorState = { kind: "local" }
 export const free = (state: EditorState): boolean => state.kind === "local"
 
 /** The card the box shows, if any. */
-export const shownBy = (state: EditorState): CardId | null =>
+export const shownBy = (state: EditorState): TextCardId | null =>
   state.kind === "bound" || state.kind === "sending" ? state.card : null
 
 const step = (

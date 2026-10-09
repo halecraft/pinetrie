@@ -1807,14 +1807,20 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         const railer = await join(toolHost, "railer", "browser")
         try {
           const say3 = (n: string) => `${n}.\nIts second line.\nIts third line.`
-          const chain = async (from: string, name: string, n: number) => {
+          const chain = async (
+            from: string,
+            name: string,
+            n: number,
+            branch: boolean,
+          ) => {
             let tip = from
             for (let k = 1; k <= n; k++) {
-              // A message below one that has a reply starts a branch there.
+              // A branch starts a thread of its own (ADR-0117); the rest
+              // continue it.
               const r = await railer.chat(
                 say3(`${name} ${k}`),
                 atEntry(entryId(tip)),
-                k === 1 ? { mode: "branch" } : undefined,
+                k === 1 && branch ? { mode: "branch" } : undefined,
               )
               if (r.kind !== "appended") return null
               tip = r.id
@@ -1824,20 +1830,23 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const start = await railer.chat(say3("Trunk 0"), ROOT, {
             mode: "branch",
           })
+          // The trunk is the first thread, which the task's first column
+          // follows; the branches at its end are threads of their own, the
+          // continuation first, so it keeps the trunk's track.
           const trunk =
             start.kind === "appended"
-              ? await chain(start.id, "Trunk", 20)
+              ? await chain(start.id, "Trunk", 20, false)
               : null
-          // The trunk's continuation first, so it keeps the trunk's track; the
-          // aside after it, so it is the newest leaf, which the tab opens.
-          const later = trunk === null ? null : await chain(trunk, "Later", 30)
-          const aside = trunk === null ? null : await chain(trunk, "Aside", 1)
+          const later =
+            trunk === null ? null : await chain(trunk, "Later", 30, true)
+          const aside =
+            trunk === null ? null : await chain(trunk, "Aside", 1, true)
           const railRoot =
             start.kind === "appended" ? start.id : entryId("none")
           // Another writer's root is not in the sidebar (ADR-0030): open it from the board.
           await openFromBoard(tp, railRoot)
           await tp.waitForSelector(
-            `${col(0)} .msg[data-entry="${aside ?? "none"}"]`,
+            `${col(0)} .msg[data-entry="${aside === null ? "none" : (trunk ?? "none")}"]`,
             { timeout: 15_000 },
           )
           const rows = projectRail(treeOf(toolHost), railRoot)

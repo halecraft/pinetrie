@@ -1,30 +1,15 @@
-import {
-  type EntryLike,
-  ERR,
-  entryId,
-  indexTree,
-  type MarkRecord,
-  writerId,
-} from "@pinetrie/core"
+import { ERR, type MarkRecord, taskIdFor, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { MARK, planMark } from "./mark.ts"
 import { recordsOf } from "./records.ts"
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
+const K1 = taskIdFor("01a0ffd2-0000-7000-8000-000000000001")
+const K2 = taskIdFor("01a0ffd2-0000-7000-8000-000000000002")
 
-const entry = (id: string, parentId: string | null): EntryLike => ({
-  id: entryId(id),
-  parentId: parentId === null ? null : entryId(parentId),
-  type: "message",
-  message: { role: "user", content: id },
-})
-const index = indexTree(
-  Object.fromEntries([entry("r1", null), entry("a", "r1")].map(e => [e.id, e])),
-)
-
-const mark = (at: string, title: string): MarkRecord => ({
-  entry: entryId(at),
+const mark = (title: string): MarkRecord => ({
+  task: K1,
   title,
   by: BEA,
   at: 1,
@@ -34,65 +19,61 @@ const plan = (
   over: Partial<Parameters<typeof planMark>[0]> = {},
 ): ReturnType<typeof planMark> =>
   planMark({
-    entry: entryId("r1"),
+    task: K1,
     title: "Tab names",
     by: ADA,
     now: 5,
-    index,
+    tasks: new Set([K1, K2]),
     marks: new Map(),
     ...over,
   })
 
 describe("the record", () => {
-  test("round-trips, and a value with no title or no entry is dropped", () => {
-    const r = mark("r1", "Tab names")
-    expect(MARK.decode(MARK.encode(r), r.entry)).toEqual(r)
-    expect(MARK.decode({ ...r, title: "" }, r.entry)).toBeUndefined()
-    expect(MARK.decode(r, "")).toBeUndefined()
+  test("round-trips at its task, in the session; a value with no title, or a key that is no task, is dropped", () => {
+    const r = mark("Tab names")
+    expect(MARK.home).toBe("session")
+    expect(MARK.decode(MARK.encode(r), r.task)).toEqual(r)
+    expect(MARK.decode({ ...r, title: "" }, r.task)).toBeUndefined()
+    expect(MARK.decode(r, "r1")).toBeUndefined()
     expect(
       recordsOf(MARK, [
-        { key: r.entry, value: r },
-        { key: "r2", value: { nope: 1 } },
-      ]).get(entryId("r1")),
+        { key: r.task, value: r },
+        { key: K2, value: { nope: 1 } },
+      ]).get(K1),
     ).toEqual(r)
   })
 })
 
 describe("planMark", () => {
-  test("titles an entry, by its writer, at now", () => {
+  test("titles a task, by its writer, at now", () => {
     expect(plan()).toEqual({
       kind: "write",
-      record: { entry: "r1", title: "Tab names", by: ADA, at: 5 },
+      record: { task: K1, title: "Tab names", by: ADA, at: 5 },
     })
   })
   test("replaces another title: the last write wins", () => {
-    expect(
-      plan({ marks: new Map([[entryId("r1"), mark("r1", "Old")]]) }),
-    ).toMatchObject({ kind: "write", record: { title: "Tab names", by: ADA } })
-  })
-  test("any entry in the tree takes a mark, not only a root", () => {
-    expect(plan({ entry: entryId("a") })).toMatchObject({ kind: "write" })
+    expect(plan({ marks: new Map([[K1, mark("Old")]]) })).toMatchObject({
+      kind: "write",
+      record: { title: "Tab names", by: ADA },
+    })
   })
   test("the title already stored writes nothing", () => {
-    expect(
-      plan({ marks: new Map([[entryId("r1"), mark("r1", "Tab names")]]) }),
-    ).toEqual({ kind: "unchanged" })
+    expect(plan({ marks: new Map([[K1, mark("Tab names")]]) })).toEqual({
+      kind: "unchanged",
+    })
   })
   test("clearing a title removes its record", () => {
-    expect(
-      plan({
-        title: null,
-        marks: new Map([[entryId("r1"), mark("r1", "Old")]]),
-      }),
-    ).toEqual({ kind: "remove", entry: "r1" })
+    expect(plan({ title: null, marks: new Map([[K1, mark("Old")]]) })).toEqual({
+      kind: "remove",
+      task: K1,
+    })
   })
-  test("clearing an entry with no title writes nothing", () => {
+  test("clearing a task with no title writes nothing", () => {
     expect(plan({ title: null })).toEqual({ kind: "unchanged" })
   })
-  test("an entry the tree does not hold is refused", () => {
-    expect(plan({ entry: entryId("gone") })).toMatchObject({
-      kind: "refused",
-      code: ERR.UNKNOWN_TARGET,
-    })
+  test("a task the session does not hold is refused", () => {
+    expect(
+      plan({ task: taskIdFor("01a0ffd2-0000-7000-8000-000000000009") }),
+    ).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })
   })
 })

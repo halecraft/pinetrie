@@ -2,11 +2,13 @@
 // no two writers mint one key (ADR-0016).
 
 import {
-  type CardId,
-  cardId,
   type RootId,
   rootIdFor,
+  type TaskId,
+  type TextCardId,
   type ThreadId,
+  taskIdFor,
+  textCardId,
   threadIdFor,
 } from "@pinetrie/core"
 
@@ -20,8 +22,8 @@ export function newUuidv7(): string {
   return `${time.slice(0, 8)}-${time.slice(8)}-7${rand.slice(0, 3)}-${variant}${rand.slice(4, 7)}-${rand.slice(7, 19)}`
 }
 
-/** A new card's id. */
-export const newCardId = (): CardId => cardId(newUuidv7())
+/** A new text card's id. */
+export const newCardId = (): TextCardId => textCardId(newUuidv7())
 
 /**
  * A new thread's lane id, reserved by a column before the lane exists
@@ -34,3 +36,9 @@ export const newThreadId = (): ThreadId => threadIdFor(newUuidv7())
  * (ADR-0063). The host accepts only this shape (`parseNewRoot`).
  */
 export const newRootId = (): RootId => rootIdFor(newUuidv7())
+
+/**
+ * A new task's id, minted by the tab that opens it, as it mints a root's
+ * (ADR-0116). The host accepts only this shape (`parseNewTask`).
+ */
+export const newTaskId = (): TaskId => taskIdFor(newUuidv7())

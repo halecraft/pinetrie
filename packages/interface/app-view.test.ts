@@ -1,10 +1,11 @@
 import {
-  type ArchivedRoot,
+  type ArchivedTask,
   entryId,
   type LaneView,
   type OfferRecord,
   rootIdFor,
   type ThreadId,
+  taskIdFor,
   threadIdFor,
   type Workflow,
   workflowStateIdFor,
@@ -24,8 +25,8 @@ import { tree } from "./fixtures.ts"
 
 const ADA = writerId("ada@x.test")
 const nameOf = new Map([[ADA, "Ada"]])
-const R_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const archived: ArchivedRoot = { root: R_ID, by: ADA, at: 1 }
+const K = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const archived: ArchivedTask = { task: K, by: ADA, at: 1 }
 const WORKFLOW: Workflow = {
   open: [
     { id: workflowStateIdFor("b"), name: "Backlog" },
@@ -36,7 +37,7 @@ const WORKFLOW: Workflow = {
 const columns = (...keys: string[]): Column[] =>
   keys.map(key => ({ key, anchor: entryId("r") }))
 const input = (over: Partial<AppViewInput>): AppViewInput => ({
-  active: { kind: "root", root: entryId("r") },
+  active: { kind: "task", task: K },
   columns: columns("a"),
   tracks: [3],
   archived: new Map(),
@@ -64,27 +65,27 @@ describe("appView's workspace", () => {
     })
   })
 
-  test("a root tab's only column offers no close; with two, both do", () => {
+  test("a task's only column offers no close; with two, both do", () => {
     const one = workspace({})
     const two = workspace({ columns: columns("a", "b"), tracks: [3] })
-    expect(one.kind === "root" && one.slots.map(s => s.closable)).toEqual([
+    expect(one.kind === "task" && one.slots.map(s => s.closable)).toEqual([
       false,
     ])
-    expect(two.kind === "root" && two.slots).toEqual([
+    expect(two.kind === "task" && two.slots).toEqual([
       { key: "a", position: 0, closable: true, track: 3 },
       { key: "b", position: 1, closable: true, track: PENDING_TRACK },
     ])
   })
 
-  test("an archived root is read-only, with Restore to the first open state; one not archived is not", () => {
-    const here = workspace({ archived: new Map([[entryId("r"), archived]]) })
-    expect(here.kind === "root" && here.readOnly).toEqual({
+  test("an archived task is read-only, with Restore to the first open state; one not archived is not", () => {
+    const here = workspace({ archived: new Map([[K, archived]]) })
+    expect(here.kind === "task" && here.readOnly).toEqual({
       label: "archived by Ada",
       action: {
         title: "Restore",
         intent: {
-          kind: "moveRoot",
-          root: R_ID,
+          kind: "moveTask",
+          task: K,
           from: WORKFLOW.archive.id,
           to: WORKFLOW.open[0]?.id,
           before: null,
@@ -92,7 +93,7 @@ describe("appView's workspace", () => {
         },
       },
     })
-    expect(workspace({}).kind === "root" && workspace({})).toMatchObject({
+    expect(workspace({}).kind === "task" && workspace({})).toMatchObject({
       readOnly: null,
     })
   })
@@ -150,15 +151,15 @@ test("the header's offers are the open ones, never one accepted work already hol
   ])
 })
 
-test("a tab's rail draws its own root's tree only", () => {
+test("a task's rail draws its first root's tree only", () => {
   const index = tree({ r1: null, a: "r1", r2: null, b: "r2" })
   const ids = (rows: readonly { readonly id: string }[]) => rows.map(r => r.id)
-  expect(ids(hereRail(index, { kind: "root", root: entryId("r1") }))).toEqual([
-    "r1",
-    "a",
-  ])
-  expect(hereRail(index, { kind: "new", key: "t" })).toEqual([])
-  expect(hereRail(index, null)).toEqual([])
+  expect(
+    ids(hereRail(index, { kind: "task", task: K }, entryId("r1"))),
+  ).toEqual(["r1", "a"])
+  expect(hereRail(index, { kind: "task", task: K }, null)).toEqual([])
+  expect(hereRail(index, { kind: "new", key: "t" }, entryId("r1"))).toEqual([])
+  expect(hereRail(index, null, null)).toEqual([])
 })
 
 test("workAnywhere: the held roots' work, and each lane running in a root this tab does not hold, by its root entry, running winning; a root with no entry yet is left out (ADR-0091)", () => {
