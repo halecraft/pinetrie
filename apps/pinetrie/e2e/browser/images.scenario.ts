@@ -374,18 +374,30 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       try {
         await ip.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
         await ip.click("#sidebar .add-agent")
-        const say = async (text: string) => {
+        // Sends `text` and waits for the scripted `reply` in column 0, then
+        // for the host to go idle. Idle alone is not enough: until the host
+        // has taken the send and started its run, it is idle too.
+        const say = async (text: string, reply: string) => {
           await ip.fill(`${col(0)} .composer .input`, text)
           await ip.click(`${col(0)} .composer .send`)
           await readRaw(ip)
+          await ip
+            .waitForFunction(
+              ([c, r]) =>
+                [...document.querySelectorAll(`${c} .msg.assistant`)].some(m =>
+                  (m.textContent ?? "").includes(r ?? ""),
+                ),
+              [col(0), reply] as const,
+              { timeout: 90_000 },
+            )
+            .catch(() => {})
+          await waitFor(() => idleNow(imageHost))
         }
-        const idle = () => waitFor(() => idleNow(imageHost))
         script.use([
           { tool: "read", args: { path: "tall.png" } },
           { text: "A grey rectangle." },
         ])
-        await say("what is tall.png?")
-        await idle()
+        await say("what is tall.png?", "A grey rectangle.")
         const row = `${col(0)} .tool[data-tool="read"]`
         const sha = sha256Of(tall)
         const img = `${row} .tool-images img[src="/blob/${sha}"]`
@@ -471,8 +483,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         )
         await ip.click(`${row} .tool-more`).catch(() => {})
         script.use([{ text: "Still grey." }])
-        await say("@agent and now?")
-        await idle()
+        await say("@agent and now?", "Still grey.")
         await ip.waitForTimeout(300)
         const after = await drawn()
         const open = await ip.getAttribute(row, "data-open")

@@ -6,6 +6,7 @@ const tree = "packages/core/tree.ts"
 const roots = "packages/core/roots.ts"
 const asks = "packages/core/asks.ts"
 const core = "packages/core/index.ts"
+const places = "packages/core/places.ts"
 const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
@@ -81,9 +82,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note's key takes any column",
-    file: core,
-    from: '    case "note":\n      return isNoteColumnId(f.column)\n        ? { kind: "note", column: f.column }\n        : undefined',
-    to: '    case "note":\n      return f.column !== ""\n        ? { kind: "note", column: f.column }\n        : undefined',
+    file: places,
+    from: '    case "note":\n      return isNoteColumnId(r.column)\n        ? { kind: "note", column: r.column }\n        : undefined',
+    to: '    case "note":\n      return r.column !== ""\n        ? { kind: "note", column: r.column as NoteColumnId }\n        : undefined',
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "a note's key carries its column",
   },
@@ -175,7 +176,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "every inventory is one place",
-    file: core,
+    file: places,
     from: '      return b.kind === "inventory" && a.holder === b.holder',
     to: '      return b.kind === "inventory"',
     command: unit,
@@ -183,8 +184,8 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an inventory without a holder is read",
-    file: core,
-    from: '      return f.holder === ""\n        ? undefined',
+    file: places,
+    from: '      return r.holder === ""\n        ? undefined',
     to: "      return false\n        ? undefined",
     command: unit,
     expect: "an inventory needs its holder",
@@ -396,7 +397,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the wire drops an inventory's holder",
-    file: core,
+    file: places,
     from: '  holder: { key: "always" },',
     to: '  holder: { key: "never" },',
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
@@ -550,7 +551,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "every message compels the agent",
-    file: "packages/core/index.ts",
+    file: core,
     from: '        ? NOBODY\n        : { kind: "agent", agent: THE_AGENT }',
     to: '        ? { kind: "agent", agent: THE_AGENT }\n        : { kind: "agent", agent: THE_AGENT }',
     command: unit,
@@ -558,7 +559,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane is told host paths as the host's",
-    file: "packages/core/index.ts",
+    file: core,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  `${HOST_MOUNT}${hostPath}`",
     to: "  hostPath",
@@ -591,7 +592,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "parseNewThread accepts any t- id",
-    file: "packages/core/index.ts",
+    file: core,
     from: "  NEW_THREAD.test(s) ? (s as ThreadId) : undefined",
     to: '  s.startsWith("t-") ? (s as ThreadId) : undefined',
     command: unit,
@@ -615,7 +616,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a move goes from nowhere",
-    file: core,
+    file: places,
     from: "  from: keyOf(card.place),",
     to: "  from: null,",
     command: unit,
@@ -631,9 +632,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an unqueue goes to another thread's notes",
-    file: core,
-    from: '): NotesTarget => ({ kind: "notes", thread: place.thread })',
-    to: '): NotesTarget => ({ kind: "notes", thread: threadIdFor("elsewhere") })',
+    file: places,
+    from: '): NotesTarget => ({ kind: "notes", near: "thread", thread: place.thread })',
+    to: '): NotesTarget => ({\n  kind: "notes",\n  near: "thread",\n  thread: threadIdFor("elsewhere"),\n})',
     command: unit,
     expect: "an unqueue sends a card to the note column nearest its thread",
   },
@@ -683,7 +684,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a pinned key keeps its order",
-    file: core,
+    file: places,
     from: '      return { kind: "pinned", at: place.at, thread: place.thread }',
     to: "      return place",
     command: unit,
@@ -692,9 +693,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a pinned card with no order decodes",
-    file: core,
-    from: '          return f.order === ""\n            ? undefined\n            : { kind: "pinned", ...at, order: f.order }',
-    to: '          return { kind: "pinned", ...at, order: f.order }',
+    file: places,
+    from: '      return at === undefined || r.order === ""\n        ? undefined\n        : { kind: "pinned", ...at, order: r.order }',
+    to: '      return at === undefined\n        ? undefined\n        : { kind: "pinned", ...at, order: r.order }',
     command: unit,
     expect:
       "a pinned card needs its order and its thread; its key has no order",
@@ -824,7 +825,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a gone key carries a task on the wire",
-    file: "packages/core/index.ts",
+    file: "packages/core/places.ts",
     from: '    kinds: ["fresh", "canvas", "canvas-at", "task-pinned", "notes"],',
     to: '    kinds: ["fresh", "canvas", "canvas-at", "task-pinned", "notes", "discarded"],',
     command: unit,
@@ -856,7 +857,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note column fits an inventory",
-    file: "packages/core/index.ts",
+    file: "packages/core/places.ts",
     from: '  "note-column": ["canvas"],',
     to: '  "note-column": ["canvas", "inventory"],',
     command: unit,
@@ -865,7 +866,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note column is placed anywhere",
-    file: "packages/core/index.ts",
+    file: "packages/core/places.ts",
     from: '      return fits("note-column", place) ? { ...card, place } : undefined',
     to: "      return { ...card, place } as CardRecord",
     command: unit,
@@ -882,7 +883,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a reorder is anywhere a card is",
-    file: core,
+    file: places,
     from: "  return kinds.includes(key.kind)",
     to: "  return kinds.length > 0",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
@@ -890,10 +891,33 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a spot on a canvas forgets the card it goes after",
-    file: core,
-    from: '        column: place.after ?? "",',
-    to: '        column: "",',
+    file: places,
+    from: '      return row("canvas-at", { task: place.task, column: place.after ?? "" })',
+    to: '      return row("canvas-at", { task: place.task, column: "" })',
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "a move's target may be a spot on a canvas",
+  },
+  {
+    name: "a row is written with a field its kind does not store",
+    file: places,
+    from: '      return row("canvas-at", { task: place.task, column: place.after ?? "" })',
+    to: '      return row("canvas-at", { task: place.task, column: place.after ?? "", order: "" })',
+    // tsc names no failing check (`failingChecks`): with typecheck clean,
+    // any error is the mutant's.
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "a row is read for a field its kind does not store",
+    file: places,
+    from: "      if (!isTaskId(r.task)) return undefined",
+    to: '      if (!isTaskId(r.task) || r.order !== "") return undefined',
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "a gone row stores its task in no field of its own",
+    file: places,
+    from: '  discarded: ["task", "holder"],',
+    to: '  discarded: ["holder"],',
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
 ]

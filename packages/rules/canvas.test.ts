@@ -20,7 +20,6 @@ import {
   planCanvasFacts,
   planCanvasRead,
 } from "./canvas.ts"
-import { planFactCard } from "./card.ts"
 import {
   CONTEXT,
   CONTEXT_KINDS,
@@ -29,6 +28,7 @@ import {
   contextOf,
 } from "./context.ts"
 import { encodePinned, PINNED_RULE } from "./pinned.ts"
+import { planFactCard } from "./queue.ts"
 import { type CanvasCard, canvasOf } from "./task.ts"
 import { encodeTaskPinned, planTaskPinnedRead } from "./task-pinned.ts"
 

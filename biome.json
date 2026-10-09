@@ -65,6 +65,7 @@
         "!**/*.test.tsx",
         "!packages/core/fixtures.ts",
         "!packages/core/trailers.ts",
+        "!packages/core/places.ts",
         "!packages/interface/fixtures.ts",
         "!apps/pinetrie/host/fakes.ts",
         "!packages/interface/layout.ts",

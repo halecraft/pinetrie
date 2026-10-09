@@ -181,16 +181,20 @@ export type LayoutAction =
       readonly known: ReadonlySet<TaskId>
     } & LayoutFacts)
 
-/** The document facts a layout follows: one moment's, read together. */
-export interface LayoutFacts {
+/** What a task's columns are drawn from: its canvas and the tree, one moment's. */
+export interface CanvasFacts {
+  /** Each task's canvas, in order (`TaskIndex.canvases`). */
+  readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
+}
+
+/** The document facts a layout follows: one moment's, read together. */
+export interface LayoutFacts extends CanvasFacts {
   /** The tasks in the archive (ADR-0122). */
   readonly archived: ReadonlySet<TaskId>
   /** The sidebar (`openThreads`). */
   readonly list: readonly TaskId[]
-  /** Each task's canvas, in order (`TaskIndex.canvases`). */
-  readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
 }
 
 export const initialLayout = (): Layout => ({
@@ -618,11 +622,7 @@ export const unlisted = (
 export const taskColumns = (
   layout: Pick<Layout, "tasks">,
   task: TaskId,
-  facts: {
-    readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
-    readonly index: TreeIndex
-    readonly lanes: readonly LaneView[]
-  },
+  facts: CanvasFacts,
 ) => {
   const canvas = facts.canvases.get(task) ?? []
   return canvasColumns({
@@ -637,11 +637,7 @@ export const taskColumns = (
 export const taskStrip = (
   layout: Pick<Layout, "tasks">,
   task: TaskId,
-  facts: {
-    readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
-    readonly index: TreeIndex
-    readonly lanes: readonly LaneView[]
-  },
+  facts: CanvasFacts,
 ): Strip =>
   stripOf(
     task,

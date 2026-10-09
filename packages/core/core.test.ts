@@ -21,9 +21,11 @@ import {
   keyOfFields,
   kindOfCard,
   latestTip,
+  type MoveTarget,
   messageText,
   moveOf,
   NOBODY,
+  type NotesTarget,
   nonEmpty,
   normalizeEmail,
   normalizeName,
@@ -41,6 +43,7 @@ import {
   projectTranscript,
   ROOT,
   rootIdFor,
+  rowFieldsOf,
   sameKey,
   seenAt,
   shellWord,
@@ -507,10 +510,15 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     })
     expect(placeOfFields({ ...f, order: "" })).toBeUndefined()
     expect(placeOfFields({ ...f, column: "t-x" })).toBeUndefined()
-    const notes = placeFields({ kind: "notes", thread: TEST_THREAD })
+    const notes = placeFields({
+      kind: "notes",
+      near: "thread",
+      thread: TEST_THREAD,
+    })
     expect(placeOfFields(notes)).toBeUndefined()
     expect(targetOfFields(keyFieldsFrom(k => notes[k]))).toEqual({
       kind: "notes",
+      near: "thread",
       thread: TEST_THREAD,
     })
   })
@@ -620,9 +628,14 @@ describe("moves, built once (ADR-0059)", () => {
   })
 
   test("a thread's nearest notes are a move's target alone: read as a target, never as a key", () => {
-    const notes = placeFields({ kind: "notes", thread: TEST_THREAD })
+    const notes = placeFields({
+      kind: "notes",
+      near: "thread",
+      thread: TEST_THREAD,
+    })
     expect(targetOfFields(notes)).toEqual({
       kind: "notes",
+      near: "thread",
       thread: TEST_THREAD,
     })
     expect(keyOfFields(notes)).toBeUndefined()
@@ -671,7 +684,7 @@ describe("moves, built once (ADR-0059)", () => {
         by: ADA,
         seen: "v",
       }),
-    ).toEqual({ kind: "notes", thread: LANE })
+    ).toEqual({ kind: "notes", near: "thread", thread: LANE })
   })
 
   test("a pin pins your message or a queued card at the same thread end; a note is at no thread", () => {
@@ -707,6 +720,67 @@ describe("threads, by construction (ADR-0117)", () => {
     const end: ChatAt = { kind: "end", seen: entryId("e-1") }
     expect([lane, branch.kind, end.kind]).toEqual(["t-x", "branch", "end"])
   })
+})
+
+test("every place writes only the fields its kind's row stores (`ROWS`)", () => {
+  const thread = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
+  const task = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ab")
+  const at = atEntry(entryId("e-1"))
+  const places: readonly (CardPlace | MoveTarget)[] = [
+    { kind: "composing", at, thread },
+    { kind: "pinned", at, thread, order: "a" },
+    {
+      kind: "queued",
+      at,
+      thread,
+      order: "a",
+      by: writerId("a@x.io"),
+      seen: "v",
+    },
+    { kind: "canvas", task, order: "a", width: 2 },
+    { kind: "canvas-at", task, after: thread },
+    { kind: "task-pinned", task, order: "a" },
+    { kind: "notes", near: "thread", thread },
+    { kind: "notes", near: "task", task },
+    { kind: "inventory", holder: writerId("a@x.io") },
+    {
+      kind: "gone",
+      task,
+      by: writerId("a@x.io"),
+      why: {
+        kind: "spun",
+        into: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ac"),
+        thread,
+      },
+    },
+  ]
+  for (const place of places) {
+    const { kind, ...fields } = placeFields(place)
+    const written = Object.entries(fields)
+      .filter(([, v]) => v !== "")
+      .map(([f]) => f)
+    expect(written.every(f => rowFieldsOf(kind)?.includes(f))).toBe(true)
+  }
+  expect(rowFieldsOf("canvas-at")).toEqual(["task", "column"])
+  expect(rowFieldsOf("nowhere")).toBeUndefined()
+})
+
+test("a notes target says by its tag which notes it is near, a thread's or a task's (ADR-0116)", () => {
+  const thread = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
+  const task = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ab")
+  // @ts-expect-error: near a thread, it names the thread
+  const wrong: NotesTarget = { kind: "notes", near: "thread", task }
+  // @ts-expect-error: untagged, it is neither
+  const bare: NotesTarget = { kind: "notes", thread }
+  const near: NotesTarget = { kind: "notes", near: "thread", thread }
+  expect([wrong.near, bare.kind, near.near]).toEqual([
+    "thread",
+    "notes",
+    "thread",
+  ])
+  expect(
+    targetOfFields(placeFields({ kind: "notes", near: "task", task })),
+  ).toEqual({ kind: "notes", near: "task", task })
 })
 
 const UUID = "01a0ffd2-0000-7000-8000-00000000000a"

@@ -83,7 +83,11 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   test("a column lands at its thread's nearest notes, its composer as your message; a fresh column as its message; a slot as your inventory; a note column at its end; a column no store holds as nothing", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
     const end = { at: E1, thread: LANE }
-    expect(at(targets[0] as PutTarget)).toEqual({ kind: "notes", thread: LANE })
+    expect(at(targets[0] as PutTarget)).toEqual({
+      kind: "notes",
+      near: "thread",
+      thread: LANE,
+    })
     expect(at(targets[8] as PutTarget)).toEqual({
       kind: "note",
       column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),

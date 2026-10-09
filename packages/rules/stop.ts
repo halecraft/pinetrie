@@ -28,9 +28,9 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
-import type { QueuedCard } from "./card.ts"
 import { decodeAt, entryKey, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
+import type { QueuedCard } from "./queue.ts"
 import { holdOnStop } from "./queue-hold.ts"
 import type { RecordSpec } from "./records.ts"
 

@@ -7,7 +7,7 @@ const archive = "packages/rules/archive.ts"
 export const mutations: readonly Mutation[] = [
   {
     name: "a card whose text has not arrived is blank",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: "      texts.holds(c.id, c.place.seen) &&\n",
     to: "",
     command: unit,
@@ -79,7 +79,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a blank message holds up the queue",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: "  const top = queue.find(c => !facts.blank.has(c.id))\n",
     to: "  const top = queue[0]\n",
     command: unit,
@@ -201,7 +201,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a split card is a plain message",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: '  if (command === "split") return { kind: "split", intent: text.trim() }\n',
     to: "",
     command: unit,
@@ -317,7 +317,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fact jumps the queue",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: "        order: orderAfter(queuedOn(input.cards, fact.lane)),",
     to: "        order: orderAfter([]),",
     command: unit,
@@ -1171,7 +1171,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "planNextQueuedCardPop pops while running",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: '  if (facts.running) return { kind: "idle" }',
     to: "  void facts.running",
     command: unit,
@@ -1179,7 +1179,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "planUnsent writes queued",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: "        record: { ...card, place: notes.place, unsent: reason },",
     to: "        record: { ...card, unsent: reason },",
     command: unit,
@@ -1188,7 +1188,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an unqueue clears why a card was not sent",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '            unsent: move.to.kind === "queued" ? null : record.unsent,',
     to: "            unsent: null,",
     command: unit,
@@ -1196,7 +1196,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "queueing keeps why a card was not sent",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '            unsent: move.to.kind === "queued" ? null : record.unsent,',
     to: "            unsent: record.unsent,",
     command: unit,
@@ -1236,7 +1236,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fact card can be moved",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '  // A fact is the host\'s, on its way into the thread: nobody moves it.\n  if (isFact(now)) return { kind: "refused", code: "fact", now }\n',
     to: "",
     command: unit,
@@ -1244,7 +1244,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a plain card is planned as a catch-up",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: '  return { kind: "send" }\n}',
     to: '  return { kind: "catch-up", command: "bring-up-to-date", after: "send" }\n}',
     command: unit,
@@ -1256,7 +1256,7 @@ export const mutations: readonly Mutation[] = [
     from: '  card.place.kind === "composing" ? placeEnd(card.place, index) : null',
     to: '  card.place.kind !== "fresh" ? placeEnd(card.place, index) : null',
     command: unit,
-    expect: "cardEnd and cardsAt note see their own kind",
+    expect: "cardEnd sees your message alone: a queued card is above the line",
   },
   {
     name: "the resolution leaves out what the person asked",
@@ -1405,15 +1405,15 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a card's thread is cast, not checked",
-    file: "packages/core/index.ts",
-    from: '  f.at === "" || !isThreadId(f.lane)\n    ? undefined\n    : { at: atEntry(entryId(f.at)), thread: f.lane }',
-    to: '  f.at === "" || f.lane === ""\n    ? undefined\n    : { at: atEntry(entryId(f.at)), thread: f.lane as ThreadId }',
+    file: "packages/core/places.ts",
+    from: '  r.at === "" || !isThreadId(r.lane)\n    ? undefined\n    : { at: atEntry(entryId(r.at)), thread: r.lane }',
+    to: '  r.at === "" || r.lane === ""\n    ? undefined\n    : { at: atEntry(entryId(r.at)), thread: r.lane as ThreadId }',
     command: unit,
     expect: "one stored with no thread's id does not decode",
   },
   {
     name: "a move skips the compare",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "  if (!seenAt(keyOf(now.place), move.from))",
     to: "  if (false)",
     command: unit,
@@ -1421,7 +1421,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a creation overwrites an id in use",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '    if (now !== undefined) return { kind: "refused", code: "exists", now }',
     to: "",
     command: unit,
@@ -1429,7 +1429,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a gone card moves by a handoff",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '  if (now === undefined || now.place.kind === "gone")',
     to: "  if (now === undefined)",
     command: unit,
@@ -1437,7 +1437,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a first send carries every column's fresh cards",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "      c.place.column !== place.column\n",
     to: "      false\n",
     command: unit,
@@ -1446,7 +1446,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "anyone takes into anyone's inventory",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '  key.kind !== "inventory" || key.holder === sender',
     to: "  true",
     command: unit,
@@ -1454,16 +1454,16 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a move out of an inventory skips whose it is",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "  if (!ownsPlace(move.from, sender))",
     to: "  if (false)",
     command: unit,
     expect:
-      "a discard from your own inventory is gone in the root you are on; from someone else's refused",
+      "a discard from your own inventory is gone in the task you are on, or none; from someone else's refused",
   },
   {
     name: "an inventory holds a nineteenth card",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: "  ).length >= INVENTORY_SLOTS",
     to: "  ).length > INVENTORY_SLOTS",
     command: unit,
@@ -1471,7 +1471,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a full inventory counts everyone's cards",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: "      c.place.holder === holder,\n  ).length",
     to: "      true,\n  ).length",
     command: unit,
@@ -1479,7 +1479,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a creation skips the inventory's rules",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '    if (refusal !== null) return { kind: "refused", code: refusal, now: null }',
     to: "",
     command: unit,
@@ -1487,7 +1487,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a move keeps its old placer",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '            placer: sender,\n            unsent: move.to.kind === "queued" ? null : record.unsent,',
     to: '            placer: now.placer,\n            unsent: move.to.kind === "queued" ? null : record.unsent,',
     command: unit,
@@ -1495,7 +1495,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a queue move asks for no drain (unit)",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "  return { step, drain: [...new Set(lanes)].filter(l => !running(l)) }",
     to: "  return { step, drain: [] }",
     command: unit,
@@ -1543,7 +1543,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fresh column's cards follow a message in another root",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '  if (place?.kind !== "fresh" || place.root !== input.root) return []',
     to: '  if (place?.kind !== "fresh") return []',
     command: unit,
@@ -1552,7 +1552,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a move's history is the task it leaves",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/move-history.ts",
     from: "          : (taskOf(move.to) ?? taskOf(from))",
     to: "          : (taskOf(from) ?? taskOf(move.to))",
     command: unit,
@@ -1560,7 +1560,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a creation enters a history",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/move-history.ts",
     from: "      return isNoteColumnId(move.card) ? taskOf(move.to) : null",
     to: "      return taskOf(move.to)",
     command: unit,
@@ -1568,7 +1568,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "several moves are planned against the cards before any",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '    now = afterStep(now, step)\n  }\n  return { kind: "steps", steps }',
     to: '  }\n  return { kind: "steps", steps }',
     command: unit,
@@ -1576,7 +1576,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a refused undo names no card",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/move-history.ts",
     from: "      const card = cardsOfParts(result.stale, placesId)[0]",
     to: "      const card = undefined",
     command: unit,
@@ -1585,16 +1585,16 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an archived root's histories are retired at once",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/move-history.ts",
     from: "      archived !== undefined && input.now - archived.at >= ARCHIVED_HISTORY_MS",
     to: "      archived !== undefined && input.now - archived.at >= 0",
     command: unit,
     expect:
-      "a root archived 7 days and a second ago is retired; one archived 6 days ago",
+      "a task archived 7 days and a second ago is retired; one archived 6 days ago",
   },
   {
     name: "a history in no task is retired after every run",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/move-history.ts",
     from: "    if (!input.tasks.has(of.task)) return input.startup\n",
     to: "    if (!input.tasks.has(of.task)) return true\n",
     command: unit,
@@ -1647,12 +1647,11 @@ export const mutations: readonly Mutation[] = [
     from: '  card.place.kind === "composing" ? placeEnd(card.place, index) : null',
     to: '  card.place.kind === "composing" || card.place.kind === "pinned"\n    ? placeEnd(card.place, index)\n    : null',
     command: unit,
-    expect:
-      "cardsAt note and yourCard never return a pinned card at the same end",
+    expect: "cardEnd and yourCard never return a pinned card at the same end",
   },
   {
     name: "a pin is ordered among nothing",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "      return { ...key, order: orderAfter(cards.filter(isPinned)) }",
     to: "      return { ...key, order: orderAfter([]) }",
     command: unit,
@@ -2150,7 +2149,7 @@ export const mutations: readonly Mutation[] = [
   // ── queue control (ADR-0048 step 7) ──
   {
     name: "a reorder forgets why the card was not sent",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/in-place.ts",
     from: "    ? (placed(card, { ...card.place, order }) ?? card)",
     to: "    ? ({ ...(placed(card, { ...card.place, order }) ?? card), unsent: null } as CardRecord)",
     command: unit,
@@ -2158,7 +2157,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a reorder passes a fact",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/in-place.ts",
     from: "    if (passed.some(isFact)) return",
     to: "    if (false) return",
     command: unit,
@@ -2166,7 +2165,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a reorder with no room skips the renumbering",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/in-place.ts",
     from: '  if (order !== null) return { kind: "write", record: withOrder(now, order) }',
     to: '  return { kind: "write", record: withOrder(now, order ?? orderOf(now)) }',
     command: unit,
@@ -2174,7 +2173,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a queued neighbour no longer next to it is accepted",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/in-place.ts",
     from: "    if (siblings[index - 1]?.id !== (reorder.after ?? undefined)) return changed\n",
     to: "",
     command: unit,
@@ -2182,7 +2181,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a move to where the card is requeues it",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '  if (sameKey(move.from, move.to))\n    return { kind: "refused", code: "moved", now }\n',
     to: "",
     command: unit,
@@ -2198,7 +2197,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a held queue holds a fact",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: '  if (top.carries.kind === "fact") return { kind: "pop", card: top }\n',
     to: "",
     command: unit,
@@ -2206,7 +2205,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the pop ignores someone typing in the top card",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: '  if (facts.typing.has(top.id)) return { kind: "typing", card: top }\n',
     to: "",
     command: unit,
@@ -2238,7 +2237,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note arrives with no order",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '    case "note":\n      return noteAt(',
     to: '    case "note":\n      return { ...key, order: "" }\n      return noteAt(',
     command: unit,
@@ -2246,7 +2245,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "unqueue all moves a fact",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: '    .filter(c => c.carries.kind === "message")\n    .map(c => moveOf(c, noteOf(c.place)))',
     to: "    .map(c => moveOf(c, noteOf(c.place)))",
     command: unit,
@@ -2427,7 +2426,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a discard's history is its sender's task, not the one it leaves",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "): TaskId | null => taskOfPlace(discards.tasks, from) ?? discards.here",
     to: "): TaskId | null => discards.here",
     command: unit,
@@ -2435,7 +2434,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a discard from an inventory is in no history",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "): TaskId | null => taskOfPlace(discards.tasks, from) ?? discards.here",
     to: "): TaskId | null => taskOfPlace(discards.tasks, from)",
     command: unit,
@@ -2460,7 +2459,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the nearest note column is the farthest",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/notes.ts",
     from: "    return best === null || distance <= best.distance",
     to: "    return best === null || distance >= best.distance",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -2468,7 +2467,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a tie goes to the note column before",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/notes.ts",
     from: "    return best === null || distance <= best.distance",
     to: "    return best === null || distance < best.distance",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -2476,7 +2475,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note column made goes at the canvas's end",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/notes.ts",
     from: '  return { kind: "make", after: at }',
     to: '  return { kind: "make", after: canvas.length - 1 }',
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -2484,7 +2483,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a thread in an inventory sends its notes nowhere",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/notes.ts",
     from: '    return { kind: "inventory", holder: card.place.holder }',
     to: "    return null",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -2492,15 +2491,15 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column made for the first is not seen by the rest",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "    now = afterSteps(now, notes.first)\n",
     to: "",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
-    expect: "planNotesTargets: each move to a thread's notes to a column",
+    expect: "planMoveTargets, notes: each move to a thread's notes to a column",
   },
   {
     name: "an unsent card with nowhere to go holds no queue",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/queue.ts",
     from: "      hold: true,",
     to: "      hold: false,",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -2541,7 +2540,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note column made enters no history",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/move-history.ts",
     from: "      return isNoteColumnId(move.card) ? taskOf(move.to) : null",
     to: "      return null",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -2550,7 +2549,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note column made with no room renumbers nothing",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/notes.ts",
     from: "        renumbered: ranked.respaced,",
     to: "        renumbered: [],",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -2558,7 +2557,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column is minted for every note",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/notes.ts",
     from: "      return { place: noteAt(input.cards, near.column), first: [] }",
     to: "      return (input.newColumn(), { place: noteAt(input.cards, near.column), first: [] })",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -2566,7 +2565,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note for a thread with no card is passed over",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '        if (notes === null)\n          return {\n            kind: "refused",',
     to: '        if (notes === null) break\n        if (notes === null)\n          return {\n            kind: "refused",',
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -2574,7 +2573,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a made column is not written with its move",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: '        ? { kind: "steps", steps: [...resolved.first, ...step.steps] }',
     to: "        ? step",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
@@ -2584,15 +2583,15 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a reordered card keeps its rank",
     file: "packages/rules/card.ts",
-    from: 'const isOrdered = (place: CardPlace): place is OrderedPlace => "order" in place',
-    to: "const isOrdered = (place: CardPlace): place is OrderedPlace => false",
+    from: 'export const isOrdered = (place: CardPlace): place is OrderedPlace =>\n  "order" in place',
+    to: "export const isOrdered = (place: CardPlace): place is OrderedPlace =>\n  false",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
     expect:
       "up and down: only the order changes, between the neighbours its sender saw",
   },
   {
     name: "a canvas reorder may split its neighbours",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/in-place.ts",
     from: "    siblings: (cards, at) => canvasOf(cards, at.task),\n    adjacent: true,",
     to: "    siblings: (cards, at) => canvasOf(cards, at.task),\n    adjacent: false,",
     command: unit,
@@ -2601,7 +2600,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a canvas reorder moves among every task's cards",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/in-place.ts",
     from: "    siblings: (cards, at) => canvasOf(cards, at.task),",
     to: '    siblings: cards => cards.filter(c => c.place.kind === "canvas").sort(byOrder),',
     command: unit,
@@ -2610,7 +2609,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a width is written over a card moved since",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/in-place.ts",
     from: '  if (now.place.kind !== "canvas" || !sameKey(keyOf(now.place), change.at))',
     to: '  if (now.place.kind !== "canvas")',
     command: unit,
@@ -2618,7 +2617,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the width a card has is written again",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/in-place.ts",
     from: "  if (now.place.width === change.width) return null\n",
     to: "",
     command: unit,
@@ -2628,7 +2627,7 @@ export const mutations: readonly Mutation[] = [
   // side's test catches it.
   {
     name: "a branch's card lands at the canvas's end",
-    file: "packages/rules/task.ts",
+    file: "packages/rules/rank.ts",
     from: "  return at < 0 ? canvas.length - 1 : at",
     to: "  return canvas.length - 1",
     command: unit,
@@ -2636,7 +2635,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a branch's fresh column is drawn at the canvas's end",
-    file: "packages/rules/task.ts",
+    file: "packages/rules/rank.ts",
     from: "  return at < 0 ? canvas.length - 1 : at",
     to: "  return canvas.length - 1",
     command: ["pnpm", "exec", "vitest", "run", "packages/interface"],
@@ -2645,7 +2644,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a branch with no room overwrites a neighbour's rank",
-    file: "packages/rules/task.ts",
+    file: "packages/rules/rank.ts",
     from: "  if (order !== null) return { order, respaced: [] }",
     to: '  if (true) return { order: order ?? canvas[after]?.place.order ?? "", respaced: [] }',
     command: unit,
@@ -2654,7 +2653,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a drop on a canvas lands at its end",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "            ? rankOfDrop(canvas, to.after)\n",
     to: "            ? rankAfter(canvas, canvas.length - 1)\n",
     command: unit,
@@ -2662,7 +2661,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a drop after a card gone from the canvas lands first",
-    file: "packages/rules/task.ts",
+    file: "packages/rules/rank.ts",
     from: "    after === null ? -1 : at < 0 ? canvas.length - 1 : at,",
     to: "    after === null ? -1 : at,",
     command: unit,
@@ -2670,7 +2669,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a pin to a task goes after every task's pins",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "        order: orderAfter(taskPinnedOf(cards, key.task)),",
     to: '        order: orderAfter(cards.filter(c => c.place.kind === "task-pinned") as never),',
     command: unit,
@@ -2678,7 +2677,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a task's pins may be reordered apart",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/in-place.ts",
     from: "    siblings: (cards, at) => taskPinnedOf(cards, at.task),\n    adjacent: true,",
     to: "    siblings: (cards, at) => taskPinnedOf(cards, at.task),\n    adjacent: false,",
     command: unit,
@@ -2687,7 +2686,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a task's own notes are its last note column",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/notes.ts",
     from: "  const at = from === null ? -1 : canvas.findIndex(c => c.id === from)",
     to: "  const at = from === null ? canvas.length : canvas.findIndex(c => c.id === from)",
     command: unit,
@@ -2704,7 +2703,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a canvas's key alone lands first",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/moves.ts",
     from: "            : rankAfter(canvas, canvas.length - 1)",
     to: "            : rankAfter(canvas, -1)",
     command: unit,

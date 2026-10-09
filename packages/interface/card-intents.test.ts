@@ -59,7 +59,7 @@ const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
 const note = { kind: "note", column: NOTES, order: "a" } as const
 const noteKey = { kind: "note", column: NOTES } as const
 /** A move's target at the thread's nearest notes, which the host resolves. */
-const toNote = { kind: "notes", thread: TEST_THREAD } as const
+const toNote = { kind: "notes", near: "thread", thread: TEST_THREAD } as const
 const pinnedKey = {
   kind: "pinned",
   at: atEntry(A),
@@ -492,7 +492,7 @@ describe("pin and unpin (ADR-0048 step 5)", () => {
       move: {
         card: C2,
         from: { kind: "task-pinned", task: TEST_TASK },
-        to: { kind: "notes", task: TEST_TASK },
+        to: { kind: "notes", near: "task", task: TEST_TASK },
       },
     })
     // A drop on the task column's pins pins there.

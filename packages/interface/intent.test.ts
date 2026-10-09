@@ -647,7 +647,7 @@ describe("planIntent", () => {
       const move = {
         card: c,
         from: { kind: "queued", at: where, thread: lane, seen: "v" },
-        to: { kind: "notes", thread: lane },
+        to: { kind: "notes", near: "thread", thread: lane },
       }
       expect(plan(unqueue, state)).toEqual([
         {

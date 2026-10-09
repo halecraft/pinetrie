@@ -644,7 +644,7 @@ test("a note's key carries its column, and a thread's nearest notes its thread (
   assert.deepEqual(decodeKey(encodeKey(note)), note)
   assert.equal(decodeKey('{"kind":"note","column":"t-x"}'), undefined)
   // A thread's nearest notes: a move's target, and no place.
-  const notes = { kind: "notes", thread: TEST_THREAD } as const
+  const notes = { kind: "notes", near: "thread", thread: TEST_THREAD } as const
   const moves = decodeMoves(
     encodeMoves([
       {

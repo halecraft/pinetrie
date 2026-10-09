@@ -19,7 +19,7 @@ import {
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
-import { type MoveStep, planMove } from "./card.ts"
+import { type MoveStep, planMove } from "./moves.ts"
 import { rootOfPlace, type TaskIndex } from "./task.ts"
 
 /**

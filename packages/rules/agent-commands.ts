@@ -16,10 +16,11 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { type CatchUpNow, type ParentNow, parentAhead } from "./base.ts"
-import { type PlaceStep, queuedOn } from "./card.ts"
 import type { LandMessage } from "./land.ts"
+import type { PlaceStep } from "./moves.ts"
 import type { OfferStatus } from "./offer.ts"
 import { orderAfter } from "./order.ts"
+import { queuedOn } from "./queue.ts"
 import type { UpdateMessage } from "./update.ts"
 
 /** What a host tool answers the agent: its text, whether it refused, and what it says as a fact. */

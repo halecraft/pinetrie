@@ -384,7 +384,7 @@ export function planUnpin(
   if (now?.place.kind === "task-pinned")
     return [
       moveCard(
-        moveOf(now, { kind: "notes", task: now.place.task }),
+        moveOf(now, { kind: "notes", near: "task", task: now.place.task }),
         IN_COLUMN(key),
         true,
       ),

@@ -11,13 +11,8 @@ import {
 import { describe, expect, test } from "vitest"
 import { BOARD } from "./board.ts"
 import { orderKey } from "./order.ts"
-import {
-  branchAfter,
-  canvasOf,
-  planThreadStart,
-  rankAfter,
-  TASK,
-} from "./task.ts"
+import { branchAfter, rankAfter } from "./rank.ts"
+import { canvasOf, planThreadStart, TASK } from "./task.ts"
 import { THREAD } from "./thread.ts"
 
 const ADA = writerId("ada@x.io")

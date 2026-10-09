@@ -51,8 +51,14 @@ follow this list. A name only this package uses is imported from its module.
 - `live.ts`: what each stream event, and a run's end and a host's start, do
   to `pinetrie:live`, as `LiveOp`s `@pinetrie/schema`'s `applyLiveOps` writes
   (`packages/schema/TECHNICAL.md`, Streams).
-- `card.ts`, `queue-hold.ts`, `seat.ts`, `startup.ts`: cards and their
-  moves, a held queue, who wrote in a text, what a starting host resumes.
+- `card.ts`, `notes.ts`, `queue.ts`, `moves.ts`, `in-place.ts`,
+  `move-history.ts`: a card's record, where it is and the sweep; note
+  columns and where a card leaving a thread goes; the queue's pops and
+  carries; handoffs and their targets; reorders, a card's width and its
+  command; each sender's history of moves and its undo.
+- `rank.ts`: a rank on a canvas, a drop's, and where a branch lands.
+- `queue-hold.ts`, `seat.ts`, `startup.ts`: a held queue, who wrote in a
+  text, what a starting host resumes.
 - `board.ts`, `archive.ts`, `order.ts`: the board's workflow states and
   each root's place, what crossing the archive's edge does, and order
   keys (a queue's, the pinned cards' and the board's).
@@ -281,18 +287,20 @@ are the only code that builds or reads the shape.
   its lane is resumed. What does not survive a process (runs and streams)
   is cleared first (`planClear`, `live.ts`).
 
-# Cards (`card.ts`, ADR-0048, ADR-0059, ADR-0066)
+# Cards (`card.ts`, `notes.ts`, `queue.ts`, `moves.ts`, `in-place.ts`, `move-history.ts`, ADR-0048, ADR-0059, ADR-0066)
 
 What you type is a card. Its text is a `TextDoc`, written by clients; its
 record is in the places document (`PlacesDoc` in `@pinetrie/schema`), which
-only the host writes. This module decodes a record, decides where a card
+only the host writes. These modules decode a record, decide where a card
 sits, which moves the host accepts, which queued card is popped next, and
 which are swept.
 
 - **The stored record is flat strings**, "" for none (`encodeCard`,
   `decodeCard`, total). Where a card is goes through core's `placeFields`
-  and `placeOfFields`, which the wire's key codec uses too, so the two
-  cannot drift. A card's place at a thread's end, or queued, has an `at`
+  and `placeOfFields` (`core/places.ts`), which the wire's key codec uses
+  too, so the two cannot drift. Each stored kind's row has its fields in
+  one table (`ROWS`): a row is written through it and read narrowed to its
+  kind, so neither can touch a field its kind does not store. A card's place at a thread's end, or queued, has an `at`
   that is never the root, and its thread (stored in `lane`), and no root:
   the thread's record names it (ADR-0116); a fresh card's `column` is
   never "", and it carries its root, its task and its branch point (a
@@ -1301,7 +1309,7 @@ the tip it must match, and the bookmark to leave on it.
   (`planFactCard`, at the thread's end, after the cards there), popped in
   order with the others: at once on an idle lane, when the run ends on a
   running one. It is never written into a running lane.
-- **The drain plans before it acts** (`planCarry`, `card.ts`): a fact, a
+- **The drain plans before it acts** (`planCarry`, `queue.ts`): a fact, a
   catch-up and what follows it (`after`: the text, or nothing), a split
   with its brief, or a message. A property named `then` is
   forbidden by the linter, hence `after`.

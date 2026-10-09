@@ -14,8 +14,8 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import type { QueuedCard } from "./card.ts"
 import { renderableMessage } from "./chat.ts"
+import type { QueuedCard } from "./queue.ts"
 import { carryOnState, decodeCarryOn, planCarryOn, planStop } from "./stop.ts"
 
 describe("planStop", () => {

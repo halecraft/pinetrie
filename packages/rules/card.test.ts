@@ -31,44 +31,41 @@ import {
 import { cardIdFor, entriesOf, withThreads } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
-  blankQueued,
   cardEnd,
-  type Discards,
   decodeCard,
   encodeCard,
-  historyOf,
-  isBlankMessage,
-  NO_DISCARDS,
-  nearestNoteColumn,
-  notesNear,
-  ownsPlace,
   pinnedAt,
   placeEnd,
   planCardSweep,
-  planCarry,
-  planFactCard,
+  yourCard,
+} from "./card.ts"
+import { planReorder, planSetCommand, planWidth, REORDERS } from "./in-place.ts"
+import { historyOf, planHistorySweep, undoAnswer } from "./move-history.ts"
+import {
+  type Discards,
+  NO_DISCARDS,
+  ownsPlace,
   planFreshFollow,
-  planHistorySweep,
   planMove,
   planMoveCommand,
   planMoveRequest,
   planMoves,
   planMoveTargets,
+} from "./moves.ts"
+import { nearestNoteColumn, notesNear, toNotes } from "./notes.ts"
+import { orderAfter, orderKeys } from "./order.ts"
+import {
+  blankQueued,
+  isBlankMessage,
+  planCarry,
+  planFactCard,
   planNextQueuedCardPop,
-  planReorder,
-  planSetCommand,
   planUnqueueAll,
   planUnsent,
-  planWidth,
   type QueuedCard,
   queuedOn,
-  REORDERS,
   taskPinnedOf,
-  toNotes,
-  undoAnswer,
-  yourCard,
-} from "./card.ts"
-import { orderAfter, orderKeys } from "./order.ts"
+} from "./queue.ts"
 import { canvasOf, indexTasks, NO_TASK_INDEX, threadCardOf } from "./task.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -414,12 +411,18 @@ describe("note columns (ADR-0116)", () => {
 
   test("notesNear decides, minting nothing: a column, one to make there, or the holder's inventory; null for a thread with no card", () => {
     const cards = [thread(LANE, K(2)), column("l", K(3))]
-    expect(notesNear(cards, { kind: "notes", thread: LANE })).toEqual({
+    expect(
+      notesNear(cards, { kind: "notes", near: "thread", thread: LANE }),
+    ).toEqual({
       kind: "column",
       column: noteColumnIdFor("l"),
     })
     expect(
-      notesNear([thread(LANE, K(2))], { kind: "notes", thread: LANE }),
+      notesNear([thread(LANE, K(2))], {
+        kind: "notes",
+        near: "thread",
+        thread: LANE,
+      }),
     ).toMatchObject({
       kind: "make",
       task: TEST_TASK,
@@ -429,15 +432,19 @@ describe("note columns (ADR-0116)", () => {
       ...thread(LANE, K(2)),
       place: { kind: "inventory", holder: BEA } as const,
     }
-    expect(notesNear([held], { kind: "notes", thread: LANE })).toEqual({
+    expect(
+      notesNear([held], { kind: "notes", near: "thread", thread: LANE }),
+    ).toEqual({
       kind: "inventory",
       holder: BEA,
     })
-    expect(notesNear([], { kind: "notes", thread: LANE })).toBeNull()
+    expect(
+      notesNear([], { kind: "notes", near: "thread", thread: LANE }),
+    ).toBeNull()
   })
 
   test("a task's own nearest notes: its first note column, or one made before every card (ADR-0116)", () => {
-    const toTask = { kind: "notes", task: TEST_TASK } as const
+    const toTask = { kind: "notes", near: "task", task: TEST_TASK } as const
     expect(
       notesNear(
         [thread(LANE, K(2)), column("l", K(3)), column("r", K(5))],
@@ -456,6 +463,7 @@ describe("note columns (ADR-0116)", () => {
     const tight = (Number.parseInt(K(2), 36) + 1).toString(36).padStart(10, "0")
     const near = notesNear([thread(LANE, K(2)), thread(T2, tight)], {
       kind: "notes",
+      near: "thread",
       thread: LANE,
     })
     if (near?.kind !== "make") throw new Error(`not made: ${near?.kind}`)
@@ -479,7 +487,7 @@ describe("note columns (ADR-0116)", () => {
     }
     const there = toNotes({
       cards: [thread(LANE, K(2)), column("l", K(3)), n1],
-      to: { kind: "notes", thread: LANE },
+      to: { kind: "notes", near: "thread", thread: LANE },
       newColumn,
       by: BEA,
     })
@@ -489,7 +497,7 @@ describe("note columns (ADR-0116)", () => {
     expect(minted).toBe(0)
     const made = toNotes({
       cards: [thread(LANE, K(2))],
-      to: { kind: "notes", thread: LANE },
+      to: { kind: "notes", near: "thread", thread: LANE },
       newColumn,
       by: BEA,
     })
@@ -640,7 +648,7 @@ describe("note columns (ADR-0116)", () => {
     const unresolved = {
       card: C1,
       from: keyOf(note().place),
-      to: { kind: "notes", thread: LANE },
+      to: { kind: "notes", near: "thread", thread: LANE },
     } as const
     // @ts-expect-error a thread's nearest notes are resolved before planning
     planMove([note()], unresolved, ADA, NO_DISCARDS)
@@ -954,7 +962,7 @@ describe("the queue", () => {
           thread: LANE,
           seen: "",
         },
-        to: { kind: "notes", thread: LANE },
+        to: { kind: "notes", near: "thread", thread: LANE },
       })),
     )
   })
@@ -2004,7 +2012,7 @@ describe("cards pinned to a task (ADR-0116)", () => {
         {
           card: pin.id,
           from: at,
-          to: { kind: "notes", task: TEST_TASK },
+          to: { kind: "notes", near: "task", task: TEST_TASK },
         },
       ],
       ADA,
@@ -2069,11 +2077,14 @@ describe("storage", () => {
   })
 
   test("a malformed card is dropped, never thrown", () => {
+    const C = cardIdFor("c1")
     const ok = encodeCard(card())
+    // The id is a card's, so each case below fails for its own reason.
+    expect(decodeCard(C, ok)).toEqual(card())
     // A pinned card needs its order.
-    expect(decodeCard("c", { ...ok, kind: "pinned" })).toBeUndefined()
+    expect(decodeCard(C, { ...ok, kind: "pinned" })).toBeUndefined()
     expect(
-      decodeCard("c", {
+      decodeCard(C, {
         ...ok,
         kind: "pinned",
         at: "",
@@ -2081,19 +2092,19 @@ describe("storage", () => {
         order: "a",
       }),
     ).toBeUndefined()
-    expect(decodeCard("c", { ...ok, at: "" })).toBeUndefined()
-    expect(decodeCard("c", { ...ok, kind: "fresh" })).toBeUndefined()
-    expect(decodeCard("c", { ...ok, kind: "inventory" })).toBeUndefined()
-    expect(decodeCard("c", { ...ok, owner: "" })).toBeUndefined()
-    expect(decodeCard("c", { ...ok, placer: "" })).toBeUndefined()
+    expect(decodeCard(C, { ...ok, at: "" })).toBeUndefined()
+    expect(decodeCard(C, { ...ok, kind: "fresh" })).toBeUndefined()
+    expect(decodeCard(C, { ...ok, kind: "inventory" })).toBeUndefined()
+    expect(decodeCard(C, { ...ok, owner: "" })).toBeUndefined()
+    expect(decodeCard(C, { ...ok, placer: "" })).toBeUndefined()
     const { placer: _, ...noPlacer } = ok
-    expect(decodeCard("c", noPlacer)).toBeUndefined()
-    expect(decodeCard("c", null)).toBeUndefined()
-    expect(decodeCard("c", { ...ok, command: "pull" })).toBeUndefined()
+    expect(decodeCard(C, noPlacer)).toBeUndefined()
+    expect(decodeCard(C, null)).toBeUndefined()
+    expect(decodeCard(C, { ...ok, command: "pull" })).toBeUndefined()
     // A fact this build cannot read, or a fact with a command (ADR-0080).
-    expect(decodeCard("c", { ...ok, fact: "{" })).toBeUndefined()
+    expect(decodeCard(C, { ...ok, fact: "{" })).toBeUndefined()
     expect(
-      decodeCard("c", {
+      decodeCard(C, {
         ...ok,
         command: "bring-up-to-date",
         fact: encodeCard(card({ carries: { kind: "fact", fact: ACCEPTED } }))
@@ -2101,7 +2112,7 @@ describe("storage", () => {
       }),
     ).toBeUndefined()
     expect(
-      decodeCard("c", {
+      decodeCard(C, {
         ...ok,
         kind: "queued",
         thread: "lane:x",
@@ -2117,8 +2128,10 @@ describe("storage", () => {
   })
 
   test("a card at a thread's end must name its thread: one stored with no thread's id does not decode", () => {
+    const id = cardIdFor("c1")
+    expect(decodeCard(id, encodeCard(card()))).toEqual(card())
     const stored = { ...encodeCard(card()), at: "e2", lane: "main" }
-    expect(decodeCard("c", stored)).toBeUndefined()
+    expect(decodeCard(id, stored)).toBeUndefined()
   })
 
   test("a card's kind is its id's: a thread's card decodes on a canvas, a text card there does not (ADR-0116)", () => {

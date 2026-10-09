@@ -116,50 +116,12 @@ export {
   planCanvasRead,
 } from "./canvas.ts"
 export {
-  afterSteps,
-  blankQueued,
-  type CarryPlan,
   cardEnd,
-  cardsOfParts,
-  type Discards,
   decodeCard,
   encodeCard,
-  historyOf,
-  type MoveStep,
-  type MovesStep,
-  NEW_NOTES_TITLE,
-  type NextQueuedCardPopStep,
-  NO_DISCARDS,
-  NONE_BLANK,
-  type NoteCard,
-  type NotesNear,
-  nearestNoteColumn,
-  notesIn,
-  notesNear,
-  type PlaceStep,
   pinnedAt,
   placeEnd,
   planCardSweep,
-  planCarry,
-  planFactCard,
-  planFreshFollow,
-  planHistorySweep,
-  planMoveCommand,
-  planMoveRequest,
-  planMoveTargets,
-  planNextQueuedCardPop,
-  planReorder,
-  planSetCommand,
-  planUnqueueAll,
-  planUnsent,
-  planWidth,
-  type QueuedCard,
-  queuedOn,
-  type TaskPinnedCard,
-  taskPinnedOf,
-  toNotes,
-  type UndoResult,
-  undoAnswer,
   yourCard,
 } from "./card.ts"
 export {
@@ -253,6 +215,7 @@ export {
   factLine,
 } from "./fact.ts"
 export { pastedImages, planImages } from "./images.ts"
+export { planReorder, planSetCommand, planWidth } from "./in-place.ts"
 export {
   type ConflictShown,
   decodeLand,
@@ -274,6 +237,25 @@ export {
 } from "./live.ts"
 export { MARK, planMark } from "./mark.ts"
 export {
+  cardsOfParts,
+  historyOf,
+  planHistorySweep,
+  type UndoResult,
+  undoAnswer,
+} from "./move-history.ts"
+export {
+  afterSteps,
+  type Discards,
+  type MoveStep,
+  type MovesStep,
+  NO_DISCARDS,
+  type PlaceStep,
+  planFreshFollow,
+  planMoveCommand,
+  planMoveRequest,
+  planMoveTargets,
+} from "./moves.ts"
+export {
   NAME,
   planNames,
   planReserve,
@@ -281,6 +263,15 @@ export {
   threadNameOf,
 } from "./names.ts"
 export { NOTE_COLUMN } from "./note-column.ts"
+export {
+  NEW_NOTES_TITLE,
+  type NoteCard,
+  type NotesNear,
+  nearestNoteColumn,
+  notesIn,
+  notesNear,
+  toNotes,
+} from "./notes.ts"
 export {
   isNotYetAccepted,
   OFFER,
@@ -331,11 +322,27 @@ export {
   planPinnedRead,
 } from "./pinned.ts"
 export {
+  blankQueued,
+  type CarryPlan,
+  type NextQueuedCardPopStep,
+  NONE_BLANK,
+  planCarry,
+  planFactCard,
+  planNextQueuedCardPop,
+  planUnqueueAll,
+  planUnsent,
+  type QueuedCard,
+  queuedOn,
+  type TaskPinnedCard,
+  taskPinnedOf,
+} from "./queue.ts"
+export {
   planHoldSweep,
   planQueueCard,
   planQueueHold,
   QUEUE_HOLD,
 } from "./queue-hold.ts"
+export { branchAfter, rankAfter, rankOfDrop } from "./rank.ts"
 export {
   byTarget,
   deleteRecord,
@@ -386,15 +393,12 @@ export {
   STOP,
 } from "./stop.ts"
 export {
-  branchAfter,
   type CanvasCard,
   canvasOf,
   indexTasks,
   NO_TASK_INDEX,
   planThreadCard,
   planThreadStart,
-  rankAfter,
-  rankOfDrop,
   rootOfPlace,
   rootsHeld,
   TASK,

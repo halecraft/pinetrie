@@ -12,8 +12,8 @@ import {
   type ValueWrite,
 } from "@pinetrie/core"
 import { BOARD } from "./board.ts"
-import type { PlaceStep } from "./card.ts"
 import { MARK } from "./mark.ts"
+import type { PlaceStep } from "./moves.ts"
 import { deleteRecord } from "./records.ts"
 import { ROOT } from "./roots.ts"
 import { rootOfPlace, TASK } from "./task.ts"

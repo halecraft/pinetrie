@@ -10,7 +10,7 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import type { QueuedCard } from "./card.ts"
+import type { QueuedCard } from "./queue.ts"
 import {
   holdOnStop,
   planHoldSweep,

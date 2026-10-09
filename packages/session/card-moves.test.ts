@@ -472,7 +472,7 @@ describe("drawnPlace (ADR-0116)", () => {
     place: { kind: "canvas", task, order: "0000000200", width: 1 },
   }
   test("a thread's nearest notes are drawn in the column the host would choose; nowhere while the host would make one", () => {
-    const to = { kind: "notes", thread: LANE } as const
+    const to = { kind: "notes", near: "thread", thread: LANE } as const
     expect(drawnPlace(to, ME, [thread, notes])).toEqual({
       kind: "note",
       column,

@@ -1,7 +1,7 @@
 // startup — what a starting host does with the lanes it finds, pure.
 
 import type { CardRecord, ThreadId, VerdictRecord } from "@pinetrie/core"
-import { queuedOn } from "./card.ts"
+import { queuedOn } from "./queue.ts"
 
 /**
  * What a starting host runs, pure. A lane a crash interrupted holds its
