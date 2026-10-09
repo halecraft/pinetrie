@@ -105,7 +105,7 @@ wires them.
 - **A prompt's run reads its pinned cards first** (`readPinned`,
   `pinned.ts`): a chat's, a popped queued card's, a resolution's, a split's
   and a carry-on's. It
-  gathers the thread's pinned cards at the lane's tip (`cardsAt`), loads
+  gathers the thread's pinned cards at the lane's tip (`pinnedAt`), loads
   their texts, waits for each as the chat's sender had it (`seen`, at most
   `PINNED_WAIT_MS`, 2 s), gathers again (a card may have been pinned or
   unpinned meanwhile), and plans against what the model last read on the
@@ -197,7 +197,10 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   minted, refused `root_id_in_use` or `task_id_in_use` when the session
   holds either already; a branch elsewhere names a task the session holds.
   The host's `TaskIndex` is `tasksNow(basics)` (`tasks.ts`), from the
-  places and the threads' records.
+  places and the threads' records, built once per command by the
+  dispatcher (`commands/index.ts`), which hands it to the archive gate and
+  every card command; a drain, a title and an offer each build their own,
+  once a step. Only an undo reads it again, after its revert wrote.
 
 ## The stored schemas (`migrations/`, ADR-0096)
 
@@ -228,16 +231,21 @@ until the next compaction (S120), and the host compacts at startup. So
   registered now: `0001-live-row`, `0002-records` (ADR-0095) and
   `0005-tasks`' places and sidebars (ADR-0116) ran, and were deleted.
 - **A change to a record's contents moves no hash**: records are JSON in a
-  document's `records`. A `RecordMigration` (`RECORD_MIGRATIONS`) is
+  document's `records`, and so does a change to the values of the places'
+  rows, whose fields stay. A `RecordMigration` (`RECORD_MIGRATIONS`) is
   one-time: `migrate` runs each one's reads with the hash migrations', and
   it returns a write only when what it read is in the old shape, so a
   second start finds nothing to do. It writes under the document's current
   schema, so its hash stays. The backup is taken after the reads, before
   the first write. Each is deleted, with its mutations, once Duane's store
-  has run it. None is registered now: `0003-workflow-archive` (the
-  workflow's `closed` state renamed `archive`), `0004-threads` (each thread
-  named in its first message, ADR-0117) and `0005-tasks`' records (a task
-  per root, ADR-0116) ran, and were deleted.
+  has run it. `0006-note-columns` is registered (ADR-0116): each thread's
+  notes, stored in the cells of its notes board, moved into a note column
+  made just after the thread's card, in reading order (`planNoteColumns`);
+  a note whose thread is on no canvas is logged and left. It logs what it
+  made through `MigrationRun.log`. `0003-workflow-archive` (the workflow's
+  `closed` state renamed `archive`), `0004-threads` (each thread named in
+  its first message, ADR-0117) and `0005-tasks`' records (a task per root,
+  ADR-0116) ran, and were deleted.
 
 ## Startup
 
@@ -561,8 +569,12 @@ rejects `shutdown()`.
   `sendPoppedQueuedCard` in mode `queue`, as its queuer (`by`), with the card's other
   writers as contributors. A card with no text starts no run.
 - **A card the host could not send goes back below the line, whole**
-  (`planUnsent`): a note where it was queued, saying why, and never queued
-  again, or the next drain would fail the same way (S69, answer 5). Its text
+  (`planUnsent`): a note in the note column nearest its thread, made in the
+  same step when its task has none (ADR-0116), saying why, and never queued
+  again, or the next drain would fail the same way (S69, answer 5). With
+  nowhere to go (a thread in a full inventory, or one with no card) it
+  stays queued, saying why, and the host holds the queue first
+  (`planQueueHold`), so the drain stops at it. Its text
   is kept. After a clean update its command is cleared: it was carried out.
   An update or a send that throws writes the card back the same way, saying
   the host failed: the pop has deleted its record, so nothing else would.

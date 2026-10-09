@@ -10,9 +10,11 @@
 import {
   type CardId,
   type CardPlace,
+  isNoteColumnId,
   isTaskId,
   isWorkflowStateId,
   keyOf,
+  type NoteColumnId,
   noteOf,
   type PlaceKey,
   pinnedOf,
@@ -23,12 +25,15 @@ import {
 } from "@pinetrie/core"
 
 export type PutTarget =
-  /** A note at a column's end (ADR-0113); in a fresh column, your message there. */
+  /**
+   * A thread's column: a note in the note column nearest it (`noteOf`,
+   * ADR-0116); in a fresh column, your message there.
+   */
   | { readonly kind: "column"; readonly key: string }
   /** A column's composer: your message, which a message with text there gives way to by a swap. */
   | { readonly kind: "composer"; readonly key: string }
-  /** A cell of a column's notes board (ADR-0113): a note there, which a note in it swaps with. */
-  | { readonly kind: "cell"; readonly key: string; readonly cell: number }
+  /** A note column (ADR-0116): a note at its end. */
+  | { readonly kind: "notes"; readonly column: NoteColumnId }
   /** The pinned strip at the top of a thread's column (ADR-0048). */
   | { readonly kind: "pinned"; readonly key: string }
   /** A slot of your inventory. */
@@ -49,8 +54,8 @@ const PUT_COMPOSER = "data-put-composer"
 const PUT_PINNED = "data-put-pinned"
 /** The attribute a slot carries: its index. */
 const PUT_SLOT = "data-put-slot"
-/** The attribute a notes board's cell carries: its column's key and its cell, as `key:cell`. */
-const PUT_CELL = "data-put-cell"
+/** The attribute a note column carries: its id. */
+const PUT_NOTES = "data-put-notes"
 /** The attribute a workflow state carries, on the board and the footer's strip: its id. */
 const PUT_STATE = "data-put-state"
 /** The attribute a place in the sidebar carries: the task it goes before, or `end`. */
@@ -58,7 +63,7 @@ const PUT_SIDEBAR = "data-put-sidebar"
 const END = "end"
 
 /** What an element a drop may land on matches: any mark. */
-export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_SLOT}],[${PUT_CELL}],[${PUT_STATE}],[${PUT_SIDEBAR}]`
+export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_STATE}],[${PUT_SIDEBAR}]`
 
 /** The attributes that mark an element as `target`, spread onto it by the page. */
 export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
@@ -71,8 +76,8 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       return { [PUT_PINNED]: target.key }
     case "inventory":
       return { [PUT_SLOT]: String(target.slot) }
-    case "cell":
-      return { [PUT_CELL]: `${target.key}:${target.cell}` }
+    case "notes":
+      return { [PUT_NOTES]: target.column }
     case "state":
       return { [PUT_STATE]: target.state }
     case "sidebar":
@@ -97,9 +102,9 @@ export function targetOfElement(el: {
   const before = el.getAttribute(PUT_SIDEBAR)
   if (before === END) return { kind: "sidebar", before: null }
   if (before !== null && isTaskId(before)) return { kind: "sidebar", before }
-  const cell = /^(.+):(\d+)$/.exec(el.getAttribute(PUT_CELL) ?? "")
-  if (cell?.[1] !== undefined && cell[2] !== undefined)
-    return { kind: "cell", key: cell[1], cell: Number(cell[2]) }
+  const notes = el.getAttribute(PUT_NOTES)
+  if (notes !== null && isNoteColumnId(notes))
+    return { kind: "notes", column: notes }
   const slot = el.getAttribute(PUT_SLOT)
   if (slot === null || !/^\d+$/.test(slot)) return null
   return { kind: "inventory", slot: Number(slot) }
@@ -111,8 +116,6 @@ export interface ComposerSpot {
   readonly place: CardPlace
   /** Your message there, if you have one (`yourCard`). */
   readonly message: CardId | null
-  /** Its notes board as drawn (`notesPlaced`): cell to note. */
-  readonly cells: ReadonlyMap<number, CardId>
 }
 
 /** Column key to its composer (`ComposerSpot`). */
@@ -130,12 +133,12 @@ export const intoMessage = (
   (target.kind === "column" && places.get(target.key)?.place.kind === "fresh")
 
 /**
- * The place `target` names: a note at a column's end (`noteOf`), in a cell
- * of its board or the first empty one, its composer's place, the same
- * thread end pinned (`pinnedOf`), or your inventory; null for a column no
- * composer publishes, and for a fresh column's strip or board, which it
- * has none of; and for a state or the sidebar, which name a new thread,
- * not a place (`planSpinOff`).
+ * The place `target` names: the note column nearest a column's thread
+ * (`noteOf`), a note column's end, its composer's place, the same thread
+ * end pinned (`pinnedOf`), or your inventory; null for a column no composer
+ * publishes, and for a fresh column's strip, which it has none of; and for
+ * a state or the sidebar, which name a new thread, not a place
+ * (`planSpinOff`).
  */
 export function placeOfTarget(
   target: PutTarget,
@@ -143,21 +146,15 @@ export function placeOfTarget(
   me: WriterId,
 ): PlaceKey | null {
   if (target.kind === "inventory") return { kind: "inventory", holder: me }
+  if (target.kind === "notes") return { kind: "note", column: target.column }
   if (target.kind === "state" || target.kind === "sidebar") return null
   const place = places.get(target.key)?.place
   if (place === undefined) return null
   if (target.kind === "pinned") return pinnedOf(place)
-  if (target.kind === "cell")
-    return place.kind === "composing" ? noteOf(place, target.cell) : null
   if (target.kind === "column" && place.kind === "composing")
     return noteOf(place)
   return keyOf(place)
 }
-
-const sameCells = (
-  a: ReadonlyMap<number, CardId>,
-  b: ReadonlyMap<number, CardId>,
-): boolean => a.size === b.size && [...a].every(([n, id]) => b.get(n) === id)
 
 /** A store each column writes its composer to as it renders; reading it redraws nothing. */
 export interface ComposerPlacesStore {
@@ -176,7 +173,6 @@ export function composerPlacesStore(): ComposerPlacesStore {
           ? now === undefined
           : now !== undefined &&
             now.message === spot.message &&
-            sameCells(now.cells, spot.cells) &&
             sameKey(keyOf(now.place), keyOf(spot.place))
       )
         return

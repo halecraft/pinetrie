@@ -18,13 +18,13 @@ import {
   type ChatAt,
   type ChatMode,
   type CommitId,
-  cardId,
   commitId,
   type EntryId,
   ERR,
   type ErrCode,
   entryId,
   type Intent,
+  isNoteColumnId,
   isRootId,
   isSha256,
   isTaskId,
@@ -34,6 +34,7 @@ import {
   keyFieldsOf,
   keyOfFields,
   MAX_TITLE,
+  type MarkTarget,
   MOVE_DIRECTIONS,
   type Move,
   type MoveDirection,
@@ -45,10 +46,12 @@ import {
   type OfferSeen,
   type PlaceKey,
   type Position,
+  parseCardId,
   parseMentions,
   parseNewRoot,
   parseNewTask,
   parseNewThread,
+  parseTextCardId,
   parseTitle,
   placeFields,
   QUEUE_HOLD_CHANGES,
@@ -62,7 +65,6 @@ import {
   type SentCard,
   type TaskId,
   type ThreadId,
-  textCardId,
   WORKFLOW_ACTIONS,
   type WorkflowAction,
   type WorkflowStateId,
@@ -255,6 +257,9 @@ export function decodeCommand(
     const chatAt = chatAtFromWire(mode, thread, at, text(wire?.task))
     if (chatAt === undefined)
       return refused(ERR.UNKNOWN_TARGET, `not a task: ${text(wire?.task)}`)
+    const card = cardFromWire(text(wire?.cardId), text(wire?.seen))
+    if (card === undefined)
+      return refused(ERR.UNKNOWN_TARGET, "a chat's card is no text card")
     return {
       kind: "chat",
       text: body,
@@ -262,7 +267,7 @@ export function decodeCommand(
       at: chatAt,
       asksAgent: wire?.asksAgent === true,
       mentions: parseMentions(body),
-      card: cardFromWire(text(wire?.cardId), text(wire?.seen)),
+      card,
       pinned,
       base: base === "" ? null : base,
       state: stateText === "" ? null : (stateText as WorkflowStateId),
@@ -336,15 +341,15 @@ export function decodeCommand(
       : refused(ERR.UNKNOWN_KIND, `unknown undo direction: ${direction}`)
   }
   if (kind === "set-command") {
-    const card = text(wire?.cardId)
-    if (card === "")
+    const card = parseCardId(text(wire?.cardId))
+    if (card === undefined)
       return refused(ERR.UNKNOWN_TARGET, "a command must name its card")
     const name = text(wire?.mode)
     if (name !== "" && !isCardCommand(name))
       return refused(ERR.UNKNOWN_KIND, `unknown card command: ${name}`)
     return {
       kind: "set-command",
-      card: cardId(card),
+      card,
       command: name === "" ? null : name,
     }
   }
@@ -412,8 +417,20 @@ export function decodeCommand(
   }
   if (kind === "mark") {
     const task = text(wire?.task)
-    if (!isTaskId(task))
-      return refused(ERR.UNKNOWN_TARGET, `not a task: ${task}`)
+    const column = text(wire?.cardId)
+    const of: MarkTarget | undefined =
+      column === ""
+        ? isTaskId(task)
+          ? { kind: "task", task }
+          : undefined
+        : isNoteColumnId(column) && task === ""
+          ? { kind: "note-column", column }
+          : undefined
+    if (of === undefined)
+      return refused(
+        ERR.UNKNOWN_TARGET,
+        `not a task or a note column: ${task}${column}`,
+      )
     const title = parseTitle(text(wire?.text))
     switch (title.kind) {
       case "invalid":
@@ -422,9 +439,9 @@ export function decodeCommand(
           `a title is one line of at most ${MAX_TITLE} characters`,
         )
       case "clear":
-        return { kind: "mark", task, title: null }
+        return { kind: "mark", of, title: null }
       case "set":
-        return { kind: "mark", task, title: title.title }
+        return { kind: "mark", of, title: title.title }
     }
   }
   if (kind === "retitle") {
@@ -497,8 +514,15 @@ function offerSeenFromWire(wire: string): OfferSeen | null {
 }
 
 /** A chat's card on the wire, with its text's version: `""` is none. */
-const cardFromWire = (id: string, seen: string): SentCard | null =>
-  id === "" ? null : { id: textCardId(id), seen }
+/** The card a chat is sent from: null for none; undefined for an id that is no text card's. */
+const cardFromWire = (
+  id: string,
+  seen: string,
+): SentCard | null | undefined => {
+  if (id === "") return null
+  const card = parseTextCardId(id)
+  return card === undefined ? undefined : { id: card, seen }
+}
 
 /** A chat's pinned cards -> the wire: a JSON list of `{ card, seen }`, `""` for none. */
 const pinnedToWire = (pinned: readonly SentCard[]): string =>
@@ -530,9 +554,9 @@ function pinnedFromWire(s: string): readonly SentCard[] | undefined {
   const out: SentCard[] = []
   for (const item of value) {
     const { card, seen } = (item ?? {}) as Record<string, unknown>
-    if (typeof card !== "string" || card === "" || typeof seen !== "string")
-      return undefined
-    out.push({ id: textCardId(card), seen })
+    const id = typeof card === "string" ? parseTextCardId(card) : undefined
+    if (id === undefined || typeof seen !== "string") return undefined
+    out.push({ id, seen })
   }
   return out
 }
@@ -601,14 +625,14 @@ export function decodeMoves(s: string): readonly Move[] | string {
     if (typeof item !== "object" || item === null)
       return "a move must name its card"
     const m = item as Record<string, unknown>
-    const card = typeof m.card === "string" ? m.card.trim() : ""
-    if (card === "") return "a move must name its card"
+    const card = parseCardId(typeof m.card === "string" ? m.card.trim() : "")
+    if (card === undefined) return "a move must name its card"
     const from = keyFromJson(m.from ?? null)
     const to = keyFromJson(m.to ?? null)
     if (from === undefined || to === undefined)
       return "a move names a malformed place"
     if (to === null) return "a move must name where the card goes"
-    moves.push({ card: cardId(card), from, to })
+    moves.push({ card, from, to })
   }
   return moves
 }
@@ -626,8 +650,9 @@ export const encodeReorder = (r: Reorder): string =>
  * not a queue's or the pinned cards', no neighbour, or a neighbour that is
  * the card itself or both of them.
  */
-export function decodeReorder(card: string, s: string): Reorder | string {
-  if (card === "") return "a reorder must name its card"
+export function decodeReorder(text: string, s: string): Reorder | string {
+  const card = parseCardId(text)
+  if (card === undefined) return "a reorder must name its card"
   const value = parsed(s)
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return "a reorder must name its place"
@@ -636,21 +661,22 @@ export function decodeReorder(card: string, s: string): Reorder | string {
   if (
     at === null ||
     at === undefined ||
-    (at.kind !== "queued" && at.kind !== "pinned")
+    (at.kind !== "queued" && at.kind !== "pinned" && at.kind !== "note")
   )
-    return "a reorder stays in a queue or among the pinned cards"
+    return "a reorder stays in a queue, among the pinned cards or in a note column"
   const neighbour = (k: unknown): string =>
     typeof k === "string" ? k.trim() : ""
   const [after, before] = [neighbour(v.after), neighbour(v.before)]
   if (after === "" && before === "") return "a reorder must name a neighbour"
   if (after === card || before === card || after === before)
     return "a reorder's neighbours are two other cards"
-  return {
-    card: cardId(card),
-    at,
-    after: after === "" ? null : cardId(after),
-    before: before === "" ? null : cardId(before),
-  }
+  const [afterId, beforeId] = [parseCardId(after), parseCardId(before)]
+  if (
+    (after !== "" && afterId === undefined) ||
+    (before !== "" && beforeId === undefined)
+  )
+    return "a reorder's neighbours are cards"
+  return { card, at, after: afterId ?? null, before: beforeId ?? null }
 }
 
 /** Cards an undo moved -> the wire: a JSON list of `{ card, place }`. */
@@ -665,9 +691,8 @@ function decodeMovedCards(s: string): readonly MovedCard[] {
     if (typeof item !== "object" || item === null) return []
     const c = item as Record<string, unknown>
     const place = keyFromJson(c.place ?? null)
-    return typeof c.card === "string" && c.card !== "" && place !== undefined
-      ? [{ card: cardId(c.card), place }]
-      : []
+    const card = typeof c.card === "string" ? parseCardId(c.card) : undefined
+    return card !== undefined && place !== undefined ? [{ card, place }] : []
   })
 }
 
@@ -782,7 +807,9 @@ export function encodeIntent(id: string, intent: Intent): Command {
       return command({
         id,
         kind: "mark",
-        task: intent.task,
+        ...(intent.of.kind === "task"
+          ? { task: intent.of.task }
+          : { cardId: intent.of.column }),
         text: intent.title ?? "",
       })
     case "retitle":

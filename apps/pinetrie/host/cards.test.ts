@@ -19,7 +19,7 @@ function setUp() {
   const store = createInMemoryStore()
   const exchange = new Exchange({ principal: "pinetrie-host", store })
   const cards = startCards({ exchange, store, session: newSessionDoc() })
-  const id = textCardId("c-1")
+  const id = textCardId("c0000000-0000-7000-8000-000000000001")
   const ada = createDocAs("0f3c9a2b7d1e4f60a8b9c0d1e2f3a4b5", TextDoc)
   batch(ada, d => d.text.insert(0, "ship it"))
   const arrive = () =>
@@ -72,8 +72,15 @@ test("blankQueued: a queued card made empty is blank; one queued with text is no
     carries: { kind: "message", command: null },
     unsent: null,
   })
-  const queue = [queuedAs("c-0", ""), queuedAs(id, seen)]
-  expect([...(await cards.blankQueued(queue))]).toEqual([textCardId("c-0")])
+  const queue = [
+    queuedAs("c0000000-0000-7000-8000-000000000000", ""),
+    queuedAs(id, seen),
+  ]
+  expect([...(await cards.blankQueued(queue))]).toEqual([
+    textCardId("c0000000-0000-7000-8000-000000000000"),
+  ])
   arrive()
-  expect([...(await cards.blankQueued(queue))]).toEqual([textCardId("c-0")])
+  expect([...(await cards.blankQueued(queue))]).toEqual([
+    textCardId("c0000000-0000-7000-8000-000000000000"),
+  ])
 })

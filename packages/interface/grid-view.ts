@@ -1,12 +1,9 @@
-// interface/grid-view — a card grid as it is drawn (ADR-0048, ADR-0113):
-// your inventory's slots, or a thread's notes board. Cells in reading
-// order, each a face or empty, the selection, and the rows shown
-// (`rowsShown`, core's `grid.ts`). Pure: `inventoryView` and
-// `notesBoardView` build one, and `CardGrid` (`packages/web/card-grid.tsx`)
-// draws it.
+// interface/grid-view — your inventory's slots as they are drawn (ADR-0048):
+// cells in reading order, each a face or empty, the selection, and its rows
+// (core's `grid.ts`). Pure: `inventoryView` builds one,
+// and `CardGrid` (`packages/web/card-grid.tsx`) draws it.
 
 import type { CardId, CardRecord, Grid } from "@pinetrie/core"
-import { rowsShown } from "@pinetrie/core"
 import { type CardFaceView, type CardTone, cardFace } from "./card-frame.ts"
 
 export interface GridCell {
@@ -39,7 +36,7 @@ export function gridView(input: {
   readonly texts: ReadonlyMap<CardId, string>
   readonly keyOf?: (cell: number) => string | null
 }): GridView {
-  const rows = rowsShown(input.grid, new Set(input.placed.keys()))
+  const { rows } = input.grid
   const cells = Array.from({ length: rows * input.grid.width }, (_, index) => {
     const card = input.placed.get(index) ?? null
     return {

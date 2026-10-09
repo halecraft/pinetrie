@@ -1,4 +1,4 @@
-import { cardId } from "@pinetrie/core"
+import { textCardId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { planReading, TYPING_EVERY_MS, typingDue } from "./presence-report.ts"
 
@@ -32,9 +32,26 @@ describe("planReading", () => {
 })
 
 test("typing is written at most once a second, and at once in another card (ADR-0048 step 7)", () => {
-  const last = { at: 0, card: cardId("c-1") }
-  expect(typingDue(last, TYPING_EVERY_MS - 1, cardId("c-1"))).toBe(false)
-  expect(typingDue(last, TYPING_EVERY_MS, cardId("c-1"))).toBe(true)
-  expect(typingDue(last, 1, cardId("c-2"))).toBe(true)
+  const last = {
+    at: 0,
+    card: textCardId("c0000000-0000-7000-8000-000000000001"),
+  }
+  expect(
+    typingDue(
+      last,
+      TYPING_EVERY_MS - 1,
+      textCardId("c0000000-0000-7000-8000-000000000001"),
+    ),
+  ).toBe(false)
+  expect(
+    typingDue(
+      last,
+      TYPING_EVERY_MS,
+      textCardId("c0000000-0000-7000-8000-000000000001"),
+    ),
+  ).toBe(true)
+  expect(
+    typingDue(last, 1, textCardId("c0000000-0000-7000-8000-000000000002")),
+  ).toBe(true)
   expect(typingDue(last, 1, null)).toBe(true)
 })

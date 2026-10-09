@@ -12,6 +12,7 @@ import {
   entryId,
   type Intent,
   type Move,
+  noteColumnIdFor,
   ROOT,
   rootIdFor,
   runId,
@@ -27,6 +28,7 @@ import { test } from "vitest"
 import {
   decodeCommand,
   decodeKey,
+  decodeMoves,
   decodeReply,
   encodeIntent,
   encodeKey,
@@ -205,10 +207,13 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       at: { kind: "end", thread: threadIdFor("abc"), seen: entryId("e-5") },
       asksAgent: false,
       mentions: [{ kind: "person", name: "bob" }],
-      card: { id: textCardId("c-7"), seen: "v-1" },
+      card: {
+        id: textCardId("c0000000-0000-7000-8000-000000000007"),
+        seen: "v-1",
+      },
       pinned: [
-        { id: textCardId("c-8"), seen: "v-2" },
-        { id: textCardId("c-9"), seen: "" },
+        { id: textCardId("c0000000-0000-7000-8000-000000000008"), seen: "v-2" },
+        { id: textCardId("c0000000-0000-7000-8000-000000000009"), seen: "" },
       ],
       base: null,
       state: null,
@@ -264,10 +269,18 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     {
       kind: "mark",
-      task: TEST_TASK,
+      of: { kind: "task", task: TEST_TASK },
       title: "Tab names",
     },
-    { kind: "mark", task: TEST_TASK, title: null },
+    { kind: "mark", of: { kind: "task", task: TEST_TASK }, title: null },
+    {
+      kind: "mark",
+      of: {
+        kind: "note-column",
+        column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+      },
+      title: "Ideas",
+    },
     { kind: "retitle", task: TEST_TASK },
     {
       kind: "offer",
@@ -297,7 +310,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "move",
       moves: [
         {
-          card: textCardId("c-7"),
+          card: textCardId("c0000000-0000-7000-8000-000000000007"),
           from: null,
           to: {
             kind: "fresh",
@@ -313,7 +326,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "queue-card",
       move: {
-        card: textCardId("c-7"),
+        card: textCardId("c0000000-0000-7000-8000-000000000007"),
         from: {
           kind: "composing",
           at: atEntry(entryId("e-5")),
@@ -332,7 +345,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "queue-card",
       move: {
-        card: textCardId("c-8"),
+        card: textCardId("c0000000-0000-7000-8000-000000000008"),
         from: null,
         to: {
           kind: "queued",
@@ -348,7 +361,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "move",
       moves: [
         {
-          card: textCardId("c-7"),
+          card: textCardId("c0000000-0000-7000-8000-000000000007"),
           from: {
             kind: "composing",
             at: atEntry(entryId("e-5")),
@@ -357,7 +370,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
           to: { kind: "gone", why: { kind: "discarded" } },
         },
         {
-          card: textCardId("c-8"),
+          card: textCardId("c0000000-0000-7000-8000-000000000008"),
           from: { kind: "inventory", holder: writerId("ada@example.com") },
           to: { kind: "gone", why: { kind: "discarded" } },
         },
@@ -367,7 +380,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "spin-off",
       move: {
-        card: textCardId("c-9"),
+        card: textCardId("c0000000-0000-7000-8000-000000000009"),
         from: { kind: "inventory", holder: writerId("ada@example.com") },
         to: {
           kind: "gone",
@@ -386,7 +399,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "move",
       moves: [
         {
-          card: textCardId("c-7"),
+          card: textCardId("c0000000-0000-7000-8000-000000000007"),
           from: {
             kind: "fresh",
             column: "k-1",
@@ -401,7 +414,10 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     {
       kind: "move",
-      moves: ["c-7", "c-8"].map(
+      moves: [
+        "c0000000-0000-7000-8000-000000000007",
+        "c0000000-0000-7000-8000-000000000008",
+      ].map(
         (id): Move => ({
           card: textCardId(id),
           from: {
@@ -420,10 +436,14 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "undo-move", task: TEST_TASK, direction: "redo" },
     {
       kind: "set-command",
-      card: textCardId("c-7"),
+      card: textCardId("c0000000-0000-7000-8000-000000000007"),
       command: "bring-up-to-date",
     },
-    { kind: "set-command", card: textCardId("c-7"), command: null },
+    {
+      kind: "set-command",
+      card: textCardId("c0000000-0000-7000-8000-000000000007"),
+      command: null,
+    },
     { kind: "traces-seen", traces: ["t-1", "t-2"] },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: true },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: false },
@@ -431,33 +451,38 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "reorder",
       reorder: {
-        card: textCardId("c-7"),
+        card: textCardId("c0000000-0000-7000-8000-000000000007"),
         at: {
           kind: "queued",
           at: atEntry(entryId("e-1")),
           thread: threadIdFor("abc"),
           seen: "v1",
         },
-        after: textCardId("c-6"),
+        after: textCardId("c0000000-0000-7000-8000-000000000006"),
         before: null,
       },
     },
     {
       kind: "reorder",
       reorder: {
-        card: textCardId("c-7"),
+        card: textCardId("c0000000-0000-7000-8000-000000000007"),
         at: {
           kind: "pinned",
           at: atEntry(entryId("e-1")),
           thread: TEST_THREAD,
         },
         after: null,
-        before: textCardId("c-8"),
+        before: textCardId("c0000000-0000-7000-8000-000000000008"),
       },
     },
   ] as const satisfies readonly Intent[]
   for (const intent of intents) {
-    assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
+    assert.deepEqual(
+      decodeCommand(
+        encodeIntent("c0000000-0000-7000-8000-000000000001", intent),
+      ),
+      intent,
+    )
   }
 })
 
@@ -485,8 +510,8 @@ test("a chat's malformed pinned cards are refused", () => {
     )
   for (const bad of [
     "{",
-    '{"card":"c-1"}',
-    '[{"card":"c-1"}]',
+    '{"card":"c0000000-0000-7000-8000-000000000001"}',
+    '[{"card":"c0000000-0000-7000-8000-000000000001"}]',
     '[{"card":"","seen":""}]',
   ])
     assert.equal(chat(bad).kind, "refused")
@@ -547,7 +572,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
       kind: "undone",
       cards: [
         {
-          card: textCardId("c-1"),
+          card: textCardId("c0000000-0000-7000-8000-000000000001"),
           place: {
             kind: "fresh",
             column: "k-1",
@@ -556,7 +581,10 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
             at: ROOT,
           },
         },
-        { card: textCardId("c-2"), place: null },
+        {
+          card: textCardId("c0000000-0000-7000-8000-000000000002"),
+          place: null,
+        },
       ],
     },
     { kind: "nothing" },
@@ -586,7 +614,12 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "failed", message: "writeValues is not in this port" },
   ]
   for (const outcome of outcomes) {
-    assert.deepEqual(decodeReply(encodeOutcome("c-1", outcome)), outcome)
+    assert.deepEqual(
+      decodeReply(
+        encodeOutcome("c0000000-0000-7000-8000-000000000001", outcome),
+      ),
+      outcome,
+    )
   }
   // A kind added to the wire without a case here fails this, not silence.
   assert.deepEqual(new Set(outcomes.map(o => o.kind)), new Set(OUTCOME_KINDS))
@@ -597,16 +630,27 @@ test("a reply carries the places document's rev when its step wrote it; none is 
   assert.equal(revOfReply(encodeOutcome("c", { kind: "named" })), null)
 })
 
-test("a note's key carries its cell, and none as none (ADR-0113)", () => {
-  for (const cell of [3, null]) {
-    const note = {
-      kind: "note",
-      at: atEntry(entryId("e-1")),
-      thread: TEST_THREAD,
-      cell,
-    } as const
-    assert.deepEqual(decodeKey(encodeKey(note)), note)
-  }
+test("a note's key carries its column, and a thread's nearest notes its thread (ADR-0116)", () => {
+  const note = {
+    kind: "note",
+    column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+  } as const
+  assert.deepEqual(decodeKey(encodeKey(note)), note)
+  const notes = { kind: "notes", thread: TEST_THREAD } as const
+  assert.deepEqual(decodeKey(encodeKey(notes)), notes)
+  assert.equal(decodeKey('{"kind":"note","column":"t-x"}'), undefined)
+})
+
+test("decode: a mark names a task or a note column, never both or neither (ADR-0116)", () => {
+  const N = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+  assert.equal(
+    refusalCode(decodeCommand({ kind: "mark", task: TEST_TASK, cardId: N })),
+    ERR.UNKNOWN_TARGET,
+  )
+  assert.equal(
+    refusalCode(decodeCommand({ kind: "mark", text: "x" })),
+    ERR.UNKNOWN_TARGET,
+  )
 })
 
 test('decodeKey: "" is none; anything malformed is undefined', () => {
@@ -649,24 +693,47 @@ test("decode: a move needs its cards, each with a place, and its sender's task a
     { kind: "move", moves: encodeMoves([]) },
     { kind: "move", moves: "{" },
     { kind: "move", moves: JSON.stringify([{ card: "", to: null }]) },
-    { kind: "move", moves: JSON.stringify([{ card: "c-1" }]) },
     {
       kind: "move",
-      moves: JSON.stringify([{ card: "c-1", to: { kind: "x" } }]),
+      moves: JSON.stringify([{ card: "c0000000-0000-7000-8000-000000000001" }]),
     },
     {
       kind: "move",
-      moves: encodeMoves([
-        { card: textCardId("c-1"), from: null, to: fresh },
-        { card: textCardId("c-2"), from: null, to: null as never },
+      moves: JSON.stringify([
+        { card: "c0000000-0000-7000-8000-000000000001", to: { kind: "x" } },
       ]),
     },
     {
       kind: "move",
-      moves: encodeMoves([{ card: textCardId("c-1"), from: null, to: fresh }]),
+      moves: encodeMoves([
+        {
+          card: textCardId("c0000000-0000-7000-8000-000000000001"),
+          from: null,
+          to: fresh,
+        },
+        {
+          card: textCardId("c0000000-0000-7000-8000-000000000002"),
+          from: null,
+          to: null as never,
+        },
+      ]),
+    },
+    {
+      kind: "move",
+      moves: encodeMoves([
+        {
+          card: textCardId("c0000000-0000-7000-8000-000000000001"),
+          from: null,
+          to: fresh,
+        },
+      ]),
       here: "r-not-a-task",
     },
-    { kind: "set-command", cardId: "c-1", mode: "pull" },
+    {
+      kind: "set-command",
+      cardId: "c0000000-0000-7000-8000-000000000001",
+      mode: "pull",
+    },
     { kind: "set-command", cardId: "" },
     { kind: "undo-move", root: "", mode: "undo" },
     { kind: "undo-move", root: TEST_ROOT, mode: "sideways" },
@@ -704,7 +771,8 @@ test("decode: a spin-off names one move, into a new thread, and a known state or
     lane: NEW_THREAD,
   }
   const from = { kind: "inventory", holder: "ada@example.com" }
-  const moves = (to: unknown) => JSON.stringify([{ card: "c-1", from, to }])
+  const moves = (to: unknown) =>
+    JSON.stringify([{ card: "c0000000-0000-7000-8000-000000000001", from, to }])
   assert.equal(
     decodeCommand({ kind: "spin-off", moves: moves(spunTo), task: NEW_TASK })
       .kind,
@@ -741,7 +809,9 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
     lane: threadIdFor("abc"),
     seen: "",
   }
-  const moves = JSON.stringify([{ card: "c-1", from: null, to: queued }])
+  const moves = JSON.stringify([
+    { card: "c0000000-0000-7000-8000-000000000001", from: null, to: queued },
+  ])
   // One way into a queue (ADR-0113): `move` refuses it, `queue-card` takes
   // one move into a queue and a known hold change.
   assert.equal(decodeCommand({ kind: "move", moves }).kind, "refused")
@@ -764,7 +834,7 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
   const moved = encodeIntent("c", {
     kind: "queue-card",
     move: {
-      card: textCardId("c-1"),
+      card: textCardId("c0000000-0000-7000-8000-000000000001"),
       from: { kind: "composing", at, thread: lane },
       to: { kind: "queued", at, thread: lane, seen: "" },
     },
@@ -777,7 +847,11 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
     decodeCommand({
       kind: "queue-card",
       moves: JSON.stringify([
-        { card: "c-1", from: null, to: { kind: "inventory", holder: "w" } },
+        {
+          card: "c0000000-0000-7000-8000-000000000001",
+          from: null,
+          to: { kind: "inventory", holder: "w" },
+        },
       ]),
       mode: "keep",
     }).kind,
@@ -787,20 +861,40 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
     decodeCommand({ kind: "reorder", cardId, moves: JSON.stringify(moves) })
       .kind
   assert.equal(
-    reorder("c-1", { at: queued, after: "c-2", before: "" }),
+    reorder("c0000000-0000-7000-8000-000000000001", {
+      at: queued,
+      after: "c0000000-0000-7000-8000-000000000002",
+      before: "",
+    }),
     "reorder",
   )
-  assert.equal(reorder("", { at: queued, after: "c-2" }), "refused")
-  assert.equal(reorder("c-1", { at: queued }), "refused")
-  assert.equal(reorder("c-1", { at: queued, after: "c-1" }), "refused")
   assert.equal(
-    reorder("c-1", { at: queued, after: "c-2", before: "c-2" }),
+    reorder("", { at: queued, after: "c0000000-0000-7000-8000-000000000002" }),
     "refused",
   )
   assert.equal(
-    reorder("c-1", {
+    reorder("c0000000-0000-7000-8000-000000000001", { at: queued }),
+    "refused",
+  )
+  assert.equal(
+    reorder("c0000000-0000-7000-8000-000000000001", {
+      at: queued,
+      after: "c0000000-0000-7000-8000-000000000001",
+    }),
+    "refused",
+  )
+  assert.equal(
+    reorder("c0000000-0000-7000-8000-000000000001", {
+      at: queued,
+      after: "c0000000-0000-7000-8000-000000000002",
+      before: "c0000000-0000-7000-8000-000000000002",
+    }),
+    "refused",
+  )
+  assert.equal(
+    reorder("c0000000-0000-7000-8000-000000000001", {
       at: { kind: "composing", at: "e-1", thread: "" },
-      after: "c-2",
+      after: "c0000000-0000-7000-8000-000000000002",
     }),
     "refused",
   )
@@ -844,9 +938,31 @@ test("decode: a chat's card is its id and its text's version, or none", () => {
     })
   const card = (i: ReturnType<typeof chat>) =>
     "kind" in i && i.kind === "chat" ? i.card : "refused"
-  assert.deepEqual(card(chat("c-1")), { id: "c-1", seen: "v" })
+  assert.deepEqual(card(chat("c0000000-0000-7000-8000-000000000001")), {
+    id: "c0000000-0000-7000-8000-000000000001",
+    seen: "v",
+  })
   assert.equal(card(chat("")), null)
   assert.equal(card(chat("  ")), null)
+  // An id that is no text card's: a thread's, or no card's at all.
+  assert.equal(card(chat(NEW_THREAD)), "refused")
+  assert.equal(card(chat("c-1")), "refused")
+})
+
+test("decode: a move, a reorder or a command names a card by an id parseCardId takes", () => {
+  const to = { kind: "inventory", holder: "w-ada@x.io" }
+  assert.equal(
+    typeof decodeMoves(JSON.stringify([{ card: "c-1", from: null, to }])),
+    "string",
+  )
+  assert.equal(
+    typeof decodeMoves(JSON.stringify([{ card: NEW_THREAD, from: null, to }])),
+    "object",
+  )
+  assert.equal(
+    refusalCode(decodeCommand({ kind: "set-command", cardId: "t", mode: "" })),
+    ERR.UNKNOWN_TARGET,
+  )
 })
 
 test("a move on the board names its task and its states; a workflow change, a known action and its state", () => {
@@ -892,11 +1008,11 @@ test("a chat's workflow state must be one", () => {
 test("a mark names its task; its title is trimmed, blank clears, and a line break or 81 characters is refused", () => {
   assert.deepEqual(
     decodeCommand({ kind: "mark", task: TEST_TASK, text: "  Tab names " }),
-    { kind: "mark", task: TEST_TASK, title: "Tab names" },
+    { kind: "mark", of: { kind: "task", task: TEST_TASK }, title: "Tab names" },
   )
   assert.deepEqual(decodeCommand({ kind: "mark", task: TEST_TASK, text: "" }), {
     kind: "mark",
-    task: TEST_TASK,
+    of: { kind: "task", task: TEST_TASK },
     title: null,
   })
   for (const text of ["two\nlines", "x".repeat(81)])

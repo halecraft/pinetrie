@@ -9,19 +9,13 @@ import {
   parseTitle,
   type RootId,
   type RootRecord,
-  type RootSummary,
   type TaskId,
   type ThreadId,
+  type WriterId,
 } from "@pinetrie/core"
 import type { Tasks } from "./tasks.ts"
 
 export { NO_TEXT }
-
-/** The directory's roots that have a message, by their root entry. */
-const withEntries = (directory: ReadonlyMap<RootId, RootRecord>) =>
-  [...directory.values()].flatMap(r =>
-    r.entry === null ? [] : [{ ...r, entry: r.entry }],
-  )
 
 /** Messages in the roots this tab holds, of every root's. */
 export interface MessageCount {
@@ -47,35 +41,41 @@ export const messageCount = (
 export const messageCountTitle = ({ held, total }: MessageCount): string =>
   `${held} in the threads this tab has loaded, of ${total} in the session`
 
-/**
- * Every root with a message, ascending by its root entry, as the sidebar and
- * the board read it: from the directory (ADR-0063), not the tree, so a
- * root this tab does not hold is there too.
- */
-export const summariesOf = (
-  directory: ReadonlyMap<RootId, RootRecord>,
-): readonly RootSummary[] =>
-  withEntries(directory)
-    .flatMap(r =>
-      r.first === null
-        ? []
-        : [
-            {
-              root: r.entry,
-              first: r.first,
-              messages: r.messages,
-              newest: r.newest ?? r.first,
-              writers: r.writers,
-            },
-          ],
-    )
-    .sort((a, b) => (a.root < b.root ? -1 : a.root > b.root ? 1 : 0))
+/** What a task's card shows of its threads' roots (ADR-0116), from the directory. */
+export interface TaskSummary {
+  /** Its first root's first message's first line: its label while it has no title. */
+  readonly line: string
+  /** Everyone who wrote a chat in its roots, in order of first message, each root in turn. */
+  readonly writers: readonly WriterId[]
+  /** Its newest message: last activity, since ids are uuidv7. */
+  readonly newest: EntryId
+}
 
-/** Every root's first message's first line, by its root entry: its label while it has no title. */
-export const firstLinesOf = (
+/**
+ * Every task with a message, as the sidebar and the board read it: from
+ * the directory (ADR-0063), not the tree, so a root this tab does not hold
+ * counts too. A task whose first root has no message yet is left out.
+ */
+export function summariesOf(
+  tasks: Tasks,
   directory: ReadonlyMap<RootId, RootRecord>,
-): ReadonlyMap<EntryId, string> =>
-  new Map(withEntries(directory).map(r => [r.entry, r.firstLine]))
+): ReadonlyMap<TaskId, TaskSummary> {
+  const out = new Map<TaskId, TaskSummary>()
+  for (const t of tasks.byId.values()) {
+    const records = t.roots.flatMap(r => directory.get(r) ?? [])
+    const first = records[0]
+    if (first === undefined || first.first === null) continue
+    const writers: WriterId[] = []
+    let newest: EntryId = first.first
+    for (const r of records) {
+      for (const w of r.writers) if (!writers.includes(w)) writers.push(w)
+      const latest = r.newest ?? r.first
+      if (latest !== null && latest > newest) newest = latest
+    }
+    out.set(t.task, { line: first.firstLine, writers, newest })
+  }
+  return out
+}
 
 /** What an untitled task no agent has worked in is called (ADR-0074). */
 export const CHAT_LABEL = "Chat"

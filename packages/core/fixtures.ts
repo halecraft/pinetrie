@@ -2,8 +2,28 @@
 // `entryId`. Core's tests use it, and other packages' tests as
 // `@pinetrie/core/fixtures`; production code never imports it.
 
-import { type EntryId, entryId, type ThreadId, threadIdFor } from "./index.ts"
+import {
+  type EntryId,
+  entryId,
+  type TextCardId,
+  type ThreadId,
+  textCardId,
+  threadIdFor,
+} from "./index.ts"
 import type { AgentMessageLike, EntryLike } from "./tree.ts"
+
+/**
+ * A text card's id for a test, a uuidv7 that `parseCardId` takes, from a
+ * name of up to 6 characters, hex-encoded into its last group: the same
+ * name always gives the same id.
+ */
+export function cardIdFor(name: string): TextCardId {
+  const hex = [...name].map(c => c.charCodeAt(0).toString(16).padStart(2, "0"))
+  const tail = hex.join("").padStart(12, "0")
+  if (name.length > 6 || tail.length !== 12)
+    throw new Error(`a test card's name is at most 6 ASCII characters: ${name}`)
+  return textCardId(`01a0ffd2-0000-7000-8000-${tail}`)
+}
 
 /** One entry: a message when `message` is given, else of `more.type`. */
 export const entry = (

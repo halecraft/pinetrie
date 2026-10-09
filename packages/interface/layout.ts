@@ -28,6 +28,7 @@ import {
   THREAD_PATTERN,
   type ThreadId,
   type TreeIndex,
+  threadAt,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
@@ -494,23 +495,26 @@ export type OpenPlan =
     }
 
 /**
- * Show entry `id`, wherever it is, in the task its root's thread is in
- * (`ofEntry`): an archived task opens as any other, read only (`appView`). A
- * message on a shared stretch of paths is drawn once, in the leftmost column
- * showing it, so every column's path is searched. Null for an entry the
- * index lacks, or one in no task.
+ * Show entry `id`, wherever it is, in the task its thread is in
+ * (`threadAt`, then `taskOfThread`): an archived task opens as any other,
+ * read only (`appView`). A message on a shared stretch of paths is drawn
+ * once, in the leftmost column showing it, so every column's path is
+ * searched. Null for an entry the index lacks, or one in no task.
  */
 export function planOpen(
   layout: Layout,
   index: TreeIndex,
   id: EntryId,
-  ofEntry: ReadonlyMap<EntryId, TaskId>,
+  taskOfThread: ReadonlyMap<ThreadId, TaskId>,
+  entries: ReadonlyMap<TaskId, EntryId>,
 ): OpenPlan | null {
   const root = rootOf(index, id)
-  if (root === null) return null
-  const task = ofEntry.get(root)
+  const thread = threadAt(index, id)
+  if (root === null || thread === null) return null
+  const task = taskOfThread.get(thread)
   if (task === undefined) return null
-  const columns = drawnColumns(layout, task, root, index, [])
+  const first = entries.get(task) ?? root
+  const columns = drawnColumns(layout, task, first, index, [])
   const views = projectColumns(
     index,
     columns.map(c => ({ anchor: c.anchor })),
@@ -523,7 +527,7 @@ export function planOpen(
   return {
     kind: "open",
     task,
-    entry: root,
+    entry: first,
     after: openBeside(index, paths, id),
   }
 }

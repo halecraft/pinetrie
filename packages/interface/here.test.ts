@@ -1,10 +1,11 @@
-import { entryId, writerId } from "@pinetrie/core"
+import { entryId, taskIdFor, threadIdFor, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { tree } from "./fixtures.ts"
 import {
   peopleHere,
+  peopleIn,
   readerHeading,
-  readersByRoot,
+  readersByTask,
   toggleOpenMenu,
   withOpenMenus,
 } from "./here.ts"
@@ -13,38 +14,49 @@ const ADA = writerId("ada")
 const BEA = writerId("bea")
 const CY = writerId("cy")
 const index = tree({ "1-r1": null, "2-a": "1-r1", "3-r2": null })
+const [K1, K2, K3] = ["1", "2", "3"].map(taskIdFor) as [
+  ReturnType<typeof taskIdFor>,
+  ReturnType<typeof taskIdFor>,
+  ReturnType<typeof taskIdFor>,
+]
+/** Each root's thread, each in a task of its own (ADR-0116). */
+const facts = {
+  taskOfThread: new Map([
+    [threadIdFor("1-r1"), K1],
+    [threadIdFor("3-r2"), K2],
+  ]),
+  reported: new Map(),
+}
 
-test("peopleHere groups each person's columns, in order, and drops an end not arrived", () => {
+test("peopleHere groups each person's columns, in order, by the task each thread is in, and drops an end not arrived", () => {
   const readingAt = new Map([
     [entryId("2-a"), [BEA, CY]],
     [entryId("3-r2"), [BEA]],
     [entryId("9-missing"), [ADA]],
   ])
-  expect(peopleHere(readingAt, index, [CY, BEA], new Map())).toEqual([
-    { writer: CY, threads: [{ end: "2-a", root: "1-r1" }] },
+  expect(peopleHere(readingAt, index, [CY, BEA], facts)).toEqual([
+    { writer: CY, threads: [{ end: "2-a", task: K1 }] },
     {
       writer: BEA,
       threads: [
-        { end: "2-a", root: "1-r1" },
-        { end: "3-r2", root: "3-r2" },
+        { end: "2-a", task: K1 },
+        { end: "3-r2", task: K2 },
       ],
     },
   ])
 })
 
-test("peopleHere names the root its reader reported for an end in a root not held (ADR-0063)", () => {
+test("peopleHere names the task its reader reported for an end in a root not held (ADR-0063)", () => {
   const readingAt = new Map([[entryId("8-far"), [BEA]]])
   expect(
-    peopleHere(
-      readingAt,
-      index,
-      [BEA],
-      new Map([[entryId("8-far"), entryId("7-r3")]]),
-    ),
-  ).toEqual([{ writer: BEA, threads: [{ end: "8-far", root: "7-r3" }] }])
+    peopleHere(readingAt, index, [BEA], {
+      ...facts,
+      reported: new Map([[entryId("8-far"), K3]]),
+    }),
+  ).toEqual([{ writer: BEA, threads: [{ end: "8-far", task: K3 }] }])
 })
 
-test("readersByRoot turns people around: each root with its readers, each once", () => {
+test("readersByTask turns people around: each task with its readers, each once; peopleIn keeps a task's", () => {
   const people = peopleHere(
     new Map([
       [entryId("2-a"), [BEA, CY]],
@@ -53,21 +65,24 @@ test("readersByRoot turns people around: each root with its readers, each once",
     ]),
     index,
     [BEA, CY],
-    new Map(),
+    facts,
   )
-  expect([...readersByRoot(people)]).toEqual([
-    ["1-r1", [BEA, CY]],
-    ["3-r2", [BEA]],
+  expect([...readersByTask(people)]).toEqual([
+    [K1, [BEA, CY]],
+    [K2, [BEA]],
+  ])
+  expect(peopleIn(people, new Set([K2]))).toEqual([
+    { writer: BEA, threads: [{ end: "3-r2", task: K2 }] },
   ])
 })
 
 test("withOpenMenus keeps a person who left while their menu is open, where they were", () => {
-  const thread = (end: string, root: string) => ({
+  const thread = (end: string, task: typeof K1) => ({
     end: entryId(end),
-    root: entryId(root),
+    task,
   })
-  const bea = { writer: BEA, threads: [thread("2-a", "1-r1")] }
-  const cy = { writer: CY, threads: [thread("3-r2", "3-r2")] }
+  const bea = { writer: BEA, threads: [thread("2-a", K1)] }
+  const cy = { writer: CY, threads: [thread("3-r2", K2)] }
   expect(withOpenMenus([bea, cy], new Map())).toEqual([
     { person: bea, gone: false },
     { person: cy, gone: false },

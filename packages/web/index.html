@@ -691,13 +691,24 @@
       /* An archived root, or a send on its way: what was typed
          stays, and nothing more is typed. */
       .card-editor .input[readonly] { opacity: .5; }
-      /* The notes at this end (ADR-0113), under your message, opening the
-         notes board; a drop on it makes a note. */
-      .notes-line { display: flex; align-items: center; gap: .5rem; padding: .3rem .75rem;
-        border-top: 1px solid #23272e; font-size: .75rem; }
-      .notes-toggle { background: none; border: 0; padding: .1rem 0; color: #8b93a1; cursor: pointer; }
-      .notes-toggle[aria-expanded="true"] { color: #ddd; }
-      body[data-card-drag] .notes-line { outline: 1px dashed #6f7784; outline-offset: -2px; }
+      /* A note column (ADR-0116): a title, and its notes one under another,
+         each folded to its first line until it holds the focus; a drop on it
+         makes a note at its end. */
+      .note-column { flex: 0 0 20rem; width: 20rem; min-width: 0; display: flex;
+        flex-direction: column; min-height: 0; border-right: 1px solid #23272e; }
+      .note-column-head { display: flex; align-items: center; gap: .5rem; padding: .4rem .75rem;
+        border-top: 4px solid #6f7784; font-size: .8rem; color: #aaa; }
+      .note-column-title { flex: 1; text-align: left; background: none; border: 0; padding: 0;
+        color: #ddd; font-weight: 600; cursor: text; }
+      .note-column-title:disabled { cursor: default; }
+      .note-count { font-size: .72rem; color: #8b93a1; }
+      .note-column-notes { flex: 1; overflow-y: auto; padding: .4rem .75rem; }
+      .note-column-notes .card-editor.note { margin-bottom: .3rem; }
+      .notes-empty { font-size: .75rem; color: #6f7784; }
+      .add-note { margin: 0 .75rem .5rem; padding: 0; background: none; border: 0;
+        font-size: .72rem; color: #8b93a1; cursor: pointer; text-align: left; }
+      .add-note:hover { color: #ddd; }
+      body[data-card-drag] .note-column { outline: 1px dashed #6f7784; outline-offset: -2px; }
       /* While a card is dragged, the places it can become a thread (ADR-0111):
          a workflow state, on the board or the footer's strip, and the sidebar. */
       body[data-card-drag] [data-put-state],
@@ -744,6 +755,11 @@
       /* A queued card in the dock, at rest: its header and one line. */
       .dock .card-editor.queued:not(:focus-within) .card-foot { display: none; }
       .dock .card-editor.queued:not(:focus-within) .input { height: 1.9rem;
+        padding: .2rem .7rem; line-height: 1.4rem; overflow: hidden; resize: none;
+        white-space: nowrap; text-overflow: ellipsis; }
+      /* A note in its note column, at rest: its header and one line (ADR-0116). */
+      .note-column .card-editor.note:not(:focus-within) .card-foot { display: none; }
+      .note-column .card-editor.note:not(:focus-within) .input { height: 1.9rem;
         padding: .2rem .7rem; line-height: 1.4rem; overflow: hidden; resize: none;
         white-space: nowrap; text-overflow: ellipsis; }
       /* Commands matching what is typed (ADR-0036), above the input. */
@@ -818,11 +834,6 @@
         box-shadow: 0 8px 24px rgb(0 0 0 / .5); }
       .card-grid-open > .card-frame { flex: 1; }
       .card-grid-cell[data-open] > button { opacity: 0; }
-      /* A selected empty cell of a notes board: a new note there. */
-      .card-grid-new { position: absolute; inset: 0; margin: auto; width: 2rem; height: 2rem;
-        padding: 0; border-radius: 50%; border: 1px solid #3a3f47; background: #1b1e24;
-        color: #9ecbff; font-size: 1.1rem; line-height: 1; cursor: pointer; }
-      .card-grid-new:hover { border-color: #9ecbff; }
       .card-grid-open[data-side="left"] { left: 0; }
       .card-grid-open[data-side="right"] { right: 0; }
       .card-grid-open .card-frame { margin: 0; }
@@ -838,9 +849,6 @@
       .card-face-key { margin-left: auto; color: #6f7784; font-size: .65rem; }
       .card-face-lines { margin-top: .15rem; white-space: pre-wrap; color: #c3c8d0;
         display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-      /* The notes board in the pane: a narrow pane scrolls it sideways. */
-      .pane-notes { overflow: auto; padding: .75rem; }
-      .notes-grid { width: max-content; }
       dialog.restore-ask { background: #171a1f; color: inherit; border: 1px solid #3a3f48;
         border-radius: 8px; }
       dialog.restore-ask::backdrop { background: rgb(0 0 0 / .5); }

@@ -546,7 +546,10 @@ describe("settling and starting up", () => {
   })
   test("planStartup: every lane with queued cards drains, once", () => {
     const plan = planStartup({
-      cards: [queuedOn(LANE1, "c-1"), queuedOn(LANE1, "c-2")],
+      cards: [
+        queuedOn(LANE1, "c0000000-0000-7000-8000-000000000001"),
+        queuedOn(LANE1, "c0000000-0000-7000-8000-000000000002"),
+      ],
       interrupted: [],
       verdicts: [],
     })
@@ -554,7 +557,10 @@ describe("settling and starting up", () => {
   })
   test("planStartup: an interrupted lane is resumed, and not drained", () => {
     const plan = planStartup({
-      cards: [queuedOn(LANE1, "c-1"), queuedOn(LANE2, "c-2")],
+      cards: [
+        queuedOn(LANE1, "c0000000-0000-7000-8000-000000000001"),
+        queuedOn(LANE2, "c0000000-0000-7000-8000-000000000002"),
+      ],
       interrupted: [LANE1],
       verdicts: [],
     })
@@ -581,7 +587,7 @@ describe("settling and starting up", () => {
 describe("a host tool's result as a fact (ADR-0080)", () => {
   const result = (toolName: string, details: unknown, text = "Asked.") => ({
     role: "toolResult",
-    toolCallId: "c-1",
+    toolCallId: "c0000000-0000-7000-8000-000000000001",
     toolName,
     content: [{ type: "text", text }],
     details,

@@ -8,10 +8,8 @@ import {
   inboxWords,
 } from "./inbox-view.ts"
 
-const R = entryId("r1")
 const verdict = (lane: string, level: Level): Item => ({
   lane: threadIdFor(lane),
-  root: R,
   end: entryId(`e-${lane}`),
   level,
   raised: {
@@ -22,10 +20,9 @@ const verdict = (lane: string, level: Level): Item => ({
 })
 const offer = (lane: string): Item => ({
   lane: threadIdFor(lane),
-  root: R,
   end: entryId(`e-${lane}`),
   level: "needsYou",
-  raised: { kind: "offer", source: "c-1" },
+  raised: { kind: "offer", source: "c0000000-0000-7000-8000-000000000001" },
 })
 
 const view = (

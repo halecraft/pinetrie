@@ -1,9 +1,7 @@
 import {
   type BannerRecord,
   blobUrl,
-  type EntryId,
   entryId,
-  type LaneView,
   type MarkRecord,
   type Sha256,
   type TaskId,
@@ -30,11 +28,11 @@ import { taskSlot } from "./palette.ts"
 import {
   dropsWords,
   listKey,
-  offeredByRoot,
+  offeredByTask,
   pageTitle,
-  rootSprites,
   type SidebarViewInput,
   sidebarView,
+  taskSprites,
 } from "./sidebar-view.ts"
 import { type ThreadCardFacts, threadCardHeads } from "./thread-card.ts"
 
@@ -68,7 +66,7 @@ const layout = resolveLayout(
   },
 )
 const none: CardMarks = {
-  roots: new Set(),
+  tasks: new Set(),
   newTabs: new Set(),
   ends: new Set(),
   elsewhere: false,
@@ -102,9 +100,9 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
       [K("r1"), "Tab names"],
       [K("r2"), "second"],
     ]),
-    lines: new Map([
-      [entryId("r1"), "first"],
-      [entryId("r2"), "second"],
+    summaries: new Map([
+      [K("r1"), { line: "first", writers: [], newest: entryId("r1") }],
+      [K("r2"), { line: "second", writers: [], newest: entryId("r2") }],
     ]),
     marks: new Map([[K("r1"), mark]]),
     archived: new Set(),
@@ -127,8 +125,9 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
   return {
     layout: f.layout,
     active: f.active,
-    heads: threadCardHeads(f.shown, { ...f, pips: f.unsent.roots }),
-    lines: f.lines,
+    heads: threadCardHeads(f.shown, { ...f, pips: f.unsent.tasks }),
+    entries: f.entries,
+    summaries: f.summaries,
     marks: f.marks,
     archived: f.archived,
     unsent: f.unsent,
@@ -197,7 +196,7 @@ describe("sidebarView", () => {
   })
 
   test("Move to Done is refused while the agent works in the root", () => {
-    const [r1] = items({ work: new Map([["r1", "running"]]) })
+    const [r1] = items({ work: new Map([[K("r1"), "running"]]) })
     const done =
       r1?.kind === "task"
         ? r1.menu.find(i => i.kind === "moveTo" && i.closes)
@@ -207,7 +206,7 @@ describe("sidebarView", () => {
 
   test("Move to Done names the threads whose offers it withdraws", () => {
     const amber = "amber-fox" as ThreadName
-    const [r1, r2] = items({ offered: new Map([[entryId("r1"), [amber]]]) })
+    const [r1, r2] = items({ offered: new Map([[K("r1"), [amber]]]) })
     const done = (r: typeof r1) =>
       r?.kind === "task"
         ? r.menu.find(i => i.kind === "moveTo" && i.closes)
@@ -220,25 +219,31 @@ describe("sidebarView", () => {
     expect(dropsWords([])).toBe(null)
   })
 
-  test("offeredByRoot: each open offer's thread, under its root; one the host has not named yet by its id's end", () => {
+  test("offeredByTask: each open offer's thread, under its task; one the host has not named yet by its id's end; one in no task left out (ADR-0116)", () => {
     const lane = (n: string) => n as ThreadId
     const names = new Map([
       [lane("l1"), "amber-fox" as ThreadName],
       [lane("l2"), "cozy-mallard" as ThreadName],
     ])
     expect(
-      offeredByRoot(
+      offeredByTask(
         [
-          { lane: lane("l1"), root: entryId("r1") },
-          { lane: lane("l2"), root: entryId("r1") },
-          { lane: lane("l3"), root: entryId("r2") },
+          { lane: lane("l1") },
+          { lane: lane("l2") },
+          { lane: lane("l3") },
+          { lane: lane("l4") },
         ],
         names,
+        new Map([
+          [lane("l1"), K("r1")],
+          [lane("l2"), K("r1")],
+          [lane("l3"), K("r2")],
+        ]),
       ),
     ).toEqual(
       new Map([
-        [entryId("r1"), ["amber-fox", "cozy-mallard"]],
-        [entryId("r2"), ["l3"]],
+        [K("r1"), ["amber-fox", "cozy-mallard"]],
+        [K("r2"), ["l3"]],
       ]),
     )
   })
@@ -246,7 +251,7 @@ describe("sidebarView", () => {
   test("a pip on each item holding a card of yours", () => {
     const unsent = {
       ...none,
-      roots: new Set([entryId("r2")]),
+      tasks: new Set([K("r2")]),
       newTabs: new Set(["t"]),
     }
     expect(items({ unsent }).map(t => t.pip)).toEqual([
@@ -261,18 +266,17 @@ describe("sidebarView", () => {
   test("a root draws its status, and what arrived as you watched (ADR-0077)", () => {
     const item: Item = {
       lane: threadIdFor("a"),
-      root: entryId("r2"),
       end: entryId("e"),
       level: "needsYou",
-      raised: { kind: "offer", source: "c-1" },
+      raised: { kind: "offer", source: "c0000000-0000-7000-8000-000000000001" },
     }
-    const status = new Map<EntryId, Status>([
-      [entryId("r1"), { kind: "working" }],
-      [entryId("r2"), { kind: "needsYou", item }],
+    const status = new Map<TaskId, Status>([
+      [K("r1"), { kind: "working" }],
+      [K("r2"), { kind: "needsYou", item }],
     ])
     const [r1, r2] = items({
       status,
-      arrivals: { arrived: new Map([[entryId("r2"), 5]]), done: new Map() },
+      arrivals: { arrived: new Map([[K("r2"), 5]]), done: new Map() },
     })
     expect(r1).toMatchObject({ status: { kind: "working" }, arrived: null })
     expect(r2).toMatchObject({ status: { kind: "needsYou" }, arrived: 5 })
@@ -281,20 +285,19 @@ describe("sidebarView", () => {
   test("a root that raises something offers not needed first in its ⋯; a working one does not", () => {
     const item: Item = {
       lane: threadIdFor("a"),
-      root: entryId("r1"),
       end: entryId("e"),
       level: "worthARead",
-      raised: { kind: "offer", source: "c-1" },
+      raised: { kind: "offer", source: "c0000000-0000-7000-8000-000000000001" },
     }
     const [raised] = items({
-      status: new Map([[entryId("r1"), { kind: "worthARead", item }]]),
+      status: new Map([[K("r1"), { kind: "worthARead", item }]]),
     })
     expect(raised?.kind === "task" && raised.menu[0]).toEqual({
       kind: "notNeeded",
       intent: { kind: "notNeeded", lane: item.lane, raised: item.raised },
     })
     const [working] = items({
-      status: new Map([[entryId("r1"), { kind: "working" }]]),
+      status: new Map([[K("r1"), { kind: "working" }]]),
     })
     expect(working?.kind === "task" && working.menu[0]).toEqual({
       kind: "rename",
@@ -354,7 +357,7 @@ describe("icons (ADR-0088)", () => {
   const SHA = "b".repeat(64) as Sha256
   test("a task with a sprite draws it; one without, its initials on a colour its id seeds; a new tab, a hollow tile", () => {
     const [r1, r2, r3, fresh] = items({
-      sprites: new Map([[entryId("r2"), SHA]]),
+      sprites: new Map([[K("r2"), SHA]]),
     })
     expect(r1?.icon).toEqual({
       kind: "initials",
@@ -371,38 +374,31 @@ describe("icons (ADR-0088)", () => {
   })
 })
 
-describe("rootSprites", () => {
-  const lane = (n: number, tip: string): LaneView => ({
-    name: threadIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`),
-    tip: entryId(tip),
-    running: false,
-    waiting: 0,
-    askedBy: null,
-    lastWaiting: null,
-    heldBy: null,
-  })
-  const banner = (l: LaneView, c: string): [ThreadId, BannerRecord] => [
-    l.name,
-    { lane: l.name, sha: c.repeat(64) as Sha256, at: 1 },
+describe("taskSprites", () => {
+  const thread = (n: number) =>
+    threadIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`)
+  const banner = (t: ThreadId, c: string): [ThreadId, BannerRecord] => [
+    t,
+    { lane: t, sha: c.repeat(64) as Sha256, at: 1 },
   ]
-  const index = tree({ r1: null, a: "r1", b: "r1", r2: null, c: "r2" })
-  const [early, late, other] = [lane(1, "a"), lane(2, "b"), lane(3, "c")]
+  const [early, late, other] = [thread(1), thread(2), thread(3)]
 
-  test("a root takes the banner of its earliest thread with one", () => {
-    const sprites = rootSprites(
-      index,
-      [late, other, early],
+  test("a task takes the banner of its earliest thread with one, whatever its canvas order (ADR-0116)", () => {
+    const sprites = taskSprites(
+      new Map([
+        [K("r1"), [late, early]],
+        [K("r2"), [other]],
+      ]),
       new Map([banner(late, "2"), banner(early, "1")]),
     )
-    expect(sprites).toEqual(new Map([[entryId("r1"), "1".repeat(64)]]))
+    expect(sprites).toEqual(new Map([[K("r1"), "1".repeat(64)]]))
   })
 
-  test("a thread with no banner gives way to a later one; a lane with no tip has no root", () => {
-    const sprites = rootSprites(
-      index,
-      [early, late, { ...other, tip: null }],
+  test("a thread with no banner gives way to a later one", () => {
+    const sprites = taskSprites(
+      new Map([[K("r1"), [early, late]]]),
       new Map([banner(late, "2"), banner(other, "3")]),
     )
-    expect(sprites).toEqual(new Map([[entryId("r1"), "2".repeat(64)]]))
+    expect(sprites).toEqual(new Map([[K("r1"), "2".repeat(64)]]))
   })
 })

@@ -8,8 +8,10 @@
 import {
   type ArchivedTask,
   type EntryId,
+  isBusy,
   type LaneRecord,
   type LaneView,
+  laneWork,
   type OfferRecord,
   projectRail,
   type RailRow,
@@ -99,29 +101,46 @@ export const laneRootsOf = (
   )
 
 /**
- * The agent's work in each root, held by this tab or not: the held lanes'
- * (`rootWork`), and every lane running in the session, by its root's entry
- * (ADR-0063, ADR-0091); running wins over waiting, and a root with no entry
- * yet is left out. What refuses a root's move to the archive, and, but
- * for `held`, what rings it in the sidebar and on the board (`rootStatus`).
+ * The agent's work in each thread, held by this tab or not: each held
+ * lane's that is busy (`laneWork`), and every lane running in the session
+ * (ADR-0063, ADR-0091), running winning. What refuses a task's move to the
+ * archive, and, but for `held`, what rings it in the sidebar and on the
+ * board (`threadStatus`).
  */
-export function workAnywhere(input: {
-  /** The held roots' work (`rootWork`). */
-  readonly held: ReadonlyMap<EntryId, RootWork>
+export function threadWork(input: {
+  /** The lanes of the roots this tab holds. */
+  readonly lanes: readonly LaneView[]
   /** Lanes running in any root (`readRunningLanes`). */
-  readonly running: readonly {
-    readonly lane: ThreadId
-    readonly root: RootId
-  }[]
-  readonly rootEntries: ReadonlyMap<RootId, EntryId>
-}): ReadonlyMap<EntryId, RootWork> {
-  const work = new Map(input.held)
-  for (const { root } of input.running) {
-    const entry = input.rootEntries.get(root)
-    if (entry !== undefined) work.set(entry, "running")
-  }
+  readonly running: readonly { readonly lane: ThreadId }[]
+}): ReadonlyMap<ThreadId, RootWork> {
+  const work = new Map<ThreadId, RootWork>()
+  for (const lane of input.lanes)
+    if (isBusy(lane)) work.set(lane.name, laneWork(lane))
+  for (const { lane } of input.running) work.set(lane, "running")
   return work
 }
+
+/**
+ * Each task's work (ADR-0116): the most among its threads', running over
+ * waiting over held. A thread in no task counts for none.
+ */
+export function taskWork(
+  threads: ReadonlyMap<ThreadId, RootWork>,
+  taskOfThread: ReadonlyMap<ThreadId, TaskId>,
+): ReadonlyMap<TaskId, RootWork> {
+  const out = new Map<TaskId, RootWork>()
+  for (const [thread, work] of threads) {
+    const task = taskOfThread.get(thread)
+    if (task === undefined) continue
+    const was = out.get(task)
+    if (was === undefined || WORK_ORDER.indexOf(work) > WORK_ORDER.indexOf(was))
+      out.set(task, work)
+  }
+  return out
+}
+
+/** Least first: `taskWork` keeps the most. */
+const WORK_ORDER: readonly RootWork[] = ["held", "waiting", "running"]
 
 /**
  * An open offer (`offerStatus`), for your inbox and the board's ⇡ (ADR-0091):

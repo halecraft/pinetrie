@@ -306,17 +306,26 @@ which are swept.
   `fact`, and is a message. Every move of a fact's card is refused
   `fact`: it is the host's. Your message (`composing`, ADR-0113) is stored
   under the kind `drafting` it had before notes, so no row changed with
-  the split; a note is stored as `note`. A card at a thread whose stored
-  `lane` is no thread's id does not decode: migration `0005-tasks`
-  (deleted once run) gave every such row its thread.
+  the split; a note is stored as `note`, its note column in `column` and its
+  rank in `order` (ADR-0116). A card at a thread whose stored `lane` is no
+  thread's id does not decode: migration `0005-tasks` (deleted once run)
+  gave every such row its thread. A card's kind is its id's prefix
+  (`kindOfCard`), and its id is parsed where it comes in (`parseCardId`):
+  a text card's is a bare lowercase uuidv7, a note column's, a media
+  card's and a file card's their prefix and one, a thread's any id
+  `isThreadId` takes. A note column's card (`NoteColumnCard`) is on a
+  canvas alone: a row naming an inventory does not decode.
 - **A handoff is a compare-and-set on where a card is** (`planMove`, pure):
   accepted only if the card is still where its sender saw it, its `PlaceKey`
   (`sameKey`, over its kind, `at` and thread, or an inventory's holder). A
   key leaves out a queue's order and queuer, so a reorder does not make
   someone else's unqueue fail. It leaves out a queue's `seen` too. Every
   move, on the host and on a client, is built by core's `moveOf` (from
-  where the card is); an unqueue's or an unpin's target is `noteOf`. No
-  `from` creates the card, its sender its owner. Nobody removes a card:
+  where the card is); an unqueue's or an unpin's target is `noteOf`, the
+  thread's nearest notes (`notes`), which the host resolves to a place
+  before planning (`planNotesTargets`, below). No `from` creates the card,
+  its sender its owner: a text card anywhere but a canvas, or a note column
+  on a canvas (`n-` id), which is then in its task's history. Nobody removes a card:
   `Move.to` is never null. A discard is a move to `gone` (`DISCARDED`,
   ADR-0111), from any place the sender may move out of. Its key names no
   task: the host names its history (`placeAt`, `historyOf`, over
@@ -340,21 +349,22 @@ which are swept.
   ADR-0048 step 7). It names the card, its place's key, and the two cards
   it goes between as its sender saw them; the host checks them against the
   places alone, since a thread's pinned cards are found through the tree,
-  which a handoff does not read. Its siblings are the lane's queue, or every
-  pinned card in the session (pinned keys are the session's). Only `order`
+  which a handoff does not read. Its siblings are the lane's queue, its
+  note column's notes, or every pinned card in the session (pinned keys are
+  the session's). Only `order`
   changes: `placer`, `by`, `seen` and `unsent` stay, so it changes nobody's
   trace and adds no history event. Refused `gone`; `fact` for a fact's card,
   or a queued card whose new place passes a fact (a fact says what already
   happened); `moved` when the card's key changed; `order-changed` when it
   names no neighbour, a neighbour is no longer a sibling, the two are out of
-  order, or, in a queue, no longer next to each other (other threads' pinned
-  cards may sit between two pinned neighbours). With no room between the
+  order, or, in a queue or a note column, no longer next to each other
+  (other threads' pinned cards may sit between two pinned neighbours). With no room between the
   neighbours, `respace` (`order.ts`) gives new keys to the fewest siblings
   around the gap, in the same step, so a whole undo is refused only when one
   of those few changed since. The session draws a pending reorder by running
   `planReorder` over what it draws.
-- **`planUnqueueAll`**: every message card queued on a lane, back to
-  `noteOf` its place, in queue order; a fact stays. The host plans it
+- **`planUnqueueAll`**: every message card queued on a lane, to `noteOf`
+  its place (the thread's nearest notes), in queue order; a fact stays. The host plans it
   from the queue as it is when the command arrives, and carries it out as
   one move, so one undo queues them again.
 - **An inventory is its holder's alone** (`ownsPlace`): a move into or out
@@ -364,9 +374,10 @@ which are swept.
   inventory keeps its owner: the take moves its place, not who wrote it.
 - **A fresh column's first send carries its other cards**
   (`planFreshFollow`): each card fresh in the sent card's column becomes a
-  note at the message the send wrote, when that message is in the
-  column's root. The host's write, so it keeps each card's placer, as
-  `planUnsent` does.
+  note in the note column nearest the thread the send started, made in the
+  same step when its task has none, when the message is in the column's
+  root and the thread's card is on a canvas. The host's write, so it keeps
+  each card's placer, as `planUnsent` does.
 - **The placer is who put the card where it is**: the sender of every
   accepted move. A write the host makes itself keeps it (`planUnsent`,
   `planSetCommand`), so a refusal never names the host.
@@ -376,7 +387,9 @@ which are swept.
   whole too (ADR-0066). `planMoveCommand` is that and the lanes to drain:
   each one a card ends queued on, when it is not running.
 - **Which history a move enters is `historyOf`'s** (ADR-0066): none for a
-  creation (a composer's new card, a copy) or a send, which is no move;
+  creation (a composer's new card, a copy) or a send, which is no move,
+  but a note column's, which enters its canvas's task, so the undo key takes
+  it back;
   else the task the card goes to, when it goes to one, else the task it
   leaves, read from its record, since a move is accepted only from there;
   a discard's is `discardHistory`'s. A place is in a task by `taskOfPlace`,
@@ -392,41 +405,47 @@ which are swept.
   that names no task is left: the histories once kept by root were
   retired by migration `0005-tasks`, since deleted.
 - **A card at a thread's end is resolved, never stored as an end**: your
-  message, a note, a pinned card. `placeEnd` takes the thread its place's
-  entry is in (`threadAt`) and that thread's end (`threadEnd`), so the card
-  follows its thread as the thread grows. `cardsAt(kind, end, …)` is
-  everyone's cards of a shared kind (`note` or `pinned`) whose end is
-  `end`, by `order` when they have one, then by id. `cardEnd` is your
+  message, a pinned card. `placeEnd` takes the thread its place's entry is
+  in (`threadAt`) and that thread's end (`threadEnd`), so the card follows
+  its thread as the thread grows. `pinnedAt(end, …)` is everyone's pinned
+  cards whose end is `end`, by `order`, then by id. `cardEnd` is your
   message's end only (`composing`), and `yourCard` finds yours through it,
   at an end or a fresh column, never another writer's and never a note,
   the newest of yours there (ids are uuidv7). Were `cardEnd` to resolve
-  notes or pinned cards too, your composer could bind to one of yours.
-- **One message per person at a thread end** (`planStoredCardRepair`,
-  ADR-0113): before notes, everyone's cards there were one kind, so a
-  starting host makes every one of a person's messages at one end but the
-  one `yourCard` would choose a note, outside every gesture, and gives every
-  note with no cell the first empty one on its board, in id order. Remove
-  it once every store has started with notes and cells.
-- **A note has a cell on its thread's notes board** (`NOTES_GRID`). The
-  host alone gives one a move leaves to it (`placeAt`: a note key with no
-  cell takes the first empty one, `withCell`), as it gives order keys, and
-  so do its own writes of notes (`planUnsent`, `planFreshFollow`). Without
-  the tree, it counts a board by the note's lane, else its root and where
-  it was made (`boardOf`): two notes of one lane-less thread made at
-  different ends may share a cell, which the page draws apart
-  (`notesBoardView`). A key names its cell (`sameKey`), so a move of a note
-  someone moved to another cell since is refused `moved`. `planMove`
-  compares with core's `seenAt`, not `sameKey`: a note seen with no cell
-  is anywhere on its board. The host gives a note its cell, so the page
-  draws a note it has just made, unqueued, unpinned or put on a column
-  with none until the host's write arrives, and a second move made in that
-  time names none. Every note the host holds has a cell, so no other move
-  names none. And `planMoves` refuses a batch that leaves two notes in one cell
-  (`cellClash`), checked once all its moves are written, so a swap is one
-  step.
-- **A pinned card** (ADR-0048 step 5) is a note's place with an `order`.
-  Pinning moves your message, a note or a queued card to pinned at the
-  same `at` and lane (`pinnedOf`); unpinning makes it a note (`noteOf`). Anyone may do either in
+  pinned cards too, your composer could bind to one of yours.
+- **A note is in a note column** (ADR-0116), at a rank there (`order`), the
+  host's to give as a queued card's is: a move into a column lands at its
+  end (`noteAt`), and ↑ and ↓ are reorders among the column's notes
+  (`notesIn`). A note's key names its column alone, so a reorder there
+  does not make someone else's move fail.
+- **A card leaving a thread's queue or pinned strip goes to the note
+  column nearest the thread** (`nearestNoteColumn`, pure): in the canvas of
+  the thread's task, the note column fewest places from the thread's card,
+  the one after it on a tie; with none, one made just after the thread's
+  card (`orderBetween`, or `respace` with no room), untitled, read as
+  `NEW_NOTES_TITLE`. `notesOf` is that as a place, with the column to write
+  first; a thread whose card is in an inventory sends its cards to that
+  inventory (ADR-0117). The page names the target `notes` (`noteOf`), and
+  the host resolves it before planning the moves (`planNotesTargets`), each
+  against the cards the ones before it left, so a column made for the first
+  takes the rest; it mints a column's id (`n-` and a uuidv7). The page draws
+  a pending one in the column the host would choose (`drawnPlace`), and,
+  while the host would make one, where it was.
+- **A card the host could not send** (`planUnsent`) goes to the note column
+  nearest its thread the same way, saying why. Where it has nowhere to go
+  (its thread's holder's inventory full, or a thread with no card) it stays
+  queued, saying why, and the host holds its queue, so the drain passes it
+  by until someone moves it.
+- **A note column's title** is its own record (`NOTE_COLUMN`, keyed by its
+  id: title, who set it, when), absent while untitled. `mark` sets it as it
+  sets a task's (`planMark` over a `MarkTarget`): last write wins, null
+  clears it, the agent never sets one, and a column on no canvas is refused
+  `UNKNOWN_TARGET`. The archive gate reads a note column's task from its
+  card (`writesIn`).
+- **A pinned card** (ADR-0048 step 5) is at a thread's end with an `order`.
+  Pinning moves your message or a queued card to pinned at the same `at`
+  and thread (`pinnedOf`); a note has no thread to pin it to; unpinning
+  sends it to the thread's nearest notes (`noteOf`). Anyone may do either in
   a shared place. The host
   orders it after every pinned card in the session (`placeAt`), not only its
   thread's: a thread is found through the tree, which a handoff does not
@@ -448,8 +467,8 @@ which are swept.
   `blank` when every card queued is blank; else `pop`. A fact on top is
   popped whatever the hold or the typing: it is nobody's instruction, and
   starts no run. `planUnsent` is the
-  step a refused pop writes back: a note where it was queued, saying why,
-  never queued.
+  step a refused pop writes back: a note in the note column nearest its
+  thread, saying why, never queued (above).
 - **`planCardSweep`**: records whose text is empty and that carry no
   command, and stored `card:` documents with no record, a spent or empty
   card's among them.
@@ -473,7 +492,7 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
 - **`isBusy` is unchanged, and a held queue is not work.** A held queue
   with no card is not busy: it blocks no archiving. A busy lane that is not
   running and whose queue is held is `held` in `rootWork` (core), which
-  refuses archiving as `waiting` does but draws no ring (`rootStatus`):
+  refuses archiving as `waiting` does but draws no ring (`threadStatus`):
   nothing happens there until a person acts (ADR-0113).
 - **`planQueueCard`** (ADR-0113): every queue is one request, `queue-card`,
   a move into a queue and what it does to the hold (`keep`, `hold-if-idle`,
@@ -581,12 +600,14 @@ when; what it holds is where the places document puts each card: a
 by construction.
 
 - **One `TaskIndex`** (`indexTasks(cards, threads)`): each task's canvas in
-  order, each thread's task (`taskOfThread`), each task's threads and
-  roots, each root's tasks, each recorded thread's root (`rootOfThread`).
-  The host (`tasksNow`) and the page (`tasksOf`) both read it, so they
-  cannot disagree on where something is.
-- **A place at a thread names its thread and no root** (composing, note,
-  pinned, queued; the thread in the row's `lane`). Its task is its
+  order, each canvas card's task (`taskOfCard`), each thread's task
+  (`taskOfThread`), each task's threads and roots, each root's tasks, each
+  recorded thread's root (`rootOfThread`). The host (`tasksNow`, once per
+  command, `commands/index.ts`) and the page (`tasksOf`) both read it, so
+  they cannot disagree on where something is. A note is in its note
+  column's task (`taskOfCard`).
+- **A place at a thread names its thread and no root** (composing, pinned,
+  queued; the thread in the row's `lane`). Its task is its
   thread's (`taskOfPlace`), and its root its thread's record's
   (`rootOfPlace`): one field per fact, so the two cannot disagree.
 - **`planThreadStart`**: a thread's record, its card at the end of its

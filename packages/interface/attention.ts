@@ -2,14 +2,16 @@
 // thread's followers are everyone who has written on its path; what it
 // raises for them is how its last run ended (its verdict), and its open
 // offer. A verdict clears by reading past it, an offer by accepting or
-// withdrawing it, and either by "not needed". Status belongs on the tab:
-// working while its root's agent works or its verdict is pending, else the
-// highest of what its threads raise. Worded in `attentionWords`. Pure.
+// withdrawing it, and either by "not needed". Status is each thread's:
+// working while its agent works or its verdict is pending, else the highest
+// of what it raises; a task's is its threads' together (`taskStatus`,
+// ADR-0116). Worded in `attentionWords`. Pure.
 
 import type {
   EntryId,
   RootRecord,
   RootWork,
+  TaskId,
   ThreadId,
   Verdict,
   VerdictRecord,
@@ -89,8 +91,6 @@ export type Raised =
 /** One thing a thread raises for you. */
 export interface Item {
   readonly lane: ThreadId
-  /** Its root entry: its tab's key. */
-  readonly root: EntryId
   /** Where choosing it opens the thread. */
   readonly end: EntryId
   readonly level: Level
@@ -107,56 +107,48 @@ export interface AttentionInput {
   readonly person: Attention
   /** Lanes running or with cards queued, in any root. */
   readonly busy: ReadonlySet<ThreadId>
-  /** Each lane's root entry (`laneRootsOf`). */
-  readonly laneRoots: ReadonlyMap<ThreadId, EntryId>
-  readonly archived: ReadonlySet<EntryId>
+  /** The threads of archived tasks (ADR-0116): they raise nothing. */
+  readonly archived: ReadonlySet<ThreadId>
 }
 
 /** Entry ids are uuidv7: the later of two is the greater. */
 const latest = (a: string, b: string | undefined): string =>
   b !== undefined && b > a ? b : a
 
-/** `lane`'s root entry, when you follow it and its root is not archived. */
-function followedRoot(input: AttentionInput, lane: ThreadId): EntryId | null {
-  const root = input.laneRoots.get(lane)
-  if (root === undefined || input.archived.has(root)) return null
-  return follows(input.me, input.writers.get(lane) ?? []) ? root : null
-}
+/** Whether you follow `lane`, and its task is not archived. */
+const followed = (input: AttentionInput, lane: ThreadId): boolean =>
+  !input.archived.has(lane) && follows(input.me, input.writers.get(lane) ?? [])
 
 /**
  * Everything raised for you, verdicts and offers apart: a thread can raise
  * both. Only a thread you follow raises anything, and only while its agent
- * is idle and its root is not archived. Before your document's first write
+ * is idle and its task is not archived. Before your document's first write
  * (`since` ""), where you started is not known, and nothing is raised.
  */
 export function attentionOf(input: AttentionInput): readonly Item[] {
   const { me, person } = input
   if (person.since === "") return []
-  const yours = (lane: ThreadId): EntryId | null =>
-    input.busy.has(lane) ? null : followedRoot(input, lane)
+  const yours = (lane: ThreadId): boolean =>
+    !input.busy.has(lane) && followed(input, lane)
   const items: Item[] = []
   for (const v of input.verdicts.values()) {
-    const root = yours(v.lane)
     const level = levelOf(v.verdict, me)
-    if (root === null || level === null) continue
+    if (!yours(v.lane) || level === null) continue
     if (v.end <= latest(person.since, person.read.get(v.lane))) continue
     if (person.dismissed.get(v.lane) === v.ask) continue
     items.push({
       lane: v.lane,
-      root,
       end: v.end,
       level,
       raised: { kind: "verdict", verdict: v.verdict, ask: v.ask },
     })
   }
   for (const o of input.offers) {
-    const root = yours(o.lane)
-    if (root === null) continue
+    if (!yours(o.lane)) continue
     if (o.source !== null && person.dismissedOffers.get(o.lane) === o.source)
       continue
     items.push({
       lane: o.lane,
-      root,
       end: o.end,
       level: "needsYou",
       raised: { kind: "offer", source: o.source },
@@ -165,77 +157,94 @@ export function attentionOf(input: AttentionInput): readonly Item[] {
   return items
 }
 
-/** A root's status: what its mark draws, in the sidebar and on the board. */
+/** A thread's or a task's status: what its mark draws, in the sidebar and on the board. */
 export type Status =
   | { readonly kind: "working" }
   | { readonly kind: Level; readonly item: Item }
 
 /**
- * The highest level among `roots` (`highest`): what one mark says for them
- * all. The one rule for a root's item, a board column's dot and ▦'s, which
- * covers the roots not in the sidebar (ADR-0122). Working raises nothing.
+ * The highest level among `keys` (`highest`): what one mark says for them
+ * all. The one rule for a task's item, a board column's dot and ▦'s, which
+ * covers the tasks not in the sidebar (ADR-0122). Working raises nothing.
  */
-export const markOf = (
-  status: ReadonlyMap<EntryId, Status>,
-  roots: Iterable<EntryId>,
+export const markOf = <K>(
+  status: ReadonlyMap<K, Status>,
+  keys: Iterable<K>,
 ): Level | null =>
   highest(
-    [...roots].map(r => {
-      const s = status.get(r)
+    [...keys].map(k => {
+      const s = status.get(k)
       return s === undefined || s.kind === "working" ? null : s.kind
     }),
   )
 
+/** `now` and `item` together: working wins, else the higher level. */
+const withItem = (now: Status | undefined, next: Status): Status => {
+  if (now?.kind === "working" || next.kind === "working")
+    return { kind: "working" }
+  return now === undefined || highest([now.kind, next.kind]) !== now.kind
+    ? next
+    : now
+}
+
 /**
- * Each root's status: working while the agent works there, cards wait for it
+ * Each thread's status: working while its agent works, cards wait for it
  * to be free, or its verdict is pending (the agent's side is not finished);
  * else its highest item. Cards behind a held queue are not work: they wait
- * for a person (ADR-0113). A root with none of these has none.
+ * for a person (ADR-0113). A thread with none of these has none.
  */
-export function rootStatus(input: {
+export function threadStatus(input: {
   readonly items: readonly Item[]
-  /** Roots where the agent works, held by this tab or not (`workAnywhere`). */
-  readonly work: ReadonlyMap<EntryId, RootWork>
+  /** Threads whose agent works, held by this tab or not (`threadWork`). */
+  readonly work: ReadonlyMap<ThreadId, RootWork>
   readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
-  readonly laneRoots: ReadonlyMap<ThreadId, EntryId>
-}): ReadonlyMap<EntryId, Status> {
-  const out = new Map<EntryId, Status>()
-  for (const [root, work] of input.work)
-    if (work !== "held") out.set(root, { kind: "working" })
-  for (const v of input.verdicts.values()) {
-    const root = input.laneRoots.get(v.lane)
-    if (root !== undefined && v.verdict.kind === "pending")
-      out.set(root, { kind: "working" })
-  }
-  for (const item of input.items) {
-    const now = out.get(item.root)
-    if (now?.kind === "working") continue
-    if (now === undefined || highest([now.kind, item.level]) !== now.kind)
-      out.set(item.root, { kind: item.level, item })
+}): ReadonlyMap<ThreadId, Status> {
+  const out = new Map<ThreadId, Status>()
+  for (const [thread, work] of input.work)
+    if (work !== "held") out.set(thread, { kind: "working" })
+  for (const v of input.verdicts.values())
+    if (v.verdict.kind === "pending") out.set(v.lane, { kind: "working" })
+  for (const item of input.items)
+    out.set(item.lane, withItem(out.get(item.lane), { kind: item.level, item }))
+  return out
+}
+
+/**
+ * Each task's status (ADR-0116): its threads' together, working when any
+ * works, else the highest item among them. A thread in no task counts for
+ * none.
+ */
+export function taskStatus(
+  threads: ReadonlyMap<ThreadId, Status>,
+  taskOfThread: ReadonlyMap<ThreadId, TaskId>,
+): ReadonlyMap<TaskId, Status> {
+  const out = new Map<TaskId, Status>()
+  for (const [thread, status] of threads) {
+    const task = taskOfThread.get(thread)
+    if (task !== undefined) out.set(task, withItem(out.get(task), status))
   }
   return out
 }
 
 /**
- * The roots where a run you follow ended asking nothing of you (`levelOf`
+ * The threads where a run you follow ended asking nothing of you (`levelOf`
  * null, and not pending): what a ✓ marks as it fades (`arrivals`).
  */
-export function doneRoots(input: AttentionInput): ReadonlySet<EntryId> {
-  const out = new Set<EntryId>()
+export function doneThreads(input: AttentionInput): ReadonlySet<ThreadId> {
+  const out = new Set<ThreadId>()
   for (const v of input.verdicts.values()) {
-    const root = followedRoot(input, v.lane)
-    if (root === null || v.verdict.kind === "pending") continue
-    if (levelOf(v.verdict, input.me) === null) out.add(root)
+    if (!followed(input, v.lane) || v.verdict.kind === "pending") continue
+    if (levelOf(v.verdict, input.me) === null) out.add(v.lane)
   }
   return out
 }
 
-/** What each change of a root's status draws, seen live. */
+/** What each change of a task's status draws, seen live. */
 export interface Arrivals {
-  /** Roots whose status rose to needs you: their mark pulses, then stays. */
-  readonly arrived: ReadonlySet<EntryId>
-  /** Roots that stopped working with a run done: a ✓ fades. */
-  readonly done: ReadonlySet<EntryId>
+  /** Tasks whose status rose to needs you: their mark pulses, then stays. */
+  readonly arrived: ReadonlySet<TaskId>
+  /** Tasks that stopped working with a run done: a ✓ fades. */
+  readonly done: ReadonlySet<TaskId>
 }
 
 /**
@@ -244,29 +253,29 @@ export interface Arrivals {
  * still: motion marks a change you saw, never a state.
  */
 export function arrivals(
-  before: ReadonlyMap<EntryId, Status> | null,
-  after: ReadonlyMap<EntryId, Status>,
-  done: ReadonlySet<EntryId>,
+  before: ReadonlyMap<TaskId, Status> | null,
+  after: ReadonlyMap<TaskId, Status>,
+  done: ReadonlySet<TaskId>,
 ): Arrivals {
-  const arrived = new Set<EntryId>()
-  const ended = new Set<EntryId>()
+  const arrived = new Set<TaskId>()
+  const ended = new Set<TaskId>()
   if (before === null) return { arrived, done: ended }
-  for (const [root, now] of after)
-    if (now.kind === "needsYou" && before.get(root)?.kind !== "needsYou")
-      arrived.add(root)
-  for (const [root, was] of before)
-    if (was.kind === "working" && !after.has(root) && done.has(root))
-      ended.add(root)
+  for (const [task, now] of after)
+    if (now.kind === "needsYou" && before.get(task)?.kind !== "needsYou")
+      arrived.add(task)
+  for (const [task, was] of before)
+    if (was.kind === "working" && !after.has(task) && done.has(task))
+      ended.add(task)
   return { arrived, done: ended }
 }
 
 /** How long an arrival's mark moves: the pulse's three beats, and the ✓'s fade (`index.html`). */
 export const ARRIVAL_MS = 3_000
 
-/** When each root's mark last arrived, and its ✓ last showed (ms since the epoch). */
+/** When each task's mark last arrived, and its ✓ last showed (ms since the epoch). */
 export interface Moments {
-  readonly arrived: ReadonlyMap<EntryId, number>
-  readonly done: ReadonlyMap<EntryId, number>
+  readonly arrived: ReadonlyMap<TaskId, number>
+  readonly done: ReadonlyMap<TaskId, number>
 }
 
 /**

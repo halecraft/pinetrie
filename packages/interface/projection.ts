@@ -25,6 +25,8 @@ import {
   indexAsks,
   type LaneView,
   type MarkRecord,
+  type NoteColumnId,
+  type NoteColumnRecord,
   type RootId,
   type SeatRecord,
   type StopRecord,
@@ -53,6 +55,7 @@ import {
   readLanes,
   readMarks,
   readNames,
+  readNoteColumns,
   readOffers,
   readProject,
   readQueueHolds,
@@ -109,6 +112,8 @@ export interface SessionFacts {
   readonly archived: ReadonlyMap<TaskId, ArchivedTask>
   /** Each task's title (ADR-0045, ADR-0116): its label. */
   readonly marks: ReadonlyMap<TaskId, MarkRecord>
+  /** Each titled note column's title (ADR-0116). */
+  readonly noteColumns: ReadonlyMap<NoteColumnId, NoteColumnRecord>
   /** Every task (ADR-0116), by id. */
   readonly tasks: ReadonlyMap<TaskId, TaskRecord>
   /** Every thread (ADR-0117), by id: each one's root. */
@@ -188,6 +193,7 @@ function readFacts(view: HeldView): SessionFacts {
     places: readBoardPlaces(doc),
     archived: readArchived(doc),
     marks: readMarks(doc),
+    noteColumns: readNoteColumns(doc),
     tasks: readTasks(doc),
     threads: readThreads(doc),
     verdicts: readVerdicts(doc),

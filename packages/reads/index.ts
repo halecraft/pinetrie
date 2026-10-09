@@ -30,7 +30,6 @@ import {
   type CardId,
   type CardRecord,
   type CommandSummary,
-  cardId,
   type DigestRecord,
   type EntryId,
   type EntryLike,
@@ -43,10 +42,13 @@ import {
   type MarkRecord,
   messageImages,
   messageText,
+  type NoteColumnId,
+  type NoteColumnRecord,
   type OfferRecord,
   type PinnedView,
   type PlanMode,
   type ProjectRecord,
+  parseCardId,
   parseMentions,
   promptOf,
   type QueueHold,
@@ -89,6 +91,7 @@ import {
   LANE,
   MARK,
   NAME,
+  NOTE_COLUMN,
   OFFER,
   PARTICIPANT,
   PICTURE,
@@ -514,27 +517,9 @@ const presenceField = (
 /** One entry per open column: its writer, and the thread end it follows. */
 export const readReading = presenceField(doc => doc.reading())
 /**
- * Each followed thread end's root entry (ADR-0063), from the column that
- * reports it: what a window that does not hold the root opens it by. Kept
- * while unchanged, as `presenceField`'s reads are.
- */
-export const readReadingRoots = keptWhileSame(
-  (doc: PresenceDocHandle): ReadonlyMap<EntryId, EntryId> => {
-    const roots = doc.readingRoot()
-    const now = new Map<EntryId, EntryId>()
-    for (const [key, end] of Object.entries(doc.reading())) {
-      const root = roots[key]
-      if (end !== null && root !== null && root !== undefined)
-        now.set(entryId(end), entryId(root))
-    }
-    return now
-  },
-  sameMap,
-)
-
-/**
  * Each followed thread end's task (ADR-0116), from the column that reports
- * it. Kept while unchanged, as `presenceField`'s reads are.
+ * it: what a window that does not hold the thread's root names it by
+ * (ADR-0063). Kept while unchanged, as `presenceField`'s reads are.
  */
 export const readReadingTasks = keptWhileSame(
   (doc: PresenceDocHandle): ReadonlyMap<EntryId, TaskId> => {
@@ -560,9 +545,10 @@ export const readTyping = presenceField(doc => doc.typing())
 export const readTypingIn = keptWhileSame(
   (doc: PresenceDocHandle): ReadonlySet<CardId> =>
     new Set(
-      Object.values(doc.typingIn()).flatMap(card =>
-        card === null ? [] : [cardId(card)],
-      ),
+      Object.values(doc.typingIn()).flatMap(text => {
+        const card = text === null ? undefined : parseCardId(text)
+        return card === undefined ? [] : [card]
+      }),
     ),
   (a, b) => a.size === b.size && [...a].every(c => b.has(c)),
 )
@@ -665,6 +651,11 @@ export const readArchived = keptWhileSame(
 export const readMarks = (
   doc: SessionDocHandle,
 ): ReadonlyMap<TaskId, MarkRecord> => readRecords(doc, MARK)
+
+/** Each titled note column's title (`pinetrie.note-column`, ADR-0116), by id. */
+export const readNoteColumns = (
+  doc: SessionDocHandle,
+): ReadonlyMap<NoteColumnId, NoteColumnRecord> => readRecords(doc, NOTE_COLUMN)
 
 /** Each ask's digest (`pinetrie.digest`, ADR-0106), by its prompt. */
 export const readDigests = (

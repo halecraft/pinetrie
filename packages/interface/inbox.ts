@@ -12,6 +12,7 @@ import {
   address,
   type EntryId,
   parseMentions,
+  type RootId,
   type RootRecord,
   type WriterId,
 } from "@pinetrie/core"
@@ -19,7 +20,8 @@ import {
 /** A message that mentions you. */
 export interface InboxItem {
   readonly id: EntryId
-  readonly root: EntryId
+  /** The root it is in: its directory record names no thread. */
+  readonly root: RootId
   readonly by: WriterId
   readonly text: string
 }
@@ -39,8 +41,7 @@ export function mentionsOf(input: {
   readonly participants: readonly string[]
 }): readonly InboxItem[] {
   const out: InboxItem[] = []
-  for (const { entry: root, mentions } of input.roots) {
-    if (root === null) continue
+  for (const { root, mentions } of input.roots) {
     for (const { id, by, text } of mentions) {
       if (by === input.me) continue
       const { people } = address({

@@ -1,48 +1,56 @@
 // interface/here — who else is in the session, for the board and the sidebar
 // (ADR-0030, ADR-0122). Pure.
 //
-// Presence is thread-level (ADR-0024): each column of the root a person is on
-// reports the end of its thread. `peopleHere` groups those by person, where
-// `readingAt` groups them by thread end; "never you" is `readingAt`'s. A
-// thread card's readers are those people in its root (`peopleIn`); your
-// list's avatars are the same people turned around, by root.
+// Presence is thread-level (ADR-0024): each column of the task a person is
+// on reports the end of its thread. `peopleHere` groups those by person,
+// where `readingAt` groups them by thread end; "never you" is `readingAt`'s.
+// A thread card's readers are those people in its task (`peopleIn`); your
+// list's avatars are the same people turned around, by task (ADR-0116).
 
 import {
   type EntryId,
-  rootOf,
+  type TaskId,
+  type ThreadId,
   type TreeIndex,
+  threadAt,
   type WriterId,
 } from "@pinetrie/core"
 
 export interface PersonHere {
   readonly writer: WriterId
-  /** Each thread end they read, with its root. */
+  /** Each thread end they read, with its task. */
   readonly threads: readonly {
     readonly end: EntryId
-    readonly root: EntryId
+    readonly task: TaskId
   }[]
 }
 
 /**
  * `readingAt` (thread end -> the others there, you left out)
  * grouped by person, in `order` (`writerOrder`, so every window agrees).
- * An end's root is found in `index`, else in what its reader reported
- * (`readReadingRoots`), for a root this window does not hold (ADR-0063). An
- * end with neither, not arrived yet, is left out.
+ * An end's task is its thread's (`threadAt`, `taskOfThread`), else what its
+ * reader reported (`readReadingTasks`), for a root this window does not
+ * hold (ADR-0063). An end with neither, not arrived yet, is left out.
  */
 export function peopleHere(
   readingAt: ReadonlyMap<EntryId, readonly WriterId[]>,
   index: TreeIndex,
   order: readonly WriterId[],
-  reportedRoots: ReadonlyMap<EntryId, EntryId>,
+  facts: {
+    readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
+    readonly reported: ReadonlyMap<EntryId, TaskId>
+  },
 ): readonly PersonHere[] {
-  const threads = new Map<WriterId, { end: EntryId; root: EntryId }[]>()
+  const threads = new Map<WriterId, { end: EntryId; task: TaskId }[]>()
   for (const [end, writers] of readingAt) {
-    const root = rootOf(index, end) ?? reportedRoots.get(end) ?? null
-    if (root === null) continue
+    const thread = threadAt(index, end)
+    const task =
+      (thread === null ? undefined : facts.taskOfThread.get(thread)) ??
+      facts.reported.get(end)
+    if (task === undefined) continue
     for (const w of writers) {
       const theirs = threads.get(w) ?? []
-      theirs.push({ end, root })
+      theirs.push({ end, task })
       threads.set(w, theirs)
     }
   }
@@ -60,30 +68,30 @@ export const readerHeading = (name: string, gone: boolean): string =>
   gone ? `${name} has left` : `${name} is in`
 
 /**
- * The people reading in `roots`, each with only their threads there: a board
- * item's readers, or a board state's (ADR-0122). A person reading elsewhere
- * only is left out.
+ * The people reading in `tasks`, each with only their threads there: a
+ * board item's readers, or a board state's (ADR-0122). A person reading
+ * elsewhere only is left out.
  */
 export function peopleIn(
   people: readonly PersonHere[],
-  roots: ReadonlySet<string>,
+  tasks: ReadonlySet<TaskId>,
 ): readonly PersonHere[] {
   return people.flatMap(p => {
-    const threads = p.threads.filter(t => roots.has(t.root))
+    const threads = p.threads.filter(t => tasks.has(t.task))
     return threads.length === 0 ? [] : [{ ...p, threads }]
   })
 }
 
-/** Each root's readers, for the sidebar's avatars: `people` turned around. */
-export function readersByRoot(
+/** Each task's readers, for the sidebar's avatars: `people` turned around. */
+export function readersByTask(
   people: readonly PersonHere[],
-): ReadonlyMap<string, readonly WriterId[]> {
-  const readers = new Map<string, WriterId[]>()
+): ReadonlyMap<TaskId, readonly WriterId[]> {
+  const readers = new Map<TaskId, WriterId[]>()
   for (const { writer, threads } of people)
-    for (const { root } of threads) {
-      const at = readers.get(root) ?? []
+    for (const { task } of threads) {
+      const at = readers.get(task) ?? []
       if (!at.includes(writer)) at.push(writer)
-      readers.set(root, at)
+      readers.set(task, at)
     }
   return readers
 }

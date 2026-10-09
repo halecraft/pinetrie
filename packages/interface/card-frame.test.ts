@@ -2,6 +2,7 @@ import {
   atEntry,
   type CardRecord,
   entryId,
+  noteColumnIdFor,
   type TextCard,
   type TextPlace,
   taskIdFor,
@@ -29,7 +30,7 @@ const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
 const CATCH_UPS = { base: { kind: "accepted" }, parent: null } as const
 const LANE = threadIdFor("x")
 const at = atEntry(entryId("e-1"))
-const C1 = textCardId("c-1")
+const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
 
 const card = (place: TextPlace, over: Partial<TextCard> = {}): TextCard => ({
   kind: "text",
@@ -54,9 +55,8 @@ const composing: TextPlace = {
 }
 const note: TextPlace = {
   kind: "note",
-  at,
-  thread: LANE,
-  cell: 0,
+  column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+  order: "a",
 }
 const queued: TextPlace = {
   kind: "queued",
@@ -96,15 +96,10 @@ describe("cardFrame (ADR-0111)", () => {
       ],
     ],
     [
-      "a note: your message, the queue, pinned, your inventory",
+      "a note: your inventory alone, its note column being no thread's (ADR-0116)",
       note,
       "note",
-      [
-        { to: "message", act: { kind: "toMessage", card: C1 } },
-        { to: "queue", act: queue },
-        { to: "pinned", act: pin },
-        { to: "inventory", act: take },
-      ],
+      [{ to: "inventory", act: take }],
     ],
     [
       "queued: the notes, pinned, your inventory",
@@ -148,8 +143,6 @@ describe("cardFrame (ADR-0111)", () => {
   test("no queue where the column has none to queue on", () => {
     const facts = { ...FACTS, queueOn: null }
     expect(cardFrame(card(note), "note", facts).moves.map(m => m.to)).toEqual([
-      "message",
-      "pinned",
       "inventory",
     ])
     expect(
@@ -214,7 +207,10 @@ describe("cardFrame (ADR-0111)", () => {
   })
 
   test("↑ and ↓ in a list, each off at its edge", () => {
-    const other = { ...card(queued), id: textCardId("c-2") }
+    const other = {
+      ...card(queued),
+      id: textCardId("c0000000-0000-7000-8000-000000000002"),
+    }
     const view = cardFrame(card(queued), "queued", {
       ...FACTS,
       among: [card(queued), other],
@@ -241,7 +237,10 @@ describe("cardFrameWords", () => {
       CATCH_UPS,
       [],
     )
-  const second = { ...card(queued), id: textCardId("c-0") }
+  const second = {
+    ...card(queued),
+    id: textCardId("c0000000-0000-7000-8000-000000000000"),
+  }
 
   test.each([
     ["the top of the queue is next", [card(queued)], false, "next", "1"],

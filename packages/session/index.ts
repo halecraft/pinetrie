@@ -14,6 +14,7 @@ export {
   drawnPlace,
   IN_COLUMN,
   intentsOf,
+  LAST_ORDER,
   type MoveAnswer,
   type MoveHow,
   type SlotMove,
@@ -25,7 +26,13 @@ export {
   type HostRequest,
   type SessionClient,
 } from "./connect.ts"
-export { newCardId, newRootId, newTaskId, newThreadId } from "./ids.ts"
+export {
+  newCardId,
+  newNoteColumnId,
+  newRootId,
+  newTaskId,
+  newThreadId,
+} from "./ids.ts"
 export {
   firstEmpty,
   heldBy,

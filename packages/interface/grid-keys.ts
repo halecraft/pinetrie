@@ -1,7 +1,6 @@
-// interface/grid-keys — the keys a card grid takes while it has focus
-// (ADR-0048, ADR-0113): arrows and `hjkl` move the selection, Alt+arrows
-// move the selected card a cell, Enter opens it (on an empty cell of a grid
-// that makes cards, a new card there), and Escape folds it again.
+// interface/grid-keys — the keys your inventory's grid takes while it has
+// focus (ADR-0048): arrows and `hjkl` move the selection, Alt+arrows move
+// the selected card a cell, Enter opens it, and Escape folds it again.
 // Pure: one table, from a key and the grid's state to an act or nothing. The
 // key-system redesign replaces this file.
 
@@ -13,8 +12,6 @@ export type GridAct =
   /** The selected card to `to`: a swap with a card there. */
   | { readonly kind: "move"; readonly from: number; readonly to: number }
   | { readonly kind: "open" }
-  /** A new card in the selected cell, empty, opened. */
-  | { readonly kind: "create" }
   | { readonly kind: "fold" }
 
 const STEPS: Readonly<Record<string, GridStep>> = {
@@ -31,13 +28,11 @@ const STEPS: Readonly<Record<string, GridStep>> = {
 /** What a grid is when a key is pressed. */
 export interface GridKeyState {
   readonly grid: Grid
-  /** The rows drawn (`rowsShown`): a move stops at the last. */
+  /** The rows drawn: a move stops at the last. */
   readonly rows: number
   readonly selected: number
   /** The selected cell holds a card. */
   readonly hasCard: boolean
-  /** An empty cell makes a new card: a notes board's, not your inventory's. */
-  readonly creates: boolean
   /** The selected card is open, whole. */
   readonly open: boolean
   /** Focus is in a text box: the open card's, whose keys are its own. */
@@ -52,13 +47,7 @@ export function gridKeyAct(event: KeyLike, at: GridKeyState): GridAct | null {
       : null
   if (at.inText || event.ctrlKey || event.metaKey || event.shiftKey) return null
   if (event.key === "Enter")
-    return event.altKey
-      ? null
-      : at.hasCard
-        ? { kind: "open" }
-        : at.creates
-          ? { kind: "create" }
-          : null
+    return event.altKey || !at.hasCard ? null : { kind: "open" }
   const dir = STEPS[event.key]
   if (dir === undefined) return null
   const to = step(at.grid, at.rows, at.selected, dir)

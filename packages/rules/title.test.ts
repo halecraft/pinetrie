@@ -43,9 +43,21 @@ const indexOf = (...entries: EntryLike[]): TreeIndex =>
 
 // A root that began as a chat, then a branch off its first message.
 const chat = indexOf(
-  at("c-0", null, { role: "chat", author: "Ada", content: "the rail" }),
-  at("c-1", "c-0", { role: "chat", author: "Bea", content: "too tall" }),
-  at("c-2", "c-0", { role: "chat", author: "Bea", content: "newest" }),
+  at("c0000000-0000-7000-8000-000000000000", null, {
+    role: "chat",
+    author: "Ada",
+    content: "the rail",
+  }),
+  at(
+    "c0000000-0000-7000-8000-000000000001",
+    "c0000000-0000-7000-8000-000000000000",
+    { role: "chat", author: "Bea", content: "too tall" },
+  ),
+  at(
+    "c0000000-0000-7000-8000-000000000002",
+    "c0000000-0000-7000-8000-000000000000",
+    { role: "chat", author: "Bea", content: "newest" },
+  ),
 )
 const lane = (l: typeof L1, root = R): LaneRecord => ({
   lane: l,
@@ -103,7 +115,10 @@ describe("planTitling", () => {
     expect(
       plan({
         index: chat,
-        trigger: { ...started, at: atEntry(entryId("c-1")) },
+        trigger: {
+          ...started,
+          at: atEntry(entryId("c0000000-0000-7000-8000-000000000001")),
+        },
       }),
     ).toMatchObject({
       lines: ["Ada: the rail", "Bea: too tall", "Ada: fix the rail"],

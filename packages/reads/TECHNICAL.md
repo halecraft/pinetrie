@@ -138,8 +138,8 @@ Kyneta has let go.
   each keeps its last array while the entries are the same: the page's
   refresh writes the same values again, and Kyneta's record is then a new
   object (S59).
-  `readReadingRoots` (each end's reported root, ADR-0063) keeps its map the
-  same way, and so do `readParticipantNames` and `readParticipantPictures`,
+  `readReadingTasks` (each end's reported task, ADR-0063, ADR-0116) keeps
+  its map the same way, and so do `readParticipantNames` and `readParticipantPictures`,
   which every message's speaker and every circle compare by identity.
 - **`readReferencedBlobs` is what the sweep keeps**: each root's images
   from its directory record, every card's text, every banner and every

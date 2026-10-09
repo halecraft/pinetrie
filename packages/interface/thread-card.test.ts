@@ -32,13 +32,12 @@ const WORKFLOW: Workflow = {
 }
 const facts = (over: Partial<ThreadCardFacts> = {}): ThreadCardFacts => ({
   workflow: WORKFLOW,
-  entries: new Map([[K1, R1]]),
   stateOf: new Map([[K1, DOING]]),
   labels: new Map([[K1, "Tab names"]]),
   status: new Map(),
-  pips: new Set([R1]),
-  offered: new Map([[R1, ["amber-fox"]]]),
-  work: new Map([[R1, "running"]]),
+  pips: new Set([K1]),
+  offered: new Map([[K1, ["amber-fox"]]]),
+  work: new Map([[K1, "running"]]),
   ...over,
 })
 
@@ -47,7 +46,6 @@ describe("threadCardHead (ADR-0111, ADR-0116)", () => {
     const head = threadCardHead(K1, facts())
     expect(head).toMatchObject({
       task: K1,
-      entry: R1,
       label: "Tab names",
       status: null,
       ready: ["amber-fox"],
@@ -68,12 +66,13 @@ describe("threadCardHead (ADR-0111, ADR-0116)", () => {
     })
   })
 
-  test("a task with no message yet has no signals; one with no place, no moves", () => {
-    expect(threadCardHead(K1, facts({ entries: new Map() }))).toMatchObject({
-      entry: null,
-      ready: [],
-      pip: false,
-    })
+  test("a task with no signals of its threads has none; one with no place, no moves", () => {
+    expect(
+      threadCardHead(
+        K1,
+        facts({ pips: new Set(), offered: new Map(), work: new Map() }),
+      ),
+    ).toMatchObject({ status: null, ready: [], pip: false })
     expect(threadCardHead(K1, facts({ stateOf: new Map() })).moves).toEqual([])
   })
 
@@ -96,11 +95,12 @@ describe("threadCardHead (ADR-0111, ADR-0116)", () => {
       layout,
       active: { kind: "task", task: K1 },
       heads,
-      lines: new Map(),
+      entries: new Map([[K1, R1]]),
+      summaries: new Map(),
       marks: new Map(),
       archived: new Set(),
       unsent: {
-        roots: new Set(),
+        tasks: new Set(),
         newTabs: new Set(),
         ends: new Set(),
         elsewhere: false,
@@ -111,10 +111,9 @@ describe("threadCardHead (ADR-0111, ADR-0116)", () => {
     const board = boardView({
       workflow: WORKFLOW,
       places: new Map(),
+      summaries: new Map([[K1, { line: "", writers: [], newest: R1 }]]),
       entries: new Map([[K1, R1]]),
-      summaries: [],
       heads,
-      lines: new Map(),
       search: null,
       me: writerId("a@x.test"),
     })

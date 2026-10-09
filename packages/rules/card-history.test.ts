@@ -8,6 +8,7 @@ import {
   type EntryId,
   entryId,
   keyOf,
+  noteColumnIdFor,
   PLAIN,
   type PlaceKey,
   rootIdFor,
@@ -33,22 +34,18 @@ import {
   verbOf,
 } from "./card-history.ts"
 
-const TEST_THREAD = threadIdFor("e")
+const _TEST_THREAD = threadIdFor("e")
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const LANE = threadIdFor("x")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const END = entryId("e-end")
-const C1 = textCardId("c-1")
+const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
 const at = atEntry(entryId("e-1"))
 
-const DRAFTING: CardPlace = {
-  kind: "note",
-  at,
-  thread: LANE,
-  cell: 0,
-}
+const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const DRAFTING: CardPlace = { kind: "note", column: NOTES, order: "1" }
 const QUEUED: CardPlace = {
   kind: "queued",
   at,
@@ -74,9 +71,8 @@ const BEAS: CardPlace = { kind: "inventory", holder: BEA }
 const ADAS: CardPlace = { kind: "inventory", holder: ADA }
 const ELSEWHERE: CardPlace = {
   kind: "note",
-  at: atEntry(entryId("e-2")),
-  thread: TEST_THREAD,
-  cell: 0,
+  column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a2"),
+  order: "1",
 }
 
 const card = (
@@ -231,7 +227,7 @@ describe("planProvenance: traces", () => {
         for: ADA,
         card: C1,
         by: BEA,
-        from: { kind: "note", at, thread: LANE, cell: 0 },
+        from: { kind: "note", column: NOTES },
         to: { kind: "queued", at, thread: LANE, seen: "" },
         message: null,
         at: 7,
@@ -298,7 +294,7 @@ describe("planProvenance: traces", () => {
       for: ADA,
       card: C1,
       by: BEA,
-      from: { kind: "note", at, thread: LANE, cell: 0 },
+      from: { kind: "note", column: NOTES },
       to: { kind: "queued", at, thread: LANE, seen: "" },
       message: null,
       at: 1,
@@ -321,7 +317,7 @@ test.each([
   [QUEUED, DRAFTING, "unqueued"],
   [DRAFTING, PINNED, "pinned"],
   [PINNED, DRAFTING, "unpinned"],
-  [QUEUED, ELSEWHERE, "moved"],
+  [QUEUED, ADAS, "took-into-inventory"],
   [DRAFTING, BEAS, "took-into-inventory"],
   [BEAS, ELSEWHERE, "put"],
   [DRAFTING, ELSEWHERE, "moved"],
@@ -345,7 +341,7 @@ describe("movedBackBy", () => {
         kind: "moved",
         by,
         from: { kind: "queued", at, thread: LANE, seen: "" },
-        to: { kind: "note", at, thread: LANE, cell: 0 },
+        to: { kind: "note", column: NOTES },
         at: 1,
       },
     ],
@@ -367,13 +363,13 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
     for: ADA,
     card: C1,
     by: BEA,
-    from: { kind: "note", at, thread: LANE, cell: 0 },
+    from: { kind: "note", column: NOTES },
     to: null,
     message: null,
     at: when,
   })
   const now = TRACE_MAX_AGE_MS + 10
-  const gone = textCardId("c-gone")
+  const gone = textCardId("c0000000-0000-7000-8000-000000000103")
   expect(
     planTraceSweep({
       traces: [trace("old", 1), trace("new", now)],
@@ -405,9 +401,9 @@ test("planGoneSweep: a card discarded a week ago or more, or with no history to 
     at: when,
   })
   const now = GONE_KEEP_MS + 100
-  const old = textCardId("c-old")
-  const fresh = textCardId("c-fresh")
-  const silent = textCardId("c-silent")
+  const old = textCardId("c0000000-0000-7000-8000-000000000107")
+  const fresh = textCardId("c0000000-0000-7000-8000-000000000108")
+  const silent = textCardId("c0000000-0000-7000-8000-000000000109")
   expect(
     planGoneSweep({
       cards: [

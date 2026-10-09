@@ -24,13 +24,14 @@ import {
   isTextCardId,
   type Move,
   type MoveRefusal,
+  noteColumnIdFor,
   type PlaceKey,
   placed,
   type Reorder,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { planReorder } from "@pinetrie/rules"
+import { notesOf, planReorder } from "@pinetrie/rules"
 import type { Intents } from "./inventory.ts"
 
 /**
@@ -323,29 +324,49 @@ export function intentsOf(state: MovesState): Intents {
   return intents
 }
 
-/** An order key after every one the host assigns (`orderAfter`). */
-const LAST = "\uffff"
+/** An order key after every one the host assigns (`orderAfter`): where a card waiting for its order is drawn. */
+export const LAST_ORDER = "\uffff"
 
 /**
- * A key as the place it is drawn as. A queued or pinned one waits for the
- * host to give it an order, so it is drawn last among its kind, a queued one
- * queued by you, a canvas card one column wide; a gone one is gone by you,
- * in no history until the host names it one (`historyOf`).
+ * A key as the place it is drawn as. A queued or pinned one, or a note,
+ * waits for the host to give it an order, so it is drawn last among its
+ * kind, a queued one queued by you, a canvas card one column wide; a gone
+ * one is gone by you, in no history until the host names it one
+ * (`historyOf`). A thread's nearest notes are the note column the host
+ * would choose from `cards` (`notesOf`); undefined, drawn where it was,
+ * when the host would make one, or the thread has no card.
  */
-export function drawnPlace(key: PlaceKey, me: WriterId): CardPlace {
+export function drawnPlace(
+  key: PlaceKey,
+  me: WriterId,
+  cards: readonly CardRecord[],
+): CardPlace | undefined {
   switch (key.kind) {
     case "queued":
-      return { ...key, order: LAST, by: me }
+      return { ...key, order: LAST_ORDER, by: me }
     case "pinned":
-      return { ...key, order: LAST }
+    case "note":
+      return { ...key, order: LAST_ORDER }
     case "canvas":
-      return { ...key, order: LAST, width: 1 }
+      return { ...key, order: LAST_ORDER, width: 1 }
     case "gone":
       return { ...key, task: null, by: me }
+    case "notes": {
+      const notes = notesOf({
+        cards,
+        thread: key.thread,
+        column: UNMADE,
+        by: me,
+      })
+      return notes === null || notes.made.length > 0 ? undefined : notes.place
+    }
     default:
       return key
   }
 }
+
+/** The id a note column the host would make is drawn with: never drawn, since it is not made yet. */
+const UNMADE = noteColumnIdFor("unmade")
 
 /**
  * The record a `queue-card` with no `from` is drawn as until the host
@@ -358,8 +379,8 @@ export const queuedDraft = (
   command: CardCommand | null,
 ): CardRecord | null => {
   if (move.from !== null || !isTextCardId(move.card)) return null
-  const place = drawnPlace(move.to, me)
-  return place.kind === "canvas"
+  const place = drawnPlace(move.to, me, [])
+  return place === undefined || place.kind === "canvas"
     ? null
     : {
         kind: "text",
@@ -409,7 +430,11 @@ export function withPending(
     }
     const now = cards.get(p.move.card)
     if (now === undefined) continue
-    cards.set(p.move.card, placed(now, drawnPlace(p.move.to, me)) ?? now)
+    const place = drawnPlace(p.move.to, me, [...cards.values()])
+    cards.set(
+      p.move.card,
+      (place === undefined ? undefined : placed(now, place)) ?? now,
+    )
   }
   return [...cards.values()].sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,

@@ -7,6 +7,7 @@ import {
   type CardId,
   type EntryId,
   NOBODY,
+  type NoteColumnId,
   type RootId,
   rootIdFor,
   type Target,
@@ -25,8 +26,10 @@ import {
 } from "@pinetrie/reads"
 import {
   byTarget,
+  canvasOf,
   encodeChat,
   LANE,
+  orderAfter,
   ROOT,
   setRecord,
   TASK,
@@ -324,7 +327,9 @@ export function basics(
     }),
     places,
     log: m => lines.push(m),
-    newId: () => `id-${String(++n).padStart(4, "0")}`,
+    // A uuidv7's shape, as the host's minter gives: a card's id is parsed.
+    newId: () =>
+      `01a0ffd2-0000-7000-8000-${(++n).toString(16).padStart(12, "0")}`,
     now: () => 1_000,
     lines,
   }
@@ -342,6 +347,34 @@ export const TASK_ID: TaskId = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
  * A task as a thread's first message makes one (`planThreadStart`): its
  * record, the thread's, and the thread's card on its canvas, in `root`.
  */
+/**
+ * A note column on `task`'s canvas, after its last card (ADR-0116): where a
+ * test's notes are.
+ */
+export function putNoteColumn(
+  b: Pick<FakeBasics, "places">,
+  column: NoteColumnId,
+  task: TaskId = TASK_ID,
+): void {
+  applyPlaceSteps(b.places, [
+    {
+      kind: "write",
+      record: {
+        kind: "note-column",
+        id: column,
+        owner: STARTER,
+        placer: STARTER,
+        place: {
+          kind: "canvas",
+          task,
+          order: orderAfter(canvasOf(readPlaces(b.places), task)),
+          width: 1,
+        },
+      },
+    },
+  ])
+}
+
 export function putTask(
   b: WriteDocs & Pick<FakeBasics, "places">,
   thread: ThreadId,

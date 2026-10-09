@@ -199,14 +199,21 @@ test("pinnedReads: each card with its text and owner, in order; a card with no t
     unsent: null,
   })
   const texts: Record<string, string> = {
-    "c-1": "ship it",
-    "c-2": " \n",
-    "c-3": "ask",
+    "c0000000-0000-7000-8000-000000000001": "ship it",
+    "c0000000-0000-7000-8000-000000000002": " \n",
+    "c0000000-0000-7000-8000-000000000003": "ask",
   }
   expect(
     pinnedReads(
-      [card("c-1"), card("c-2"), card("c-3", BEA)],
+      [
+        card("c0000000-0000-7000-8000-000000000001"),
+        card("c0000000-0000-7000-8000-000000000002"),
+        card("c0000000-0000-7000-8000-000000000003", BEA),
+      ],
       id => texts[id] ?? "",
     ),
-  ).toEqual([read("c-1", "ship it"), read("c-3", "ask", BEA)])
+  ).toEqual([
+    read("c0000000-0000-7000-8000-000000000001", "ship it"),
+    read("c0000000-0000-7000-8000-000000000003", "ask", BEA),
+  ])
 })

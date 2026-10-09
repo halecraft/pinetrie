@@ -31,19 +31,38 @@ const card = (id: string, owner = "p-ada"): TextCard => ({
 
 test("readPlaces: oldest first, malformed ones left out, an unchanged card the same object", () => {
   const doc = newPlacesDoc()
-  doc.cards.set("c-2", encodeCard(card("c-2")))
-  doc.cards.set("c-1", encodeCard(card("c-1")))
-  doc.cards.set("c-3", { ...encodeCard(card("c-3")), kind: "pinned" })
+  doc.cards.set(
+    "c0000000-0000-7000-8000-000000000002",
+    encodeCard(card("c0000000-0000-7000-8000-000000000002")),
+  )
+  doc.cards.set(
+    "c0000000-0000-7000-8000-000000000001",
+    encodeCard(card("c0000000-0000-7000-8000-000000000001")),
+  )
+  doc.cards.set("c0000000-0000-7000-8000-000000000003", {
+    ...encodeCard(card("c0000000-0000-7000-8000-000000000003")),
+    kind: "pinned",
+  })
   const first = readPlaces(doc)
-  expect(first.map(c => c.id)).toEqual(["c-1", "c-2"])
+  expect(first.map(c => c.id)).toEqual([
+    "c0000000-0000-7000-8000-000000000001",
+    "c0000000-0000-7000-8000-000000000002",
+  ])
   // A write to one card keeps every other card's object.
-  doc.cards.set("c-4", encodeCard(card("c-4")))
+  doc.cards.set(
+    "c0000000-0000-7000-8000-000000000004",
+    encodeCard(card("c0000000-0000-7000-8000-000000000004")),
+  )
   const second = readPlaces(doc)
-  expect(second.map(c => c.id)).toEqual(["c-1", "c-2", "c-4"])
+  expect(second.map(c => c.id)).toEqual([
+    "c0000000-0000-7000-8000-000000000001",
+    "c0000000-0000-7000-8000-000000000002",
+    "c0000000-0000-7000-8000-000000000004",
+  ])
   expect(second[0]).toBe(first[0])
   expect(second[1]).toBe(first[1])
-  doc.cards.set("c-1", {
-    ...encodeCard(card("c-1")),
+  doc.cards.set("c0000000-0000-7000-8000-000000000001", {
+    ...encodeCard(card("c0000000-0000-7000-8000-000000000001")),
     lane: threadIdFor("elsewhere"),
   })
   const third = readPlaces(doc)

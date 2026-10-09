@@ -29,7 +29,7 @@ test("an image only a card's text shows is kept past its grace", async () => {
     grace: 0,
     texts: async () => [
       {
-        id: textCardId("c-1"),
+        id: textCardId("c0000000-0000-7000-8000-000000000001"),
         text: `pasted ![y](/blob/${inCard.sha256})`,
         clients: [],
       },

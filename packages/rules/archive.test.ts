@@ -9,6 +9,7 @@ import {
   type Intent,
   indexTree,
   type LaneView,
+  noteColumnIdFor,
   type RevisionRecord,
   ROOT,
   rootIdFor,
@@ -125,9 +126,15 @@ describe("planArchive (ADR-0116)", () => {
       conflicts: [],
     })
     const revisions = new Map([
-      [entryId("a"), revision("a", A, "c-a", "s-a1")],
+      [
+        entryId("a"),
+        revision("a", A, "c0000000-0000-7000-8000-00000000000a", "s-a1"),
+      ],
       [entryId("b"), revision("b", A, null, "s-a2")],
-      [entryId("r1"), revision("r1", B, "c-c", "s-c")],
+      [
+        entryId("r1"),
+        revision("r1", B, "c0000000-0000-7000-8000-00000000000c", "s-c"),
+      ],
     ])
     const own = [
       { lane: A, tip: entryId("b"), index },
@@ -150,7 +157,7 @@ describe("planArchive (ADR-0116)", () => {
       expect(plan({ crossing: "restore", own, revisions })).toMatchObject({
         teardown: {
           forget: [],
-          refs: [{ lane: A, commit: "c-a" }],
+          refs: [{ lane: A, commit: "c0000000-0000-7000-8000-00000000000a" }],
           snapshots: [],
         },
         unload: [],
@@ -161,6 +168,7 @@ describe("planArchive (ADR-0116)", () => {
 
 const LANE_X = threadIdFor("x")
 const T_B = threadIdFor("b-thread")
+const NOTES_X = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
 
 describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
   // LANE_X's card is on OTHER_TASK's canvas, T_B's on TASK's.
@@ -169,7 +177,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
     threadCardOf({ thread: T_B, task: TASK, by: BEA, cards: [] }),
     {
       kind: "text",
-      id: textCardId("c-archived"),
+      id: textCardId("c0000000-0000-7000-8000-000000000106"),
       owner: BEA,
       placer: BEA,
       place: {
@@ -179,6 +187,13 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
       },
       carries: { kind: "message", command: null },
       unsent: null,
+    },
+    {
+      kind: "note-column",
+      id: NOTES_X,
+      owner: BEA,
+      placer: BEA,
+      place: { kind: "canvas", task: OTHER_TASK, order: "z", width: 1 },
     },
   ]
   const tasks = indexTasks(cards, new Map())
@@ -249,7 +264,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
       {
         kind: "reorder",
         reorder: {
-          card: textCardId("c-1"),
+          card: textCardId("c0000000-0000-7000-8000-000000000001"),
           at: {
             kind: "queued",
             at: atEntry(entryId("a")),
@@ -257,7 +272,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
             seen: "",
           },
           after: null,
-          before: textCardId("c-2"),
+          before: textCardId("c0000000-0000-7000-8000-000000000002"),
         },
       },
       [OTHER_TASK],
@@ -284,8 +299,17 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
     ],
     [
       "a mark: its task",
-      { kind: "mark", task: TASK, title: "Tab names" },
+      { kind: "mark", of: { kind: "task", task: TASK }, title: "Tab names" },
       [TASK],
+    ],
+    [
+      "a note column's title: its column's task",
+      {
+        kind: "mark",
+        of: { kind: "note-column", column: NOTES_X },
+        title: "Ideas",
+      },
+      [OTHER_TASK],
     ],
     ["a retitle: its task", { kind: "retitle", task: TASK }, [TASK]],
     [
@@ -308,7 +332,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
         kind: "move",
         moves: [
           {
-            card: textCardId("c-archived"),
+            card: textCardId("c0000000-0000-7000-8000-000000000106"),
             from: atB,
             to: { kind: "inventory", holder: writerId("ada@x.io") },
           },

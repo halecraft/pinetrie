@@ -23,6 +23,12 @@ export interface Edge {
 export interface Span {
   readonly first: Edge
   readonly last: Edge
+  /**
+   * How far, in px, the view's top is past the end of its first message,
+   * in the space before the next (`first.at` is 1 there); 0 inside it. A
+   * spot keeps it, so a column left between two messages comes back there.
+   */
+  readonly past: number
 }
 
 const through = (b: Box, y: number): number =>
@@ -66,6 +72,7 @@ export function visibleSpan(
   return {
     first: { id: top.id, at: through(top, 0) },
     last: { id: bottom.id, at: through(bottom, height) },
+    past: Math.max(0, -top.bottom),
   }
 }
 
@@ -85,7 +92,13 @@ export const sameSpan = (a: Span | null, b: Span | null): boolean =>
  * message when its tab is shown again.
  */
 export type Spot =
-  | { readonly kind: "at"; readonly id: string; readonly at: number }
+  | {
+      readonly kind: "at"
+      readonly id: string
+      readonly at: number
+      /** Px past the message's end, between it and the next (`Span.past`). */
+      readonly past: number
+    }
   | { readonly kind: "end"; readonly id: string }
 
 /** The spot a column leaves: its end while it followed it, else its view's top. */
@@ -98,7 +111,7 @@ export function spotOf(
     return lastId === undefined ? null : { kind: "end", id: lastId }
   return span === null
     ? null
-    : { kind: "at", id: span.first.id, at: span.first.at }
+    : { kind: "at", id: span.first.id, at: span.first.at, past: span.past }
 }
 
 /** Every spot kept, by the message it is at. */
@@ -155,7 +168,7 @@ export function placeAt(
   const end = m.scrollHeight - m.clientHeight
   const top =
     spot.kind === "at"
-      ? m.top + spot.at * (m.bottom - m.top)
+      ? m.top + spot.at * (m.bottom - m.top) + spot.past
       : spot.id === m.lastId
         ? end
         : m.bottom - m.clientHeight

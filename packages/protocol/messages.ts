@@ -57,8 +57,8 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     action (`add`, `rename`, `move`, `remove`), `targetId` the state (`""`
  *     to add), `text` its name, and `parentId` the state it goes before
  *     (`""` for after every open state).
- *   - `mark` titles the entry `targetId` with `text` (ADR-0045); `""`
- *     clears its title.
+ *   - `mark` titles the task `task`, or the note column `cardId`, with
+ *     `text` (ADR-0045, ADR-0116); `""` clears its title.
  *   - `retitle` asks a model for the root `root`'s title (ADR-0074).
  *   - `offer` acts on that lane's offer in your repo; `mode` names the
  *     action: `accept`, `split`, `squash`, `describe` or `refresh`. An

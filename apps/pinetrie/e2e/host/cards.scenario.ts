@@ -10,7 +10,6 @@ import {
   ROOT,
   type TextCardId,
   type ThreadId,
-  textCardId,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
@@ -25,7 +24,7 @@ import {
 } from "@pinetrie/reads"
 import { yourCard } from "@pinetrie/rules"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pinetrie/schema"
-import type { SessionClient } from "@pinetrie/session"
+import { LAST_ORDER, newCardId, type SessionClient } from "@pinetrie/session"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
@@ -87,23 +86,27 @@ async function run(check: Checks["check"]): Promise<void> {
         thread: threadHolding(ch, end),
       }) as const
     /**
-     * A note at `end` (ADR-0113): shared, as your message is not. With no
-     * cell: the host gives a new one the first empty cell on its thread's
-     * board, and a move from it names it anywhere there (`seenAt`).
+     * Pinned at `end` (ADR-0048): shared, as your message is not. Its order
+     * is the host's to give, as a queued card's is.
      */
-    const noteAt = (end: EntryId | null) =>
-      ({ ...drafting(end), kind: "note", cell: null }) as const
+    const pinnedIn = (end: EntryId | null) =>
+      ({
+        kind: "pinned",
+        at: at(end),
+        thread: threadHolding(ch, end),
+        order: LAST_ORDER,
+      }) as const
     const newCard = (
       who: Omit<SessionClient, "chat">,
       end: EntryId | null,
       text: string,
-      place: "composing" | "note" = "composing",
+      place: "composing" | "pinned" = "composing",
     ): TextCardId => {
-      const id = textCardId(crypto.randomUUID())
+      const id = newCardId()
       who.createCard(
         {
           id,
-          place: place === "note" ? noteAt(end) : drafting(end),
+          place: place === "pinned" ? pinnedIn(end) : drafting(end),
           carries: { kind: "message", command: null },
           unsent: null,
         },
@@ -399,7 +402,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // sends her writes to the card's document 300 ms late (`lateFor`): her
     // card is made, pinned and sent at once, and the commands arrive first.
     const editEnd = tipOf()
-    const late = textCardId(crypto.randomUUID())
+    const late = newCardId()
     const adaLate = await join(ch, "ada", "cards", {
       WebSocket: lateFor(cardDocId(late), 300),
     })
@@ -439,10 +442,10 @@ async function run(check: Checks["check"]): Promise<void> {
     await adaLate.close()
     await ch.quiet()
 
-    // 4g. Traces (ADR-0048 step 6): Bea pins a card of Ada's while Ada has no
-    // column open at its thread, which leaves Ada a trace naming Bea; she pins
-    // another while Ada reads that thread, which leaves none. The host learns
-    // what Ada reads from presence alone.
+    // 4g. Traces (ADR-0048 step 6): Bea takes a card Ada pinned while Ada
+    // has no column open at its thread, which leaves Ada a trace naming Bea;
+    // she takes another while Ada reads that thread, which leaves none. The
+    // host learns what Ada reads from presence alone.
     const traceEnd = tipOf()
     const pinnedAt = (end: EntryId | null) =>
       ({
@@ -450,8 +453,8 @@ async function run(check: Checks["check"]): Promise<void> {
         at: at(end),
         thread: threadHolding(ch, end),
       }) as const
-    const away = newCard(ada, traceEnd, "pinned while Ada was away", "note")
-    const watched = newCard(ada, traceEnd, "pinned while Ada read", "note")
+    const away = newCard(ada, traceEnd, "taken while Ada was away", "pinned")
+    const watched = newCard(ada, traceEnd, "taken while Ada read", "pinned")
     await waitFor(
       () => onHost(away) !== undefined && onHost(watched) !== undefined,
       5_000,
@@ -460,16 +463,12 @@ async function run(check: Checks["check"]): Promise<void> {
       actedAt: { kind: "column", key: "k-bea" },
       slot: null,
     } as const
+    const beas = { kind: "inventory", holder: bea.writer } as const
     await bea.moveCard(
-      { card: away, from: noteAt(traceEnd), to: pinnedAt(traceEnd) },
+      { card: away, from: pinnedAt(traceEnd), to: beas },
       byBea,
     )
-    ada.setReading(
-      "k-ada",
-      traceEnd ?? "",
-      rootHolding(ch, traceEnd),
-      taskHolding(ch, traceEnd),
-    )
+    ada.setReading("k-ada", traceEnd ?? "", taskHolding(ch, traceEnd))
     await waitFor(
       () =>
         readReading(ch.presence).some(
@@ -478,7 +477,7 @@ async function run(check: Checks["check"]): Promise<void> {
       5_000,
     )
     await bea.moveCard(
-      { card: watched, from: noteAt(traceEnd), to: pinnedAt(traceEnd) },
+      { card: watched, from: pinnedAt(traceEnd), to: beas },
       byBea,
     )
     const tracesOf = (card: CardId) =>
@@ -503,10 +502,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     ada.clearReading("k-ada")
     for (const card of [away, watched])
-      await bea.moveCard(
-        { card, from: pinnedAt(traceEnd), to: drafting(traceEnd) },
-        byBea,
-      )
+      await bea.moveCard({ card, from: beas, to: drafting(traceEnd) }, byBea)
     await ch.quiet()
 
     // 4d. A client cannot write the places document: only the host writes it
@@ -514,7 +510,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // throws before it is made. A throwaway session tries it: had it been
     // made, the writer's copy would keep its own value for good (S76).
     const mallory = await join(ch, "mallory", "cards")
-    const forged = textCardId(crypto.randomUUID())
+    const forged = newCardId()
     const placesRefused = refusedWrite(() =>
       mallory.exchange.get(PLACES_DOC_ID, PlacesDoc).cards.set(forged, {
         owner: mallory.writer,
@@ -659,7 +655,7 @@ async function run(check: Checks["check"]): Promise<void> {
       at: at(tipOf()),
     } as const
     const three = ["one", "two", "three"].map(text => {
-      const id = textCardId(crypto.randomUUID())
+      const id = newCardId()
       void ada.createCard(
         {
           id,
@@ -723,7 +719,7 @@ async function run(check: Checks["check"]): Promise<void> {
         .map(slot =>
           ada.createCard(
             {
-              id: textCardId(crypto.randomUUID()),
+              id: newCardId(),
               place: mine,
               carries: { kind: "message", command: null },
               unsent: null,
@@ -776,7 +772,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // and a seat no text names; a card with text is back.
     const keep = newCard(bea, tipOf(), "kept across a restart")
     const empty = newCard(bea, tipOf(), "")
-    const orphan = textCardId(crypto.randomUUID())
+    const orphan = newCardId()
     bea.cardText(orphan).text.insert(0, "no record")
     const zed = await join(ch, "zed", "cards")
     await waitFor(

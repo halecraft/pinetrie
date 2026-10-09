@@ -23,7 +23,7 @@ const record = (n: string): RootRecord => ({
   mentions: [],
   images: [],
 })
-const directory = new Map(
+const _directory = new Map(
   ["1", "2", "3", "4"].map(n => [rootIdFor(`r${n}`), record(n)] as const),
 )
 /** Task `k-<n>` holds the thread `t-<n>`, in root `r<n>` (ADR-0116). */
@@ -50,7 +50,6 @@ const tasks = tasksOf({
       },
     ]),
   ),
-  directory,
 })
 const held = (input: Parameters<typeof planHeldRoots>[0]) =>
   [...planHeldRoots(input)].sort()

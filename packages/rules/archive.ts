@@ -193,7 +193,11 @@ export function writesIn(
     // A reorder stays in the place it names.
     case "reorder":
       return only(tasksOf.place(intent.reorder.at))
+    // A note column's title writes in its column's task.
     case "mark":
+      return intent.of.kind === "task"
+        ? [intent.of.task]
+        : only(tasksOf.card(intent.of.column))
     case "retitle":
     case "undo-move":
       return [intent.task]

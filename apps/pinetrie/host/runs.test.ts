@@ -192,7 +192,11 @@ describe("a run's pinned cards (ADR-0048)", () => {
     {
       lane: LANE,
       cards: [
-        { id: textCardId("c-1"), text: "ship it", by: writerId("a@x.io") },
+        {
+          id: textCardId("c0000000-0000-7000-8000-000000000001"),
+          text: "ship it",
+          by: writerId("a@x.io"),
+        },
       ],
       retired: [],
     },
@@ -210,7 +214,9 @@ describe("a run's pinned cards (ADR-0048)", () => {
         return pinned
       },
     )
-    const seen = [{ id: textCardId("c-1"), seen: "v-1" }]
+    const seen = [
+      { id: textCardId("c0000000-0000-7000-8000-000000000001"), seen: "v-1" },
+    ]
     runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: seen })
     lane.finish({ kind: "ok" })
     await ended

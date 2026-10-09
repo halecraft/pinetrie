@@ -12,7 +12,7 @@ test("before the host's copy arrives, your attention document is not written: an
   store.read(LANE, entryId("e-1"))
   store.leave()
   store.dismiss(LANE, entryId("p-1"))
-  store.dismissOffer(LANE, "c-1")
+  store.dismissOffer(LANE, "c0000000-0000-7000-8000-000000000001")
   store.setInbox({ since: "e-9", seen: ["e-10"] })
   expect(store.attention.current()).toEqual({
     since: "",

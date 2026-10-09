@@ -3,7 +3,6 @@ import {
   entryId,
   type LaneView,
   type OfferRecord,
-  rootIdFor,
   type ThreadId,
   taskIdFor,
   threadIdFor,
@@ -17,7 +16,8 @@ import {
   appView,
   hereRail,
   readOnlyWords,
-  workAnywhere,
+  taskWork,
+  threadWork,
 } from "./app-view.ts"
 import { PENDING_TRACK } from "./column-paths.ts"
 import type { Column } from "./columns.ts"
@@ -122,7 +122,10 @@ test("the header's offers are the open ones, never one accepted work already hol
       acceptedAs,
       files,
       edited: false,
-      ledger: lane === A ? { source: "c-a", start: [] } : null,
+      ledger:
+        lane === A
+          ? { source: "c0000000-0000-7000-8000-00000000000a", start: [] }
+          : null,
     }) as unknown as OfferRecord
   const lane = (name: ThreadId, tip: string | null) =>
     ({ name, tip }) as unknown as LaneView
@@ -146,7 +149,12 @@ test("the header's offers are the open ones, never one accepted work already hol
     }),
   )
   expect(offers).toEqual([
-    { lane: A, root: "r1", end: "t1", source: "c-a" },
+    {
+      lane: A,
+      root: "r1",
+      end: "t1",
+      source: "c0000000-0000-7000-8000-00000000000a",
+    },
     { lane: D, root: "r2", end: "r2", source: null },
   ])
 })
@@ -162,27 +170,57 @@ test("a task's rail draws its first root's tree only", () => {
   expect(hereRail(index, null, null)).toEqual([])
 })
 
-test("workAnywhere: the held roots' work, and each lane running in a root this tab does not hold, by its root entry, running winning; a root with no entry yet is left out (ADR-0091)", () => {
-  const held = rootIdFor("01a0ffd2-0000-7000-8000-000000000001")
-  const unheld = rootIdFor("01a0ffd2-0000-7000-8000-000000000002")
-  const unknown = rootIdFor("01a0ffd2-0000-7000-8000-000000000003")
+test("threadWork and taskWork: each busy held lane's work, and each lane running anywhere, by thread; a task's is the most of its threads' (ADR-0091, ADR-0116)", () => {
+  const [a, b, c, d] = ["a", "b", "c", "d"].map(threadIdFor) as [
+    ThreadId,
+    ThreadId,
+    ThreadId,
+    ThreadId,
+  ]
+  const lane = (name: ThreadId, over: Partial<LaneView>): LaneView => ({
+    name,
+    tip: entryId("e"),
+    running: false,
+    waiting: 0,
+    askedBy: null,
+    lastWaiting: null,
+    heldBy: null,
+    ...over,
+  })
+  const work = threadWork({
+    lanes: [
+      lane(a, { waiting: 1 }),
+      lane(b, { waiting: 1, heldBy: ADA }),
+      lane(c, {}),
+    ],
+    running: [{ lane: d }, { lane: a }],
+  })
+  expect(work).toEqual(
+    new Map([
+      [a, "running"],
+      [b, "held"],
+      [d, "running"],
+    ]),
+  )
+  const K2 = taskIdFor("01a0ffd2-0000-7000-8000-00000000000b")
   expect(
-    workAnywhere({
-      held: new Map([[entryId("r1"), "waiting"]]),
-      running: [
-        { lane: threadIdFor("a"), root: held },
-        { lane: threadIdFor("b"), root: unheld },
-        { lane: threadIdFor("c"), root: unknown },
-      ],
-      rootEntries: new Map([
-        [held, entryId("r1")],
-        [unheld, entryId("r2")],
+    taskWork(
+      // The most first, so a later, lesser thread cannot win by coming last.
+      new Map([
+        [c, "waiting"],
+        [b, "held"],
+        [d, "running"],
       ]),
-    }),
+      new Map([
+        [b, K],
+        [c, K],
+        [d, K2],
+      ]),
+    ),
   ).toEqual(
     new Map([
-      [entryId("r1"), "running"],
-      [entryId("r2"), "running"],
+      [K, "waiting"],
+      [K2, "running"],
     ]),
   )
 })

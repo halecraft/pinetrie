@@ -57,7 +57,7 @@ describe("planQueueHold", () => {
 describe("holdOnStop", () => {
   const card = (kind: "message" | "fact"): QueuedCard =>
     ({
-      id: "c-1",
+      id: "c0000000-0000-7000-8000-000000000001",
       owner: ADA,
       placer: ADA,
       place: {
@@ -125,7 +125,7 @@ describe("planQueueCard (ADR-0113)", () => {
   const atEnd = { kind: "composing", at, thread: L } as const
   const card: CardRecord = {
     kind: "text",
-    id: textCardId("c-1"),
+    id: textCardId("c0000000-0000-7000-8000-000000000001"),
     owner: ADA,
     placer: ADA,
     place: atEnd,

@@ -19,7 +19,7 @@
 // names the filter, `/` focuses the search, and Escape clears the filter
 // before it closes the board. What it shows is `boardView`'s.
 
-import type { EntryId, WorkflowStateId, WriterId } from "@pinetrie/core"
+import type { EntryId, TaskId, WorkflowStateId, WriterId } from "@pinetrie/core"
 import {
   addStateIntent,
   type BoardSide,
@@ -288,8 +288,8 @@ function StateSignalMarks({
   const words = stateWords(signals)
   return (
     <>
-      {signals.roots.length > 0 && (
-        <Readers {...readers} roots={signals.roots} />
+      {signals.tasks.length > 0 && (
+        <Readers {...readers} tasks={signals.tasks} />
       )}
       {mark !== null && (
         <StatusMark arrived={null} level={mark} title={LEVEL_WORDS[mark]} />
@@ -326,7 +326,7 @@ export function Board({
   searchRef: RefObject<HTMLInputElement | null>
   readers: ReadersProps
   /** A thread as a row of a reader's menu, which opens it. */
-  thread: (end: EntryId, root: EntryId) => MenuItem
+  thread: (end: EntryId, task: TaskId) => MenuItem
   pip: React.ReactNode
 }) {
   // The board's keys are `boardKeyAct`'s: Escape closes the board, as ▦
@@ -583,13 +583,13 @@ function ItemCard({
   drop: Readonly<Record<string, string>>
   onIntent: (intent: Intent) => void
   readers: ReadersProps
-  thread: (end: EntryId, root: EntryId) => MenuItem
+  thread: (end: EntryId, task: TaskId) => MenuItem
   pip: React.ReactNode
 }) {
   return (
     <div
       className="thread-card"
-      data-entry={item.entry}
+      data-entry={item.entry ?? undefined}
       data-task={item.task}
       {...drop}
     >
@@ -611,7 +611,7 @@ function ItemCard({
       {item.body !== null && <span className="board-body">{item.body}</span>}
       <span className="board-meta">
         <Writers nameOf={readers.nameOf} writers={item.writers} />
-        <ReaderMenus {...readers} root={item.entry} thread={thread} />
+        <ReaderMenus {...readers} task={item.task} thread={thread} />
       </span>
       <Menu
         className="item-more"

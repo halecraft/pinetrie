@@ -1,4 +1,4 @@
-import { cardId } from "@pinetrie/core"
+import { textCardId } from "@pinetrie/core"
 import { CARD_HISTORY, setRecord } from "@pinetrie/rules"
 import { applyRecordWrites, newLiveDoc } from "@pinetrie/schema"
 import { newRootDoc, newSessionDoc } from "@pinetrie/schema/fixtures"
@@ -9,7 +9,10 @@ test("readSessionFacts: a write to the session keeps every fact it did not chang
   const session = newSessionDoc()
   const view = { session, live: newLiveDoc(), roots: [newRootDoc()] }
   const before = readSessionFacts(view)
-  const write = setRecord(CARD_HISTORY, { card: cardId("c-1"), events: [] })
+  const write = setRecord(CARD_HISTORY, {
+    card: textCardId("c0000000-0000-7000-8000-000000000001"),
+    events: [],
+  })
   applyRecordWrites(session, [write])
   const after = readSessionFacts(view)
   const changed = Object.keys(after).filter(

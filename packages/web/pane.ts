@@ -22,8 +22,6 @@ import { imageLookup, messageTree, tableAt, tableHeads } from "./markdown.ts"
  */
 export type PaneSubject =
   | { readonly kind: "offer" }
-  /** The thread's notes board (ADR-0113). */
-  | { readonly kind: "notes" }
   | { readonly kind: "ask"; readonly ask: EntryId }
   | { readonly kind: "table"; readonly entry: EntryId; readonly nth: number }
   | {
@@ -43,8 +41,6 @@ export function paneKey(subject: PaneSubject): string {
   switch (subject.kind) {
     case "offer":
       return "offer"
-    case "notes":
-      return "notes"
     case "ask":
       return `ask:${subject.ask}`
     case "table":
@@ -66,7 +62,6 @@ export const togglePane = (
 
 /** What the pane draws. */
 export type PaneView =
-  | { readonly kind: "notes" }
   | {
       readonly kind: "review"
       readonly target: ReviewTarget
@@ -90,15 +85,12 @@ export interface PaneFacts {
   readonly nodes: readonly SpineNode[]
   /** An ask's review, or null when it has none (`askReviewTarget`). */
   readonly askTarget: (ask: EntryId) => ReviewTarget | null
-  /** The column has a notes board: a thread's end it can write at. */
-  readonly notes: boolean
 }
 
 /**
  * What to draw for `subject`, or null when it is gone: the offer has no
  * review, the column no longer draws the message, an ask has no span, the
- * message has no such table, or the column has no notes board. Null closes
- * the pane.
+ * message has no such table. Null closes the pane.
  */
 export function paneView(
   subject: PaneSubject,
@@ -107,8 +99,6 @@ export function paneView(
   switch (subject.kind) {
     case "offer":
       return facts.offer === null ? null : { kind: "review", ...facts.offer }
-    case "notes":
-      return facts.notes ? { kind: "notes" } : null
     case "ask": {
       const target = facts.askTarget(subject.ask)
       return target === null
@@ -201,9 +191,6 @@ export const narrowStrip = (width: number, rem: number): boolean =>
 
 /** The line heading an ask's review. */
 export const ASK_REVIEW_LINE = "what this ask changed"
-
-/** The notes board's title in the pane (ADR-0113). */
-export const NOTES_TITLE = "notes"
 
 /** The image pane's link to the image alone. */
 export const OPEN_IN_TAB = "open in a new tab"

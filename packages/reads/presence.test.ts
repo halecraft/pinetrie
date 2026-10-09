@@ -1,9 +1,9 @@
-import { writerId } from "@pinetrie/core"
+import { taskIdFor, writerId } from "@pinetrie/core"
 import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import {
   readReading,
-  readReadingRoots,
+  readReadingTasks,
   readTyping,
   readTypingIn,
 } from "./index.ts"
@@ -47,29 +47,32 @@ test("a presence read keeps its array while its entries are the same, and not af
   expect(moved).toEqual([[writerId("ada@x.io"), "e2"]])
 })
 
-test("each followed end's root, as its column reported it; the same map while unchanged (ADR-0063)", () => {
+test("each followed end's task, as its column reported it; one that is no task's left out; the same map while unchanged (ADR-0063, ADR-0116)", () => {
   const ada = seatKey(writerId("ada@x.io"), "s1")
   const doc = newPresenceDoc()
+  const [k1, k9] = [taskIdFor("1"), taskIdFor("9")]
   doc.reading.set(readingKey(ada, "c1"), "e1")
-  doc.readingRoot.set(readingKey(ada, "c1"), "r1")
+  doc.readingTask.set(readingKey(ada, "c1"), k1)
   doc.reading.set(readingKey(ada, "c2"), "e2")
-  doc.readingRoot.set(readingKey(ada, "c2"), null)
-  const first = readReadingRoots(doc)
-  expect([...first]).toEqual([["e1", "r1"]])
-  doc.readingRoot.set(readingKey(ada, "c1"), "r1")
-  expect(readReadingRoots(doc)).toBe(first)
-  doc.readingRoot.set(readingKey(ada, "c1"), "r9")
-  expect([...readReadingRoots(doc)]).toEqual([["e1", "r9"]])
+  doc.readingTask.set(readingKey(ada, "c2"), null)
+  doc.reading.set(readingKey(ada, "c3"), "e3")
+  doc.readingTask.set(readingKey(ada, "c3"), "r-not-a-task")
+  const first = readReadingTasks(doc)
+  expect([...first]).toEqual([["e1", k1]])
+  doc.readingTask.set(readingKey(ada, "c1"), k1)
+  expect(readReadingTasks(doc)).toBe(first)
+  doc.readingTask.set(readingKey(ada, "c1"), k9)
+  expect([...readReadingTasks(doc)]).toEqual([["e1", k9]])
 })
 
 test("the cards someone is typing in, from any seat, without decayed ones; the same set while unchanged (ADR-0048 step 7)", () => {
   const ada = writerId("ada@x.io")
   const doc = newPresenceDoc()
-  doc.typingIn.set(seatKey(ada, "s1"), "c-1")
+  doc.typingIn.set(seatKey(ada, "s1"), "c0000000-0000-7000-8000-000000000001")
   doc.typingIn.set(seatKey(ada, "s2"), null)
   const first = readTypingIn(doc)
-  expect([...first]).toEqual(["c-1"])
-  doc.typingIn.set(seatKey(ada, "s1"), "c-1")
+  expect([...first]).toEqual(["c0000000-0000-7000-8000-000000000001"])
+  doc.typingIn.set(seatKey(ada, "s1"), "c0000000-0000-7000-8000-000000000001")
   expect(readTypingIn(doc)).toBe(first)
   doc.typingIn.set(seatKey(ada, "s1"), null)
   expect([...readTypingIn(doc)]).toEqual([])

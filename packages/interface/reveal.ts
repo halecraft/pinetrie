@@ -76,18 +76,34 @@ export function revealOf(
     // A card on a canvas: its task comes into view.
     case "canvas":
       return { effects: showTask(place.task), actedAt: AT_INVENTORY }
+    // A note: its note column's task, where the column is drawn (ADR-0116).
+    case "note": {
+      const task = state.tasks.index.taskOfCard.get(place.column)
+      return {
+        effects: task === undefined ? [] : showTask(task),
+        actedAt: at(place.column),
+      }
+    }
+    // A target alone: no card is ever there.
+    case "notes":
+      return { effects: [], actedAt: AT_INVENTORY }
     // Discarded: drawn nowhere, so nothing comes into view.
     case "gone":
       return { effects: [], actedAt: AT_INVENTORY }
     case "composing":
-    case "note":
     case "pinned":
     case "queued": {
       const end =
         placeEnd(place, state.index) ??
         (place.at.kind === "entry" ? place.at.id : null)
       if (end === null) return { effects: [], actedAt: AT_INVENTORY }
-      const plan = planOpen(state.layout, state.index, end, state.tasks.ofEntry)
+      const plan = planOpen(
+        state.layout,
+        state.index,
+        end,
+        state.tasks.index.taskOfThread,
+        state.entries,
+      )
       return {
         effects: [
           ...planOpenAt(end, state, minted.key),

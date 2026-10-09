@@ -11,6 +11,7 @@
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
+import { noteColumns } from "./0006-note-columns.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -22,6 +23,8 @@ export interface MigrationRun {
    * that fails to load stops the migration before it writes.
    */
   readonly hydrated: (docId: string) => Promise<void>
+  /** A line for the host's log: what a migration found, and did. */
+  readonly log: (line: string) => void
 }
 
 /** A change to one kind of document's schema, from one stored hash. */
@@ -47,9 +50,9 @@ export interface Migration {
 export const MIGRATIONS: readonly Migration[] = []
 
 /**
- * A one-time change to stored records' contents. A record's contents are
- * JSON in its document's `records`, so changing them moves no schema hash and
- * `planOpen` never schedules one. Each decides from what it reads whether it
+ * A one-time change to stored contents that keeps every schema's hash: a
+ * record's contents, JSON in its document's `records`, or the values of the
+ * places' rows, whose fields stay, so `planOpen` never schedules one. Each decides from what it reads whether it
  * is due, and is deleted once Duane's store has run it; the one store this
  * build opens is his, so no other store is left behind.
  */
@@ -64,11 +67,11 @@ export interface RecordMigration {
 }
 
 /**
- * Every one-time record migration this build carries, oldest first. Empty:
+ * Every one-time record migration this build carries, oldest first.
  * 0003-workflow-archive, 0004-threads (ADR-0117) and 0005-tasks' records
  * (ADR-0116) ran on Duane's store and were deleted.
  */
-export const RECORD_MIGRATIONS: readonly RecordMigration[] = []
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = [noteColumns]
 
 /** Each stored document's id and the hash of the schema it was written under. */
 export async function readStored(
@@ -215,13 +218,14 @@ export async function migrate(input: {
         writes.push({
           name: migration.name,
           docs: docIds.length,
-          write: await migration.run({ exchange, docIds, hydrated }),
+          write: await migration.run({ exchange, docIds, hydrated, log }),
         })
     for (const migration of input.records) {
       const write = await migration.run({
         exchange,
         docIds: input.storedIds,
         hydrated,
+        log,
       })
       if (write !== null)
         writes.push({ name: migration.name, docs: null, write })

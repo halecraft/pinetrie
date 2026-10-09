@@ -15,6 +15,7 @@ import {
   NEW_ROOT,
   NEW_TASK,
   NEW_THREAD,
+  tasksFor,
   threadOfEntry,
   tree,
   withThreads,
@@ -55,9 +56,11 @@ const ROOTS = ["1-r1", "5-r2", "7-r3", "9-r", "9-x"]
 const ENTRIES: ReadonlyMap<TaskId, EntryId> = new Map(
   ROOTS.map(r => [TK(r), entryId(r)] as const),
 )
-const OF_ENTRY: ReadonlyMap<EntryId, TaskId> = new Map(
-  ROOTS.map(r => [entryId(r), TK(r)] as const),
-)
+/** Each thread's task: every thread of a root is in its root's task. */
+const OF_THREAD = tasksFor(
+  index,
+  ...ROOTS.map(r => [TK(r), entryId(r)] as const),
+).index.taskOfThread
 const R1: Here = { kind: "task", task: TK("1-r1") }
 const at = (l: Layout, here: Here = R1): Layout =>
   layoutReducer(l, { kind: "show", here })
@@ -549,7 +552,7 @@ describe("planOpen", () => {
   const l = at(initialLayout())
   test("scrolls to a message a column of its root already shows", () => {
     // The root's first column follows its thread, through 2-a to 3-b.
-    expect(planOpen(l, index, entryId("2-a"), OF_ENTRY)).toEqual({
+    expect(planOpen(l, index, entryId("2-a"), OF_THREAD, ENTRIES)).toEqual({
       kind: "scroll",
       task: TK("1-r1"),
       key: expect.any(String),
@@ -557,20 +560,21 @@ describe("planOpen", () => {
   })
   test("opens beside the column sharing most of its path, in its own root", () => {
     // 4-c is a branch at 2-a: another thread, which no column shows.
-    expect(planOpen(l, index, entryId("4-c"), OF_ENTRY)).toEqual({
+    expect(planOpen(l, index, entryId("4-c"), OF_THREAD, ENTRIES)).toEqual({
       kind: "open",
       task: TK("1-r1"),
       entry: "1-r1",
       after: 0,
     })
-    expect(planOpen(l, index, entryId("6-d"), OF_ENTRY)).toEqual({
+    expect(planOpen(l, index, entryId("6-d"), OF_THREAD, ENTRIES)).toEqual({
       kind: "scroll",
       task: TK("5-r2"),
       key: expect.any(String),
     })
   })
-  test("an entry the index lacks has no plan", () => {
-    expect(planOpen(l, index, entryId("nope"), OF_ENTRY)).toBeNull()
+  test("an entry the index lacks, or one whose thread is in no task, has no plan", () => {
+    expect(planOpen(l, index, entryId("nope"), OF_THREAD, ENTRIES)).toBeNull()
+    expect(planOpen(l, index, entryId("4-c"), new Map(), ENTRIES)).toBeNull()
   })
 })
 

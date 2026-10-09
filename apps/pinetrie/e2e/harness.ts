@@ -30,7 +30,6 @@ import {
   type TaskId,
   type ThreadId,
   type TreeIndex,
-  textCardId,
   threadAt,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
@@ -64,6 +63,7 @@ import {
   type ConnectOptions,
   chatAtOf,
   connectSession,
+  newCardId,
   newTaskId,
   newThreadId,
   type SessionClient,
@@ -241,7 +241,11 @@ export const join = async (
       const task = taskAt(client, entry)
       return task === undefined
         ? NO_TASK
-        : client.request({ kind: "mark", task, title })
+        : client.request({
+            kind: "mark",
+            of: { kind: "task", task },
+            title,
+          })
     },
   })
 }
@@ -637,7 +641,7 @@ export async function composeAt(
   // A lane is named by its thread (ADR-0117); with none, the entry's thread.
   const thread = place.lane ?? threadAt(treeOf(client), entry)
   if (thread === null) throw new Error("no thread to compose a card in")
-  const id = textCardId(crypto.randomUUID())
+  const id = newCardId()
   void client.createCard(
     {
       id,

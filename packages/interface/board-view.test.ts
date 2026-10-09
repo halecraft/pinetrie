@@ -1,8 +1,6 @@
 import {
   type BoardPlace,
-  type EntryId,
   entryId,
-  type RootSummary,
   type RootWork,
   type TaskId,
   taskIdFor,
@@ -37,6 +35,7 @@ import {
   tasksWords,
 } from "./board-view.ts"
 import type { KeyLike } from "./inventory-keys.ts"
+import type { TaskSummary } from "./root-label.ts"
 import { threadCardHeads } from "./thread-card.ts"
 
 const ADA = writerId("ada@x.io")
@@ -56,7 +55,8 @@ const WORKFLOW: Workflow = {
 /** Task `n`, holding task `n`'s threads (ADR-0116). */
 const ID = (n: number) =>
   taskIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
-const E = (n: number) => entryId(`${n}-r`)
+/** Task `n` as the facts and the expectations name it. */
+const E = ID
 const keys = orderKeys(4)
 const place = (n: number, state: typeof DOING, rank = 0): BoardPlace => ({
   task: ID(n),
@@ -69,21 +69,19 @@ const summary = (
   n: number,
   writers: WriterId[],
   newest: string,
-): RootSummary => ({
-  root: E(n),
-  first: E(n),
-  messages: 1,
-  newest: entryId(newest),
-  writers,
-})
+  line = "",
+): readonly [TaskId, TaskSummary] => [
+  E(n),
+  { line, writers, newest: entryId(newest) },
+]
 // r1, r2 in Doing (r2 first); r3 in Backlog; r4, r5 in Done (r5 newer).
 /** What the board is read from, its thread cards' facts among them. */
 type Facts = Omit<BoardViewInput, "heads"> & {
-  readonly labels: ReadonlyMap<EntryId, string>
-  readonly status: ReadonlyMap<EntryId, Status>
-  readonly cardRoots: ReadonlySet<EntryId>
-  readonly ready: ReadonlyMap<EntryId, readonly string[]>
-  readonly work: ReadonlyMap<string, RootWork>
+  readonly labels: ReadonlyMap<TaskId, string>
+  readonly status: ReadonlyMap<TaskId, Status>
+  readonly cardRoots: ReadonlySet<TaskId>
+  readonly ready: ReadonlyMap<TaskId, readonly string[]>
+  readonly work: ReadonlyMap<TaskId, RootWork>
 }
 const input = (over: Partial<Facts> = {}): BoardViewInput => {
   const f: Facts = {
@@ -97,14 +95,14 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
         place(5, DONE, 1),
       ].map(p => [p.task, p]),
     ),
-    entries: new Map<TaskId, EntryId>([1, 2, 3, 4, 5].map(n => [ID(n), E(n)])),
-    summaries: [
+    entries: new Map(),
+    summaries: new Map([
       summary(1, [ADA], "1"),
       summary(2, [BEA], "2"),
       summary(3, [ADA], "3"),
       summary(4, [ADA], "4"),
-      summary(5, [BEA], "5"),
-    ],
+      summary(5, [BEA], "5", "can we try warmer colours?"),
+    ]),
     labels: new Map([
       [E(4), "Old spike about SQLite"],
       [E(5), "Palette work"],
@@ -115,29 +113,20 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
     search: null,
     me: ADA,
     work: new Map(),
-    lines: new Map([[E(5), "can we try warmer colours?"]]),
     ...over,
   }
-  const board = boardOf(f.workflow, f.places, f.entries.keys())
-  const taskOf = new Map([...f.entries].map(([t, e]) => [e, t] as const))
+  const board = boardOf(f.workflow, f.places, f.summaries.keys())
   return {
     workflow: f.workflow,
     places: f.places,
-    entries: f.entries,
     summaries: f.summaries,
+    entries: f.entries,
     search: f.search,
     me: f.me,
-    lines: f.lines,
-    heads: threadCardHeads(f.entries.keys(), {
+    heads: threadCardHeads(f.summaries.keys(), {
       workflow: f.workflow,
-      entries: f.entries,
       stateOf: board.stateOf,
-      labels: new Map(
-        [...f.labels].flatMap(([e, label]) => {
-          const task = taskOf.get(e)
-          return task === undefined ? [] : [[task, label] as const]
-        }),
-      ),
+      labels: f.labels,
       status: f.status,
       pips: f.cardRoots,
       offered: f.ready,
@@ -150,7 +139,7 @@ describe("boardView", () => {
   test("each open state a column, in order, by rank; the archive apart; the strip says each", () => {
     const view = boardView(input())
     expect(
-      view.open.map(c => [c.state.name, c.items.map(t => t.entry)]),
+      view.open.map(c => [c.state.name, c.items.map(t => t.task)]),
     ).toEqual([
       ["Backlog", [E(3)]],
       ["Doing", [E(2), E(1)]],
@@ -185,12 +174,11 @@ describe("boardView", () => {
   test("a column's mark and the strip's are its tasks' highest; the archive has none", () => {
     const item = {
       lane: threadIdFor("a"),
-      root: E(1),
-      end: E(1),
+      end: entryId("e-1"),
       level: "needsYou" as const,
       raised: { kind: "offer" as const, source: "c" },
     }
-    const status = new Map<EntryId, Status>([
+    const status = new Map<TaskId, Status>([
       [E(1), { kind: "needsYou", item }],
       [E(3), { kind: "working" }],
       [E(4), { kind: "needsYou", item }],
@@ -200,8 +188,8 @@ describe("boardView", () => {
     expect(view.strip.map(s => s.mark)).toEqual([null, "needsYou", null])
   })
 
-  test("an item's ⇡ names its threads with work ready; a column counts its items working (a pending verdict is working, `rootStatus`), and its items ready, not threads; the strip copies them, the archive 0 (ADR-0091)", () => {
-    const status = new Map<EntryId, Status>([
+  test("an item's ⇡ names its threads with work ready; a column counts its items working (a pending verdict is working, `threadStatus`), and its items ready, not threads; the strip copies them, the archive 0 (ADR-0091)", () => {
+    const status = new Map<TaskId, Status>([
       [E(1), { kind: "working" }],
       [E(3), { kind: "working" }],
       [E(4), { kind: "working" }],
@@ -317,8 +305,8 @@ describe("the board's search (ADR-0109)", () => {
   const kept = (over: Partial<BoardViewInput>) => {
     const view = boardView(input({ labels, ...over }))
     return [
-      ...view.open.map(c => c.items.map(t => t.entry)),
-      view.archive.rows.map(t => t.entry),
+      ...view.open.map(c => c.items.map(t => t.task)),
+      view.archive.rows.map(t => t.task),
     ]
   }
   const find = (query: string, mine = false) => ({
@@ -342,15 +330,14 @@ describe("the board's search (ADR-0109)", () => {
     expect(kept(find("palette", true))).toEqual([[], [], []])
   })
   test("a filtered head counts what it shows; its mark, Remove and the strip count every task", () => {
-    const status = new Map<EntryId, Status>([
+    const status = new Map<TaskId, Status>([
       [E(1), { kind: "working" }],
       [E(2), { kind: "working" }],
     ])
     const ready = new Map([[E(2), ["amber-fox"]]])
     const item = {
       lane: threadIdFor("a"),
-      root: E(2),
-      end: E(2),
+      end: entryId("e-2"),
       level: "needsYou" as const,
       raised: { kind: "offer" as const, source: "c" },
     }
@@ -363,16 +350,16 @@ describe("the board's search (ADR-0109)", () => {
       kept: 1,
       total: 5,
     })
-    expect(doing?.items.map(t => t.entry)).toEqual([E(1)])
+    expect(doing?.items.map(t => t.task)).toEqual([E(1)])
     expect(doing?.count).toEqual({ kind: "kept", kept: 1, total: 2 })
-    expect(doing?.signals).toEqual({ working: 1, ready: 0, roots: [E(1)] })
+    expect(doing?.signals).toEqual({ working: 1, ready: 0, tasks: [E(1)] })
     expect(doing?.mark).toBe("needsYou")
     expect(doing?.remove.why).not.toBeNull()
     expect(view.open[0]?.items).toEqual([])
     expect(view.open[0]?.remove.why).not.toBeNull()
     expect(view.archive.count).toEqual({ kind: "kept", kept: 0, total: 2 })
     expect(
-      view.strip.map(s => [s.count, s.signals.ready, s.signals.roots.length]),
+      view.strip.map(s => [s.count, s.signals.ready, s.signals.tasks.length]),
     ).toEqual([
       [1, 0, 1],
       [2, 1, 2],
@@ -388,8 +375,7 @@ describe("the board's search (ADR-0109)", () => {
     const item = (n: number) =>
       ({
         ...boardView(input()).archive.rows[0],
-        entry: E(n),
-        root: ID(n),
+        task: ID(n),
         label: `r${n}`,
         writers: [],
       }) as never

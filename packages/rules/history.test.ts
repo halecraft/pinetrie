@@ -1,9 +1,9 @@
 import { readdirSync } from "node:fs"
 import path from "node:path"
 import {
-  cardId,
   commitId,
   type ThreadName,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -81,8 +81,8 @@ const SAMPLES: Record<CustomType, unknown> = {
   "pinetrie.carry-on": { lane: LANE, by: ADA, name: "Ada" },
   "pinetrie.pinned": {
     lane: LANE,
-    cards: [{ id: cardId("k-1"), text: "do it", by: ADA }],
-    retired: [{ id: cardId("k-0"), line: "old" }],
+    cards: [{ id: textCardId("k-1"), text: "do it", by: ADA }],
+    retired: [{ id: textCardId("k-0"), line: "old" }],
   },
 }
 

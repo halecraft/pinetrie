@@ -69,11 +69,13 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   while the page does. What opens and goes, and why every other root is
   declined, is the session's (`planHold`, `root-hold.ts`, and `rootDocs`,
   `packages/session/TECHNICAL.md`).
-- **Every cross-root fact comes from the directory** (`readRoots`): your
-  list's labels and summaries (`summariesOf`, `firstLinesOf`, `labelsOf`), the
-  board's items, `prune`'s known roots, the inbox's mentions, ▦'s count (`messageCount`: the held roots' messages, of every root's), the participants (`participantsIn`), the
-  roots of running lanes and of offers (`workAnywhere`, `laneRootsOf`), and the
-  root of a card drafted in a root not held (`cardMarks`'s `rootEntries`).
+- **Every cross-root fact comes from the directory** (`readRoots`): each
+  task's summary and label (`summariesOf`, `labelsOf`), the board's items,
+  `prune`'s known roots, the inbox's mentions, ▦'s count (`messageCount`:
+  the held roots' messages, of every root's), the participants
+  (`participantsIn`), and the root entries of offers (`laneRootsOf`). A
+  card drafted in a root not held marks its thread's task, from the task
+  index alone (`cardMarks`).
   The board's search covers labels: a search of every message would hold
   every root.
 - **A record's read keeps its map while its namespace is unchanged**
@@ -180,10 +182,12 @@ kept by its `TaskId`, its first column at its first root's root entry
 not the layout's: it is your own document (`openThreads`,
 `@pinetrie/session`), keyed by `TaskId`, which `App` passes in as
 `LayoutFacts.list`. `tasksOf` (`tasks.ts`) is the page's `Tasks`: the
-rules' `TaskIndex`, each task's threads, roots and first root entry
-(`byId`), and each root entry's task (`ofEntry`). In Phase 2 a task holds
-one root's threads, so an item's signals are still its root entry's
-(`summarizeRoots`, `rootWork`).
+rules' `TaskIndex`, and each task's threads and roots (`byId`).
+`entriesOf(tasks, directory)` is each task's first root's root entry:
+where its first column opens, whose rail is drawn, and what the sidebar's
+`data-root` and the board's `data-entry` carry, which the browser suite
+selects by. A task's signals are its threads', whatever roots they are in
+(*Attention*, below).
 
 - **`Layout.open` is drawn, never stored** (`drawnList`): the sidebar, less
   the archived roots but the one you are on, and the root you are on
@@ -203,10 +207,13 @@ one root's threads, so an item's signals are still its root entry's
   ADR-0116): its title (its `MARK`); else, from its first root,
   `CHAT_LABEL` for a root no lane works in, read from the session's lane
   records, so a root only people wrote in needs no field of its own; else
-  its first line (`firstLinesOf`), from its directory record (ADR-0063). `App` builds both maps once per directory change, and every
-  place that names a root looks one up: the sidebar, the board, the activity
-  menu, the inbox. The first lines are also the rename field's placeholder:
-  what clearing a title brings back.
+  its first line, from its directory record (ADR-0063). `summariesOf(tasks,
+  directory)` is each task with a message: its first root's first line,
+  every one of its roots' writers, and its newest message. `App` builds
+  both maps once per change, and every place that names a task looks one
+  up: the sidebar, the board, the activity menu, the inbox. The first line
+  is also the rename field's placeholder: what clearing a title brings
+  back.
 - **Renaming is `Sidebar`'s state, never the layout's.** `planTitle` is the
   field's submit, over `parseTitle`, the rule the codec decides by too, and
   `renameKey` what Enter and Escape do.
@@ -236,7 +243,8 @@ one root's threads, so an item's signals are still its root entry's
   the root element, and the CSS sets `--side` from that, so the body's
   grid, the footer's corner and the board follow. Folded, `Sidebar` draws
   each item as `FoldedItem`: `sidebarView` decides its `ItemIcon` (a
-  sprite from `rootSprites`, else `initialsOf` its label on a slot seeded
+  sprite from `taskSprites`, the banner of the task's earliest thread with
+  one, else `initialsOf` its label on a slot seeded
   by its `TaskId` (`taskSlot`), which `Sidebar` draws in `slotColor`,
   else a new tab's hollow tile). The icon is the trigger of a `Menu` opened
   by `contextmenu` (`Popover`'s `opensOn`), whose click shows the root;
@@ -470,11 +478,12 @@ leads with "syncing…" (`.sync-note`) while the document's status is
 pending.
 
 - **People:** `peopleHere` (`here.ts`) groups `readingAt` by
-  person, in `writerOrder`. An end's root is found in the index, else in
-  the root its column reported (`readingRoot`, `readReadingRoots`), so a
-  person in a root this tab does not hold is shown, and opens it. "Never you" is `readingAt`'s rule, not
-  repeated here. There is no group of people of its own (ADR-0122): a board
-  item's readers are those people in its root (`peopleIn`), each avatar
+  person, in `writerOrder`. An end's task is its thread's (`threadAt`,
+  `taskOfThread`), else the task its column reported (`readingTask`,
+  `readReadingTasks`), so a person in a root this tab does not hold is
+  shown, and opens it. "Never you" is `readingAt`'s rule, not repeated here.
+  There is no group of people of its own (ADR-0122): a board item's readers
+  are those people in its task (`peopleIn`), each avatar
   (`Avatar`) a `Menu` of the threads that person reads there
   (`ReaderMenus`); the sidebar's items and the strip's states show avatars
   only (`Readers`).
@@ -498,16 +507,18 @@ pending.
   always drawn, quiet at zero. Its first section has a heading and no
   items: it names the menu, and its empty `.menu-section` is hidden, with
   no rule under it.
-- **Where the agent works, and what is ready, is the board's** (ADR-0091):
-  `workAnywhere` (`app-view.ts`) is the agent's work in every root: the held
-  lanes' (`rootWork`) and every lane running in the session (`running`, by
-  its root entry). `App` builds it once, and the sidebar, the board and
-  `rootStatus` all read it, so a root rung on the board also refuses Move to
-  Done there. `rootStatus` rings a root while the agent works there or its
-  verdict is pending; `boardView` folds each column's items into `working` and `ready`
-  counts beside `mark`, and an item's `ready` is its root's threads with an
-  open offer (`offeredByRoot`, each named by `threadNameOf`, so one the host
-  has not named yet still counts). Nothing lists the runs.
+- **Where the agent works, and what is ready, is the board's** (ADR-0091,
+  ADR-0116): `threadWork` (`app-view.ts`) is the agent's work in every
+  thread: each busy held lane's (`laneWork`) and every lane running in the
+  session (`running`); `taskWork` is each task's, the most of its threads'.
+  `App` builds them once, and the sidebar, the board and `threadStatus` all
+  read them, so a task rung on the board also refuses Move to Done there.
+  `threadStatus` rings a thread while the agent works there or its verdict
+  is pending, and `taskStatus` a task while any of its threads rings;
+  `boardView` folds each column's items into `working` and `ready` counts
+  beside `mark`, and an item's `ready` is its task's threads with an open
+  offer (`offeredByTask`, each named by `threadNameOf`, so one the host has
+  not named yet still counts). Nothing lists the runs.
 - **The publish button and its toast** (`publish-view.ts`, `toast.tsx`,
   ADR-0090, ADR-0099): `publishView` decides the one button: `absent` with
   no record; `setup`, before setup on any host, whose `Menu` shows what it
@@ -593,18 +604,19 @@ pending.
 
 - **`attentionOf` decides what is raised**, pure: a thread's verdict and its
   open offer, for its followers only (`follows`, over the directory's
-  `RootRecord.threads`), while its lane is idle and its root not archived.
+  `RootRecord.threads`), while its lane is idle and its task not archived.
   A verdict clears when your read mark passes its `end`, an offer when it
   goes; either with "not needed" (`dismissed`, `dismissedOffers`). Nothing
   is raised before your attention document's `since` is set.
 - **`levelOf` turns a verdict, a fact, into a level for you**: a stop is
   done for whoever stopped it. `LEVELS` orders the levels once; `highest`
   reads it.
-- **`rootStatus`** is each root's mark: working while the agent works there
-  (`workAnywhere`, held by this tab or not) or its verdict is pending, else
-  its highest item. `markOf` folds it
-  over several roots: `unlisted` (`layout.ts`) gives ▦'s, as it gives
-  `cardMarks.elsewhere`.
+- **`threadStatus`** is each thread's mark: working while the agent works
+  there (`threadWork`, held by this tab or not) or its verdict is pending,
+  else its highest item; **`taskStatus`** is each task's, its threads'
+  together, working winning, through `taskOfThread` (ADR-0116). `markOf`
+  folds it over several tasks: `unlisted` (`layout.ts`) gives ▦'s, as it
+  gives `cardMarks.elsewhere`.
 - **Motion is a change you saw, never a state.** `arrivals` compares two
   statuses, and `useArrivals` takes the first status after the session has
   settled and your `since` is known as the baseline, so a load moves
@@ -1028,9 +1040,8 @@ composer*).
   (*Card frames*, below). They are not in the tree yet, and leave the
   scrolling body alone: queueing a card changes no height `useFollow`
   measures. Below the line, the composer shows your message alone
-  (`yourCard`, ADR-0113), and the notes are on the notes board
-  (`cardsAt("note", …)`): an unqueued card is a note, so it never takes
-  your composer.
+  (`yourCard`, ADR-0113), and the notes are in note columns (ADR-0116): an
+  unqueued card is a note, so it never takes your composer.
 - **A queue sends the text's version too** (`seen`, `textVersion`), in the
   queued key, and so does a chat sent from a card (`SentCard`), which the
   host queues when the lane is busy: the host pops the card only once it
@@ -1066,7 +1077,7 @@ composer*).
   (`queueNew` in `card-intents.ts`, a move with no `from`) with its
   command: a command button's (`keep`) and "+ add to queue"'s
   (`hold-if-idle`). Neither is made as a note first, which would draw it
-  on the notes board until the queue's move landed. `planSend` decides the hold: on
+  in a note column until the queue's move landed. `planSend` decides the hold: on
   an idle lane whose queue is held, `release`, and the queue place is
   `releases`, which `queueWords` words "send all (n)"; else `keep`.
 - **A discard is a move to gone** (ADR-0111): the `discard` act (a card's
@@ -1154,8 +1165,9 @@ composer*).
   `visibilitychange` listener refreshes on return). Switching roots therefore
   clears the last root's keys, through that same deletion. On nothing, a
   page reports nothing. Typing is written at most once a second (`typingDue`).
-- **A root's avatars in the sidebar** are `readersByRoot(peopleHere(…))` (`here.ts`): the
-  header's people turned around, each tab's `Readers` taking its root's.
+- **A task's avatars in the sidebar** are `readersByTask(peopleHere(…))`
+  (`here.ts`): the header's people turned around, each item's `Readers`
+  taking its task's.
 - **`core/presence.ts` decides everything shown**, from one field's read
   (`readReading` and `readTyping` in `@pinetrie/reads`) and the
   tree: rings (`readingAt`), a header's avatars (`seenBy`, others whose
@@ -1248,15 +1260,15 @@ closed is `App`'s state, never stored.
   repair has not cleared it** (`steadiness`), else the first empty one: the
   host knows no slots.
 - **One landing rule** (`put-target.ts`). A put and a drop name a
-  `PutTarget`: a column by key (a note there), its composer (your
-  message), a cell of its notes board, its pinned strip, a slot, or a new
-  thread: a workflow state or a place in the sidebar (`data-put-state`,
-  `data-put-sidebar`, *The board*). Each
-  writable `Column` publishes its composer as it renders
-  (`ComposerSpot`: its place, `composerPlace` in `column-view.ts`, your
-  message there, and its notes board's cells as drawn); reading it redraws
-  nothing. A drop target carries `data-put-column` (the notes line),
-  `data-put-composer`, `data-put-cell` (`key:cell`), `data-put-pinned` or
+  `PutTarget`: a thread's column by key (a note in the note column nearest
+  its thread, `noteOf`), its composer (your message), a note column (a
+  note at its end, ADR-0116), its pinned strip, a slot, or a new thread: a
+  workflow state or a place in the sidebar (`data-put-state`,
+  `data-put-sidebar`, *The board*). Each writable `Column` publishes its
+  composer as it renders (`ComposerSpot`: its place, `composerPlace` in
+  `column-view.ts`, and your message there); reading it redraws nothing. A
+  drop target carries `data-put-column`, `data-put-composer`,
+  `data-put-notes` (a note column's id), `data-put-pinned` or
   `data-put-slot`, each written by `dropProps` and read by
   `targetOfElement`, so a drop lands exactly where a put can. A column's pinned strip carries `data-put-pinned`: it
   lands where the column's composer would create a card, pinned (`pinnedOf`),
@@ -1305,36 +1317,50 @@ closed is `App`'s state, never stored.
   `.take-copy-into-inventory`, and a fresh column's `.close-keep`,
   `.close-discard` and `.close-cancel`.
 
-## Card grids (`grid-view.ts`, `grid-keys.ts`, ADR-0113)
+## Card grids (`grid-view.ts`, `grid-keys.ts`, ADR-0048)
 
-Your inventory and a thread's notes board are one grid (`CardGrid`,
-`packages/web/card-grid.tsx`): core's `grid.ts` says what a cell is
-(`INVENTORY_GRID`, 6 × 3; `NOTES_GRID`, 4 wide and growing), the first
-empty one (`firstEmpty`), a step (`step`) and the rows drawn (`rowsShown`).
+Your inventory is a grid (`CardGrid`, `packages/web/card-grid.tsx`):
+core's `grid.ts` says what a cell is (`INVENTORY_GRID`, 6 × 3), the first
+empty one (`firstEmpty`) and a step (`step`).
 
 - **`gridView`** lays cards out by cell, each folded (`cardFace`), with the
   selection and the selected card. `inventoryView` places them by
-  `settleSlots`, each of the first nine labelled 1–9 (`slotKey`);
-  `notesBoardView` by each note's cell (`notesPlaced`): a note with no
-  cell yet, or one whose cell an older note holds, is drawn in the next
-  empty cell. The host counts a lane-less thread's notes by where each was
-  made (`@pinetrie/rules`, *Cards*), so two can claim one cell.
-- **`gridKeyAct`** is a grid's keys while it has focus: arrows and `hjkl`
-  select, Alt+arrows move the selected card (a put on that cell or slot,
-  which swaps), Enter opens it, or on an empty cell of a grid that makes
-  cards (`creates`) makes one (`create`), and Escape folds it, from its
-  box too.
-- **A new note is a creation in a cell** (`newNote`, `planNewNote`): an
-  empty note at the column's thread end (its composer's place, as a note),
-  in that cell, in no history. The host refuses it when a note took the
-  cell first (`cellClash`).
-- **A move in a notes board is a put on a cell** (`putInCell`): an empty
-  cell takes the card; on a note, a note or a card from your inventory
-  swaps with it in one move of the two, and a card from anywhere else
-  takes the first empty cell. A put on the column, with no cell, leaves
-  the cell to the host (`placeAt`).
-- **The notes board is a pane subject** (`notes`, `packages/web/pane.ts`),
-  opened from the column's notes line.
+  `settleSlots`, each of the first nine labelled 1–9 (`slotKey`).
+- **`gridKeyAct`** is the grid's keys while it has focus: arrows and `hjkl`
+  select, Alt+arrows move the selected card (a put on that slot, which
+  swaps), Enter opens it, and Escape folds it, from its box too.
+
+## Note columns (`note-column-view.ts`, ADR-0116)
+
+A task's notes are in note columns on its canvas, each a title and its
+notes in one order; the notes board, its grid and the dock's notes line are
+gone.
+
+- **`noteColumnsOf`** is the task's note columns in the canvas's order,
+  each with its title (its `NOTE_COLUMN` record, else `NEW_NOTES_TITLE`)
+  and its notes in order (`notesIn`).
+- **Where one is drawn is `stripItems`'s**, until the canvas lays out the
+  columns: each just after the last open thread column whose thread comes
+  before it on the canvas, else first, so every reader sees it beside the
+  same thread. A fresh column is passed over. A note column is neither
+  closed nor moved from the page yet; a thread column's `data-position`
+  counts thread columns alone.
+- **A note's acts are a column's**, keyed by its note column's id (a
+  `column` intent at position -1), so a refusal is said there: ↑ and ↓
+  reorder it among the column's notes (`reorderOf`, a `note` key), and its
+  ⋯ takes it into your inventory or makes it a thread; a drag takes it
+  anywhere else. "+ add a note" is `newNote`: an empty note at the
+  column's end, drawn last until the host gives it its order
+  (`LAST_ORDER`), in no history.
+- **Renaming a note column is `rename` with a `MarkTarget`**: the same
+  `TitleField` and `planTitle` as a task's, sent as `mark`.
+- **A card leaving a queue or a pinned strip** is sent to its thread's
+  nearest notes (`noteOf`, the `notes` key), which the host resolves; the
+  page draws the move pending in the column the host would choose
+  (`drawnPlace`), or where it was while the host would make one.
+- **Selectors for the browser suite:** `.note-column` (`data-column`, its
+  id), `.note-column-title`, `.note-column .open-title-input`, `.add-note`,
+  and each note's `.card-editor.note` with its `textarea[data-card]`.
 
 ## Names
 

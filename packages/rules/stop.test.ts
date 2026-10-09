@@ -64,7 +64,7 @@ describe("planStop", () => {
     const name = threadIdFor("s")
     const queued: QueuedCard = {
       kind: "text",
-      id: textCardId("c-1"),
+      id: textCardId("c0000000-0000-7000-8000-000000000001"),
       owner: ada,
       placer: ada,
       place: {

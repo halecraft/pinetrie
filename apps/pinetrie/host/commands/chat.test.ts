@@ -141,7 +141,9 @@ describe("executeChat", () => {
 
   test("a run carries the sender's pinned versions, for it to wait for", async () => {
     const { seen, deps, context } = setUp()
-    const pinned = [{ id: textCardId("c-1"), seen: "v-1" }]
+    const pinned = [
+      { id: textCardId("c0000000-0000-7000-8000-000000000001"), seen: "v-1" },
+    ]
     await executeChat(
       deps,
       { kind: "run", lane: LANE, details },
@@ -272,7 +274,9 @@ describe("sendChat", () => {
 
   test("the chat command's pinned versions reach its run", async () => {
     const { seen, deps } = setUp()
-    const pinned = [{ id: textCardId("c-1"), seen: "v-1" }]
+    const pinned = [
+      { id: textCardId("c0000000-0000-7000-8000-000000000001"), seen: "v-1" },
+    ]
     await sendChat(deps, ALICE, "s-1", { ...chat("do it", true), pinned })
     expect(seen).toEqual([pinned])
   })
@@ -491,7 +495,10 @@ describe("sendChat", () => {
     const { pi, cards, deps } = setUp()
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("from the card"),
-      card: { id: textCardId("c-1"), seen: "" },
+      card: {
+        id: textCardId("c0000000-0000-7000-8000-000000000001"),
+        seen: "",
+      },
     })
     expect(out).toEqual({ kind: "appended", id: "e-2" })
     const appended = pi.calls.find(c => c.method === "appendToTree")
@@ -502,7 +509,7 @@ describe("sendChat", () => {
       cards.calls
         .filter(c => c.method === "writers")
         .map(c => [c.method, ...c.args]),
-    ).toEqual([["writers", "c-1"]])
+    ).toEqual([["writers", "c0000000-0000-7000-8000-000000000001"]])
   })
 
   test("spendsCard: written or running takes the card; busy, a conflict, a refusal or a failure leaves it", () => {
@@ -524,7 +531,10 @@ describe("sendChat", () => {
     // Refused before it is planned: an image the host does not store.
     const early = await sendChat(deps, ALICE, "s-1", {
       ...chat(`look ![a](/blob/${missing})`),
-      card: { id: textCardId("c-1"), seen: "" },
+      card: {
+        id: textCardId("c0000000-0000-7000-8000-000000000001"),
+        seen: "",
+      },
     })
     // Refused as it is written: pi will not append it.
     const late = await sendChat(
@@ -536,7 +546,13 @@ describe("sendChat", () => {
       },
       ALICE,
       "s-2",
-      { ...chat("from the card"), card: { id: textCardId("c-1"), seen: "" } },
+      {
+        ...chat("from the card"),
+        card: {
+          id: textCardId("c0000000-0000-7000-8000-000000000001"),
+          seen: "",
+        },
+      },
     )
     expect([early.kind, late.kind]).toEqual(["refused", "refused"])
   })
@@ -548,7 +564,10 @@ describe("sendChat", () => {
     putValue(b, setRecord(PARTICIPANT, { writer: BEA, name: "Bea" }))
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("@bea when it is done"),
-      card: { id: textCardId("c-1"), seen: "" },
+      card: {
+        id: textCardId("c0000000-0000-7000-8000-000000000001"),
+        seen: "",
+      },
     })
     expect(out).toEqual({ kind: "busy" })
     expect(pi.calls).toEqual([])

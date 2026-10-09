@@ -76,6 +76,8 @@ const byRank = (a: CanvasCard, b: CanvasCard): number =>
 export interface TaskIndex {
   /** Each task's cards, in its canvas's order: by rank, then by id. */
   readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
+  /** Each canvas card's task: a thread's, a note column's. */
+  readonly taskOfCard: ReadonlyMap<CardId, TaskId>
   /** Each thread's task; a thread in an inventory has none. */
   readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
   /** Each task's thread cards, in canvas order. */
@@ -105,6 +107,7 @@ export function indexTasks(
     list.push(c)
     canvases.set(c.place.task, list)
   }
+  const taskOfCard = new Map<CardId, TaskId>()
   const taskOfThread = new Map<ThreadId, TaskId>()
   const threadsOf = new Map<TaskId, readonly ThreadId[]>()
   const rootsOf = new Map<TaskId, readonly RootId[]>()
@@ -112,6 +115,7 @@ export function indexTasks(
   for (const task of [...canvases.keys()].sort()) {
     const canvas = canvases.get(task) ?? []
     canvas.sort(byRank)
+    for (const c of canvas) taskOfCard.set(c.id, task)
     const ids = canvas.flatMap(c => (isThreadId(c.id) ? [c.id] : []))
     threadsOf.set(task, ids)
     const roots: RootId[] = []
@@ -129,6 +133,7 @@ export function indexTasks(
   )
   return {
     canvases,
+    taskOfCard,
     taskOfThread,
     threadsOf,
     rootsOf,
@@ -156,8 +161,9 @@ export const NO_TASK_INDEX: TaskIndex = indexTasks([], new Map())
 
 /**
  * The task a place is in (ADR-0116): a canvas card's, a fresh column's or a
- * gone card's own; a card at a thread, its thread's task (a queued card's
- * thread is its lane). Null for an inventory, or a thread in none. Pure.
+ * gone card's own; a note, its note column's; a card at a thread, its
+ * thread's task (a queued card's thread is its lane). Null for an
+ * inventory, or a thread or a note column in none. Pure.
  */
 export function taskOfPlace(
   tasks: TaskIndex,
@@ -172,10 +178,12 @@ export function taskOfPlace(
       return "task" in place ? place.task : null
     case "inventory":
       return null
+    case "note":
+      return tasks.taskOfCard.get(place.column) ?? null
     case "queued":
     case "composing":
-    case "note":
     case "pinned":
+    case "notes":
       return tasks.taskOfThread.get(place.thread) ?? null
   }
 }

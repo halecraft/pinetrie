@@ -24,10 +24,10 @@ import { whenSettled } from "@kyneta/exchange"
 import { useDocStatus, useSelector } from "@kyneta/react"
 import {
   type CardId,
-  cardId,
   type EntryId,
+  parseCardId,
   pathIds,
-  rootWork,
+  type RootId,
   type TaskId,
   type WorkflowState,
   type WorkflowStateId,
@@ -49,7 +49,6 @@ import {
   drawnColumns,
   type Effect,
   entriesOf,
-  firstLinesOf,
   foldMemory,
   type HeldView,
   hereRail,
@@ -67,7 +66,8 @@ import {
   messageCount,
   NO_TEXT,
   nameEffects,
-  offeredByRoot,
+  noteColumnsOf,
+  offeredByTask,
   ownCards,
   pageTitle,
   parseSearch,
@@ -86,7 +86,6 @@ import {
   resolveLayout,
   rootEntriesOf,
   rootSeed,
-  rootSprites,
   type SeenEnd,
   type Spot,
   screenMemory,
@@ -94,14 +93,17 @@ import {
   sidebarView,
   spotFor,
   spotStore,
+  stripItems,
   summariesOf,
   type TypedLast,
   targetOfElement,
+  taskSprites,
   tasksOf,
+  taskWork,
   threadCardHeads,
+  threadWork,
   typingDue,
   viewportStore,
-  workAnywhere,
 } from "@pinetrie/interface"
 import {
   participantsIn,
@@ -137,6 +139,7 @@ import { Column } from "./column.tsx"
 import { Footer } from "./footer.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
+import { NoteColumn } from "./note-column.tsx"
 import { Page } from "./page.tsx"
 import { TrackSeed } from "./palette-context.ts"
 import { Pictures } from "./pictures-context.ts"
@@ -182,7 +185,7 @@ export interface AppStores {
 const ITEM_HOVER_MS = 600
 
 const cardOrNull = (id: string | undefined): CardId | null =>
-  id === undefined || id === "" ? null : cardId(id)
+  id === undefined ? null : (parseCardId(id) ?? null)
 
 /**
  * Bring a newly opened column's first message level with its fork point in
@@ -337,6 +340,7 @@ export function App({
     places,
     archived,
     marks,
+    noteColumns: noteTitles,
     tasks: taskRecords,
     threads,
     verdicts,
@@ -372,17 +376,20 @@ export function App({
 
   // Every task (ADR-0116): its threads, from the places, and their roots.
   const tasks = useMemo(
-    () => tasksOf({ known: taskRecords.keys(), cards, threads, directory }),
-    [taskRecords, cards, threads, directory],
+    () => tasksOf({ known: taskRecords.keys(), cards, threads }),
+    [taskRecords, cards, threads],
   )
+  const { taskOfThread } = tasks.index
   // Each task's first root's root entry: where its first column is, and
-  // whose signals its card shows.
-  const entries = useMemo(() => entriesOf(tasks), [tasks])
-  // Each root, for the board, and each task's label: its title, else its
-  // first card's (ADR-0045). Which tasks are in the sidebar is yours
-  // (`openThreads`, ADR-0122).
-  const summaries = useMemo(() => summariesOf(directory), [directory])
-  const lines = useMemo(() => firstLinesOf(directory), [directory])
+  // whose rail is drawn.
+  const entries = useMemo(() => entriesOf(tasks, directory), [tasks, directory])
+  // Each task with a message, for the board, and each task's label: its
+  // title, else its first card's (ADR-0045). Which tasks are in the sidebar
+  // is yours (`openThreads`, ADR-0122).
+  const summaries = useMemo(
+    () => summariesOf(tasks, directory),
+    [tasks, directory],
+  )
   const labels = useMemo(
     () => labelsOf({ tasks, marks, directory, lanes: workFacts.lanes }),
     [tasks, marks, directory, workFacts.lanes],
@@ -402,19 +409,8 @@ export function App({
   // Each root's root entry, held or not (ADR-0063): where a lane running in
   // a root this tab does not hold rings it, and where its offer's ⇡ goes.
   const rootEntries = useMemo(() => rootEntriesOf(directory), [directory])
-  // The tasks in the archive (ADR-0122), and their first roots' root
-  // entries, which attention is keyed by.
+  // The tasks in the archive (ADR-0122).
   const archivedTasks = useMemo(() => new Set(archived.keys()), [archived])
-  const archivedEntries = useMemo(
-    () =>
-      new Set(
-        [...archivedTasks].flatMap(t => {
-          const entry = entries.get(t)
-          return entry === undefined ? [] : [entry]
-        }),
-      ),
-    [archivedTasks, entries],
-  )
   // The sidebar (ADR-0122): your own document; a task the session does not
   // hold yet is left out until it does.
   const listIds = useSyncExternalStore(
@@ -428,8 +424,8 @@ export function App({
   // The board (ADR-0122): each task's state.
   const board = useMemo(
     () =>
-      workflow === null ? null : boardOf(workflow, places, entries.keys()),
-    [workflow, places, entries],
+      workflow === null ? null : boardOf(workflow, places, summaries.keys()),
+    [workflow, places, summaries],
   )
   const stateOf: ReadonlyMap<TaskId, WorkflowStateId> =
     board?.stateOf ?? NO_STATE_OF
@@ -437,19 +433,20 @@ export function App({
     () => laneRootsOf(workFacts.lanes, rootEntries),
     [workFacts.lanes, rootEntries],
   )
-  // The agent's work in every root, held or not: one map for the sidebar,
-  // the board and each root's ring (ADR-0091).
-  const work = useMemo(
-    () => workAnywhere({ held: rootWork(index, lanes), running, rootEntries }),
-    [index, lanes, running, rootEntries],
+  // The agent's work in every thread, held or not, and so in every task:
+  // one map for the sidebar, the board and each task's ring (ADR-0091).
+  const work = useMemo(() => threadWork({ lanes, running }), [lanes, running])
+  const workOfTask = useMemo(
+    () => taskWork(work, taskOfThread),
+    [work, taskOfThread],
   )
   // A task with no message has no label in `labels`.
-  const labelOf = (task: TaskId): string => labels.get(task) ?? NO_TEXT
-  // What a row naming a root's entry calls it: the label of its task.
-  const labelOfEntry = (root: EntryId): string => {
-    const task = tasks.ofEntry.get(root)
-    return task === undefined ? NO_TEXT : labelOf(task)
-  }
+  const labelOf = (task: TaskId | null): string =>
+    task === null ? NO_TEXT : (labels.get(task) ?? NO_TEXT)
+  // A mention names its root and no thread: it opens in the first task
+  // holding a thread of that root.
+  const taskOfRoot = (root: RootId): TaskId | null =>
+    tasks.index.tasksOfRoot.get(root)?.[0] ?? null
 
   const [stored, dispatch] = useReducer(
     layoutReducer,
@@ -511,7 +508,6 @@ export function App({
             known: facts.tasks.keys(),
             cards: session.cards.current(),
             threads: facts.threads,
-            directory: readRoots(doc),
           }),
         }),
       )
@@ -603,6 +599,28 @@ export function App({
       ),
     [index, columns],
   )
+  // The task's note columns (ADR-0116), each beside the thread it comes
+  // after on the canvas, among the open thread columns (`stripItems`).
+  const canvas = useMemo(
+    () =>
+      active?.kind === "task"
+        ? (tasks.index.canvases.get(active.task) ?? [])
+        : [],
+    [active, tasks],
+  )
+  const noteViews = useMemo(
+    () =>
+      new Map(
+        noteColumnsOf({ canvas, cards, titles: noteTitles }).map(
+          v => [v.column, v] as const,
+        ),
+      ),
+    [canvas, cards, noteTitles],
+  )
+  const stripOrder = useMemo(
+    () => stripItems(columns, canvas),
+    [columns, canvas],
+  )
   // The task you are on, which the sidebar's repair keeps while it is
   // archived, and its first root's root entry, whose rail is drawn.
   const hereTask = active?.kind === "task" ? active.task : null
@@ -640,11 +658,10 @@ export function App({
         filled,
         layout,
         archived: archivedTasks,
-        tasks,
+        tasks: tasks.index,
         index,
-        rootEntries,
       }),
-    [mine, filled, layout, archivedTasks, tasks, index, rootEntries],
+    [mine, filled, layout, archivedTasks, tasks, index],
   )
   const yours = useMemo(
     () => ({ ends: unsent.ends, color: colorOf(session.writer) }),
@@ -667,37 +684,27 @@ export function App({
   // column on each write, the refresh and others' typing included (S59).
   // Each part that shows presence reads it (`use-presence.ts`).
   //
-  // Each column of the root you are on reports its thread end (ADR-0024,
-  // ADR-0029; `planReading`), and its root, so a window that does not hold
-  // that root can name it (ADR-0063). While the page is visible the entries
-  // are refreshed, so they outlive their decay.
+  // Each column of the task you are on reports its thread end (ADR-0024,
+  // ADR-0029; `planReading`), and its task, so a window that does not hold
+  // the thread's root can name it (ADR-0063, ADR-0116). While the page is
+  // visible the entries are refreshed, so they outlive their decay.
   const reported = useRef(new Map<string, string | null>())
-  const reportedRoot = useRef<EntryId | null>(null)
   const reportedTask = useRef<TaskId | null>(null)
-  const readingRoot = hereEntry
   useEffect(() => {
     const now = new Map(
       columns.map((c, i) => [c.key, views[i]?.tipId ?? null] as const),
     )
     const writes = planReading(reported.current, now)
-    for (const [key, end] of writes.set)
-      session.setReading(key, end, readingRoot, hereTask)
+    for (const [key, end] of writes.set) session.setReading(key, end, hereTask)
     for (const key of writes.clear) session.clearReading(key)
     reported.current = now
-    reportedRoot.current = readingRoot
     reportedTask.current = hereTask
-  }, [columns, views, session, readingRoot, hereTask])
+  }, [columns, views, session, hereTask])
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== "visible") return
       for (const [key, end] of reported.current)
-        if (end !== null)
-          session.setReading(
-            key,
-            end,
-            reportedRoot.current,
-            reportedTask.current,
-          )
+        if (end !== null) session.setReading(key, end, reportedTask.current)
     }
     const timer = setInterval(refresh, PRESENCE_REFRESH_MS)
     document.addEventListener("visibilitychange", refresh)
@@ -745,8 +752,8 @@ export function App({
     ],
   )
   const offered = useMemo(
-    () => offeredByRoot(view.offers, workFacts.names),
-    [view.offers, workFacts.names],
+    () => offeredByTask(view.offers, workFacts.names, taskOfThread),
+    [view.offers, workFacts.names, taskOfThread],
   )
 
   // Your inbox: the messages that mention you, and which you have seen.
@@ -775,43 +782,40 @@ export function App({
     offers: view.offers,
     running,
     lanes,
-    laneRoots,
-    archived: archivedEntries,
-    archivedTasks,
-    ofEntry: tasks.ofEntry,
+    archived: archivedTasks,
+    taskOfThread,
     work,
     layout,
     settled,
   })
   const needsYou = inboxCount(attention.items, inbox.unseen)
   const sprites = useMemo(
-    () => rootSprites(index, lanes, workFacts.banners),
-    [index, lanes, workFacts.banners],
+    () => taskSprites(tasks.index.threadsOf, workFacts.banners),
+    [tasks, workFacts.banners],
   )
   // Every task card's header, once per task: the board and the sidebar
   // draw the same one (ADR-0111).
   const heads = useMemo(
     () =>
-      threadCardHeads(new Set([...entries.keys(), ...layout.open]), {
+      threadCardHeads(new Set([...summaries.keys(), ...layout.open]), {
         workflow,
-        entries,
         stateOf,
         labels,
         status: attention.status,
-        pips: unsent.roots,
+        pips: unsent.tasks,
         offered,
-        work,
+        work: workOfTask,
       }),
     [
-      entries,
+      summaries,
       layout.open,
       workflow,
       stateOf,
       labels,
       attention.status,
-      unsent.roots,
+      unsent.tasks,
       offered,
-      work,
+      workOfTask,
     ],
   )
   const listView =
@@ -821,7 +825,8 @@ export function App({
           layout,
           active,
           heads,
-          lines,
+          entries,
+          summaries,
           marks,
           archived: archivedTasks,
           unsent,
@@ -850,23 +855,13 @@ export function App({
         : boardView({
             workflow,
             places,
-            entries,
             summaries,
+            entries,
             heads,
-            lines,
             search: boardSearch,
             me: session.writer,
           }),
-    [
-      workflow,
-      places,
-      entries,
-      summaries,
-      heads,
-      lines,
-      boardSearch,
-      session.writer,
-    ],
+    [workflow, places, summaries, entries, heads, boardSearch, session.writer],
   )
   useEffect(() => {
     document.title = title
@@ -1045,6 +1040,7 @@ export function App({
             composers: composers.current(),
           },
           tasks,
+          entries,
           listWidth,
           page,
         },
@@ -1157,10 +1153,10 @@ export function App({
     const onDrop = (e: DragEvent) => {
       dragging(false)
       const target = targetOf(e)
-      const card = e.dataTransfer?.getData(CARD_MIME) ?? ""
-      if (target === null || card === "") return
+      const card = parseCardId(e.dataTransfer?.getData(CARD_MIME) ?? "")
+      if (target === null || card === undefined) return
       e.preventDefault()
-      onIntent({ kind: "put", card: cardId(card), target })
+      onIntent({ kind: "put", card, target })
     }
     document.addEventListener("dragover", onOver)
     document.addEventListener("dragenter", onEnter)
@@ -1183,10 +1179,9 @@ export function App({
     state: stateOf.get(task) ?? null,
   })
   const openAt = (entry: EntryId) => onIntent({ kind: "openAt", entry })
-  /** Show `entry`, in the task its root entry `root`'s thread is in. */
-  const openIn = (entry: EntryId, root: EntryId) => {
-    const task = tasks.ofEntry.get(root)
-    if (task !== undefined) onIntent({ kind: "openIn", entry, task })
+  /** Show `entry`, in `task`; nothing for none. */
+  const openIn = (entry: EntryId, task: TaskId | null) => {
+    if (task !== null) onIntent({ kind: "openIn", entry, task })
   }
   const dragColumn = useColumnDrag(strip, (from, to) =>
     onIntent({
@@ -1248,9 +1243,9 @@ export function App({
   )
 
   const { workspace } = view
-  const readers = { session, index, order, nameOf, colorOf }
+  const readers = { session, index, taskOfThread, order, nameOf, colorOf }
   const pip = <CardPip color={colorOf(session.writer)} />
-  const thread = threadRow({ index, labelOf: labelOfEntry, onOpen: openIn })
+  const thread = threadRow({ index, labelOf, onOpen: openIn })
   return (
     <Pictures value={pictures}>
       <CardHistories value={historyFacts}>
@@ -1263,6 +1258,7 @@ export function App({
             onIntent={onIntent}
             order={order}
             session={session}
+            taskOfThread={taskOfThread}
             view={listView}
             width={listWidth}
           />
@@ -1332,10 +1328,35 @@ export function App({
                       {/* A column's header is its drag handle; its grip is the
                   keyboard's way to move it. */}
                       <div id="strip" onPointerDown={dragColumn} ref={strip}>
-                        {workspace.slots.map(slot => {
-                          const column = columns[slot.position]
-                          const columnView = views[slot.position]
-                          if (column === undefined || columnView === undefined)
+                        {stripOrder.map(item => {
+                          if (item.kind === "notes") {
+                            const notes = noteViews.get(item.column)
+                            return notes === undefined ? null : (
+                              <NoteColumn
+                                colorOf={colorOf}
+                                key={item.column}
+                                onIntent={onIntent}
+                                onTyping={card => typing(null, card)}
+                                readOnly={
+                                  workspace.kind === "task"
+                                    ? workspace.readOnly
+                                    : null
+                                }
+                                reader={historyFacts.reader}
+                                seats={seats}
+                                session={session}
+                                view={notes}
+                              />
+                            )
+                          }
+                          const slot = workspace.slots[item.position]
+                          const column = columns[item.position]
+                          const columnView = views[item.position]
+                          if (
+                            slot === undefined ||
+                            column === undefined ||
+                            columnView === undefined
+                          )
                             return null
                           return (
                             <Column
@@ -1377,7 +1398,7 @@ export function App({
                       pip={pip}
                       readers={readers}
                       searchRef={boardSearchField}
-                      thread={(end, root) => thread(end, end, root)}
+                      thread={(end, task) => thread(end, end, task)}
                       view={boardShown}
                     />
                   )}
@@ -1430,7 +1451,9 @@ export function App({
             inbox,
             thread,
             names: workFacts.names,
-            labelOf: labelOfEntry,
+            taskOfThread,
+            taskOfRoot,
+            labelOf,
             nameOf,
             onOpen: openIn,
             onIntent,

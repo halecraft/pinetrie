@@ -178,15 +178,21 @@ test("a chat completes while an acceptance is held open on your repo's owner", a
     mode: "accept",
     seen: JSON.stringify({ ledger: null, conflicted: false }),
   })
-  await commands.handle(sender, ALICE, chat("c-1"))
-  expect(replies.map(r => r.id)).toEqual(["c-1"])
+  await commands.handle(
+    sender,
+    ALICE,
+    chat("c0000000-0000-7000-8000-000000000001"),
+  )
+  expect(replies.map(r => r.id)).toEqual([
+    "c0000000-0000-7000-8000-000000000001",
+  ])
   held.resolve({
     kind: "done",
     fact: { kind: "squashed", lane: HELD, by: ALICE },
   })
   await acceptance
   expect(replies.map(r => [r.id, r.outcome])).toEqual([
-    ["c-1", "appended"],
+    ["c0000000-0000-7000-8000-000000000001", "appended"],
     ["t-1", "accepted"],
   ])
 })
@@ -209,10 +215,14 @@ test("a move into Done holds the keeper only for its place and its unload: a com
     kind: "name",
     text: "Alice",
   })
-  await commands.handle(sender, ALICE, chat("c-1"))
+  await commands.handle(
+    sender,
+    ALICE,
+    chat("c0000000-0000-7000-8000-000000000001"),
+  )
   expect(replies.map(r => [r.id, r.outcome])).toEqual([
     ["n-1", "named"],
-    ["c-1", "refused"],
+    ["c0000000-0000-7000-8000-000000000001", "refused"],
   ])
   teardown.resolve()
   await archive
@@ -223,24 +233,41 @@ test("a move into Done holds the keeper only for its place and its unload: a com
 test("a chat in an archived root is refused, and the agent is never called", async () => {
   const { b, pi, commands, replies, sender, chat } = setUp()
   placeRoot(b, DONE)
-  await commands.handle(sender, ALICE, chat("c-1"))
-  expect(replies[0]).toMatchObject({ id: "c-1", outcome: "refused" })
+  await commands.handle(
+    sender,
+    ALICE,
+    chat("c0000000-0000-7000-8000-000000000001"),
+  )
+  expect(replies[0]).toMatchObject({
+    id: "c0000000-0000-7000-8000-000000000001",
+    outcome: "refused",
+  })
   expect(replies[0]?.errorMessage).toMatch(/^archived by /)
   expect(pi.calls).toEqual([])
 })
 
 test("the command's id is the send's id", async () => {
   const { pi, commands, replies, sender, chat } = setUp()
-  await commands.handle(sender, ALICE, chat("c-2"))
-  expect(replies[0]).toMatchObject({ id: "c-2", outcome: "appended" })
+  await commands.handle(
+    sender,
+    ALICE,
+    chat("c0000000-0000-7000-8000-000000000002"),
+  )
+  expect(replies[0]).toMatchObject({
+    id: "c0000000-0000-7000-8000-000000000002",
+    outcome: "appended",
+  })
   expect(pi.calls[0]?.args[0]).toMatchObject({
-    details: { sendId: "c-2" },
+    details: { sendId: "c0000000-0000-7000-8000-000000000002" },
   })
 })
 
 test("a chat command spends its card once written, record then text, answering with its rev; a refused one leaves it", async () => {
   const { b, cards, commands, replies, sender, chat } = setUp()
-  for (const id of ["card-1", "card-2"])
+  for (const id of [
+    "c0000000-0000-7000-8000-0000000000c1",
+    "c0000000-0000-7000-8000-0000000000c2",
+  ])
     applyPlaceSteps(b.places, [
       {
         kind: "write",
@@ -259,21 +286,27 @@ test("a chat command spends its card once written, record then text, answering w
         },
       },
     ])
-  await commands.handle(sender, ALICE, { ...chat("c-4"), cardId: "card-1" })
+  await commands.handle(sender, ALICE, {
+    ...chat("c0000000-0000-7000-8000-000000000004"),
+    cardId: "c0000000-0000-7000-8000-0000000000c1",
+  })
   // Refused by `sendChat` itself: an image the host does not store.
   await commands.handle(sender, ALICE, {
-    ...chat("c-5"),
+    ...chat("c0000000-0000-7000-8000-000000000005"),
     text: `look ![a](/blob/${"b".repeat(64)})`,
-    cardId: "card-2",
+    cardId: "c0000000-0000-7000-8000-0000000000c2",
   })
   expect(replies.map(r => [r.outcome, r.rev])).toEqual([
     ["appended", 4],
     ["refused", 0],
   ])
-  expect(readPlaces(b.places).map(c => c.id)).toEqual(["card-2", THREAD])
+  expect(readPlaces(b.places).map(c => c.id)).toEqual([
+    "c0000000-0000-7000-8000-0000000000c2",
+    THREAD,
+  ])
   expect(
     cards.calls.filter(c => c.method === "destroy").map(c => c.args[0]),
-  ).toEqual(["card-1"])
+  ).toEqual(["c0000000-0000-7000-8000-0000000000c1"])
 })
 
 test("a popped queued card in an archived root is refused, and the agent is never called", async () => {
@@ -296,7 +329,11 @@ test("a popped queued card in an archived root is refused, and the agent is neve
 
 test("a seat whose principal names nobody is refused whatever it sends", async () => {
   const { pi, commands, replies, sender, chat } = setUp()
-  await commands.handle(sender, undefined, chat("c-3"))
+  await commands.handle(
+    sender,
+    undefined,
+    chat("c0000000-0000-7000-8000-000000000003"),
+  )
   expect(replies[0]).toMatchObject({ outcome: "refused" })
   expect(pi.calls).toEqual([])
 })
@@ -305,13 +342,13 @@ test("a command that throws is answered failed, and logged", async () => {
   const { b, commands, replies, sender } = setUp({}, { writes: false })
   // The agent port has no `writeValues`, so `record` throws.
   await commands.handle(sender, ALICE, {
-    id: "c-4",
+    id: "c0000000-0000-7000-8000-000000000004",
     kind: "name",
     text: "Alice",
   } as never)
   expect(replies).toEqual([
     expect.objectContaining({
-      id: "c-4",
+      id: "c0000000-0000-7000-8000-000000000004",
       outcome: "failed",
       errorMessage: "writeValues is not in this port",
     }),
@@ -325,23 +362,25 @@ test("a reservation is answered reserved, and refused for a lane pi holds (ADR-0
   const { commands, replies, sender } = setUp()
   const reserve = (id: string, lane: string) =>
     commands.handle(sender, ALICE, { id, kind: "reserve", lane } as never)
-  await reserve("c-4", NEW)
-  await reserve("c-5", HELD)
+  await reserve("c0000000-0000-7000-8000-000000000004", NEW)
+  await reserve("c0000000-0000-7000-8000-000000000005", HELD)
   expect(replies.map(r => [r.id, r.outcome, r.errorCode])).toEqual([
-    ["c-4", "reserved", ""],
-    ["c-5", "refused", "thread_taken"],
+    ["c0000000-0000-7000-8000-000000000004", "reserved", ""],
+    ["c0000000-0000-7000-8000-000000000005", "refused", "thread_taken"],
   ])
 })
 
 test("a retitle asks for its task's title as its sender, and answers retitling", async () => {
   const { commands, replies, sender, titles } = setUp()
   await commands.handle(sender, ALICE, {
-    id: "c-6",
+    id: "c0000000-0000-7000-8000-000000000006",
     kind: "retitle",
     task: TASK_ID,
   } as never)
   expect(titles.calls.map(c => [c.method, ...c.args])).toEqual([
     ["asked", TASK_ID, ALICE],
   ])
-  expect(replies.map(r => [r.id, r.outcome])).toEqual([["c-6", "retitling"]])
+  expect(replies.map(r => [r.id, r.outcome])).toEqual([
+    ["c0000000-0000-7000-8000-000000000006", "retitling"],
+  ])
 })

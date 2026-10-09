@@ -89,7 +89,8 @@ const at = (
   index,
   asks,
   cards,
-  tasks: tasksFor(...[...ROOT_IDS].map(([e, t]) => [t, e] as const)),
+  tasks: tasksFor(index, ...[...ROOT_IDS].map(([e, t]) => [t, e] as const)),
+  entries: new Map([...ROOT_IDS].map(([e, t]) => [t, e] as const)),
   listWidth: "full",
   page: null,
 })
@@ -530,10 +531,10 @@ describe("planIntent", () => {
     const lane = threadIdFor("x")
     const where = atEntry(entryId("3-b"))
     const ada = writerId("ada@x.test")
-    const c = textCardId("c-1")
+    const c = textCardId("c0000000-0000-7000-8000-000000000001")
     const fresh: TextCard = {
       kind: "text",
-      id: textCardId("c-new"),
+      id: textCardId("c0000000-0000-7000-8000-000000000105"),
       owner: ada,
       placer: ada,
       place: { kind: "composing", at: where, thread: lane },
@@ -598,7 +599,7 @@ describe("planIntent", () => {
       const move = {
         card: c,
         from: { kind: "queued", at: where, thread: lane, seen: "v" },
-        to: { ...atEnd, kind: "note", cell: null },
+        to: { kind: "notes", thread: lane },
       }
       expect(plan(unqueue, state)).toEqual([
         {
@@ -621,9 +622,12 @@ describe("planIntent", () => {
           id: textCardId(id),
           place: { ...queuedPlace, order },
         }) satisfies CardRecord
-      const [a, b] = [q("c-a", "a"), q("c-b", "b")]
+      const [a, b] = [
+        q("c0000000-0000-7000-8000-00000000000a", "a"),
+        q("c0000000-0000-7000-8000-00000000000b", "b"),
+      ]
       const fact = {
-        ...q("c-f", "c"),
+        ...q("c0000000-0000-7000-8000-00000000000f", "c"),
         carries: {
           kind: "fact",
           fact: { kind: "described", lane, by: ada },
@@ -729,8 +733,13 @@ describe("planIntent", () => {
 
   test("rename and retitle are one request each, by task", () => {
     const task = TASK_OF("1-r1")
-    expect(plan({ kind: "rename", task, title: "T" })).toEqual([
-      { kind: "request", intent: { kind: "mark", task, title: "T" } },
+    expect(
+      plan({ kind: "rename", of: { kind: "task", task }, title: "T" }),
+    ).toEqual([
+      {
+        kind: "request",
+        intent: { kind: "mark", of: { kind: "task", task }, title: "T" },
+      },
     ])
     expect(plan({ kind: "retitle", task })).toEqual([
       { kind: "request", intent: { kind: "retitle", task } },

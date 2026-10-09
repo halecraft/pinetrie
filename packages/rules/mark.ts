@@ -1,21 +1,29 @@
-// mark — a task's title (ADR-0045, ADR-0116).
+// mark — a task's title (ADR-0045, ADR-0116), and the one plan for titling
+// a task or a note column (`planMark`).
 //
 // The record is a host-written `pinetrie.mark` value in the session, keyed by
 // the task's id. The last write wins, since nobody types a title together
-// (ADR-0023), and clearing a title deletes its record.
+// (ADR-0023), and clearing a title deletes its record. A note column's title
+// is its own record (`NOTE_COLUMN`).
 
 import {
   type AgentId,
   ERR,
   type MarkRecord,
+  type MarkTarget,
+  type NoteColumnId,
+  type NoteColumnRecord,
   type Refusal,
   refused,
   type TaskId,
+  THE_AGENT,
+  type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, taskKey } from "./decode.ts"
-import type { RecordSpec } from "./records.ts"
+import { NOTE_COLUMN } from "./note-column.ts"
+import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
 // The shape only: the host is the session's one writer, and stores only
 // titles `parseTitle` accepted, so the title rule is not repeated here.
@@ -41,32 +49,63 @@ export const MARK: RecordSpec<MarkRecord, TaskId, "session"> = {
     })),
 }
 
+const isAgent = (by: WriterId | AgentId): by is AgentId => by === THE_AGENT
+
 type MarkPlan =
   | Refusal
   /** The title is already stored, or there is none to clear: nothing is written. */
   | { readonly kind: "unchanged" }
-  | { readonly kind: "write"; readonly record: MarkRecord }
-  | { readonly kind: "remove"; readonly task: TaskId }
+  /** The title's record written, or deleted to clear it. */
+  | { readonly kind: "writes"; readonly writes: readonly ValueWrite[] }
 
-/** Decide a mark: set `task`'s title, or clear it with null. */
+/**
+ * Decide a mark (ADR-0045, ADR-0116): set a task's or a note column's
+ * title, or clear it with null. Each title is in its own record: a task's in
+ * `MARK`, a note column's in `NOTE_COLUMN`, which only a person sets.
+ */
 export function planMark(input: {
-  readonly task: TaskId
+  readonly of: MarkTarget
   readonly title: string | null
   readonly by: WriterId | AgentId
   readonly now: number
   /** Every task the session holds. */
   readonly tasks: ReadonlySet<TaskId>
   readonly marks: ReadonlyMap<TaskId, MarkRecord>
+  /** Every note column on a canvas. */
+  readonly columns: ReadonlySet<NoteColumnId>
+  readonly columnTitles: ReadonlyMap<NoteColumnId, NoteColumnRecord>
 }): MarkPlan {
-  const { task, title } = input
-  if (!input.tasks.has(task))
-    return refused(ERR.UNKNOWN_TARGET, "no such task to title")
-  const stored = input.marks.get(task)?.title ?? null
-  if (stored === title) return { kind: "unchanged" }
-  return title === null
-    ? { kind: "remove", task }
-    : {
-        kind: "write",
-        record: { task, title, by: input.by, at: input.now },
+  const { of, title, by, now } = input
+  switch (of.kind) {
+    case "task": {
+      const { task } = of
+      if (!input.tasks.has(task))
+        return refused(ERR.UNKNOWN_TARGET, "no such task to title")
+      const stored = input.marks.get(task)?.title ?? null
+      if (stored === title) return { kind: "unchanged" }
+      return {
+        kind: "writes",
+        writes: [
+          title === null
+            ? deleteRecord(MARK, task)
+            : setRecord(MARK, { task, title, by, at: now }),
+        ],
       }
+    }
+    case "note-column": {
+      const { column } = of
+      if (!input.columns.has(column) || isAgent(by))
+        return refused(ERR.UNKNOWN_TARGET, "no such note column to title")
+      const stored = input.columnTitles.get(column)?.title ?? null
+      if (stored === title) return { kind: "unchanged" }
+      return {
+        kind: "writes",
+        writes: [
+          title === null
+            ? deleteRecord(NOTE_COLUMN, column)
+            : setRecord(NOTE_COLUMN, { column, title, by, at: now }),
+        ],
+      }
+    }
+  }
 }

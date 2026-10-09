@@ -23,6 +23,8 @@ import {
   type Move,
   type MoveDirection,
   moveOf,
+  type NoteColumnId,
+  noteColumnIdFor,
   type QueueHoldChange,
   type Reorder,
   type RootId,
@@ -46,6 +48,7 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
+  afterSteps,
   type Cause,
   cardsOfParts,
   historyOf,
@@ -57,6 +60,7 @@ import {
   planFreshFollow,
   planLiftRoot,
   planMoveCommand,
+  planNotesTargets,
   planQueueCard,
   planReorder,
   planRootDelete,
@@ -65,6 +69,7 @@ import {
   planUnqueueAll,
   type SpinOff,
   type SpunThread,
+  type TaskIndex,
   taskOfPlace,
   undoAnswer,
 } from "@pinetrie/rules"
@@ -92,7 +97,10 @@ export const settled = (
 ): Settled => ({ outcome, rev })
 
 export interface CardCommandDeps {
-  readonly basics: Pick<Basics, "docs" | "live" | "places" | "session" | "now">
+  readonly basics: Pick<
+    Basics,
+    "docs" | "live" | "places" | "session" | "now" | "newId"
+  >
   readonly cards: Pick<
     CardPort,
     "destroy" | "hydrate" | "textNow" | "blankQueued"
@@ -121,6 +129,8 @@ const writersOf = (index: TreeIndex): readonly (WriterId | null)[] =>
 export function createCardCommands(deps: CardCommandDeps) {
   const { docs, live, places, session } = deps.basics
   const running = (lane: ThreadId) => readRunning(deps.basics.live, lane)
+  /** A note column's id, for one made for a note with nowhere else to go. */
+  const newColumn = (): NoteColumnId => noteColumnIdFor(deps.basics.newId())
 
   /** A refused move: where the card is now and who put it there. */
   const unmoved = (refusal: Extract<MoveStep, { kind: "refused" }>): Settled =>
@@ -165,7 +175,11 @@ export function createCardCommands(deps: CardCommandDeps) {
    * cards were spun into (S139): the cards its step moves, read before it
    * is tried, and each thread they spun off, as its tree is now.
    */
-  async function liftOf(writer: WriterId, task: TaskId): Promise<LiftPlan> {
+  async function liftOf(
+    writer: WriterId,
+    task: TaskId,
+    tasks: TaskIndex,
+  ): Promise<LiftPlan> {
     const top = await deps.histories.top(writer, task, "undo")
     const lifting =
       top === undefined ? [] : cardsOfParts(top.parts, PLACES_DOC_ID)
@@ -187,7 +201,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       cards: readPlaces(places),
       threads,
       lanes: [...readLaneRecords(session).values()],
-      rootOfThread: tasksNow(deps.basics).rootOfThread,
+      rootOfThread: tasks.rootOfThread,
     })
   }
 
@@ -203,6 +217,7 @@ export function createCardCommands(deps: CardCommandDeps) {
    */
   async function deleteRoot(root: RootId, thread: ThreadId): Promise<void> {
     const cards = readPlaces(places)
+    // Read after the undo wrote: the command's gathered index is older.
     const tasks = tasksNow(deps.basics)
     const task = tasks.taskOfThread.get(thread)
     if (task === undefined) return
@@ -226,6 +241,7 @@ export function createCardCommands(deps: CardCommandDeps) {
    * else on none.
    */
   async function followers(
+    writer: WriterId,
     cards: readonly CardRecord[],
     card: CardId,
     sent: { readonly sendId: string; readonly chat: Chat },
@@ -239,7 +255,14 @@ export function createCardCommands(deps: CardCommandDeps) {
     if (at === undefined) return { message: null, steps: [] }
     return {
       message: at,
-      steps: planFreshFollow(cards, card, root, at, sent.chat.at.thread),
+      steps: planFreshFollow({
+        cards,
+        sent: card,
+        root,
+        thread: sent.chat.at.thread,
+        column: newColumn(),
+        by: writer,
+      }),
     }
   }
 
@@ -252,23 +275,40 @@ export function createCardCommands(deps: CardCommandDeps) {
     writer: WriterId,
     moves: readonly Move[],
     here: TaskId | null,
+    tasks: TaskIndex,
   ): Promise<Settled> {
     // gather: the history's stack, loaded before the places are read. One
     // `Discards` names both the history and a discard's gone place.
-    const discards = { tasks: tasksNow(deps.basics), here }
+    const discards = { tasks, here }
     const task = historyOf(moves, readPlaces(places), discards)
     const gesture =
       task === null ? undefined : await deps.histories.gestureOf(writer, task)
-    // plan
-    const { step, drain } = planMoveCommand(
-      readPlaces(places),
+    // plan: each move to a thread's notes to its nearest note column, made
+    // first where its task has none, then the moves
+    const cards = readPlaces(places)
+    const notes = planNotesTargets({
+      cards,
       moves,
+      sender: writer,
+      newColumn,
+    })
+    const made = notes.made.map(record => ({ kind: "write", record }) as const)
+    const { step, drain } = planMoveCommand(
+      afterSteps(cards, made),
+      notes.moves,
       writer,
       running,
       discards,
     )
     // execute
-    return carry(step, drain, { kind: "move", by: writer }, gesture)
+    return carry(
+      step.kind === "steps"
+        ? { kind: "steps", steps: [...made, ...step.steps] }
+        : step,
+      drain,
+      { kind: "move", by: writer },
+      gesture,
+    )
   }
 
   /**
@@ -283,13 +323,11 @@ export function createCardCommands(deps: CardCommandDeps) {
     queued: Move,
     hold: QueueHoldChange,
     command: CardCommand | null,
+    tasks: TaskIndex,
   ): Promise<Settled> {
     // gather: the history's stack, loaded before the places are read
     // A queueing discards nothing: its history is the queue's task.
-    const task = historyOf([queued], readPlaces(places), {
-      tasks: tasksNow(deps.basics),
-      here: null,
-    })
+    const task = historyOf([queued], readPlaces(places), { tasks, here: null })
     const gesture =
       task === null ? undefined : await deps.histories.gestureOf(writer, task)
     // plan
@@ -317,9 +355,13 @@ export function createCardCommands(deps: CardCommandDeps) {
      * as one step of the sender's history of moves in its task, so the
      * page can undo it. It changes no lane's turn, so it drains nothing.
      */
-    async reorder(writer: WriterId, reorder: Reorder): Promise<Settled> {
+    async reorder(
+      writer: WriterId,
+      reorder: Reorder,
+      tasks: TaskIndex,
+    ): Promise<Settled> {
       // gather: the history's stack, loaded before the places are read
-      const task = taskOfPlace(tasksNow(deps.basics), reorder.at)
+      const task = taskOfPlace(tasks, reorder.at)
       const gesture =
         task === null ? undefined : await deps.histories.gestureOf(writer, task)
       // plan
@@ -333,11 +375,15 @@ export function createCardCommands(deps: CardCommandDeps) {
      * is now (`planUnqueueAll`): one move, so one undo queues them again.
      * `nothing` when none is queued.
      */
-    unqueueAll(writer: WriterId, lane: ThreadId): Promise<Settled> {
+    unqueueAll(
+      writer: WriterId,
+      lane: ThreadId,
+      tasks: TaskIndex,
+    ): Promise<Settled> {
       const moves = planUnqueueAll(readPlaces(places), lane)
       return moves.length === 0
         ? Promise.resolve(settled({ kind: "nothing" }))
-        : move(writer, moves, null)
+        : move(writer, moves, null, tasks)
     },
 
     /**
@@ -349,10 +395,12 @@ export function createCardCommands(deps: CardCommandDeps) {
       writer: WriterId,
       task: TaskId,
       direction: MoveDirection,
+      tasks: TaskIndex,
     ): Promise<Settled> {
       // gather and plan: an undo that lifts a thread back into its card
       // happens only while the thread holds its first message alone
-      const lift = direction === "undo" ? await liftOf(writer, task) : NO_LIFT
+      const lift =
+        direction === "undo" ? await liftOf(writer, task, tasks) : NO_LIFT
       if (lift.kind === "replied") return notLifted(lift.by)
       // execute
       const before = deps.provenance.before()
@@ -384,6 +432,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       writer: WriterId,
       request: SpinOff,
       start: (chat: Chat) => Promise<Outcome>,
+      tasks: TaskIndex,
     ): Promise<Settled> {
       const { move } = request
       const card = move.card
@@ -393,7 +442,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       // gather: the card's text, loaded whole, and the history's stack
       await deps.cards.hydrate([card])
       const text = deps.cards.textNow(card)
-      const discards = { tasks: tasksNow(deps.basics), here: request.here }
+      const discards = { tasks, here: request.here }
       const task = historyOf([move], readPlaces(places), discards)
       const gesture =
         task === null ? undefined : await deps.histories.gestureOf(writer, task)
@@ -403,7 +452,7 @@ export function createCardCommands(deps: CardCommandDeps) {
         cards,
         request,
         sender: writer,
-        tasks: tasksNow(deps.basics),
+        tasks,
         text,
         roots: new Set(readRoots(session).keys()),
       })
@@ -470,7 +519,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       sent: { readonly sendId: string; readonly chat: Chat },
     ): Promise<number> {
       const cards = readPlaces(places)
-      const followed = await followers(cards, card, sent)
+      const followed = await followers(writer, cards, card, sent)
       const held = cards.some(c => c.id === card)
       const { rev } = await carry(
         {

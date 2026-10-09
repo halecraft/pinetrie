@@ -94,7 +94,7 @@ export interface CardFrameFacts {
   readonly readOnly: boolean
   /** Where a queue from its column puts it; absent or null where nothing can be queued. */
   readonly queueOn?: QueueOn | null
-  /** Its queue or the thread's pinned cards, as drawn; absent for no list. */
+  /** Its queue, the thread's pinned cards or its note column's notes, as drawn; absent for no list. */
   readonly among?: readonly CardRecord[]
   /** Its queue is held. */
   readonly held?: boolean
@@ -146,14 +146,10 @@ const moveItems = (
         take,
         ...threads,
       ]
+    // A note column is no thread's: a note has no message, queue or pinned
+    // strip of its own to go to (ADR-0116); a drag takes it there.
     case "note":
-      return [
-        { to: "message", act: { kind: "toMessage", card: id } },
-        ...queue,
-        pin,
-        take,
-        ...threads,
-      ]
+      return [take, ...threads]
     case "queued":
       return [
         {

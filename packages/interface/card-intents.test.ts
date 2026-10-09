@@ -3,6 +3,7 @@ import {
   type CardRecord,
   entryId,
   indexAsks,
+  noteColumnIdFor,
   rootIdFor,
   type TextCard,
   type TextPlace,
@@ -12,6 +13,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
+import { LAST_ORDER } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import { afterKeep } from "./card-intents.ts"
 import type { CardFacts, IntentState } from "./effects.ts"
@@ -38,8 +40,8 @@ const TEST_THREAD = threadIdFor("e")
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("ada@x.io")
-const C1 = textCardId("c-1")
-const C2 = textCardId("c-2")
+const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+const C2 = textCardId("c0000000-0000-7000-8000-000000000002")
 const index = tree({ "1-r1": null, "2-a": "1-r1" })
 const R1 = entryId("1-r1")
 const A = entryId("2-a")
@@ -49,9 +51,12 @@ const atEnd = {
   at: atEntry(A),
   thread: TEST_THREAD,
 } as const
-const note = { ...atEnd, kind: "note", cell: 0 } as const
-/** A move's note target: the host gives it the first empty cell. */
-const toNote = { ...note, cell: null } as const
+/** The note column the fixtures' notes are in (ADR-0116). */
+const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const note = { kind: "note", column: NOTES, order: "a" } as const
+const noteKey = { kind: "note", column: NOTES } as const
+/** A move's target at the thread's nearest notes, which the host resolves. */
+const toNote = { kind: "notes", thread: TEST_THREAD } as const
 const pinnedKey = {
   kind: "pinned",
   at: atEntry(A),
@@ -110,8 +115,8 @@ const facts = (over: Partial<CardFacts> = {}): CardFacts => ({
   slots: {},
   selected: 0,
   composers: new Map<string, ComposerSpot>([
-    [threadKey, { place: atEnd, message: null, cells: new Map() }],
-    ["f-1", { place: freshF1, message: null, cells: new Map() }],
+    [threadKey, { place: atEnd, message: null }],
+    ["f-1", { place: freshF1, message: null }],
   ]),
   ...over,
 })
@@ -123,7 +128,8 @@ const state = (
   index,
   asks: indexAsks(index),
   cards: facts(cards),
-  tasks: tasksFor([TEST_TASK, R1]),
+  tasks: tasksFor(index, [TEST_TASK, R1]),
+  entries: new Map([[TEST_TASK, R1]]),
   listWidth: "full",
   page: null,
 })
@@ -255,7 +261,7 @@ describe("put", () => {
     ).toEqual([])
     expect(
       plan(
-        { kind: "put", card: C1, target: { kind: "column", key: threadKey } },
+        { kind: "put", card: C1, target: { kind: "notes", column: NOTES } },
         s,
       ),
     ).toEqual([])
@@ -263,7 +269,7 @@ describe("put", () => {
 })
 
 describe("your message (ADR-0113)", () => {
-  const MSG = textCardId("c-9")
+  const MSG = textCardId("c0000000-0000-7000-8000-000000000009")
   const withMessage = (
     filled: boolean,
     cards: readonly CardRecord[],
@@ -275,7 +281,7 @@ describe("your message (ADR-0113)", () => {
       filled: new Set(filled ? [MSG] : []),
       slots: { "3": C1 },
       composers: new Map<string, ComposerSpot>([
-        [key, { place, message: MSG, cells: new Map() }],
+        [key, { place, message: MSG }],
       ]),
     })
   const toComposer = (key = threadKey): Intent => ({
@@ -289,7 +295,7 @@ describe("your message (ADR-0113)", () => {
     expect(plan(toComposer(), s)).toEqual([
       {
         kind: "moveCard",
-        move: { card: C1, from: note, to: atEnd },
+        move: { card: C1, from: noteKey, to: atEnd },
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
         fly: true,
@@ -303,8 +309,8 @@ describe("your message (ADR-0113)", () => {
       {
         kind: "keep",
         moves: [
-          { move: { card: C1, from: note, to: atEnd }, slot: null },
-          { move: { card: MSG, from: atEnd, to: note }, slot: null },
+          { move: { card: C1, from: noteKey, to: atEnd }, slot: null },
+          { move: { card: MSG, from: atEnd, to: noteKey }, slot: null },
         ],
         actedAt: { kind: "column", key: threadKey },
         close: [],
@@ -358,7 +364,7 @@ describe("your message (ADR-0113)", () => {
     })
   })
 
-  test("Move to ▸ notes: your message becomes a note at its end", () => {
+  test("Move to ▸ notes: your message goes to the note column nearest its thread", () => {
     const s = state({ cards: [card(C1, atEnd)] })
     expect(plan(inColumn({ kind: "toNote", card: C1 }, threadKey), s)).toEqual([
       {
@@ -373,71 +379,54 @@ describe("your message (ADR-0113)", () => {
   })
 })
 
-describe("a notes board's cells (ADR-0113)", () => {
-  const C3 = textCardId("c-3")
-  const inCell = (cell: number) => ({ ...note, cell })
-  const board = (cards: readonly CardRecord[], cells: [number, typeof C1][]) =>
-    state({
-      cards,
-      slots: { "3": C1 },
-      composers: new Map<string, ComposerSpot>([
-        [threadKey, { place: atEnd, message: null, cells: new Map(cells) }],
-      ]),
-    })
-  const toCell = (card: typeof C1, cell: number): Intent => ({
+describe("a note column (ADR-0116)", () => {
+  const C3 = textCardId("c0000000-0000-7000-8000-000000000003")
+  const OTHER = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a2")
+  const into = (card: typeof C1, column = OTHER): Intent => ({
     kind: "put",
     card,
-    target: { kind: "cell", key: threadKey, cell },
+    target: { kind: "notes", column },
   })
 
-  test("an empty cell takes the card", () => {
-    expect(
-      plan(toCell(C1, 4), board([card(C1, inCell(0))], [[0, C1]]))[0],
-    ).toMatchObject({
-      kind: "moveCard",
-      move: { card: C1, from: inCell(0), to: inCell(4) },
-    })
-  })
-
-  test("a note on a note swaps the two, in one move of the two", () => {
-    const s = board(
-      [card(C1, inCell(0)), card(C3, inCell(4))],
-      [
-        [0, C1],
-        [4, C3],
-      ],
-    )
-    expect(plan(toCell(C1, 4), s)).toEqual([
+  test("a drop on a note column makes the card a note at its end, said there", () => {
+    const s = state({ cards: [card(C1, atEnd), card(C3, note)] })
+    expect(plan(into(C1), s)).toEqual([
       {
-        kind: "keep",
-        moves: [
-          { move: { card: C1, from: inCell(0), to: inCell(4) }, slot: null },
-          { move: { card: C3, from: inCell(4), to: inCell(0) }, slot: null },
-        ],
-        actedAt: { kind: "column", key: threadKey },
-        close: [],
+        kind: "moveCard",
+        move: { card: C1, from: atEnd, to: { kind: "note", column: OTHER } },
+        how: { actedAt: { kind: "column", key: OTHER }, slot: null },
+        queuedBy: null,
+        fly: true,
         here: null,
       },
     ])
+    expect(plan(into(C3, NOTES), s)).toEqual([])
   })
 
-  test("a card from your inventory on a note: the note takes its slot", () => {
-    const s = board([card(C1, inventory), card(C3, inCell(4))], [[4, C3]])
-    expect(plan(toCell(C1, 4), s)[0]).toMatchObject({
-      kind: "keep",
-      moves: [
-        { move: { card: C1, to: inCell(4) } },
-        { move: { card: C3, to: inventory }, slot: 3 },
-      ],
-    })
-  })
-
-  test("a pinned card on a note takes the first empty cell instead", () => {
-    const s = board([card(C1, pinnedAtA), card(C3, inCell(4))], [[4, C3]])
-    expect(plan(toCell(C1, 4), s)[0]).toMatchObject({
-      kind: "moveCard",
-      move: { card: C1, to: toNote },
-    })
+  test("a note moves one place in its column with ↑ and ↓, as a queued card does", () => {
+    const n = (id: typeof C1, order: string) =>
+      card(id, { kind: "note", column: NOTES, order })
+    const s = state({ cards: [n(C1, "a"), n(C3, "b")] })
+    expect(
+      plan(
+        inColumn(
+          { kind: "reorder", card: C3, among: [C1, C3], step: -1 },
+          NOTES,
+        ),
+        s,
+      ),
+    ).toEqual([
+      {
+        kind: "reorderCard",
+        reorder: {
+          card: C3,
+          at: { kind: "note", column: NOTES },
+          after: null,
+          before: C1,
+        },
+        how: { actedAt: { kind: "column", key: NOTES }, slot: null },
+      },
+    ])
   })
 })
 
@@ -736,7 +725,7 @@ describe("a card made a thread (ADR-0111)", () => {
       "a note dropped on a state: its thread there, sent with the task you are on",
       card(C1, note),
       { kind: "state", state: S1 },
-      { from: note, state: S1, sidebar: null, here: TEST_TASK },
+      { from: noteKey, state: S1, sidebar: null, here: TEST_TASK },
     ],
     [
       "an inventory card dropped in the sidebar: placed before the task it was dropped on, sent with the new task, which you will be on",
@@ -819,11 +808,13 @@ describe("a card made a thread (ADR-0111)", () => {
   })
 })
 
-describe("a new note on the notes board (ADR-0113)", () => {
-  test("Enter or + on an empty cell makes an empty note in that cell, at the column's thread end; a fresh column has no board", () => {
-    const s = state()
+describe("a new note (ADR-0116)", () => {
+  test("+ add a note makes an empty note at the end of its note column, said there", () => {
     expect(
-      plan(inColumn({ kind: "newNote", card: C1, cell: 5 }, threadKey), s),
+      plan(
+        inColumn({ kind: "newNote", card: C1, column: NOTES }, NOTES),
+        state(),
+      ),
     ).toEqual([
       {
         kind: "createCard",
@@ -832,16 +823,13 @@ describe("a new note on the notes board (ADR-0113)", () => {
           id: C1,
           owner: ADA,
           placer: ADA,
-          place: { ...atEnd, kind: "note", cell: 5 },
+          place: { kind: "note", column: NOTES, order: LAST_ORDER },
           carries: { kind: "message", command: null },
           unsent: null,
         },
         text: "",
-        how: { actedAt: { kind: "column", key: threadKey }, slot: null },
+        how: { actedAt: { kind: "column", key: NOTES }, slot: null },
       },
     ])
-    expect(plan(inColumn({ kind: "newNote", card: C1, cell: 5 }), s)).toEqual(
-      [],
-    )
   })
 })

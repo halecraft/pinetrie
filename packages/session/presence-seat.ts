@@ -21,15 +21,10 @@ export interface PresenceSeat {
   /** Who is here: read it through `@pinetrie/reads`; write it only here. */
   readonly handle: PresenceDocHandle
   /**
-   * This seat's column `columnKey` follows the thread ending at `end`, in
-   * the root whose root entry is `root` (null: not yet known).
+   * This seat's column `columnKey` follows the thread ending at `end`, on
+   * `task` (null: not yet known, or a new tab's).
    */
-  setReading(
-    columnKey: string,
-    end: string,
-    root: string | null,
-    task: string | null,
-  ): void
+  setReading(columnKey: string, end: string, task: string | null): void
   /** The column closed: its entry is deleted, not left to decay. */
   clearReading(columnKey: string): void
   /**
@@ -51,11 +46,10 @@ export function presenceSeat(
   const mine = seatKey(me, exchange.peerId)
   return {
     handle: presence,
-    setReading(columnKey, end, root, task) {
+    setReading(columnKey, end, task) {
       const key = readingKey(mine, columnKey)
       batch(presence, d => {
         d.reading.set(key, end)
-        d.readingRoot.set(key, root)
         d.readingTask.set(key, task)
       })
     },
@@ -64,7 +58,6 @@ export function presenceSeat(
       if (presence.reading()[key] !== undefined)
         batch(presence, d => {
           d.reading.delete(key)
-          d.readingRoot.delete(key)
           d.readingTask.delete(key)
         })
     },

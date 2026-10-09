@@ -62,7 +62,7 @@ const ids = mine.map(m => m.id)
 describe("mentionsOf", () => {
   test("chats naming you, newest first, each with its root and writer", () => {
     expect(ids).toEqual(["7-d", "6-c", "1-r1"])
-    expect(mine[1]).toMatchObject({ root: "4-r2", by: BEA })
+    expect(mine[1]).toMatchObject({ root: "r-4-r2", by: BEA })
   })
   test("never your own message or someone else's mention", () => {
     expect(ids).not.toContain("2-a")

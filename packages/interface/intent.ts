@@ -10,8 +10,10 @@ import {
   type CardCommand,
   type CardId,
   type EntryId,
+  type MarkTarget,
   type MoveDirection,
   moveOf,
+  type NoteColumnId,
   noteOf,
   type OfferAction,
   type Position,
@@ -110,13 +112,13 @@ export type ColumnAct =
   | { readonly kind: "pin"; readonly card: CardId }
   /** Unpin a card: a note at the thread's end. */
   | { readonly kind: "unpin"; readonly card: CardId }
-  /** Your message to the notes at its thread's end (ADR-0113). */
+  /** Your message to the note column nearest its thread (ADR-0116). */
   | { readonly kind: "toNote"; readonly card: CardId }
-  /** A new, empty note in `cell` of this column's notes board (ADR-0113). */
+  /** A new, empty note at the end of note column `column` (ADR-0116). */
   | {
       readonly kind: "newNote"
       readonly card: TextCardId
-      readonly cell: number
+      readonly column: NoteColumnId
     }
   /** A card into this column's composer, as your message (`planPut`). */
   | { readonly kind: "toMessage"; readonly card: CardId }
@@ -234,9 +236,10 @@ export type Intent =
   | { readonly kind: "foldList" }
   /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
   | { readonly kind: "page"; readonly to: PageName | null }
+  /** Title a task or a note column, or clear its title with null (ADR-0116). */
   | {
       readonly kind: "rename"
-      readonly task: TaskId
+      readonly of: MarkTarget
       readonly title: string | null
     }
   /** Ask a model for the task's title (ADR-0074). */
@@ -382,7 +385,7 @@ function planOf(
       return [
         {
           kind: "request",
-          intent: { kind: "mark", task: intent.task, title: intent.title },
+          intent: { kind: "mark", of: intent.of, title: intent.title },
         },
       ]
     case "retitle":
@@ -578,7 +581,7 @@ function planColumn(
     case "toNote":
       return planToNote(act.card, key, state)
     case "newNote":
-      return planNewNote(act.card, act.cell, key, state)
+      return planNewNote(act.card, act.column, state)
     case "toMessage":
       return planPut(act.card, { kind: "composer", key }, state, minted)
     case "spinOff":

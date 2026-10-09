@@ -15,7 +15,7 @@ import {
   Schema,
 } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
-import { type CardId, cardId } from "@pinetrie/core"
+import { type CardId, parseCardId } from "@pinetrie/core"
 
 /** Slot index ("0"–"17", reading order) to card id. An empty slot has no key. */
 export const InventoryDoc = yjs.bind(
@@ -36,7 +36,9 @@ export const readSlots = (
   doc: InventoryDocHandle,
 ): Readonly<Record<string, CardId>> => {
   const out: Record<string, CardId> = {}
-  for (const [slot, card] of Object.entries(doc.slots()))
-    out[slot] = cardId(card)
+  for (const [slot, text] of Object.entries(doc.slots())) {
+    const card = parseCardId(text)
+    if (card !== undefined) out[slot] = card
+  }
   return out
 }

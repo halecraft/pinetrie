@@ -2,6 +2,8 @@
 // no two writers mint one key (ADR-0016).
 
 import {
+  type NoteColumnId,
+  noteColumnIdFor,
   type RootId,
   rootIdFor,
   type TaskId,
@@ -24,6 +26,12 @@ export function newUuidv7(): string {
 
 /** A new text card's id. */
 export const newCardId = (): TextCardId => textCardId(newUuidv7())
+
+/**
+ * A new note column's id, minted by the page that makes the column with a
+ * move (ADR-0116). `parseCardId` accepts only this shape.
+ */
+export const newNoteColumnId = (): NoteColumnId => noteColumnIdFor(newUuidv7())
 
 /**
  * A new thread's lane id, reserved by a column before the lane exists

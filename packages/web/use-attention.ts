@@ -1,10 +1,10 @@
 // web/use-attention — what needs you, and where (ADR-0077): the shell
 // over `attention.ts`. It reads your attention document, decides each
-// root's status, and keeps what changed as you watched long enough for its
-// mark to move (`moving`). The decisions are `attention.ts`'s.
+// thread's status and so each task's (ADR-0116), and keeps what changed as
+// you watched long enough for its mark to move (`moving`). The decisions
+// are `attention.ts`'s.
 
 import {
-  type EntryId,
   isBusy,
   type LaneView,
   laneWork,
@@ -19,15 +19,16 @@ import {
 import {
   arrivals,
   attentionOf,
-  doneRoots,
+  doneThreads,
   type Item,
   type Layout,
   type Level,
   type Moments,
   markOf,
   type OpenOffer,
-  rootStatus,
   type Status,
+  taskStatus,
+  threadStatus,
   threadWriters,
   unlisted,
 } from "@pinetrie/interface"
@@ -43,8 +44,9 @@ import {
 export interface AttentionView {
   /** Everything raised for you (`attentionOf`). */
   readonly items: readonly Item[]
-  readonly status: ReadonlyMap<EntryId, Status>
-  /** ▦'s: the highest status of roots not in the sidebar (`markOf`). */
+  /** Each task's (`taskStatus`). */
+  readonly status: ReadonlyMap<TaskId, Status>
+  /** ▦'s: the highest status of tasks not in the sidebar (`markOf`). */
   readonly elsewhere: Level | null
   readonly arrivals: Moments
 }
@@ -61,15 +63,12 @@ export function useAttention(input: {
   readonly running: readonly { readonly lane: ThreadId }[]
   /** The held roots' lanes, with their queues. */
   readonly lanes: readonly LaneView[]
-  readonly laneRoots: ReadonlyMap<ThreadId, EntryId>
-  /** The root entries of archived tasks' roots. */
-  readonly archived: ReadonlySet<EntryId>
-  /** The archived tasks themselves (ADR-0116). */
-  readonly archivedTasks: ReadonlySet<TaskId>
-  /** Each root entry's task: ▦ marks the roots of tasks not in the sidebar. */
-  readonly ofEntry: ReadonlyMap<EntryId, TaskId>
-  /** Roots whose agent works, held or not (`workAnywhere`). */
-  readonly work: ReadonlyMap<EntryId, RootWork>
+  /** The archived tasks (ADR-0116): their threads raise nothing. */
+  readonly archived: ReadonlySet<TaskId>
+  /** Each thread's task: a task's status is its threads'. */
+  readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
+  /** Threads whose agent works, held or not (`threadWork`). */
+  readonly work: ReadonlyMap<ThreadId, RootWork>
   readonly layout: Pick<Layout, "open">
   /** The session has settled: before, a change is data arriving, not news. */
   readonly settled: boolean
@@ -94,6 +93,16 @@ export function useAttention(input: {
       ]),
     [input.running, input.lanes],
   )
+  // The threads of archived tasks, which raise nothing.
+  const archived = useMemo(
+    () =>
+      new Set(
+        [...input.taskOfThread].flatMap(([thread, task]) =>
+          input.archived.has(task) ? [thread] : [],
+        ),
+      ),
+    [input.taskOfThread, input.archived],
+  )
   const { items, done } = useMemo(() => {
     const facts = {
       me: input.me,
@@ -102,10 +111,12 @@ export function useAttention(input: {
       offers: input.offers,
       person,
       busy,
-      laneRoots: input.laneRoots,
-      archived: input.archived,
+      archived,
     }
-    return { items: attentionOf(facts), done: doneRoots(facts) }
+    const ended = new Set(
+      [...doneThreads(facts)].flatMap(t => input.taskOfThread.get(t) ?? []),
+    )
+    return { items: attentionOf(facts), done: ended }
   }, [
     input.me,
     writers,
@@ -113,35 +124,21 @@ export function useAttention(input: {
     input.offers,
     person,
     busy,
-    input.laneRoots,
-    input.archived,
+    archived,
+    input.taskOfThread,
   ])
   const status = useMemo(
     () =>
-      rootStatus({
-        items,
-        work: input.work,
-        verdicts: input.verdicts,
-        laneRoots: input.laneRoots,
-      }),
-    [items, input.work, input.verdicts, input.laneRoots],
-  )
-  const elsewhere = useMemo(() => {
-    const away = new Set(
-      unlisted(
-        input.layout,
-        input.archivedTasks,
-        [...status.keys()].flatMap(e => input.ofEntry.get(e) ?? []),
+      taskStatus(
+        threadStatus({ items, work: input.work, verdicts: input.verdicts }),
+        input.taskOfThread,
       ),
-    )
-    return markOf(
-      status,
-      [...status.keys()].filter(e => {
-        const task = input.ofEntry.get(e)
-        return task !== undefined && away.has(task)
-      }),
-    )
-  }, [input.layout, input.archivedTasks, input.ofEntry, status])
+    [items, input.work, input.verdicts, input.taskOfThread],
+  )
+  const elsewhere = useMemo(
+    () => markOf(status, unlisted(input.layout, input.archived, status.keys())),
+    [input.layout, input.archived, status],
+  )
   return {
     items,
     status,
@@ -151,17 +148,17 @@ export function useAttention(input: {
 }
 
 /**
- * When each root's mark last arrived, as you watched. Until `ready`, every
+ * When each task's mark last arrived, as you watched. Until `ready`, every
  * change is data arriving, so the first status after it is the baseline: a
  * page that loads draws every mark still. Nothing is dropped when a mark
  * stops moving (`moving`).
  */
 function useArrivals(
-  status: ReadonlyMap<EntryId, Status>,
-  done: ReadonlySet<EntryId>,
+  status: ReadonlyMap<TaskId, Status>,
+  done: ReadonlySet<TaskId>,
   ready: boolean,
 ): Moments {
-  const before = useRef<ReadonlyMap<EntryId, Status> | null>(null)
+  const before = useRef<ReadonlyMap<TaskId, Status> | null>(null)
   const [kept, setKept] = useState<Moments>(NO_MOMENTS)
   useEffect(() => {
     if (!ready) {

@@ -18,10 +18,10 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
-  cardsAt,
   displayName,
   encodePinned,
   type PinnedMessage,
+  pinnedAt,
   pinnedReads,
   planPinnedRead,
 } from "@pinetrie/rules"
@@ -60,13 +60,13 @@ export function createPinned(deps: {
   const { cards } = deps
 
   /** The pinned cards at the lane's tip: its thread's end. */
-  function pinnedAt(lane: ThreadId) {
+  function pinnedOn(lane: ThreadId) {
     const doc = docs.docOfLane(lane)
     const tip = doc === null ? null : readLaneTip(doc, lane)
     if (doc === null || tip === null) return null
     const index = readTreeIndex(doc)
     const records = readPlaces(places)
-    return { index, tip, pinned: cardsAt("pinned", tip, records, index) }
+    return { index, tip, pinned: pinnedAt(tip, records, index) }
   }
 
   /**
@@ -80,7 +80,7 @@ export function createPinned(deps: {
     signal: AbortSignal,
   ): Promise<PinnedMessage | null> {
     // gather: the texts, loaded, then as the sender had them, within the wait
-    const before = pinnedAt(lane)
+    const before = pinnedOn(lane)
     if (before === null) return null
     await cards.hydrate(before.pinned.map(c => c.id))
     const ids = new Set(before.pinned.map(c => c.id))
@@ -91,7 +91,7 @@ export function createPinned(deps: {
       signal,
     )
     // A card may have been pinned or unpinned during the wait: read again.
-    const after = pinnedAt(lane)
+    const after = pinnedOn(lane)
     if (after === null) return null
     await cards.hydrate(after.pinned.map(c => c.id))
     const names = readParticipantNames(session)

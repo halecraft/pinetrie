@@ -1,6 +1,7 @@
 import {
   atEntry,
   entryId,
+  noteColumnIdFor,
   ROOT,
   rootIdFor,
   taskIdFor,
@@ -49,12 +50,9 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   )
   store.set(
     "k-thread",
-    thread === null ? null : { place: thread, message: null, cells: new Map() },
+    thread === null ? null : { place: thread, message: null },
   )
-  store.set(
-    "k-fresh",
-    fresh === null ? null : { place: fresh, message: null, cells: new Map() },
-  )
+  store.set("k-fresh", fresh === null ? null : { place: fresh, message: null })
   const targets: PutTarget[] = [
     { kind: "column", key: "k-thread" },
     { kind: "column", key: "k-fresh" },
@@ -64,7 +62,10 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     { kind: "column", key: "k-closed" },
     { kind: "pinned", key: "k-thread" },
     { kind: "pinned", key: "k-fresh" },
-    { kind: "cell", key: "k-thread", cell: 6 },
+    {
+      kind: "notes",
+      column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+    },
     { kind: "state", state: workflowStateIdFor("s-1") },
     { kind: "sidebar", before: TEST_TASK },
     { kind: "sidebar", before: null },
@@ -78,13 +79,13 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     ).toEqual(placeOfTarget(target, store.current(), ME))
   })
 
-  test("a column lands as a note at its end, its composer as your message; a fresh column as its message; a slot as your inventory; a column no store holds as nothing", () => {
+  test("a column lands at its thread's nearest notes, its composer as your message; a fresh column as its message; a slot as your inventory; a note column at its end; a column no store holds as nothing", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
     const end = { at: E1, thread: LANE }
-    expect(at(targets[0] as PutTarget)).toEqual({
+    expect(at(targets[0] as PutTarget)).toEqual({ kind: "notes", thread: LANE })
+    expect(at(targets[8] as PutTarget)).toEqual({
       kind: "note",
-      ...end,
-      cell: null,
+      column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
     })
     expect(at(targets[1] as PutTarget)).toEqual({
       kind: "fresh",

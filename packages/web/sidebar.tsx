@@ -13,6 +13,7 @@
 import {
   MAX_TITLE,
   type TaskId,
+  type ThreadId,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
@@ -71,6 +72,7 @@ export function Sidebar({
   onIntent,
   session,
   index,
+  taskOfThread,
   order,
   nameOf,
   colorOf,
@@ -81,9 +83,10 @@ export function Sidebar({
   /** Full, or folded to icons (ADR-0088). */
   width: ListWidth
   onIntent: (intent: Intent) => void
-  /** Whose presence an item shows: others reading in its root. */
+  /** Whose presence an item shows: others reading in its task. */
   session: SessionClient
   index: TreeIndex
+  taskOfThread: ReadonlyMap<ThreadId, TaskId>
   /** Everyone, in the order every window agrees on (`writerOrder`). */
   order: readonly WriterId[]
   nameOf: ReadonlyMap<WriterId, string>
@@ -114,7 +117,7 @@ export function Sidebar({
       ?.querySelector(".sidebar-item[data-selected]")
       ?.scrollIntoView({ block: "nearest" })
   }, [here])
-  const readers = { session, index, order, nameOf, colorOf }
+  const readers = { session, index, taskOfThread, order, nameOf, colorOf }
   return (
     <nav aria-label="your threads" id="sidebar" ref={nav}>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Up and Down move focus between the buttons inside */}
@@ -178,7 +181,7 @@ export function Sidebar({
               </span>
             )
           const { task } = item
-          const root = item.head.entry
+          const root = item.entry
           if (renaming === task)
             return (
               <span
@@ -226,7 +229,7 @@ export function Sidebar({
                   nameOf={nameOf}
                   pip={pip}
                 />
-                <Readers {...readers} roots={root === null ? [] : [root]} />
+                <Readers {...readers} tasks={[item.task]} />
               </button>
               {item.menu.length > 0 && (
                 <Menu
@@ -376,7 +379,6 @@ function FoldedItem({
         ]
       : [close]
   const task = item.kind === "task" ? item.task : undefined
-  const root = item.kind === "task" ? (item.head.entry ?? undefined) : undefined
   return (
     <span
       className="sidebar-item"
@@ -420,7 +422,7 @@ function FoldedItem({
           ...(item.kind === "new"
             ? { "data-new": item.key }
             : {
-                "data-root": item.head.entry ?? undefined,
+                "data-root": item.entry ?? undefined,
                 "data-task": item.task,
                 draggable: true,
                 onDragStart: startDrag,
@@ -439,7 +441,7 @@ function FoldedItem({
           style={{ left: at.right + 6, top: at.top }}
         >
           <span className="open-tip-label">{item.label}</span>
-          {root !== undefined && <Readers {...readers} roots={[root]} />}
+          {task !== undefined && <Readers {...readers} tasks={[task]} />}
         </span>
       )}
       {at !== null && rename !== null && item.kind === "task" && (
@@ -518,14 +520,17 @@ function menuItem(
  * A root's item while it is renamed: a field holding its title. Enter and
  * leaving the field save, and Escape cancels.
  */
-function TitleField({
+export function TitleField({
   stored,
   placeholder,
   onSend,
   onEnd,
+  label = "title for this thread",
 }: {
   stored: string | null
   placeholder: string
+  /** The field's accessible name. */
+  label?: string
   onSend: (title: string | null) => void
   /** The field is done; `focusItem` when the keyboard ended it. */
   onEnd: (focusItem: boolean) => void
@@ -556,7 +561,7 @@ function TitleField({
   return (
     <input
       aria-invalid={invalid}
-      aria-label="title for this thread"
+      aria-label={label}
       className="open-title-input"
       maxLength={MAX_TITLE}
       onBlur={() => finish(true, false)}

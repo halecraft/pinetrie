@@ -49,7 +49,6 @@ import {
   DISCARD,
   densityWords,
   detailsTitle,
-  dropProps,
   type EditorState,
   type FoldMemory,
   type HeadBanner,
@@ -66,10 +65,7 @@ import {
   leftLine,
   NEW_PIN,
   NEW_PIN_TITLE,
-  NOTES_LINE_TITLE,
   newPinAt,
-  notesLineWords,
-  notesPlaced,
   noticeKey,
   noticeWords,
   type Pending,
@@ -94,9 +90,9 @@ import {
   workingWords,
 } from "@pinetrie/interface"
 import {
-  cardsAt,
   effectiveBase,
   type OfferButton,
+  pinnedAt,
   placeEnd,
   queuedOn,
   yourCard,
@@ -120,7 +116,6 @@ import { Dock } from "./dock.tsx"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
-import { NotesBoard } from "./notes-board.tsx"
 import { useTrackColors } from "./palette-context.ts"
 import {
   askReviewTarget,
@@ -229,8 +224,8 @@ export interface ColumnProps {
 }
 
 /** A place a text card may be in; undefined for a canvas. */
-const textPlaceOf = (place: CardPlace): TextPlace | undefined =>
-  place.kind === "canvas" ? undefined : place
+const textPlaceOf = (place: CardPlace | undefined): TextPlace | undefined =>
+  place === undefined || place.kind === "canvas" ? undefined : place
 
 export function Column(p: ColumnProps) {
   const { view, index } = p
@@ -446,9 +441,7 @@ export function Column(p: ColumnProps) {
   // them now, from the walk the host plans a run's cards from. A fresh
   // column has no thread, so none.
   const pinned =
-    fresh || threadEnd === null
-      ? []
-      : cardsAt("pinned", threadEnd, p.cards, index)
+    fresh || threadEnd === null ? [] : pinnedAt(threadEnd, p.cards, index)
   const inView = threadEnd === null ? null : pinnedInView(index, threadEnd)
   // Your last offer command on this lane: in flight, refused or failed.
   const acting = useSyncExternalStore(
@@ -537,13 +530,11 @@ export function Column(p: ColumnProps) {
           nodes: view.nodes,
           askTarget: ask =>
             askReviewTarget(index, p.asks, p.work.revisions, ask, askLine(ask)),
-          notes: !fresh && threadEnd !== null,
         })
   // Reset in render, not an effect: no frame draws a pane that is gone.
   if (pane !== null && paneShows === null) setPane(null)
   const paneId = `pane-${p.column.key}`
   const toggleReview = useStable(() => openPane({ kind: "offer" }))
-  const toggleNotes = useStable(() => openPane({ kind: "notes" }))
   // Catching up and splitting are a card with the command and no text,
   // made in the queue (ADR-0108, ADR-0061, ADR-0080, ADR-0113): the host
   // pops it when the lane is free. An acceptance names its destination: the default,
@@ -594,16 +585,6 @@ export function Column(p: ColumnProps) {
   const forkConflicts =
     above.commit === null ? [] : conflictsAt(p.work.revisions, above.commit)
 
-  // The notes at this end (ADR-0113): everyone's, on the thread's notes
-  // board. A fresh column has none.
-  const notes =
-    fresh || threadEnd === null
-      ? []
-      : cardsAt("note", threadEnd, p.cards, index)
-  const cells = useMemo(
-    () => new Map([...notesPlaced(notes)].map(([n, c]) => [n, c.id] as const)),
-    [notes],
-  )
   const place =
     composerPlace(
       p.column,
@@ -620,7 +601,7 @@ export function Column(p: ColumnProps) {
     composers.set(
       key,
       writable && place !== undefined
-        ? { place, message: mine?.id ?? null, cells }
+        ? { place, message: mine?.id ?? null }
         : null,
     )
   })
@@ -666,9 +647,7 @@ export function Column(p: ColumnProps) {
     !watches || threadEnd === null
       ? []
       : tracesAt(p.traces.values(), p.session.writer, threadEnd, from =>
-          from.kind === "note" ||
-          from.kind === "queued" ||
-          from.kind === "pinned"
+          from.kind === "queued" || from.kind === "pinned"
             ? placeEnd(from, index)
             : null,
         )
@@ -694,7 +673,7 @@ export function Column(p: ColumnProps) {
   const [askClose, setAskClose] = useState<readonly CardId[] | null>(null)
   const close = () => {
     const typed = fresh
-      ? [...(mine === undefined ? [] : [mine]), ...notes]
+      ? (mine === undefined ? [] : [mine])
           .filter(c => p.session.cardText(c.id).text().trim() !== "")
           .map(c => c.id)
       : []
@@ -883,7 +862,9 @@ export function Column(p: ColumnProps) {
                     onTyping={p.onTyping}
                     participants={p.participants}
                     pending={undefined}
-                    place={textPlaceOf(drawnPlace(pinKey, p.session.writer))}
+                    place={textPlaceOf(
+                      drawnPlace(pinKey, p.session.writer, p.cards),
+                    )}
                     prefill={undefined}
                     readOnly={p.readOnly}
                     reader={reader}
@@ -1064,40 +1045,6 @@ export function Column(p: ColumnProps) {
               typingAt={view.tipId}
               session={p.session}
             />
-            {/* The notes line (ADR-0113): how many notes there are and whose,
-            opening the thread's notes board in the pane. A drop on it makes a
-            note, in the board's first empty cell. */}
-            {!fresh && threadEnd !== null && (
-              <div
-                className="notes-line"
-                {...(putColumn === null
-                  ? {}
-                  : dropProps({ kind: "column", key: putColumn }))}
-              >
-                <button
-                  aria-controls={pane?.kind === "notes" ? paneId : undefined}
-                  aria-expanded={pane?.kind === "notes"}
-                  className="notes-toggle"
-                  onClick={toggleNotes}
-                  title={NOTES_LINE_TITLE}
-                  type="button"
-                >
-                  {notesLineWords(notes.length)}
-                </button>
-                <Avatars
-                  colorOf={p.colorOf}
-                  nameOf={p.nameOf}
-                  // Others' notes: the page draws no avatar of you.
-                  writers={[
-                    ...new Set(
-                      notes
-                        .map(c => c.owner)
-                        .filter(w => w !== p.session.writer),
-                    ),
-                  ]}
-                />
-              </div>
-            )}
           </Dock>
         </div>
         {pane !== null && paneShows !== null && (
@@ -1105,24 +1052,6 @@ export function Column(p: ColumnProps) {
             close={closePane}
             id={paneId}
             key={paneKey(pane)}
-            notes={
-              threadEnd === null ? null : (
-                <NotesBoard
-                  catchUps={catchUps}
-                  colorOf={p.colorOf}
-                  columnKey={key}
-                  notes={notes}
-                  onAct={act}
-                  onIntent={p.onIntent}
-                  onTyping={p.onTyping}
-                  queueOn={queueOn}
-                  readOnly={p.readOnly}
-                  reader={reader}
-                  seats={p.seats}
-                  session={p.session}
-                />
-              )
-            }
             track={p.track}
             view={paneShows}
           />

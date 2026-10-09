@@ -11,7 +11,6 @@ import { threadCardOf } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import {
   CHAT_LABEL,
-  firstLinesOf,
   initialsOf,
   labelsOf,
   messageCount,
@@ -49,6 +48,18 @@ const directory = new Map(
 /** Each root's task, one a root, its thread `t-<n>` (ADR-0116); task 1 titled. */
 const K = (n: string) => taskIdFor(n)
 const thread = (n: string) => threadIdFor(`thread-${n}`)
+const threads = new Map(
+  ["1", "2", "3"].map(n => [
+    thread(n),
+    {
+      thread: thread(n),
+      root: rootIdFor(n),
+      by: writerId("p-ada"),
+      createdAt: 0,
+      fork: null,
+    },
+  ]),
+)
 const tasks = tasksOf({
   known: ["1", "2", "3"].map(K),
   cards: ["1", "2", "3"].map(n =>
@@ -59,19 +70,7 @@ const tasks = tasksOf({
       cards: [],
     }),
   ),
-  threads: new Map(
-    ["1", "2", "3"].map(n => [
-      thread(n),
-      {
-        thread: thread(n),
-        root: rootIdFor(n),
-        by: writerId("p-ada"),
-        createdAt: 0,
-        fork: null,
-      },
-    ]),
-  ),
-  directory,
+  threads,
 })
 const marks = new Map([
   [K("1"), { task: K("1"), title: "Tab names", by: writerId("p-ada"), at: 1 }],
@@ -98,9 +97,6 @@ describe("labels and summaries, from the directory (ADR-0063)", () => {
     expect(labels.get(K("1"))).toBe("Tab names")
     expect(labels.get(K("2"))).toBe("Plan the release")
     expect(labels.get(K("3"))).toBe(CHAT_LABEL)
-    expect(firstLinesOf(directory).get(entryId("e-1"))).toBe(
-      "I'd like to start talking about a change",
-    )
   })
 
   test("an untitled task no lane works in is a chat; a title still names it", () => {
@@ -131,16 +127,67 @@ describe("labels and summaries, from the directory (ADR-0063)", () => {
     expect(messageCountTitle(count)).toBe(words)
   })
 
-  test("summaries: each root with a message, by its root entry", () => {
-    expect(summariesOf(directory)).toEqual(
-      ["1", "2"].map(n => ({
-        root: entryId(`e-${n}`),
-        first: entryId(`e-${n}`),
-        messages: 2,
-        newest: entryId(`f-${n}`),
-        writers: [writerId("p-ada")],
-      })),
+  test("summaries: each task whose first root has a message, its first line, writers and newest message (ADR-0116)", () => {
+    expect(summariesOf(tasks, directory)).toEqual(
+      new Map([
+        [
+          K("1"),
+          {
+            line: "I'd like to start talking about a change",
+            writers: [writerId("p-ada")],
+            newest: entryId("f-1"),
+          },
+        ],
+        [
+          K("2"),
+          {
+            line: "Plan the release",
+            writers: [writerId("p-ada")],
+            newest: entryId("f-2"),
+          },
+        ],
+      ]),
     )
+  })
+
+  test("summaries: a task over two roots reads its first root's line, every root's writers and the newest message", () => {
+    const two = tasksOf({
+      known: [K("1")],
+      cards: ["1", "2"].map((n, i) =>
+        threadCardOf({
+          thread: thread(n),
+          task: K("1"),
+          by: writerId("p-ada"),
+          cards:
+            i === 0
+              ? []
+              : [
+                  threadCardOf({
+                    thread: thread("1"),
+                    task: K("1"),
+                    by: writerId("p-ada"),
+                    cards: [],
+                  }),
+                ],
+        }),
+      ),
+      threads,
+    })
+    const both = new Map([
+      ...directory,
+      [
+        rootIdFor("2"),
+        {
+          ...(directory.get(rootIdFor("2")) as RootRecord),
+          writers: [writerId("p-bea")],
+        },
+      ],
+    ])
+    expect(summariesOf(two, both).get(K("1"))).toEqual({
+      line: "I'd like to start talking about a change",
+      writers: [writerId("p-ada"), writerId("p-bea")],
+      newest: entryId("f-2"),
+    })
   })
 })
 

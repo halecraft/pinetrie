@@ -1063,11 +1063,13 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
   ): PinnedView => ({ lane, cards, retired })
 
   test("pinnedMarker: the cards read, and what no longer applies only after this lane's own read", () => {
-    const before = read(A, [card("c-1", "old")])
+    const before = read(A, [
+      card("c0000000-0000-7000-8000-000000000001", "old"),
+    ])
     const entry = read(
       A,
-      [card("c-2", "new")],
-      [{ id: textCardId("c-1"), line: "old" }],
+      [card("c0000000-0000-7000-8000-000000000002", "new")],
+      [{ id: textCardId("c0000000-0000-7000-8000-000000000001"), line: "old" }],
     )
     expect(pinnedMarker(entry, before)).toEqual({
       cards: entry.cards,
@@ -1076,16 +1078,37 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
     // A branch's first run retires its parent's cards, read by another lane.
     expect(
       pinnedMarker(
-        read(B, [], [{ id: textCardId("c-1"), line: "old" }]),
+        read(
+          B,
+          [],
+          [
+            {
+              id: textCardId("c0000000-0000-7000-8000-000000000001"),
+              line: "old",
+            },
+          ],
+        ),
         before,
       ),
     ).toBeNull()
     expect(
       pinnedMarker(
-        read(B, [card("c-3", "x")], [{ id: textCardId("c-1"), line: "old" }]),
+        read(
+          B,
+          [card("c0000000-0000-7000-8000-000000000003", "x")],
+          [
+            {
+              id: textCardId("c0000000-0000-7000-8000-000000000001"),
+              line: "old",
+            },
+          ],
+        ),
         before,
       ),
-    ).toEqual({ cards: [card("c-3", "x")], retired: [] })
+    ).toEqual({
+      cards: [card("c0000000-0000-7000-8000-000000000003", "x")],
+      retired: [],
+    })
   })
 
   test("pinnedMarkers: above the entry whose parent is a cards entry, its prompt, and nowhere else", () => {
@@ -1096,14 +1119,24 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
     })
     const index = indexOf([
       entry("1-q", null, chat("q")),
-      entry("2-k", "1-q", pinned(read(A, [card("c-1", "a")]))),
+      entry(
+        "2-k",
+        "1-q",
+        pinned(read(A, [card("c0000000-0000-7000-8000-000000000001", "a")])),
+      ),
       entry("3-p", "2-k", chat("p", true)),
       entry("4-r", "3-p", { role: "assistant", content: "r" }),
       entry("5-p", "4-r", chat("again", true)),
     ])
     const nodes = ["1-q", "3-p", "4-r", "5-p"].map(id => ({ id: entryId(id) }))
     expect([...pinnedMarkers(index, nodes)]).toEqual([
-      [entryId("3-p"), { cards: [card("c-1", "a")], retired: [] }],
+      [
+        entryId("3-p"),
+        {
+          cards: [card("c0000000-0000-7000-8000-000000000001", "a")],
+          retired: [],
+        },
+      ],
     ])
   })
 })
@@ -1111,7 +1144,7 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
 test("pinnedStatus: read, changed or unread against what the agent reads, by the host's comparison; none for a card with no text", () => {
   const card = {
     kind: "text" as const,
-    id: textCardId("c-1"),
+    id: textCardId("c0000000-0000-7000-8000-000000000001"),
     owner: ADA,
     placer: ADA,
     place: { kind: "inventory", holder: ADA } as const,
@@ -1120,7 +1153,13 @@ test("pinnedStatus: read, changed or unread against what the agent reads, by the
   }
   const inView: PinnedView = {
     lane: A,
-    cards: [{ id: textCardId("c-1"), text: "ship it", by: ADA }],
+    cards: [
+      {
+        id: textCardId("c0000000-0000-7000-8000-000000000001"),
+        text: "ship it",
+        by: ADA,
+      },
+    ],
     retired: [],
   }
   expect(pinnedStatus(card, "ship it", inView)).toBe("read")

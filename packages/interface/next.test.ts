@@ -3,7 +3,6 @@ import {
   atEntry,
   type CardId,
   type CardRecord,
-  cardId,
   type EntryId,
   entryId,
   indexAsks,
@@ -70,9 +69,12 @@ const queued = (id: string, order: string): TextCard => ({
   carries: PLAIN,
   unsent: null,
 })
-const C1 = textCardId("c-1")
-const C2 = textCardId("c-2")
-const two = [queued("c-1", "a"), queued("c-2", "b")]
+const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+const C2 = textCardId("c0000000-0000-7000-8000-000000000002")
+const two = [
+  queued("c0000000-0000-7000-8000-000000000001", "a"),
+  queued("c0000000-0000-7000-8000-000000000002", "b"),
+]
 
 const facts = (
   over: {
@@ -87,7 +89,7 @@ const facts = (
   return {
     cards: over.cards ?? [],
     typing: new Set(over.typing ?? []),
-    blank: new Set((over.blank ?? []).map(cardId)),
+    blank: new Set((over.blank ?? []).map(textCardId)),
     index: i,
     asks: indexAsks(i),
     stops: over.stops ?? new Map(),
@@ -117,7 +119,10 @@ describe("nextOf: what the thread does next, as the host decides it (ADR-0113)",
     [
       "held with only a blank card: nothing to send",
       { waiting: 1, heldBy: BEA },
-      { cards: [queued("c-1", "a")], blank: ["c-1"] },
+      {
+        cards: [queued("c0000000-0000-7000-8000-000000000001", "a")],
+        blank: ["c0000000-0000-7000-8000-000000000001"],
+      },
       { kind: "held", by: BEA, top: null, count: 0, resumable: false },
     ],
     [
@@ -147,7 +152,7 @@ describe("nextOf: what the thread does next, as the host decides it (ADR-0113)",
     [
       "a blank top card is passed over, as the drain passes it",
       { waiting: 2 },
-      { cards: two, blank: ["c-1"] },
+      { cards: two, blank: ["c0000000-0000-7000-8000-000000000001"] },
       { kind: "sending", top: C2, typing: false },
     ],
   ])("%s", (_, over, f, next) => {

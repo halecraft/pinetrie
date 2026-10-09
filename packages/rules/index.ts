@@ -95,10 +95,10 @@ export {
   type WorkflowPlan,
 } from "./board.ts"
 export {
+  afterSteps,
   blankQueued,
   type CarryPlan,
   cardEnd,
-  cardsAt,
   cardsOfParts,
   type Discards,
   decodeCard,
@@ -106,10 +106,16 @@ export {
   historyOf,
   type MoveStep,
   type MovesStep,
+  NEW_NOTES_TITLE,
   type NextQueuedCardPopStep,
   NO_DISCARDS,
   NONE_BLANK,
+  type NoteCard,
+  nearestNoteColumn,
+  notesIn,
+  notesOf,
   type PlaceStep,
+  pinnedAt,
   placeEnd,
   planCardSweep,
   planCarry,
@@ -118,9 +124,9 @@ export {
   planHistorySweep,
   planMoveCommand,
   planNextQueuedCardPop,
+  planNotesTargets,
   planReorder,
   planSetCommand,
-  planStoredCardRepair,
   planUnqueueAll,
   planUnsent,
   type QueuedCard,
@@ -236,6 +242,7 @@ export {
   type ReservePlan,
   threadNameOf,
 } from "./names.ts"
+export { NOTE_COLUMN } from "./note-column.ts"
 export {
   isNotYetAccepted,
   OFFER,
@@ -258,7 +265,13 @@ export {
   offerSeen,
   offerView,
 } from "./offer-view.ts"
-export { keyAfter, orderAfter, orderBetween, orderKeys } from "./order.ts"
+export {
+  keyAfter,
+  orderAfter,
+  orderBetween,
+  orderKeys,
+  respace,
+} from "./order.ts"
 export {
   displayName,
   PARTICIPANT,

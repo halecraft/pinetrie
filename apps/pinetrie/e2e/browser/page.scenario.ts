@@ -4,15 +4,14 @@
 
 import {
   atEntry,
-  cardId,
   entryId,
   handleOf,
   isTextCard,
   keyOf,
-  pinnedOf,
   projectRail,
   ROOT,
   type ThreadId,
+  textCardId,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -26,6 +25,7 @@ import {
   readBoardPlaces,
   readMarks,
   readNames,
+  readNoteColumns,
   readParticipantNames,
   readPlaces,
   readQueueHolds,
@@ -50,6 +50,7 @@ import {
   startSuiteHost,
   suiteModel,
   taskHolding,
+  threadHolding,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -59,7 +60,6 @@ import {
   boardSel,
   chooseFromMenu,
   chooseOnCard,
-  closeNotes,
   componentRenders,
   connected,
   itemSel,
@@ -1543,7 +1543,7 @@ async function run(check: Checks["check"]): Promise<void> {
         ms.at(-1)?.getAttribute("data-entry"),
       )
       await componentRenders(page)
-      if (onPath != null) api.setReading("presence-check", onPath, null, null)
+      if (onPath != null) api.setReading("presence-check", onPath, null)
       const beaHere = `${col(0)} .column-head .avatar[data-writer="${api.writer}"]`
       const beaShown = await page
         .waitForSelector(beaHere, { timeout: 15_000 })
@@ -2948,18 +2948,17 @@ async function run(check: Checks["check"]): Promise<void> {
           `${col(0)} .composer`,
           '.move-to[data-to="note"]',
         )
-        const theirColumn = `.column:has(.msg[data-entry="${cardEnd}"])`
-        const theirs = `${await openNote(second, theirColumn, together)} textarea`
+        const theirs = `${await openNote(second, together)} textarea`
         const shownThere = await hasValue(second, theirs, "Together:")
         check(
-          "your message shows only in your window; moved to the notes, it shows on the other's notes board",
+          "your message shows only in your window; moved to the notes, it shows in the other's note column",
           messageHidden && shownThere,
           `hidden ${messageHidden}, a note there ${shownThere}`,
         )
         await second.focus(theirs)
         await second.keyboard.press("End")
         await second.keyboard.type(" from B")
-        const ourFrame = await openNote(page, col(0), together)
+        const ourFrame = await openNote(page, together)
         const mergedHere = await hasValue(
           page,
           `${ourFrame} textarea`,
@@ -2973,11 +2972,8 @@ async function run(check: Checks["check"]): Promise<void> {
           mergedHere && /'s note · with /.test(heading ?? ""),
           `${heading}`,
         )
-        // The note discarded, the board closed, and a message again, for
-        // what follows.
+        // The note discarded, and a message again, for what follows.
         await page.click(`${ourFrame} .discard-card`)
-        await closeNotes(page)
-        await closeNotes(second)
         await page.click(box)
         await page.keyboard.type("Together: from B")
         await hasValue(page, box, "Together: from B")
@@ -3348,7 +3344,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.click(downBox)
       await page.click(slotOf(parked))
       await page.keyboard.press("Control+Shift+O")
-      const putNote = `${await openNote(page, col(1), parked)} textarea`
+      const putNote = `${await openNote(page, parked)} textarea`
       const putBack = await valueIs(putNote, "for later: a plan")
       await waitFor(() => placeOf(parked)?.kind === "note", 5_000)
       check(
@@ -3356,7 +3352,6 @@ async function run(check: Checks["check"]): Promise<void> {
         putBack && placeOf(parked)?.kind === "note",
         `${await boxText(putNote)}; ${placeOf(parked)?.kind}`,
       )
-      await closeNotes(page)
       // Undo, outside a box: the put is undone, and the card is back in its
       // slot. The host records a move as it applies it (ADR-0066), so the key
       // can follow at once.
@@ -3600,8 +3595,8 @@ async function run(check: Checks["check"]): Promise<void> {
         readMarked,
       )
 
-      // Notes (ADR-0113): your message's ⋯ moves it to the notes above the
-      // composer, which empties; the note's ⋯ moves it back into the box.
+      // Notes (ADR-0116): your message's ⋯ moves it to the note column
+      // nearest its thread.
       // The inventory, left open in the middle of the screen, would cover it.
       if ((await page.locator(".inventory").count()) > 0)
         await page.click("#bottom .inventory-toggle")
@@ -3618,57 +3613,17 @@ async function run(check: Checks["check"]): Promise<void> {
         `${col(0)} .composer`,
         '.move-to[data-to="note"]',
       )
-      const emptied = await valueIs(composerBox, "")
-      const noteFrame = await openNote(page, col(0), noted)
-      const drawnAsNote = await appears(noteFrame)
-      await chooseOnCard(page, noteFrame, '.move-to[data-to="message"]')
-      const back = await page
-        .waitForFunction(
-          ([s, id]) =>
-            document.querySelector(s ?? "")?.getAttribute("data-card") === id,
-          [composerBox, noted],
-          { timeout: 10_000 },
-        )
-        .then(
-          () => true,
-          () => false,
-        )
-      check(
-        "Move to notes puts your message on the notes board, and the note's Move to your message brings it back into the box",
-        emptied && drawnAsNote && back,
-        `emptied ${emptied}, a note ${drawnAsNote}, back ${back}`,
-      )
-      // Enter on a selected empty cell makes a note there, open over the
-      // cell it covers whole, its box focused, so you write in it at once.
-      const notesBefore = new Set(
-        readPlaces(host.places)
-          .filter(c => c.place.kind === "note")
-          .map(c => c.id),
-      )
-      const emptyCell = ".pane-notes .note-cell.empty"
-      await page
-        .locator(emptyCell)
-        .first()
-        .dispatchEvent("click")
-        .catch(() => {})
-      await page.keyboard.press("Enter")
+      await valueIs(composerBox, "")
+      await appears(await openNote(page, noted))
+      // "+ add a note" makes an empty note at the column's end, its box
+      // focused, so you write in it at once; Alt+↑ there moves it up the
+      // column, for everyone.
+      await page.click(".note-column .add-note")
       const writing = await page
         .waitForFunction(
-          () => {
-            const box = document.activeElement
-            const open = box?.closest(".card-grid-open")
-            const cell = open?.parentElement?.querySelector(".note-cell")
-            if (!(box instanceof HTMLTextAreaElement) || cell == null)
-              return false
-            const o = open?.getBoundingClientRect()
-            const c = cell.getBoundingClientRect()
-            return (
-              o !== undefined &&
-              o.top <= c.top + 1 &&
-              o.left <= c.left + 1 &&
-              o.bottom >= c.bottom - 1
-            )
-          },
+          () =>
+            document.activeElement instanceof HTMLTextAreaElement &&
+            document.activeElement.closest(".note-column") != null,
           undefined,
           { timeout: 10_000 },
         )
@@ -3680,20 +3635,61 @@ async function run(check: Checks["check"]): Promise<void> {
       const jotted = await waitFor(
         () =>
           readPlaces(host.places).some(
-            c =>
-              c.place.kind === "note" &&
-              !notesBefore.has(c.id) &&
-              host.cardText(c.id) === "jot",
+            c => c.place.kind === "note" && host.cardText(c.id) === "jot",
           ),
         10_000,
       )
       check(
-        "Enter on an empty cell of the notes board makes a note there, open over its cell, ready to write in",
+        "+ add a note makes an empty note at its note column's end, ready to write in",
         writing && jotted >= 0,
         `writing ${writing}; jotted ${jotted} ms`,
       )
-      await page.keyboard.press("Escape")
-      await closeNotes(page)
+      const orderOf = (text: string) => {
+        const c = readPlaces(host.places).find(
+          x => x.place.kind === "note" && host.cardText(x.id) === text,
+        )
+        return c?.place.kind === "note" ? c.place.order : ""
+      }
+      await page.keyboard.press("Alt+ArrowUp")
+      const raised = await waitFor(
+        () => orderOf("jot") < orderOf("one thought"),
+        10_000,
+      )
+      check(
+        "Alt+↑ in a note's box moves it up its note column, for everyone",
+        raised >= 0,
+        `jot ${orderOf("jot")}, one thought ${orderOf("one thought")}`,
+      )
+      // Its title, renamed from its header, for everyone.
+      const notesColumn = `.note-column:has(textarea[data-card="${noted}"])`
+      await page.click(`${notesColumn} .note-column-title`)
+      const titleBox = `${notesColumn} .open-title-input`
+      await page.waitForSelector(titleBox, { timeout: 10_000 })
+      await page.fill(titleBox, "Ideas")
+      await page.press(titleBox, "Enter")
+      const columnRenamed = await waitFor(
+        () =>
+          [...readNoteColumns(host.session).values()].some(
+            r => r.title === "Ideas",
+          ),
+        10_000,
+      )
+      // The record reaches the page apart from the reply.
+      await page
+        .waitForFunction(
+          s => document.querySelector(s)?.textContent === "Ideas",
+          `${notesColumn} .note-column-title`,
+          { timeout: 10_000 },
+        )
+        .catch(() => {})
+      const shownTitle = await page
+        .textContent(`${notesColumn} .note-column-title`)
+        .catch(() => null)
+      check(
+        "a note column is renamed from its header, for everyone",
+        columnRenamed >= 0 && shownTitle === "Ideas",
+        `${columnRenamed} ms; ${[...readNoteColumns(host.session).values()].map(r => r.title).join()}; shown ${shownTitle}`,
+      )
 
       // "+ pin" (ADR-0048), in the conversation below, which has no pinned
       // card: the header offers it, and the box it opens in the strip makes a
@@ -3735,10 +3731,11 @@ async function run(check: Checks["check"]): Promise<void> {
         `focused ${pinFocused}, lines ${twoLines}, drawn ${drawnPinned}, ${placeOf(newPinned)?.kind}, moved ${pinMoved}`,
       )
 
-      // A trace (ADR-0048 step 6): someone else pins Ada's card in the
-      // conversation below while she is on a new tab, which reports no column.
-      // Back on her tab, a trace says so where the card was, leads to
-      // it, and the card's history names who pinned it.
+      // A trace (ADR-0048 step 6): Ada pins her card in the conversation
+      // below, and someone else pins it on the thread above while she is on
+      // a new tab, which reports no column. Back on her tab, a trace says so
+      // where the card was, leads to it, and the card's history names who
+      // pinned it.
       const traceBox = `${col(1)} .composer .input`
       await page.click(traceBox)
       await page.keyboard.type("pinned while away")
@@ -3747,23 +3744,34 @@ async function run(check: Checks["check"]): Promise<void> {
         traceBox,
         { timeout: 10_000 },
       )
-      const traced = cardId(
+      const traced = textCardId(
         (await page.getAttribute(traceBox, "data-card")) ?? "",
       )
-      // A note: your message is yours alone, and nobody else moves it.
+      // Pinned: your message is yours alone, and nobody else moves it.
       await chooseOnCard(
         page,
         `${col(1)} .composer`,
-        '.move-to[data-to="note"]',
+        '.move-to[data-to="pinned"]',
       )
-      await waitFor(() => placeOf(traced)?.kind === "note", 5_000)
+      await waitFor(() => placeOf(traced)?.kind === "pinned", 5_000)
       const tracedFrom = placeOf(traced)
+      const aboveEnd = await page
+        .locator(`${col(0)} .msg[data-entry]`)
+        .last()
+        .getAttribute("data-entry")
       await stepAway(page)
       await waitFor(
         () => !readReading(host.presence).some(([w]) => w === ME),
         5_000,
       )
-      const pinTo = tracedFrom === undefined ? null : pinnedOf(tracedFrom)
+      const pinTo =
+        aboveEnd === null
+          ? null
+          : ({
+              kind: "pinned",
+              at: atEntry(entryId(aboveEnd)),
+              thread: threadHolding(host, entryId(aboveEnd)),
+            } as const)
       if (tracedFrom !== undefined && pinTo !== null)
         await api.moveCard(
           { card: traced, from: keyOf(tracedFrom), to: pinTo },
@@ -3775,12 +3783,12 @@ async function run(check: Checks["check"]): Promise<void> {
       const traceText = (await page.textContent(traceRow).catch(() => "")) ?? ""
       await page.click(traceRow).catch(() => {})
       const leads = await appears(
-        `${col(1)} .pinned-strip textarea[data-card="${traced}"]`,
+        `${col(0)} .pinned-strip textarea[data-card="${traced}"]`,
       )
       // The inventory, left open in the middle of the screen, would cover it.
       if ((await page.locator(".inventory").count()) > 0)
         await page.click("#bottom .inventory-toggle")
-      const tracedFrame = `${col(1)} .pinned-strip .card-editor:has(textarea[data-card="${traced}"])`
+      const tracedFrame = `${col(0)} .pinned-strip .card-editor:has(textarea[data-card="${traced}"])`
       const historyOpened = await chooseOnCard(
         page,
         tracedFrame,

@@ -1,4 +1,4 @@
-import { INVENTORY_GRID, NOTES_GRID } from "@pinetrie/core"
+import { INVENTORY_GRID } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { type GridKeyState, gridKeyAct } from "./grid-keys.ts"
 import type { KeyLike } from "./inventory-keys.ts"
@@ -16,7 +16,6 @@ const at = (over: Partial<GridKeyState> = {}): GridKeyState => ({
   rows: 3,
   selected: 7,
   hasCard: true,
-  creates: false,
   open: false,
   inText: false,
   ...over,
@@ -50,12 +49,8 @@ describe("gridKeyAct (ADR-0113)", () => {
     ).toBeNull()
   })
 
-  test("Enter on an empty cell of a notes board makes a note there; never in your inventory, nor with Alt", () => {
-    const empty = at({ grid: NOTES_GRID, hasCard: false, creates: true })
-    expect(gridKeyAct(key("Enter"), empty)).toEqual({ kind: "create" })
-    expect(gridKeyAct(key("Enter", { altKey: true }), empty)).toBeNull()
+  test("Enter on an empty cell does nothing", () => {
     expect(gridKeyAct(key("Enter"), at({ hasCard: false }))).toBeNull()
-    expect(gridKeyAct(key("Enter"), { ...empty, inText: true })).toBeNull()
   })
 
   test("Enter opens a card; Escape folds an open one", () => {
@@ -74,9 +69,10 @@ describe("gridKeyAct (ADR-0113)", () => {
     expect(gridKeyAct(key("Escape"), inText)).toEqual({ kind: "fold" })
   })
 
-  test("a growing grid stops at the rows it shows", () => {
-    expect(
-      gridKeyAct(key("j"), at({ grid: NOTES_GRID, rows: 2, selected: 5 })),
-    ).toEqual({ kind: "select", cell: 5 })
+  test("a move stops at the last row", () => {
+    expect(gridKeyAct(key("j"), at({ selected: 13 }))).toEqual({
+      kind: "select",
+      cell: 13,
+    })
   })
 })

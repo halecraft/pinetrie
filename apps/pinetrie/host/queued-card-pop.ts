@@ -16,6 +16,7 @@ import {
   type CardId,
   type CardRecord,
   errorText,
+  noteColumnIdFor,
   type OfferFact,
   PLAIN,
   parseMentions,
@@ -39,6 +40,7 @@ import {
   encodeFact,
   planCarry,
   planNextQueuedCardPop,
+  planQueueHold,
   planUnsent,
   type QueuedCard,
   queuedOn,
@@ -49,6 +51,7 @@ import type { CardPort } from "./cards.ts"
 import type { Chat } from "./commands/chat.ts"
 import { applyPlaceSteps } from "./places.ts"
 import type { Provenance } from "./provenance.ts"
+import type { Records } from "./records.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -128,7 +131,12 @@ export const chatOfPoppedQueuedCard = (
 })
 
 export interface QueuedCardPopDeps {
-  readonly basics: Pick<Basics, "session" | "live" | "places" | "log" | "now">
+  readonly basics: Pick<
+    Basics,
+    "session" | "live" | "places" | "log" | "now" | "newId"
+  >
+  /** A queue's hold, written when an unsent card has nowhere to go. */
+  readonly records: Pick<Records, "writeValues">
   /** Who is typing in which card (`typingIn`): the pop waits for them. */
   readonly presence: PresenceDocHandle
   readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds" | "destroy">
@@ -271,13 +279,13 @@ async function catchUpThenSend(
       plan.command,
       "send",
     )
-    .catch((error: unknown) => {
-      unsent(deps, card, hostFailedWords(errorText(error)))
+    .catch(async (error: unknown) => {
+      await unsent(deps, card, hostFailedWords(errorText(error)))
       return null
     })
   if (prepared === null) return "next"
   if (prepared.kind === "refused") {
-    unsent(deps, card, prepared.reason)
+    await unsent(deps, card, prepared.reason)
     return "next"
   }
   if (prepared.kind === "conflicted") {
@@ -314,7 +322,7 @@ async function splitThen(
       refused: hostFailedWords(errorText(error)),
     }))
   if ("refused" in message) {
-    unsent(deps, card, message.refused)
+    await unsent(deps, card, message.refused)
     return "next"
   }
   await deps.texts.destroy(card.id)
@@ -329,8 +337,8 @@ async function sendCard(
   sending: QueuedCard,
 ): Promise<"ran" | "next"> {
   const { card } = popped
-  const sent = await deps.send(popped).catch((error: unknown) => {
-    unsent(deps, sending, hostFailedWords(errorText(error)))
+  const sent = await deps.send(popped).catch(async (error: unknown) => {
+    await unsent(deps, sending, hostFailedWords(errorText(error)))
     return null
   })
   if (sent === null) return "next"
@@ -344,28 +352,53 @@ async function sendCard(
       applyPlaceSteps(deps.basics.places, [{ kind: "write", record: sending }])
       return "ran"
     case "refused":
-      unsent(deps, sending, sent.message)
+      await unsent(deps, sending, sent.message)
       return "next"
     case "conflict":
-      unsent(deps, sending, "two threads end here: send it from one of them")
+      await unsent(
+        deps,
+        sending,
+        "two threads end here: send it from one of them",
+      )
       return "next"
     case "failed":
-      unsent(deps, sending, hostFailedWords(sent.message))
+      await unsent(deps, sending, hostFailedWords(sent.message))
       return "next"
     default:
-      unsent(deps, sending, `not sent: ${sent.kind}`)
+      await unsent(deps, sending, `not sent: ${sent.kind}`)
       return "next"
   }
 }
 
-/** Write a card the host could not send back below the line, whole, saying why. */
-function unsent(
+/**
+ * Write a card the host could not send back, whole, saying why: a note in
+ * the column nearest its thread, or queued still behind a hold where it
+ * has nowhere to go (`planUnsent`).
+ */
+async function unsent(
   deps: QueuedCardPopDeps,
   card: QueuedCard,
   reason: string,
-): void {
-  const { session, places, log } = deps.basics
-  applyPlaceSteps(places, [planUnsent(readPlaces(places), card, reason)])
+): Promise<void> {
+  const { session, places, log, newId, now } = deps.basics
+  const plan = planUnsent({
+    cards: readPlaces(places),
+    card,
+    reason,
+    column: noteColumnIdFor(newId()),
+  })
+  // The hold first, so the drain this card ends finds the queue held.
+  if (plan.hold)
+    await deps.records.writeValues(
+      planQueueHold({
+        holds: readQueueHolds(session),
+        lane: card.place.thread,
+        by: card.place.by,
+        now: now(),
+        held: true,
+      }),
+    )
+  applyPlaceSteps(places, plan.steps)
   log(
     `[host] ${readThreadName(session, card.place.thread)}: a queued card was not sent: ${reason}`,
   )

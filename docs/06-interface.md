@@ -385,8 +385,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   cards at a thread's end stay with the thread.
 - **Each column's foot is its dock** (ADR-0113), pinned there while the
   messages scroll above it: the queue's header, which says what happens
-  next, the cards queued, **+ add to queue**, the line, your message, and
-  the notes line. It takes at most a third of the column and scrolls within
+  next, the cards queued, **+ add to queue**, the line, and your message.
+  It takes at most a third of the column and scrolls within
   itself past that, its queue header kept in view.
 - **The queue's header says what happens next**, with one button. ▸ marks
   what goes next: the run, the queued card the host sends next (a blank
@@ -806,37 +806,33 @@ The rail is E; the column is T. Seeing both at once is the product.
   thread as the thread grows. A new tab's or a new branch's card belongs to
   its column until its first message is sent. Others writing at the
   thread's end show above it as "Bea is writing…".
-- **A note is a card below the line that everyone at the thread's end
-  sees**, on the thread's **notes board**, and anyone can type in it. Your
-  message's **Move to notes** makes it one; a note's **Move to your
-  message** puts it in your composer. A note dropped on the composer
-  becomes your message, and a message there with text takes the note's
-  place, in one move the undo key outside a box undoes; an empty one is
-  discarded. In a new branch, a message with text takes a card only from
-  your inventory ("not moved: your message here holds text"). An unqueued
-  card, an unpinned card, a card the host could not send and a card put in
-  a column are notes.
-- **The notes board is a grid in the column's pane**, 4 wide, with one
-  empty row below its last note to grow into, opened and closed by the
-  column's **notes (n)** line under your message, beside the circles of
-  whose notes are there, other than yours. A narrow pane scrolls it sideways. Each note sits
-  in a cell, folded to its first three lines, and keeps it, gaps included,
-  for everyone: a cell is an address. **Enter on a selected empty cell, or
-  the "+" drawn in it, makes a new note there**, open with the cursor in
-  it; one left empty is swept when the host next starts. Click a note, or
-  Enter on it, and it
-  opens whole in place, over its neighbours, headed "Ada's note · with
-  Bea"; Escape folds it. Arrows and `hjkl` move the selection, and
-  Alt+arrows the selected note a cell. A card dropped on an empty cell goes
-  there; on a note, the two swap, in one move, when the card is a note or
-  from your inventory. Dropped on the notes line, or put in the column, a
-  card takes the first empty cell.
+- **A note is a card in a note column** (ADR-0116), which everyone in the
+  task sees and anyone can type in; no agent reads it. A **note column** is
+  a column of the task's: a title ("Notes" until someone renames it, from
+  its header, for everyone) and its notes one under another, each folded to
+  its first line until you click into it, headed "Ada's note · with Bea".
+  ↑ and ↓ on a note, or Alt+↑/↓ in its box, move it in the column, as a
+  queued card moves; **+ add a note** makes an empty one at its end, the
+  cursor in it; one left empty is swept when the host next starts. Until
+  the canvas lays out a task's columns, a note column sits just after the
+  thread it follows on the task, among the open threads' columns, and
+  cannot be closed or moved from the page.
+- **A card leaving a thread's queue or pinned strip goes to the note column
+  nearest the thread**, in the task's order, the one after it on a tie;
+  with none, a note column titled "Notes" is made just after the thread.
+  So does your message's **Move to notes**, a card the host could not send,
+  and a card put or dropped on a thread's column. A card dropped on a note
+  column is a note at its end. Dropped on the composer a note becomes your
+  message, and a message there with text takes the note's place, in one
+  move the undo key outside a box undoes; an empty one is discarded. In a
+  new branch, a message with text takes a card only from your inventory
+  ("not moved: your message here holds text").
 - **Marks say where you left something unsent** (ADR-0048): a small dot in
   your colour on its root's item in the sidebar, and on the rail at its
   thread's end, whether or not that thread's column is open. A root you
   closed is marked on ▦ and its thread card; an archived root only on its
-  thread card, since its work is done. Only your own message and the notes
-  you own count, and only while they hold text: emptied, sent or
+  thread card, since its work is done. A note you own marks its task, not a
+  thread's end. Only your own message and the notes you own count, and only while they hold text: emptied, sent or
   discarded, the dot goes. A bare `@agent ` is nothing typed.
 - **Sending spends the card.** The box stays as it was until the host
   answers: written or running, the card is gone and the box empty; a
@@ -947,7 +943,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   middle of the screen by default; drag its top bar and it settles left,
   centre or right, and this device remembers where. Only you see it, on
   every root and device; nobody else can move a card into or out of it.
-- **A fixed 3 × 6 grid of cards**, the notes board's grid: each slot shows
+- **A fixed 3 × 6 grid of cards**: each slot shows
   its card folded, its first three lines under its author's circle; the
   first nine are numbered 1–9. Click a slot, or move with the arrow keys or
   `hjkl` while the panel has focus, to select it; a click or Enter opens
@@ -964,8 +960,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   means full: the nineteenth card is refused with "inventory full".
 - **Put** moves the selected card to the notes of the column you were last
   in: Ctrl+Shift+O, the panel's **put** button, or a drag out
-  of the panel onto a column's notes line or a cell of its notes board: a
-  note, in the first empty cell, or the cell it is dropped on. Dropped on a
+  of the panel onto a column: a note in the note column nearest its thread,
+  or, onto a note column, at its end. Dropped on a
   composer, it becomes your message there. Held over a root in the sidebar,
   a drag opens it. The open card's **×** discards it; the undo key brings
   it back.
@@ -1041,18 +1037,16 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 - **Tasks and the canvas** (ADR-0116), accepted, not yet built: the board would hold
   tasks, and a task's canvas would lay out what it holds as columns, in an
   order everyone shares, each folded only for whoever folds it: threads
-  from any root under a rail that draws a forest, note columns in place of
-  each thread's notes board, file cards showing a source's file, and
-  media. Each thread's agent would be told what is on its canvas.
+  from any root under a rail that draws a forest, note columns (built:
+  above), file cards showing a source's file, and media. Each thread's agent would be told what is on its canvas.
 - **Threads as cards** (ADR-0117), accepted, not yet built: a thread would have an id and
   one place, in a task or an inventory; taking it would move its card, not
   its run; copying it would branch at its end, and a copy's fork row would
   lead back to its source, or say who has it.
 - **What is left of cards and the dock** (ADR-0111, ADR-0113): a thread
   card's body on the board drawn from its pinned cards' first lines (today
-  its first line, under a title); and the notes line's avatars as the
-  people on the notes board now (today the notes' owners), which needs a
-  presence field of its own.
+  its first line, under a title); and who is in a note column now, which
+  needs a presence field of its own.
 - **Narrow screens**: the stacked sequence described above, with the sidebar
   collapsed to each root's banner (ADR-0050, ADR-0053) and the footer to ▦,
   what needs you and you (ADR-0122); built after the wide layout works. The

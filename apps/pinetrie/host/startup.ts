@@ -26,7 +26,6 @@ import {
   planClear,
   planSeatSweep,
   planStartup,
-  planStoredCardRepair,
   planUndeclaredSweep,
   planWorkflowSeed,
   SEAT,
@@ -152,26 +151,9 @@ export async function recover(deps: StartupDeps): Promise<void> {
   if (changed.length > 0) await keeper.run(() => records.writeValues(changed))
   for (const r of piSetup.refusedCommands())
     log(`[host] command ${r.name} is refused: ${r.reason}`)
-  repairCards(deps)
   await sweepTexts(deps)
   // Last, so the startup compaction it ends with holds every write above.
   void settle(planned.drain)
-}
-
-/**
- * One message per person at each thread end (`planStoredCardRepair`):
- * outside every gesture, so no undo reaches it. Remove this, its planner and
- * its test once every store has started with notes.
- */
-function repairCards(deps: StartupDeps): void {
-  // gather
-  const { cards, ends } = deps.provenance.before()
-  // plan
-  const steps = planStoredCardRepair(cards, ends)
-  // execute
-  applyPlaceSteps(deps.basics.places, steps)
-  if (steps.length > 0)
-    deps.basics.log(`[host] ${steps.length} extra message(s) became notes`)
 }
 
 /**

@@ -1,7 +1,9 @@
 import {
   type EntryId,
   entryId,
+  type TaskId,
   type ThreadId,
+  taskIdFor,
   threadIdFor,
   type Verdict,
   type VerdictRecord,
@@ -15,13 +17,14 @@ import {
   arrivals,
   attentionOf,
   attentionWords,
-  doneRoots,
+  doneThreads,
   follows,
   highest,
   levelOf,
   markOf,
-  rootStatus,
   type Status,
+  taskStatus,
+  threadStatus,
 } from "./attention.ts"
 
 const ADA = writerId("ada@x.io")
@@ -30,6 +33,8 @@ const A = threadIdFor("a")
 const B = threadIdFor("b")
 const R1 = entryId("r1")
 const R2 = entryId("r2")
+const K1 = taskIdFor("1")
+const _K2 = taskIdFor("2")
 
 const said = (s: "needsYou" | "worthARead" | "done"): Verdict => ({
   kind: "said",
@@ -63,10 +68,6 @@ const input = (over: Partial<AttentionInput> = {}): AttentionInput => ({
   offers: [],
   person: person(),
   busy: new Set(),
-  laneRoots: new Map([
-    [A, R1],
-    [B, R2],
-  ]),
   archived: new Set(),
   ...over,
 })
@@ -107,7 +108,6 @@ describe("attentionOf", () => {
     expect(attentionOf(input())).toEqual([
       {
         lane: A,
-        root: R1,
         end: "e-5",
         level: "needsYou",
         raised: { kind: "verdict", verdict: said("needsYou"), ask: "p-1" },
@@ -120,7 +120,7 @@ describe("attentionOf", () => {
       attentionOf(
         input({
           verdicts: new Map([[B, verdict(B, said("needsYou"))]]),
-          offers: [offer(B, "c-1")],
+          offers: [offer(B, "c0000000-0000-7000-8000-000000000001")],
         }),
       ),
     ).toEqual([])
@@ -157,25 +157,31 @@ describe("attentionOf", () => {
     ).toHaveLength(1)
   })
 
-  test("a busy lane, or an archived root, raises nothing", () => {
+  test("a busy lane, or a thread of an archived task, raises nothing", () => {
     expect(attentionOf(input({ busy: new Set([A]) }))).toEqual([])
-    expect(attentionOf(input({ archived: new Set([R1]) }))).toEqual([])
+    expect(attentionOf(input({ archived: new Set([A]) }))).toEqual([])
   })
 
   test("an offer on a thread you follow needs you, reading clears it not, and not needed holds until new work", () => {
     const read = person({ read: new Map([[A, entryId("e-9")]]) })
     const items = attentionOf(
-      input({ verdicts: new Map(), offers: [offer(A, "c-1")], person: read }),
+      input({
+        verdicts: new Map(),
+        offers: [offer(A, "c0000000-0000-7000-8000-000000000001")],
+        person: read,
+      }),
     )
     expect(items.map(i => [i.level, i.raised.kind])).toEqual([
       ["needsYou", "offer"],
     ])
-    const dismissed = person({ dismissedOffers: new Map([[A, "c-1"]]) })
+    const dismissed = person({
+      dismissedOffers: new Map([[A, "c0000000-0000-7000-8000-000000000001"]]),
+    })
     expect(
       attentionOf(
         input({
           verdicts: new Map(),
-          offers: [offer(A, "c-1")],
+          offers: [offer(A, "c0000000-0000-7000-8000-000000000001")],
           person: dismissed,
         }),
       ),
@@ -184,7 +190,7 @@ describe("attentionOf", () => {
       attentionOf(
         input({
           verdicts: new Map(),
-          offers: [offer(A, "c-2")],
+          offers: [offer(A, "c0000000-0000-7000-8000-000000000002")],
           person: dismissed,
         }),
       ),
@@ -192,43 +198,70 @@ describe("attentionOf", () => {
   })
 })
 
-describe("rootStatus", () => {
-  const laneRoots = new Map([
-    [A, R1],
-    [B, R2],
-  ])
-  const facts = { work: new Map(), verdicts: new Map(), laneRoots }
+describe("threadStatus and taskStatus (ADR-0116)", () => {
+  const facts = { work: new Map(), verdicts: new Map() }
   test("working wins, and a pending verdict is working; else the highest item", () => {
-    const items = attentionOf(input({ offers: [offer(A, "c-1")] }))
-    const status = rootStatus({
+    const items = attentionOf(
+      input({ offers: [offer(A, "c0000000-0000-7000-8000-000000000001")] }),
+    )
+    const status = threadStatus({
       ...facts,
       items,
-      work: new Map([[R2, "running"]]),
+      work: new Map([[B, "running"]]),
     })
-    expect(status.get(R1)?.kind).toBe("needsYou")
-    expect(status.get(R2)).toEqual({ kind: "working" })
+    expect(status.get(A)?.kind).toBe("needsYou")
+    expect(status.get(B)).toEqual({ kind: "working" })
     expect(
-      rootStatus({
+      threadStatus({
         ...facts,
         items,
         verdicts: new Map([[A, verdict(A, { kind: "pending" })]]),
-      }).get(R1),
+      }).get(A),
     ).toEqual({ kind: "working" })
   })
 
-  test("cards behind a held queue are not working: the root shows what was raised there, or nothing", () => {
-    const items = attentionOf(input({ offers: [offer(A, "c-1")] }))
+  test("cards behind a held queue are not working: the thread shows what was raised there, or nothing", () => {
+    const items = attentionOf(
+      input({ offers: [offer(A, "c0000000-0000-7000-8000-000000000001")] }),
+    )
     const work = new Map([
-      [R1, "held"],
-      [R2, "held"],
+      [A, "held"],
+      [B, "held"],
     ] as const)
-    const status = rootStatus({ ...facts, items, work })
-    expect(status.get(R1)?.kind).toBe("needsYou")
-    expect(status.has(R2)).toBe(false)
+    const status = threadStatus({ ...facts, items, work })
+    expect(status.get(A)?.kind).toBe("needsYou")
+    expect(status.has(B)).toBe(false)
   })
 
-  test("a root with nothing raised and nothing working has no status", () => {
-    expect(rootStatus({ ...facts, items: [] }).size).toBe(0)
+  test("a thread with nothing raised and nothing working has no status", () => {
+    expect(threadStatus({ ...facts, items: [] }).size).toBe(0)
+  })
+
+  test("a task's status is its threads' together: working wins, else the highest; a thread in no task counts for none", () => {
+    const [item] = attentionOf(input())
+    if (item === undefined) throw new Error("no item")
+    const C = threadIdFor("c")
+    // The higher first, so a later, lower thread cannot win by coming last.
+    const threads = new Map<ThreadId, Status>([
+      [C, { kind: "working" }],
+      [B, { kind: "needsYou", item }],
+      [A, { kind: "worthARead", item }],
+    ])
+    const of = (taskOf: [ThreadId, TaskId][]) =>
+      taskStatus(threads, new Map(taskOf))
+    expect(
+      of([
+        [A, K1],
+        [B, K1],
+      ]).get(K1)?.kind,
+    ).toBe("needsYou")
+    expect(
+      of([
+        [A, K1],
+        [C, K1],
+      ]).get(K1),
+    ).toEqual({ kind: "working" })
+    expect([...of([[A, K1]]).keys()]).toEqual([K1])
   })
 })
 
@@ -239,34 +272,34 @@ describe("arrivals", () => {
   }
   const working: Status = { kind: "working" }
   test("a first render arrives at nothing: a load draws every mark still", () => {
-    expect(arrivals(null, new Map([[R1, needs]]), new Set([R1]))).toEqual({
+    expect(arrivals(null, new Map([[K1, needs]]), new Set([K1]))).toEqual({
       arrived: new Set(),
       done: new Set(),
     })
   })
   test("rising to needs you arrives; staying there does not", () => {
     expect(
-      arrivals(new Map([[R1, working]]), new Map([[R1, needs]]), new Set())
+      arrivals(new Map([[K1, working]]), new Map([[K1, needs]]), new Set())
         .arrived,
-    ).toEqual(new Set([R1]))
+    ).toEqual(new Set([K1]))
     expect(
-      arrivals(new Map([[R1, needs]]), new Map([[R1, needs]]), new Set())
+      arrivals(new Map([[K1, needs]]), new Map([[K1, needs]]), new Set())
         .arrived,
     ).toEqual(new Set())
   })
   test("working, then nothing, with a run you follow done: a ✓", () => {
     expect(
-      arrivals(new Map([[R1, working]]), new Map(), new Set([R1])).done,
-    ).toEqual(new Set([R1]))
+      arrivals(new Map([[K1, working]]), new Map(), new Set([K1])).done,
+    ).toEqual(new Set([K1]))
     expect(
-      arrivals(new Map([[R1, working]]), new Map(), new Set()).done,
+      arrivals(new Map([[K1, working]]), new Map(), new Set()).done,
     ).toEqual(new Set())
   })
 })
 
-test("doneRoots: a run you follow that was done, or that you stopped", () => {
+test("doneThreads: a run you follow that was done, or that you stopped", () => {
   expect(
-    doneRoots(
+    doneThreads(
       input({
         verdicts: new Map([
           [A, verdict(A, said("done"))],
@@ -274,14 +307,14 @@ test("doneRoots: a run you follow that was done, or that you stopped", () => {
         ]),
       }),
     ),
-  ).toEqual(new Set([R1]))
+  ).toEqual(new Set([A]))
   expect(
-    doneRoots(
+    doneThreads(
       input({
         verdicts: new Map([[A, verdict(A, { kind: "stopped", by: ADA })]]),
       }),
     ),
-  ).toEqual(new Set([R1]))
+  ).toEqual(new Set([A]))
 })
 
 test("attentionWords: each reason, as a value worded once", () => {
@@ -304,21 +337,21 @@ test("attentionWords: each reason, as a value worded once", () => {
   )
 })
 
-test("markOf: the highest level among the roots it covers; working raises nothing", () => {
+test("markOf: the highest level among the tasks it covers; working raises nothing", () => {
   const item = (level: "needsYou" | "worthARead") => ({
     lane: threadIdFor("m"),
-    root: entryId("r"),
     end: entryId("e"),
     level,
     raised: { kind: "offer" as const, source: "c" },
   })
-  const status = new Map<EntryId, Status>([
-    [entryId("a"), { kind: "working" }],
-    [entryId("b"), { kind: "worthARead", item: item("worthARead") }],
-    [entryId("c"), { kind: "needsYou", item: item("needsYou") }],
+  const [a, b, c] = [taskIdFor("a"), taskIdFor("b"), taskIdFor("c")]
+  const status = new Map<TaskId, Status>([
+    [a, { kind: "working" }],
+    [b, { kind: "worthARead", item: item("worthARead") }],
+    [c, { kind: "needsYou", item: item("needsYou") }],
   ])
-  expect(markOf(status, [entryId("a")])).toBeNull()
-  expect(markOf(status, [entryId("a"), entryId("b")])).toBe("worthARead")
-  expect(markOf(status, [entryId("b"), entryId("c")])).toBe("needsYou")
+  expect(markOf(status, [a])).toBeNull()
+  expect(markOf(status, [a, b])).toBe("worthARead")
+  expect(markOf(status, [b, c])).toBe("needsYou")
   expect(markOf(status, [])).toBeNull()
 })

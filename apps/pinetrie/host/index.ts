@@ -560,6 +560,7 @@ export async function startHost({
     drainQueue(
       {
         basics,
+        records,
         texts: cardPort,
         agent,
         work,

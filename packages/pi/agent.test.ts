@@ -6,7 +6,6 @@
 // boundary ADR-0003 holds.
 
 import {
-  cardId,
   commitId,
   ERR,
   NOBODY,
@@ -15,6 +14,7 @@ import {
   rootIdFor,
   THE_AGENT,
   type ThreadId,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -231,7 +231,17 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     )
   const cardsOf = (lane: ThreadId, text: string) =>
     encodePinned(
-      { lane, cards: [{ id: cardId("c-1"), text, by: ADA }], retired: [] },
+      {
+        lane,
+        cards: [
+          {
+            id: textCardId("c0000000-0000-7000-8000-000000000001"),
+            text,
+            by: ADA,
+          },
+        ],
+        retired: [],
+      },
       () => "Ada",
       1,
     )

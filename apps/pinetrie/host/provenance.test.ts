@@ -5,10 +5,10 @@ import {
   rootIdFor,
   type TextPlace,
   taskIdFor,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { newPresenceDoc } from "@pinetrie/schema"
 import { writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
@@ -27,7 +27,7 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
     kind: "write" as const,
     record: {
       kind: "text" as const,
-      id: textCardId(id),
+      id: cardIdFor(id),
       owner: ADA,
       placer: ADA,
       place,
@@ -46,16 +46,16 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
   )
   applyPlaceSteps(b.places, [
     card("here", {
-      kind: "note",
+      kind: "pinned",
       at: atEntry(E1),
       thread: LANE,
-      cell: 0,
+      order: "a",
     }),
     card("away", {
-      kind: "note",
+      kind: "pinned",
       at: atEntry(E1),
       thread: AWAY,
-      cell: 0,
+      order: "a",
     }),
     card("held", { kind: "inventory", holder: ADA }),
   ])
@@ -64,5 +64,5 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
     presence: newPresenceDoc(),
     records: { writeValues: async w => applyWrites(b, w) },
   })
-  expect([...provenance.before().ends]).toEqual([[textCardId("here"), E1]])
+  expect([...provenance.before().ends]).toEqual([[cardIdFor("here"), E1]])
 })

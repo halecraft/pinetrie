@@ -335,7 +335,7 @@ describe("planObserve: what moved between two fingerprints", () => {
   const LANE_B = threadIdFor("b")
   const fp = (
     bookmarks: Record<string, string>,
-    at: string | null = "c-at",
+    at: string | null = "c0000000-0000-7000-8000-000000000104",
   ): Fingerprint => ({
     op: "op",
     bookmarks: new Map(Object.entries(bookmarks)),
@@ -365,7 +365,11 @@ describe("planObserve: what moved between two fingerprints", () => {
     ],
     ["a WIP moved", fp({ ...base, "wip/a": "c9" }), { ...none, all: true }],
     ["a WIP appeared", fp({ ...base, "wip/b": "c9" }), { ...none, all: true }],
-    ["@ alone moved", fp(base, "c-new"), { ...none, yours: true }],
+    [
+      "@ alone moved",
+      fp(base, "c0000000-0000-7000-8000-000000000105"),
+      { ...none, yours: true },
+    ],
     [
       "the publish bookmark moved: accepted work's record alone (ADR-0076)",
       fp({ ...base, main: "c1" }),

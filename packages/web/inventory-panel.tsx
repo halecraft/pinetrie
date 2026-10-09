@@ -102,8 +102,6 @@ export function InventoryPanel(p: {
       </div>
       <div className="inventory-body">
         <CardGrid
-          kind="inventory"
-          onCreate={null}
           colorOf={p.colorOf}
           onMove={(card, slot) =>
             p.onIntent({

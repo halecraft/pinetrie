@@ -43,14 +43,9 @@ export const presenceSchema = (d: PresenceDecay) =>
     /** Keyed `${writer}:${columnKey}`: the end of the thread that column shows. */
     reading: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
     /**
-     * Keyed as `reading`: the root entry of the thread that column shows
-     * (ADR-0063), so a window that does not hold that root can still name it
-     * and open it.
-     */
-    readingRoot: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
-    /**
      * Keyed as `reading`: the task the column is on (ADR-0116), so the
-     * sidebar and the board name readers by task.
+     * sidebar and the board name readers by task, and a window that does not
+     * hold the thread's root can still name it (ADR-0063).
      */
     readingTask: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
     /** Keyed by writer: the thread end whose composer they are typing in. */

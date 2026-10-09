@@ -7,6 +7,8 @@ import {
   type EntryId,
   firstLine,
   messageText,
+  type RootId,
+  type TaskId,
   type ThreadId,
   type ThreadName,
   type TreeIndex,
@@ -32,18 +34,19 @@ import { nameFor } from "./presence.tsx"
 import type { InboxSeen } from "./use-inbox.ts"
 
 /**
- * A thread as a menu row: its lane's name when it has one, its root's label,
- * and the start of the message at `end`; choosing it opens it (`onOpen`).
+ * A thread as a menu row: its lane's name when it has one, its task's label,
+ * and the start of the message at `end`; choosing it opens it in its task
+ * (`onOpen`).
  */
 export function threadRow(input: {
   readonly index: TreeIndex
-  readonly labelOf: (root: EntryId) => string
-  readonly onOpen: (id: EntryId, root: EntryId) => void
+  readonly labelOf: (task: TaskId | null) => string
+  readonly onOpen: (id: EntryId, task: TaskId | null) => void
 }) {
   return (
     key: string,
     end: EntryId,
-    root: EntryId,
+    task: TaskId | null,
     name?: string,
     at: string = firstLine(messageText(input.index.entries[end]?.message), 48),
   ): MenuItem => ({
@@ -53,11 +56,11 @@ export function threadRow(input: {
     label: (
       <>
         {name !== undefined && <span className="here-name">{name}</span>}
-        <span className="here-root">{input.labelOf(root)}</span>
+        <span className="here-root">{input.labelOf(task)}</span>
         <span className="here-at">{at}</span>
       </>
     ),
-    onChoose: () => input.onOpen(end, root),
+    onChoose: () => input.onOpen(end, task),
   })
 }
 
@@ -72,9 +75,16 @@ export interface InboxMenuProps {
   readonly inbox: InboxSeen
   readonly thread: ThreadRow
   readonly names: ReadonlyMap<ThreadId, ThreadName>
-  readonly labelOf: (root: EntryId) => string
+  /** Each thread's task: a raised item opens there. */
+  readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
+  /**
+   * The task a mention opens in: its directory record names its root and
+   * no thread, so the first task holding a thread of that root.
+   */
+  readonly taskOfRoot: (root: RootId) => TaskId | null
+  readonly labelOf: (task: TaskId | null) => string
   readonly nameOf: ReadonlyMap<WriterId, string>
-  readonly onOpen: (id: EntryId, root: EntryId) => void
+  readonly onOpen: (id: EntryId, task: TaskId | null) => void
   readonly onIntent: (intent: Intent) => void
 }
 
@@ -92,6 +102,8 @@ export function useInboxMenu({
   inbox,
   thread,
   names,
+  taskOfThread,
+  taskOfRoot,
   labelOf,
   nameOf,
   onIntent,
@@ -120,7 +132,7 @@ export function useInboxMenu({
       ...thread(
         `${item.lane}:${item.raised.kind}`,
         item.end,
-        item.root,
+        taskOfThread.get(item.lane) ?? null,
         threadNameOf(names, item.lane),
         attentionWords(item.raised, w => nameFor(nameOf, w)),
       ),
@@ -171,14 +183,14 @@ export function useInboxMenu({
     label: (
       <>
         <span className="inbox-who">
-          {nameFor(nameOf, m.by)} · {labelOf(m.root)}
+          {nameFor(nameOf, m.by)} · {labelOf(taskOfRoot(m.root))}
         </span>
         <span className="inbox-text">{firstLine(m.text, 48)}</span>
       </>
     ),
     onChoose: () => {
       inbox.markSeen(m.id)
-      onOpen(m.id, m.root)
+      onOpen(m.id, taskOfRoot(m.root))
     },
   }))
   const items = (s: InboxSection): readonly MenuItem[] =>

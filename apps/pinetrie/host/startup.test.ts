@@ -80,10 +80,10 @@ test("recover resumes each interrupted lane before it settles the others, and na
   const OTHER = threadIdFor("fedcba9876543210")
   const placesDoc = newPlacesDoc()
   placesDoc.cards.set(
-    "c-1",
+    "c0000000-0000-7000-8000-000000000001",
     encodeCard({
       kind: "text" as const,
-      id: textCardId("c-1"),
+      id: textCardId("c0000000-0000-7000-8000-000000000001"),
       owner: writerId("ada@x.io"),
       placer: writerId("ada@x.io"),
       place: {
@@ -240,8 +240,14 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
       carries: { kind: "message", command: null },
       unsent: null,
     })
-  placesDoc.cards.set("c-full", card("c-full"))
-  placesDoc.cards.set("c-empty", card("c-empty"))
+  placesDoc.cards.set(
+    "c0000000-0000-7000-8000-000000000100",
+    card("c0000000-0000-7000-8000-000000000100"),
+  )
+  placesDoc.cards.set(
+    "c0000000-0000-7000-8000-000000000101",
+    card("c0000000-0000-7000-8000-000000000101"),
+  )
   for (const clientId of [11, 22, 33])
     putValue(
       b,
@@ -255,18 +261,32 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
   const agent = fakePi()
   const cards = record<StartupDeps["cards"]>({
     texts: async () => [
-      { id: textCardId("c-full"), text: "keep me", clients: [11] },
-      { id: textCardId("c-empty"), text: "", clients: [] },
+      {
+        id: textCardId("c0000000-0000-7000-8000-000000000100"),
+        text: "keep me",
+        clients: [11],
+      },
+      {
+        id: textCardId("c0000000-0000-7000-8000-000000000101"),
+        text: "",
+        clients: [],
+      },
     ],
-    stored: async () => ["card:c-full", "card:c-empty", "card:c-gone"],
+    stored: async () => [
+      "card:c0000000-0000-7000-8000-000000000100",
+      "card:c0000000-0000-7000-8000-000000000101",
+      "card:c0000000-0000-7000-8000-000000000103",
+    ],
     destroyDocs: async () => {},
   })
   await recover(deps({ basics: b, ...ports(agent), cards: cards.port }))
-  expect(readPlaces(placesDoc).map(c => c.id)).toEqual(["c-full"])
+  expect(readPlaces(placesDoc).map(c => c.id)).toEqual([
+    "c0000000-0000-7000-8000-000000000100",
+  ])
   expect(readPlacesRev(placesDoc)).toBe(1)
   expect(cards.calls.find(c => c.method === "destroyDocs")?.args[0]).toEqual([
-    "card:c-empty",
-    "card:c-gone",
+    "card:c0000000-0000-7000-8000-000000000101",
+    "card:c0000000-0000-7000-8000-000000000103",
   ])
   // Both stale seats in one write, each by its peer.
   expect(

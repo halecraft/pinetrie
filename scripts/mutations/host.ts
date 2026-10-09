@@ -483,8 +483,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refusal destroys the card's text",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: '    case "refused":\n      unsent(deps, sending, sent.message)',
-    to: '    case "refused":\n      await deps.texts.destroy(card.id)\n      unsent(deps, sending, sent.message)',
+    from: '    case "refused":\n      await unsent(deps, sending, sent.message)',
+    to: '    case "refused":\n      await deps.texts.destroy(card.id)\n      await unsent(deps, sending, sent.message)',
     command: unit,
     expect:
       "a refused send goes back below the line, whole, saying why; its text is kept",
@@ -666,9 +666,9 @@ export const mutations: readonly Mutation[] = [
     expect: "stopping a running lane records who stopped its ask, then aborts",
   },
   {
-    name: "a cleared title is never removed",
+    name: "a planned title is never written",
     file: "apps/pinetrie/host/commands/mark.ts",
-    from: "      await records.writeValues([deleteRecord(MARK, planned.task)])\n",
+    from: "      await records.writeValues(planned.writes)\n",
     to: "",
     command: unit,
     expect: "clearing a task's title removes its mark",
@@ -870,7 +870,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fresh column's first send strands its other cards",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "      const followed = await followers(cards, card, sent)\n",
+    from: "      const followed = await followers(writer, cards, card, sent)\n",
     to: "      const followed: PlaceStep[] = []\n",
     command: unit,
     expect: "spend: a fresh column's first send leaves its other cards notes",
@@ -982,16 +982,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a send that throws loses its card",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "  const sent = await deps.send(popped).catch((error: unknown) => {",
-    to: "  const sent = await deps.send(popped).then(s => s, (error: unknown) => {\n    throw error",
+    from: "  const sent = await deps.send(popped).catch(async (error: unknown) => {",
+    to: "  const sent = await deps.send(popped).then(s => s, async (error: unknown) => {\n    throw error",
     command: unit,
     expect: "a send that throws writes the card back below the line",
   },
   {
     name: "an update that throws loses its card",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: '      "send",\n    )\n    .catch((error: unknown) => {',
-    to: '      "send",\n    )\n    .then(p => p, (error: unknown) => {\n      throw error',
+    from: '      "send",\n    )\n    .catch(async (error: unknown) => {',
+    to: '      "send",\n    )\n    .then(p => p, async (error: unknown) => {\n      throw error',
     command: unit,
     expect: "an update that throws writes the card back with its command",
   },
@@ -1198,8 +1198,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move is recorded in no history",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '    return carry(step, drain, { kind: "move", by: writer }, gesture)',
-    to: '    return carry(step, drain, { kind: "move", by: writer })',
+    from: '      drain,\n      { kind: "move", by: writer },\n      gesture,\n    )',
+    to: '      drain,\n      { kind: "move", by: writer },\n    )',
     command: unit,
     expect:
       "a take into the inventory is one step of the taker's history in the root it left; a creation is in none",
@@ -1773,9 +1773,25 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host's discard history ignores the sender's task",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "    const discards = { tasks: tasksNow(deps.basics), here }\n",
-    to: "    const discards = { tasks: tasksNow(deps.basics), here: null }\n",
+    from: "    const discards = { tasks, here }\n",
+    to: "    const discards = { tasks, here: null }\n",
     command: unit,
     expect: "the host names a discard's history",
+  },
+  {
+    name: "0006 makes the note column at the canvas's end",
+    file: "apps/pinetrie/host/migrations/0006-note-columns.ts",
+    from: "    const between = orderBetween(orders[at - 1] ?? null, orders[at] ?? null)",
+    to: "    const between = orderBetween(orders.at(-1) ?? null, null)",
+    command: unit,
+    expect: "each thread's notes go to a note column made just after its card",
+  },
+  {
+    name: "0006 orders notes by id, not by cell",
+    file: "apps/pinetrie/host/migrations/0006-note-columns.ts",
+    from: "      .sort(([a, x], [b, y]) => cellOf(x) - cellOf(y) || (a < b ? -1 : 1))",
+    to: "      .sort(([a], [b]) => (a < b ? -1 : 1))",
+    command: unit,
+    expect: "in the board's reading order, gaps dropped",
   },
 ]

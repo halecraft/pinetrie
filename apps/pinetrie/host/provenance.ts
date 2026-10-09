@@ -64,7 +64,7 @@ export interface ProvenanceDeps {
 
 /**
  * Each card's thread end, from its thread's loaded root, for a card at
- * one: your message, a note, a queued or a pinned card; a card in a root
+ * one: your message, a queued or a pinned card; a card in a root
  * not loaded, or at a thread with no record, is left out, and counts as
  * unwatched.
  */
@@ -75,12 +75,7 @@ export function endsOf(
   const ends = new Map<CardId, EntryId | null>()
   for (const c of cards) {
     const p = c.place
-    if (
-      p.kind !== "composing" &&
-      p.kind !== "note" &&
-      p.kind !== "queued" &&
-      p.kind !== "pinned"
-    )
+    if (p.kind !== "composing" && p.kind !== "queued" && p.kind !== "pinned")
       continue
     const index = view(p.thread)
     if (index !== null) ends.set(c.id, placeEnd(p, index))

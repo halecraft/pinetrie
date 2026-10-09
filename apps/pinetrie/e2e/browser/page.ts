@@ -91,32 +91,15 @@ export async function chooseOnCard(
 }
 
 /**
- * Open `card` on the notes board of the column `column` matches (ADR-0113):
- * the board opened from its notes line if none is, then the note's cell.
- * The selector of its open frame, which may not be there.
+ * Open `card` in the note column that holds it (ADR-0116): its box focused,
+ * so the note unfolds. The selector of its frame, which may not be there.
  */
-export async function openNote(
-  p: Page,
-  column: string,
-  card: string,
-): Promise<string> {
-  // Dispatched, not clicked: the inventory, floating in the middle of the
-  // screen, may cover the notes line.
-  if ((await p.locator(".pane-notes").count()) === 0)
-    await p
-      .locator(`${column} .notes-toggle`)
-      .dispatchEvent("click")
-      .catch(() => {})
+export async function openNote(p: Page, card: string): Promise<string> {
   await p
-    .locator(`.pane-notes .note-cell[data-card="${card}"]`)
-    .dispatchEvent("click", undefined, { timeout: 10_000 })
+    .locator(`.note-column textarea[data-card="${card}"]`)
+    .focus({ timeout: 10_000 })
     .catch(() => {})
-  return `.pane-notes .card-frame:has(textarea[data-card="${card}"])`
-}
-
-/** Close the notes board, wide beside its thread or over a narrow page. */
-export async function closeNotes(p: Page): Promise<void> {
-  await p.click(".pane:has(.pane-notes) .pane-close").catch(() => {})
+  return `.note-column .card-frame:has(textarea[data-card="${card}"])`
 }
 
 /** Your name as the page shows it: the one mentions resolve against. */

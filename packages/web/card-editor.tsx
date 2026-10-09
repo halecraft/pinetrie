@@ -786,19 +786,21 @@ const keyOfBox = (e: KeyboardEvent<HTMLTextAreaElement>) => ({
 })
 
 /**
- * A note at a thread's end (ADR-0113): its text, which anyone here may
- * edit, and whose it is. It has no send: Enter is a new line, and its ⋯
- * moves it into your message, the queue, the pinned cards or your
- * inventory.
+ * A note in a note column (ADR-0116): its text, which anyone in the task
+ * may edit, and whose it is, with ↑ and ↓ that move it in its column (as
+ * Alt+↑/↓ in its box do). It has no send: Enter is a new line, and its ⋯
+ * takes it into your inventory or makes it a thread; a drag takes it
+ * anywhere else.
  */
 export function NoteCardEditor(p: {
   session: SessionClient
   card: TextCard
-  /** Where a queue from its column puts it; null where nothing can be queued. */
-  queueOn: CardFrameFacts["queueOn"]
+  /** Its note column's notes as drawn: what a reorder moves it among. */
+  among: readonly CardRecord[]
   reader: Reader
   readOnly: ReadOnly | null
-  catchUps: CatchUps
+  /** What a command catches up with; null in a note column, at no thread. */
+  catchUps: CatchUps | null
   seats: readonly SeatRecord[]
   onAct: (act: ColumnAct) => void
   onTyping: (card: CardId) => void
@@ -806,13 +808,13 @@ export function NoteCardEditor(p: {
   const { card } = p
   const view = cardFrame(card, "note", {
     me: p.session.writer,
-    queueOn: p.queueOn,
+    among: p.among,
     readOnly: p.readOnly !== null,
     threadIn: useThreadStates(),
   })
   return (
     <BoundCardEditor
-      among={null}
+      among={p.among}
       card={card}
       catchUps={p.catchUps}
       foot={null}

@@ -1,7 +1,7 @@
 // interface/card-marks — where your unsent cards are, as marks (ADR-0048, step
-// 2): on the sidebar's roots and new tabs, on the rail at a thread's end, on
-// the board's items, and on ▦ for a root not in the sidebar (ADR-0122). An
-// archived root's work is done, so it lights only its own item on the board,
+// 2): on the sidebar's tasks and new tabs, on the rail at a thread's end, on
+// the board's items, and on ▦ for a task not in the sidebar (ADR-0122). An
+// archived task's work is done, so it lights only its own item on the board,
 // never ▦. They answer "where was I?",
 // so they count only the cards you own (contributors wait for Kyneta,
 // ADR-0048's *Who contributed*). A card counts while it holds text, not while its record exists:
@@ -11,22 +11,18 @@
 // nothing yet: raising it is for `attentionOf` (ADR-0077), beside verdicts
 // and offers. Pure.
 
-import {
-  type CardId,
-  type CardRecord,
-  type EntryId,
-  type RootId,
-  rootOf,
-  type TaskId,
-  type ThreadId,
-  type TreeIndex,
-  type WriterId,
+import type {
+  CardId,
+  CardRecord,
+  EntryId,
+  TaskId,
+  TreeIndex,
+  WriterId,
 } from "@pinetrie/core"
-import { placeEnd } from "@pinetrie/rules"
+import { placeEnd, type TaskIndex, taskOfPlace } from "@pinetrie/rules"
 import { needsCard } from "./card-state.ts"
 import { hereOfColumn, type Layout, unlisted } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
-import type { Tasks } from "./tasks.ts"
 
 /**
  * The cards that are yours, as the marks count them: those you own. Cards you
@@ -63,15 +59,15 @@ export function withFilled(
 
 /** Where your unsent cards are: the marks that answer "where was I?". */
 export interface CardMarks {
-  /** Roots holding a card of yours: their items in the sidebar and on the board. */
-  readonly roots: ReadonlySet<EntryId>
+  /** Tasks holding a card of yours: their items in the sidebar and on the board. */
+  readonly tasks: ReadonlySet<TaskId>
   /** New tabs, by key, whose column holds a card of yours. */
   readonly newTabs: ReadonlySet<string>
-  /** Thread ends holding your message or a note of yours: dots on the rail. */
+  /** Thread ends holding your message: dots on the rail. */
   readonly ends: ReadonlySet<EntryId>
   /**
-   * A task holding a root in `roots` is not in the sidebar and not
-   * archived: ▦ is marked (ADR-0122).
+   * A task in `tasks` is not in the sidebar and not archived: ▦ is marked
+   * (ADR-0122).
    */
   readonly elsewhere: boolean
 }
@@ -84,35 +80,29 @@ export function cardMarks(input: {
   readonly layout: Layout
   /** Tasks in the archive (ADR-0029, ADR-0122). */
   readonly archived: ReadonlySet<TaskId>
-  /** Every task: a fresh card marks its task's first root, and ▦ counts tasks. */
-  readonly tasks: Tasks
+  /** Every task: a card at a thread marks the thread's task. */
+  readonly tasks: TaskIndex
   readonly index: TreeIndex
-  /**
-   * Each root's root entry, by its id, from the directory: a message or a
-   * note in a root this tab does not hold is marked by its place's root (ADR-0063).
-   */
-  readonly rootEntries: ReadonlyMap<RootId, EntryId>
 }): CardMarks {
-  const roots = new Set<EntryId>()
-  const rootEntryOf = (thread: ThreadId) => {
-    const root = input.tasks.index.rootOfThread.get(thread)
-    return root === undefined ? undefined : input.rootEntries.get(root)
-  }
+  const tasks = new Set<TaskId>()
   const newTabs = new Set<string>()
   const ends = new Set<EntryId>()
   for (const card of input.mine) {
     if (!input.filled.has(card.id)) continue
     switch (card.place.kind) {
-      case "composing":
-      case "note": {
+      case "composing": {
+        // A thread in a root this tab does not hold has no end here, and
+        // still marks its task (ADR-0063).
         const end = placeEnd(card.place, input.index)
-        const root =
-          (end === null ? null : rootOf(input.index, end)) ??
-          rootEntryOf(card.place.thread) ??
-          null
-        if (root === null) break
         if (end !== null) ends.add(end)
-        roots.add(root)
+        const task = taskOfPlace(input.tasks, card.place)
+        if (task !== null) tasks.add(task)
+        break
+      }
+      // A note marks its note column's task (ADR-0116).
+      case "note": {
+        const task = taskOfPlace(input.tasks, card.place)
+        if (task !== null) tasks.add(task)
         break
       }
       case "fresh": {
@@ -120,10 +110,7 @@ export function cardMarks(input: {
         // browser tab, and is marked nowhere here.
         const tab = hereOfColumn(input.layout, card.place.column)
         if (tab?.kind === "new") newTabs.add(tab.key)
-        if (tab?.kind === "task") {
-          const entry = input.tasks.byId.get(tab.task)?.entry ?? null
-          if (entry !== null) roots.add(entry)
-        }
+        if (tab?.kind === "task") tasks.add(tab.task)
         break
       }
       // The inventory is no tab, a pinned card is a thread's direction, not
@@ -137,17 +124,9 @@ export function cardMarks(input: {
     }
   }
   return {
-    roots,
+    tasks,
     newTabs,
     ends,
-    elsewhere:
-      unlisted(
-        input.layout,
-        input.archived,
-        [...roots].flatMap(r => {
-          const task = input.tasks.ofEntry.get(r)
-          return task === undefined ? [] : [task]
-        }),
-      ).length > 0,
+    elsewhere: unlisted(input.layout, input.archived, tasks).length > 0,
   }
 }

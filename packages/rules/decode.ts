@@ -9,9 +9,11 @@ import {
   type CommitId,
   type EntryId,
   entryId,
+  isNoteColumnId,
   isRootId,
   isTaskId,
   isThreadId,
+  type NoteColumnId,
   type RootId,
   type TaskId,
   THREAD_PATTERN,
@@ -72,6 +74,9 @@ export const rootKey = (key: string): RootId | undefined =>
 
 export const taskKey = (key: string): TaskId | undefined =>
   isTaskId(key) ? key : undefined
+
+export const noteColumnKey = (key: string): NoteColumnId | undefined =>
+  isNoteColumnId(key) ? key : undefined
 
 /** A singleton's address: only `expected` names it. */
 export const fixedKey = <K extends string>(

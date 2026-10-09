@@ -15,7 +15,8 @@ export {
   laneRootsOf,
   type OpenOffer,
   type ReadOnly,
-  workAnywhere,
+  taskWork,
+  threadWork,
 } from "./app-view.ts"
 export {
   type AtTop,
@@ -57,7 +58,7 @@ export {
   arrivals,
   attentionOf,
   attentionWords,
-  doneRoots,
+  doneThreads,
   type Item,
   LEVEL_CLASS,
   LEVEL_WORDS,
@@ -65,8 +66,9 @@ export {
   type Moments,
   markOf,
   moving,
-  rootStatus,
   type Status,
+  taskStatus,
+  threadStatus,
   threadWriters,
 } from "./attention.ts"
 export {
@@ -135,12 +137,9 @@ export {
   INVENTORY,
   KEEP_IN_INVENTORY,
   movedBackWords,
-  NEW_NOTE_TITLE,
   NEW_PIN,
   NEW_PIN_PLACEHOLDER,
   NEW_PIN_TITLE,
-  NOTES_LINE_TITLE,
-  notesLineWords,
   noticeKey,
   noticeWords,
   PINNED_EMPTY,
@@ -216,7 +215,7 @@ export {
   peopleHere,
   peopleIn,
   readerHeading,
-  readersByRoot,
+  readersByTask,
   toggleOpenMenu,
   withOpenMenus,
 } from "./here.ts"
@@ -304,7 +303,15 @@ export {
   queueHead,
   queueHeadPlan,
 } from "./next.ts"
-export { notesBoardView, notesPlaced } from "./notes-board-view.ts"
+export {
+  ADD_NOTE,
+  NOTES_EMPTY,
+  type NoteColumnView,
+  noteColumnsOf,
+  noteCountWords,
+  type StripItem,
+  stripItems,
+} from "./note-column-view.ts"
 export {
   BACK,
   hashOfPage,
@@ -405,7 +412,6 @@ export {
   sectionState,
 } from "./review.ts"
 export {
-  firstLinesOf,
   labelsOf,
   type MessageCount,
   messageCount,
@@ -458,12 +464,12 @@ export {
   type ItemIcon,
   type ItemMenuItem,
   listKey,
-  offeredByRoot,
+  offeredByTask,
   pageTitle,
   renameIntent,
-  rootSprites,
   type SidebarView,
   sidebarView,
+  taskSprites,
 } from "./sidebar-view.ts"
 export {
   entriesOf,

@@ -19,10 +19,9 @@ const BEA = writerId("bea@x.io")
 const CAL = writerId("cal@x.io")
 const HERE = entryId("e-here")
 const at = (id: string): PlaceKey => ({
-  kind: "note",
+  kind: "pinned",
   at: atEntry(entryId(id)),
   thread: TEST_THREAD,
-  cell: 0,
 })
 const queued: PlaceKey = {
   kind: "queued",
@@ -33,7 +32,7 @@ const queued: PlaceKey = {
 const trace = (over: Partial<TraceRecord>): TraceRecord => ({
   id: "t",
   for: ADA,
-  card: textCardId("c-1"),
+  card: textCardId("c0000000-0000-7000-8000-000000000001"),
   by: BEA,
   from: at("e-here"),
   to: queued,
@@ -44,7 +43,7 @@ const trace = (over: Partial<TraceRecord>): TraceRecord => ({
 
 test("tracesAt: yours, whose place resolves to this end, oldest first", () => {
   const endOf = (from: PlaceKey) =>
-    from.kind === "note" && from.at.kind === "entry" ? from.at.id : null
+    from.kind === "pinned" && from.at.kind === "entry" ? from.at.id : null
   const traces = [
     trace({ id: "late", at: 3 }),
     trace({ id: "early", at: 1 }),

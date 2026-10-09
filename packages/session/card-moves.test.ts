@@ -2,6 +2,7 @@ import {
   atEntry,
   type CardRecord,
   entryId,
+  noteColumnIdFor,
   type TextCard,
   taskIdFor,
   textCardId,
@@ -12,6 +13,7 @@ import { describe, expect, test } from "vitest"
 import {
   type ActedAt,
   answerOf,
+  drawnPlace,
   intentsOf,
   type LocalState,
   localStep,
@@ -32,7 +34,7 @@ const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const ME = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const LANE = threadIdFor("x")
-const C1 = textCardId("c-1")
+const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
 const at = atEntry(entryId("e-1"))
 const atEnd = { kind: "composing", at, thread: LANE } as const
 const queuedKey = {
@@ -83,15 +85,17 @@ describe("the tab's moves (ADR-0059)", () => {
   const host = [card()]
 
   test("sent: a creation, a move and a move out are drawn at once", () => {
-    const draft = card({ id: textCardId("c-2") })
+    const draft = card({
+      id: textCardId("c0000000-0000-7000-8000-000000000002"),
+    })
     const s = run([
       sent({ ...sentAs, id: "m-0", kind: "create", draft }),
       sent(queueIt),
     ])
     const drawn = withPending(host, s, ME)
     expect(drawn.map(c => [c.id, c.place.kind])).toEqual([
-      ["c-1", "queued"],
-      ["c-2", "composing"],
+      ["c0000000-0000-7000-8000-000000000001", "queued"],
+      ["c0000000-0000-7000-8000-000000000002", "composing"],
     ])
     const out = run([sent({ ...sentAs, id: "m-1", kind: "send", card: C1 })])
     expect(withPending(host, out, ME)).toEqual([])
@@ -211,18 +215,24 @@ describe("the tab's moves (ADR-0059)", () => {
         place: { ...queuedKey, order: key(n), by: BEA },
         placer: BEA,
       })
-    const records = [q("c-a", 100), q("c-b", 200), q("c-c", 300)]
+    const records = [
+      q("c0000000-0000-7000-8000-00000000000a", 100),
+      q("c0000000-0000-7000-8000-00000000000b", 200),
+      q("c0000000-0000-7000-8000-00000000000c", 300),
+    ]
     const reorder = {
-      card: textCardId("c-c"),
+      card: textCardId("c0000000-0000-7000-8000-00000000000c"),
       at: queuedKey,
-      after: textCardId("c-a"),
-      before: textCardId("c-b"),
+      after: textCardId("c0000000-0000-7000-8000-00000000000a"),
+      before: textCardId("c0000000-0000-7000-8000-00000000000b"),
     }
     const s = run([
       sent({ ...sentAs, id: "r-1", kind: "reorder", reorder }),
       accepted("r-1", 4),
     ])
-    const drawn = withPending(records, s, ME).find(c => c.id === "c-c")
+    const drawn = withPending(records, s, ME).find(
+      c => c.id === "c0000000-0000-7000-8000-00000000000c",
+    )
     expect(drawn?.place).toEqual({ ...queuedKey, order: key(150), by: BEA })
     expect(drawn?.placer).toBe(BEA)
     expect(withPending(records, movesStep(s, changed(4)), ME)).toBe(records)
@@ -297,7 +307,7 @@ describe("answerOf", () => {
 })
 
 describe("a command of several moves: a keep (ADR-0066)", () => {
-  const C2 = textCardId("c-2")
+  const C2 = textCardId("c0000000-0000-7000-8000-000000000002")
   const inventory = { kind: "inventory", holder: ME } as const
   const keeping = (card: typeof C1, slot: number): Pending => ({
     ...sentAs,
@@ -372,7 +382,7 @@ describe("intentsOf", () => {
       ...sentAs,
       id: "m-2",
       kind: "create",
-      draft: card({ id: textCardId("c-2") }),
+      draft: card({ id: textCardId("c0000000-0000-7000-8000-000000000002") }),
       slot: 7,
     }
     const s = run([
@@ -383,11 +393,11 @@ describe("intentsOf", () => {
     expect(intentsOf(s)).toEqual(
       new Map([
         [C1, 3],
-        [textCardId("c-2"), 7],
+        [textCardId("c0000000-0000-7000-8000-000000000002"), 7],
       ]),
     )
     expect(intentsOf(run([accepted("m-1", 5), changed(5)], s))).toEqual(
-      new Map([[textCardId("c-2"), 7]]),
+      new Map([[textCardId("c0000000-0000-7000-8000-000000000002"), 7]]),
     )
   })
 })
@@ -442,5 +452,34 @@ describe("records, moves and cards, in one step", () => {
     expect(
       localStep(start, { kind: "records", records: host, rev: 0 }, ME),
     ).toBe(start)
+  })
+})
+
+describe("drawnPlace (ADR-0116)", () => {
+  const task = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+  const thread: CardRecord = {
+    kind: "thread",
+    id: LANE,
+    owner: ME,
+    placer: ME,
+    place: { kind: "canvas", task, order: "0000000001", width: 1 },
+  }
+  const column = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+  const notes: CardRecord = {
+    kind: "note-column",
+    id: column,
+    owner: ME,
+    placer: ME,
+    place: { kind: "canvas", task, order: "0000000002", width: 1 },
+  }
+  test("a thread's nearest notes are drawn in the column the host would choose; nowhere while the host would make one", () => {
+    const to = { kind: "notes", thread: LANE } as const
+    expect(drawnPlace(to, ME, [thread, notes])).toEqual({
+      kind: "note",
+      column,
+      order: expect.any(String),
+    })
+    expect(drawnPlace(to, ME, [thread])).toBeUndefined()
+    expect(drawnPlace(to, ME, [])).toBeUndefined()
   })
 })

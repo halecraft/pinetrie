@@ -7,7 +7,6 @@ import {
   atEntry,
   baseKnown,
   type ChatAt,
-  cardId,
   conflictAskedAt,
   type EntryLike,
   entryId,
@@ -29,6 +28,7 @@ import {
   TOOL_IDS,
   tailEdit,
   taskIdFor,
+  textCardId,
   threadAt,
   threadEnd,
   threadIdFor,
@@ -607,7 +607,7 @@ describe("subjectOf, toolIdOf and tailEdit", () => {
 
 describe("pinned cards in the tree (ADR-0048)", () => {
   const card = (id: string, text: string) => ({
-    id: cardId(id),
+    id: textCardId(id),
     text,
     by: writerId("ada@example.com"),
   })
@@ -621,13 +621,15 @@ describe("pinned cards in the tree (ADR-0048)", () => {
     entry(id, parent, { role: "pinned", content: "", pinned: view })
   const first: PinnedView = {
     lane: OTHER,
-    cards: [card("c-1", "a")],
+    cards: [card("c0000000-0000-7000-8000-000000000001", "a")],
     retired: [],
   }
   const second: PinnedView = {
     lane: LANE,
-    cards: [card("c-2", "b")],
-    retired: [{ id: cardId("c-1"), line: "a" }],
+    cards: [card("c0000000-0000-7000-8000-000000000002", "b")],
+    retired: [
+      { id: textCardId("c0000000-0000-7000-8000-000000000001"), line: "a" },
+    ],
   }
   // 1-q -> 2-cards(first) -> 3-p1 -> 4-r1 -> 5-cards(second) -> 6-p2 -> 7-r2
   const list = [

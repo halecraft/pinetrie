@@ -28,10 +28,8 @@ import {
 } from "@pinetrie/reads"
 import {
   archivedIn,
-  MARK,
   planMark,
   planTitling,
-  setRecord,
   type TitleTrigger,
   titleOf,
   titleRequest,
@@ -130,15 +128,17 @@ export function createTitles(deps: {
         const marks = readMarks(session)
         if (!titleStillWanted(marks.get(task), by)) return
         const planned = planMark({
-          task,
+          of: { kind: "task", task },
           title,
           by,
           now: basics.now(),
           tasks: new Set(readTasks(session).keys()),
           marks,
+          columns: new Set(),
+          columnTitles: new Map(),
         })
-        if (planned.kind === "write")
-          await deps.records.writeValues([setRecord(MARK, planned.record)])
+        if (planned.kind === "writes")
+          await deps.records.writeValues(planned.writes)
       },
     })
     return null

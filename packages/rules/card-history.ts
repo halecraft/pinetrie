@@ -16,13 +16,13 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
-  cardId,
   type EntryId,
   entryId,
   keyOf,
   keyOfFields,
   type PlaceFields,
   type PlaceKey,
+  parseCardId,
   placeFields,
   sameKey,
   type TraceRecord,
@@ -107,16 +107,21 @@ export const CARD_HISTORY: RecordSpec<CardHistoryRecord, CardId, "session"> = {
     })),
   }),
   decode: (contents, key) =>
-    decodeAt(HistorySchema, contents, textKey(key), (r, card) => ({
-      card: cardId(card),
-      events: r.events.flatMap(e => {
-        const from = keyOrNull(e.from)
-        const to = keyOfFields(asPlaceFields(e.to))
-        return from === undefined || to === undefined
-          ? []
-          : [{ ...e, by: e.by as WriterId | null, from, to }]
-      }),
-    })),
+    decodeAt(HistorySchema, contents, textKey(key), (r, id) => {
+      const card = parseCardId(id)
+      return card === undefined
+        ? undefined
+        : {
+            card,
+            events: r.events.flatMap(e => {
+              const from = keyOrNull(e.from)
+              const to = keyOfFields(asPlaceFields(e.to))
+              return from === undefined || to === undefined
+                ? []
+                : [{ ...e, by: e.by as WriterId | null, from, to }]
+            }),
+          }
+    }),
 }
 
 /** Each trace, at its own id. */
@@ -133,12 +138,13 @@ export const TRACE: RecordSpec<TraceRecord, string, "session"> = {
     decodeAt(TraceSchema, contents, textKey(key), (r, id) => {
       const from = keyOfFields(asPlaceFields(r.from))
       const to = keyOrNull(r.to)
-      return from === undefined || to === undefined
+      const card = parseCardId(r.card)
+      return from === undefined || to === undefined || card === undefined
         ? undefined
         : {
             id,
             for: r.for as WriterId,
-            card: cardId(r.card),
+            card,
             by: r.by as WriterId,
             from,
             to,
@@ -172,8 +178,8 @@ const isShared = (p: PlaceKey | CardPlace): boolean =>
   p.kind === "note" || p.kind === "queued" || p.kind === "pinned"
 
 /**
- * Back below the line where it was queued or pinned, a note: an unqueue or
- * an unpin. The card stays in its column, so it leaves no trace.
+ * Out of a queue or a pinned strip to a note: an unqueue or an unpin, to
+ * the note column nearest its thread (ADR-0116), which leaves no trace.
  */
 function movedBack(
   from: PlaceKey,
@@ -181,14 +187,6 @@ function movedBack(
 ): "unqueued" | "unpinned" | null {
   if (to.kind !== "note" || (from.kind !== "queued" && from.kind !== "pinned"))
     return null
-  // In whichever cell the host gave it.
-  const below: PlaceKey = {
-    kind: "note",
-    at: from.at,
-    thread: from.thread,
-    cell: to.cell,
-  }
-  if (!sameKey(below, to)) return null
   return from.kind === "queued" ? "unqueued" : "unpinned"
 }
 

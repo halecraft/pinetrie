@@ -8,11 +8,11 @@ import {
   type CardPlace,
   type CardRecord,
   type ChatAt,
-  cardId,
   DISCARDED,
   emailLocalPart,
   entryId,
   findSeqKeys,
+  fitsPlace,
   handleOf,
   indexTree,
   keyFieldsFrom,
@@ -27,9 +27,12 @@ import {
   nonEmpty,
   normalizeEmail,
   normalizeName,
+  noteColumnIdFor,
   noteOf,
+  parseCardId,
   parseMentions,
   parseNewThread,
+  parseTextCardId,
   parseTitle,
   pinnedOf,
   placeFields,
@@ -97,12 +100,21 @@ test("latestTip: the newest tip by id, independent of input order", () => {
   // Out of id order on purpose: a helper that returned the first or last tip
   // would pass an in-order input.
   assert.equal(
-    latestTip([entryId("b-2"), null, entryId("c-3"), entryId("a-1")]),
-    "c-3",
+    latestTip([
+      entryId("b-2"),
+      null,
+      entryId("c0000000-0000-7000-8000-000000000003"),
+      entryId("a-1"),
+    ]),
+    "c0000000-0000-7000-8000-000000000003",
   )
   assert.equal(
-    latestTip([entryId("c-3"), entryId("a-1"), entryId("b-2")]),
-    "c-3",
+    latestTip([
+      entryId("c0000000-0000-7000-8000-000000000003"),
+      entryId("a-1"),
+      entryId("b-2"),
+    ]),
+    "c0000000-0000-7000-8000-000000000003",
   )
   assert.equal(latestTip([null, null]), null, "lanes with no tip are ignored")
   assert.equal(latestTip([]), null, "an empty session has no view")
@@ -323,12 +335,7 @@ describe("address: mentions pick who a message is for (ADR-0021)", () => {
 describe("a card's place as flat fields (ADR-0059)", () => {
   const ADA = writerId("ada@example.com")
   const places: CardPlace[] = [
-    {
-      kind: "note",
-      at: atEntry(entryId("e-1")),
-      thread: TEST_THREAD,
-      cell: 0,
-    },
+    { kind: "note", column: NOTES, order: "c" },
     {
       kind: "queued",
       at: atEntry(entryId("e-1")),
@@ -389,7 +396,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(keyOfFields(keyFieldsFrom(k => f[k]))).toEqual(keyOf(canvas))
   })
 
-  test("a key's fields on the wire are the table's: no width, no order but a note's, no task but a canvas's and a fresh one's", () => {
+  test("a key's fields on the wire are the table's: no width, no order, no task but a canvas's and a fresh one's", () => {
     const f = placeFields({
       kind: "canvas",
       task: TEST_TASK,
@@ -399,13 +406,9 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(keyFieldsOf(f)).not.toHaveProperty("width")
     expect(keyFieldsOf(f)).not.toHaveProperty("order")
     expect(keyFieldsOf(f)).toHaveProperty("task", TEST_TASK)
-    const note = placeFields({
-      kind: "note",
-      at: atEntry(entryId("e-1")),
-      thread: TEST_THREAD,
-      cell: 4,
-    })
-    expect(keyFieldsOf(note)).toHaveProperty("order", "4")
+    const note = placeFields({ kind: "note", column: NOTES, order: "m" })
+    expect(keyFieldsOf(note)).not.toHaveProperty("order")
+    expect(keyFieldsOf(note)).toHaveProperty("column", NOTES)
     const gone = placeFields({
       kind: "gone",
       task: TEST_TASK,
@@ -416,22 +419,68 @@ describe("a card's place as flat fields (ADR-0059)", () => {
   })
 
   test("a card's kind is its id's prefix: a bare uuidv7 is a text card", () => {
-    expect(kindOfCard(textCardId("01a0ffd2-0000-7000-8000-00000000000a"))).toBe(
-      "text",
-    )
-    expect(kindOfCard(threadIdFor("x"))).toBe("thread")
-    expect(kindOfCard(cardId("n-1"))).toBe("note-column")
-    expect(kindOfCard(cardId("m-1"))).toBe("media")
-    expect(kindOfCard(cardId("f-1"))).toBe("file")
+    const at = (id: string) => {
+      const card = parseCardId(id)
+      return card === undefined ? undefined : kindOfCard(card)
+    }
+    expect(at(UUID)).toBe("text")
+    expect(at(threadIdFor("x"))).toBe("thread")
+    expect(at(`n-${UUID}`)).toBe("note-column")
+    expect(at(`m-${UUID}`)).toBe("media")
+    expect(at(`f-${UUID}`)).toBe("file")
   })
 
-  test("sameKey leaves out the pinned cards' order, and tells pinned from a note", () => {
+  test("fitsPlace: a text card anywhere but a canvas, a thread's card on a canvas or in an inventory, a note column on a canvas alone", () => {
+    const fits = (kind: Parameters<typeof fitsPlace>[0]) =>
+      (["note", "canvas", "inventory"] as const).filter(p => fitsPlace(kind, p))
+    expect(fits("text")).toEqual(["note", "inventory"])
+    expect(fits("thread")).toEqual(["canvas", "inventory"])
+    expect(fits("note-column")).toEqual(["canvas"])
+    expect(fits("media")).toEqual([])
+  })
+
+  test("text that is no card's id parses as none", () => {
+    for (const id of [
+      "",
+      "c-1",
+      "n-1",
+      `x-${UUID}`,
+      UUID.toUpperCase(),
+      `${UUID}x`,
+    ])
+      expect(parseCardId(id)).toBeUndefined()
+    expect(parseTextCardId(`n-${UUID}`)).toBeUndefined()
+    expect(parseTextCardId(UUID)).toBe(UUID)
+  })
+
+  test("sameKey leaves out the pinned cards' and a note's order, and tells two note columns apart", () => {
     const pinned = keyOf(places[2] as CardPlace)
     expect(sameKey(pinned, keyOf({ ...(places[2] as CardPlace) }))).toBe(true)
+    const note = keyOf({ kind: "note", column: NOTES, order: "a" })
     expect(
-      pinned.kind === "pinned" &&
-        sameKey(pinned, { ...pinned, kind: "note", cell: 0 }),
-    ).toBe(false)
+      sameKey(note, keyOf({ kind: "note", column: NOTES, order: "z" })),
+    ).toBe(true)
+    expect(sameKey(note, { kind: "note", column: noteColumnIdFor("x") })).toBe(
+      false,
+    )
+  })
+
+  test("a note needs its column and its order; the nearest notes are a target, never a stored place", () => {
+    const f = placeFields({ kind: "note", column: NOTES, order: "m" })
+    expect(f).toMatchObject({
+      kind: "note",
+      column: NOTES,
+      order: "m",
+      lane: "",
+    })
+    expect(placeOfFields({ ...f, order: "" })).toBeUndefined()
+    expect(placeOfFields({ ...f, column: "t-x" })).toBeUndefined()
+    const notes = placeFields({ kind: "notes", thread: TEST_THREAD })
+    expect(placeOfFields(notes)).toBeUndefined()
+    expect(keyOfFields(keyFieldsFrom(k => notes[k]))).toEqual({
+      kind: "notes",
+      thread: TEST_THREAD,
+    })
   })
 
   test("a fresh card needs its root", () => {
@@ -498,23 +547,18 @@ describe("moves, built once (ADR-0059)", () => {
   const at = atEntry(entryId("e-1"))
   const card = (place: TextPlace): CardRecord => ({
     kind: "text",
-    id: textCardId("c-1"),
+    id: textCardId("c0000000-0000-7000-8000-000000000001"),
     owner: ADA,
     place,
     placer: ADA,
     carries: { kind: "message", command: null },
     unsent: null,
   })
-  const atEnd = card({
-    kind: "note",
-    at,
-    thread: LANE,
-    cell: 0,
-  })
+  const atEnd = card({ kind: "note", column: NOTES, order: "a" })
   test("a move goes from where the card is; a discard names no history: the host's to name", () => {
     expect(moveOf(atEnd, DISCARDED)).toEqual({
-      card: textCardId("c-1"),
-      from: { kind: "note", at, thread: LANE, cell: 0 },
+      card: textCardId("c0000000-0000-7000-8000-000000000001"),
+      from: { kind: "note", column: NOTES },
       to: { kind: "gone", why: { kind: "discarded" } },
     })
   })
@@ -535,18 +579,18 @@ describe("moves, built once (ADR-0059)", () => {
     expect(keyOfFields(fields)).toEqual({ kind: "gone", why: place.why })
   })
 
-  test("seenAt: a note seen with no cell is anywhere on its board; one seen in a cell is where it is only in that cell", () => {
-    const note = {
-      kind: "note",
-      at: atEntry(entryId("e-1")),
-      thread: TEST_THREAD,
-    } as const
-    const now = { ...note, cell: 3 }
-    expect(seenAt(now, { ...note, cell: null })).toBe(true)
-    expect(seenAt(now, { ...note, cell: 3 })).toBe(true)
-    expect(seenAt(now, { ...note, cell: 2 })).toBe(false)
+  test("seenAt: a card seen on its way to a thread's nearest notes is in whichever note column the host chose; else where it is", () => {
+    const now = { kind: "note", column: NOTES } as const
+    expect(seenAt(now, { kind: "notes", thread: TEST_THREAD })).toBe(true)
+    expect(seenAt(now, now)).toBe(true)
+    expect(seenAt(now, { kind: "note", column: noteColumnIdFor("x") })).toBe(
+      false,
+    )
     expect(
-      seenAt(now, { ...note, at: atEntry(entryId("e-2")), cell: null }),
+      seenAt(
+        { kind: "inventory", holder: ADA },
+        { kind: "notes", thread: TEST_THREAD },
+      ),
     ).toBe(false)
   })
 
@@ -577,7 +621,7 @@ describe("moves, built once (ADR-0059)", () => {
     ).toBe(false)
   })
 
-  test("an unqueue puts a card back where it was queued, at its thread", () => {
+  test("an unqueue sends a card to the note column nearest its thread, for the host to resolve", () => {
     expect(
       noteOf({
         kind: "queued",
@@ -587,14 +631,13 @@ describe("moves, built once (ADR-0059)", () => {
         by: ADA,
         seen: "v",
       }),
-    ).toEqual({ kind: "note", at, thread: LANE, cell: null })
+    ).toEqual({ kind: "notes", thread: LANE })
   })
 
-  test("a pin pins a card below the line or queued, at the same thread end", () => {
+  test("a pin pins your message or a queued card at the same thread end; a note is at no thread", () => {
     const pinned = { kind: "pinned", at, thread: LANE }
-    expect(pinnedOf({ kind: "note", at, thread: LANE, cell: 0 })).toEqual(
-      pinned,
-    )
+    expect(pinnedOf({ kind: "composing", at, thread: LANE })).toEqual(pinned)
+    expect(pinnedOf({ kind: "note", column: NOTES })).toBeNull()
     expect(
       pinnedOf({
         kind: "queued",
@@ -625,3 +668,6 @@ describe("threads, by construction (ADR-0117)", () => {
     expect([lane, branch.kind, end.kind]).toEqual(["t-x", "branch", "end"])
   })
 })
+
+const UUID = "01a0ffd2-0000-7000-8000-00000000000a"
+const NOTES = noteColumnIdFor(UUID)

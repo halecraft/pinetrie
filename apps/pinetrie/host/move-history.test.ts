@@ -8,10 +8,10 @@ import {
   type TaskId,
   type TextCard,
   taskIdFor,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
 import { PlacesDoc } from "@pinetrie/schema"
@@ -29,10 +29,10 @@ const R2 = taskIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 const _ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const atEnd = (_task: TaskId) =>
   ({
-    kind: "note",
+    kind: "pinned",
     at: atEntry(entryId("e-1")),
     thread: TEST_THREAD,
-    cell: 0,
+    order: "a",
   }) as const
 const inventory = { kind: "inventory", holder: ADA } as const
 
@@ -44,7 +44,7 @@ async function setUp() {
   const histories = createMoveHistories(exchange)
   const card = (id: string, root: TaskId): TextCard => ({
     kind: "text",
-    id: textCardId(id),
+    id: cardIdFor(id),
     owner: ADA,
     placer: ADA,
     place: atEnd(root),
@@ -67,8 +67,9 @@ async function setUp() {
       await histories.gestureOf(writer, root),
     )
   const placeOf = (id: string) =>
-    readPlaces(places).find(c => c.id === id)?.place.kind
-  const recordOf = (id: string) => readPlaces(places).find(c => c.id === id)
+    readPlaces(places).find(c => c.id === cardIdFor(id))?.place.kind
+  const recordOf = (id: string) =>
+    readPlaces(places).find(c => c.id === cardIdFor(id))
   return { store, exchange, histories, card, seed, move, placeOf, recordOf }
 }
 
@@ -80,7 +81,7 @@ test("a move is one step of its writer's history in its task, and undoes whole a
   expect(placeOf("a")).toBe("inventory")
   const undone = await histories.step(ADA, R1, "undo")
   expect(undone.kind).toBe("undone")
-  expect(placeOf("a")).toBe("note")
+  expect(placeOf("a")).toBe("pinned")
   expect((await histories.step(ADA, R1, "redo")).kind).toBe("undone")
   expect(placeOf("a")).toBe("inventory")
   histories.dispose()
@@ -95,7 +96,7 @@ test("another task's history, and another writer's, are untouched by an undo", a
   await move(BEA, R1, c, inventory)
   expect((await histories.step(ADA, R1, "undo")).kind).toBe("undone")
   expect([placeOf("a"), placeOf("b"), placeOf("c")]).toEqual([
-    "note",
+    "pinned",
     "inventory",
     "inventory",
   ])

@@ -6,7 +6,13 @@
 // reading in it. Each reads presence itself, so a presence write redraws it
 // and not the list or the board (S59).
 
-import type { EntryId, TreeIndex, WriterId } from "@pinetrie/core"
+import type {
+  EntryId,
+  TaskId,
+  ThreadId,
+  TreeIndex,
+  WriterId,
+} from "@pinetrie/core"
 import {
   attentionWords,
   LEVEL_CLASS,
@@ -17,7 +23,7 @@ import {
   peopleHere,
   peopleIn,
   readerHeading,
-  readersByRoot,
+  readersByTask,
   type Status,
   toggleOpenMenu,
   withOpenMenus,
@@ -26,7 +32,7 @@ import type { SessionClient } from "@pinetrie/session"
 import { useMemo, useState } from "react"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, Avatars, nameFor } from "./presence.tsx"
-import { useReadingAt, useReadingRoots } from "./use-presence.ts"
+import { useReadingAt, useReadingTasks } from "./use-presence.ts"
 
 /** A level's mark: an amber dot, bright for needs you, dim for worth a read. */
 export function StatusMark({
@@ -102,6 +108,8 @@ export function RootStatus({
 export interface ReadersProps {
   session: SessionClient
   index: TreeIndex
+  /** Each thread's task: a reader is in the task their thread is in. */
+  taskOfThread: ReadonlyMap<ThreadId, TaskId>
   /** Everyone, in the order every window agrees on (`writerOrder`). */
   order: readonly WriterId[]
   nameOf: ReadonlyMap<WriterId, string>
@@ -111,43 +119,44 @@ export interface ReadersProps {
 /** The people reading now, grouped by person (`peopleHere`). */
 function usePeople(p: ReadersProps) {
   const reading = useReadingAt(p.session.presence, p.session.writer)
-  const reportedRoots = useReadingRoots(p.session.presence)
+  const reported = useReadingTasks(p.session.presence)
   return useMemo(
-    () => peopleHere(reading, p.index, p.order, reportedRoots),
-    [reading, p.index, p.order, reportedRoots],
+    () =>
+      peopleHere(reading, p.index, p.order, {
+        taskOfThread: p.taskOfThread,
+        reported,
+      }),
+    [reading, p.index, p.order, p.taskOfThread, reported],
   )
 }
 
-/** The others reading in any of `roots`, as avatars: a list item's, or a board state's. */
-export function Readers(p: ReadersProps & { roots: readonly EntryId[] }) {
+/** The others reading in any of `tasks`, as avatars: a list item's, or a board state's. */
+export function Readers(p: ReadersProps & { tasks: readonly TaskId[] }) {
   const people = usePeople(p)
-  const key = p.roots.join(",")
-  const writers = useMemo(() => {
-    const byRoot = readersByRoot(people)
-    const out: WriterId[] = []
-    for (const root of key.split(","))
-      for (const w of byRoot.get(root) ?? []) if (!out.includes(w)) out.push(w)
-    return out
-  }, [people, key])
+  const byTask = useMemo(() => readersByTask(people), [people])
+  const writers: WriterId[] = []
+  for (const task of p.tasks)
+    for (const w of byTask.get(task) ?? [])
+      if (!writers.includes(w)) writers.push(w)
   return <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={writers} />
 }
 
 /**
- * The others reading in `root`, each a menu of the threads they read there,
+ * The others reading in `task`, each a menu of the threads they read there,
  * a row of which opens it (`thread`). A person who leaves while you have
  * their menu open stays, marked gone, until you close it (`withOpenMenus`).
  */
 export function ReaderMenus(
   p: ReadersProps & {
-    root: EntryId
-    thread: (end: EntryId, root: EntryId) => MenuItem
+    task: TaskId
+    thread: (end: EntryId, task: TaskId) => MenuItem
   },
 ) {
   const [openMenus, setOpenMenus] = useState<OpenMenus>(new Map())
   const people = usePeople(p)
   const here = useMemo(
-    () => peopleIn(people, new Set([p.root])),
-    [people, p.root],
+    () => peopleIn(people, new Set([p.task])),
+    [people, p.task],
   )
   return (
     <span className="readers">
@@ -164,7 +173,7 @@ export function ReaderMenus(
             {
               key: "threads",
               heading: readerHeading(nameFor(p.nameOf, person.writer), gone),
-              items: person.threads.map(t => p.thread(t.end, t.root)),
+              items: person.threads.map(t => p.thread(t.end, t.task)),
             },
           ]}
           title={nameFor(p.nameOf, person.writer)}

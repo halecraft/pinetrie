@@ -28,12 +28,12 @@ const THREAD = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
 const STARTS = threadIdFor("spun")
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
-const C1 = textCardId("c-1")
+const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+/** Your message at the thread: a card at a thread, in its task. */
 const note = {
-  kind: "note",
+  kind: "composing",
   at: atEntry(entryId("e1")),
   thread: TEST_THREAD,
-  cell: 0,
 } as const
 const spun = {
   kind: "gone",
@@ -105,7 +105,7 @@ describe("planSpinOff (ADR-0111)", () => {
     ["a root id in use", { roots: new Set([THREAD]) }, { kind: "root-in-use" }],
     [
       "a card someone moved first",
-      { cards: [card({ place: { ...note, cell: 3 } })] },
+      { cards: [card({ place: { ...note, kind: "pinned", order: "a" } })] },
       { kind: "refused", code: "moved" },
     ],
     [
@@ -177,7 +177,7 @@ describe("planLiftRoot (S139)", () => {
         cards: [
           gone,
           card({
-            id: textCardId("c-2"),
+            id: textCardId("c0000000-0000-7000-8000-000000000002"),
             place: { ...note, thread: STARTS },
           }),
         ],
@@ -225,7 +225,7 @@ describe("planLiftRoot (S139)", () => {
 
 test("planRootDelete: its directory record, its thread's, its task's record, board place and title, the cards in it and on its task's canvas, its document and the task's stacks", () => {
   const inThread = card({
-    id: textCardId("c-2"),
+    id: textCardId("c0000000-0000-7000-8000-000000000002"),
     place: { ...note, thread: STARTS },
   })
   const onCanvas = threadCardOf({
@@ -249,7 +249,7 @@ test("planRootDelete: its directory record, its thread's, its task's record, boa
     "pinetrie.mark",
   ])
   expect(plan.cards).toEqual([
-    { kind: "remove", id: textCardId("c-2") },
+    { kind: "remove", id: textCardId("c0000000-0000-7000-8000-000000000002") },
     { kind: "remove", id: STARTS },
   ])
   expect(plan.doc).toBe(`root:${THREAD}`)

@@ -144,12 +144,12 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
   {
-    name: "a reported root is the end itself",
+    name: "a reported task is dropped",
     file: "packages/reads/index.ts",
-    from: "      now.set(entryId(end), entryId(root))",
-    to: "      now.set(entryId(end), entryId(end))",
+    from: "        now.set(entryId(end), task)\n",
+    to: "        void task\n",
     command: unit,
-    expect: "each followed end's root, as its column reported it",
+    expect: "each followed end's task, as its column reported it",
   },
   {
     name: "a writer only in a root not held is no participant",
@@ -168,12 +168,12 @@ export const mutations: readonly Mutation[] = [
     expect: "readParticipantNames keeps its map while the names are the same",
   },
   {
-    name: "the reported roots are a new map on every presence write",
+    name: "the reported tasks are a new map on every presence write",
     file: "packages/reads/index.ts",
-    from: "        now.set(entryId(end), entryId(root))\n    }\n    return now\n  },\n  sameMap,",
-    to: "        now.set(entryId(end), entryId(root))\n    }\n    return now\n  },\n  () => false,",
+    from: "        now.set(entryId(end), task)\n    }\n    return now\n  },\n  sameMap,",
+    to: "        now.set(entryId(end), task)\n    }\n    return now\n  },\n  () => false,",
     command: unit,
-    expect: "each followed end's root, as its column reported it",
+    expect: "each followed end's task, as its column reported it",
   },
   {
     name: "a compaction carries no cards",

@@ -3,7 +3,6 @@
 
 import {
   atEntry,
-  cardId,
   commitId,
   entryId,
   type OfferRecord,
@@ -14,6 +13,7 @@ import {
   snapshotId,
   type ThreadName,
   taskIdFor,
+  textCardId,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -243,7 +243,7 @@ const SAMPLES: readonly Sample[] = [
     "card history",
     CARD_HISTORY,
     {
-      card: cardId("c-1"),
+      card: textCardId("c0000000-0000-7000-8000-000000000001"),
       events: [
         {
           kind: "created",
@@ -273,7 +273,7 @@ const SAMPLES: readonly Sample[] = [
     {
       id: "t-1",
       for: ADA,
-      card: cardId("c-1"),
+      card: textCardId("c0000000-0000-7000-8000-000000000001"),
       by: writerId("bea@x.io"),
       from: {
         kind: "pinned",

@@ -27,7 +27,7 @@ const END: ChatAt = {
 const ADA = writerId("ada@x.io")
 const card: CardRecord = {
   kind: "text" as const,
-  id: textCardId("c-1"),
+  id: textCardId("c0000000-0000-7000-8000-000000000001"),
   owner: ADA,
   placer: ADA,
   place: { kind: "composing", at, thread: TEST_THREAD },
@@ -84,7 +84,7 @@ test("a chat fills in what its column left out, and carries each card's version 
   ).toMatchObject({
     at: branch,
     asksAgent: true,
-    card: { id: "c-1", seen: "v-c-1" },
+    card: { id: "c0000000-0000-7000-8000-000000000001", seen: "v-c-1" },
     pinned,
     base: "wip",
   })

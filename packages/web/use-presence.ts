@@ -4,9 +4,9 @@
 // so only small components call these: never `App`, never a `Column` (S59).
 
 import { useSelector } from "@kyneta/react"
-import type { EntryId, TreeIndex, WriterId } from "@pinetrie/core"
+import type { EntryId, TaskId, TreeIndex, WriterId } from "@pinetrie/core"
 import { readingAt, seenBy, whoIsAt } from "@pinetrie/interface"
-import { readReading, readReadingRoots, readTyping } from "@pinetrie/reads"
+import { readReading, readReadingTasks, readTyping } from "@pinetrie/reads"
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import { useMemo } from "react"
 
@@ -19,11 +19,11 @@ export function useReadingAt(
   return useMemo(() => readingAt(reading, me), [reading, me])
 }
 
-/** The root each thread end being read was reported in (ADR-0063). */
-export function useReadingRoots(
+/** The task each thread end being read was reported on (ADR-0063, ADR-0116). */
+export function useReadingTasks(
   presence: PresenceDocHandle,
-): ReadonlyMap<EntryId, EntryId> {
-  return useSelector(presence, readReadingRoots)
+): ReadonlyMap<EntryId, TaskId> {
+  return useSelector(presence, readReadingTasks)
 }
 
 /** Others reading the thread that ends at `end` (`seenBy`). */

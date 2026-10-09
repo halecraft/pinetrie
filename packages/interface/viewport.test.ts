@@ -23,10 +23,12 @@ test("visibleSpan: the messages at the view's top and bottom, and how far into e
   expect(visibleSpan(boxes, 150)).toEqual({
     first: { id: "a", at: 0.5 },
     last: { id: "b", at: 1 },
+    past: 0,
   })
   expect(visibleSpan(boxes, 175)).toEqual({
     first: { id: "a", at: 0.5 },
     last: { id: "c", at: 0.25 },
+    past: 0,
   })
   expect(visibleSpan([], 100)).toBeNull()
 })
@@ -40,11 +42,16 @@ test("visibleSpan: a top in a gap is past the message above it; content short of
   expect(visibleSpan(gap, 500)).toEqual({
     first: { id: "a", at: 1 },
     last: { id: "b", at: 1 },
+    past: 0,
   })
+  // 12 px down that line: past a's end by 12.
+  const down = gap.map(b => ({ ...b, top: b.top - 12, bottom: b.bottom - 12 }))
+  expect(visibleSpan(down, 500)?.past).toBe(12)
   // Everything below the top: the first message, from its start.
   expect(visibleSpan([{ id: "a", top: 30, bottom: 60 }], 500)).toEqual({
     first: { id: "a", at: 0 },
     last: { id: "a", at: 1 },
+    past: 0,
   })
 })
 
@@ -73,20 +80,36 @@ test("sameSpan: a change under 1% of a message is the same", () => {
 test("spotOf: following leaves the end, at the last message; else the view's top", () => {
   const span = visibleSpan(boxes, 150)
   expect(spotOf(span, true, "c")).toEqual({ kind: "end", id: "c" })
-  expect(spotOf(span, false, "c")).toEqual({ kind: "at", id: "a", at: 0.5 })
+  expect(spotOf(span, false, "c")).toEqual({
+    kind: "at",
+    id: "a",
+    at: 0.5,
+    past: 0,
+  })
   expect(spotOf(null, false, "c")).toBeNull()
 })
 
 test("keepSpot: one spot per column, at a message it shows", () => {
-  let spots = keepSpot(new Map(), ["a", "b"], { kind: "at", id: "b", at: 0 })
+  let spots = keepSpot(new Map(), ["a", "b"], {
+    kind: "at",
+    id: "b",
+    at: 0,
+    past: 0,
+  })
   spots = keepSpot(spots, ["x", "y"], { kind: "end", id: "y" })
   // The first column again: its old spot goes.
-  spots = keepSpot(spots, ["a", "b", "c"], { kind: "at", id: "a", at: 0.2 })
+  spots = keepSpot(spots, ["a", "b", "c"], {
+    kind: "at",
+    id: "a",
+    at: 0.2,
+    past: 0,
+  })
   expect([...spots.keys()].sort()).toEqual(["a", "y"])
   expect(spotFor(spots, ["c", "b", "a"])).toEqual({
     kind: "at",
     id: "a",
     at: 0.2,
+    past: 0,
   })
   expect(spotFor(spots, ["q"])).toBeUndefined()
   // No spot, or one at a message it does not show: the column keeps none.
@@ -102,18 +125,23 @@ test("placeAt: as far into the message as the view's top was; an end at the bott
     clientHeight: 500,
     lastId: "z",
   }
-  expect(placeAt({ kind: "at", id: "a", at: 0.25 }, m)).toBe(450)
+  expect(placeAt({ kind: "at", id: "a", at: 0.25, past: 0 }, m)).toBe(450)
+  // Left between two messages: as far past its end as it was.
+  expect(placeAt({ kind: "at", id: "a", at: 1, past: 12 }, m)).toBe(612)
   // Its old end, with more below it now: that message's bottom at the view's bottom.
   expect(placeAt({ kind: "end", id: "a" }, m)).toBe(100)
   // Still the last message: the column's end.
   expect(placeAt({ kind: "end", id: "z" }, m)).toBe(1500)
   // Clamped to what can scroll.
-  expect(placeAt({ kind: "at", id: "a", at: 0 }, { ...m, top: 1900 })).toBe(
-    1500,
-  )
+  expect(
+    placeAt({ kind: "at", id: "a", at: 0, past: 0 }, { ...m, top: 1900 }),
+  ).toBe(1500)
   // Content that fits its view is left to alignment.
   expect(
-    placeAt({ kind: "at", id: "a", at: 0 }, { ...m, scrollHeight: 500 }),
+    placeAt(
+      { kind: "at", id: "a", at: 0, past: 0 },
+      { ...m, scrollHeight: 500 },
+    ),
   ).toBeNull()
 })
 

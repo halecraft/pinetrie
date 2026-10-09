@@ -8,10 +8,15 @@ import {
   type EntryLike,
   indexTree,
   rootIdFor,
+  rootOf,
   type TaskId,
+  type ThreadCard,
+  type ThreadId,
+  type ThreadRecord,
   type TreeIndex,
   taskIdFor,
   threadIdFor,
+  writerId,
 } from "@pinetrie/core"
 import { entriesOf, entry, withThreads } from "@pinetrie/core/fixtures"
 
@@ -23,7 +28,7 @@ export {
   withThreads,
 } from "@pinetrie/core/fixtures"
 
-import { NO_TASKS, type Tasks } from "./tasks.ts"
+import { type Tasks, tasksOf } from "./tasks.ts"
 
 /**
  * The index of `list`, keyed by each entry's own id as the reads key them,
@@ -64,18 +69,38 @@ export const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
 export const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 /**
- * The page's tasks for a test (ADR-0116): each task named with its first
- * root's root entry, holding no thread cards the index needs.
+ * The page's tasks for a test (ADR-0116): each task holding every thread of
+ * `index` whose first entry is under the root entry named with it, each a
+ * thread card on its canvas in thread order, its root `TEST_ROOT`.
  */
-export const tasksFor = (
+export function tasksFor(
+  index: TreeIndex,
   ...pairs: readonly (readonly [TaskId, EntryId])[]
-): Tasks => ({
-  ...NO_TASKS,
-  byId: new Map(
-    pairs.map(([task, entry]) => [
-      task,
-      { task, threads: [], roots: [], entry },
-    ]),
-  ),
-  ofEntry: new Map(pairs.map(([task, entry]) => [entry, task])),
-})
+): Tasks {
+  const cards: ThreadCard[] = []
+  const threads = new Map<ThreadId, ThreadRecord>()
+  for (const [thread, first] of [...index.firstOf].sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  )) {
+    const root = rootOf(index, first)
+    const task = pairs.find(([, entry]) => entry === root)?.[0]
+    if (task === undefined) continue
+    cards.push({
+      kind: "thread",
+      id: thread,
+      owner: TEST_WRITER,
+      placer: TEST_WRITER,
+      place: { kind: "canvas", task, order: `a${cards.length}`, width: 1 },
+    })
+    threads.set(thread, {
+      thread,
+      root: TEST_ROOT,
+      by: TEST_WRITER,
+      createdAt: 0,
+      fork: null,
+    })
+  }
+  return tasksOf({ known: pairs.map(([task]) => task), cards, threads })
+}
+
+const TEST_WRITER = writerId("ada@x.io")

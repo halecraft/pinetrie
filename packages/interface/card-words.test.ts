@@ -2,6 +2,7 @@ import {
   atEntry,
   type CardEvent,
   entryId,
+  noteColumnIdFor,
   type PlaceKey,
   rootIdFor,
   type ThreadName,
@@ -32,7 +33,7 @@ const BEA = writerId("bea@x.test")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
 type MoveRefused = Extract<CardNotice, { fromQueue: boolean }>
 const refusal = (over: Partial<MoveRefused>): CardNotice => ({
-  card: textCardId("c-1"),
+  card: textCardId("c0000000-0000-7000-8000-000000000001"),
   actedAt: { kind: "inventory" },
   code: "gone",
   by: null,
@@ -179,9 +180,7 @@ describe("history and traces (ADR-0048 step 6)", () => {
   const _ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
   const atEnd: PlaceKey = {
     kind: "note",
-    at: atEntry(entryId("e-1")),
-    thread: threadIdFor("x"),
-    cell: 0,
+    column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
   }
   const queued: PlaceKey = {
     kind: "queued",
@@ -218,7 +217,7 @@ describe("history and traces (ADR-0048 step 6)", () => {
   const trace = (to: PlaceKey | null) => ({
     id: "t",
     for: ME,
-    card: textCardId("c-1"),
+    card: textCardId("c0000000-0000-7000-8000-000000000001"),
     by: BEA,
     from: atEnd,
     to,

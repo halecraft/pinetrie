@@ -202,16 +202,10 @@ export interface SessionClient {
    */
   undoFor(id: TextCardId): CardUndo
   /**
-   * This window's column `columnKey` shows the thread ending at `end`,
-   * in the root whose root entry is `root` and the task `task` (null: not
-   * yet known).
+   * This window's column `columnKey` shows the thread ending at `end`, on
+   * the task `task` (null: not yet known).
    */
-  setReading(
-    columnKey: string,
-    end: string,
-    root: string | null,
-    task: string | null,
-  ): void
+  setReading(columnKey: string, end: string, task: string | null): void
   /** The column closed: its entry is deleted, not left to decay. */
   clearReading(columnKey: string): void
   /**

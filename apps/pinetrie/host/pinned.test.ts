@@ -71,16 +71,27 @@ const signal = () => new AbortController().signal
 describe("readPinned: what a run reads of its pinned cards", () => {
   test("the thread's pinned cards in order, named by their owner, as one cards entry", async () => {
     const { pin, readPinned } = setUp({
-      "c-1": "ship it",
-      "c-2": "no schema changes",
+      "c0000000-0000-7000-8000-000000000001": "ship it",
+      "c0000000-0000-7000-8000-000000000002": "no schema changes",
     })
-    pin(pinnedCard("c-2", "b"), pinnedCard("c-1", "a"))
+    pin(
+      pinnedCard("c0000000-0000-7000-8000-000000000002", "b"),
+      pinnedCard("c0000000-0000-7000-8000-000000000001", "a"),
+    )
     const message = await readPinned(LANE, [], signal())
     expect(decodePinned(message)).toEqual({
       lane: LANE,
       cards: [
-        { id: "c-1", text: "ship it", by: ADA },
-        { id: "c-2", text: "no schema changes", by: ADA },
+        {
+          id: "c0000000-0000-7000-8000-000000000001",
+          text: "ship it",
+          by: ADA,
+        },
+        {
+          id: "c0000000-0000-7000-8000-000000000002",
+          text: "no schema changes",
+          by: ADA,
+        },
       ],
       retired: [],
     })
@@ -88,12 +99,20 @@ describe("readPinned: what a run reads of its pinned cards", () => {
   })
 
   test("nothing when the model already reads them as they are on the lane's path", async () => {
-    const { b, pin, readPinned } = setUp({ "c-1": "ship it" })
-    pin(pinnedCard("c-1", "a"))
+    const { b, pin, readPinned } = setUp({
+      "c0000000-0000-7000-8000-000000000001": "ship it",
+    })
+    pin(pinnedCard("c0000000-0000-7000-8000-000000000001", "a"))
     const read = encodePinned(
       {
         lane: LANE,
-        cards: [{ id: textCardId("c-1"), text: "ship it", by: ADA }],
+        cards: [
+          {
+            id: textCardId("c0000000-0000-7000-8000-000000000001"),
+            text: "ship it",
+            by: ADA,
+          },
+        ],
         retired: [],
       },
       () => "Ada",
@@ -107,25 +126,29 @@ describe("readPinned: what a run reads of its pinned cards", () => {
   })
 
   test("a card with no text yet is left out", async () => {
-    const { pin, readPinned } = setUp({ "c-1": "  " })
-    pin(pinnedCard("c-1", "a"))
+    const { pin, readPinned } = setUp({
+      "c0000000-0000-7000-8000-000000000001": "  ",
+    })
+    pin(pinnedCard("c0000000-0000-7000-8000-000000000001", "a"))
     expect(await readPinned(LANE, [], signal())).toBeNull()
   })
 
   test("it waits for each pinned card as the sender had it, and no other card", async () => {
-    const { pin, readPinned, waits } = setUp({ "c-1": "ship it" })
-    pin(pinnedCard("c-1", "a"))
+    const { pin, readPinned, waits } = setUp({
+      "c0000000-0000-7000-8000-000000000001": "ship it",
+    })
+    pin(pinnedCard("c0000000-0000-7000-8000-000000000001", "a"))
     const seen: SentCard[] = [
-      { id: textCardId("c-1"), seen: "v-1" },
-      { id: textCardId("c-9"), seen: "v-9" },
+      { id: textCardId("c0000000-0000-7000-8000-000000000001"), seen: "v-1" },
+      { id: textCardId("c0000000-0000-7000-8000-000000000009"), seen: "v-9" },
     ]
     await readPinned(LANE, seen, signal())
-    expect(waits).toEqual([["c-1", "v-1"]])
+    expect(waits).toEqual([["c0000000-0000-7000-8000-000000000001", "v-1"]])
   })
 
   test("a text that never arrives is waited for `waitMs`, then read as the host holds it", async () => {
     const { pin, readPinned } = setUp(
-      { "c-1": "ship it" },
+      { "c0000000-0000-7000-8000-000000000001": "ship it" },
       {
         whenHolds: (_, __, giveUp) =>
           new Promise(resolve =>
@@ -133,10 +156,10 @@ describe("readPinned: what a run reads of its pinned cards", () => {
           ),
       },
     )
-    pin(pinnedCard("c-1", "a"))
+    pin(pinnedCard("c0000000-0000-7000-8000-000000000001", "a"))
     const message = await readPinned(
       LANE,
-      [{ id: textCardId("c-1"), seen: "v-1" }],
+      [{ id: textCardId("c0000000-0000-7000-8000-000000000001"), seen: "v-1" }],
       signal(),
     )
     expect(decodePinned(message)?.cards.map(c => c.text)).toEqual(["ship it"])
@@ -155,7 +178,7 @@ test("waitFor: an aborted signal ends the wait at once, whatever is left", async
           giveUp?.addEventListener("abort", () => resolve())
         }),
     },
-    [{ id: textCardId("c-1"), seen: "v-1" }],
+    [{ id: textCardId("c0000000-0000-7000-8000-000000000001"), seen: "v-1" }],
     60_000,
     stop.signal,
   )

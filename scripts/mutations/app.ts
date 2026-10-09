@@ -1134,26 +1134,6 @@ export const mutations: readonly Mutation[] = [
       "a card dropped on a state in the footer's strip becomes a thread there, and the undo key lifts it back into the card",
   },
   {
-    name: "Enter on an empty notes cell makes nothing",
-    file: "packages/web/card-grid.tsx",
-    from: "          creates: p.onCreate !== null,",
-    to: "          creates: false,",
-    suite: "browser",
-    scenario: "page",
-    expect:
-      "Enter on an empty cell of the notes board makes a note there, open over its cell, ready to write in",
-  },
-  {
-    name: "the open card is as short as its text",
-    file: "packages/web/index.html",
-    from: "        min-height: 100%; display: flex; flex-direction: column;",
-    to: "        display: flex; flex-direction: column;",
-    suite: "browser",
-    scenario: "page",
-    expect:
-      "Enter on an empty cell of the notes board makes a note there, open over its cell, ready to write in",
-  },
-  {
     name: "the dock grows past a third of the column",
     file: "packages/web/index.html",
     from: "      .dock { flex: 0 0 auto; max-height: 33%;",
@@ -1490,8 +1470,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the marks are given no archived tasks",
     file: "packages/web/app.tsx",
-    from: "        archived: archivedTasks,\n        tasks,\n        index,\n        rootEntries,",
-    to: "        archived: new Set(),\n        tasks,\n        index,\n        rootEntries,",
+    from: "        archived: archivedTasks,\n        tasks: tasks.index,\n        index,\n      }),",
+    to: "        archived: new Set(),\n        tasks: tasks.index,\n        index,\n      }),",
     suite: "browser",
     scenario: "page",
     expect: "an archived root holding your card marks its thread card, not ▦",
@@ -1925,7 +1905,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column publishes no composer place",
     file: "packages/web/column.tsx",
-    from: "      writable && place !== undefined\n        ? { place, message: mine?.id ?? null, cells }\n        : null,",
+    from: "      writable && place !== undefined\n        ? { place, message: mine?.id ?? null }\n        : null,",
     to: "      null,",
     suite: "browser",
     scenario: "page",
@@ -1945,7 +1925,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a drop asks for nothing",
     file: "packages/web/app.tsx",
-    from: '      onIntent({ kind: "put", card: cardId(card), target })',
+    from: '      onIntent({ kind: "put", card, target })',
     to: "",
     suite: "browser",
     scenario: "page",
@@ -2095,24 +2075,14 @@ export const mutations: readonly Mutation[] = [
       "pin draws the card in the strip at the top of its column, above the messages, and empties the composer",
   },
   {
-    name: "a column draws no notes",
-    file: "packages/web/column.tsx",
-    from: '      : cardsAt("note", threadEnd, p.cards, index)',
-    to: "      : []",
+    name: "a note column draws no notes",
+    file: "packages/web/note-column.tsx",
+    from: "        {view.notes.map(note => (",
+    to: "        {view.notes.slice(0, 0).map(note => (",
     suite: "browser",
     scenario: "page",
     expect:
-      "your message shows only in your window; moved to the notes, it shows on the other's notes board",
-  },
-  {
-    name: "a note offers no way into your message",
-    file: "packages/interface/card-frame.ts",
-    from: '        { to: "message", act: { kind: "toMessage", card: id } },\n',
-    to: "",
-    suite: "browser",
-    scenario: "page",
-    expect:
-      "Move to notes puts your message on the notes board, and the note's Move to your message brings it back into the box",
+      "your message shows only in your window; moved to the notes, it shows in the other's note column",
   },
   {
     name: "a composer keeps showing the card a drop swapped away",
@@ -2202,5 +2172,43 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "hold queue holds the thread's queue, and unqueue all puts every queued card below the line",
+  },
+  {
+    name: "the strip draws no note column",
+    file: "packages/web/app.tsx",
+    from: "    () => stripItems(columns, canvas),",
+    to: "    () => stripItems(columns, []),",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "your message shows only in your window; moved to the notes, it shows in the other's note column",
+  },
+  {
+    name: "a new note's box is not focused",
+    file: "packages/web/note-column.tsx",
+    from: "    setFocusing(card)\n",
+    to: "",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "+ add a note makes an empty note at its note column's end, ready to write in",
+  },
+  {
+    name: "a note moves among no notes",
+    file: "packages/web/note-column.tsx",
+    from: "              among={view.notes}",
+    to: "              among={[]}",
+    suite: "browser",
+    scenario: "page",
+    expect: "Alt+↑ in a note's box moves it up its note column, for everyone",
+  },
+  {
+    name: "a note column's rename sends nothing",
+    file: "packages/web/note-column.tsx",
+    from: '              p.onIntent({\n                kind: "rename",',
+    to: '              void ({\n                kind: "rename",',
+    suite: "browser",
+    scenario: "page",
+    expect: "a note column is renamed from its header, for everyone",
   },
 ]

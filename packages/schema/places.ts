@@ -28,15 +28,15 @@ const StoredCard = Schema.struct.json({
   owner: Schema.string(),
   /** `drafting`, `note`, `pinned`, `queued`, `fresh`, `canvas`, `inventory`, or why it is gone: the place's kind (`CardPlace`). */
   kind: Schema.string(),
-  /** A drafting, queued or fresh card's root (ADR-0063). */
+  /** A fresh card's root (ADR-0063): a card at a thread's is its thread's. */
   root: Schema.string(),
-  /** A drafting or queued card's entry; a fresh card's branch point, "" for a new tab. */
+  /** A card at a thread's entry; a fresh card's branch point, "" for a new tab. */
   at: Schema.string(),
-  /** A queued card's lane; a spun card's thread. */
+  /** A card at a thread's thread, which names its lane; a spun card's thread. */
   lane: Schema.string(),
-  /** A fresh card's column key. */
+  /** A fresh card's column key; a note's note column (ADR-0116); a spun card's root. */
   column: Schema.string(),
-  /** A queued card's place in its lane's queue (S69). */
+  /** A queued, pinned or canvas card's rank, or a note's in its column (S69). */
   order: Schema.string(),
   /** Who queued it. */
   by: Schema.string(),

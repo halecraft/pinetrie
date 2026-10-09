@@ -172,9 +172,11 @@ export function createCommands(deps: CommandDeps): Commands {
     intent: Intent,
     id: string,
   ): Promise<Settled> {
+    // gather: the task index once, for the gate and every card command
+    const tasks = tasksNow(deps.basics)
     const archived = refuseInArchive(
       deps.basics,
-      writesIn(intent, tasksNow(deps.basics), readPlaces(deps.basics.places)),
+      writesIn(intent, tasks, readPlaces(deps.basics.places)),
     )
     if (archived !== null) return settled(archived)
     switch (intent.kind) {
@@ -197,10 +199,13 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(sent)
       }
       case "move":
-        return cardCommands.move(writer, intent.moves, intent.here)
+        return cardCommands.move(writer, intent.moves, intent.here, tasks)
       case "spin-off":
-        return cardCommands.spinOff(writer, intent, chat =>
-          sendChat(deps, writer, newId(), chat),
+        return cardCommands.spinOff(
+          writer,
+          intent,
+          chat => sendChat(deps, writer, newId(), chat),
+          tasks,
         )
       case "queue-card":
         return cardCommands.queueCard(
@@ -208,17 +213,23 @@ export function createCommands(deps: CommandDeps): Commands {
           intent.move,
           intent.hold,
           intent.command,
+          tasks,
         )
       case "reorder":
-        return cardCommands.reorder(writer, intent.reorder)
+        return cardCommands.reorder(writer, intent.reorder, tasks)
       case "unqueue-all":
-        return cardCommands.unqueueAll(writer, intent.lane)
+        return cardCommands.unqueueAll(writer, intent.lane, tasks)
       case "queue-hold":
         return settled(
           await handleQueueHold(deps, intent.lane, intent.held, writer),
         )
       case "undo-move":
-        return cardCommands.undoMove(writer, intent.task, intent.direction)
+        return cardCommands.undoMove(
+          writer,
+          intent.task,
+          intent.direction,
+          tasks,
+        )
       case "set-command":
         return cardCommands.setCommand(intent.card, intent.command)
       case "traces-seen":

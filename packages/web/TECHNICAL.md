@@ -517,7 +517,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   cards (`.queue-cards`, each a `QueuedCardEditor` in a `.queued-card`, a
   fact a `.queued-fact`), "+ add to queue" (`.add-to-queue`), the line
   (`.the-line`), the column's notices, then what `Column` puts in it: your
-  message (`Composer`) and the notes line. CSS caps it at a third of the
+  message (`Composer`). CSS caps it at a third of the
   column (`.dock`'s `max-height`) and it scrolls within. It reads presence
   (`readTypingIn`) itself, for `queueHead`, so typing redraws the dock and
   not the column (S59).
@@ -636,7 +636,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **Open offers in your repo** ("work ready to accept") are your inbox's
   rows for the threads you follow, each leading with the thread's name and
   opening it, and a thread card's ⇡ for everyone (ADR-0091). Move to Done
-  in an item's `⋯` names the threads whose offers it withdraws (`offeredByRoot`,
+  in an item's `⋯` names the threads whose offers it withdraws (`offeredByTask`,
   `dropsWords`). All read `openOffers`, which keeps only `offerStatus`'s
   `open` (ADR-0067): one accepted work already holds (`held`) has nothing to
   add, so it is neither counted nor named, as the strip says.
@@ -706,10 +706,9 @@ heads a range, which has no description.
 ## A column's pane (`pane.ts`, `pane.tsx`, ADR-0078)
 
 Beside the thread, a column has one pane, holding one thing at a time: the
-offer's review, an ask's, a table from a message, a stored image, or the
-thread's notes board (ADR-0113).
+offer's review, an ask's, a table from a message, or a stored image.
 
-- **A subject is a name, never data** (`PaneSubject`): the offer, the notes
+- **A subject is a name, never data** (`PaneSubject`): the offer,
   board (drawn while the column has a thread end), an ask by
   its entry, a table by its entry and its number in that message, an image
   by its hash and the message it is in (null in a reply still streaming).
@@ -819,8 +818,8 @@ the session sends moves and draws them until its copy holds them
 `packages/session/TECHNICAL.md`.
 
 - **A move is planned once.** `planIntent` builds each `Move` with core's
-  `moveOf` (an unqueue's target is `noteOf`), from the cards as drawn, and
-  the session sends it.
+  `moveOf` (an unqueue's target is `noteOf`, the thread's nearest notes),
+  from the cards as drawn, and the session sends it.
 - **Refusals are worded here** (`refusalWords`), from the session's
   `CardRefusal`: an unqueue the pop beat says "already sent", a move
   someone made first names them. A column draws its own, and the panel the
@@ -828,32 +827,36 @@ the session sends moves and draws them until its copy holds them
 
 - **Where the column's cards are.** `Column`'s anchor is its thread's end
   (`threadEnd`), where a reply goes, and it finds your message there with
-  `yourCard` (`composing` only) and the notes with `cardsAt("note", …)`. A
-  fresh column's cards are found by its key (`CardPlace` `fresh`), and
-  every one there but your message is drawn as a note. So a tab switch, a
+  `yourCard` (`composing` only). A fresh column's cards are found by its
+  key (`CardPlace` `fresh`); its first send sends every one there but your
+  message to the new thread's nearest notes (`planFreshFollow`). So a tab switch, a
   reload or another device finds the same card: it belongs to the thread,
   not to the mounted column. Nobody else's message is drawn.
 - **A column publishes its composer** (`ComposerSpot`: its place and your
-  message there) for `planPut`: a put on the column makes a note, a drop on
+  message there) for `planPut`: a put on the column makes a note in the
+  note column nearest its thread, a drop on
   the composer (`data-put-composer`) your message, swapping out one with
   text (`App`'s `filled` says which hold text).
-- **The notes are on the notes board** (`notes-board.tsx`, `NotesBoard`), a
-  `CardGrid` in the column's pane, each opening as a `NoteCardEditor`. The
-  column's notes line (`.notes-line`) says how many there are and whose,
-  opens and closes the board (`.notes-toggle`), and is the column's drop
-  target for a new note.
-- **`CardGrid`** (`card-grid.tsx`) draws a `GridView` as index cards, each
-  cell a button (the drop target, `dropProps`, and the card's drag) holding
-  its `CardFace`. Its keys are `gridKeyAct`'s, on the grid; the open card
-  is the caller's (`renderOpen`), drawn over its neighbours from its cell,
-  towards the grid's middle (`data-side`), at least as tall as the cell,
-  which it hides (`data-open`, by opacity so Escape can focus it again),
-  carrying the selection's ring itself. A grid that makes cards
-  (`onCreate`, the notes board's `newNote`; never the inventory's) draws a
-  "+" in a selected empty cell (`.card-grid-new`) and makes one there on
-  it or on Enter, then opens it once it is drawn, its box focused. A face's owner is an `Initial`,
-  not an `Avatar`: the suites count people by `.avatar`. A cell's text
-  comes from `useCardTexts`.
+- **The notes are in note columns** (`note-column.tsx`, `NoteColumn`,
+  ADR-0116), drawn in `#strip` among the thread columns where `stripItems`
+  puts them, a `.note-column` with its id as `data-column`: its title
+  (`.note-column-title`, a button that opens `TitleField`, the sidebar's
+  rename field, and sends `rename` with a `MarkTarget`), its notes one under
+  another, each a `NoteCardEditor` (`among` its column's notes, so ↑ and ↓
+  and Alt+↑/↓ reorder it), folded to one line until it holds the focus, as
+  a queued card in the dock is, and "+ add a note" (`.add-note`), which
+  focuses its card's box once drawn. The whole column is a drop target
+  (`data-put-notes`). A note's acts are sent as a `column` intent keyed by
+  the note column's id, so its refusals are said there.
+- **`CardGrid`** (`card-grid.tsx`) draws your inventory's `GridView` as
+  index cards, each cell a button (the drop target, `dropProps`, and the
+  card's drag) holding its `CardFace`. Its keys are `gridKeyAct`'s, on the
+  grid; the open card is the caller's (`renderOpen`), drawn over its
+  neighbours from its cell, towards the grid's middle (`data-side`), at
+  least as tall as the cell, which it hides (`data-open`, by opacity so
+  Escape can focus it again), carrying the selection's ring itself. A
+  face's owner is an `Initial`, not an `Avatar`: the suites count people by
+  `.avatar`. A cell's text comes from `useCardTexts`.
 - **One editor for every card: `card-editor.tsx`, in one frame:
   `card-frame.tsx`** (ADR-0111). `CardEditor` is your composer's and the
   "+ pin" box's; every other card is a `BoundCardEditor`, a note named in
@@ -925,7 +928,7 @@ A thread's pinned cards are drawn in a strip under its column's header,
 outside the scrolling body (`pinned-strip.tsx`), so the thread's direction
 stays in view; the strip scrolls past 30vh.
 
-- **`Column` finds them with `cardsAt("pinned", threadEnd, …)`.** A fresh
+- **`Column` finds them with `pinnedAt(threadEnd, …)`.** A fresh
   column, or one with no thread end, has no strip: a card is pinned at a
   thread's end, and a fresh column has none until its first send.
 - **Each is a `PinnedCardEditor`** (`card-editor.tsx`), a `BoundCardEditor`
@@ -975,11 +978,10 @@ stays in view; the strip scrolls past 30vh.
   prompt's `.msg`. A card's frame is `.card-frame` (with `data-tone`), its
   header `.card-head` (`.card-state[data-state]`, `.card-by`), its ⋯
   `.card-menu-trigger` and its items `.move-to[data-to]` and
-  `.card-history-item`; its × `.discard-card`. A notes board is
-  `.pane-notes`, its cells `.note-cell[data-cell][data-card]`, the open
-  card `.card-grid-open`; the column's `.notes-line` and `.notes-toggle`.
-  `openNote` and `closeNotes` (`apps/pinetrie/e2e/browser/page.ts`) open a
-  note on the board and close it.
+  `.card-history-item`; its × `.discard-card`. A note column is
+  `.note-column`, its notes `.card-editor.note` with their
+  `textarea[data-card]`. `openNote` (`apps/pinetrie/e2e/browser/page.ts`)
+  focuses a note's box, which unfolds it.
 
 ## History and traces (ADR-0048 step 6)
 

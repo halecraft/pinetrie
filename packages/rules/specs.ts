@@ -13,6 +13,7 @@ import { COMMANDS } from "./commands.ts"
 import { DIGEST } from "./digest.ts"
 import { MARK } from "./mark.ts"
 import { NAME } from "./names.ts"
+import { NOTE_COLUMN } from "./note-column.ts"
 import { OFFER } from "./offer.ts"
 import { PARTICIPANT, PICTURE } from "./participant.ts"
 import { QUEUE_HOLD } from "./queue-hold.ts"
@@ -43,6 +44,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   ACCEPTED,
   MARK,
   NAME,
+  NOTE_COLUMN,
   OFFER,
   PARTICIPANT,
   PICTURE,

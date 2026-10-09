@@ -1,11 +1,10 @@
 // interface/thread-card — what a task's card shows in its header (ADR-0111,
 // ADR-0116): a task on the board, or in the sidebar, is one card, its header
 // built once per task (`threadCardHeads`) and read by both views. Its signals
-// are its first root's, the one root a task holds until a task's canvas
-// holds several. Neutral: never in the thread's colour. PURE.
+// are its threads' together, whatever roots they are in (ADR-0116).
+// Neutral: never in the thread's colour. PURE.
 
 import type {
-  EntryId,
   RootWork,
   TaskId,
   Workflow,
@@ -30,14 +29,12 @@ export interface ThreadMove {
 /** A thread card's header: its signals, and its ⋯'s Move to ▸. */
 export interface ThreadCardHead {
   readonly task: TaskId
-  /** Its first root's root entry; null before that root has a message. */
-  readonly entry: EntryId | null
   readonly label: string
-  /** What its mark draws (`rootStatus`), or null for none. */
+  /** What its mark draws (`taskStatus`), or null for none. */
   readonly status: Status | null
-  /** Its threads with work ready to accept (`offeredByRoot`): ⇡, for everyone (ADR-0091). */
+  /** Its threads with work ready to accept (`offeredByTask`): ⇡, for everyone (ADR-0091). */
   readonly ready: readonly string[]
-  /** An unsent card of yours is in it (`CardMarks.roots`): your pip. */
+  /** An unsent card of yours is in it (`CardMarks.tasks`): your pip. */
   readonly pip: boolean
   /** The state it is in on the board; null before the host placed it. */
   readonly state: WorkflowStateId | null
@@ -49,20 +46,18 @@ export interface ThreadCardHead {
 export interface ThreadCardFacts {
   /** The board's states, or null before the host wrote them. */
   readonly workflow: Workflow | null
-  /** Each task's first root's root entry (`entriesOf`). */
-  readonly entries: ReadonlyMap<TaskId, EntryId>
   /** Each task's state on the board (`boardOf`). */
   readonly stateOf: ReadonlyMap<TaskId, WorkflowStateId>
   /** Each task's label (`labelsOf`). */
   readonly labels: ReadonlyMap<TaskId, string>
-  /** Each root's status (`rootStatus`, ADR-0077). */
-  readonly status: ReadonlyMap<EntryId, Status>
-  /** Roots holding an unsent card of yours (`CardMarks.roots`). */
-  readonly pips: ReadonlySet<EntryId>
-  /** The threads with an open offer, by root (`offeredByRoot`). */
-  readonly offered: ReadonlyMap<EntryId, readonly string[]>
-  /** The agent's work in each root, held or not (`workAnywhere`). */
-  readonly work: ReadonlyMap<string, RootWork>
+  /** Each task's status (`taskStatus`, ADR-0077). */
+  readonly status: ReadonlyMap<TaskId, Status>
+  /** Tasks holding an unsent card of yours (`CardMarks.tasks`). */
+  readonly pips: ReadonlySet<TaskId>
+  /** The threads with an open offer, by task (`offeredByTask`). */
+  readonly offered: ReadonlyMap<TaskId, readonly string[]>
+  /** The agent's work in each task, held or not (`taskWork`). */
+  readonly work: ReadonlyMap<TaskId, RootWork>
 }
 
 /** The header of `task`. */
@@ -70,26 +65,21 @@ export function threadCardHead(
   task: TaskId,
   facts: ThreadCardFacts,
 ): ThreadCardHead {
-  const entry = facts.entries.get(task) ?? null
   const state = facts.stateOf.get(task) ?? null
-  const of = <T>(m: ReadonlyMap<EntryId | string, T>): T | undefined =>
-    entry === null ? undefined : m.get(entry)
   return {
     task,
-    entry,
     label: facts.labels.get(task) ?? NO_TEXT,
-    status: of(facts.status) ?? null,
-    ready: of(facts.offered) ?? [],
-    pip: entry !== null && facts.pips.has(entry),
+    status: facts.status.get(task) ?? null,
+    ready: facts.offered.get(task) ?? [],
+    pip: facts.pips.has(task),
     state,
-    moves: movesOf(task, entry, state, facts),
+    moves: movesOf(task, state, facts),
   }
 }
 
 /** "Move to ▸" each state but `from`. */
 function movesOf(
   task: TaskId,
-  entry: EntryId | null,
   from: WorkflowStateId | null,
   facts: ThreadCardFacts,
 ): readonly ThreadMove[] {
@@ -102,8 +92,8 @@ function movesOf(
       {
         name: to.name,
         closes,
-        busy: closes && entry !== null ? (facts.work.get(entry) ?? null) : null,
-        drops: closes && entry !== null ? (facts.offered.get(entry) ?? []) : [],
+        busy: closes ? (facts.work.get(task) ?? null) : null,
+        drops: closes ? (facts.offered.get(task) ?? []) : [],
         intent: {
           kind: "moveTask",
           task,

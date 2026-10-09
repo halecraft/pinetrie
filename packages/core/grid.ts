@@ -1,13 +1,11 @@
-// core/grid — the one grid rule for your inventory and a thread's notes
-// board (ADR-0048, ADR-0113). A cell is an index in reading order, as an
-// inventory slot is: an address, the same for everyone, and a gap stays a
-// gap. Pure.
+// core/grid — the one grid rule for your inventory (ADR-0048). A cell is an
+// index in reading order: an address, the same for everyone, and a gap stays
+// a gap. Pure.
 
-/** A grid: its width, and its rows, fixed or growing with what it holds. */
+/** A grid: its width, and its rows. */
 export interface Grid {
   readonly width: number
-  /** A fixed count, or "grows": one empty row below the last taken one. */
-  readonly rows: number | "grows"
+  readonly rows: number
 }
 
 /** A move through a grid by arrow or `hjkl`. */
@@ -19,29 +17,11 @@ export const INVENTORY_GRID = { width: 6, rows: 3 } as const satisfies Grid
 /** How many cards an inventory holds: every cell of its grid (ADR-0048). */
 export const INVENTORY_SLOTS = INVENTORY_GRID.width * INVENTORY_GRID.rows
 
-/** A thread's notes board: 4 wide, growing a row at a time. */
-export const NOTES_GRID: Grid = { width: 4, rows: "grows" }
-
-/** Whether `n` is a cell of `grid` (any row, for one that grows). */
+/** Whether `n` is a cell of `grid`. */
 export const isCell = (grid: Grid, n: number): boolean =>
-  Number.isInteger(n) &&
-  n >= 0 &&
-  (grid.rows === "grows" || n < grid.width * grid.rows)
+  Number.isInteger(n) && n >= 0 && n < grid.width * grid.rows
 
-/**
- * The rows drawn: a fixed grid's own; a growing one's last taken row and
- * one empty row below it.
- */
-export function rowsShown(grid: Grid, taken: ReadonlySet<number>): number {
-  if (grid.rows !== "grows") return grid.rows
-  const last = Math.max(-1, ...taken)
-  return Math.floor(last / grid.width) + 2
-}
-
-/**
- * The first empty cell in reading order, from `start` if it is empty; null
- * when a fixed grid is full. A growing grid always has one.
- */
+/** The first empty cell in reading order, from `start` if it is empty; null when the grid is full. */
 export function firstEmpty(
   grid: Grid,
   taken: ReadonlySet<number>,
@@ -49,11 +29,9 @@ export function firstEmpty(
 ): number | null {
   if (start !== undefined && isCell(grid, start) && !taken.has(start))
     return start
-  const cells = grid.rows === "grows" ? taken.size + 1 : grid.width * grid.rows
-  for (let n = 0; n < cells; n++) if (!taken.has(n)) return n
+  for (let n = 0; n < grid.width * grid.rows; n++) if (!taken.has(n)) return n
   return null
 }
-
 /** The cell a move selects from `from` in `rows` rows; it stops at the grid's edge. */
 export function step(
   grid: Grid,

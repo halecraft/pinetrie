@@ -1,9 +1,9 @@
-import { cardId } from "@pinetrie/core"
+import { textCardId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { type KeyFocus, type KeyLike, keyAct } from "./inventory-keys.ts"
 
-const C1 = cardId("c-1")
-const C2 = cardId("c-2")
+const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+const C2 = textCardId("c0000000-0000-7000-8000-000000000002")
 const key = (k: string, over: Partial<KeyLike> = {}): KeyLike => ({
   key: k,
   ctrlKey: false,

@@ -115,10 +115,16 @@ describe("columnsReducer", () => {
       thread: threadIdFor("b"),
       at: entryId("2-t"),
       after: 0,
-      pending: { text: "@agent separately?", card: textCardId("c-1") },
+      pending: {
+        text: "@agent separately?",
+        card: textCardId("c0000000-0000-7000-8000-000000000001"),
+      },
     })
     expect(opened[1]?.fresh).toEqual({
-      pending: { text: "@agent separately?", card: "c-1" },
+      pending: {
+        text: "@agent separately?",
+        card: "c0000000-0000-7000-8000-000000000001",
+      },
     })
     const sent = columnsReducer(opened, { kind: "sent", key: "b", sendId: "s" })
     expect(sent[1]?.fresh).toEqual({ sendId: "s" })

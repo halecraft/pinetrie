@@ -33,7 +33,7 @@ import {
   storedKind,
 } from "./policy.ts"
 
-const CARD = cardDocId(textCardId("c-1"))
+const CARD = cardDocId(textCardId("c0000000-0000-7000-8000-000000000001"))
 const UNDO = "undo:seat-a"
 const INVENTORY = personDocId("inventory", writerId("ada@x.io"))
 const ATTENTION = personDocId("attention", writerId("ada@x.io"))

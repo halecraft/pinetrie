@@ -181,11 +181,10 @@ export interface IntentState {
   /** Every ask (`indexAsks`): a pick into one's work opens its fold. */
   readonly asks: AskIndex
   readonly cards: CardFacts
-  /**
-   * Every task (ADR-0116): an entry opens in the task its root's thread is
-   * in, and a task's first column at its first root's root entry.
-   */
+  /** Every task (ADR-0116): an entry opens in the task its thread is in. */
   readonly tasks: Tasks
+  /** Each task's first root's root entry (`entriesOf`): where its first column is. */
+  readonly entries: ReadonlyMap<TaskId, EntryId>
   /** What the sidebar shows now (`shownWidth`). */
   readonly listWidth: ListWidth
   /** The page over the workspace, if any (ADR-0098). */
@@ -229,9 +228,9 @@ export const showTask = (task: TaskId): readonly Effect[] =>
 
 /** A task's first root's root entry, where its first column is; null for none. */
 export const entryOfTask = (
-  state: Pick<IntentState, "tasks">,
+  state: Pick<IntentState, "entries">,
   task: TaskId,
-): EntryId | null => state.tasks.byId.get(task)?.entry ?? null
+): EntryId | null => state.entries.get(task) ?? null
 
 /**
  * Show entry `id` (`planOpen`): in view in the column that shows it, or in a
@@ -244,7 +243,13 @@ export function planOpenAt(
   state: IntentState,
   fresh: string,
 ): readonly Effect[] {
-  const plan = planOpen(state.layout, state.index, id, state.tasks.ofEntry)
+  const plan = planOpen(
+    state.layout,
+    state.index,
+    id,
+    state.tasks.index.taskOfThread,
+    state.entries,
+  )
   if (plan === null) return []
   const ask = state.asks.askOf.get(id)
   const fold: readonly Effect[] =

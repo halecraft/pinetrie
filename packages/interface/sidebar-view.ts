@@ -5,15 +5,13 @@
 import type {
   BannerRecord,
   EntryId,
-  LaneView,
   MarkRecord,
   Sha256,
   TaskId,
   ThreadId,
   ThreadName,
-  TreeIndex,
 } from "@pinetrie/core"
-import { blobUrl, PRODUCT_NAME, rootOf } from "@pinetrie/core"
+import { blobUrl, PRODUCT_NAME } from "@pinetrie/core"
 import { threadNameOf } from "@pinetrie/rules"
 import type { Moments, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
@@ -21,7 +19,7 @@ import type { Intent } from "./intent.ts"
 import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
 import { type PageName, pageWords } from "./page.ts"
 import { type ColorSlot, taskSlot } from "./palette.ts"
-import { initialsOf, NO_TEXT } from "./root-label.ts"
+import { initialsOf, NO_TEXT, type TaskSummary } from "./root-label.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 
 /** What a task's ⋯ in the sidebar offers. */
@@ -41,7 +39,7 @@ export type ItemMenuItem =
 
 /**
  * What an item draws while the sidebar is folded (ADR-0088): the sprite of the
- * task's earliest thread with one (`rootSprites`), else its initials on a
+ * task's earliest thread with one (`taskSprites`), else its initials on a
  * colour seeded by its id (ADR-0089). A new tab has neither yet: a hollow tile, as its rail
  * has a hollow dot where its first message will be.
  */
@@ -70,13 +68,15 @@ export type ItemView =
   | (ItemCommon & {
       readonly kind: "task"
       readonly task: TaskId
+      /** Its first root's root entry, written as `data-root`; null before its first message. */
+      readonly entry: EntryId | null
       /** Its thread card's header, the board's too (`threadCardHead`). */
       readonly head: ThreadCardHead
       /** Its first line: the rename field's placeholder. */
       readonly line: string
       /** Its stored title, or null: what the rename field starts with. */
       readonly title: string | null
-      /** What its mark draws (`rootStatus`), or null for none. */
+      /** What its mark draws (`taskStatus`), or null for none. */
       readonly status: Status | null
       /**
        * When its status last rose to needs you as you watched, or null: the
@@ -105,17 +105,19 @@ export interface SidebarViewInput {
   readonly active: Here
   /** Each task's thread card header (`threadCardHeads`), which the board reads too. */
   readonly heads: ReadonlyMap<TaskId, ThreadCardHead>
-  /** Each root's first line, by root entry (`firstLinesOf`). */
-  readonly lines: ReadonlyMap<EntryId, string>
+  /** Each task's first root's root entry (`entriesOf`). */
+  readonly entries: ReadonlyMap<TaskId, EntryId>
+  /** Each task's summary (`summariesOf`): the rename field's placeholder. */
+  readonly summaries: ReadonlyMap<TaskId, TaskSummary>
   readonly marks: ReadonlyMap<TaskId, MarkRecord>
   /** Tasks in the archive. */
   readonly archived: ReadonlySet<TaskId>
   /** Your unsent text: a new tab's pip. */
   readonly unsent: CardMarks
-  /** When each root's mark last arrived as you watched (`useAttention`), by root entry. */
+  /** When each task's mark last arrived as you watched (`useAttention`). */
   readonly arrivals: Moments
-  /** Each root's sprite, by root entry (`rootSprites`). */
-  readonly sprites: ReadonlyMap<EntryId, Sha256>
+  /** Each task's sprite (`taskSprites`). */
+  readonly sprites: ReadonlyMap<TaskId, Sha256>
 }
 
 export function sidebarView(input: SidebarViewInput): SidebarView {
@@ -157,20 +159,19 @@ function itemView(here: Here, input: SidebarViewInput): ItemView {
       const { task } = here
       const archived = input.archived.has(task)
       const head = input.heads.get(task) ?? noHead(task)
-      const { entry } = head
       return {
         ...common,
         kind: "task",
         task,
+        entry: input.entries.get(task) ?? null,
         head,
         label: head.label,
         icon: iconOf(head, input),
-        line: (entry === null ? undefined : input.lines.get(entry)) ?? NO_TEXT,
+        line: input.summaries.get(task)?.line ?? NO_TEXT,
         title: input.marks.get(task)?.title ?? null,
         status: head.status,
-        arrived:
-          entry === null ? null : (input.arrivals.arrived.get(entry) ?? null),
-        done: entry === null ? null : (input.arrivals.done.get(entry) ?? null),
+        arrived: input.arrivals.arrived.get(task) ?? null,
+        done: input.arrivals.done.get(task) ?? null,
         archived,
         menu: archived ? [] : menuOf(task, head),
         pip: head.pip,
@@ -182,7 +183,6 @@ function itemView(here: Here, input: SidebarViewInput): ItemView {
 /** A task the heads lack: drawn with no signals, as a task not yet in the session. */
 const noHead = (task: TaskId): ThreadCardHead => ({
   task,
-  entry: null,
   label: NO_TEXT,
   status: null,
   ready: [],
@@ -192,7 +192,7 @@ const noHead = (task: TaskId): ThreadCardHead => ({
 })
 
 function iconOf(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
-  const sprite = head.entry === null ? undefined : input.sprites.get(head.entry)
+  const sprite = input.sprites.get(head.task)
   if (sprite !== undefined) return { kind: "sprite", src: blobUrl(sprite) }
   return {
     kind: "initials",
@@ -202,25 +202,19 @@ function iconOf(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
 }
 
 /**
- * Each root's sprite (ADR-0053): the banner of its earliest thread that has
- * one. A lane's name is `t-` and a uuidv7, so names sort by creation; a lane
- * belongs to the root its tip is in, as `rootWork` finds it. A root this tab
- * does not hold has no tips here, and so no sprite. Pure.
+ * Each task's sprite (ADR-0053, ADR-0116): the banner of its earliest
+ * thread that has one. A thread's id is `t-` and a uuidv7, so ids sort by
+ * creation. Pure.
  */
-export function rootSprites(
-  index: TreeIndex,
-  lanes: readonly LaneView[],
+export function taskSprites(
+  threadsOf: ReadonlyMap<TaskId, readonly ThreadId[]>,
   banners: ReadonlyMap<ThreadId, BannerRecord>,
-): ReadonlyMap<EntryId, Sha256> {
-  const sprites = new Map<EntryId, Sha256>()
-  const byName = [...lanes].sort((a, b) =>
-    a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
-  )
-  for (const lane of byName) {
-    const banner = banners.get(lane.name)
-    if (banner === undefined || lane.tip === null) continue
-    const root = rootOf(index, lane.tip)
-    if (root !== null && !sprites.has(root)) sprites.set(root, banner.sha)
+): ReadonlyMap<TaskId, Sha256> {
+  const sprites = new Map<TaskId, Sha256>()
+  for (const [task, threads] of threadsOf) {
+    const earliest = [...threads].sort().find(thread => banners.has(thread))
+    const banner = earliest === undefined ? undefined : banners.get(earliest)
+    if (banner !== undefined) sprites.set(task, banner.sha)
   }
   return sprites
 }
@@ -267,19 +261,23 @@ export const pageTitle = (
 }
 
 /**
- * The threads with an open offer, by their root, each as people read it
- * (`threadNameOf`), named or not: what archiving that root withdraws, and
- * what a thread card's ⇡ names (ADR-0091). `offers` are the open offers
- * (`appView`'s).
+ * The threads with an open offer, by their task (ADR-0116), each as people
+ * read it (`threadNameOf`), named or not: what archiving that task
+ * withdraws, and what a thread card's ⇡ names (ADR-0091). `offers` are the
+ * open offers (`appView`'s); one whose thread is in no task is left out.
  */
-export function offeredByRoot(
-  offers: readonly { readonly lane: ThreadId; readonly root: EntryId }[],
+export function offeredByTask(
+  offers: readonly { readonly lane: ThreadId }[],
   names: ReadonlyMap<ThreadId, ThreadName>,
-): ReadonlyMap<EntryId, readonly string[]> {
-  const byRoot = new Map<EntryId, string[]>()
-  for (const { lane, root } of offers)
-    byRoot.set(root, [...(byRoot.get(root) ?? []), threadNameOf(names, lane)])
-  return byRoot
+  taskOfThread: ReadonlyMap<ThreadId, TaskId>,
+): ReadonlyMap<TaskId, readonly string[]> {
+  const byTask = new Map<TaskId, string[]>()
+  for (const { lane } of offers) {
+    const task = taskOfThread.get(lane)
+    if (task !== undefined)
+      byTask.set(task, [...(byTask.get(task) ?? []), threadNameOf(names, lane)])
+  }
+  return byTask
 }
 
 /** What archiving a task does to its threads' offers, beside its item. */
@@ -289,6 +287,6 @@ export const dropsWords = (drops: readonly string[]): string | null =>
 /** What a task's rename field sends, once planned (`planTitle`). */
 export const renameIntent = (task: TaskId, title: string | null): Intent => ({
   kind: "rename",
-  task,
+  of: { kind: "task", task },
   title,
 })

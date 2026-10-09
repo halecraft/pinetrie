@@ -14,7 +14,6 @@
 import type {
   BoardPlace,
   EntryId,
-  RootSummary,
   TaskId,
   Workflow,
   WorkflowState,
@@ -26,7 +25,7 @@ import { type Level, markOf } from "./attention.ts"
 import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
 import type { KeyLike } from "./inventory-keys.ts"
-import { NO_TEXT } from "./root-label.ts"
+import { NO_TEXT, type TaskSummary } from "./root-label.ts"
 import { stepsIn } from "./root-target.ts"
 import type { ThreadCardHead } from "./thread-card.ts"
 
@@ -35,13 +34,13 @@ import type { ThreadCardHead } from "./thread-card.ts"
  * sidebar draws too (`ThreadCardHead`), spread here and kept whole as
  * `head`, with what only the board adds.
  */
-export interface ThreadCard extends Omit<ThreadCardHead, "entry" | "state"> {
+export interface ThreadCard extends Omit<ThreadCardHead, "state"> {
   readonly head: ThreadCardHead
-  /** Its first root's root entry: a task on the board has a message. */
-  readonly entry: EntryId
+  /** Its first root's root entry (`entriesOf`), written as `data-entry`; null for none. */
+  readonly entry: EntryId | null
   /** The state it is in: what its drag carries. */
   readonly state: WorkflowStateId
-  /** Everyone who wrote a chat in it, in order of first message. */
+  /** Everyone who wrote a chat in it (`TaskSummary.writers`). */
   readonly writers: readonly WriterId[]
   /** Its body: its first line, under a title that differs from it; null for none. */
   readonly body: string | null
@@ -58,16 +57,16 @@ export type Count =
 
 /** What a workflow state shows of its roots' work, beyond their count. */
 export interface StateSignals {
-  /** Its roots the agent works in (`Status` working, a pending verdict among them): ◌. */
+  /** Its tasks the agent works in (`Status` working, a pending verdict among them): ◌. */
   readonly working: number
-  /** Its roots with work ready to accept: ⇡. */
+  /** Its tasks with work ready to accept: ⇡. */
   readonly ready: number
-  /** The roots whose readers' avatars it shows. */
-  readonly roots: readonly EntryId[]
+  /** The tasks whose readers' avatars it shows. */
+  readonly tasks: readonly TaskId[]
 }
 
 /** The archive's: it shows none. */
-const NO_SIGNALS: StateSignals = { working: 0, ready: 0, roots: [] }
+const NO_SIGNALS: StateSignals = { working: 0, ready: 0, tasks: [] }
 
 /** An open state's column. */
 export interface BoardColumnView {
@@ -143,14 +142,12 @@ export const BOARD_SEARCH = "board-search"
 export interface BoardViewInput {
   readonly workflow: Workflow
   readonly places: ReadonlyMap<TaskId, BoardPlace>
-  /** Each task's first root's root entry: every task with a message (`entriesOf`). */
+  /** Each task with a message (`summariesOf`): its first line is a titled card's body. */
+  readonly summaries: ReadonlyMap<TaskId, TaskSummary>
+  /** Each task's first root's root entry (`entriesOf`). */
   readonly entries: ReadonlyMap<TaskId, EntryId>
-  /** Each root, by its root entry (`summariesOf`). */
-  readonly summaries: readonly RootSummary[]
   /** Each task's thread card header (`threadCardHeads`), which the sidebar reads too. */
   readonly heads: ReadonlyMap<TaskId, ThreadCardHead>
-  /** Each root's first line (`firstLinesOf`): a titled card's body. */
-  readonly lines: ReadonlyMap<EntryId, string>
   /** The board's filter (`parseSearch`), or null for none. */
   readonly search: BoardSearch | null
   readonly me: WriterId
@@ -161,15 +158,12 @@ const bodyOf = (label: string, line: string | undefined): string | null =>
   line === undefined || line === "" || line === label ? null : line
 
 export function boardView(input: BoardViewInput): BoardView {
-  const { workflow, search } = input
-  const board = boardOf(workflow, input.places, input.entries.keys())
-  const summaries = new Map(input.summaries.map(s => [s.root, s]))
+  const { workflow, search, summaries } = input
+  const board = boardOf(workflow, input.places, summaries.keys())
   const keeps = search === null ? null : boardFilter(search, input.me)
-  const _states = [...workflow.open, workflow.archive]
-  const headOf = (task: TaskId, entry: EntryId): ThreadCardHead =>
+  const headOf = (task: TaskId): ThreadCardHead =>
     input.heads.get(task) ?? {
       task,
-      entry,
       label: NO_TEXT,
       status: null,
       ready: [],
@@ -177,19 +171,7 @@ export function boardView(input: BoardViewInput): BoardView {
       state: null,
       moves: [],
     }
-  const status = new Map(
-    [...input.heads.values()].flatMap(head =>
-      head.status === null || head.entry === null
-        ? []
-        : [[head.entry, head.status] as const],
-    ),
-  )
-  const readyAt = new Set(
-    [...input.heads.values()].flatMap(head =>
-      head.ready.length === 0 || head.entry === null ? [] : [head.entry],
-    ),
-  )
-  const writersOf = (entry: EntryId) => summaries.get(entry)?.writers ?? []
+  const writersOf = (task: TaskId) => summaries.get(task)?.writers ?? []
   /** A move within `state`, before `before` there, or to its end. */
   const within = (
     task: TaskId,
@@ -203,66 +185,62 @@ export function boardView(input: BoardViewInput): BoardView {
     before,
     closes: false,
   })
-  /** The signals of the tasks whose first root entries are `entries`, from each one's status and offers. */
-  const stateSignals = (entries: readonly EntryId[]): StateSignals => ({
-    working: entries.filter(e => status.get(e)?.kind === "working").length,
-    ready: entries.filter(e => readyAt.has(e)).length,
-    roots: entries,
+  /** The signals of `tasks`, from each one's status and offers. */
+  const stateSignals = (tasks: readonly TaskId[]): StateSignals => ({
+    working: tasks.filter(t => headOf(t).status?.kind === "working").length,
+    ready: tasks.filter(t => headOf(t).ready.length > 0).length,
+    tasks,
   })
+  const status = new Map(
+    [...input.heads.values()].flatMap(head =>
+      head.status === null ? [] : [[head.task, head.status] as const],
+    ),
+  )
   /** A kept task's card, whose Move up and Move down step among the tasks `isShown` keeps. */
   const cardOf = (
     task: TaskId,
-    entry: EntryId,
     state: WorkflowStateId,
     column: readonly TaskId[],
     isShown: (task: TaskId) => boolean,
   ): ThreadCard => {
     const steps = stepsIn(column, task, isShown)
-    const head = headOf(task, entry)
+    const head = headOf(task)
     return {
       ...head,
       head,
-      entry,
+      entry: input.entries.get(task) ?? null,
       state,
-      writers: writersOf(entry),
-      body: bodyOf(head.label, input.lines.get(entry)),
+      writers: writersOf(task),
+      body: bodyOf(head.label, summaries.get(task)?.line),
       show: { kind: "show", here: { kind: "task", task } },
       up: steps.up === null ? null : within(task, state, steps.up.before),
       down: steps.down === null ? null : within(task, state, steps.down.before),
     }
   }
   /**
-   * A state's tasks: the entry of every one, which its mark, Remove and the
-   * strip count, and a card for each the search keeps, which is drawn.
+   * A state's tasks: every one with a message, which its mark, Remove and
+   * the strip count, and a card for each the search keeps, which is drawn.
    */
   const tasksOf = (column: {
     tasks: readonly TaskId[]
     state: WorkflowState
   }): {
-    entries: readonly EntryId[]
+    all: readonly TaskId[]
     cards: readonly ThreadCard[]
     count: Count
   } => {
-    const all = column.tasks.flatMap(task => {
-      const entry = input.entries.get(task)
-      return entry === undefined ? [] : [{ task, entry }]
-    })
+    const all = column.tasks.filter(task => summaries.has(task))
     const kept =
       keeps === null
         ? all
-        : all.filter(r =>
-            keeps({
-              label: headOf(r.task, r.entry).label,
-              writers: writersOf(r.entry),
-            }),
+        : all.filter(task =>
+            keeps({ label: headOf(task).label, writers: writersOf(task) }),
           )
-    const shown = new Set(kept.map(r => r.task))
+    const shown = new Set(kept)
     return {
-      entries: all.map(r => r.entry),
-      cards: kept.map(r =>
-        cardOf(r.task, r.entry, column.state.id, column.tasks, task =>
-          shown.has(task),
-        ),
+      all,
+      cards: kept.map(task =>
+        cardOf(task, column.state.id, column.tasks, t => shown.has(t)),
       ),
       count:
         keeps === null
@@ -271,7 +249,7 @@ export function boardView(input: BoardViewInput): BoardView {
     }
   }
   const columns = board.open.map((column, i) => {
-    const { entries, cards, count } = tasksOf(column)
+    const { all, cards, count } = tasksOf(column)
     const { state } = column
     const before = (to: WorkflowStateId | null): Intent => ({
       kind: "editWorkflow",
@@ -280,13 +258,13 @@ export function boardView(input: BoardViewInput): BoardView {
     const next = board.open[i + 1]
     const afterNext = board.open[i + 2]
     const previous = board.open[i - 1]
-    const mark = markOf(status, entries)
+    const mark = markOf(status, all)
     const view: BoardColumnView = {
       state,
       items: cards,
       count,
       mark,
-      signals: stateSignals(cards.map(t => t.entry)),
+      signals: stateSignals(cards.map(t => t.task)),
       add: {
         agent: { kind: "newTab", asksAgent: true, state: state.id },
         conversation: { kind: "newTab", asksAgent: false, state: state.id },
@@ -299,15 +277,15 @@ export function boardView(input: BoardViewInput): BoardView {
           kind: "editWorkflow",
           edit: { action: "remove", state: state.id, name: "", before: null },
         },
-        why: removeWords(entries.length, board.open.length),
+        why: removeWords(all.length, board.open.length),
       },
     }
     const strip: StripState = {
       id: state.id,
       name: state.name,
-      count: entries.length,
+      count: all.length,
       mark,
-      signals: stateSignals(entries),
+      signals: stateSignals(all),
       archive: false,
     }
     return { view, strip }
@@ -323,7 +301,7 @@ export function boardView(input: BoardViewInput): BoardView {
     {
       id: archive.state.id,
       name: archive.state.name,
-      count: archiveRoots.entries.length,
+      count: archiveRoots.all.length,
       mark: null,
       signals: NO_SIGNALS,
       archive: true,
@@ -384,10 +362,10 @@ function boardFilter(
  */
 export function archiveRows(input: {
   readonly items: readonly ThreadCard[]
-  readonly summaries: ReadonlyMap<EntryId, RootSummary>
+  readonly summaries: ReadonlyMap<TaskId, TaskSummary>
   readonly search: BoardSearch | null
 }): readonly ThreadCard[] {
-  const newest = (t: ThreadCard) => input.summaries.get(t.entry)?.newest ?? ""
+  const newest = (t: ThreadCard) => input.summaries.get(t.task)?.newest ?? ""
   const sorted = input.items.toSorted((a, b) =>
     newest(a) < newest(b) ? 1 : newest(a) > newest(b) ? -1 : 0,
   )

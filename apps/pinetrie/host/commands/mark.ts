@@ -1,15 +1,20 @@
-// host/commands/mark — a task's title (ADR-0045, ADR-0116): gather,
-// `planMark`, execute.
+// host/commands/mark — a task's or a note column's title (ADR-0045,
+// ADR-0116): gather, `planMark`, execute.
 
-import type { Intent, WriterId } from "@pinetrie/core"
+import { type Intent, isNoteColumnId, type WriterId } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { readMarks, readTasks } from "@pinetrie/reads"
-import { deleteRecord, MARK, planMark, setRecord } from "@pinetrie/rules"
+import {
+  readMarks,
+  readNoteColumns,
+  readPlaces,
+  readTasks,
+} from "@pinetrie/reads"
+import { planMark } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
 import type { Records } from "../records.ts"
 
 export interface MarkDeps {
-  readonly basics: Pick<Basics, "session" | "now">
+  readonly basics: Pick<Basics, "session" | "places" | "now">
   readonly records: Pick<Records, "writeValues">
 }
 
@@ -19,25 +24,29 @@ export async function handleMark(
   intent: Extract<Intent, { kind: "mark" }>,
 ): Promise<Outcome> {
   const { records } = deps
-  const { session, now } = deps.basics
-  // plan (pure), over the session's tasks and titles
+  const { session, places, now } = deps.basics
+  // plan (pure), over the session's tasks and titles, and the note columns
+  // on a canvas
   const planned = planMark({
-    task: intent.task,
+    of: intent.of,
     title: intent.title,
     by: writer,
     now: now(),
     tasks: new Set(readTasks(session).keys()),
     marks: readMarks(session),
+    columns: new Set(
+      readPlaces(places).flatMap(c =>
+        c.place.kind === "canvas" && isNoteColumnId(c.id) ? [c.id] : [],
+      ),
+    ),
+    columnTitles: readNoteColumns(session),
   })
   // execute
   switch (planned.kind) {
     case "refused":
       return planned
-    case "write":
-      await records.writeValues([setRecord(MARK, planned.record)])
-      break
-    case "remove":
-      await records.writeValues([deleteRecord(MARK, planned.task)])
+    case "writes":
+      await records.writeValues(planned.writes)
       break
     case "unchanged":
       break

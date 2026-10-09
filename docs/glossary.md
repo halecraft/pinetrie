@@ -33,12 +33,12 @@ words they were written with.
 | **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `CardRecord`, `CardPlace`, `CardFrame`, `cardFrame` | |
 | **thread card** | A root, as the board and the sidebar draw it. | `ThreadCard` | board item |
 | **your message** | The text card in your composer at a thread's end, which only you see. | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours) |
-| **note** | A text card below the line, which everyone at the thread sees and the agent does not (ADR-0113). | `note`, `noteOf`, `NoteCardEditor` | drafting card, draft |
+| **note** | A text card in a note column, which everyone in the task sees and no agent reads (ADR-0116). | `note`, `noteOf`, `notesIn`, `NoteCardEditor` | drafting card, draft; a note below the line on its thread's notes board |
+| **note column** | A card on a task's canvas holding notes in one order, titled or "Notes" (ADR-0116). | `NoteColumnId`, `NoteColumnCard`, `NOTE_COLUMN`, `nearestNoteColumn`, `NoteColumn` | notes board |
 | **queued card** | A text card above the line, which the agent reads once, when the host pops it. | `queued`, `queuedOn`, `QueuedCardEditor` | |
 | **pinned card** | A text card the agent reads on every run, at the top of its thread's column. | `pinned`, `pinnedOf`, `PinnedCardEditor` | |
 | **inventory** | Your own grid of text cards, on every root and device. | `inventory`, `InventoryPanel` | |
-| **the line** | What divides a thread's queued cards, which the agent reads, from its notes and your message, which it does not. | | |
-| **notes board** | A thread's notes laid out in a grid, in its column's pane (ADR-0113). | | |
+| **the line** | What divides a thread's queued cards, which the agent reads, from your message, which it does not. | | |
 | **the dock** | A column's foot: the queue, the line and your message (ADR-0113). | | |
 | **the sidebar** | The column down the left of the page, of your open tasks. | `Sidebar`, `sidebarView`, `OpenThreads` | your list |
 | **your open threads** | The roots in the sidebar, yours on every device. | `open:<you>` (stored) | your list |
@@ -71,8 +71,6 @@ code uses them yet; each becomes current as its part is built.
 | **thread card** | A thread, held by a task or by someone's inventory. | ADR-0117 | a root, as the board and the sidebar draw it |
 | **root** | A code word, not the interface's: the first message a thread's path leads back to, and the document of every thread that branched from it (`RootId`, `root:<RootId>`), which is also one pi session. Nothing a person reads says "root" (or "tree"): ＋ starts a thread. | ADR-0116 | the root as the board's item, and "root" on screen |
 | **copy** (a thread) | A new thread branched at a thread's end, put as its own card; its fork row leads back to the original. | ADR-0117 | |
-| **note column** | A card holding notes in one order, a task's or an inventory's. | ADR-0116 | notes board |
-| **note** | A text card in a note column, which everyone in the task sees and no agent reads. | ADR-0116 | a note below the line on its thread's notes board |
 | **file card** | A card showing one file of a source: as it is on disk for a live or read-only source, as accepted work has it for a branched one. | ADR-0116 | |
 | **media card** | A card showing an image, a video or a piece of art, kept as a blob. | ADR-0116 | |
 | **source** | A folder the host's owner registers, which a thread's lane gets in one of three modes. | ADR-0118 | the host's one project |
@@ -80,17 +78,15 @@ code uses them yet; each becomes current as its part is built.
 | **runner** | Where a lane runs: the host that holds it, that host's machine, and the model of each run. | ADR-0119 | |
 
 As they are built, these current words change: **thread card** is a thread,
-not a root; **note** is a note column's, not a thread's, and the **notes
-board** goes; **the dock** is the queue, the line and your message, without
-the notes line; **the line**
-divides a thread's queued cards from your message; and the **inventory**
-holds any card.
+not a root; and the **inventory** holds any card. (**note** and **note
+column** are built: notes are in note columns, and the notes board is
+gone.)
 
 ## Words that look alike and are not these
 
 - **line**: a line of text (`firstLine`, a column's one-line fact), the
-  cards' line in a column (above it queued, below it notes and your
-  message, ADR-0048, ADR-0113),
+  cards' line in a column (above it queued, below it your message,
+  ADR-0048, ADR-0113),
   and Kyneta's command **Line** (`host/control.ts`), one per seat. None of
   them is accepted work.
 - **take**: take a card into your inventory (ADR-0083). Nothing is done to

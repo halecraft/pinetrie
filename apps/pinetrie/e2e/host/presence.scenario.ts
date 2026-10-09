@@ -36,8 +36,8 @@ async function run(check: Checks["check"]): Promise<void> {
       join(ph, name, "presence", { presenceDecay: decay })
     const ada = await joinHere("ada")
     const bea = await joinHere("bea")
-    ada.setReading("c1", "e-one", null, null)
-    ada.setReading("c2", "e-two", null, null)
+    ada.setReading("c1", "e-one", null)
+    ada.setReading("c2", "e-two", null)
     ada.setTyping("e-two", null)
     const seen = await waitFor(
       () => readReading(bea.presence).length === 2,
@@ -65,7 +65,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await sleep(20)
     ada.clearReading("c2")
     const closed = await waitFor(() => {
-      ada.setReading("c1", "e-one", null, null)
+      ada.setReading("c1", "e-one", null)
       return (
         !Object.keys(bea.presence.reading()).some(
           k => k.startsWith(`${ada.writer}:`) && k.endsWith(":c2"),

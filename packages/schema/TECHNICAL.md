@@ -175,9 +175,9 @@ readers need, as the stream row's, lives here. It still imports no pi.
 wins per field. Its records are flat, and every key starts with its seat's
 `seatKey`, `${writer}:${seat}` (ADR-0037): `reading` is keyed
 `readingKey(seatKey, columnKey)` (every column of the tab a person is on
-reports its thread's end), and so are `readingRoot` (the root entry of
-that thread, ADR-0063, for a window that does not hold the root) and
-`readingTask` (the task it is in, ADR-0116); `typing` (a
+reports its thread's end), and so is `readingTask` (the task it is on,
+ADR-0116, which also names it for a window that does not hold the
+thread's root, ADR-0063); `typing` (a
 thread end) and `typingIn` (the card typed in: the host pops no queued card
 while someone types in it, ADR-0048 step 7) are keyed by `seatKey`, and
 decay after `typingMs`. A person on
@@ -263,11 +263,13 @@ would refuse each whole undo of a move (S82).
 - **A pinned row carries `order`**, as a queued one does, and no `by` or
   `seen`: `kind`, `at` and `lane` are a note's.
 - **Your message is stored as kind `drafting`**, the kind every card at a
-  thread's end had before notes (ADR-0113); a note as `note`, with a
-  message's fields. So no stored row changed with the split.
-- **A note's cell is its row's `order`**, a decimal, "" for none yet. No
-  new field, so no migration (ADR-0096); `placeOfFields` refuses any other
-  `order` for a note.
+  thread's end had before notes (ADR-0113). So no stored row changed with
+  the split.
+- **A note is stored as `note`, its note column in `column` and its rank in
+  `order`** (ADR-0116), no `at` and no `lane`: the fields a row had, so the
+  schema's hash held, and record migration `0006-note-columns` moved each
+  thread's notes from their cells into a note column beside it. A note
+  column is a `canvas` row whose id starts `n-`.
 - **A client cannot write it.** Every peer registers `writersPolicy`
   (`@pinetrie/protocol/writers`), Kyneta's `canWrite`, so a client's write
   throws before it is made, and the host refuses the same operations from

@@ -19,6 +19,7 @@ import {
   type Move,
   type MoveDirection,
   moveOf,
+  type NoteColumnId,
   noteOf,
   type PlaceKey,
   type Position,
@@ -38,6 +39,7 @@ import {
   type CardNotice,
   firstEmpty,
   IN_COLUMN,
+  LAST_ORDER,
   type MoveAnswer,
   type MoveHow,
   type Slots,
@@ -100,7 +102,8 @@ export function reorderOf(
   step: -1 | 1,
 ): Reorder | null {
   const at = keyOf(card.place)
-  if (at.kind !== "queued" && at.kind !== "pinned") return null
+  if (at.kind !== "queued" && at.kind !== "pinned" && at.kind !== "note")
+    return null
   const from = among.findIndex(c => c.id === card.id)
   const to = from + step
   const passed = among[to]
@@ -207,7 +210,8 @@ export function planTakeCopyIntoInventory(
 
 /**
  * Put `card` at `target`. A state or a place in the sidebar: a new thread
- * there (`planSpinOff`). A column: a note at its end. A composer, or a
+ * there (`planSpinOff`). A thread's column: a note in the note column
+ * nearest it; a note column: a note at its end (ADR-0116). A composer, or a
  * fresh column: your message there (`putInMessage`). A slot: a card already
  * in your inventory swaps with what is there; any other card is taken into
  * the inventory, into that slot if it is empty.
@@ -223,8 +227,10 @@ export function planPut(
   if (now === undefined) return []
   if (target.kind === "state" || target.kind === "sidebar")
     return planSpinOff(card, target, minted, state)
-  if (target.kind === "cell") return putInCell(now, target, state)
-  if (target.kind !== "inventory" && intoMessage(target, facts.composers))
+  if (
+    (target.kind === "column" || target.kind === "composer") &&
+    intoMessage(target, facts.composers)
+  )
     return putInMessage(now, target.key, state)
   if (target.kind === "inventory") {
     const from = slotOf(facts.slots, card)
@@ -234,15 +240,11 @@ export function planPut(
     return [{ kind: "swapSlots", a: from, b: target.slot }]
   }
   const to = placeOfTarget(target, facts.composers, facts.me)
-  const from = keyOf(now.place)
-  // A note put on its own column stays in its cell.
-  const here =
-    from.kind === "note" && to?.kind === "note" && to.cell === null
-      ? { ...from, cell: null }
-      : from
-  if (to === null || sameKey(here, to)) return []
+  // A note put on its own column stays where it is: a reorder moves it there.
+  if (to === null || sameKey(keyOf(now.place), to)) return []
+  const key = target.kind === "notes" ? target.column : target.key
   const move = moveOf(now, to)
-  return [moveCard(move, { actedAt: atColumn(target.key), slot: null }, true)]
+  return [moveCard(move, { actedAt: atColumn(key), slot: null }, true)]
 }
 
 /**
@@ -296,49 +298,7 @@ function putInMessage(
   return [{ kind: "keep", moves: [into, back], actedAt, close: [], here: null }]
 }
 
-/**
- * `now` into a cell of column `key`'s notes board (ADR-0113). An empty cell
- * takes it. A note there swaps with it, in one move the host accepts or
- * refuses whole, when `now` is a note or in your inventory (into its slot);
- * from anywhere else, `now` takes the first empty cell instead, since the
- * note could not go where it was.
- */
-function putInCell(
-  now: CardRecord,
-  target: Extract<PutTarget, { kind: "cell" }>,
-  state: IntentState,
-): readonly Effect[] {
-  const facts = state.cards
-  const spot = facts.composers.get(target.key)
-  const to = placeOfTarget(target, facts.composers, facts.me)
-  if (spot === undefined || to === null) return []
-  const there = spot.cells.get(target.cell)
-  if (there === now.id) return []
-  const actedAt = atColumn(target.key)
-  const occupant = there === undefined ? undefined : cardOf(facts, there)
-  if (occupant === undefined)
-    return [moveCard(moveOf(now, to), { actedAt, slot: null }, true)]
-  const from = keyOf(now.place)
-  if (from.kind !== "note" && from.kind !== "inventory") {
-    const first = to.kind === "note" ? { ...to, cell: null } : to
-    return [moveCard(moveOf(now, first), { actedAt, slot: null }, true)]
-  }
-  const back = {
-    move: moveOf(occupant, from),
-    slot: from.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
-  }
-  return [
-    {
-      kind: "keep",
-      moves: [{ move: moveOf(now, to), slot: null }, back],
-      actedAt,
-      close: [],
-      here: null,
-    },
-  ]
-}
-
-/** Your message `card` to the notes at its thread's end (ADR-0113). */
+/** Your message `card` to the note column nearest its thread (ADR-0116). */
 export function planToNote(
   card: CardId,
   key: string,
@@ -351,19 +311,14 @@ export function planToNote(
 }
 
 /**
- * A new, empty note made in `cell` of column `key`'s notes board, at the
- * thread end its composer writes at (ADR-0113): a creation, in no history.
- * The host refuses it when a note took the cell first (`cellClash`). Nothing
- * for a column with no thread end: a fresh column has no notes board.
+ * A new, empty note made at the end of note column `column` (ADR-0116): a
+ * creation, in no history, drawn last until the host gives it its order.
  */
 export function planNewNote(
   card: TextCardId,
-  cell: number,
-  key: string,
+  column: NoteColumnId,
   state: IntentState,
 ): readonly Effect[] {
-  const place = state.cards.composers.get(key)?.place
-  if (place?.kind !== "composing") return []
   return [
     {
       kind: "createCard",
@@ -372,19 +327,19 @@ export function planNewNote(
         id: card,
         owner: state.cards.me,
         placer: state.cards.me,
-        place: { ...place, kind: "note", cell },
+        place: { kind: "note", column, order: LAST_ORDER },
         carries: { kind: "message", command: null },
         unsent: null,
       },
       text: "",
-      how: IN_COLUMN(key),
+      how: IN_COLUMN(column),
     },
   ]
 }
 
 /**
- * Pin `card`, your message, a note or a queued card, at the top of its
- * thread's column. A move like any other: the host records it, and an undo
+ * Pin `card`, your message or a queued card, at the top of its thread's
+ * column. A move like any other: the host records it, and an undo
  * of moves reverses it (ADR-0066).
  */
 export function planPin(

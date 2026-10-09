@@ -50,7 +50,6 @@ const facts = (over: Partial<PaneFacts> = {}): PaneFacts => ({
   offer: null,
   nodes: [node("m1", TABLES)],
   askTarget: () => null,
-  notes: true,
   ...over,
 })
 
@@ -88,10 +87,6 @@ describe("paneView", () => {
     expect(
       paneView({ kind: "offer" }, facts({ offer: { target, line: "ready" } })),
     ).toEqual({ kind: "review", target, line: "ready" })
-  })
-  test("the notes board draws for a column with a board, and closes without one", () => {
-    expect(paneView({ kind: "notes" }, facts())).toEqual({ kind: "notes" })
-    expect(paneView({ kind: "notes" }, facts({ notes: false }))).toBeNull()
   })
   test("an ask draws its review, and closes without one", () => {
     const ask: PaneSubject = { kind: "ask", ask: entryId("p") }
