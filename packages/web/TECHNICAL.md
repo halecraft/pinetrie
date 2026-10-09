@@ -452,8 +452,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   right and the label wraps around it. The summary stays a list item: a
   flex summary loses its ▶. An open command is one inline block beside the
   tag, so every line of it has the room the tag leaves: `LAYOUT_WIDTH`
-  (`tool-row.ts`) is 44 characters, the Mac's SF Mono at .8rem (0.6em a
-  character) in a 28rem column's 25.5rem, less the ▶ and the tag. A wider
+  (`tool-row.ts`) is 46 characters, the Mac's SF Mono at .8rem (0.6em a
+  character) in a 28rem column's 26.5rem row, less the ▶ and the tag. A wider
   open command drops below the tag. Measured in headless Chromium, whose
   fallback monospace is 0.5em wide, so it is the Mac's font that sets the
   width.
@@ -552,10 +552,11 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   - A live row the work opened carries `data-revealed`, and
     `.tool.live[data-revealed]::after` draws a ring around it. A call
     shorter than `REVEAL_MS` is never revealed, so it shows none. The ring
-    is a positioned pseudo-element, not an `outline`, so it can reach 1rem
-    into the column's right gutter (1.75rem, against .75rem on the left)
-    and sit centred in the column. The browser suite measures it from the
-    row's box and the pseudo-element's resolved insets.
+    is a positioned pseudo-element 4px outside the row, taking no layout.
+    The row itself reaches 1rem into the column's right gutter (1.75rem,
+    against .75rem on the left: `.tool`'s negative right margin), so the
+    row, its contents and its ring sit centred in the column. The browser
+    suite measures the row's box and the pseudo-element's resolved insets.
   - `.working-line` is drawn at the content's end for the whole run, before
     the queued cards; in outline the running ask's own line pulses, and
     `.column[data-density="outline"]` hides it. `.column-content:has(.tool.live[data-revealed])`

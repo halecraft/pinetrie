@@ -524,8 +524,10 @@
           transparent 0) 0 0 0 1 / 0 0 0 2px / 0 0 0 6px; }
       .msg.streaming { opacity: .75; }
       /* A tool call: what it touched, its status, and its result folded away
-         (`rowSize`, tool-row.ts). */
-      .tool { margin: .3rem 0; font-size: .8rem; }
+         (`rowSize`, tool-row.ts). Its right margin takes the rem .column-body's
+         right gutter has over its left padding, so a row sits as far from the
+         column's right edge as from its left. */
+      .tool { margin: .3rem -1rem .3rem 0; font-size: .8rem; }
       .tool summary { cursor: pointer; color: #aab4c3; }
       /* Not a scroll container: a long path wraps, or it runs out of the column. */
       .tool-label { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
@@ -570,12 +572,11 @@
       /* A command the work opened, still running: a ring, absolutely placed, so
          it takes no layout and the column does not move when it comes or goes.
          A call that ends within REVEAL_MS is never revealed, so it never shows
-         one. The ring reaches 1rem past the row's right edge, into the gutter
-         .column-body keeps for → (1.75rem, against .75rem on the left), so it
-         sits as far from the column's right edge as from its left. */
+         one. The ring is 4px clear of the row on every side; the row is centred
+         in the column (`.tool`'s margin). */
       .tool.live[data-revealed] { position: relative; }
       .tool.live[data-revealed]::after { content: ""; position: absolute;
-        inset: -4px calc(-1rem - 4px) -4px -4px; border: 1px solid transparent;
+        inset: -4px; border: 1px solid transparent;
         border-radius: 3px; pointer-events: none;
         animation: tool-working 1.2s ease-in-out infinite; }
       @keyframes tool-working { 0%, 100% { border-color: rgb(232 192 122 / .3); }

@@ -109,10 +109,10 @@ export interface RowSummary {
 /**
  * How many columns a shell command is laid out to. An open command is one
  * box beside the tag, so every line has the room the tag leaves: a 28rem
- * column's 25.5rem of content, less the ▶ and the tag, is about 349px, which
- * is 45 characters of the Mac's SF Mono at a row's .8rem (0.6em each).
+ * column's row is 26.5rem, which less the ▶ and the tag is about 365px, or
+ * 47 characters of the Mac's SF Mono at a row's .8rem (0.6em each).
  */
-export const LAYOUT_WIDTH = 44
+export const LAYOUT_WIDTH = 46
 
 /** A subject's preview, and all of it. */
 type View = (subject: string) => {

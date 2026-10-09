@@ -1201,7 +1201,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a running command the work opened is outlined, centred in its column, and hides the line; a fast one does neither",
+      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
   },
   {
     name: "a revealed row is never marked revealed",
@@ -1211,17 +1211,27 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a running command the work opened is outlined, centred in its column, and hides the line; a fast one does neither",
+      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
   },
   {
-    name: "a running row's ring hugs the row, off-centre in its column",
+    name: "a running row's ring reaches past the row into the gutter",
     file: "packages/web/index.html",
-    from: "        inset: -4px calc(-1rem - 4px) -4px -4px; border: 1px solid transparent;",
-    to: "        inset: -4px; border: 1px solid transparent;",
+    from: "        inset: -4px; border: 1px solid transparent;",
+    to: "        inset: -4px calc(-1rem - 4px) -4px -4px; border: 1px solid transparent;",
     suite: "browser",
     scenario: "tools",
     expect:
-      "a running command the work opened is outlined, centred in its column, and hides the line; a fast one does neither",
+      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
+  },
+  {
+    name: "a tool row stops short of the right gutter",
+    file: "packages/web/index.html",
+    from: "      .tool { margin: .3rem -1rem .3rem 0;",
+    to: "      .tool { margin: .3rem 0;",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
   },
   {
     name: "the result is a new element",

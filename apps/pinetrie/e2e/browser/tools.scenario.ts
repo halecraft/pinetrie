@@ -992,6 +992,18 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
                     body === undefined
                       ? null
                       : { left: left - body.left, right: body.right - right },
+                  // The row itself: its contents reach as far right as left.
+                  row:
+                    body === undefined
+                      ? null
+                      : {
+                          left: r.left - body.left,
+                          right: body.right - r.right,
+                        },
+                  // The ring, as far outside the row on each side.
+                  insets: [s.top, s.right, s.bottom, s.left].map(v =>
+                    Number.parseFloat(v),
+                  ),
                 }
               },
               col(0),
@@ -1048,13 +1060,16 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             return w.__frames
           })
           check(
-            "a running command the work opened is outlined, centred in its column, and hides the line; a fast one does neither",
+            "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
             outlined &&
               slow?.outline === "solid" &&
               slow.colour !== "rgba(0, 0, 0, 0)" &&
               slow.line === "hidden" &&
               slow.margins !== null &&
               Math.abs(slow.margins.left - slow.margins.right) <= 1 &&
+              slow.row !== null &&
+              Math.abs(slow.row.left - slow.row.right) <= 1 &&
+              new Set(slow.insets).size === 1 &&
               fast.line > 0 &&
               fast.live > 0 &&
               fast.hidden === 0 &&
