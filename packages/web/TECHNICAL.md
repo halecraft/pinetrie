@@ -276,7 +276,7 @@ page-colour literal is left in the stylesheet. `--surface` is the colour
 behind a thing, set by context: `--page` by default, `--chrome` in
 `#sidebar` and `#bottom`, the hover fill on a hovered item, `--page` on
 the selected one and on a thread card. A ring that must read as a gap around
-a dot (`.root-status.needs-you`, `.signal[data-signal="unsent"]`) is drawn in `--surface`, so
+a dot (`.signal[data-signal="needs-you"]`, `.signal[data-signal="unsent"]`) is drawn in `--surface`, so
 it matches whatever the dot sits on.
 
 ## Colour carries the link, not geometry

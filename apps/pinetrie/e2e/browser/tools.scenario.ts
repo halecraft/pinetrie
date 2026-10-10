@@ -1845,7 +1845,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await appears("#bottom .state-working")
           const newTask = taskHolding(toolHost, entryId(newRoot))
           await openBoard(tp)
-          const ringed = `#board ${boardSel(newTask)}:has(.root-status.working) .board-open`
+          const ringed = `#board ${boardSel(newTask)}:has(.signal[data-signal="running"]) .board-open`
           await appears(ringed)
           await tp.click(ringed)
           await appears(

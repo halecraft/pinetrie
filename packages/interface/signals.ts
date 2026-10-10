@@ -1,5 +1,6 @@
-// interface/signals — the unsent signal (ADR-0126): where your unsent cards
-// are (ADR-0048, step 2), on the sidebar's tasks, on the rail at
+// interface/signals — what a mark says (ADR-0126): one family of signals,
+// each worded once (`signalWords`), and the unsent signal: where your
+// unsent cards are (ADR-0048, step 2), on the sidebar's tasks, on the rail at
 // a thread's end, on the board's items, and on ▦ for a task not in the
 // sidebar (ADR-0122). An archived task's work is done, so it lights only its
 // own item on the board, never ▦. They answer "where was I?", so they count
@@ -19,9 +20,66 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import { placeEnd, type TaskIndex, taskOfPlace } from "@pinetrie/rules"
+import type { Level, Status } from "./attention.ts"
 import { needsCard } from "./card-state.ts"
 import { type Layout, unlisted } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
+
+/**
+ * What a mark says, each named for it (ADR-0126): unsent text of yours
+ * (ADR-0048), needs you or worth a read (ADR-0077's levels), running (its
+ * agent works, ADR-0069) and done (a run you follow ended asking nothing).
+ * `SignalMark` draws every one, as `.signal[data-signal]`.
+ */
+export type Signal =
+  | "unsent"
+  | "needs-you"
+  | "worth-a-read"
+  | "running"
+  | "done"
+
+/** Every signal, so a table over them is total. */
+export const SIGNALS: readonly Signal[] = [
+  "unsent",
+  "needs-you",
+  "worth-a-read",
+  "running",
+  "done",
+]
+
+/** A signal in words: its mark's name, and what its title says. */
+export interface SignalWords {
+  readonly label: string
+  readonly title: string
+}
+
+const SIGNAL_WORDS: Readonly<Record<Signal, SignalWords>> = {
+  unsent: { label: "your unsent card", title: "your unsent card is here" },
+  "needs-you": { label: "needs you", title: "needs you" },
+  "worth-a-read": { label: "worth a read", title: "worth a read" },
+  running: { label: "the agent is working", title: "the agent is working" },
+  done: { label: "the agent has finished", title: "the agent has finished" },
+}
+
+/** What a signal says: the one place each is worded. */
+export const signalWords = (signal: Signal): SignalWords => SIGNAL_WORDS[signal]
+
+/** The signal an attention level raises (`LEVELS`): the one mapping of the two. */
+export const signalOfLevel = (level: Level): Signal =>
+  level === "needsYou" ? "needs-you" : "worth-a-read"
+
+/**
+ * The signal a thread's or a task's status draws (ADR-0077): running while
+ * its agent works, its level's when something is raised, done while a run
+ * you follow that ended asking nothing still fades (`moving`), else none.
+ */
+export const statusSignal = (
+  status: Status | null,
+  doneFading: boolean,
+): Signal | null => {
+  if (status === null) return doneFading ? "done" : null
+  return status.kind === "working" ? "running" : signalOfLevel(status.kind)
+}
 
 /**
  * The cards that are yours, as the marks count them: those you own. Cards you
@@ -102,15 +160,19 @@ export function unsentSignals(input: {
         break
       }
       // The inventory is no tab, a pinned card is a thread's or a task's
-      // direction, not unsent work (ADR-0048), and a canvas holds no text
-      // card.
+      // direction, not unsent work (ADR-0048), a comment is shared, and a
+      // canvas or the board holds no text card.
       case "queued":
+      case "margin":
       case "pinned":
       case "task-pinned":
       case "inventory":
       case "canvas":
+      case "board":
       case "trash":
         break
+      default:
+        card.place satisfies never
     }
   }
   return {

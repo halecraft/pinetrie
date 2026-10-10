@@ -1,18 +1,42 @@
-// web/signal-mark — a signal's mark (ADR-0126): today the unsent signal, a
-// card of yours holding text (ADR-0048, step 2), on a tab, a rail dot or an
-// Archive row (`unsentSignals`). One element, so the browser suite finds every
-// mark by `.signal[data-signal]`.
+// web/signal-mark — a signal's mark (ADR-0126): every signal, the unsent
+// pip in your colour (ADR-0048, step 2) on a tab, a rail dot or ▦, and a
+// status's (ADR-0077) before a task's label. One element, so the browser
+// suite finds every mark by `.signal[data-signal]`, and `signalWords` words
+// each.
 
-/** A small dot in your colour, which your avatar uses. */
-export function SignalMark({ color }: { color: string }) {
+import { moving, type Signal, signalWords } from "@pinetrie/interface"
+
+/**
+ * `signal`'s mark: unsent in `color`, your colour; done is a ✓ that fades.
+ * `arrived` is when a needs-you arrived as you watched: it pulses only as it
+ * mounts fresh. `title` says more than the signal's own words, where there
+ * is more to say.
+ */
+export function SignalMark({
+  signal,
+  color,
+  arrived = null,
+  title,
+}: {
+  signal: Signal
+  color?: string
+  arrived?: number | null
+  title?: string
+}) {
+  const words = signalWords(signal)
   return (
     <span
-      aria-label="your unsent card"
+      aria-label={words.label}
       className="signal"
-      data-signal="unsent"
+      data-arrived={moving(arrived, Date.now()) ? "" : undefined}
+      data-signal={signal}
+      // A new arrival is a new element, so its pulse plays again.
+      key={arrived ?? "still"}
       role="img"
-      style={{ background: color }}
-      title="your unsent card is here"
-    />
+      style={color === undefined ? undefined : { background: color }}
+      title={title ?? words.title}
+    >
+      {signal === "done" ? "✓" : null}
+    </span>
   )
 }

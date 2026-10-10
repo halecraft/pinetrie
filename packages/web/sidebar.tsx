@@ -85,7 +85,7 @@ export function Sidebar({
   /** A task's drag. */
   dragOf: (task: TaskId) => RootDrag
 }) {
-  const pip = <SignalMark color={colorOf(session.writer)} />
+  const pip = <SignalMark color={colorOf(session.writer)} signal="unsent" />
   // The task whose item is a title field now. Never stored.
   const [renaming, setRenaming] = useState<TaskId | null>(null)
   // The task whose item takes focus once its field has gone.

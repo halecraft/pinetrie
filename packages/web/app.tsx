@@ -1648,7 +1648,7 @@ export function App({
 
   const { stage } = view
   const readers = { session, index, taskOfThread, order, nameOf, colorOf }
-  const pip = <SignalMark color={colorOf(session.writer)} />
+  const pip = <SignalMark color={colorOf(session.writer)} signal="unsent" />
   const reader = { me: session.writer, nameOf }
   /** Where a link to `thread` leads, as you follow it (ADR-0124). */
   const linkOf = (thread: ThreadId) => threadLink(thread, cards, session.writer)

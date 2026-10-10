@@ -503,7 +503,7 @@ function Dot(p: {
       {p.people.length > 1 && (
         <span className="here-count">{p.people.length}</span>
       )}
-      {p.yours !== null && <SignalMark color={p.yours} />}
+      {p.yours !== null && <SignalMark color={p.yours} signal="unsent" />}
     </button>
   )
 }

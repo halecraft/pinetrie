@@ -1136,14 +1136,16 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       const tabWorking = await page
-        .waitForSelector("#sidebar .root-status.working", { timeout: 15_000 })
+        .waitForSelector('#sidebar .signal[data-signal="running"]', {
+          timeout: 15_000,
+        })
         .then(
           () => true,
           () => false,
         )
       const animated = await page
         .$$eval(
-          "#bottom .strip-state, #bottom .strip-state *, #sidebar .root-status",
+          '#bottom .strip-state, #bottom .strip-state *, #sidebar .signal:not([data-signal="unsent"])',
           ns =>
             ns.flatMap(n => {
               const name = getComputedStyle(n).animationName

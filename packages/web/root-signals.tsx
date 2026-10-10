@@ -1,8 +1,8 @@
 // web/root-signals — what a root shows wherever it is drawn: in the sidebar
-// and on the board (ADR-0077, ADR-0122). Its status before its label (a
-// still ring while its agent works or cards wait for it, never behind a held
-// queue; an amber dot when something needs you, a dim one when something is
-// worth a read, a ✓ that fades), and the others
+// and on the board (ADR-0077, ADR-0122). Its status before its label, a
+// signal's mark (ADR-0126: a still ring while its agent works or cards wait
+// for it, never behind a held queue; an amber dot when something needs you,
+// a dim one when something is worth a read, a ✓ that fades), and the others
 // reading in it. Each reads presence itself, so a presence write redraws it
 // and not the list or the board (S59).
 
@@ -15,8 +15,6 @@ import type {
 } from "@pinetrie/core"
 import {
   attentionWords,
-  LEVEL_CLASS,
-  LEVEL_WORDS,
   type Level,
   moving,
   type OpenMenus,
@@ -25,6 +23,9 @@ import {
   readerHeading,
   readersByTask,
   type Status,
+  signalOfLevel,
+  signalWords,
+  statusSignal,
   toggleOpenMenu,
   withOpenMenus,
 } from "@pinetrie/interface"
@@ -32,6 +33,7 @@ import type { SessionClient } from "@pinetrie/session"
 import { useMemo, useState } from "react"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, Avatars, nameFor } from "./presence.tsx"
+import { SignalMark } from "./signal-mark.tsx"
 import { useReadingAt, useReadingTasks } from "./use-presence.ts"
 
 /** A level's mark: an amber dot, bright for needs you, dim for worth a read. */
@@ -46,22 +48,14 @@ export function StatusMark({
   arrived: number | null
 }) {
   return (
-    <span
-      aria-label={LEVEL_WORDS[level]}
-      className={`root-status ${LEVEL_CLASS[level]}`}
-      data-arrived={moving(arrived, Date.now()) ? "" : undefined}
-      // A new arrival is a new element, so its pulse plays again.
-      key={arrived ?? "still"}
-      role="img"
-      title={title}
-    />
+    <SignalMark arrived={arrived} signal={signalOfLevel(level)} title={title} />
   )
 }
 
 /**
  * A root's status, before its label (ADR-0077): a still ring while its
  * agent works, its level's mark when something is raised, a ✓ that fades
- * when a run you follow ended with nothing to do.
+ * when a run you follow ended with nothing to do (`statusSignal`).
  */
 export function RootStatus({
   status,
@@ -74,32 +68,17 @@ export function RootStatus({
   done: number | null
   nameOf: ReadonlyMap<WriterId, string>
 }) {
-  if (status === null)
-    return moving(done, Date.now()) ? (
-      <span
-        aria-label="the agent has finished"
-        className="root-status done"
-        key={done ?? "none"}
-        role="img"
-        title="the agent has finished"
-      >
-        ✓
-      </span>
-    ) : null
-  if (status.kind === "working")
+  const signal = statusSignal(status, moving(done, Date.now()))
+  if (signal === null) return null
+  if (status === null || status.kind === "working")
     return (
-      <span
-        aria-label="the agent is working"
-        className="root-status working"
-        role="img"
-        title="the agent is working"
-      />
+      <SignalMark arrived={status === null ? done : null} signal={signal} />
     )
   return (
-    <StatusMark
+    <SignalMark
       arrived={arrived}
-      level={status.kind}
-      title={`${LEVEL_WORDS[status.kind]}: ${attentionWords(status.item.raised, w => nameFor(nameOf, w))}`}
+      signal={signal}
+      title={`${signalWords(signal).title}: ${attentionWords(status.item.raised, w => nameFor(nameOf, w))}`}
     />
   )
 }

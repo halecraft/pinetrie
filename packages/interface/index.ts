@@ -67,8 +67,6 @@ export {
   attentionWords,
   doneThreads,
   type Item,
-  LEVEL_CLASS,
-  LEVEL_WORDS,
   type Level,
   type Moments,
   markOf,
@@ -561,6 +559,12 @@ export {
 export {
   holdsText,
   ownCards,
+  SIGNALS,
+  type Signal,
+  type SignalWords,
+  signalOfLevel,
+  signalWords,
+  statusSignal,
   unsentSignals,
   withFilled,
 } from "./signals.ts"

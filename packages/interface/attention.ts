@@ -286,18 +286,6 @@ export interface Moments {
 export const moving = (at: number | null, now: number): boolean =>
   at !== null && now - at < ARRIVAL_MS
 
-/** Words for a level: a mark's name. */
-export const LEVEL_WORDS: Readonly<Record<Level, string>> = {
-  needsYou: "needs you",
-  worthARead: "worth a read",
-}
-
-/** Each level's class, on a root's mark and an inbox row: what the styles key on. */
-export const LEVEL_CLASS: Readonly<Record<Level, string>> = {
-  needsYou: "needs-you",
-  worthARead: "worth-a-read",
-}
-
 /** Why the agent's end could not be told, in words. */
 const UNCLASSIFIED_WORDS = `the run ended; ${PRODUCT_NAME} could not tell what it needs`
 

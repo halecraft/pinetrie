@@ -22,10 +22,10 @@ import {
   type Item,
   inboxView,
   inboxWords,
-  LEVEL_CLASS,
   linkWords,
   opens,
   type Reader,
+  signalOfLevel,
   type ThreadLink,
 } from "@pinetrie/interface"
 import { threadNameOf } from "@pinetrie/rules"
@@ -138,7 +138,7 @@ export function useInboxMenu({
         threadNameOf(names, item.lane),
         attentionWords(item.raised, w => nameFor(nameOf, w)),
       ),
-      className: `here-thread raised ${LEVEL_CLASS[item.level]}`,
+      className: `here-thread raised ${signalOfLevel(item.level)}`,
     },
     ...(item.raised.kind === "offer" && item.raised.source === null
       ? []

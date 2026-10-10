@@ -33,7 +33,6 @@ import {
   filterWords,
   type Intent,
   keptWords,
-  LEVEL_WORDS,
   type Level,
   type MessageCount,
   messageCountTitle,
@@ -43,6 +42,8 @@ import {
   type StateSignals,
   type StripState,
   searchWords,
+  signalOfLevel,
+  signalWords,
   stateWords,
   type ThreadCard,
   tasksWords,
@@ -63,7 +64,7 @@ import { startRootDrag } from "./use-root-drag.ts"
 
 /** ▦'s mark's title: what the roots not in the sidebar raise. */
 const elsewhereWords = (level: Level): string =>
-  `a thread not in the sidebar: ${LEVEL_WORDS[level]}`
+  `a thread not in the sidebar: ${signalWords(signalOfLevel(level)).label}`
 
 /**
  * The strip: ▦, then, while the board is closed, each state's name, count,
@@ -292,7 +293,11 @@ function StateSignalMarks({
         <Readers {...readers} tasks={signals.tasks} />
       )}
       {mark !== null && (
-        <StatusMark arrived={null} level={mark} title={LEVEL_WORDS[mark]} />
+        <StatusMark
+          arrived={null}
+          level={mark}
+          title={signalWords(signalOfLevel(mark)).title}
+        />
       )}
       {signals.working > 0 && (
         <span className="state-working" title={words.working}>

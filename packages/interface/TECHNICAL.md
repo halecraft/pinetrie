@@ -706,9 +706,10 @@ pending.
 - **One count** (`inboxCount`: the items that need you plus unseen mentions),
   computed once in `App`, is the inbox's badge and the window title's.
   `pageTitle` (`sidebar-view.ts`) puts it before the selected root's label.
-- **Words:** `attentionWords` words each item's reason, `LEVEL_WORDS` and
-  `LEVEL_CLASS` a level's name and class. Selectors: `.root-status`
-  (`.working`, `.needs-you`, `.worth-a-read`, `.done`, `data-arrived`),
+- **Words:** `attentionWords` words each item's reason; a level is a
+  signal (`signalOfLevel`, *Signals*), named by `signalWords`, and an
+  inbox row's class is its signal. Selectors: `.signal[data-signal]`
+  (`running`, `needs-you`, `worth-a-read`, `done`, with `data-arrived`),
   `.here-thread.raised`, `.not-needed`.
 
 ## The rail of a task (`taskRail`, `app-view.ts`, ADR-0116, ADR-0117)
@@ -1399,10 +1400,23 @@ composer*).
   colour, class `initial`. `Avatar` is an `Initial` with class `avatar`,
   which means a person shown here (Gotchas).
 
-## The unsent signal (ADR-0048, step 2, ADR-0126)
+## Signals (ADR-0126)
 
-A pip in your colour (`SignalMark`, `.signal[data-signal="unsent"]`, the one
-selector the suites use) marks where an unsent card of yours holds text: its root's item in your
+What a mark says is one value, `Signal` (`signals.ts`): `unsent`,
+`needs-you`, `worth-a-read`, `running`, `done`. `signalWords` is the one
+place each is worded (its mark's name and title), and `packages/web` draws
+every one through `SignalMark`, `.signal[data-signal]`, the one selector
+the suites use. Attention keeps its `LEVELS` as what it decides
+(`attention.ts`); `signalOfLevel` is the one mapping of a level to its
+signal, and `statusSignal` a thread's or a task's status to its mark
+(running while its agent works, its level's when raised, done while a
+finished run fades). The plan's four signals are five: worth a read is a
+level of its own, with its own dim mark.
+
+### The unsent signal (ADR-0048, step 2)
+
+A pip in your colour (`SignalMark`, `.signal[data-signal="unsent"]`) marks
+where an unsent card of yours holds text: its root's item in your
 list, the rail dot at its thread end, and the
 root's item on the board. ▦ itself is marked only for a root not in your
 list: an archived root's work is done, so it never lights ▦ (`elsewhere`).

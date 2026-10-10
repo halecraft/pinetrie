@@ -818,8 +818,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root's mark pulses while its agent works",
     file: "packages/web/index.html",
-    from: "      .root-status.working { border: 1.5px solid #9ecbff; }",
-    to: "      .root-status.working { border: 1.5px solid #9ecbff; animation: pulse 1s ease-in-out infinite; }",
+    from: '      .signal[data-signal="running"] { border: 1.5px solid #9ecbff; }',
+    to: '      .signal[data-signal="running"] { border: 1.5px solid #9ecbff; animation: pulse 1s ease-in-out infinite; }',
     suite: "browser",
     scenario: "page",
     expect:

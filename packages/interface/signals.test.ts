@@ -16,9 +16,19 @@ import {
 } from "@pinetrie/core"
 import { threadCardOf } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
+import { LEVELS, type Status } from "./attention.ts"
 import { entry, indexOf, tasksWith } from "./fixtures.ts"
 import { initialLayout, type Layout } from "./layout.ts"
-import { holdsText, ownCards, unsentSignals, withFilled } from "./signals.ts"
+import {
+  holdsText,
+  ownCards,
+  SIGNALS,
+  signalOfLevel,
+  signalWords,
+  statusSignal,
+  unsentSignals,
+  withFilled,
+} from "./signals.ts"
 
 const _TEST_THREAD = threadIdFor("e")
 const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -124,6 +134,33 @@ const sets = (m: ReturnType<typeof marks>) => ({
   tasks: [...m.tasks],
   ends: [...m.ends],
   elsewhere: m.elsewhere,
+})
+
+describe("signals as one family (ADR-0126)", () => {
+  test("each attention level maps to one signal of its own", () => {
+    const signals = LEVELS.map(signalOfLevel)
+    expect(signals).toEqual(["worth-a-read", "needs-you"])
+    expect(signals.every(s => SIGNALS.includes(s))).toBe(true)
+  })
+  test("signalWords is total: every signal has a name and a title", () => {
+    for (const signal of SIGNALS) {
+      const words = signalWords(signal)
+      expect(words.label).not.toBe("")
+      expect(words.title).not.toBe("")
+    }
+    expect(new Set(SIGNALS.map(s => signalWords(s).label)).size).toBe(
+      SIGNALS.length,
+    )
+  })
+  test("a status's signal: running while its agent works, its level's when raised, done while a finished run fades, else none", () => {
+    const raised = (level: (typeof LEVELS)[number]): Status =>
+      ({ kind: level, item: {} }) as unknown as Status
+    expect(statusSignal({ kind: "working" }, true)).toBe("running")
+    expect(statusSignal(raised("needsYou"), true)).toBe("needs-you")
+    expect(statusSignal(raised("worthARead"), false)).toBe("worth-a-read")
+    expect(statusSignal(null, true)).toBe("done")
+    expect(statusSignal(null, false)).toBeNull()
+  })
 })
 
 test("holdsText: what would make a card, a bare @agent nothing", () => {

@@ -51,7 +51,7 @@ words they were written with.
 | **the sidebar** | The column down the left of the page, of your open tasks. | `Sidebar`, `sidebarView`, `OpenThreads` | your list |
 | **your open tasks** | The tasks in the sidebar, yours on every device. | `open:<you>` (stored), `OpenThreads` | your list, your open threads |
 | **the stage** | The page's main area, beside the sidebar: it shows the board or a task's strip, and a page such as the profile covers it (ADR-0126). | `#stage`, `Stage`, `showsStage` | the workspace |
-| **signal** | What a card or a list says by a mark, each named for what it says: unsent text of yours, needs you, running, done (ADR-0126). | `unsentSignals`, `SignalMark`, `.signal[data-signal]` | card marks, pips |
+| **signal** | What a card or a list says by a mark, each named for what it says: unsent text of yours, needs you, worth a read, running, done (ADR-0126). | `Signal`, `signalWords`, `signalOfLevel`, `statusSignal`, `unsentSignals`, `SignalMark`, `.signal[data-signal]` | card marks, pips; `LEVEL_WORDS`, `LEVEL_CLASS`, `.root-status` |
 
 ## Threads
 
