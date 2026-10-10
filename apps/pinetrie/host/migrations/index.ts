@@ -13,6 +13,7 @@ import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
 import { cardContent } from "./0009-card-content.ts"
 import { referenceFields } from "./0010-reference-fields.ts"
+import { threadOrigin } from "./0011-thread-origin.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -68,11 +69,14 @@ export interface RecordMigration {
 
 /**
  * Every one-time record migration this build carries, oldest first:
- * 0009-card-content (ADR-0126). 0003-workflow-archive, 0004-threads
+ * 0009-card-content and 0011-thread-origin (ADR-0126). 0003-workflow-archive, 0004-threads
  * (ADR-0117), 0005-tasks' records, 0006-note-columns (ADR-0116) and
  * 0007-thread-origin (ADR-0117) ran on Duane's store and were deleted.
  */
-export const RECORD_MIGRATIONS: readonly RecordMigration[] = [cardContent]
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
+  cardContent,
+  threadOrigin,
+]
 
 /** Each stored document's id and the hash of the schema it was written under. */
 export async function readStored(

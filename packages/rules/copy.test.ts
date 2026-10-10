@@ -28,7 +28,7 @@ const record = (thread: typeof SOURCE): ThreadRecord => ({
   root: ROOT,
   by: ADA,
   createdAt: 1,
-  origin: { kind: "started" },
+  origin: { kind: "root" },
 })
 const threads = new Map([[SOURCE, record(SOURCE)]])
 const onCanvas = threadCardOf({
@@ -63,7 +63,7 @@ describe("planCopy (ADR-0117, ADR-0124)", () => {
         root: ROOT,
         by: ADA,
         createdAt: 7,
-        origin: { kind: "copy", source: SOURCE, fork: "b" },
+        origin: { kind: "fork", at: "b", how: "copy" },
       },
     })
     const card = planned.kind === "copy" ? planned.steps.at(-1) : undefined

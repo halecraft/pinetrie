@@ -55,9 +55,8 @@ import { isThreadNameHandle } from "./thread-names.ts"
 
 /**
  * A thread as the host records it, keyed by its id in the session
- * (`pinetrie.thread`, ADR-0117), written with its first message. Its first
- * entry and its end are the tree's: every entry names its thread
- * (`EntryLike.thread`, ADR-0125).
+ * (`pinetrie.thread`, ADR-0117). Its first entry and its end are the
+ * tree's: every entry names its thread (`EntryLike.thread`, ADR-0125).
  */
 export interface ThreadRecord {
   readonly thread: ThreadId
@@ -70,20 +69,26 @@ export interface ThreadRecord {
 }
 
 /**
- * How a thread began (ADR-0117): started by its first message, a branch's
- * or a new root's; or a copy of `source` at `fork`, its source's end as its
- * copier saw it, which its first send branches at and its fork row names.
+ * How a thread began (ADR-0117, ADR-0126): a root's first thread, or a
+ * fork at `at`, a branch or a copy. A fork's source is the thread its
+ * entry is in (ADR-0125), so it is not stored. Before its first send a
+ * thread's column ends at its fork, and its first send branches there.
  */
-export type ThreadOrigin =
-  | { readonly kind: "started" }
-  | {
-      readonly kind: "copy"
-      readonly source: ThreadId
-      readonly fork: EntryId
-    }
+export type ThreadOrigin = { readonly kind: "root" } | ThreadFork
 
-/** A thread started by its first message. */
-export const STARTED: ThreadOrigin = { kind: "started" }
+/** A thread forked at an entry: a branch, or a copy, whose fork row says so. */
+export interface ThreadFork {
+  readonly kind: "fork"
+  readonly at: EntryId
+  readonly how: "branch" | "copy"
+}
+
+/** A root's first thread. */
+export const ROOT_ORIGIN: ThreadOrigin = { kind: "root" }
+
+/** The entry a thread forks at, where its first send branches; null for a root's first thread. */
+export const forkEntry = (origin: ThreadOrigin): EntryId | null =>
+  origin.kind === "fork" ? origin.at : null
 
 /**
  * A task as the host records it (`pinetrie.task`, keyed by its id): who

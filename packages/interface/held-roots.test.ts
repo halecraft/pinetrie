@@ -47,7 +47,7 @@ const tasks = tasksOf({
         root: rootIdFor(`r${n}`),
         by: writerId("a"),
         createdAt: 0,
-        origin: { kind: "started" },
+        origin: { kind: "root" },
       },
     ]),
   ),

@@ -29,6 +29,7 @@ import {
   type RootId,
   type TaskId,
   THREAD_PATTERN,
+  type ThreadFork,
   type ThreadId,
   type TreeIndex,
   threadAt,
@@ -188,8 +189,8 @@ export type LayoutAction =
 export interface CanvasFacts {
   /** Each task's canvas, in order (`TaskIndex.canvases`). */
   readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
-  /** Each copy's fork (`TaskIndex.forkOf`, ADR-0117). */
-  readonly forks: ReadonlyMap<ThreadId, EntryId>
+  /** Each forked thread's fork (`TaskIndex.forkOf`, ADR-0117). */
+  readonly forks: ReadonlyMap<ThreadId, ThreadFork>
   /** Each thread someone else holds, by its holder (`heldByOthers`, ADR-0124). */
   readonly holders: ReadonlyMap<ThreadId, WriterId>
   readonly index: TreeIndex

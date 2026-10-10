@@ -7,6 +7,15 @@ const archive = "packages/rules/archive.ts"
 export const mutations: readonly Mutation[] = [
   // ── a card's content as stored (ADR-0126) ──
   {
+    name: "a thread's origin this build does not know is read as a root",
+    file: "packages/rules/thread.ts",
+    from: '    Type.Object({ kind: Type.Literal("root") }),\n',
+    to: "    Type.Object({ kind: Type.String() }),\n",
+    command: unit,
+    expect:
+      "an origin this build does not know does not decode, never read as a root",
+  },
+  {
     name: "a text card's origin is not stored",
     file: "packages/rules/card.ts",
     from: '      origin: c.origin === null ? "" : printAddress(c.origin),\n',
@@ -2958,8 +2967,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy forgets its fork",
     file: "packages/rules/copy.ts",
-    from: '      origin: { kind: "copy", source: copy.source, fork: copy.end },\n',
-    to: '      origin: { kind: "started" },\n',
+    from: '      origin: { kind: "fork", at: copy.end, how: "copy" },\n',
+    to: '      origin: { kind: "root" },\n',
     command: unit,
     expect:
       "a copy is a new thread forked at the end its copier saw, its card where it was dropped, and no entry",
@@ -3041,7 +3050,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy's first send is refused while its source is held",
     file: "packages/rules/held.ts",
-    from: "        : forkOf.get(a.starts) === a.entry\n",
+    from: "        : forkOf.get(a.starts)?.at === a.entry\n",
     to: "        : forkOf.get(a.starts) === undefined\n",
     command: unit,
     expect:

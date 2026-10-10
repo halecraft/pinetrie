@@ -109,7 +109,7 @@ export function planCopy(input: {
       root: source.root,
       by: sender,
       createdAt: input.now,
-      origin: { kind: "copy", source: copy.source, fork: copy.end },
+      origin: { kind: "fork", at: copy.end, how: "copy" },
     },
     steps: [...(ranked?.first ?? []), made],
   }

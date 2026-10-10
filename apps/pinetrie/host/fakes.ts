@@ -394,7 +394,7 @@ export function putTask(
       root,
       by: STARTER,
       createdAt: 0,
-      origin: { kind: "started" },
+      origin: { kind: "root" },
     }),
   )
   const { step } = planThreadCard({

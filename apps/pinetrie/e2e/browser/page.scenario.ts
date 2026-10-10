@@ -4244,7 +4244,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // card beside its source, its fork row naming where it came from.
       const copiesBefore = new Set(
         [...readThreads(host.session)].flatMap(([t, r]) =>
-          r.origin.kind === "copy" ? [t] : [],
+          r.origin.kind === "fork" && r.origin.how === "copy" ? [t] : [],
         ),
       )
       const chose = await chooseFromMenu(
@@ -4256,13 +4256,19 @@ async function run(check: Checks["check"]): Promise<void> {
         await waitFor(
           () =>
             [...readThreads(host.session)].some(
-              ([t, r]) => r.origin.kind === "copy" && !copiesBefore.has(t),
+              ([t, r]) =>
+                r.origin.kind === "fork" &&
+                r.origin.how === "copy" &&
+                !copiesBefore.has(t),
             ),
           10_000,
         )
       const copy =
         [...readThreads(host.session)].find(
-          ([t, r]) => r.origin.kind === "copy" && !copiesBefore.has(t),
+          ([t, r]) =>
+            r.origin.kind === "fork" &&
+            r.origin.how === "copy" &&
+            !copiesBefore.has(t),
         )?.[0] ?? ""
       if (copy !== "")
         await page

@@ -56,7 +56,7 @@ const threads = new Map(
       root: rootIdFor(n),
       by: writerId("p-ada"),
       createdAt: 0,
-      origin: { kind: "started" as const },
+      origin: { kind: "root" as const },
     },
   ]),
 )

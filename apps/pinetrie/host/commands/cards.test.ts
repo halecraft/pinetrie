@@ -438,7 +438,7 @@ describe("a thread copied (ADR-0117, ADR-0124)", () => {
     expect(readThreads(b.session).get(COPY)).toMatchObject({
       root: TEST_ROOT,
       by: BEA,
-      origin: { kind: "copy", source: LANE, fork: E1 },
+      origin: { kind: "fork", at: E1, how: "copy" },
     })
     const canvas = readPlaces(b.places).filter(
       c => c.place.kind === "canvas" && c.place.task === TEST_TASK,

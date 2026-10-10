@@ -122,7 +122,8 @@ export interface SessionFacts {
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
   /** Every trace, by id: each column draws its reader's own. */
   readonly traces: ReadonlyMap<string, TraceRecord>
-  readonly workFacts: WorkFacts
+  /** What a column says of its threads' work; its forks are the page's `TaskIndex`'. */
+  readonly workFacts: Omit<WorkFacts, "forks">
 }
 
 /**
@@ -206,7 +207,6 @@ function readFacts(view: HeldView): SessionFacts {
       banners: readBanners(doc),
       accepted: readAccepted(doc),
       bases: readBases(doc),
-      forks: forksOf(readThreads(doc)),
       filesLost: readFilesLost(doc),
       budgets: readBudgets(doc),
     },
@@ -229,13 +229,3 @@ export const readHeldLanes = (
     readLanes({ doc: root, live: view.live }, index, cards, holds, blank),
   )
 }
-
-/** Each copy's fork, from the threads' records (ADR-0117). */
-const forksOf = (
-  threads: ReadonlyMap<ThreadId, ThreadRecord>,
-): ReadonlyMap<ThreadId, EntryId> =>
-  new Map(
-    [...threads].flatMap(([thread, r]) =>
-      r.origin.kind === "copy" ? [[thread, r.origin.fork] as const] : [],
-    ),
-  )

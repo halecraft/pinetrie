@@ -11,6 +11,7 @@ import type {
   EntryId,
   Intent,
   RootId,
+  ThreadFork,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
@@ -117,13 +118,13 @@ export function heldIn(
   at: readonly RunAt[],
   cards: readonly CardRecord[],
   threadAt: (root: RootId, entry: EntryId) => ThreadId | null,
-  forkOf: ReadonlyMap<ThreadId, EntryId>,
+  forkOf: ReadonlyMap<ThreadId, ThreadFork>,
 ): { readonly thread: ThreadId; readonly by: WriterId } | null {
   for (const a of at) {
     const thread =
       a.kind === "thread"
         ? a.thread
-        : forkOf.get(a.starts) === a.entry
+        : forkOf.get(a.starts)?.at === a.entry
           ? a.starts
           : threadAt(a.root, a.entry)
     if (thread === null) continue

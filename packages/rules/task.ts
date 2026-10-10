@@ -11,7 +11,6 @@ import {
   type CardInPlace,
   type CardPlace,
   type CardRecord,
-  type EntryId,
   hasPlaceKind,
   isThreadId,
   type MoveTarget,
@@ -21,7 +20,9 @@ import {
   type RootId,
   type TaskId,
   type TaskRecord,
+  type ThreadFork,
   type ThreadId,
+  type ThreadOrigin,
   type ThreadRecord,
   threadOfPlace,
   type ValueWrite,
@@ -106,10 +107,10 @@ export interface TaskIndex {
    */
   readonly rootOfThread: ReadonlyMap<ThreadId, RootId>
   /**
-   * Each copy's fork (ADR-0117): where its column ends before its first
-   * send, and what its fork row names after it.
+   * Each forked thread's fork, a branch's or a copy's (ADR-0117): where its
+   * column ends before its first send, and what its fork row names after it.
    */
-  readonly forkOf: ReadonlyMap<ThreadId, EntryId>
+  readonly forkOf: ReadonlyMap<ThreadId, ThreadFork>
 }
 
 /** Every card's task, as the places and the threads' records say. Pure. */
@@ -149,7 +150,7 @@ export function indexTasks(
   )
   const forkOf = new Map(
     [...threads].flatMap(([thread, r]) =>
-      r.origin.kind === "copy" ? [[thread, r.origin.fork] as const] : [],
+      r.origin.kind === "fork" ? [[thread, r.origin] as const] : [],
     ),
   )
   return {
@@ -311,6 +312,8 @@ export function planThreadStart(input: {
   readonly thread: ThreadId
   /** The thread a branch forks from; null for a new root. */
   readonly parent: ThreadId | null
+  /** Where it forks, or a root's first thread. */
+  readonly origin: ThreadOrigin
   readonly root: RootId
   readonly task: TaskId
   readonly by: WriterId
@@ -330,7 +333,7 @@ export function planThreadStart(input: {
       root: input.root,
       by,
       createdAt: now,
-      origin: { kind: "started" },
+      origin: input.origin,
     }),
   ]
   if (opens) {

@@ -32,6 +32,7 @@ import {
   type TaskId,
   type TaskPinnedView,
   type TextPlace,
+  type ThreadFork,
   type ThreadId,
   type ThreadLane,
   type ThreadName,
@@ -103,8 +104,8 @@ export interface WorkFacts {
   readonly accepted: AcceptedRecord | null
   /** Each lane's base, as its history says it (ADR-0104). */
   readonly bases: ReadonlyMap<ThreadId, BaseRecord>
-  /** Each copy's fork, from its record (ADR-0117). */
-  readonly forks: ReadonlyMap<ThreadId, EntryId>
+  /** Each forked thread's fork, a branch's or a copy's (`TaskIndex.forkOf`, ADR-0117). */
+  readonly forks: ReadonlyMap<ThreadId, ThreadFork>
   /** The lanes that began from their base, their fork's files not kept (ADR-0124). */
   readonly filesLost: ReadonlyMap<ThreadId, FilesLostRecord>
   /** Each budget for agents talking, by the message that set it (ADR-0128). */
@@ -568,12 +569,13 @@ function sourceOf(f: ColumnFacts): HeadOrigin | null {
   if (thread === null) return null
   const fork = f.work.forks.get(thread)
   const first = index.firstOf.get(thread)
-  const parentAt = fork ?? (first === undefined ? null : index.parentOf(first))
+  const parentAt =
+    fork?.at ?? (first === undefined ? null : index.parentOf(first))
   if (parentAt === null || index.entries[parentAt] === undefined) return null
   const parent = threadAt(index, parentAt)
   if (parent === null) return null
   const link = origins.linkOf(parent)
-  const copied = fork !== undefined
+  const copied = fork?.how === "copy"
   // A branch whose parent is on this canvas keeps today's row.
   if (!copied && link.kind === "open" && link.task === origins.task) return null
   const name = f.work.names.get(parent) ?? "a thread"

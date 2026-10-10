@@ -5,6 +5,15 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a started thread's origin is migrated as a copy",
+    file: "apps/pinetrie/host/migrations/0011-thread-origin.ts",
+    from: '            how: origin?.kind === "copy" ? "copy" : "branch",\n',
+    to: '            how: "copy",\n',
+    command: unit,
+    expect:
+      "a root's first thread is a root; a branch forks at its first entry's parent; a copy at its fork",
+  },
+  {
     name: "a relay opens its threads before their reach is read",
     file: "apps/pinetrie/host/relays.ts",
     from: '    if (away !== null) return { kind: "refused", why: away }\n',
@@ -1850,8 +1859,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a branch names a copy anywhere",
     file: "apps/pinetrie/host/commands/chat.ts",
-    from: '    (copied.origin.kind !== "copy" || copied.origin.fork !== chat.at.at)\n',
-    to: '    copied.origin.kind !== "copy"\n',
+    from: "    forkEntry(copied.origin) !== chat.at.at\n",
+    to: "    true\n",
     command: unit,
     expect:
       "a copy's first send is a branch at its fork, appended in the copy's thread, and its record and card stay as made (ADR-0117)",

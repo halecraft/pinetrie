@@ -106,7 +106,7 @@ export function tasksFor(
       root: TEST_ROOT,
       by: TEST_WRITER,
       createdAt: 0,
-      origin: { kind: "started" },
+      origin: { kind: "root" },
     })
   }
   return tasksOf({ known: pairs.map(([task]) => task), cards, threads })

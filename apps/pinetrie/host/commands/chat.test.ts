@@ -310,7 +310,7 @@ describe("sendChat", () => {
           root: ROOT_ID,
           by: ALICE,
           createdAt: 1000,
-          origin: { kind: "started" },
+          origin: { kind: "fork", at: E1, how: "branch" },
         }),
       ],
     ])
@@ -355,7 +355,7 @@ describe("sendChat", () => {
         root: ROOT_ID,
         by: BEA,
         createdAt: 5,
-        origin: { kind: "copy", source: LANE, fork: E1 },
+        origin: { kind: "fork", at: E1, how: "copy" },
       }),
     )
     const before = readPlaces(b.places)

@@ -2,6 +2,7 @@ import {
   type CardRecord,
   cardIdOfKind,
   NO_CONTENT,
+  ROOT_ORIGIN,
   rootIdFor,
   type ThreadId,
   taskIdFor,
@@ -62,6 +63,7 @@ const start = (cards: readonly CardRecord[], parent: ThreadId | null) =>
   planThreadStart({
     thread: NEW,
     parent,
+    origin: ROOT_ORIGIN,
     root: ROOT,
     task: K,
     by: ADA,
@@ -117,6 +119,7 @@ describe("where a thread's card lands (ADR-0116)", () => {
     const opened = planThreadStart({
       thread: NEW,
       parent: null,
+      origin: ROOT_ORIGIN,
       root: ROOT,
       task: taskIdFor("new"),
       by: ADA,

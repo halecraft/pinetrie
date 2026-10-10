@@ -9,10 +9,12 @@ import {
   type BlobStore,
   baseKnown,
   ERR,
+  forkEntry,
   type Intent,
   isImageRef,
   messageText,
   planModeOf,
+  ROOT_ORIGIN,
   type SendAt,
   type SentCard,
   type ThreadId,
@@ -205,13 +207,13 @@ export async function sendChat(
       code: ERR.THREAD_TAKEN,
       message: "that thread has started already",
     }
-  // A copy's first send is a branch at its fork, which its record names
-  // (ADR-0117): any other branch naming a recorded thread is another's.
+  // A recorded thread's first send is a branch where its record says it
+  // begins (ADR-0117): any other branch naming it is another's.
   const copied = readThreads(session).get(chat.at.thread)
   if (
     chat.at.kind === "branch" &&
     copied !== undefined &&
-    (copied.origin.kind !== "copy" || copied.origin.fork !== chat.at.at)
+    forkEntry(copied.origin) !== chat.at.at
   )
     return {
       kind: "refused",
@@ -309,6 +311,10 @@ export async function sendChat(
             chat.at.kind === "branch" && chat.at.at !== null
               ? threadAt(index, chat.at.at)
               : null,
+          origin:
+            chat.at.kind === "branch" && chat.at.at !== null
+              ? { kind: "fork", at: chat.at.at, how: "branch" }
+              : ROOT_ORIGIN,
           root: chat.root,
           by: writer,
           now: deps.basics.now(),

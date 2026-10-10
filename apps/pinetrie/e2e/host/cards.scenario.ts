@@ -10,6 +10,7 @@ import {
   ROOT,
   type TextCardId,
   type ThreadId,
+  threadAt,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
@@ -910,8 +911,9 @@ async function run(check: Checks["check"]): Promise<void> {
         firstOfCopy.kind === "appended" &&
         copyFirst !== undefined &&
         treeOf(ch).parentOf(copyFirst) === tipNow &&
-        copyRecord?.origin.kind === "copy" &&
-        copyRecord.origin.source === lane,
+        copyRecord?.origin.kind === "fork" &&
+        copyRecord.origin.how === "copy" &&
+        threadAt(treeOf(ch), copyRecord.origin.at) === lane,
       `${copied.kind}; ${firstOfCopy.kind}; ${JSON.stringify(copyRecord?.origin)}`,
     )
     const put = await eve.moveCard(

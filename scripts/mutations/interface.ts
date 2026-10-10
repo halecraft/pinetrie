@@ -6,6 +6,14 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a branch's fork row says it was copied",
+    file: "packages/interface/column-view.ts",
+    from: '  const copied = fork?.how === "copy"\n',
+    to: "  const copied = fork !== undefined\n",
+    command: unit,
+    expect: "a copy says it was copied; a branch, only where it is from",
+  },
+  {
     name: "a row from this task's thread names its task too",
     file: "packages/interface/thread-link.ts",
     from: '    if (link.kind === "open" && link.task === facts.here) continue\n',
@@ -3701,8 +3709,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy's column is left out before its first send",
     file: "packages/interface/canvas-columns.ts",
-    from: "      const fork = forks.get(c.id)\n",
-    to: "      const fork = forks.get(c.id) && undefined\n",
+    from: "      const fork = forks.get(c.id)?.at\n",
+    to: "      const fork = forks.get(c.id)?.at && undefined\n",
     command: unit,
     expect:
       "a copy before its first send ends at its fork, and sends as a branch there (ADR-0117)",

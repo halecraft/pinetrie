@@ -2,10 +2,10 @@ import {
   type CardRecord,
   type CardWidth,
   cardIdOfKind,
-  type EntryId,
   entryId,
   NO_CONTENT,
   type NoteColumnId,
+  type ThreadFork,
   type ThreadId,
   taskIdFor,
   threadIdFor,
@@ -81,7 +81,7 @@ const E = threadOfEntry("6-e")
 const draw = (
   canvas: readonly CanvasCard[],
   view: TaskView,
-  forks: ReadonlyMap<ThreadId, EntryId> = new Map(),
+  forks: ReadonlyMap<ThreadId, ThreadFork> = new Map(),
   holders: ReadonlyMap<ThreadId, WriterId> = new Map(),
 ) => canvasColumns({ canvas, view, index, lanes: [], forks, holders })
 
@@ -188,7 +188,7 @@ describe("canvasColumns (ADR-0116)", () => {
     const [drawn] = draw(
       canvasFor([copy]),
       defaultView(copy),
-      new Map([[copy, entryId("3-b")]]),
+      new Map([[copy, { kind: "fork", at: entryId("3-b"), how: "copy" }]]),
     )
     expect(drawn).toMatchObject({
       kind: "thread",

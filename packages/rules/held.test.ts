@@ -108,7 +108,12 @@ describe("runsIn: what each command runs or writes a message in (ADR-0124)", () 
     })
     // A copy's first send, at its record's fork, runs in the copy.
     expect(
-      heldIn([branch], held, () => T, new Map([[COPY, entryId("e")]])),
+      heldIn(
+        [branch],
+        held,
+        () => T,
+        new Map([[COPY, { kind: "fork", at: entryId("e"), how: "copy" }]]),
+      ),
     ).toBeNull()
     expect(
       heldIn([{ kind: "thread", thread: T }], [], () => null, none),

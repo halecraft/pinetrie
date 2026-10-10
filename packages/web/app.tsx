@@ -446,6 +446,11 @@ export function App({
     [taskRecords, cards, threads],
   )
   const { taskOfThread, canvases, forkOf } = tasks.index
+  // What a column says of its threads' work, its forks the task index's.
+  const columnWork = useMemo(
+    () => ({ ...workFacts, forks: forkOf }),
+    [workFacts, forkOf],
+  )
   // Each task with a message, for the board, and each task's label: its
   // title, else its first card's (ADR-0045). Which tasks are in the sidebar
   // is yours (`openThreads`, ADR-0122).
@@ -777,7 +782,8 @@ export function App({
           ? []
           : (tasks.byId.get(hereTask)?.threads ?? [])
         ).flatMap(thread => {
-          const end = threadAnchor(index, lanes, thread) ?? forkOf.get(thread)
+          const end =
+            threadAnchor(index, lanes, thread) ?? forkOf.get(thread)?.at
           return end === undefined || end === null
             ? []
             : [[thread, end] as const]
@@ -1619,7 +1625,7 @@ export function App({
     session,
     takeFocus,
     traces,
-    work: workFacts,
+    work: columnWork,
   }
   // What every card's history reads (`card-history.tsx`): one object while
   // its parts are the same, since every card's editor reads it.
@@ -1682,7 +1688,7 @@ export function App({
             onIntent={onIntent}
             openRequest={openSlot}
             previewOf={thread =>
-              threadPreview(thread, index, forkOf.get(thread) ?? null)
+              threadPreview(thread, index, forkOf.get(thread)?.at ?? null)
             }
             notes={noteViews}
             threadNames={workFacts.names}

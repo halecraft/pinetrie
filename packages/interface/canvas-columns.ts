@@ -15,6 +15,7 @@ import {
   type LaneView,
   type NoteColumnId,
   type TaskId,
+  type ThreadFork,
   type ThreadId,
   type TreeIndex,
   threadAt,
@@ -151,8 +152,8 @@ export function canvasColumns(input: {
   readonly view: TaskView
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
-  /** Each copy's fork (`TaskIndex.forkOf`): its column's end before its first send. */
-  readonly forks: ReadonlyMap<ThreadId, EntryId>
+  /** Each forked thread's fork (`TaskIndex.forkOf`): its column's end before its first send. */
+  readonly forks: ReadonlyMap<ThreadId, ThreadFork>
   /** Each thread someone else holds in their inventory, by its holder (`heldByOthers`). */
   readonly holders: ReadonlyMap<ThreadId, WriterId>
 }): readonly CardColumn[] {
@@ -208,7 +209,7 @@ function cardColumn(
   seen: CardView | undefined,
   index: TreeIndex,
   lanes: readonly LaneView[],
-  forks: ReadonlyMap<ThreadId, EntryId>,
+  forks: ReadonlyMap<ThreadId, ThreadFork>,
   onCanvas: ReadonlySet<string>,
 ): CardColumn | null {
   const folded = seen?.unfolded !== true
@@ -216,7 +217,7 @@ function cardColumn(
   switch (c.kind) {
     case "thread": {
       const anchor = threadAnchor(index, lanes, c.id)
-      const fork = forks.get(c.id)
+      const fork = forks.get(c.id)?.at
       if (
         anchor === null &&
         fork !== undefined &&

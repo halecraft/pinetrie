@@ -20,6 +20,7 @@ import {
   type TreeIndex,
   taskIdFor,
   textCardId,
+  threadAt,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -421,6 +422,26 @@ describe("columnView: the header", () => {
     expect(
       columnView({ ...facts(0), index, view: fromChat }).origin,
     ).toMatchObject({ speaker: "Ada", text: "hi" })
+  })
+})
+
+describe("columnView: the fork row of a thread forked elsewhere (ADR-0117)", () => {
+  const index = tree(BRANCH)
+  const thread = threadAt(index, entryId("b1"))
+  const row = (how: "branch" | "copy") => {
+    if (thread === null) throw new Error("no thread")
+    const forks = new Map([
+      [thread, { kind: "fork", at: entryId("4"), how } as const],
+    ])
+    return columnView(facts(1, { thread, work: work({ forks }) })).origin
+  }
+  test("a copy says it was copied; a branch, only where it is from", () => {
+    expect(row("copy")).toMatchObject({ kind: "source", copied: true })
+    expect(row("branch")).toMatchObject({ kind: "source", copied: false })
+    const words = (o: ReturnType<typeof row>) =>
+      o.kind === "source" ? o.words : ""
+    expect(words(row("copy"))).toMatch(/^copied from /)
+    expect(words(row("branch"))).toMatch(/^from /)
   })
 })
 
