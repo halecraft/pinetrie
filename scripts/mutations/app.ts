@@ -2346,6 +2346,17 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect: "another window's card redraws the column and none of its messages",
   },
+  // Its list's props are rebuilt with the same data, which React measures
+  // no render for: caught by the list's own commit mark (`markCommit`).
+  {
+    name: "a tab's columns are new with every card",
+    file: "packages/web/app.tsx",
+    from: "  const columns: readonly ColumnSpec[] = useSameData(\n",
+    to: "  const columns: readonly ColumnSpec[] = ((x: readonly ColumnSpec[]) => x)(\n",
+    suite: "browser",
+    scenario: "page",
+    expect: "another window's card redraws the column and none of its messages",
+  },
   {
     name: "a table's take takes nothing",
     file: "packages/web/message-table.tsx",

@@ -116,14 +116,23 @@ about 55 ms (S59).
 - **The browser suite counts renders** from React's development build, which
   `startHost` serves with `NODE_ENV` unset, as `pnpm run host:react-dev`
   does (`pnpm run host` serves production React): React measures every
-  render whose props changed on its "Components ⚛" track, with the changed
-  props' diff (`componentRenders` in `apps/pinetrie/e2e/browser.ts`). A
-  production build records none, and every count would pass, so the suite
-  stops at its start unless the page has recorded some. A render whose props
-  are the same (a state change, a `useSelector` write) is not recorded. An
-  entry is named by the function that rendered: a message's is
-  `MessageView`, the function `memo` wraps, and a list's
-  `MessageListView`, so a check counting `Message` counts nothing.
+  render whose props its diff finds changed on its "Components ⚛" track,
+  with that diff (`componentRenders` in `apps/pinetrie/e2e/browser/page.ts`).
+  A production build records none, and every count would pass, so the suite
+  stops at its start unless the page has recorded some. An entry is named by
+  the function that rendered: a message's is `MessageView`, the function
+  `memo` wraps, and a list's `MessageListView`, so a check counting
+  `Message` counts nothing.
+- **React measures no render whose props are new objects with the same
+  data**, nor one from state (a `useSelector` write). That is the redraw
+  `MessageList`'s memo prevents: a tab's `columns` rebuilt on every card's
+  change redrew every list, and "another window's card redraws … none of its
+  messages" passed anyway. So the list also marks each of its own commits
+  (`markCommit`, `commit-marks.ts`: a `useEffect` with no dependency list,
+  which does not run for an update inside it or a render React threw away),
+  in the development build only, and `componentRenders` counts the marks.
+  Both are written in passive effects, which can run after the DOM a check
+  waits for has changed, so `componentRenders` reads two frames later.
 
 ## Kept per tab (`tab-state.ts`, ADR-0027)
 

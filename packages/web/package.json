@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./commit-marks": "./commit-marks.ts",
     "./copy": "./copy.ts",
     "./package.json": "./package.json",
     "./storage-keys": "./storage-keys.ts"

@@ -3,6 +3,7 @@
 
 import { errorText, NOBODY, THE_AGENT } from "@pinetrie/core"
 import { identityCodec, recipientWords } from "@pinetrie/interface"
+import { COMMIT_MARK } from "@pinetrie/web/commit-marks"
 import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Browser } from "@playwright/test"
 import { chromium, type Page } from "@playwright/test"
@@ -247,15 +248,24 @@ export async function recordFrames(
 }
 
 /**
- * The component renders React recorded since the last call, and clears them.
- * React's development build, which the host's Vite serves, measures every
- * render whose props changed on its "Components ⚛" track, with the changed
- * props' diff as [label, value] pairs (S54). A label is a two-character mark,
- * an indent, then the prop's name.
+ * The component renders the page recorded since the last call, and clears
+ * them. React's development build, which the host's Vite serves, measures
+ * every render whose props its diff finds changed on its "Components ⚛"
+ * track, with the diff as [label, value] pairs (S54): a label is a
+ * two-character mark, an indent, then the prop's name. A render whose props
+ * are new objects with the same data is not measured, so a message list also
+ * marks each of its commits (`markCommit`), counted here with no props. Both
+ * are written in passive effects, which can run after the DOM a check waits
+ * for has changed, so it reads two frames later.
  */
 export const componentRenders = (p: Page) =>
-  p.evaluate(() => {
-    const out = performance.getEntriesByType("measure").flatMap(e => {
+  p.evaluate(async prefix => {
+    await new Promise(done =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => setTimeout(done, 0)),
+      ),
+    )
+    const measured = performance.getEntriesByType("measure").flatMap(e => {
       const d = (e as PerformanceMeasure).detail?.devtools
       if (d?.track !== "Components \u269b") return []
       const props: string[] = (d.properties ?? []).map(
@@ -263,9 +273,20 @@ export const componentRenders = (p: Page) =>
       )
       return [{ name: e.name.replace("\u200b", ""), props }]
     })
+    const marked = performance
+      .getEntriesByType("mark")
+      .filter(e => e.name.startsWith(prefix))
+    for (const name of new Set(marked.map(e => e.name)))
+      performance.clearMarks(name)
     performance.clearMeasures()
-    return out
-  })
+    return [
+      ...measured,
+      ...marked.map(e => ({
+        name: e.name.slice(prefix.length),
+        props: [] as string[],
+      })),
+    ]
+  }, COMMIT_MARK)
 
 /**
  * Chromium's headless shell. In a lane it comes with the lane's image

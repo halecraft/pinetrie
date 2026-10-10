@@ -15,8 +15,9 @@ import {
   promptParent,
   segmentPath,
 } from "@pinetrie/interface"
-import { memo } from "react"
+import { memo, useEffect } from "react"
 import { AskWork } from "./ask-work.tsx"
+import { markCommit } from "./commit-marks.ts"
 import { Message } from "./message.tsx"
 import {
   type MessageListProps,
@@ -25,6 +26,8 @@ import {
 import { nameFor } from "./presence.tsx"
 
 function MessageListView(p: MessageListProps) {
+  // No dependency list: once per commit of the list itself.
+  useEffect(() => markCommit("MessageListView"))
   const { view, index, asks } = p
   const at = new Map(view.nodes.map((node, i) => [node.id, i]))
   const markers = pinnedMarkers(index, view.nodes)
