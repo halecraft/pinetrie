@@ -82,6 +82,8 @@
   - ADR-0116: a card can be pinned to a task, and read by every thread of it.
   - ADR-0117: a card in an inventory is its holder's alone, and links to it
     say who has it.
+  - ADR-0126: a card's history is of its content as well as its places, and a
+    trace is one way of drawing it.
 
 Steps 1 to 7 are built, but for step 6's contributors, which wait for Kyneta.
 Probe 2 is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,

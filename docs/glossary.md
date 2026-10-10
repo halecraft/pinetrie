@@ -29,7 +29,8 @@ words they were written with.
 
 | word | what it is | in code | retired |
 |---|---|---|---|
-| **card** | Something with one place, which the host keeps: a text card, a thread card or a note column (ADR-0111, ADR-0116, ADR-0117). | `CardRecord`, `CardId`, `CardKind`, `PLACES_OF` | |
+| **card** | Something present: an identity, one place, and content, which the host keeps; its content's kind decides where it can be, what can be done with it, and how it is drawn (ADR-0126). A text card, a thread card or a note column (ADR-0111, ADR-0116, ADR-0117). | `CardRecord`, `CardId`, `CardKind`, `PLACES_OF` | |
+| **surface** | Where cards are put: part of some content or of a person (a task's canvas, a thread's dock, a note column, an inventory). Every place is a surface's, with a rank there (ADR-0111, ADR-0126). | `CardPlace` | |
 | **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `TextCard`, `TextCardId`, `CardPlace`, `CardFrame`, `cardFrame` | |
 | **thread card** | A thread, as a card: on a task's canvas or in someone's inventory, one place either way (ADR-0117, ADR-0124). | `ThreadCard`, `threadFace` | a root, as the board and the sidebar draw it; board item |
 | **your message** | The text card in your composer at a thread's end, which only you see. | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours) |
@@ -52,6 +53,22 @@ words they were written with.
 | **take** (a thread) | Move a thread's card into your inventory: its run stops, and only you open it until you put it on a canvas (ADR-0124). A link to it anywhere else says who has it. | `takenIn`, `runsIn`, `heldIn`, `linkTo`, `ThreadLink` | |
 | **root** | A code word, not the interface's: the first message a thread's path leads back to, and the document of every thread that branched from it (`root:<RootId>`), which is also one pi session. Nothing a person reads says "root" (or "tree"): ＋ starts a thread (ADR-0116). | `RootId`, `rootSeed`, `RootRecord` | the root as the board's item, and "root" on screen |
 
+## The past
+
+What is in a thread (ADR-0126). Nothing a person reads calls a kind of
+thing a "row" or a "record": those are how a column draws entries and how
+a value is stored.
+
+| word | what it is | in code | retired |
+|---|---|---|---|
+| **entry** | Anything in a thread's past: immutable, with an author and a time. A message or a fact. To change one, fork. | `EntryId`, `EntryLike` | row (as a kind of thing) |
+| **message** | An entry a person or the agent wrote. | `TranscriptMessage`, roles `chat` and `assistant` | |
+| **fact** | An entry the host wrote: a catch-up, an acceptance, the base's news (ADR-0080). | roles `update`, `land`, `behind`; `OfferFact` | |
+| **run** | The agent's work in answer to an ask: the entries it wrote, and any fact steered into it. A run has an ask (ADR-0106). | `AskIndex.work`, `runOf` | |
+| **ask** | The message that started a run (ADR-0106). | `askOf`, `indexAsks` (by prompt) | |
+| **fork** | The point, at an entry, where threads diverge; not an entry. Forking before an entry edits it (ADR-0043); after it, branches. | `ThreadOrigin.fork` | |
+| **derivation** | What the host computes from a thread's entries and replaces as they grow: a digest, a verdict. Never an entry, never a card, never read by the agent; one a model made says so. | `DigestRecord`, `VerdictRecord` | host record (for these), annotation |
+
 ## The board
 
 | word | what it is | in code | retired |
@@ -73,9 +90,9 @@ words they were written with.
 
 ## Accepted, not yet built: tasks, the canvas and sources
 
-Words of ADR-0116 to ADR-0119, accepted and not yet built. Nothing in the
-code uses them yet, beyond a reserved id (`MediaId`, `FileCardId`); each
-becomes current as its part is built.
+Words of ADR-0116 to ADR-0119 and ADR-0126, accepted and not yet built.
+Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
+`FileCardId`); each becomes current as its part is built.
 
 | word | what it is | ADR | replaces |
 |---|---|---|---|
@@ -84,6 +101,21 @@ becomes current as its part is built.
 | **source** | A folder the host's owner registers, which a thread's lane gets in one of three modes. | ADR-0118 | the host's one project |
 | **branched**, **live**, **read-only** | A source's modes: its own copy in the lane, whose work comes back as an offer; a read-write mount, never branched; a read-only mount. | ADR-0118 | |
 | **runner** | Where a lane runs: the host that holds it, that host's machine, and the model of each run. | ADR-0119 | |
+| **content** | What a card holds: a text, a thread, a note column, a task, a fact, a reference. Its kind decides the card's places, acts and renderings. | ADR-0126 | the card's kind (as where it may be) |
+| **task card** | A task, as a card, on the board's workflow states. | ADR-0126 | `BoardPlace` as a place of its own |
+| **fact card** | A fact on its way into a thread: a card of its own kind, only ever queued, until the thread's end consumes it. | ADR-0126 | a text card carrying a fact |
+| **consume** | What a thread's live end does to a card: a send, a spin, a fact popped. The card ends; the entry it became is the record. | ADR-0126 | |
+| **block** | Part of a message: a paragraph, a table, code, an image, a tool call with its result. | ADR-0126 | |
+| **address** | What names a thread, an entry, a block, a range of text or a card, and optionally its version: with one, a snapshot; without, it follows its target. | ADR-0126 | |
+| **reference** | A card holding an address. A link, a quote and a transclusion are its renderings. Edited, it becomes a copy. | ADR-0126 | |
+| **origin** | Where a copy came from: an address every copy keeps (a thread's copy does today, `ThreadOrigin`). | ADR-0126 | |
+| **margin** | An entry's surface, for notes on it. | ADR-0126 | |
+| **comment** | A note on an entry, in its margin: people read it; the agent does once it is queued. | ADR-0126 | annotation |
+| **face**, **normal**, **wide**, **whole** | A card's four renderings, which every kind draws: a strip or a grid cell; one column; two columns; an open column or the pane. | ADR-0126 | |
+| **preview** | A selected card's normal rendering, read only, in the inventory. | ADR-0126 | |
+| **signal** | What a card or a list says by a mark: unsent text of yours, needs you, running, done. Each named for what it says. | ADR-0126 | card marks (the pips, `card-marks.ts`) |
+| **in your hand** | Your inventory's selected slot: what the put key puts. | ADR-0126 | |
+| **put key** | Puts the card in your hand where focus is: a reference into a text box, the card onto a surface. A reference stays in your inventory; a card of the present leaves it. | ADR-0126 | |
 
 (**thread card**, **copy**, **root**, **note** and **note column** are
 built: threads are cards, notes are in note columns, and "root" is a code
@@ -105,7 +137,19 @@ word alone.)
   do (ADR-0077), and the archive's default name. A thread can be done
   while its task is in Doing.
 - **task** and **ask**: a task is a card on the board (ADR-0116); an ask is
-  a message to the agent and its run (ADR-0106).
+  the message that started a run (ADR-0106, ADR-0126).
+- **record**: a stored value (`CardRecord`, a host record in `records`),
+  never the past. What is in a thread is entries (ADR-0126).
+- **row**: how a column draws entries (a tool row, a fork row), a places
+  row, an SQL row. Never a kind of thing a person reads about.
+- **mark**: a task's title (ADR-0045). The pips that show your unsent
+  text are a signal (ADR-0126).
+- **copy**: a thread's copy, a new thread at its end (ADR-0117); a copy
+  from the past, a card made from an entry, a block or a selection; and
+  Cmd+C, which makes that card and writes markdown to the system
+  clipboard (ADR-0126). Every copy keeps its origin.
+- **fact**: an entry the host wrote, and a fact card, the same fact before
+  its thread's end consumes it.
 - **column**: a card opened on a task's canvas, and each workflow state's
   column on the board. The board's are **states**.
 - **fold**: hiding something on screen (a column, an ask's work, the

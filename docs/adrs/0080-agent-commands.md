@@ -25,6 +25,8 @@
 - **Amended by:**
   - ADR-0085: the `archive` command is gone; `move-root` and `workflow` change
     the workspace people share in its place.
+  - ADR-0126: a fact is a card of its own kind, only ever queued, not a text
+    card with no text.
 
 Also changes `packages/pi/TECHNICAL.md`'s "A running lane is never written": a
 tool's own result carries a merge, and a steer carries a host's fact; see

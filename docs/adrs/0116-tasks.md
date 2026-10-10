@@ -20,6 +20,9 @@
   - ADR-0074: the model titles a task, from its first thread's first ask.
   - ADR-0121: a lane is told its task's canvas.
   - ADR-0048: a card can be pinned to a task, and read by every thread of it.
+- **Amended by:**
+  - ADR-0126: a task is a card, whose surface is the board; a text card
+    dropped on a canvas lands in a note column made for it.
 
 **Context.**
 

@@ -7,6 +7,9 @@
     thread read only; a thread moved between tasks keeps running.
   - ADR-0034: archiving keeps the snapshot nearest each thread's end, not only
     each lane's newest.
+- **Amended by:**
+  - ADR-0126: selecting a card in the inventory previews it, read only, at one
+    column's width; Enter opens it.
 
 **Context.**
 
