@@ -3058,15 +3058,43 @@ export const mutations: readonly Mutation[] = [
     from: '  const before = isWordChar(first[0]) ? `(?<![${WORD}])` : ""',
     to: '  const before = ""',
     command: unit,
-    expect: "a word inside a longer word does not match",
+    expect: "a match starts where a word starts",
+  },
+  {
+    name: "every word of a search may start a longer word",
+    file: "packages/interface/search.ts",
+    from: '  const body = query.words.map(literal).join("\\\\s+")',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "  const body = query.words.map(literal).join(`[${WORD}]*\\\\s+`)",
+    command: unit,
+    expect: "a word before the last is whole",
+  },
+  {
+    name: "a search's last word is whole",
+    file: "packages/interface/search.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  const rest = isWordChar(last.at(-1)) ? `[${WORD}]*` : ""',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: '  const rest = isWordChar(last.at(-1)) ? `(?![${WORD}])` : ""',
+    command: unit,
+    expect: "the last word may start a longer word",
+  },
+  {
+    name: "a match stops where the last word typed does",
+    file: "packages/interface/search.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  const rest = isWordChar(last.at(-1)) ? `[${WORD}]*` : ""',
+    to: '  const rest = ""',
+    command: unit,
+    expect: "the match takes the whole word",
   },
   {
     name: "a search minds case",
     file: "packages/interface/search.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  return new RegExp(`${before}${body}${after}`, "giu")',
+    from: '  return new RegExp(`${before}${body}${rest}`, "giu")',
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: '  return new RegExp(`${before}${body}${after}`, "gu")',
+    to: '  return new RegExp(`${before}${body}${rest}`, "gu")',
     command: unit,
     expect: "matching ignores case",
   },

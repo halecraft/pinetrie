@@ -1,9 +1,11 @@
 // interface/search — finding a phrase in the task you are on (ADR-0101): the
 // query, the matcher, a match's snippet, and the search's own state. Pure.
 //
-// A word matches only whole, and `\b` cannot say so: in JavaScript it knows
-// only ASCII word characters, so it would find "rail" in "railé". The edges
-// here are lookarounds over Unicode classes instead.
+// A match starts at a word's start, and every word but the last is whole;
+// the last may be the start of a longer word, since it may be the one still
+// being typed: "colum" finds "column". `\b` cannot say where a word starts:
+// in JavaScript it knows only ASCII word characters, so it would find "rail"
+// in "éraile". The edges here are Unicode classes instead.
 
 import {
   type EntryId,
@@ -103,17 +105,19 @@ const isWordChar = (c: string | undefined): boolean =>
 const literal = (s: string) => s.replace(/[.*+?^${}()|[\]\\/-]/g, "\\$&")
 
 /**
- * The query's pattern: its words separated by any whitespace, and an edge
- * that is a word character not touching another one. An edge that is not one
- * (`@ada`'s start, `c++`'s end) needs nothing.
+ * The query's pattern: its words separated by any whitespace, so each word
+ * but the last ends where a space does. A first word starting with a word
+ * character starts no later than a word does (`@ada`'s start needs nothing).
+ * A last word ending in one runs on to its word's end, so a match, and what
+ * a snippet marks, is the whole word: "colum" matches "columns".
  */
 export function queryPattern(query: Query): RegExp {
   const first = query.words[0]
   const last = query.words[query.words.length - 1] ?? first
   const body = query.words.map(literal).join("\\s+")
   const before = isWordChar(first[0]) ? `(?<![${WORD}])` : ""
-  const after = isWordChar(last.at(-1)) ? `(?![${WORD}])` : ""
-  return new RegExp(`${before}${body}${after}`, "giu")
+  const rest = isWordChar(last.at(-1)) ? `[${WORD}]*` : ""
+  return new RegExp(`${before}${body}${rest}`, "giu")
 }
 
 /** A message's text, as searched. */

@@ -889,18 +889,22 @@ A search covers the task you are on: `searchCorpus` over its rail's rows
 `searchTexts` with a parsed query. `App` holds the `SearchState` (never
 stored), and `searchOn` applies it only on the task it was opened on.
 
-- **Whole words, by lookarounds, not `\b`.** JavaScript's `\b` knows only
-  ASCII word characters, so it would find "rail" in "railé". `queryPattern`
-  puts `(?<![\p{L}\p{N}\p{M}_])` before, and the matching lookahead after,
-  only at an edge that is itself a word character, so `@ada` and `c++` match
-  too. `-` is not a word character, unlike in a handle (`HANDLE_CHARS`,
-  core), so "rail" finds "rail-view". The words join with `\s+`, and the
-  flags are `giu`.
+- **A match starts at a word's start; the last word may run on.** The
+  results update as you type, so the last word may be half typed: "colum"
+  finds "column". `queryPattern` puts `(?<![\p{L}\p{N}\p{M}_])` before the
+  first word when it starts with a word character (so `@ada` matches too),
+  joins the words with `\s+`, so each word but the last is whole, and lets a
+  last word ending in a word character run on with `[\p{L}\p{N}\p{M}_]*`,
+  so the match, and what the snippet marks, is the whole word. Not `\b`:
+  in JavaScript it knows only ASCII word characters, and would find "rail"
+  in "éraile". `-` is not a word character, unlike in a handle
+  (`HANDLE_CHARS`, core), so "rail" finds "rail-view". The flags are `giu`.
 - **The query is composed (NFC), the text is not.** Composing the text would
   move the ranges a snippet cuts by; text typed in a browser is NFC already.
 - **Unlike the board's label search, on purpose.** The board keeps any label
-  holding what is typed, as you type (`board-view.ts`), which suits short
-  labels. This finds words in prose. Neither should be made to match the
+  holding every word typed, anywhere in it and in any order (`board-view.ts`),
+  which suits short labels. This finds a phrase in prose, from a word's
+  start, so "rail" never finds "trail". Neither should be made to match the
   other.
 - **Built only while searching.** `App` builds no corpus while the bar is
   closed, and searches the deferred query (`useDeferredValue`).

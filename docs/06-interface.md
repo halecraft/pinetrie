@@ -669,9 +669,13 @@ The rail is E; the column is T. Seeing both at once is the product.
   "close search · Esc". A new tab has no 🔍, and while the board is open
   over the columns, `/` is the board's own search's (ADR-0115), which finds
   tasks by their labels; this one finds words in one task's messages.
-- **It finds a phrase of whole words**: the words you type, in order, with any
-  space between them, in any case. A word is found only whole: "rail" finds
-  "the rail." and "rail-view", never "trail" or "rails". It looks in every
+- **It finds a phrase, as you type it**: the words you type, in order, with
+  any space between them, in any case. A match starts where a word starts,
+  and every word but the last is whole; the last, which you may still be
+  typing, may start a longer word, and the whole word is marked. "colum"
+  finds "column" and "columns"; "rail" finds "the rail.", "rails" and
+  "rail-view", never "trail"; "fix the col" finds "fix the column", never
+  "fixes the column". It looks in every
   message on the task's rail, as written: people's, the agent's, and pine·trie's own
   lines. It does not look in tool calls or their output. A reply still being
   written is found once it is a message.

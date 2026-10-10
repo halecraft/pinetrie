@@ -27,22 +27,39 @@ const found = (raw: string, ...texts: string[]): string[][] => {
   )
 }
 
-describe("a word inside a longer word does not match", () => {
+describe("a match starts where a word starts", () => {
   test.each([
     ["the rail.", ["rail"]],
     ["(rail)", ["rail"]],
     ["rail-view", ["rail"]],
     ["trail", []],
-    ["rails", []],
-    ["rail_way", []],
     ["raïl", []],
-    ["railé", []],
     ["éraile", []],
-    ["rail\u0301", []],
     ["9rail", []],
+    ["_rail", []],
   ])("%s", (text, expected) => {
     expect(found("rail", text)).toEqual([expected])
   })
+})
+
+describe("the last word may start a longer word, and the match takes the whole word", () => {
+  test.each([
+    ["colum", "the column.", ["column"]],
+    ["colum", "two columns", ["columns"]],
+    ["rail", "railé, rail_way", ["railé", "rail_way"]],
+    ["rail", "rail\u0301", ["rail\u0301"]],
+    ["fix the col", "fix the column now", ["fix the column"]],
+  ])("%s in %s", (query, text, expected) => {
+    expect(found(query, text)).toEqual([expected])
+  })
+})
+
+test("a word before the last is whole", () => {
+  expect(found("fi the", "fix the rail")).toEqual([[]])
+  expect(found("rail fix", "rails fix it", "rail fixes")).toEqual([
+    [],
+    ["rail fixes"],
+  ])
 })
 
 test("matching ignores case", () => {

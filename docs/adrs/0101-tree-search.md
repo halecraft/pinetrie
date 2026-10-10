@@ -31,9 +31,12 @@
   the columns. The 🔍 leads the bar, pressed, where it sat. `/` outside a
   text box opens it. It is a view state of one browser tab, never stored,
   and writes nothing.
-- **It matches a phrase of whole words.** The query's words, in order,
-  separated by any whitespace; case ignored; a word only whole, by Unicode
-  letters, digits, marks and `_`. It searches every message's text as a
+- **It matches a phrase as it is typed.** The query's words, in order,
+  separated by any whitespace; case ignored. A match starts at a word's
+  start, by Unicode letters, digits, marks and `_`; every word but the last
+  is whole, and the last may start a longer word, so a word half typed
+  already finds what it begins: results update with each keystroke, and a
+  rule of whole words alone showed none until the word was done. It searches every message's text as a
   reader sees it. Tool calls, tool results and thinking are not searched.
 - **An empty field is no search.** The page changes only once there is
   something to look for.
@@ -89,6 +92,10 @@
   does not open, and output would bury the messages.
 - **A two-step Escape** (clear, then close). It is easy to fumble, and the
   pane's Escape closes.
+- **Every word whole**, as first built. Typing "colum" found nothing until
+  "column" was complete, so a search that updates as you type read as broken.
+- **A whole last word once a space or Enter follows it.** More precise, but
+  what is found would change on a signal no one sees.
 - **Taking over Cmd/Ctrl+F.** It would surprise people.
 - **A search of every task.** It would hold every root (ADR-0063). The
   board's search (ADR-0115) finds a task by its label; this one finds words
