@@ -232,13 +232,11 @@ until the next compaction (S120), and the host compacts at startup. So
   planned the same way next time.
 - **One file per migration**, deleted once Duane's store has passed it; a
   store still on its hash is then refused. A change that moves no data is a
-  migration with no `run`: registering it is the acknowledgement. A `run`
-  is given `log` for what it found. `0008-entry-thread` is registered: it
-  gives every root's rows the thread column (ADR-0125), labelling each as
-  the tree's walk did, a context entry in the thread of the prompt below
-  it, and logs its counts against S143's (3 moved, every lane's tip at its
-  thread's end). `0001-live-row`, `0002-records` (ADR-0095) and
-  `0005-tasks`' places and sidebars (ADR-0116) ran, and were deleted.
+  migration with no `run`: registering it is the acknowledgement. None is
+  registered now: `0001-live-row`, `0002-records` (ADR-0095),
+  `0005-tasks`' places and sidebars (ADR-0116) and `0008-entry-thread`
+  (every root's rows given the thread column, a context entry in the
+  thread of the prompt below it, ADR-0125) ran, and were deleted.
 - **A change to a record's contents moves no hash**: records are JSON in a
   document's `records`, and so does a change to the values of the places'
   rows, whose fields stay. A `RecordMigration` (`RECORD_MIGRATIONS`) is

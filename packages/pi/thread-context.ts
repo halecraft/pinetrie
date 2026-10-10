@@ -2,7 +2,7 @@
 // `Context`. Every call that drives a lane carries its thread, and pi keeps
 // it in every commit of the run (S143), so the same value names the lane for
 // its tools (S36 item 18) and the thread of every entry a commit writes
-// (`commitThread`, ADR-0125). The scribe passes it for a thread with no lane.
+// (`threadOfEntries`, ADR-0125). The scribe passes it for a thread with no lane.
 
 import {
   createContextKey,
@@ -17,7 +17,7 @@ const THREAD = createContextKey<ThreadId>("pinetrie.thread")
 /**
  * `base` with `thread` named: pass it to every call that drives the thread's
  * lane, and to the scribe's commits in it. Every entry a commit under it
- * writes is that thread's (`commitThread`, ADR-0125).
+ * writes is that thread's (`threadOfEntries`, ADR-0125).
  */
 export const threadContext = (thread: ThreadId, base: Context): Context =>
   withContextValue(THREAD, thread, base)

@@ -56,7 +56,7 @@ const NEVER_IN_PAYLOAD: readonly string[] = [...HOISTED, "thread", "seq"]
  *
  * A message's image parts whose blob `refOf` finds are stored as references,
  * without their bytes (ADR-0051). `thread` is the thread whose commit wrote
- * it (`commitThread`, ADR-0125): pi's entry has no such field.
+ * it (`threadOfEntries`, ADR-0125): pi's entry has no such field.
  */
 export function toStoredRow(
   entry: EntryWithoutSeq,

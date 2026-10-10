@@ -46,8 +46,8 @@
 
   pi keeps a lane call's context in every commit of its run (S143). A
   commit that also moves another lane's tip is an error.
-- **No entry is written in no thread.** The column is never null, and a
-  commit that writes entries and names no thread throws. The only storage
+- **Every entry is written in a thread.** The column is never null, and a
+  commit with entries whose context names no thread throws. The only storage
   given a fallback thread is the one pi's own conformance suite drives,
   since its commits name no thread. The host gives none.
 - **A thread's first entry, its end, and an entry's thread are read, not

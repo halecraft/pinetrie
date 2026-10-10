@@ -929,7 +929,7 @@ export const mutations: readonly Mutation[] = [
     from: "      const created = await agent.createThreadLane(\n        { root, at: planned.at },\n        planned.thread,\n      )",
     to: "      const created = await agent.createThreadLane(\n        { root, at: planned.at },\n        threadIdFor(newId()),\n      )",
     command: unit,
-    expect: "a new lane is created under the column's reserved id",
+    expect: "a new lane is named by its thread's id",
   },
   {
     name: "a reservation of a lane pi holds is answered reserved",
@@ -1880,13 +1880,5 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "an undo that puts a running thread back in an inventory stops it too: the stop follows the places change, whatever wrote it",
-  },
-  {
-    name: "0008 leaves a branch's context entries in the thread it forks from",
-    file: "apps/pinetrie/host/migrations/0008-entry-thread.ts",
-    from: "!isContext(rows[id]) ? walked : (reached(id) ?? walked)\n",
-    to: "!isContext(rows[id]) ? walked : walked\n",
-    command: unit,
-    expect: "a branch's context entry is the branch's",
   },
 ]

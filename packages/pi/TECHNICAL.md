@@ -100,7 +100,7 @@ pure modules, each with its own test:
 | `stored-values.ts` | `encodeValue` / `decodeValue` by namespace: checkpoints, pending entries, the rest as they are |
 | `dirty.ts` | `dirtyFrom`, and `Scope`: what a replay leaves to re-index |
 | `arrivals.ts` | `ArrivalLine`, `ArrivalIndex`, `planArrivals`: the local `seq` |
-| `commit.ts` | `planCommit`: a commit's writes as document operations and arrivals; `commitThread`: the thread its entries are in |
+| `commit.ts` | `planCommit`: a commit's writes as document operations and arrivals; `threadOfEntries`: the thread its entries are in |
 | `thread-context.ts` | `threadContext`, `threadOfContext`: the thread a pi call is made in, carried in its `Context` |
 | `queries.ts` | pi's read rules over rows: branch walk, stop-at, cursor, key order |
 
@@ -144,7 +144,7 @@ Five rules hold them together:
    branch about twice a model request, at 0.65 ms for a 2 MB image (S93).
 5. **Every entry is in the thread its commit names** (ADR-0125). pi's
    `Entry` has no thread, so the row's comes from the commit:
-   `commitThread` takes the one its `Context` names (`threadOfContext`).
+   `threadOfEntries` takes the one its `Context` names (`threadOfContext`).
    Every call through a lane's handle carries `threadContext(name, …)`,
    and pi keeps a call's context in every commit of its run (S143); the
    scribe passes the same for a thread with no lane. A commit that writes
@@ -152,7 +152,7 @@ Five rules hold them together:
    and moves another lane's tip, since a lane is named by its thread.
    `fromStoredRow` ignores the column.
 
-**Gotcha: pi's conformance suite commits entries in no thread.** Its
+**Gotcha: pi's conformance suite commits entries outside any thread.** Its
 commits carry its own context, and one moves a tip named `main` with an
 entry. So `KynetaStorageOptions.fallbackThread` gives a thread to an entry
 whose commit names none, and only `apps/conformance/run-conformance.ts`

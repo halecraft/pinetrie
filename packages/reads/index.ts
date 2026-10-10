@@ -69,7 +69,6 @@ import {
   type ThreadRecord,
   type TraceRecord,
   type TreeIndex,
-  threadAt,
   type VerdictRecord,
   type Workflow,
   type WriterId,
@@ -164,9 +163,9 @@ function carriedBy(row: StoredEntryRow): ContextInView | undefined {
 
 /**
  * A row's entry, or null for one whose thread is no thread's id. None is:
- * every commit names its thread (ADR-0125), and a store from before is
- * refused until migrated (ADR-0096). Left out, as a malformed lane name is
- * (`readStoredLanes`), rather than read into some thread.
+ * every commit names its thread (ADR-0125), and a store from before the
+ * column is refused at startup (ADR-0096). Left out, as a malformed lane
+ * name is (`readStoredLanes`), rather than read into some thread.
  */
 function renderableEntry(row: StoredEntryRow): EntryLike | null {
   const known = entryOfRow.get(row)
@@ -842,10 +841,9 @@ export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
     const m = e.message
     if (m?.role !== "chat" || m.writer === undefined) return []
     const text = messageText(m)
-    const thread = threadAt(index, e.id)
-    return parseMentions(text).length === 0 || thread === null
+    return parseMentions(text).length === 0
       ? []
-      : [{ id: e.id, by: m.writer, text, thread }]
+      : [{ id: e.id, by: m.writer, text, thread: e.thread }]
   })
   return {
     root,

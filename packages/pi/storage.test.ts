@@ -128,12 +128,12 @@ test("scanValues keeps to its namespace: a prefix of `a` is not one of `ab`", as
   ).toEqual(["a"])
 })
 
-test("a commit that writes an entry in no thread throws and writes nothing; one that moves only a tip needs no thread (ADR-0125)", async () => {
+test("a commit whose context names no thread throws on its entries and writes nothing; one that moves only a tip needs no thread (ADR-0125)", async () => {
   const doc = newRootDoc()
   const storage = new KynetaStorage({ doc })
   await expect(
     storage.commit([message("e1", null)], BACKGROUND_CONTEXT),
-  ).rejects.toThrow(/in no thread/)
+  ).rejects.toThrow(/names no thread/)
   expect(doc.entries()).toEqual({})
   const lane = threadIdFor("0123456789abcdef")
   await storage.commit(

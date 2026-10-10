@@ -32,13 +32,13 @@ plus one sealed `payload`.
 | `payload` | **not** typed: pi's variant data, sealed |
 
 **Every entry names its thread (ADR-0125).** The commit that writes it
-names it in its pi `Context` (`commitThread`, `packages/pi/TECHNICAL.md`),
+names it in its pi `Context` (`threadOfEntries`, `packages/pi/TECHNICAL.md`),
 so a thread's first entry, its end and an entry's thread are read from the
 rows (`TreeIndex.firstOf`, `endOf`), never inferred by walking the tree. A
 walk lost a thread's end when a branch's first run had written its context
-entries above the chat naming it (S143). The column is never empty once
-written; a row from before it reads `""`, the schema's default, which only
-migration `0008-entry-thread` meets.
+entries above the chat naming it (S143). The column is never empty. A
+store from before it is refused at startup: `0008-entry-thread`, which
+labelled every row, ran on Duane's store and was deleted.
 
 Everything pine·trie reasons about is a column. Everything pi owns is in
 `payload`. We type what we traverse. Two readers lift what pine·trie reads out

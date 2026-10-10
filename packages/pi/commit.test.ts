@@ -14,7 +14,7 @@ import { threadIdFor } from "@pinetrie/core"
 import { LANE_TIP, physicalKey } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import { CHECKPOINT_NAMESPACE } from "./checkpoint.ts"
-import { commitThread, planCommit } from "./commit.ts"
+import { planCommit, threadOfEntries } from "./commit.ts"
 import { emptyUsage } from "./deep.ts"
 
 const THREAD = threadIdFor("a")
@@ -96,7 +96,7 @@ test("planCommit: one operation and one arrival per write, with pi's seqs", () =
   expect(checkpoint).toMatchObject({ text: "out", record: { sealed: true } })
 })
 
-describe("commitThread: a commit's entries are in the thread its context names (ADR-0125)", () => {
+describe("threadOfEntries: a commit's entries are in the thread its context names (ADR-0125)", () => {
   const OTHER = threadIdFor("b")
   const commit = (lane?: string) =>
     prepareStorageCommit(
@@ -114,21 +114,21 @@ describe("commitThread: a commit's entries are in the thread its context names (
     ).writes
 
   test("the context's thread, with or without its lane's tip in the commit", () => {
-    expect(commitThread(commit(), THREAD, undefined)).toBe(THREAD)
-    expect(commitThread(commit(THREAD), THREAD, OTHER)).toBe(THREAD)
+    expect(threadOfEntries(commit(), THREAD, undefined)).toBe(THREAD)
+    expect(threadOfEntries(commit(THREAD), THREAD, OTHER)).toBe(THREAD)
   })
 
   test("a tip of another lane in the commit is refused", () => {
-    expect(() => commitThread(commit(OTHER), THREAD, undefined)).toThrow(
+    expect(() => threadOfEntries(commit(OTHER), THREAD, undefined)).toThrow(
       /moves the tip of lane/,
     )
   })
 
   test("no thread named takes the fallback, whatever tip moves; with none, it is refused", () => {
-    expect(commitThread(commit(), undefined, OTHER)).toBe(OTHER)
-    expect(commitThread(commit("main"), undefined, OTHER)).toBe(OTHER)
-    expect(() => commitThread(commit(), undefined, undefined)).toThrow(
-      /in no thread/,
+    expect(threadOfEntries(commit(), undefined, OTHER)).toBe(OTHER)
+    expect(threadOfEntries(commit("main"), undefined, OTHER)).toBe(OTHER)
+    expect(() => threadOfEntries(commit(), undefined, undefined)).toThrow(
+      /names no thread/,
     )
   })
 

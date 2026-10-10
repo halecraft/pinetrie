@@ -747,7 +747,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a tip of another lane in the commit is refused",
   },
   {
-    name: "the scribe appends in no thread",
+    name: "the scribe's appends name no thread",
     file: "packages/pi/scribe.ts",
     from: "      const ctx = threadContext(thread, CTX)\n",
     to: "      const ctx = CTX\n",

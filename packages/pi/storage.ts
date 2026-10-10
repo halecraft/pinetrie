@@ -138,7 +138,7 @@ export interface KynetaStorageOptions {
   /**
    * The thread of an entry whose commit's context names none (ADR-0125).
    * Only pi's storage conformance suite gives one: its commits are made
-   * outside any thread. Without it, such a commit throws (`commitThread`).
+   * outside any thread. Without it, such a commit throws (`threadOfEntries`).
    */
   readonly fallbackThread?: ThreadId
 }

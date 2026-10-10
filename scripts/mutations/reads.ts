@@ -210,8 +210,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a mention names its root's first thread",
     file: "packages/reads/index.ts",
-    from: "    const thread = threadAt(index, e.id)",
-    to: "    const thread = threadAt(index, index.roots[0] ?? e.id)",
+    from: "      : [{ id: e.id, by: m.writer, text, thread: e.thread }]",
+    to: "      : [{ id: e.id, by: m.writer, text, thread: index.entries[index.roots[0] ?? e.id]?.thread ?? e.thread }]",
     command: ["pnpm", "exec", "vitest", "run", "packages/reads"],
     expect: "a mention names the thread it is in",
   },
