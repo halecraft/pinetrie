@@ -17,6 +17,9 @@
     several cards are one command, accepted whole or refused.
   - ADR-0063: a new tab mints its `RootId` as it opens, not at its first send;
     a fresh card's place carries a `Spot`; `places` is Yjs, not `json`.
+- **Amended by:**
+  - ADR-0126: a discard is undone from its discarder's trash, and one made on
+    no task from a history of theirs outside any task.
 
 **Context.** Moves you can undo (ADR-0048 step 4) were built as pine·trie's own
 history in each browser tab: an undo sent the reverse handoff (ADR-0059),

@@ -9,7 +9,8 @@
     each lane's newest.
 - **Amended by:**
   - ADR-0126: selecting a card in the inventory previews it, read only, at one
-    column's width; Enter opens it.
+    column's width; Enter opens it; a take's stop is a fact card, not a stop
+    record.
 
 **Context.**
 

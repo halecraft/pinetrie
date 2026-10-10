@@ -30,12 +30,12 @@ words they were written with.
 | word | what it is | in code | retired |
 |---|---|---|---|
 | **card** | Something present: an identity, one place, and content, which the host keeps; its content's kind decides where it can be, what can be done with it, and how it is drawn (ADR-0126). A text card, a thread card or a note column (ADR-0111, ADR-0116, ADR-0117). | `CardRecord`, `CardId`, `CardKind`, `PLACES_OF` | |
-| **surface** | Where cards are put: part of some content or of a person (a task's canvas, a thread's dock, a note column, an inventory). Every place is a surface's, with a rank there (ADR-0111, ADR-0126). | `CardPlace` | |
+| **surface** | Where cards are put, which some content or a party has: a team's board, a task's canvas, a thread's dock, a note column's list, a person's inventory. A card is placed on one surface, and has the surfaces its content gives; a surface is data, never a view (ADR-0111, ADR-0126). | `CardPlace` | |
 | **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `TextCard`, `TextCardId`, `CardPlace`, `CardFrame`, `cardFrame` | |
 | **thread card** | A thread, as a card: on a task's canvas or in someone's inventory, one place either way (ADR-0117, ADR-0124). | `ThreadCard`, `threadFace` | a root, as the board and the sidebar draw it; board item |
 | **your message** | The text card in your composer at a thread's end, which only you see. | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours) |
 | **note** | A text card in a note column, which everyone in the task sees and no agent reads (ADR-0116). | `note`, `noteOf`, `notesIn`, `NoteCardEditor` | drafting card, draft; a note below the line on its thread's notes board |
-| **note column** | A card on a task's canvas holding notes in one order, titled or "Notes" (ADR-0116). | `NoteColumnId`, `NoteColumnCard`, `NOTE_COLUMN`, `nearestNoteColumn`, `NoteColumn` | notes board |
+| **note column** | A card on a task's canvas whose content is a list of notes, titled or "Notes" (ADR-0116). Named by how it is drawn (ADR-0126). | `NoteColumnId`, `NoteColumnCard`, `NOTE_COLUMN`, `nearestNoteColumn`, `NoteColumn` | notes board |
 | **queued card** | A text card above the line, which the agent reads once, when the host pops it. | `queued`, `queuedOn`, `QueuedCardEditor` | |
 | **pinned card** | A text card the agent reads on every run, at the top of its thread's column. | `pinned`, `pinnedOf`, `PinnedCardEditor` | |
 | **inventory** | Your own grid of cards, text cards and thread cards, on every task and device. A thread there is yours alone, read only and run by nobody (ADR-0124). | `inventory`, `InventoryPanel`, `holderOf`, `ThreadPreview` | |
@@ -82,8 +82,8 @@ a value is stored.
 
 | word | what it is | in code | retired |
 |---|---|---|---|
-| **canvas** | Where a task opens: its cards laid out as columns, in an order everyone shares (ADR-0116). | `canvas` (a `CardPlace`), `CanvasCard`, `canvasOf`, `canvasColumns`, `Strip` | |
-| **column** | A card on the canvas, opened: a thread's path or a note column (ADR-0116). | `CardColumn`, `Column`, `ColumnKey` | a column as only a thread's path |
+| **canvas** | A task's surface: its cards in an order everyone shares, each one or two columns wide (ADR-0116, ADR-0126). Drawn as the strip, when the task opens. | `canvas` (a `CardPlace`), `CanvasCard`, `canvasOf`, `canvasColumns`, `Strip` (the view) | |
+| **column** | A view, not a card: a card on a canvas, drawn whole, such as a thread's path or a note column (ADR-0116, ADR-0126). | `CardColumn`, `Column`, `ColumnKey` | a column as only a thread's path |
 | **task column** | The strip's first column, outside the canvas's order: the task's title, state, readers, the cards pinned to the task and the canvas list. | `TaskColumn`, `taskColumnView` | |
 | **fold** (a column) | Hide a column for yourself; it keeps its place as a narrow strip with its title. Every column is folded until you open it. | `CardView.unfolded`, `FoldedColumn` | close (a column) |
 | **pinned to the task** | A text card every thread's agent in the task reads on every run, in the task column. | `task-pinned`, `taskPinnedOf` | |
@@ -110,9 +110,14 @@ Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
 | **reference** | A card holding an address. A link, a quote and a transclusion are its renderings. Edited, it becomes a copy. | ADR-0126 | |
 | **origin** | Where a copy came from: an address every copy keeps (a thread's copy does today, `ThreadOrigin`). | ADR-0126 | |
 | **margin** | An entry's surface, for notes on it. | ADR-0126 | |
+| **trash** | A person's surface, one each, of the cards they discarded, until undone or swept. Each remembers the task it left, or none. | ADR-0126 | the `gone` place |
+| **team** | The people who share a board, its tasks and, later, its sources and runners. | ADR-0126 | the host's session, as the board's owner |
+| **party** | A person or a team: what owns a surface that no content does (an inventory, a trash, a board). | ADR-0126 | |
+| **stage** | The page's main area, beside the sidebar: it shows the board or a task's strip, and a page such as the profile covers it. | ADR-0126 | the workspace (`#workspace`, `showsWorkspace`) |
+| **stack** | A card holding two or more threads of one root, one on top, drawn as one column: only the top runs, and which is on top is shared. Not built with the rest. | ADR-0126 | |
 | **comment** | A note on an entry, in its margin: people read it; the agent does once it is queued. | ADR-0126 | annotation |
-| **face**, **normal**, **wide**, **whole** | A card's four renderings, which every kind draws: a strip or a grid cell; one column; two columns; an open column or the pane. | ADR-0126 | |
-| **preview** | A selected card's normal rendering, read only, in the inventory. | ADR-0126 | |
+| **face**, **normal**, **whole** | The three levels of detail every kind is drawn at, chosen by the surface it is on: a strip, a grid cell or a mark; the card itself, bounded; all of it, as a column or in the pane. Width is the place's, not a level. | ADR-0126 | |
+| **preview** | A selected card in the inventory, drawn normal, one column wide, read only. | ADR-0126 | |
 | **signal** | What a card or a list says by a mark: unsent text of yours, needs you, running, done. Each named for what it says. | ADR-0126 | card marks (the pips, `card-marks.ts`) |
 | **in your hand** | Your inventory's selected slot: what the put key puts. | ADR-0126 | |
 | **put key** | Puts the card in your hand where focus is: a reference into a text box, the card onto a surface. A reference stays in your inventory; a card of the present leaves it. | ADR-0126 | |
@@ -138,6 +143,9 @@ word alone.)
   while its task is in Doing.
 - **task** and **ask**: a task is a card on the board (ADR-0116); an ask is
   the message that started a run (ADR-0106, ADR-0126).
+- **workspace**: jj's (a lane's own, ADR-0032) and pnpm's (this repo's
+  packages). Nothing of pine·trie's is called one: the page's main area is
+  the stage, and a board is a team's (ADR-0126).
 - **record**: a stored value (`CardRecord`, a host record in `records`),
   never the past. What is in a thread is entries (ADR-0126).
 - **row**: how a column draws entries (a tool row, a fork row), a places
@@ -150,7 +158,7 @@ word alone.)
   clipboard (ADR-0126). Every copy keeps its origin.
 - **fact**: an entry the host wrote, and a fact card, the same fact before
   its thread's end consumes it.
-- **column**: a card opened on a task's canvas, and each workflow state's
+- **column**: a card drawn whole on a task's canvas, and each workflow state's
   column on the board. The board's are **states**.
 - **fold**: hiding something on screen (a column, an ask's work, the
   sidebar to icons), and the context merge of `docs/00-vision.md`, a

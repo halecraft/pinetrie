@@ -21,8 +21,9 @@
   - ADR-0121: a lane is told its task's canvas.
   - ADR-0048: a card can be pinned to a task, and read by every thread of it.
 - **Amended by:**
-  - ADR-0126: a task is a card, whose surface is the board; a text card
-    dropped on a canvas lands in a note column made for it.
+  - ADR-0126: a task is a card, placed on the board, whose surface is its
+    canvas; a column is how a card on a canvas is drawn, not a card; a text
+    card dropped on a canvas lands in a note column made for it.
 
 **Context.**
 

@@ -9,10 +9,14 @@
     card with no text.
   - ADR-0106: a run has an ask, the message that started it; who stopped a run
     is a fact in its thread, not a `pinetrie.stop` record.
-  - ADR-0116: a task is a card, whose surface is the board; a text card
-    dropped on a canvas lands in a note column made for it.
+  - ADR-0116: a task is a card, placed on the board, whose surface is its
+    canvas; a column is how a card on a canvas is drawn, not a card; a text
+    card dropped on a canvas lands in a note column made for it.
   - ADR-0124: selecting a card in the inventory previews it, read only, at one
-    column's width; Enter opens it.
+    column's width; Enter opens it; a take's stop is a fact card, not a stop
+    record.
+  - ADR-0066: a discard is undone from its discarder's trash, and one made on
+    no task from a history of theirs outside any task.
 
 **Context.**
 
@@ -44,6 +48,12 @@
   card's face, and the card opens whole only on Enter.
 - **"Mark" means two things.** ADR-0045's mark is a task's title;
   `card-marks.ts`'s marks are the pips that show where your unsent text is.
+- **"Workspace" means three.** A lane's jj workspace (ADR-0032), the pnpm
+  workspace of this repo, and the page's main area (`#workspace`, beside
+  the sidebar), which a page such as the profile covers.
+- **The board has no owner in the words.** It is the host's session's,
+  and a host is a machine: once hosts federate, the people who share a
+  board may be on several.
 
 **Decision.**
 
@@ -79,14 +89,61 @@
 
 *Places.*
 
-- **Every place is a surface of some content or person**: the board, of
-  task cards; a task's canvas; a thread's dock (its queue, its pinned
-  cards, your message); a note column; an entry's margin; a person's
-  inventory. A place is its owner, its surface, and a rank there.
+- **Three relations, kept apart.** A card is **placed on** one surface. A
+  card **has** the surfaces its content gives, none or several. How a
+  card is **drawn** is decided by the surface it is on, the width its
+  place gives it, and the person looking. The first two are data; the
+  third is the view, and no surface is a view.
+- **Every place is on a surface of some content or person**, at a rank
+  there:
+
+  | owner | its surfaces |
+  |---|---|
+  | a team | its board, of task cards |
+  | a task card | its canvas; its pinned cards |
+  | a thread card | its dock (its queue, its pinned cards, your message); a margin for each of its entries |
+  | a stack card | its pile, of thread cards |
+  | a note column | its list, of notes |
+  | a person | their inventory; their trash, of what they discarded |
+
+- **A column is a view**: a card on a canvas, drawn whole. It is no card
+  and no surface.
 - **A place decides the audience**: who sees a card there, and whether the
   agent reads it never, once or on every run.
-- **A task is a card.** Its content is the task, and the board's workflow
-  states are its surface.
+- **A board is a team's.** A team is the people who share a board, its
+  tasks and, later, its sources and runners. A person and a team are the
+  two **parties**: every surface is some content's or a party's.
+- **A task is a card**, placed on the board, whose surface is its canvas.
+  Opened, it is drawn whole: its canvas's cards as a strip of columns.
+- **An unsent branch or a new tab is a thread card not yet started.** A
+  column already mints its thread's id as it opens (ADR-0117); its card is
+  made then, on its task's canvas, and your text is your message on its
+  dock. Its first send writes its first entry. Closing its column before
+  then discards it.
+- **A discarded card is in its discarder's trash**, one for each person,
+  until an undo brings it back or the host sweeps it. It remembers the
+  task it left, or none: the undo key finds it from its discarder's
+  history of moves for that task, or, for none, from their history
+  outside any task.
+- **A stack is a card holding two or more threads of one root**, one of
+  them on top:
+  - **Its column draws its top thread whole**, with a control at each
+    entry where a thread of the stack leaves the top's path, naming every
+    thread that leaves there. Choosing one puts it on top. Which is on top
+    is shared.
+  - **Only the top runs.** The others' queues are held, as in an
+    inventory (ADR-0124), and the stack shows no signal of them. A stack
+    whose top is running is refused a change of top: stop it, or pull it
+    out.
+  - **Dropping a thread onto a column stacks them**, making a stack when
+    the column was a lone thread's. Dropping it between columns places it
+    there. A stack left with one thread is dissolved in the same gesture,
+    so a lone thread is never a stack of one.
+  - **The column's header is the stack's grip** and the control at a fork
+    is one thread's: taking the column takes the stack and every thread in
+    it; taking at the control takes that thread alone.
+  - **A copy of a stack copies its top thread.** A link to a thread in a
+    stack puts it on top.
 - **A comment is a note on an entry**, in the entry's margin, seen by
   people and never read by the agent, like any note. To tell the agent,
   queue it, or a reference to it, and the thread's end consumes it.
@@ -130,23 +187,40 @@
 
 *Renderings.*
 
-- **Every kind has four renderings**: **face** (a folded column's strip, a
-  grid cell), **normal** (one column wide), **wide** (two columns),
-  **whole** (an open column, or the pane). Each kind draws all four, so no
-  surface finds one missing.
+- **Every kind is drawn at three levels of detail**: **face** (a folded
+  column's strip, a grid cell, a mark in a margin), **normal** (the card
+  itself, bounded: a note in its list, a preview), **whole** (all of it: a
+  column, the pane). Each kind draws all three, so no surface finds one
+  missing.
+- **Width is the place's, not a level of detail**: a card on a canvas is
+  one column wide or two (`CardWidth`), whole either way.
+- **The surface decides the level**:
+
+  | surface | its cards are drawn |
+  |---|---|
+  | the board | normal, as tiles; a task opened is drawn whole |
+  | a canvas | whole, as columns at their width; a face where you folded it |
+  | a pile | its top whole, as the stack's column; the others by their faces at the controls |
+  | a list, a dock | normal |
+  | a margin | a face at the entry; normal when opened |
+  | an inventory | faces in the grid; the selected one normal; opened, whole |
 - **The kind's signals and the place's never cross**: a card's icon and
   shape say its kind, its frame's colour says its place (`cardFrame`).
-- **Selecting a card in the inventory previews it**: its normal rendering,
-  read only. Enter opens it.
+- **Selecting a card in the inventory previews it**: drawn normal, one
+  column wide, read only. Enter opens it.
 - **Entries are selected and addressed as cards are**: keys move among
   them as among a grid's slots, and each can be copied, linked and
   commented on. They are never placed.
 - **Signals are one family**, each named for what it says: unsent text of
   yours (the pips, today's card marks), needs you (ADR-0077), running,
   done.
-- **Arrangement is shared and attention is personal.** A canvas's order
-  and its cards' widths are everyone's; which columns you fold and what
-  your pane shows are yours.
+- **Arrangement is shared and attention is personal.** A canvas's order,
+  its cards' widths and each stack's top are everyone's; which columns you
+  fold and what your pane shows are yours.
+- **The stage is the page's main area**, beside the sidebar: it shows the
+  board or a task's strip, and a page such as the profile covers it.
+- **"Workspace" is jj's and pnpm's word alone.** Nothing of pine·trie's
+  is called one.
 
 *Keys.*
 
@@ -187,11 +261,17 @@
   kind of thing a person reads about.
 - **ADR-0048 is past its amendment limit** (`scripts/unconsolidated.ts`),
   and this adds one more: it is due a restatement.
+- **`fresh` and `gone` stop being places of their own**: an unsent
+  branch's text is your message on a thread card not yet started, and a
+  discarded card is in a person's trash. A thread's card is made as its
+  column opens, not with its first message (`planThreadCard`, now).
+- **The page's main area is renamed the stage**, in code (`#workspace`,
+  `showsWorkspace`) and in its living docs, with the code.
+- **"Note column" names a card by its view.** It is a card whose content
+  is a list of notes. The name stays for now.
+- **Stacks are not built by the plan that builds the rest.** They wait
+  for forking in one column to be designed.
 - **Left open**, for the plan that builds this:
-  - which card a column is when it steps through the alternatives at a
-    fork, which is shared state;
-  - whether an unsent branch (`fresh`) and a discarded card (`gone`) are
-    surfaces of something, as every other place is;
   - whether the host deletes only what no reference reaches, keeping the
     rest in the archive, in place of today's sweeps;
   - whether Kyneta's history is kept untrimmed, which snapshot references
@@ -219,6 +299,19 @@
 - **Cmd+V as put.** In a text box, people expect it to paste text.
 - **Refusing a text card on a canvas** (`no-place`, now). It makes the
   person build the container first; the drop can make it.
+- **A trash for each task.** A card discarded on no task, from an
+  inventory, would have none, and nothing could undo its discard.
+- **"The host's" board.** A host is a machine, and a team may span
+  several once hosts federate.
+- **"Workspace" for the board's owner or the stage.** It is already
+  jj's and pnpm's, for things a person in a lane meets every day.
+- **Every thread on a canvas in a stack**, most of them stacks of one.
+  A stack of one looks and acts as its thread does: a card nobody can
+  see, which every link and take must look through.
+- **A column as a card, or as a surface.** It is how a card on a canvas
+  is drawn; calling it either confused a card's data with its view.
+- **Four renderings, width among them.** Width is the place's, and a
+  column two wide is as whole as one.
 - **A task outside the card model** (`BoardPlace`, now). It is a second
   system of places, moves, history and undo for something that moves as a
   card does.
