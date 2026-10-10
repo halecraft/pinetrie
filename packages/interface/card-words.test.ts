@@ -133,6 +133,11 @@ describe("card words", () => {
       noticeWords(refusal({ code: "full" }), READER),
       "inventory full",
     ],
+    [
+      "noticeWords, an undo across the archive's edge (ADR-0126)",
+      noticeWords(refusal({ code: "archived" }), READER),
+      "not undone: restore or archive it on the board",
+    ],
   ])("%s", (_, words, expected) => {
     expect(words).toBe(expected)
   })

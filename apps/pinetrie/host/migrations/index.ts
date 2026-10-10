@@ -14,6 +14,7 @@ import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
 import { cardContent } from "./0009-card-content.ts"
 import { threadOrigin } from "./0011-thread-origin.ts"
 import { unstartedThreads } from "./0012-unstarted-threads.ts"
+import { taskCards } from "./0013-task-cards.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -43,13 +44,14 @@ export interface Migration {
 
 /**
  * Every migration this build carries, oldest first: 0012-unstarted-threads
- * (ADR-0126). A store opens through the one migration from its stored hash.
+ * and 0013-task-cards (ADR-0126). A store opens through the one migration
+ * from its stored hash, so 0012 moves 0013's data too.
  * 0001-live-row, 0002-records (ADR-0095), 0005-tasks' places and sidebars
  * (ADR-0116), 0008-entry-thread (ADR-0125) and 0010-reference-fields
  * (ADR-0126) ran on Duane's store and were deleted; restore one from the
  * revision that deleted it for a store still on its hash.
  */
-export const MIGRATIONS: readonly Migration[] = [unstartedThreads]
+export const MIGRATIONS: readonly Migration[] = [unstartedThreads, taskCards]
 
 /**
  * A one-time change to stored contents that keeps every schema's hash: a

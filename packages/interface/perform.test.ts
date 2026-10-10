@@ -309,7 +309,7 @@ test("a move on the board runs what follows it only once the host accepts it (AD
     moved: [{ kind: "layout", action: closed }],
   }
   const p = ports()
-  p.session.request.mockImplementationOnce(async () => ({ kind: "moved-task" }))
+  p.session.request.mockImplementationOnce(async () => ({ kind: "moved" }))
   perform([effect], p)
   expect(p.session.request).toHaveBeenCalledWith(request)
   await vi.waitFor(() => expect(p.dispatch).toHaveBeenCalledWith(closed))

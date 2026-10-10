@@ -12,7 +12,7 @@ import { createKeeper } from "@pinetrie/keeper"
 import type { WireCommand } from "@pinetrie/protocol/codec"
 import type { Reply } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
-import { BOARD, HELD_WORDS, setRecord, WORKFLOW } from "@pinetrie/rules"
+import { HELD_WORDS, setRecord, WORKFLOW } from "@pinetrie/rules"
 import { newPresenceDoc } from "@pinetrie/schema"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
@@ -21,6 +21,7 @@ import {
   applyWrites,
   basics,
   NO_BLANK_CARDS,
+  placeTask,
   putTask,
   putValue,
   ROOT_ID,
@@ -47,8 +48,8 @@ const THREAD = threadIdFor("root")
 
 /** The test's root in `state` on a board of Doing and Done (ADR-0122). */
 const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
-  // The task THREAD is in (ADR-0116), on the board.
-  putTask(b, THREAD)
+  // The task THREAD is in (ADR-0116), its card on the board.
+  putTask(b, THREAD, TASK_ID, undefined, state)
   putValue(
     b,
     setRecord(WORKFLOW, {
@@ -56,10 +57,7 @@ const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
       archive: { id: DONE, name: "Done" },
     }),
   )
-  putValue(
-    b,
-    setRecord(BOARD, { task: TASK_ID, state, rank: "a", by: ALICE, at: 1 }),
-  )
+  placeTask(b, TASK_ID, state, ALICE)
 }
 
 function setUp(
@@ -112,7 +110,9 @@ function setUp(
       ensure: async () => {},
     }).port,
     drain: lane => void drains.push(lane),
-    histories: record<CommandDeps["histories"]>().port,
+    histories: record<CommandDeps["histories"]>({
+      gestureOf: async () => write => write(),
+    }).port,
     // Its own writes, so a test counting the agent's sees only the command's.
     provenance: createProvenance({
       basics: b,
@@ -217,7 +217,7 @@ test("a move into Done holds the keeper only for its place and its unload: a com
   ])
   teardown.resolve()
   await archive
-  expect(replies.at(-1)).toMatchObject({ id: "a-1", outcome: "moved-task" })
+  expect(replies.at(-1)).toMatchObject({ id: "a-1", outcome: "moved" })
   expect(b.docs.loaded()).not.toContain(ROOT_ID)
 })
 
@@ -280,6 +280,7 @@ test("a chat command spends its card once written, record then text, answering w
   ])
   expect(readPlaces(b.places).map(c => c.id)).toEqual([
     cardIdFor("cc2"),
+    TASK_ID,
     THREAD,
   ])
   expect(

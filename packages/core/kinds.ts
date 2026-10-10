@@ -35,6 +35,10 @@ export interface KindSpec {
  *
  * - a text card, anywhere but a canvas;
  * - a thread's card, on a canvas or in an inventory;
+ * - a task's card, on the board, in a workflow state: the host places it
+ *   (a board move is its own command, which crosses the archive's edge),
+ *   so no person's move takes it, and only the host trashes it (a new tab
+ *   closed unsent); it is reordered within its state;
  * - a note column, on a canvas;
  * - a reference, holding an address and its quote: a note, a comment in
  *   an entry's margin, queued (its quote sent as its queuer's message), in
@@ -76,6 +80,14 @@ export const KINDS = {
     prefix: "t-",
     places: ["canvas", "inventory", "trash"],
     moves: true,
+    reordered: true,
+    put: "moves",
+    text: "none",
+  },
+  task: {
+    prefix: "k-",
+    places: ["board", "trash"],
+    moves: false,
     reordered: true,
     put: "moves",
     text: "none",

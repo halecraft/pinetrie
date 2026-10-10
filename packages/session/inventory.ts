@@ -12,8 +12,10 @@
 
 import {
   type CardId,
+  type CardInPlace,
   type CardRecord,
   firstEmpty as firstEmptyCell,
+  hasPlaceKind,
   INVENTORY_GRID,
   INVENTORY_SLOTS,
   isCell,
@@ -239,5 +241,8 @@ export function repairStep(
 export const heldBy = (
   cards: readonly CardRecord[],
   me: WriterId,
-): readonly CardRecord[] =>
-  cards.filter(c => c.place.kind === "inventory" && c.place.holder === me)
+): readonly CardInPlace<"inventory">[] =>
+  cards.filter(
+    (c): c is CardInPlace<"inventory"> =>
+      hasPlaceKind(c, "inventory") && c.place.holder === me,
+  )

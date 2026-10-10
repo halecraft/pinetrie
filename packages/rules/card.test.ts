@@ -34,6 +34,8 @@ import {
   textCardId,
   textSourceOf,
   threadIdFor,
+  type WorkflowStateId,
+  workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -56,7 +58,12 @@ import { wordsOf } from "./card-words.ts"
 import { factLine } from "./fact.ts"
 import { threadCardOf } from "./fixtures.ts"
 import { planReorder, planSetCommand, planWidth, REORDERS } from "./in-place.ts"
-import { historyOf, planHistorySweep, undoAnswer } from "./move-history.ts"
+import {
+  crossesArchive,
+  historyOf,
+  planHistorySweep,
+  undoAnswer,
+} from "./move-history.ts"
 import {
   type Discards,
   NO_DISCARDS,
@@ -2478,6 +2485,47 @@ describe("undoAnswer (ADR-0066)", () => {
       kind: "nothing",
     })
   })
+})
+
+test("crossesArchive: a step whose task card last went into or out of the archive is not undone; one within open states, or no task's, is (ADR-0126)", () => {
+  const K = taskIdFor("01a0ffd2-0000-7000-8000-000000000001")
+  const [open, other, done] = ["o", "p", "x"].map(workflowStateIdFor) as [
+    WorkflowStateId,
+    WorkflowStateId,
+    WorkflowStateId,
+  ]
+  const workflow = {
+    open: [
+      { id: open, name: "Open" },
+      { id: other, name: "Other" },
+    ],
+    archive: { id: done, name: "Done" },
+  }
+  const moved = (from: WorkflowStateId, to: WorkflowStateId) =>
+    new Map([
+      [
+        K,
+        {
+          card: K,
+          events: [
+            {
+              kind: "moved" as const,
+              by: ADA,
+              from: { kind: "board" as const, state: from },
+              to: { kind: "board" as const, state: to },
+              at: 1,
+            },
+          ],
+        },
+      ],
+    ])
+  expect(crossesArchive([K], moved(open, done), workflow)).toBe(true)
+  expect(crossesArchive([K], moved(done, open), workflow)).toBe(true)
+  expect(crossesArchive([K], moved(open, other), workflow)).toBe(false)
+  expect(crossesArchive([cardIdFor("c1")], moved(open, done), workflow)).toBe(
+    false,
+  )
+  expect(crossesArchive([K], moved(open, done), null)).toBe(false)
 })
 
 describe("planHistorySweep (ADR-0066)", () => {

@@ -1,21 +1,29 @@
-// board — the session's workflow and each task's place on the board
-// (ADR-0122, ADR-0116).
+// board — the team's workflow and each task's card on the board (ADR-0122,
+// ADR-0116, ADR-0126).
 //
 // The workflow is one host-written singleton: the open states in order, then
-// the archive, which is always there and always last. A task's place is
-// a host-written value keyed by its `TaskId`: its state and its rank there.
-// A task in the archive is archived (ADR-0029); `archive.ts` decides
-// what crossing that state's edge does.
+// the archive, which is always there and always last. A task is a card
+// (`KINDS.task`), its id its `TaskId`, placed on the board in a state at a
+// rank there: the places document is the one record of where it is, and its
+// card's history says who moved it there and when. A task in the archive is
+// archived (ADR-0029); `archive.ts` decides what crossing that state's edge
+// does.
 //
-// The board is total: a task with no place, or a place in a state the
-// workflow no longer holds, is read at the end of the first open state, so a
-// missing or stale record never hides a task.
+// The board is total: a task's card in a state the workflow no longer holds
+// is read at the end of the first open state, so a stale place never hides
+// a task.
 
 import {
   type ArchivedTask,
-  type BoardPlace,
+  type CardHistoryRecord,
+  type CardId,
+  type CardInPlace,
+  type CardPlace,
+  type CardRecord,
   ERR,
+  hasPlaceKind,
   isWorkflowStateId,
+  type PlaceRefusal,
   type Refusal,
   refused,
   type TaskId,
@@ -28,9 +36,11 @@ import {
   workflowStateIdFor,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, fixedKey, taskKey } from "./decode.ts"
-import { keyAfter, orderBetween, orderKeys } from "./order.ts"
-import { displayName } from "./participant.ts"
+import { byOrder } from "./card.ts"
+import { decodeAt, fixedKey } from "./decode.ts"
+import type { PlaceStep } from "./moves.ts"
+import { orderAfter } from "./order.ts"
+import { rankAfter } from "./rank.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 
 export const WORKFLOW_KEY = "workflow"
@@ -67,27 +77,6 @@ export const WORKFLOW: RecordSpec<Workflow, typeof WORKFLOW_KEY, "session"> = {
     }),
 }
 
-const PlaceSchema = Type.Object({
-  state: Type.String({ minLength: 1 }),
-  rank: Type.String(),
-  by: Type.String(),
-  at: Type.Number(),
-})
-
-/** Each task's place on the board, at its `TaskId`. */
-export const BOARD: RecordSpec<BoardPlace, TaskId, "session"> = {
-  namespace: "pinetrie.board",
-  home: "session",
-  keyOf: p => p.task,
-  encode: ({ task, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeAt(PlaceSchema, contents, taskKey(key), (p, task) =>
-      isWorkflowStateId(p.state)
-        ? { task, state: p.state, rank: p.rank, by: p.by as WriterId, at: p.at }
-        : undefined,
-    ),
-}
-
 /** A new session's workflow: Backlog and Doing, then Done, the archive. */
 export const defaultWorkflow = (newId: () => string): Workflow => ({
   open: [
@@ -99,8 +88,8 @@ export const defaultWorkflow = (newId: () => string): Workflow => ({
 
 /**
  * A store with no workflow gets the default one: a new store's first start
- * (ADR-0122). Nothing else writes the first workflow, and a task started
- * before there is one gets no place. Pure.
+ * (ADR-0122). Nothing else writes the first workflow, and no task is
+ * opened before there is one (`planThreadOpen`). Pure.
  */
 export const planWorkflowSeed = (
   workflow: Workflow | null,
@@ -120,6 +109,20 @@ export const stateIn = (
   id: WorkflowStateId,
 ): WorkflowState | undefined => statesOf(w).find(s => s.id === id)
 
+/** A task's card on the board. */
+export type BoardCard = CardInPlace<"board">
+
+/** Whether `c` is a task's card on the board. */
+export const isBoardCard = (c: CardRecord): c is BoardCard =>
+  hasPlaceKind(c, "board")
+
+/**
+ * The tasks on the board: each task whose card is there, not in a trash
+ * (ADR-0126). The set of tasks the session holds. Pure.
+ */
+export const boardTasks = (cards: readonly CardRecord[]): ReadonlySet<TaskId> =>
+  new Set(cards.filter(isBoardCard).map(c => c.id))
+
 /** A column of the board: a state and its tasks, in order. */
 export interface BoardColumn {
   readonly state: WorkflowState
@@ -134,86 +137,78 @@ export interface Board {
   readonly stateOf: ReadonlyMap<TaskId, WorkflowStateId>
 }
 
-/** The place a task has, or the end of the first open state's. */
-const effectiveState = (
-  w: Workflow,
-  place: BoardPlace | undefined,
-): WorkflowStateId =>
-  place !== undefined && stateIn(w, place.state) !== undefined
-    ? place.state
+/** The state a card on the board is read in: its own, or the first open state's when the workflow lacks it. */
+const effectiveState = (w: Workflow, card: BoardCard): WorkflowStateId =>
+  stateIn(w, card.place.state) !== undefined
+    ? card.place.state
     : (w.open[0]?.id ?? w.archive.id)
 
+/** Each state's cards, in order: by rank, then by id; a stale state's after them at the end of the first open state. */
+function columnsOf(
+  workflow: Workflow,
+  cards: readonly CardRecord[],
+): ReadonlyMap<WorkflowStateId, readonly BoardCard[]> {
+  const placed = cards.filter(isBoardCard)
+  const fits = (c: BoardCard) => stateIn(workflow, c.place.state) !== undefined
+  const byState = new Map<WorkflowStateId, BoardCard[]>()
+  for (const c of [
+    ...placed.filter(fits).sort(byOrder),
+    ...placed.filter(c => !fits(c)).sort(byOrder),
+  ]) {
+    const state = effectiveState(workflow, c)
+    byState.set(state, [...(byState.get(state) ?? []), c])
+  }
+  return byState
+}
+
 /**
- * Every task in `tasks` on the board: in its place's state, by rank, then by
- * id; a task with no place, or one in a state the workflow lacks, after them
- * at the end of the first open state. Pure.
+ * Every task's card on the board, in its state by rank, then by id; one in
+ * a state the workflow lacks after them at the end of the first open state.
+ * Pure.
  */
 export function boardOf(
   workflow: Workflow,
-  places: ReadonlyMap<TaskId, BoardPlace>,
-  tasks: Iterable<TaskId>,
+  cards: readonly CardRecord[],
 ): Board {
-  const byState = new Map<WorkflowStateId, TaskId[]>()
-  const stateOfTask = new Map<TaskId, WorkflowStateId>()
-  for (const task of tasks) {
-    const state = effectiveState(workflow, placed(workflow, places, task))
-    stateOfTask.set(task, state)
-    const list = byState.get(state) ?? []
-    list.push(task)
-    byState.set(state, list)
-  }
+  const columns = columnsOf(workflow, cards)
+  const stateOf = new Map<TaskId, WorkflowStateId>()
+  for (const [state, list] of columns)
+    for (const c of list) stateOf.set(c.id, state)
   const column = (state: WorkflowState): BoardColumn => ({
     state,
-    tasks: (byState.get(state.id) ?? []).toSorted((a, b) =>
-      compareTasks(
-        placed(workflow, places, a),
-        placed(workflow, places, b),
-        a,
-        b,
-      ),
-    ),
+    tasks: (columns.get(state.id) ?? []).map(c => c.id),
   })
   return {
     open: workflow.open.map(column),
     archive: column(workflow.archive),
-    stateOf: stateOfTask,
+    stateOf,
   }
 }
 
-/** A task's place when its state is the workflow's; else none. */
-const placed = (
-  w: Workflow,
-  places: ReadonlyMap<TaskId, BoardPlace>,
-  task: TaskId,
-): BoardPlace | undefined => {
-  const p = places.get(task)
-  return p !== undefined && stateIn(w, p.state) !== undefined ? p : undefined
-}
-
-/** Placed tasks by rank, then the unplaced ones; each tie by id. */
-const compareTasks = (
-  pa: BoardPlace | undefined,
-  pb: BoardPlace | undefined,
-  a: TaskId,
-  b: TaskId,
-): number => {
-  if (pa !== undefined && pb === undefined) return -1
-  if (pa === undefined && pb !== undefined) return 1
-  const ra = pa?.rank ?? ""
-  const rb = pb?.rank ?? ""
-  if (ra !== rb) return ra < rb ? -1 : 1
-  return a < b ? -1 : a > b ? 1 : 0
-}
-
-/** The tasks in the archive: archived (ADR-0029). Pure. */
+/**
+ * The tasks in the archive: archived (ADR-0029), by whom and when: the
+ * newest event of its card's history that put it in the archive, which a
+ * history always keeps (`HISTORY_EVENTS`); its placer at 0 for a card with
+ * none. Pure.
+ */
 export function archivedOf(
   workflow: Workflow,
-  places: ReadonlyMap<TaskId, BoardPlace>,
+  cards: readonly CardRecord[],
+  histories: ReadonlyMap<CardId, CardHistoryRecord>,
 ): ReadonlyMap<TaskId, ArchivedTask> {
+  const archive = workflow.archive.id
   const out = new Map<TaskId, ArchivedTask>()
-  for (const p of places.values())
-    if (p.state === workflow.archive.id)
-      out.set(p.task, { task: p.task, by: p.by, at: p.at })
+  for (const c of cards) {
+    if (!isBoardCard(c) || c.place.state !== archive) continue
+    const into = histories
+      .get(c.id)
+      ?.events.findLast(e => e.to.kind === "board" && e.to.state === archive)
+    out.set(c.id, {
+      task: c.id,
+      by: into?.by ?? c.placer,
+      at: into?.at ?? 0,
+    })
+  }
   return out
 }
 
@@ -232,121 +227,93 @@ export function transitionOf(
 }
 
 /** A task moved on the board, as the host plans it. */
-export type TaskMovePlan =
-  | Refusal
-  /** Already there: nothing is written, and the answer is the same. */
-  | { readonly kind: "unchanged" }
+export type BoardMove =
   | {
-      readonly kind: "write"
-      /** The moved task's place, and any of its new state's renumbered. */
-      readonly places: readonly BoardPlace[]
+      readonly kind: "refused"
+      readonly code: PlaceRefusal
+      /** The card as it is, or null when it is gone. */
+      readonly now: CardRecord | null
+    }
+  /** Already there: nothing is written. */
+  | { readonly kind: "unchanged" }
+  /**
+   * Its card's writes: within its state, a reorder, which changes no key
+   * and so enters no history; between states, a move, with whether it
+   * crosses the archive's edge. Either way the cards re-ranked to make room
+   * follow it.
+   */
+  | {
+      readonly kind: "reorder" | "move"
+      readonly steps: readonly PlaceStep[]
       readonly transition: Transition
     }
 
 /**
- * Decide a move of a task on the board, over the board alone. The sender
- * names the state it saw the task in; if the task has left it, the move is
- * refused, naming who moved it and where. `before` is the task it goes
- * before in `to`, null (or a task no longer there) for its end. A task moved
- * within the archive keeps who archived it and when. Pure.
+ * Decide a move of a task's card on the board (ADR-0122, ADR-0126). The
+ * sender names the state it saw the task in; if the task has left it, the
+ * move is refused `moved`, the card as it is saying who moved it where.
+ * `before` is the task it goes before in `to`, null (or a task no longer
+ * there) for its end. Within one state it is a reorder: its rank alone
+ * changes, its placer stays. Between states its sender is its placer. A
+ * card with no room between its neighbours renumbers the fewest of them
+ * (`rankAfter`). Refused `gone` for a task with no card on the board, and
+ * `no-place` for a state the workflow lacks. Pure.
  */
-export function planTaskMove(input: {
+export function planBoardMove(input: {
   readonly task: TaskId
   readonly from: WorkflowStateId
   readonly to: WorkflowStateId
   readonly before: TaskId | null
-  readonly by: WriterId
-  readonly now: number
+  readonly sender: WriterId
   readonly workflow: Workflow
-  readonly places: ReadonlyMap<TaskId, BoardPlace>
-  /** Every task the board shows (`boardOf`'s `tasks`). */
-  readonly tasks: readonly TaskId[]
-  readonly names: ReadonlyMap<WriterId, string>
-}): TaskMovePlan {
-  const { workflow, places, task, to } = input
-  const target = stateIn(workflow, to)
-  if (target === undefined)
-    return refused(ERR.UNKNOWN_STATE, "that workflow state is gone")
-  if (!input.tasks.includes(task))
-    return refused(ERR.UNKNOWN_TARGET, "no such task")
-  const board = boardOf(workflow, places, input.tasks)
-  const now = board.stateOf.get(task) ?? workflow.archive.id
-  if (now !== input.from) {
-    const where = stateIn(workflow, now)?.name ?? ""
-    const mover = places.get(task)?.by
-    return refused(
-      ERR.TASK_MOVED,
-      mover === undefined
-        ? `not moved: it is in ${where} now`
-        : `not moved: ${displayName(mover, input.names.get(mover))} moved it to ${where} first`,
-    )
-  }
-  const column =
-    [...board.open, board.archive].find(c => c.state.id === to)?.tasks ?? []
-  const others = column.filter(r => r !== task)
-  const at =
-    input.before === null || !others.includes(input.before)
-      ? others.length
-      : others.indexOf(input.before)
-  const order = [...others.slice(0, at), task, ...others.slice(at)]
-  if (now === to && order.every((r, i) => column[i] === r))
-    return { kind: "unchanged" }
-
-  const was = places.get(task)
-  const keep = now === workflow.archive.id && to === workflow.archive.id
-  const moved = (rank: string): BoardPlace => ({
-    task,
-    state: to,
-    rank,
-    by: keep && was !== undefined ? was.by : input.by,
-    at: keep && was !== undefined ? was.at : input.now,
-  })
-  const transition = transitionOf(workflow, input.from, to)
-  const rankOf = (r: TaskId | undefined) =>
-    r === undefined ? null : (placed(workflow, places, r)?.rank ?? undefined)
-  const low = rankOf(order[at - 1])
-  const high = rankOf(order[at + 1])
-  const between =
-    low === undefined || high === undefined ? null : orderBetween(low, high)
-  if (between !== null)
-    return { kind: "write", places: [moved(between)], transition }
-  // No room, or a neighbour with no place yet: the whole state renumbered.
-  const keys = orderKeys(order.length)
+  readonly cards: readonly CardRecord[]
+}): BoardMove {
+  const { workflow, cards, task, to } = input
+  const now = cards.find(c => c.id === task)
+  if (now === undefined || !isBoardCard(now))
+    return { kind: "refused", code: "gone", now: now ?? null }
+  if (stateIn(workflow, to) === undefined)
+    return { kind: "refused", code: "no-place", now }
+  const at = effectiveState(workflow, now)
+  if (at !== input.from) return { kind: "refused", code: "moved", now }
+  const column = columnsOf(workflow, cards).get(to) ?? []
+  const others = column.filter(c => c.id !== task)
+  const before = others.findIndex(c => c.id === input.before)
+  const index = input.before === null || before < 0 ? others.length : before
+  // A card in a stale state is drawn in `to` but stored elsewhere: its
+  // state is written, so it moves.
+  const within = now.place.state === to
+  if (within && column[index]?.id === task) return { kind: "unchanged" }
+  const { order, respaced } = rankAfter(others, index - 1)
+  const place: CardPlace = { kind: "board", state: to, order }
   return {
-    kind: "write",
-    transition,
-    places: order.map((r, i) => {
-      const rank = keys[i] ?? ""
-      if (r === task) return moved(rank)
-      const p = places.get(r)
-      return p !== undefined && p.state === to
-        ? { ...p, rank }
-        : { task: r, state: to, rank, by: input.by, at: input.now }
-    }),
+    kind: within ? "reorder" : "move",
+    transition: transitionOf(workflow, at, to),
+    steps: [
+      {
+        kind: "write",
+        record: { ...now, place, placer: within ? now.placer : input.sender },
+      },
+      ...respaced.map((record): PlaceStep => ({ kind: "write", record })),
+    ],
   }
 }
 
-/** A new task's place: the end of `state`, or of the first open state. Pure. */
-export function placeStarted(input: {
-  readonly task: TaskId
-  readonly state: WorkflowStateId | null
-  readonly by: WriterId
-  readonly now: number
-  readonly workflow: Workflow
-  readonly places: ReadonlyMap<TaskId, BoardPlace>
-}): BoardPlace {
-  const { workflow } = input
-  const open = workflow.open.find(s => s.id === input.state)
-  const state = open?.id ?? workflow.open[0]?.id ?? workflow.archive.id
-  const ranks = [...input.places.values()]
-    .filter(p => p.state === state)
-    .map(p => p.rank)
+/**
+ * A new task's place on the board: the end of `state`, or of the first open
+ * state for none or one that is no open state. Pure.
+ */
+export function boardEnd(
+  workflow: Workflow,
+  cards: readonly CardRecord[],
+  state: WorkflowStateId | null,
+): Extract<CardPlace, { readonly kind: "board" }> {
+  const open = workflow.open.find(s => s.id === state)
+  const at = open?.id ?? workflow.open[0]?.id ?? workflow.archive.id
   return {
-    task: input.task,
-    state,
-    rank: keyAfter(ranks),
-    by: input.by,
-    at: input.now,
+    kind: "board",
+    state: at,
+    order: orderAfter(columnsOf(workflow, cards).get(at) ?? []),
   }
 }
 

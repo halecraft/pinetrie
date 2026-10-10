@@ -51,11 +51,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a closed new tab's task stays",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "    if (emptied.length > 0)\n",
-    to: "    if (emptied.length < 0)\n",
+    from: "              ...planTasksTrashed(cards, emptied, writer),\n",
+    to: "              ...planTasksTrashed(cards, [], writer),\n",
     command: unit,
-    expect:
-      "a new tab's thread to the trash before its first send leaves its task empty: the task goes",
+    expect: "the task's card goes to your trash in the same step",
   },
   {
     name: "an undo of a spin-off lifts no thread",
@@ -1271,8 +1270,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move is recorded in no history",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '    const done = await carry(step, drain, { kind: "move", by: writer }, gesture)\n',
-    to: '    const done = await carry(step, drain, { kind: "move", by: writer })\n',
+    from: '    return carry(step, planned.drain, { kind: "move", by: writer }, gesture)\n',
+    to: '    return carry(step, planned.drain, { kind: "move", by: writer })\n',
     command: unit,
     expect:
       "a take into the inventory is one step of the taker's history in the root it left; a creation is in none",
@@ -1443,7 +1442,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archived task takes a title",
     file: "apps/pinetrie/host/titles.ts",
-    from: "        if (archivedIn([task], readArchived(session)) !== null) return",
+    from: "        if (archivedIn([task], readArchived(session, places)) !== null) return",
     to: "        if (false) return",
     command: unit,
     expect:
@@ -2006,5 +2005,29 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a queued reference whose quote is not found is skipped, not sent empty; the card behind it is sent (ADR-0126)",
+  },
+  {
+    name: "a move on the board is in no history",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: '        move.kind === "move"',
+    to: '        move.kind === "reorder"',
+    command: unit,
+    expect: "between states in your history outside any task",
+  },
+  {
+    name: "a board move refused says nowhere",
+    file: "apps/pinetrie/host/commands/board.ts",
+    from: "          place: moved.now === null ? null : keyOf(moved.now.place),",
+    to: "          place: null,",
+    command: unit,
+    expect: "refused `moved`, saying where it is",
+  },
+  {
+    name: "a task card's history skips its move into its state",
+    file: "apps/pinetrie/host/migrations/0013-task-cards.ts",
+    from: "        ...(state === first",
+    to: "        ...(true",
+    command: unit,
+    expect: "its history: created by its opener",
   },
 ]

@@ -10,12 +10,7 @@
 // (`card-editor.tsx`), so the frame's wrappers are the same with a card and
 // without one, and only the header's contents change.
 
-import {
-  type CardId,
-  type CardRecord,
-  isTextCard,
-  type WriterId,
-} from "@pinetrie/core"
+import { type CardId, isTextCard, type WriterId } from "@pinetrie/core"
 import {
   CARD_MIME,
   type CardFrameView,
@@ -25,6 +20,7 @@ import {
   cardFrameWords,
   DISCARD_CARD,
   DISCARD_CARD_TITLE,
+  type DrawnCard,
   HISTORY_TITLE,
   historyItemWords,
   KIND_ICON,
@@ -48,7 +44,7 @@ const TONE_CLASS: Readonly<Record<CardFrameView["tone"], string>> = {
 export function CardFrame(p: {
   view: CardFrameView
   /** The card it frames; null before the composer's or "+ pin" box's exists. */
-  card: CardRecord | null
+  card: DrawnCard | null
   /** The box "+ pin" opens: a pinned frame that is still being written. */
   pinning?: boolean
   reader: Reader

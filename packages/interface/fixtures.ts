@@ -4,6 +4,7 @@
 // it as `@pinetrie/interface/fixtures`.
 
 import {
+  type CardRecord,
   cardIdOfKind,
   type EntryId,
   type EntryLike,
@@ -20,7 +21,12 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { entriesOf, entry, withThreads } from "@pinetrie/core/fixtures"
+import {
+  entriesOf,
+  entry,
+  taskCard,
+  withThreads,
+} from "@pinetrie/core/fixtures"
 
 export {
   entriesOf,
@@ -109,7 +115,24 @@ export function tasksFor(
       origin: { kind: "root" },
     })
   }
-  return tasksOf({ known: pairs.map(([task]) => task), cards, threads })
+  return tasksOf({
+    cards: [...pairs.map(([task], i) => taskCard(task, `a${i}`)), ...cards],
+    threads,
+  })
 }
+
+/**
+ * The page's tasks for a test, each of `known` a task whose card is on
+ * the board (ADR-0126), beside `cards`.
+ */
+export const tasksWith = (input: {
+  readonly known: readonly TaskId[]
+  readonly cards: readonly CardRecord[]
+  readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
+}): Tasks =>
+  tasksOf({
+    cards: [...input.known.map(task => taskCard(task)), ...input.cards],
+    threads: input.threads,
+  })
 
 const TEST_WRITER = writerId("ada@x.io")

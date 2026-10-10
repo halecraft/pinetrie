@@ -9,7 +9,6 @@
 // other.
 
 import {
-  type CardRecord,
   isTextCard,
   type NoteColumnId,
   type ThreadId,
@@ -18,6 +17,7 @@ import {
 } from "@pinetrie/core"
 import {
   type Dock,
+  type DrawnCard,
   INVENTORY,
   type Intent,
   inventoryView,
@@ -50,7 +50,7 @@ const PREVIEW_SIDE: Readonly<Record<Dock, "left" | "right">> = {
 export function InventoryPanel(p: {
   session: SessionClient
   /** Every card your inventory holds, as drawn. */
-  held: readonly CardRecord[]
+  held: readonly DrawnCard[]
   slots: Slots
   intents: Intents
   selected: number
@@ -161,7 +161,7 @@ export function InventoryPanel(p: {
               onOpen={setOpen}
               onSelect={slot => p.onIntent({ kind: "selectSlot", slot })}
               open={open}
-              renderOpen={(card: CardRecord) => (
+              renderOpen={(card: DrawnCard) => (
                 <DrawCard card={card} detail="whole" width={1} />
               )}
               targetOf={slot => ({ kind: "inventory", slot })}

@@ -124,11 +124,6 @@ export type Outcome =
   /** The sender's picture is set, or removed (ADR-0098). */
   | { readonly kind: "pictured" }
   | { readonly kind: "stopped" }
-  /**
-   * A root moved on the board, or already there (ADR-0122): into the closed
-   * state it is archived, and out of it restored.
-   */
-  | { readonly kind: "moved-task" }
   /** The workflow's states changed, or already were as asked (ADR-0122). */
   | { readonly kind: "workflow-changed" }
   /** An entry's title is set or cleared (ADR-0045); also when it already was. */
@@ -862,6 +857,7 @@ const PLACE_REFUSALS = {
   full: true,
   "not-yours": true,
   replied: true,
+  archived: true,
   "no-place": true,
   fact: true,
   "order-changed": true,
@@ -1103,8 +1099,6 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "pictured" })
     case "stopped":
       return reply({ id, outcome: "stopped" })
-    case "moved-task":
-      return reply({ id, outcome: "moved-task" })
     case "workflow-changed":
       return reply({ id, outcome: "workflow-changed" })
     case "marked":
@@ -1177,8 +1171,6 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "pictured" }
     case "stopped":
       return { kind: "stopped" }
-    case "moved-task":
-      return { kind: "moved-task" }
     case "workflow-changed":
       return { kind: "workflow-changed" }
     case "marked":

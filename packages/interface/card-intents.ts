@@ -692,8 +692,10 @@ export function planDiscard(
   state: IntentState,
 ): readonly Effect[] {
   const now = cardOf(state.cards, card)
-  // A kind is discarded only where it may be in the trash (`PLACES_OF`).
-  if (now === undefined || !cardFitsPlace(now, "trash")) return []
+  // A kind is discarded only where it may be in the trash (`PLACES_OF`),
+  // and only one a person moves: a task's card is the host's to trash.
+  if (now === undefined || !cardFitsPlace(now, "trash") || !isMovable(now))
+    return []
   // Someone else's inventory is theirs to empty (ADR-0059).
   if (now.place.kind === "inventory" && state.cards.me !== now.place.holder)
     return []

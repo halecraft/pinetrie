@@ -285,7 +285,7 @@ function madeAt(
   place: CardPlace,
   sender: WriterId,
 ): CardRecord | undefined {
-  if (isTextCardId(card) && place.kind !== "canvas")
+  if (isTextCardId(card) && place.kind !== "canvas" && place.kind !== "board")
     return makeCard(
       "text",
       card,
@@ -383,7 +383,8 @@ export function planMove(
  * A move into an entry's margin (ADR-0126) is refused `no-place` unless the
  * margin names the thread its entry is in (`entryThreads`): a margin's task
  * is read from its thread, so one naming another would put a comment in
- * the wrong task.
+ * the wrong task. A move onto the board is refused `no-place`: only the
+ * board's own move places a task's card.
  *
  * Pure.
  */
@@ -478,6 +479,14 @@ export function planMoveTargets(input: {
           }
         moves.push({ ...move, to })
         break
+      // No person's move takes a task's card (`KINDS`): the board's own
+      // move places it (`planBoardMove`).
+      case "board":
+        return {
+          kind: "refused",
+          code: "no-place",
+          now: now.find(c => c.id === move.card) ?? null,
+        }
       default:
         moves.push({ ...move, to })
     }

@@ -116,12 +116,12 @@ export async function sweepBlobs(input: {
  * directory does not name, which only a starting host can know are dead.
  */
 export async function sweepHistories(input: {
-  readonly basics: Pick<Basics, "session" | "log" | "now">
+  readonly basics: Pick<Basics, "session" | "places" | "log" | "now">
   readonly store: Pick<Store, "listDocIds">
   readonly histories: Pick<MoveHistories, "retire">
   readonly startup: boolean
 }): Promise<void> {
-  const { session, log, now } = input.basics
+  const { session, places, log, now } = input.basics
   // gather
   const stored: string[] = []
   for await (const id of input.store.listDocIds(MOVES_DOC_PREFIX))
@@ -129,8 +129,8 @@ export async function sweepHistories(input: {
   // plan
   const retired = planHistorySweep({
     stored,
-    tasks: new Set(readTasks(session).keys()),
-    archived: readArchived(session),
+    tasks: readTasks(places),
+    archived: readArchived(session, places),
     now: now(),
     startup: input.startup,
   })
@@ -153,7 +153,7 @@ export async function sweepHolds(input: {
   const { session, places, log } = input.basics
   // gather
   const cards = readPlaces(places)
-  const archived = readArchived(session)
+  const archived = readArchived(session, places)
   // plan
   const swept = planHoldSweep({
     holds: readQueueHolds(session),

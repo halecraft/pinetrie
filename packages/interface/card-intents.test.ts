@@ -243,6 +243,7 @@ const ofEveryKind = (): readonly CardRecord[] => {
     composing: atEnd,
     note,
     canvas: { kind: "canvas", task: TEST_TASK, order: "a", width: 1 },
+    board: { kind: "board", state: workflowStateIdFor("open"), order: "a" },
     queued: {
       kind: "queued",
       thread: TEST_THREAD,
@@ -850,6 +851,20 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
         fromQueue: false,
       },
     })
+  })
+
+  test("a task's card back on the board: the board, open (ADR-0126)", () => {
+    expect(
+      answered({
+        kind: "undone",
+        cards: [
+          {
+            card: TEST_TASK,
+            place: { kind: "board", state: workflowStateIdFor("open") },
+          },
+        ],
+      }),
+    ).toEqual([{ kind: "layout", action: { kind: "board", open: true } }])
   })
 
   test("nothing to undo: nothing", () => {

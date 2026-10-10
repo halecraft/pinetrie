@@ -67,6 +67,8 @@ const StoredCard = Type.Object({
   task: Type.Optional(Type.String()),
   /** A canvas card's width; absent before tasks. */
   width: Type.Optional(Type.String()),
+  /** A task's card's workflow state; absent before tasks were cards. */
+  state: Type.Optional(Type.String()),
   /** A reference's address, printed (ADR-0126); absent before references. */
   address: Type.Optional(Type.String()),
   /** A reference's quote's blob; absent before references. */
@@ -93,6 +95,7 @@ interface StoredCardFields {
   readonly holder: string
   readonly task: string
   readonly width: string
+  readonly state: string
   readonly address: string
   readonly quote: string
   readonly origin: string
@@ -163,6 +166,7 @@ export const CARD_CODEC: { readonly [K in PlacedKind]: ContentCodec<K> } = {
     },
   },
   thread: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
+  task: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
   "note-column": { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
   fact: {
     columns: ["fact"],
@@ -268,6 +272,8 @@ export const decodeCard = (
         return decodeOfKind(of.kind, of.id, row, place, fields)
       case "thread":
         return decodeOfKind(of.kind, of.id, row, place, fields)
+      case "task":
+        return decodeOfKind(of.kind, of.id, row, place, fields)
       case "note-column":
         return decodeOfKind(of.kind, of.id, row, place, fields)
       case "fact":
@@ -279,6 +285,8 @@ export const decodeCard = (
       case "media":
       case "file":
         return undefined
+      default:
+        return of satisfies never
     }
   })
 

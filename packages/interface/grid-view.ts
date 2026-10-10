@@ -3,22 +3,16 @@
 // (core's `grid.ts`). Pure: `inventoryView` builds one,
 // and `CardGrid` (`packages/web/card-grid.tsx`) draws it.
 
-import type {
-  CardId,
-  CardRecord,
-  Grid,
-  NoteColumnId,
-  ThreadId,
-} from "@pinetrie/core"
+import type { CardId, Grid, NoteColumnId, ThreadId } from "@pinetrie/core"
 import type { CardTone } from "./card-frame.ts"
-import { type Face, faceOf } from "./face.ts"
+import { type DrawnCard, type Face, faceOf } from "./face.ts"
 import type { NoteColumnView } from "./note-column-view.ts"
 import type { ThreadFace } from "./thread-face.ts"
 
 export interface GridCell {
   readonly index: number
   /** Its card, and the card at its least detail (`faceOf`); null for an empty cell. */
-  readonly card: CardRecord | null
+  readonly card: DrawnCard | null
   readonly face: Face | null
   readonly selected: boolean
 }
@@ -29,7 +23,7 @@ export interface GridView {
   readonly cells: readonly GridCell[]
   readonly selected: number
   /** The selected cell's card; null when it is empty. */
-  readonly card: CardRecord | null
+  readonly card: DrawnCard | null
 }
 
 /**
@@ -41,7 +35,7 @@ const NONE: ReadonlyMap<never, never> = new Map<never, never>()
 export function gridView(input: {
   readonly grid: Grid
   readonly tone: CardTone
-  readonly placed: ReadonlyMap<number, CardRecord>
+  readonly placed: ReadonlyMap<number, DrawnCard>
   readonly selected: number
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>

@@ -1149,7 +1149,9 @@ has one row per drawn kind with three components (`Face`, `Normal`,
 DrawnKind]: Renderings<K> }`: a kind added to `CardRecord` does not
 compile until it draws all three (`renderings.test.ts` proves it with
 `@ts-expect-error`). `DrawFace` and `DrawCard` pick the row by the card's
-kind, in a switch that is total too.
+kind, in a switch that is total too. A task's card is no `DrawnCard`: the
+board draws it (`boardView`), and an inventory never holds one
+(`heldBy`).
 
 - **The rows wrap what exists.** A text card's face is `TextFaceView`, its
   normal its text through `MessageText`, read only and bounded at a

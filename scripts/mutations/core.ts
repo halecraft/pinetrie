@@ -1085,4 +1085,12 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a comment in an entry's margin round-trips, its entry in `at` and its thread in `lane`; it needs both and its order, and its key keeps both (ADR-0126)",
   },
+  {
+    name: "a task's id parses as no card",
+    file: "packages/core/ids.ts",
+    from: "  if (isTaskId(id)) return id\n",
+    to: "",
+    command: unit,
+    expect: "a card's kind is its id's prefix",
+  },
 ]

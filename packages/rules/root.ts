@@ -11,28 +11,22 @@ import {
   type ThreadId,
   type ThreadRecord,
   type ValueWrite,
+  type WriterId,
 } from "@pinetrie/core"
-import { BOARD } from "./board.ts"
+import { isBoardCard } from "./board.ts"
 import { MARK } from "./mark.ts"
 import type { PlaceStep } from "./moves.ts"
 import { deleteRecord } from "./records.ts"
 import { ROOT } from "./roots.ts"
-import { rootOfPlace, TASK } from "./task.ts"
+import { rootOfPlace } from "./task.ts"
 import { THREAD } from "./thread.ts"
-
-/** A task deleted (ADR-0116): its record, its board place and its title. */
-export const planTaskDelete = (task: TaskId): readonly ValueWrite[] => [
-  deleteRecord(TASK, task),
-  deleteRecord(BOARD, task),
-  deleteRecord(MARK, task),
-]
 
 /**
  * The tasks a step leaves empty that were a new tab's (ADR-0126): a thread
  * card that left `task`'s canvas for a trash, its thread a new root's not
  * yet started (its root one the directory does not name, `started`), and
  * nothing left on that canvas or pinned to the task. Closing an unsent new
- * tab deletes its task (`planTaskDelete`), not undone. Pure.
+ * tab sends its task's card to the trash too (`planTasksTrashed`). Pure.
  */
 export function emptiedTasks(input: {
   readonly before: readonly CardRecord[]
@@ -63,11 +57,38 @@ export function emptiedTasks(input: {
   return out
 }
 
+/**
+ * Each of `tasks`' cards from the board to `closer`'s trash (ADR-0126),
+ * remembering the task, whose closer placed it there: written in the
+ * close's step, so the undo key brings the task back with its thread. A
+ * task with no card on the board is left. Pure.
+ */
+export function planTasksTrashed(
+  cards: readonly CardRecord[],
+  tasks: readonly TaskId[],
+  closer: WriterId,
+): readonly PlaceStep[] {
+  return cards.flatMap((c): PlaceStep[] =>
+    isBoardCard(c) && tasks.includes(c.id)
+      ? [
+          {
+            kind: "write",
+            record: {
+              ...c,
+              place: { kind: "trash", holder: closer, task: c.id },
+              placer: closer,
+            },
+          },
+        ]
+      : [],
+  )
+}
+
 /** What deleting a root writes, and what it lets go. */
 export interface RootDelete {
-  /** Its directory record, its thread's, and its task's record, board place and title. */
+  /** Its directory record, its thread's, and its task's title. */
   readonly values: readonly ValueWrite[]
-  /** Every card still in it, a new tab's, say, and its task's canvas. */
+  /** Every card still in it, a new tab's, say, its task's canvas and the task's card. */
   readonly cards: readonly PlaceStep[]
   /** Its document, destroyed: its tree, and the records kept in it. */
   readonly doc: string
@@ -77,7 +98,8 @@ export interface RootDelete {
 
 /**
  * Delete `root`, its one thread, and the task it was spun into: their
- * records, the board place, the document and every card in either. Pure.
+ * records, the task's title, the document and every card in either, the
+ * task's own included. Pure.
  */
 export function planRootDelete(
   root: RootId,
@@ -90,11 +112,12 @@ export function planRootDelete(
     values: [
       deleteRecord(ROOT, root),
       deleteRecord(THREAD, thread),
-      ...planTaskDelete(task),
+      deleteRecord(MARK, task),
     ],
     cards: cards
       .filter(
         c =>
+          c.id === task ||
           rootOfPlace(c.place, rootOfThread) === root ||
           (c.place.kind === "canvas" && c.place.task === task),
       )

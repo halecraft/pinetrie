@@ -8,7 +8,8 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import { BOARD, setRecord, WORKFLOW } from "@pinetrie/rules"
+import { readPlaces } from "@pinetrie/reads"
+import { setRecord, WORKFLOW } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
@@ -25,6 +26,7 @@ import {
   writesOf,
 } from "../fakes.ts"
 import { type BoardDeps, handleTaskMove, handleWorkflow } from "./board.ts"
+import { settled } from "./cards.ts"
 
 /** The task's one thread. */
 const THREAD_1 = threadIdFor("0123456789abcdef")
@@ -42,22 +44,15 @@ function setUp() {
   const root = entryId("e-1")
   writeEntry(b.root, row(root, null))
   writeDirectory(b)
-  putTask(b, THREAD_1)
+  putTask(b, THREAD_1, TASK_ID, undefined, DOING)
   putValue(b, setRecord(WORKFLOW, WORKFLOW_NOW))
-  putValue(
-    b,
-    setRecord(BOARD, {
-      task: TASK_ID,
-      state: DOING,
-      rank: "a",
-      by: ADA,
-      at: 0,
-    }),
-  )
   const records = record<BoardDeps["records"]>({ writeValues: async () => {} })
   const work = record<BoardDeps["work"]>({
     repo: null,
     teardown: async () => {},
+  })
+  const moves = record<BoardDeps["moves"]>({
+    placeTask: async () => settled({ kind: "moved" }, 1),
   })
   const deps: BoardDeps = {
     basics: b,
@@ -65,8 +60,9 @@ function setUp() {
     work: work.port,
     keeper: createKeeper(),
     cards: NO_BLANK_CARDS,
+    moves: moves.port,
   }
-  return { b, root, records, work, deps }
+  return { b, root, records, work, moves, deps }
 }
 
 const toDone = {
@@ -78,28 +74,57 @@ const toDone = {
 } as const
 
 test("a task an agent of its threads works in is not archived, and nothing is written", async () => {
-  const { b, root, records, deps } = setUp()
+  const { b, root, records, moves, deps } = setUp()
   const lane = THREAD_1
   putLane(b, lane, root)
   writeLaneTip(b.root, lane, root)
   beginRun(b.live, lane, runId("r-1"))
   const out = await handleTaskMove(deps, ADA, toDone)
-  expect(out).toMatchObject({ kind: "refused", code: ERR.TASK_BUSY })
+  expect(out.outcome).toMatchObject({ kind: "refused", code: ERR.TASK_BUSY })
   expect(records.calls).toEqual([])
+  expect(moves.calls).toEqual([])
 })
 
-test("an idle task moved to Done: its place written, then torn down and unloaded", async () => {
-  const { records, work, deps } = setUp()
+test("an idle task moved to Done: its card's move written, then torn down and unloaded (ADR-0126)", async () => {
+  const { moves, work, deps } = setUp()
   const out = await handleTaskMove(deps, ADA, toDone)
-  expect(out).toEqual({ kind: "moved-task" })
-  expect(writesOf(records.calls)).toMatchObject([
-    { namespace: "pinetrie.board", key: TASK_ID, value: { state: DONE } },
+  expect(out.outcome).toEqual({ kind: "moved" })
+  expect(moves.calls).toMatchObject([
+    {
+      method: "placeTask",
+      args: [
+        ADA,
+        {
+          kind: "move",
+          transition: "archive",
+          steps: [
+            {
+              record: {
+                id: TASK_ID,
+                place: { kind: "board", state: DONE },
+              },
+            },
+          ],
+        },
+      ],
+    },
   ])
   expect(methods(work.calls)).toEqual(["teardown"])
 })
 
-test("a move within open states writes only the place, and opens no root", async () => {
-  const { b, records, work, deps } = setUp()
+test("a move from a state the task has left is refused `moved`, saying where it is and who put it there", async () => {
+  const { moves, deps } = setUp()
+  const out = await handleTaskMove(deps, ADA, { ...toDone, from: DONE })
+  expect(out.outcome).toMatchObject({
+    kind: "unmoved",
+    code: "moved",
+    place: { kind: "board", state: DOING },
+  })
+  expect(moves.calls).toEqual([])
+})
+
+test("a move within open states writes only its card, and opens no root", async () => {
+  const { b, moves, work, deps } = setUp()
   const review = workflowStateIdFor("r")
   putValue(
     b,
@@ -109,9 +134,10 @@ test("a move within open states writes only the place, and opens no root", async
     }),
   )
   const out = await handleTaskMove(deps, ADA, { ...toDone, to: review })
-  expect(out).toEqual({ kind: "moved-task" })
-  expect(writesOf(records.calls)).toHaveLength(1)
+  expect(out.outcome).toEqual({ kind: "moved" })
+  expect(methods(moves.calls)).toEqual(["placeTask"])
   expect(work.calls).toEqual([])
+  expect(readPlaces(b.places).some(c => c.id === TASK_ID)).toBe(true)
 })
 
 test("a workflow edit writes the workflow; a refusal writes nothing", async () => {

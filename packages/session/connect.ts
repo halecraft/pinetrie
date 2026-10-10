@@ -472,9 +472,10 @@ export async function connectSession(
       : null,
   )
   const open = openThreads(exchange, me, host.peerId, () => {
-    const archived = readArchived(session)
+    const archived = readArchived(session, places)
     return new Set(archived.keys())
   })
+  // The archive is read from both: the board's cards and their histories.
   const unsubscribeSession = subscribe(session, () => open.repair())
   const step = (event: LocalEvent) => {
     local.set(localStep(local.current(), event, me))
@@ -514,6 +515,7 @@ export async function connectSession(
       rev: readPlacesRev(places),
     })
     texts.sweep()
+    open.repair()
   })
   // A client does not reconnect: once the host has gone, nothing this tab
   // sent or sends will be answered. The moves the host accepted are dropped

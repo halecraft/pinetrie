@@ -416,7 +416,7 @@ export async function startHost({
     rootsHeld(
       readPlaces(places),
       threadsNow,
-      new Set(readArchived(session).keys()),
+      new Set(readArchived(session, places).keys()),
       new Set(readRoots(session).keys()),
     ),
   )

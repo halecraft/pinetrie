@@ -28,6 +28,7 @@ import {
   type MoveHistoryScope,
   moveOf,
   type NoteColumnId,
+  PERSON_HISTORY,
   type QueueHoldChange,
   type QueueMove,
   type Reorder,
@@ -44,7 +45,6 @@ import {
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
-  readBoardPlaces,
   readCardHistories,
   readLaneRecords,
   readLanes,
@@ -59,10 +59,12 @@ import {
 } from "@pinetrie/reads"
 import {
   afterSteps,
+  type BoardMove,
   type Cause,
   type CopyPlan,
   type CopyThread,
   cardsOfParts,
+  crossesArchive,
   emptiedTasks,
   historyOf,
   type LiftPlan,
@@ -85,7 +87,7 @@ import {
   planRootDelete,
   planSetCommand,
   planSpinOff,
-  planTaskDelete,
+  planTasksTrashed,
   planUnqueueAll,
   planWidth,
   type ReorderStep,
@@ -149,6 +151,9 @@ const writersOf = (index: TreeIndex): readonly (WriterId | null)[] =>
   Object.values(index.entries)
     .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .map(e => e.message?.writer ?? null)
+
+/** The card commands (`createCardCommands`). */
+export type CardCommands = ReturnType<typeof createCardCommands>
 
 export function createCardCommands(deps: CardCommandDeps) {
   const { docs, live, places, session } = deps.basics
@@ -218,19 +223,15 @@ export function createCardCommands(deps: CardCommandDeps) {
   }
 
   /**
-   * What an undo of `writer`'s newest step in `scope` does to the threads
-   * its cards were spun into (S139): the cards its step moves, read before
-   * it is tried, and each thread whose record says it was spun from one of
-   * them, as its tree is now.
+   * What an undo of a step does to the threads its cards were spun into
+   * (S139): `lifting`, the cards its step moves, read before it is tried,
+   * and each thread whose record says it was spun from one of them, as its
+   * tree is now.
    */
   async function liftOf(
-    writer: WriterId,
-    scope: MoveHistoryScope,
+    lifting: readonly CardId[],
     tasks: TaskIndex,
   ): Promise<LiftPlan> {
-    const top = await deps.histories.top(writer, scope, "undo")
-    const lifting =
-      top === undefined ? [] : cardsOfParts(top.parts, PLACES_DOC_ID)
     const known = readRoots(session)
     const spun: SpunThread[] = []
     for (const [thread, record] of readThreads(session)) {
@@ -306,17 +307,15 @@ export function createCardCommands(deps: CardCommandDeps) {
     here: TaskId | null,
     tasks: TaskIndex,
   ): Promise<Settled> {
-    // gather: the history's stack, loaded before the places are read. One
-    // `Discards` names both the history and a discard's gone place.
+    // gather. One `Discards` names both the history and a discard's
+    // trash place.
     const discards = { tasks, here }
-    const scope = historyOf(moves, readPlaces(places), discards)
-    const gesture =
-      scope === null ? undefined : await deps.histories.gestureOf(writer, scope)
     const entryThreads = await marginEntryThreads(moves)
+    const cards = readPlaces(places)
     // plan: each move to a thread's notes to its nearest note column, made
     // first where its task has none, then the moves
-    const { step, drain } = planMoveRequest(
-      readPlaces(places),
+    const planned = planMoveRequest(
+      cards,
       moves,
       writer,
       running,
@@ -324,20 +323,36 @@ export function createCardCommands(deps: CardCommandDeps) {
       newColumn,
       entryThreads,
     )
+    // A new tab closed before its first send leaves its task empty: its
+    // card goes to the closer's trash in the same step (ADR-0126), which is
+    // in their history outside any task, since the task leaves their view.
+    const emptied =
+      planned.step.kind === "steps"
+        ? emptiedTasks({
+            before: cards,
+            after: afterSteps(cards, planned.step.steps),
+            threads: readThreads(session),
+            started: new Set(readRoots(session).keys()),
+          })
+        : []
+    const step: MovesStep =
+      planned.step.kind === "steps" && emptied.length > 0
+        ? {
+            kind: "steps",
+            steps: [
+              ...planned.step.steps,
+              ...planTasksTrashed(cards, emptied, writer),
+            ],
+          }
+        : planned.step
+    const scope =
+      emptied.length > 0 ? PERSON_HISTORY : historyOf(moves, cards, discards)
+    // gather the history's stack: nothing writes the places while it loads,
+    // on the keeper
+    const gesture =
+      scope === null ? undefined : await deps.histories.gestureOf(writer, scope)
     // execute
-    const before = readPlaces(places)
-    const done = await carry(step, drain, { kind: "move", by: writer }, gesture)
-    // A new tab closed before its first send leaves its task empty: it goes
-    // (ADR-0126), not undone.
-    const emptied = emptiedTasks({
-      before,
-      after: readPlaces(places),
-      threads: readThreads(session),
-      started: new Set(readRoots(session).keys()),
-    })
-    if (emptied.length > 0)
-      await deps.records.writeValues(emptied.flatMap(planTaskDelete))
-    return done
+    return carry(step, planned.drain, { kind: "move", by: writer }, gesture)
   }
 
   /**
@@ -453,10 +468,23 @@ export function createCardCommands(deps: CardCommandDeps) {
       direction: MoveDirection,
       tasks: TaskIndex,
     ): Promise<Settled> {
-      // gather and plan: an undo that lifts a thread back into its card
-      // happens only while the thread holds its first message alone
-      const lift =
-        direction === "undo" ? await liftOf(writer, scope, tasks) : NO_LIFT
+      // gather and plan: no undo crosses the archive's edge, and one that
+      // lifts a thread back into its card happens only while the thread
+      // holds its first message alone
+      const top = await deps.histories.top(writer, scope, direction)
+      const touched =
+        top === undefined ? [] : cardsOfParts(top.parts, PLACES_DOC_ID)
+      if (
+        crossesArchive(
+          touched,
+          readCardHistories(session),
+          readWorkflow(session),
+        )
+      ) {
+        const card = readPlaces(places).find(c => c.id === touched[0]) ?? null
+        return unmoved({ kind: "refused", code: "archived", now: card })
+      }
+      const lift = direction === "undo" ? await liftOf(touched, tasks) : NO_LIFT
       if (lift.kind === "replied") return notLifted(lift.by)
       // execute
       const before = deps.provenance.before()
@@ -519,7 +547,6 @@ export function createCardCommands(deps: CardCommandDeps) {
         opens: {
           state: request.state,
           workflow: readWorkflow(session),
-          board: readBoardPlaces(session),
         },
         now: deps.basics.now(),
       })
@@ -578,6 +605,28 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
+     * A task's card moved on the board (`planBoardMove`'s writes): between
+     * states, one step of its sender's history outside any task (ADR-0126);
+     * within one, a reorder, in none. Its card's history and traces are
+     * written as any move's.
+     */
+    async placeTask(
+      writer: WriterId,
+      move: Extract<BoardMove, { kind: "move" | "reorder" }>,
+    ): Promise<Settled> {
+      const gesture =
+        move.kind === "move"
+          ? await deps.histories.gestureOf(writer, PERSON_HISTORY)
+          : undefined
+      return carry(
+        { kind: "steps", steps: move.steps },
+        [],
+        { kind: "move", by: writer },
+        gesture,
+      )
+    },
+
+    /**
      * A thread opened as its column opens (ADR-0126), in one step of the
      * keeper: planned (`planOpenThread`) from its root's tree for a branch,
      * then its record (and a new tab's task's), its card on its task's
@@ -595,10 +644,9 @@ export function createCardCommands(deps: CardCommandDeps) {
         cards: readPlaces(places),
         threads: readThreads(session),
         roots: new Set(readRoots(session).keys()),
-        tasks: new Set(readTasks(session).keys()),
+        tasks: readTasks(places),
         index,
         workflow: readWorkflow(session),
-        board: readBoardPlaces(session),
         now: deps.basics.now(),
       })
       if (plan.kind === "refused") return settled(openRefusal(plan.why))

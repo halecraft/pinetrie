@@ -10,7 +10,7 @@ What the session document says, read once, by the host and the client alike.
   record as the host writes it.
 - **The session's reads take its `SessionDocHandle`**: every record read
   across roots (`readLaneRecords`, `readNames`, `readOffers`, `readWorkflow`,
-  `readBoardPlaces`, `readArchived`, `readMarks` and `readTasks`, each by
+  `readArchived` (with the places, ADR-0126) and `readMarks`, each by
   task (ADR-0116), `readThreads`,
   `readRoots`, the singletons…), `readRunningLanes` with `pinetrie:live`, and
   `readReferencedBlobs`, which takes each root's images from its directory
@@ -42,10 +42,11 @@ behind it, `promptAuthor`, ADR-0080),
 `readParticipantNames`, `readParticipantPictures` (ADR-0098), `readParticipants`, `readReading`, `readTyping`,
 `readTypingIn` and `readQueueHolds` (ADR-0048 step 7), `readAgentActivity`,
 `readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059), `readWorkflow`,
-`readBoardPlaces` and `readArchived` (the board, ADR-0122: the tasks in the
-archive, derived and kept while the same, since every write to the
-session's values wakes it), `readMarks` (each task's title, ADR-0045,
-ADR-0116), `readTasks`, `readReadingTasks` (each followed end's task, from
+`readTasks` (the tasks whose card is on the board, from the places,
+ADR-0126) and `readArchived` (the board, ADR-0122: the tasks in the
+archive, from the board's cards and their histories, derived and kept
+while the same, since every write to the session's values wakes it),
+`readMarks` (each task's title, ADR-0045, ADR-0116), `readReadingTasks` (each followed end's task, from
 presence), `readDigests` (ADR-0106), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (the project's root, written only by a host with tools).

@@ -3,12 +3,14 @@
 
 import {
   type ArchivedTask,
+  type CardHistoryRecord,
   type CardId,
   type CardPlace,
   type CardRecord,
   historyScope,
   isNoteColumnId,
   keyOf,
+  kindOfCard,
   type Move,
   type MoveHistoryScope,
   type MoveTarget,
@@ -16,7 +18,9 @@ import {
   type PlaceKey,
   parseCardId,
   type TaskId,
+  type Workflow,
 } from "@pinetrie/core"
+import { transitionOf } from "./board.ts"
 import { type Discards, discardHistory, type MoveStep } from "./moves.ts"
 import { taskOfTarget } from "./task.ts"
 
@@ -88,6 +92,30 @@ export function planHistorySweep(input: {
     const archived = input.archived.get(task)
     return (
       archived !== undefined && input.now - archived.at >= ARCHIVED_HISTORY_MS
+    )
+  })
+}
+
+/**
+ * Whether an undo or a redo of a step that wrote `cards` would move a
+ * task's card across the archive's edge (ADR-0126): the newest event of a
+ * task's card among them, the step's own while nobody moved it since, went
+ * into or out of the archive. Such an undo is refused `archived`: the
+ * board's move gathers what crossing the edge needs. Pure.
+ */
+export function crossesArchive(
+  cards: readonly CardId[],
+  histories: ReadonlyMap<CardId, CardHistoryRecord>,
+  workflow: Workflow | null,
+): boolean {
+  if (workflow === null) return false
+  return cards.some(card => {
+    if (kindOfCard(card) !== "task") return false
+    const last = histories.get(card)?.events.at(-1)
+    return (
+      last?.from?.kind === "board" &&
+      last.to.kind === "board" &&
+      transitionOf(workflow, last.from.state, last.to.state) !== "within"
     )
   })
 }

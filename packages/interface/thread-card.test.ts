@@ -5,6 +5,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { taskCard } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { boardView } from "./board-view.ts"
 import { tree } from "./fixtures.ts"
@@ -105,7 +106,7 @@ describe("threadCardHead (ADR-0111, ADR-0116)", () => {
     })
     const board = boardView({
       workflow: WORKFLOW,
-      places: new Map(),
+      cards: [taskCard(K1, "a", DOING)],
       summaries: new Map([[K1, { line: "", writers: [], newest: R1 }]]),
       heads,
       search: null,

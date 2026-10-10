@@ -5,7 +5,6 @@
 // Pure.
 
 import {
-  type BoardPlace,
   type CardRecord,
   type Intent,
   type MoveRefusal,
@@ -55,7 +54,6 @@ export function planOpenThread(input: {
   /** A branch's root's tree; null for a new tab's. */
   readonly index: TreeIndex | null
   readonly workflow: Workflow | null
-  readonly board: ReadonlyMap<TaskId, BoardPlace>
   readonly now: number
 }): OpenPlan {
   const { open, index } = input
@@ -79,11 +77,7 @@ export function planOpenThread(input: {
       ...base,
       origin: { kind: "root" },
       placement: { kind: "after", task: open.task, parent: null },
-      opens: {
-        state: open.state,
-        workflow: input.workflow,
-        board: input.board,
-      },
+      opens: { state: open.state, workflow: input.workflow },
     })
     return opened.kind === "open" ? opened : refusedBy(opened.code)
   }

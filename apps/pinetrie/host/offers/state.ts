@@ -107,7 +107,10 @@ export function createOfferDeps(input: {
         session: doc,
       }).taskOfThread.get(lane)
       return (
-        archivedIn(task === undefined ? [] : [task], readArchived(doc)) !== null
+        archivedIn(
+          task === undefined ? [] : [task],
+          readArchived(doc, basics.places),
+        ) !== null
       )
     },
     input: lane => ({

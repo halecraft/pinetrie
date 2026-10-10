@@ -1,6 +1,5 @@
 import {
   entryId,
-  type Reorder,
   taskIdFor,
   type Workflow,
   workflowStateIdFor,
@@ -112,7 +111,7 @@ describe("taskColumnView (ADR-0116)", () => {
   })
 })
 
-test("a strip's task column is first, folded by default, and no card (ADR-0116)", () => {
+test("a strip's task column is first, folded by default, and no card's column (ADR-0116)", () => {
   const strip = stripOf(K, defaultView(null), [])
   expect(strip[0]).toEqual({ kind: "task", task: K, folded: true })
   const card = {
@@ -125,12 +124,5 @@ test("a strip's task column is first, folded by default, and no card (ADR-0116)"
   const cardFirst: Strip = [card]
   // @ts-expect-error: and the task column is never among the cards
   const taskAmong: readonly CardColumn[] = [strip[0]]
-  const moved: Reorder = {
-    // @ts-expect-error: nor does a reorder name it, which has no card's id
-    card: K,
-    at: { kind: "canvas", task: K },
-    after: null,
-    before: null,
-  }
-  expect([cardFirst, taskAmong, moved]).toHaveLength(3)
+  expect([cardFirst, taskAmong]).toHaveLength(2)
 })

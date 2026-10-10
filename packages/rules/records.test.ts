@@ -23,7 +23,6 @@ import {
   ACCEPTED,
   BANNER,
   BASE,
-  BOARD,
   byTarget,
   CARD_HISTORY,
   COMMANDS,
@@ -46,7 +45,6 @@ import {
   SEAT,
   setIfChanged,
   setRecord,
-  TASK,
   TRACE,
   VERDICT,
   WORKFLOW,
@@ -130,24 +128,11 @@ const SAMPLES: readonly Sample[] = [
     null,
   ),
   sample(
-    "board",
-    BOARD,
-    {
-      task: TEST_TASK,
-      state: workflowStateIdFor("1"),
-      rank: "0a",
-      by: ADA,
-      at: 1,
-    },
-    "task",
-  ),
-  sample(
     "mark",
     MARK,
     { task: TEST_TASK, title: "Plans", by: ADA, at: 1 },
     "task",
   ),
-  sample("task", TASK, { task: TEST_TASK, by: ADA, createdAt: 1 }, "task"),
   sample(
     "digest",
     DIGEST,
@@ -386,9 +371,7 @@ test("each record lives where it is read (ADR-0063): across roots in the session
   )
   expect(homes).toEqual({
     workflow: "session",
-    board: "session",
     mark: "session",
-    task: "session",
     digest: "root",
     seat: "session",
     participant: "session",

@@ -32,7 +32,7 @@ export async function handleMark(
     title: intent.title,
     by: writer,
     now: now(),
-    tasks: new Set(readTasks(session).keys()),
+    tasks: readTasks(places),
     marks: readMarks(session),
     columns: new Set(
       readPlaces(places).flatMap(c =>

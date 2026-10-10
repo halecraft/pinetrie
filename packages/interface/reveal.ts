@@ -12,6 +12,7 @@ import {
   changeViewOf,
   type Effect,
   type IntentState,
+  layout,
   planOpenAt,
   showTask,
 } from "./effects.ts"
@@ -24,7 +25,7 @@ const at = (key: string): ActedAt => ({ kind: "column", key })
  * inventory's panel; a thread's end, or a comment's entry, as `openAt`
  * shows an entry; a note
  * column, unfolded; your message at a thread not yet started, its card,
- * unfolded in its task. A queued `card` is scrolled to in its column's
+ * unfolded in its task; a task's card, the board. A queued `card` is scrolled to in its column's
  * dock, which scrolls apart from the thread (ADR-0113).
  */
 export function revealOf(
@@ -80,6 +81,12 @@ export function revealOf(
           changeViewOf(state, place.task, { kind: "foldTask", unfolded: true }),
         ],
         actedAt: at(place.task),
+      }
+    // A task's card on the board: the board, open (ADR-0126).
+    case "board":
+      return {
+        effects: [layout({ kind: "board", open: true })],
+        actedAt: AT_INVENTORY,
       }
     // Discarded: drawn nowhere, so nothing comes into view.
     case "trash":

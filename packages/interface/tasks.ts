@@ -9,7 +9,12 @@ import type {
   ThreadId,
   ThreadRecord,
 } from "@pinetrie/core"
-import { indexTasks, NO_TASK_INDEX, type TaskIndex } from "@pinetrie/rules"
+import {
+  boardTasks,
+  indexTasks,
+  NO_TASK_INDEX,
+  type TaskIndex,
+} from "@pinetrie/rules"
 
 /** One task, as the page reads it. */
 export interface TaskThreads {
@@ -29,17 +34,16 @@ export interface Tasks {
 export const NO_TASKS: Tasks = { index: NO_TASK_INDEX, byId: new Map() }
 
 /**
- * Every task in `known` (the session's task records), its canvas read from
- * `cards`, and each thread's root from its record. Pure.
+ * Every task whose card is on the board (`boardTasks`), its canvas read
+ * from `cards`, and each thread's root from its record. Pure.
  */
 export function tasksOf(input: {
-  readonly known: Iterable<TaskId>
   readonly cards: readonly CardRecord[]
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
 }): Tasks {
   const index = indexTasks(input.cards, input.threads)
   const byId = new Map<TaskId, TaskThreads>()
-  for (const task of [...input.known].sort())
+  for (const task of [...boardTasks(input.cards)].sort())
     byId.set(task, {
       task,
       threads: index.threadsOf.get(task) ?? [],

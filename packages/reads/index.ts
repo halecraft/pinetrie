@@ -25,7 +25,6 @@ import {
   ancestry,
   type BannerRecord,
   type BaseRecord,
-  type BoardPlace,
   type CardHistoryRecord,
   type CardId,
   type CardRecord,
@@ -61,7 +60,6 @@ import {
   type SnapshotId,
   summarizeRoots,
   type TaskId,
-  type TaskRecord,
   type ThreadId,
   type ThreadLane,
   type ThreadName,
@@ -79,9 +77,9 @@ import {
   archivedOf,
   BANNER,
   BASE,
-  BOARD,
   BUDGET,
   type BudgetRecord,
+  boardTasks,
   CARD_HISTORY,
   COMMANDS,
   COMMANDS_KEY,
@@ -112,7 +110,6 @@ import {
   recordsIn,
   renderableMessage,
   SEAT,
-  TASK,
   THREAD,
   TRACE,
   threadNameOf,
@@ -425,18 +422,18 @@ export function readRunningLanes(
 }
 
 /**
- * `read`, returning its last result for a document while a new one is
- * `same`. Kyneta gives a record a new identity on every write, the same
+ * `read`, returning its last result for a document (its first argument)
+ * while a new one is `same`. Kyneta gives a record a new identity on every write, the same
  * value written again included, and a memo or `React.memo` keyed on a read
  * skips only while the read keeps its identity (S59).
  */
-function keptWhileSame<D extends object, T>(
-  read: (doc: D) => T,
+function keptWhileSame<D extends object, T, R extends readonly unknown[] = []>(
+  read: (doc: D, ...rest: R) => T,
   same: (a: T, b: T) => boolean,
-): (doc: D) => T {
+): (doc: D, ...rest: R) => T {
   const last = new WeakMap<D, T>()
-  return doc => {
-    const now = read(doc)
+  return (doc, ...rest) => {
+    const now = read(doc, ...rest)
     const before = last.get(doc)
     if (before !== undefined && same(before, now)) return before
     last.set(doc, now)
@@ -640,28 +637,26 @@ export const readPlacesRev = (places: PlacesDocHandle): number => places.rev()
 export const readWorkflow = (doc: SessionDocHandle): Workflow | null =>
   readRecords(doc, WORKFLOW).get(WORKFLOW_KEY) ?? null
 
-/** Each task's place on the board (`pinetrie.board`, ADR-0122), by its id. */
-export const readBoardPlaces = (
-  doc: SessionDocHandle,
-): ReadonlyMap<TaskId, BoardPlace> => readRecords(doc, BOARD)
-
-/** Every task (`pinetrie.task`, ADR-0116), by its id. */
-export const readTasks = (
-  doc: SessionDocHandle,
-): ReadonlyMap<TaskId, TaskRecord> => readRecords(doc, TASK)
+/** Every task the session holds: each one whose card is on the board (ADR-0126). */
+export const readTasks = (places: PlacesDocHandle): ReadonlySet<TaskId> =>
+  boardTasks(readPlaces(places))
 
 /**
- * The tasks in the archive, archived (ADR-0029, ADR-0122), by
- * id; none before a host wrote the workflow. The same map while the same
- * tasks are archived by the same writers at the same times: every write to
- * the session's values wakes it, the directory's included.
+ * The tasks in the archive, archived (ADR-0029, ADR-0122), by id, from the
+ * board's cards and their histories (`archivedOf`); none before a host
+ * wrote the workflow. The same map while the same tasks are archived by the
+ * same writers at the same times: every write to the session's values
+ * wakes it, the directory's included.
  */
 export const readArchived = keptWhileSame(
-  (doc: SessionDocHandle): ReadonlyMap<TaskId, ArchivedTask> => {
+  (
+    doc: SessionDocHandle,
+    places: PlacesDocHandle,
+  ): ReadonlyMap<TaskId, ArchivedTask> => {
     const workflow = readWorkflow(doc)
     return workflow === null
       ? new Map()
-      : archivedOf(workflow, readBoardPlaces(doc))
+      : archivedOf(workflow, readPlaces(places), readCardHistories(doc))
   },
   (a, b) =>
     a.size === b.size &&

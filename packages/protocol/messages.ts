@@ -50,9 +50,11 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     it (`release`), ADR-0048 step 7.
  *   - `unqueue-all` takes every message card queued on that thread back
  *     below the line.
- *   - `move-task` moves the root `root` on the board (ADR-0122): `text` is
- *     JSON `{ from, to, before }`, the state its sender saw it in, the state
- *     it goes to, and the root it goes before there, or null for the end.
+ *   - `move-task` moves the task `task`'s card on the board (ADR-0122,
+ *     ADR-0126): `text` is JSON `{ from, to, before }`, the state its
+ *     sender saw it in, the state it goes to, and the task it goes before
+ *     there, or null for the end. Answered `moved`, or `unmoved` as a
+ *     card's move is.
  *   - `workflow` changes the board's states (ADR-0122): `mode` names the
  *     action (`add`, `rename`, `move`, `remove`), `targetId` the state (`""`
  *     to add), `text` its name, and `parentId` the state it goes before
@@ -239,7 +241,6 @@ export const OUTCOME_KINDS = [
   "reserved",
   "pictured",
   "stopped",
-  "moved-task",
   "workflow-changed",
   "marked",
   "retitling",

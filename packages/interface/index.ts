@@ -233,6 +233,7 @@ export {
   cardOfFace,
   DETAIL_ON,
   type Detail,
+  type DrawnCard,
   type DrawnKind,
   detailOf,
   type Face,

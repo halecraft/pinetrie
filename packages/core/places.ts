@@ -23,6 +23,7 @@ import {
   isNoteColumnId,
   isTaskId,
   isThreadId,
+  isWorkflowStateId,
   kindOfCard,
   type MediaId,
   type NoteColumnId,
@@ -31,6 +32,7 @@ import {
   type TaskId,
   type TextCardId,
   type ThreadId,
+  type WorkflowStateId,
   type WriterId,
 } from "./index.ts"
 import { KINDS } from "./kinds.ts"
@@ -53,6 +55,8 @@ import { KINDS } from "./kinds.ts"
  * the holder's own document (`InventoryDoc`), not the host's (ADR-0059).
  * Trash: discarded into its holder's trash, drawn nowhere, kept so the undo
  * key can bring it back until the host sweeps it (ADR-0111, ADR-0126).
+ * Board: a task's card, in a workflow state of the team's board, at its
+ * rank there (ADR-0122, ADR-0126).
  */
 export type CardPlace =
   | {
@@ -114,6 +118,13 @@ export type CardPlace =
       readonly width: CardWidth
     }
   | { readonly kind: "inventory"; readonly holder: WriterId }
+  | {
+      readonly kind: "board"
+      /** Its workflow state (ADR-0122). */
+      readonly state: WorkflowStateId
+      /** Its rank in the state: an order key (S69), the host's to give. */
+      readonly order: string
+    }
   | {
       readonly kind: "trash"
       /** Whose trash: who discarded it (ADR-0126). */
@@ -217,6 +228,8 @@ export function keyOf(place: CardPlace): PlaceKey {
       return { kind: "canvas", task: place.task }
     case "inventory":
       return place
+    case "board":
+      return { kind: "board", state: place.state }
     case "trash":
       return { kind: "trash" }
   }
@@ -247,6 +260,8 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
       return b.kind === "canvas" && a.task === b.task
     case "inventory":
       return b.kind === "inventory" && a.holder === b.holder
+    case "board":
+      return b.kind === "board" && a.state === b.state
     case "trash":
       return b.kind === "trash"
   }
@@ -292,10 +307,11 @@ export interface Move<To extends MoveTarget = MoveTarget> {
 /**
  * Where a move the host plans sends a card: a place's key, but a canvas's
  * with the rank it was given there (`RankedCanvas`), so no card lands on a
- * canvas unranked.
+ * canvas unranked. No person's move takes a task's card (`KINDS`), so a
+ * board's key is never one.
  */
 export type ResolvedTarget =
-  | Exclude<PlaceKey, { readonly kind: "canvas" }>
+  | Exclude<PlaceKey, { readonly kind: "canvas" | "board" }>
   | RankedCanvas
 
 /**
@@ -317,7 +333,10 @@ export type QueueMove = Move<QueuedKey>
 /**
  * The places a reorder moves a card among (ADR-0048 step 7, ADR-0116): a
  * queue, a thread's pinned cards, a task's pinned cards, a note column, an
- * entry's margin (ADR-0126), or a task's canvas. Each has its rule in `@pinetrie/rules`' `REORDERS`.
+ * entry's margin (ADR-0126), or a task's canvas. Each has its rule in
+ * `@pinetrie/rules`' `REORDERS`. A task's card is reordered on the board
+ * by the board's own move (`planBoardMove`), which may cross the archive's
+ * edge.
  */
 export const REORDER_PLACES = [
   "queued",
@@ -456,6 +475,12 @@ export type MoveRefusal =
    */
   | "replied"
   /**
+   * An undo or a redo that would move a task's card across the archive's
+   * edge (ADR-0126): archiving and restoring are done on the board, which
+   * gathers what crossing it needs.
+   */
+  | "archived"
+  /**
    * A card moved to a place its kind is never in (`KINDS`): a text card on
    * a canvas, a thread's card into a queue, a fact out of its queue.
    */
@@ -500,6 +525,8 @@ export interface PlaceFields {
   readonly task: string
   /** A canvas card's width, `1` or `2`. */
   readonly width: string
+  /** A task card's workflow state (ADR-0126). */
+  readonly state: string
 }
 
 /**
@@ -531,6 +558,7 @@ const PLACE_FIELDS = {
     kinds: ["canvas", "canvas-at", "task-pinned", "notes"],
   },
   width: { key: "never" },
+  state: { key: "always" },
 } as const satisfies Record<keyof PlaceFields, FieldCodec>
 
 const FIELD_NAMES = Object.keys(PLACE_FIELDS) as readonly (keyof PlaceFields)[]
@@ -582,7 +610,8 @@ export const keyFieldsFrom = (
  * - a spot on a canvas, the card it goes after in `column` ("" for first);
  * - a comment, its entry in `at` and the entry's thread in `lane`;
  * - a card in a trash as `discarded`, whose trash in `holder`, the task
- *   it left in `task` ("" for none).
+ *   it left in `task` ("" for none);
+ * - a task's card on the board, its workflow state in `state`.
  */
 const ROWS = {
   drafting: ["lane"],
@@ -596,6 +625,7 @@ const ROWS = {
   canvas: ["task", "order", "width"],
   inventory: ["holder"],
   discarded: ["task", "holder"],
+  board: ["state", "order"],
 } as const satisfies Record<
   string,
   readonly Exclude<keyof PlaceFields, "kind">[]
@@ -678,6 +708,11 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
       })
     case "inventory":
       return row("inventory", { holder: place.holder })
+    case "board":
+      return row("board", {
+        state: place.state,
+        order: "order" in place ? place.order : "",
+      })
     case "trash":
       return row("discarded", {
         task: "task" in place ? (place.task ?? "") : "",
@@ -733,6 +768,10 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
       return r.holder === ""
         ? undefined
         : { kind: "inventory", holder: r.holder as WriterId }
+    case "board":
+      return !isWorkflowStateId(r.state) || r.order === ""
+        ? undefined
+        : { kind: "board", state: r.state, order: r.order }
     case "discarded": {
       const task = trashTaskOf(r.task)
       return r.holder === "" || task === undefined
@@ -796,6 +835,10 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
         : undefined
     case "discarded":
       return { kind: "trash" }
+    case "board":
+      return isWorkflowStateId(r.state)
+        ? { kind: "board", state: r.state }
+        : undefined
     case "queued": {
       const at = atThread(r)
       return at === undefined
@@ -849,6 +892,7 @@ export const PLACES_OF: {
 } = {
   text: KINDS.text.places,
   thread: KINDS.thread.places,
+  task: KINDS.task.places,
   "note-column": KINDS["note-column"].places,
   fact: KINDS.fact.places,
   reference: KINDS.reference.places,
@@ -942,6 +986,7 @@ export const placeOfKind = <K extends CardKind>(
 export type IdOf<K extends CardKind> = {
   readonly text: TextCardId
   readonly thread: ThreadId
+  readonly task: TaskId
   readonly "note-column": NoteColumnId
   readonly fact: FactCardId
   readonly reference: ReferenceCardId
@@ -1067,6 +1112,8 @@ export function placed(
       return fits("text", place) ? { ...card, place } : undefined
     case "thread":
       return fits("thread", place) ? { ...card, place } : undefined
+    case "task":
+      return fits("task", place) ? { ...card, place } : undefined
     case "note-column":
       return fits("note-column", place) ? { ...card, place } : undefined
     case "fact":

@@ -9,6 +9,7 @@ import {
 } from "@pinetrie/core"
 import { threadCardOf } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
+import { tasksWith } from "./fixtures.ts"
 import {
   CHAT_LABEL,
   initialsOf,
@@ -19,7 +20,6 @@ import {
   renameKey,
   summariesOf,
 } from "./root-label.ts"
-import { tasksOf } from "./tasks.ts"
 
 const record = (
   n: string,
@@ -60,7 +60,7 @@ const threads = new Map(
     },
   ]),
 )
-const tasks = tasksOf({
+const tasks = tasksWith({
   known: ["1", "2", "3"].map(K),
   cards: ["1", "2", "3"].map(n =>
     threadCardOf({
@@ -151,7 +151,7 @@ describe("labels and summaries, from the directory (ADR-0063)", () => {
   })
 
   test("summaries: a task over two roots reads its first root's line, every root's writers and the newest message", () => {
-    const two = tasksOf({
+    const two = tasksWith({
       known: [K("1")],
       cards: ["1", "2"].map((n, i) =>
         threadCardOf({

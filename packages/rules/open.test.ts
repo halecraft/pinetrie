@@ -8,11 +8,11 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
+import { fromParents, taskCard, threadOfEntry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { threadCardOf } from "./fixtures.ts"
 import { planOpenThread } from "./open.ts"
-import { emptiedTasks, planTaskDelete } from "./root.ts"
+import { emptiedTasks, planTasksTrashed } from "./root.ts"
 import { rootsHeld, unstartedThreads } from "./task.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -57,7 +57,6 @@ const plan = (
     tasks: new Set([TASK]),
     index,
     workflow: WORKFLOW,
-    board: new Map(),
     now: 7,
     ...over,
   })
@@ -89,20 +88,37 @@ describe("planOpenThread (ADR-0126)", () => {
     })
   })
 
-  test("a new tab: a new root's first thread, in a new task written with its board place", () => {
+  test("a new tab: a new root's first thread, in a new task whose card is made at the end of its state, its opener its owner", () => {
     const opened = plan(
       { root: NEW_ROOT, at: null, task: NEW_TASK, state: STATE },
       { index: null },
     )
     expect(
       opened.kind === "open" && opened.records.map(r => r.namespace),
-    ).toEqual(["pinetrie.thread", "pinetrie.task", "pinetrie.board"])
+    ).toEqual(["pinetrie.thread"])
     expect(opened.kind === "open" && opened.records[0]).toMatchObject({
       value: { root: NEW_ROOT, origin: { kind: "root" } },
+    })
+    expect(opened.kind === "open" && opened.steps[0]).toMatchObject({
+      record: {
+        kind: "task",
+        id: NEW_TASK,
+        owner: ADA,
+        place: { kind: "board", state: STATE },
+      },
     })
     expect(opened.kind === "open" && opened.steps.at(-1)).toMatchObject({
       record: { id: NEW, place: { kind: "canvas", task: NEW_TASK } },
     })
+  })
+
+  test("a new tab before the board has states is refused", () => {
+    expect(
+      plan(
+        { root: NEW_ROOT, at: null, task: NEW_TASK },
+        { index: null, workflow: null },
+      ),
+    ).toEqual({ kind: "refused", why: "no-place" })
   })
 
   test.each([
@@ -166,7 +182,7 @@ describe("closing a new tab before its first send (ADR-0126)", () => {
     place: { kind: "trash", holder: ADA, task: NEW_TASK },
   } as const
   const threads = new Map([[NEW, record(NEW, NEW_ROOT)]])
-  test("its thread to the trash leaves its task empty: the task goes", () => {
+  test("its thread to the trash leaves its task empty: the task's card goes to the closer's trash, remembering the task", () => {
     expect(
       emptiedTasks({
         before: [tab],
@@ -175,10 +191,16 @@ describe("closing a new tab before its first send (ADR-0126)", () => {
         started: new Set([ROOT]),
       }),
     ).toEqual([NEW_TASK])
-    expect(planTaskDelete(NEW_TASK).map(w => [w.kind, w.namespace])).toEqual([
-      ["delete", "pinetrie.task"],
-      ["delete", "pinetrie.board"],
-      ["delete", "pinetrie.mark"],
+    const card = taskCard(NEW_TASK)
+    expect(planTasksTrashed([card, taskCard(TASK)], [NEW_TASK], ADA)).toEqual([
+      {
+        kind: "write",
+        record: {
+          ...card,
+          place: { kind: "trash", holder: ADA, task: NEW_TASK },
+          placer: ADA,
+        },
+      },
     ])
   })
   test("never a task that holds another card, nor one whose root has started, nor a branch's", () => {

@@ -537,6 +537,9 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     }
     expect(at(UUID)).toBe("text")
     expect(at(threadIdFor("x"))).toBe("thread")
+    // A task's id is its card's, any `isTaskId` takes (ADR-0126).
+    expect(at(TEST_TASK)).toBe("task")
+    expect(at(taskIdFor("x"))).toBe("task")
     expect(at(`n-${UUID}`)).toBe("note-column")
     expect(at(`m-${UUID}`)).toBe("media")
     expect(at(`f-${UUID}`)).toBe("file")

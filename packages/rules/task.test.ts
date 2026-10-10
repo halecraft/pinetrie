@@ -12,10 +12,9 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { BOARD } from "./board.ts"
 import { orderKey } from "./order.ts"
 import { branchAfter, rankAfter } from "./rank.ts"
-import { canvasOf, planThreadOpen, TASK, type ThreadPlacement } from "./task.ts"
+import { canvasOf, planThreadOpen, type ThreadPlacement } from "./task.ts"
 import { THREAD } from "./thread.ts"
 
 const ADA = writerId("ada@x.io")
@@ -150,7 +149,7 @@ describe("where a thread's card lands as it opens (ADR-0116, ADR-0126)", () => {
     })
   })
 
-  test("a new task's record and its board place come with its first thread; an existing one's do not", () => {
+  test("a new task's card, at the end of its state, comes with its first thread; an existing one's does not", () => {
     const opened = planThreadOpen({
       thread: NEW,
       origin: ROOT_ORIGIN,
@@ -164,19 +163,19 @@ describe("where a thread's card lands as it opens (ADR-0116, ADR-0126)", () => {
           open: [{ id: DOING, name: "Doing" }],
           archive: { id: workflowStateIdFor("x"), name: "Done" },
         },
-        board: new Map(),
       },
       cards: [],
     })
     if (opened.kind !== "open") throw new Error("refused")
-    expect(opened.records.map(w => w.namespace)).toEqual([
-      THREAD.namespace,
-      TASK.namespace,
-      BOARD.namespace,
+    expect(opened.records.map(w => w.namespace)).toEqual([THREAD.namespace])
+    expect(opened.steps.map(s => s.kind === "write" && s.record.kind)).toEqual([
+      "task",
+      "thread",
     ])
-    expect(start([], null).records.map(w => w.namespace)).toEqual([
-      THREAD.namespace,
-    ])
+    expect(opened.steps[0]).toMatchObject({
+      record: { place: { kind: "board", state: DOING } },
+    })
+    expect(start([], null).cards.map(c => c.kind)).toEqual(["thread"])
   })
 })
 

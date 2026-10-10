@@ -21,6 +21,7 @@ import {
   type Position,
   pinnedInView,
   pinnedOf,
+  placeOfKind,
   promptOf,
   ROOT,
   type SeatRecord,
@@ -286,9 +287,9 @@ export interface ColumnProps {
 const TAKE_DRAG =
   "drag onto a slot of your inventory to put this thread away: its run stops"
 
-/** A place a text card may be in; undefined for a canvas. */
+/** A place a text card may be in; undefined for any other. */
 const textPlaceOf = (place: CardPlace | undefined): TextPlace | undefined =>
-  place === undefined || place.kind === "canvas" ? undefined : place
+  place === undefined ? undefined : placeOfKind("text", place)
 
 export function Column(p: ColumnProps) {
   const { index } = p

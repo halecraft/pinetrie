@@ -184,8 +184,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new tab closed unsent keeps its task",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "    if (emptied.length > 0)\n",
-    to: "    if (emptied.length < 0)\n",
+    from: "              ...planTasksTrashed(cards, emptied, writer),\n",
+    to: "              ...planTasksTrashed(cards, [], writer),\n",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1561,18 +1561,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher answers a move on the board without moving",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "        return settled(await handleTaskMove(deps, writer, intent))",
-    to: '        return settled({ kind: "moved-task" })',
+    from: "        return handleTaskMove({ ...deps, moves: cardCommands }, writer, intent)",
+    to: '        return settled({ kind: "moved" })',
     suite: "host",
     scenario: "board",
     expect:
       "a root moved to Done is archived for another client, and a chat into it is refused naming the mover",
   },
   {
-    name: "a started root is never placed",
+    name: "a new task lands in the first open state whatever its chat names",
     file: "packages/rules/task.ts",
-    from: "    if (input.opens.workflow !== null)\n      records.push(",
-    to: "    if (input.opens.workflow !== null && false)\n      records.push(",
+    from: '    makeCard("task", task, boardEnd(workflow, cards, state), NO_CONTENT, by),',
+    to: '    makeCard("task", task, boardEnd(workflow, cards, null), NO_CONTENT, by),',
     suite: "host",
     scenario: "board",
     expect:
@@ -1581,8 +1581,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root moved out of Done keeps its place there",
     file: "apps/pinetrie/host/commands/board.ts",
-    from: "  // execute\n  await deps.records.writeValues(writes)\n",
-    to: '  // execute\n  if (moved.transition === "archive") await deps.records.writeValues(writes)\n',
+    from: "    outcome: await deps.moves.placeTask(writer, moved),\n    teardown:",
+    to: '    outcome:\n      moved.transition === "archive"\n        ? await deps.moves.placeTask(writer, moved)\n        : settled({ kind: "moved" }),\n    teardown:',
     suite: "host",
     scenario: "board",
     expect:
@@ -2064,8 +2064,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a starting host retires every history of moves",
     file: "apps/pinetrie/host/housekeeping.ts",
-    from: "    tasks: new Set(readTasks(session).keys()),\n    archived: readArchived(session),",
-    to: "    tasks: new Set(),\n    archived: readArchived(session),",
+    from: "    tasks: readTasks(places),\n    archived: readArchived(session, places),",
+    to: "    tasks: new Set(),\n    archived: readArchived(session, places),",
     suite: "host",
     scenario: "cards",
     expect:
@@ -2475,5 +2475,25 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "a comment is a note in its message's margin, written where it opens; shut, the message shows how many it holds",
+  },
+  {
+    name: "a move on the board enters no history",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "          ? await deps.histories.gestureOf(writer, PERSON_HISTORY)\n",
+    to: "          ? undefined\n",
+    suite: "host",
+    scenario: "board",
+    expect:
+      "a move on the board is undone by its mover's undo key outside any task, the task back in its state",
+  },
+  {
+    name: "a closed new tab is in its task's history",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "      emptied.length > 0 ? PERSON_HISTORY : historyOf(moves, cards, discards)",
+    to: "      historyOf(moves, cards, discards)",
+    suite: "host",
+    scenario: "board",
+    expect:
+      "an unsent new tab closed is undone whole by its closer's undo key outside any task: its task and its thread back",
   },
 ]

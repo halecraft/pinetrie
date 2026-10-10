@@ -10,13 +10,14 @@ import {
 import { createKeeper } from "@pinetrie/keeper"
 import type { PiSetup } from "@pinetrie/pi"
 import { readMarks } from "@pinetrie/reads"
-import { BOARD, MARK, setRecord, WORKFLOW } from "@pinetrie/rules"
+import { MARK, setRecord, WORKFLOW } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   applyWrites,
   basics,
   deferred,
+  placeTask,
   putLane,
   putTask,
   putValue,
@@ -141,10 +142,7 @@ test("a reply that is not a title, or a root archived meanwhile, writes nothing"
   writeEntry(archived.b.root, row(E1, null))
   writeDirectory(archived.b)
   await archived.keeper.run(() => archived.titles.asked(TASK_ID, ADA))
-  putValue(
-    archived.b,
-    setRecord(BOARD, { task: TASK_ID, state: DONE, rank: "a", by: ADA, at: 1 }),
-  )
+  placeTask(archived.b, TASK_ID, DONE, ADA)
   putValue(
     archived.b,
     setRecord(WORKFLOW, {

@@ -1,12 +1,12 @@
-// task — a task's record and its canvas (ADR-0116).
+// task — a task's canvas, and a thread's opening (ADR-0116, ADR-0126).
 //
-// A task is the board's card. Its record says only who opened it and when:
-// what it holds is where the places document puts each card (a `canvas`
-// place, with the task and a rank), so a card has one place by construction
-// and no list can disagree with it. A thread card's id is its thread's.
+// A task is a card on the board (`board.ts`), its card's owner who opened
+// it. What it holds is where the places document puts each card (a
+// `canvas` place, with the task and a rank), so a card has one place by
+// construction and no list can disagree with it. A thread card's id is its
+// thread's.
 
 import {
-  type BoardPlace,
   type CanvasKey,
   type CanvasTarget,
   type CardId,
@@ -24,7 +24,6 @@ import {
   type PlaceOf,
   type RootId,
   type TaskId,
-  type TaskRecord,
   type ThreadFork,
   type ThreadId,
   type ThreadOrigin,
@@ -36,9 +35,7 @@ import {
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
-import { Type } from "typebox"
-import { BOARD, placeStarted } from "./board.ts"
-import { decodeAt, taskKey } from "./decode.ts"
+import { boardEnd } from "./board.ts"
 import {
   type MakeStep,
   type PlaceStep,
@@ -46,27 +43,8 @@ import {
   rankOnCanvas,
 } from "./moves.ts"
 import { branchAfter, rankAfter } from "./rank.ts"
-import { type RecordSpec, setRecord } from "./records.ts"
+import { setRecord } from "./records.ts"
 import { THREAD } from "./thread.ts"
-
-const TaskSchema = Type.Object({
-  by: Type.String({ minLength: 1 }),
-  createdAt: Type.Number(),
-})
-
-/** Each task, at its id, in the session: written as it opens. */
-export const TASK: RecordSpec<TaskRecord, TaskId, "session"> = {
-  namespace: "pinetrie.task",
-  home: "session",
-  keyOf: r => r.task,
-  encode: ({ task, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeAt(TaskSchema, contents, taskKey(key), (r, task) => ({
-      task,
-      by: r.by as WriterId,
-      createdAt: r.createdAt,
-    })),
-}
 
 /** A card on a canvas, in its task's order. */
 export type CanvasCard = CardInPlace<"canvas">
@@ -197,7 +175,8 @@ export const NO_TASK_INDEX: TaskIndex = indexTasks([], new Map())
  * task's or a trashed card's own; a note, its note column's; a card at a thread or
  * in an entry's margin, its thread's task (a queued card's thread is its
  * lane). Null for an
- * inventory, or a thread or a note column in none. Pure.
+ * inventory, the board (a task's card is in no task: the board is the
+ * team's), or a thread or a note column in none. Pure.
  */
 export function taskOfPlace(
   tasks: TaskIndex,
@@ -211,6 +190,7 @@ export function taskOfPlace(
     case "trash":
       return "task" in place ? place.task : null
     case "inventory":
+    case "board":
       return null
     case "note":
       return tasks.taskOfCard.get(place.column) ?? null
@@ -282,21 +262,21 @@ export type ThreadPlacement =
 export interface TaskOpening {
   /** The workflow state it lands in; null for the first open one (ADR-0122). */
   readonly state: WorkflowStateId | null
+  /** The board's states; null before the host wrote them, when no task opens. */
   readonly workflow: Workflow | null
-  readonly board: ReadonlyMap<TaskId, BoardPlace>
 }
 
 /** What a thread's opening writes, or why its card's make was refused. */
 export type ThreadOpen =
   | {
       readonly kind: "open"
-      /**
-       * Its record; for a task the session lacks, the task's record and its
-       * board place, at the end of its state (`placeStarted`), none with no
-       * workflow yet.
-       */
+      /** Its record. */
       readonly records: readonly ValueWrite[]
-      /** The cards re-ranked to make room, then its card. */
+      /**
+       * The cards re-ranked to make room, then its card; for a task the
+       * session lacks, the task's card first, at the end of its state on
+       * the board (`boardEnd`).
+       */
       readonly steps: readonly PlaceStep[]
     }
   | Extract<MakeStep, { kind: "refused" }>
@@ -306,8 +286,9 @@ export type ThreadOpen =
  * entry, as its column opens, a copy is made or a card is spun into it. Its
  * record says how it began (`origin`); its card is made by `by`
  * (`makeCard`, `planMake`) where `placement` says; and a task the session
- * does not hold (`opens`) is written with it. Its first send writes only
- * its entry. Pure.
+ * does not hold (`opens`) is made with it, its card by the host on `by`'s
+ * behalf, `by` its owner: refused `no-place` before the board has states.
+ * Its first send writes only its entry. Pure.
  */
 export function planThreadOpen(input: {
   readonly thread: ThreadId
@@ -362,24 +343,17 @@ export function planThreadOpen(input: {
     }),
   ]
   const task = ranked.to.kind === "canvas" ? ranked.to.task : null
-  if (input.opens !== null && task !== null) {
-    records.push(setRecord(TASK, { task, by, createdAt: now }))
-    if (input.opens.workflow !== null)
-      records.push(
-        setRecord(
-          BOARD,
-          placeStarted({
-            task,
-            state: input.opens.state,
-            by,
-            now,
-            workflow: input.opens.workflow,
-            places: input.opens.board,
-          }),
-        ),
-      )
-  }
-  return { kind: "open", records, steps: [...ranked.first, made] }
+  if (input.opens === null || task === null)
+    return { kind: "open", records, steps: [...ranked.first, made] }
+  const { workflow, state } = input.opens
+  if (workflow === null) return { kind: "refused", code: "no-place", now: null }
+  const opened = planMake(
+    cards,
+    makeCard("task", task, boardEnd(workflow, cards, state), NO_CONTENT, by),
+    "host",
+  )
+  if (opened.kind === "refused") return opened
+  return { kind: "open", records, steps: [opened, ...ranked.first, made] }
 }
 
 /** Where a thread not yet started begins: its root, and its fork, or null for a new root's first. */

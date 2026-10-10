@@ -446,15 +446,20 @@ rejects `shutdown()`.
   the thread it writes in (`thread`), and for a branch what its card needs
   (`starts`), and `sendChat`, after its last await, plans its opening
   (`planThreadOpen`): the thread's record, its card just after the thread
-  it forks from on its task's canvas, and for a new task its record and
-  its board place, at the end of the state the chat names
+  it forks from on its task's canvas, and for a new task its card on the
+  board (ADR-0126), at the end of the state the chat names
   (`Command.state`, a board column's ＋), else of the first open state.
   `executeChat` writes that before the message and reads nothing for it.
-- **A move on the board** (`commands/board.ts`): `planTaskMove` over the
-  workflow and the places; a move within open states writes its place and
-  answers; one that crosses the archive's edge gathers the task's roots'
-  documents (`docs.root` loads an unloaded one, S86) and `planArchive`s
-  the crossing first. **A change to the states** (`handleWorkflow`) is one
+- **A move on the board** (`commands/board.ts`): `planBoardMove` over the
+  workflow and the places; a move within open states writes the task's
+  card (`placeTask`, the card commands': a move in its mover's history
+  outside any task, a reorder in none, with its card's history) and
+  answers `moved`; one that crosses the archive's edge gathers the task's
+  roots' documents (`docs.root` loads an unloaded one, S86) and
+  `planArchive`s the crossing first. A refusal is a card move's,
+  `unmoved`, saying where the card is and who put it there. An undo of
+  moves whose step crossed the archive's edge is refused `archived`
+  (`crossesArchive`), before Kyneta reverts anything. **A change to the states** (`handleWorkflow`) is one
   keeper step, `planWorkflowEdit` over the workflow and the board.
 - **A message sent from a card spends it** (ADR-0048): `sendChat` names the
   card's other writers as contributors, through the card port, and spends
@@ -543,11 +548,13 @@ rejects `shutdown()`.
   answer is the chat's: `appended`, with the first message's id.
 - **`open-thread` opens a thread before its first entry** (ADR-0126,
   `openThread`), in one keeper step: a branch's root's tree loaded,
-  `planOpenThread`, then its record (and a new tab's task's record and
-  board place), its card and the canvas re-ranked for it, then its name
+  `planOpenThread`, then its record, its card and the canvas re-ranked for
+  it (and a new tab's task's card on the board), then its name
   (`names.ensure`). No entry is written. A move that takes a new tab's only
-  thread to a trash before its first send deletes its emptied task after
-  it (`emptiedTasks`, `planTaskDelete`), not undone.
+  thread to a trash before its first send sends its emptied task's card
+  to the closer's trash in the same step (`emptiedTasks`,
+  `planTasksTrashed`), in their history outside any task, so the undo key
+  on no task brings both back.
 - **A person's documents are clients' documents the host only keeps**
   (ADR-0059, ADR-0077, ADR-0122): their inventory, their attention and
   their list. `resolveDoc` names a `<kind>:<writer>` id's kind, and the host

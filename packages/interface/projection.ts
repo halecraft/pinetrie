@@ -14,9 +14,7 @@
 
 import {
   type AgentRun,
-  type ArchivedTask,
   type AskIndex,
-  type BoardPlace,
   type CardHistoryRecord,
   type CardId,
   type CardRecord,
@@ -30,7 +28,6 @@ import {
   type RootId,
   type SeatRecord,
   type TaskId,
-  type TaskRecord,
   type ThreadId,
   type ThreadRecord,
   type TraceRecord,
@@ -41,10 +38,8 @@ import {
 import {
   readAccepted,
   readAgentActivity,
-  readArchived,
   readBanners,
   readBases,
-  readBoardPlaces,
   readBudgets,
   readCardHistories,
   readCommands,
@@ -63,7 +58,6 @@ import {
   readRevisions,
   readRunningLanes,
   readSeats,
-  readTasks,
   readThreads,
   readTraces,
   readVerdicts,
@@ -104,16 +98,10 @@ export interface SessionFacts {
   readonly seats: readonly SeatRecord[]
   /** The board's workflow states (ADR-0122), or null before the host wrote them. */
   readonly workflow: Workflow | null
-  /** Each task's place on the board, by its id. */
-  readonly places: ReadonlyMap<TaskId, BoardPlace>
-  /** The tasks in the archive, by id (`readArchived`). */
-  readonly archived: ReadonlyMap<TaskId, ArchivedTask>
   /** Each task's title (ADR-0045, ADR-0116): its label. */
   readonly marks: ReadonlyMap<TaskId, MarkRecord>
   /** Each titled note column's title (ADR-0116). */
   readonly noteColumns: ReadonlyMap<NoteColumnId, NoteColumnRecord>
-  /** Every task (ADR-0116), by id. */
-  readonly tasks: ReadonlyMap<TaskId, TaskRecord>
   /** Every thread (ADR-0117), by id: each one's root. */
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
   /** Each thread's last run's verdict, in any root (ADR-0077), by lane. */
@@ -188,11 +176,8 @@ function readFacts(view: HeldView): SessionFacts {
     live: liveWork(readStreamRecords(live), activity),
     seats: readSeats(doc),
     workflow: readWorkflow(doc),
-    places: readBoardPlaces(doc),
-    archived: readArchived(doc),
     marks: readMarks(doc),
     noteColumns: readNoteColumns(doc),
-    tasks: readTasks(doc),
     threads: readThreads(doc),
     verdicts: readVerdicts(doc),
     histories: readCardHistories(doc),

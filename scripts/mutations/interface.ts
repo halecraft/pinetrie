@@ -2659,7 +2659,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused move closes the root",
     file: "packages/interface/intent.ts",
-    from: '): readonly Effect[] => (outcome.kind === "moved-task" ? moved : [])',
+    from: '): readonly Effect[] => (outcome.kind === "moved" ? moved : [])',
     to: "): readonly Effect[] => moved",
     command: unit,
     expect:
@@ -3819,10 +3819,26 @@ export const mutations: readonly Mutation[] = [
   {
     name: "only a text card is discarded",
     file: "packages/interface/card-intents.ts",
-    from: '  if (now === undefined || !cardFitsPlace(now, "trash")) return []\n',
-    to: '  if (now === undefined || now.kind !== "text") return []\n',
+    from: '  if (now === undefined || !cardFitsPlace(now, "trash") || !isMovable(now))\n',
+    to: '  if (now === undefined || now.kind !== "text")\n',
     command: unit,
     expect:
       "goes back to its thread's notes from its ⋯, and to the trash from its ×",
+  },
+  {
+    name: "the board draws a task with no message",
+    file: "packages/interface/board-view.ts",
+    from: "    const all = column.tasks.filter(task => summaries.has(task))",
+    to: "    const all = column.tasks",
+    command: unit,
+    expect: "a task with no message yet is on no column",
+  },
+  {
+    name: "an undo back onto the board shows nothing",
+    file: "packages/interface/reveal.ts",
+    from: '        effects: [layout({ kind: "board", open: true })],',
+    to: "        effects: [],",
+    command: unit,
+    expect: "a task's card back on the board",
   },
 ]

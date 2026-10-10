@@ -124,9 +124,9 @@ export const parseNewThread = (s: string): ThreadId | undefined =>
 declare const taskIdBrand: unique symbol
 /**
  * A task's id (ADR-0116): `k-` and a uuidv7, minted by the tab that opens
- * the task, as it mints a `RootId`. A task is the board's card: its place,
- * its title, the sidebar and the layout are keyed by it. What it holds is in
- * the places document, never in its record.
+ * the task, as it mints a `RootId`. A task is a card on the board, and this
+ * is its card's id (ADR-0126): its place, its title, the sidebar and the
+ * layout are keyed by it. What it holds is in the places document.
  */
 export type TaskId = string & { readonly [taskIdBrand]: true }
 
@@ -331,6 +331,7 @@ export type AskCardId = string & { readonly [askCardIdBrand]: true }
 export type CardId =
   | TextCardId
   | ThreadId
+  | TaskId
   | NoteColumnId
   | FactCardId
   | ReferenceCardId
@@ -342,6 +343,7 @@ export type CardId =
 export type CardKind =
   | "text"
   | "thread"
+  | "task"
   | "note-column"
   | "fact"
   | "reference"
@@ -399,11 +401,13 @@ const PREFIXED_CARD_RE = new RegExp(
  * a fact's, a reference's, an ask's, a media card's and a file card's are
  * their prefix and one. A
  * thread's is any id `isThreadId` takes, as everywhere a thread is read, so
- * a thread the store names is never dropped for its id's shape. The one way
- * text becomes a `CardId` outside a minter.
+ * a thread the store names is never dropped for its id's shape; a task's,
+ * any `isTaskId` takes, the same way. The one way text becomes a `CardId`
+ * outside a minter.
  */
 export function parseCardId(id: string): CardId | undefined {
   if (isThreadId(id)) return id
+  if (isTaskId(id)) return id
   if (TEXT_CARD_RE.test(id)) return id as TextCardId
   return PREFIXED_CARD_RE.test(id) ? (id as CardId) : undefined
 }

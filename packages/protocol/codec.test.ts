@@ -548,7 +548,6 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "named" },
     { kind: "pictured" },
     { kind: "stopped" },
-    { kind: "moved-task" },
     { kind: "workflow-changed" },
     { kind: "marked" },
     { kind: "retitling" },

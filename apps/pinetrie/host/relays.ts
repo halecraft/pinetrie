@@ -97,7 +97,7 @@ export function readReachableAgents(
 ): readonly { readonly thread: ThreadId; readonly name: ThreadName }[] {
   return reachableAgents({
     canvases: tasksNow(docs).canvases,
-    archived: readArchived(docs.session),
+    archived: readArchived(docs.session, docs.places),
     names: readNames(docs.session),
   })
 }
@@ -175,7 +175,7 @@ export function createRelays(deps: {
   const reachNow = (thread: ThreadId): Reach =>
     threadReach(thread, {
       cards: readPlaces(places),
-      archived: readArchived(session),
+      archived: readArchived(session, places),
     })
 
   /** Both threads of an ask, named, and where each is: gathered once, before any root is opened. */

@@ -19,12 +19,12 @@ import {
   taskIdFor,
   threadIdFor,
   type WriterId,
+  workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
-  readBoardPlaces,
   readCardHistories,
   readPlaces,
   readPlacesRev,
@@ -36,13 +36,14 @@ import {
   readTraces,
 } from "@pinetrie/reads"
 import {
-  BOARD,
+  CARD_HISTORY,
   type CopyThread,
   QUEUE_HOLD,
   ROOT as ROOT_RECORD,
   setRecord,
   THREAD as THREAD_RECORD,
   type UndoResult,
+  WORKFLOW,
 } from "@pinetrie/rules"
 import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
@@ -212,6 +213,7 @@ function setUp() {
     drains,
     stops,
     commands,
+    raw,
     put,
     histories,
     undoes,
@@ -322,13 +324,13 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(atThread.recorded).toEqual([[ADA, TEST_TASK]])
   })
 
-  test("a new tab's thread to the trash before its first send leaves its task empty: the task goes (ADR-0126)", async () => {
-    const { b, commands } = setUp()
+  test("a new tab's thread to the trash before its first send leaves its task empty: the task's card goes to your trash in the same step, in your history outside any task (ADR-0126)", async () => {
+    const { b, commands, recorded } = setUp()
     const TAB = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f7")
     const TAB_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000f8")
     // Its root is one the directory does not name: nothing is written in it.
     putTask(b, TAB, TAB_TASK, rootIdFor("01a0ffd2-0000-7000-8000-0000000000f9"))
-    expect(readTasks(b.session).has(TAB_TASK)).toBe(true)
+    expect(readTasks(b.places).has(TAB_TASK)).toBe(true)
     await commands.move(
       ADA,
       [
@@ -343,7 +345,92 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(readPlaces(b.places).find(c => c.id === TAB)?.place.kind).toBe(
       "trash",
     )
-    expect(readTasks(b.session).has(TAB_TASK)).toBe(false)
+    expect(readTasks(b.places).has(TAB_TASK)).toBe(false)
+    expect(readPlaces(b.places).find(c => c.id === TAB_TASK)?.place).toEqual({
+      kind: "trash",
+      holder: ADA,
+      task: TAB_TASK,
+    })
+    expect(recorded).toEqual([[ADA, "person"]])
+  })
+
+  test("a task's card moved on the board: between states in your history outside any task, a reorder in none (ADR-0126)", async () => {
+    const { b, raw, recorded } = setUp()
+    const at = (state: string) => workflowStateIdFor(state)
+    const card = readPlaces(b.places).find(c => c.id === TEST_TASK)
+    if (card?.kind !== "task") throw new Error("the test's task has its card")
+    const moved = {
+      ...card,
+      place: { kind: "board", state: at("d"), order: "z" },
+    } as const
+    const done = await raw.placeTask(ADA, {
+      kind: "move",
+      transition: "within",
+      steps: [{ kind: "write", record: moved }],
+    })
+    expect(done.outcome).toEqual({ kind: "moved" })
+    expect(readPlaces(b.places).find(c => c.id === TEST_TASK)?.place).toEqual(
+      moved.place,
+    )
+    expect(recorded).toEqual([[ADA, "person"]])
+    await raw.placeTask(ADA, {
+      kind: "reorder",
+      transition: "within",
+      steps: [
+        {
+          kind: "write",
+          record: { ...moved, place: { ...moved.place, order: "y" } },
+        },
+      ],
+    })
+    expect(recorded).toEqual([[ADA, "person"]])
+  })
+
+  test("an undo or a redo that would move a task's card across the archive's edge is refused `archived`, nothing reverted (ADR-0126)", async () => {
+    const { b, commands, undoes } = setUp()
+    const [doing, done] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
+    putValue(
+      b,
+      setRecord(WORKFLOW, {
+        open: [{ id: doing, name: "Doing" }],
+        archive: { id: done, name: "Done" },
+      }),
+    )
+    putValue(
+      b,
+      setRecord(CARD_HISTORY, {
+        card: TEST_TASK,
+        events: [
+          {
+            kind: "moved",
+            by: ADA,
+            from: { kind: "board", state: doing },
+            to: { kind: "board", state: done },
+            at: 1,
+          },
+        ],
+      }),
+    )
+    let reverted = false
+    undoes(
+      {
+        kind: "undone",
+        step: {
+          parts: [{ docId: PLACES_DOC_ID, footprint: [["cards", TEST_TASK]] }],
+        },
+      },
+      () => {
+        reverted = true
+      },
+    )
+    for (const direction of ["undo", "redo"] as const) {
+      const answer = await commands.undoMove(ADA, null, direction)
+      expect(answer.outcome).toMatchObject({
+        kind: "unmoved",
+        code: "archived",
+      })
+    }
+    expect(reverted).toBe(false)
   })
 
   test("a discard from your inventory on no task is in your history outside any task, and undone there (ADR-0126)", async () => {
@@ -953,6 +1040,15 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
   const SPUN_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000fe")
   const spun = { kind: "trash" } as const
   const spinMove = { card: C1, from: atEnd, to: spun }
+  /** The board a new task lands on (ADR-0126). */
+  const board = (b: ReturnType<typeof setUp>["b"]) =>
+    putValue(
+      b,
+      setRecord(WORKFLOW, {
+        open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
+        archive: { id: workflowStateIdFor("x"), name: "Done" },
+      }),
+    )
   const spinOff = {
     move: spinMove,
     root: THREAD,
@@ -978,13 +1074,6 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
         threads: {},
         mentions: [],
         images: [],
-      }),
-      setRecord(BOARD, {
-        task: SPUN_TASK,
-        state: "s-1" as never,
-        rank: "m",
-        by: ADA,
-        at: 1,
       }),
     ])
     putTask(b, STARTS, SPUN_TASK, THREAD)
@@ -1013,6 +1102,7 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
 
   test("the thread is opened spun from the card in its new task, then started with the card's text, never asking the agent; the card goes to its sender's trash, in the history of the task it leaves (ADR-0126)", async () => {
     const { b, commands, put, texts, recorded } = setUp()
+    board(b)
     put()
     texts.set(C1, "  plan this @agent with @Bea ")
     const chats: unknown[] = []
@@ -1045,10 +1135,14 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
     expect(
       readPlaces(b.places).find(c => c.id === STARTS)?.place,
     ).toMatchObject({ kind: "canvas", task: SPUN_TASK })
+    expect(
+      readPlaces(b.places).find(c => c.id === SPUN_TASK)?.place,
+    ).toMatchObject({ kind: "board", state: workflowStateIdFor("d") })
   })
 
   test("a thread that is not started leaves the card where it was; a blank card starts none", async () => {
     const { b, commands, put, texts } = setUp()
+    board(b)
     put()
     texts.set(C1, "plan")
     const refused = await commands.spinOff(ADA, spinOff, async () => ({
@@ -1084,7 +1178,7 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
       cards: [{ card: C1, place: noteKey }],
     })
     expect(readRoots(b.session).has(THREAD)).toBe(false)
-    expect(readBoardPlaces(b.session).has(SPUN_TASK)).toBe(false)
+    expect(readPlaces(b.places).some(c => c.id === SPUN_TASK)).toBe(false)
     expect(readPlaces(b.places).some(c => c.id === STARTS)).toBe(false)
     expect(b.docs.loaded()).not.toContain(THREAD)
   })

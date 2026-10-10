@@ -1,5 +1,5 @@
 import {
-  type BoardPlace,
+  type CardRecord,
   entryId,
   type RootWork,
   type TaskId,
@@ -10,6 +10,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { taskCard } from "@pinetrie/core/fixtures"
 import { boardOf, orderKeys } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
@@ -59,13 +60,8 @@ const ID = (n: number) =>
 /** Task `n` as the facts and the expectations name it. */
 const E = ID
 const keys = orderKeys(4)
-const place = (n: number, state: typeof DOING, rank = 0): BoardPlace => ({
-  task: ID(n),
-  state,
-  rank: keys[rank] ?? "",
-  by: ADA,
-  at: 1,
-})
+const place = (n: number, state: typeof DOING, rank = 0): CardRecord =>
+  taskCard(ID(n), keys[rank] ?? "", state, ADA)
 const summary = (
   n: number,
   writers: WriterId[],
@@ -87,15 +83,13 @@ type Facts = Omit<BoardViewInput, "heads"> & {
 const input = (over: Partial<Facts> = {}): BoardViewInput => {
   const f: Facts = {
     workflow: WORKFLOW,
-    places: new Map(
-      [
-        place(1, DOING, 1),
-        place(2, DOING, 0),
-        place(3, BACKLOG),
-        place(4, DONE),
-        place(5, DONE, 1),
-      ].map(p => [p.task, p]),
-    ),
+    cards: [
+      place(1, DOING, 1),
+      place(2, DOING, 0),
+      place(3, BACKLOG),
+      place(4, DONE),
+      place(5, DONE, 1),
+    ],
     summaries: new Map([
       summary(1, [ADA], "1"),
       summary(2, [BEA], "2"),
@@ -115,10 +109,10 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
     work: new Map(),
     ...over,
   }
-  const board = boardOf(f.workflow, f.places, f.summaries.keys())
+  const board = boardOf(f.workflow, f.cards)
   return {
     workflow: f.workflow,
-    places: f.places,
+    cards: f.cards,
     summaries: f.summaries,
     search: f.search,
     me: f.me,
@@ -149,6 +143,13 @@ describe("boardView", () => {
       ["Doing", 2, false],
       ["Done", 2, true],
     ])
+  })
+
+  test("a task with no message yet is on no column: a new tab's joins with its first send (ADR-0126)", () => {
+    const view = boardView(
+      input({ cards: [...input().cards, place(6, BACKLOG, 1)] }),
+    )
+    expect(view.open[0]?.items.map(t => t.task)).toEqual([E(3)])
   })
 
   test("a titled card's body is its first line; an untitled card, or one titled by it, has none (ADR-0111)", () => {

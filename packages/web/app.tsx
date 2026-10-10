@@ -24,6 +24,7 @@
 import { whenSettled } from "@kyneta/exchange"
 import { useDocStatus, useSelector } from "@kyneta/react"
 import {
+  type ArchivedTask,
   type CardId,
   type EntryId,
   isPastAddress,
@@ -141,6 +142,7 @@ import {
   readRoots,
 } from "@pinetrie/reads"
 import {
+  archivedOf,
   boardOf,
   type CanvasCard,
   canvasLines,
@@ -363,6 +365,7 @@ const NO_CANVAS: readonly CanvasCard[] = []
 
 /** No task's state: the board has not arrived. */
 const NO_STATE_OF: ReadonlyMap<TaskId, WorkflowStateId> = new Map()
+const NO_ARCHIVED: ReadonlyMap<TaskId, ArchivedTask> = new Map()
 
 export function App({
   session,
@@ -404,11 +407,8 @@ export function App({
     live,
     seats,
     workflow,
-    places,
-    archived,
     marks,
     noteColumns: noteTitles,
-    tasks: taskRecords,
     threads,
     verdicts,
     workFacts,
@@ -440,10 +440,19 @@ export function App({
   const nameOf = useSelector(doc, readParticipantNames)
   const pictures = useSelector(doc, readParticipantPictures)
 
-  // Every task (ADR-0116): its threads, from the places, and their roots.
-  const tasks = useMemo(
-    () => tasksOf({ known: taskRecords.keys(), cards, threads }),
-    [taskRecords, cards, threads],
+  // Every task (ADR-0116): its card on the board, its threads, from the
+  // places, and their roots.
+  const tasks = useMemo(() => tasksOf({ cards, threads }), [cards, threads])
+  // The tasks in the archive (ADR-0122), from the board's cards and their
+  // histories, the same map while it reads the same.
+  const archived = useSameData(
+    useMemo(
+      () =>
+        workflow === null
+          ? NO_ARCHIVED
+          : archivedOf(workflow, cards, histories),
+      [workflow, cards, histories],
+    ),
   )
   const { taskOfThread, canvases, forkOf } = tasks.index
   // What a column says of its threads' work, its forks the task index's.
@@ -491,9 +500,8 @@ export function App({
   )
   // The board (ADR-0122): each task's state.
   const board = useMemo(
-    () =>
-      workflow === null ? null : boardOf(workflow, places, summaries.keys()),
-    [workflow, places, summaries],
+    () => (workflow === null ? null : boardOf(workflow, cards)),
+    [workflow, cards],
   )
   const stateOf: ReadonlyMap<TaskId, WorkflowStateId> =
     board?.stateOf ?? NO_STATE_OF
@@ -598,7 +606,6 @@ export function App({
             open: session.openThreads.tasks.current(),
           },
           tasks: tasksOf({
-            known: facts.tasks.keys(),
             cards: session.cards.current(),
             threads: facts.threads,
           }),
@@ -1148,13 +1155,13 @@ export function App({
         ? null
         : boardView({
             workflow,
-            places,
+            cards,
             summaries,
             heads,
             search: boardSearch,
             me: session.writer,
           }),
-    [workflow, places, summaries, heads, boardSearch, session.writer],
+    [workflow, cards, summaries, heads, boardSearch, session.writer],
   )
   useEffect(() => {
     document.title = title

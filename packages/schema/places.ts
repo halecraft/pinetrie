@@ -26,7 +26,7 @@ import { type TextCardId, textCardId } from "@pinetrie/core"
  */
 const StoredCard = Schema.struct.json({
   owner: Schema.string(),
-  /** `drafting`, `note`, `pinned`, `queued`, `margin`, `canvas`, `inventory` or `discarded`: the place's kind (`CardPlace`). */
+  /** `drafting`, `note`, `pinned`, `queued`, `margin`, `canvas`, `inventory`, `board` or `discarded`: the place's kind (`CardPlace`). */
   kind: Schema.string(),
   /** A comment's entry (ADR-0126). */
   at: Schema.string(),
@@ -34,7 +34,7 @@ const StoredCard = Schema.struct.json({
   lane: Schema.string(),
   /** A note's note column (ADR-0116). */
   column: Schema.string(),
-  /** A queued, pinned or canvas card's rank, or a note's in its column (S69). */
+  /** A queued, pinned, canvas or board card's rank, or a note's in its column (S69). */
   order: Schema.string(),
   /** Who queued it. */
   by: Schema.string(),
@@ -59,6 +59,8 @@ const StoredCard = Schema.struct.json({
   task: Schema.string(),
   /** A canvas card's width: `1` or `2` columns (ADR-0116). */
   width: Schema.string(),
+  /** A task's card's workflow state on the board (ADR-0126). */
+  state: Schema.string(),
   /** A reference's address, printed (`printAddress`, ADR-0126). */
   address: Schema.string(),
   /** A reference's quote's blob: its markdown's SHA-256. */

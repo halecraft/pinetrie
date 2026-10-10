@@ -970,7 +970,7 @@ test("afterTaskMove: what follows a move runs only once the host accepts it", ()
   const moved: Effect[] = [
     { kind: "layout", action: { kind: "closeTask", task: TASK_OF("1-r1") } },
   ]
-  expect(afterTaskMove({ kind: "moved-task" }, moved)).toBe(moved)
+  expect(afterTaskMove({ kind: "moved" }, moved)).toBe(moved)
   expect(
     afterTaskMove(
       { kind: "refused", code: "task_moved", message: "no" },

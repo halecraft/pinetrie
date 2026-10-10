@@ -11,6 +11,7 @@
 
 import type { CardRecord } from "@pinetrie/core"
 import {
+  type DrawnCard,
   dropProps,
   type GridView,
   gridKeyAct,
@@ -32,7 +33,7 @@ export function CardGrid(p: {
   /** The selected card to cell `to`, a card there swapping with it. */
   onMove: (card: CardRecord, to: number) => void
   /** The open card, whole: a `CardFrame` around its box. */
-  renderOpen: (card: CardRecord) => ReactNode
+  renderOpen: (card: DrawnCard) => ReactNode
   /** The selected card is open, drawn whole. */
   open: boolean
   onOpen: (open: boolean) => void

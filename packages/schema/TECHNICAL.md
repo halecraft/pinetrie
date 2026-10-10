@@ -380,7 +380,7 @@ A session is a document per root, the session's own, and `pinetrie:live`.
 | document | id | schema | holds |
 |---|---|---|---|
 | a root's | `root:<RootId>` (`rootDocId`, core) | `RootDoc` | its entries, usage rows, pi's values and lists for its lanes, checkpoints, and in `records` the host's records keyed by its entries (revision, mark, stop, digest) |
-| the session's | `pinetrie:session` | `SessionDoc` | in `records`, the records read across roots: the directory (`pinetrie.root`), every lane's record (`pinetrie.lane`, naming its root), names, offers, banners, bases, the board (`pinetrie.workflow`, `pinetrie.board`), seats, participants and the singletons |
+| the session's | `pinetrie:session` | `SessionDoc` | in `records`, the records read across roots: the directory (`pinetrie.root`), every lane's record (`pinetrie.lane`, naming its root), names, offers, banners, bases, the board's states (`pinetrie.workflow`), seats, participants and the singletons |
 | what streams | `pinetrie:live` | `LiveDoc` | streams, their text, active runs |
 
 - **Two schemas, two handle types** (ADR-0095). `RootDocHandle` and

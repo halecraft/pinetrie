@@ -23,7 +23,6 @@ import {
 } from "@pinetrie/interface"
 import { SCRIPTED_DESCRIPTION } from "@pinetrie/pi"
 import {
-  readBoardPlaces,
   readMarks,
   readNames,
   readNoteColumns,
@@ -43,6 +42,7 @@ import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
 import {
+  boardStateOf,
   composeAt,
   entriesOf,
   idleNow,
@@ -1961,7 +1961,7 @@ async function run(check: Checks["check"]): Promise<void> {
             "dragging a thread card to another state moves it for the other window",
             theirs &&
               id !== undefined &&
-              readBoardPlaces(host.session).get(id)?.state === doing,
+              boardStateOf(readPlaces(host.places), id) === doing,
             `${theirs}`,
           )
           await page.click("#bottom .board-toggle")
@@ -2049,14 +2049,14 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
-        const tasksBefore = readTasks(host.session).size
+        const tasksBefore = readTasks(host.places).size
         await page.keyboard.press("Enter")
         await page.waitForSelector(`${col(0)}[data-card] .composer`, {
           timeout: 15_000,
         })
         const convo = await label(0)
         const opened = await waitFor(
-          () => readTasks(host.session).size === tasksBefore + 1,
+          () => readTasks(host.places).size === tasksBefore + 1,
           5_000,
         )
         const tab = (await page.getAttribute(col(0), "data-card")) ?? ""
@@ -2076,7 +2076,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.click(`${col(0)} .close`)
         await page.click(`${col(0)} .close-discard`).catch(() => {})
         const gone = await waitFor(
-          () => readTasks(host.session).size === tasksBefore,
+          () => readTasks(host.places).size === tasksBefore,
           10_000,
         )
         check(
@@ -3623,7 +3623,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const landed =
         thread === undefined
           ? undefined
-          : readBoardPlaces(host.session).get(thread)?.state
+          : boardStateOf(readPlaces(host.places), thread)
       await page.evaluate(() =>
         (document.activeElement as HTMLElement | null)?.blur(),
       )

@@ -15,8 +15,8 @@ import {
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import {
-  readBoardPlaces,
   readNames,
+  readPlaces,
   readRecords,
   readThreads,
   readWorkflow,
@@ -25,6 +25,7 @@ import { BUDGET } from "@pinetrie/rules"
 import type { Checks } from "../checks.ts"
 import {
   at,
+  boardStateOf,
   START_AGENT,
   SUITE_CONFIG,
   taskHolding,
@@ -138,7 +139,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       const done = readWorkflow(host.session)?.archive
       const bTask = taskHolding(host, threadEnd(treeOf(host), b))
       const bRoot = readThreads(host.session).get(b)?.root
-      const state = readBoardPlaces(host.session).get(bTask)?.state
+      const state = boardStateOf(readPlaces(host.places), bTask)
       if (done === undefined || state === undefined || bRoot === undefined)
         throw new Error("B's task is on the board")
       await user.request({

@@ -124,12 +124,9 @@ cannot reach the wrong document and needs no guard at run time.
   which each client decides for its person.
 - **`LANE`** is written for every lane as it is created, naming its root;
   `work` is null for a lane with no work of its own.
-- **`WORKFLOW` and `BOARD`** (`board.ts`, ADR-0122): the session's workflow
-  states, a singleton, and each task's place on the board, keyed by its
-  `TaskId` (ADR-0116).
-- **`TASK`** (`task.ts`, ADR-0116): a task's record, in the session: who
-  opened it and when, nothing more. What it holds is the places
-  document's.
+- **`WORKFLOW`** (`board.ts`, ADR-0122): the session's workflow states, a
+  singleton. A task is a card on the board (ADR-0126): no record says
+  where it is, who opened it or when; its card and its card's history do.
 - **`QUEUE_HOLD`** (`queue-hold.ts`, ADR-0048 step 7): a thread's queue
   held, keyed by lane, in the session: who held it and when.
 - **The archive gate** reads the tasks a command writes in (`writesIn`) and
@@ -671,16 +668,19 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   thread, read before the undo reverts the card.
 - **`planRootDelete`** (`root.ts`) is what deleting a lifted thread
   writes: its directory record (`ROOT`), its thread's (`THREAD`), and its
-  task's (`planTaskDelete`: record, board place and title), every card
-  still in the root or on the task's canvas removed, its document named
+  task's title (`MARK`), every card still in the root or on the task's
+  canvas removed, the task's own card with them, its document named
   for destruction, and the task for its stacks to be unloaded;
   `planHistorySweep` retires those stacks at the next start, as for any
   task the session lacks.
 - **`emptiedTasks`** (`root.ts`): the tasks a step leaves empty that were
   a new tab's: a thread card that left its canvas for a trash, its thread a
   new root's not yet started (its root one the directory does not name),
-  and nothing left on that canvas or pinned to the task. The host deletes
-  each (`planTaskDelete`) after the move, not undone.
+  and nothing left on that canvas or pinned to the task. The host sends
+  each one's card to the closer's trash in the same step
+  (`planTasksTrashed`, remembering the task), in their history outside any
+  task, since the task leaves their view: the undo key on no task brings
+  the task and its thread back (ADR-0126).
 - **The history's verb is `discarded`** (`verbOf`): the spin-off's card is
   in its sender's trash, as any discard's is.
 
@@ -745,10 +745,10 @@ contents: Yjs derives it from the peer, which this package cannot.
 
 # Tasks (`task.ts`, ADR-0116)
 
-A task is the board's card. Its record (`TASK`) says who opened it and
-when; what it holds is where the places document puts each card: a
-`canvas` place names the task, a rank and a width, so a card has one place
-by construction.
+A task is a card on the board (`board.ts`, ADR-0126), its id its
+`TaskId`, its owner who opened it; what it holds is where the places
+document puts each card: a `canvas` place names the task, a rank and a
+width, so a card has one place by construction.
 
 - **One `TaskIndex`** (`indexTasks(cards, threads)`): each task's canvas in
   order, each canvas card's task (`taskOfCard`), each thread's task
@@ -768,8 +768,9 @@ by construction.
   `ThreadPlacement` says (on a task's canvas just after the thread it forks
   from, `branchAfter` and `rankAfter`, else at its end; where it was
   dropped, `rankOnCanvas`; or in an inventory), and for a task the session
-  does not hold (`TaskOpening`, a new tab's) the task's record and its
-  board place (`placeStarted`). The one planner for a branch or a new tab
+  does not hold (`TaskOpening`, a new tab's) the task's card, made by the
+  host with its opener its owner, at the end of its state (`boardEnd`);
+  refused `no-place` before the board has states. The one planner for a branch or a new tab
   as its column opens (`planOpenThread`, `open.ts`: refused `taken` for an
   id in use, `unknown` for a branch's entry its root lacks or a task the
   session lacks), a copy (`planCopy`) and a spin-off (`planSpinOff`). A
@@ -836,26 +837,38 @@ trash, have no agent and no runner.
 
 Every task is in one workflow state. The workflow is a host-written
 singleton (`WORKFLOW`): the open states in board order, then the closed
-state, always there and always last. A task's place is a host-written
-value keyed by its `TaskId` (`BOARD`): its state, its rank there, who moved
-it, and when.
+state, always there and always last. A task is a card (`KINDS.task`,
+ADR-0126), its id its `TaskId`, placed `{ kind: "board", state, order }`
+(the row's `state` and `order`): the places document is the one record of
+where it is, and its card's history of who moved it there and when. The
+board is the team's: everyone in the session shares it.
 
-- **The board is total** (`boardOf`): every task it is given, in its
-  place's state, by rank, then by id; a task with no place, or one in a
-  state the workflow no longer holds, at the end of the first open state.
-  A missing or stale record never hides a task.
+- **The tasks the session holds are the cards on the board**
+  (`boardTasks`): a task's card in a trash (a new tab closed unsent) is on
+  no board and in no list until the undo key brings it back.
+- **The board is total** (`boardOf`): every task's card on it, in its
+  state, by rank, then by id; one in a state the workflow no longer holds
+  at the end of the first open state, so a stale place never hides a task.
 - **Archived is derived, never stored** (`archivedOf`): the tasks whose
-  place is the archive, with who moved them there and when
-  (`ArchivedTask`), keyed by `TaskId`. Every former reader of the archive
-  record reads it (`readArchived`).
-- **`planTaskMove` decides a move over the board alone.** The sender names
-  the state it saw the task in; one that has left it is refused
-  `task_moved`, naming who moved it and where. `before` is the task it goes
-  before, or the end. The new rank is `orderBetween` its neighbours; with no
-  room, or a neighbour with no place yet, the whole state is renumbered,
-  the others keeping who put them there. A reorder within the archive
-  keeps `by` and `at`, which say when the task was archived and so when its
-  move histories retire (`planHistorySweep`).
+  card is in the archive, with who moved them there and when
+  (`ArchivedTask`), read from the newest event of each card's history that
+  put it there, which a history always keeps; its placer at 0 for a card
+  with none. Every reader of the archive reads it (`readArchived`).
+- **No person's move takes a task's card** (`KINDS.task.moves` false: a
+  move onto the board is refused `no-place`): `planBoardMove` decides the
+  board's own move. The sender names the state it saw the task in; one
+  that has left it is refused `moved`, the card as it is saying where and
+  who put it there. `before` is the task it goes before, or the end.
+  Within one state it is a reorder: its rank alone, its placer kept, so no
+  history step and no event; between states, a move, its sender its
+  placer. With no room between its neighbours the fewest are renumbered
+  (`rankAfter`), each keeping who put it there. The host carries it as any
+  card's write (`placeTask`), a move in its mover's history outside any
+  task.
+- **No undo crosses the archive's edge** (`crossesArchive`,
+  `move-history.ts`): an undo or a redo of a step whose task's card last
+  went into or out of the archive is refused `archived`; the board
+  gathers what crossing it needs.
 - **`transitionOf` says whether a move crosses the archive's edge**:
   `within`, `close` or `reopen`. The host gathers the task's roots'
   documents only to cross it (`apps/pinetrie/host/commands/board.ts`).
@@ -863,9 +876,9 @@ it, and when.
   rename (trimmed; names may repeat), move, remove. The archive is
   renamed only; a state holding a task is not removed, nor the only open
   state.
-- **`placeStarted`** puts a new task at the end of the state its chat names,
-  or of the first open state when it names none, one gone, or the closed
-  one.
+- **`boardEnd`** places a new task's card at the end of the state its
+  chat names, or of the first open state when it names none, one gone, or
+  the closed one.
 - **Order keys are `order.ts`'s**, shared with cards' queues and pins:
   fixed-width base-36, so string order is numeric order; `keyAfter`,
   `orderBetween` (null with no room), `orderKeys`.
@@ -873,7 +886,7 @@ it, and when.
 # The archive (`archive.ts`, ADR-0029, ADR-0122, ADR-0116)
 
 A task put aside for everyone: one in the archive. Moving it there or out
-writes only its board place: entries are immutable, so a task is hidden
+writes only its card's place: entries are immutable, so a task is hidden
 and made read-only, never removed.
 
 - **`planArchive` decides what crossing the edge does**, pure, for a

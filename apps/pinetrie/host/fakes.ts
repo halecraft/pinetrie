@@ -6,6 +6,7 @@
 import {
   type CardId,
   type EntryId,
+  makeCard,
   NO_CONTENT,
   NOBODY,
   type NoteColumnId,
@@ -18,6 +19,9 @@ import {
   taskIdFor,
   threadIdFor,
   type ValueWrite,
+  type WorkflowStateId,
+  type WriterId,
+  workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import type { ThreadLaneHandle, WriteOutcome } from "@pinetrie/pi"
@@ -29,14 +33,16 @@ import {
 } from "@pinetrie/reads"
 import {
   byTarget,
+  CARD_HISTORY,
   canvasOf,
   encodeChat,
+  isBoardCard,
   LANE,
   orderAfter,
+  type PlaceStep,
   planThreadOpen,
   ROOT,
   setRecord,
-  TASK,
 } from "@pinetrie/rules"
 import {
   applyRecordWrites,
@@ -377,16 +383,88 @@ export function putNoteColumn(
 }
 
 /**
- * A task as a thread's opening makes one (`planThreadOpen`): its record,
- * the thread's, and the thread's card on its canvas, in `root`.
+ * `task`'s card on the board in `state`, put there by `by` at `at`, as its
+ * card's history says (ADR-0126): how a test archives a task. A card
+ * already there is not written again.
+ */
+export function placeTask(
+  b: WriteDocs & Pick<FakeBasics, "places">,
+  task: TaskId,
+  state: WorkflowStateId,
+  by: WriterId,
+  at = 1,
+): void {
+  const now = readPlaces(b.places).find(c => c.id === task)
+  const card =
+    now?.kind === "task"
+      ? now
+      : makeCard(
+          "task",
+          task,
+          { kind: "board", state, order: "m" },
+          NO_CONTENT,
+          by,
+        )
+  if (card.place.kind !== "board" || card.place.state !== state || now !== card)
+    applyPlaceSteps(b.places, [
+      {
+        kind: "write",
+        record: {
+          ...card,
+          place: {
+            kind: "board",
+            state,
+            order: card.place.kind === "board" ? card.place.order : "m",
+          },
+          placer: by,
+        },
+      },
+    ])
+  putValue(
+    b,
+    setRecord(CARD_HISTORY, {
+      card: task,
+      events: [
+        { kind: "moved", by, from: null, to: { kind: "board", state }, at },
+      ],
+    }),
+  )
+}
+
+/** The board state `putTask` puts a task's card in, by default. */
+export const TASK_STATE = workflowStateIdFor("open")
+
+/**
+ * A task as a thread's opening makes one (`planThreadOpen`): its card on
+ * the board in `state`, the thread's record, and the thread's card on its
+ * canvas, in `root`.
  */
 export function putTask(
   b: WriteDocs & Pick<FakeBasics, "places">,
   thread: ThreadId,
   task: TaskId = TASK_ID,
   root: RootId = ROOT_ID,
+  state: WorkflowStateId = TASK_STATE,
 ): void {
-  putValue(b, setRecord(TASK, { task, by: STARTER, createdAt: 0 }))
+  const cards = readPlaces(b.places)
+  const made: readonly PlaceStep[] = cards.some(c => c.id === task)
+    ? []
+    : [
+        {
+          kind: "write",
+          record: makeCard(
+            "task",
+            task,
+            {
+              kind: "board",
+              state,
+              order: orderAfter(cards.filter(isBoardCard)),
+            },
+            NO_CONTENT,
+            STARTER,
+          ),
+        },
+      ]
   const opened = planThreadOpen({
     thread,
     origin: ROOT_ORIGIN,
@@ -395,9 +473,9 @@ export function putTask(
     now: 0,
     placement: { kind: "after", task, parent: null },
     opens: null,
-    cards: readPlaces(b.places),
+    cards,
   })
   if (opened.kind !== "open") return
   applyWrites(b, opened.records)
-  applyPlaceSteps(b.places, opened.steps)
+  applyPlaceSteps(b.places, [...made, ...opened.steps])
 }

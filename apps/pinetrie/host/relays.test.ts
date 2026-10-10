@@ -11,10 +11,17 @@ import {
   writerId,
 } from "@pinetrie/core"
 import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
-import { BOARD, NAME, PARTICIPANT, setRecord, WORKFLOW } from "@pinetrie/rules"
+import { NAME, PARTICIPANT, setRecord, WORKFLOW } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Budgets } from "./budgets.ts"
-import { basics, putTask, putValue, record, TASK_ID } from "./fakes.ts"
+import {
+  basics,
+  placeTask,
+  putTask,
+  putValue,
+  record,
+  TASK_ID,
+} from "./fakes.ts"
 import { createRelays, readReachableAgents } from "./relays.ts"
 
 const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
@@ -47,7 +54,7 @@ function setUp() {
     [OTHER, DOING],
     [GONE_TASK, DONE],
   ] as const)
-    putValue(b, setRecord(BOARD, { task, state, rank: "a", by: ADA, at: 1 }))
+    placeTask(b, task, state, ADA)
   for (const [lane, name] of [
     [HERE, "sable-meadow"],
     [FOX, "amber-fox"],

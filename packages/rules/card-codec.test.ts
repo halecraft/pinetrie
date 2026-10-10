@@ -9,6 +9,7 @@ import {
   type Sha256,
   taskIdFor,
   threadIdFor,
+  workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -63,6 +64,13 @@ const EACH: { readonly [K in PlacedKind]: CardRecord } = {
     "thread",
     lane,
     { kind: "canvas", task, order: "m", width: 1 },
+    NO_CONTENT,
+    ada,
+  ),
+  task: makeCard(
+    "task",
+    task,
+    { kind: "board", state: workflowStateIdFor("todo"), order: "m" },
     NO_CONTENT,
     ada,
   ),

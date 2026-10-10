@@ -222,9 +222,10 @@ const moveItems = (
         take,
       ]
     // Put is an inventory card's move, × discards it, and a drag moves it
-    // anywhere; a card on a canvas is no text card.
+    // anywhere; a card on a canvas is no text card, nor one on the board.
     case "inventory":
     case "canvas":
+    case "board":
     case "trash":
       return []
   }

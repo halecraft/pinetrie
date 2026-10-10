@@ -69,7 +69,7 @@ export function createTitles(deps: {
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
 }): Titles {
   const { basics, keeper } = deps
-  const { session, log } = basics
+  const { session, places, log } = basics
   // Tasks an unasked title is being asked for.
   const asking = new Set<TaskId>()
 
@@ -124,7 +124,7 @@ export function createTitles(deps: {
       },
       settle: async title => {
         // An archived task takes no writes (ADR-0029).
-        if (archivedIn([task], readArchived(session)) !== null) return
+        if (archivedIn([task], readArchived(session, places)) !== null) return
         const marks = readMarks(session)
         if (!titleStillWanted(marks.get(task), by)) return
         const planned = planMark({
@@ -132,7 +132,7 @@ export function createTitles(deps: {
           title,
           by,
           now: basics.now(),
-          tasks: new Set(readTasks(session).keys()),
+          tasks: readTasks(places),
           marks,
           columns: new Set(),
           columnTitles: new Map(),

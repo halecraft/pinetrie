@@ -57,6 +57,8 @@ const FieldsSchema = Type.Object({
   /** Absent from an event stored before tasks (ADR-0116): read as "". */
   task: Type.Optional(Str),
   width: Type.Optional(Str),
+  /** Absent from an event stored before tasks were cards (ADR-0126): read as "". */
+  state: Type.Optional(Str),
 })
 const OrNull = <T extends ReturnType<typeof Type.Object>>(t: T) =>
   Type.Union([t, Type.Null()])

@@ -150,6 +150,8 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
       return by === null
         ? "not lifted back: its thread or its task has more in it"
         : `not lifted back: ${who(by, reader)} replied`
+    case "archived":
+      return "not undone: restore or archive it on the board"
     case "exists":
     case "no-place":
       return "not moved"
@@ -170,7 +172,7 @@ export const PUT_TITLE =
 export const DISCARD_CARD = "×"
 export const DISCARD_CARD_TITLE =
   "discard (Ctrl+Shift+Backspace) · the undo key brings it back"
-/** Closing a fresh column that holds text: the default, and the final choice. */
+/** Closing an unstarted thread's column that holds text: the default, and the final choice. */
 export const KEEP_IN_INVENTORY = "keep in inventory"
 export const DISCARD = "discard"
 /** The close ask's question, by how many cards hold text. */

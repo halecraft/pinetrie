@@ -19,6 +19,7 @@ import {
   textCardId,
   textSourceOf,
   WRAPS,
+  workflowStateIdFor,
   writerId,
 } from "./index.ts"
 
@@ -113,6 +114,13 @@ test("a card's words are where its kind says (`KINDS`' text): textSourceOf agree
       ADA,
     ),
     makeCard("thread", thread, place, NO_CONTENT, ADA),
+    makeCard(
+      "task",
+      `k-${UUID}` as TaskId,
+      { kind: "board", state: workflowStateIdFor("open"), order: "a" },
+      NO_CONTENT,
+      ADA,
+    ),
     makeCard(
       "note-column",
       `n-${UUID}` as NoteColumnId,

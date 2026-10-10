@@ -12,7 +12,7 @@
 // (`BoardShown`, ADR-0115).
 
 import type {
-  BoardPlace,
+  CardRecord,
   TaskId,
   Workflow,
   WorkflowState,
@@ -138,7 +138,8 @@ export const BOARD_SEARCH = "board-search"
 
 export interface BoardViewInput {
   readonly workflow: Workflow
-  readonly places: ReadonlyMap<TaskId, BoardPlace>
+  /** Every card: the board's are each task's (ADR-0126). */
+  readonly cards: readonly CardRecord[]
   /** Each task with a message (`summariesOf`): its first line is a titled card's body. */
   readonly summaries: ReadonlyMap<TaskId, TaskSummary>
   /** Each task's thread card header (`threadCardHeads`), which the sidebar reads too. */
@@ -152,9 +153,13 @@ export interface BoardViewInput {
 const bodyOf = (label: string, line: string | undefined): string | null =>
   line === undefined || line === "" || line === label ? null : line
 
+/**
+ * The board as drawn: each task with a message (`summaries`), so a new
+ * tab's task joins it with its first send.
+ */
 export function boardView(input: BoardViewInput): BoardView {
   const { workflow, search, summaries } = input
-  const board = boardOf(workflow, input.places, summaries.keys())
+  const board = boardOf(workflow, input.cards)
   const keeps = search === null ? null : boardFilter(search, input.me)
   const headOf = (task: TaskId): ThreadCardHead =>
     input.heads.get(task) ?? {

@@ -14,6 +14,7 @@ import path from "node:path"
 import { NotAWriterError } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import {
+  type ArchivedTask,
   atEntry,
   type CardCommand,
   type CardId,
@@ -31,12 +32,13 @@ import {
   type ThreadId,
   type TreeIndex,
   threadAt,
+  type WorkflowStateId,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readAccepted,
-  readBoardPlaces,
+  readCardHistories,
   readHeld,
   readHeldIndex,
   readLanes,
@@ -46,7 +48,7 @@ import {
   readThreads,
   readWorkflow,
 } from "@pinetrie/reads"
-import { indexTasks, NONE_BLANK } from "@pinetrie/rules"
+import { archivedOf, indexTasks, NONE_BLANK } from "@pinetrie/rules"
 import {
   hasLaneRecord,
   type LiveDocHandle,
@@ -101,6 +103,29 @@ export function taskAt(
     client.cards.current(),
     readThreads(client.session),
   ).taskOfThread.get(thread)
+}
+
+/** The board state `task`'s card is in, as `cards` say; undefined for none on the board. */
+export const boardStateOf = (
+  cards: readonly CardRecord[],
+  task: TaskId,
+): WorkflowStateId | undefined => {
+  const card = cards.find(c => c.id === task)
+  return card?.place.kind === "board" ? card.place.state : undefined
+}
+
+/** The tasks in the archive as `client` holds the board (`archivedOf`). */
+export const archivedFor = (
+  client: Pick<SessionClient, "session" | "cards">,
+): ReadonlyMap<TaskId, ArchivedTask> => {
+  const workflow = readWorkflow(client.session)
+  return workflow === null
+    ? new Map()
+    : archivedOf(
+        workflow,
+        client.cards.current(),
+        readCardHistories(client.session),
+      )
 }
 
 /** How the two starts send at the root (ADR-0021), and a branch's. */
@@ -464,7 +489,7 @@ export function moveTaskTo(
   const first = workflow?.open[0]
   if (workflow === null || task === undefined || first === undefined)
     throw new Error(`no board place for ${entry}`)
-  const from = readBoardPlaces(client.session).get(task)?.state ?? first.id
+  const from = boardStateOf(client.cards.current(), task) ?? first.id
   return client.request({
     kind: "move-task",
     task,

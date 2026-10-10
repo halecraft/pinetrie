@@ -281,12 +281,15 @@ pinetrie:live      LiveDoc                  streams and active runs: compacted
                                           restarted host
 pinetrie:card-places
                  PlacesDoc, Yjs           where every card is (ADR-0059),
-                                          Yjs so the host undoes moves
-                                          (ADR-0066)
-moves:<writer>:<RootId>
+                                          a task's on the board among them
+                                          (ADR-0126); Yjs so the host undoes
+                                          moves (ADR-0066)
+moves:<writer>:<TaskId>
                  UndoDoc, one a person    a person's history of moves in
-                 and root                 that root (ADR-0066): the host's
-                                          only, shared with no client
+                 and task                 that task (ADR-0066, ADR-0116):
+                                          the host's only, shared with no
+                                          client; moves:<writer>, theirs
+                                          outside any task (ADR-0126)
 presence         ephemeral                who reads which thread, in which root
 ```
 

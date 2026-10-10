@@ -2,13 +2,19 @@
 // `entryId`. Core's tests use it, and other packages' tests as
 // `@pinetrie/core/fixtures`; production code never imports it.
 
+import { makeCard, NO_CONTENT, type TaskCard } from "./cards.ts"
 import {
   type EntryId,
   entryId,
+  type TaskId,
   type TextCardId,
   type ThreadId,
   textCardId,
   threadIdFor,
+  type WorkflowStateId,
+  type WriterId,
+  workflowStateIdFor,
+  writerId,
 } from "./index.ts"
 import type { AgentMessageLike, EntryLike } from "./tree.ts"
 
@@ -24,6 +30,21 @@ export function cardIdFor(name: string): TextCardId {
     throw new Error(`a test card's name is at most 6 ASCII characters: ${name}`)
   return textCardId(`01a0ffd2-0000-7000-8000-${tail}`)
 }
+
+/** The board state a fixture's task is in when its test names none. */
+export const FIXTURE_STATE = workflowStateIdFor("fixture")
+
+/**
+ * A task's card on the board (ADR-0126), at `order` in `state`, made by
+ * `by`: what makes a task one the session holds.
+ */
+export const taskCard = (
+  task: TaskId,
+  order = "a",
+  state: WorkflowStateId = FIXTURE_STATE,
+  by: WriterId = writerId("ada@x.io"),
+): TaskCard =>
+  makeCard("task", task, { kind: "board", state, order }, NO_CONTENT, by)
 
 /** The thread a fixture's entry is in when its test names none. */
 export const FIXTURE_THREAD = threadIdFor("fixture")

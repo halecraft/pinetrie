@@ -9,8 +9,8 @@ import {
 } from "@pinetrie/core"
 import { threadCardOf } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
+import { tasksWith } from "./fixtures.ts"
 import { planHeldRoots } from "./held-roots.ts"
-import { tasksOf } from "./tasks.ts"
 
 const record = (n: string): RootRecord => ({
   root: rootIdFor(`r${n}`),
@@ -29,7 +29,7 @@ const _directory = new Map(
 )
 /** Task `k-<n>` holds the thread `t-<n>`, in root `r<n>` (ADR-0116). */
 const K = (n: string) => taskIdFor(n)
-const tasks = tasksOf({
+const tasks = tasksWith({
   known: ["1", "2", "3", "4"].map(K),
   cards: ["1", "2", "3", "4"].map(n =>
     threadCardOf({

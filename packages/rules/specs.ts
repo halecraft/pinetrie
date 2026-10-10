@@ -7,7 +7,7 @@ import type { HostNamespace, Target, ValueWrite } from "@pinetrie/core"
 import { ACCEPTED } from "./accepted.ts"
 import { BANNER } from "./banner.ts"
 import { BASE } from "./base.ts"
-import { BOARD, WORKFLOW } from "./board.ts"
+import { WORKFLOW } from "./board.ts"
 import { BUDGET } from "./budget.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"
 import { COMMANDS } from "./commands.ts"
@@ -21,7 +21,6 @@ import { QUEUE_HOLD } from "./queue-hold.ts"
 import type { RecordSpec } from "./records.ts"
 import { ROOT } from "./roots.ts"
 import { SEAT } from "./seat.ts"
-import { TASK } from "./task.ts"
 import { THREAD } from "./thread.ts"
 import { VERDICT } from "./verdict.ts"
 import { FILES_LOST, LANE, PROJECT, REVISION } from "./work.ts"
@@ -36,7 +35,6 @@ export type AnyRecordSpec = Pick<
 export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   BANNER,
   BASE,
-  BOARD,
   BUDGET,
   CARD_HISTORY,
   COMMANDS,
@@ -56,7 +54,6 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   REVISION,
   ROOT,
   SEAT,
-  TASK,
   TRACE,
   VERDICT,
   WORKFLOW,

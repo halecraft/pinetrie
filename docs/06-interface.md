@@ -801,10 +801,11 @@ The rail is E; the column is T. Seeing both at once is the product.
   conversation.
 - **A new tab is a task from the moment it opens** (ADR-0126): its thread,
   not yet started, is a card on its canvas, and the task is in your sidebar
-  and on the board, at the end of the first open state from your list's ＋,
-  of its own state from a board column's (ADR-0122). Others find it on the
-  board, and its agent can be asked. Closing it unsent with discard takes
-  the task away. Its first send makes the root.
+  at once, placed at the end of the first open state from your list's ＋,
+  of its own state from a board column's (ADR-0122). Its first send makes
+  the root, and the board shows it from then: others find it there.
+  Closing it unsent with discard sends the task to your trash with its
+  thread, and the undo key, on no task, brings both back.
 - **An empty session** shows the board, with nothing in it, and ＋.
 - **A page with nothing in the sidebar** (a first visit, or a list you
   emptied) opens on the board, which shows every root to open: nothing opens
@@ -1194,11 +1195,13 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
   attention document (`attention:<you>`, ADR-0077), on every device of
   yours: an entry id (`mentionsSince`), at or before which every mention is
   seen, and the ids of later ones you have seen.
-- **The board** is two host-written records (ADR-0122): the workflow
-  (`pinetrie.workflow`, the open states in order, then the archive) and each
-  root's place (`pinetrie.board`, by its id: its state, its rank there, who
-  moved it and when). A root in the archive is archived; the host
-  refuses commands that would write in it (ADR-0029).
+- **The board** is the team's (ADR-0122, ADR-0126): a host-written
+  workflow (`pinetrie.workflow`, the open states in order, then the
+  archive), and each task's card on it, in a state at a rank there; who
+  moved it there and when is its card's history. A task in the archive is
+  archived; the host refuses commands that would write in it (ADR-0029).
+  A move on the board is undone by its mover's undo key on no task, unless
+  it crossed the archive's edge: archiving and restoring are the board's.
 - **Which task you are on, each task's view (which of its columns you
   unfolded, how each reads, what a thread you opened starts with) and
   whether the board is open** are view state, kept in the browser per

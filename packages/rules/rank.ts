@@ -1,10 +1,11 @@
-// rank — where a card goes on a canvas (ADR-0116): a rank just after a
-// card, a drop's rank, and where a branch lands, beside the thread it forks
-// from.
+// rank — where a card goes among ranked cards (ADR-0116): a rank just after
+// a card, a drop's rank, and where a branch lands on a canvas, beside the
+// thread it forks from.
 
 import {
   type CardId,
   type CardRecord,
+  type OrderedPlace,
   placed,
   type ThreadId,
 } from "@pinetrie/core"
@@ -27,14 +28,17 @@ export function branchAfter(
   return at < 0 ? canvas.length - 1 : at
 }
 
+/** A card at a ranked place: on a canvas, on the board. */
+type RankedCard = CardRecord & { readonly place: OrderedPlace }
+
 /**
- * A rank for a card going just after index `after` of `canvas` (-1: before
- * every card), and the cards given new ranks to make room when its
- * neighbours have none between them (`respace`), each at its new rank.
- * Pure.
+ * A rank for a card going just after index `after` of `canvas`, ranked
+ * cards in order (-1: before every card), and the cards given new ranks to
+ * make room when its neighbours have none between them (`respace`), each
+ * at its new rank. Pure.
  */
 export function rankAfter(
-  canvas: readonly CanvasCard[],
+  canvas: readonly RankedCard[],
   after: number,
 ): { readonly order: string; readonly respaced: readonly CardRecord[] } {
   const order =
@@ -61,12 +65,13 @@ export function rankAfter(
 }
 
 /**
- * The rank of a drop on `canvas` just after the card `after` (null: before
- * every card), or at the end when that card is not on it (`CanvasTarget`),
- * with the cards given new ranks to make room (`rankAfter`). Pure.
+ * The rank of a drop among `canvas`, ranked cards in order, just after the
+ * card `after` (null: before every card), or at the end when that card is
+ * not among them (`CanvasTarget`), with the cards given new ranks to make
+ * room (`rankAfter`). Pure.
  */
 export function rankOfDrop(
-  canvas: readonly CanvasCard[],
+  canvas: readonly RankedCard[],
   after: CardId | null,
 ): ReturnType<typeof rankAfter> {
   const at = canvas.findIndex(c => c.id === after)

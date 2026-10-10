@@ -284,7 +284,7 @@ export function createCommands(deps: CommandDeps): Commands {
       case "carry-on":
         return settled(await handleCarryOn(deps, intent.lane, writer))
       case "move-task":
-        return settled(await handleTaskMove(deps, writer, intent))
+        return handleTaskMove({ ...deps, moves: cardCommands }, writer, intent)
       case "workflow":
         return settled(await handleWorkflow(deps, intent))
       case "mark":
@@ -373,11 +373,11 @@ async function refuseHeld(
 }
 
 function refuseInArchive(
-  basics: Pick<Basics, "session">,
+  basics: Pick<Basics, "session" | "places">,
   tasks: readonly TaskId[],
 ): Outcome | null {
-  const { session } = basics
-  const archived = readArchived(session)
+  const { session, places } = basics
+  const archived = readArchived(session, places)
   if (archived.size === 0) return null
   const record = archivedIn(tasks, archived)
   if (record === null) return null

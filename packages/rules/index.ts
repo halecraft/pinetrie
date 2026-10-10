@@ -88,17 +88,19 @@ export {
 } from "./blocks.ts"
 export {
   archivedOf,
-  BOARD,
   type Board,
+  type BoardCard,
   type BoardColumn,
+  type BoardMove,
+  boardEnd,
   boardOf,
-  placeStarted,
-  planTaskMove,
+  boardTasks,
+  isBoardCard,
+  planBoardMove,
   planWorkflowEdit,
   planWorkflowSeed,
   stateIn,
   statesOf,
-  type TaskMovePlan,
   type Transition,
   transitionOf,
   WORKFLOW,
@@ -288,6 +290,7 @@ export { type MarginCard, marginCards, marginCounts } from "./margin.ts"
 export { MARK, planMark } from "./mark.ts"
 export {
   cardsOfParts,
+  crossesArchive,
   historyOf,
   planHistorySweep,
   type UndoResult,
@@ -462,7 +465,7 @@ export {
 export {
   emptiedTasks,
   planRootDelete,
-  planTaskDelete,
+  planTasksTrashed,
   type RootDelete,
 } from "./root.ts"
 export { ROOT } from "./roots.ts"
@@ -508,7 +511,6 @@ export {
   planThreadOpen,
   rootOfPlace,
   rootsHeld,
-  TASK,
   type TaskIndex,
   type TaskOpening,
   type ThreadOpen,

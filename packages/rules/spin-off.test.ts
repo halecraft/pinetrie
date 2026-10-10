@@ -9,9 +9,10 @@ import {
   type TextCard,
   taskIdFor,
   threadIdFor,
+  workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor, taskCard } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { threadCardOf } from "./fixtures.ts"
 import { planRootDelete } from "./root.ts"
@@ -28,6 +29,10 @@ const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
 const C1 = cardIdFor("c1")
 const canvasKey = { kind: "canvas", task: NEW_TASK } as const
+const SPIN_WORKFLOW = {
+  open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
+  archive: { id: workflowStateIdFor("x"), name: "Done" },
+}
 /** Your message at the thread: a card at a thread, in its task. */
 const note = {
   kind: "composing",
@@ -69,7 +74,7 @@ describe("planSpinOff (ADR-0111)", () => {
       text: over.text ?? " plan it @agent ",
       roots: over.roots ?? new Set(),
       threads: new Set(),
-      opens: { state: null, workflow: null, board: new Map() },
+      opens: { state: null, workflow: SPIN_WORKFLOW },
       now: 5,
     })
 
@@ -87,10 +92,10 @@ describe("planSpinOff (ADR-0111)", () => {
       },
     })
     const opened = planned.kind === "spin" ? planned.open : null
-    expect(opened?.records.map(r => r.namespace)).toEqual([
-      "pinetrie.thread",
-      "pinetrie.task",
-    ])
+    expect(opened?.records.map(r => r.namespace)).toEqual(["pinetrie.thread"])
+    expect(opened?.steps[0]).toMatchObject({
+      record: { kind: "task", id: NEW_TASK, place: { kind: "board" } },
+    })
     expect(
       opened?.records.find(r => r.namespace === "pinetrie.thread"),
     ).toMatchObject({ value: { origin: { kind: "spun", card: C1 } } })
@@ -323,7 +328,7 @@ describe("planLiftRoot (S139)", () => {
   })
 })
 
-test("planRootDelete: its directory record, its thread's, its task's record, board place and title, the cards in it and on its task's canvas, its document and the task's stacks", () => {
+test("planRootDelete: its directory record, its thread's, its task's title, the cards in it, on its task's canvas and the task's own, its document and the task's stacks", () => {
   const inThread = card({
     id: cardIdFor("c2"),
     place: { ...note, thread: STARTS },
@@ -338,19 +343,18 @@ test("planRootDelete: its directory record, its thread's, its task's record, boa
     THREAD,
     STARTS,
     TEST_TASK,
-    [card(), inThread, onCanvas],
+    [card(), inThread, onCanvas, taskCard(TEST_TASK)],
     new Map([[STARTS, THREAD]]),
   )
   expect(plan.values.map(v => v.namespace)).toEqual([
     "pinetrie.root",
     "pinetrie.thread",
-    "pinetrie.task",
-    "pinetrie.board",
     "pinetrie.mark",
   ])
   expect(plan.cards).toEqual([
     { kind: "remove", id: cardIdFor("c2") },
     { kind: "remove", id: STARTS },
+    { kind: "remove", id: TEST_TASK },
   ])
   expect(plan.doc).toBe(`root:${THREAD}`)
   expect(plan.histories).toBe(TEST_TASK)

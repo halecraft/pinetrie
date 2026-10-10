@@ -13,6 +13,7 @@ import {
   taskIdFor,
   threadIdFor,
   type ValueWrite,
+  workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
@@ -27,8 +28,8 @@ import {
   PARTICIPANT,
   PROJECT,
   setRecord,
-  TASK,
   THREAD,
+  WORKFLOW,
 } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
@@ -342,8 +343,16 @@ describe("sendChat", () => {
     expect(names.calls.map(c => c.method)).toEqual(["ensure"])
   })
 
-  test("a thread's start is planned with its send and written before it: its card on its task's canvas, and a new task's record (ADR-0116)", async () => {
+  test("a thread's start is planned with its send and written before it: its card on its task's canvas, and a new task's card on the board (ADR-0116, ADR-0126)", async () => {
     const { b, records, deps } = setUp()
+    const doing = workflowStateIdFor("d")
+    putValue(
+      b,
+      setRecord(WORKFLOW, {
+        open: [{ id: doing, name: "Doing" }],
+        archive: { id: workflowStateIdFor("x"), name: "Done" },
+      }),
+    )
     await sendChat(deps, ALICE, "s-1", {
       ...chat("a new task"),
       at: { kind: "branch", thread: NEW, at: null, task: NEW_TASK },
@@ -353,11 +362,13 @@ describe("sendChat", () => {
       task: NEW_TASK,
       width: 1,
     })
+    expect(readPlaces(b.places).find(c => c.id === NEW_TASK)?.place).toEqual({
+      kind: "board",
+      state: doing,
+      order: expect.any(String),
+    })
     const written = records.calls.flatMap(c => c.args[0] as ValueWrite[])
-    expect(written.map(w => w.namespace)).toEqual([
-      THREAD.namespace,
-      TASK.namespace,
-    ])
+    expect(written.map(w => w.namespace)).toEqual([THREAD.namespace])
   })
 
   test("a branch naming a thread that has started is refused, and nothing is written", async () => {

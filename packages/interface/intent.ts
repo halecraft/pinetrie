@@ -983,7 +983,7 @@ const closeTask = closeTaskEffects
 export const afterTaskMove = (
   outcome: Outcome,
   moved: readonly Effect[],
-): readonly Effect[] => (outcome.kind === "moved-task" ? moved : [])
+): readonly Effect[] => (outcome.kind === "moved" ? moved : [])
 
 /** `reconcileName`'s step, as effects. */
 export function nameEffects(step: NameStep | null): readonly Effect[] {

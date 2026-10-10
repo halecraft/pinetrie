@@ -16,10 +16,9 @@ import {
 } from "@pinetrie/core"
 import { threadCardOf } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
-import { entry, indexOf } from "./fixtures.ts"
+import { entry, indexOf, tasksWith } from "./fixtures.ts"
 import { initialLayout, type Layout } from "./layout.ts"
 import { holdsText, ownCards, unsentSignals, withFilled } from "./signals.ts"
-import { tasksOf } from "./tasks.ts"
 
 const _TEST_THREAD = threadIdFor("e")
 const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -77,7 +76,7 @@ const FAR_THREAD = threadIdFor("far")
 /** A branch not yet started on e1's canvas, and one on g1's (ADR-0126). */
 const BRANCH = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
 const G_BRANCH = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
-const tasks = tasksOf({
+const tasks = tasksWith({
   known: ["e1", "g1", "f1"].map(K),
   cards: [
     ...(

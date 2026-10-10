@@ -6,17 +6,26 @@
 // it, a new root lands where its chat says, and the records reach another
 // client.
 
-import { entryId, ROOT, type TaskId } from "@pinetrie/core"
+import { DISCARDED, entryId, ROOT, type TaskId } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readArchived,
-  readBoardPlaces,
   readMarks,
+  readPlaces,
   readWorkflow,
 } from "@pinetrie/reads"
+import { newRootId, newTaskId, newThreadId } from "@pinetrie/session"
 import type { Checks } from "../checks.ts"
-import { join, START_CHAT, taskHolding, waitFor, withHost } from "../harness.ts"
+import {
+  archivedFor,
+  boardStateOf,
+  join,
+  START_CHAT,
+  taskHolding,
+  waitFor,
+  withHost,
+} from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 export const scenario: Scenario = {
@@ -54,12 +63,12 @@ async function run(check: Checks["check"]): Promise<void> {
         taskHolding(host, entryId(r1)),
         taskHolding(host, entryId(r2)),
       ]
-      const places = readBoardPlaces(host.session)
+      const cards = readPlaces(host.places)
+      const states = [boardStateOf(cards, id1), boardStateOf(cards, id2)]
       check(
         "a new root lands in the state its chat names, else the first open one",
-        places.get(id1)?.state === doing.id &&
-          places.get(id2)?.state === backlog.id,
-        JSON.stringify([places.get(id1)?.state, places.get(id2)?.state]),
+        states[0] === doing.id && states[1] === backlog.id,
+        JSON.stringify(states),
       )
 
       const closed = await ada.request({
@@ -69,15 +78,12 @@ async function run(check: Checks["check"]): Promise<void> {
         to: done.id,
         before: null,
       })
-      const seen = await waitFor(
-        () => readArchived(bea.session).has(id1),
-        10_000,
-      )
+      const seen = await waitFor(() => archivedFor(bea).has(id1), 10_000)
       const refused = await bea.chat("too late", { kind: "entry", id: r1 })
       check(
         "a root moved to Done is archived for another client, and a chat into it is refused naming the mover",
-        closed.kind === "moved-task" &&
-          readArchived(host.session).get(id1)?.by === ada.writer &&
+        closed.kind === "moved" &&
+          readArchived(host.session, host.places).get(id1)?.by === ada.writer &&
           seen >= 0 &&
           refused.kind === "refused" &&
           refused.message.startsWith("archived by ada"),
@@ -101,9 +107,12 @@ async function run(check: Checks["check"]): Promise<void> {
       const accepted = await bea.chat("back again", { kind: "entry", id: r1 })
       check(
         "a move from a state the root has left is refused naming who moved it; moved out of Done, it takes writes again",
-        late.kind === "refused" &&
-          late.message === "not moved: ada moved it to Done first" &&
-          reopened.kind === "moved-task" &&
+        late.kind === "unmoved" &&
+          late.code === "moved" &&
+          late.by === ada.writer &&
+          late.place?.kind === "board" &&
+          late.place.state === done.id &&
+          reopened.kind === "moved" &&
           accepted.kind === "appended",
         `${late.kind} ${reopened.kind} ${accepted.kind}`,
       )
@@ -116,6 +125,55 @@ async function run(check: Checks["check"]): Promise<void> {
           mark?.title === "Tab names" &&
           mark.by === bea.writer,
         titled.kind,
+      )
+      // A task is a card (ADR-0126): a move on the board is its mover's,
+      // undone by their undo key outside any task.
+      const forward = await ada.request({
+        kind: "move-task",
+        task: id2,
+        from: backlog.id,
+        to: doing.id,
+        before: null,
+      })
+      const back = await ada.undoMoves(null, "undo")
+      check(
+        "a move on the board is undone by its mover's undo key outside any task, the task back in its state",
+        forward.kind === "moved" &&
+          back.kind === "undone" &&
+          boardStateOf(readPlaces(host.places), id2) === backlog.id,
+        `${forward.kind} ${back.kind}`,
+      )
+
+      // A new tab closed unsent goes to its closer's trash with its task,
+      // and the undo key outside any task brings both back.
+      const tab = newThreadId()
+      const tabTask = newTaskId()
+      const opened = await ada.request({
+        kind: "open-thread",
+        thread: tab,
+        root: newRootId(),
+        at: null,
+        task: tabTask,
+        state: null,
+      })
+      const shut = await ada.moveCard(
+        { card: tab, from: { kind: "canvas", task: tabTask }, to: DISCARDED },
+        undefined,
+        null,
+        tabTask,
+      )
+      const trashed = readPlaces(host.places).find(c => c.id === tabTask)?.place
+      const undone = await ada.undoMoves(null, "undo")
+      const now = readPlaces(host.places)
+      check(
+        "an unsent new tab closed is undone whole by its closer's undo key outside any task: its task and its thread back",
+        opened.kind === "moved" &&
+          shut.kind === "accepted" &&
+          trashed?.kind === "trash" &&
+          undone.kind === "undone" &&
+          boardStateOf(now, tabTask) === backlog.id &&
+          now.find(c => c.id === tab)?.place.kind === "canvas",
+        `${opened.kind} ${shut.kind} ${trashed?.kind} ${undone.kind}`,
       )
       await Promise.all([ada.close(), bea.close()])
     },

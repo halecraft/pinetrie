@@ -29,7 +29,6 @@ import {
   type RootView,
   readAccepted,
   readBases,
-  readBoardPlaces,
   readLanes,
   readOffers,
   readParticipantNames,
@@ -149,7 +148,7 @@ export async function sendChat(
   // another's, but for the task its thread was opened in, in that root
   // (ADR-0126). A branch elsewhere goes in a task the session holds.
   if (chat.at.kind === "branch") {
-    const known = readTasks(session).has(chat.at.task)
+    const known = readTasks(deps.basics.places).has(chat.at.task)
     const opened = readThreads(session).get(chat.at.thread)?.root === chat.root
     if (chat.at.at === null && readRoots(session).has(chat.root))
       return {
@@ -326,12 +325,11 @@ export async function sendChat(
                 ? threadAt(index, chat.at.at)
                 : null,
           },
-          opens: readTasks(session).has(begun.starts.task)
+          opens: readTasks(deps.basics.places).has(begun.starts.task)
             ? null
             : {
                 state: begun.starts.state,
                 workflow: readWorkflow(session),
-                board: readBoardPlaces(session),
               },
           // As they are now, after the gathering's awaits.
           cards: readPlaces(deps.basics.places),

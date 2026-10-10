@@ -30,8 +30,14 @@ import type { NoteColumnView } from "./note-column-view.ts"
 import type { Reader } from "./send.ts"
 import { bareThreadFace, type ThreadFace } from "./thread-face.ts"
 
-/** The kinds of card that are drawn: those with a record. */
-export type DrawnKind = CardRecord["kind"]
+/**
+ * The cards drawn by their kind's renderings: every one with a record but
+ * a task's, which the board draws (`boardView`).
+ */
+export type DrawnCard = Exclude<CardRecord, { readonly kind: "task" }>
+
+/** The kinds of card drawn by their renderings (`DrawnCard`). */
+export type DrawnKind = DrawnCard["kind"]
 
 /** A text card's face: its place's colour, its owner, its first lines. */
 export interface TextFace {
@@ -114,7 +120,7 @@ const firstLines = (text: string): string =>
   text.trimStart().split("\n").slice(0, 3).join("\n").trimEnd()
 
 /** `card` at its least detail. */
-export function faceOf(card: CardRecord, facts: FaceFacts): Face {
+export function faceOf(card: DrawnCard, facts: FaceFacts): Face {
   switch (card.kind) {
     case "text":
       return {
@@ -212,8 +218,9 @@ export type Detail = "face" | "normal" | "whole"
  * list draw normal, a canvas whole, an inventory faces in its grid (its
  * selected card normal in the preview, and whole when opened). An entry's
  * margin draws its comments normal under the entry while it is open, and a
- * face, their count, while it is shut (`detailOf`). A discarded card is
- * drawn nowhere; were it drawn, it would be a face.
+ * face, their count, while it is shut (`detailOf`). The board draws its
+ * task cards as faces. A discarded card is drawn nowhere; were it drawn,
+ * it would be a face.
  */
 export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
   composing: "normal",
@@ -224,6 +231,7 @@ export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
   "task-pinned": "normal",
   canvas: "whole",
   inventory: "face",
+  board: "face",
   trash: "face",
 }
 

@@ -14,13 +14,14 @@
 // - An ask card's relay moves from `fact` to `relay`.
 // - A card's history event `followed` (a fresh card that followed its
 //   column's first send) reads `moved`.
+// - Each task becomes its card on the board (0013-task-cards, which plans
+//   from the same records), so a new tab's task opened here is a card too.
 //
 // Planned with the rules it replaces' successors, pure; one write. Delete
 // this file once Duane's store has run it.
 
 import { batch } from "@kyneta/schema"
 import {
-  type BoardPlace,
   type CardRecord,
   cardIdOfKind,
   isRootId,
@@ -31,7 +32,7 @@ import {
   parseCardId,
   ROOT_ORIGIN,
   SESSION_TARGET,
-  type TaskId,
+  type TaskCard,
   type ThreadId,
   type ValueWrite,
   type Workflow,
@@ -39,9 +40,10 @@ import {
 } from "@pinetrie/core"
 import { newId } from "@pinetrie/pi"
 import { PLACES_DOC_ID, SESSION_DOC_ID } from "@pinetrie/protocol/messages"
-import { readBoardPlaces, readTasks, readWorkflow } from "@pinetrie/reads"
+import { readWorkflow } from "@pinetrie/reads"
 import {
   afterSteps,
+  boardTasks,
   CARD_HISTORY,
   decodeCard,
   encodeCard,
@@ -55,6 +57,7 @@ import {
   readNamespace,
   SessionDoc,
 } from "@pinetrie/schema"
+import { planStoredTaskCards } from "./0013-task-cards.ts"
 import type { Migration } from "./index.ts"
 
 /** A stored row, its fields as strings. */
@@ -64,7 +67,7 @@ type Row = Readonly<Record<string, string>>
 export interface UnstartedPlan {
   /** Every row, whole, in the new shape. */
   readonly rows: Readonly<Record<string, Row>>
-  /** Threads' and tasks' records, and each history rewritten. */
+  /** Threads' records, and each history rewritten. */
   readonly records: readonly ValueWrite[]
 }
 
@@ -101,23 +104,24 @@ const historyMoved = (stored: unknown): unknown => {
 
 /**
  * The places' rows and the session's records in the new shape, pure. Every
- * row is written whole, since each loses `root`; a fresh column's thread
- * and task are made where the session lacks them.
+ * row is written whole, since each loses `root`; each task's card
+ * (`planTaskCards`) is among them, and a fresh column's thread and task
+ * are made where the session lacks them.
  */
 export function planUnstartedThreads(input: {
   readonly rows: Readonly<Record<string, Row>>
   /** The keys of the thread records stored. */
   readonly threads: ReadonlySet<string>
-  readonly tasks: ReadonlySet<TaskId>
+  /** Each task's card, as 0013-task-cards plans it. */
+  readonly taskCards: readonly TaskCard[]
   readonly workflow: Workflow | null
-  readonly board: ReadonlyMap<TaskId, BoardPlace>
   readonly histories: Readonly<Record<string, unknown>>
   readonly now: number
   readonly newColumn: () => NoteColumnId
 }): UnstartedPlan {
   const records: ValueWrite[] = []
   const kept: Record<string, Row> = {}
-  let cards: CardRecord[] = []
+  let cards: CardRecord[] = [...input.taskCards]
   const fresh = new Map<string, { id: string; row: Row }[]>()
   for (const [id, stored] of Object.entries(input.rows).sort(([a], [b]) =>
     a < b ? -1 : 1,
@@ -135,7 +139,7 @@ export function planUnstartedThreads(input: {
     if (card === undefined) kept[id] = row
     else cards.push(card)
   }
-  const tasks = new Set(input.tasks)
+  const tasks = new Set(boardTasks(cards))
   for (const [column, members] of [...fresh].sort(([a], [b]) =>
     a < b ? -1 : 1,
   )) {
@@ -176,11 +180,7 @@ export function planUnstartedThreads(input: {
         placement: { kind: "after", task, parent: null },
         opens: tasks.has(task)
           ? null
-          : {
-              state: null,
-              workflow: input.workflow,
-              board: input.board,
-            },
+          : { state: null, workflow: input.workflow },
         cards,
       })
       if (opened.kind === "open") {
@@ -248,18 +248,18 @@ export const unstartedThreads: Migration = {
     await hydrated(PLACES_DOC_ID)
     const session = exchange.get(SESSION_DOC_ID, SessionDoc)
     await hydrated(SESSION_DOC_ID)
+    const tasks = planStoredTaskCards(session)
     const plan = planUnstartedThreads({
       rows: places.cards() as Readonly<Record<string, Row>>,
       threads: new Set(Object.keys(readNamespace(session, THREAD.namespace))),
-      tasks: new Set(readTasks(session).keys()),
+      taskCards: tasks.cards,
       workflow: readWorkflow(session),
-      board: readBoardPlaces(session),
       histories: readNamespace(session, CARD_HISTORY.namespace),
       now: Date.now(),
       newColumn: () => cardIdOfKind("note-column", newId()),
     })
     return async () => {
-      applyRecordWrites(session, plan.records)
+      applyRecordWrites(session, [...tasks.records, ...plan.records])
       batch(places, d => {
         for (const id of Object.keys(places.cards()))
           if (plan.rows[id] === undefined) d.cards.delete(id)

@@ -528,6 +528,7 @@ async function run(check: Checks["check"]): Promise<void> {
         holder: "",
         task: "",
         width: "",
+        state: "",
         address: "",
         quote: "",
         origin: "",

@@ -325,6 +325,17 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
 
 ## The board (`board-view.ts`, `board.tsx`, ADR-0122)
 
+- **A task is a card on the board** (ADR-0126): `boardView` reads the
+  cards (`BoardViewInput.cards`), the board's task cards among them, and
+  draws each task with a message (`summaries`), so a new tab's task joins
+  it with its first send. A move's answer is a card move's: `moved`, then
+  what follows it (`afterTaskMove`); `unmoved` changes nothing. The
+  archive (`archivedOf`) is `App`'s, from the cards and their histories,
+  kept while it reads the same (`useSameData`). The undo key on no task
+  undoes a move on the board; one that crossed the archive's edge is
+  refused `archived`, worded "not undone: restore or archive it on the
+  board", and an undo that puts a task's card back on the board opens it
+  (`revealOf`).
 - **What the board shows is `boardView`'s**, over `boardOf` (`@pinetrie/rules`):
   the strip (each state's name, count, `markOf` and signals), each open state
   as a column of the cards the search keeps, the archive's

@@ -90,8 +90,10 @@ a value is stored.
 
 | word | what it is | in code | retired |
 |---|---|---|---|
-| **task** | The board's card: a piece of work in one workflow state, holding the cards needed to do it, threads of any root among them. | `TaskId`, `TaskRecord`, `TaskIndex` (ADR-0116) | the root as what the board holds; "the root you are on" |
-| **workflow state** | A column of the board: Backlog, Doing, or any a team makes. Every task is in one. | `WorkflowState`, `Workflow`, `BoardPlace` | |
+| **task** | The board's card: a piece of work in one workflow state, holding the cards needed to do it, threads of any root among them. | `TaskId`, `TaskCard`, `TaskIndex` (ADR-0116) | the root as what the board holds; "the root you are on" |
+| **task card** | A task, as a card, on the board in a workflow state, at its rank there; who moved it there and when is its card's history (ADR-0126). | `TaskCard`, `KINDS.task`, `BoardCard`, `planBoardMove`, `boardTasks` | the board place (`BoardPlace`, `pinetrie.board`), the task's record (`TaskRecord`, `pinetrie.task`) |
+| **workflow state** | A column of the board: Backlog, Doing, or any a team makes. Every task is in one. | `WorkflowState`, `Workflow`, `boardOf` | |
+| **team** | The people who share a board, its tasks and, later, its sources and runners: today, everyone in the session (ADR-0126). | the session | the host's session, as the board's owner |
 | **the archive** | The board's last workflow state, always there, named Done in a new session and renamed as any state is. | `Workflow.archive` | the closed state, the Archive tab |
 | **archived** | In the archive: read-only for everyone, unloaded by the host, its threads' offers withdrawn, until moved out (**restore**). | `archivedOf`, `archivedIn`, `planArchive`, `readArchived` | closed |
 
@@ -118,9 +120,7 @@ Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
 | **source** | A folder the host's owner registers, which a thread's lane gets in one of three modes. | ADR-0118 | the host's one project |
 | **branched**, **live**, **read-only** | A source's modes: its own copy in the lane, whose work comes back as an offer; a read-write mount, never branched; a read-only mount. | ADR-0118 | |
 | **runner** | Where a lane runs: the host that holds it, that host's machine, and the model of each run. | ADR-0119 | |
-| **task card** | A task, as a card, on the board's workflow states. | ADR-0126 | `BoardPlace` as a place of its own |
 | **consume** | What a thread's live end does to a card: a send, a fact popped. The card ends; the entry it became is the record. A spin sends its card to the trash instead, so it can be undone. | ADR-0126 | |
-| **team** | The people who share a board, its tasks and, later, its sources and runners. | ADR-0126 | the host's session, as the board's owner |
 | **party** | A person or a team: what owns a surface that no content does (an inventory, a trash, a board). | ADR-0126 | |
 | **stack** | A card holding two or more threads of one root, one on top, drawn as one column: only the top runs, and which is on top is shared. Not built with the rest. | ADR-0126 | |
 | **face**, **normal**, **whole** | The three levels of detail every kind is drawn at, chosen by the surface it is on: a strip, a grid cell or a mark; the card itself, bounded; all of it, as a column or in the pane. Width is the place's, not a level. | ADR-0126 | |

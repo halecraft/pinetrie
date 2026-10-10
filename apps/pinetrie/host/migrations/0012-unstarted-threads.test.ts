@@ -5,7 +5,7 @@ import {
   threadIdFor,
   workflowStateIdFor,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor, taskCard } from "@pinetrie/core/fixtures"
 import { CARD_HISTORY, decodeCard, THREAD } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { planUnstartedThreads } from "./0012-unstarted-threads.ts"
@@ -94,12 +94,11 @@ const plan = () =>
       },
     },
     threads: new Set(),
-    tasks: new Set([TASK]),
+    taskCards: [taskCard(TASK, "a", workflowStateIdFor("d"))],
     workflow: {
       open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
       archive: { id: workflowStateIdFor("x"), name: "Done" },
     },
-    board: new Map(),
     histories: {
       [M1]: {
         events: [
@@ -114,7 +113,7 @@ const plan = () =>
   })
 
 describe("0012-unstarted-threads (ADR-0126)", () => {
-  test("a fresh column becomes its thread opened, a new tab's task with it; your newest card is your message on its dock, the rest notes", () => {
+  test("a fresh column becomes its thread opened, a new tab's task's card with it; your newest card is your message on its dock, the rest notes", () => {
     const { rows, records } = plan()
     const sets = records.flatMap(r =>
       r.kind === "set" ? [[r.namespace, r.key] as const] : [],
@@ -123,11 +122,8 @@ describe("0012-unstarted-threads (ADR-0126)", () => {
       expect.arrayContaining([
         [THREAD.namespace, BRANCH],
         [THREAD.namespace, TAB],
-        ["pinetrie.task", NEW_TASK],
-        ["pinetrie.board", NEW_TASK],
       ]),
     )
-    expect(sets).not.toContainEqual(["pinetrie.task", TASK])
     expect(
       records.find(r => r.kind === "set" && r.key === BRANCH),
     ).toMatchObject({
@@ -140,6 +136,11 @@ describe("0012-unstarted-threads (ADR-0126)", () => {
     expect(card(M1)?.place).toMatchObject({ kind: "note", column: NOTES })
     expect(card(M3)?.place).toEqual({ kind: "composing", thread: TAB })
     expect(card(NOTES)?.place).toMatchObject({ kind: "canvas", task: TASK })
+    expect(card(TASK)?.place).toMatchObject({ kind: "board" })
+    expect(card(NEW_TASK)?.place).toMatchObject({
+      kind: "board",
+      state: workflowStateIdFor("d"),
+    })
   })
 
   test("a spun card is in its spinner's trash; an ask's relay is in `relay`; no row keeps a root", () => {

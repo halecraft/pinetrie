@@ -2,10 +2,11 @@
 // states (ADR-0122, ADR-0116).
 //
 // A move runs in up to three parts (ADR-0065). On the documents' keeper:
-// gather the workflow and the places, plan the move (`planTaskMove`); if it
-// crosses the archive's edge, gather the documents of the task's roots and
-// plan the crossing (`planArchive`); then write the place, from which moment
-// the archive gate refuses writes into the archived task. Off the keeper:
+// gather the workflow and the places, plan the task card's move
+// (`planBoardMove`); if it crosses the archive's edge, gather the documents
+// of the task's roots and plan the crossing (`planArchive`); then write the
+// card (`placeTask`), from which moment the archive gate refuses writes into
+// the archived task. Off the keeper:
 // the crossing's teardown (its lanes' containers, their refs in your repo
 // through the owner, snapshots). Then, on archiving, the roots nothing else
 // holds unloaded on the keeper again. The sender's reply comes after all of
@@ -15,6 +16,7 @@ import {
   type EntryId,
   ERR,
   type Intent,
+  keyOf,
   type RevisionRecord,
   type RootId,
   refused,
@@ -24,26 +26,22 @@ import {
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readArchived,
-  readBoardPlaces,
   readLaneRecords,
   readLanes,
-  readParticipantNames,
   readPlaces,
   readQueueHolds,
   readRevisions,
   readRoots,
-  readTasks,
   readThreads,
   readTreeIndex,
   readWorkflow,
 } from "@pinetrie/reads"
 import {
   type ArchiveTeardown,
-  BOARD,
   boardOf,
   type Crossing,
   planArchive,
-  planTaskMove,
+  planBoardMove,
   planWorkflowEdit,
   rootsHeld,
   setRecord,
@@ -55,6 +53,7 @@ import type { CardPort } from "../cards.ts"
 import type { Records } from "../records.ts"
 import { tasksNow } from "../tasks.ts"
 import type { LaneWork } from "../work/index.ts"
+import { type CardCommands, type Settled, settled } from "./cards.ts"
 
 export interface BoardDeps {
   readonly basics: Pick<
@@ -66,30 +65,25 @@ export interface BoardDeps {
   readonly keeper: Pick<HostKeeper, "run" | "track">
   /** Which queued cards are blank: they leave a lane idle (ADR-0113). */
   readonly cards: Pick<CardPort, "blankQueued">
+  /** The task's card written, with its history (`placeTask`). */
+  readonly moves: Pick<CardCommands, "placeTask">
 }
-
-/** The tasks the board shows: every task the session holds. */
-const boardTasks = (basics: Pick<Basics, "session">): readonly TaskId[] => [
-  ...readTasks(basics.session).keys(),
-]
 
 /** What the keeper's first step decided: the answer, and what follows it. */
 type Recorded =
-  | { readonly kind: "done"; readonly outcome: Outcome }
+  | { readonly kind: "done"; readonly outcome: Settled }
   | {
       readonly kind: "follow"
-      readonly outcome: Outcome
+      readonly outcome: Settled
       readonly teardown: ArchiveTeardown
       readonly unload: readonly RootId[]
     }
-
-const MOVED: Outcome = { kind: "moved-task" }
 
 export async function handleTaskMove(
   deps: BoardDeps,
   writer: WriterId,
   intent: Extract<Intent, { kind: "move-task" }>,
-): Promise<Outcome> {
+): Promise<Settled> {
   const recorded = await deps.keeper.run(() => record(deps, writer, intent))
   if (recorded.kind === "done") return recorded.outcome
   // Off the keeper: no other seat's command waits on containers or your repo.
@@ -102,45 +96,51 @@ export async function handleTaskMove(
   return recorded.outcome
 }
 
-/** Gather, plan, and write the place: the first part, on the keeper. */
+/** Gather, plan, and write the task's card: the first part, on the keeper. */
 async function record(
   deps: BoardDeps,
   writer: WriterId,
   intent: Extract<Intent, { kind: "move-task" }>,
 ): Promise<Recorded> {
-  const { session, now } = deps.basics
+  const { session, places } = deps.basics
   // gather: the board
   const workflow = readWorkflow(session)
   if (workflow === null)
     return done(refused(ERR.UNKNOWN_STATE, "the board has no states yet"))
+  const cards = readPlaces(places)
   // plan the move (pure)
-  const moved = planTaskMove({
+  const moved = planBoardMove({
     task: intent.task,
     from: intent.from,
     to: intent.to,
     before: intent.before,
-    by: writer,
-    now: now(),
+    sender: writer,
     workflow,
-    places: readBoardPlaces(session),
-    tasks: boardTasks(deps.basics),
-    names: readParticipantNames(session),
+    cards,
   })
-  if (moved.kind === "refused") return done(moved)
-  if (moved.kind === "unchanged") return done(MOVED)
-  const writes = moved.places.map(p => setRecord(BOARD, p))
-  if (moved.transition === "within") {
-    await deps.records.writeValues(writes)
-    return done(MOVED)
-  }
+  if (moved.kind === "refused")
+    return {
+      kind: "done",
+      outcome: settled(
+        {
+          kind: "unmoved",
+          code: moved.code,
+          place: moved.now === null ? null : keyOf(moved.now.place),
+          by: moved.now?.placer ?? null,
+        },
+        places.rev(),
+      ),
+    }
+  if (moved.kind === "unchanged") return done({ kind: "moved" })
+  if (moved.transition === "within")
+    return { kind: "done", outcome: await deps.moves.placeTask(writer, moved) }
   // gather what crossing the archive's edge needs, and plan it (pure)
   const crossed = await planCrossing(deps, intent.task, moved.transition)
   if (crossed.kind === "refused") return done(crossed)
   // execute
-  await deps.records.writeValues(writes)
   return {
     kind: "follow",
-    outcome: MOVED,
+    outcome: await deps.moves.placeTask(writer, moved),
     teardown: crossed.teardown,
     unload: crossed.unload,
   }
@@ -184,7 +184,7 @@ async function planCrossing(
   }
   // The roots another live task or an inventory holds a thread of, this
   // one counted as archived.
-  const archived = new Set([...readArchived(session).keys(), task])
+  const archived = new Set([...readArchived(session, places).keys(), task])
   return planArchive({
     crossing,
     threads,
@@ -202,7 +202,10 @@ async function planCrossing(
   })
 }
 
-const done = (outcome: Outcome): Recorded => ({ kind: "done", outcome })
+const done = (outcome: Outcome): Recorded => ({
+  kind: "done",
+  outcome: settled(outcome),
+})
 
 /**
  * Change the workflow's states: gather, plan, write. One step on the
@@ -216,11 +219,7 @@ export async function handleWorkflow(
   const workflow = readWorkflow(session)
   if (workflow === null)
     return refused(ERR.UNKNOWN_STATE, "the board has no states yet")
-  const board = boardOf(
-    workflow,
-    readBoardPlaces(session),
-    boardTasks(deps.basics),
-  )
+  const board = boardOf(workflow, readPlaces(deps.basics.places))
   const planned = planWorkflowEdit(workflow, board, intent.edit, newId)
   if (planned.kind === "refused") return planned
   if (planned.kind === "write")

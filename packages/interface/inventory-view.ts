@@ -11,6 +11,7 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import { type Intents, type Slots, settleSlots } from "@pinetrie/session"
+import type { DrawnCard } from "./face.ts"
 import { type GridView, gridView } from "./grid-view.ts"
 import type { ThreadFace } from "./thread-face.ts"
 
@@ -38,7 +39,7 @@ export const slotKey = (slot: number): string | null =>
 
 /** What the panel draws: `settleSlots`, each slot with its card. */
 export function inventoryView(input: {
-  readonly held: readonly CardRecord[]
+  readonly held: readonly DrawnCard[]
   readonly slots: Slots
   readonly intents: Intents
   readonly selected: number
@@ -49,7 +50,7 @@ export function inventoryView(input: {
   /** The selected card is open, drawn whole in its slot. */
   readonly open: boolean
 }): InventoryView {
-  const byId = new Map<CardId, CardRecord>(
+  const byId = new Map<CardId, DrawnCard>(
     input.held.map(c => [c.id, c] as const),
   )
   const settled = settleSlots(
@@ -57,7 +58,7 @@ export function inventoryView(input: {
     input.slots,
     input.intents,
   )
-  const placed = new Map<number, CardRecord>()
+  const placed = new Map<number, DrawnCard>()
   for (const [slot, id] of Object.entries(settled)) {
     const card = byId.get(id)
     if (card !== undefined) placed.set(Number(slot), card)
