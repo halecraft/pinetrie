@@ -1073,7 +1073,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   opens them, **+ comment** adds one, **shut** closes them. A comment's ⋯
   has **Queue a reference**, which queues the comment on its thread, under
   a link to the message, so the agent reads it once with what it is about;
-  the comment stays. With a column's messages focused (a click on one), `j`
+  the comment stays. Queued, the reference shows in the dock as a queued
+  message does, with ↑ ↓, × and a ⋯ that moves it back to the notes or into
+  your inventory. With a column's messages focused (a click on one), `j`
   and `k` select a message, Enter opens its comments, `c` comments on it,
   Escape shuts them, and Cmd+C takes a reference to it.
 - **Put** moves the selected card to the notes of the column you were last

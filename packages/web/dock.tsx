@@ -16,11 +16,13 @@ import type {
   LaneView,
   Position,
   TreeIndex,
+  WriterId,
 } from "@pinetrie/core"
 import {
   ADD_TO_QUEUE,
   type CatchUps,
   type ColumnAct,
+  cardFrame,
   type NextButton,
   type NextItem,
   nextButtonWords,
@@ -37,8 +39,49 @@ import type { QueuedCard } from "@pinetrie/rules"
 import { newCardId, type SessionClient } from "@pinetrie/session"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { QueuedCardEditor } from "./card-editor.tsx"
+import { CardFrame } from "./card-frame.tsx"
 import { Menu } from "./menu.tsx"
 import { RENDERINGS } from "./renderings.tsx"
+
+/**
+ * A reference queued to tell the agent (ADR-0126), framed as a queued
+ * message is: who queued it, its place in line, ↑ and ↓, its ⋯ (back to
+ * the notes, into your inventory: the moves its kind may make, `cardFrame`)
+ * and ×. Its body is its quote, read only.
+ */
+function QueuedReference(p: {
+  card: Extract<QueuedCard, { kind: "reference" }>
+  among: readonly CardRecord[]
+  held: boolean
+  me: WriterId
+  reader: Reader
+  readOnly: ReadOnly | null
+  onAct: (act: ColumnAct) => void
+}) {
+  const { card } = p
+  const view = cardFrame(card, "queued", {
+    me: p.me,
+    queueOn: null,
+    among: p.among,
+    held: p.held,
+    pinned: null,
+    readOnly: p.readOnly !== null,
+  })
+  return (
+    <CardFrame
+      card={card}
+      catchUps={null}
+      foot={null}
+      onAct={p.onAct}
+      onClearCommand={null}
+      onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
+      reader={p.reader}
+      view={view}
+    >
+      <RENDERINGS.reference.Normal card={card} width={1} />
+    </CardFrame>
+  )
+}
 
 export function Dock(p: {
   session: SessionClient
@@ -157,10 +200,6 @@ export function Dock(p: {
             ) : c.kind === "ask" ? (
               // An ask from another thread, the host's (ADR-0128).
               <RENDERINGS.ask.Normal card={c} key={c.id} width={1} />
-            ) : c.kind === "reference" ? (
-              // A reference queued to tell the agent (ADR-0126): its quote,
-              // read only.
-              <RENDERINGS.reference.Normal card={c} key={c.id} width={1} />
             ) : (
               <div
                 className="queued-card"
@@ -169,17 +208,29 @@ export function Dock(p: {
                 }
                 key={c.id}
               >
-                <QueuedCardEditor
-                  among={queued}
-                  card={c}
-                  catchUps={p.catchUps}
-                  held={lane?.heldBy != null}
-                  onAct={p.onAct}
-                  onTyping={p.onTyping}
-                  readOnly={p.readOnly}
-                  reader={p.reader}
-                  session={p.session}
-                />
+                {c.kind === "reference" ? (
+                  <QueuedReference
+                    among={queued}
+                    card={c}
+                    held={lane?.heldBy != null}
+                    me={p.session.writer}
+                    onAct={p.onAct}
+                    readOnly={p.readOnly}
+                    reader={p.reader}
+                  />
+                ) : (
+                  <QueuedCardEditor
+                    among={queued}
+                    card={c}
+                    catchUps={p.catchUps}
+                    held={lane?.heldBy != null}
+                    onAct={p.onAct}
+                    onTyping={p.onTyping}
+                    readOnly={p.readOnly}
+                    reader={p.reader}
+                    session={p.session}
+                  />
+                )}
               </div>
             ),
           )}

@@ -511,7 +511,7 @@ export function moveOf(
 ): TypedMove
 export function moveOf(
   card: TextCard | ReferenceCard,
-  to: NotesTarget,
+  to: NotesTarget | Extract<PlaceKey, { readonly kind: "gone" }>,
 ): TypedMove
 export function moveOf(card: CardRecord, to: MoveTarget): Move {
   return { card: card.id, from: keyOf(card.place), to }

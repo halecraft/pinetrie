@@ -3,12 +3,14 @@ import {
   type CardPlace,
   type CardRecord,
   cardIdOfKind,
+  DISCARDED,
   entryId,
   fitsPlace,
   indexAsks,
   KINDS,
   type PlacedKind,
   rootIdFor,
+  type Sha256,
   type TextCard,
   type TextPlace,
   textCardId,
@@ -290,6 +292,66 @@ describe("which kinds are taken and put (KINDS)", () => {
           state({ cards: [c] }),
         ),
       ).toEqual([])
+  })
+})
+
+describe("a queued reference (ADR-0126)", () => {
+  const id = cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e3")
+  const queuedAt = {
+    kind: "queued",
+    thread: TEST_THREAD,
+    order: "a",
+    by: ADA,
+    seen: "",
+  } as const
+  const reference: CardRecord = {
+    kind: "reference",
+    id,
+    owner: ADA,
+    placer: ADA,
+    place: queuedAt,
+    content: {
+      address: { kind: "entry", thread: TEST_THREAD, entry: A },
+      quote: "0".repeat(64) as Sha256,
+    },
+  }
+  const from = { kind: "queued", thread: TEST_THREAD, seen: "" } as const
+  const how = { actedAt: { kind: "column", key: TEST_THREAD }, slot: null }
+  test("goes back to its thread's notes from its ⋯, and to the trash from its ×", () => {
+    const s = state({ cards: [reference] })
+    const column = { kind: "card", card: TEST_THREAD } as const
+    expect(
+      plan(
+        inColumn(
+          { kind: "unqueue", card: id, lane: TEST_THREAD, by: ADA },
+          column,
+        ),
+        s,
+      ),
+    ).toEqual([
+      {
+        kind: "moveCard",
+        move: {
+          card: id,
+          from,
+          to: { kind: "notes", near: "thread", thread: TEST_THREAD },
+        },
+        how,
+        queuedBy: ADA,
+        fly: false,
+        here: null,
+      },
+    ])
+    expect(plan(inColumn({ kind: "discard", card: id }, column), s)).toEqual([
+      {
+        kind: "moveCard",
+        move: { card: id, from, to: DISCARDED },
+        how,
+        queuedBy: null,
+        fly: false,
+        here: TEST_TASK,
+      },
+    ])
   })
 })
 

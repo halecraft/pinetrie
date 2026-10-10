@@ -957,6 +957,13 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
   agent reads the quote, and the entry under the link (the host's
   `linkedQuotes`), so it reads the comment under what it is about. The
   comment stays where it is.
+- **A queued reference is framed as a queued message** (`QueuedReference`,
+  `dock.tsx`): who queued it, its place in line, ↑ ↓, its quote as the
+  body, read only, and ⋯ and ×. Its ⋯ offers what its kind may do
+  (`cardFrame` keeps a Move to ▸ item only where `PLACES_OF` puts the kind,
+  `MOVE_PLACES`): back to the notes and into your inventory, never pinned.
+  Unqueue and discard plan for any kind that may be queued or discarded
+  (`isQueuedMessage`, `cardFitsPlace(card, "gone")`).
 - **Entries by keys** (`onEntryKey`, `Column`): while focus is in a
   column's messages and in no text box, they are a grid one cell wide,
   read by `gridKeyAct` (`comments: true`): `j` and `k` select (a click

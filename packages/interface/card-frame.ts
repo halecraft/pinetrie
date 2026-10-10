@@ -1,5 +1,5 @@
-// interface/card-frame — what one text card's frame shows, in every place
-// (ADR-0111): its header (place, state, who put it there, a command, ⋯ and
+// interface/card-frame — what a card's frame shows, in every place
+// (ADR-0111): a text card's, and a queued reference's (ADR-0126): its header (place, state, who put it there, a command, ⋯ and
 // ×), and its footer (one primary action, and ↑ ↓ in a list). The frame is
 // the place's: its colour says who reads the card. The card's icon and its
 // face are the kind's (`face.ts`, ADR-0126). Pure: `cardFrame` decides it as
@@ -8,13 +8,15 @@
 
 import type {
   CardCommand,
+  CardKind,
+  CardPlace,
   CardRecord,
   Position,
   ThreadId,
   WorkflowState,
   WriterId,
 } from "@pinetrie/core"
-import { commandOf, KINDS } from "@pinetrie/core"
+import { commandOf, fitsPlace, KINDS } from "@pinetrie/core"
 import { displayName, type PinnedStatus } from "@pinetrie/rules"
 import { reorderOf } from "./card-intents.ts"
 import {
@@ -59,6 +61,31 @@ export type CardMoveTo =
   | "task"
   | "inventory"
   | { readonly kind: "thread"; readonly state: WorkflowState }
+
+/**
+ * The place each Move to ▸ item sends a card to, which its kind must be
+ * ever in (`PLACES_OF`) to be offered it: a reference is never pinned, so
+ * its ⋯ has no pin (ADR-0126). A new thread's first message is your
+ * message sent, so a card that is never your message makes none. Queueing
+ * a reference to a comment leaves the comment where it is: any comment may.
+ */
+const MOVE_PLACES: Readonly<
+  Record<Exclude<CardMoveTo, object>, CardPlace["kind"] | null>
+> = {
+  message: "composing",
+  note: "note",
+  queue: "queued",
+  pinned: "pinned",
+  task: "task-pinned",
+  inventory: "inventory",
+  reference: null,
+}
+
+/** Whether a card of `kind` is ever where `to` sends it (`MOVE_PLACES`). */
+const offers = (kind: CardKind, to: CardMoveTo): boolean => {
+  const place = MOVE_PLACES[typeof to === "string" ? to : "message"]
+  return place === null || fitsPlace(kind, place)
+}
 
 /** One Move to ▸ item: the move a drag makes there. */
 export interface CardMoveItem {
@@ -283,7 +310,9 @@ export function cardFrame(
                     step,
                   },
           })),
-    moves: movable ? moveItems(card, facts) : [],
+    moves: movable
+      ? moveItems(card, facts).filter(m => offers(card.kind, m.to))
+      : [],
     discards:
       movable &&
       card.place.kind !== "gone" &&

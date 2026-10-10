@@ -125,7 +125,7 @@ export function CardFrame(p: {
         }}
       >
         <span aria-hidden className="card-icon">
-          {KIND_ICON.text}
+          {KIND_ICON[card?.kind ?? "text"]}
         </span>
         <span className="card-place">{words.place}</span>
         {words.state !== null && (

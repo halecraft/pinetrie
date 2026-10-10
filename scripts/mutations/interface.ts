@@ -2065,8 +2065,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card not queued is unqueued",
     file: "packages/interface/intent.ts",
-    from: '      if (now?.place.kind !== "queued") return []',
-    to: "      if (now === undefined) return []",
+    from: '        !hasPlaceKind(now, "queued") ||\n',
+    to: "",
     command: unit,
     expect: "an unqueue puts the card back where it was queued",
   },
@@ -3744,5 +3744,32 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a column's messages are a grid one cell wide (ADR-0126): j and k step through them, stopping at either end; Enter opens the margin, c comments, Escape shuts it",
+  },
+  {
+    name: "a reference's ⋯ offers a pin",
+    file: "packages/interface/card-frame.ts",
+    from: "      ? moveItems(card, facts).filter(m => offers(card.kind, m.to))\n",
+    to: "      ? moveItems(card, facts)\n",
+    command: unit,
+    expect:
+      "a queued reference's ⋯ offers only the moves its kind may make: back to the notes, into your inventory, never pinned; it reorders and is discarded (ADR-0126)",
+  },
+  {
+    name: "a queued reference is never unqueued",
+    file: "packages/interface/intent.ts",
+    from: "        !isQueuedMessage(now)\n",
+    to: '        now.kind !== "text"\n',
+    command: unit,
+    expect:
+      "goes back to its thread's notes from its ⋯, and to the trash from its ×",
+  },
+  {
+    name: "only a text card is discarded",
+    file: "packages/interface/card-intents.ts",
+    from: '  if (now === undefined || !cardFitsPlace(now, "gone")) return []\n',
+    to: '  if (now === undefined || now.kind !== "text") return []\n',
+    command: unit,
+    expect:
+      "goes back to its thread's notes from its ⋯, and to the trash from its ×",
   },
 ]

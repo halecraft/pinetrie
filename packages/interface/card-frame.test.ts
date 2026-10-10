@@ -3,6 +3,7 @@ import {
   type CardRecord,
   cardIdOfKind,
   entryId,
+  type Sha256,
   type TextCard,
   type TextPlace,
   taskIdFor,
@@ -202,6 +203,31 @@ describe("cardFrame (ADR-0111)", () => {
       state: null,
       who: null,
     })
+  })
+
+  test("a queued reference's ⋯ offers only the moves its kind may make: back to the notes, into your inventory, never pinned; it reorders and is discarded (ADR-0126)", () => {
+    const id = cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1")
+    const reference: CardRecord = {
+      kind: "reference",
+      id,
+      owner: ME,
+      placer: ME,
+      place: queued as Extract<TextPlace, { kind: "queued" }>,
+      content: {
+        address: { kind: "thread", thread: LANE },
+        quote: "0".repeat(64) as Sha256,
+      },
+    }
+    const view = cardFrame(reference, "queued", {
+      ...FACTS,
+      among: [reference, card(queued)],
+    })
+    expect(view.moves).toEqual([
+      { to: "note", act: { kind: "unqueue", card: id, lane: LANE, by: BEA } },
+      { to: "inventory", act: { kind: "takeIntoInventory", card: id } },
+    ])
+    expect(view.discards).toBe(true)
+    expect(view.tools.map(t => t.act?.kind ?? null)).toEqual([null, "reorder"])
   })
 
   test("a read-only column, or a fact, moves and discards nothing", () => {

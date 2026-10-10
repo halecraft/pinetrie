@@ -699,8 +699,10 @@ export function planDiscard(
   how: MoveHow,
   state: IntentState,
 ): readonly Effect[] {
-  const now = textCardOf(state.cards, card)
-  if (now === undefined) return []
+  const now = cardOf(state.cards, card)
+  // A kind is discarded only where it may be gone (`PLACES_OF`): a text
+  // card or a reference.
+  if (now === undefined || !cardFitsPlace(now, "gone")) return []
   // Someone else's inventory is theirs to empty (ADR-0059).
   if (now.place.kind === "inventory" && state.cards.me !== now.place.holder)
     return []

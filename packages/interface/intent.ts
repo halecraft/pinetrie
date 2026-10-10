@@ -11,6 +11,7 @@ import {
   type CardId,
   type CardWidth,
   type EntryId,
+  hasPlaceKind,
   type MarkTarget,
   type MoveDirection,
   messageAt,
@@ -30,6 +31,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
+import { isQueuedMessage } from "@pinetrie/rules"
 import { AT_INVENTORY, firstEmpty, IN_COLUMN } from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
@@ -730,8 +732,13 @@ function planColumn(
     }
     case "unqueue": {
       // If the host popped the card first, the refusal says it was sent.
-      const now = textCardOf(state.cards, act.card)
-      if (now?.place.kind !== "queued") return []
+      const now = cardOf(state.cards, act.card)
+      if (
+        now === undefined ||
+        !hasPlaceKind(now, "queued") ||
+        !isQueuedMessage(now)
+      )
+        return []
       const move = moveOf(now, noteOf(now.place))
       return [moveCard(move, IN_COLUMN(key), false, act.by)]
     }
