@@ -453,6 +453,7 @@ describe("askedAboutConflict (ADR-0080)", () => {
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
       fetchLane: async () => {},
       writeRevision: async () => {},
+      recipes: record<Parameters<typeof createUpdates>[0]["recipes"]>().port,
     })
     return { updates, asked }
   }
@@ -563,6 +564,7 @@ describe("catchUpInRun (ADR-0080)", () => {
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
       fetchLane: async () => {},
       writeRevision: async () => {},
+      recipes: record<Parameters<typeof createUpdates>[0]["recipes"]>().port,
     })
     return { updates, asked }
   }

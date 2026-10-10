@@ -550,9 +550,12 @@ export {
   verdictOf,
 } from "./verdict.ts"
 export {
+  classifyDisk,
+  type DiskClass,
   FILES_LOST,
   type FilesLostRecord,
   forkPoint,
+  ignoredFiles,
   LANE,
   PROJECT,
   PROJECT_KEY,

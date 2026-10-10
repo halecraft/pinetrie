@@ -3,11 +3,15 @@
 // fetched into your repo.
 
 import {
+  type CommitId,
   type EntryId,
   firstLine,
+  type IgnoredFiles,
   messageText,
+  nearestRevision,
   promptOf,
   type RevisionRecord,
+  type SnapshotId,
   snapshotId,
   type ThreadId,
   type TreeIndex,
@@ -22,15 +26,24 @@ import {
   changedPaths,
   commitTurn,
   conflictedFilesAt,
+  type LaneRuntime,
+  type Runner,
 } from "@pinetrie/lanes"
 import type { LaneHooks } from "@pinetrie/pi"
-import { readTreeIndex } from "@pinetrie/reads"
-import { planTurnRecord, REVISION, setRecord } from "@pinetrie/rules"
+import { readRevisions, readTreeIndex } from "@pinetrie/reads"
+import {
+  classifyDisk,
+  ignoredFiles,
+  planTurnRecord,
+  REVISION,
+  setRecord,
+} from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
-import { snapshotOnQueue } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"
+import type { Recipes } from "./recipe.ts"
 import type { LaneRegistry } from "./registry.ts"
+import type { Setup } from "./setup.ts"
 
 /** A revision's title: a message's first line, cut. */
 const TITLE_LENGTH = 72
@@ -58,8 +71,16 @@ export interface Turns {
   writeRevision(record: RevisionRecord): Promise<void>
 }
 
+/** A lane's disk at a revision: its snapshot, and the commit with it. */
+interface Disk {
+  readonly snapshot: SnapshotId
+  readonly commit: CommitId | null
+}
+
 export function createTurns(deps: {
   readonly basics: Basics
+  readonly setup: Pick<Setup, "lanes">
+  readonly recipes: Recipes
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
@@ -69,6 +90,50 @@ export function createTurns(deps: {
   const { basics, registry, keeper } = deps
   const { docs } = basics
   const recording = new Set<Promise<unknown>>()
+  /** Each lane's newest snapshot this host planned, and the commit with it: the next turn's diff starts there. */
+  const last = new Map<ThreadId, Disk>()
+
+  /** With none planned since the host started: the nearest snapshot above the turn. */
+  const nearestBefore = (
+    index: TreeIndex,
+    doc: Parameters<typeof readRevisions>[0],
+    entry: EntryId,
+  ): Disk | null => {
+    const above = nearestRevision(index, readRevisions(doc), {
+      kind: "entry",
+      id: entry,
+    })
+    return above.snapshot === null
+      ? null
+      : { snapshot: above.snapshot, commit: above.commit }
+  }
+
+  /** A turn's ignored files: its whole-disk diff, sorted (`classifyDisk`). */
+  async function turnIgnored(input: {
+    readonly jj: Runner
+    readonly runtime: LaneRuntime
+    readonly from: Disk
+    readonly to: Disk
+    /** The turn's own commit's paths. */
+    readonly paths: readonly string[]
+    readonly outputs: readonly string[]
+  }): Promise<IgnoredFiles | null> {
+    const { from, to } = input
+    const diff = await input.runtime.diff(from.snapshot, to.snapshot)
+    const tracked =
+      from.commit !== null && to.commit !== null && from.commit !== to.commit
+        ? await changedPaths(input.jj, from.commit, to.commit)
+        : input.paths
+    return ignoredFiles(
+      classifyDisk({
+        diff,
+        tracked,
+        outputs: input.outputs,
+        caches: deps.setup.lanes.config.recipe?.caches ?? [],
+        shared: deps.setup.lanes.shared.map(d => d.path),
+      }),
+    )
+  }
 
   /** A revision, in the root its lane works in (ADR-0063). */
   const writeRevision = async (record: RevisionRecord) => {
@@ -162,18 +227,56 @@ export function createTurns(deps: {
           merged,
         })
         if (planned === null) return
-        // The snapshot is queued and not awaited: the next tool call waits
-        // for it, the next request does not.
+        const previous = isPrompt
+          ? null
+          : (last.get(lane) ?? nearestBefore(index, doc, entry))
+        if (planned.snapshot !== null)
+          last.set(lane, {
+            snapshot: planned.snapshot,
+            commit: planned.commit ?? newest,
+          })
+        // The recipe, if an input changed, then the snapshot: queued, so the
+        // next tool call waits for both, and not awaited, so the next request
+        // does not (ADR-0131).
+        const ended = deps.recipes
+          .snapshotOnQueue(
+            lane,
+            handle,
+            jj,
+            merged ? "all" : changed,
+            snapshotId(entry),
+          )
+          .then(end => {
+            if (!end.snapped) last.delete(lane)
+            return end
+          })
         const recorded = keeper.track(
-          snapshotOnQueue(handle, lane, entry)
-            .catch(error => {
-              failed(basics, "the turn's snapshot", lane)(error)
-              return false
-            })
-            .then(async snapped => {
+          ended
+            .then(async ({ snapped, outcome, outputs }) => {
+              // What else the turn wrote: its whole disk against the one
+              // before, sorted by what each path is.
+              const ignored =
+                snapped && previous !== null && planned.snapshot !== null
+                  ? await turnIgnored({
+                      jj,
+                      runtime: handle.runners.runtime,
+                      from: previous,
+                      to: {
+                        snapshot: planned.snapshot,
+                        commit: planned.commit ?? newest,
+                      },
+                      paths: changed,
+                      outputs,
+                    }).catch(error => {
+                      failed(basics, "the turn's diff", lane)(error)
+                      return null
+                    })
+                  : null
               await writeRevision({
                 ...planned,
                 snapshot: snapped ? planned.snapshot : null,
+                ignored,
+                recipe: outcome,
               })
             })
             .catch(failed(basics, "recording a turn", lane)),

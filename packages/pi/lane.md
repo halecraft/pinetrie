@@ -60,6 +60,18 @@ changes pine·trie can keep this note true. You can skip them.
   `jj diffedit`. <!-- packages/core/index.ts NO_EDITOR -->
 - Ignored files, such as `node_modules` and build output, stay on the disk,
   and a branch gets them. The person's copy of your work never includes them.
+- The project's dependencies are made by its recipe (`pnpm install
+  --frozen-lockfile` for a pnpm repo, or `lanes.install` in `pinetrie.json`).
+  When a turn changes one of its inputs (its lockfile), pine·trie removes
+  what the recipe last made and runs it again at the turn's end, before the
+  turn's snapshot, so nothing a deleted package installed stays behind.
+  `/workspace/.pinetrie-lane/derived.json` says what it made, from which
+  key, and the tail of its output if it failed.
+  <!-- apps/pinetrie/host/work/recipe.ts createRecipes -->
+  <!-- packages/lanes/plan.ts planRecipe -->
+- Each turn's record names the ignored files it wrote outside what the
+  recipe makes, and the person sees how many.
+  <!-- packages/rules/work.ts classifyDisk -->
 
 ## What the person gets
 

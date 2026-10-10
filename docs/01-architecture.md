@@ -120,7 +120,9 @@ packages/     libraries; their boundaries are enforced by resolution
   protocol/      @pinetrie/protocol     the wire contract and its codec
   rules/         @pinetrie/rules        each stored shape and the pure rules about it (TECHNICAL.md)
   reads/         @pinetrie/reads        document reads shared by the host and the client
+  channel/       @pinetrie/channel      declares NOTHING; a held JSON-lines channel to a server process (TECHNICAL.md)
   lanes/         @pinetrie/lanes        a lane's container and disk, and jj and git in it (TECHNICAL.md)
+  lanehost/      @pinetrie/lanehost     the lanes' machine: disks, diffs, grants, by role (TECHNICAL.md)
   keeper/        @pinetrie/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
   repo/          @pinetrie/repo         your repo: reads, steps, the owner; offers, accepted work, lanes' refs (TECHNICAL.md)
   session/       @pinetrie/session      one client's connection to a host; no React (TECHNICAL.md)

@@ -1,7 +1,7 @@
 # S125 — A lane runs lanes of its own without privilege: rootless Docker and btrfs snapshots in an unprivileged container, under Docker's seccomp profile plus the namespace calls
 
 - **Status:** Answered
-- **Led to:** ADR-0102, ADR-0103
+- **Led to:** ADR-0102, ADR-0103, ADR-0130
 
 Follows S123 and S124. It serves `e2e:lanes`, which must run its lanes inside
 a lane.

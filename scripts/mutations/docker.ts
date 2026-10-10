@@ -15,12 +15,12 @@ const launcher = "packages/vm/launcher/launcher.swift"
 const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 
 export const mutations: readonly Mutation[] = [
-  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  // ── the lanes suite, proven in a lane (ADR-0130) ──
   {
     name: "lanes share the network of the machine Docker runs on",
     file: "packages/docker/plan.ts",
-    from: '    "--network",\n    projectNetwork(input.project),',
-    to: '    "--network",\n    "host",',
+    from: "    network: projectNetwork(input.project),",
+    to: '    network: "host",',
     suite: "lanes",
     scenario: "main",
     expect: "two lanes serve :5173 at once, each its own",
@@ -28,8 +28,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's disk is mounted read-only",
     file: "packages/docker/plan.ts",
-    from: "      target: WORKSPACE_ROOT,\n      readonly: false,",
-    to: "      target: WORKSPACE_ROOT,\n      readonly: true,",
+    from: "        target: WORKSPACE_ROOT,\n        readonly: false,",
+    to: "        target: WORKSPACE_ROOT,\n        readonly: true,",
     suite: "lanes",
     scenario: "main",
     expect:
@@ -38,17 +38,17 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane granted ssh is given no agent",
     file: "packages/docker/plan.ts",
-    from: "    shape.ssh && target.sshAgent !== null",
-    to: "    false && target.sshAgent !== null",
+    from: "  const ssh = shape.ssh && target.sshAgent !== null",
+    to: "  const ssh = false && target.sshAgent !== null",
     suite: "lanes",
     scenario: "main",
     expect: "with ssh granted, the lane has SSH_AUTH_SOCK",
   },
   {
     name: "a snapshot is a new empty subvolume, not a snapshot of the lane",
-    file: plan,
-    from: `          'btrfs -q subvolume snapshot "$1" "$2.tmp"',\n`,
-    to: `          'btrfs -q subvolume create "$2.tmp"',\n`,
+    file: "packages/lanehost/disks.ts",
+    from: '      case "snapshot":\n        await btrfs([\n          "subvolume",\n          "snapshot",\n          ...(step.readonly ? ["-r"] : []),\n          step.from,\n          step.to,\n        ])\n',
+    to: '      case "snapshot":\n        await btrfs(["subvolume", "create", step.to])\n',
     suite: "lanes",
     scenario: "contract",
     expect:
@@ -67,10 +67,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "(Linux) a lane's read-only mounts are bound read-write",
     file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '      `type=bind,source=${source},target=${m.target}${m.readonly ? ",readonly" : ""}`,',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "      `type=bind,source=${source},target=${m.target}`,",
+    from: "  target: m.target,\n  readonly: m.readonly,\n",
+    to: "  target: m.target,\n  readonly: false,\n",
     suite: "lanes",
     scenario: "contract",
     expect:
@@ -89,8 +87,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "(Mac) every lane runs without seccomp",
     file: plan,
-    from: '    : ["--security-opt", "no-new-privileges"]',
-    to: '    : ["--security-opt", "no-new-privileges", "--security-opt", "seccomp=unconfined"]',
+    from: '      : ["no-new-privileges"],',
+    to: '      : ["no-new-privileges", "seccomp=unconfined"],',
     suite: "lanes",
     scenario: "contract",
     expect: "a lane cannot open a vsock socket",
@@ -119,16 +117,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's container carries no project label",
     file: plan,
-    from: "  const labels = { [PROJECT_LABEL]: input.project, ...target.labels }",
-    to: "  const labels = { ...target.labels }",
+    from: "  [PROJECT_LABEL]: project,\n  ...target.labels,\n  ...more,\n",
+    to: "  ...target.labels,\n  ...more,\n",
     command: unit("packages/docker"),
     expect: "the project's and the target's labels",
   },
   {
     name: "ssh is forwarded without the grant",
     file: plan,
-    from: "    shape.ssh && target.sshAgent !== null",
-    to: "    target.sshAgent !== null",
+    from: "  const ssh = shape.ssh && target.sshAgent !== null",
+    to: "  const ssh = target.sshAgent !== null",
     command: unit("packages/docker"),
     expect: "ssh: the slot's agent, only with the grant",
   },
@@ -142,10 +140,10 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane's delete leaves its inner lanes' disk",
-    file: plan,
-    from: "        disks.nested(op.lane),\n",
+    file: "packages/lanehost/disks.ts",
+    from: '        { kind: "drop", path: disks.nested(call.lane) },\n',
     to: "",
-    command: unit("packages/docker"),
+    command: unit("packages/lanehost"),
     expect: "a lane's delete takes its inner lanes' disk",
   },
   {
@@ -244,8 +242,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's hostname is Docker's container id",
     file: plan,
-    from: '    "--hostname",\n    shape.name,\n',
-    to: "",
+    from: "    hostname: shape.name,\n",
+    to: "    hostname: null,\n",
     command: unit("packages/docker"),
     expect: "the lane's hostname is its container's name",
   },
@@ -260,8 +258,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a host whose Docker does not answer is given lanes",
     file: "apps/pinetrie/host/work/runtime.ts",
-    from: "  if (refusal !== null) return refusedWith(dockerWords(refusal))\n  const runtime = dockerRuntime({ target, lanesDir, root })\n  log(",
-    to: "  const runtime = dockerRuntime({ target, lanesDir, root })\n  log(",
+    from: "  if (refusal !== null) return refusedWith(dockerWords(refusal))\n  const runtime = dockerRuntime({ target, lanesDir, root, log })\n  log(",
+    to: "  const runtime = dockerRuntime({ target, lanesDir, root, log })\n  log(",
     command: unit("apps/pinetrie/host/work/runtime.test.ts"),
     expect: "a Docker that does not answer, in the runtime's words",
   },
@@ -276,27 +274,27 @@ export const mutations: readonly Mutation[] = [
   {
     name: "lanes share Docker's default network, whatever their project",
     file: plan,
-    from: '    "--network",\n    projectNetwork(input.project),\n',
-    to: "",
+    from: "    network: projectNetwork(input.project),",
+    to: '    network: "bridge",',
     command: unit("packages/docker"),
     expect: "every lane is on its project's network",
   },
   {
     name: "a lane is told the host's ports where there is no host address",
     file: plan,
-    from: "    target.hostAddress !== null && shape.hostPorts.length > 0",
-    to: "    shape.hostPorts.length > 0",
+    from: "  const hostPorts = target.hostAddress !== null && shape.hostPorts.length > 0",
+    to: "  const hostPorts = shape.hostPorts.length > 0",
     command: unit("packages/docker"),
     expect: "a lane is told the host's address and its granted ports",
   },
   {
     name: "a project's grant applies to every project's lanes",
-    file: plan,
+    file: "packages/lanehost/grants.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "          `iptables -I DOCKER-USER -s ${input.subnet} -j ${chain}`,",
+    from: "          `-I DOCKER-USER -s ${subnet} -j ${chain}`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "          `iptables -I DOCKER-USER -j ${chain}`,",
-    command: unit("packages/docker"),
+    to: "          `-I DOCKER-USER -j ${chain}`,",
+    command: unit("packages/lanehost"),
     expect: "the rules accept each port only from the project's network",
   },
   {
@@ -307,12 +305,41 @@ export const mutations: readonly Mutation[] = [
     command: unit("apps/pinetrie/host/work/runtime.test.ts"),
     expect: "planHostPortGrant: the granted ports, but the host's own",
   },
+  {
+    name: "lanehost's privileged role writes the lanes directory",
+    file: "packages/docker/plan.ts",
+    from: '      readonly: spec.lanesDir === "ro",\n',
+    to: "      readonly: false,\n",
+    suite: "lanes",
+    scenario: "contract",
+    expect: "lanehost's privileged role cannot write the lanes directory",
+  },
+  {
+    name: "a walk's diff drops what was deleted",
+    file: "packages/lanehost/walk.ts",
+    from: '    if (!after.has(p)) out.push({ path: p, change: "deleted", kind: b.kind })\n',
+    to: "",
+    suite: "lanes",
+    scenario: "contract",
+    expect:
+      "a diff between two snapshots of a lane reports a file it deleted, and one it made",
+  },
+  {
+    name: "(Mac) a send stream's diff drops what was unlinked",
+    file: "packages/lanehost/send-stream.ts",
+    from: '        deleted(resolve(path), "file")\n',
+    to: "",
+    suite: "lanes",
+    scenario: "contract",
+    expect:
+      "a diff between two snapshots of a lane reports a file it deleted, and one it made",
+  },
   // ── the network (S135, S136), the contract's checks ──
   {
     name: "(Mac) a lane is on the VM's own network, outside the fence",
     file: plan,
-    from: '    "--network",\n    projectNetwork(input.project),\n',
-    to: '    "--network",\n    "host",\n',
+    from: "    network: projectNetwork(input.project),",
+    to: '    network: "host",',
     suite: "lanes",
     scenario: "contract",
     expect:
@@ -320,11 +347,11 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "(Mac) a project's grant reaches every project's lanes",
-    file: plan,
+    file: "packages/lanehost/grants.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "          `iptables -I DOCKER-USER -s ${input.subnet} -j ${chain}`,",
+    from: "          `-I DOCKER-USER -s ${subnet} -j ${chain}`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "          `iptables -I DOCKER-USER -j ${chain}`,",
+    to: "          `-I DOCKER-USER -j ${chain}`,",
     suite: "lanes",
     scenario: "contract",
     expect:

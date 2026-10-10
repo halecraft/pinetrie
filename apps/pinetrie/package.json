@@ -22,6 +22,7 @@
     "@pinetrie/docker": "workspace:*",
     "@pinetrie/interface": "workspace:*",
     "@pinetrie/keeper": "workspace:*",
+    "@pinetrie/lanehost": "workspace:*",
     "@pinetrie/lanes": "workspace:*",
     "@pinetrie/pi": "workspace:*",
     "@pinetrie/protocol": "workspace:*",

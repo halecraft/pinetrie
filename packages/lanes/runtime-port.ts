@@ -1,8 +1,8 @@
-// lanes/runtime-port — what a runtime does for lanes (ADR-0103). Planners
+// lanes/runtime-port — what a runtime does for lanes (ADR-0130). Planners
 // return values (`ContainerShape`, `DiskOp`); a runtime turns them into
 // commands. The host picks the runtime and hands it in.
 
-import type { SnapshotId } from "@pinetrie/core"
+import type { DiskDiff, SnapshotId } from "@pinetrie/core"
 import type { ContainerShape, ImagePlan, LaneOwner } from "./plan.ts"
 import type { Ran } from "./run.ts"
 
@@ -11,7 +11,15 @@ import type { Ran } from "./run.ts"
  * and `deleteSnapshots` succeed when there is nothing to delete.
  */
 export type DiskOp =
-  | { readonly kind: "create"; readonly lane: LaneOwner }
+  | {
+      readonly kind: "create"
+      readonly lane: LaneOwner
+      /** Paths copied into the new disk from a snapshot, by reflink; null with none. */
+      readonly carry: {
+        readonly from: SnapshotId
+        readonly paths: readonly string[]
+      } | null
+    }
   | {
       readonly kind: "restore"
       readonly lane: LaneOwner
@@ -42,8 +50,16 @@ export interface LaneRuntime {
   disk(op: DiskOp): Promise<void>
   diskExists(lane: LaneOwner): Promise<boolean>
   snapshotExists(id: SnapshotId): Promise<boolean>
-  /** The container's arguments, without its label: pure. Their hash is its spec label. */
-  runArgs(shape: ContainerShape): readonly string[]
+  /** What differs between two snapshots, both of this project's. */
+  diff(from: SnapshotId, to: SnapshotId): Promise<DiskDiff>
+  /** This project's snapshots, each with when it was made (ms since the epoch). */
+  snapshots(): Promise<
+    readonly { readonly id: string; readonly made: number }[]
+  >
+  /** A file of pine·trie's own (`.pinetrie-lane/<file>`) in a snapshot; null when absent. */
+  readLaneFile(snapshot: SnapshotId, file: string): Promise<string | null>
+  /** The container's spec as the runtime makes it, without its label: pure. Its hash is its spec label. */
+  runSpec(shape: ContainerShape): unknown
   /** Make the container from `shape`, labelled with its spec hash, and start it. */
   run(shape: ContainerShape): Promise<void>
   containerFacts(container: string): Promise<ContainerFacts>

@@ -1,15 +1,10 @@
-// docker/cli — the docker commands a lane runtime runs, against the target's
-// socket (`-H`).
+// docker/cli — the docker CLI, against the target's socket (`-H`), for what
+// streams or builds: `buildx build`, `exec -i` (`dockerArgv`), a throwaway
+// container's stdout as bytes, and the startup's check that the CLI and
+// buildx answer. Everything else is Docker's API (`api.ts`).
 
 import path from "node:path"
-import {
-  describeFailure,
-  hostBytesRunner,
-  type ImagePlan,
-  type Ran,
-  run,
-} from "@pinetrie/lanes"
-import { DISKS_CONTAINER, parseImagePath } from "./plan.ts"
+import { hostBytesRunner, type ImagePlan, type Ran, run } from "@pinetrie/lanes"
 import type { DockerTarget } from "./target.ts"
 
 /** The docker CLI against the target's socket. */
@@ -24,28 +19,6 @@ export const docker = (
   const [program = "docker", ...rest] = dockerArgv(target)
   return run(program, [...rest, ...args])
 }
-
-/** `docker` with `args`, throwing on failure with the command named. */
-export async function dockerOrThrow(
-  target: Pick<DockerTarget, "socket">,
-  args: readonly string[],
-): Promise<Ran> {
-  const ran = await docker(target, args)
-  if (!ran.ok) throw new Error(describeFailure(`docker ${args[0] ?? ""}`, ran))
-  return ran
-}
-
-/** One command in the disks helper. */
-export const inDisks = (
-  target: Pick<DockerTarget, "socket">,
-  argv: readonly string[],
-): Promise<Ran> => docker(target, ["exec", DISKS_CONTAINER, ...argv])
-
-export const imageExists = async (
-  target: Pick<DockerTarget, "socket">,
-  tag: string,
-): Promise<boolean> =>
-  (await docker(target, ["image", "inspect", "--format", "{{.Id}}", tag])).ok
 
 /** Build `plan`'s image into Docker's store, from the host's CLI. */
 export async function buildImage(
@@ -81,20 +54,6 @@ export function buildError(stderr: string): string {
     lines.at(-1) ??
     "no message"
   )
-}
-
-export async function imagePath(
-  target: Pick<DockerTarget, "socket">,
-  tag: string,
-): Promise<string> {
-  const ran = await dockerOrThrow(target, [
-    "image",
-    "inspect",
-    "--format",
-    "{{json .Config.Env}}",
-    tag,
-  ])
-  return parseImagePath(ran.stdout)
 }
 
 export const runInImage = (

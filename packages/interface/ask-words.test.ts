@@ -49,6 +49,8 @@ const stats = (over: Partial<WorkStats> = {}): WorkStats => ({
   calls: 0,
   failed: 0,
   files: [],
+  ignored: 0,
+  recipeFailed: 0,
   first: 0,
   last: 0,
   ...over,
@@ -72,6 +74,11 @@ describe("workWords", () => {
       "people, named",
       stats({ people: 12, writers: [ada, bea], agent: 3 }),
       "12 messages from Ada and Bea · 3 steps",
+    ],
+    [
+      "ignored files a turn wrote, and a recipe that failed (ADR-0131)",
+      stats({ agent: 2, files: ["a"], ignored: 3, recipeFailed: 1 }),
+      "2 steps · 1 file · 3 ignored files · dependencies failed to install",
     ],
     [
       "under a second takes no time",

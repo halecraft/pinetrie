@@ -127,6 +127,8 @@ describe("planArchive (ADR-0116)", () => {
       snapshot: snapshot === null ? null : snapshotId(snapshot),
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     })
     const revisions = new Map([
       [

@@ -6,6 +6,14 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a turn's ignored files go unsaid",
+    file: "packages/interface/ask-words.ts",
+    from: '    stats.ignored > 0 ? plural(stats.ignored, "ignored file") : "",\n',
+    to: "",
+    command: unit,
+    expect: "ignored files a turn wrote, and a recipe that failed",
+  },
+  {
     name: "a named thread opened before its lane asks for no banner",
     file: "packages/interface/column-view.ts",
     from: "  return f.work.names.has(f.thread) && f.work.banners.has(f.thread)\n",
@@ -254,8 +262,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an ask's files are its first turn's",
     file: "packages/interface/work-stats.ts",
-    from: "    for (const p of revisions.get(id)?.paths ?? []) files.add(p)",
-    to: "    if (id === messages[0]) for (const p of revisions.get(id)?.paths ?? []) files.add(p)",
+    from: "    for (const p of record?.paths ?? []) files.add(p)",
+    to: "    if (id === messages[0]) for (const p of record?.paths ?? []) files.add(p)",
     command: unit,
     expect: "the union of its turns' paths",
   },

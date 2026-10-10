@@ -1,4 +1,4 @@
-// pine·trie's lane VM launcher (ADR-0103), from S131's probe. One per user:
+// pine·trie's lane VM launcher (ADR-0130), from S131's probe. One per user:
 // it keeps the VM running while any host holds a lease, gives each host a
 // slot of its own, and bridges Docker with half-closes.
 //

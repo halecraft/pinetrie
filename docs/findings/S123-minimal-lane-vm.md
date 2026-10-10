@@ -1,7 +1,7 @@
 # S123 — Alpine in Lima runs lanes on btrfs snapshots end to end, with a seventh of Ubuntu's disk and less memory, but boots no faster
 
 - **Status:** Answered
-- **Led to:** ADR-0102, ADR-0103
+- **Led to:** ADR-0102, ADR-0103, ADR-0130
 
 Follows S122.
 

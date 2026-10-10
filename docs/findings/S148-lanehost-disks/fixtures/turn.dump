@@ -1,0 +1,48 @@
+snapshot        ./B                             uuid=d83282bf-dc2e-3941-9836-3a81ac150253 transid=87865 parent_uuid=98f965bb-72f8-b44f-a0e4-29d31c928d20 parent_transid=87862
+rename          ./B/d                           dest=./B/o257-87862-0
+rename          ./B/o257-87862-0/sub            dest=./B/o258-87862-0
+unlink          ./B/o257-87862-0/a
+rmdir           ./B/o257-87862-0
+unlink          ./B/o258-87862-0/b
+rmdir           ./B/o258-87862-0
+update_extent   ./B/mod.txt                     offset=0 len=9
+utimes          ./B/mod.txt                     atime=2026-10-10T19:25:12+0000 mtime=2026-10-10T19:25:12+0000 ctime=2026-10-10T19:25:12+0000
+link            ./B/ren-dst.txt                 dest=ren-src.txt
+unlink          ./B/ren-src.txt
+utimes          ./B/ren-dst.txt                 atime=2026-10-10T19:25:12+0000 mtime=2026-10-10T19:25:12+0000 ctime=2026-10-10T19:25:12+0000
+chmod           ./B/chmod.txt                   mode=700
+utimes          ./B/chmod.txt                   atime=2026-10-10T19:25:12+0000 mtime=2026-10-10T19:25:12+0000 ctime=2026-10-10T19:25:12+0000
+unlink          ./B/link
+mkfile          ./B/o266-87865-0
+rename          ./B/o266-87865-0                dest=./B/new\nline
+update_extent   ./B/new\nline                   offset=0 len=1
+chown           ./B/new\nline                   gid=0 uid=0
+chmod           ./B/new\nline                   mode=644
+utimes          ./B/new\nline                   atime=2026-10-10T19:25:12+0000 mtime=2026-10-10T19:25:12+0000 ctime=2026-10-10T19:25:12+0000
+mkfile          ./B/o267-87865-0
+rename          ./B/o267-87865-0                dest=./B/with\ space.txt
+update_extent   ./B/with\ space.txt             offset=0 len=1
+chown           ./B/with\ space.txt             gid=0 uid=0
+chmod           ./B/with\ space.txt             mode=644
+utimes          ./B/with\ space.txt             atime=2026-10-10T19:25:12+0000 mtime=2026-10-10T19:25:12+0000 ctime=2026-10-10T19:25:12+0000
+mkdir           ./B/o268-87865-0
+rename          ./B/o268-87865-0                dest=./B/newdir
+chown           ./B/newdir                      gid=0 uid=0
+chmod           ./B/newdir                      mode=755
+mkdir           ./B/o269-87865-0
+rename          ./B/o269-87865-0                dest=./B/newdir/inner
+chown           ./B/newdir/inner                gid=0 uid=0
+chmod           ./B/newdir/inner                mode=755
+mkfile          ./B/o270-87865-0
+rename          ./B/o270-87865-0                dest=./B/newdir/inner/f
+update_extent   ./B/newdir/inner/f              offset=0 len=2
+chown           ./B/newdir/inner/f              gid=0 uid=0
+chmod           ./B/newdir/inner/f              mode=644
+utimes          ./B/newdir/inner/f              atime=2026-10-10T19:25:12+0000 mtime=2026-10-10T19:25:12+0000 ctime=2026-10-10T19:25:12+0000
+symlink         ./B/o271-87865-0                dest=mod.txt
+rename          ./B/o271-87865-0                dest=./B/link
+chown           ./B/link                        gid=0 uid=0
+utimes          ./B/link                        atime=2026-10-10T19:25:12+0000 mtime=2026-10-10T19:25:12+0000 ctime=2026-10-10T19:25:12+0000
+utimes          ./B/                            atime=2026-10-10T19:25:12+0000 mtime=2026-10-10T19:25:12+0000 ctime=2026-10-10T19:25:12+0000
+utimes          ./B/newdir/inner                atime=2026-10-10T19:25:12+0000 mtime=2026-10-10T19:25:12+0000 ctime=2026-10-10T19:25:12+0000
+utimes          ./B/newdir                      atime=2026-10-10T19:25:12+0000 mtime=2026-10-10T19:25:12+0000 ctime=2026-10-10T19:25:12+0000

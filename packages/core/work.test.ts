@@ -74,6 +74,8 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: S1,
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     },
     {
       entry: entryId("2-m1"),
@@ -82,6 +84,8 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: S2,
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     },
     {
       entry: entryId("4-m2"),
@@ -90,6 +94,8 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: S4,
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     },
     {
       entry: entryId("6-pb"),
@@ -98,6 +104,8 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: SB,
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     },
     {
       entry: entryId("8-pd"),
@@ -106,6 +114,8 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: null,
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     },
     {
       entry: entryId("b-pe"),
@@ -114,6 +124,8 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: null,
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     },
   ].map(r => [r.entry, r]),
 )
@@ -204,6 +216,8 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
           snapshot: null,
           paths: [],
           conflicts: [],
+          ignored: null,
+          recipe: null,
         },
       ],
     ])
@@ -255,6 +269,8 @@ describe("forkParent and conflictsAt: what a lane's copy was cloned from (ADR-00
           snapshot: null,
           paths: [],
           conflicts,
+          ignored: null,
+          recipe: null,
         },
       ] as const
     const records = new Map([

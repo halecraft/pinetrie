@@ -1,6 +1,6 @@
 # `@pinetrie/vm`: technical notes
 
-A Linux machine on the Mac for lanes' Docker (ADR-0103): its image, and
+A Linux machine on the Mac for lanes' Docker (ADR-0130): its image, and
 the launcher that runs it and a host's lease on a slot of it. It declares
 only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
 

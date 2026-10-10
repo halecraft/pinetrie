@@ -10,11 +10,16 @@ import {
   BASE_SNAPSHOT,
   type CommitId,
   commitId,
+  DISK_OWN_ROOTS,
+  type DiskDiff,
   type EntryId,
   type ForkStart,
   HOST_WORKING_COPY,
+  IGNORED_LISTED,
+  type IgnoredFiles,
   isRootId,
   isThreadId,
+  isUnderAny,
   type LaneRecord,
   type ProjectRecord,
   type RevisionRecord,
@@ -61,6 +66,19 @@ const RevisionRecordSchema = Type.Object({
   paths: Type.Optional(Type.Array(Type.String())),
   // Absent in records written before they recorded conflicts (ADR-0072).
   conflicts: Type.Optional(Type.Array(Type.String())),
+  // Absent in records written before turns diffed their disk (ADR-0131).
+  ignored: Type.Optional(
+    Type.Union([
+      Type.Object({
+        paths: Type.Array(Type.String()),
+        more: Type.Integer({ minimum: 0 }),
+      }),
+      Type.Null(),
+    ]),
+  ),
+  recipe: Type.Optional(
+    Type.Union([Type.Literal("ran"), Type.Literal("failed"), Type.Null()]),
+  ),
 })
 
 const ProjectRecordSchema = Type.Object({
@@ -117,6 +135,11 @@ export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
                 : snapshotId(r.snapshot),
             paths: r.paths ?? [],
             conflicts: r.conflicts ?? [],
+            ignored:
+              r.ignored === undefined || r.ignored === null
+                ? null
+                : { paths: r.ignored.paths, more: r.ignored.more },
+            recipe: r.recipe ?? null,
           }
         : undefined,
     ),
@@ -180,7 +203,16 @@ export function planTurnRecord(input: {
   const { entry, lane } = input
   if (!input.own)
     return input.isPrompt
-      ? { entry, lane, commit: null, snapshot: null, paths: [], conflicts: [] }
+      ? {
+          entry,
+          lane,
+          commit: null,
+          snapshot: null,
+          paths: [],
+          conflicts: [],
+          ignored: null,
+          recipe: null,
+        }
       : null
   if (!input.isPrompt && !input.toolCalls && input.committed === null)
     return null
@@ -193,6 +225,72 @@ export function planTurnRecord(input: {
     snapshot: input.snapshot,
     paths: input.committed === null ? [] : input.paths,
     conflicts: commit === null ? [] : input.conflicts,
+    // The turn's whole-disk diff fills these in once its snapshot is taken.
+    ignored: null,
+    recipe: null,
+  }
+}
+
+/** What a path a turn changed is to pine·trie (`classifyDisk`). */
+export type DiskClass = "tracked" | "own" | "derived" | "cache" | "ignored"
+
+/**
+ * What each path a turn's whole-disk diff names is (ADR-0131): tracked, if
+ * the repo's commits between the two snapshots changed it; pine·trie's or a
+ * repo's own; under a recipe's output; under a recipe's cache; else an
+ * ignored file the turn wrote. A shared directory is no part of the disk:
+ * only its mount point is, which is pine·trie's own.
+ */
+export function classifyDisk(input: {
+  readonly diff: DiskDiff
+  /** Paths the repo's commits between the two snapshots changed (`changedPaths`). */
+  readonly tracked: readonly string[]
+  /** The recipe's outputs (`derived.json`). */
+  readonly outputs: readonly string[]
+  readonly caches: readonly string[]
+  /** Shared directories, relative to the disk's root. */
+  readonly shared: readonly string[]
+}): ReadonlyMap<string, DiskClass> {
+  const tracked = new Set(input.tracked)
+  const out = new Map<string, DiskClass>()
+  for (const { path } of input.diff.changes)
+    out.set(
+      path,
+      tracked.has(path) || [...tracked].some(t => t.startsWith(`${path}/`))
+        ? "tracked"
+        : isUnderAny(path, DISK_OWN_ROOTS) || input.shared.includes(path)
+          ? "own"
+          : isUnderAny(path, input.outputs)
+            ? "derived"
+            : isUnderAny(path, input.caches)
+              ? "cache"
+              : "ignored",
+    )
+  return out
+}
+
+/**
+ * A turn's ignored files as its record keeps them: the topmost of them (a
+ * directory stands for what is under it), sorted, at most `IGNORED_LISTED`,
+ * and how many more. Null when there are none.
+ */
+export function ignoredFiles(
+  classes: ReadonlyMap<string, DiskClass>,
+): IgnoredFiles | null {
+  const ignored = [...classes]
+    .filter(([, c]) => c === "ignored")
+    .map(([p]) => p)
+  const set = new Set(ignored)
+  const topmost = ignored
+    .filter(p => {
+      const slash = p.lastIndexOf("/")
+      return slash < 0 || !set.has(p.slice(0, slash))
+    })
+    .sort()
+  if (topmost.length === 0) return null
+  return {
+    paths: topmost.slice(0, IGNORED_LISTED),
+    more: Math.max(0, topmost.length - IGNORED_LISTED),
   }
 }
 

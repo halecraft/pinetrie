@@ -1048,6 +1048,51 @@ export const snapshotId = (id: string): SnapshotId => id as SnapshotId
 /** The project's disk at accepted work's commit, which root lanes fork from (ADR-0104). */
 export const BASE_SNAPSHOT = snapshotId("base")
 
+/** The names of dependency layers' snapshots (ADR-0131). */
+export const DEPS_PREFIX = "deps-"
+/** A dependency layer: the snapshot of the disk a recipe made, named by its key. */
+export const depsSnapshot = (key: string): SnapshotId =>
+  snapshotId(`${DEPS_PREFIX}${key}`)
+
+/**
+ * One path that differs between two snapshots of a disk, from the disk's
+ * root. A renamed directory is its old path deleted and its new one added,
+ * the directory alone: what is under it moved with it.
+ */
+export interface DiskChange {
+  readonly path: string
+  readonly change: "added" | "changed" | "deleted"
+  /** What is at the path: what was, for a deletion; `other` when not known. */
+  readonly kind: "file" | "dir" | "symlink" | "other"
+}
+
+/**
+ * Paths on a lane's disk that no person and no recipe writes: pine·trie's
+ * own, the repos', and the file system's. A recipe never owns one, and a
+ * turn's diff counts none as the turn's (ADR-0131).
+ */
+export const DISK_OWN_ROOTS: readonly string[] = [
+  ".pinetrie-lane",
+  ".jj",
+  ".git",
+  "lost+found",
+]
+
+/** Whether `p`, from a disk's root, is `root` or under it, for any of `roots`. */
+export const isUnderAny = (p: string, roots: readonly string[]): boolean =>
+  roots.some(r => p === r || p.startsWith(`${r}/`))
+
+/** A path inside a disk: relative, each segment a name, never `.` or `..`. */
+export const isPathInside = (p: string): boolean =>
+  p !== "" &&
+  !p.startsWith("/") &&
+  p.split("/").every(s => s !== "" && s !== "." && s !== "..")
+
+/** What differs between two snapshots of a disk, sorted by path. */
+export interface DiskDiff {
+  readonly changes: readonly DiskChange[]
+}
+
 /**
  * A lane's record: a host-written `pinetrie.lane` value keyed by the lane's
  * name, written once, when the lane is created. The setting never changes:
@@ -1065,6 +1110,15 @@ export interface LaneRecord {
   readonly by: WriterId
   readonly createdAt: number
 }
+
+/** Ignored files a turn wrote: the first of them, and how many more. */
+export interface IgnoredFiles {
+  readonly paths: readonly string[]
+  readonly more: number
+}
+
+/** How many of a turn's ignored files its record lists. */
+export const IGNORED_LISTED = 100
 
 /**
  * The files at an entry: a host-written `pinetrie.revision` value keyed by the
@@ -1090,6 +1144,16 @@ export interface RevisionRecord {
   readonly paths: readonly string[]
   /** The files conflicted in `commit`: what a branch from here starts with (ADR-0072). */
   readonly conflicts: readonly string[]
+  /**
+   * Ignored files the turn wrote that are no recipe's output, no cache and
+   * not pine·trie's own, from its whole-disk diff (ADR-0131): the topmost
+   * of them, sorted, at most `IGNORED_LISTED`, and how many more. Null for a
+   * prompt's record, a lane with no copy of its own, and records written
+   * before.
+   */
+  readonly ignored: IgnoredFiles | null
+  /** Whether the lane's recipe ran at the turn's end, and how it went; null when it did not run. */
+  readonly recipe: "ran" | "failed" | null
 }
 
 /**

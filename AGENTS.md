@@ -107,3 +107,11 @@ Plans live in `.plans/`, named `YYYY-MM-DD-slug.md`, and are referred to as
 `docs/` and source paths, never `.plans/` or `.jj/`. `.plans/` is untracked,
 and shared read-write with every thread's lane (ADR-0035), so an agent in a
 lane reads and writes plans at the same path.
+
+A plan is what we implement once its risks are found and settled; it is not
+a sequence of steps that branches on what it finds. So the spikes come
+before it: each belief a plan would rest on that no spike has measured is a
+spike of its own in `docs/findings/`, run and answered first. The plan then
+cites the answers as evidence. It holds no spike phase, and no task whose
+shape depends on an answer still to come ("if this fails, Phase N
+changes").

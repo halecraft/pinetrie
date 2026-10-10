@@ -24,6 +24,7 @@ import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes, recordLane } from "./create.ts"
 import { createFetches } from "./fetch.ts"
+import { createRecipes } from "./recipe.ts"
 import { createRegistry } from "./registry.ts"
 import type { Found } from "./runtime.ts"
 import { startSetup } from "./setup.ts"
@@ -148,12 +149,14 @@ export async function startLaneWork(input: {
     },
     acceptedWork: accepted,
   })
+  const recipes = createRecipes({ basics, setup })
   const containers = createContainers({
     basics,
     setup,
     registry,
     keeper,
     offers,
+    recipes,
   })
   const { fetchLane } = createFetches({
     basics,
@@ -164,10 +167,12 @@ export async function startLaneWork(input: {
   })
   const turns = createTurns({
     basics,
+    setup,
     registry,
     keeper,
     records: input.records,
     fetchLane,
+    recipes,
   })
   const newLanes = createNewLanes({
     basics,
@@ -186,6 +191,7 @@ export async function startLaneWork(input: {
     containers,
     fetchLane,
     writeRevision: turns.writeRevision,
+    recipes,
   })
   const splits = createSplits({
     basics,

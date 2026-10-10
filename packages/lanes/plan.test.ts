@@ -2,6 +2,7 @@ import {
   BASE_SNAPSHOT,
   baseMessage,
   commitId,
+  type DiskDiff,
   shellWord,
   snapshotId,
   type ThreadName,
@@ -9,15 +10,19 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  addedRoots,
   BASE_LANE,
   bookmarkName,
   DEFAULT_REPO,
   decodeLaneConfig,
+  depsKey,
   FETCHED_REF,
   fetchById,
   forkConfig,
   imageRefusal,
+  isBaseCurrent,
   isBookmarkName,
+  isRecipeTouched,
   type LaneSpec,
   type LaneStep,
   laneContainer,
@@ -25,9 +30,11 @@ import {
   laneIgnores,
   machineConfig,
   NO_GRANTS,
-  planBaseRefresh,
+  parseDerivedFacts,
+  planBaseCheckout,
   planBundle,
   planContainer,
+  planDepsRetention,
   planDisk,
   planExclude,
   planFork,
@@ -40,12 +47,16 @@ import {
   planMounts,
   planOldNamesOnDisk,
   planProjectDir,
+  planRecipe,
+  planRecipeCheck,
+  planRecipeRecord,
   planRoot,
   planShape,
   planShared,
   planSnapshot,
   planStartFrom,
   planTurnCommit,
+  type Recipe,
   repoConfig,
   type Step,
   specHash,
@@ -144,15 +155,16 @@ describe("planHostMounts: granted host paths, and the ones never mounted", () =>
       home,
       agentDir,
     })
+    // Docker's API takes any path: a comma and a colon are no trouble.
     expect(planned.mounts).toEqual([
       "/Users/ada/.pi/agent/npm/node_modules/pi-subagents",
+      "/x/a,b:c",
     ])
     expect(planned.refused.map(r => `${r.path}: ${r.reason}`)).toEqual([
       "/: it is the file system's root",
       "/Users: it is, or holds, your home directory",
       "/Users/ada: it is, or holds, your home directory",
       "/Users/ada/.pi: it is, or holds, pi's agent directory",
-      "/x/a,b:c: it has both a comma and a colon, which Docker's mount arguments cannot name",
     ])
   })
 })
@@ -181,6 +193,10 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
     )
     expect(laneIgnores([".plans", "notes/shared"])).toBe(
       "/.pinetrie-lane/\n/lost+found/\n/.plans/\n/notes/shared/\n",
+    )
+    // A recipe's cache is never tracked, as a fresh disk carries it in first.
+    expect(laneIgnores([], [".pnpm-store"])).toBe(
+      "/.pinetrie-lane/\n/lost+found/\n/.pnpm-store/\n",
     )
   })
   test("never your home directory, and no variable no grant names", () => {
@@ -216,8 +232,8 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
   })
 })
 
-test("specHashOf: the hash of the runtime's arguments, changed when they change", () => {
-  const runtime = { runArgs: (s: { image: string }) => ["run", s.image] }
+test("specHashOf: the hash of the runtime's spec, changed when it changes", () => {
+  const runtime = { runSpec: (s: { image: string }) => ["run", s.image] }
   const shape = planShape(spec, {})
   expect(specHashOf(runtime, shape)).toBe(
     specHash(["run", "pinetrie-lane:abc"]),
@@ -331,13 +347,13 @@ describe("repoConfig: the project's values win, and a bad one falls back (ADR-01
   })
 })
 
-describe("decodeLaneConfig: grants, the install and shared directories, total", () => {
+describe("decodeLaneConfig: grants, the recipe and shared directories, total", () => {
   const empty = (pnpm: boolean) => decodeLaneConfig(undefined, "/p", pnpm)
   test("nothing, or anything malformed, grants and shares nothing", () => {
     for (const json of [undefined, {}, { lanes: 3 }])
       expect(decodeLaneConfig(json, "/p", false)).toEqual({
         grants: NO_GRANTS,
-        install: null,
+        recipe: null,
         shared: [],
         repo: {
           acceptedBookmark: null,
@@ -370,7 +386,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         env: ["OK_1"],
         mounts: [],
       },
-      install: null,
+      recipe: null,
       shared: [".plans"],
       repo: {
         acceptedBookmark: null,
@@ -457,22 +473,40 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
       mounts: [{ source: "/p/d", target: "/d", readonly: true }],
     })
   })
-  test("the install: the config's, else pnpm's for a pnpm repo, else none", () => {
+  test("the recipe: the config's, else pnpm's for a pnpm repo, else none", () => {
     expect(
       decodeLaneConfig(
         { lanes: { install: "npm ci", installWhen: "package-lock.json" } },
         "/p",
         true,
-      ).install,
-    ).toEqual({ command: "npm ci", lockfile: "package-lock.json" })
+      ).recipe,
+    ).toEqual({ command: "npm ci", inputs: ["package-lock.json"], caches: [] })
     expect(
-      decodeLaneConfig({ lanes: { install: "npm ci" } }, "/p", true).install,
+      decodeLaneConfig(
+        {
+          lanes: {
+            install: "make deps",
+            installWhen: ["Cargo.lock", "pnpm-lock.yaml"],
+            installCaches: [".cargo"],
+          },
+        },
+        "/p",
+        false,
+      ).recipe,
+    ).toEqual({
+      command: "make deps",
+      inputs: ["Cargo.lock", "pnpm-lock.yaml"],
+      caches: [".cargo"],
+    })
+    expect(
+      decodeLaneConfig({ lanes: { install: "npm ci" } }, "/p", true).recipe,
     ).toEqual({
       command: "pnpm install --frozen-lockfile",
-      lockfile: "pnpm-lock.yaml",
+      inputs: ["pnpm-lock.yaml"],
+      caches: [".pnpm-store"],
     })
-    expect(empty(true).install?.command).toBe("pnpm install --frozen-lockfile")
-    expect(empty(false).install).toBeNull()
+    expect(empty(true).recipe?.command).toBe("pnpm install --frozen-lockfile")
+    expect(empty(false).recipe).toBeNull()
   })
 })
 
@@ -581,11 +615,12 @@ test("planForkSetup: on accepted work, an empty commit naming it; its id read fo
 test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's own commits (ADR-0104)", () => {
   const W = commitId("w1")
   const steps = argvs(
-    planForkSetup(
-      LANE,
-      { kind: "wip", bookmark: "wip/x", commit: W, under: C1 },
-      "pnpm i",
-    ),
+    planForkSetup(LANE, {
+      kind: "wip",
+      bookmark: "wip/x",
+      commit: W,
+      under: C1,
+    }),
   )
   expect(steps[1]).toBe(`lane: ${fetchById([W, C1]).argv.join(" ")}`)
   expect(steps.slice(2, 5)).toEqual([
@@ -594,7 +629,8 @@ test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's o
     `lane: jj commit -m ${baseMessage("copy of wip/x", { kind: "wip", bookmark: "wip/x", commit: W })}`,
   ])
   expect(steps.some(s => s.includes("jj new w1"))).toBe(false)
-  expect(steps.at(-1)).toBe("lane: sh -c pnpm i")
+  // No fork installs: a WIP's dependencies are a layer of its own (ADR-0131).
+  expect(steps.join("\n")).not.toContain("pnpm")
 })
 
 describe("planJoins: the accepted-offer commits a lane holds, joined before it catches up (S102)", () => {
@@ -740,9 +776,14 @@ test("planDisk: a new disk, or one restored from a snapshot; then the container,
   const disk = (from: typeof BASE_SNAPSHOT | null) =>
     planDisk({ spec, env: {}, from })
   expect(disk(null)).toEqual([
-    { in: "runtime", op: { kind: "create", lane: LANE } },
+    { in: "runtime", op: { kind: "create", lane: LANE, carry: null } },
     { in: "runtime", op: { kind: "run", shape: planShape(spec, {}) } },
   ])
+  const carry = { from: snapshotId("deps-k"), paths: [".pnpm-store"] }
+  expect(planDisk({ spec, env: {}, from: null, carry })[0]).toEqual({
+    in: "runtime",
+    op: { kind: "create", lane: LANE, carry },
+  })
   expect(disk(BASE_SNAPSHOT)[0]).toEqual({
     in: "runtime",
     op: { kind: "restore", lane: LANE, from: BASE_SNAPSHOT },
@@ -776,60 +817,173 @@ test("planBundle: the lane's bookmark, excluding what your repo has", () => {
   })
 })
 
-describe("planBaseRefresh: the base snapshot at your @-", () => {
-  const install = {
+describe("the base: a dependency layer and a checkout (ADR-0131)", () => {
+  const recipe: Recipe = {
     command: "pnpm install --frozen-lockfile",
-    lockfile: "pnpm-lock.yaml",
+    inputs: ["pnpm-lock.yaml"],
+    caches: [".pnpm-store"],
   }
-  test("a new base: git and jj initialized, not cloned, then your @-, then the install", () => {
-    expect(
-      argvs(planBaseRefresh({ base: null, yours: [C1], lock: "h", install })),
-    ).toEqual([
+  test("planBaseCheckout: a fresh disk's git and jj, not cloned; a restored layer's stale copy recovered", () => {
+    expect(argvs(planBaseCheckout({ yours: [C1], fresh: true }))).toEqual([
       "lane: git init -q",
       "lane: jj git init --colocate",
       `lane: ${fetchById([C1]).argv.join(" ")}`,
-      "lane: jj workspace update-stale",
       "lane: jj new c1",
-      "lane: sh -c pnpm install --frozen-lockfile",
     ])
-  })
-  test("nothing when your @- and the lockfile match", () => {
-    expect(
-      planBaseRefresh({
-        base: { commits: [C1], lock: "h" },
-        yours: [C1],
-        lock: "h",
-        install,
-      }),
-    ).toEqual([])
-  })
-  test("fetch, recover a stale working copy, and jj new when only your @- moved", () => {
-    expect(
-      argvs(
-        planBaseRefresh({
-          base: { commits: [C1], lock: "h" },
-          yours: [C2],
-          lock: "h",
-          install,
-        }),
-      ),
-    ).toEqual([
+    expect(argvs(planBaseCheckout({ yours: [C2], fresh: false }))).toEqual([
       `lane: ${fetchById([C2]).argv.join(" ")}`,
       "lane: jj workspace update-stale",
       "lane: jj new c2",
     ])
   })
-  test("then the install when the lockfile changed too", () => {
+  test("depsKey: what made a layer, its caches not among it; with no recipe, the image alone", () => {
+    const key = depsKey({ recipe, image: "lane:1", inputs: "h" })
+    expect(key).toMatch(/^[0-9a-f]{16}$/)
+    expect(depsKey({ recipe, image: "lane:1", inputs: "i" })).not.toBe(key)
+    expect(depsKey({ recipe, image: "lane:2", inputs: "h" })).not.toBe(key)
     expect(
-      argvs(
-        planBaseRefresh({
-          base: { commits: [C1], lock: "h" },
-          yours: [C2],
-          lock: "i",
-          install,
+      depsKey({
+        recipe: { ...recipe, command: "pnpm i" },
+        image: "lane:1",
+        inputs: "h",
+      }),
+    ).not.toBe(key)
+    expect(
+      depsKey({
+        recipe: { ...recipe, caches: [] },
+        image: "lane:1",
+        inputs: "h",
+      }),
+    ).toBe(key)
+    const none = depsKey({ recipe: null, image: "lane:1", inputs: "" })
+    expect(none).not.toBe(key)
+    expect(depsKey({ recipe: null, image: "lane:2", inputs: "" })).not.toBe(
+      none,
+    )
+  })
+  test("isBaseCurrent: the same commits on the same layer", () => {
+    expect(isBaseCurrent({ commits: [C1], key: "k" }, [C1], "k")).toBe(true)
+    expect(isBaseCurrent({ commits: [C1], key: "k" }, [C2], "k")).toBe(false)
+    expect(isBaseCurrent({ commits: [C1], key: "k" }, [C1], "l")).toBe(false)
+    expect(isBaseCurrent(null, [C1], "k")).toBe(false)
+  })
+  test("addedRoots: the topmost paths a run added, never a cache nor a repo's own", () => {
+    const added = (...paths: string[]): DiskDiff => ({
+      changes: paths.map(path => ({
+        path,
+        change: "added" as const,
+        kind: "dir" as const,
+      })),
+    })
+    expect(
+      addedRoots(
+        {
+          changes: [
+            ...added(
+              "node_modules",
+              "node_modules/.pnpm",
+              "packages/a/node_modules",
+              "packages/a/node_modules/x",
+              ".pnpm-store",
+              ".pnpm-store/v10",
+              ".pinetrie-lane/derived.json",
+              ".jj/repo",
+            ).changes,
+            {
+              path: "packages/b/package.json",
+              change: "changed",
+              kind: "file",
+            },
+          ],
+        },
+        recipe.caches,
+      ),
+    ).toEqual(["node_modules", "packages/a/node_modules"])
+  })
+  test("planRecipe: the recorded outputs removed before the snapshot and the command; the snapshot after", () => {
+    const pre = snapshotId("recipe-pre-l")
+    const post = snapshotId("recipe-post-l")
+    const steps = planRecipe({
+      lane: LANE,
+      recipe,
+      outputs: ["node_modules", "packages/gone/node_modules", "../x"],
+      pre,
+      post,
+    })
+    expect(argvs(steps.before)).toEqual([
+      "lane: sh -c rm -rf -- /workspace/node_modules /workspace/packages/gone/node_modules",
+      "lane: sync",
+      `runtime: ${JSON.stringify({ kind: "snapshot", lane: LANE, snapshot: pre })}`,
+    ])
+    expect(argvs([steps.command])).toEqual([
+      "lane: sh -c pnpm install --frozen-lockfile",
+    ])
+    expect(argvs(steps.after).at(-1)).toContain(post)
+  })
+  test("planRecipeRecord: what it made, written on the disk; a failure keeps the key before it", () => {
+    const pre = snapshotId("p")
+    const post = snapshotId("q")
+    const diff: DiskDiff = {
+      changes: [{ path: "node_modules", change: "added", kind: "dir" }],
+    }
+    const record = (failed: string | null) =>
+      planRecipeRecord({
+        diff,
+        recipe,
+        key: "new",
+        previous: "old",
+        failed,
+        pre,
+        post,
+      })
+    const recorded = (failed: string | null) => argvs(record(failed).steps)
+    expect(record("boom").facts).toEqual({
+      key: "old",
+      outputs: ["node_modules"],
+      failed: "boom",
+    })
+    expect(recorded(null)[0]).toContain(
+      JSON.stringify({ key: "new", outputs: ["node_modules"], failed: null }),
+    )
+    expect(recorded("boom")[0]).toContain(
+      JSON.stringify({ key: "old", outputs: ["node_modules"], failed: "boom" }),
+    )
+    expect(recorded(null).at(-1)).toBe(
+      `runtime: ${JSON.stringify({ kind: "deleteSnapshots", ids: [pre, post] })}`,
+    )
+  })
+  test("parseDerivedFacts: none made when absent, and never an output outside the disk", () => {
+    expect(parseDerivedFacts(null)).toEqual({
+      key: null,
+      outputs: [],
+      failed: null,
+    })
+    expect(
+      parseDerivedFacts(
+        JSON.stringify({
+          key: "k",
+          outputs: ["node_modules", "../etc", ".jj"],
+          failed: null,
         }),
-      ).at(-1),
-    ).toBe("lane: sh -c pnpm install --frozen-lockfile")
+      ),
+    ).toEqual({ key: "k", outputs: ["node_modules"], failed: null })
+  })
+  test("planDepsRetention: every layer but the base's and the three newest", () => {
+    const at = (id: string, made: number) => ({ id, made })
+    expect(
+      planDepsRetention({
+        snapshots: [
+          at("deps-a", 1),
+          at("deps-b", 2),
+          at("deps-c", 3),
+          at("deps-d", 4),
+          at("deps-e", 5),
+          at("base", 0),
+          at("t-1-e1", 0),
+        ],
+        keep: ["a"],
+      }),
+    ).toEqual([snapshotId("deps-b")])
   })
 })
 
@@ -1037,4 +1191,25 @@ test("the base's scratch lane is no thread's: nothing that takes a thread takes 
     "pinetrie-base-scratch",
     "pinetrie/base-scratch",
   ])
+})
+
+describe("a lane's recipe, run again when its inputs change (ADR-0131)", () => {
+  const recipe: Recipe = {
+    command: "pnpm install --frozen-lockfile",
+    inputs: ["pnpm-lock.yaml"],
+    caches: [".pnpm-store"],
+  }
+  test("isRecipeTouched: an input among the paths, or every path when not known", () => {
+    expect(isRecipeTouched(recipe, ["src/a.ts"])).toBe(false)
+    expect(isRecipeTouched(recipe, ["src/a.ts", "pnpm-lock.yaml"])).toBe(true)
+    expect(isRecipeTouched(recipe, "all")).toBe(true)
+  })
+  test("planRecipeCheck: it runs when the disk's outputs were made from another key, or never made", () => {
+    const made = { key: "k", outputs: ["node_modules"], failed: null }
+    expect(planRecipeCheck(made, "k")).toBe("none")
+    expect(planRecipeCheck(made, "l")).toBe("run")
+    expect(planRecipeCheck({ key: null, outputs: [], failed: null }, "k")).toBe(
+      "run",
+    )
+  })
 })

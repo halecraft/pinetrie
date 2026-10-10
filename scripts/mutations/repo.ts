@@ -23,7 +23,7 @@ const offersRefresh = [
 ]
 
 export const mutations: readonly Mutation[] = [
-  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  // ── the lanes suite, proven in a lane (ADR-0130) ──
   {
     name: "nothing in your repo is immutable",
     file: "packages/repo/plan.ts",
@@ -337,7 +337,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stale base working copy is not recovered",
     file: "packages/lanes/plan.ts",
-    from: '          inLane("jj", "workspace", "update-stale"),\n',
+    from: '    ...(input.fresh ? [] : [inLane("jj", "workspace", "update-stale")]),\n',
     to: "",
     command: unit,
     expect: "a base refreshes after your @- was rewritten",

@@ -29,6 +29,13 @@ export interface WorkStats {
   readonly failed: number
   /** Paths its turns changed, from their revision records, sorted. */
   readonly files: readonly string[]
+  /**
+   * Ignored files its turns wrote, from their records: each record's topmost
+   * paths and how many more it counted (ADR-0131).
+   */
+  readonly ignored: number
+  /** Turns whose recipe failed to run. */
+  readonly recipeFailed: number
   /** Its first and last entries' timestamps, results included; 0 when unknown. */
   readonly first: number
   readonly last: number
@@ -72,6 +79,9 @@ export function statsOf(
   let people = 0
   const calls: ToolCall[] = []
   const files = new Set<string>()
+  const ignored = new Set<string>()
+  let ignoredMore = 0
+  let recipeFailed = 0
   const times: number[] = []
   for (const id of [...messages, ...others]) {
     const t = index.entries[id]?.timestamp
@@ -81,7 +91,11 @@ export function statsOf(
     const message = messageAt(index, id)
     if (message?.role !== "assistant") people += 1
     calls.push(...(message?.toolCalls ?? []))
-    for (const p of revisions.get(id)?.paths ?? []) files.add(p)
+    const record = revisions.get(id)
+    for (const p of record?.paths ?? []) files.add(p)
+    for (const p of record?.ignored?.paths ?? []) ignored.add(p)
+    ignoredMore += record?.ignored?.more ?? 0
+    if (record?.recipe === "failed") recipeFailed += 1
   }
   const results = resultsOn(index, others)
   return {
@@ -91,6 +105,8 @@ export function statsOf(
     calls: calls.length,
     failed: calls.filter(c => results.get(c.id)?.isError === true).length,
     files: [...files].sort(),
+    ignored: ignored.size + ignoredMore,
+    recipeFailed,
     first: times.length === 0 ? 0 : Math.min(...times),
     last: times.length === 0 ? 0 : Math.max(...times),
   }

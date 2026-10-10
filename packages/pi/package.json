@@ -11,6 +11,7 @@
     "@earendil-works/pi-ai": "0.87.1",
     "@earendil-works/pi-coding-agent": "0.87.1",
     "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
+    "@pinetrie/channel": "workspace:*",
     "@pinetrie/core": "workspace:*",
     "@pinetrie/rules": "workspace:*",
     "@pinetrie/schema": "workspace:*",

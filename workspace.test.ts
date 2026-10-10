@@ -141,16 +141,22 @@ test("lanes declares only core: it runs jj and git in a lane, on a runtime it is
   assert.deepEqual(deps(read("packages/lanes")), ["@pinetrie/core"])
 })
 
-/** The packages that run lanes, and the VM Docker runs in on the Mac (ADR-0103). */
+/** The packages that run lanes, and the VM Docker runs in on the Mac (ADR-0130). */
 const RUNTIMES = ["@pinetrie/docker", "@pinetrie/vm"]
 
-test("a runtime declares only core, and lanes when it runs lanes; never another runtime", () => {
+/** What a runtime may declare: core, lanes when it runs lanes, and lanehost with its channel for the disks (ADR-0129). */
+const RUNTIME_MAY = [
+  "@pinetrie/channel",
+  "@pinetrie/core",
+  "@pinetrie/lanehost",
+  "@pinetrie/lanes",
+]
+
+test("a runtime declares only core, lanes, and lanehost with its channel; never another runtime", () => {
   for (const dir of WORKSPACE) {
     const m = read(dir)
     if (m.name === undefined || !RUNTIMES.includes(m.name)) continue
-    const extra = deps(m).filter(
-      d => d !== "@pinetrie/core" && d !== "@pinetrie/lanes",
-    )
+    const extra = deps(m).filter(d => !RUNTIME_MAY.includes(d))
     assert.deepEqual(extra, [], `${m.name} declares ${extra.join(", ")}`)
   }
 })
@@ -176,6 +182,17 @@ test("repo declares only core, keeper and lanes: it runs jj and git on your repo
 
 test("keeper declares nothing", () => {
   assert.deepEqual(allDeps(read("packages/keeper")), [])
+})
+
+test("channel declares nothing: a lane's helper and lanehost both run it from pine·trie's install", () => {
+  assert.deepEqual(allDeps(read("packages/channel")), [])
+})
+
+test("lanehost declares only core and channel: it knows nothing of lanes or Docker", () => {
+  assert.deepEqual(deps(read("packages/lanehost")).sort(), [
+    "@pinetrie/channel",
+    "@pinetrie/core",
+  ])
 })
 
 test("the page declares no server package and no app", () => {

@@ -22,7 +22,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "toolContextOf: no access is no lane, named by the project's root, whose every call is refused",
   },
-  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  // ── the lanes suite, proven in a lane (ADR-0130) ──
   {
     name: "a lane's prompt lists its skills at their host paths",
     file: "packages/pi/lanes.ts",
@@ -43,11 +43,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an abort is sent before the request it aborts",
-    file: "packages/pi/lane-env.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "      child.stdin.write(`${encode(request(id))}\\n`)\n      if (signal?.aborted)",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "      if (signal?.aborted) {\n        child.stdin.write(`${encode({ abort: id })}\\n`)\n        child.stdin.write(`${encode(request(id))}\\n`)\n        return\n      }\n      child.stdin.write(`${encode(request(id))}\\n`)\n      if (signal?.aborted)",
+    file: "packages/channel/client.ts",
+    from: "      write({ id, call: body, updates: onUpdate !== undefined })\n      if (signal?.aborted) write({ abort: id })",
+    to: "      if (signal?.aborted) {\n        write({ abort: id })\n        write({ id, call: body, updates: onUpdate !== undefined })\n        return\n      }\n      write({ id, call: body, updates: onUpdate !== undefined })\n      if (signal?.aborted) write({ abort: id })",
     command: unit,
     expect: "a call aborted while it waited for its lane is aborted, not run",
   },
@@ -104,25 +102,25 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Buffer bytes are encoded as their toJSON shape",
-    file: "packages/pi/lane-protocol.ts",
+    file: "packages/channel/wire.ts",
     from: "  const raw = (this as Record<string, unknown>)[key]",
     to: "  const raw = value",
-    command: unit,
+    command: ["pnpm", "exec", "vitest", "run", "packages/channel"],
     expect: "a Buffer crosses as bytes, not in its toJSON shape",
   },
   {
     name: "the lane protocol drops an error nested in a result",
-    file: "packages/pi/lane-protocol.ts",
+    file: "packages/channel/wire.ts",
     from: "  if (raw instanceof Error) {",
     to: "  if (false) {",
-    command: unit,
+    command: ["pnpm", "exec", "vitest", "run", "packages/channel"],
     expect: "an error nested in a result is rebuilt",
   },
   {
     name: "the helper drops { abort }",
-    file: "packages/pi/lane-helper.ts",
-    from: '    if ("abort" in request) running.get(request.abort)?.abort()',
-    to: '    if ("abort" in request) return',
+    file: "packages/channel/serve.ts",
+    from: '      if ("abort" in request) running.get(request.abort)?.abort()',
+    to: '      if ("abort" in request) return',
     command: ["pnpm", "exec", "vitest", "run", "packages/pi/lane-env.test.ts"],
     expect: "an abort kills the command and its children",
   },

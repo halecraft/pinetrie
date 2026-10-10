@@ -1122,6 +1122,16 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     prompt's newest revision is what came before it. A record from before
     paths decodes with none. An ask's file count is the union of its turns'
     paths (`workStats`), so it is what its review lists.
+  - A turn's record names the ignored files it wrote (`ignored`, ADR-0131):
+    its whole disk diffed against the snapshot before it, each path sorted
+    by `classifyDisk` into tracked (the repo's commits between the two
+    snapshots changed it), pine·trie's or a repo's own (`.jj`, `.git`,
+    `.pinetrie-lane`, `lost+found`, a shared directory's mount point), a
+    recipe's output, a recipe's cache, or ignored; `ignoredFiles` keeps the
+    topmost of the last, at most `IGNORED_LISTED`, and how many more. It
+    also says whether the lane's recipe ran at the turn's end, and whether
+    it failed (`recipe`). A prompt's record has neither, and a record from
+    before decodes with neither.
   - Every record with a commit carries that commit's `conflicts`, a
     prompt's included, since a branch from it is cloned with them
     (ADR-0072); `conflictsAt` (core) reads them by commit. A record from

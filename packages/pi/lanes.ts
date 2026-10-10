@@ -78,6 +78,11 @@ export interface LaneFacts {
    * neither.
    */
   readonly defaultImage: boolean
+  /**
+   * The project's recipe, by its command, which pine·trie runs again when a
+   * turn changes its inputs (ADR-0131); null with none.
+   */
+  readonly recipe: string | null
   /** pinetrie's install, mounted read-only in the lane. */
   readonly install: string
   /** The lane note's path in the lane. */
@@ -130,6 +135,11 @@ export function laneGuidelines(facts: LaneFacts): string[] {
           "Chromium's headless shell is installed ($PLAYWRIGHT_BROWSERS_PATH), and so is python3.",
         ]
       : []),
+    ...(facts.recipe === null
+      ? []
+      : [
+          `When a turn changes its lockfile, ${PRODUCT_NAME} removes what \`${facts.recipe}\` made and runs it again at the turn's end. ${dir}/.pinetrie-lane/derived.json says how it went.`,
+        ]),
     `More about the lane, when you need it: ${facts.note}`,
   ]
 }

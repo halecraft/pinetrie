@@ -1,4 +1,5 @@
-import { BASE_SNAPSHOT, snapshotId, threadIdFor } from "@pinetrie/core"
+import { threadIdFor } from "@pinetrie/core"
+import { projectDisks } from "@pinetrie/lanehost"
 import {
   type ContainerShape,
   type LaneSpec,
@@ -10,21 +11,18 @@ import { buildError } from "./cli.ts"
 import {
   type DockerHostFacts,
   dockerWords,
+  imagePathOf,
+  isRootless,
   type Listed,
   labelled,
-  mountArgs,
+  lanehostContainer,
   NESTED_MOUNT,
-  parseImagePath,
-  parseInspect,
   parseMountinfo,
-  parsePs,
-  planDiskCommand,
   planDockerHost,
-  planHostPortRules,
   planProjectSweep,
   planSlotSweep,
-  projectDisks,
   projectKey,
+  renderHelper,
   renderRun,
 } from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
@@ -65,8 +63,6 @@ const render = (shape: ContainerShape, target = mac) =>
     project: key,
     seccomp: "/opt/p/seccomp.json",
   })
-const valuesOf = (argv: readonly string[], flag: string) =>
-  argv.flatMap((a, i) => (a === flag ? [argv[i + 1] ?? ""] : []))
 
 const shapes: readonly ContainerShape[] = [
   planShape(spec, {}),
@@ -74,72 +70,79 @@ const shapes: readonly ContainerShape[] = [
   planShape({ ...spec, grants: { ...spec.grants, nested: true } }, {}),
 ]
 
-describe("renderRun: a lane's shape as `docker run`", () => {
-  test("no shape gets --privileged, a capability, or a Docker socket", () => {
+describe("renderRun: a lane's shape as a container", () => {
+  test("no shape gets a capability, or a Docker socket", () => {
     for (const shape of shapes) {
-      const argv = render(shape)
-      expect(argv).not.toContain("--privileged")
-      expect(argv).not.toContain("--cap-add")
-      for (const bind of [
-        ...valuesOf(argv, "--mount"),
-        ...valuesOf(argv, "-v"),
-      ])
-        expect(bind).not.toMatch(/docker\.sock|\/var\/run|\/run\/docker/)
+      const made = render(shape)
+      expect([made.capAdd, made.capDrop]).toEqual([[], []])
+      for (const m of made.mounts)
+        expect(m.source).not.toMatch(/docker\.sock|\/var\/run|\/run\/docker/)
     }
   })
   test("the lane's subvolume at /workspace; every mount through pathOf, read-only where it says", () => {
-    const argv = render(shapes[0] as ContainerShape)
-    const mounts = valuesOf(argv, "--mount")
-    expect(mounts[0]).toBe(
-      `type=bind,source=${disks.lane(LANE)},target=/workspace`,
-    )
+    const { mounts } = render(shapes[0] as ContainerShape)
+    expect(mounts[0]).toEqual({
+      source: disks.lane(LANE),
+      target: "/workspace",
+      readonly: false,
+    })
     for (const m of spec.mounts)
-      expect(mounts).toContain(
-        `type=bind,source=${mac.pathOf(m.source)},target=${m.target}${m.readonly ? ",readonly" : ""}`,
-      )
-    expect(mounts.filter(m => m.endsWith(",readonly")).length).toBe(
+      expect(mounts).toContainEqual({
+        source: mac.pathOf(m.source),
+        target: m.target,
+        readonly: m.readonly,
+      })
+    expect(mounts.filter(m => m.readonly).length).toBe(
       spec.mounts.filter(m => m.readonly).length,
     )
   })
   test("the lane's hostname is its container's name, as under container", () => {
-    const argv = render(shapes[0] as ContainerShape)
-    expect(valuesOf(argv, "--hostname")).toEqual([`pinetrie-${LANE}`])
+    expect(render(shapes[0] as ContainerShape).hostname).toBe(
+      `pinetrie-${LANE}`,
+    )
   })
-  test("the project's and the target's labels; the image's command last", () => {
-    const argv = render(shapes[0] as ContainerShape)
-    expect(valuesOf(argv, "--label")).toEqual([
-      `pinetrie.project=${key}`,
-      "pinetrie.slot=3",
+  test("the project's and the target's labels; the image and its command", () => {
+    const made = render(shapes[0] as ContainerShape)
+    expect(made.labels).toEqual({
+      "pinetrie.project": key,
+      "pinetrie.slot": "3",
+    })
+    expect([made.image, made.cmd]).toEqual([
+      "pinetrie-lane:abc",
+      ["sleep", "infinity"],
     ])
-    expect(argv.slice(-3)).toEqual(["pinetrie-lane:abc", "sleep", "infinity"])
   })
   test("ssh: the slot's agent, only with the grant", () => {
-    expect(render(shapes[0] as ContainerShape).join(" ")).not.toContain("ssh")
-    const argv = render(shapes[1] as ContainerShape)
-    expect(valuesOf(argv, "--mount")).toContain(
-      "type=bind,source=/run/pinetrie/ssh-3.sock,target=/run/pinetrie/ssh-agent.sock",
+    expect(JSON.stringify(render(shapes[0] as ContainerShape))).not.toContain(
+      "ssh",
     )
-    expect(valuesOf(argv, "-e")).toContain(
-      "SSH_AUTH_SOCK=/run/pinetrie/ssh-agent.sock",
-    )
+    const made = render(shapes[1] as ContainerShape)
+    expect(made.mounts).toContainEqual({
+      source: "/run/pinetrie/ssh-3.sock",
+      target: "/run/pinetrie/ssh-agent.sock",
+      readonly: false,
+    })
+    expect(made.env).toContain("SSH_AUTH_SOCK=/run/pinetrie/ssh-agent.sock")
   })
   test("the nested options only for a nested shape; every other lane has no-new-privileges", () => {
     const plain = render(shapes[0] as ContainerShape)
-    expect(valuesOf(plain, "--security-opt")).toEqual(["no-new-privileges"])
-    expect(plain).not.toContain("--device")
+    expect(plain.securityOpt).toEqual(["no-new-privileges"])
+    expect(plain.devices).toEqual([])
     const nested = render(shapes[2] as ContainerShape)
-    expect(valuesOf(nested, "--security-opt")).toEqual([
+    expect(nested.securityOpt).toEqual([
       "seccomp=/opt/p/seccomp.json",
       "systempaths=unconfined",
     ])
-    expect(valuesOf(nested, "--device")).toEqual(["/dev/net/tun"])
-    expect(valuesOf(nested, "--mount")).toContain(
-      `type=bind,source=${disks.nested(LANE)},target=${NESTED_MOUNT}`,
-    )
-    expect(valuesOf(nested, "-e")).toContain(
+    expect(nested.devices).toEqual(["/dev/net/tun"])
+    expect(nested.mounts).toContainEqual({
+      source: disks.nested(LANE),
+      target: NESTED_MOUNT,
+      readonly: false,
+    })
+    expect(nested.env).toContain(
       "DOCKER_HOST=unix:///run/user/1000/docker.sock",
     )
-    expect(nested.slice(-3)).toEqual([
+    expect(nested.cmd).toEqual([
       "sh",
       "-c",
       "(pinetrie-inner-docker &); exec sleep infinity",
@@ -153,78 +156,93 @@ describe("renderRun: a lane's shape as `docker run`", () => {
       sshAgent: null,
       hostAddress: null,
     }
-    const argv = render(shapes[1] as ContainerShape, linux)
-    expect(valuesOf(argv, "--mount")).toContain(
-      "type=bind,source=/Users/ada/p,target=/mnt/host-working-copy,readonly",
-    )
-    expect(argv.join(" ")).not.toContain("SSH_AUTH_SOCK")
-    expect(valuesOf(argv, "--label")).toEqual([`pinetrie.project=${key}`])
+    const made = render(shapes[1] as ContainerShape, linux)
+    expect(made.mounts).toContainEqual({
+      source: "/Users/ada/p",
+      target: "/mnt/host-working-copy",
+      readonly: true,
+    })
+    expect(made.env.join(" ")).not.toContain("SSH_AUTH_SOCK")
+    expect(made.labels).toEqual({ "pinetrie.project": key })
   })
-  test("a path with a comma takes -v; the label goes after `run`", () => {
-    expect(
-      mountArgs("/a,b", { source: "/a,b", target: "/t", readonly: true }),
-    ).toEqual(["-v", "/a,b:/t:ro"])
-    expect(labelled(["run", "-d"], "pinetrie.spec=h")).toEqual([
-      "run",
-      "--label",
-      "pinetrie.spec=h",
-      "-d",
-    ])
+  test("the spec label is a label like any other", () => {
+    expect(labelled(render(shapes[0] as ContainerShape), "h").labels).toEqual({
+      "pinetrie.project": key,
+      "pinetrie.slot": "3",
+      "pinetrie.spec": "h",
+    })
   })
 })
 
-describe("planDiskCommand: each disk operation as one command in the helper", () => {
-  const script = (op: Parameters<typeof planDiskCommand>[0]) => {
-    const [sh, c, body, , ...args] = planDiskCommand(op, disks)
-    expect([sh, c]).toEqual(["sh", "-c"])
-    return { body: body ?? "", args }
+describe("renderHelper: a lanehost role's container", () => {
+  const shape = {
+    project: key,
+    image: "pinetrie-lanehost:abc",
+    lanesDir: "/var/lib/lanehost",
+    install: "/opt/pinetrie",
+    runtime: "/Users/ada/p/.pinetrie/runtime/abc",
   }
-  test("each project's disks are under its key", () => {
-    expect(disks.lane(LANE)).toBe(
-      `/var/lib/lanehost/projects/${key}/lanes/${LANE}`,
+  test("the disks role: Docker's default capabilities, no network, the lanes directory read-write", () => {
+    const made = renderHelper({ ...shape, role: "disks" }, mac)
+    expect(made.name).toBe(lanehostContainer("disks", key, mac))
+    expect(lanehostContainer("disks", key, mac)).toBe(
+      `pinetrie-lanehost-disks-${key}-3`,
     )
-    expect(projectKey("/Users/ada/q")).not.toBe(key)
-  })
-  test("create and restore", () => {
-    expect(script({ kind: "create", lane: LANE })).toMatchObject({
-      args: [disks.lane(LANE)],
+    expect([made.capDrop, made.capAdd, made.network]).toEqual([[], [], "none"])
+    expect(made.mounts[0]).toEqual({
+      source: "/var/lib/lanehost",
+      target: "/var/lib/lanehost",
+      readonly: false,
     })
-    expect(script({ kind: "create", lane: LANE }).body).toContain(
-      'btrfs -q subvolume create "$1"',
+    expect(made.labels).toEqual({
+      "pinetrie.project": key,
+      "pinetrie.slot": "3",
+      "pinetrie.lanehost": "disks",
+    })
+  })
+  test("the privileged role: every capability dropped but its own, the lanes directory read-only", () => {
+    const made = renderHelper({ ...shape, role: "privileged" }, mac)
+    expect([made.capDrop, made.capAdd, made.network]).toEqual([
+      ["ALL"],
+      ["NET_ADMIN", "NET_RAW", "SYS_ADMIN"],
+      "host",
+    ])
+    expect(made.mounts[0]?.readonly).toBe(true)
+  })
+  test("the install and the runtime, read-only where a lane has them, through the slot", () => {
+    const made = renderHelper({ ...shape, role: "disks" }, mac)
+    expect(made.mounts.slice(1)).toEqual([
+      {
+        source: mac.pathOf("/opt/pinetrie"),
+        target: "/pinetrie",
+        readonly: true,
+      },
+      {
+        source: mac.pathOf(shape.runtime),
+        target: "/pinetrie-runtime",
+        readonly: true,
+      },
+    ])
+    expect([made.image, made.cmd]).toEqual([shape.image, ["sleep", "infinity"]])
+  })
+  test("on Linux, no slot in its name", () => {
+    expect(lanehostContainer("disks", key, { labels: {} })).toBe(
+      `pinetrie-lanehost-disks-${key}`,
     )
-    const restore = script({ kind: "restore", lane: LANE, from: BASE_SNAPSHOT })
-    expect(restore.args).toEqual([
-      `/var/lib/lanehost/projects/${key}/snapshots/base`,
-      disks.lane(LANE),
-    ])
-    expect(restore.body).toContain('btrfs -q subvolume snapshot "$1" "$2"')
   })
-  test("a snapshot is made aside, then renamed over the old one; writable, so it can be deleted", () => {
-    const s = script({
-      kind: "snapshot",
-      lane: LANE,
-      snapshot: snapshotId("e1"),
-    })
-    expect(s.args).toEqual([disks.lane(LANE), disks.snapshot(snapshotId("e1"))])
-    expect(s.body).toContain('btrfs -q subvolume snapshot "$1" "$2.tmp"')
-    expect(s.body).toContain('mv "$2.tmp" "$2"')
-    expect(s.body).not.toContain("snapshot -r")
-  })
-  test("a lane's delete takes its inner lanes' disk; snapshots are deleted by id", () => {
-    expect(script({ kind: "delete", lane: LANE }).args).toEqual([
-      disks.lane(LANE),
-      disks.nested(LANE),
-    ])
-    expect(
-      script({
-        kind: "deleteSnapshots",
-        ids: [snapshotId("e1"), snapshotId("e2")],
-      }).args,
-    ).toEqual([
-      disks.snapshot(snapshotId("e1")),
-      disks.snapshot(snapshotId("e2")),
-    ])
-  })
+})
+
+test("isRootless: Docker's security options name a rootless daemon", () => {
+  expect(
+    isRootless([
+      "name=seccomp,profile=builtin",
+      "name=rootless",
+      "name=cgroupns",
+    ]),
+  ).toBe(true)
+  expect(isRootless(["name=seccomp,profile=builtin", "name=cgroupns"])).toBe(
+    false,
+  )
 })
 
 describe("planDockerHost: what stops Docker running lanes here, with its fix", () => {
@@ -314,29 +332,11 @@ describe("the sweeps", () => {
       }),
     ).toEqual({ containers: ["b"], projects: ["k2"] })
   })
-  test("parsePs reads names and labels", () => {
-    expect(
-      parsePs(
-        '{"Names":"pinetrie-t-1","Labels":"pinetrie.project=k1,pinetrie.slot=3"}\n',
-      ),
-    ).toEqual([
-      c("pinetrie-t-1", { "pinetrie.project": "k1", "pinetrie.slot": "3" }),
-    ])
-  })
 })
 
-test("parseInspect and parseImagePath", () => {
-  expect(
-    parseInspect(
-      '[{"State":{"Running":true},"Config":{"Labels":{"pinetrie.spec":"h"}}}]',
-      "pinetrie.spec",
-    ),
-  ).toEqual({ state: "running", label: "h" })
-  expect(
-    parseInspect('[{"State":{"Running":false},"Config":{"Labels":null}}]', "x"),
-  ).toEqual({ state: "stopped", label: null })
-  expect(parseImagePath('["A=1","PATH=/a:/b"]')).toBe("/a:/b")
-  expect(parseImagePath("null")).toBe(
+test("imagePathOf: an image's PATH, else the standard one", () => {
+  expect(imagePathOf(["A=1", "PATH=/a:/b"])).toBe("/a:/b")
+  expect(imagePathOf(null)).toBe(
     "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
   )
 })
@@ -358,52 +358,19 @@ describe("a project's grant of the host's ports", () => {
     {},
   )
   test("every lane is on its project's network", () => {
-    expect(valuesOf(render(shapes[0] as ContainerShape), "--network")).toEqual([
-      `pinetrie-${key}`,
-    ])
+    expect(render(shapes[0] as ContainerShape).network).toBe(`pinetrie-${key}`)
   })
   test("a lane is told the host's address and its granted ports, where the target has an address", () => {
-    expect(valuesOf(render(granted), "-e")).toEqual(
+    expect(render(granted).env).toEqual(
       expect.arrayContaining([
         "PINETRIE_HOST=192.168.127.254",
         "PINETRIE_HOST_PORTS=3000,5432",
       ]),
     )
-    expect(render(shapes[0] as ContainerShape).join(" ")).not.toContain(
+    expect(render(shapes[0] as ContainerShape).env.join(" ")).not.toContain(
       "PINETRIE_HOST",
     )
     const linux: DockerTarget = { ...mac, hostAddress: null }
-    expect(render(granted, linux).join(" ")).not.toContain("PINETRIE_HOST")
-  })
-  test("the rules accept each port only from the project's network, to the host's address, after clearing its old ones", () => {
-    const [sh, c, script = ""] = planHostPortRules({
-      key,
-      subnet: "172.18.0.0/16",
-      hostAddress: "192.168.127.254",
-      ports: [3000, 5432],
-    })
-    expect([sh, c]).toEqual(["sh", "-c"])
-    const lines = script.split("\n")
-    const chain = `PT-${key.slice(0, 16)}`
-    expect(lines.findIndex(l => l.includes("-D "))).toBeLessThan(
-      lines.findIndex(l => l.includes("--dport")),
-    )
-    expect(lines).toContain(
-      `iptables -A ${chain} -d 192.168.127.254 -p tcp --dport 5432 -j ACCEPT`,
-    )
-    expect(lines.at(-1)).toBe(
-      `iptables -I DOCKER-USER -s 172.18.0.0/16 -j ${chain}`,
-    )
-  })
-  test("with no ports, only the old rules go", () => {
-    const [, , script = ""] = planHostPortRules({
-      key,
-      subnet: "172.18.0.0/16",
-      hostAddress: "192.168.127.254",
-      ports: [],
-    })
-    expect(script).not.toContain("ACCEPT")
-    expect(script).not.toContain("-I DOCKER-USER")
-    expect(script.split("\n").at(-1)).toBe(`iptables -X PT-${key.slice(0, 16)}`)
+    expect(render(granted, linux).env.join(" ")).not.toContain("PINETRIE_HOST")
   })
 })

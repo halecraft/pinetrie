@@ -104,6 +104,8 @@ describe("the review (ADR-0047)", () => {
           snapshot: null,
           paths: [],
           conflicts: [],
+          ignored: null,
+          recipe: null,
         },
       ] as const
     const revisions = new Map([

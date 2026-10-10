@@ -58,7 +58,7 @@ import {
   offerBookmark,
   oldNamesOnDisk,
   parseAcceptedOfferCommits,
-  planBaseRefresh,
+  planBaseCheckout,
   planBundle,
   planForkSetup,
   planMerge,
@@ -291,10 +291,7 @@ describe("a lane's repo, with jj", () => {
     expect(base).toHaveLength(1)
 
     // The base disk: git and jj initialized, your @- fetched by id, jj new.
-    await inLane(
-      laneDir,
-      planBaseRefresh({ base: null, yours: base, lock: null, install: null }),
-    )
+    await inLane(laneDir, planBaseCheckout({ yours: base, fresh: true }))
     await inLane(
       laneDir,
       planForkSetup(LANE, { kind: "commits", commits: base }),
@@ -646,7 +643,7 @@ describe("a lane's repo, with jj", () => {
     const [base] = await commitsOf(yoursJj, "@-")
     if (base === undefined) throw new Error("no base")
     await executeOrThrow(
-      planBaseRefresh({ base: null, yours: [base], lock: null, install: null }),
+      planBaseCheckout({ yours: [base], fresh: true }),
       runners,
     )
     await executeOrThrow(
@@ -1197,9 +1194,7 @@ describe("a lane's repo, with jj", () => {
     const [line] = base
     if (line === undefined) throw new Error("no base")
     await rig.setUpAccepted()
-    await rig.inLane(
-      planBaseRefresh({ base: null, yours: base, lock: null, install: null }),
-    )
+    await rig.inLane(planBaseCheckout({ yours: base, fresh: true }))
     await rig.inLane(
       planForkSetup(LANE, {
         kind: "accepted",
@@ -2553,9 +2548,7 @@ describe("a lane's repo, with jj", () => {
     await rig.yoursJj(["bookmark", "create", "wip/search", "-r", "@-"])
     const [wip] = await commitsOf(rig.yoursJj, "wip/search")
     if (wip === undefined) throw new Error("no wip")
-    await rig.inLane(
-      planBaseRefresh({ base: null, yours: base, lock: null, install: null }),
-    )
+    await rig.inLane(planBaseCheckout({ yours: base, fresh: true }))
     await rig.inLane(
       planForkSetup(LANE, {
         kind: "wip",
@@ -2719,14 +2712,7 @@ describe("a lane's repo, with jj", () => {
       await yoursJj(["commit", "-m", "your base"])
       await rig.setUpAccepted()
       const onAccepted = await rig.acceptedNow()
-      await inLane(
-        planBaseRefresh({
-          base: null,
-          yours: [onAccepted],
-          lock: null,
-          install: null,
-        }),
-      )
+      await inLane(planBaseCheckout({ yours: [onAccepted], fresh: true }))
       await inLane(
         planForkSetup(LANE, { kind: "commits", commits: [onAccepted] }),
       )
@@ -2813,22 +2799,13 @@ describe("a lane's repo, with jj", () => {
     await writeFile(path.join(yoursDir, "a.txt"), "first\n")
     await yoursJj(["commit", "-m", "yours"])
     const first = await commitsOf(yoursJj, "@-")
-    await inBase(
-      planBaseRefresh({ base: null, yours: first, lock: null, install: null }),
-    )
+    await inBase(planBaseCheckout({ yours: first, fresh: true }))
     // Your @- rewritten in place: the base's commit is no ancestor of it.
     await writeFile(path.join(yoursDir, "a.txt"), "rewritten\n")
     await yoursJj(["squash", "--into", "@-"])
     const rewritten = await commitsOf(yoursJj, "@-")
     expect(rewritten).not.toEqual(first)
-    await inBase(
-      planBaseRefresh({
-        base: { commits: first, lock: null },
-        yours: rewritten,
-        lock: null,
-        install: null,
-      }),
-    )
+    await inBase(planBaseCheckout({ yours: rewritten, fresh: false }))
     expect(await readFile(path.join(baseDir, "a.txt"), "utf8")).toBe(
       "rewritten\n",
     )

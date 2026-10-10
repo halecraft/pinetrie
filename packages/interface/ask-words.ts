@@ -55,8 +55,9 @@ export function durationWords(ms: number): string {
 
 /**
  * What some work holds, as one line: "12 messages from Ada and Bea · 38 steps
- * · 61 tool calls · 7 files · 4m 12s · 2 failed". A part that is zero is left
- * out; failures come last. A capsule's tooltip and a fold's line hold this
+ * · 61 tool calls · 7 files · 3 ignored files · 4m 12s · 2 failed". A part
+ * that is zero is left out; failures come last, a failed recipe after the
+ * failed calls. A capsule's tooltip and a fold's line hold this
  * line.
  */
 export function workWords(
@@ -73,8 +74,10 @@ export function workWords(
     stats.agent > 0 ? plural(stats.agent, "step") : "",
     stats.calls > 0 ? plural(stats.calls, "tool call") : "",
     stats.files.length > 0 ? plural(stats.files.length, "file") : "",
+    stats.ignored > 0 ? plural(stats.ignored, "ignored file") : "",
     stats.first > 0 && took >= 1000 ? durationWords(took) : "",
     stats.failed > 0 ? `${stats.failed} failed` : "",
+    stats.recipeFailed > 0 ? "dependencies failed to install" : "",
   ]
     .filter(part => part !== "")
     .join(" · ")

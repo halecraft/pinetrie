@@ -65,7 +65,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a spent budget: the answer wakes nobody, and the asking thread is told it was spent",
   },
-  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  // ── the lanes suite, proven in a lane (ADR-0130) ──
   {
     name: "a new lane forks from the root, not where it branched",
     file: "apps/pinetrie/host/work/create.ts",

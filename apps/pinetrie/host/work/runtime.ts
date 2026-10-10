@@ -1,5 +1,5 @@
 // host/work/runtime — the one place that picks the runtime lanes run on
-// (ADR-0103): gather the facts, plan (`planRuntime`), and build the
+// (ADR-0130): gather the facts, plan (`planRuntime`), and build the
 // `LaneRuntime` lanes of their own get. On the Mac, Docker's is the lane VM's,
 // through a lease on a slot of it; on Linux, the host's own. Everything after
 // it takes the runtime as given.
@@ -175,13 +175,14 @@ async function hostDockerFound(
   }
   const refusal = planDockerHost(await gatherDockerHost(target, lanesDir))
   if (refusal !== null) return refusedWith(dockerWords(refusal))
-  const runtime = dockerRuntime({ target, lanesDir, root })
+  const runtime = dockerRuntime({ target, lanesDir, root, log })
   log(`[host] lanes run on Docker, their disks in ${lanesDir}`)
   return {
     kind: "found",
     project,
     runtime,
-    ready: async ({ hostPorts }) => {
+    ready: async ({ mounts, hostPorts }) => {
+      runtime.serveFrom(mounts)
       sweptLog(await runtime.sweepProjects(), log)
       if (hostPorts.length > 0)
         log(
@@ -251,7 +252,7 @@ async function vmFound(
       )
   }
   await sweep(first)
-  const runtime = dockerRuntime({ target, lanesDir, root })
+  const runtime = dockerRuntime({ target, lanesDir, root, log })
   /** What setup gave `ready`, for each lease after the first. */
   let given: { mounts: readonly Mount[]; hostPorts: readonly number[] } | null =
     null
@@ -292,6 +293,7 @@ async function vmFound(
     runtime,
     async ready({ mounts, hostPorts }) {
       given = { mounts, hostPorts }
+      runtime.serveFrom(mounts)
       await fillAndGrant(current)
       sweptLog(await runtime.sweepProjects(), log)
     },

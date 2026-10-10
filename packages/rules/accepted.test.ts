@@ -405,6 +405,8 @@ describe("parentNow and planParentUpdate: the thread a lane branched from (ADR-0
       snapshot: null,
       paths: [],
       conflicts,
+      ignored: null,
+      recipe: null,
     },
   ]
   const revisions = new Map([

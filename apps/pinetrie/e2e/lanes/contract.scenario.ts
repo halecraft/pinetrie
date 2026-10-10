@@ -1,5 +1,5 @@
 // e2e/lanes/contract — what the Docker runtime must hold that no unit test
-// can show (ADR-0103): snapshots under writes, the working copy read-only on
+// can show (ADR-0130): snapshots under writes, the working copy read-only on
 // the Mac's side, a half-close through the launcher, no vsock from a lane,
 // two hosts' slots apart, and what a lane's start and a snapshot cost. On the
 // Mac it runs a VM of its own, from this checkout's launcher and the built
@@ -25,16 +25,24 @@ import {
   type ThreadId,
   threadIdFor,
 } from "@pinetrie/core"
+import { LANEHOST_LABEL, projectKey } from "@pinetrie/docker"
 import {
+  ensureRuntime,
   executeOrThrow,
   type LaneRuntime,
   laneContainer,
   type Mount,
+  PINETRIE_INSTALL,
+  PINETRIE_MOUNT,
+  pinetrieDir,
   planSnapshot,
+  prepareImages,
+  RUNTIME_MOUNT,
   run,
 } from "@pinetrie/lanes"
 import { GVPROXY_HOST_ADDRESS, vmStateDir } from "@pinetrie/vm"
 import { findProject } from "../../host/work/runtime.ts"
+import { playwrightVersion } from "../../host/work/setup.ts"
 import type { Checks } from "../checks.ts"
 import { committedProject, waitFor } from "../harness.ts"
 import { ownForInnerLanes } from "../lane-runtime.ts"
@@ -176,7 +184,7 @@ async function dockerContract(
     const name = threadIdFor(`contract-${process.pid}-${lanes.length}`)
     lanes.push(name)
     laneRuntimes.set(name, on)
-    await on.disk({ kind: "create", lane: name })
+    await on.disk({ kind: "create", lane: name, carry: null })
     const started = Date.now()
     await on.run({
       name: laneContainer(name),
@@ -205,7 +213,7 @@ async function dockerContract(
   }
   try {
     // ── a half-close: first, before anything streams through the bridge
-    // (the slot's fill sweeps through the disks helper's exec), so a broken
+    // (the slot's fill sweeps through lanehost's held exec), so a broken
     // bridge fails here and not in a check after it. Only API calls come
     // before it: Docker's version, the slot's sweep, the pull. ──
     const echoed = quietCli(["run", "--rm", "-i", ALPINE_IMAGE, "cat"], "hi\n")
@@ -215,13 +223,62 @@ async function dockerContract(
       JSON.stringify(echoed),
     )
 
+    // Lanehost's server runs from pine·trie's install on the lane runtime,
+    // which a host copies out of the default image (ADR-0129).
+    const { runtimeFrom } = await prepareImages(
+      runtime,
+      projA,
+      playwrightVersion(),
+      log,
+    )
+    const serverMounts: readonly Mount[] = [
+      { source: PINETRIE_INSTALL, target: PINETRIE_MOUNT, readonly: true },
+      {
+        source: await ensureRuntime(
+          runtime,
+          pinetrieDir(projA).runtime,
+          runtimeFrom,
+        ),
+        target: RUNTIME_MOUNT,
+        readonly: true,
+      },
+    ]
     await a.ready({
       defaultImage: "",
       hostPorts: [grantedPort.port],
-      mounts: mountsOfA,
+      mounts: [...mountsOfA, ...serverMounts],
     })
     for (const image of [NODE_IMAGE, PYTHON_IMAGE, ALPINE_IMAGE])
       await runtime.runInImage(image, ["true"])
+
+    // ── lanehost's privileged role (ADR-0129): the host's grant made it ──
+    const privileged = quietCli([
+      "ps",
+      "--filter",
+      `label=pinetrie.project=${projectKey(projA)}`,
+      "--filter",
+      `label=${LANEHOST_LABEL}=privileged`,
+      "--format",
+      "{{.Names}}",
+    ]).trim()
+    if (privileged === "")
+      skip(
+        "lanehost's privileged role cannot write the lanes directory",
+        "nothing here needs the privileged role: no grant of the host's ports, and no diff by send under rootless Docker",
+      )
+    else {
+      const wrote = quietCli([
+        "exec",
+        privileged,
+        "touch",
+        `${dockerDisks(projA).dir}/from-privileged`,
+      ])
+      check(
+        "lanehost's privileged role cannot write the lanes directory",
+        /read-only/i.test(wrote),
+        wrote.trim(),
+      )
+    }
 
     // ── snapshots under writes ──
     const writerLane = await lane(NODE_IMAGE)
@@ -278,6 +335,7 @@ async function dockerContract(
     const disks = dockerDisks(projA)
     const holding = promised.filter(([id, count]) => {
       const out = inDisks(
+        projA,
         'head -n "$2" "$1/log.bin" | awk \'!/^rec [0-9]{8} x{40}$/ { b++ } END { print b + 0 }\'; wc -l < "$1/log.bin"',
         disks.snapshot(id),
         String(count),
@@ -289,6 +347,33 @@ async function dockerContract(
       "every snapshot taken while a lane writes holds every record written before it",
       holding.length === SNAPSHOTS,
       `${holding.length} of ${SNAPSHOTS}`,
+    )
+
+    // ── a diff between two snapshots (ADR-0129) ──
+    await exec(writerLane, "echo gone > /workspace/gone.txt")
+    const diffFrom = snapshotId(`contract-${process.pid}-before`)
+    const diffTo = snapshotId(`contract-${process.pid}-after`)
+    snapshots.push(diffFrom, diffTo)
+    await executeOrThrow(
+      planSnapshot({ lane: writerLane, snapshot: diffFrom }),
+      runners,
+    )
+    await exec(
+      writerLane,
+      "rm /workspace/gone.txt && echo kept > /workspace/kept.txt",
+    )
+    await executeOrThrow(
+      planSnapshot({ lane: writerLane, snapshot: diffTo }),
+      runners,
+    )
+    const diffed = await runtime.diff(diffFrom, diffTo)
+    const named = Object.fromEntries(
+      diffed.changes.map(c => [c.path, c.change]),
+    )
+    check(
+      "a diff between two snapshots of a lane reports a file it deleted, and one it made",
+      named["gone.txt"] === "deleted" && named["kept.txt"] === "added",
+      JSON.stringify(diffed.changes.slice(0, 5)),
     )
 
     // ── the working copy ──
@@ -371,7 +456,11 @@ async function dockerContract(
     ] as const
     const b = await findProject({ dir: projB, machine, log })
     if (b?.kind === "found") {
-      await b.ready({ defaultImage: "", hostPorts: [], mounts: mountsOfB })
+      await b.ready({
+        defaultImage: "",
+        hostPorts: [],
+        mounts: [...mountsOfB, ...serverMounts],
+      })
       if (onMac) {
         const granted = `http://${GVPROXY_HOST_ADDRESS}:${grantedPort.port}/`
         const ofA = await fetchFrom(await lane(ALPINE_IMAGE), granted)

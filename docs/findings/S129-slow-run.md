@@ -1,7 +1,7 @@
 # S129 — `docker run -d` took 500 ms under the launcher because its disks used synchronization `full`; with `fsync`, it takes 82–103 ms, and the VM is ready 0.5 s sooner
 
 - **Status:** Answered
-- **Led to:** ADR-0103
+- **Led to:** ADR-0103, ADR-0130
 
 Follows S128. ADR-0103's lane start (74–113 ms) depends on it.
 

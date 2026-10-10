@@ -1,4 +1,4 @@
-// vm/lease — a host's lease on the lane VM (ADR-0103). To a host the VM is a
+// vm/lease — a host's lease on the lane VM (ADR-0130). To a host the VM is a
 // Docker socket and a slot of shared directories: it gathers what decides
 // whether to start or join the VM (`planVm`), starts the launcher when need
 // be, takes a slot, and waits for Docker to answer.

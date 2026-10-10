@@ -6,7 +6,13 @@ import { stat } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import path from "node:path"
-import { errorText, PRODUCT_NAME, type ProjectRecord } from "@pinetrie/core"
+import {
+  type CommitId,
+  errorText,
+  PRODUCT_NAME,
+  type ProjectRecord,
+  type SnapshotId,
+} from "@pinetrie/core"
 import { createKeeper, type Keeper } from "@pinetrie/keeper"
 import {
   BASE_LANE,
@@ -14,8 +20,11 @@ import {
   commitsOf,
   configJson,
   decodeLaneConfig,
+  depsKey,
+  ensureDepsLayer,
   ensureRuntime,
   gatherLinks,
+  inputsHash,
   jjIn,
   type LaneOwner,
   type LaneRuntime,
@@ -30,6 +39,7 @@ import {
   prepareImages,
   prepareShared,
   projectContainerfile,
+  type Runner,
   readConfigFile,
   refreshBase,
   repoConfig,
@@ -39,7 +49,6 @@ import type { PiSetup } from "@pinetrie/pi"
 import { type RepoOwner, renameAccepted, startRepoOwner } from "@pinetrie/repo"
 import { type Basics, failed, slow } from "../basics.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
-import { lockHashAt } from "./disk.ts"
 import { openLinkOf } from "./registry.ts"
 import type { Found } from "./runtime.ts"
 
@@ -51,7 +60,7 @@ const LANE_MEMORY = "4G"
  * image carries (ADR-0041). A dev dependency: the host runs from pinetrie's
  * repo, where `pnpm install` installs it.
  */
-const playwrightVersion = (): string =>
+export const playwrightVersion = (): string =>
   (
     createRequire(import.meta.url)("@playwright/test/package.json") as {
       version: string
@@ -112,6 +121,10 @@ export interface Setup {
    * up or moved since the last refresh (ADR-0104).
    */
   baseAtAccepted(): Promise<void>
+  /** The dependency layer's key at `rev` of the repo `jj` reads (ADR-0131). */
+  keyAt(jj: Runner, rev: string, ready: Ready): Promise<string>
+  /** The dependency layer `key` names, at `commits`: made if missing, after the base's builds queued before. */
+  depsLayerAt(commits: readonly CommitId[], key: string): Promise<SnapshotId>
 }
 
 export async function startSetup(input: {
@@ -208,33 +221,44 @@ export async function startSetup(input: {
    */
   async function refreshBaseNow(r: Ready) {
     const acceptedBookmark = revsetName(lanes.repoConfig.acceptedBookmark)
-    const install = lanes.config.install
+    const { recipe } = lanes.config
     const read = await owner.read(async ({ jj }) => {
       const yours = await commitsOf(jj, `present(${acceptedBookmark})`)
       const [commit] = yours
       if (commit === undefined) return null
-      const lock =
-        install === null ? null : await lockHashAt(jj, commit, install.lockfile)
-      return { yours, commit, lock }
+      return { yours, commit, key: await keyAt(jj, commit, r) }
     })
     if (read === null) return
-    const { yours, commit, lock } = read
+    const { yours, commit, key } = read
     const made = await refreshBase({
-      runtime,
-      root,
-      // Nothing in the base should see a shared directory.
-      spec: specOf(BASE_LANE, r, true),
-      env: process.env,
+      ...scratchOf(r),
       yours,
-      lock,
-      install,
-      open: openLinkOf(runtime),
+      recipe,
+      key,
     })
     if (made)
       log(
         `[host] the base snapshot is at accepted work (${commit.slice(0, 8)})`,
       )
   }
+
+  /** The dependency layer's key at `rev` of a repo `jj` reads. */
+  async function keyAt(jj: Runner, rev: string, r: Ready): Promise<string> {
+    const { recipe } = lanes.config
+    return depsKey({
+      recipe,
+      image: r.image,
+      inputs: recipe === null ? "" : await inputsHash(jj, rev, recipe.inputs),
+    })
+  }
+
+  /** What the scratch lane builds with. Nothing in it should see a shared directory. */
+  const scratchOf = (r: Ready) => ({
+    runtime,
+    spec: specOf(BASE_LANE, r, true),
+    env: process.env,
+    open: openLinkOf(runtime),
+  })
 
   // --- the images, runtime and base snapshot, in the background ----------
   const ready: Promise<Ready> = keeper.track(
@@ -257,6 +281,19 @@ export async function startSetup(input: {
   async function baseAtAccepted(): Promise<void> {
     await base.run(async () => refreshBaseNow(await ready))
   }
+  /** The dependency layer for `commits`, made if missing, one build at a time with the base's. */
+  async function depsLayerAt(commits: readonly CommitId[], key: string) {
+    const r = await ready
+    return base.run(() =>
+      ensureDepsLayer({
+        ...scratchOf(r),
+        commits,
+        recipe: lanes.config.recipe,
+        key,
+      }),
+    )
+  }
+
   function refreshBaseSoon(): void {
     void keeper.track(
       baseAtAccepted().catch(failed(basics, "refreshing the base snapshot")),
@@ -275,6 +312,8 @@ export async function startSetup(input: {
     specOf,
     refreshBaseSoon,
     baseAtAccepted,
+    keyAt,
+    depsLayerAt,
   }
 }
 
@@ -300,10 +339,11 @@ async function prepareLanes(
     ...grants.mounts.map(m => m.source),
   ].filter(g => g !== null)
   if (on.length > 0) log(`[host] lanes are granted: ${on.join(", ")}`)
-  const sharing = await prepareShared(at, {
-    user: user.shared,
-    project: config.shared,
-  })
+  const sharing = await prepareShared(
+    at,
+    { user: user.shared, project: config.shared },
+    config.recipe?.caches ?? [],
+  )
   for (const d of sharing.shared) {
     const from = user.shared.some(p => normalShared(p) === d.path)
       ? userConfig.file

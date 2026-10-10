@@ -1,6 +1,6 @@
 # ADR-0103 — Lanes are Docker containers on btrfs snapshots: in a VM of pine·trie's own on the Mac, on the host on Linux
 
-- **Status:** Accepted (Duane, 2026-10-07)
+- **Status:** Superseded (Duane, 2026-10-07)
 - **Area:** `packages/lanes/TECHNICAL.md`, `packages/docker/TECHNICAL.md`,
   `packages/vm/TECHNICAL.md`
 - **Evidence:** S39, S122, S123, S124, S125, S127, S128, S129, S130, S131,
@@ -22,6 +22,9 @@
     launcher, not Virtualization's NAT, which another tool's VM can take away;
     lanes are fenced from `gvproxy`'s own addresses, and a project may grant
     ports of the Mac's loopback (`lanes.hostPorts`).
+- **Superseded by:**
+  - ADR-0130: restated whole, with its two revisions of 2026-10-07 and what
+    ADR-0118 changed in it folded in.
 - **Amended by:**
   - ADR-0118: a host's slot holds its sources.
 

@@ -1,20 +1,24 @@
-// docker/plan — Docker as a lane runtime: every decision, pure (ADR-0103).
+// docker/plan — Docker as a lane runtime: every decision, pure (ADR-0130).
 //
 // Each lane's disk is a btrfs subvolume on Docker's machine, under the
-// project's own directory there, so a project's disks are deleted with it:
-//   <lanesDir>/projects/<projectKey>/root            the project's root path
-//   <lanesDir>/projects/<projectKey>/lanes/<lane>    each lane's subvolume
-//   <lanesDir>/projects/<projectKey>/snapshots/<id>  snapshots, the base too
-//   <lanesDir>/projects/<projectKey>/nested/<lane>   a nested lane's inner lanes
+// project's own directory there (`projectDisks`, lanehost's layout), so a
+// project's disks are deleted with it. Lanehost's roles, each a container,
+// do everything to the disks (ADR-0129).
 
 import { createHash } from "node:crypto"
-import { type SnapshotId, WORKSPACE_ROOT } from "@pinetrie/core"
-import type {
-  ContainerFacts,
-  ContainerShape,
-  DiskOp,
-  LaneOwner,
-  Mount,
+import { WORKSPACE_ROOT } from "@pinetrie/core"
+import {
+  type ProjectDisks,
+  ROLES,
+  ROOTLESS_UID,
+  type Role,
+} from "@pinetrie/lanehost"
+import {
+  type ContainerShape,
+  type Mount,
+  PINETRIE_MOUNT,
+  RUNTIME_MOUNT,
+  SPEC_LABEL,
 } from "@pinetrie/lanes"
 import type { DockerTarget } from "./target.ts"
 
@@ -22,12 +26,10 @@ import type { DockerTarget } from "./target.ts"
 export const PROJECT_LABEL = "pinetrie.project"
 /** On the Mac, every container carries its host's slot. */
 export const SLOT_LABEL = "pinetrie.slot"
-/** The helper container every disk operation runs in. */
-export const DISKS_CONTAINER = "pinetrie-disks"
+/** A lanehost container carries the role it serves. */
+export const LANEHOST_LABEL = "pinetrie.lanehost"
 /** Where a nested lane's inner lanes are, inside it. */
 export const NESTED_MOUNT = "/var/lib/pinetrie-lanes"
-/** The user rootless Docker runs as in a nested lane, who owns its inner lanes' disks. */
-export const ROOTLESS_UID = 1000
 /** The inner Docker's socket, which a nested lane's own host uses. */
 export const INNER_DOCKER_HOST = `unix:///run/user/${ROOTLESS_UID}/docker.sock`
 /** Where a lane granted ssh finds the agent. */
@@ -50,38 +52,50 @@ export const HOST_PORTS_ENV = "PINETRIE_HOST_PORTS"
 export const projectKey = (root: string): string =>
   createHash("sha256").update(root).digest("hex").slice(0, 16)
 
-/** Where one project's disks are on Docker's machine. */
-export function projectDisks(lanesDir: string, key: string) {
-  const dir = `${lanesDir}/projects/${key}`
-  return {
-    dir,
-    root: `${dir}/root`,
-    lane: (lane: LaneOwner) => `${dir}/lanes/${lane}`,
-    nested: (lane: LaneOwner) => `${dir}/nested/${lane}`,
-    snapshot: (id: SnapshotId) => `${dir}/snapshots/${id}`,
-  }
+/** A bind mount, as Docker's machine sees its source. */
+export interface BindMount {
+  readonly source: string
+  readonly target: string
+  readonly readonly: boolean
 }
-export type ProjectDisks = ReturnType<typeof projectDisks>
 
 /**
- * A bind mount's `docker run` arguments. `--mount` separates its fields with
- * commas and `-v` with colons, so a path with a comma takes `-v`;
- * `planHostMounts` refuses one with both.
+ * A container as a value: everything it is made with. Docker's API takes it
+ * (`createBody`), and its hash is its spec label (`SPEC_LABEL`), so a
+ * container made from another spec is recreated. Every container runs
+ * `--init`.
  */
-export function mountArgs(source: string, m: Mount): readonly string[] {
-  const paths = `${source}${m.target}`
-  if (!paths.includes(","))
-    return [
-      "--mount",
-      `type=bind,source=${source},target=${m.target}${m.readonly ? ",readonly" : ""}`,
-    ]
-  return ["-v", `${source}:${m.target}${m.readonly ? ":ro" : ""}`]
+export interface ContainerSpec {
+  readonly name: string
+  readonly hostname: string | null
+  readonly image: string
+  readonly cmd: readonly string[]
+  readonly workingDir: string | null
+  /** `KEY=value`. */
+  readonly env: readonly string[]
+  readonly labels: Readonly<Record<string, string>>
+  readonly mounts: readonly BindMount[]
+  readonly network: string
+  /** As the CLI's `-m` reads it: `4G`, `256m`. */
+  readonly memory: string
+  readonly capDrop: readonly string[]
+  readonly capAdd: readonly string[]
+  /** `seccomp=<path>` names a profile on the host, read when the container is made. */
+  readonly securityOpt: readonly string[]
+  readonly devices: readonly string[]
 }
 
+/** A host mount as Docker's machine sees it. */
+const bind = (m: Mount, pathOf: (p: string) => string): BindMount => ({
+  source: pathOf(m.source),
+  target: m.target,
+  readonly: m.readonly,
+})
+
 /**
- * A lane's shape as `docker run`'s arguments, without its spec label. Never
- * `--privileged`, `--cap-add` or a Docker socket (ADR-0103): a lane with the
- * VM's socket reads every lane's disk (S125). A nested lane gets the narrow
+ * A lane's shape as a container, without its spec label. Never privileged,
+ * never a capability, never a Docker socket (ADR-0130): a lane with the VM's
+ * socket reads every lane's disk (S125). A nested lane gets the narrow
  * seccomp profile, unconfined system paths, `/dev/net/tun` and its inner
  * lanes' subvolume, and keeps setuid, which rootless Docker's `newuidmap`
  * needs; every other lane runs with `no-new-privileges`.
@@ -92,251 +106,162 @@ export function renderRun(
     readonly target: DockerTarget
     readonly disks: ProjectDisks
     readonly project: string
-    /** The nested seccomp profile's path on the host, which the docker CLI reads. */
+    /** The nested seccomp profile's path on the host. */
     readonly seccomp: string
   },
-): readonly string[] {
+): ContainerSpec {
   const { target, disks } = input
-  const ssh =
-    shape.ssh && target.sshAgent !== null
-      ? [
-          ...mountArgs(target.sshAgent, {
-            source: target.sshAgent,
-            target: SSH_AGENT_IN_LANE,
-            readonly: false,
-          }),
-          "-e",
-          `SSH_AUTH_SOCK=${SSH_AGENT_IN_LANE}`,
-        ]
-      : []
+  const ssh = shape.ssh && target.sshAgent !== null
   const nested = shape.nested
-    ? [
-        "--security-opt",
-        `seccomp=${input.seccomp}`,
-        "--security-opt",
-        "systempaths=unconfined",
-        "--device",
-        "/dev/net/tun",
-        ...mountArgs(disks.nested(shape.lane), {
-          source: disks.nested(shape.lane),
-          target: NESTED_MOUNT,
-          readonly: false,
-        }),
-        "-e",
-        `DOCKER_HOST=${INNER_DOCKER_HOST}`,
-      ]
-    : ["--security-opt", "no-new-privileges"]
-  const labels = { [PROJECT_LABEL]: input.project, ...target.labels }
-  const hostPorts =
-    target.hostAddress !== null && shape.hostPorts.length > 0
-      ? [
-          "-e",
-          `${HOST_ENV}=${target.hostAddress}`,
-          "-e",
-          `${HOST_PORTS_ENV}=${shape.hostPorts.join(",")}`,
-        ]
-      : []
-  return [
-    "run",
-    "-d",
-    "--init",
-    "--name",
-    shape.name,
+  const hostPorts = target.hostAddress !== null && shape.hostPorts.length > 0
+  return {
+    name: shape.name,
     // A lane's hostname is its container's name; Docker's own would be the
     // container's id.
-    "--hostname",
-    shape.name,
-    "-m",
-    shape.memory,
-    "--network",
-    projectNetwork(input.project),
-    ...Object.entries(labels).flatMap(([k, v]) => ["--label", `${k}=${v}`]),
-    ...mountArgs(disks.lane(shape.lane), {
-      source: disks.lane(shape.lane),
-      target: WORKSPACE_ROOT,
-      readonly: false,
-    }),
-    ...shape.mounts.flatMap(m => mountArgs(target.pathOf(m.source), m)),
-    ...ssh,
-    ...hostPorts,
-    ...nested,
-    ...Object.entries(shape.env).flatMap(([k, v]) => ["-e", `${k}=${v}`]),
-    "-w",
-    WORKSPACE_ROOT,
-    shape.image,
-    ...(shape.nested ? ["sh", "-c", NESTED_COMMAND] : ["sleep", "infinity"]),
-  ]
-}
-
-/** `renderRun`'s arguments with the label inserted after `run`. */
-export function labelled(
-  args: readonly string[],
-  label: string,
-): readonly string[] {
-  const [first, ...rest] = args
-  return [first ?? "run", "--label", label, ...rest]
-}
-
-/** A shell script and its arguments, run in the helper. */
-const sh = (script: string, ...args: string[]): readonly string[] => [
-  "sh",
-  "-c",
-  `set -e\n${script}`,
-  "sh",
-  ...args,
-]
-
-/** Delete the subvolume at "$1" if it is there. */
-const DELETE_ONE =
-  'if [ -e "$1" ]; then btrfs -q subvolume delete "$1" 2>/dev/null || rm -rf "$1"; fi'
-
-/**
- * A disk operation as one command in the helper, which has the lanes
- * directory and no added capability: the volume is mounted with
- * `user_subvol_rm_allowed` (S125, S127).
- * - Snapshots are writable. Without `CAP_SYS_ADMIN`, btrfs deletes a
- *   subvolume only for a process that may write its root
- *   (`btrfs_ioctl_snap_destroy`), which a read-only one refuses; no spike
- *   has measured it yet. Nothing mounts a snapshot but to restore it.
- * - A snapshot is taken to `<id>.tmp`, then renamed over the old one, so a
- *   snapshot read is never half-made: the base's is replaced each refresh.
- * - A lane's delete takes its inner lanes' subvolume too. An inner Docker
- *   makes subvolumes inside it, which `rm -rf` deletes: `rmdir` of an empty
- *   subvolume is a delete with `user_subvol_rm_allowed`.
- */
-export function planDiskCommand(
-  op: DiskOp,
-  disks: ProjectDisks,
-): readonly string[] {
-  switch (op.kind) {
-    case "create":
-      return sh(
-        'mkdir -p "$(dirname "$1")"\nbtrfs -q subvolume create "$1"',
-        disks.lane(op.lane),
-      )
-    case "restore":
-      return sh(
-        'mkdir -p "$(dirname "$2")"\nbtrfs -q subvolume snapshot "$1" "$2"',
-        disks.snapshot(op.from),
-        disks.lane(op.lane),
-      )
-    case "snapshot":
-      return sh(
-        [
-          'mkdir -p "$(dirname "$2")"',
-          'gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }',
-          'gone "$2.tmp"',
-          'btrfs -q subvolume snapshot "$1" "$2.tmp"',
-          'gone "$2"',
-          'mv "$2.tmp" "$2"',
-        ].join("\n"),
-        disks.lane(op.lane),
-        disks.snapshot(op.snapshot),
-      )
-    case "delete":
-      return sh(
-        `${DELETE_ONE}\nrm -rf "$2"`,
-        disks.lane(op.lane),
-        disks.nested(op.lane),
-      )
-    case "deleteSnapshots":
-      return sh(
-        `for s in "$@"; do set -- "$s"; ${DELETE_ONE}; done`,
-        ...op.ids.map(disks.snapshot),
-      )
+    hostname: shape.name,
+    image: shape.image,
+    cmd: nested ? ["sh", "-c", NESTED_COMMAND] : ["sleep", "infinity"],
+    workingDir: WORKSPACE_ROOT,
+    env: [
+      ...(ssh ? [`SSH_AUTH_SOCK=${SSH_AGENT_IN_LANE}`] : []),
+      ...(hostPorts
+        ? [
+            `${HOST_ENV}=${target.hostAddress}`,
+            `${HOST_PORTS_ENV}=${shape.hostPorts.join(",")}`,
+          ]
+        : []),
+      ...(nested ? [`DOCKER_HOST=${INNER_DOCKER_HOST}`] : []),
+      ...Object.entries(shape.env).map(([k, v]) => `${k}=${v}`),
+    ],
+    labels: projectLabels(input.project, target),
+    mounts: [
+      {
+        source: disks.lane(shape.lane),
+        target: WORKSPACE_ROOT,
+        readonly: false,
+      },
+      ...shape.mounts.map(m => bind(m, target.pathOf)),
+      ...(ssh && target.sshAgent !== null
+        ? [
+            {
+              source: target.sshAgent,
+              target: SSH_AGENT_IN_LANE,
+              readonly: false,
+            },
+          ]
+        : []),
+      ...(nested
+        ? [
+            {
+              source: disks.nested(shape.lane),
+              target: NESTED_MOUNT,
+              readonly: false,
+            },
+          ]
+        : []),
+    ],
+    network: projectNetwork(input.project),
+    memory: shape.memory,
+    capDrop: [],
+    capAdd: [],
+    securityOpt: nested
+      ? [`seccomp=${input.seccomp}`, "systempaths=unconfined"]
+      : ["no-new-privileges"],
+    devices: nested ? ["/dev/net/tun"] : [],
   }
 }
 
-/** Whether the subvolume at a path is there: a subvolume's root is inode 256 (S125). */
-export const subvolumeCheck = (at: string): readonly string[] => [
-  "stat",
-  "-c",
-  "%i",
-  at,
-]
-export const isSubvolume = (statOut: string): boolean =>
-  statOut.trim() === "256"
+/** Every container made for a project carries its key, and the target's labels. */
+export const projectLabels = (
+  project: string,
+  target: Pick<DockerTarget, "labels">,
+  more: Readonly<Record<string, string>> = {},
+): Readonly<Record<string, string>> => ({
+  [PROJECT_LABEL]: project,
+  ...target.labels,
+  ...more,
+})
 
-/** A nested lane's inner lanes' subvolume, made if missing, owned by the rootless user. */
-export const planNestedDisk = (
-  disks: ProjectDisks,
-  lane: LaneOwner,
-): readonly string[] =>
-  sh(
-    `mkdir -p "$(dirname "$1")"\n[ -e "$1" ] || btrfs -q subvolume create "$1"\nchown ${ROOTLESS_UID}:${ROOTLESS_UID} "$1"`,
-    disks.nested(lane),
-  )
+/** A lanehost role's container: its project's, and on the Mac its slot's. */
+export const lanehostContainer = (
+  role: Role,
+  project: string,
+  target: Pick<DockerTarget, "labels">,
+): string => {
+  const slot = target.labels[SLOT_LABEL]
+  return `pinetrie-lanehost-${role}-${project}${slot === undefined ? "" : `-${slot}`}`
+}
 
-/** The project's root, written once, for the sweep. */
-export const planProjectRecord = (
-  disks: ProjectDisks,
-  root: string,
-): readonly string[] =>
-  sh('mkdir -p "$(dirname "$1")"\nprintf %s "$2" > "$1"', disks.root, root)
+/** What a lanehost role's container is made from. */
+export interface HelperShape {
+  readonly role: Role
+  readonly project: string
+  readonly image: string
+  readonly lanesDir: string
+  /** pine·trie's install and the lane runtime, on the host: the server runs from them. */
+  readonly install: string
+  readonly runtime: string
+}
 
 /**
- * The helper container's arguments, without its spec label: the lanes
- * directory at its own path, no added capability, no network.
+ * A lanehost role's container, without its spec label: its grant (`ROLES`),
+ * the lanes directory at its own path, and the install and the runtime
+ * read-only where a lane has them. It only waits: the host starts the
+ * server in it with `exec -i`.
  */
-export function planDisksHelper(
-  lanesDir: string,
-  image: string,
-): readonly string[] {
-  return [
-    "run",
-    "-d",
-    "--init",
-    "--name",
-    DISKS_CONTAINER,
-    "--network",
-    "none",
-    "--security-opt",
-    "no-new-privileges",
-    "-m",
-    "256m",
-    ...mountArgs(lanesDir, {
-      source: lanesDir,
-      target: lanesDir,
-      readonly: false,
+export function renderHelper(
+  shape: HelperShape,
+  target: Pick<DockerTarget, "labels" | "pathOf">,
+): ContainerSpec {
+  const spec = ROLES[shape.role]
+  return {
+    name: lanehostContainer(shape.role, shape.project, target),
+    hostname: null,
+    image: shape.image,
+    cmd: ["sleep", "infinity"],
+    workingDir: null,
+    env: [],
+    labels: projectLabels(shape.project, target, {
+      [LANEHOST_LABEL]: shape.role,
     }),
-    image,
-    "sleep",
-    "infinity",
-  ]
-}
-
-/** A container's state and spec label from `docker inspect`'s output; missing when unreadable. */
-export function parseInspect(stdout: string, label: string): ContainerFacts {
-  const missing: ContainerFacts = { state: "missing", label: null }
-  try {
-    const [found] = JSON.parse(stdout) as {
-      State?: { Running?: boolean }
-      Config?: { Labels?: Record<string, unknown> | null }
-    }[]
-    if (found === undefined) return missing
-    const value = found.Config?.Labels?.[label]
-    return {
-      state: found.State?.Running === true ? "running" : "stopped",
-      label: typeof value === "string" ? value : null,
-    }
-  } catch {
-    return missing
+    mounts: [
+      {
+        source: shape.lanesDir,
+        target: shape.lanesDir,
+        readonly: spec.lanesDir === "ro",
+      },
+      bind(
+        { source: shape.install, target: PINETRIE_MOUNT, readonly: true },
+        target.pathOf,
+      ),
+      bind(
+        { source: shape.runtime, target: RUNTIME_MOUNT, readonly: true },
+        target.pathOf,
+      ),
+    ],
+    network: spec.network,
+    memory: spec.memory,
+    capDrop: spec.caps.keep === "default" ? [] : ["ALL"],
+    capAdd: spec.caps.keep === "default" ? [] : spec.caps.add,
+    securityOpt: ["no-new-privileges"],
+    devices: [],
   }
 }
+
+/** A spec with its spec label. */
+export const labelled = (spec: ContainerSpec, hash: string): ContainerSpec => ({
+  ...spec,
+  labels: { ...spec.labels, [SPEC_LABEL]: hash },
+})
 
 /** The `PATH` of an image that names none. */
 const STANDARD_PATH =
   "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-/** The image's `PATH` from `docker image inspect -f '{{json .Config.Env}}'`. */
-export function parseImagePath(stdout: string): string {
-  try {
-    const env = JSON.parse(stdout) as string[] | null
-    const found = (env ?? []).find(e => e.startsWith("PATH="))
-    return found === undefined ? STANDARD_PATH : found.slice("PATH=".length)
-  } catch {
-    return STANDARD_PATH
-  }
+/** The image's `PATH`, from its own environment (`Config.Env`). */
+export function imagePathOf(env: readonly string[] | null): string {
+  const found = (env ?? []).find(e => e.startsWith("PATH="))
+  return found === undefined ? STANDARD_PATH : found.slice("PATH=".length)
 }
 
 /**
@@ -433,42 +358,6 @@ export function dockerWords(r: DockerRefusal): string {
   }
 }
 
-/** The firewall chain of one project's grant in the lane VM. */
-export const grantChain = (key: string): string => `PT-${key.slice(0, 16)}`
-
-/**
- * One project's `lanes.hostPorts` as a script for the lane VM's firewall,
- * run by the host in a container on the VM's own network with
- * `CAP_NET_ADMIN`. Its earlier rules are removed first, so a host's start
- * replaces them. Each granted port is accepted only from the project's
- * network (`subnet`), to the host's address, over TCP, above the init's
- * fence, which rejects the rest (`packages/vm/image/init`). With no ports,
- * only the removal.
- */
-export function planHostPortRules(input: {
-  readonly key: string
-  readonly subnet: string
-  readonly hostAddress: string
-  readonly ports: readonly number[]
-}): readonly string[] {
-  const chain = grantChain(input.key)
-  const clear = [
-    `iptables -S DOCKER-USER | grep -- '-j ${chain}$' | sed 's/^-A /-D /' | while read -r rule; do eval iptables "$rule"; done`,
-    `iptables -F ${chain} 2>/dev/null || iptables -N ${chain}`,
-  ]
-  const grant =
-    input.ports.length === 0
-      ? [`iptables -X ${chain}`]
-      : [
-          ...input.ports.map(
-            p =>
-              `iptables -A ${chain} -d ${input.hostAddress} -p tcp --dport ${p} -j ACCEPT`,
-          ),
-          `iptables -I DOCKER-USER -s ${input.subnet} -j ${chain}`,
-        ]
-  return ["sh", "-c", ["set -e", ...clear, ...grant].join("\n")]
-}
-
 /** A container as `docker ps` lists it: its name and labels. */
 export interface Listed {
   readonly name: string
@@ -511,20 +400,6 @@ export function planProjectSweep(input: {
   }
 }
 
-/** `docker ps --format '{{json .}}'`'s lines as names and labels. */
-export function parsePs(stdout: string): readonly Listed[] {
-  const out: Listed[] = []
-  for (const line of stdout.split("\n")) {
-    if (line.trim() === "") continue
-    try {
-      const row = JSON.parse(line) as { Names?: string; Labels?: string }
-      const labels: Record<string, string> = {}
-      for (const pair of (row.Labels ?? "").split(",")) {
-        const i = pair.indexOf("=")
-        if (i > 0) labels[pair.slice(0, i)] = pair.slice(i + 1)
-      }
-      if (row.Names !== undefined) out.push({ name: row.Names, labels })
-    } catch {}
-  }
-  return out
-}
+/** Whether `docker info`'s `SecurityOptions` name rootless Docker. */
+export const isRootless = (options: readonly string[]): boolean =>
+  options.includes("name=rootless")

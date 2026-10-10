@@ -168,6 +168,8 @@ const SAMPLES: readonly Sample[] = [
       snapshot: snapshotId("e-1"),
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     },
     "entry",
   ),

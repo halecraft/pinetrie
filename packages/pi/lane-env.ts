@@ -12,26 +12,16 @@
 //   code, and its output is capped text with stderr mixed in.
 // A call takes 0.3–1 ms (S43 item 2).
 
-import { spawn } from "node:child_process"
-import readline from "node:readline"
 import { type ExecutionEnv, FileError } from "@earendil-works/pi-agent-core"
+import { openChannel as open, type RunResult } from "@pinetrie/channel"
 import {
-  decode,
   type EnvMethod,
-  encode,
   isEnvMethod,
-  type LaneReply,
-  type LaneRequest,
-  type RunResult,
+  type LaneCall,
+  type LaneHello,
 } from "./lane-protocol.ts"
 
 type Context = { readonly abortSignal: AbortSignal | undefined }
-
-interface Pending {
-  readonly resolve: (value: unknown) => void
-  readonly reject: (error: Error) => void
-  readonly onUpdate: ((update: unknown) => void) | undefined
-}
 
 /** One open channel to a lane's helper. */
 export interface LaneChannel {
@@ -59,89 +49,18 @@ export interface LaneChannel {
  * exits fails every call still waiting, with what it wrote to stderr.
  */
 export function openChannel(argv: readonly string[]): LaneChannel {
-  const child = spawn(argv[0] ?? "", argv.slice(1), {
-    stdio: ["pipe", "pipe", "pipe"],
-  })
-  const pending = new Map<number, Pending>()
-  let next = 1
-  let stderr = ""
-  let exited: Error | null = null
-  child.stderr.setEncoding("utf8")
-  child.stderr.on("data", (chunk: string) => {
-    stderr = (stderr + chunk).slice(-4000)
-  })
-
-  let onReady: (hello: { cwd: string }) => void = () => {}
-  let onFail: (error: Error) => void = () => {}
-  const ready = new Promise<{ cwd: string }>((resolve, reject) => {
-    onReady = resolve
-    onFail = reject
-  })
-  ready.catch(() => {})
-
-  readline.createInterface({ input: child.stdout }).on("line", line => {
-    const reply = decode<LaneReply>(line)
-    if ("ready" in reply) return onReady({ cwd: reply.cwd })
-    const waiting = pending.get(reply.id)
-    if (waiting === undefined) return
-    if ("update" in reply) return waiting.onUpdate?.(reply.update)
-    pending.delete(reply.id)
-    if ("thrown" in reply) waiting.reject(new Error(reply.thrown))
-    else waiting.resolve(reply.result)
-  })
-
-  const closed = new Promise<void>(resolve => {
-    const fail = (why: string) => {
-      exited = new Error(
-        `the lane's helper ${why}${stderr === "" ? "" : `: ${stderr.trim()}`}`,
-      )
-      onFail(exited)
-      for (const waiting of pending.values()) waiting.reject(exited)
-      pending.clear()
-      resolve()
-    }
-    child.on("error", error => fail(`could not start (${error.message})`))
-    child.on("exit", code => fail(`exited (code ${code})`))
-  })
-  // A write to a helper that exited is reported by `closed`, not as a crash.
-  child.stdin.on("error", () => {})
-
-  function send(
-    request: (id: number) => LaneRequest,
-    signal: AbortSignal | undefined,
-    onUpdate?: (update: unknown) => void,
-  ): Promise<unknown> {
-    if (exited !== null) return Promise.reject(exited)
-    const id = next++
-    return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject, onUpdate })
-      // The request first: the helper ignores an abort for an id it has not
-      // been sent, so a call aborted while it waited for its lane would run.
-      child.stdin.write(`${encode(request(id))}\n`)
-      if (signal?.aborted) child.stdin.write(`${encode({ abort: id })}\n`)
-      else
-        signal?.addEventListener(
-          "abort",
-          () => {
-            if (pending.has(id)) child.stdin.write(`${encode({ abort: id })}\n`)
-          },
-          { once: true },
-        )
-    })
-  }
-
+  const channel = open<LaneHello, LaneCall, unknown, unknown>(
+    argv,
+    "the lane's helper",
+  )
   return {
-    ready,
-    closed,
+    ready: channel.ready,
+    closed: channel.closed,
     call: (method, args, signal, onUpdate) =>
-      send(
-        id => ({ id, method, args, updates: onUpdate !== undefined }),
-        signal,
-        onUpdate,
-      ),
+      channel.call({ method, args }, signal, onUpdate),
     run: (run, bytes, signal) =>
-      send(id => ({ id, run, cwd: null, bytes }), signal) as Promise<RunResult>,
-    close: () => child.stdin.end(),
+      channel.call({ run, cwd: null, bytes }, signal) as Promise<RunResult>,
+    close: channel.close,
   }
 }
 

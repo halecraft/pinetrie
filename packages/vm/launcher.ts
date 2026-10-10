@@ -1,4 +1,4 @@
-// vm/launcher — the launcher's binary, built on demand (ADR-0103): compiled
+// vm/launcher — the launcher's binary, built on demand (ADR-0130): compiled
 // with `swiftc` and signed ad hoc with the virtualization entitlement, once
 // per change of its source, into `<state dir>/bin/`.
 

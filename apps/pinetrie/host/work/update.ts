@@ -77,8 +77,8 @@ import {
 import { readLaneTip } from "@pinetrie/schema"
 import type { Basics } from "../basics.ts"
 import type { Containers } from "./containers.ts"
-import { snapshotOnQueue } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"
+import type { Recipes } from "./recipe.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
@@ -366,6 +366,7 @@ export function createUpdates(deps: {
   readonly containers: Pick<Containers, "beforeRun" | "runEnded">
   readonly fetchLane: Fetches["fetchLane"]
   readonly writeRevision: Turns["writeRevision"]
+  readonly recipes: Recipes
 }): Updates {
   const { basics, setup, registry, containers } = deps
   const { docs } = basics
@@ -381,8 +382,15 @@ export function createUpdates(deps: {
     merge: CommitId,
   ): Promise<void> {
     const handle = registry.handleOf(lane)
-    const snapped = await snapshotOnQueue(handle, lane, entry).catch(
-      () => false,
+    const _jj = registry.laneJjOf(lane)
+    // The merge may have changed the recipe's inputs: it runs before the
+    // snapshot, so a branch below starts with its outputs.
+    const { snapped, outcome } = await deps.recipes.snapshotOnQueue(
+      lane,
+      handle,
+      registry.laneJjOf(lane),
+      "all",
+      snapshotId(entry),
     )
     await deps.writeRevision({
       entry,
@@ -393,6 +401,8 @@ export function createUpdates(deps: {
       paths: [],
       // A clean merge.
       conflicts: [],
+      ignored: null,
+      recipe: outcome,
     })
   }
 

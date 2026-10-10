@@ -1,7 +1,7 @@
 # S130 — Replacing a virtiofs share while the VM runs breaks every container's bind mount into it; a bind of the share's root survives
 
 - **Status:** Answered
-- **Led to:** ADR-0103, ADR-0118
+- **Led to:** ADR-0103, ADR-0118, ADR-0130
 
 Follows S128.
 

@@ -51,6 +51,7 @@ const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   shared: [],
   grants: { ssh: false, env: [], mounts: [] },
   defaultImage: false,
+  recipe: null,
   install: "/pinetrie",
   note: "/pinetrie/packages/pi/lane.md",
   ...over,
@@ -212,6 +213,13 @@ describe("laneGuidelines", () => {
     const told = text(facts({ defaultImage: true }))
     expect(told).toContain("Chromium's headless shell is installed")
     expect(told).toContain("and so is python3")
+  })
+
+  test("names the recipe, run again at a turn's end, only with one (ADR-0131)", () => {
+    expect(text(facts())).not.toContain("derived.json")
+    expect(text(facts({ recipe: "pnpm install --frozen-lockfile" }))).toContain(
+      "When a turn changes its lockfile, pine·trie removes what `pnpm install --frozen-lockfile` made and runs it again at the turn's end. /workspace/.pinetrie-lane/derived.json says how it went.",
+    )
   })
 
   test("names the runtime's programs for bash, on any image", () => {

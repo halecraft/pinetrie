@@ -94,6 +94,8 @@ const revisions = (
         snapshot: null,
         paths: [],
         conflicts: [],
+        ignored: null,
+        recipe: null,
       },
     ]),
   )

@@ -450,32 +450,31 @@ item 18, and in `lanes.test.ts` against the harness.
     turn's disk is cloned, and no tool touches the disk until the clone is
     done.
 - **The channel** (`openChannel`) is one long-lived process: the helper,
-  started by the lane runtime's `execArgv` (`helperCommand`: `docker exec -i`
-  or `container exec -i`), speaking `lane-protocol.ts`, one JSON line per
-  message. Its input's end must reach the helper: through the lane VM's
-  launcher it does, as a half-close (S128).
-  - Requests are answered concurrently: pi runs a turn's calls in parallel.
+  started by the lane runtime's `execArgv` (`helperCommand`: `docker exec
+  -i`), serving `lane-protocol.ts`'s calls over `@pinetrie/channel`
+  (`packages/channel/TECHNICAL.md`), one JSON line per message. Its input's
+  end must reach the helper: through the lane VM's launcher it does, as a
+  half-close (S128).
+  - Calls are answered concurrently: pi runs a turn's calls in parallel.
   - The host closes the channel by ending the helper's input. Killing the
     `exec` process does not reach the guest (S43 item 2).
   - A helper that exits fails every waiting call with its stderr.
-  - `laneRunner(channel)` gives the host's own jj and git a `run` request:
-    exit status, stdout and stderr apart, and bytes for a bundle. pi's `exec`
-    gives only an exit code and capped, mixed text.
-- **The protocol** (`lane-protocol.ts`) imports nothing, since the helper
-  runs it from pine·trie's install, mounted read-only at `/pinetrie`.
-  - Bytes cross as base64, read from `this[key]` in the replacer: `Buffer`'s
-    own `toJSON` runs first and would hand over `{ type, data }`.
-  - Errors cross as `{ name, code, message, path }` at any depth, since
-    `NodeExecutionEnv` never throws: its errors are values inside results
-    (S44 item 5).
+  - `laneRunner(channel)` gives the host's own jj and git a `run` call
+    (`runCommand`): exit status, stdout and stderr apart, and bytes for a
+    bundle. pi's `exec` gives only an exit code and capped, mixed text.
+- **The protocol** (`lane-protocol.ts`) is the calls alone: an environment
+  method and its arguments, or a `run`. Bytes and errors cross as the
+  channel's wire carries them, at any depth, since `NodeExecutionEnv` never
+  throws: its errors are values inside results (S44 item 5).
 - **The helper runs on the lane runtime's Node through its own loader**, so
   `process.execPath` is the loader: nothing in it may re-execute that
   (S44 item 2).
 - **The system prompt** names the lane's directory. For a lane of its own it
   adds a block of guidelines, `laneGuidelines(facts)` in `lanes.ts`
   (ADR-0121): what holds in every lane, filled in with the lane's own
-  values, in about 260 tokens. The model is sent the conversation as stored:
-  nothing is rewritten.
+  values, in about 260 tokens, and about 40 more for a project with a
+  recipe, whose run again at a turn's end it is told of (ADR-0131). The
+  model is sent the conversation as stored: nothing is rewritten.
   - **Guidelines, not a section of its own.** pi joins its sections into one
     string, and a provider may rebuild that string by its tags:
     `pi-anthropic-auth` keeps `<rules>` and drops `<docs>` (S23, addendum).

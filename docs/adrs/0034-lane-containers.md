@@ -32,6 +32,11 @@
     rebuildable.
   - ADR-0124: archiving keeps the snapshot nearest each thread's end, not only
     each lane's newest.
+  - ADR-0131: the base is a dependency layer named by what made it, with
+    accepted work checked out on it, never an older base; a fork from a WIP
+    whose lockfile differs starts from a layer of its own; a lane runs the
+    recipe again when its inputs change; `installWhen` is one lockfile or a
+    list, and `installCaches` names what is carried.
 
 **Context.** ADR-0032 gave each lane a jj workspace on the host and made a
 branch's inherited history read as if it had always worked there, by

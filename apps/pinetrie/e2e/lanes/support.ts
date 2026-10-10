@@ -80,7 +80,7 @@ export function snapshotListing(
   id: SnapshotId,
   dir: string,
 ): string {
-  return inDisks('ls -a "$1"', `${dockerDisks(root).snapshot(id)}/${dir}`)
+  return inDisks(root, 'ls -a "$1"', `${dockerDisks(root).snapshot(id)}/${dir}`)
 }
 
 /** Why jj refused a command in `dir`: its stderr, or null when it ran. */

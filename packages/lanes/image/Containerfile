@@ -11,7 +11,7 @@
 # - Chromium's headless shell and its libraries, at the build pinetrie's
 #   Playwright drives (`PLAYWRIGHT_VERSION`).
 # - Rootless Docker, the docker CLI and buildx, for a lane granted lanes of
-#   its own (`lanes.nested`, ADR-0103); unused otherwise.
+#   its own (`lanes.nested`, ADR-0130); unused otherwise.
 # A project's own `pinetrie.Containerfile` replaces it. The lane runtime is
 # copied out of this image (`runtime.ts`).
 FROM docker.io/library/node:24-trixie-slim
@@ -35,7 +35,7 @@ ARG PLAYWRIGHT_VERSION
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium-headless-shell \
  && rm -rf /var/lib/apt/lists/* /root/.npm
-# Lanes inside a lane (ADR-0103, S125): rootless Docker, from Docker's static
+# Lanes inside a lane (ADR-0130, S125): rootless Docker, from Docker's static
 # bundles, which a lane granted `lanes.nested` starts as `rootless` (uid 1000)
 # on its inner lanes' btrfs subvolume (`pinetrie-inner-docker`). runc's
 # NoNewKeyring is its default: Docker's seccomp profile refuses `keyctl`.

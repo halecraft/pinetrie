@@ -164,6 +164,8 @@ describe("askReviewTarget", () => {
       snapshot: null,
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     },
   ]
   const revisions = new Map([rev("p", "a0"), rev("a", "a1")])

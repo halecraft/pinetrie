@@ -140,6 +140,8 @@ export async function prepareShared(
     readonly user: readonly string[]
     readonly project: readonly string[]
   },
+  /** The recipe's caches, which no repo in a lane tracks either. */
+  caches: readonly string[] = [],
 ): Promise<{
   readonly shared: readonly SharedDir[]
   readonly refused: readonly {
@@ -185,7 +187,7 @@ export async function prepareShared(
   await mkdir(ignoreDir, { recursive: true })
   await writeFile(
     path.join(ignoreDir, IGNORE_FILE),
-    laneIgnores(planned.shared),
+    laneIgnores(planned.shared, caches),
   )
   await writeFile(path.join(ignoreDir, LANE_GITCONFIG), laneGitConfig())
   return {

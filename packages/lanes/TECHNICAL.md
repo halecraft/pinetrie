@@ -3,7 +3,7 @@
 This package's one job is what a lane is and what runs in it: the
 container's shape, mounts, grants, lane config, jj and git in a lane, forks,
 turns, bundles, the base, the queue and the handle (ADR-0032 to ADR-0034).
-It defines the `LaneRuntime` port and implements no runtime (ADR-0103):
+It defines the `LaneRuntime` port and implements no runtime (ADR-0130):
 `@pinetrie/docker` does, and the app composes it
 (`apps/pinetrie/host/work/runtime.ts`). Every lane has its own copy: none
 works directly in a directory (ADR-0102). Your repo is `@pinetrie/repo`'s
@@ -24,8 +24,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 - **A lane's container is decided once, as a value** (`planShape`): a
   `ContainerShape` holds its name, its lane (its disk, at `/workspace`), the
   image, memory, mounts (`planMounts`), environment, ssh and `nested`, and no
-  runtime's flags. A runtime renders it (`runArgs`); the hash of those
-  arguments is its spec label (`specHashOf`).
+  runtime's flags. A runtime renders it (`runSpec`); the hash of that value
+  is its spec label (`specHashOf`).
 - **Planners return values; a runtime turns them into commands.** A plan is a
   list of `Step`s: a `LaneStep` (a command in the lane, through its channel)
   or a `RuntimeOp` (a `DiskOp`, or a container made from a shape), carried
@@ -34,6 +34,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 - **What any runtime must do:**
   - a snapshot that holds what the lane wrote, after the `sync` before it
     (`planSnapshot`), and a restore from it into a new disk;
+  - what differs between two snapshots (`diff`), deletions included;
   - a disposable container on the lane's disk, made from its shape;
   - `exec -i` that carries stdin's end to the helper (`execArgv`);
   - the base kept as a snapshot like any other (`BASE_SNAPSHOT`), per
@@ -80,13 +81,55 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 
 - **Every disk operation is a `DiskOp`** (`runtime-port.ts`), carried out by
   the runtime the host hands in: create, restore from a snapshot, snapshot,
-  delete, and delete snapshots. Docker's keeps both as btrfs subvolumes
-  (`packages/docker/TECHNICAL.md`).
+  delete, and delete snapshots. Docker's keeps both as btrfs subvolumes,
+  and carries each operation out as a call to lanehost's `disks` role over a
+  held channel (ADR-0129, `packages/lanehost/TECHNICAL.md`).
+- **A snapshot is read-only:** a restore is a writable snapshot of it, and
+  `diff` compares two (`packages/lanehost/TECHNICAL.md`, Diffs).
 - **`sync` comes before every snapshot** (`planSnapshot`). Otherwise files the
   lane wrote but had not flushed come out empty in the snapshot (S41 item 1).
 - **The base is a snapshot like any other** (`BASE_SNAPSHOT`), which each
-  runtime keeps per project. `base.json`, what it holds, stays on the host
-  in the project's `.pinetrie/snapshots/`.
+  runtime keeps per project. What it holds is written inside it
+  (`.pinetrie-lane/base.json`, `BaseFacts`) and read back through the
+  runtime (`readLaneFile`), so the two cannot disagree.
+
+## The base and the recipe (ADR-0131)
+
+- **A recipe** (`Recipe`, `lanes.install`) is how a disk's dependencies are
+  made: a command, the tracked files whose content keys it (its inputs,
+  `lanes.installWhen`, one or a list), and directories carried from one
+  build to the next (`lanes.installCaches`). A pnpm repo with no config
+  gets `pnpm install --frozen-lockfile`, keyed by `pnpm-lock.yaml`, with
+  `.pnpm-store` its cache: pnpm keeps its store at the root of the file
+  system it installs on, and refuses a `node_modules` made with another
+  store (S148), so the store stays there. No repo in a lane tracks a cache
+  (`laneIgnores`).
+- **A dependency layer** (`deps-<key>`, `depsSnapshot`) is a disk on which
+  the recipe ran once, named by what made it (`depsKey`: the recipe, the
+  content of its inputs at the commits, `inputsHash`, the lane image, and
+  `BASE_FORMAT`). It is built on a fresh disk, with only the recipe's
+  caches carried in from the newest layer by reflink (`DiskOp`'s `carry`,
+  about 300 ms for a 329 MB store, S148): it holds nothing an older layer
+  held, so a package deleted from accepted work leaves nothing behind.
+- **The base is a layer and a checkout** (`refreshBase`): the layer for
+  accepted work's key restored (built first if missing), accepted work's
+  commits fetched and checked out on it (`planBaseCheckout`), its facts
+  written, then snapshotted. It never restores an older base. With no
+  recipe, a layer is a checkout alone, keyed by the image, so a refresh
+  still fetches only what is new. A refresh does nothing when the base holds
+  the same commits on the same layer (`isBaseCurrent`).
+- **A recipe's run is planned in two halves around a gather** (`runRecipe`):
+  `planRecipe` removes the outputs the disk recorded, snapshots it
+  read-only, runs the command, and snapshots it again; the runtime's `diff`
+  of the two says what it made; `planRecipeRecord` records its outputs
+  (`addedRoots`: the topmost paths it added, never a cache) in
+  `.pinetrie-lane/derived.json` and deletes the two snapshots. A failed run
+  records its outputs too, with the key before it, so the next run removes
+  them and runs again.
+- **Old layers go after each base build** (`planDepsRetention`): every one
+  but the base's and the three newest. A fork copies its layer when it
+  starts, so a layer serves only forks to come, and is built again from its
+  key when one needs it.
 
 ## Forks
 
@@ -98,8 +141,10 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   bookmark and immutable in your repo, would make them immutable too (S48
   item 11), and your WIP would freeze. Either commit carries
   `Pinetrie-Base: <bookmark>@<commit>` (`baseMessage`), the lane's ledger of
-  its base. The base disk is accepted work's, so a WIP whose lockfile differs
-  from accepted work's installs (`installIfLockMoved`).
+  its base. The base disk holds accepted work's dependencies, so a fork from
+  a WIP whose recipe's inputs differ starts from a dependency layer of its
+  own, made at the WIP's commit if missing (the host's `create.ts`): no fork
+  installs.
 - **The base snapshot is made in a scratch lane that is no thread's**
   (`BASE_LANE`, a `BaseLane`): a container, a disk and snapshots are named by
   a `LaneOwner`, a thread's id or the base's, while a bookmark, a remote and
@@ -142,9 +187,10 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   and tags, so it does not see a commit fetched with no ref (S44 item 7).
   When your `@-` was rewritten, that branch moves sideways, and the import
   (`--ignore-working-copy`) abandons the commit it named and rebases its
-  descendants. On the base disk the working-copy commit is one of them, so
-  the working copy goes stale: `planBaseRefresh` runs `jj workspace
-  update-stale` before `jj new`, which does nothing when it is fresh (S74).
+  descendants. On a base restored from a dependency layer the working-copy
+  commit is one of them, so the working copy goes stale: `planBaseCheckout`
+  runs `jj workspace update-stale` before `jj new`, which does nothing when
+  it is fresh (S74).
   It fetches every commit it names when the disk lacks any, and git skips a
   wanted commit the disk already holds, so naming one of the lane's own is
   harmless, though a caller names only what the lane may lack (S83).
@@ -169,8 +215,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   `--ignore-working-copy` imports no git refs. A plain `jj git import`
   snapshots the working copy as well, recording your uncommitted edits into
   `@`: 107 ms against 12–47 ms (S44 item 8).
-- **A new base disk is `git init` and `jj git init --colocate`,** then a
-  fetch by id. `jj git clone` refuses a directory that is not empty, and a
+- **A fresh disk's checkout is `git init` and `jj git init --colocate`,**
+  then a fetch by id (`planBaseCheckout`). `jj git clone` refuses a directory that is not empty, and a
   fresh volume holds `lost+found` (S44 item 6). A clone would also fetch every
   bookmark and check out nothing (S43 item 5).
 - **`PINETRIE_GIT=1`** is set on every host command `run` starts. A git shim
@@ -224,7 +270,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 
 - **A container is disposable; the disk is the lane.** Each lane's container
   is labelled `pinetrie.spec=<hash>` (`SPEC_LABEL`), a hash of the runtime's
-  arguments for its shape (`specHashOf`). `planContainer` decides at each start:
+  spec for its shape (`specHashOf`). `planContainer` decides at each start:
   - missing: create it;
   - its label differs, or it has none: recreate it on the same disk;
   - stopped: start it;
@@ -300,18 +346,17 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   ignore file's directory, links, grants, shared directories and granted
   host paths, in a `ContainerShape`. A runtime renders each, and does not
   know what a mount is for.
-- **A path with both a comma and a colon is refused** (`planHostMounts`):
-  Docker's `--mount` separates its fields with commas and `-v` with colons,
-  so it cannot mount one (S46 item 4).
+- **Any path can be mounted:** Docker's API takes each mount as JSON, so a
+  path with a comma and a colon, which the CLI's `--mount` and `-v` could
+  not both name (S46 item 4), is no trouble.
 - **Granted host paths** (`planHostMounts`) are the roots of the commands pi
   loaded, read-only at `/mnt/host` and their host path (`hostPathInLane`), so
   none can shadow a directory of the image's (S46). Nested roots collapse. A
   root that is, or holds, your home directory, `/` or pi's agent directory
-  (`auth.json`) is refused, and so is one with both a comma and a colon. A
-  package inside the agent directory is allowed: it lies inside, and does not
-  hold it.
-- **A change to them recreates lanes:** they are in `container run`'s
-  arguments, and so in the spec hash.
+  (`auth.json`) is refused. A package inside the agent directory is
+  allowed: it lies inside, and does not hold it.
+- **A change to them recreates lanes:** they are in the container's spec,
+  and so in its hash.
 
 ## The queue
 
@@ -493,8 +538,11 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   image. Its `commands` section
   reads skill files at `/mnt/host`, and checks what a real lane's prompt
   tells it about itself and that the note it names is there (ADR-0121). It
-  has five scenarios (`apps/pinetrie/e2e/lanes/`), `main`, `images`,
-  `shared`, `commands` and `contract`, and `PINETRIE_SCENARIO` picks some.
+  has seven scenarios (`apps/pinetrie/e2e/lanes/`), `main`, `images`,
+  `shared`, `commands`, `catch-up`, `recipe` and `contract`, and
+  `PINETRIE_SCENARIO` picks some. `recipe` is ADR-0131's: a package deleted
+  from accepted work, or in a lane, leaves no output behind, and a turn's
+  record names the ignored files it wrote.
   It runs on Docker, and where Docker cannot run lanes, each scenario
   reports SKIP with the host's own reason (`runtimeProblem`).
   Its hosts pass their own `userConfig`, so the person's own lane config

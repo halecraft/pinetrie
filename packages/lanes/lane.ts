@@ -20,7 +20,7 @@ import type { Runners } from "./execute.ts"
 import { type LaneOwner, laneContainer, PINETRIE_MOUNT } from "./plan.ts"
 import type { BytesRunner, Runner } from "./run.ts"
 import { runtimeNode } from "./runtime.ts"
-import type { LaneRuntime } from "./runtime-port.ts"
+import type { ContainerFacts, LaneRuntime } from "./runtime-port.ts"
 
 /** pinetrie's own install on the host, mounted read-only at `/pinetrie` in every lane. */
 export const PINETRIE_INSTALL = path.resolve(import.meta.dirname, "../..")
@@ -105,8 +105,12 @@ export interface LaneHandle<C> {
   readonly runners: Runners
   /** The open link, opening it if need be. The container must be running. */
   link(): Promise<LaneLink<C>>
-  /** Start the stopped container, or leave a running one; then open the link. */
-  start(): Promise<LaneLink<C>>
+  /**
+   * Start the stopped container, or leave a running one; then open the
+   * link. A caller that has just read or made the container says its state
+   * (`known`), and it is not asked again.
+   */
+  start(known?: ContainerFacts["state"]): Promise<LaneLink<C>>
   /** Close the link and stop the container. */
   stop(): Promise<void>
 }
@@ -133,9 +137,9 @@ export function laneHandle<C>(
       laneBytes: async argv => (await opened()).bytes(argv),
     },
     link: opened,
-    async start() {
-      if ((await runtime.containerFacts(container)).state !== "running")
-        await runtime.start(container)
+    async start(known) {
+      const state = known ?? (await runtime.containerFacts(container)).state
+      if (state !== "running") await runtime.start(container)
       return opened()
     },
     async stop() {

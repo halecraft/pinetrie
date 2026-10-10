@@ -18,7 +18,12 @@ import {
   recordsOf,
   setRecord,
 } from "./index.ts"
-import { planRetention, showHostWorkingCopy } from "./work.ts"
+import {
+  classifyDisk,
+  ignoredFiles,
+  planRetention,
+  showHostWorkingCopy,
+} from "./work.ts"
 
 const LANE = threadIdFor("1")
 const ADA = writerId("ada")
@@ -40,6 +45,8 @@ describe("records: one spec each, total decoders", () => {
     snapshot: snapshotId("e1"),
     paths: ["a.txt", "d/c é.txt"],
     conflicts: ["b.txt"],
+    ignored: { paths: [".env", "dist"], more: 2 },
+    recipe: "ran" as const,
   }
   const project = { root: "/p" }
   test("each record round-trips, keyed as its reader expects", () => {
@@ -129,6 +136,8 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       snapshot: S,
       paths: [],
       conflicts: ["x.txt"],
+      ignored: null,
+      recipe: null,
     })
     expect(
       planTurnRecord({
@@ -148,6 +157,8 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       snapshot: S,
       paths: ["a.txt"],
       conflicts: ["x.txt"],
+      ignored: null,
+      recipe: null,
     })
     // The newest revision is what came before the prompt: no paths of its own.
     expect(
@@ -160,6 +171,8 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       paths: [],
       // The newest revision's conflicts: a branch from the prompt clones it.
       conflicts: ["x.txt"],
+      ignored: null,
+      recipe: null,
     })
   })
   test("a turn with tool calls gets its disk, and a commit only when one was made", () => {
@@ -177,6 +190,8 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       snapshot: S,
       paths: ["a.txt"],
       conflicts: ["x.txt"],
+      ignored: null,
+      recipe: null,
     })
     expect(
       planTurnRecord({
@@ -192,6 +207,8 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       snapshot: S,
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     })
   })
   test("a turn with no tool calls and nothing committed gets none", () => {
@@ -208,6 +225,8 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       snapshot: null,
       paths: [],
       conflicts: [],
+      ignored: null,
+      recipe: null,
     })
     expect(
       planTurnRecord({ ...direct, isPrompt: false, toolCalls: true }),
@@ -277,6 +296,8 @@ describe("planRetention: which snapshots go", () => {
     snapshot: snapshotId(entry),
     paths: [],
     conflicts: [],
+    ignored: null,
+    recipe: null,
   })
   const records = [
     rec("01-a"),
@@ -338,5 +359,94 @@ describe("showHostWorkingCopy: whole path prefixes only", () => {
   })
   test("the file system's root is never a working copy's", () => {
     expect(showHostWorkingCopy("/etc/hosts", "/")).toBe("/etc/hosts")
+  })
+})
+
+describe("classifyDisk: what each path a turn's whole-disk diff names is (ADR-0131)", () => {
+  const change = (
+    path: string,
+    change: "added" | "changed" | "deleted" = "added",
+  ) => ({
+    path,
+    change,
+    kind: "file" as const,
+  })
+  const classes = classifyDisk({
+    diff: {
+      changes: [
+        change("src/a.ts", "changed"),
+        change("src/new"),
+        change("src/new/b.ts"),
+        change(".jj/repo/op"),
+        change(".pinetrie-lane/derived.json"),
+        change("node_modules/x"),
+        change(".pnpm-store/v10/y"),
+        change(".plans"),
+        change(".env"),
+        change("dist"),
+        change("dist/app.js"),
+        change("old.log", "deleted"),
+      ],
+    },
+    tracked: ["src/a.ts", "src/new/b.ts"],
+    outputs: ["node_modules"],
+    caches: [".pnpm-store"],
+    shared: [".plans"],
+  })
+  test("tracked, own, derived, cache, and the ignored rest", () => {
+    expect(Object.fromEntries(classes)).toEqual({
+      "src/a.ts": "tracked",
+      "src/new": "tracked",
+      "src/new/b.ts": "tracked",
+      ".jj/repo/op": "own",
+      ".pinetrie-lane/derived.json": "own",
+      "node_modules/x": "derived",
+      ".pnpm-store/v10/y": "cache",
+      ".plans": "own",
+      ".env": "ignored",
+      dist: "ignored",
+      "dist/app.js": "ignored",
+      "old.log": "ignored",
+    })
+  })
+  test("ignoredFiles: the topmost, sorted; a directory stands for what is under it", () => {
+    expect(ignoredFiles(classes)).toEqual({
+      paths: [".env", "dist", "old.log"],
+      more: 0,
+    })
+    expect(ignoredFiles(new Map([["a", "tracked" as const]]))).toBeNull()
+    const many = new Map(
+      Array.from({ length: 103 }, (_, i) => [
+        `f${String(i).padStart(3, "0")}`,
+        "ignored" as const,
+      ]),
+    )
+    expect(ignoredFiles(many)?.paths).toHaveLength(100)
+    expect(ignoredFiles(many)?.more).toBe(3)
+  })
+  test("a record from before turns diffed their disk decodes with neither", () => {
+    const old = setRecord(
+      REVISION,
+      {
+        entry: entryId("e1"),
+        lane: LANE,
+        commit: C1,
+        snapshot: snapshotId("e1"),
+        paths: [],
+        conflicts: [],
+        ignored: { paths: ["x"], more: 0 },
+        recipe: "ran",
+      },
+      rootIdFor("test-root"),
+    )
+    const {
+      ignored: _i,
+      recipe: _r,
+      ...value
+    } = old.value as Record<string, unknown>
+    expect(REVISION.decode(value, old.key)).toMatchObject({
+      ignored: null,
+      recipe: null,
+    })
   })
 })

@@ -24,7 +24,7 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
   disk, where pi's tools run. Every thread's agent works in one; none works
   directly in a directory (ADR-0102). A branch clones its parent's disk. Lanes run
   on Docker, on btrfs snapshots: in pine·trie's own VM on the Mac, on the
-  host on Linux (ADR-0103). A host with tools that cannot run them does not
+  host on Linux (ADR-0130). A host with tools that cannot run them does not
   start. A lane's work
   reaches your repo as an offer, a single commit you can review first.
 

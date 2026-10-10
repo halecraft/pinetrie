@@ -48,7 +48,14 @@ describe("workStats", () => {
     entry("6-a", "5-r", said("done"), { timestamp: 200 }),
     entry("7-q", "6-a", chat("thanks"), { timestamp: 300 }),
   ])
-  const rev = (entry: string, paths: string[]): [EntryId, RevisionRecord] => [
+  const rev = (
+    entry: string,
+    paths: string[],
+    disk: Pick<RevisionRecord, "ignored" | "recipe"> = {
+      ignored: null,
+      recipe: null,
+    },
+  ): [EntryId, RevisionRecord] => [
     entryId(entry),
     {
       entry: entryId(entry),
@@ -57,13 +64,20 @@ describe("workStats", () => {
       snapshot: null,
       paths,
       conflicts: [],
+      ...disk,
     },
   ]
   const revisions = new Map([
-    rev("2-a", ["a.txt", "b.txt"]),
-    rev("4-a", ["b.txt", "c.txt"]),
+    rev("2-a", ["a.txt", "b.txt"], {
+      ignored: { paths: [".env", "dist"], more: 1 },
+      recipe: null,
+    }),
+    rev("4-a", ["b.txt", "c.txt"], {
+      ignored: { paths: [".env"], more: 0 },
+      recipe: "failed",
+    }),
   ])
-  test("counts the work, the union of its turns' paths, and its time", () => {
+  test("counts the work, the union of its turns' paths and ignored files, and its time", () => {
     expect(
       workStats(
         index,
@@ -78,6 +92,8 @@ describe("workStats", () => {
       calls: 2,
       failed: 1,
       files: ["a.txt", "b.txt", "c.txt"],
+      ignored: 3,
+      recipeFailed: 1,
       first: 110,
       last: 200,
     })

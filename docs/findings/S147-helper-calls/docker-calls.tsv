@@ -1,0 +1,283 @@
+1791656823.4680221081	25.2	0	version
+1791656823.4680209160	166.8	0	buildx version
+1791656823.6397860050	37.3	0	ps -a --filter label=pinetrie.slot=0 --format '{{json .}}'
+1791656823.6824009418	23.0	0	rm -f pinetrie-t-01a10e7b-23f8-7ab8-895e-254bae5ab33c
+1791656823.7102019787	44.7	0	rm -f pinetrie-t-01a125ee-afcf-7d13-99dc-58aa74a6e0fe
+1791656823.7603669167	45.3	0	rm -f pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9
+1791656827.2368791103	24.1	0	image inspect --format '{{.Id}}' pinetrie-lane:ccee0cdce672
+1791656827.2982749939	209.2	0	run --rm pinetrie-lane:ccee0cdce672 sh -c 'git --version 2>/dev/null || true'
+1791656827.5129768848	22.2	0	image inspect --format '{{json .Config.Env}}' pinetrie-lane:ccee0cdce672
+1791656827.6387460232	19.0	0	image inspect --format '{{.Id}}' pinetrie-disks:4db60b2da62f
+1791656827.6634778976	11.7	0	network inspect pinetrie-dff06c0e66d017b0
+1791656827.6799979210	11.4	0	inspect --type container pinetrie-disks
+1791656827.6960940361	27.1	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$1")"
+printf %s "$2" > "$1"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/root /Users/duane/halecraft/pinetrie
+1791656827.7281329632	12.2	0	network inspect -f '{{(index .IPAM.Config 0).Subnet}}' pinetrie-dff06c0e66d017b0
+1791656827.7453699112	127.3	0	run --rm --network host --cap-add NET_ADMIN --cap-add NET_RAW pinetrie-disks:4db60b2da62f sh -c 'set -e
+iptables -S DOCKER-USER | grep -- '\''-j PT-dff06c0e66d017b0$'\'' | sed '\''s/^-A /-D /'\'' | while read -r rule; do eval iptables "$rule"; done
+iptables -F PT-dff06c0e66d017b0 2>/dev/null || iptables -N PT-dff06c0e66d017b0
+iptables -X PT-dff06c0e66d017b0'
+1791656827.8778231144	28.6	0	exec pinetrie-disks sh -c 'for d in "$1"/projects/*/; do [ -d "$d" ] || continue; printf "%s\t%s\n" "$(basename "$d")" "$(cat "$d/root" 2>/dev/null)"; done' sh /var/lib/lanehost
+1791656827.9114139080	13.0	0	ps -a --filter label=pinetrie.project --format '{{json .}}'
+1791656827.9576210976	28.3	0	exec pinetrie-disks stat -c %i /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/base
+1791656827.9924058914	12.6	1	inspect --type container pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9
+1791656828.0104420185	27.7	0	exec pinetrie-disks stat -c %i /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9
+1791656828.0431981087	28.3	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$1")"
+[ -e "$1" ] || btrfs -q subvolume create "$1"
+chown 1000:1000 "$1"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/nested/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9
+1791656828.0767359734	105.3	0	run --label pinetrie.spec=014a56d793a2a486 -d --init --name pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 --hostname pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 -m 4G --network pinetrie-dff06c0e66d017b0 --label pinetrie.project=dff06c0e66d017b0 --label pinetrie.slot=0 --mount type=bind,source=/var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9,target=/workspace --mount type=bind,source=/mnt/host-shares/0/dff06c0e66d017b0,target=/mnt/host-working-copy,readonly --mount type=bind,source=/mnt/host-shares/0/dff06c0e66d017b0,target=/pinetrie,readonly --mount type=bind,source=/mnt/host-shares/0/e4320523375c5218,target=/pinetrie-runtime,readonly --mount type=bind,source=/mnt/host-shares/0/173e34e25e572f20,target=/pinetrie-git,readonly --mount type=bind,source=/mnt/host-shares/0/50cc9f40364aa60a,target=/kyneta,readonly --mount type=bind,source=/mnt/host-shares/0/d871d082f412bfa1,target=/workspace/.plans --mount type=bind,source=/mnt/host-shares/0/6e1c57731a395e86,target=/mnt/host/Users/duane/.local/share/ai/duane,readonly --mount type=bind,source=/mnt/host-shares/0/e787aa916e2331a3,target=/mnt/host/Users/duane/.local/share/ai/pstack,readonly --mount type=bind,source=/mnt/host-shares/0/4c7ce14697ece22a,target=/mnt/host/Users/duane/.pi/agent/npm/node_modules/pi-subagents,readonly --mount type=bind,source=/mnt/host-shares/0/3913115c3c782c62,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/agents-round,readonly --mount type=bind,source=/mnt/host-shares/0/7a7528d0621be180,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/ask-digest,readonly --mount type=bind,source=/mnt/host-shares/0/273cbebcdf8d8f85,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/column-banner,readonly --mount type=bind,source=/mnt/host-shares/0/e96a40fca0caba86,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/commit-message,readonly --mount type=bind,source=/mnt/host-shares/0/6da65630d01ebec8,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/offer-stack,readonly --mount type=bind,source=/mnt/host-shares/0/0015ae034a3791ee,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/resolve-conflicts,readonly --mount type=bind,source=/mnt/host-shares/0/24757262515e157b,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/tab-title,readonly --security-opt seccomp=/Users/duane/halecraft/pinetrie/packages/docker/seccomp-nested.json --security-opt systempaths=unconfined --device /dev/net/tun --mount type=bind,source=/var/lib/lanehost/projects/dff06c0e66d017b0/nested/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9,target=/var/lib/pinetrie-lanes -e DOCKER_HOST=unix:///run/user/1000/docker.sock -e 'JJ_USER=Duane Johnson' -e JJ_EMAIL=duane.johnson@gmail.com -e JJ_CONFIG=/workspace/.pinetrie-lane/jj.toml -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=core.excludesFile -e GIT_CONFIG_VALUE_0=/pinetrie-git/ignore -e GIT_CONFIG_SYSTEM=/pinetrie-git/gitconfig -e JJ_EDITOR=false -e VISUAL=false -e EDITOR=false -e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/pinetrie-runtime/bin -w /workspace pinetrie-lane:ccee0cdce672 sh -c '(pinetrie-inner-docker &); exec sleep infinity'
+1791656828.1881210804	13.5	0	inspect --type container pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9
+1791656828.2078080177	-1	-	exec -i pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /pinetrie-runtime/node/ld-linux-aarch64.so.1 --library-path /pinetrie-runtime/node/lib /pinetrie-runtime/node/node /pinetrie/packages/pi/lane-helper.ts
+1791656828.5221600533	33.8	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12711-6711-765e-a217-14d68f2062a4
+1791656840.8661129475	29.5	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12711-9dff-717d-928d-e7127c218026
+1791656840.9016199112	13.7	0	inspect --type container pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9
+1791656854.9892439842	33.1	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12711-ce72-717d-928d-e71c07a35b2b
+1791656863.9736769199	32.4	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-0588-717d-928d-e727ff20d432
+1791656867.2454590797	29.9	0	exec pinetrie-disks stat -c %i /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/base
+1791656867.2816889286	14.1	0	rm -f pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656867.3013489246	29.4	0	exec pinetrie-disks sh -c 'set -e
+if [ -e "$1" ]; then btrfs -q subvolume delete "$1" 2>/dev/null || rm -rf "$1"; fi
+rm -rf "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/nested/t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656867.3367500305	34.9	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+btrfs -q subvolume snapshot "$1" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/base /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656867.3770558834	29.6	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$1")"
+[ -e "$1" ] || btrfs -q subvolume create "$1"
+chown 1000:1000 "$1"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/nested/t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656867.4123759270	106.2	0	run --label pinetrie.spec=da9b36986fcfc096 -d --init --name pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9 --hostname pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9 -m 4G --network pinetrie-dff06c0e66d017b0 --label pinetrie.project=dff06c0e66d017b0 --label pinetrie.slot=0 --mount type=bind,source=/var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9,target=/workspace --mount type=bind,source=/mnt/host-shares/0/dff06c0e66d017b0,target=/mnt/host-working-copy,readonly --mount type=bind,source=/mnt/host-shares/0/dff06c0e66d017b0,target=/pinetrie,readonly --mount type=bind,source=/mnt/host-shares/0/e4320523375c5218,target=/pinetrie-runtime,readonly --mount type=bind,source=/mnt/host-shares/0/173e34e25e572f20,target=/pinetrie-git,readonly --mount type=bind,source=/mnt/host-shares/0/50cc9f40364aa60a,target=/kyneta,readonly --mount type=bind,source=/mnt/host-shares/0/d871d082f412bfa1,target=/workspace/.plans --mount type=bind,source=/mnt/host-shares/0/6e1c57731a395e86,target=/mnt/host/Users/duane/.local/share/ai/duane,readonly --mount type=bind,source=/mnt/host-shares/0/e787aa916e2331a3,target=/mnt/host/Users/duane/.local/share/ai/pstack,readonly --mount type=bind,source=/mnt/host-shares/0/4c7ce14697ece22a,target=/mnt/host/Users/duane/.pi/agent/npm/node_modules/pi-subagents,readonly --mount type=bind,source=/mnt/host-shares/0/3913115c3c782c62,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/agents-round,readonly --mount type=bind,source=/mnt/host-shares/0/7a7528d0621be180,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/ask-digest,readonly --mount type=bind,source=/mnt/host-shares/0/273cbebcdf8d8f85,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/column-banner,readonly --mount type=bind,source=/mnt/host-shares/0/e96a40fca0caba86,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/commit-message,readonly --mount type=bind,source=/mnt/host-shares/0/6da65630d01ebec8,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/offer-stack,readonly --mount type=bind,source=/mnt/host-shares/0/0015ae034a3791ee,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/resolve-conflicts,readonly --mount type=bind,source=/mnt/host-shares/0/24757262515e157b,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/tab-title,readonly --security-opt seccomp=/Users/duane/halecraft/pinetrie/packages/docker/seccomp-nested.json --security-opt systempaths=unconfined --device /dev/net/tun --mount type=bind,source=/var/lib/lanehost/projects/dff06c0e66d017b0/nested/t-01a12711-f725-7494-b95b-3dc09a2bd6c9,target=/var/lib/pinetrie-lanes -e DOCKER_HOST=unix:///run/user/1000/docker.sock -e 'JJ_USER=Duane Johnson' -e JJ_EMAIL=duane.johnson@gmail.com -e JJ_CONFIG=/workspace/.pinetrie-lane/jj.toml -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=core.excludesFile -e GIT_CONFIG_VALUE_0=/pinetrie-git/ignore -e GIT_CONFIG_SYSTEM=/pinetrie-git/gitconfig -e JJ_EDITOR=false -e VISUAL=false -e EDITOR=false -e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/pinetrie-runtime/bin -w /workspace pinetrie-lane:ccee0cdce672 sh -c '(pinetrie-inner-docker &); exec sleep infinity'
+1791656867.5247669220	-1	-	exec -i pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /pinetrie-runtime/node/ld-linux-aarch64.so.1 --library-path /pinetrie-runtime/node/lib /pinetrie-runtime/node/node /pinetrie/packages/pi/lane-helper.ts
+1791656867.7715148926	13.2	0	inspect --type container pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656867.7910521030	14.2	0	inspect --type container pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656867.8112089634	13.7	0	inspect --type container pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656867.9070320129	34.9	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-3576-717d-928d-e7391f6b4090
+1791656870.6614100933	35.0	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-28c8-717d-928d-e73183563cc0
+1791656871.1645810604	31.5	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-380d-717d-928d-e73d824ca90a
+1791656875.5467059612	32.6	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-42e6-717d-928d-e746a1661186
+1791656877.4313099384	30.9	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-44cc-717d-928d-e750c408fff5
+1791656880.8788619041	139.1	0	stop pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656883.5802021027	15.2	0	inspect --type container pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656883.6016340256	14.9	0	inspect --type container pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656883.6226489544	87.5	0	start pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656883.7165739536	-1	-	exec -i pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /pinetrie-runtime/node/ld-linux-aarch64.so.1 --library-path /pinetrie-runtime/node/lib /pinetrie-runtime/node/node /pinetrie/packages/pi/lane-helper.ts
+1791656883.9406909943	32.6	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-757c-717d-928d-e77528306d91
+1791656885.5843830109	147.1	0	stop pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656897.5472800732	15.3	0	inspect --type container pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656897.5688080788	18.7	0	inspect --type container pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656897.5943679810	80.2	0	start pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656897.6811599731	-1	-	exec -i pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /pinetrie-runtime/node/ld-linux-aarch64.so.1 --library-path /pinetrie-runtime/node/lib /pinetrie-runtime/node/node /pinetrie/packages/pi/lane-helper.ts
+1791656897.8858790398	32.7	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-ac0c-717d-928d-e783d7bf74ec
+1791656900.7521650791	32.8	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-55fe-717d-928d-e75b2b32f07a
+1791656900.7909660339	13.0	0	inspect --type container pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9
+1791656901.7309041023	34.1	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-ad51-717d-928d-e786762cbac0
+1791656905.8502850533	33.5	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-b872-717d-928d-e78d016bc9e3
+1791656910.3451550007	31.9	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-cc61-717d-928d-e7a05ca636c9
+1791656910.3830559254	13.0	0	inspect --type container pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9
+1791656914.7914369106	35.6	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-ddf1-717d-928d-e7ab71fd8285
+1791656916.2724630833	31.9	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-bc1a-717d-928d-e79655155df3
+1791656916.3102569580	13.3	0	inspect --type container pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656917.1559920311	35.3	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-ef47-717d-928d-e7b4dc89f86e
+1791656917.3273520470	29.0	0	exec pinetrie-disks stat -c %i /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-757c-717d-928d-e77528306d91
+1791656917.3627068996	13.8	0	rm -f pinetrie-t-01a12712-ec83-7f83-a805-a880cc1168e5
+1791656917.3822069168	29.6	0	exec pinetrie-disks sh -c 'set -e
+if [ -e "$1" ]; then btrfs -q subvolume delete "$1" 2>/dev/null || rm -rf "$1"; fi
+rm -rf "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12712-ec83-7f83-a805-a880cc1168e5 /var/lib/lanehost/projects/dff06c0e66d017b0/nested/t-01a12712-ec83-7f83-a805-a880cc1168e5
+1791656917.4467170238	33.8	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+btrfs -q subvolume snapshot "$1" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-757c-717d-928d-e77528306d91 /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12712-ec83-7f83-a805-a880cc1168e5
+1791656917.4853370190	31.2	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$1")"
+[ -e "$1" ] || btrfs -q subvolume create "$1"
+chown 1000:1000 "$1"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/nested/t-01a12712-ec83-7f83-a805-a880cc1168e5
+1791656917.5220639706	111.1	0	run --label pinetrie.spec=8d8d602ca7aec9d9 -d --init --name pinetrie-t-01a12712-ec83-7f83-a805-a880cc1168e5 --hostname pinetrie-t-01a12712-ec83-7f83-a805-a880cc1168e5 -m 4G --network pinetrie-dff06c0e66d017b0 --label pinetrie.project=dff06c0e66d017b0 --label pinetrie.slot=0 --mount type=bind,source=/var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12712-ec83-7f83-a805-a880cc1168e5,target=/workspace --mount type=bind,source=/mnt/host-shares/0/dff06c0e66d017b0,target=/mnt/host-working-copy,readonly --mount type=bind,source=/mnt/host-shares/0/dff06c0e66d017b0,target=/pinetrie,readonly --mount type=bind,source=/mnt/host-shares/0/e4320523375c5218,target=/pinetrie-runtime,readonly --mount type=bind,source=/mnt/host-shares/0/173e34e25e572f20,target=/pinetrie-git,readonly --mount type=bind,source=/mnt/host-shares/0/50cc9f40364aa60a,target=/kyneta,readonly --mount type=bind,source=/mnt/host-shares/0/d871d082f412bfa1,target=/workspace/.plans --mount type=bind,source=/mnt/host-shares/0/6e1c57731a395e86,target=/mnt/host/Users/duane/.local/share/ai/duane,readonly --mount type=bind,source=/mnt/host-shares/0/e787aa916e2331a3,target=/mnt/host/Users/duane/.local/share/ai/pstack,readonly --mount type=bind,source=/mnt/host-shares/0/4c7ce14697ece22a,target=/mnt/host/Users/duane/.pi/agent/npm/node_modules/pi-subagents,readonly --mount type=bind,source=/mnt/host-shares/0/3913115c3c782c62,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/agents-round,readonly --mount type=bind,source=/mnt/host-shares/0/7a7528d0621be180,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/ask-digest,readonly --mount type=bind,source=/mnt/host-shares/0/273cbebcdf8d8f85,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/column-banner,readonly --mount type=bind,source=/mnt/host-shares/0/e96a40fca0caba86,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/commit-message,readonly --mount type=bind,source=/mnt/host-shares/0/6da65630d01ebec8,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/offer-stack,readonly --mount type=bind,source=/mnt/host-shares/0/0015ae034a3791ee,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/resolve-conflicts,readonly --mount type=bind,source=/mnt/host-shares/0/24757262515e157b,target=/mnt/host/Users/duane/halecraft/pinetrie/packages/pi/skills/tab-title,readonly --security-opt seccomp=/Users/duane/halecraft/pinetrie/packages/docker/seccomp-nested.json --security-opt systempaths=unconfined --device /dev/net/tun --mount type=bind,source=/var/lib/lanehost/projects/dff06c0e66d017b0/nested/t-01a12712-ec83-7f83-a805-a880cc1168e5,target=/var/lib/pinetrie-lanes -e DOCKER_HOST=unix:///run/user/1000/docker.sock -e 'JJ_USER=Duane Johnson' -e JJ_EMAIL=duane.johnson@gmail.com -e JJ_CONFIG=/workspace/.pinetrie-lane/jj.toml -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=core.excludesFile -e GIT_CONFIG_VALUE_0=/pinetrie-git/ignore -e GIT_CONFIG_SYSTEM=/pinetrie-git/gitconfig -e JJ_EDITOR=false -e VISUAL=false -e EDITOR=false -e PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/pinetrie-runtime/bin -w /workspace pinetrie-lane:ccee0cdce672 sh -c '(pinetrie-inner-docker &); exec sleep infinity'
+1791656917.6387140751	-1	-	exec -i pinetrie-t-01a12712-ec83-7f83-a805-a880cc1168e5 /pinetrie-runtime/node/ld-linux-aarch64.so.1 --library-path /pinetrie-runtime/node/lib /pinetrie-runtime/node/node /pinetrie/packages/pi/lane-helper.ts
+1791656917.8757700920	13.7	0	inspect --type container pinetrie-t-01a12712-ec83-7f83-a805-a880cc1168e5
+1791656917.8953609467	13.7	0	inspect --type container pinetrie-t-01a12712-ec83-7f83-a805-a880cc1168e5
+1791656917.9178879261	13.5	0	inspect --type container pinetrie-t-01a12712-ec83-7f83-a805-a880cc1168e5
+1791656918.0044569969	36.0	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12712-ec83-7f83-a805-a880cc1168e5 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-f93b-717d-928d-e7d7f8faf15e
+1791656920.1478788853	31.8	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-f521-717d-928d-e7c325a6c29f
+1791656920.6744809151	141.3	0	stop pinetrie-t-01a12712-ec83-7f83-a805-a880cc1168e5
+1791656922.3210430145	33.5	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12713-0446-717d-928d-e7e59eca4094
+1791656924.5618140697	31.6	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12712-f85e-717d-928d-e7cd32cbea75
+1791656928.7609100342	31.1	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12713-0ca4-717d-928d-e7f4121f997b
+1791656928.7976300716	13.2	0	inspect --type container pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656931.0132119656	58.5	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12713-25ec-717d-928d-e80e54de3023
+1791656934.0530290604	55.5	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12713-2e77-717d-928d-e81de0c2dad0
+1791656936.5281090736	56.4	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a12711-f725-7494-b95b-3dc09a2bd6c9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12713-3a46-717d-928d-e82834580872
+1791656939.0627350807	32.2	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12713-1577-717d-928d-e7ff902d820e
+1791656943.0525450706	140.4	0	stop pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656943.4348568916	31.1	0	exec pinetrie-disks sh -c 'set -e
+mkdir -p "$(dirname "$2")"
+gone() { if [ -e "$1" ]; then btrfs -q subvolume delete "$1"; fi; }
+gone "$2.tmp"
+btrfs -q subvolume snapshot "$1" "$2.tmp"
+gone "$2"
+mv "$2.tmp" "$2"' sh /var/lib/lanehost/projects/dff06c0e66d017b0/lanes/t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9 /var/lib/lanehost/projects/dff06c0e66d017b0/snapshots/01a12713-4e1b-717d-928d-e839642dc2a1
+1791656947.4730401039	18.9	0	stop pinetrie-t-01a12712-ec83-7f83-a805-a880cc1168e5
+1791656947.4729490280	18.9	0	stop pinetrie-t-01a12711-f725-7494-b95b-3dc09a2bd6c9
+1791656947.4728679657	112.3	141	stop pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9
+1791656947.4757790565	109.4	141	stop pinetrie-t-01a126a1-6aad-7bda-b01b-0dc09f9f70a9

@@ -824,6 +824,11 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
 - **Both are `ReaderAction`s, by the column's key** (`readerAction`,
   `intent.ts`), as `sent` is: `planColumn` sends them
   through `onColumn`, as your view of the column's card.
+- **`workWords` counts what the work's records say** (`statsOf`): the
+  files its turns changed, the ignored files they wrote ("3 ignored
+  files", each record's topmost and how many more, ADR-0131), and
+  "dependencies failed to install" when a turn's recipe failed, after the
+  failed calls.
 - **What `askView` decides:** what its work holds (`work`, `workWords`
   over `askStats`), the outcome's words, the live line while it runs, the
   last word outline hides (none in the column's last ended ask,

@@ -1,0 +1,27 @@
+kernel 6.18.55-0-virt, btrfs-progs v6.17.1
+-EXPERIMENTAL -INJECT -STATIC +LZO +ZSTD +UDEV +FSVERITY +ZONED CRYPTO=builtin
+lane: 44566 entries, 711.0M
+
+== snapshot -r of the lane, then its delete: 2.395 ms (835 runs)
+
+== send --no-data -p, the stream alone (to /dev/null)
+no change      (a -> a2): 0.727 ms (2751 runs)
+small change   (a -> b):  2.283 ms (876 runs)
+large change   (a -> c):  617.500 ms (4 runs)
+whole disk, no parent (a): 7530.000 ms (1 runs)
+
+== the same, parsed by receive --dump
+no change      (a -> a2): 0.758 ms (2638 runs)
+small change   (a -> b):  2.656 ms (753 runs)
+large change   (a -> c):  650.000 ms (4 runs)
+whole disk, no parent (a): 7260.000 ms (1 runs)
+(ops: a -> b 55, a -> c 25639, a 278193)
+
+== find-new since a (generation 83454)
+on b: 0.705 ms (2836 runs)
+on c: 2.890 ms (692 runs)
+-- what find-new reports for b (look for packages/vm: a deletion):
+new-probe.txt
+packages/lanes/probe-dir/f
+transid marker was 83459
+-- lines naming packages/vm: 0

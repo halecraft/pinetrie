@@ -31,9 +31,8 @@ import {
 } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
-import { lockHashAt } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
-import type { Setup } from "./setup.ts"
+import type { Ready, Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
 
 /**
@@ -123,26 +122,30 @@ export function createNewLanes(deps: {
   const { repoConfig } = setup.lanes
 
   /**
-   * The install to run in a fork from a WIP's copy: the base disk was
-   * installed at accepted work's commit, so a WIP whose lockfile differs from it
-   * needs its own.
+   * Where a fork from a WIP's copy starts: the base disk holds accepted
+   * work's dependencies, so a WIP whose recipe's inputs differ from accepted
+   * work's starts from a dependency layer of its own (ADR-0131), made at
+   * its commit if missing. Any other fork starts where its point says.
    */
-  async function installIfLockMoved(
+  async function startSnapshot(
     owner: RepoOwner,
-    start: ForkStart,
-  ): Promise<string | null> {
-    const { install } = setup.lanes.config
-    if (install === null || start.kind !== "wip") return null
-    return owner.read(async ({ jj }) =>
-      (await lockHashAt(jj, start.commit, install.lockfile)) ===
-      (await lockHashAt(
+    point: { readonly snapshot: SnapshotId; readonly start: ForkStart },
+    r: Ready,
+  ): Promise<SnapshotId> {
+    const { start } = point
+    if (point.snapshot !== BASE_SNAPSHOT || start.kind !== "wip")
+      return point.snapshot
+    const keys = await owner.read(async ({ jj }) => ({
+      wip: await setup.keyAt(jj, start.commit, r),
+      accepted: await setup.keyAt(
         jj,
         `present(${revsetName(repoConfig.acceptedBookmark)})`,
-        install.lockfile,
-      ))
-        ? null
-        : install.command,
-    )
+        r,
+      ),
+    }))
+    return keys.wip === keys.accepted
+      ? point.snapshot
+      : setup.depsLayerAt([start.commit], keys.wip)
   }
 
   /** Where agent work begins for `base`, read from your repo at the head its owner last observed. */
@@ -190,17 +193,18 @@ export function createNewLanes(deps: {
                   setRecord(FILES_LOST, { lane, snapshot: point.lost }),
                 ])
               if (point.snapshot === BASE_SNAPSHOT) await setup.baseAtAccepted()
+              const from = await startSnapshot(owner, point, r)
               await removeLane(runtime, lane)
               await executeOrThrow(
                 planFork({
-                  point,
+                  point: { ...point, snapshot: from },
                   spec: setup.specOf(lane, r),
                   env: process.env,
-                  install: await installIfLockMoved(owner, point.start),
                 }),
                 handle.runners,
               )
-              await handle.start()
+              // The fork's `run` made it, and started it.
+              await handle.start("running")
             },
             { fatal: true },
           )

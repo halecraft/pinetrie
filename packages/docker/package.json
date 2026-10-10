@@ -7,7 +7,9 @@
     ".": "./index.ts"
   },
   "dependencies": {
+    "@pinetrie/channel": "workspace:*",
     "@pinetrie/core": "workspace:*",
+    "@pinetrie/lanehost": "workspace:*",
     "@pinetrie/lanes": "workspace:*"
   }
 }

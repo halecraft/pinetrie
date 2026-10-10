@@ -1,7 +1,7 @@
 # S136 — On gvproxy, the lane VM's network survives a `container run`, and Docker answers 1.1 s into a boot; lanes must be fenced from gvproxy's own network, or they reach the Mac's loopback
 
 - **Status:** Answered
-- **Led to:** ADR-0103
+- **Led to:** ADR-0103, ADR-0130
 
 Follows S135, item 2.
 

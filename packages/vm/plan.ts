@@ -1,4 +1,4 @@
-// vm/plan — the lane VM's decisions, pure (ADR-0103).
+// vm/plan — the lane VM's decisions, pure (ADR-0130).
 
 import { createHash } from "node:crypto"
 import path from "node:path"

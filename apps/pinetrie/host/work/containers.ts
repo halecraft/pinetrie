@@ -26,6 +26,7 @@ import type { LaneAccess } from "@pinetrie/pi"
 import { readLaneSnapshots, readThreadName } from "@pinetrie/reads"
 import { type Basics, failed } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
+import type { Recipes } from "./recipe.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 
@@ -57,6 +58,7 @@ export function createContainers(deps: {
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
   readonly offers: Offers
+  readonly recipes: Recipes
 }): Containers {
   const { basics, setup, registry, keeper, offers } = deps
   const { session, docs, log } = basics
@@ -114,7 +116,12 @@ export function createContainers(deps: {
           throw new Error(RETIRED)
       }
     }
-    await handle.start()
+    // Made just now, or read above: running unless it was stopped.
+    await handle.start(decided === "start" ? "stopped" : "running")
+    // A container made anew may run another image, whose dependencies the
+    // disk's do not match: the recipe's key says (ADR-0131).
+    if (decided === "create" || decided === "recreate")
+      await deps.recipes.onQueue(lane, handle, registry.laneJjOf(lane), "all")
   }
 
   return {
@@ -133,6 +140,7 @@ export function createContainers(deps: {
             mounts: grants.mounts.map(m => m.target),
           },
           defaultImage: setup.defaultImage,
+          recipe: setup.lanes.config.recipe?.command ?? null,
           install: PINETRIE_MOUNT,
           note: LANE_NOTE,
         },

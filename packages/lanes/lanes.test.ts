@@ -22,6 +22,7 @@ import {
   HELPER,
   helperCommand,
   type LaneRuntime,
+  laneHandle,
   prepareProjectDir,
   type Ran,
   type Runner,
@@ -52,7 +53,10 @@ function recordingRuntime(seen: string[]): LaneRuntime {
     execArgv: (container, argv) => ["exec", container, ...argv],
     diskExists: no,
     snapshotExists: no,
-    runArgs: no,
+    diff: no,
+    snapshots: no,
+    readLaneFile: no,
+    runSpec: no,
     containerFacts: no,
     start: no,
     stop: no,
@@ -75,7 +79,7 @@ describe("execute", () => {
         : ok
     }
     const steps: Step[] = [
-      { in: "runtime", op: { kind: "create", lane: LANE } },
+      { in: "runtime", op: { kind: "create", lane: LANE, carry: null } },
       { in: "lane", argv: ["sync"] },
       {
         in: "runtime",
@@ -296,4 +300,41 @@ test("readConfigFile: a file read, a missing one, and one that cannot be read or
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+describe("laneHandle.start", () => {
+  const counting = (state: "running" | "stopped") => {
+    const seen: string[] = []
+    const runtime: LaneRuntime = {
+      ...recordingRuntime(seen),
+      containerFacts: async () => {
+        seen.push("inspect")
+        return { state, label: null }
+      },
+      start: async name => {
+        seen.push(`start ${name}`)
+      },
+    }
+    const handle = laneHandle(runtime, "pinetrie-t-1", async () => ({
+      channel: null,
+      run: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+      bytes: async () => ({
+        ok: true,
+        code: 0,
+        stdout: new Uint8Array(),
+        stderr: "",
+      }),
+      close: async () => {},
+    }))
+    return { seen, handle }
+  }
+  test("asks the container's state only when the caller does not know it", async () => {
+    const asked = counting("stopped")
+    await asked.handle.start()
+    expect(asked.seen).toEqual(["inspect", "start pinetrie-t-1"])
+    const known = counting("stopped")
+    await known.handle.start("running")
+    await known.handle.start("stopped")
+    expect(known.seen).toEqual(["start pinetrie-t-1"])
+  })
 })

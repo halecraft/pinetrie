@@ -1,7 +1,7 @@
-// e2e/lane-runtime — the suites' runtime, Docker (ADR-0103): its CLI, and a
-// lane's container and disks read and removed as the runtime keeps them. The
-// lane VM's Docker on the Mac, the host's on Linux, and a nested lane's
-// rootless one inside a lane.
+// e2e/lane-runtime — the suites' runtime, Docker (ADR-0130): its CLI, and a
+// lane's container and disks read and removed through lanehost, as the host
+// does (ADR-0129). The lane VM's Docker on the Mac, the host's on Linux, and
+// a nested lane's rootless one inside a lane.
 
 import { execFileSync } from "node:child_process"
 import { existsSync } from "node:fs"
@@ -9,12 +9,14 @@ import { homedir } from "node:os"
 import path from "node:path"
 import type { SnapshotId, ThreadId } from "@pinetrie/core"
 import {
-  DISKS_CONTAINER,
+  LANEHOST_LABEL,
   NESTED_MOUNT,
   projectDisks,
   projectKey,
   ROOTLESS_UID,
 } from "@pinetrie/docker"
+import { type LanehostCall, ONCE, serverArgs } from "@pinetrie/lanehost"
+import { PINETRIE_MOUNT, runtimeNode } from "@pinetrie/lanes"
 import { vmStateDir } from "@pinetrie/vm"
 import { planRuntime } from "../host/work/runtime.ts"
 
@@ -54,38 +56,90 @@ export const isRunning = (name: string): boolean =>
 export const containerExists = (name: string): boolean =>
   /^[0-9a-f]{12,}$/.test(quietly(["inspect", "-f", "{{.Id}}", name]).trim())
 
-/** Where a project's disks are on Docker's machine, as its host keeps them. */
-export function dockerDisks(root: string) {
-  const { lanesDir } = planRuntime({
+/** The lanes directory, as a host here keeps it. */
+const lanesDir = () =>
+  planRuntime({
     platform: process.platform,
     nestedMount: existsSync(NESTED_MOUNT),
     stateHome:
       process.env.XDG_STATE_HOME ?? path.join(homedir(), ".local", "state"),
-  })
-  return projectDisks(lanesDir, projectKey(root))
+  }).lanesDir
+
+/** Where a project's disks are on Docker's machine, as its host keeps them. */
+export const dockerDisks = (root: string) =>
+  projectDisks(lanesDir(), projectKey(root))
+
+/** The project's lanehost `disks` container, which its host made; throws when there is none. */
+function disksContainer(root: string): string {
+  const [name] = cli([
+    "ps",
+    "--filter",
+    `label=pinetrie.project=${projectKey(root)}`,
+    "--filter",
+    `label=${LANEHOST_LABEL}=disks`,
+    "--format",
+    "{{.Names}}",
+  ])
+    .split("\n")
+    .filter(l => l.trim() !== "")
+  if (name === undefined)
+    throw new Error(
+      `no lanehost disks container for ${root}: has its host started?`,
+    )
+  return name
 }
 
-/** A script in Docker's disks helper, with `args`; its output, or a failure's. */
-export const inDisks = (script: string, ...args: string[]): string =>
-  quietly(["exec", DISKS_CONTAINER, "sh", "-c", script, "sh", ...args])
+/** One call to lanehost, as the host makes it, through its one-shot command. */
+function lanehostOnce(root: string, call: LanehostCall): unknown {
+  const out = cli([
+    "exec",
+    disksContainer(root),
+    ...runtimeNode(`${PINETRIE_MOUNT}/${ONCE}`),
+    ...serverArgs("disks", lanesDir(), { rootless: existsSync(NESTED_MOUNT) }),
+    JSON.stringify(call),
+  ])
+  return JSON.parse(out) as unknown
+}
+
+/**
+ * A script in the project's lanehost `disks` container, with `args`: for a
+ * check that reads what a snapshot holds. Its output, or a failure's.
+ */
+export const inDisks = (
+  root: string,
+  script: string,
+  ...args: string[]
+): string =>
+  quietly(["exec", disksContainer(root), "sh", "-c", script, "sh", ...args])
 
 /** Whether snapshot `id` of the project at `root` is there. */
 export const snapshotExists = (root: string, id: SnapshotId): boolean =>
-  inDisks('stat -c %i "$1"', dockerDisks(root).snapshot(id)).trim() === "256"
+  lanehostOnce(root, {
+    kind: "snapshotExists",
+    project: projectKey(root),
+    snapshot: id,
+  }) === true
 
 export function deleteSnapshot(root: string, id: SnapshotId): void {
-  inDisks('btrfs -q subvolume delete "$1"', dockerDisks(root).snapshot(id))
+  lanehostOnce(root, {
+    kind: "disk",
+    project: projectKey(root),
+    op: { kind: "deleteSnapshots", ids: [id] },
+  })
 }
 
 /** Remove a lane's container and its disk. */
 export function removeLane(root: string, lane: ThreadId): void {
   quietly(["rm", "-f", container(lane)])
-  const disks = dockerDisks(root)
-  inDisks(
-    'for d in "$@"; do [ ! -e "$d" ] || btrfs -q subvolume delete "$d" 2>/dev/null || rm -rf "$d"; done',
-    disks.lane(lane),
-    disks.nested(lane),
-  )
+  try {
+    lanehostOnce(root, {
+      kind: "disk",
+      project: projectKey(root),
+      op: { kind: "delete", lane },
+    })
+  } catch {
+    // No lanehost: its host never made a disk.
+  }
 }
 
 /**

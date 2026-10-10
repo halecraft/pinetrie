@@ -1,5 +1,5 @@
 #!/bin/sh
-# The lane VM's image (ADR-0103), built as root in an `alpine:<branch>`
+# The lane VM's image (ADR-0130), built as root in an `alpine:<branch>`
 # container: build.sh <this directory> <out>. It writes to <out>:
 # - Image: linux-virt's kernel, uncompressed, as Virtualization boots it;
 # - stage1.cpio: static busybox, the stage 1 modules and `stage1-init`;

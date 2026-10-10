@@ -16,8 +16,9 @@ starts, the scripted model), `lane-hosts.ts` (why the
 suites' runtime cannot run here, `runtimeProblem`; hosts with tools,
 `LaneHosts`; a section's host with accepted work set up, `sectionHost`; a
 lane's shell, `inLane`; `cleanUp`) and `lane-runtime.ts` (the suites'
-runtime's CLI, and a lane's container and disks read and removed as that
-runtime keeps them). A suite's own helpers are beside its scenarios:
+runtime's CLI, and a lane's container and disks read and removed through
+lanehost's one-shot command in the project's `disks` role container, as
+the host does: ADR-0129). A suite's own helpers are beside its scenarios:
 `host/support.ts`, `lanes/support.ts`, `browser/page.ts`.
 
 ## Scenarios
@@ -28,7 +29,7 @@ runtime keeps them). A suite's own helpers are beside its scenarios:
   its own file; one that writes its own spreads `SUITE_CONFIG` into it.
   `startHost` without a `userConfig` would read
   `~/.config/pinetrie/config.json`.
-- **Lanes run on Docker** (ADR-0103): on the Mac against the lane VM, on
+- **Lanes run on Docker** (ADR-0130): on the Mac against the lane VM, on
   Linux against the host's Docker, and inside a pine·trie lane granted
   `lanes.nested` against the lane's rootless Docker, its lanes in
   `/var/lib/pinetrie-lanes`.

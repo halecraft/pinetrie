@@ -1,7 +1,7 @@
 # S39 — a Linux container per lane, with Apple's `container`
 
 - **Status:** Answered
-- **Led to:** ADR-0034, ADR-0103
+- **Led to:** ADR-0034, ADR-0103, ADR-0130
 
 S38 found that rewriting paths in a lane's history cannot make the history
 true: files the fork does not carry, paths the rewrite misses, and state that

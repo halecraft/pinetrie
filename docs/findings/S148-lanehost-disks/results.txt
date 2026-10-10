@@ -1,0 +1,37 @@
+== 2026-10-10T19:25:12Z, VM Docker SecurityOptions: ["name=seccomp,profile=builtin","name=cgroupns"]
+
+== the privileged role, the lanes directory read-only
+write refused: yes
+send -p A A2: ok
+send -p A B: ok
+-- kill a send halfway (LA -> LB, about 25,000 operations)
+killed while running: yes
+its exit: 143
+btrfs processes left: 0
+the same send again: ok
+  took 600 ms
+
+== streams, for fixtures (privileged role)
+total 20
+-rw-r--r-- 1 duane staff  107 Oct 10 13:25 no-change.stream
+-rw-r--r-- 1 duane staff 3570 Oct 10 13:25 turn.dump
+-rw-r--r-- 1 duane staff 2256 Oct 10 13:25 turn.stream
+-rw-r--r-- 1 duane staff   99 Oct 10 13:25 VERSION
+-rw-r--r-- 1 duane staff 2421 Oct 10 13:25 whole.stream
+
+== deleting what the privileged role read (the disks role, flip first)
+WARNING: cannot read subvolume info
+WARNING: cannot read default subvolume id: Operation not permitted
+A: deleted
+WARNING: cannot read subvolume info
+WARNING: cannot read default subvolume id: Operation not permitted
+A2: deleted
+WARNING: cannot read subvolume info
+WARNING: cannot read default subvolume id: Operation not permitted
+B: deleted
+WARNING: cannot read subvolume info
+WARNING: cannot read default subvolume id: Operation not permitted
+LA: deleted
+WARNING: cannot read subvolume info
+WARNING: cannot read default subvolume id: Operation not permitted
+LB: deleted

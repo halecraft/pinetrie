@@ -351,7 +351,7 @@ any refresh they queued.
   for a drain, a drain sends through the commands), as closures that run
   only once both exist.
 
-- **The runtime is Docker** (`work/runtime.ts`, ADR-0103): the lane VM's on
+- **The runtime is Docker** (`work/runtime.ts`, ADR-0130): the lane VM's on
   the Mac and the host's own on Linux (`planRuntime`).
   - **A host with tools that cannot run lanes does not start** (ADR-0102):
     `findProject` returns the refusal as a value, worded with its fix, and
@@ -891,15 +891,15 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 |---|---|
 | `setup.ts` | `Setup`, all of it or none: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once accepted work's names are read, before anything else reads your repo), the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the commands pi's setup loaded), and the base snapshot's refreshes. The project is found before it (`findProject`), since pi's setup loads from its root |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
-| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, `planOldNamesOnDisk`, `pre-rename:`), `beforeRun`, `runEnded` |
+| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, `planOldNamesOnDisk`, `pre-rename:`; a container made anew checks its recipe, `recipe.ts`), `beforeRun`, `runEnded` |
 | `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
-| `turns.ts` | pi's `turnDone`: the turn's revision, snapshot and fetch; the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
-| `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`), its fork (`forkFacts` waits for `pendingRecords`) |
+| `turns.ts` | pi's `turnDone`: the turn's revision, its recipe and snapshot, its whole-disk diff (`classifyDisk`, ADR-0131), and its fetch; the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
+| `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`), its fork (`forkFacts` waits for `pendingRecords`); a fork from a WIP whose recipe's inputs differ from accepted work's starts from a dependency layer of its own (`startSnapshot`, `Setup.depsLayerAt`) |
+| `recipe.ts` | a lane's recipe run again when its inputs change (ADR-0131): the check (`isRecipeTouched`, then `planRecipeCheck` against the key `Setup.keyAt` reads through the lane's jj), then `runRecipe`; and `snapshotOnQueue`, the recipe and a snapshot as one queued step, a turn's and an update's |
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks jj for conflicts in the lane's copy |
 | `split.ts` | a split's prompt, and its end (`finishSplit`, which moves the lane back to its tip even when a step before it throws: left on the stack, the lane refuses every catch-up) |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
 | `runtime.ts` | the composition root, the one place that picks the runtime: gathers, plans (`planRuntime`, `planBuilder` for `pnpm vm:build`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
-| `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed
   after it. Each lane's handle is the registry's. Each coordination set is
@@ -918,6 +918,21 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   update's line and WIP, a new lane's begin and lockfile, the base
   snapshot's line, a split's stack) is a pinned read (`owner.read`), which
   waits on no queue.
+- **A turn's end is its recipe, then its snapshot, then its diff**
+  (`turns.ts`, ADR-0131). The commit is queued and awaited; the recipe (when
+  an input the turn's commit changed has another key than the disk's
+  outputs) and the snapshot are one queued step, not awaited, so the next
+  tool call waits for both and the next request for neither. The diff
+  runs after, between this snapshot and the one before: the newest this
+  host planned for the lane, else the nearest above the turn
+  (`nearestRevision`). Its paths are sorted by `classifyDisk`, the repo's
+  commits between the two snapshots counting as tracked, and the record,
+  written after it, names the ignored ones (`ignoredFiles`) and how the
+  recipe went. A fork waits for pending records, so a branch at a turn
+  waits for its diff: about 3 ms, up to about 600 ms after an install.
+- **An update's recipe runs before its snapshot** (`recordUpdate`), for
+  every input, since a merge may change any; so does a container's, when
+  it is made anew, since it may run another image.
 - **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
   the lane's base from its own history, accepted work and the WIP from your
   repo (pinned), `planUpdateFrom`, the edits committed and `mergeUpdate`

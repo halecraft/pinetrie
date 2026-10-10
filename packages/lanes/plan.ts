@@ -13,13 +13,21 @@ import {
   type BaseMerge,
   baseMessage,
   type CommitId,
+  commitId,
+  DEPS_PREFIX,
+  DISK_OWN_ROOTS,
+  type DiskDiff,
+  depsSnapshot,
   type ForkStart,
   HOST_WORKING_COPY,
   hostPathInLane,
+  isPathInside,
+  isUnderAny,
   isWithin,
   NO_EDITOR,
   type SnapshotId,
   shellWord,
+  snapshotId,
   type ThreadId,
   type ThreadName,
   WORKSPACE_ROOT,
@@ -107,7 +115,7 @@ export const laneContainer = (lane: LaneOwner): string => `pinetrie-${lane}`
 /** What a project lets cross a lane's boundary (ADR-0034), from `pinetrie.json`. */
 export interface LaneGrants {
   readonly ssh: boolean
-  /** Lanes of their own inside each lane: rootless Docker (ADR-0103). */
+  /** Lanes of their own inside each lane: rootless Docker (ADR-0130). */
   readonly nested: boolean
   /** Ports of the Mac's loopback a lane may reach, through the lane VM (S136). */
   readonly hostPorts: readonly number[]
@@ -132,12 +140,20 @@ export const NO_GRANTS: LaneGrants = {
   mounts: [],
 }
 
-/** How the base snapshot installs a project's dependencies. */
-export interface Install {
+/**
+ * How a disk's dependencies are made: what the base's dependency layer runs,
+ * and a lane runs again when its inputs change (ADR-0131).
+ */
+export interface Recipe {
   /** A shell command, run in `/workspace`. */
   readonly command: string
-  /** The file whose change makes the base snapshot install again. */
-  readonly lockfile: string
+  /** Tracked files whose content keys the recipe: its lockfiles. */
+  readonly inputs: readonly string[]
+  /**
+   * Directories carried from one dependency layer to the next, and never
+   * an output: content-addressed caches, such as pnpm's store.
+   */
+  readonly caches: readonly string[]
 }
 
 /** A lane's spec: a thread's, unless `L` says the base's scratch lane. */
@@ -223,9 +239,7 @@ export function planHostMounts(input: {
           ? "it is, or holds, your home directory"
           : isWithin(input.agentDir, root)
             ? "it is, or holds, pi's agent directory"
-            : root.includes(",") && root.includes(":")
-              ? "it has both a comma and a colon, which Docker's mount arguments cannot name"
-              : null
+            : null
     if (reason === null) allowed.push(root)
     else refused.push({ path: root, reason })
   }
@@ -265,7 +279,7 @@ export interface ContainerShape {
   readonly env: Readonly<Record<string, string>>
   /** Your ssh agent, forwarded. */
   readonly ssh: boolean
-  /** Lanes of its own inside it: rootless Docker (ADR-0103). */
+  /** Lanes of its own inside it: rootless Docker (ADR-0130). */
   readonly nested: boolean
   /** Ports of the Mac's loopback it may reach (`LaneGrants.hostPorts`). */
   readonly hostPorts: readonly number[]
@@ -318,15 +332,15 @@ export function planShape(
   }
 }
 
-/** The hash a container is labelled with (`SPEC_LABEL`): of its arguments, without the label. */
-export const specHash = (args: readonly string[]): string =>
-  createHash("sha256").update(args.join("\0")).digest("hex").slice(0, 16)
+/** The hash a container is labelled with (`SPEC_LABEL`): of its spec, without the label. */
+export const specHash = (spec: unknown): string =>
+  createHash("sha256").update(JSON.stringify(spec)).digest("hex").slice(0, 16)
 
 /** The spec hash `runtime` labels `shape`'s container with. */
 export const specHashOf = (
-  runtime: Pick<LaneRuntime, "runArgs">,
+  runtime: Pick<LaneRuntime, "runSpec">,
   shape: ContainerShape,
-): string => specHash(runtime.runArgs(shape))
+): string => specHash(runtime.runSpec(shape))
 
 /**
  * The lane's ignore file: what no repo in a lane may track. pinetrie's own
@@ -342,8 +356,18 @@ export const specHashOf = (
 export const laneGitConfig = (): string =>
   `[safe]\n\tdirectory = ${HOST_WORKING_COPY}\n\tdirectory = ${HOST_WORKING_COPY}/.git\n`
 
-export const laneIgnores = (shared: readonly string[]): string =>
-  ["/.pinetrie-lane/", "/lost+found/", ...shared.map(p => `/${p}/`)]
+export const laneIgnores = (
+  shared: readonly string[],
+  caches: readonly string[] = [],
+): string =>
+  [
+    "/.pinetrie-lane/",
+    "/lost+found/",
+    ...shared.map(p => `/${p}/`),
+    // A recipe's cache is no one's work, and a fresh disk carries it in
+    // before any jj command could track it.
+    ...caches.map(p => `/${p}/`),
+  ]
     .map(l => `${l}\n`)
     .join("")
 
@@ -368,8 +392,8 @@ export const configJson = (read: ConfigRead): unknown =>
 /** A `lanes` key: the project's `pinetrie.json`, or the user's config. */
 export interface LaneConfig {
   readonly grants: LaneGrants
-  /** How the base snapshot installs; null with nothing to install. */
-  readonly install: Install | null
+  /** How a disk's dependencies are made; null with none. */
+  readonly recipe: Recipe | null
   /** Relative paths, as written; `planShared` decides which apply. */
   readonly shared: readonly string[]
   /** How pine·trie uses your repo, as written (`repoConfig` decides). */
@@ -416,8 +440,9 @@ const writtenFlag = (v: unknown): WrittenFlag =>
  * and shares nothing.
  * - A grant's mount source is relative to the project's root, and its target
  *   must be absolute.
- * - The install is `lanes.install` with `lanes.installWhen` (its lockfile),
- *   else pnpm for a repo with a `pnpm-lock.yaml`.
+ * - The recipe is `lanes.install` with `lanes.installWhen` (its lockfile, or
+ *   a list of them) and `lanes.installCaches`, else pnpm's for a repo with
+ *   a `pnpm-lock.yaml`.
  */
 export function decodeLaneConfig(
   json: unknown,
@@ -438,13 +463,20 @@ export function decodeLaneConfig(
     catchUp: writtenFlag(publish.catchUp),
     offers: isRecord(json) && json.offers !== undefined,
   }
-  const pnpm: Install | null = pnpmLock
-    ? { command: "pnpm install --frozen-lockfile", lockfile: "pnpm-lock.yaml" }
+  const pnpm: Recipe | null = pnpmLock
+    ? {
+        command: "pnpm install --frozen-lockfile",
+        inputs: ["pnpm-lock.yaml"],
+        // pnpm keeps its store on the disk it installs on, at the root of
+        // its file system, and refuses a `node_modules` made with another
+        // store (S148): the store stays there, carried by reflink.
+        caches: [".pnpm-store"],
+      }
     : null
   if (!isRecord(lanes))
     return {
       grants: NO_GRANTS,
-      install: pnpm,
+      recipe: pnpm,
       shared: [],
       repo,
       machine: NO_MACHINE,
@@ -476,12 +508,20 @@ export function decodeLaneConfig(
           : [],
       )
     : []
-  const install =
+  const inputs = (
+    typeof lanes.installWhen === "string"
+      ? [lanes.installWhen]
+      : strings(lanes.installWhen)
+  ).filter(p => p !== "")
+  const recipe =
     typeof lanes.install === "string" &&
     lanes.install !== "" &&
-    typeof lanes.installWhen === "string" &&
-    lanes.installWhen !== ""
-      ? { command: lanes.install, lockfile: lanes.installWhen }
+    inputs.length > 0
+      ? {
+          command: lanes.install,
+          inputs,
+          caches: strings(lanes.installCaches).filter(p => p !== ""),
+        }
       : pnpm
   return {
     grants: {
@@ -499,7 +539,7 @@ export function decodeLaneConfig(
       env: strings(lanes.env).filter(n => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n)),
       mounts,
     },
-    install,
+    recipe,
     shared: strings(lanes.shared),
     repo,
     machine,
@@ -989,14 +1029,11 @@ export function planJoins(
  * its parent's change id, and your repo sees a divergent change. A base with
  * several parents is committed once, empty, so the bookmark names one commit.
  * A lane starting on accepted work or a WIP's copy is based on the commit that
- * names it (ADR-0104), installing dependencies when a WIP's lockfile differs
- * from the base disk's, which is accepted work's (`install`).
+ * names it (ADR-0104). Its dependencies are its disk's: a WIP whose recipe's
+ * inputs differ from accepted work's forks from a dependency layer of its
+ * own (ADR-0131).
  */
-export function planForkSetup(
-  lane: ThreadId,
-  start: ForkStart,
-  install: string | null = null,
-): LaneStep[] {
+export function planForkSetup(lane: ThreadId, start: ForkStart): LaneStep[] {
   const base: LaneStep[] =
     start.kind === "accepted"
       ? planAcceptedStart(start.commit)
@@ -1034,7 +1071,6 @@ export function planForkSetup(
     laneShell(
       `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} ${WORKSPACE_ROOT} ${immutable} > ${LANE_JJ_CONFIG}`,
     ),
-    ...(install === null ? [] : [laneShell(install)]),
   ]
 }
 
@@ -1052,12 +1088,17 @@ export const planDisk = (input: {
   readonly spec: LaneSpec<LaneOwner>
   readonly env: Readonly<Record<string, string | undefined>>
   readonly from: SnapshotId | null
+  /** For a new disk: paths copied in from a snapshot first. */
+  readonly carry?: {
+    readonly from: SnapshotId
+    readonly paths: readonly string[]
+  } | null
 }): Step[] => {
   const { lane } = input.spec
   return [
     onRuntime(
       input.from === null
-        ? { kind: "create", lane }
+        ? { kind: "create", lane, carry: input.carry ?? null }
         : { kind: "restore", lane, from: input.from },
     ),
     planStart(input.spec, input.env),
@@ -1140,11 +1181,9 @@ export const planFork = (input: {
   }
   readonly spec: LaneSpec
   readonly env: Readonly<Record<string, string | undefined>>
-  /** The install to run when your `@`'s lockfile differs from the base's. */
-  readonly install?: string | null
 }): Step[] => [
   ...planDisk({ ...input, from: input.point.snapshot }),
-  ...planForkSetup(input.spec.lane, input.point.start, input.install ?? null),
+  ...planForkSetup(input.spec.lane, input.point.start),
 ]
 
 /**
@@ -1213,56 +1252,281 @@ export const planSnapshot = (input: {
   onRuntime({ kind: "snapshot", lane: input.lane, snapshot: input.snapshot }),
 ]
 
-/** What the base snapshot was made from, kept beside it. */
+/**
+ * The version of the steps a dependency layer is built with: in every
+ * `depsKey`, so a change to them builds every layer again.
+ */
+export const BASE_FORMAT = 2
+
+/**
+ * A dependency layer's key: what made it. Its recipe and the content of its
+ * inputs (`inputsHash`), the lane image it ran in, and `BASE_FORMAT`. With
+ * no recipe, a layer is a checkout alone, keyed by the image. Two
+ * disks with one key have the same dependencies, so a layer is built once
+ * per key and never carries anything an older one held (ADR-0131).
+ */
+export function depsKey(input: {
+  /** Null with none: the layer is a checkout alone. */
+  readonly recipe: Recipe | null
+  readonly image: string
+  /** `inputsHash` of the recipe's inputs at the disk's commits; empty with no recipe. */
+  readonly inputs: string
+}): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        BASE_FORMAT,
+        input.image,
+        input.recipe?.command ?? null,
+        input.recipe?.inputs ?? [],
+        input.inputs,
+      ]),
+    )
+    .digest("hex")
+    .slice(0, 16)
+}
+
+/** The files of pine·trie's own a disk holds about itself, under `.pinetrie-lane/`. */
+export const BASE_FILE = "base.json"
+export const DERIVED_FILE = "derived.json"
+
+/** What the base disk is: accepted work's commits on a dependency layer. */
 export interface BaseFacts {
   readonly commits: readonly CommitId[]
-  /** The lockfile's hash when it installed; null with no install. */
-  readonly lock: string | null
+  /** The dependency layer's key. */
+  readonly key: string
+}
+
+/** What a disk's recipe last made, and from what. */
+export interface DerivedFacts {
+  /** The key its outputs were made from; null when none was ever made. */
+  readonly key: string | null
+  /** Paths from `/workspace`, each a recipe's output, removed before it runs again. */
+  readonly outputs: readonly string[]
+  /** The last run failed, with its output's tail: `key` is the run before's. */
+  readonly failed: string | null
+}
+
+/** `base.json` read; null when absent or not one. */
+export function parseBaseFacts(text: string | null): BaseFacts | null {
+  if (text === null) return null
+  try {
+    const raw = JSON.parse(text) as { commits?: unknown; key?: unknown }
+    if (
+      !Array.isArray(raw.commits) ||
+      !raw.commits.every(c => typeof c === "string")
+    )
+      return null
+    if (typeof raw.key !== "string") return null
+    return { commits: raw.commits.map(c => commitId(String(c))), key: raw.key }
+  } catch {
+    return null
+  }
+}
+
+/** `derived.json` read; none made when absent or not one. */
+export function parseDerivedFacts(text: string | null): DerivedFacts {
+  const none: DerivedFacts = { key: null, outputs: [], failed: null }
+  if (text === null) return none
+  try {
+    const raw = JSON.parse(text) as {
+      key?: unknown
+      outputs?: unknown
+      failed?: unknown
+    }
+    return {
+      key: typeof raw.key === "string" ? raw.key : null,
+      outputs: strings(raw.outputs).filter(isOutputPath),
+      failed: typeof raw.failed === "string" ? raw.failed : null,
+    }
+  } catch {
+    return none
+  }
+}
+
+/** An output: a path inside the disk, never pine·trie's or a repo's own. */
+const isOutputPath = (p: string): boolean =>
+  isPathInside(p) && !isUnderAny(p, DISK_OWN_ROOTS)
+
+/**
+ * A recipe's outputs: the topmost paths its run added, never a cache, nor
+ * pine·trie's or a repo's own. On a fresh disk, or after the last outputs
+ * were removed, everything it wrote is under them.
+ */
+export function addedRoots(
+  diff: DiskDiff,
+  caches: readonly string[],
+): readonly string[] {
+  const added = new Set(
+    diff.changes.filter(c => c.change === "added").map(c => c.path),
+  )
+  return [...added]
+    .filter(p => {
+      const slash = p.lastIndexOf("/")
+      return slash < 0 || !added.has(p.slice(0, slash))
+    })
+    .filter(p => isOutputPath(p) && !isUnderAny(p, caches))
+    .sort()
 }
 
 /**
- * Making or refreshing the base snapshot, run in a scratch lane. A new base
- * is `git init` and `jj git init --colocate`, not `jj git clone`: a fresh
- * volume holds `lost+found`, which `jj git clone` refuses (S44 item 6). It then
- * takes accepted work's commit (`yours`) by id and installs. A refresh fetches and
- * moves only when that commit moved, and installs only when the lockfile
- * changed.
- *
- * When the commit was rewritten rather than built on (a line moved with
- * `--ignore-immutable`, or your `@-` before accepted work existed), the fetched ref moves
- * sideways: the import abandons the commit it named, and rebases the base's
- * working-copy commit, a child of it, with `--ignore-working-copy`. The
- * working copy is then stale, and `jj new` refuses until `jj workspace
- * update-stale`, which does nothing when it is not (S74).
+ * Whether a lane's recipe may need to run: a path it reads changed, or
+ * every path when the caller cannot say (a container made anew may run
+ * another image). Only then is the key read.
  */
-export function planBaseRefresh(input: {
-  readonly base: BaseFacts | null
+export const isRecipeTouched = (
+  recipe: Recipe,
+  touched: readonly string[] | "all",
+): boolean => touched === "all" || touched.some(p => recipe.inputs.includes(p))
+
+/**
+ * Whether the recipe runs: the disk's outputs were made from another key,
+ * or never made. A failed run keeps the key before it, so it runs again.
+ */
+export const planRecipeCheck = (
+  derived: DerivedFacts,
+  key: string,
+): "run" | "none" => (derived.key === key ? "none" : "run")
+
+/** What `planRecipe` plans: the steps before its command, the command, and the steps after. */
+export interface RecipeSteps {
+  readonly before: readonly Step[]
+  readonly command: LaneStep
+  readonly after: readonly Step[]
+}
+
+/**
+ * A recipe's run on `lane`, before the diff that says what it made: its
+ * recorded outputs removed (none on a fresh disk), a read-only snapshot
+ * `pre`, the command, a read-only snapshot `post`. The command may fail:
+ * `post` is taken all the same, so its outputs are known and removed at the
+ * next run.
+ */
+export function planRecipe(input: {
+  readonly lane: LaneOwner
+  readonly recipe: Recipe
+  readonly outputs: readonly string[]
+  readonly pre: SnapshotId
+  readonly post: SnapshotId
+}): RecipeSteps {
+  const remove = input.outputs.filter(isOutputPath)
+  return {
+    before: [
+      ...(remove.length === 0
+        ? []
+        : [
+            laneShell(
+              `rm -rf -- ${remove.map(o => shellWord(`${WORKSPACE_ROOT}/${o}`)).join(" ")}`,
+            ),
+          ]),
+      ...planSnapshot({ lane: input.lane, snapshot: input.pre }),
+    ],
+    command: laneShell(input.recipe.command),
+    after: planSnapshot({ lane: input.lane, snapshot: input.post }),
+  }
+}
+
+/** A JSON value written to `.pinetrie-lane/<file>` on the lane's disk. */
+const writeLaneFile = (file: string, value: unknown): LaneStep =>
+  laneShell(
+    `mkdir -p ${LANE_CONFIG_DIR} && printf %s ${shellWord(JSON.stringify(value))} > ${LANE_CONFIG_DIR}/${file}`,
+  )
+
+/**
+ * After a recipe's run and its diff: what it made (`facts`), and the steps
+ * that record it on the disk (`derived.json`) and delete the two snapshots. A failed run keeps the
+ * key the disk had, so the next check runs it again, and records its
+ * outputs all the same, so that run removes them first.
+ */
+export function planRecipeRecord(input: {
+  readonly diff: DiskDiff
+  readonly recipe: Recipe
+  /** The key the run was for. */
+  readonly key: string
+  /** The disk's key before the run. */
+  readonly previous: string | null
+  /** Null when the command succeeded, else its output's tail. */
+  readonly failed: string | null
+  readonly pre: SnapshotId
+  readonly post: SnapshotId
+}): { readonly facts: DerivedFacts; readonly steps: readonly Step[] } {
+  const facts: DerivedFacts = {
+    key: input.failed === null ? input.key : input.previous,
+    outputs: addedRoots(input.diff, input.recipe.caches),
+    failed: input.failed,
+  }
+  return {
+    facts,
+    steps: [
+      writeLaneFile(DERIVED_FILE, facts),
+      onRuntime({ kind: "deleteSnapshots", ids: [input.pre, input.post] }),
+    ],
+  }
+}
+
+/**
+ * A base's checkout of accepted work's commits (`yours`), by id. On a fresh
+ * disk, `git init` and `jj git init --colocate` first, not `jj git clone`: a
+ * fresh volume holds `lost+found`, which `jj git clone` refuses (S44 item 6).
+ *
+ * On a disk restored from a dependency layer made at other commits, the
+ * fetched ref moves sideways when your `@-` was rewritten rather than built
+ * on: the import abandons the commit it named, and rebases the working-copy
+ * commit, a child of it, with `--ignore-working-copy`. The working copy is
+ * then stale, and `jj new` refuses until `jj workspace update-stale`, which
+ * does nothing when it is not (S74).
+ */
+export function planBaseCheckout(input: {
   readonly yours: readonly CommitId[]
-  readonly lock: string | null
-  readonly install: Install | null
+  readonly fresh: boolean
 }): readonly LaneStep[] {
-  const { base, yours, install } = input
-  const init =
-    base === null
-      ? [inLane("git", "init", "-q"), inLane("jj", "git", "init", "--colocate")]
-      : []
-  const moved =
-    base === null ||
-    base.commits.length !== yours.length ||
-    base.commits.some((c, i) => c !== yours[i])
-  const installs =
-    install !== null && (base === null || base.lock !== input.lock)
   return [
-    ...init,
-    ...(moved
-      ? [
-          fetchById(yours),
-          inLane("jj", "workspace", "update-stale"),
-          inLane("jj", "new", ...yours),
-        ]
+    ...(input.fresh
+      ? [inLane("git", "init", "-q"), inLane("jj", "git", "init", "--colocate")]
       : []),
-    ...(installs ? [laneShell(install.command)] : []),
+    fetchById(input.yours),
+    ...(input.fresh ? [] : [inLane("jj", "workspace", "update-stale")]),
+    inLane("jj", "new", ...input.yours),
   ]
+}
+
+/** The base's facts, written on its disk before it is snapshotted. */
+export const planBaseFacts = (facts: BaseFacts): LaneStep =>
+  writeLaneFile(BASE_FILE, facts)
+
+/**
+ * Whether the base disk holds `yours` on the layer `key` names: then a
+ * refresh does nothing.
+ */
+export const isBaseCurrent = (
+  base: BaseFacts | null,
+  yours: readonly CommitId[],
+  key: string,
+): boolean =>
+  base !== null &&
+  base.key === key &&
+  base.commits.length === yours.length &&
+  base.commits.every((c, i) => c === yours[i])
+
+/**
+ * Which dependency layers go: every one but the base's and the three newest.
+ * A fork copies a layer when it starts, so a layer serves only forks to
+ * come, and one deleted is built again from its key when one needs it.
+ */
+export function planDepsRetention(input: {
+  readonly snapshots: readonly { readonly id: string; readonly made: number }[]
+  readonly keep: readonly string[]
+}): readonly SnapshotId[] {
+  const layers = input.snapshots
+    .filter(s => s.id.startsWith(DEPS_PREFIX))
+    .sort((a, b) => b.made - a.made)
+  const kept = new Set([
+    ...input.keep.map(k => depsSnapshot(k)),
+    ...layers.slice(0, 3).map(s => s.id),
+  ])
+  return layers
+    .filter(s => !kept.has(s.id as SnapshotId))
+    .map(s => snapshotId(s.id))
 }
 
 /** A project's root for lanes, or why its folder cannot have them. */

@@ -7,7 +7,89 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
 const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
-  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  {
+    name: "a recipe runs over the outputs of the run before",
+    file: plan,
+    from: "  const remove = input.outputs.filter(isOutputPath)\n",
+    to: "  const remove: string[] = []\n",
+    command: unit,
+    expect:
+      "planRecipe: the recorded outputs removed before the snapshot and the command",
+  },
+  {
+    name: "a recipe's cache is one of its outputs",
+    file: plan,
+    from: "    .filter(p => isOutputPath(p) && !isUnderAny(p, caches))\n",
+    to: "    .filter(p => isOutputPath(p))\n",
+    command: unit,
+    expect:
+      "addedRoots: the topmost paths a run added, never a cache nor a repo's own",
+  },
+  {
+    name: "a dependency layer's key leaves out its inputs",
+    file: plan,
+    from: "        input.inputs,\n      ]),\n",
+    to: "      ]),\n",
+    command: unit,
+    expect: "depsKey: what made a layer, its caches not among it",
+  },
+  {
+    name: "a send stream's orphan stands for nothing",
+    file: "packages/lanehost/send-stream.ts",
+    from: "        } else if (ORPHAN.test(pathTo)) orphans.set(pathTo, resolve(path))\n",
+    to: "        } else if (ORPHAN.test(pathTo)) orphans.set(pathTo, null)\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
+    expect: "a deleted directory resolves to its original path",
+  },
+  {
+    name: "a diff is send's under rootless Docker",
+    file: "packages/lanehost/roles.ts",
+    from: '    ["diff", facts.rootless ? "disks" : "privileged"],\n',
+    to: '    ["diff", "privileged"],\n',
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
+    expect:
+      "a diff is send's, in the privileged role, unless Docker is rootless",
+  },
+  {
+    name: "a lane's start asks its state again after the caller read it",
+    file: "packages/lanes/lane.ts",
+    from: "      const state = known ?? (await runtime.containerFacts(container)).state\n",
+    to: "      const state = (await runtime.containerFacts(container)).state\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
+    expect: "asks the container's state only when the caller does not know it",
+  },
+  // ── the lanes suite, proven in a lane (ADR-0130) ──
+  {
+    name: "a base is the base before it, checked out again",
+    file: "packages/lanes/base.ts",
+    from: "  await inScratch(input, { from: layer, carry: null }, async runners => {\n",
+    to: "  const old = (await runtime.snapshotExists(BASE_SNAPSHOT)) ? BASE_SNAPSHOT : layer\n  await inScratch(input, { from: old, carry: null }, async runners => {\n",
+    suite: "lanes",
+    scenario: "recipe",
+    expect:
+      "a package deleted from accepted work leaves no output of its own in the next fork",
+  },
+  {
+    name: "a turn that changes the recipe's inputs runs no recipe",
+    file: "apps/pinetrie/host/work/turns.ts",
+    from: '            merged ? "all" : changed,\n',
+    to: "            [],\n",
+    suite: "lanes",
+    scenario: "recipe",
+    expect:
+      "a package deleted in a lane leaves no output of its own in a branch from that turn",
+  },
+  {
+    name: "every path a turn changed counts as tracked",
+    file: "packages/rules/work.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "      tracked.has(path) || [...tracked].some(t => t.startsWith(`${path}/`))\n",
+    to: "      true\n",
+    suite: "lanes",
+    scenario: "recipe",
+    expect:
+      "a turn's record names the ignored files it wrote, and no recipe output",
+  },
   {
     name: "a fork's inherited history is not made immutable",
     file: "packages/lanes/plan.ts",
@@ -251,8 +333,8 @@ export const mutations: readonly Mutation[] = [
     name: "the lane's ignore file leaves out the shared directories",
     file: plan,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  ["/.pinetrie-lane/", "/lost+found/", ...shared.map(p => `/${p}/`)]',
-    to: '  ["/.pinetrie-lane/", "/lost+found/"]',
+    from: "    ...shared.map(p => `/${p}/`),\n",
+    to: "",
     command: unit,
     expect: "every repo in the lane ignores what the ignore file lists",
   },
@@ -444,10 +526,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the spec label hashes the shape's name, not the runtime's arguments",
     file: plan,
-    from: "): string => specHash(runtime.runArgs(shape))",
+    from: "): string => specHash(runtime.runSpec(shape))",
     to: "): string => specHash([shape.name])",
     command: unit,
-    expect: "specHashOf: the hash of the runtime's arguments",
+    expect: "specHashOf: the hash of the runtime's spec",
   },
   {
     name: "a runtime with jj alone is taken as complete",
@@ -538,15 +620,5 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "every repo in the lane ignores what the ignore file lists, through git's own variables",
-  },
-  {
-    name: "(Linux) the base's facts are written into a directory nothing made",
-    file: "packages/lanes/base.ts",
-    from: "    await mkdir(path.dirname(factsFile(root)), { recursive: true })\n",
-    to: "",
-    suite: "lanes",
-    scenario: "catch-up",
-    expect:
-      "a catch_up mid-run merges accepted work, and a branch at its turn has accepted work's file",
   },
 ]

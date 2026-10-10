@@ -5,6 +5,23 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a turn's whole-disk diff (ADR-0131) ──
+  {
+    name: "a recipe's outputs count as ignored files",
+    file: "packages/rules/work.ts",
+    from: "          : isUnderAny(path, input.outputs)\n",
+    to: "          : false\n",
+    command: unit,
+    expect: "tracked, own, derived, cache, and the ignored rest",
+  },
+  {
+    name: "a directory's ignored files are each listed",
+    file: "packages/rules/work.ts",
+    from: "      return slash < 0 || !set.has(p.slice(0, slash))\n",
+    to: "      return slash < 0 || true\n",
+    command: unit,
+    expect: "ignoredFiles: the topmost, sorted",
+  },
   // ── a card's content as stored (ADR-0126) ──
   // ── threads opened before their first entry (ADR-0126) ──
   {
@@ -172,7 +189,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a lane's copy of its own is stored as its work, as records before ADR-0102 hold it",
   },
-  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  // ── the lanes suite, proven in a lane (ADR-0130) ──
   {
     name: "a fork at a turn starts from the base snapshot",
     file: "packages/rules/work.ts",

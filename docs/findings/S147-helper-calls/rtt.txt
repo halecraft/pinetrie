@@ -1,0 +1,19 @@
+socket /Users/duane/.local/state/pinetrie/vm/docker.sock, helper pinetrie-disks, 2026-10-10T18:24:22.075Z
+host Darwin 25.6.0 arm64, node v24.19.0
+
+== the bridge alone
+API GET /_ping                          mean 0.22  p50 0.19  p90 0.26  min 0.14 ms  (n=200)
+API GET /containers/<helper>/json      mean 0.21  p50 0.23  p90 0.27  min 0.14 ms  (n=100)
+CLI docker version                     mean 13.47  p50 13.43  p90 13.90  min 12.96 ms  (n=20)
+CLI docker inspect <helper>            mean 11.12  p50 11.09  p90 11.76  min 10.62 ms  (n=20)
+
+== a call that does nothing (`true`)
+CLI docker exec (what the host does)   mean 25.96  p50 25.79  p90 26.70  min 25.30 ms  (n=30)
+API exec create + start + inspect      mean 13.95  p50 13.86  p90 14.68  min 13.35 ms  (n=30)
+held exec -i, echo a line              mean 0.22  p50 0.21  p90 0.24  min 0.19 ms  (n=500)
+held exec -i, fork `true` in it       mean 0.44  p50 0.43  p90 0.52  min 0.37 ms  (n=200)
+
+== a real disk operation: snapshot a subvolume, then delete it
+CLI docker exec                        mean 28.48  p50 28.61  p90 29.46  min 27.33 ms  (n=30)
+API exec                               mean 15.55  p50 15.64  p90 16.43  min 14.33 ms  (n=30)
+held exec -i, forked in it             mean 3.31  p50 3.15  p90 4.08  min 2.34 ms  (n=100)

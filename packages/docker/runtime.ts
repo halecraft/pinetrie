@@ -1,86 +1,112 @@
-// docker/runtime — Docker as a `LaneRuntime` (ADR-0103): the facts, plan and
-// CLI modules composed. One code path for the Mac, through the launcher's
+// docker/runtime — Docker as a `LaneRuntime` (ADR-0130): the facts, plan,
+// API and CLI modules composed, and lanehost's roles for the disks
+// (ADR-0129). One code path for the Mac, through the launcher's
 // socket and the host's slot, and for Linux, inside a lane or not.
 
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
-import path from "node:path"
+import { openChannel } from "@pinetrie/channel"
 import {
-  type LaneOwner,
+  LANEHOST_CONTAINERFILE,
+  type LanehostChannel,
+  lanehostClient,
+  projectDisks,
+  type Role,
+  SERVER,
+  serverArgs,
+} from "@pinetrie/lanehost"
+import {
   type LaneRuntime,
+  type Mount,
+  PINETRIE_MOUNT,
   planContainer,
-  SPEC_LABEL,
+  RUNTIME_MOUNT,
+  runtimeNode,
   specHash,
 } from "@pinetrie/lanes"
 import {
-  buildImage,
-  docker,
-  dockerArgv,
-  dockerOrThrow,
+  apiMessage,
+  createNetwork,
+  imageEnv,
   imageExists,
-  imagePath,
-  inDisks,
-  runInImage,
-} from "./cli.ts"
-import { containerFacts, hostPathExists, listLabelled } from "./facts.ts"
+  inspectContainer,
+  listLabelled,
+  networkExists,
+  networkSubnet,
+  removeContainer,
+  removeNetwork,
+  runContainer,
+  startContainer,
+  stopContainer,
+} from "./api.ts"
+import { buildImage, dockerArgv, runInImage } from "./cli.ts"
+import { dockerRootless, hostPathExists } from "./facts.ts"
 import {
-  DISKS_CONTAINER,
-  isSubvolume,
+  type ContainerSpec,
+  imagePathOf,
   labelled,
+  lanehostContainer,
   PROJECT_LABEL,
-  planDiskCommand,
-  planDisksHelper,
-  planHostPortRules,
-  planNestedDisk,
-  planProjectRecord,
   planProjectSweep,
   planSlotSweep,
-  projectDisks,
   projectKey,
   projectNetwork,
+  renderHelper,
   renderRun,
   SLOT_LABEL,
-  subvolumeCheck,
 } from "./plan.ts"
 import { NESTED_PROFILE } from "./seccomp-nested.ts"
 import type { DockerTarget } from "./target.ts"
 
-const DISKS_FILE = path.join(import.meta.dirname, "disks.Containerfile")
+/** The project's lanes' network, labelled with it for the sweep. */
+async function ensureNetwork(target: DockerTarget, key: string): Promise<void> {
+  const network = projectNetwork(key)
+  if (await networkExists(target, network)) return
+  const made = await createNetwork(target, network, { [PROJECT_LABEL]: key })
+  // Another host of the project may have made it at the same moment.
+  if (made.status >= 300 && !(await networkExists(target, network)))
+    throw new Error(`docker network create ${network}: ${apiMessage(made)}`)
+}
 
-/** A container made from `args`, labelled with their hash, as `planContainer` decides. */
+/** A container made from `spec`, labelled with its hash, as `planContainer` decides. */
 async function ensureContainer(
   target: DockerTarget,
-  name: string,
-  args: readonly string[],
+  spec: ContainerSpec,
 ): Promise<void> {
-  const want = specHash(args)
+  const want = specHash(spec)
   const decided = planContainer({
-    facts: await containerFacts(target, name),
+    facts: await inspectContainer(target, spec.name),
     want,
   })
   if (decided === "running") return
   if (decided === "start") {
-    await dockerOrThrow(target, ["start", name])
+    await startContainer(target, spec.name)
     return
   }
-  if (decided === "recreate") await docker(target, ["rm", "-f", name])
-  const made = await docker(target, labelled(args, `${SPEC_LABEL}=${want}`))
+  if (decided === "recreate") await removeContainer(target, spec.name)
+  const made = await runContainer(target, labelled(spec, want))
   // Another host may have made it at the same moment.
-  if (!made.ok && (await containerFacts(target, name)).label !== want)
-    throw new Error(`docker run ${name} failed: ${made.stderr.trim()}`)
+  if (
+    made.status >= 300 &&
+    (await inspectContainer(target, spec.name)).label !== want
+  )
+    throw new Error(`docker run ${spec.name} failed: ${apiMessage(made)}`)
 }
 
 export interface DockerRuntime extends LaneRuntime {
   /**
-   * The containers and disks of every project whose root is gone, as the
-   * suites' throwaway projects are. Returns the projects' keys.
+   * Where lanehost's server runs from: the mounts every lane gets, whose
+   * targets are pine·trie's install and the lane runtime. Until then a disk
+   * operation is refused, since a role's container mounts both.
+   */
+  serveFrom(mounts: readonly Mount[]): void
+  /**
+   * This project's root recorded beside its disks and its lanes' network
+   * made, then the containers and disks of every project whose root is
+   * gone, as the suites' throwaway projects are. Returns the gone projects'
+   * keys.
    */
   sweepProjects(): Promise<readonly string[]>
-  /**
-   * pre-docker: a host command that reads a tar on its stdin into `lane`'s
-   * disk, which must exist (`create`).
-   */
-  importArgv(lane: LaneOwner): readonly string[]
   /**
    * The project's grant of the host's ports (`lanes.hostPorts`), in the
    * lane VM's firewall, replacing the last. False where the target has no
@@ -88,9 +114,9 @@ export interface DockerRuntime extends LaneRuntime {
    */
   grantHostPorts(ports: readonly number[]): Promise<boolean>
   /**
-   * The VM started again (a new lease): the disks helper and the project's
-   * network are made again at the next disk operation, as they were at the
-   * first.
+   * The VM started again (a new lease): lanehost's channels are closed, and
+   * its containers and the project's network are made again at the next
+   * call that needs them, as they were at the first.
    */
   vmRestarted(): void
 }
@@ -102,197 +128,198 @@ export function dockerRuntime(input: {
   readonly lanesDir: string
   /** The project's root on the host. */
   readonly root: string
+  /** Where each call to lanehost is logged; none in the suites' own runtimes. */
+  readonly log?: (line: string) => void
 }): DockerRuntime {
   const { target, lanesDir, root } = input
   const key = projectKey(root)
   const disks = projectDisks(lanesDir, key)
-  const runArgs = (shape: Parameters<LaneRuntime["runArgs"]>[0]) =>
+  const runSpec = (shape: Parameters<LaneRuntime["runSpec"]>[0]) =>
     renderRun(shape, { target, disks, project: key, seccomp: NESTED_PROFILE })
+  const execArgv = (container: string, argv: readonly string[]) => [
+    ...dockerArgv(target),
+    "exec",
+    "-i",
+    container,
+    ...argv,
+  ]
 
-  const disksTag = readFile(DISKS_FILE, "utf8").then(
+  const lanehostTag = readFile(LANEHOST_CONTAINERFILE, "utf8").then(
     content =>
-      `pinetrie-disks:${createHash("sha256").update(content).digest("hex").slice(0, 12)}`,
+      `pinetrie-lanehost:${createHash("sha256").update(content).digest("hex").slice(0, 12)}`,
   )
-  async function startHelper(): Promise<void> {
-    const tag = await disksTag
-    if (!(await imageExists(target, tag)))
-      await buildImage(target, { file: DISKS_FILE, tag, buildArgs: [] })
-    // The project's lanes' network, labelled for the sweep.
-    const network = projectNetwork(key)
-    if (!(await docker(target, ["network", "inspect", network])).ok) {
-      const made = await docker(target, [
-        "network",
-        "create",
-        "--label",
-        `${PROJECT_LABEL}=${key}`,
-        network,
-      ])
-      // Another host of the project may have made it at the same moment.
-      if (
-        !made.ok &&
-        !(await docker(target, ["network", "inspect", network])).ok
-      )
-        throw new Error(
-          `docker network create ${network}: ${made.stderr.trim()}`,
-        )
-    }
-    await ensureContainer(
-      target,
-      DISKS_CONTAINER,
-      planDisksHelper(lanesDir, tag),
-    )
-    await disksOrThrow(planProjectRecord(disks, root), false)
-  }
-  let helper: Promise<void> | null = null
-  /** The helper, started once per runtime; a failed start is tried again next time. */
-  const helperReady = (): Promise<void> => {
-    if (helper === null) {
-      const started = startHelper()
-      helper = started
-      started.catch(() => {
-        helper = null
+  /** The image, built once per runtime; a failed build is tried again. */
+  let built: Promise<string> | null = null
+  const lanehostImage = (): Promise<string> => {
+    if (built === null) {
+      const building = lanehostTag.then(async tag => {
+        if (!(await imageExists(target, tag)))
+          await buildImage(target, {
+            file: LANEHOST_CONTAINERFILE,
+            tag,
+            buildArgs: [],
+          })
+        return tag
+      })
+      built = building
+      building.catch(() => {
+        built = null
       })
     }
-    return helper
+    return built
   }
-  async function disksOrThrow(argv: readonly string[], wait = true) {
-    if (wait) await helperReady()
-    const ran = await inDisks(target, argv)
-    if (!ran.ok)
+  let serving: { install: string; runtime: string } | null = null
+  let rootless: Promise<boolean> | null = null
+  const facts = async () => {
+    rootless ??= dockerRootless(target)
+    return { rootless: await rootless }
+  }
+  async function openRole(role: Role): Promise<LanehostChannel> {
+    if (serving === null)
       throw new Error(
-        `a disk operation failed (exit ${ran.code}): ${ran.stderr.trim().split("\n")[0] ?? ""}`,
+        "lanehost cannot start yet: setup has not named pine·trie's install and the lane runtime",
       )
-    return ran
+    const name = lanehostContainer(role, key, target)
+    const shape = {
+      role,
+      project: key,
+      image: await lanehostImage(),
+      lanesDir,
+      ...serving,
+    }
+    await ensureContainer(target, renderHelper(shape, target))
+    return openChannel(
+      execArgv(name, [
+        ...runtimeNode(`${PINETRIE_MOUNT}/${SERVER}`),
+        ...serverArgs(role, lanesDir, await facts()),
+      ]),
+      `lanehost's ${role} role`,
+    )
   }
-  /** A project's grant rules, in a throwaway container on the VM's own network. */
+  const lanehost = lanehostClient({
+    open: openRole,
+    facts,
+    ...(input.log === undefined ? {} : { log: input.log }),
+  })
+
+  /** The project's lanes' network, labelled for the sweep; made once per VM. */
+  let network: Promise<void> | null = null
+  const projectNetworkReady = (): Promise<void> => {
+    if (network === null) {
+      const making = ensureNetwork(target, key)
+      network = making
+      making.catch(() => {
+        network = null
+      })
+    }
+    return network
+  }
+
+  /** A project's grant rules, by lanehost's privileged role on the VM's own network. */
   async function firewall(
     k: string,
     subnet: string,
     ports: readonly number[],
   ): Promise<void> {
     if (target.hostAddress === null) return
-    await dockerOrThrow(target, [
-      "run",
-      "--rm",
-      "--network",
-      "host",
-      "--cap-add",
-      "NET_ADMIN",
-      "--cap-add",
-      "NET_RAW",
-      await disksTag,
-      ...planHostPortRules({
-        key: k,
-        subnet,
-        hostAddress: target.hostAddress,
-        ports,
-      }),
-    ])
-  }
-  const subvolumeAt = async (at: string) => {
-    await helperReady()
-    const ran = await inDisks(target, subvolumeCheck(at))
-    return ran.ok && isSubvolume(ran.stdout)
+    await lanehost.call({
+      kind: "grant",
+      project: k,
+      subnet,
+      hostAddress: target.hostAddress,
+      ports,
+    })
   }
 
   return {
+    serveFrom(mounts) {
+      const at = (where: string) => mounts.find(m => m.target === where)?.source
+      const install = at(PINETRIE_MOUNT)
+      const runtime = at(RUNTIME_MOUNT)
+      if (install === undefined || runtime === undefined)
+        throw new Error(
+          `lanehost runs from the mounts at ${PINETRIE_MOUNT} and ${RUNTIME_MOUNT}, and setup gave none`,
+        )
+      serving = { install, runtime }
+    },
     disk: async op => {
-      await disksOrThrow(planDiskCommand(op, disks))
+      await lanehost.call({ kind: "disk", project: key, op })
     },
-    diskExists: lane => subvolumeAt(disks.lane(lane)),
-    snapshotExists: id => subvolumeAt(disks.snapshot(id)),
-    runArgs,
+    diskExists: lane =>
+      lanehost.call({ kind: "diskExists", project: key, lane }),
+    snapshotExists: id =>
+      lanehost.call({ kind: "snapshotExists", project: key, snapshot: id }),
+    diff: (from, to) => lanehost.call({ kind: "diff", project: key, from, to }),
+    snapshots: () => lanehost.call({ kind: "snapshots", project: key }),
+    readLaneFile: (snapshot, file) =>
+      lanehost.call({ kind: "read", project: key, snapshot, file }),
+    runSpec,
     async run(shape) {
-      if (shape.nested) await disksOrThrow(planNestedDisk(disks, shape.lane))
-      const args = runArgs(shape)
-      await dockerOrThrow(
-        target,
-        labelled(args, `${SPEC_LABEL}=${specHash(args)}`),
-      )
+      if (shape.nested)
+        await lanehost.call({
+          kind: "nestedDisk",
+          project: key,
+          lane: shape.lane,
+        })
+      await projectNetworkReady()
+      const spec = runSpec(shape)
+      const made = await runContainer(target, labelled(spec, specHash(spec)))
+      if (made.status >= 300)
+        throw new Error(`docker run ${spec.name} failed: ${apiMessage(made)}`)
     },
-    containerFacts: name => containerFacts(target, name),
+    containerFacts: name => inspectContainer(target, name),
     async start(name) {
-      await dockerOrThrow(target, ["start", name])
+      await startContainer(target, name)
     },
     // Docker's disk needs nothing after a stop: btrfs frees what a lane deletes.
     async stop(name) {
-      await docker(target, ["stop", name])
+      await stopContainer(target, name)
     },
     async remove(name) {
-      await docker(target, ["rm", "-f", name])
+      await removeContainer(target, name)
     },
-    execArgv: (container, argv) => [
-      ...dockerArgv(target),
-      "exec",
-      "-i",
-      container,
-      ...argv,
-    ],
+    execArgv,
     imageExists: tag => imageExists(target, tag),
     buildImage: plan => buildImage(target, plan),
-    imagePath: tag => imagePath(target, tag),
+    imagePath: async tag => imagePathOf(await imageEnv(target, tag)),
     runInImage: (tag, argv) => runInImage(target, tag, argv),
-    importArgv: lane => [
-      ...dockerArgv(target),
-      "exec",
-      "-i",
-      DISKS_CONTAINER,
-      "tar",
-      "-xpf",
-      "-",
-      "-C",
-      disks.lane(lane),
-    ],
     async sweepProjects() {
-      const listed = await disksOrThrow([
-        "sh",
-        "-c",
-        'for d in "$1"/projects/*/; do [ -d "$d" ] || continue; printf "%s\\t%s\\n" "$(basename "$d")" "$(cat "$d/root" 2>/dev/null)"; done',
-        "sh",
-        lanesDir,
-      ])
+      await lanehost.call({ kind: "record", project: key, root })
+      // Made at startup, so no lane's start waits for it.
+      await projectNetworkReady()
       const projects = []
-      for (const line of listed.stdout.split("\n")) {
-        const [k, r] = line.split("\t")
-        if (k === undefined || k === "" || k === key) continue
+      for (const p of await lanehost.call({ kind: "projects" })) {
+        if (p.key === key) continue
         projects.push({
-          key: k,
-          rootExists: r !== undefined && r !== "" && (await hostPathExists(r)),
+          key: p.key,
+          rootExists: p.root !== null && (await hostPathExists(p.root)),
         })
       }
       const planned = planProjectSweep({
         projects,
         containers: await listLabelled(target, PROJECT_LABEL),
       })
-      for (const name of planned.containers)
-        await docker(target, ["rm", "-f", name])
+      for (const name of planned.containers) await removeContainer(target, name)
       for (const k of planned.projects) {
-        await docker(target, ["network", "rm", projectNetwork(k)])
+        await removeNetwork(target, projectNetwork(k))
         await firewall(k, "", [])
-        await disksOrThrow([
-          "sh",
-          "-c",
-          'cd "$1" && for s in */*/; do btrfs -q subvolume delete "$s" 2>/dev/null || true; done; cd / && rm -rf "$1"',
-          "sh",
-          projectDisks(lanesDir, k).dir,
-        ])
+        await lanehost.call({ kind: "removeProject", project: k })
       }
       return planned.projects
     },
     vmRestarted() {
-      helper = null
+      lanehost.reset()
+      built = null
+      network = null
     },
     async grantHostPorts(ports) {
       if (target.hostAddress === null) return false
-      await helperReady()
-      const inspected = await dockerOrThrow(target, [
-        "network",
-        "inspect",
-        "-f",
-        "{{(index .IPAM.Config 0).Subnet}}",
-        projectNetwork(key),
-      ])
-      await firewall(key, inspected.stdout.trim(), ports)
+      await projectNetworkReady()
+      await firewall(
+        key,
+        await networkSubnet(target, projectNetwork(key)),
+        ports,
+      )
       return true
     },
   }
@@ -310,6 +337,6 @@ export async function sweepSlot(
     slot,
     await listLabelled(target, `${SLOT_LABEL}=${slot}`),
   )
-  for (const name of names) await docker(target, ["rm", "-f", name])
+  for (const name of names) await removeContainer(target, name)
   return names
 }

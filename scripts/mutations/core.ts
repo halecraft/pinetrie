@@ -45,7 +45,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "invites add, in the order invited, and a fact removes",
   },
-  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  // ── the lanes suite, proven in a lane (ADR-0130) ──
   {
     name: "an offer's message names its thread under another key",
     file: "packages/core/trailers.ts",

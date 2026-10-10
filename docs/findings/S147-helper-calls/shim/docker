@@ -1,0 +1,29 @@
+#!/bin/zsh
+# A `docker` that logs each call the host makes, then runs the real one
+# (thread smart-dolphin). Start the host with this directory first on PATH:
+#   PATH="$PWD/.plans/helper-probes/shim:$PATH" pnpm host
+# Each call appends a line to ../docker-calls.tsv:
+#   start (epoch s)  ms  exit  args (without -H)
+# A held `exec -i` (a lane's channel) is logged when it starts, with ms -1,
+# and replaced by the real docker so its input and signals are untouched.
+zmodload zsh/datetime
+self=${0:A:h}
+log=$self/../docker-calls.tsv
+path=(${path:#$self})
+real=$(whence -p docker) || { print -u2 "shim: no docker on PATH"; exit 127; }
+
+args=("$@")
+[[ $args[1] == -H ]] && args=("${(@)args[3,-1]}")
+line=${(j: :)${(q-)args}}
+
+if [[ $args[1] == exec && ($args[2] == -i || $args[2] == --interactive) ]]; then
+  print -r -- "$EPOCHREALTIME	-1	-	$line" >> $log
+  exec $real "$@"
+fi
+
+t0=$EPOCHREALTIME
+$real "$@"
+rc=$?
+t1=$EPOCHREALTIME
+printf '%s\t%.1f\t%s\t%s\n' $t0 $(( (t1 - t0) * 1000 )) $rc "$line" >> $log
+exit $rc

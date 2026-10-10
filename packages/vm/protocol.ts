@@ -1,5 +1,5 @@
 // vm/protocol — the lease's messages on the launcher's control.sock, one JSON
-// object a line (ADR-0103). The launcher's side is `launcher/launcher.swift`.
+// object a line (ADR-0130). The launcher's side is `launcher/launcher.swift`.
 
 /** A directory of a host's slot: the name it has under `/mnt/host-shares/<slot>/`. */
 export interface ShareEntry {

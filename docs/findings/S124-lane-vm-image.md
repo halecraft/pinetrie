@@ -1,7 +1,7 @@
 # S124 — The Alpine ISO boots fastest (15 s): Docker is not reinstalled at boot, and the time goes before ssh answers; the cloud image and a clone of it take 27 s
 
 - **Status:** Answered
-- **Led to:** ADR-0102, ADR-0103
+- **Led to:** ADR-0102, ADR-0103, ADR-0130
 
 Follows S123.
 
