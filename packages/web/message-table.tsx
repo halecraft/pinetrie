@@ -46,7 +46,7 @@ export function MessageTable(
   )
   return (
     // Its block's number on the wrap too: Cmd+C with focus on its bar takes
-    // the table (`copyFrom`, ADR-0126).
+    // the table (the column's `onEntryKey`, ADR-0126).
     <div
       className="table-wrap"
       data-block={props["data-block"]}

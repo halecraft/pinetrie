@@ -80,6 +80,7 @@ import {
   type LiveWork,
   leftLine,
   markdownOf,
+  messageReference,
   NEW_PIN,
   NEW_PIN_TITLE,
   newPinAt,
@@ -90,7 +91,6 @@ import {
   type ReadOnly,
   type ReserveStep,
   type RowMemory,
-  referenceOf,
   type ScreenMemory,
   type SeenEnd,
   type SpotStore,
@@ -146,6 +146,7 @@ import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { Dock } from "./dock.tsx"
 import { Margin } from "./margin.tsx"
+import { blockOfProperty } from "./markdown.ts"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
@@ -441,7 +442,8 @@ export function Column(p: ColumnProps) {
    * The column's messages as a grid one cell wide (ADR-0126), while focus is
    * in it and in no text box: `j` and `k` select, Enter opens the selected
    * entry's margin, Escape shuts it, `c` comments, and Cmd+C with no text
-   * selected takes a reference to it.
+   * selected takes a reference to the focused table's bar's table, else to
+   * the selected entry. A selection is the page's copy event's (`App`).
    */
   const onEntryKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (isTextBox(document.activeElement)) return
@@ -454,20 +456,28 @@ export function Column(p: ColumnProps) {
     const copying =
       e.metaKey !== e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "c"
     if (copying) {
-      const node = view.nodes[from]
-      if (
-        at < 0 ||
-        node === undefined ||
-        !writable ||
-        window.getSelection()?.isCollapsed === false
+      if (!writable || window.getSelection()?.isCollapsed === false) return
+      const focused = document.activeElement
+      const blockEl =
+        focused instanceof HTMLElement
+          ? focused.closest<HTMLElement>("[data-block]")
+          : null
+      const block = blockOfProperty(blockEl?.dataset.block)
+      const owner = view.nodes.find(
+        n =>
+          n.id ===
+          blockEl?.closest<HTMLElement>(".msg[data-entry]")?.dataset.entry,
       )
-        return
+      const node = at < 0 ? undefined : view.nodes[at]
+      const taken =
+        owner !== undefined && block !== null
+          ? messageReference(owner, block)
+          : node === undefined
+            ? null
+            : messageReference(node, null)
+      if (taken === null) return
       e.preventDefault()
-      act({
-        kind: "takeReference",
-        card: newReferenceCardId(),
-        ...referenceOf(node, null, null),
-      })
+      act({ kind: "takeReference", card: newReferenceCardId(), ...taken })
       return
     }
     const grid = { width: 1, rows: ids.length }

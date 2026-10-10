@@ -233,6 +233,13 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
       },
     ])
   })
+
+  test("Cmd+C on a selection a range names takes it; on one none names, nothing, and the browser's copy stands (ADR-0126)", () => {
+    const copy = (text: string) =>
+      plan({ kind: "copySelection", entry: A, text }, state())
+    expect(copy("a")[0]).toEqual({ kind: "copyText", text: "a" })
+    expect(copy("2 a")).toEqual([])
+  })
 })
 
 /** A card of each kind with records, at the first of its places that is no inventory. */

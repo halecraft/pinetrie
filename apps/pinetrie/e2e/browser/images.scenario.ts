@@ -329,7 +329,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // slot shows a reference, and selected, the preview its quote, a
         // table. The put key in her composer puts it there as a link, and
         // the reference stays in her hand. Cmd+C on the table's bar takes
-        // another, by the page's copy event.
+        // another, by the column's key.
         const take = `${col(0)} .msg[data-entry] .table-wrap .take-block`
         // Open first: a take into a closed inventory shows it only briefly.
         await pp.click("#bottom .inventory-toggle")
@@ -385,8 +385,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         )
         await pp.fill(box, "")
         await pp.evaluate(() => navigator.clipboard.writeText(""))
+        // Its message selected, the column's Cmd+C would take the message:
+        // focus on the bar takes the table instead.
+        await pp.click(`${col(0)} .msg[data-entry]:has(.table-wrap) > .text`, {
+          position: { x: 2, y: 2 },
+        })
         await pp.focus(take)
-        await pp.evaluate(() => document.execCommand("copy"))
+        await pp.keyboard.press("ControlOrMeta+c")
         const byKey = await pp
           .waitForFunction(
             sel => document.querySelectorAll(sel).length === 3,
@@ -400,10 +405,15 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         const copiedByKey = await pp
           .evaluate(() => navigator.clipboard.readText())
           .catch(() => "")
+        // The message is the table alone, so only the chip tells the
+        // table's reference from the message's.
+        const tables = await pp
+          .locator(`${refSlot} .reference-face-label`, { hasText: /^a table$/ })
+          .count()
         check(
           "Cmd+C on a table's bar takes a reference to it, its markdown on the clipboard",
-          byKey && copiedByKey.startsWith("| n | what |"),
-          `taken ${byKey}, copied ${JSON.stringify(copiedByKey.slice(0, 12))}`,
+          byKey && tables === 2 && copiedByKey.startsWith("| n | what |"),
+          `taken ${byKey}, tables ${tables}, copied ${JSON.stringify(copiedByKey.slice(0, 12))}`,
         )
         await pp.click("#bottom .inventory-toggle")
         // Pia's picture (ADR-0098): chosen on her profile page, cropped to a

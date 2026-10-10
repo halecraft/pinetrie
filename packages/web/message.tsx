@@ -14,6 +14,7 @@ import {
   joinWords,
   type MessageAct,
   type MessageTools,
+  messageReference,
   NO_MEMORY,
   opens,
   pinnedMarkerWords,
@@ -21,12 +22,12 @@ import {
   REVEAL_MS,
   type RowMemory,
   type Run,
-  referenceOf,
   retiredWords,
   rowSummary,
   rowView,
   runningFor,
   type ScreenMemory,
+  selectionReference,
   showsText,
   speakerLabel,
   TAKE_COPY,
@@ -248,20 +249,18 @@ function Tools({
               selection === null || selection.rangeCount === 0
                 ? null
                 : selection.getRangeAt(0)
+            // Your selection in the message when a range names it, else the
+            // message: the button is the message's own.
+            const inside =
+              range !== null &&
+              selection !== null &&
+              msg?.contains(range.commonAncestorContainer) === true
             onAct({
               kind: "takeReference",
               card: newReferenceCardId(),
-              ...referenceOf(
-                node,
-                range === null || selection === null
-                  ? null
-                  : {
-                      text: selection.toString(),
-                      inside:
-                        msg?.contains(range.commonAncestorContainer) === true,
-                    },
-                null,
-              ),
+              ...((inside
+                ? selectionReference(node, selection.toString())
+                : null) ?? messageReference(node, null)),
             })
           }}
           title={TAKE_COPY_INTO_INVENTORY}

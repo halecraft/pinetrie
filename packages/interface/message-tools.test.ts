@@ -11,8 +11,9 @@ import { describe, expect, test } from "vitest"
 import {
   branchPrefill,
   type MessageTools,
+  messageReference,
   messageTools,
-  referenceOf,
+  selectionReference,
   showsText,
 } from "./message-tools.ts"
 
@@ -205,31 +206,34 @@ test("showsText: a message that only called tools shows only its rows", () => {
   ).toBe(true)
 })
 
-describe("referenceOf (ADR-0126)", () => {
+describe("taking from the past (ADR-0126)", () => {
   const node = {
     id: entryId("5-m"),
     thread: FIXTURE_THREAD,
     role: "assistant",
-    text: "Plan:\n\n| a |\n|---|\n| 1 |",
+    text: "Plan: **go**\n\n| a |\n|---|\n| 1 |",
     branches: [],
   } as const
   const at = { thread: FIXTURE_THREAD, entry: entryId("5-m") }
 
-  test("a selection inside the message is a range of its text; one outside, or not in its text, the whole message", () => {
-    expect(referenceOf(node, { text: "Plan", inside: true }, null)).toEqual({
+  test("a selection whose text is in the message as written is a range of it", () => {
+    expect(selectionReference(node, "Plan")).toEqual({
       address: { kind: "range", ...at, from: 0, to: 4 },
       markdown: "Plan",
     })
-    expect(
-      referenceOf(node, { text: "Plan", inside: false }, null).address,
-    ).toEqual({ kind: "entry", ...at })
-    expect(
-      referenceOf(node, { text: "**Plan**", inside: true }, null).address,
-    ).toEqual({ kind: "entry", ...at })
   })
 
-  test("a block named is the block, its markdown its source", () => {
-    expect(referenceOf(node, null, { kind: "table", n: 0 })).toEqual({
+  test("a selection across formatting, or of only space, takes nothing: never the whole message", () => {
+    expect(selectionReference(node, "Plan: go")).toBeNull()
+    expect(selectionReference(node, " ")).toBeNull()
+  })
+
+  test("a message is the whole message, or the block named, its markdown its source", () => {
+    expect(messageReference(node, null)).toEqual({
+      address: { kind: "entry", ...at },
+      markdown: node.text,
+    })
+    expect(messageReference(node, { kind: "table", n: 0 })).toEqual({
       address: { kind: "block", ...at, block: { kind: "table", n: 0 } },
       markdown: "| a |\n|---|\n| 1 |",
     })

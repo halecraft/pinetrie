@@ -1061,7 +1061,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   or Cmd+C outside a text box, takes a *reference*, a card naming the
   message, the table or your selection in it, with its quote, and puts its
   markdown on the clipboard. The past never changes, so the reference is
-  the copy. It shows as a chip; selected, its quote; opened, its quote and
+  the copy. Cmd+C on a selection copies what is selected: one across
+  formatting, which no range of the message's text names, is copied as
+  the browser copies it, and nothing is taken (ADR-0126). It shows as a chip; selected, its quote; opened, its quote and
   thread, and **Edit as text**, which makes it a text card you can change,
   in its place, one undo. Put with the put key, it stays in your hand and
   a new one lands; in a text box, it is a link, which opens what it names.

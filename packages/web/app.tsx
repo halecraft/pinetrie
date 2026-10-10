@@ -165,7 +165,6 @@ import { CardHistories } from "./card-history.tsx"
 import { Footer } from "./footer.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
-import { blockOfProperty } from "./markdown.ts"
 import { Page } from "./page.tsx"
 import { TrackSeed } from "./palette-context.ts"
 import { Pictures } from "./pictures-context.ts"
@@ -1340,53 +1339,27 @@ export function App({
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
   }, [onIntent, selected, slots, page])
-  // Cmd+C outside a text box (ADR-0126): a selection inside one message,
-  // or the focused message's table or image, is taken as a reference, its
-  // markdown on the clipboard. With nothing to take, the browser copies as
-  // usual; in a text box, its own copy stands.
+  // Cmd+C on a selection outside a text box (ADR-0126) is copied as the
+  // browser copies it, what you selected and nothing else; one inside one
+  // message that a range names is taken as a reference too, its markdown
+  // written over the browser's copy. With nothing selected, Cmd+C is the
+  // column's key (`onEntryKey`); in a text box, the box's own copy stands.
   useEffect(() => {
-    const onCopy = (e: ClipboardEvent) => {
-      const focused = document.activeElement
-      if (isTextBox(focused)) return
+    const onCopy = () => {
+      if (isTextBox(document.activeElement)) return
       const selection = window.getSelection()
-      const range =
-        selection === null || selection.rangeCount === 0
-          ? null
-          : selection.getRangeAt(0)
-      const around =
-        range === null
-          ? null
-          : range.commonAncestorContainer instanceof Element
-            ? range.commonAncestorContainer
-            : range.commonAncestorContainer.parentElement
-      const selected =
-        selection !== null && !selection.isCollapsed
-          ? (around?.closest<HTMLElement>(".msg[data-entry]") ?? null)
-          : null
-      const blockEl =
-        focused instanceof HTMLElement
-          ? focused.closest<HTMLElement>("[data-block]")
-          : null
-      const msg =
-        selected ??
-        (focused instanceof HTMLElement
-          ? focused.closest<HTMLElement>(".msg[data-entry]")
-          : null)
-      const entry = msg?.dataset.entry
-      if (entry === undefined || msg === null) return
-      e.preventDefault()
-      onIntent({
-        kind: "copyFrom",
-        entry,
-        selection:
-          selected === null || selection === null
-            ? null
-            : { text: selection.toString(), inside: true },
-        block:
-          selected === null && blockEl !== null && msg.contains(blockEl)
-            ? blockOfProperty(blockEl.dataset.block)
-            : null,
-      })
+      if (
+        selection === null ||
+        selection.isCollapsed ||
+        selection.rangeCount === 0
+      )
+        return
+      const common = selection.getRangeAt(0).commonAncestorContainer
+      const around = common instanceof Element ? common : common.parentElement
+      const entry =
+        around?.closest<HTMLElement>(".msg[data-entry]")?.dataset.entry
+      if (entry !== undefined)
+        onIntent({ kind: "copySelection", entry, text: selection.toString() })
     }
     document.addEventListener("copy", onCopy)
     return () => document.removeEventListener("copy", onCopy)

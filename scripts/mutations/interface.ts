@@ -2382,13 +2382,22 @@ export const mutations: readonly Mutation[] = [
     expect: "snapTo: the nearest third",
   },
   {
-    name: "a take from the past takes a selection outside the message",
+    name: "a selection of only space is a range",
     file: "packages/interface/message-tools.ts",
-    from: '    selection?.inside === true && selection.text.trim() !== ""',
-    to: '    selection !== null && selection.text.trim() !== ""',
+    from: '  const from = text.trim() === "" ? -1 : node.text.indexOf(text)',
+    to: "  const from = node.text.indexOf(text)",
     command: unit,
     expect:
-      "a selection inside the message is a range of its text; one outside, or not in its text, the whole message",
+      "a selection across formatting, or of only space, takes nothing: never the whole message",
+  },
+  {
+    name: "Cmd+C on a selection no range names takes the whole message",
+    file: "packages/interface/intent.ts",
+    from: "        message === null ? null : selectionReference(message, intent.text)",
+    to: '        message === null ? null : (selectionReference(message, intent.text) ?? { address: { kind: "entry", thread: message.thread, entry: message.id }, markdown: message.text })',
+    command: unit,
+    expect:
+      "Cmd+C on a selection a range names takes it; on one none names, nothing, and the browser's copy stands (ADR-0126)",
   },
   {
     name: "a keep closes whatever its answers",

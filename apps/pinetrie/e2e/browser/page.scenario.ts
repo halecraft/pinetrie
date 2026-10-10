@@ -1415,6 +1415,58 @@ async function run(check: Checks["check"]): Promise<void> {
         selected.trim() === STILL,
         `"${selected}"`,
       )
+      // Cmd+C on a selection across formatting copies what you selected, as
+      // the browser does: no range names it, and the message is not what
+      // you selected (ADR-0126).
+      await page.evaluate(() => navigator.clipboard.writeText(""))
+      await page.locator(`${still} > .text > p`).evaluate(p => {
+        const selection = getSelection()
+        if (selection === null) return
+        selection.selectAllChildren(p)
+        document.execCommand("copy")
+        selection.removeAllRanges()
+      })
+      const highlighted = await page
+        .waitForFunction(
+          async () => (await navigator.clipboard.readText()) !== "",
+          undefined,
+          { timeout: 5_000 },
+        )
+        .then(
+          () => page.evaluate(() => navigator.clipboard.readText()),
+          () => "",
+        )
+      check(
+        "Cmd+C on a selection across formatting copies the text selected, not the message",
+        highlighted.trim() === STILL,
+        `"${highlighted}"`,
+      )
+      // One within a run of plain text is a range of the message's text,
+      // taken as a quote too.
+      await page.locator(`${still} > .text > p`).evaluate(p => {
+        const selection = getSelection()
+        const text = p.firstChild
+        if (selection === null || text === null) return
+        selection.setBaseAndExtent(text, 0, text, "still".length)
+        document.execCommand("copy")
+        selection.removeAllRanges()
+      })
+      const quoted = await waitFor(
+        () =>
+          readPlaces(host.places).some(
+            c =>
+              c.kind === "reference" &&
+              c.content.address.kind === "range" &&
+              c.content.address.from === 0 &&
+              c.content.address.to === "still".length,
+          ),
+        10_000,
+      )
+      check(
+        "Cmd+C on a selection a range names takes it as a quote",
+        quoted >= 0,
+        `taken in ${quoted} ms`,
+      )
       // Edit opens a branch at the message's parent, holding its text as sent,
       // with @agent in front: its thread's default person the agent, and a branch
       // asks only through a mention.

@@ -11,8 +11,9 @@
 // move are Cmd or Ctrl with Z (Shift+Z, or Ctrl+Y, to redo), only outside a
 // text box, where they are the box's own text undo (ADR-0052). Cmd or Ctrl
 // with X outside a text box takes as Ctrl+Shift+I does, and the put key in a
-// text box puts a reference there as a link (ADR-0126). Cmd+C is the page's
-// `copy` event's (`copyFrom`), not a key here; Cmd+V is the browser's.
+// text box puts a reference there as a link (ADR-0126). Cmd+C is not a key
+// here: on a selection it is the page's `copy` event's (`copySelection`),
+// and with none the column's (`onEntryKey`); Cmd+V is the browser's.
 
 import { type CardId, kindOfCard } from "@pinetrie/core"
 import type { Intent } from "./intent.ts"

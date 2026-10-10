@@ -2368,14 +2368,33 @@ export const mutations: readonly Mutation[] = [
       "a table taken from a reply is a reference in the inventory, previewed as its quote, put in a composer as a link, and kept in the hand",
   },
   {
-    name: "the page's copy takes nothing",
-    file: "packages/web/app.tsx",
-    from: "      if (isTextBox(focused)) return\n      const selection = window.getSelection()",
-    to: "      if (isTextBox(focused) || true) return\n      const selection = window.getSelection()",
+    name: "Cmd+C on a table's bar takes its message",
+    file: "packages/web/column.tsx",
+    from: "          ? messageReference(owner, block)",
+    to: "          ? messageReference(owner, null)",
     suite: "browser",
     scenario: "images",
     expect:
       "Cmd+C on a table's bar takes a reference to it, its markdown on the clipboard",
+  },
+  {
+    name: "the page's copy takes nothing",
+    file: "packages/web/app.tsx",
+    from: "      if (entry !== undefined)\n        onIntent({ kind: \"copySelection\"",
+    to: "      if (entry === undefined)\n        onIntent({ kind: \"copySelection\"",
+    suite: "browser",
+    scenario: "page",
+    expect: "Cmd+C on a selection a range names takes it as a quote",
+  },
+  {
+    name: "the page's copy of a selection stops the browser's",
+    file: "packages/web/app.tsx",
+    from: "    const onCopy = () => {",
+    to: "    const onCopy = (e: ClipboardEvent) => {\n      e.preventDefault()",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Cmd+C on a selection across formatting copies the text selected, not the message",
   },
   {
     name: "an image's take takes nothing",

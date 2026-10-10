@@ -6,7 +6,6 @@
 // under its key, and a message's acts (`MessageAct`) are among them.
 
 import {
-  type BlockRef,
   type CardCommand,
   type CardId,
   type CardWidth,
@@ -86,11 +85,7 @@ import {
 import type { NameStep } from "./identity.ts"
 import { type Here, showsStage, type ViewChange } from "./layout.ts"
 import { otherWidth } from "./list-width.ts"
-import {
-  type MessageAct,
-  referenceOf,
-  type SelectionLike,
-} from "./message-tools.ts"
+import { type MessageAct, selectionReference } from "./message-tools.ts"
 import type { PageName } from "./page.ts"
 import type { PutTarget } from "./put-target.ts"
 import { planSpinOff } from "./spin-off.ts"
@@ -372,16 +367,16 @@ export type Intent =
       readonly text: string
     }
   /**
-   * Cmd+C outside a text box (ADR-0126): a reference to the message at
-   * `entry`, a block of it, or the selection in it, taken into your
-   * inventory and its markdown on the clipboard (`referenceOf`).
+   * Cmd+C on a selection in the message at `entry` (ADR-0126): a range of
+   * it taken into your inventory and its markdown on the clipboard when a
+   * range names `text` (`selectionReference`), else nothing, and the
+   * browser's copy stands.
    */
   | {
-      readonly kind: "copyFrom"
+      readonly kind: "copySelection"
       /** The message's entry, as the page read it from `data-entry`. */
       readonly entry: string
-      readonly selection: SelectionLike | null
-      readonly block: BlockRef | null
+      readonly text: string
     }
   /** Select an inventory slot. */
   | { readonly kind: "selectSlot"; readonly slot: number }
@@ -593,19 +588,17 @@ function planOf(
       return planPut(intent.card, intent.target, state, minted)
     case "editAsText":
       return planEditAsText(intent, state)
-    case "copyFrom": {
+    case "copySelection": {
       // An id the page read is this tab's entry only if its index has it.
       const entry = (Object.keys(state.index.entries) as EntryId[]).find(
         id => id === intent.entry,
       )
       const message = entry === undefined ? null : messageAt(state.index, entry)
-      return message === null
+      const taken =
+        message === null ? null : selectionReference(message, intent.text)
+      return taken === null
         ? []
-        : planTakeReference(
-            minted.reference,
-            referenceOf(message, intent.selection, intent.block),
-            state,
-          )
+        : planTakeReference(minted.reference, taken, state)
     }
     case "discard":
       return planDiscard(

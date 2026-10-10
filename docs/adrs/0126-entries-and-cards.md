@@ -17,6 +17,10 @@
     record.
   - ADR-0066: a discard is undone from its discarder's trash, and one made on
     no task from a history of theirs outside any task.
+- **Revised:**
+  - 2026-10-10 (S145): Cmd+C on a selection no range names, as one across
+    formatting, copies what is selected as the browser does and takes nothing,
+    rather than taking the whole message.
 - **Amended by:**
   - ADR-0128: an ask card is a kind of card of its own, only ever queued,
     which a person may reorder and nobody moves.
@@ -232,7 +236,9 @@
 
 - **Cmd+C** (Ctrl+C elsewhere) on an entry, a block or a selection takes a
   reference into your inventory, and writes it as markdown to the system
-  clipboard. The past never changes, so a reference to it is the copy.
+  clipboard. The past never changes, so a reference to it is the copy. A
+  selection is what you copy: one that no range of the message's text
+  names is copied as the browser copies it, and nothing is taken.
 - **Cmd+X** on a card takes it into your inventory.
 - **Cmd+V in a text box pastes markdown**, as it does anywhere.
 - **The put key puts the card in your hand**, your inventory's selected

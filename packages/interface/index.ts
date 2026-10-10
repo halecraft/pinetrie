@@ -351,9 +351,9 @@ export { markdownOf } from "./markdown-of.ts"
 export {
   type MessageAct,
   type MessageTools,
+  messageReference,
   messageTools,
-  referenceOf,
-  type SelectionLike,
+  selectionReference,
   showsText,
 } from "./message-tools.ts"
 export {

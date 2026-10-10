@@ -42,7 +42,8 @@ export interface MessageTools {
   readonly copy: boolean
   /**
    * Take a reference into your inventory (ADR-0126): what copy offers, where
-   * the column can be written. Built on a press too (`referenceOf`).
+   * the column can be written. Built on a press too (`messageReference`,
+   * `selectionReference`).
    */
   readonly takeReference: boolean
   /** Comment on it: a note in its margin (ADR-0126), where the column can be written. */
@@ -160,47 +161,50 @@ function editOf(
   }
 }
 
-/** The page's selection as a take reads it: its text, and whether it lies within the message. */
-export interface SelectionLike {
-  readonly text: string
-  readonly inside: boolean
-}
-
 /**
- * What taking from `node` takes (ADR-0126): a block of it when one is named
- * (a table's bar, an image); else your selection when it lies within the
- * message and its text is in the message's text as written, a range of it;
- * else the whole message. Its markdown is `markdownOf`'s, so a reference's
- * quote and the clipboard say the same. Pure.
+ * What taking `node` takes (ADR-0126): the block named (a table's bar, an
+ * image), else the whole message. Pure.
  */
-export function referenceOf(
+export function messageReference(
   node: TranscriptMessage,
-  selection: SelectionLike | null,
   block: BlockRef | null,
 ): Taken {
   const at = { thread: node.thread, entry: node.id }
-  const from =
-    selection?.inside === true && selection.text.trim() !== ""
-      ? node.text.indexOf(selection.text)
-      : -1
-  const address: Address =
-    block !== null
-      ? { kind: "block", ...at, block }
-      : selection !== null && from >= 0
-        ? {
-            kind: "range",
-            ...at,
-            from,
-            to: from + selection.text.length,
-          }
-        : { kind: "entry", ...at }
-  return {
-    address,
-    markdown: markdownOf(address, {
-      messageOf: entry => (entry === node.id ? node : undefined),
-    }),
-  }
+  return takenAt(
+    node,
+    block === null ? { kind: "entry", ...at } : { kind: "block", ...at, block },
+  )
 }
+
+/**
+ * What taking your selection in `node` takes (ADR-0126): a range of the
+ * message's text when the selection's text is in it as written. Null
+ * otherwise, as when the selection crosses formatting, whose drawn text is
+ * not its markdown: the selection is no part of the message a range can
+ * name, and the whole message is not what you selected. Pure.
+ */
+export function selectionReference(
+  node: TranscriptMessage,
+  text: string,
+): Taken | null {
+  const from = text.trim() === "" ? -1 : node.text.indexOf(text)
+  if (from < 0) return null
+  return takenAt(node, {
+    kind: "range",
+    thread: node.thread,
+    entry: node.id,
+    from,
+    to: from + text.length,
+  })
+}
+
+/** `address` in `node` taken: its markdown `markdownOf`'s, so a reference's quote and the clipboard say the same. */
+const takenAt = (node: TranscriptMessage, address: Address): Taken => ({
+  address,
+  markdown: markdownOf(address, {
+    messageOf: entry => (entry === node.id ? node : undefined),
+  }),
+})
 
 /**
  * Whether a message draws its own text: a message that only called tools
