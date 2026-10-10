@@ -4,7 +4,7 @@
 // added to `CardKind` does not compile until each is said. Re-exported from
 // `index.ts`; `PLACES_OF`, `kindOfCard` and `textSourceOf` read it.
 
-import type { CardKind } from "./index.ts"
+import type { CardKind } from "./ids.ts"
 import type { CardPlace } from "./places.ts"
 
 /** What is true of every card of one kind. */

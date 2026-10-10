@@ -6,6 +6,7 @@ const tree = "packages/core/tree.ts"
 const roots = "packages/core/roots.ts"
 const asks = "packages/core/asks.ts"
 const core = "packages/core/index.ts"
+const ids = "packages/core/ids.ts"
 const places = "packages/core/places.ts"
 const trailers = "packages/core/trailers.ts"
 
@@ -520,7 +521,7 @@ export const mutations: readonly Mutation[] = [
 
   {
     name: "an email may hold a colon",
-    file: core,
+    file: ids,
     from: '  if (/[\\s:]/u.test(email) || email.includes("\\u0000")) return undefined',
     to: '  if (/[\\s]/u.test(email) || email.includes("\\u0000")) return undefined',
     command: unit,
@@ -636,7 +637,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "parseNewThread accepts any t- id",
-    file: core,
+    file: ids,
     from: "  NEW_THREAD.test(s) ? (s as ThreadId) : undefined",
     to: '  s.startsWith("t-") ? (s as ThreadId) : undefined',
     command: unit,
@@ -762,7 +763,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "any text is a text card's id",
-    file: core,
+    file: ids,
     from: "  if (TEXT_CARD_RE.test(id)) return id as TextCardId\n",
     to: '  if (id !== "") return id as TextCardId\n',
     command: unit,
@@ -1050,7 +1051,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an ask's id is no card's",
-    file: "packages/core/index.ts",
+    file: ids,
     from: "CARD_PREFIXES.map(([p]) => p)",
     to: 'CARD_PREFIXES.filter(([, k]) => k !== "ask").map(([p]) => p)',
     command: ["pnpm", "exec", "vitest", "run", "packages/core/kinds.test.ts"],

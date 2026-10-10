@@ -1,16 +1,22 @@
-// places — cards and where they are (ADR-0048, ADR-0059, ADR-0116): a
-// card's record and commands, its places and their keys, the targets and
-// moves between them, reorders, the places row's fields, and a card's
-// history and traces. Re-exported from `index.ts`.
+// places — where cards are (ADR-0048, ADR-0059, ADR-0116): its places and
+// their keys, which kinds each takes (`PLACES_OF`), the targets and moves
+// between them, reorders, and the places row's fields. What a card is, is
+// `cards.ts`'. Re-exported from `index.ts`.
 
-import type { Address } from "./address.ts"
+import type {
+  Card,
+  CardRecord,
+  NoteColumnCard,
+  PlacedKind,
+  ReferenceCard,
+  TextCard,
+  ThreadCard,
+} from "./cards.ts"
 import {
   type AskCardId,
   atEntry,
-  type BudgetSpentFact,
   type CardId,
   type CardKind,
-  type CatchUpFrom,
   type EntryId,
   entryId,
   type FactCardId,
@@ -21,97 +27,18 @@ import {
   isThreadId,
   kindOfCard,
   type MediaId,
-  type MemberFact,
   type NoteColumnId,
   type Position,
   parseCardId,
   type ReferenceCardId,
-  type RelayDetails,
   ROOT,
   type RootId,
-  type RoundFact,
-  type Sha256,
-  type StopFact,
   type TaskId,
   type TextCardId,
   type ThreadId,
-  type UnansweredFact,
-  type UndeliveredFact,
   type WriterId,
 } from "./index.ts"
 import { KINDS } from "./kinds.ts"
-
-/**
- * The commands that catch a thread up (ADR-0108). The first two bring the
- * thread up to date with its base, `continue-on-accepted` moving a thread whose
- * WIP is gone to accepted work first (ADR-0104); `catch-up-with-parent` merges
- * the thread it branched from (ADR-0072).
- */
-export type CatchUpCommand =
-  | "bring-up-to-date"
-  | "continue-on-accepted"
-  | "catch-up-with-parent"
-export const CATCH_UP_COMMANDS: readonly CatchUpCommand[] = [
-  "bring-up-to-date",
-  "continue-on-accepted",
-  "catch-up-with-parent",
-]
-
-/**
- * A command a card is sent through (ADR-0108); a plain card has none. The
- * catch-up commands, and `split`, which splits the thread's offer into a
- * stack in a run of its own, its text the person's intent (ADR-0080).
- */
-export type CardCommand = CatchUpCommand | "split"
-export const CARD_COMMANDS: readonly CardCommand[] = [
-  ...CATCH_UP_COMMANDS,
-  "split",
-]
-
-/** Whether `command` catches the thread up, rather than doing something else. */
-export const isCatchUp = (command: CardCommand): command is CatchUpCommand =>
-  (CATCH_UP_COMMANDS as readonly string[]).includes(command)
-
-/**
- * What a command on a thread's offer did, as a fact in the thread
- * (ADR-0080): an acceptance, with the change it was added as, the bookmark it moved
- * and what that bookmark is to the thread; or a description asked for again,
- * a squash, a refresh. `by` is who asked.
- */
-export type OfferFact =
-  | {
-      readonly kind: "accepted"
-      readonly lane: ThreadId
-      readonly by: WriterId
-      /** The change id the offer was added as. */
-      readonly as: string
-      readonly bookmark: string
-      readonly to: CatchUpFrom
-    }
-  | {
-      readonly kind: "described" | "squashed" | "refreshed"
-      readonly lane: ThreadId
-      readonly by: WriterId
-    }
-
-/**
- * A fact on its way into its thread (ADR-0080, ADR-0126): what a fact card
- * holds, appended as an entry when the thread's end consumes it. What a
- * command on the offer did, who stopped a run, a member dismissed or gone,
- * or a budget spent (ADR-0128).
- */
-export type QueuedFact =
-  | OfferFact
-  | StopFact
-  | MemberFact
-  | BudgetSpentFact
-  | UnansweredFact
-  | UndeliveredFact
-  | RoundFact
-
-/** A card's command, or null: only a text card has one. */
-export const commandOf = (card: CardRecord): CardCommand | null =>
-  card.kind === "text" ? card.content.command : null
 
 /**
  * Where a card is (ADR-0113, ADR-0116). Composing: your message, in your
@@ -1034,95 +961,8 @@ export type TextPlace = PlaceOf<"text">
 /** The places a thread card is ever in. */
 export type HeldPlace = PlaceOf<"thread">
 
-/**
- * What each kind of card holds (ADR-0126), beside its identity and its
- * place: a new kind is a row here, one in `KINDS`, and one in the page's
- * `RENDERINGS`.
- *
- * - A text card: the command it is sent through when popped (ADR-0108), and
- *   why the host could not send it, until it is queued again (null when it
- *   never failed). Its text is its own document; who wrote in it is read
- *   from that document's operations (`writersOfClients`), never stored.
- * - A thread's card (ADR-0117): nothing; its id is its thread's.
- * - A note column (ADR-0116): nothing here; its title is the host's record
- *   (`NOTE_COLUMN`, absent while untitled), and its notes are text cards
- *   whose place names it.
- * - A fact (ADR-0080): the fact, appended to its thread as the thread's end
- *   consumes it.
- * - A reference (ADR-0126): an address, and the quote of what it names,
- *   kept as a blob: the past never changes, so the quote is exact, and the
- *   reference draws without loading its referent's root.
- */
-export interface ContentOf {
-  readonly text: {
-    readonly command: CardCommand | null
-    readonly unsent: string | null
-    /** Where it was copied from: a reference edited as text (ADR-0126); null for none. */
-    readonly origin: Address | null
-  }
-  readonly reference: {
-    /** What it names. */
-    readonly address: Address
-    /** Its quote's blob: the markdown of what it names, which never changes. */
-    readonly quote: Sha256
-  }
-  readonly thread: Readonly<Record<string, never>>
-  readonly "note-column": Readonly<Record<string, never>>
-  readonly fact: { readonly fact: QueuedFact }
-  readonly ask: { readonly relay: RelayDetails }
-}
-
-/** The kinds of card with records: the reserved `media` and `file` have none yet. */
-export type PlacedKind = keyof ContentOf
-
-/**
- * A card (ADR-0126): an identity, one place, and content. Its record is in
- * the places document, which only the host writes (ADR-0059). Its kind is
- * its id's (`kindOfCard`), never stored.
- */
-export interface Card<K extends PlacedKind> {
-  readonly kind: K
-  readonly id: IdOf<K>
-  /** Who made it: whose composer it is, who started its thread, who acted. */
-  readonly owner: WriterId
-  /**
-   * Who put it where it is: the sender of the last move the host accepted.
-   * A write the host makes itself (a popped card written back when refused)
-   * keeps it. When someone else moves the card, the trace is for them
-   * (ADR-0048).
-   */
-  readonly placer: WriterId
-  readonly place: PlaceOf<K>
-  readonly content: ContentOf[K]
-}
-
-/** A text card's record. */
-export type TextCard = Card<"text">
-
-/** A thread's card (ADR-0117): its id is its thread's, and it has no text. */
-export type ThreadCard = Card<"thread">
-
-/** A note column's card (ADR-0116), on a canvas alone. */
-export type NoteColumnCard = Card<"note-column">
-
-/** A fact on its way into its thread (ADR-0080): only ever queued. */
-export type FactCard = Card<"fact">
-
-/** A reference to an address (ADR-0126). */
-export type ReferenceCard = Card<"reference">
-
-/** An ask from another thread for a busy agent (ADR-0128): only ever queued. */
-export type AskCard = Card<"ask">
-
 /** A canvas card's place: a task and a rank there. */
 export type CanvasPlace = Extract<CardPlace, { readonly kind: "canvas" }>
-
-/**
- * A card's record, by kind (ADR-0116, ADR-0126), so a text card on a canvas,
- * a thread's card in a queue or a fact anywhere but a queue does not
- * compile.
- */
-export type CardRecord = { [K in PlacedKind]: Card<K> }[PlacedKind]
 
 /** The kinds of card ever at a place of `P` (`PLACES_OF`). */
 export type KindsInPlace<P extends CardPlace["kind"]> = {
@@ -1145,42 +985,6 @@ export const hasPlaceKind = <P extends CardPlace["kind"]>(
   card: CardRecord,
   place: P,
 ): card is CardRecord & CardInPlace<P> => card.place.kind === place
-
-/** Whether a card is a text card. */
-export const isTextCard = (card: CardRecord): card is TextCard =>
-  card.kind === "text"
-
-/** A thread card's content, and a note column's: nothing. */
-export const NO_CONTENT: Readonly<Record<string, never>> = {}
-
-/**
- * Where a card's words are read (`KINDS`' `text`): its text document, the
- * fact it holds, or nowhere. Every reader of what cards say (the drain, the
- * context builders, search) gathers through it, so none branches on kind.
- */
-export type TextSource =
-  | { readonly kind: "doc"; readonly card: TextCardId }
-  | { readonly kind: "fact"; readonly fact: QueuedFact }
-  | { readonly kind: "blob"; readonly sha: Sha256 }
-  | { readonly kind: "ask"; readonly relay: RelayDetails }
-  | { readonly kind: "none" }
-
-/** Where `card`'s words are read. Pure. */
-export function textSourceOf(card: CardRecord): TextSource {
-  switch (card.kind) {
-    case "text":
-      return { kind: "doc", card: card.id }
-    case "fact":
-      return { kind: "fact", fact: card.content.fact }
-    case "reference":
-      return { kind: "blob", sha: card.content.quote }
-    case "ask":
-      return { kind: "ask", relay: card.content.relay }
-    case "thread":
-    case "note-column":
-      return { kind: "none" }
-  }
-}
 
 /** Whether a card of `kind` is ever at a place of `place` (`PLACES_OF`). */
 export const fitsPlace = (kind: CardKind, place: PlaceKey["kind"]): boolean => {
@@ -1364,79 +1168,4 @@ export function placed(
     case "ask":
       return fits("ask", place) ? { ...card, place } : undefined
   }
-}
-
-/**
- * A new card of `kind` (ADR-0126), made by `by`, its owner and placer: the
- * one way a record is built, a person's or the host's, so a place its kind
- * is never in does not compile. `planMake` (`@pinetrie/rules`) decides
- * whether the host writes it.
- */
-export const makeCard = <K extends PlacedKind>(
-  kind: K,
-  id: IdOf<K>,
-  place: PlaceOf<K>,
-  content: ContentOf[K],
-  by: WriterId,
-): Card<K> => ({ kind, id, owner: by, placer: by, place, content })
-
-/**
- * One change to a living card's place (ADR-0048 step 6): who made it, from
- * where to where, and when. What the change was called (queued, took into
- * the inventory, pinned) is read from the two places when it is worded (`verbOf`).
- */
-export interface CardEvent {
-  readonly kind:
-    | "created"
-    | "moved"
-    | "undone"
-    | "redone"
-    | "unsent"
-    | "followed"
-  /** Who made it; null for the host's own write. */
-  readonly by: WriterId | null
-  readonly from: PlaceKey | null
-  readonly to: PlaceKey
-  readonly at: number
-}
-
-/**
- * A card's history: a host-written `pinetrie.card-history` value in the
- * session, keyed by the card, and deleted with it.
- */
-export interface CardHistoryRecord {
-  readonly card: CardId
-  /** Oldest first; at most `HISTORY_EVENTS`, the first always kept. */
-  readonly events: readonly CardEvent[]
-}
-
-/**
- * What stays where your card was when someone else moved it, while you were
- * not looking (ADR-0048, *Other people*): a host-written `pinetrie.trace`
- * value in the session, keyed by its own id, since it outlives its card.
- * Drawn only for its placer, and deleted once they have seen it.
- */
-/**
- * The places a trace is left at (ADR-0048): a thread's queue and its pinned
- * cards, at the thread's end, where its column draws it. A note moved by
- * someone else leaves none: a note column is everyone's scratch (ADR-0116).
- * Each has its drawer in `@pinetrie/rules`' `TRACED`.
- */
-export type TracedKind = "queued" | "pinned"
-
-/** Where a trace was left: a key of a place in `TracedKind`. */
-export type TracedPlace = Extract<PlaceKey, { readonly kind: TracedKind }>
-
-export interface TraceRecord {
-  readonly id: string
-  /** The card's placer before it moved: the one person it is drawn for. */
-  readonly for: WriterId
-  readonly card: CardId
-  readonly by: WriterId
-  readonly from: TracedPlace
-  /** Where the card went; null when it was sent. */
-  readonly to: PlaceKey | null
-  /** The message a send wrote; null for any other move. */
-  readonly message: EntryId | null
-  readonly at: number
 }
