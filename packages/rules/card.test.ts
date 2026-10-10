@@ -9,6 +9,7 @@ import {
   entryId,
   type FactCard,
   fitsPlace,
+  historyScope,
   INVENTORY_SLOTS,
   indexTree,
   KINDS,
@@ -17,6 +18,7 @@ import {
   movesDocId,
   NO_CONTENT,
   type OfferFact,
+  PERSON_HISTORY,
   type PlacedKind,
   REORDER_PLACES,
   type ReferenceCard,
@@ -930,8 +932,8 @@ describe("note columns (ADR-0116)", () => {
         NO_DISCARDS,
       ),
     ).toEqual({ kind: "refused", code: "no-place", now: null })
-    expect(historyOf([{ card: id, from: null, to }], [], NO_DISCARDS)).toBe(
-      TEST_TASK,
+    expect(historyOf([{ card: id, from: null, to }], [], NO_DISCARDS)).toEqual(
+      historyScope(TEST_TASK),
     )
     expect(
       historyOf(
@@ -1530,9 +1532,9 @@ describe("handoffs (ADR-0059)", () => {
         record: {
           ...c,
           place: {
-            kind: "gone",
+            kind: "trash",
             task: TEST_TASK,
-            by: ADA,
+            holder: ADA,
             why: { kind: "discarded" },
           },
           placer: ADA,
@@ -1543,9 +1545,9 @@ describe("handoffs (ADR-0059)", () => {
     test("a gone card is moved by no handoff, and a popped one is gone", () => {
       const discarded = card({
         place: {
-          kind: "gone",
+          kind: "trash",
           task: TEST_TASK,
-          by: ADA,
+          holder: ADA,
           why: { kind: "discarded" },
         },
       })
@@ -1659,13 +1661,13 @@ describe("handoffs (ADR-0059)", () => {
         planMove([held], { card: C1, from: mine, to }, ADA, here),
       ).toMatchObject({
         kind: "write",
-        record: { place: { kind: "gone", task: TEST_TASK } },
+        record: { place: { kind: "trash", task: TEST_TASK } },
       })
       expect(
         planMove([held], { card: C1, from: mine, to }, ADA, NO_DISCARDS),
       ).toMatchObject({
         kind: "write",
-        record: { place: { kind: "gone", task: null } },
+        record: { place: { kind: "trash", task: null } },
       })
       expect(planMove([held], { card: C1, from: mine, to }, BEA, here)).toEqual(
         {
@@ -2469,12 +2471,16 @@ describe("historyOf: the task a move enters the sender's history in (ADR-0066, A
       OTHER_TASK,
     ],
   ])("%s", (_, moves, cards, want) => {
-    expect(historyOf(moves, cards, { tasks, here: OTHER_TASK })).toBe(want)
+    expect(historyOf(moves, cards, { tasks, here: OTHER_TASK })).toEqual(
+      want === null ? null : historyScope(want),
+    )
   })
 
-  test("a discard from an inventory on no task: none", () => {
+  test("a discard from an inventory on no task: its sender's history outside any task (ADR-0126)", () => {
     const moves = [{ card: C1, from: inv, to: DISCARDED }]
-    expect(historyOf(moves, at(inv), { tasks, here: null })).toBeNull()
+    expect(historyOf(moves, at(inv), { tasks, here: null })).toEqual(
+      PERSON_HISTORY,
+    )
   })
 })
 
@@ -2555,12 +2561,13 @@ describe("planHistorySweep (ADR-0066)", () => {
       ] as const
     ).map(([task, ago]) => [task, { task, by: ADA, at: NOW - ago }] as const),
   )
-  const doc = (task: TaskId) => movesDocId(ADA, task)
+  const doc = (task: TaskId) => movesDocId(ADA, historyScope(task))
   const fromBefore = `moves:${ADA}:${TEST_ROOT}`
+  const outside = movesDocId(ADA, PERSON_HISTORY)
   const stored = [K("1"), K("2"), K("3"), K("4"), K("5")].map(doc)
   const sweep = (startup: boolean) =>
     planHistorySweep({
-      stored: [...stored, fromBefore],
+      stored: [...stored, fromBefore, outside],
       tasks,
       archived,
       now: NOW,
@@ -2570,7 +2577,7 @@ describe("planHistorySweep (ADR-0066)", () => {
   test("a task archived 7 days and a second ago is retired; one archived 6 days ago, a restored one and one never archived are not", () => {
     expect(sweep(false)).toEqual([doc(K("1"))])
   })
-  test("at startup, a task the session does not hold is retired too; an id that names no task is left", () => {
+  test("at startup, a task the session does not hold is retired too; an id that names no task, and a person's history outside any task, are left (ADR-0126)", () => {
     expect(sweep(true)).toEqual([doc(K("1")), doc(K("5"))])
   })
 })
@@ -2651,7 +2658,7 @@ describe("references (ADR-0126)", () => {
           kind: "write",
           record: expect.objectContaining({
             id: REF,
-            place: expect.objectContaining({ kind: "gone" }),
+            place: expect.objectContaining({ kind: "trash" }),
           }),
         },
       ],

@@ -6,6 +6,14 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the undo key on no task does nothing",
+    file: "packages/interface/card-intents.ts",
+    from: '  return [{ kind: "undoMoves", task: taskOfTab(state), direction }]\n',
+    to: '  const task = taskOfTab(state)\n  return task === null ? [] : [{ kind: "undoMoves", task, direction }]\n',
+    command: unit,
+    expect: "on no task: your history outside any task (ADR-0126)",
+  },
+  {
     name: "a branch's fork row says it was copied",
     file: "packages/interface/column-view.ts",
     from: '  const copied = fork?.how === "copy"\n',
@@ -3976,7 +3984,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "only a text card is discarded",
     file: "packages/interface/card-intents.ts",
-    from: '  if (now === undefined || !cardFitsPlace(now, "gone")) return []\n',
+    from: '  if (now === undefined || !cardFitsPlace(now, "trash")) return []\n',
     to: '  if (now === undefined || now.kind !== "text") return []\n',
     command: unit,
     expect:

@@ -320,10 +320,11 @@ export interface SessionClient {
     here?: TaskId | null,
   ): Promise<MoveAnswer>
   /**
-   * Undo or redo your newest move in `root`: the host's history of your
-   * moves there, from any of your tabs (ADR-0066).
+   * Undo or redo your newest move in `task`, or outside any task for none:
+   * the host's history of your moves there, from any of your tabs
+   * (ADR-0066, ADR-0126).
    */
-  undoMoves(task: TaskId, direction: MoveDirection): Promise<Outcome>
+  undoMoves(task: TaskId | null, direction: MoveDirection): Promise<Outcome>
   /**
    * Swap two slots of your inventory, in one write, as one step of this
    * tab's swaps; no host is asked.

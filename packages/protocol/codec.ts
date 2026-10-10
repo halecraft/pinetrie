@@ -327,7 +327,7 @@ export function decodeCommand(
     if (
       first === undefined ||
       more.length > 0 ||
-      to?.kind !== "gone" ||
+      to?.kind !== "trash" ||
       to.why.kind !== "spun"
     )
       return refused(
@@ -423,12 +423,13 @@ export function decodeCommand(
     return { kind, reference, from, card, here }
   }
   if (kind === "undo-move") {
+    // "" names the sender's history outside any task (ADR-0126).
     const task = text(wire?.task)
-    if (!isTaskId(task))
+    if (task !== "" && !isTaskId(task))
       return refused(ERR.UNKNOWN_TARGET, `not a task: ${task}`)
     const direction = text(wire?.mode)
     return isMoveDirection(direction)
-      ? { kind, task, direction }
+      ? { kind, task: task === "" ? null : task, direction }
       : refused(ERR.UNKNOWN_KIND, `unknown undo direction: ${direction}`)
   }
   if (kind === "card-width") {
@@ -1000,7 +1001,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
       return command({
         id,
         kind: "undo-move",
-        task: intent.task,
+        task: intent.task ?? "",
         mode: intent.direction,
       })
     case "card-width":

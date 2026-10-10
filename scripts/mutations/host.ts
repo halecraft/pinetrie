@@ -1181,8 +1181,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "one history of moves for every task",
     file: "apps/pinetrie/host/move-history.ts",
-    from: "    const docId = movesDocId(writer, task)\n",
-    to: "    const docId = movesDocId(writer, task.slice(0, 2) as TaskId)\n",
+    from: "    const docId = movesDocId(writer, scope)\n",
+    to: '    const docId = movesDocId(writer, { kind: "person" })\n',
     command: unit,
     expect:
       "another task's history, and another writer's, are untouched by an undo",

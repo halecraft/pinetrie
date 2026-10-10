@@ -217,8 +217,9 @@ export function writesIn(
         ? [intent.of.task]
         : only(tasksOf.card(intent.of.column))
     case "retitle":
-    case "undo-move":
       return [intent.task]
+    case "undo-move":
+      return intent.task === null ? [] : [intent.task]
     case "move":
       return only(
         ...intent.moves.flatMap(m => [

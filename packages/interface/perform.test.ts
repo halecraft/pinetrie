@@ -332,7 +332,7 @@ test("a spin-off into the sidebar places and shows its thread only once the host
       card: textCardId("c"),
       from: { kind: "inventory", holder: writerId("ada@x.io") },
       to: {
-        kind: "gone",
+        kind: "trash",
         why: { kind: "spun", into: thread, thread: threadIdFor("spun") },
       },
     },

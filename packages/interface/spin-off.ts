@@ -41,9 +41,9 @@ export function planSpinOff(
   if (now === undefined || now.kind !== "text") return []
   const { place } = now
   if (place.kind === "inventory" && place.holder !== state.cards.me) return []
-  if (place.kind === "gone") return []
+  if (place.kind === "trash") return []
   const move = moveOf(now, {
-    kind: "gone",
+    kind: "trash",
     why: { kind: "spun", into: minted.root, thread: minted.thread },
   })
   const request: Extract<HostRequest, { kind: "spin-off" }> = {

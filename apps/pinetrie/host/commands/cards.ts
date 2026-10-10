@@ -20,11 +20,13 @@ import {
   DISCARDED,
   type EntryId,
   ERR,
+  historyScope,
   type Intent,
   isTextCardId,
   keyOf,
   type Move,
   type MoveDirection,
+  type MoveHistoryScope,
   moveOf,
   type NoteColumnId,
   type QueueHoldChange,
@@ -218,17 +220,18 @@ export function createCardCommands(deps: CardCommandDeps) {
    */
   async function liftOf(
     writer: WriterId,
-    task: TaskId,
+    scope: MoveHistoryScope,
     tasks: TaskIndex,
   ): Promise<LiftPlan> {
-    const top = await deps.histories.top(writer, task, "undo")
+    const top = await deps.histories.top(writer, scope, "undo")
     const lifting =
       top === undefined ? [] : cardsOfParts(top.parts, PLACES_DOC_ID)
     const known = readRoots(session)
     const threads = new Map<RootId, SpunThread>()
     for (const card of readPlaces(places)) {
       if (!lifting.includes(card.id)) continue
-      if (card.place.kind !== "gone" || card.place.why.kind !== "spun") continue
+      if (card.place.kind !== "trash" || card.place.why.kind !== "spun")
+        continue
       const { into } = card.place.why
       const held = known.has(into)
       threads.set(into, {
@@ -322,9 +325,9 @@ export function createCardCommands(deps: CardCommandDeps) {
     // gather: the history's stack, loaded before the places are read. One
     // `Discards` names both the history and a discard's gone place.
     const discards = { tasks, here }
-    const task = historyOf(moves, readPlaces(places), discards)
+    const scope = historyOf(moves, readPlaces(places), discards)
     const gesture =
-      task === null ? undefined : await deps.histories.gestureOf(writer, task)
+      scope === null ? undefined : await deps.histories.gestureOf(writer, scope)
     const entryThreads = await marginEntryThreads(moves)
     // plan: each move to a thread's notes to its nearest note column, made
     // first where its task has none, then the moves
@@ -357,9 +360,12 @@ export function createCardCommands(deps: CardCommandDeps) {
   ): Promise<Settled> {
     // gather: the history's stack, loaded before the places are read
     // A queueing discards nothing: its history is the queue's task.
-    const task = historyOf([queued], readPlaces(places), { tasks, here: null })
+    const scope = historyOf([queued], readPlaces(places), {
+      tasks,
+      here: null,
+    })
     const gesture =
-      task === null ? undefined : await deps.histories.gestureOf(writer, task)
+      scope === null ? undefined : await deps.histories.gestureOf(writer, scope)
     // plan
     const plan = planQueueCard({
       cards: readPlaces(places),
@@ -393,7 +399,9 @@ export function createCardCommands(deps: CardCommandDeps) {
       // gather: the history's stack, loaded before the places are read
       const task = taskOfPlace(tasks, reorder.at)
       const gesture =
-        task === null ? undefined : await deps.histories.gestureOf(writer, task)
+        task === null
+          ? undefined
+          : await deps.histories.gestureOf(writer, historyScope(task))
       // plan
       const step = planReorder(readPlaces(places), reorder)
       // execute
@@ -410,7 +418,10 @@ export function createCardCommands(deps: CardCommandDeps) {
       change: Extract<Intent, { kind: "card-width" }>,
     ): Promise<Settled> {
       // gather: the history's stack, loaded before the places are read
-      const gesture = await deps.histories.gestureOf(writer, change.at.task)
+      const gesture = await deps.histories.gestureOf(
+        writer,
+        historyScope(change.at.task),
+      )
       // plan
       const step = planWidth(readPlaces(places), change)
       // execute
@@ -436,24 +447,24 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * Undo or redo the sender's newest move in `task`, whole or refused
-     * (ADR-0066). Kyneta writes the revert, then `rev` is raised apart from
-     * it (S82).
+     * Undo or redo the sender's newest move in `scope`, a task's history or
+     * theirs outside any task, whole or refused (ADR-0066). Kyneta writes
+     * the revert, then `rev` is raised apart from it (S82).
      */
     async undoMove(
       writer: WriterId,
-      task: TaskId,
+      scope: MoveHistoryScope,
       direction: MoveDirection,
       tasks: TaskIndex,
     ): Promise<Settled> {
       // gather and plan: an undo that lifts a thread back into its card
       // happens only while the thread holds its first message alone
       const lift =
-        direction === "undo" ? await liftOf(writer, task, tasks) : NO_LIFT
+        direction === "undo" ? await liftOf(writer, scope, tasks) : NO_LIFT
       if (lift.kind === "replied") return notLifted(lift.by)
       // execute
       const before = deps.provenance.before()
-      const result = await deps.histories.step(writer, task, direction)
+      const result = await deps.histories.step(writer, scope, direction)
       const answer = undoAnswer(result, readPlaces(places), PLACES_DOC_ID)
       switch (answer.kind) {
         case "nothing":
@@ -492,9 +503,11 @@ export function createCardCommands(deps: CardCommandDeps) {
       await deps.cards.hydrate([card])
       const text = deps.cards.textNow(card)
       const discards = { tasks, here: request.here }
-      const task = historyOf([move], readPlaces(places), discards)
+      const scope = historyOf([move], readPlaces(places), discards)
       const gesture =
-        task === null ? undefined : await deps.histories.gestureOf(writer, task)
+        scope === null
+          ? undefined
+          : await deps.histories.gestureOf(writer, scope)
       // plan
       const cards = readPlaces(places)
       const plan = planSpinOff({
@@ -611,13 +624,15 @@ export function createCardCommands(deps: CardCommandDeps) {
     ): Promise<Settled> {
       // gather: the history's stack, loaded before the places are read
       const discards = { tasks, here: edit.here }
-      const task = historyOf(
+      const scope = historyOf(
         [{ card: edit.reference, from: edit.from, to: DISCARDED }],
         readPlaces(places),
         discards,
       )
       const gesture =
-        task === null ? undefined : await deps.histories.gestureOf(writer, task)
+        scope === null
+          ? undefined
+          : await deps.histories.gestureOf(writer, scope)
       // plan
       const step = planEditAsText(readPlaces(places), edit, writer, discards)
       // execute

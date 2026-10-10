@@ -4,8 +4,10 @@ import {
   cardIdOfKind,
   ERR,
   entryId,
+  historyScope,
   isTextCard,
   type MoveDirection,
+  PERSON_HISTORY,
   type QueueHoldChange,
   type QueueMove,
   type Reorder,
@@ -127,8 +129,8 @@ function setUp() {
   let reverting = () => {}
   const recorded: [string, string][] = []
   const histories = record<CardCommandDeps["histories"]>({
-    gestureOf: async (writer, root) => write => {
-      recorded.push([writer, root])
+    gestureOf: async (writer, scope) => write => {
+      recorded.push([writer, scope.kind === "task" ? scope.task : "person"])
       return write()
     },
     step: async () => {
@@ -174,8 +176,8 @@ function setUp() {
     ) => raw.queueCard(w, m, h, c, tasksNow(b)),
     reorder: (w: WriterId, r: Reorder) => raw.reorder(w, r, tasksNow(b)),
     unqueueAll: (w: WriterId, l: ThreadId) => raw.unqueueAll(w, l, tasksNow(b)),
-    undoMove: (w: WriterId, t: TaskId, d: MoveDirection) =>
-      raw.undoMove(w, t, d, tasksNow(b)),
+    undoMove: (w: WriterId, t: TaskId | null, d: MoveDirection) =>
+      raw.undoMove(w, historyScope(t), d, tasksNow(b)),
     spinOff: (
       w: WriterId,
       r: Parameters<Raw["spinOff"]>[1],
@@ -294,7 +296,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
 
   test("the host names a discard's history: from your inventory, the task you are on, whatever task you are on when it leaves a thread (ADR-0116)", async () => {
     const elsewhere = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
-    const gone = { kind: "gone", why: { kind: "discarded" } } as const
+    const gone = { kind: "trash", why: { kind: "discarded" } } as const
     const mine = { kind: "inventory", holder: ADA } as const
     const held = setUp()
     held.put({ place: mine })
@@ -318,10 +320,26 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(atThread.recorded).toEqual([[ADA, TEST_TASK]])
   })
 
+  test("a discard from your inventory on no task is in your history outside any task, and undone there (ADR-0126)", async () => {
+    const gone = { kind: "trash", why: { kind: "discarded" } } as const
+    const mine = { kind: "inventory", holder: ADA } as const
+    const { b, commands, put, recorded, histories } = setUp()
+    put({ place: mine })
+    await commands.move(ADA, [{ card: C1, from: mine, to: gone }], null)
+    expect(textsIn(b.places)[0]?.place).toEqual({
+      ...gone,
+      holder: ADA,
+      task: null,
+    })
+    expect(recorded).toEqual([[ADA, "person"]])
+    await commands.undoMove(ADA, null, "undo")
+    expect(histories.calls.at(-1)?.args).toEqual([ADA, PERSON_HISTORY, "undo"])
+  })
+
   test("a discard keeps the card, gone, in the discarder's history of its task: no text is destroyed, and its placer gets a trace", async () => {
     const { b, cards, commands, put, recorded } = setUp()
     put({ placer: BEA, place: pinnedPlace })
-    const gone = { kind: "gone", why: { kind: "discarded" } } as const
+    const gone = { kind: "trash", why: { kind: "discarded" } } as const
     expect(
       (
         await commands.move(
@@ -332,7 +350,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
       ).outcome,
     ).toEqual({ kind: "moved" })
     expect(textsIn(b.places).map(c => c.place)).toEqual([
-      { ...gone, task: TEST_TASK, by: ADA },
+      { ...gone, holder: ADA, task: TEST_TASK },
     ])
     expect(cards.calls).toEqual([])
     expect(recorded).toEqual([[ADA, TEST_TASK]])
@@ -600,7 +618,11 @@ describe("moves' history (ADR-0066)", () => {
       outcome: { kind: "undone", cards: [{ card: C1, place: noteKey }] },
       rev: rev + 1,
     })
-    expect(histories.calls.at(-1)?.args).toEqual([ADA, TEST_TASK, "undo"])
+    expect(histories.calls.at(-1)?.args).toEqual([
+      ADA,
+      historyScope(TEST_TASK),
+      "undo",
+    ])
   })
 
   test("a refused undo names who moved the card; one with nothing to undo is nothing", async () => {
@@ -973,7 +995,7 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
   /** The task the thread was spun into: a new one. */
   const SPUN_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000fe")
   const spun = {
-    kind: "gone",
+    kind: "trash",
     why: { kind: "spun", into: THREAD, thread: STARTS },
   } as const
   const spinMove = { card: C1, from: atEnd, to: spun }
@@ -1043,8 +1065,8 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
     ])
     expect(textsIn(b.places)[0]?.place).toEqual({
       ...spun,
+      holder: ADA,
       task: TEST_TASK,
-      by: ADA,
     })
     expect(recorded).toEqual([[ADA, TEST_TASK]])
   })
@@ -1081,7 +1103,7 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
 
   test("an undo while the thread holds its first message alone lifts it back: the card where it was, the thread deleted", async () => {
     const { b, commands, put, undoes } = setUp()
-    put({ place: { ...spun, task: TEST_TASK, by: ADA } })
+    put({ place: { ...spun, holder: ADA, task: TEST_TASK } })
     await thread(b, [ADA])
     undoes(spunStep, () => put())
     const done = await commands.undoMove(ADA, TEST_TASK, "undo")
@@ -1097,7 +1119,7 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
 
   test("once someone replied, the undo is refused, naming them, and nothing is reverted", async () => {
     const { b, commands, put, undoes } = setUp()
-    put({ place: { ...spun, task: TEST_TASK, by: ADA } })
+    put({ place: { ...spun, holder: ADA, task: TEST_TASK } })
     await thread(b, [ADA, BEA])
     let reverted = false
     undoes(spunStep, () => {

@@ -225,7 +225,7 @@ export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
   canvas: "whole",
   fresh: "whole",
   inventory: "face",
-  gone: "face",
+  trash: "face",
 }
 
 /** The level a card at a place of `place` is drawn at: a folded column, or a shut margin, is a face. */

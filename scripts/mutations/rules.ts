@@ -7,6 +7,42 @@ const archive = "packages/rules/archive.ts"
 export const mutations: readonly Mutation[] = [
   // ── a card's content as stored (ADR-0126) ──
   {
+    name: "a person's history outside any task is retired at startup",
+    file: "packages/rules/move-history.ts",
+    from: '    if (of === undefined || of.scope.kind === "person") return false\n',
+    to: "    if (of === undefined) return false\n",
+    command: unit,
+    expect:
+      "at startup, a task the session does not hold is retired too; an id that names no task, and a person's history outside any task, are left (ADR-0126)",
+  },
+  {
+    name: "a discard on no task enters no history",
+    file: "packages/rules/move-history.ts",
+    from: "      return historyScope(discardHistory(from, discards))\n",
+    to: "      return discardHistory(from, discards) === null ? null : historyScope(discardHistory(from, discards))\n",
+    command: unit,
+    expect:
+      "a discard from an inventory on no task: its sender's history outside any task (ADR-0126)",
+  },
+  {
+    name: "a thread in a trash is held by no one",
+    file: "packages/rules/held.ts",
+    from: '  return card?.place.kind === "inventory" || card?.place.kind === "trash"\n',
+    to: '  return card?.place.kind === "inventory"\n',
+    command: unit,
+    expect:
+      "a thread in a trash is held as in an inventory: its discard stops its run, and its holder holds it (ADR-0126)",
+  },
+  {
+    name: "a thread discarded keeps running",
+    file: "packages/rules/held.ts",
+    from: '    (c.place.kind === "inventory" || c.place.kind === "trash") &&\n',
+    to: '    c.place.kind === "inventory" &&\n',
+    command: unit,
+    expect:
+      "a thread in a trash is held as in an inventory: its discard stops its run, and its holder holds it (ADR-0126)",
+  },
+  {
     name: "a thread's origin this build does not know is read as a root",
     file: "packages/rules/thread.ts",
     from: '    Type.Object({ kind: Type.Literal("root") }),\n',
@@ -165,11 +201,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a discarded card is kept for good",
     file: "packages/rules/card-history.ts",
-    from: "      return last === undefined || input.now - last.at > GONE_KEEP_MS",
+    from: "      return last === undefined || input.now - last.at > TRASH_KEEP_MS",
     to: "      return last === undefined",
     command: unit,
     expect:
-      "planGoneSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere",
+      "planTrashSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere",
   },
   // ── card history and traces (ADR-0048 step 6) ──
   {
@@ -1508,7 +1544,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a gone card moves by a handoff",
     file: "packages/rules/moves.ts",
-    from: '  if (now === undefined || now.place.kind === "gone")',
+    from: '  if (now === undefined || now.place.kind === "trash")',
     to: "  if (now === undefined)",
     command: unit,
     expect: "a gone card is moved by no handoff, and a popped one is gone",
@@ -1631,16 +1667,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move's history is the task it leaves",
     file: "packages/rules/move-history.ts",
-    from: "          : (taskOf(move.to) ?? taskOf(from))",
-    to: "          : (taskOf(from) ?? taskOf(move.to))",
+    from: "    const task = taskOf(move.to) ?? taskOf(from)\n",
+    to: "    const task = taskOf(from) ?? taskOf(move.to)\n",
     command: unit,
     expect: "a drag across tasks: the task it went to",
   },
   {
     name: "a creation enters a history",
     file: "packages/rules/move-history.ts",
-    from: "      return isNoteColumnId(move.card) ? taskOf(move.to) : null",
-    to: "      return taskOf(move.to)",
+    from: "      const task = isNoteColumnId(move.card) ? taskOf(move.to) : null\n",
+    to: "      const task = taskOf(move.to)\n",
     command: unit,
     expect: "a creation: none",
   },
@@ -1673,8 +1709,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a history in no task is retired after every run",
     file: "packages/rules/move-history.ts",
-    from: "    if (!input.tasks.has(of.task)) return input.startup\n",
-    to: "    if (!input.tasks.has(of.task)) return true\n",
+    from: "    if (!input.tasks.has(task)) return input.startup\n",
+    to: "    if (!input.tasks.has(task)) return true\n",
     command: unit,
     expect:
       "a task archived 7 days and a second ago is retired; one archived 6 days ago",
@@ -1794,8 +1830,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a retitle writes nowhere, so an archived task takes it",
     file: archive,
-    from: '    case "retitle":\n    case "undo-move":\n      return [intent.task]',
-    to: '    case "undo-move":\n      return [intent.task]\n    case "retitle":\n      return []',
+    from: '    case "retitle":\n      return [intent.task]\n',
+    to: '    case "retitle":\n      return []\n',
     command: unit,
     expect: "a retitle: its task",
   },
@@ -2611,8 +2647,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note column made enters no history",
     file: "packages/rules/move-history.ts",
-    from: "      return isNoteColumnId(move.card) ? taskOf(move.to) : null",
-    to: "      return null",
+    from: "      const task = isNoteColumnId(move.card) ? taskOf(move.to) : null\n",
+    to: "      const task = null\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
     expect:
       "a note column is made by a move onto a canvas, in its task's history",
@@ -3034,8 +3070,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a change takes no thread",
     file: "packages/rules/held.ts",
-    from: '    was.get(c.id) !== "inventory"\n      ? [c.id]',
-    to: '    was.get(c.id) === "inventory"\n      ? [c.id]',
+    from: "    was.get(c.id) !== c.place.kind\n",
+    to: "    was.get(c.id) === c.place.kind\n",
     command: [
       "pnpm",
       "exec",

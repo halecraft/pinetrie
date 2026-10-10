@@ -107,7 +107,7 @@ export function revealOf(
         actedAt: at(place.task),
       }
     // Discarded: drawn nowhere, so nothing comes into view.
-    case "gone":
+    case "trash":
       return { effects: [], actedAt: AT_INVENTORY }
     case "composing":
     case "pinned":

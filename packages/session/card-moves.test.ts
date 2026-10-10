@@ -142,7 +142,7 @@ describe("the tab's moves (ADR-0059)", () => {
   })
 
   test("an accepted discard is kept as a notice where you made it, until your next move there; drawn gone until then", () => {
-    const gone = { kind: "gone", why: { kind: "discarded" } } as const
+    const gone = { kind: "trash", why: { kind: "discarded" } } as const
     const discard = {
       ...sentAs,
       id: "d-1",
@@ -156,8 +156,8 @@ describe("the tab's moves (ADR-0059)", () => {
     // In no history until the host names one.
     expect(withPending(host, s, ME)[0]?.place).toEqual({
       ...gone,
+      holder: ME,
       task: null,
-      by: ME,
     })
     expect(movesStep(s, sent(queueIt)).notices).toEqual([])
   })

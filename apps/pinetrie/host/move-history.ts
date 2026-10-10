@@ -1,9 +1,10 @@
-// host/move-history — each person's history of moves, per task (ADR-0066,
-// ADR-0116).
+// host/move-history — each person's history of moves, per task, and one
+// outside any task (ADR-0066, ADR-0116, ADR-0126).
 //
 // Kyneta undoes only the writes its own runtime made, and the host is the one
 // writer of the places document, so the stacks live here: one per writer and
-// task, `moves:<writer>:<task>`, kept in the host's store, so a person's tabs
+// task, `moves:<writer>:<task>`, and one per writer outside any task,
+// `moves:<writer>` (`MoveHistoryScope`), kept in the host's store, so a person's tabs
 // share it and it outlives a restart (S91). Every undo is whole or refused
 // (`whole: true`): without it, a step someone else's move broke would be
 // skipped and an older one undone out of sight (S82). A stack is made on its
@@ -19,6 +20,7 @@ import {
 } from "@kyneta/exchange"
 import {
   type MoveDirection,
+  type MoveHistoryScope,
   movesDocId,
   movesOfDocId,
   type TaskId,
@@ -28,21 +30,21 @@ import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import type { Gesture } from "./places.ts"
 
 export interface MoveHistories {
-  /** One step of `writer`'s history in `task`, its stack loaded first. */
-  gestureOf(writer: WriterId, task: TaskId): Promise<Gesture>
+  /** One step of `writer`'s history in `scope`, its stack loaded first. */
+  gestureOf(writer: WriterId, scope: MoveHistoryScope): Promise<Gesture>
   /**
    * The step `step` would try first, without reverting it: its parts name
    * the cards it moves (S139). Undefined for none.
    */
   top(
     writer: WriterId,
-    task: TaskId,
+    scope: MoveHistoryScope,
     direction: MoveDirection,
   ): Promise<Step | undefined>
-  /** Undo or redo `writer`'s newest step in `task`, whole or refused. */
+  /** Undo or redo `writer`'s newest step in `scope`, whole or refused. */
   step(
     writer: WriterId,
-    task: TaskId,
+    scope: MoveHistoryScope,
     direction: MoveDirection,
   ): Promise<UndoneWhole>
   /** The writers with a stack loaded now. */
@@ -60,8 +62,11 @@ export function createMoveHistories(exchange: Exchange): MoveHistories {
   // A stack still being made is kept as its promise, so two uses at once
   // make one.
   const stacks = new Map<string, Promise<UndoStack>>()
-  const stackOf = (writer: WriterId, task: TaskId): Promise<UndoStack> => {
-    const docId = movesDocId(writer, task)
+  const stackOf = (
+    writer: WriterId,
+    scope: MoveHistoryScope,
+  ): Promise<UndoStack> => {
+    const docId = movesDocId(writer, scope)
     const held = stacks.get(docId)
     if (held !== undefined) return held
     const made = createUndoStack({
@@ -84,21 +89,23 @@ export function createMoveHistories(exchange: Exchange): MoveHistories {
     await exchange.flush()
     for (const docId of docIds) await exchange.unload(docId)
   }
-  const held = (keep: (of: { writer: WriterId; task: TaskId }) => boolean) =>
+  const held = (
+    keep: (of: { writer: WriterId; scope: MoveHistoryScope }) => boolean,
+  ) =>
     [...stacks.keys()].filter(docId => {
       const of = movesOfDocId(docId)
       return of !== undefined && keep(of)
     })
   return {
-    async gestureOf(writer, task) {
-      const stack = await stackOf(writer, task)
+    async gestureOf(writer, scope) {
+      const stack = await stackOf(writer, scope)
       return write => stack.gesture(write)
     },
-    async top(writer, task, direction) {
-      return (await stackOf(writer, task)).top(direction)
+    async top(writer, scope, direction) {
+      return (await stackOf(writer, scope)).top(direction)
     },
-    async step(writer, task, direction) {
-      const stack = await stackOf(writer, task)
+    async step(writer, scope, direction) {
+      const stack = await stackOf(writer, scope)
       return direction === "undo"
         ? stack.undo({ whole: true })
         : stack.redo({ whole: true })
@@ -114,7 +121,9 @@ export function createMoveHistories(exchange: Exchange): MoveHistories {
       return unload(held(of => writers.includes(of.writer)))
     },
     unloadTask(task) {
-      return unload(held(of => of.task === task))
+      return unload(
+        held(of => of.scope.kind === "task" && of.scope.task === task),
+      )
     },
     async retire(docIds) {
       for (const docId of docIds) {

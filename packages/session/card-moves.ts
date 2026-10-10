@@ -180,7 +180,7 @@ const drawn = (p: Pending, rev: number): boolean =>
 /** The discards a command sent as `id` made, each a notice where it was made. */
 const discardsIn = (pending: readonly Pending[], id: string): CardNotice[] =>
   pending.flatMap(p =>
-    p.id === id && p.kind === "move" && p.move.to.kind === "gone"
+    p.id === id && p.kind === "move" && p.move.to.kind === "trash"
       ? [{ card: p.move.card, actedAt: p.actedAt, code: "discarded" as const }]
       : [],
   )
@@ -355,8 +355,8 @@ export function drawnPlace(
       return { ...key, order: LAST_ORDER }
     case "canvas":
       return { ...key, order: LAST_ORDER, width: 1 }
-    case "gone":
-      return { ...key, task: null, by: me }
+    case "trash":
+      return { ...key, holder: me, task: null }
     // Drawn at the rank the host would give it there.
     case "canvas-at":
       return {

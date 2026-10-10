@@ -29,7 +29,7 @@ import { rootOfPlace, type TaskIndex } from "./task.ts"
  * the first open one).
  */
 export interface SpinOff {
-  readonly move: Move<Extract<PlaceKey, { readonly kind: "gone" }>>
+  readonly move: Move<Extract<PlaceKey, { readonly kind: "trash" }>>
   /** The new task the thread is put in (ADR-0116). */
   readonly task: TaskId
   readonly state: WorkflowStateId | null
@@ -77,7 +77,7 @@ export function planSpinOff(input: {
 }): SpinOffPlan | SpinOffRefusal {
   const { move } = input.request
   const to = move.to
-  if (to.kind !== "gone" || to.why.kind !== "spun" || move.from === null)
+  if (to.kind !== "trash" || to.why.kind !== "spun" || move.from === null)
     return { kind: "refused", code: "moved" }
   const { into, thread } = to.why
   if (input.roots.has(into)) return { kind: "root-in-use" }
@@ -147,12 +147,12 @@ export function planLiftRoot(input: {
   const spun = input.cards.filter(
     c =>
       input.lifting.includes(c.id) &&
-      c.place.kind === "gone" &&
+      c.place.kind === "trash" &&
       c.place.why.kind === "spun",
   )
   const deleting: { root: RootId; thread: ThreadId }[] = []
   for (const card of spun) {
-    if (card.place.kind !== "gone" || card.place.why.kind !== "spun") continue
+    if (card.place.kind !== "trash" || card.place.why.kind !== "spun") continue
     const thread = input.threads.get(card.place.why.into)
     if (thread === undefined || !thread.known) continue
     const second = thread.writers[1]

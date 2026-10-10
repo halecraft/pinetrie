@@ -6,9 +6,11 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
+  historyScope,
   isNoteColumnId,
   keyOf,
   type Move,
+  type MoveHistoryScope,
   type MoveTarget,
   movesOfDocId,
   type PlaceKey,
@@ -21,37 +23,39 @@ import { taskOfTarget } from "./task.ts"
 // ── moves' history (ADR-0066) ─────────────────────────────────────────────
 
 /**
- * The task whose history of the sender's moves `moves` enter, or null for
- * none (ADR-0066, ADR-0116). A creation enters none (a composer's new card,
- * a copy) but a note column's, which enters its canvas's task. Otherwise the task the card goes to, when it goes to one, else the
- * task it leaves, read from its record, since the host accepts a move only
- * from where the card is. So a take into the inventory is recorded where it
+ * The history of the sender's moves `moves` enter, or null for none
+ * (ADR-0066, ADR-0116, ADR-0126). A creation enters none (a composer's new
+ * card, a copy) but a note column's, which enters its canvas's task.
+ * Otherwise the task the card goes to, when it goes to one, else the task
+ * it leaves, read from its record, since the host accepts a move only from
+ * where the card is. So a take into the inventory is recorded where it
  * left, a put where it went, a drag across tasks where it went, and a
- * discard where its gone place goes (`discardHistory`), which the page does not
- * name (ADR-0066). Of several, the first that names a task names the
- * step's. A place at a thread, or a thread's nearest notes, is in its
- * thread's task, a spot on a canvas in its canvas's (`taskOfTarget`). Pure.
+ * discard in the task it leaves (`discardHistory`), which the page does not
+ * name (ADR-0066), or, leaving no task, in its sender's history outside any
+ * task. Of several, the first that names a history names the step's. A
+ * place at a thread, or a thread's nearest notes, is in its thread's task,
+ * a spot on a canvas in its canvas's (`taskOfTarget`). Pure.
  */
 export function historyOf(
   moves: readonly Move[],
   cards: readonly CardRecord[],
   discards: Discards,
-): TaskId | null {
+): MoveHistoryScope | null {
   const taskOf = (to: CardPlace | MoveTarget) =>
     taskOfTarget(discards.tasks, to)
   for (const move of moves) {
     // A note column made is in its task's history, so the undo key takes
     // it back; a card made in a composer or a queue is in none.
-    if (move.from === null)
-      return isNoteColumnId(move.card) ? taskOf(move.to) : null
+    if (move.from === null) {
+      const task = isNoteColumnId(move.card) ? taskOf(move.to) : null
+      return task === null ? null : historyScope(task)
+    }
     const from = cards.find(c => c.id === move.card)?.place
-    const task =
-      from === undefined
-        ? null
-        : move.to.kind === "gone"
-          ? discardHistory(from, discards)
-          : (taskOf(move.to) ?? taskOf(from))
-    if (task !== null) return task
+    if (from === undefined) continue
+    if (move.to.kind === "trash")
+      return historyScope(discardHistory(from, discards))
+    const task = taskOf(move.to) ?? taskOf(from)
+    if (task !== null) return historyScope(task)
   }
   return null
 }
@@ -63,7 +67,8 @@ const ARCHIVED_HISTORY_MS = 7 * 24 * 60 * 60 * 1000
  * The histories of moves to retire (ADR-0066): those of a task archived
  * `ARCHIVED_HISTORY_MS` ago or longer; and, at startup only, those of a
  * task the session does not hold (a new tab that never sent, or a task
- * gone). An id that names no task is left. After a run's end that second
+ * gone). An id that names no task is left: a person's history outside any
+ * task (`moves:<writer>`), or a document no history names. After a run's end that second
  * rule would retire the history of a new tab open now. `stored` is every
  * stored `moves:` document. Pure.
  */
@@ -76,9 +81,11 @@ export function planHistorySweep(input: {
 }): readonly string[] {
   return input.stored.filter(docId => {
     const of = movesOfDocId(docId)
-    if (of === undefined) return false
-    if (!input.tasks.has(of.task)) return input.startup
-    const archived = input.archived.get(of.task)
+    // A person's history outside any task is kept: no task retires it.
+    if (of === undefined || of.scope.kind === "person") return false
+    const { task } = of.scope
+    if (!input.tasks.has(task)) return input.startup
+    const archived = input.archived.get(task)
     return (
       archived !== undefined && input.now - archived.at >= ARCHIVED_HISTORY_MS
     )

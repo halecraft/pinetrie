@@ -1,7 +1,10 @@
 import { createInMemoryStore, Exchange, whenHydrated } from "@kyneta/exchange"
 import {
   type CardRecord,
+  historyScope,
+  type MoveHistoryScope,
   movesDocId,
+  PERSON_HISTORY,
   rootIdFor,
   type TaskId,
   type TextCard,
@@ -53,14 +56,17 @@ async function setUp() {
   /** `writer` moves `c` to `place`, as one step of their history in `root`. */
   const move = async (
     writer: typeof ADA,
-    root: TaskId,
+    root: TaskId | MoveHistoryScope,
     c: TextCard,
     place: TextCard["place"],
   ) =>
     applyPlaceSteps(
       places,
       [{ kind: "write", record: { ...c, place, placer: writer } }],
-      await histories.gestureOf(writer, root),
+      await histories.gestureOf(
+        writer,
+        typeof root === "string" ? historyScope(root) : root,
+      ),
     )
   const placeOf = (id: string) =>
     readPlaces(places).find(c => c.id === cardIdFor(id))?.place.kind
@@ -75,10 +81,12 @@ test("a move is one step of its writer's history in its task, and undoes whole a
   seed(a)
   await move(ADA, R1, a, inventory)
   expect(placeOf("a")).toBe("inventory")
-  const undone = await histories.step(ADA, R1, "undo")
+  const undone = await histories.step(ADA, historyScope(R1), "undo")
   expect(undone.kind).toBe("undone")
   expect(placeOf("a")).toBe("pinned")
-  expect((await histories.step(ADA, R1, "redo")).kind).toBe("undone")
+  expect((await histories.step(ADA, historyScope(R1), "redo")).kind).toBe(
+    "undone",
+  )
   expect(placeOf("a")).toBe("inventory")
   histories.dispose()
 })
@@ -90,13 +98,34 @@ test("another task's history, and another writer's, are untouched by an undo", a
   await move(ADA, R1, a, inventory)
   await move(ADA, R2, b, inventory)
   await move(BEA, R1, c, inventory)
-  expect((await histories.step(ADA, R1, "undo")).kind).toBe("undone")
+  expect((await histories.step(ADA, historyScope(R1), "undo")).kind).toBe(
+    "undone",
+  )
   expect([placeOf("a"), placeOf("b"), placeOf("c")]).toEqual([
     "pinned",
     "inventory",
     "inventory",
   ])
-  expect((await histories.step(ADA, R1, "undo")).kind).toBe("none")
+  expect((await histories.step(ADA, historyScope(R1), "undo")).kind).toBe(
+    "none",
+  )
+  histories.dispose()
+})
+
+test("a person's history outside any task is a stack of its own: a task's undo leaves it, and its own undoes it (ADR-0126)", async () => {
+  const { histories, card, seed, move, placeOf } = await setUp()
+  const [a, b] = [card("a", R1), card("b", R1)]
+  for (const x of [a, b]) seed(x)
+  await move(ADA, PERSON_HISTORY, a, inventory)
+  await move(ADA, R1, b, inventory)
+  expect((await histories.step(ADA, historyScope(R1), "undo")).kind).toBe(
+    "undone",
+  )
+  expect([placeOf("a"), placeOf("b")]).toEqual(["inventory", "pinned"])
+  expect((await histories.step(ADA, PERSON_HISTORY, "undo")).kind).toBe(
+    "undone",
+  )
+  expect(placeOf("a")).toBe("pinned")
   histories.dispose()
 })
 
@@ -106,7 +135,7 @@ test("an undo is refused, and nothing reverted, after someone else moved the car
   seed(a)
   await move(ADA, R1, a, inventory)
   await move(BEA, R1, a, atEnd(R2))
-  const refused = await histories.step(ADA, R1, "undo")
+  const refused = await histories.step(ADA, historyScope(R1), "undo")
   expect(refused.kind).toBe("refused")
   // Where Bea put it.
   expect(recordOf("a")).toMatchObject({ place: atEnd(R2), placer: BEA })
@@ -126,9 +155,11 @@ test("a stored history not loaded is retired by id, and a stack made on it again
     for await (const id of store.listDocIds("moves:")) out.push(id)
     return out
   }
-  expect(await listed()).toEqual([movesDocId(ADA, R1)])
-  await histories.retire([movesDocId(ADA, R1)])
+  expect(await listed()).toEqual([movesDocId(ADA, historyScope(R1))])
+  await histories.retire([movesDocId(ADA, historyScope(R1))])
   expect(await listed()).toEqual([])
-  expect((await histories.step(ADA, R1, "undo")).kind).toBe("none")
+  expect((await histories.step(ADA, historyScope(R1), "undo")).kind).toBe(
+    "none",
+  )
   histories.dispose()
 })

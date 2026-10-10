@@ -1,4 +1,5 @@
 import {
+  historyScope,
   movesDocId,
   rootDocId,
   rootIdFor,
@@ -117,7 +118,7 @@ test.each([
 test("a stack of moves is the host's: shared with no one, taken from no one, and rejected when a client announces one (ADR-0066)", () => {
   const MOVES = movesDocId(
     writerId("ada@x.io"),
-    taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
+    historyScope(taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")),
   )
   const peer = {
     peerId: "seat-a",
@@ -151,7 +152,7 @@ test("storedKind: each stored document's kind, by which its schema is checked at
     storedKind(
       movesDocId(
         writerId("ada@x.io"),
-        taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
+        historyScope(taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")),
       ),
     ),
   ).toBe("kyneta")

@@ -3244,7 +3244,7 @@ async function run(check: Checks["check"]): Promise<void> {
           `${await boxValue(page, freshBox)}`,
         )
         const cardsBefore = readPlaces(host.places).filter(
-          c => c.place.kind !== "gone",
+          c => c.place.kind !== "trash",
         ).length
         await page.click(`${col(1)} .close`)
         const asks = await page
@@ -3265,7 +3265,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         const shown = () =>
-          readPlaces(host.places).filter(c => c.place.kind !== "gone").length
+          readPlaces(host.places).filter(c => c.place.kind !== "trash").length
         await waitFor(() => shown() < cardsBefore, 5_000)
         check(
           "closing a new branch that holds text asks first, and discarding takes its card away",
@@ -3566,7 +3566,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.click(slotOf(parked))
       await page.keyboard.press("Enter")
       await page.click(".inventory .discard-card")
-      await waitFor(() => placeOf(parked)?.kind === "gone", 5_000)
+      await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       await page.evaluate(() =>
         (document.activeElement as HTMLElement | null)?.blur(),
       )
@@ -3594,7 +3594,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       await page.dragAndDrop(slotOf(parked), stateEl).catch(() => undefined)
       const spun = await waitFor(
-        () => spunInto() !== undefined && placeOf(parked)?.kind === "gone",
+        () => spunInto() !== undefined && placeOf(parked)?.kind === "trash",
         15_000,
       )
       const into = spunInto()
@@ -3698,7 +3698,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.click(slotOf(parked))
       await page.keyboard.press("Enter")
       await page.click(".inventory .discard-card")
-      await waitFor(() => placeOf(parked)?.kind === "gone", 5_000)
+      await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       const columnsBefore = await page.locator(".column").count()
       // Closing a fresh column with text keeps its card, in the slot selected.
       const branchable = page

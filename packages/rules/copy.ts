@@ -78,6 +78,7 @@ export function planCopy(input: {
     return { kind: "refused", why: "held" }
   // Onto a canvas, ranked where it was dropped; or into an inventory.
   const { to: target } = move
+  if (target.kind === "trash") return { kind: "refused", why: "no-place" }
   const placed =
     target.kind === "inventory"
       ? { to: target, ranked: null }

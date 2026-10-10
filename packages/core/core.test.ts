@@ -16,6 +16,7 @@ import {
   findSeqKeys,
   fitsPlace,
   handleOf,
+  historyScope,
   indexTree,
   keyFieldsFrom,
   keyFieldsOf,
@@ -26,6 +27,8 @@ import {
   type MoveTarget,
   messageText,
   moveOf,
+  movesDocId,
+  movesOfDocId,
   NO_CONTENT,
   NOBODY,
   type NotesTarget,
@@ -33,6 +36,7 @@ import {
   normalizeEmail,
   normalizeName,
   noteOf,
+  PERSON_HISTORY,
   parseCardId,
   parseMentions,
   parseNewThread,
@@ -526,9 +530,9 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(keyFieldsOf(note)).not.toHaveProperty("order")
     expect(keyFieldsOf(note)).toHaveProperty("column", NOTES)
     const gone = placeFields({
-      kind: "gone",
+      kind: "trash",
       task: TEST_TASK,
-      by: writerId("ada@example.com"),
+      holder: writerId("ada@example.com"),
       why: { kind: "discarded" },
     })
     expect(keyFieldsOf(gone)).not.toHaveProperty("task")
@@ -714,15 +718,15 @@ describe("moves, built once (ADR-0059)", () => {
     expect(moveOf(atEnd, DISCARDED)).toEqual({
       card: cardIdFor("c1"),
       from: { kind: "note", column: NOTES },
-      to: { kind: "gone", why: { kind: "discarded" } },
+      to: { kind: "trash", why: { kind: "discarded" } },
     })
   })
 
   test("a gone place is stored under its reason, with who discarded it", () => {
     const place = {
-      kind: "gone",
+      kind: "trash",
       task: TEST_TASK,
-      by: ADA,
+      holder: ADA,
       why: { kind: "discarded" },
     } as const
     const fields = placeFields(place)
@@ -731,7 +735,7 @@ describe("moves, built once (ADR-0059)", () => {
     expect(keyOfFields({ ...fields, holder: "" })).toEqual(keyOf(place))
     expect(placeOfFields({ ...fields, task: "" })).toMatchObject({ task: null })
     expect(placeOfFields({ ...fields, holder: "" })).toBeUndefined()
-    expect(keyOfFields(fields)).toEqual({ kind: "gone", why: place.why })
+    expect(keyOfFields(fields)).toEqual({ kind: "trash", why: place.why })
   })
 
   test("seenAt: a note is where its sender saw it in its column, whatever its rank", () => {
@@ -765,9 +769,9 @@ describe("moves, built once (ADR-0059)", () => {
   test("a spun card is stored as spun, its root in its column and its thread in its lane; a spun place with neither is malformed", () => {
     const thread = threadIdFor("spun")
     const place = {
-      kind: "gone",
+      kind: "trash",
       task: TEST_TASK,
-      by: ADA,
+      holder: ADA,
       why: { kind: "spun", into: OTHER, thread },
     } as const
     const fields = placeFields(place)
@@ -783,7 +787,7 @@ describe("moves, built once (ADR-0059)", () => {
     expect(placeOfFields({ ...fields, lane: "" })).toBeUndefined()
     expect(
       sameKey(keyOf(place), {
-        kind: "gone",
+        kind: "trash",
         why: { kind: "spun", into: TEST_ROOT, thread },
       }),
     ).toBe(false)
@@ -855,9 +859,9 @@ test("every place writes only the fields its kind's row stores (`ROWS`)", () => 
     { kind: "notes", near: "task", task },
     { kind: "inventory", holder: writerId("a@x.io") },
     {
-      kind: "gone",
+      kind: "trash",
       task,
-      by: writerId("a@x.io"),
+      holder: writerId("a@x.io"),
       why: {
         kind: "spun",
         into: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ac"),
@@ -896,3 +900,16 @@ test("a notes target says by its tag which notes it is near, a thread's or a tas
 
 const UUID = "01a0ffd2-0000-7000-8000-00000000000a"
 const NOTES = cardIdOfKind("note-column", UUID)
+
+describe("a history of moves' document (ADR-0066, ADR-0126)", () => {
+  const ADA_W = writerId("ada@x.io")
+  test("a task's and a person's outside any task read back as written; other ids name none", () => {
+    for (const scope of [historyScope(TEST_TASK), PERSON_HISTORY])
+      expect(movesOfDocId(movesDocId(ADA_W, scope))).toEqual({
+        writer: ADA_W,
+        scope,
+      })
+    expect(movesOfDocId(`moves:${ADA_W}:r-x`)).toBeUndefined()
+    expect(movesOfDocId("root:r-x")).toBeUndefined()
+  })
+})

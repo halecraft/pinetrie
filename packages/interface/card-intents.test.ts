@@ -563,7 +563,7 @@ describe("your message (ADR-0113)", () => {
       kind: "keep",
       moves: [
         { move: { card: C1, to: atEnd } },
-        { move: { card: MSG, to: { kind: "gone" } } },
+        { move: { card: MSG, to: { kind: "trash" } } },
       ],
     })
   })
@@ -840,12 +840,14 @@ describe("undo and redo of moves (ADR-0066)", () => {
     ])
   })
 
-  test("on nothing: nothing", () => {
+  test("on no task: your history outside any task (ADR-0126)", () => {
     const nothing = layoutReducer(onR1, {
       kind: "show",
       here: { kind: "nothing" },
     })
-    expect(plan(undo, state({}, nothing))).toEqual([])
+    expect(plan(undo, state({}, nothing))).toEqual([
+      { kind: "undoMoves", task: null, direction: "undo" },
+    ])
   })
 })
 
@@ -997,7 +999,7 @@ describe("a card made a thread (ADR-0111)", () => {
   const S1 = workflowStateIdFor("s-1")
   // The host names the move's history (ADR-0116): the page names none.
   const spun = {
-    kind: "gone",
+    kind: "trash",
     why: { kind: "spun", into: NEW_ROOT, thread: NEW_THREAD },
   } as const
   test.each([

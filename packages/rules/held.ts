@@ -16,13 +16,15 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 
-/** Who holds `thread` in their inventory, or null for a thread on a canvas or with no card. Pure. */
+/** Who holds `thread` in their inventory or trash, or null for a thread on a canvas or with no card. Pure. */
 export function holderOf(
   cards: readonly CardRecord[],
   thread: ThreadId,
 ): WriterId | null {
   const card = cards.find(c => c.id === thread)
-  return card?.place.kind === "inventory" ? card.place.holder : null
+  return card?.place.kind === "inventory" || card?.place.kind === "trash"
+    ? card.place.holder
+    : null
 }
 
 /** Why a command in a thread in an inventory is refused. */
@@ -135,10 +137,11 @@ export function heldIn(
 }
 
 /**
- * The threads a change to the places takes into an inventory (ADR-0124):
- * each thread card there after it that was not before. Whatever wrote the
- * change (a move, an undo or a redo, a copy), their runs stop with it, as
- * the taker's own stop: there is no agent in an inventory. Pure.
+ * The threads a change to the places takes into an inventory or a trash
+ * (ADR-0124, ADR-0126): each thread card there after it that was not
+ * there before. Whatever wrote the change (a move, an undo or a redo, a
+ * copy), their runs stop with it, as the taker's own stop: there is no
+ * agent in either. Pure.
  */
 export function takenIn(
   before: readonly CardRecord[],
@@ -147,8 +150,8 @@ export function takenIn(
   const was = new Map(before.map(c => [c.id, c.place.kind] as const))
   return after.flatMap(c =>
     c.kind === "thread" &&
-    c.place.kind === "inventory" &&
-    was.get(c.id) !== "inventory"
+    (c.place.kind === "inventory" || c.place.kind === "trash") &&
+    was.get(c.id) !== c.place.kind
       ? [c.id]
       : [],
   )

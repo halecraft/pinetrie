@@ -385,7 +385,7 @@ describe("planIntent", () => {
       move: {
         card: "c",
         from: place,
-        to: { kind: "gone", why: { kind: "discarded" } },
+        to: { kind: "trash", why: { kind: "discarded" } },
       },
       how: {
         actedAt: { kind: "column", key: F },

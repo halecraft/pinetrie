@@ -198,8 +198,8 @@ export function taskOfPlace(
     case "fresh":
     case "task-pinned":
       return place.task
-    // A gone key names no history: the host gives it one (`historyOf`).
-    case "gone":
+    // A trash key names no history: the host gives it one (`historyOf`).
+    case "trash":
       return "task" in place ? place.task : null
     case "inventory":
       return null

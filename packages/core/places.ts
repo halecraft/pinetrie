@@ -138,14 +138,14 @@ export type CardPlace =
     }
   | { readonly kind: "inventory"; readonly holder: WriterId }
   | {
-      readonly kind: "gone"
+      readonly kind: "trash"
+      /** Whose trash: who discarded it (ADR-0126). */
+      readonly holder: WriterId
       /**
-       * The task whose history of moves the discard is in: the one its
-       * discarder was on; null for none, and then nothing undoes it.
+       * The task it left, whose history of moves the discard is in; null
+       * for none, and then its holder's history outside any task is.
        */
       readonly task: TaskId | null
-      /** Who discarded it. */
-      readonly by: WriterId
       readonly why: GoneWhy
     }
 
@@ -153,7 +153,7 @@ export type CardPlace =
 export type CardWidth = 1 | 2
 
 /**
- * Why a card is gone: the stored kind of its place. Discarded; or spun off
+ * Why a card is in the trash: the stored kind of its place. Discarded; or spun off
  * into `thread`, a conversation root it started (ADR-0111), whose undo
  * lifts the root back into the card while it holds that first message
  * alone.
@@ -187,11 +187,14 @@ type OmitEach<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
  */
 export type PlaceKey =
   | OmitEach<
-      Exclude<CardPlace, { readonly kind: "gone" }>,
+      Exclude<CardPlace, { readonly kind: "trash" }>,
       "order" | "by" | "width"
     >
-  /** A discard names no history: the host's to decide (`historyOf`, ADR-0066). */
-  | { readonly kind: "gone"; readonly why: GoneWhy }
+  /**
+   * A discard names neither whose trash nor which history: the host's to
+   * decide, its sender's and the task it leaves (`historyOf`, ADR-0066).
+   */
+  | { readonly kind: "trash"; readonly why: GoneWhy }
 
 /**
  * A move's target alone, never where a card is: the note column nearest
@@ -254,8 +257,8 @@ export function keyOf(place: CardPlace): PlaceKey {
     case "fresh":
     case "inventory":
       return place
-    case "gone":
-      return { kind: "gone", why: place.why }
+    case "trash":
+      return { kind: "trash", why: place.why }
   }
 }
 
@@ -287,9 +290,9 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
       return b.kind === "fresh" && a.column === b.column
     case "inventory":
       return b.kind === "inventory" && a.holder === b.holder
-    case "gone":
+    case "trash":
       return (
-        b.kind === "gone" &&
+        b.kind === "trash" &&
         a.why.kind === b.why.kind &&
         (a.why.kind !== "spun" ||
           (b.why.kind === "spun" &&
@@ -438,7 +441,11 @@ export function moveOf(
 ): TypedMove
 export function moveOf(
   card: TextCard | ReferenceCard,
-  to: NotesTarget | Extract<PlaceKey, { readonly kind: "gone" }>,
+  to: NotesTarget,
+): TypedMove
+export function moveOf(
+  card: TextCard | ReferenceCard | ThreadCard,
+  to: Extract<PlaceKey, { readonly kind: "trash" }>,
 ): TypedMove
 export function moveOf(card: CardRecord, to: MoveTarget): Move {
   return { card: card.id, from: keyOf(card.place), to }
@@ -462,11 +469,12 @@ export const threadOfPlace = (place: CardPlace | PlaceKey): ThreadId | null =>
     : null
 
 /**
- * Where a discard puts a card (ADR-0111): gone. Which history it is in is
- * the host's to name (`historyOf`), from where the card leaves.
+ * Where a discard puts a card (ADR-0111, ADR-0126): its discarder's trash.
+ * Which history it is in is the host's to name (`historyOf`), from where
+ * the card leaves.
  */
-export const DISCARDED: Extract<PlaceKey, { readonly kind: "gone" }> = {
-  kind: "gone",
+export const DISCARDED: Extract<PlaceKey, { readonly kind: "trash" }> = {
+  kind: "trash",
   why: { kind: "discarded" },
 }
 
@@ -736,9 +744,9 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
       })
     case "inventory":
       return row("inventory", { holder: place.holder })
-    case "gone": {
+    case "trash": {
       const task = "task" in place ? (place.task ?? "") : ""
-      const holder = "by" in place ? place.by : ""
+      const holder = "holder" in place ? place.holder : ""
       return place.why.kind === "spun"
         ? row("spun", {
             task,
@@ -751,7 +759,7 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
   }
 }
 
-/** A gone row -> why it is gone; undefined for a spun one with no thread. */
+/** A trash row -> why it is there; undefined for a spun one with no thread. */
 const goneWhyOf = (
   r: Extract<Row, { kind: "discarded" | "spun" }>,
 ): GoneWhy | undefined =>
@@ -826,7 +834,7 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
       const task = goneTaskOf(r.task)
       return r.holder === "" || task === undefined || why === undefined
         ? undefined
-        : { kind: "gone", task, by: r.holder as WriterId, why }
+        : { kind: "trash", holder: r.holder as WriterId, task, why }
     }
     case "drafting": {
       const at = atThread(r)
@@ -886,7 +894,7 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
     case "discarded":
     case "spun": {
       const why = goneWhyOf(r)
-      return why === undefined ? undefined : { kind: "gone", why }
+      return why === undefined ? undefined : { kind: "trash", why }
     }
     case "queued": {
       const at = atThread(r)

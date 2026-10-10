@@ -689,8 +689,8 @@ rejects `shutdown()`.
   not, so an undo takes the card back and leaves the hold. One with no
   `from` makes the card in the queue with its command (`targetId` on the
   wire), in no history, as any creation.
-- **Discarded cards are swept** (`sweepGone`, `housekeeping.ts`): a card
-  gone more than `GONE_KEEP_MS` loses its record, then its text, at startup
+- **Discarded cards are swept** (`sweepTrash`, `housekeeping.ts`): a card
+  gone more than `TRASH_KEEP_MS` loses its record, then its text, at startup
   and in `settle`'s sweep, before the provenance's sweep deletes its history.
 - **`reorder` and `unqueue-all` are moves of their own** (`commands/cards.ts`).
   A reorder is written in the sender's history of its place's root

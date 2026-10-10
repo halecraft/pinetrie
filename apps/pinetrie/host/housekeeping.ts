@@ -30,9 +30,9 @@ import {
 } from "@pinetrie/reads"
 import {
   deleteRecord,
-  planGoneSweep,
   planHistorySweep,
   planHoldSweep,
+  planTrashSweep,
   QUEUE_HOLD,
 } from "@pinetrie/rules"
 import type { Basics } from "./basics.ts"
@@ -176,12 +176,12 @@ export async function sweepHolds(input: {
 }
 
 /**
- * Delete the cards discarded more than `GONE_KEEP_MS` ago (ADR-0111): gather
- * the places and the cards' histories, plan (`planGoneSweep`), then delete
+ * Delete the cards discarded more than `TRASH_KEEP_MS` ago (ADR-0111): gather
+ * the places and the cards' histories, plan (`planTrashSweep`), then delete
  * each record, then its text (S64). The histories left with no card go with
  * the provenance's own sweep, which the caller runs after.
  */
-export async function sweepGone(input: {
+export async function sweepTrash(input: {
   readonly basics: Pick<Basics, "session" | "places" | "log" | "now">
   readonly cards: Pick<CardPort, "destroy">
 }): Promise<void> {
@@ -190,7 +190,7 @@ export async function sweepGone(input: {
   const cards = readPlaces(places)
   const histories = readCardHistories(session)
   // plan
-  const doomed = planGoneSweep({ cards, histories, now: now() })
+  const doomed = planTrashSweep({ cards, histories, now: now() })
   // execute
   if (doomed.length === 0) return
   applyPlaceSteps(

@@ -34,7 +34,7 @@ const note = {
   thread: TEST_THREAD,
 } as const
 const spun = {
-  kind: "gone",
+  kind: "trash",
   why: { kind: "spun", into: THREAD, thread: STARTS },
 } as const
 const card = (over: Partial<TextCard> = {}): TextCard => ({
@@ -80,7 +80,7 @@ describe("planSpinOff (ADR-0111)", () => {
       mentions: [],
       step: {
         kind: "write",
-        record: { ...card(), place: { ...spun, task: TEST_TASK, by: ADA } },
+        record: { ...card(), place: { ...spun, holder: ADA, task: TEST_TASK } },
       },
     })
   })
@@ -118,7 +118,7 @@ describe("planSpinOff (ADR-0111)", () => {
 })
 
 describe("planLiftRoot (S139)", () => {
-  const gone = card({ place: { ...spun, task: TEST_TASK, by: ADA } })
+  const gone = card({ place: { ...spun, holder: ADA, task: TEST_TASK } })
   const thread = (
     writers: SpunThread["writers"],
     known = true,

@@ -190,10 +190,13 @@ export type Effect =
       /** As `moveCard`'s. */
       readonly here: TaskId | null
     }
-  /** Undo or redo your newest move in `task`, on the host (ADR-0066). */
+  /**
+   * Undo or redo your newest move in `task`, or outside any task for none,
+   * on the host (ADR-0066, ADR-0126).
+   */
   | {
       readonly kind: "undoMoves"
-      readonly task: TaskId
+      readonly task: TaskId | null
       readonly direction: MoveDirection
     }
   /** Undo or redo this tab's newest swap in your inventory. */

@@ -369,12 +369,12 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
             kind: "composing",
             thread: TEST_THREAD,
           },
-          to: { kind: "gone", why: { kind: "discarded" } },
+          to: { kind: "trash", why: { kind: "discarded" } },
         },
         {
           card: cardIdFor("c8"),
           from: { kind: "inventory", holder: writerId("ada@example.com") },
-          to: { kind: "gone", why: { kind: "discarded" } },
+          to: { kind: "trash", why: { kind: "discarded" } },
         },
       ],
       here: TEST_TASK,
@@ -385,7 +385,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         card: cardIdFor("c9"),
         from: { kind: "inventory", holder: writerId("ada@example.com") },
         to: {
-          kind: "gone",
+          kind: "trash",
           why: {
             kind: "spun",
             into: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
@@ -896,7 +896,7 @@ test("decode: a move needs its cards, each with a place, and its sender's task a
     { kind: "card-width", cardId: "", task: TEST_TASK, mode: "2" },
     { kind: "card-width", cardId: cardIdFor("c1"), task: "r-x", mode: "2" },
     { kind: "card-width", cardId: cardIdFor("c1"), task: TEST_TASK, mode: "3" },
-    { kind: "undo-move", root: "", mode: "undo" },
+    { kind: "undo-move", task: "r-x", mode: "undo" },
     { kind: "undo-move", root: TEST_ROOT, mode: "sideways" },
     // Accepted work command is gone: setup and publish are commands of their own (ADR-0100).
     { kind: "line", mode: "publish" },

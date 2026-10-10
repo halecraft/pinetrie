@@ -700,9 +700,8 @@ export function planDiscard(
   state: IntentState,
 ): readonly Effect[] {
   const now = cardOf(state.cards, card)
-  // A kind is discarded only where it may be gone (`PLACES_OF`): a text
-  // card or a reference.
-  if (now === undefined || !cardFitsPlace(now, "gone")) return []
+  // A kind is discarded only where it may be in the trash (`PLACES_OF`).
+  if (now === undefined || !cardFitsPlace(now, "trash")) return []
   // Someone else's inventory is theirs to empty (ADR-0059).
   if (now.place.kind === "inventory" && state.cards.me !== now.place.holder)
     return []
@@ -767,8 +766,9 @@ export function taskOfTab(state: IntentState): TaskId | null {
 }
 
 /**
- * Undo or redo your newest move in the task you are on, which the host does
- * whole or refuses (ADR-0066); with the inventory panel focused, this tab's
+ * Undo or redo your newest move in the task you are on, or, on none, in
+ * your history outside any task, which the host does whole or refuses
+ * (ADR-0066, ADR-0126); with the inventory panel focused, this tab's
  * newest swap.
  */
 export function planUndoMove(
@@ -777,8 +777,7 @@ export function planUndoMove(
   state: IntentState,
 ): readonly Effect[] {
   if (inPanel) return [{ kind: "undoSwap", direction }]
-  const task = taskOfTab(state)
-  return task === null ? [] : [{ kind: "undoMoves", task, direction }]
+  return [{ kind: "undoMoves", task: taskOfTab(state), direction }]
 }
 
 /**

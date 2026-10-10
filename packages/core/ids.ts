@@ -206,27 +206,54 @@ export function rootOfDocId(docId: string): RootId | undefined {
 export const MOVES_DOC_PREFIX = "moves:"
 
 /**
- * The host's undo stack of `writer`'s moves in `task` (ADR-0066, ADR-0116):
- * only the host holds it.
+ * Which of a person's histories of moves a step is in (ADR-0066, ADR-0116,
+ * ADR-0126): a task's, or theirs outside any task (a discard from their
+ * inventory while on no task).
  */
-export const movesDocId = (writer: WriterId, task: TaskId): string =>
-  `${MOVES_DOC_PREFIX}${writer}:${task}`
+export type MoveHistoryScope =
+  | { readonly kind: "task"; readonly task: TaskId }
+  | { readonly kind: "person" }
+
+/** A person's history outside any task. */
+export const PERSON_HISTORY: MoveHistoryScope = { kind: "person" }
+
+/** The history of `task`, or the person's own for none. */
+export const historyScope = (task: TaskId | null): MoveHistoryScope =>
+  task === null ? PERSON_HISTORY : { kind: "task", task }
 
 /**
- * A document id -> the writer and task whose moves' stack it is, or
- * undefined for any other document: one keyed by a root, from before tasks,
- * among them. A task's id holds no `:`.
+ * The host's undo stack of `writer`'s moves in `scope` (ADR-0066,
+ * ADR-0116): `moves:<writer>:<task>` for a task's, `moves:<writer>` for
+ * theirs outside any task. Only the host holds it.
+ */
+export const movesDocId = (
+  writer: WriterId,
+  scope: MoveHistoryScope,
+): string =>
+  scope.kind === "task"
+    ? `${MOVES_DOC_PREFIX}${writer}:${scope.task}`
+    : `${MOVES_DOC_PREFIX}${writer}`
+
+/**
+ * A document id -> the writer and scope whose moves' stack it is, or
+ * undefined for any other document. A task's id holds no `:`, and an
+ * email none (`normalizeEmail`), so a suffix after the last `:` that is a
+ * task's id names a task's history, and none names the person's.
  */
 export function movesOfDocId(
   docId: string,
-): { readonly writer: WriterId; readonly task: TaskId } | undefined {
+): { readonly writer: WriterId; readonly scope: MoveHistoryScope } | undefined {
   if (!docId.startsWith(MOVES_DOC_PREFIX)) return undefined
   const rest = docId.slice(MOVES_DOC_PREFIX.length)
   const cut = rest.lastIndexOf(":")
-  if (cut <= 0) return undefined
-  const task = rest.slice(cut + 1)
-  return isTaskId(task)
-    ? { writer: rest.slice(0, cut) as WriterId, task }
+  const task = cut <= 0 ? "" : rest.slice(cut + 1)
+  if (isTaskId(task))
+    return {
+      writer: rest.slice(0, cut) as WriterId,
+      scope: { kind: "task", task },
+    }
+  return rest.startsWith("w-") && cut < 0
+    ? { writer: rest as WriterId, scope: PERSON_HISTORY }
     : undefined
 }
 

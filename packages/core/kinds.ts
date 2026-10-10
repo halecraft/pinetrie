@@ -65,7 +65,7 @@ export const KINDS = {
       "queued",
       "margin",
       "fresh",
-      "gone",
+      "trash",
       "inventory",
     ],
     moves: true,
@@ -75,7 +75,7 @@ export const KINDS = {
   },
   thread: {
     prefix: "t-",
-    places: ["canvas", "inventory"],
+    places: ["canvas", "inventory", "trash"],
     moves: true,
     reordered: true,
     put: "moves",
@@ -99,7 +99,7 @@ export const KINDS = {
   },
   reference: {
     prefix: "q-",
-    places: ["note", "margin", "queued", "gone", "inventory"],
+    places: ["note", "margin", "queued", "trash", "inventory"],
     moves: true,
     reordered: true,
     put: "copies",

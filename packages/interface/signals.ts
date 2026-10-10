@@ -120,7 +120,7 @@ export function unsentSignals(input: {
       case "task-pinned":
       case "inventory":
       case "canvas":
-      case "gone":
+      case "trash":
         break
     }
   }

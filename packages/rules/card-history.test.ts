@@ -24,15 +24,15 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type Cause,
-  GONE_KEEP_MS,
   HISTORY_EVENTS,
   movedBackBy,
-  planGoneSweep,
   planProvenance,
   planTraceSweep,
+  planTrashSweep,
   TRACE_MAX_AGE_MS,
   TRACED,
   TRACED_PLACES,
+  TRASH_KEEP_MS,
   verbOf,
 } from "./card-history.ts"
 
@@ -458,11 +458,11 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
   })
 })
 
-test("planGoneSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere", () => {
+test("planTrashSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere", () => {
   const discarded: CardPlace = {
-    kind: "gone",
+    kind: "trash",
     task: TEST_TASK,
-    by: ADA,
+    holder: ADA,
     why: { kind: "discarded" },
   }
   const event = (when: number) => ({
@@ -472,12 +472,12 @@ test("planGoneSweep: a card discarded a week ago or more, or with no history to 
     to: keyOf(discarded),
     at: when,
   })
-  const now = GONE_KEEP_MS + 100
+  const now = TRASH_KEEP_MS + 100
   const old = cardIdFor("c107")
   const fresh = cardIdFor("c108")
   const silent = cardIdFor("c109")
   expect(
-    planGoneSweep({
+    planTrashSweep({
       cards: [
         { ...card(discarded), id: old },
         { ...card(discarded), id: fresh },

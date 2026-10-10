@@ -135,14 +135,14 @@ function placeAt(
         key.entry,
         key.thread,
       )
-    case "gone":
+    case "trash":
       return {
         ...key,
+        holder: sender,
         task:
           now === undefined
             ? discards.here
             : discardHistory(now.place, discards),
-        by: sender,
       }
     default:
       return key
@@ -339,7 +339,7 @@ export function planMove(
       ? { kind: "refused", code: "no-place", now: null }
       : planMake(cards, made, sender)
   }
-  if (now === undefined || now.place.kind === "gone")
+  if (now === undefined || now.place.kind === "trash")
     return { kind: "refused", code: "gone", now: null }
   if (!seenAt(keyOf(now.place), move.from))
     return { kind: "refused", code: "moved", now }

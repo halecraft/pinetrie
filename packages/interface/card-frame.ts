@@ -227,7 +227,7 @@ const moveItems = (
     // anywhere; a card on a canvas is no text card.
     case "inventory":
     case "canvas":
-    case "gone":
+    case "trash":
       return []
   }
 }
@@ -315,7 +315,7 @@ export function cardFrame(
       : [],
     discards:
       movable &&
-      card.place.kind !== "gone" &&
+      card.place.kind !== "trash" &&
       (card.place.kind !== "inventory" || card.place.holder === facts.me),
   }
 }

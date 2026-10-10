@@ -9,7 +9,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { heldIn, runsIn, takenIn } from "./held.ts"
+import { heldIn, holderOf, runsIn, takenIn } from "./held.ts"
 
 const T = threadIdFor("t")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -134,4 +134,28 @@ test("takenIn: the threads a change puts in an inventory that were not in one (A
   expect(takenIn([on], [held])).toEqual([T])
   expect(takenIn([held], [held])).toEqual([])
   expect(takenIn([held], [on])).toEqual([])
+})
+
+test("a thread in a trash is held as in an inventory: its discard stops its run, and its holder holds it (ADR-0126)", () => {
+  const on: CardRecord = {
+    kind: "thread",
+    id: T,
+    owner: BEA,
+    placer: BEA,
+    place: { kind: "canvas", task: TASK, order: "1", width: 1 },
+    content: NO_CONTENT,
+  }
+  const trashed: CardRecord = {
+    ...on,
+    place: {
+      kind: "trash",
+      holder: BEA,
+      task: TASK,
+      why: { kind: "discarded" },
+    },
+  }
+  expect(takenIn([on], [trashed])).toEqual([T])
+  expect(takenIn([trashed], [trashed])).toEqual([])
+  expect(holderOf([trashed], T)).toBe(BEA)
+  expect(holderOf([on], T)).toBeNull()
 })

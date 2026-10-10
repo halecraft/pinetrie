@@ -6,6 +6,7 @@
 import {
   ERR,
   errorText,
+  historyScope,
   type Intent,
   type RootId,
   type TaskId,
@@ -261,7 +262,7 @@ export function createCommands(deps: CommandDeps): Commands {
       case "undo-move":
         return cardCommands.undoMove(
           writer,
-          intent.task,
+          historyScope(intent.task),
           intent.direction,
           tasks,
         )

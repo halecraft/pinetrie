@@ -430,9 +430,9 @@ which are swept.
   since its target is a queue. A gone card keeps its
   record and text, is drawn nowhere (every read of a place names the kinds
   it draws), and moves only by an undo:
-  a handoff from gone is refused `gone`. `planGoneSweep`
+  a handoff from gone is refused `gone`. `planTrashSweep`
   (`card-history.ts`) deletes it once its newest history event is older
-  than `GONE_KEEP_MS` (7 days). Queueing puts it after the lane's
+  than `TRASH_KEEP_MS` (7 days). Queueing puts it after the lane's
   last card, queued by the sender, and clears why it was not sent before;
   below the line, or into an inventory, it keeps both. A move to where the
   card already is is refused `moved`: it would queue the card last under its

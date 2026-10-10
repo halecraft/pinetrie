@@ -382,7 +382,7 @@ export type Intent =
    */
   | {
       readonly kind: "spin-off"
-      readonly move: Move<Extract<PlaceKey, { readonly kind: "gone" }>>
+      readonly move: Move<Extract<PlaceKey, { readonly kind: "trash" }>>
       readonly task: TaskId
       readonly state: WorkflowStateId | null
       /**
@@ -495,10 +495,13 @@ export type Intent =
       readonly at: CanvasKey
       readonly width: CardWidth
     }
-  /** Undo or redo the sender's newest move in `task` (ADR-0066). */
+  /**
+   * Undo or redo the sender's newest move in `task`, or, with none, in
+   * their history outside any task (ADR-0066, ADR-0126).
+   */
   | {
       readonly kind: "undo-move"
-      readonly task: TaskId
+      readonly task: TaskId | null
       readonly direction: MoveDirection
     }
   /** Set a card's command, or clear it with null (ADR-0108). */

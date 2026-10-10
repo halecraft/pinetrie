@@ -12,6 +12,15 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a person's history of moves names no stack",
+    file: ids,
+    from: "    ? { writer: rest as WriterId, scope: PERSON_HISTORY }\n",
+    to: "    ? undefined\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/core"],
+    expect:
+      "a task's and a person's outside any task read back as written; other ids name none",
+  },
+  {
     name: "a mention in code counts",
     file: core,
     from: "  for (const [, handle] of withoutCode(text).matchAll(pattern)) {\n",
