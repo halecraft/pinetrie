@@ -35,6 +35,7 @@ import type {
   SentCard,
   TypedMove,
 } from "./places.ts"
+import { isThreadNameHandle } from "./thread-names.ts"
 
 // --- branded identifiers ----------------------------------------------------
 //
@@ -363,6 +364,19 @@ const FACT_CARD_PREFIX = "x-"
 export const factCardIdFor = (id: string): FactCardId =>
   `${FACT_CARD_PREFIX}${id}` as FactCardId
 
+declare const askCardIdBrand: unique symbol
+/**
+ * An ask card's id (ADR-0128): `a-` and a uuidv7, minted by the host as it
+ * queues an ask for a busy agent.
+ */
+export type AskCardId = string & { readonly [askCardIdBrand]: true }
+
+const ASK_CARD_PREFIX = "a-"
+
+/** An ask card's id from the text after its prefix: for minters, fixtures and parsers. */
+export const askCardIdFor = (id: string): AskCardId =>
+  `${ASK_CARD_PREFIX}${id}` as AskCardId
+
 /**
  * Any card's id: the key of its record in the places document. Its kind is
  * its prefix (`kindOfCard`, `KINDS`), so no record stores a kind that could
@@ -373,6 +387,7 @@ export type CardId =
   | ThreadId
   | NoteColumnId
   | FactCardId
+  | AskCardId
   | MediaId
   | FileCardId
 
@@ -382,6 +397,7 @@ export type CardKind =
   | "thread"
   | "note-column"
   | "fact"
+  | "ask"
   | "media"
   | "file"
 
@@ -403,12 +419,13 @@ export const isTextCardId = (id: CardId): id is TextCardId =>
 const UUIDV7 =
   "[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
 const TEXT_CARD_RE = new RegExp(`^${UUIDV7}$`)
-const PREFIXED_CARD_RE = new RegExp(`^[nmfx]-${UUIDV7}$`)
+const PREFIXED_CARD_RE = new RegExp(`^[nmfxa]-${UUIDV7}$`)
 
 /**
  * A card's id as it comes in from the wire or the store; undefined for text
  * that is none. A text card's is a bare lowercase uuidv7; a note column's,
- * a fact's, a media card's and a file card's are their prefix and one. A
+ * a fact's, an ask's, a media card's and a file card's are their prefix and
+ * one. A
  * thread's is any id `isThreadId` takes, as everywhere a thread is read, so
  * a thread the store names is never dropped for its id's shape. The one way
  * text becomes a `CardId` outside a minter.
@@ -424,7 +441,10 @@ export const parseTextCardId = (id: string): TextCardId | undefined =>
   TEXT_CARD_RE.test(id) ? (id as TextCardId) : undefined
 
 declare const agentIdBrand: unique symbol
-/** An agent that can be compelled to reply. The host has exactly one for now. */
+/**
+ * The agent a message compels in its own thread: the host has one, `@agent`.
+ * Other threads' agents are named by their threads (`Address.asks`, ADR-0128).
+ */
 export type AgentId = string & { readonly [agentIdBrand]: true }
 /** The host's agent, addressed as `@agent`. */
 export const THE_AGENT = "agent" as AgentId
@@ -1020,6 +1040,66 @@ export interface StopFact {
   readonly by: WriterId
   /** When Stop was pressed, in ms since the epoch. */
   readonly at: number
+  /**
+   * The message whose budget was spent, when it was the budget that stopped
+   * the run, and `by` is whose message it was (ADR-0128); absent for a Stop.
+   */
+  readonly budget?: EntryId
+}
+
+/**
+ * Who joined or left a thread's members (ADR-0128): a person dismissed an
+ * agent, or the agent left. Read back by `membersOf`.
+ */
+export type MemberFact =
+  | {
+      readonly kind: "dismissed"
+      readonly lane: ThreadId
+      readonly member: ThreadId
+      readonly by: WriterId
+    }
+  | {
+      readonly kind: "left"
+      readonly lane: ThreadId
+      readonly member: ThreadId
+      /** The person behind the run that left (`promptAuthor`). */
+      readonly by: WriterId
+    }
+
+/**
+ * An ask another thread's agent did not answer (ADR-0128): its run was
+ * stopped or failed. In the thread that asked; `member` is the asked
+ * thread, `by` the person behind the chain.
+ */
+export interface UnansweredFact {
+  readonly kind: "unanswered"
+  readonly lane: ThreadId
+  readonly member: ThreadId
+  readonly why: "stopped" | "failed"
+  readonly by: WriterId
+}
+
+/**
+ * What the request after a round of answers told the people (ADR-0128): a
+ * line for them, in the thread whose message asked. `by` is whose it was.
+ */
+export interface RoundFact {
+  readonly kind: "round"
+  readonly lane: ThreadId
+  readonly line: string
+  readonly by: WriterId
+}
+
+/**
+ * Agents spent a budget (ADR-0128): its message's tokens ran out, in the
+ * thread whose message set it. `by` is whose message it was.
+ */
+export interface BudgetSpentFact {
+  readonly kind: "budget-spent"
+  readonly lane: ThreadId
+  readonly budget: EntryId
+  readonly limit: number
+  readonly by: WriterId
 }
 
 /**
@@ -1665,8 +1745,9 @@ const HANDLE_CHARS = "\\p{L}\\p{N}_\\-"
 
 /**
  * Every `@handle` in `text`, in order, without repeats. `@agent` is the agent;
- * any other handle is a person. A handle starts a word, so an e-mail address is
- * not a mention.
+ * any other handle is read as a person here, and `address` finds whether it
+ * names another thread's agent instead (ADR-0128). A handle starts a word, so
+ * an e-mail address is not a mention.
  */
 export function parseMentions(text: string): Mention[] {
   const seen = new Set<string>()
@@ -1698,52 +1779,146 @@ export const handleOf = (name: string): string =>
     .toLowerCase()
     .replace(new RegExp(`[^${HANDLE_CHARS}]`, "gu"), "")
 
-/** Who a message is for. */
-export interface Address {
-  /** The agent, if it must answer: a run. */
-  readonly compels: Responder
-  /** Participants the message names, by display name. Never compelled. */
-  readonly people: readonly string[]
+/** Who asked another thread's agent (ADR-0128): a person, or a thread's agent. */
+export type Asker =
+  | { readonly kind: "person"; readonly writer: WriterId }
+  | { readonly kind: "agent"; readonly thread: ThreadId }
+
+/**
+ * An ask relayed into another thread (ADR-0128), the asked agent's prompt:
+ * where it was asked, by whom, and what. `budget` is the person's message
+ * whose budget the chain spends (its run spends from it only when an agent
+ * asked); `by` is the person behind the chain, who a stop, a card or a
+ * run's author names.
+ */
+export interface RelayDetails {
+  readonly from: ThreadId
+  readonly fromName: string
+  /** The chat, or the agent's message calling `ask`, in `from`. */
+  readonly source: EntryId
+  readonly asker: Asker
+  readonly askerName: string
+  readonly text: string
+  readonly budget: EntryId
+  readonly by: WriterId
 }
 
 /**
- * Who a message is for (ADR-0021). `@agent` compels the agent. Otherwise a
- * message naming participants is for them, and the agent is left out.
+ * An asked agent's answer, in the thread that asked (ADR-0128): its last
+ * message of the run its relay started. `wakes` says whether it started a
+ * run of the asking agent.
+ */
+export interface AnswerDetails {
+  /** The answering thread. */
+  readonly from: ThreadId
+  readonly fromName: string
+  /** The relay, in `from`, whose run this answers. */
+  readonly relay: EntryId
+  /** The asking thread's entry the relay came from (`RelayDetails.source`). */
+  readonly source: EntryId
+  readonly text: string
+  readonly wakes: boolean
+  readonly budget: EntryId
+  readonly by: WriterId
+}
+
+/**
+ * What an asked agent heard of the thread that asked (ADR-0128): those
+ * entries' ids, newest last. Their text is the heard entry's `content`.
+ */
+export interface HeardDetails {
+  readonly from: ThreadId
+  readonly fromName: string
+  readonly entries: readonly EntryId[]
+}
+
+/**
+ * Another thread's agent a mention may reach (ADR-0128): a thread on the
+ * task's canvas other than the one written in, by its name. `member` says
+ * whether it was invited into the thread written in already.
+ */
+export interface AgentCandidate {
+  readonly thread: ThreadId
+  readonly name: ThreadName
+  readonly member: boolean
+}
+
+/** Who a message is for. */
+export interface Address {
+  /** This thread's own agent, if it must answer: a run. */
+  readonly compels: Responder
+  /** Participants the message names, by display name. Never compelled. */
+  readonly people: readonly string[]
+  /** Members, other threads' agents, that it asks: each runs (ADR-0128). */
+  readonly asks: readonly ThreadId[]
+  /** Other threads' agents it invites: they become members, asked or not. */
+  readonly invites: readonly ThreadId[]
+}
+
+/**
+ * Who a message is for (ADR-0021, ADR-0128). A handle that is a candidate
+ * agent's name is that agent, before any person: a member is asked, any
+ * other invited. `@agent` compels this thread's agent. Otherwise a message
+ * naming participants or asking members is for them, and the agent is left
+ * out; an invite alone leaves the message where it would have gone.
  * Otherwise the thread decides: the agent where it is the default (a thread
- * with a lane, or a Start Agent column), nobody where it is not.
+ * with a lane, or a Start Agent column), nobody where it is not. A message
+ * that then compels nobody, names no one and asks no member asks the agents
+ * it invites, since nobody else would answer.
  *
- * A handle that names no participant is ignored, so `@types/node` in agent
- * work still asks the agent. Pure; the composer and the host both call it.
+ * A handle that names no participant and no candidate is ignored, so
+ * `@types/node` in agent work still asks the agent. Pure; the composer and
+ * the host both call it.
  */
 export function address(input: {
   readonly mentions: readonly Mention[]
   /** Every participant's display name, as shown. */
   readonly participants: readonly string[]
+  /** Other threads' agents on the task's canvas (ADR-0128). */
+  readonly agents: readonly AgentCandidate[]
   readonly agentByDefault: boolean
 }): Address {
   const byHandle = new Map(input.participants.map(n => [handleOf(n), n]))
-  const people = input.mentions.flatMap(m =>
-    m.kind === "person" ? [byHandle.get(handleOf(m.name))].filter(isName) : [],
+  const agentByHandle = new Map(
+    input.agents.map(a => [handleOf(a.name), a] as const),
   )
+  const people: string[] = []
+  const asks: ThreadId[] = []
+  const invites: ThreadId[] = []
+  for (const m of input.mentions) {
+    if (m.kind !== "person") continue
+    const handle = handleOf(m.name)
+    const agent = agentByHandle.get(handle)
+    if (agent !== undefined) {
+      const into = agent.member ? asks : invites
+      if (!into.includes(agent.thread)) into.push(agent.thread)
+      continue
+    }
+    const person = byHandle.get(handle)
+    if (person !== undefined) people.push(person)
+  }
   const agent = input.mentions.find(m => m.kind === "agent")
   const compels: Responder =
     agent !== undefined
       ? { kind: "agent", agent: agent.agent }
-      : people.length > 0 || !input.agentByDefault
+      : people.length > 0 || asks.length > 0 || !input.agentByDefault
         ? NOBODY
         : { kind: "agent", agent: THE_AGENT }
-  return { compels, people }
+  const nobodyElse =
+    compels.kind === "none" && people.length === 0 && asks.length === 0
+  return nobodyElse
+    ? { compels, people, asks: invites, invites }
+    : { compels, people, asks, invites }
 }
-
-const isName = (n: string | undefined): n is string => n !== undefined
 
 /** A display name's longest form, in UTF-16 code units. */
 export const MAX_NAME_LENGTH = 40
 
 /**
  * A display name as typed -> the stored one, or undefined if unusable: empty,
- * too long, or one no mention could reach (no letter or digit, or spelled
- * `@agent`, which is always the agent).
+ * too long, or one no mention could reach (no letter or digit, spelled
+ * `@agent`, which is always the agent, or a thread's name, which is always
+ * that thread's agent: ADR-0128).
  */
 export function normalizeName(name: string): string | undefined {
   const n = name.trim()
@@ -1751,7 +1926,8 @@ export function normalizeName(name: string): string | undefined {
   return n.length === 0 ||
     n.length > MAX_NAME_LENGTH ||
     handle === "" ||
-    handle === THE_AGENT
+    handle === THE_AGENT ||
+    isThreadNameHandle(handle)
     ? undefined
     : n
 }
@@ -1858,6 +2034,7 @@ export function orderNewEntries(
 
 // ── the tree ──────────────────────────────────────────────────────────────
 
+export * from "./agents.ts"
 export * from "./asks.ts"
 export * from "./edits.ts"
 export * from "./errors.ts"
@@ -1869,6 +2046,7 @@ export * from "./offers.ts"
 export * from "./paths.ts"
 export * from "./places.ts"
 export * from "./roots.ts"
+export * from "./thread-names.ts"
 export * from "./tools.ts"
 export * from "./trailers.ts"
 export * from "./tree.ts"

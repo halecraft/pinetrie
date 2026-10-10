@@ -26,6 +26,7 @@
     carries the mark the Archive tab did.
   - ADR-0091: an open offer is marked on the board for everyone, and listed
     and counted in your inbox for its followers.
+  - ADR-0128: a run another thread asked for has its verdict in that thread.
 
 Builds on ADR-0076.
 

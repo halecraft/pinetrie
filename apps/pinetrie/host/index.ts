@@ -14,10 +14,12 @@ import {
 import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import {
+  atEntry,
   type BlobStore,
   type CardId,
   isTextCardId,
   type ThreadId,
+  threadEnd,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import {
@@ -46,17 +48,22 @@ import {
 import { writersPolicy } from "@pinetrie/protocol/writers"
 import {
   readArchived,
+  readParticipantNames,
   readPlaces,
   readRoots,
   readRunning,
   readThreadName,
   readThreads,
+  readTreeIndex,
 } from "@pinetrie/reads"
 import {
+  decodeAgentsConfig,
   decodeBannerConfig,
   decodeCommandRenames,
   decodeDigestConfig,
   decodeTitleConfig,
+  displayName,
+  encodeFact,
   type QueuedText,
   rootsHeld,
 } from "@pinetrie/rules"
@@ -85,6 +92,7 @@ import {
   slow,
 } from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
+import { createBudgets } from "./budgets.ts"
 import { createTaskContext } from "./canvas.ts"
 import { createCanvasNews } from "./canvas-news.ts"
 import { startCards } from "./cards.ts"
@@ -126,6 +134,7 @@ import {
   untilNotTyped,
 } from "./queued-card-pop.ts"
 import { createRecords, type Records } from "./records.ts"
+import { createRelays, type Relays } from "./relays.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
@@ -423,6 +432,16 @@ export async function startHost({
       : createBanners({ basics, keeper, blobs, records, piSetup })
   // Each run's verdict (ADR-0077), and each ask's digest unless the user
   // config turns digests off (ADR-0071).
+  // What agents talking spend (ADR-0128). Its drain and the relays are made
+  // after the agent, whose hooks call them: bound late.
+  let queueDrainLate: (lane: ThreadId) => void = () => {}
+  const budgets = createBudgets({
+    basics,
+    keeper,
+    records,
+    limit: decodeAgentsConfig(userJson),
+    drain: lane => queueDrainLate(lane),
+  })
   const digests = createDigests({
     basics,
     keeper,
@@ -430,6 +449,7 @@ export async function startHost({
     records,
     piSetup,
     enabled: decodeDigestConfig(userJson),
+    spent: (ask, tokens) => budgets.spendFor(ask, tokens),
   })
   const digestFailed = (lane: ThreadId) =>
     failed(basics, "summarizing its ask", lane)
@@ -466,6 +486,12 @@ export async function startHost({
     ensureNames: names.ensure,
   })
 
+  let relaysLate: Relays | null = null
+  const relaysNow = (): Relays => {
+    if (relaysLate === null) throw new Error("the relays are not made yet")
+    return relaysLate
+  }
+
   // --- the agent, at work in threads' lanes ---------------------------------
   const agent = await createAgent({
     documents: docs,
@@ -480,6 +506,8 @@ export async function startHost({
             hooks: {
               ...work.hooks,
               askSplit,
+              ask: (lane, to, text) => relaysNow().ask(lane, to, text),
+              leave: (lane, thread) => relaysNow().leave(lane, thread),
               // A turn recorded, then a live digest of the ask `tip` is in,
               // when due.
               turnDone: async (lane, tip) => {
@@ -496,6 +524,8 @@ export async function startHost({
         `[host] ${readThreadName(session, lane)}: the model's prompt or tools changed`,
       ),
     ...(banners === null ? {} : { bannerAsks: banners.request }),
+    onUsage: (lane, tokens) => budgets.onUsage(lane, tokens),
+    mayRequest: lane => budgets.mayRequest(lane),
   })
   log(
     agentReadyLine({
@@ -528,6 +558,17 @@ export async function startHost({
     baseNews,
     pending: digests.pending,
   })
+  const relays = createRelays({
+    basics,
+    keeper,
+    agent,
+    scribe,
+    start: runs.start,
+    budgets,
+    piSetup,
+    drain: lane => queueDrain(lane),
+  })
+  relaysLate = relays
   const commands = createCommands({
     basics,
     agent,
@@ -552,6 +593,7 @@ export async function startHost({
     histories,
     provenance,
     keeper,
+    relays,
   })
   // The drain's waits for its top card: its text (S96), someone's typing in
   // it to stop (ADR-0048 step 7), or a blank card to be written in (ADR-0113).
@@ -586,6 +628,28 @@ export async function startHost({
         typing,
         blank,
         provenance,
+        relay: (to, relay) => relays.relayCard(to, relay),
+        appendLaneless: async (thread, fact) => {
+          if (docs.docOfLane(thread) !== null) return false
+          const root = readThreads(session).get(thread)?.root
+          const doc = root === undefined ? null : docs.view(root)?.doc
+          const end =
+            doc === null || doc === undefined
+              ? null
+              : threadEnd(readTreeIndex(doc), thread)
+          if (root === undefined || end === null) return false
+          const names = readParticipantNames(session)
+          await scribe.appendToTree(
+            encodeFact(
+              fact,
+              displayName(fact.by, names.get(fact.by)),
+              basics.now(),
+            ),
+            { root, at: atEntry(end) },
+            thread,
+          )
+          return true
+        },
       },
       lane,
     )
@@ -612,6 +676,7 @@ export async function startHost({
   // final digest is for the run's prompt: the drain queued before it may
   // append to the lane or start its next run.
   runs.onEnded((lane, prompt) => {
+    void relays.ended(lane, prompt).catch(failed(basics, "an answer"))
     void settle([lane])
     banners?.due(lane).catch(failed(basics, "banner"))
     const root = docs.rootOfLane(lane)
@@ -627,6 +692,7 @@ export async function startHost({
     if (readRunning(live, lane)) return
     void keeper.once(`drain:${lane}`, () => drain(lane))
   }
+  queueDrainLate = queueDrain
   /**
    * Resolves when no queued step remains (a compaction after a run among
    * them), no lane's queue has work, and every write has reached the store.

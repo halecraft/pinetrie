@@ -15,6 +15,7 @@
 
 import {
   type Address,
+  type AgentCandidate,
   type AgentId,
   type AgentMessageLike,
   address,
@@ -47,10 +48,18 @@ import {
 import { type Static, Type } from "typebox"
 import { type BaseNews, behindLine, decodeBehind } from "./behind.ts"
 import { canvasFactLine, decodeCanvas, decodeCanvasFact } from "./canvas.ts"
-import { decodeWith } from "./decode.ts"
+import { decodeWith, ThreadIdSchema } from "./decode.ts"
 import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { decodePinned } from "./pinned.ts"
+import {
+  type AnswerMessage,
+  decodeAnswer,
+  decodeHeard,
+  decodeRelay,
+  heardLine,
+  type RelayMessage,
+} from "./relay.ts"
 import { decodeStack, type StackMessage, stackLine } from "./stack.ts"
 import { type CarryOnMessage, carryOnLine, decodeCarryOn } from "./stop.ts"
 import { decodeTaskPinned } from "./task-pinned.ts"
@@ -94,6 +103,10 @@ const DetailsSchema = Type.Object({
   ),
   /** The images its text shows, by reference (ADR-0042). */
   images: Type.Optional(Type.Array(ImageRefSchema)),
+  /** Other threads' agents it asks, members already (ADR-0128). */
+  asks: Type.Optional(Type.Array(ThreadIdSchema)),
+  /** Other threads' agents it invites: they become members (ADR-0128). */
+  invites: Type.Optional(Type.Array(ThreadIdSchema)),
 })
 
 const ChatSchema = Type.Object({
@@ -122,6 +135,10 @@ export interface ChatDetails {
    * their bytes after `content`. Absent when it shows none.
    */
   readonly images?: readonly ImageRef[]
+  /** Other threads' agents it asks (ADR-0128); absent when none. */
+  readonly asks?: readonly ThreadId[]
+  /** Other threads' agents it invites (ADR-0128); absent when none. */
+  readonly invites?: readonly ThreadId[]
 }
 
 /** The pi `CustomMessage` a chat is stored as. */
@@ -136,13 +153,16 @@ export interface ChatMessage {
 
 /**
  * What a run can start with: a compelled chat, a land message (ADR-0033), a
- * stack message (ADR-0105), or a carry-on message (ADR-0082).
+ * stack message (ADR-0105), a carry-on message (ADR-0082), or an ask relayed
+ * from another thread, or an answer that wakes its asker (ADR-0128).
  */
 export type PromptMessage =
   | ChatMessage
   | LandMessage
   | StackMessage
   | CarryOnMessage
+  | RelayMessage
+  | AnswerMessage
 
 /**
  * The text the model reads: what was typed, or for a command its expansion,
@@ -243,6 +263,8 @@ export const detailsFromStored = (
     : {
         images: d.images.map(i => ({ ...i, sha256: i.sha256 as Sha256 })),
       }),
+  ...(d.asks === undefined ? {} : { asks: d.asks }),
+  ...(d.invites === undefined ? {} : { invites: d.invites }),
 })
 
 /** A stored message -> its chat details, or undefined if it is not a chat. */
@@ -289,9 +311,11 @@ function toolResultFacts(
  * ADR-0105, ADR-0082), as a fact becomes role `fact` and a base's news role
  * `behind` (ADR-0080); a cards entry becomes role `pinned` with the cards it
  * read (ADR-0048), a task's cards entry role `task-pinned`, and a canvas
- * entry role `canvas` with the list it told (ADR-0116); a host tool's result keeps its role and gains what it
- * says as a fact (`asked`, `merged`, ADR-0080); anything else passes
- * through unchanged for `core` to judge.
+ * entry role `canvas` with the list it told (ADR-0116); an ask relayed from
+ * another thread, an answer and what an asked agent heard become roles
+ * `relay`, `answer` and `heard` with their details (ADR-0128); a host tool's
+ * result keeps its role and gains what it says as a fact (`asked`, `merged`,
+ * ADR-0080); anything else passes through unchanged for `core` to judge.
  */
 export function renderableMessage(message: unknown): AgentMessageLike {
   const land = decodeLand(message)
@@ -312,9 +336,27 @@ export function renderableMessage(message: unknown): AgentMessageLike {
       ? {
           role: "fact",
           content: factLine(fact),
-          stopped: { prompt: fact.prompt, by: fact.by },
+          stopped: {
+            prompt: fact.prompt,
+            by: fact.by,
+            ...(fact.budget === undefined ? {} : { budget: fact.budget }),
+          },
         }
-      : { role: "fact", content: factLine(fact) }
+      : fact.kind === "dismissed" || fact.kind === "left"
+        ? {
+            role: "fact",
+            content: factLine(fact),
+            member: { gone: fact.member },
+          }
+        : { role: "fact", content: factLine(fact) }
+  const relay = decodeRelay(message)
+  if (relay !== undefined) return { role: "relay", content: relay.text, relay }
+  const answer = decodeAnswer(message)
+  if (answer !== undefined)
+    return { role: "answer", content: answer.text, answer }
+  const heard = decodeHeard(message)
+  if (heard !== undefined)
+    return { role: "heard", content: heardLine(heard), heard }
   const behind = decodeBehind(message)
   if (behind !== undefined)
     return { role: "behind", content: behindLine(behind), behind }
@@ -350,17 +392,27 @@ export function renderableMessage(message: unknown): AgentMessageLike {
           : { contributors: chat.contributors }),
         ...(chat.command === undefined ? {} : { command: chat.command.name }),
         ...(chat.images === undefined ? {} : { images: chat.images }),
+        ...(chat.asks === undefined ? {} : { asks: chat.asks }),
+        ...(chat.invites === undefined ? {} : { invites: chat.invites }),
       }
 }
 
 /**
  * The person behind a run (ADR-0080), from its prompt as stored: a chat's
- * author, or a land or stack message's `by`. Null for anything else.
+ * author, a land or stack message's `by`, or for an ask relayed from another
+ * thread and an answer, the person behind the chain (ADR-0128). Null for
+ * anything else.
  */
 export function promptAuthor(message: unknown): WriterId | null {
   const chat = decodeChat(message)
   if (chat !== undefined) return chat.author
-  return decodeLand(message)?.by ?? decodeStack(message)?.by ?? null
+  return (
+    decodeLand(message)?.by ??
+    decodeStack(message)?.by ??
+    decodeRelay(message)?.by ??
+    decodeAnswer(message)?.by ??
+    null
+  )
 }
 
 /**
@@ -458,6 +510,8 @@ export const agentByDefault = (send: {
 export function addressChat(input: {
   readonly mentions: readonly Mention[]
   readonly participants: readonly string[]
+  /** Other threads' agents on the task's canvas (ADR-0128). */
+  readonly agents: readonly AgentCandidate[]
   readonly mode: PlanMode
   readonly lane: ThreadLane
   readonly asksAgent: boolean
@@ -467,11 +521,60 @@ export function addressChat(input: {
   const to = address({
     mentions: input.mentions,
     participants: input.participants,
+    agents: input.agents,
     agentByDefault: agentByDefault(input),
   })
   return input.command
     ? { ...to, compels: { kind: "agent", agent: THE_AGENT } }
     : to
+}
+
+/**
+ * Where a message into a thread goes, by its lane's state (ADR-0120,
+ * ADR-0128): the one table a person's chat (`planChat`), a relayed ask and
+ * an answer (`relay.ts`) are all planned with.
+ *
+ * - No lane: appended with no lane, or, compelled, the lane is created and
+ *   runs. A compelled `reply` another writer raced is a conflict.
+ * - A lane that runs, or has cards queued (`sendWaits`), is busy; in `queue`
+ *   mode (the host's own send) only a run is. A busy lane is never written
+ *   (S21): the message waits as a card, or, for a message that `steers`
+ *   (an answer), is steered into the run at its next boundary.
+ * - An idle lane appends, or, compelled, runs. A compelled `reply` that
+ *   finds it raced or busy is a conflict, so its sender chooses.
+ */
+export type Delivery =
+  | { readonly kind: "appendToTree" }
+  | { readonly kind: "createAndRun" }
+  | { readonly kind: "appendToLane"; readonly thread: ThreadId }
+  | { readonly kind: "run"; readonly thread: ThreadId }
+  | { readonly kind: "steer"; readonly thread: ThreadId }
+  | { readonly kind: "busy" }
+  | { readonly kind: "conflict"; readonly by: WriterId | null }
+
+export function planDelivery(input: {
+  readonly lane: ThreadLane
+  readonly compelled: boolean
+  readonly mode: PlanMode
+  readonly race: { readonly by: WriterId } | null
+  /** It may enter a running lane by a steer: only an answer (ADR-0128). */
+  readonly steers: boolean
+}): Delivery {
+  const { lane, compelled, mode, race } = input
+  if (lane.kind === "none") {
+    if (!compelled) return { kind: "appendToTree" }
+    if (mode === "reply" && race !== null)
+      return { kind: "conflict", by: race.by }
+    return { kind: "createAndRun" }
+  }
+  const thread: ThreadId = lane.name
+  if (input.steers && lane.running) return { kind: "steer", thread }
+  const busy = mode === "queue" ? lane.running : sendWaits(lane)
+  if (!compelled)
+    return busy ? { kind: "busy" } : { kind: "appendToLane", thread }
+  if (mode === "reply" && (race !== null || busy))
+    return { kind: "conflict", by: race?.by ?? lane.askedBy }
+  return busy ? { kind: "busy" } : { kind: "run", thread }
 }
 
 /**
@@ -512,6 +615,8 @@ export function planChat(input: {
   readonly mentions: readonly Mention[]
   /** Every participant's display name (`participants`). */
   readonly participants: readonly string[]
+  /** Other threads' agents on the task's canvas (ADR-0128). */
+  readonly agents: readonly AgentCandidate[]
   readonly asksAgent: boolean
   /** The command's id. */
   readonly sendId: string
@@ -557,9 +662,10 @@ export function planChat(input: {
       ERR.UNKNOWN_COMMAND,
       `the file of /${command.unreadable} could not be read`,
     )
-  const { compels } = addressChat({
+  const { compels, asks, invites } = addressChat({
     mentions: input.mentions,
     participants: input.participants,
+    agents: input.agents,
     mode,
     lane,
     asksAgent: input.asksAgent,
@@ -579,6 +685,8 @@ export function planChat(input: {
       : { contributors: input.contributors }),
     ...(command === null ? {} : { command }),
     ...(input.images.length === 0 ? {} : { images: input.images }),
+    ...(asks.length === 0 ? {} : { asks }),
+    ...(invites.length === 0 ? {} : { invites }),
   }
   const compelled = compels.kind === "agent"
 
@@ -590,8 +698,15 @@ export function planChat(input: {
       : { kind: "appendToTree", thread, parent: end, details, starts }
   }
 
-  if (lane.kind === "none") {
-    if (!compelled)
+  const to = planDelivery({
+    lane,
+    compelled,
+    mode,
+    race,
+    steers: false,
+  })
+  switch (to.kind) {
+    case "appendToTree":
       return {
         kind: "appendToTree",
         thread: at.thread,
@@ -599,28 +714,24 @@ export function planChat(input: {
         details,
         starts: null,
       }
-    if (mode === "reply" && race !== null)
-      return { kind: "conflict", by: race.by }
-    return {
-      kind: "createAndRun",
-      at: end,
-      thread: at.thread,
-      details,
-      starts: null,
-    }
+    case "createAndRun":
+      return {
+        kind: "createAndRun",
+        at: end,
+        thread: at.thread,
+        details,
+        starts: null,
+      }
+    case "appendToLane":
+      return { kind: "appendToLane", thread: to.thread, details }
+    case "busy":
+    case "conflict":
+      return to
+    case "steer":
+    case "run":
+      break
   }
-
-  const name: ThreadId = lane.name
-  const busy = mode === "queue" ? lane.running : sendWaits(lane)
-  if (!compelled) {
-    return busy
-      ? { kind: "busy" }
-      : { kind: "appendToLane", thread: name, details }
-  }
-  if (mode === "reply" && (race !== null || busy)) {
-    return { kind: "conflict", by: race?.by ?? lane.askedBy }
-  }
-  if (busy) return { kind: "busy" }
+  const name: ThreadId = to.thread
   return input.news === "catch-up" && !input.caughtUp
     ? { kind: "catch-up-first", thread: name }
     : { kind: "run", thread: name, details }

@@ -178,11 +178,12 @@ export function planTakeIntoInventory(
 ): readonly Effect[] {
   const facts = state.cards
   const now = cardOf(facts, card)
-  // A note column or a fact is never in an inventory (`PLACES_OF`).
+  // A note column, a fact or an ask is never in an inventory (`PLACES_OF`).
   if (
     now === undefined ||
     now.kind === "note-column" ||
     now.kind === "fact" ||
+    now.kind === "ask" ||
     now.place.kind === "inventory"
   )
     return []
@@ -251,8 +252,9 @@ export function planPut(
   if (target.kind === "state" || target.kind === "sidebar")
     return planSpinOff(card, target, minted, state)
   if (target.kind === "inventory") {
-    // A note column or a fact is never in an inventory (`PLACES_OF`).
-    if (now.kind === "note-column" || now.kind === "fact") return []
+    // A note column, a fact or an ask is never in an inventory (`PLACES_OF`).
+    if (now.kind === "note-column" || now.kind === "fact" || now.kind === "ask")
+      return []
     const from = slotOf(facts.slots, card)
     if (from === null || now.place.kind !== "inventory")
       return takeIntoInventoryAt(now, target.slot, state)
@@ -260,8 +262,8 @@ export function planPut(
     return [{ kind: "swapSlots", a: from, b: target.slot }]
   }
   // A thread's card or a note column goes on a canvas (ADR-0117); a fact
-  // is the host's (`KINDS`).
-  if (now.kind === "fact") return []
+  // or an ask is the host's (`KINDS`).
+  if (now.kind === "fact" || now.kind === "ask") return []
   if (now.kind !== "text") return putOnCanvas(now, target, state)
   if (
     (target.kind === "column" || target.kind === "composer") &&

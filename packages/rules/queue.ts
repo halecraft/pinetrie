@@ -3,6 +3,8 @@
 // the cards a run's facts make.
 
 import {
+  type AskCard,
+  type AskCardId,
   type CardId,
   type CardPlace,
   type CardRecord,
@@ -17,6 +19,7 @@ import {
   type NoteColumnId,
   noteOf,
   type QueuedFact,
+  type RelayDetails,
   type TaskId,
   type TextCard,
   type TextCardId,
@@ -35,15 +38,22 @@ export type QueuedText = TextCard & {
   readonly place: Extract<CardPlace, { kind: "queued" }>
 }
 
-/** A queued card: a text card, or a fact on its way into its thread (ADR-0126). */
-export type QueuedCard = QueuedText | FactCard
+/**
+ * A queued card: a text card, a fact on its way into its thread (ADR-0126),
+ * or an ask from another thread for its busy agent (ADR-0128).
+ */
+export type QueuedCard = QueuedText | FactCard | AskCard
 
 /** Whether a queued card is a text card: a message, not a fact. */
 export const isQueuedText = (c: QueuedCard): c is QueuedText =>
   c.kind === "text"
 
 const isQueued = (c: CardRecord): c is QueuedCard =>
-  c.place.kind === "queued" && (c.kind === "text" || c.kind === "fact")
+  c.place.kind === "queued" &&
+  (c.kind === "text" || c.kind === "fact" || c.kind === "ask")
+
+/** Whether a queued card is a fact: nobody's instruction, and it starts no run. */
+const isQueuedFact = (c: QueuedCard): c is FactCard => c.kind === "fact"
 
 export const isPinned = (
   c: CardRecord,
@@ -167,7 +177,7 @@ export function planNextQueuedCardPop(
   // A fact on top starts no run, so it is appended there too: a take's
   // stop is in the thread, and its face says so (ADR-0126).
   if (facts.away)
-    return top !== undefined && !isQueuedText(top)
+    return top !== undefined && isQueuedFact(top)
       ? { kind: "pop", card: top }
       : { kind: "idle" }
   if (top === undefined) {
@@ -175,9 +185,11 @@ export function planNextQueuedCardPop(
     if (first === undefined) return { kind: "idle" }
     return facts.held ? { kind: "held" } : { kind: "blank", card: first }
   }
-  if (!isQueuedText(top)) return { kind: "pop", card: top }
+  if (isQueuedFact(top)) return { kind: "pop", card: top }
   if (facts.held) return { kind: "held" }
-  if (facts.typing.has(top.id)) return { kind: "typing", card: top }
+  // An ask starts a run, as a message does, but nobody types in it.
+  if (isQueuedText(top) && facts.typing.has(top.id))
+    return { kind: "typing", card: top }
   return { kind: "pop", card: top }
 }
 
@@ -329,6 +341,40 @@ export function planFactCard(input: {
 }
 
 /**
+ * An ask for a busy agent, queued as an ask card after the cards there
+ * (ADR-0128): the host makes it, for the person behind the chain, and the
+ * drain relays it when the lane is free. Null when the host's own make is
+ * refused, which no queue does. Pure.
+ */
+export function planAskCard(input: {
+  readonly cards: readonly CardRecord[]
+  readonly id: AskCardId
+  readonly lane: ThreadId
+  readonly relay: RelayDetails
+}): PlaceStep | null {
+  const queue = queuedOn(input.cards, input.lane)
+  const step = planMake(
+    input.cards,
+    makeCard(
+      "ask",
+      input.id,
+      {
+        kind: "queued",
+        thread: input.lane,
+        order: orderAfter(queue),
+        by: input.relay.by,
+        seen: "",
+      },
+      { relay: input.relay },
+      input.relay.by,
+    ),
+    // No person places an ask (`KINDS`): the host makes it.
+    "host",
+  )
+  return step.kind === "refused" ? null : step
+}
+
+/**
  * What the drain does with a popped card (ADR-0080), decided before it acts:
  * append a fact; catch up through a command, then send the text or, with
  * none, nothing; or send a plain message. A blank plain message is never
@@ -350,13 +396,16 @@ export type CarryPlan =
       readonly intent: string
     }
   | { readonly kind: "send"; readonly card: QueuedText }
+  /** Relay an ask from another thread: its run starts here (ADR-0128). */
+  | { readonly kind: "relay"; readonly relay: RelayDetails }
 
 /**
  * A popped card and its words (`textSourceOf`: a text card's document, a
  * fact's fact) -> what the drain does with it. Pure.
  */
 export function planCarry(card: QueuedCard, text: string): CarryPlan {
-  if (!isQueuedText(card)) return { kind: "fact", fact: card.content.fact }
+  if (card.kind === "fact") return { kind: "fact", fact: card.content.fact }
+  if (card.kind === "ask") return { kind: "relay", relay: card.content.relay }
   const blank = text.trim() === ""
   const { command } = card.content
   if (command === "split") return { kind: "split", card, intent: text.trim() }

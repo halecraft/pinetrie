@@ -8,6 +8,7 @@ import { ACCEPTED } from "./accepted.ts"
 import { BANNER } from "./banner.ts"
 import { BASE } from "./base.ts"
 import { BOARD, WORKFLOW } from "./board.ts"
+import { BUDGET } from "./budget.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"
 import { COMMANDS } from "./commands.ts"
 import { DIGEST } from "./digest.ts"
@@ -36,6 +37,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   BANNER,
   BASE,
   BOARD,
+  BUDGET,
   CARD_HISTORY,
   COMMANDS,
   DIGEST,

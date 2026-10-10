@@ -1,0 +1,171 @@
+import {
+  entryId,
+  type RelayDetails,
+  type ThreadLane,
+  type TranscriptMessage,
+  threadIdFor,
+  writerId,
+} from "@pinetrie/core"
+import { describe, expect, test } from "vitest"
+import { planDelivery } from "./chat.ts"
+import { planAnswer, planRelay } from "./relay.ts"
+
+const here = threadIdFor("here")
+const fox = threadIdFor("fox")
+const ada = writerId("ada@example.com")
+const idle: ThreadLane = {
+  kind: "lane",
+  name: fox,
+  tip: entryId("t"),
+  running: false,
+  waiting: 0,
+  askedBy: null,
+  lastWaiting: null,
+  heldBy: null,
+}
+const said = (
+  id: string,
+  role: string,
+  text: string,
+  more: Partial<TranscriptMessage> = {},
+): TranscriptMessage => ({
+  id: entryId(id),
+  thread: here,
+  role,
+  text,
+  ...more,
+})
+const path: readonly TranscriptMessage[] = [
+  said("1", "chat", "please talk to @amber-fox", { author: "Ada" }),
+  said("2", "assistant", "I will ask it"),
+  said("3", "answer", "fox said so", { author: "amber-fox", from: fox }),
+  said("4", "assistant", "and now"),
+  said("5", "assistant", "asking again"),
+]
+const relay = (over: Partial<Parameters<typeof planRelay>[0]> = {}) =>
+  planRelay({
+    from: here,
+    fromName: "sable-meadow",
+    to: fox,
+    toName: "amber-fox",
+    members: [fox],
+    toLane: idle,
+    path,
+    heard: null,
+    invitedAt: entryId("1"),
+    source: entryId("5"),
+    asker: { kind: "agent", thread: here },
+    askerName: "sable-meadow",
+    text: "what next?",
+    budget: entryId("1"),
+    spent: false,
+    by: ada,
+    ...over,
+  })
+
+describe("planRelay (ADR-0128)", () => {
+  test("it hears what was said from its invite on, not the ask nor its own answers", () => {
+    const plan = relay()
+    expect(plan.kind).toBe("relay")
+    if (plan.kind !== "relay") return
+    expect(plan.heard?.details.entries).toEqual([
+      entryId("1"),
+      entryId("2"),
+      entryId("4"),
+    ])
+    expect(plan.heard?.lines).toEqual([
+      "Ada: please talk to @amber-fox",
+      "agent: I will ask it",
+      "agent: and now",
+    ])
+    expect(plan.relay).toMatchObject({ source: "5", budget: "1", by: ada })
+  })
+  test("after what it heard last; nothing new, nothing heard", () => {
+    const plan = relay({ heard: entryId("4") })
+    expect(plan.kind === "relay" && plan.heard).toBeNull()
+  })
+  test("only a member with a lane, while the budget lasts, is asked", () => {
+    expect(relay({ members: [] })).toEqual({
+      kind: "refused",
+      why: { kind: "not-member", name: "amber-fox" },
+    })
+    expect(relay({ toLane: { kind: "none" } })).toMatchObject({
+      why: { kind: "no-lane" },
+    })
+    expect(relay({ spent: true })).toMatchObject({ why: { kind: "spent" } })
+    expect(relay({ to: here })).toMatchObject({ why: { kind: "self" } })
+  })
+})
+
+describe("planAnswer (ADR-0128)", () => {
+  const asked: RelayDetails = {
+    from: here,
+    fromName: "sable-meadow",
+    source: entryId("5"),
+    asker: { kind: "agent", thread: here },
+    askerName: "sable-meadow",
+    text: "what next?",
+    budget: entryId("1"),
+    by: ada,
+  }
+  const answer = (over: Partial<Parameters<typeof planAnswer>[0]> = {}) =>
+    planAnswer({
+      relay: asked,
+      relayEntry: entryId("r"),
+      thread: fox,
+      name: "amber-fox",
+      end: { kind: "answered", text: "this" },
+      spent: false,
+      ...over,
+    })
+  test("an answer to an agent's ask wakes it", () => {
+    expect(answer()).toEqual({
+      kind: "answer",
+      answer: {
+        from: fox,
+        fromName: "amber-fox",
+        relay: entryId("r"),
+        source: entryId("5"),
+        text: "this",
+        wakes: true,
+        budget: entryId("1"),
+        by: ada,
+      },
+    })
+  })
+  test("an answer to a person's ask, or past the budget, wakes nobody", () => {
+    const person = answer({
+      relay: { ...asked, asker: { kind: "person", writer: ada } },
+    })
+    expect(person.kind === "answer" && person.answer.wakes).toBe(false)
+    const spent = answer({ spent: true })
+    expect(spent.kind === "answer" && spent.answer.wakes).toBe(false)
+  })
+  test("a stopped or failed run sends no answer", () => {
+    expect(answer({ end: { kind: "stopped" } })).toEqual({
+      kind: "unanswered",
+      why: "stopped",
+    })
+    expect(answer({ end: { kind: "failed" } })).toEqual({
+      kind: "unanswered",
+      why: "failed",
+    })
+  })
+})
+
+describe("planDelivery: one table for chats, relays and answers", () => {
+  const go = (lane: ThreadLane, compelled: boolean, steers = false) =>
+    planDelivery({ lane, compelled, mode: "queue", race: null, steers })
+  test("an idle lane runs or appends; no lane appends to the tree or is made", () => {
+    expect(go(idle, true)).toEqual({ kind: "run", thread: fox })
+    expect(go(idle, false)).toEqual({ kind: "appendToLane", thread: fox })
+    expect(go({ kind: "none" }, false)).toEqual({ kind: "appendToTree" })
+    expect(go({ kind: "none" }, true)).toEqual({ kind: "createAndRun" })
+  })
+  test("a running lane is busy, unless the message steers into it", () => {
+    const running = { ...idle, running: true }
+    expect(go(running, true)).toEqual({ kind: "busy" })
+    expect(go(running, false, true)).toEqual({ kind: "steer", thread: fox })
+    expect(go(running, true, true)).toEqual({ kind: "steer", thread: fox })
+  })
+})

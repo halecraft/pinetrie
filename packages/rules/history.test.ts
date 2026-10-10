@@ -2,6 +2,7 @@ import { readdirSync } from "node:fs"
 import path from "node:path"
 import {
   commitId,
+  entryId,
   type ThreadName,
   taskIdFor,
   textCardId,
@@ -16,6 +17,7 @@ import { FACT } from "./fact.ts"
 import type { HistorySpec } from "./history.ts"
 import { LAND } from "./land.ts"
 import { PINNED } from "./pinned.ts"
+import { ANSWER, HEARD, RELAY } from "./relay.ts"
 import { STACK } from "./stack.ts"
 import { CARRY_ON } from "./stop.ts"
 import { TASK_PINNED } from "./task-pinned.ts"
@@ -33,6 +35,9 @@ const MESSAGE_SPECS = [
   TASK_PINNED,
   CANVAS,
   CANVAS_FACT,
+  HEARD,
+  RELAY,
+  ANSWER,
 ] as const
 
 type CustomType = (typeof MESSAGE_SPECS)[number]["customType"]
@@ -108,6 +113,31 @@ const SAMPLES: Record<CustomType, unknown> = {
     title: "Decisions",
     change: "added",
   },
+  "pinetrie.heard": {
+    from: LANE,
+    fromName: "amber-fox",
+    entries: [entryId("e-1"), entryId("e-2")],
+  },
+  "pinetrie.relay": {
+    from: LANE,
+    fromName: "amber-fox",
+    source: entryId("e-2"),
+    asker: { kind: "agent", thread: LANE },
+    askerName: "amber-fox",
+    text: "what next?",
+    budget: entryId("e-1"),
+    by: ADA,
+  },
+  "pinetrie.answer": {
+    from: LANE,
+    fromName: "slate-owl",
+    relay: entryId("r-1"),
+    source: entryId("e-2"),
+    text: "this next",
+    wakes: true,
+    budget: entryId("e-1"),
+    by: ADA,
+  },
 }
 
 /** The role each kind renders as (`renderableMessage`). */
@@ -122,6 +152,9 @@ const ROLES: Record<CustomType, string> = {
   "pinetrie.task-pinned": "task-pinned",
   "pinetrie.canvas": "canvas",
   "pinetrie.canvas-fact": "fact",
+  "pinetrie.heard": "heard",
+  "pinetrie.relay": "relay",
+  "pinetrie.answer": "answer",
 }
 
 const isSpec = (v: unknown): v is HistorySpec<string, unknown> =>

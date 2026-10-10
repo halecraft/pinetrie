@@ -19,6 +19,7 @@ import {
   noteColumnIdFor,
   parseMentions,
   type QueuedFact,
+  type RelayDetails,
   type RootId,
   type TextCardId,
   type ThreadId,
@@ -170,6 +171,19 @@ export interface QueuedCardPopDeps {
   readonly blank: (card: QueuedText) => void
   /** Each card's history (ADR-0048 step 6). */
   readonly provenance: Pick<Provenance, "before" | "after">
+  /** Relay a popped ask card's ask (ADR-0128): "ran" when its run started. */
+  readonly relay: (
+    lane: ThreadId,
+    relay: RelayDetails,
+  ) => Promise<"ran" | "next">
+  /**
+   * Append a fact to a thread with no lane, at its end: a conversation an
+   * agent was asked from (ADR-0128). False when it could not be.
+   */
+  readonly appendLaneless: (
+    thread: ThreadId,
+    fact: QueuedFact,
+  ) => Promise<boolean>
 }
 
 /**
@@ -258,6 +272,8 @@ async function carryOut(
       return splitThen(deps, lane, plan.card, plan.intent)
     case "send":
       return sendCard(deps, { card: plan.card, text: popped.text }, plan.card)
+    case "relay":
+      return deps.relay(lane, plan.relay)
   }
 }
 
@@ -272,6 +288,7 @@ async function appendFact(
   fact: QueuedFact,
 ): Promise<"next"> {
   const { session, log, now } = deps.basics
+  if (await deps.appendLaneless(lane, fact)) return "next"
   const appended = await deps.agent
     .lane(lane)
     .append(

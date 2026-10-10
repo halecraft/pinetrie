@@ -53,6 +53,7 @@ const ROLE_LABEL: Readonly<Record<string, string>> = {
   "carry-on": "resumed",
   fact: "offer",
   behind: "the base",
+  heard: "heard",
 }
 
 function MessageView(p: MessageProps) {
@@ -64,7 +65,11 @@ function MessageView(p: MessageProps) {
           speakerLabel(p.nameOf, node.writer, node.author ?? ""),
           (node.contributors ?? []).map(w => nameFor(p.nameOf, w)),
         )
-      : (ROLE_LABEL[node.role] ?? node.role)
+      : node.role === "relay" || node.role === "answer"
+        ? // Another thread's ask, by its asker; an answer, by the thread
+          // that answered (ADR-0128).
+          (node.author ?? node.role)
+        : (ROLE_LABEL[node.role] ?? node.role)
   const classes = [
     "msg",
     node.role,

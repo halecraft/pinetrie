@@ -125,6 +125,17 @@ describe("planStop", () => {
       ).map(c => c.id),
     ).toEqual([FACT, queued.id])
   })
+  test("a spent budget stops the run, names the budget, and holds no queue (ADR-0128)", () => {
+    const planned = planStop(lane(true), {
+      ...facts([queued]),
+      budget: entryId("m"),
+    })
+    expect(planned).toMatchObject({ kind: "abort", hold: null })
+    const fact = planned.kind === "abort" ? planned.fact[0] : undefined
+    expect(fact?.kind === "write" && fact.record.content).toEqual({
+      fact: { ...stopped(), budget: entryId("m") },
+    })
+  })
   test("the first press is named: a stop of the same ask queued, or one in the thread, queues no second", () => {
     const first = planStop(lane(true), facts([], i, bea))
     const queuedStop =

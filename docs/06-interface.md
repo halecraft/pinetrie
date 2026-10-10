@@ -683,6 +683,32 @@ The rail is E; the column is T. Seeing both at once is the product.
   and mentioned, by their email's part before the `@` (`@ada` for
   `ada@example.com`, ADR-0037). A name with no such character, or spelled
   `agent`, is refused: no mention could reach it.
+- **Another thread's agent can be brought in** (ADR-0128, proposed). A
+  mention can name the agent of another thread on the task's canvas by its
+  thread's name (`@amber-fox`); a person's name may not be a thread's.
+  - **The first mention invites it**: it becomes a **member** of the
+    thread, and the message goes where it would have gone without that
+    mention, so "Please talk to @amber-fox" in agent work asks the thread's
+    own agent. Where that is nobody, as in a conversation, the agents it
+    invites are asked. A member's mention asks it, and leaves the thread's
+    own agent out, as a person's mention does.
+  - **Members are read from the thread's path**: a branch has the members
+    its thread had where it forked. The column's header names them ("with
+    amber-fox"), and what agents talking from the thread spent ("agents
+    spent 38k of 200k tokens").
+  - **The send button names them**: "invite amber-fox · send to agent",
+    "send to amber-fox", "send to amber-fox +1".
+  - **An agent asks another with its `ask` tool**, which never waits: its
+    row reads "asked amber-fox". The asked agent works in its own thread:
+    a "heard in sable-meadow: 3 messages" line, then the ask, spoken by its
+    asker. Its last message comes back as an answer, spoken by its thread's
+    name; an answer to an agent's ask runs that agent again, and nothing
+    else does. An ask for a busy agent waits in its dock as an ask card,
+    which a held queue holds.
+  - **A budget of tokens** (200k unless the user config's `agents.budget`
+    says otherwise) is set by the person's message the talk began from;
+    the runs agents start spend it, and a spent one stops the run, wakes
+    nobody, and says so in the thread.
 - **The send button says what the message will do**: "send", "send to Ada"
   ("send to Ada +2" for three), "send to agent", or, while the agent is busy,
   "queue up next", "queue after Bea" or "queue after yours", naming who

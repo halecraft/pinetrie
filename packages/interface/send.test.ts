@@ -38,6 +38,8 @@ const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
 const AGENT: Address = {
   compels: { kind: "agent", agent: THE_AGENT },
   people: [],
+  asks: [],
+  invites: [],
 }
 
 const lane = (
@@ -169,6 +171,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       lane: { kind: "none" },
       asksAgent: false,
       participants: ["Ada", "Bea", "Cy"],
+      agents: [],
       reader: READER,
       command: null,
       ...over,
@@ -188,13 +191,19 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
     expect(plan("hi")).toEqual({
       mode: "reply",
       createsLane: false,
-      to: { compels: NOBODY, people: [] },
+      to: { compels: NOBODY, people: [], asks: [], invites: [] },
       queue: { kind: "next" },
       hold: "keep",
       agentByDefault: false,
+      agentNames: new Map(),
       command: null,
     })
-    expect(plan("@ada hi").to).toEqual({ compels: NOBODY, people: ["Ada"] })
+    expect(plan("@ada hi").to).toEqual({
+      compels: NOBODY,
+      people: ["Ada"],
+      asks: [],
+      invites: [],
+    })
     expect(plan("@ada @bea @cy").to.people).toEqual(["Ada", "Bea", "Cy"])
   })
   test("asking the agent where there is no lane creates one", () => {
@@ -272,6 +281,7 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
   const sent = (to: Address, mode: ComposerMode = "reply"): SendPlan => ({
     mode,
     createsLane: false,
+    agentNames: new Map(),
     to,
     queue: { kind: "after", name: "Bea", ahead: 3 },
     hold: "keep",
@@ -282,6 +292,8 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
   const people = (...names: string[]): Address => ({
     compels: NOBODY,
     people: names,
+    asks: [],
+    invites: [],
   })
   test.each([
     ["to nobody", sent(people()), IDLE, "send", null, false],

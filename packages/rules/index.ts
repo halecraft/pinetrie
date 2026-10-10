@@ -96,6 +96,16 @@ export {
   type WorkflowPlan,
 } from "./board.ts"
 export {
+  BUDGET,
+  type BudgetRecord,
+  DEFAULT_BUDGET,
+  decodeAgentsConfig,
+  mayRequest,
+  newBudget,
+  planSpend,
+  type Spend,
+} from "./budget.ts"
+export {
   CANVAS_CAP,
   CANVAS_FACT_TYPE,
   CANVAS_RULE,
@@ -157,10 +167,12 @@ export {
   type ChatDetails,
   type ChatMessage,
   chatImageShas,
+  type Delivery,
   decodeChat,
   encodeChat,
   type PromptMessage,
   planChat,
+  planDelivery,
   promptAuthor,
   renderableMessage,
   settleRun,
@@ -215,6 +227,7 @@ export {
   type FactMessage,
   factContent,
   factLine,
+  tokensWords,
   wordsOf,
 } from "./fact.ts"
 export {
@@ -348,6 +361,7 @@ export {
   isQueuedText,
   type NextQueuedCardPopStep,
   NONE_BLANK,
+  planAskCard,
   planCarry,
   planFactCard,
   planNextQueuedCardPop,
@@ -376,6 +390,31 @@ export {
   setIfChanged,
   setRecord,
 } from "./records.ts"
+export {
+  AGENTS_RULE,
+  ANSWER,
+  type AnswerMessage,
+  type AnswerPlan,
+  answerContent,
+  askLine,
+  decodeAnswer,
+  decodeHeard,
+  decodeRelay,
+  encodeAnswer,
+  encodeHeard,
+  encodeRelayMessage,
+  HEARD,
+  type HeardMessage,
+  heardLine,
+  planAnswer,
+  planRelay,
+  RELAY,
+  type RelayEnd,
+  type RelayMessage,
+  type RelayPlan,
+  type RelayRefusal,
+  relayRefusalText,
+} from "./relay.ts"
 export { describeRequest, transcriptLines } from "./request.ts"
 export {
   answerDiff,
@@ -390,6 +429,12 @@ export {
 } from "./review.ts"
 export { planRootDelete, type RootDelete } from "./root.ts"
 export { ROOT } from "./roots.ts"
+export {
+  NOTHING_NEXT,
+  type RoundNext,
+  roundReplyOf,
+  roundRequest,
+} from "./round.ts"
 export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
 export {
   type AnyRecordSpec,

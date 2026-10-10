@@ -1,0 +1,108 @@
+// budget — the tokens agents may spend talking (ADR-0128). A person's message
+// that leads to agents talking sets one, keyed by that message: every run
+// an ask or an answer starts spends from it, and so do those runs' verdict,
+// digest and round requests. The person's own run spends nothing from it.
+//
+// What has been spent while runs go on is counted live (the host's
+// `budgets.ts`); the record holds the limit, and is rewritten only when the
+// count crosses it and at a run's end, so a session write is
+// not made for every model request.
+
+import type { EntryId, ThreadId, ValueWrite, WriterId } from "@pinetrie/core"
+import { Type } from "typebox"
+import { recordOf } from "./config.ts"
+import { decodeAt, entryKey } from "./decode.ts"
+import { type RecordSpec, setRecord } from "./records.ts"
+
+/** A budget, at the message that set it. */
+export interface BudgetRecord {
+  /** The person's message that set it: the key. */
+  readonly message: EntryId
+  /** The thread that message is in, where its facts go. */
+  readonly thread: ThreadId
+  /** Whose message it was: a stop for its sake names them. */
+  readonly by: WriterId
+  /** Tokens agents may spend. */
+  readonly limit: number
+  /** Tokens spent, as of the last run's end, or of going over. */
+  readonly spent: number
+  /** Whether a request crossed `limit`: nothing more is spent from it. */
+  readonly over: boolean
+}
+
+const BudgetSchema = Type.Object({
+  thread: Type.String({ minLength: 1 }),
+  by: Type.String({ minLength: 1 }),
+  limit: Type.Number({ minimum: 0 }),
+  spent: Type.Number({ minimum: 0 }),
+  over: Type.Boolean(),
+})
+
+/** Each budget, at the message that set it. */
+export const BUDGET: RecordSpec<BudgetRecord, EntryId, "session"> = {
+  namespace: "pinetrie.budget",
+  home: "session",
+  keyOf: r => r.message,
+  encode: ({ message, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(BudgetSchema, contents, entryKey(key), (r, message) => ({
+      message,
+      thread: r.thread as ThreadId,
+      by: r.by as WriterId,
+      limit: r.limit,
+      spent: r.spent,
+      over: r.over,
+    })),
+}
+
+/** The budget a person's message sets when the user config names none. */
+export const DEFAULT_BUDGET = 200_000
+
+/**
+ * The user config's budget for agents talking (`{ "agents": { "budget":
+ * 200000 } }`): a positive whole number of tokens, else the default. Total.
+ */
+export function decodeAgentsConfig(json: unknown): number {
+  const budget = recordOf(recordOf(json)?.agents)?.budget
+  return typeof budget === "number" && Number.isInteger(budget) && budget > 0
+    ? budget
+    : DEFAULT_BUDGET
+}
+
+/** A new budget for `message`. Pure. */
+export const newBudget = (input: {
+  readonly message: EntryId
+  readonly thread: ThreadId
+  readonly by: WriterId
+  readonly limit: number
+}): ValueWrite => setRecord(BUDGET, { ...input, spent: 0, over: false })
+
+/** What one spend does: the new count, and the record to write when it went over. */
+export interface Spend {
+  readonly spent: number
+  /** The record with `over`, the first time the count crosses `limit`; null otherwise. */
+  readonly over: BudgetRecord | null
+}
+
+/**
+ * `tokens` more spent from `record`, whose live count is `spent`. The
+ * record is rewritten only by the spend that crosses its limit. Pure.
+ */
+export function planSpend(
+  record: BudgetRecord,
+  spent: number,
+  tokens: number,
+): Spend {
+  const now = spent + Math.max(0, tokens)
+  return {
+    spent: now,
+    over:
+      !record.over && now >= record.limit
+        ? { ...record, spent: now, over: true }
+        : null,
+  }
+}
+
+/** Whether a run spending `record` may make another model request. Pure. */
+export const mayRequest = (record: BudgetRecord | undefined): boolean =>
+  record === undefined || !record.over

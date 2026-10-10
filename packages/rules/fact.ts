@@ -1,6 +1,7 @@
 // fact — what the host records in a thread (ADR-0080, ADR-0126): what a
 // command on its offer did (an acceptance, a description asked for again, a
-// squash, a refresh), and who stopped a run.
+// squash, a refresh), who stopped a run, a member dismissed or gone, and a
+// budget spent (ADR-0128).
 //
 // A history message (`history.ts`): `content` is what the model reads,
 // `details` the fact, which the column words as one line (`factLine`). It
@@ -10,7 +11,6 @@
 
 import type {
   CatchUpFrom,
-  EntryId,
   OfferAcceptanceDecision,
   OfferFact,
   QueuedFact,
@@ -22,8 +22,9 @@ import type {
 import { Type } from "typebox"
 import { Value } from "typebox/value"
 import { CatchUpFromSchema, catchUpName } from "./catch-up-from.ts"
-import { ThreadIdSchema, WriterIdSchema } from "./decode.ts"
+import { EntryIdSchema, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
+import { askLine } from "./relay.ts"
 
 const QueuedFactSchema = Type.Union([
   Type.Object({
@@ -46,9 +47,36 @@ const QueuedFactSchema = Type.Union([
   Type.Object({
     kind: Type.Literal("stopped"),
     lane: ThreadIdSchema,
-    prompt: Type.Unsafe<EntryId>(Type.String({ minLength: 1 })),
+    prompt: EntryIdSchema,
     by: WriterIdSchema,
     at: Type.Number(),
+    budget: Type.Optional(EntryIdSchema),
+  }),
+  Type.Object({
+    kind: Type.Union([Type.Literal("dismissed"), Type.Literal("left")]),
+    lane: ThreadIdSchema,
+    member: ThreadIdSchema,
+    by: WriterIdSchema,
+  }),
+  Type.Object({
+    kind: Type.Literal("round"),
+    lane: ThreadIdSchema,
+    line: Type.String(),
+    by: WriterIdSchema,
+  }),
+  Type.Object({
+    kind: Type.Literal("unanswered"),
+    lane: ThreadIdSchema,
+    member: ThreadIdSchema,
+    why: Type.Union([Type.Literal("stopped"), Type.Literal("failed")]),
+    by: WriterIdSchema,
+  }),
+  Type.Object({
+    kind: Type.Literal("budget-spent"),
+    lane: ThreadIdSchema,
+    budget: EntryIdSchema,
+    limit: Type.Number(),
+    by: WriterIdSchema,
   }),
 ])
 
@@ -94,7 +122,9 @@ export const wordsOf = (
     ? docText(source.card)
     : source.kind === "fact"
       ? factLine(source.fact)
-      : ""
+      : source.kind === "ask"
+        ? askLine(source.relay)
+        : ""
 
 /** The one line a column shows for a fact. */
 export function factLine(fact: QueuedFact): string {
@@ -108,8 +138,30 @@ export function factLine(fact: QueuedFact): string {
     case "refreshed":
       return "↻ the offer was rebuilt from this thread's work"
     case "stopped":
-      return "■ the run was stopped"
+      return fact.budget === undefined
+        ? "■ the run was stopped"
+        : "■ the run was stopped: its budget was spent"
+    case "dismissed":
+      return "− an agent was dismissed from this thread"
+    case "left":
+      return "− an agent left this thread"
+    case "budget-spent":
+      return `■ agents spent the budget of ${tokensWords(fact.limit)}`
+    case "round":
+      return `↳ ${fact.line}`
+    case "unanswered":
+      return fact.why === "stopped"
+        ? "■ an asked agent was stopped before it answered"
+        : "■ an asked agent's run failed before it answered"
   }
+}
+
+/** A number of tokens as people read it: "200k tokens", "1.5M tokens". */
+export function tokensWords(tokens: number): string {
+  if (tokens >= 1_000_000)
+    return `${Number((tokens / 1_000_000).toFixed(1))}M tokens`
+  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}k tokens`
+  return `${tokens} tokens`
 }
 
 /** What the model reads of a fact: who did what to this thread's work. */
@@ -124,7 +176,19 @@ export function factContent(fact: QueuedFact, name: string): string {
     case "refreshed":
       return `${name} rebuilt this thread's offer from your work as it is now, discarding their edits to it.`
     case "stopped":
-      return `${name} stopped this run.`
+      return fact.budget === undefined
+        ? `${name} stopped this run.`
+        : `This run was stopped: the budget of tokens ${name}'s message set for agents talking was spent.`
+    case "dismissed":
+      return `${name} dismissed another thread's agent from this thread's members; it is no longer asked here.`
+    case "left":
+      return "Another thread's agent left this thread's members; it is no longer asked here."
+    case "round":
+      return `After the agents answered: ${fact.line}`
+    case "unanswered":
+      return `The agent you asked in another thread did not answer: its run ${fact.why === "stopped" ? "was stopped" : "failed"}.`
+    case "budget-spent":
+      return `Agents talking from ${name}'s message spent its budget of ${tokensWords(fact.limit)}. Asking another thread's agent is refused until ${name} adds more.`
   }
 }
 

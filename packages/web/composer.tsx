@@ -2,6 +2,7 @@
 // (ADR-0113), which only you see, and who else is writing here.
 
 import type {
+  AgentCandidate,
   CardId,
   CommandSummary,
   EntryId,
@@ -46,6 +47,8 @@ export function Composer(p: {
   fresh: boolean
   commands: readonly CommandSummary[]
   participants: readonly string[]
+  /** Other threads' agents a mention may reach (ADR-0128). */
+  agents: readonly AgentCandidate[]
   reader: Reader
   prefill: Prefill | undefined
   pending: Pending | undefined
@@ -97,6 +100,7 @@ export function Composer(p: {
         onSend={p.onSend}
         onTyping={p.onTyping}
         participants={p.participants}
+        agents={p.agents}
         pending={p.pending}
         place={p.readOnly === null ? p.place : undefined}
         prefill={p.prefill}

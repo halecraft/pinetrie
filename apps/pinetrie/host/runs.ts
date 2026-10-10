@@ -18,6 +18,7 @@ import type { Agent } from "@pinetrie/pi"
 import { readLatestPrompt } from "@pinetrie/reads"
 import {
   CHAT_TYPE,
+  type HeardMessage,
   type PinnedMessage,
   type PromptMessage,
   planEndRun,
@@ -47,6 +48,11 @@ export type RunStart =
        * a landing or a stack.
        */
       readonly pinnedSeen: readonly SentCard[]
+      /**
+       * What an asked agent heard of the thread that asked (ADR-0128),
+       * written first, before its relayed ask; absent for every other run.
+       */
+      readonly heard?: HeardMessage | null
     }
   | { readonly kind: "resume" }
 
@@ -245,8 +251,11 @@ export function createRuns(deps: {
             failed(basics, "the task's context")(error)
             return []
           })
-          // The cards entry stays the prompt's parent.
-          const before = [behind, ...task, pinned].filter(m => m !== null)
+          // The cards entry stays the prompt's parent; what an asked agent
+          // heard goes first (ADR-0128).
+          const before = [start.heard ?? null, behind, ...task, pinned].filter(
+            m => m !== null,
+          )
           const ran = await handle.run(start.message, before)
           if (chat !== null && settleRun(ran) === "keep") {
             // The reply was already `started`, so the author cannot be told;

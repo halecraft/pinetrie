@@ -374,11 +374,21 @@ export function titleModelOf(
  * tools, no session, so nothing enters the tree or a lane's context. Null
  * when it fails.
  */
+/**
+ * A request outside every thread, answered: its text, null when it failed,
+ * and the tokens it spent, which a budget for agents talking counts
+ * (ADR-0128); 0 when nothing came back.
+ */
+export interface Completed {
+  readonly text: string | null
+  readonly tokens: number
+}
+
 export async function complete(
   setup: Pick<ModelSetup, "models">,
   model: Model,
   request: { readonly system: string; readonly user: string },
-): Promise<string | null> {
+): Promise<Completed> {
   try {
     const reply = await setup.models.completeSimple(model, {
       systemPrompt: request.system,
@@ -390,8 +400,12 @@ export async function complete(
       .flatMap(p => (p.type === "text" ? [p.text] : []))
       .join("")
       .trim()
-    return reply.stopReason === "error" || text === "" ? null : text
+    const tokens = reply.usage?.totalTokens ?? 0
+    return {
+      text: reply.stopReason === "error" || text === "" ? null : text,
+      tokens,
+    }
   } catch {
-    return null
+    return { text: null, tokens: 0 }
   }
 }

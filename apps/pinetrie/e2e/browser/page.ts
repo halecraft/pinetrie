@@ -11,8 +11,15 @@ import { chromium, type Page } from "@playwright/test"
 export const TO_AGENT = recipientWords({
   compels: { kind: "agent", agent: THE_AGENT },
   people: [],
+  asks: [],
+  invites: [],
 }).label
-export const TO_NOBODY = recipientWords({ compels: NOBODY, people: [] }).label
+export const TO_NOBODY = recipientWords({
+  compels: NOBODY,
+  people: [],
+  asks: [],
+  invites: [],
+}).label
 
 /** The ⋯ of the root you are on in the sidebar: every root has one, shown on hover or focus. */
 export const OWN_MENU = '#sidebar [aria-current="true"] ~ .open-more .open-menu'

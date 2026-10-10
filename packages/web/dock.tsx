@@ -154,6 +154,9 @@ export function Dock(p: {
               // its cards normal (`DETAIL_ON`), and nobody edits or moves
               // it (ADR-0080).
               <RENDERINGS.fact.Normal card={c} key={c.id} width={1} />
+            ) : c.kind === "ask" ? (
+              // An ask from another thread, the host's (ADR-0128).
+              <RENDERINGS.ask.Normal card={c} key={c.id} width={1} />
             ) : (
               <div
                 className="queued-card"

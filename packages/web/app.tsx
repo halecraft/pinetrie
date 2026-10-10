@@ -25,6 +25,7 @@ import { useDocStatus, useSelector } from "@kyneta/react"
 import {
   type CardId,
   type EntryId,
+  namedThreads,
   parseCardId,
   pathIds,
   type TaskId,
@@ -683,6 +684,11 @@ export function App({
     () =>
       active?.kind === "task" ? (canvases.get(active.task) ?? NO_CANVAS) : [],
     [active, canvases],
+  )
+  // The named threads on the canvas, whose agents a mention may reach (ADR-0128).
+  const canvasAgents = useMemo(
+    () => namedThreads(canvas, workFacts.names),
+    [canvas, workFacts.names],
   )
   const noteViews = useMemo(
     () =>
@@ -1442,6 +1448,7 @@ export function App({
     lanes,
     nameOf,
     participants,
+    canvasAgents,
     rows,
     seats,
     session,

@@ -106,7 +106,7 @@ export function createTitles(deps: {
           log("[host] no tab-title skill")
           return null
         }
-        const reply = await deps.piSetup.complete({
+        const { text: reply } = await deps.piSetup.complete({
           ...titleRequest({
             skill: skill.content,
             lines: plan.lines,

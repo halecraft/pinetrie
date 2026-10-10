@@ -13,11 +13,13 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import type {
+  AnswerMessage,
   BehindMessage,
   CanvasFactMessage,
   CanvasMessage,
   ChatMessage,
   FactMessage,
+  HeardMessage,
   PinnedMessage,
   PromptMessage,
   TaskPinnedMessage,
@@ -103,9 +105,11 @@ type PiResult =
 
 /**
  * What goes into a run's commit before its prompt (`ThreadLaneHandle.run`):
- * a base's news, and the context entries (ADR-0048, ADR-0116).
+ * what an asked agent heard of the thread that asked (ADR-0128), a base's
+ * news, and the context entries (ADR-0048, ADR-0116).
  */
 export type BeforePrompt =
+  | HeardMessage
   | BehindMessage
   | PinnedMessage
   | TaskPinnedMessage
@@ -125,7 +129,7 @@ export interface ThreadLaneHandle {
    * thread's offer did (ADR-0080).
    */
   append(
-    message: ChatMessage | UpdateMessage | FactMessage,
+    message: ChatMessage | UpdateMessage | FactMessage | AnswerMessage,
   ): Promise<AppendOutcome>
   /**
    * Run one turn with `message` as the prompt itself (S19). `before` goes
@@ -139,13 +143,15 @@ export interface ThreadLaneHandle {
   ): Promise<WriteOutcome>
   /**
    * Tell a running lane something that changed while it runs: its base has
-   * new work (ADR-0080, S103 item 4), or a card was added to or taken from
-   * its task (ADR-0116). pi places the message after the tool results of the
+   * new work (ADR-0080, S103 item 4), a card was added to or taken from
+   * its task (ADR-0116), or an agent it asked answered (ADR-0128). pi places the message after the tool results of the
    * turn in flight, at its next boundary, appended, so the prompt cache
    * holds. A steer that arrives after the run's last tool call makes one
    * more request.
    */
-  steer(message: BehindMessage | CanvasFactMessage): Promise<WriteOutcome>
+  steer(
+    message: BehindMessage | CanvasFactMessage | AnswerMessage,
+  ): Promise<WriteOutcome>
   /** Resume the operation a crash interrupted, in the lane's own directory. */
   resume(): Promise<WriteOutcome>
   /**

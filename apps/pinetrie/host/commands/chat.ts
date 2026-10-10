@@ -5,10 +5,12 @@
 // (ADR-0048).
 
 import {
+  agentCandidates,
   type BlobStore,
   baseKnown,
   ERR,
   type Intent,
+  membersOf,
   planModeOf,
   type SendAt,
   type SentCard,
@@ -57,6 +59,7 @@ import type { CardPort } from "../cards.ts"
 import type { Names } from "../names.ts"
 import { applyPlaceSteps } from "../places.ts"
 import type { Records } from "../records.ts"
+import { canvasThreadsOf, type Relays } from "../relays.ts"
 import type { Runs } from "../runs.ts"
 import type { Titles } from "../titles.ts"
 import type { LaneWork } from "../work/index.ts"
@@ -87,6 +90,8 @@ export interface ChatDeps {
   readonly records: Pick<Records, "writeValues">
   /** Every thread is named once recorded (ADR-0117). */
   readonly names: Pick<Names, "ensure">
+  /** A chat that asks or invites other threads' agents is relayed (ADR-0128). */
+  readonly relays: Pick<Relays, "relayChat">
 }
 
 /** What `executeChat` needs besides the decision: the facts the send was planned from. */
@@ -270,6 +275,11 @@ export async function sendChat(
     thread,
     mentions: chat.mentions,
     participants: readParticipants(session, index),
+    agents: agentCandidates(
+      canvasThreadsOf({ places: deps.basics.places, session }, chat.at.thread),
+      chat.at.thread,
+      membersOf(index, thread.end.kind === "entry" ? thread.end.id : null),
+    ),
     asksAgent: chat.asksAgent,
     sendId,
     contributors,
@@ -303,13 +313,23 @@ export async function sendChat(
           cards: readPlaces(deps.basics.places),
         })
 
-  return executeChat(deps, planned, {
+  const sent = await executeChat(deps, planned, {
     view,
     writer,
     base: chat.base,
     pinned: chat.pinned,
     start,
   })
+  // Other threads' agents it asks or invites are relayed to once the chat
+  // is written (ADR-0128), in a step of their own.
+  const details = "details" in planned ? planned.details : null
+  if (
+    details !== null &&
+    (sent.kind === "appended" || sent.kind === "started") &&
+    ((details.asks?.length ?? 0) > 0 || (details.invites?.length ?? 0) > 0)
+  )
+    void deps.relays.relayChat(chat.at.thread, sendId)
+  return sent
 }
 
 /**

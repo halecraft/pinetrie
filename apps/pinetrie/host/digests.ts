@@ -90,6 +90,11 @@ export function createDigests(deps: {
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
   /** The user config's `digests` (`decodeDigestConfig`): off, a run's end asks for its verdict alone. */
   readonly enabled: boolean
+  /**
+   * Tokens a request for `ask`'s run spent: its budget counts them, when
+   * another thread's agent asked for the run (ADR-0128).
+   */
+  readonly spent?: (ask: EntryId, tokens: number) => void
 }): Digests {
   const { basics, keeper, presence, enabled } = deps
   // Asks a request is out for.
@@ -100,6 +105,7 @@ export function createDigests(deps: {
    * is missing or the request failed. A half it refused is logged.
    */
   async function askModel(
+    ask: EntryId,
     request: Omit<Parameters<typeof digestRequest>[0], "skill" | "budget">,
   ): Promise<EndReply | null> {
     const skill = await deps.piSetup.skill("pinetrie:skill:ask-digest")
@@ -107,13 +113,14 @@ export function createDigests(deps: {
       basics.log("[host] no ask-digest skill")
       return null
     }
-    const reply = await deps.piSetup.complete(
+    const { text: reply, tokens } = await deps.piSetup.complete(
       digestRequest({
         ...request,
         skill: skill.content,
         budget: DIGEST_BUDGET,
       }),
     )
+    deps.spent?.(ask, tokens)
     if (reply === null) return null
     const read = endReplyOf(reply, request.answer)
     const refused = (half: string) =>
@@ -156,7 +163,7 @@ export function createDigests(deps: {
           held: { set: asking, key: ask },
           failed,
           request: async () => {
-            const read = await askModel({
+            const read = await askModel(ask, {
               answer: "digest",
               ask: plan.said,
               work: plan.work,
@@ -238,7 +245,7 @@ export function createDigests(deps: {
           held: { set: asking, key: prompt },
           failed,
           request: async () => {
-            const reply = await askModel({
+            const reply = await askModel(prompt, {
               answer,
               ask: request.lines.said,
               work: request.lines.work,

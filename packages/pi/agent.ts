@@ -110,6 +110,17 @@ export interface CreateAgentOptions {
    * thinking is dropped, and its prompt cached again (`prefix.ts`, S85).
    */
   readonly onPrefixChange?: (lane: ThreadId) => void
+  /**
+   * Each model request's tokens, pi's `totalTokens`, per lane, as pi reports
+   * them (S144): what a budget for agents talking spends (ADR-0128).
+   */
+  readonly onUsage?: (lane: ThreadId, tokens: number) => void
+  /**
+   * Asked before each model request of a lane's run; false aborts the run
+   * before the request is sent (S144), so a spent budget overruns by at most
+   * the request that crossed it (ADR-0128). Absent: every request is sent.
+   */
+  readonly mayRequest?: (lane: ThreadId) => boolean
 }
 
 /**
@@ -246,6 +257,29 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         return undefined
       })
     }
+    // A spent budget stops the run before its next request (ADR-0128, S144).
+    // The abort is not awaited: this hook runs inside the lane's drive,
+    // which an awaited abort would wait on.
+    const { mayRequest } = options
+    if (mayRequest !== undefined)
+      harness.hooks.on("before_request", async event => {
+        const lane = event.lane
+        if (event.step !== "assistant" || !isThreadId(lane)) return undefined
+        if (mayRequest(lane)) return undefined
+        // The lane is held, so this resolves at once; the abort is begun
+        // before the request is sent, and not awaited.
+        const held = await harness.lane(lane, CTX)
+        void held.abort(CTX).catch(() => undefined)
+        return undefined
+      })
+    const { onUsage } = options
+    const usageOff =
+      onUsage === undefined
+        ? () => undefined
+        : harness.events.on("usage", event => {
+            if (isThreadId(event.lane))
+              onUsage(event.lane, event.row.usage.totalTokens)
+          })
     // A compaction keeps the context the model last read in view (S92):
     // the newest entry of each kind summarised is carried into pi's
     // retained tail. Nothing is thrown: if `compact` fails, pi compacts on
@@ -293,6 +327,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       lanes,
       async close() {
         for (const off of offs) off()
+        usageOff()
         await harness.close(CTX)
       },
     }

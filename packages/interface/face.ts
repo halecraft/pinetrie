@@ -7,6 +7,7 @@
 // draws each.
 
 import type {
+  AskCardId,
   CardCommand,
   CardId,
   CardPlace,
@@ -14,6 +15,7 @@ import type {
   FactCardId,
   NoteColumnId,
   QueuedFact,
+  RelayDetails,
   TextCardId,
   ThreadId,
   WriterId,
@@ -57,8 +59,15 @@ export interface FactFace {
   readonly fact: QueuedFact
 }
 
+/** An ask card's face (ADR-0128): the ask relayed, worded by `askLine`. */
+export interface AskFace {
+  readonly kind: "ask"
+  readonly card: AskCardId
+  readonly relay: RelayDetails
+}
+
 /** A card at its least detail, by kind. */
-export type Face = TextFace | ThreadFace | NoteColumnFace | FactFace
+export type Face = TextFace | ThreadFace | NoteColumnFace | FactFace | AskFace
 
 /** The face of a card of `K`. */
 export type FaceOf<K extends DrawnKind> = Extract<Face, { readonly kind: K }>
@@ -104,6 +113,8 @@ export function faceOf(card: CardRecord, facts: FaceFacts): Face {
       return noteColumnFace(card.id, facts.notes)
     case "fact":
       return { kind: "fact", card: card.id, fact: card.content.fact }
+    case "ask":
+      return { kind: "ask", card: card.id, relay: card.content.relay }
   }
 }
 
@@ -130,6 +141,7 @@ export const KIND_ICON: Readonly<Record<DrawnKind, string>> = {
   thread: "≡",
   "note-column": "▤",
   fact: "※",
+  ask: "⇢",
 }
 
 /** A text card's face in words: its command's chip, and whose it is. */

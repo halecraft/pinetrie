@@ -22,6 +22,10 @@ export const CATCH_UP_TOOL = "catch_up"
 export const SPLIT_TOOL = "split_offer"
 /** Set the image in a thread's column header (ADR-0050). */
 export const BANNER_TOOL = "set_banner"
+/** Ask another thread's agent, a member of this thread, without waiting (ADR-0128). */
+export const ASK_TOOL = "ask"
+/** Leave another thread's members (ADR-0128). */
+export const LEAVE_TOOL = "leave"
 
 /**
  * Every tool pine·trie registers, in the order the model is given them. The
@@ -39,6 +43,8 @@ export const TOOL_IDS = [
   CATCH_UP_TOOL,
   SPLIT_TOOL,
   BANNER_TOOL,
+  ASK_TOOL,
+  LEAVE_TOOL,
 ] as const
 
 export type ToolId = (typeof TOOL_IDS)[number]
@@ -83,12 +89,15 @@ const SUBJECTS: Readonly<
   [CATCH_UP_TOOL]: args => field(args, "from") ?? "base",
   [SPLIT_TOOL]: undefined,
   [BANNER_TOOL]: undefined,
+  [ASK_TOOL]: args => field(args, "to"),
+  [LEAVE_TOOL]: args => field(args, "thread"),
 }
 
 /**
  * What a call touches, whole: `bash`'s command, the path of `read`, `write`
- * and `edit`, the pattern of `grep` and `find` and the path they search, or
- * what `catch_up` merges from. Undefined for any other tool.
+ * and `edit`, the pattern of `grep` and `find` and the path they search,
+ * what `catch_up` merges from, or the thread `ask` asks and `leave` leaves.
+ * Undefined for any other tool.
  */
 export function subjectOf(name: string, args: unknown): string | undefined {
   const id = toolIdOf(name)

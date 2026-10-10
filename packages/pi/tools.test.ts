@@ -14,6 +14,8 @@ const input = {
     askedAboutConflict: unused,
     catchUp: unused,
     askSplit: unused,
+    ask: unused,
+    leave: unused,
   },
   blobs: undefined,
   bannerAsks: undefined,
@@ -43,10 +45,16 @@ describe("activeToolNames", () => {
     "ask_about_conflict",
     "catch_up",
     "split_offer",
+    "ask",
+    "leave",
   ]
   test("every tool always; set_banner with banners", () => {
     expect(activeToolNames({ banners: false })).toEqual(always)
-    expect(activeToolNames({ banners: true })).toEqual([...always, BANNER_TOOL])
+    expect(activeToolNames({ banners: true })).toEqual([
+      ...always.slice(0, 9),
+      BANNER_TOOL,
+      ...always.slice(9),
+    ])
   })
 })
 

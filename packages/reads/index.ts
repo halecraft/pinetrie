@@ -80,6 +80,8 @@ import {
   BANNER,
   BASE,
   BOARD,
+  BUDGET,
+  type BudgetRecord,
   CARD_HISTORY,
   COMMANDS,
   COMMANDS_KEY,
@@ -285,6 +287,21 @@ export function readLatestPrompt(
 }
 
 /**
+ * A lane's latest run's prompt, as stored: its id and its message, for a
+ * decoder of its own (`promptAuthor`, `decodeRelay`). Null for a lane with no
+ * prompt, or one whose message is not stored.
+ */
+export function readPromptMessage(
+  doc: RootDocHandle,
+  lane: ThreadId,
+): { readonly id: EntryId; readonly message: unknown } | null {
+  const latest = readLatestPrompt(doc, lane)
+  if (latest === null) return null
+  const stored = readEntryMessage(doc, latest.id)
+  return stored.present ? { id: latest.id, message: stored.message } : null
+}
+
+/**
  * The person behind a lane's latest run (ADR-0080): its prompt's author, a
  * chat's or a land or stack message's `by` (`promptAuthor`); else whoever
  * started the lane. Null for a lane with neither.
@@ -294,13 +311,9 @@ export function readRunAuthor(
   session: SessionDocHandle,
   lane: ThreadId,
 ): WriterId | null {
-  const latest = readLatestPrompt(doc, lane)
-  const stored =
-    latest === null
-      ? { present: false as const }
-      : readEntryMessage(doc, latest.id)
+  const prompt = readPromptMessage(doc, lane)
   return (
-    (stored.present ? promptAuthor(stored.message) : null) ??
+    (prompt === null ? null : promptAuthor(prompt.message)) ??
     readLaneRecords(session).get(lane)?.by ??
     null
   )
@@ -725,6 +738,11 @@ export const readBases = (
 ): ReadonlyMap<ThreadId, BaseRecord> => readRecords(doc, BASE)
 
 /** Each lane's name (`pinetrie.name`, ADR-0039), by lane. */
+/** Each budget for agents talking, by the message that set it (ADR-0128). */
+export const readBudgets = (
+  doc: SessionDocHandle,
+): ReadonlyMap<EntryId, BudgetRecord> => readRecords(doc, BUDGET)
+
 export const readNames = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, ThreadName> =>

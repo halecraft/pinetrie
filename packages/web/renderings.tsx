@@ -30,7 +30,7 @@ import {
   type ThreadPreview,
   textFaceWords,
 } from "@pinetrie/interface"
-import { factLine } from "@pinetrie/rules"
+import { askLine, factLine } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { createContext, type ReactNode, useContext } from "react"
 import { BoundCardEditor } from "./card-editor.tsx"
@@ -297,6 +297,30 @@ function FactLine(p: { card: CardOf<"fact">; width: CardWidth }) {
   )
 }
 
+/** An ask card's face: its kind's icon, and its line. */
+function AskFaceView({ face }: { face: FaceOf<"ask"> }) {
+  return (
+    <span className="fact-face" data-card={face.card}>
+      <span aria-hidden className="card-icon">
+        {KIND_ICON.ask}
+      </span>
+      {askLine(face.relay)}
+    </span>
+  )
+}
+
+/**
+ * An ask from another thread, normal and whole alike (ADR-0128): its one
+ * line, the host's, waiting for its thread's end. Nobody edits or moves it.
+ */
+function AskLine(p: { card: CardOf<"ask">; width: CardWidth }) {
+  return (
+    <div className="queued-fact queued-ask" data-card={p.card.id}>
+      {askLine(p.card.content.relay)}
+    </div>
+  )
+}
+
 /** Every kind, drawn at every level. */
 export const RENDERINGS = {
   text: {
@@ -323,6 +347,12 @@ export const RENDERINGS = {
     Normal: FactLine,
     Whole: FactLine,
   },
+  ask: {
+    icon: KIND_ICON.ask,
+    Face: AskFaceView,
+    Normal: AskLine,
+    Whole: AskLine,
+  },
 } as const satisfies { readonly [K in DrawnKind]: Renderings<K> }
 
 const NoteColumnRow = RENDERINGS["note-column"]
@@ -338,6 +368,8 @@ export function DrawFace({ face }: { face: Face }) {
       return <NoteColumnRow.Face face={face} />
     case "fact":
       return <RENDERINGS.fact.Face face={face} />
+    case "ask":
+      return <RENDERINGS.ask.Face face={face} />
   }
 }
 
@@ -374,5 +406,7 @@ export function DrawCard(p: {
       ) : (
         <RENDERINGS.fact.Normal card={card} width={width} />
       )
+    case "ask":
+      return <RENDERINGS.ask.Normal card={card} width={width} />
   }
 }

@@ -5,6 +5,31 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── agents talking (ADR-0128) ──
+  {
+    name: "a budget goes over at every spend past its limit",
+    file: "packages/rules/budget.ts",
+    from: "      !record.over && now >= record.limit\n",
+    to: "      now >= record.limit\n",
+    command: unit,
+    expect: "only the one that crosses the limit writes",
+  },
+  {
+    name: "a stopped run's answer is sent anyway",
+    file: "packages/rules/relay.ts",
+    from: '  if (end.kind !== "answered") return { kind: "unanswered", why: end.kind }\n',
+    to: "",
+    command: unit,
+    expect: "a stopped or failed run sends no answer",
+  },
+  {
+    name: "the round acts on prose",
+    file: "packages/rules/round.ts",
+    from: '  if (people !== null) return { kind: "people", line: (people[1] ?? "").trim() }\n  return NOTHING_NEXT\n',
+    to: '  if (people !== null) return { kind: "people", line: (people[1] ?? "").trim() }\n  return { kind: "people", line }\n',
+    command: unit,
+    expect: "anything else is nothing",
+  },
   {
     name: "a card whose text has not arrived is blank",
     file: "packages/rules/queue.ts",
@@ -326,8 +351,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fact is read as a message",
     file: "packages/rules/chat.ts",
-    from: '  if (fact !== undefined)\n    return fact.kind === "stopped"\n      ? {\n          role: "fact",\n          content: factLine(fact),\n          stopped: { prompt: fact.prompt, by: fact.by },\n        }\n      : { role: "fact", content: factLine(fact) }\n',
-    to: "",
+    from: '  if (fact !== undefined)\n    return fact.kind === "stopped"\n',
+    to: '  if (fact !== undefined && false)\n    return fact.kind === "stopped"\n',
     command: unit,
     expect: "the column draws it as its one line, role fact",
   },
@@ -351,8 +376,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a split's prompt names no one",
     file: "packages/rules/chat.ts",
-    from: "  return decodeLand(message)?.by ?? decodeStack(message)?.by ?? null",
-    to: "  return decodeLand(message)?.by ?? null",
+    from: "    decodeStack(message)?.by ??\n",
+    to: "",
     command: unit,
     expect:
       "a chat's author, a land or stack message's by; none for anything else",
@@ -643,16 +668,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a plain reply conflicts",
     file: "packages/rules/chat.ts",
-    from: "  if (!compelled) {\n    return busy",
-    to: '  if (!compelled) {\n    if (race !== null) return { kind: "conflict", by: race.by }\n    return busy',
+    from: "  if (!compelled)\n    return busy",
+    to: '  if (!compelled)\n    return race !== null ? { kind: "conflict", by: race.by } : busy',
     command: unit,
     expect: "plain messages never conflict",
   },
   {
     name: "a raced compelled reply runs anyway",
     file: "packages/rules/chat.ts",
-    from: '  if (mode === "reply" && (race !== null || busy)) {',
-    to: '  if (mode === "reply" && busy) {',
+    from: '  if (mode === "reply" && (race !== null || busy))',
+    to: '  if (mode === "reply" && busy)',
     command: unit,
     expect: "another writer raced",
   },
@@ -1044,8 +1069,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host writes a plain message to a running lane",
     file: "packages/rules/chat.ts",
-    from: '    return busy\n      ? { kind: "busy" }\n      : { kind: "appendToLane", thread: name, details }',
-    to: '    return { kind: "appendToLane", thread: name, details }',
+    from: '    return busy ? { kind: "busy" } : { kind: "appendToLane", thread }',
+    to: '    return { kind: "appendToLane", thread }',
     command: unit,
     expect: "a running lane, or one with cards queued: busy",
   },
@@ -2200,7 +2225,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a held queue holds a fact",
     file: "packages/rules/queue.ts",
-    from: '  if (!isQueuedText(top)) return { kind: "pop", card: top }\n',
+    from: '  if (isQueuedFact(top)) return { kind: "pop", card: top }\n',
     to: "",
     command: unit,
     expect: "planNextQueuedCardPop: a held queue pops no message",
@@ -2208,7 +2233,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the pop ignores someone typing in the top card",
     file: "packages/rules/queue.ts",
-    from: '  if (facts.typing.has(top.id)) return { kind: "typing", card: top }\n',
+    from: '  if (isQueuedText(top) && facts.typing.has(top.id))\n    return { kind: "typing", card: top }\n',
     to: "",
     command: unit,
     expect: "planNextQueuedCardPop: a held queue pops no message",
@@ -2899,8 +2924,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread in an inventory pops its queue",
     file: "packages/rules/queue.ts",
-    from: "  if (facts.away)\n    return top !== undefined && !isQueuedText(top)\n",
-    to: "  if (facts.away && false)\n    return top !== undefined && !isQueuedText(top)\n",
+    from: "  if (facts.away)\n    return top !== undefined && isQueuedFact(top)\n",
+    to: "  if (facts.away && false)\n    return top !== undefined && isQueuedFact(top)\n",
     command: unit,
     expect:
       "planNextQueuedCardPop: a thread in an inventory pops no message, but a fact on top: it starts no run (ADR-0124, ADR-0126)",

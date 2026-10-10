@@ -45,6 +45,7 @@ test("a scripted model given no agent directory loads nothing of pi's, and still
       .commands.map(c => c.name)
       .sort(),
   ).toEqual([
+    "pinetrie:skill:agents-round",
     "pinetrie:skill:ask-digest",
     "pinetrie:skill:column-banner",
     "pinetrie:skill:commit-message",

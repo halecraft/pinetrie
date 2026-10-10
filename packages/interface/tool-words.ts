@@ -4,6 +4,7 @@
 // calls and a row's tag all read these.
 
 import {
+  ASK_TOOL,
   BANNER_TOOL,
   BASH_TOOL,
   CATCH_UP_TOOL,
@@ -11,6 +12,7 @@ import {
   EDIT_TOOL,
   FIND_TOOL,
   GREP_TOOL,
+  LEAVE_TOOL,
   READ_TOOL,
   SPLIT_TOOL,
   type ToolCall,
@@ -31,6 +33,8 @@ const TOOL_WORDS: Readonly<Record<ToolId, string>> = {
   [CATCH_UP_TOOL]: "catch up",
   [SPLIT_TOOL]: "split",
   [BANNER_TOOL]: "banner",
+  [ASK_TOOL]: "asked",
+  [LEAVE_TOOL]: "left",
 }
 
 /** A tool's word; a tool pine·trie does not register goes by its own name. */

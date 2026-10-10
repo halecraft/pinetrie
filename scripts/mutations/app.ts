@@ -6,6 +6,55 @@
 import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── agents talking (ADR-0128), the host suite's agents scenario ──
+  {
+    name: "a chat stores none of the agents it invites",
+    file: "packages/rules/chat.ts",
+    from: "    ...(invites.length === 0 ? {} : { invites }),\n",
+    to: "",
+    suite: "host",
+    scenario: "agents",
+    expect:
+      "a first mention of another thread's agent invites it, and the thread's own agent is asked",
+  },
+  {
+    name: "a relayed run is not given what its agent heard",
+    file: "apps/pinetrie/host/runs.ts",
+    from: "          const before = [start.heard ?? null, behind, ...task, pinned].filter(",
+    to: "          const before = [null, behind, ...task, pinned].filter(",
+    suite: "host",
+    scenario: "agents",
+    expect:
+      "an agent's ask runs the other thread's agent, on what it heard and then the ask",
+  },
+  {
+    name: "a relayed run's end sends no answer",
+    file: "apps/pinetrie/host/index.ts",
+    from: '    void relays.ended(lane, prompt).catch(failed(basics, "an answer"))\n',
+    to: "",
+    suite: "host",
+    scenario: "agents",
+    expect: "the answer comes back to the asking thread, and wakes its agent",
+  },
+  {
+    name: "a budget counts nothing spent",
+    file: "apps/pinetrie/host/budgets.ts",
+    from: "    if (!budget.spends) return\n",
+    to: "    return\n",
+    suite: "host",
+    scenario: "agents",
+    expect: "what the other thread's agent spent is counted in the budget",
+  },
+  {
+    name: "a spent budget tells its thread nothing",
+    file: "apps/pinetrie/host/budgets.ts",
+    from: "        if (fact !== null) applyPlaceSteps(places, fact)\n",
+    to: "",
+    suite: "host",
+    scenario: "agents",
+    expect:
+      "a spent budget: the answer wakes nobody, and the asking thread is told it was spent",
+  },
   // ── the lanes suite, proven in a lane (ADR-0103) ──
   {
     name: "a new lane forks from the root, not where it branched",

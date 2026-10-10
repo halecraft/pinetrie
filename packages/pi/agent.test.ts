@@ -9,6 +9,7 @@ import {
   atEntry,
   commitId,
   ERR,
+  entryId,
   NOBODY,
   type Position,
   ROOT,
@@ -24,7 +25,9 @@ import {
   BEHIND_TYPE,
   encodeBehind,
   encodeChat,
+  encodeHeard,
   encodePinned,
+  encodeRelayMessage,
   LANE,
   PINNED_TYPE,
   recordsIn,
@@ -43,7 +46,7 @@ import {
 } from "@pinetrie/schema"
 import { newRootDoc, newSessionDoc } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
-import { newId } from "./agent.ts"
+import { type CreateAgentOptions, newId } from "./agent.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
 import { startPi } from "./start-pi.ts"
@@ -451,5 +454,103 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
       .sort((a, b) => (a.id < b.id ? -1 : 1))
     expect(underFork.map(r => r.thread)).toEqual([branch, trunk])
     expect(all[fork]?.thread).toBe(trunk)
+  })
+})
+
+describe("agents talking (ADR-0128, S144)", () => {
+  const ADA = writerId("ada@x.io")
+  const asked = (text: string) =>
+    encodeChat(
+      {
+        author: ADA,
+        authorName: "Ada",
+        text,
+        compels: { kind: "agent", agent: THE_AGENT },
+        sendId: newId(),
+      },
+      1,
+    )
+  async function laneOver(
+    script: ReturnType<typeof scriptedModel>,
+    gate: Pick<CreateAgentOptions, "onUsage" | "mayRequest">,
+  ) {
+    const doc = newRootDoc()
+    const { agent } = await startPi(oneRoot(doc), {
+      model: { kind: "scripted", script },
+      ...gate,
+    })
+    const made = await agent.createThreadLane(
+      { root: ONE_ROOT, at: ROOT },
+      threadIdFor(newId()),
+    )
+    if (made.kind !== "created") throw new Error("no lane")
+    return { agent, doc, lane: made.lane }
+  }
+
+  test("each request's tokens are told, by lane", async () => {
+    const script = scriptedModel({ answer: { text: "ok" } })
+    const told: [string, number][] = []
+    const { agent, lane } = await laneOver(script, {
+      onUsage: (l, tokens) => told.push([l, tokens]),
+    })
+    await agent.lane(lane).run(asked("go"), [])
+    await agent.close()
+    expect(told.length).toBe(1)
+    expect(told[0]?.[0]).toBe(lane)
+    expect(told[0]?.[1]).toBeGreaterThan(0)
+  })
+
+  test("a spent budget stops the run before its request is sent", async () => {
+    const script = scriptedModel()
+    let requests = 0
+    script.use([
+      {
+        reply: () => {
+          requests++
+          return "should not be asked"
+        },
+      },
+    ])
+    const { agent, lane } = await laneOver(script, { mayRequest: () => false })
+    await agent.lane(lane).run(asked("go"), [])
+    await agent.close()
+    expect(requests).toBe(0)
+  })
+
+  test("what an asked agent heard goes in first, in the run's commit, and the model reads it before the ask", async () => {
+    const script = scriptedModel()
+    let seen: readonly string[] = []
+    script.use([
+      {
+        reply: context => {
+          seen = context
+          return "ok"
+        },
+      },
+    ])
+    const { agent, lane } = await laneOver(script, {})
+    const from = threadIdFor(newId())
+    const heard = encodeHeard(
+      { from, fromName: "sable-meadow", entries: [entryId("e-1")] },
+      ["Ada: should we queue?"],
+      1,
+    )
+    const relay = encodeRelayMessage(
+      {
+        from,
+        fromName: "sable-meadow",
+        source: entryId("e-1"),
+        asker: { kind: "agent", thread: from },
+        askerName: "sable-meadow",
+        text: "what do you think?",
+        budget: entryId("e-1"),
+        by: ADA,
+      },
+      1,
+    )
+    expect(await agent.lane(lane).run(relay, [heard])).toEqual({ kind: "ok" })
+    await agent.close()
+    expect(seen.at(-2)).toBe(heard.content)
+    expect(seen.at(-1)).toBe(relay.content)
   })
 })

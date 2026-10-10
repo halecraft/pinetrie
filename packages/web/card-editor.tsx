@@ -18,6 +18,7 @@ import { attach } from "@kyneta/react"
 import { subscribe } from "@kyneta/schema"
 import type {
   AcceptedRecord,
+  AgentCandidate,
   CardId,
   CardRecord,
   CommandSummary,
@@ -160,6 +161,8 @@ export function CardEditor(p: {
   commands: readonly CommandSummary[]
   /** Everyone who can be mentioned, as shown. */
   participants: readonly string[]
+  /** Other threads' agents a mention may reach (ADR-0128). */
+  agents: readonly AgentCandidate[]
   /** Who is sending, and everyone's names. */
   reader: Reader
   /** What the box starts with, unsent: a fresh column's (`Prefill`). */
@@ -229,6 +232,7 @@ export function CardEditor(p: {
     lane: p.lane,
     asksAgent: p.how.asksAgent,
     participants: p.participants,
+    agents: p.agents,
     reader: p.reader,
     command,
   })

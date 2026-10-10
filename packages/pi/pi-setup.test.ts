@@ -8,7 +8,7 @@ test("a setup answers with no documents", async () => {
   const setup = await loadPiSetup({
     model: { kind: "scripted", script: scriptedModel() },
   })
-  expect(await setup.complete({ system: "s", user: "u" })).toBe(
+  expect((await setup.complete({ system: "s", user: "u" })).text).toBe(
     SCRIPTED_DESCRIPTION,
   )
   expect(await setup.skill("pinetrie:skill:tab-title")).not.toBeNull()

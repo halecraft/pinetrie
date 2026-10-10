@@ -10,6 +10,23 @@ const places = "packages/core/places.ts"
 const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── agents talking (ADR-0128) ──
+  {
+    name: "a first mention asks rather than invites",
+    file: core,
+    from: "      const into = agent.member ? asks : invites\n",
+    to: "      const into = asks\n",
+    command: unit,
+    expect: "a first mention invites",
+  },
+  {
+    name: "a dismissal leaves its member in the thread",
+    file: "packages/core/agents.ts",
+    from: "    if (gone !== undefined) {\n",
+    to: "    if (gone !== undefined && false) {\n",
+    command: unit,
+    expect: "invites add, in the order invited, and a fact removes",
+  },
   // ── the lanes suite, proven in a lane (ADR-0103) ──
   {
     name: "an offer's message names its thread under another key",
@@ -299,8 +316,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "naming people still asks the agent in agent work",
     file: core,
-    from: "      : people.length > 0 || !input.agentByDefault",
-    to: "      : !input.agentByDefault",
+    from: "      : people.length > 0 || asks.length > 0 || !input.agentByDefault",
+    to: "      : asks.length > 0 || !input.agentByDefault",
     command: unit,
     expect: "is for Ada only",
   },
@@ -323,8 +340,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every handle is a person",
     file: core,
-    from: '    m.kind === "person" ? [byHandle.get(handleOf(m.name))].filter(isName) : [],',
-    to: '    m.kind === "person" ? [m.name] : [],',
+    from: "    if (person !== undefined) people.push(person)",
+    to: "    people.push(person ?? m.name)",
     command: unit,
     expect: "an unknown handle is ignored",
   },
@@ -771,8 +788,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a carry-on message starts no run",
     file: tree,
-    from: '  "land",\n  "stack",\n  "carry-on",\n])',
-    to: '  "land",\n  "stack",\n])',
+    from: '  "stack",\n  "carry-on",\n  "relay",',
+    to: '  "stack",\n  "relay",',
     command: unit,
     expect: "a carry-on message starts an ask of its own",
   },

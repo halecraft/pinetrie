@@ -93,6 +93,7 @@ function setUp(
     ...(writes ? { writeValues: async w => applyWrites(b, w) } : {}),
   })
   const commands = createCommands({
+    relays: { relayChat: async () => {} },
     basics: b,
     agent: pi.port,
     scribe: pi.port,

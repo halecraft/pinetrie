@@ -67,7 +67,7 @@ export function describe(
             const skill = await deps.piSetup.skill(
               "pinetrie:skill:commit-message",
             )
-            return deps.piSetup.complete(
+            const { text } = await deps.piSetup.complete(
               describeRequest({
                 skill:
                   skill?.content ?? "Write a commit message for this change.",
@@ -77,6 +77,7 @@ export function describe(
                 budget: DESCRIBE_BUDGET,
               }),
             )
+            return text
           },
           settle: text =>
             owner.command(async ops => {

@@ -14,12 +14,15 @@
 
 import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import {
+  type AnswerDetails,
   atEntry,
   type CardId,
   type CatchUpFrom,
   type CommitId,
   type EntryId,
+  type HeardDetails,
   type Position,
+  type RelayDetails,
   type SendAt,
   type TaskId,
   type ThreadId,
@@ -169,7 +172,20 @@ export interface AgentMessageLike {
   readonly stopped?: {
     readonly prompt: EntryId
     readonly by: WriterId
+    /** A spent budget's message, when the budget stopped it (ADR-0128). */
+    readonly budget?: EntryId
   }
+  /** Role `fact` only, for a member's: who left the thread's members (ADR-0128). */
+  readonly member?: { readonly gone: ThreadId }
+  /** Role `chat` only: the other threads' agents it asks and invites (ADR-0128). */
+  readonly asks?: readonly ThreadId[]
+  readonly invites?: readonly ThreadId[]
+  /** Role `relay` only: an ask from another thread (ADR-0128). */
+  readonly relay?: RelayDetails
+  /** Role `answer` only: an asked agent's answer (ADR-0128). */
+  readonly answer?: AnswerDetails
+  /** Role `heard` only: what an asked agent heard of the thread that asked. */
+  readonly heard?: HeardDetails
 }
 
 export interface EntryLike {
@@ -214,6 +230,8 @@ export interface TranscriptMessage {
   readonly toolCalls?: readonly ToolCall[]
   /** Roles `update` and `land` only: the commits merged into the lane (ADR-0072). */
   readonly merged?: readonly CommitId[]
+  /** Roles `relay` and `answer` only: the thread it came from (ADR-0128). */
+  readonly from?: ThreadId
 }
 
 /**
@@ -345,6 +363,23 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
         : { images: entry.message.images }),
     }
   }
+  // An ask from another thread, and an asked agent's answer (ADR-0128), are
+  // messages as a chat is, spoken by the asker and by the answering thread.
+  if (role === "relay" || role === "answer") {
+    const came = role === "relay" ? entry.message?.relay : entry.message?.answer
+    const author =
+      role === "relay"
+        ? entry.message?.relay?.askerName
+        : entry.message?.answer?.fromName
+    return {
+      id: entry.id,
+      thread: entry.thread,
+      role,
+      text: messageText(entry.message),
+      author: author ?? "",
+      ...(came === undefined ? {} : { from: came.from }),
+    }
+  }
   // A one-line message (`LINE_ROLES`) shows as its short line: the reader
   // decodes it into its role with that line as its content.
   if (role !== "user" && role !== "assistant" && !LINE_ROLES.has(role))
@@ -367,7 +402,8 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
  * prompt (`land`, ADR-0033), an update and a split's prompt (`update`,
  * `stack`, ADR-0105), a Resume's carry-on (`carry-on`, ADR-0082), and the
  * host's facts, what a command on the offer did (`fact`) and that the base
- * has new work (`behind`, ADR-0080).
+ * has new work (`behind`, ADR-0080), and what an asked agent heard of the
+ * thread that asked (`heard`, ADR-0128).
  */
 export const LINE_ROLES: ReadonlySet<string> = new Set([
   "land",
@@ -376,6 +412,7 @@ export const LINE_ROLES: ReadonlySet<string> = new Set([
   "carry-on",
   "fact",
   "behind",
+  "heard",
 ])
 
 /** The message a reader sees at `id`, or null (`renderableMessage`). */
@@ -468,9 +505,10 @@ export const turnMerged = (index: TreeIndex, tip: EntryId): boolean =>
 
 /**
  * The roles a run can start with: a person's message, pi's own, and a land,
- * stack or carry-on message. An update never starts one: it is a fact in the
- * thread. Nor does a cards entry (role `pinned`): it is written with a run's
- * prompt, as its parent.
+ * stack or carry-on message, an ask relayed from another thread and the
+ * answer that wakes its asker (ADR-0128). An update never starts one: it is
+ * a fact in the thread. Nor does a cards entry (role `pinned`): it is
+ * written with a run's prompt, as its parent.
  */
 const PROMPT_ROLES: ReadonlySet<string> = new Set([
   "chat",
@@ -478,6 +516,8 @@ const PROMPT_ROLES: ReadonlySet<string> = new Set([
   "land",
   "stack",
   "carry-on",
+  "relay",
+  "answer",
 ])
 
 /** Whether a run can start with `entry` (`PROMPT_ROLES`). */

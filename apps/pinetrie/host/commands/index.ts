@@ -89,6 +89,7 @@ export interface CommandDeps {
     Pick<Provenance, "onTaken">
   /** The documents' keeper: a `documents` command is one step on it. */
   readonly keeper: Pick<HostKeeper, "run" | "track">
+  readonly relays: ChatDeps["relays"]
 }
 
 /**

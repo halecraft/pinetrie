@@ -1,12 +1,16 @@
 // pi/thread-tools — the tools an agent acts on its own thread with (ADR-0080):
 // `catch_up`, which merges its base's or its parent's new work into its copy
-// during the run, and `split_offer`, which queues its offer's split. The host
+// during the run, and `split_offer`, which queues its offer's split; and the
+// tools it talks to other threads' agents with (ADR-0128): `ask`, which
+// relays an ask to a member without waiting, and `leave`. The host
 // decides and carries them out (`LaneHooks`); this only reads the call and
 // hands back the host's answer, as the model reads it.
 
 import {
+  ASK_TOOL,
   CATCH_UP_TOOL,
   type CommitId,
+  LEAVE_TOOL,
   SPLIT_TOOL,
   type ThreadId,
 } from "@pinetrie/core"
@@ -98,6 +102,71 @@ export function splitTool(askSplit: (lane: ThreadId) => Promise<ToolAnswer>) {
     ) {
       const lane = threadOfContext(context)
       return resultOf(lane === undefined ? NO_LANE : await askSplit(lane))
+    },
+  }
+}
+
+/**
+ * `ask` (ADR-0128): relay an ask to another thread's agent, a member of this
+ * thread. It never waits for the answer, which arrives as a message: two
+ * agents that waited on each other would never finish (S144).
+ */
+export function askTool(
+  ask: (lane: ThreadId, to: string, text: string) => Promise<ToolAnswer>,
+) {
+  return {
+    name: ASK_TOOL,
+    label: "ask",
+    description:
+      "Ask another thread's agent, a member of this thread, by its thread's name. It does not wait: it answers whether the ask was relayed or queued, and the other agent's answer arrives later as a message. An @name you write in a reply asks nobody; only this does.",
+    parameters: Type.Object({
+      to: Type.String({ description: "The other thread's name, as amber-fox" }),
+      text: Type.String({ description: "What you ask it" }),
+    }),
+    async execute(
+      _id: string,
+      params: { to: string; text: string },
+      _onUpdate: unknown,
+      _toolContext: unknown,
+      _invocation: unknown,
+      context: Context,
+    ) {
+      const lane = threadOfContext(context)
+      const answer =
+        lane === undefined
+          ? NO_LANE
+          : await ask(lane, params.to.replace(/^@/, ""), params.text)
+      return resultOf(answer)
+    },
+  }
+}
+
+/** `leave` (ADR-0128): this thread's agent leaves another thread's members. */
+export function leaveTool(
+  leave: (lane: ThreadId, thread: string) => Promise<ToolAnswer>,
+) {
+  return {
+    name: LEAVE_TOOL,
+    label: "leave",
+    description:
+      "Leave another thread you were invited into: you are no longer asked there.",
+    parameters: Type.Object({
+      thread: Type.String({ description: "That thread's name" }),
+    }),
+    async execute(
+      _id: string,
+      params: { thread: string },
+      _onUpdate: unknown,
+      _toolContext: unknown,
+      _invocation: unknown,
+      context: Context,
+    ) {
+      const lane = threadOfContext(context)
+      const answer =
+        lane === undefined
+          ? NO_LANE
+          : await leave(lane, params.thread.replace(/^@/, ""))
+      return resultOf(answer)
     },
   }
 }

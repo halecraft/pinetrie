@@ -15,20 +15,28 @@ export const transcriptLine = (
   const speaker =
     m.role === "assistant"
       ? "agent"
-      : m.role === "chat" || m.role === "user"
+      : SPOKEN.has(m.role)
         ? (m.author ?? "someone")
         : m.role
   return `${speaker}: ${m.text}`
 }
 
-/** Each chat, prompt and agent reply as `transcriptLine`; the rest are left out. */
+/**
+ * The roles spoken by someone a line names: a person's chat, pi's own user
+ * message, and an ask from another thread or an asked agent's answer
+ * (ADR-0128), whose speakers are the asker and the answering thread.
+ */
+const SPOKEN: ReadonlySet<string> = new Set(["chat", "user", "relay", "answer"])
+
+/**
+ * Each chat, prompt, agent reply, and what agents in other threads asked and
+ * answered, as `transcriptLine`; the rest are left out.
+ */
 export const transcriptLines = (
   messages: readonly TranscriptMessage[],
 ): string[] =>
   messages
-    .filter(
-      m => m.role === "chat" || m.role === "user" || m.role === "assistant",
-    )
+    .filter(m => m.role === "assistant" || SPOKEN.has(m.role))
     .map(transcriptLine)
 
 /**

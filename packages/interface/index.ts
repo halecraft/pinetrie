@@ -8,6 +8,7 @@ export {
   accountWords,
   inventoryWords,
 } from "./account-view.ts"
+export { type AgentsRow, agentsRow, agentsWords } from "./agents-view.ts"
 export { placement } from "./align.ts"
 export {
   appView,

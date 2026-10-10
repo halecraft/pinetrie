@@ -85,6 +85,7 @@ function setUp(begin: ErrCode | null = null) {
   const seen: (readonly SentCard[])[] = []
   const titles = record<ChatDeps["titles"]>({ laneStarted: async () => {} })
   const deps: ChatDeps = {
+    relays: { relayChat: async () => {} },
     names: record<ChatDeps["names"]>({ ensure: async () => {} }).port,
     basics: b,
     agent: pi.port,
@@ -221,6 +222,7 @@ describe("sendChat", () => {
     const records = record<ChatDeps["records"]>({ writeValues: async () => {} })
     const names = record<ChatDeps["names"]>({ ensure: async () => {} })
     const deps: ChatDeps = {
+      relays: { relayChat: async () => {} },
       basics: b,
       agent: pi.port,
       scribe: pi.port,

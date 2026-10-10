@@ -4,7 +4,9 @@
 // history and traces. Re-exported from `index.ts`.
 
 import {
+  type AskCardId,
   atEntry,
+  type BudgetSpentFact,
   type CardId,
   type CardKind,
   type CatchUpFrom,
@@ -18,15 +20,19 @@ import {
   isThreadId,
   kindOfCard,
   type MediaId,
+  type MemberFact,
   type NoteColumnId,
   type Position,
   parseCardId,
+  type RelayDetails,
   ROOT,
   type RootId,
+  type RoundFact,
   type StopFact,
   type TaskId,
   type TextCardId,
   type ThreadId,
+  type UnansweredFact,
   type WriterId,
 } from "./index.ts"
 import { KINDS } from "./kinds.ts"
@@ -87,9 +93,16 @@ export type OfferFact =
 /**
  * A fact on its way into its thread (ADR-0080, ADR-0126): what a fact card
  * holds, appended as an entry when the thread's end consumes it. What a
- * command on the offer did, or who stopped a run.
+ * command on the offer did, who stopped a run, a member dismissed or gone,
+ * or a budget spent (ADR-0128).
  */
-export type QueuedFact = OfferFact | StopFact
+export type QueuedFact =
+  | OfferFact
+  | StopFact
+  | MemberFact
+  | BudgetSpentFact
+  | UnansweredFact
+  | RoundFact
 
 /** A card's command, or null: only a text card has one. */
 export const commandOf = (card: CardRecord): CardCommand | null =>
@@ -951,6 +964,7 @@ export const PLACES_OF: {
   thread: KINDS.thread.places,
   "note-column": KINDS["note-column"].places,
   fact: KINDS.fact.places,
+  ask: KINDS.ask.places,
   media: KINDS.media.places,
   file: KINDS.file.places,
 }
@@ -991,6 +1005,7 @@ export interface ContentOf {
   readonly thread: Readonly<Record<string, never>>
   readonly "note-column": Readonly<Record<string, never>>
   readonly fact: { readonly fact: QueuedFact }
+  readonly ask: { readonly relay: RelayDetails }
 }
 
 /** The kinds of card with records: the reserved `media` and `file` have none yet. */
@@ -1029,6 +1044,9 @@ export type NoteColumnCard = Card<"note-column">
 /** A fact on its way into its thread (ADR-0080): only ever queued. */
 export type FactCard = Card<"fact">
 
+/** An ask from another thread for a busy agent (ADR-0128): only ever queued. */
+export type AskCard = Card<"ask">
+
 /** A canvas card's place: a task and a rank there. */
 export type CanvasPlace = Extract<CardPlace, { readonly kind: "canvas" }>
 
@@ -1054,6 +1072,7 @@ export const NO_CONTENT: Readonly<Record<string, never>> = {}
 export type TextSource =
   | { readonly kind: "doc"; readonly card: TextCardId }
   | { readonly kind: "fact"; readonly fact: QueuedFact }
+  | { readonly kind: "ask"; readonly relay: RelayDetails }
   | { readonly kind: "none" }
 
 /** Where `card`'s words are read. Pure. */
@@ -1063,6 +1082,8 @@ export function textSourceOf(card: CardRecord): TextSource {
       return { kind: "doc", card: card.id }
     case "fact":
       return { kind: "fact", fact: card.content.fact }
+    case "ask":
+      return { kind: "ask", relay: card.content.relay }
     case "thread":
     case "note-column":
       return { kind: "none" }
@@ -1087,6 +1108,7 @@ export type IdOf<K extends CardKind> = {
   readonly thread: ThreadId
   readonly "note-column": NoteColumnId
   readonly fact: FactCardId
+  readonly ask: AskCardId
   readonly media: MediaId
   readonly file: FileCardId
 }[K]
@@ -1175,6 +1197,8 @@ export function placed(
       return fits("note-column", place) ? { ...card, place } : undefined
     case "fact":
       return fits("fact", place) ? { ...card, place } : undefined
+    case "ask":
+      return fits("ask", place) ? { ...card, place } : undefined
   }
 }
 

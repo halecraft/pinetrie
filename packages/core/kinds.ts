@@ -38,6 +38,10 @@ export interface KindSpec {
  * - a fact, only ever queued, until its thread's end consumes it: the
  *   host places it, no person moves it (a move is refused `no-place`), and
  *   nothing passes it in its queue (`planReorder`, refused `fact`);
+ * - an ask, an ask from another thread for a busy agent (ADR-0128), only
+ *   ever queued, until its thread's end consumes it: the host places it, no
+ *   person moves it (it never becomes a note), and a person may reorder it,
+ *   or hold the queue it waits in;
  * - a media card and a file card, reserved: their ids are taken, and no
  *   place takes them yet.
  *
@@ -83,6 +87,14 @@ export const KINDS = {
     places: ["queued"],
     moves: false,
     reordered: false,
+    put: "moves",
+    text: "fact",
+  },
+  ask: {
+    prefix: "a-",
+    places: ["queued"],
+    moves: false,
+    reordered: true,
     put: "moves",
     text: "fact",
   },

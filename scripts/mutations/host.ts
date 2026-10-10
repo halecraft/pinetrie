@@ -141,8 +141,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a chat's run is not told its base's news",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [behind, ...task, pinned].filter(m => m !== null)",
-    to: "          const before = [...task, pinned].filter(m => m !== null)",
+    from: "          const before = [start.heard ?? null, behind, ...task, pinned].filter(",
+    to: "          const before = [start.heard ?? null, ...task, pinned].filter(",
     command: unit,
     expect: "a chat's run is told its base's news first",
   },
@@ -1406,8 +1406,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run reads no pinned cards",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [behind, ...task, pinned].filter(m => m !== null)",
-    to: "          const before = [behind, ...task].filter(m => m !== null)",
+    from: "          const before = [start.heard ?? null, behind, ...task, pinned].filter(",
+    to: "          const before = [start.heard ?? null, behind, ...task].filter(",
     command: unit,
     expect: "a prompt's run reads its pinned cards",
   },
@@ -1791,8 +1791,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run is told nothing of its task",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [behind, ...task, pinned].filter(m => m !== null)",
-    to: "          const before = [behind, pinned].filter(m => m !== null)",
+    from: "          const before = [start.heard ?? null, behind, ...task, pinned].filter(",
+    to: "          const before = [start.heard ?? null, behind, pinned].filter(",
     command: unit,
     expect: "then its task, before its cards entry",
   },

@@ -104,6 +104,12 @@ test("the prompt no longer tells the model to search with bash", () => {
       askSplit: async () => {
         throw new Error("no split_offer here")
       },
+      ask: async () => {
+        throw new Error("unused")
+      },
+      leave: async () => {
+        throw new Error("unused")
+      },
     },
     blobs: undefined,
     bannerAsks: undefined,
@@ -294,6 +300,12 @@ describe("lanes in a harness", () => {
           },
           askSplit: async () => {
             throw new Error("no split_offer here")
+          },
+          ask: async () => {
+            throw new Error("unused")
+          },
+          leave: async () => {
+            throw new Error("unused")
           },
         },
       },
@@ -534,6 +546,12 @@ describe("lanes in a harness", () => {
           },
           askSplit: async () => {
             throw new Error("no split_offer here")
+          },
+          ask: async () => {
+            throw new Error("unused")
+          },
+          leave: async () => {
+            throw new Error("unused")
           },
         },
       },

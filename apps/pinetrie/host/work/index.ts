@@ -57,7 +57,7 @@ export type LaneWork = Pick<
     /** What the host found where it runs; null when it has no tools. */
     readonly project: ProjectRecord | null
     /** pi's hooks lane work answers; `askSplit` is the documents' (`host/split-call.ts`). */
-    readonly hooks: Omit<LaneHooks, "askSplit">
+    readonly hooks: Omit<LaneHooks, "askSplit" | "ask" | "leave">
     /** Your repo, as lane work keeps it; null for a host without tools. */
     readonly repo: YourRepo | null
     /**

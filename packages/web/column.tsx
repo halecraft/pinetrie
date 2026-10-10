@@ -4,6 +4,7 @@ import { useSelector } from "@kyneta/react"
 import {
   type AgentRun,
   type AskIndex,
+  agentCandidates,
   atEntry,
   type CardId,
   type CardPlace,
@@ -15,6 +16,7 @@ import {
   isThreadId,
   type LaneView,
   laneOf,
+  membersOf,
   messageAt,
   nearestRevision,
   type Position,
@@ -28,12 +30,15 @@ import {
   type TextPlace,
   type ThreadId,
   type ThreadLane,
+  type ThreadName,
   type TraceRecord,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import {
   AGENT_MARK,
+  agentsRow,
+  agentsWords,
   askWords,
   bannerUrl,
   behind,
@@ -181,6 +186,11 @@ export interface ColumnProps {
   nameOf: ReadonlyMap<WriterId, string>
   /** Everyone who can be mentioned (`readParticipants`). */
   participants: readonly string[]
+  /** The named threads on the task's canvas, whose agents a mention may reach (ADR-0128). */
+  canvasAgents: readonly {
+    readonly thread: ThreadId
+    readonly name: ThreadName
+  }[]
   /** Each person's colour (`presenceColors`). */
   colorOf: (writer: WriterId) => string
   /** This window is typing in this column, in the card its box shows. */
@@ -551,6 +561,27 @@ export function Column(p: ColumnProps) {
     ...(freshMode?.root === undefined ? {} : { root: freshMode.root }),
     ...(pinned.length === 0 ? {} : { pinned: pinned.map(c => c.id) }),
   }
+  // This thread's members and its budget, in its header (ADR-0128).
+  const agentsHere = useMemo(
+    () => membersOf(p.index, view.tipId),
+    [p.index, view.tipId],
+  )
+  const agentsLine = useMemo(
+    () =>
+      agentsRow({
+        thread,
+        members: agentsHere,
+        names: p.work.names,
+        budgets: p.work.budgets,
+      }),
+    [thread, agentsHere, p.work.names, p.work.budgets],
+  )
+  // Other threads' agents a message here may name (ADR-0128).
+  const agents = useMemo(
+    () =>
+      agentCandidates(p.canvasAgents, thread, membersOf(p.index, view.tipId)),
+    [p.canvasAgents, thread, p.index, view.tipId],
+  )
   // The column's pane (ADR-0078): what you opened beside the thread, kept
   // only while the column is mounted. One subject at a time, named, so
   // `paneView` can tell when it is gone: the offer's review after an
@@ -878,6 +909,11 @@ export function Column(p: ColumnProps) {
               onOpen={openAt}
               origin={shows.origin}
             />
+            {agentsLine !== null && (
+              // Other threads' agents in this thread, and what agents
+              // talking from it spent (ADR-0128).
+              <div className="agents-row">{agentsWords(agentsLine)}</div>
+            )}
             {view.above.length > 0 && (
               <button
                 className="earlier"
@@ -976,6 +1012,7 @@ export function Column(p: ColumnProps) {
                     onShows={setPinBox}
                     onTyping={p.onTyping}
                     participants={p.participants}
+                    agents={agents}
                     pending={undefined}
                     place={textPlaceOf(
                       drawnPlace(pinKey, p.session.writer, p.cards),
@@ -1153,6 +1190,7 @@ export function Column(p: ColumnProps) {
               catchUps={catchUps}
               putColumn={putColumn}
               participants={p.participants}
+              agents={agents}
               pending={freshMode?.pending}
               readOnly={p.readOnly}
               typingAt={view.tipId}

@@ -50,6 +50,7 @@ export function mentionsOf(input: {
       const { people } = address({
         mentions: parseMentions(text),
         participants: input.participants,
+        agents: [],
         agentByDefault: false,
       })
       if (people.includes(input.myName))

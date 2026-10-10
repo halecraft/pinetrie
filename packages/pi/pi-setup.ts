@@ -13,6 +13,7 @@ import {
 import { type Banners, banners } from "./banner.ts"
 import { type CommandFiles, commandFiles } from "./commands.ts"
 import {
+  type Completed,
   complete,
   DEFAULT_AGENT_DIR,
   loadModelSetup,
@@ -25,8 +26,8 @@ import { sealed } from "./inside.ts"
 
 /**
  * pinetrie's own skills, loaded after yours and the repo's: `resolve-conflicts`,
- * `commit-message`, `offer-stack`, `column-banner`, `ask-digest` and
- * `tab-title`.
+ * `commit-message`, `offer-stack`, `column-banner`, `ask-digest`,
+ * `tab-title` and `agents-round` (ADR-0128).
  */
 const SKILLS_DIR = path.join(import.meta.dirname, "skills")
 
@@ -42,13 +43,14 @@ export interface PiSetup extends CommandFiles, Banners {
   /**
    * One request outside every thread, with no tools and no session
    * (`complete` in `config.ts`), on the title model for `purpose` `title`,
-   * else the describe model. Null when it fails.
+   * else the describe model: its text, null when it fails, and the tokens
+   * it spent (ADR-0128).
    */
   complete(request: {
     readonly system: string
     readonly user: string
     readonly purpose?: "title"
-  }): Promise<string | null>
+  }): Promise<Completed>
 }
 
 export interface PiSetupOptions {

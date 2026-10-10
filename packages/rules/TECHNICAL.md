@@ -1500,6 +1500,55 @@ Gotchas:
   (`conflictAskedAt`, core), which the strip reads as "needs you" while it
   is newer than the offer's record.
 
+# Agents talking (`relay.ts`, `budget.ts`, `round.ts`, ADR-0128)
+
+Another thread's agent, invited into a thread, is asked there and answers
+from its own thread. Who a message invites and asks is `address`
+(`@pinetrie/core`), and the chat stores both (`ChatDetails.asks`,
+`invites`, absent when none); members, what an agent has heard and whether
+a round is done are read from the path (`membersOf`, `heardFrom`,
+`roundOf`, core). Nothing about them is stored beside the entries.
+
+- **Three history messages.** `pinetrie.heard` (role `heard`, a one-line
+  message): what an asked agent was told of the thread that asked, its text
+  frozen in `content`, the source ids in `details`. `pinetrie.relay` (role
+  `relay`): the ask, the asked agent's prompt, carrying where it came from,
+  its asker, its chain's budget and the person behind it (`by`).
+  `pinetrie.answer` (role `answer`): the asked agent's last message, in the
+  asking thread, a prompt when it `wakes` its asker. Both are prompts
+  (`PROMPT_ROLES`), so each is an ask; `transcriptLines` speaks them by
+  asker and by thread.
+- **`planDelivery`** (`chat.ts`) is the one table of where a message into a
+  thread goes by its lane's state; `planChat` and the host's relays and
+  answers plan with it. Only an answer that wakes `steers` into a running
+  lane; one that wakes nobody waits for the run's end.
+- **`planRelay`** hears the asking thread's path after the newest entry
+  `heardFrom` names, or from the message that invited it, never the ask
+  itself nor the asked agent's own answers; it refuses a non-member, a
+  thread with no lane, itself and a spent budget (`relayRefusalText`).
+- **`planAnswer`** wakes the asker only when an agent asked and the budget
+  is not spent; a stopped or failed run sends no answer, and the asking
+  thread is told by an `unanswered` fact.
+- **An ask card** is a card of its own kind (`KINDS.ask`, `a-` id), only
+  ever queued, made by the host for the person behind the chain
+  (`planAskCard`). Its relay is stored as JSON in the row's `fact` string,
+  as a fact card's fact is, so no field was added. A held queue holds it;
+  nobody moves it, but it may be reordered. The drain carries it as a relay
+  (`planCarry`).
+- **A budget** (`BUDGET`, keyed by the person's message that set it) holds
+  its limit, its count as of the last write, and `over`. `planSpend`
+  counts, and returns the record to write only when a spend crosses the
+  limit; `mayRequest` reads it. The user config's
+  `agents.budget` is `decodeAgentsConfig`'s.
+- **Facts**: `dismissed` and `left` (a member gone, read by `membersOf`),
+  `unanswered`, `round` (what the round told the people) and
+  `budget-spent`; a stop the budget made names it (`StopFact.budget`) and
+  holds no queue (`planStop`).
+- **The round** (`round.ts`): `roundRequest` is the `agents-round` skill,
+  the members and the thread's newest lines; `roundReplyOf` reads
+  `nothing`, `ask <member>: <text>` or `people: <line>`, and anything else
+  as nothing (ADR-0067).
+
 # Participants (`participant.ts`)
 
 A session is its participants (ADR-0021). A `pinetrie.participant` value is a

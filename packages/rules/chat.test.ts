@@ -93,6 +93,7 @@ const plan = (over: Partial<PlanInput>) => {
     author: ALICE,
     authorName: "Alice",
     text: "hello",
+    agents: [],
     mode: "reply",
     at: atEntry(E1),
     end: atEntry(E1),
@@ -141,6 +142,7 @@ describe("addressChat: who a chat is for, host and composer alike", () => {
     addressChat({
       mentions: [],
       participants: ["Alice", "Bo"],
+      agents: [],
       mode: "reply",
       lane: NONE,
       asksAgent: false,
@@ -151,10 +153,14 @@ describe("addressChat: who a chat is for, host and composer alike", () => {
     expect(to({ command: true, mentions: parseMentions("@bo look") })).toEqual({
       compels: AGENT,
       people: ["Bo"],
+      asks: [],
+      invites: [],
     })
     expect(to({ mentions: parseMentions("@bo look") })).toEqual({
       compels: NOBODY,
       people: ["Bo"],
+      asks: [],
+      invites: [],
     })
   })
   test("no mention asks the agent in agent work, and nobody in a branch", () => {
@@ -510,6 +516,7 @@ test("participants: named writers and every writer in the tree, the unnamed by t
     address({
       mentions: parseMentions("@bob look"),
       participants: all,
+      agents: [],
       agentByDefault: true,
     }).people,
     ["bo.b"],

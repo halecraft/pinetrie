@@ -33,6 +33,7 @@ import {
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { decodeQueuedFact, encodeQueuedFact } from "./fact.ts"
+import { decodeStoredRelay, encodeRelay } from "./relay.ts"
 
 /**
  * A card as the places document stores it: flat strings, "" for none. The
@@ -83,13 +84,19 @@ interface StoredCardFields {
 /**
  * A card record -> the flat value the places document stores under its id:
  * its place's fields, and its content's. A text card's command and reason
- * unsent, a fact card's fact; a thread's card and a note column hold none.
+ * unsent, a fact card's fact, an ask card's relay (ADR-0128), both as JSON
+ * in `fact`; a thread's card and a note column hold none.
  */
 export const encodeCard = (card: CardRecord): StoredCardFields => ({
   owner: card.owner,
   ...placeFields(card.place),
   command: card.kind === "text" ? (card.content.command ?? "") : "",
-  fact: card.kind === "fact" ? encodeQueuedFact(card.content.fact) : "",
+  fact:
+    card.kind === "fact"
+      ? encodeQueuedFact(card.content.fact)
+      : card.kind === "ask"
+        ? encodeRelay(card.content.relay)
+        : "",
   unsent: card.kind === "text" ? (card.content.unsent ?? "") : "",
   placer: card.placer,
 })
@@ -142,6 +149,19 @@ export const decodeCard = (
                 placer,
                 place,
                 content: { fact: decoded },
+              } as CardRecord)
+        }
+        case "ask": {
+          const relay = c.command === "" ? decodeStoredRelay(fact) : undefined
+          return relay === undefined
+            ? undefined
+            : ({
+                kind,
+                id: card,
+                owner,
+                placer,
+                place,
+                content: { relay },
               } as CardRecord)
         }
         case "text":

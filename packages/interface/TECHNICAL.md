@@ -1472,6 +1472,17 @@ gone.
   id), `.note-column-title`, `.note-column .open-title-input`, `.add-note`,
   and each note's `.card-editor.note` with its `textarea[data-card]`.
 
+## Other threads' agents (`agents-view.ts`, `send.ts`, ADR-0128)
+
+- **The composer's candidates** are the named threads on the task's canvas
+  (the app's `canvasAgents`), each a member when `membersOf` the column's
+  path holds it (`agentCandidates`, core): the host builds them the same
+  way, so the send button and the host agree.
+- **`recipientWords`** puts the agents a send invites first ("invite
+  amber-fox · send to agent") and names those it asks as people are named.
+- **`agentsRow`** is the header's row: the thread's members by name, and
+  the newest budget a message of the thread set, worded by `agentsWords`.
+
 ## Names
 
 A message keeps the name its writer had when they sent it: that is what the

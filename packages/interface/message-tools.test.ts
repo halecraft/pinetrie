@@ -68,6 +68,7 @@ describe("edit", () => {
       const asks = address({
         mentions: parseMentions(text),
         participants: ["Ada"],
+        agents: [],
         agentByDefault: false,
       }).compels.kind
       expect(asks === "agent", node.text).toBe(node.compelled === true)

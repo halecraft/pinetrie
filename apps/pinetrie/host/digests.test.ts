@@ -73,7 +73,7 @@ function running(
     Pick<PiSetup, "complete" | "skill"> & Pick<Records, "writeValues">
   >({
     skill: async () => ({ path: "SKILL.md", content: "Summarize.", hash: "h" }),
-    complete: async () => answer,
+    complete: async () => ({ text: await answer, tokens: 0 }),
     writeValues: async () => {},
   })
   const keeper = createKeeper()

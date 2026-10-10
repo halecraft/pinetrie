@@ -20,7 +20,7 @@ import {
   type Spot,
   type ThreadId,
 } from "@pinetrie/core"
-import type { ChatMessage } from "@pinetrie/rules"
+import type { AnswerMessage, ChatMessage, FactMessage } from "@pinetrie/rules"
 import type { RootDocHandle } from "@pinetrie/schema"
 import type { AgentDocuments, Stack } from "./agent.ts"
 import { sealed } from "./inside.ts"
@@ -38,7 +38,7 @@ export interface Scribe {
    * nothing was written there since it planned, so no re-read is needed here.
    */
   appendToTree(
-    message: ChatMessage,
+    message: ChatMessage | AnswerMessage | FactMessage,
     spot: Spot,
     thread: ThreadId,
   ): Promise<AppendOutcome>

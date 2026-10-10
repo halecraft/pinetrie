@@ -182,6 +182,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   bases: new Map(),
   forks: new Map(),
   filesLost: new Map(),
+  budgets: new Map(),
   ...over,
 })
 /** Accepted work, one commit past the lane's base: `base` read what catching up brings. */

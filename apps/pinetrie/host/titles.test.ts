@@ -52,8 +52,10 @@ function setUp(
     Pick<PiSetup, "complete" | "skill"> & Pick<Records, "writeValues">
   >({
     skill: async () => ({ path: "SKILL.md", content: "Title it.", hash: "h" }),
-    complete: async () =>
-      over.reply === undefined ? reply.promise : over.reply,
+    complete: async () => ({
+      text: await (over.reply === undefined ? reply.promise : over.reply),
+      tokens: 0,
+    }),
     writeValues: async w => applyWrites(b, w),
   })
   const keeper = createKeeper()

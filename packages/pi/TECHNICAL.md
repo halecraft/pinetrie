@@ -734,6 +734,31 @@ Note what it does **not** do: it detects change, it does not design for it.
 Probes P1 and P2 in `sandbox/s17-typed-entries/` could each have failed while
 conformance stayed green, which is why they ran first.
 
+### Agents talking: `ask`, `leave`, and the budget's gate (ADR-0128, S144)
+
+- **`ask` and `leave` are the host's tools** (`thread-tools.ts`), as
+  `catch_up` is: each reads its call and returns the hook's answer
+  (`LaneHooks.ask`, `LaneHooks.leave`). `ask` never waits for the asked
+  agent's answer: two agents that waited on each other would never finish
+  (S144). Every lane has both, so its tool list stays the same between
+  runs (S85); adding them changed every lane's prefix once.
+- **`AGENTS_RULE`** (`@pinetrie/rules`) is in every thread's `<rules>`,
+  after the context rules.
+- **`onUsage`** is pi's `usage` event, per request and per lane: its
+  `totalTokens`, input, output and cache alike.
+- **`mayRequest`** is asked in a `before_request` hook; false aborts the
+  run before the request is sent. The hook awaits the held lane, which
+  resolves at once, and does not await the abort: the hook runs inside the
+  lane's drive, which an awaited abort would wait on (S144).
+- **`complete` returns its tokens** (`Completed`): a budget counts a
+  relayed run's verdict and digest requests too.
+- **Gotcha: compaction keeps only what is stored.** pi summarises stored
+  messages with `convertToLlm` and skips custom entries, so what an asked
+  agent hears of another thread is copied into its thread as a heard
+  entry's `content`, never drawn in from the other root at each request
+  (S144). `run` writes it first in `before`, so the cards entry stays the
+  prompt's parent.
+
 ### Requests outside every thread (`PiSetup.complete`, ADR-0105, ADR-0106, ADR-0074)
 
 `complete({ system, user, purpose })` is one `completeSimple` request, with

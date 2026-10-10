@@ -242,6 +242,8 @@ function setUp(
   const sends = [...answers]
   const deps: QueuedCardPopDeps = {
     basics: b,
+    relay: async () => "next",
+    appendLaneless: async () => false,
     records: { writeValues: async writes => applyWrites(b, writes) },
     agent: record<QueuedCardPopDeps["agent"]>({
       lane: () =>

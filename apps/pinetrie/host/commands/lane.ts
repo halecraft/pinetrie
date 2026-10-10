@@ -23,10 +23,13 @@ import {
   readLanes,
   readParticipantNames,
   readPlaces,
+  readPromptMessage,
   readQueueHolds,
+  readRunningLanes,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
+  decodeRelay,
   displayName,
   planCarryOn,
   planFactCard,
@@ -142,7 +145,27 @@ export async function handleStop(
     }
     if (!deps.cancel(lane)) await agent.lane(lane).abort()
   }
+  // A run this thread asked for in another thread stops with it (ADR-0128).
+  for (const asked of askedFrom(deps.basics, lane))
+    await handleStop(deps, asked, by)
   return { kind: "stopped" }
+}
+
+/** The running lanes whose run another thread's ask from `lane` started. */
+function askedFrom(
+  basics: Pick<LaneDeps["basics"], "docs" | "session" | "live">,
+  lane: ThreadId,
+): readonly ThreadId[] {
+  return readRunningLanes(basics.session, basics.live).flatMap(
+    ({ lane: l }) => {
+      if (l === lane) return []
+      const doc = basics.docs.docOfLane(l)
+      const prompt = doc === null ? null : readPromptMessage(doc, l)
+      return prompt !== null && decodeRelay(prompt.message)?.from === lane
+        ? [l]
+        : []
+    },
+  )
 }
 
 /**

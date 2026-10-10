@@ -6,6 +6,7 @@
 import {
   type AcceptedRecord,
   type Address,
+  type AgentCandidate,
   type CardCommand,
   type ChatMode,
   parseMentions,
@@ -174,6 +175,8 @@ export interface SendPlan {
   } | null
   /** A message naming no one asks the agent (`agentByDefault`). */
   readonly agentByDefault: boolean
+  /** Other threads' agents a mention may reach, by thread, their names: the button names them. */
+  readonly agentNames: ReadonlyMap<ThreadId, string>
 }
 
 /**
@@ -195,6 +198,8 @@ export function planSend(input: {
   readonly lane: ThreadLane
   readonly asksAgent: boolean
   readonly participants: readonly string[]
+  /** Other threads' agents on the task's canvas (ADR-0128). */
+  readonly agents: readonly AgentCandidate[]
   readonly reader: Reader
   /** The card's command (ADR-0108), or null. */
   readonly command: CardCommand | null
@@ -209,6 +214,7 @@ export function planSend(input: {
     ...how,
     mentions: parseMentions(input.text),
     participants: input.participants,
+    agents: input.agents,
     command: parseCommand(input.text) !== null,
   })
   const compelled = to.compels.kind === "agent"
@@ -225,6 +231,7 @@ export function planSend(input: {
       : queuePlace(lane, input.reader),
     hold: releases ? "release" : "keep",
     agentByDefault: agentByDefault(how),
+    agentNames: new Map(input.agents.map(a => [a.thread, a.name])),
     command:
       input.command === null
         ? null
@@ -263,24 +270,38 @@ export function sendButton(plan: SendPlan, busy: EditorBusy): SendButton {
       ? commandSendWords(plan.command, plan.queue)
       : plan.mode === "queue"
         ? queueWords(plan.queue)
-        : recipientWords(plan.to)
+        : recipientWords(plan.to, plan.agentNames)
   return { ...words, disabled: busy.uploading || busy.sending }
 }
 
 /**
  * Who a send is for, in the button's words. A send that asks the agent says
- * so, whoever else it names.
+ * so, whoever else it names. Other threads' agents it invites come first
+ * ("invite amber-fox · send to agent"), and those it asks are named as
+ * people are (ADR-0128): `names` gives each its thread's name.
  */
-export function recipientWords(to: Address): ButtonWords {
+export function recipientWords(
+  to: Address,
+  names: ReadonlyMap<ThreadId, string> = new Map(),
+): ButtonWords {
+  const nameOf = (t: ThreadId) => names.get(t) ?? "another agent"
+  const invited = to.invites.filter(t => !to.asks.includes(t)).map(nameOf)
+  const prefix = invited.length === 0 ? "" : `invite ${invited.join(", ")} · `
+  const words = sendWords(to, nameOf)
+  return { label: `${prefix}${words.label}`, title: words.title }
+}
+
+function sendWords(to: Address, nameOf: (t: ThreadId) => string): ButtonWords {
   if (to.compels.kind === "agent")
     return { label: "send to agent", title: null }
-  const [first, ...others] = to.people
+  const named = [...to.asks.map(nameOf), ...to.people]
+  const [first, ...others] = named
   if (first === undefined) return { label: "send", title: null }
   return others.length === 0
     ? { label: `send to ${first}`, title: null }
     : {
         label: `send to ${first} +${others.length}`,
-        title: `to ${to.people.join(", ")}`,
+        title: `to ${named.join(", ")}`,
       }
 }
 

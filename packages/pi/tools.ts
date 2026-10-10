@@ -8,6 +8,7 @@ import {
   createWriteTool,
 } from "@earendil-works/pi-agent-core"
 import {
+  ASK_TOOL,
   BANNER_TOOL,
   BASH_TOOL,
   type BlobStore,
@@ -16,6 +17,7 @@ import {
   EDIT_TOOL,
   FIND_TOOL,
   GREP_TOOL,
+  LEAVE_TOOL,
   READ_TOOL,
   SPLIT_TOOL,
   type ThreadId,
@@ -28,7 +30,7 @@ import { bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"
 import { findTool, grepTool } from "./search.ts"
-import { catchUpTool, splitTool } from "./thread-tools.ts"
+import { askTool, catchUpTool, leaveTool, splitTool } from "./thread-tools.ts"
 
 export interface ToolsInput {
   readonly hooks: LaneHooks
@@ -67,6 +69,10 @@ export const TOOLS: Readonly<
     catchUpTool((lane, from) => input.hooks.catchUp(lane, from)),
   [SPLIT_TOOL]: input => splitTool(lane => input.hooks.askSplit(lane)),
   [BANNER_TOOL]: input => bannerTool(input.bannerAsks),
+  [ASK_TOOL]: input =>
+    askTool((lane, to, text) => input.hooks.ask(lane, to, text)),
+  [LEAVE_TOOL]: input =>
+    leaveTool((lane, thread) => input.hooks.leave(lane, thread)),
 }
 
 /**
@@ -87,8 +93,8 @@ const FILE_TOOLS: readonly ToolId[] = [
 /**
  * Every tool the harness registers, in `TOOL_IDS`' order, and the names of
  * the file tools among them. Besides the file tools, the tools the host
- * answers: `ask_about_conflict`, `catch_up` and `split_offer` (ADR-0080), and
- * `set_banner`.
+ * answers: `ask_about_conflict`, `catch_up` and `split_offer` (ADR-0080),
+ * `set_banner`, and `ask` and `leave` (ADR-0128).
  */
 export function assembleTools(input: ToolsInput): {
   readonly registered: readonly unknown[]

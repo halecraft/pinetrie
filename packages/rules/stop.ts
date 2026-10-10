@@ -73,7 +73,9 @@ const queuedStopper = (
  * is the one named; and hold its queue when a message card waits there, so
  * the run's end does not send the next one (ADR-0048 step 7). The fact goes
  * before the cards queued, and the run's end pops it whatever the hold.
- * Nothing when it is idle (stopping is idempotent). Pure.
+ * Nothing when it is idle (stopping is idempotent). A spent budget stops a
+ * run too (ADR-0128): its fact names the budget, and it holds no queue,
+ * which is the stopped thread's own people's. Pure.
  */
 export function planStop(
   lane: LaneView,
@@ -86,6 +88,8 @@ export function planStop(
     readonly now: number
     /** The id its fact card would have. */
     readonly id: FactCardId
+    /** The spent budget's message, for a stop the budget made; absent for a person's. */
+    readonly budget?: EntryId
   },
 ): StopPlan {
   if (!lane.running) return { kind: "idle" }
@@ -108,15 +112,19 @@ export function planStop(
             prompt,
             by: facts.by,
             at: facts.now,
+            ...(facts.budget === undefined ? {} : { budget: facts.budget }),
           },
         }) ?? []),
-    hold: holdOnStop({
-      queue,
-      holds: facts.holds,
-      by: facts.by,
-      now: facts.now,
-      lane: lane.name,
-    }),
+    hold:
+      facts.budget === undefined
+        ? holdOnStop({
+            queue,
+            holds: facts.holds,
+            by: facts.by,
+            now: facts.now,
+            lane: lane.name,
+          })
+        : null,
   }
 }
 

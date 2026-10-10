@@ -45,6 +45,7 @@ import {
   readBanners,
   readBases,
   readBoardPlaces,
+  readBudgets,
   readCardHistories,
   readCommands,
   readDigests,
@@ -207,6 +208,7 @@ function readFacts(view: HeldView): SessionFacts {
       bases: readBases(doc),
       forks: forksOf(readThreads(doc)),
       filesLost: readFilesLost(doc),
+      budgets: readBudgets(doc),
     },
   }
 }

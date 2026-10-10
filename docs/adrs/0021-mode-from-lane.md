@@ -17,6 +17,8 @@
     in it.
   - ADR-0117: a copy's lane, like a branch's, is made when its agent is first
     asked.
+  - ADR-0128: a mention can name another thread's agent, by its thread's name;
+    its first mention in a thread invites it, and later ones ask it.
 
 **Context.** ADR-0018 stored a default at an entry (`pinetrie.thread`): below a
 *working session* entry the agent answers every message, below a

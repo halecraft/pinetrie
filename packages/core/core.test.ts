@@ -53,6 +53,7 @@ import {
   type TextPlace,
   THE_AGENT,
   type ThreadId,
+  type ThreadName,
   targetOfFields,
   taskIdFor,
   threadIdFor,
@@ -275,11 +276,65 @@ test("messageText: flattens pi's content parts", () => {
   assert.equal(messageText(undefined), "")
 })
 
+describe("address: other threads' agents are invited, then asked (ADR-0128)", () => {
+  const fox = threadIdFor("01a00000-0000-7000-8000-00000000f0c5")
+  const owl = threadIdFor("01a00000-0000-7000-8000-0000000000e1")
+  const agents = (member: boolean) => [
+    { thread: fox, name: "amber-fox" as ThreadName, member },
+    { thread: owl, name: "slate-owl" as ThreadName, member: true },
+  ]
+  const to = (text: string, member: boolean, agentByDefault: boolean) =>
+    address({
+      mentions: parseMentions(text),
+      participants: ["Ada", "amber-fox"],
+      agents: agents(member),
+      agentByDefault,
+    })
+  test("a first mention invites, and the message goes where it would have gone", () => {
+    expect(to("please talk to @amber-fox", false, true)).toEqual({
+      compels: { kind: "agent", agent: THE_AGENT },
+      people: [],
+      asks: [],
+      invites: [fox],
+    })
+  })
+  test("where it would go to nobody, the invited agents are asked", () => {
+    expect(to("@amber-fox what do you think?", false, false)).toEqual({
+      compels: NOBODY,
+      people: [],
+      asks: [fox],
+      invites: [fox],
+    })
+  })
+  test("a member's mention asks it, and leaves this thread's agent out", () => {
+    expect(to("@amber-fox @slate-owl next?", true, true)).toEqual({
+      compels: NOBODY,
+      people: [],
+      asks: [fox, owl],
+      invites: [],
+    })
+  })
+  test("a person named only beside an invite keeps it from being asked", () => {
+    expect(to("@ada meet @amber-fox", false, false)).toEqual({
+      compels: NOBODY,
+      people: ["Ada"],
+      asks: [],
+      invites: [fox],
+    })
+  })
+  test("@agent beside a member asks both", () => {
+    const both = to("@agent @slate-owl both of you", true, false)
+    expect(both.compels.kind).toBe("agent")
+    expect(both.asks).toEqual([owl])
+  })
+})
+
 describe("address: mentions pick who a message is for (ADR-0021)", () => {
   const who = (text: string, agentByDefault: boolean) =>
     address({
       mentions: parseMentions(text),
       participants: ["Ada Lovelace", "O'Brien", "guest-x4bu"],
+      agents: [],
       agentByDefault,
     })
   test("@agent asks the agent, with or without people", () => {
@@ -287,12 +342,16 @@ describe("address: mentions pick who a message is for (ADR-0021)", () => {
     expect(who("@agent @adalovelace go", false)).toEqual({
       compels: { kind: "agent", agent: THE_AGENT },
       people: ["Ada Lovelace"],
+      asks: [],
+      invites: [],
     })
   })
   test("@Ada alone in agent work is for Ada only", () => {
     expect(who("@AdaLovelace look", true)).toEqual({
       compels: NOBODY,
       people: ["Ada Lovelace"],
+      asks: [],
+      invites: [],
     })
   })
   test("an unknown handle is ignored: the thread's default stands", () => {
@@ -307,9 +366,15 @@ describe("address: mentions pick who a message is for (ADR-0021)", () => {
     const people = address({
       mentions: parseMentions("@日本 @josé look"),
       participants: ["日本", "Jose\u0301"],
+      agents: [],
       agentByDefault: true,
     })
-    expect(people).toEqual({ compels: NOBODY, people: ["日本", "Jose\u0301"] })
+    expect(people).toEqual({
+      compels: NOBODY,
+      people: ["日本", "Jose\u0301"],
+      asks: [],
+      invites: [],
+    })
   })
   test("normalizeName refuses a name no mention could reach", () => {
     expect(normalizeName("  Ada ")).toBe("Ada")
@@ -317,6 +382,12 @@ describe("address: mentions pick who a message is for (ADR-0021)", () => {
     expect(normalizeName("Agent")).toBeUndefined()
     expect(normalizeName("")).toBeUndefined()
   })
+  test("normalizeName refuses a thread's name, which a mention reads as its agent (ADR-0128)", () => {
+    expect(normalizeName("Amber-Fox")).toBeUndefined()
+    expect(normalizeName("amber fox")).toBe("amber fox")
+    expect(normalizeName("Mary-Jane")).toBe("Mary-Jane")
+  })
+
   test("parseTitle trims a title, clears on blank, and refuses a line break or 81 characters", () => {
     expect(parseTitle("  Tab names  ")).toEqual({
       kind: "set",

@@ -17,6 +17,9 @@
     record.
   - ADR-0066: a discard is undone from its discarder's trash, and one made on
     no task from a history of theirs outside any task.
+- **Amended by:**
+  - ADR-0128: an ask card is a kind of card of its own, only ever queued,
+    which a person may reorder and nobody moves.
 
 **Context.**
 

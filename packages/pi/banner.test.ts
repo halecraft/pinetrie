@@ -127,6 +127,12 @@ describe("banners in a harness", () => {
           askSplit: async () => {
             throw new Error("no split_offer here")
           },
+          ask: async () => {
+            throw new Error("unused")
+          },
+          leave: async () => {
+            throw new Error("unused")
+          },
         },
       },
       ...(asks === undefined

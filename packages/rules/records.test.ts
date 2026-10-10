@@ -18,6 +18,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { BUDGET } from "./budget.ts"
 import {
   ACCEPTED,
   BANNER,
@@ -240,6 +241,12 @@ const SAMPLES: readonly Sample[] = [
     "lane",
   ),
   sample("queue hold", QUEUE_HOLD, { lane: L, by: ADA, at: 1 }, "lane"),
+  sample(
+    "budget",
+    BUDGET,
+    { message: E, thread: L, by: ADA, limit: 200, spent: 10, over: false },
+    "message",
+  ),
   sample("project", PROJECT, { root: "/p" }, null),
   sample("commands", COMMANDS, { commands: [] }, null),
   sample("root", ROOT, rootRecord, "root"),
@@ -394,6 +401,7 @@ test("each record lives where it is read (ADR-0063): across roots in the session
     name: "session",
     banner: "session",
     "queue hold": "session",
+    budget: "session",
     project: "session",
     commands: "session",
     root: "session",

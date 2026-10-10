@@ -14,6 +14,8 @@ describe("toolWord (ADR-0114)", () => {
     catch_up: "catch up",
     split_offer: "split",
     set_banner: "banner",
+    ask: "asked",
+    leave: "left",
   }
   test.each(TOOL_IDS)("%s reads as its word", id => {
     expect(toolWord(id)).toBe(WORDS[id])

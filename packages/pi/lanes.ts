@@ -22,7 +22,7 @@ import {
   type RuntimeProgram,
   type ThreadId,
 } from "@pinetrie/core"
-import { CONTEXT_RULES, type ToolAnswer } from "@pinetrie/rules"
+import { AGENTS_RULE, CONTEXT_RULES, type ToolAnswer } from "@pinetrie/rules"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPrompt } from "./deep.ts"
@@ -151,6 +151,10 @@ export interface LaneHooks {
   catchUp(lane: ThreadId, from: "base" | "parent"): Promise<ToolAnswer>
   /** `split_offer` was called (ADR-0080): the host's answer. */
   askSplit(lane: ThreadId): Promise<ToolAnswer>
+  /** `ask` was called (ADR-0128): the host relays it, and answers at once. */
+  ask(lane: ThreadId, to: string, text: string): Promise<ToolAnswer>
+  /** `leave` was called (ADR-0128): the host's answer. */
+  leave(lane: ThreadId, thread: string): Promise<ToolAnswer>
 }
 
 /**
@@ -248,8 +252,12 @@ export const systemPromptFor =
           : skillsInLane(setup.skills, toolContext.lane.hostPaths),
       promptGuidelines:
         toolContext.lane === null
-          ? [...CONTEXT_RULES]
-          : [...CONTEXT_RULES, ...laneGuidelines(toolContext.lane.facts)],
+          ? [...CONTEXT_RULES, AGENTS_RULE]
+          : [
+              ...CONTEXT_RULES,
+              AGENTS_RULE,
+              ...laneGuidelines(toolContext.lane.facts),
+            ],
     })
 
 /** What `ask_about_conflict` answers with no conflict in the lane's copy. */

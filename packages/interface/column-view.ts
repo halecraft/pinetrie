@@ -40,6 +40,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import {
+  type BudgetRecord,
   baseMovedOn,
   type CatchUpNow,
   catchUpName,
@@ -106,6 +107,8 @@ export interface WorkFacts {
   readonly forks: ReadonlyMap<ThreadId, EntryId>
   /** The lanes that began from their base, their fork's files not kept (ADR-0124). */
   readonly filesLost: ReadonlyMap<ThreadId, FilesLostRecord>
+  /** Each budget for agents talking, by the message that set it (ADR-0128). */
+  readonly budgets: ReadonlyMap<EntryId, BudgetRecord>
 }
 
 /**

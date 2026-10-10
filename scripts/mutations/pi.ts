@@ -4,6 +4,15 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
+  // ── agents talking (ADR-0128) ──
+  {
+    name: "a spent budget does not stop the run",
+    file: "packages/pi/agent.ts",
+    from: "        if (mayRequest(lane)) return undefined\n",
+    to: "        return undefined\n",
+    command: unit,
+    expect: "a spent budget stops the run before its request is sent",
+  },
   {
     name: "an agent without a lane runs its calls",
     file: "packages/pi/lane-env.ts",
@@ -26,8 +35,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane is not told it is in a lane",
     file: "packages/pi/lanes.ts",
-    from: "          : [...CONTEXT_RULES, ...laneGuidelines(toolContext.lane.facts)],",
-    to: "          : [...CONTEXT_RULES],",
+    from: "              ...laneGuidelines(toolContext.lane.facts),\n",
+    to: "",
     suite: "lanes",
     scenario: "commands",
     expect: "a lane of its own is told it is in a lane, and of its browser",
@@ -154,8 +163,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane of its own is not told where it is",
     file: "packages/pi/lanes.ts",
-    from: "          : [...CONTEXT_RULES, ...laneGuidelines(toolContext.lane.facts)],",
-    to: "          : [...CONTEXT_RULES],",
+    from: "              ...laneGuidelines(toolContext.lane.facts),\n",
+    to: "",
     command: unit,
     expect: "its rules tell it about the lane",
   },
@@ -651,8 +660,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a direct thread is not told of pinned cards",
     file: "packages/pi/lanes.ts",
-    from: "          ? [...CONTEXT_RULES]\n",
-    to: "          ? []\n",
+    from: "          ? [...CONTEXT_RULES, AGENTS_RULE]\n",
+    to: "          ? [AGENTS_RULE]\n",
     command: unit,
     expect: "every thread is told what pinned cards are",
   },

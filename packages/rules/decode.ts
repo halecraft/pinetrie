@@ -92,6 +92,9 @@ export const fixedKey = <K extends string>(
 /** A commit id as stored: never empty. */
 export const CommitSchema = Type.Unsafe<CommitId>(Type.String({ minLength: 1 }))
 
+/** An entry's id as stored: never empty. */
+export const EntryIdSchema = Type.Unsafe<EntryId>(Type.String({ minLength: 1 }))
+
 /** A lane's name as stored (`THREAD_PATTERN`). */
 export const ThreadIdSchema = Type.Unsafe<ThreadId>(
   Type.String({ pattern: THREAD_PATTERN }),

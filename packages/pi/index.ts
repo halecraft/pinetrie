@@ -8,6 +8,7 @@ export {
 export type { Drawn } from "./banner.ts"
 export { LAND_BUDGET } from "./compaction.ts"
 export {
+  type Completed,
   type FieldSource,
   type ModelChoice,
   type ModelOrigin,
