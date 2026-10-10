@@ -83,7 +83,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
 
   test("a column lands at its thread's nearest notes, its composer as your message; a fresh column as its message; a slot as your inventory; a note column at its end; a column no store holds as nothing", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
-    const end = { at: E1, thread: LANE }
+    const end = { thread: LANE }
     expect(at(targets[0] as PutTarget)).toEqual({
       kind: "notes",
       near: "thread",
@@ -112,7 +112,6 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
     expect(at(targets[6] as PutTarget)).toEqual({
       kind: "pinned",
-      at: E1,
       thread: LANE,
     })
     expect(at(targets[7] as PutTarget)).toBeNull()
@@ -146,7 +145,6 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
     ),
   ).toEqual({
     kind: "composing",
-    at: E1,
     thread: LANE,
   })
   // A branch: its tab's root, at its branch point, on the task you are on.
@@ -215,5 +213,5 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
       undefined,
       TEST_TASK,
     ),
-  ).toEqual({ kind: "composing", at: E1, thread: LANE })
+  ).toEqual({ kind: "composing", thread: LANE })
 })

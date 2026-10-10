@@ -59,7 +59,6 @@ import {
   type SeatRecord,
   type Sha256,
   type SnapshotId,
-  type StopRecord,
   summarizeRoots,
   type TaskId,
   type TaskRecord,
@@ -111,7 +110,6 @@ import {
   recordsIn,
   renderableMessage,
   SEAT,
-  STOP,
   TASK,
   THREAD,
   TRACE,
@@ -674,11 +672,6 @@ export const readNoteColumns = (
 export const readDigests = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, DigestRecord> => readRecords(doc, DIGEST)
-
-/** Who stopped each ask (`pinetrie.stop`, ADR-0106), by its prompt. */
-export const readStops = (
-  doc: RootDocHandle,
-): ReadonlyMap<EntryId, StopRecord> => readRecords(doc, STOP)
 
 /** Each thread's last run's verdict (`pinetrie.verdict`, ADR-0077), by lane. */
 /** Every card's history (`pinetrie.card-history`, ADR-0048 step 6), by card. */

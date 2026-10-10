@@ -11,7 +11,6 @@ import {
   type LaneView,
   type OfferRecord,
   type PinnedView,
-  PLAIN,
   type ProjectRecord,
   type RevisionRecord,
   type Sha256,
@@ -1198,8 +1197,7 @@ test("pinnedStatus: read, changed or unread against what the agent reads, by the
     owner: ADA,
     placer: ADA,
     place: { kind: "inventory", holder: ADA } as const,
-    carries: PLAIN,
-    unsent: null,
+    content: { command: null, unsent: null },
   }
   const inView: PinnedView = {
     lane: A,

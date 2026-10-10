@@ -15,7 +15,6 @@ import {
   messageAt,
   type RevisionRecord,
   runOf,
-  type StopRecord,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
@@ -133,7 +132,6 @@ export function askView(input: {
   readonly runningAsk: EntryId | null
   /** The column's last ended ask (`lastEndedAsk`). */
   readonly lastEnded: EntryId | null
-  readonly stops: ReadonlyMap<EntryId, StopRecord>
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   readonly digests: ReadonlyMap<
     EntryId,
@@ -145,10 +143,7 @@ export function askView(input: {
 }): AskView {
   const { index, asks, ask } = input
   const running = input.runningAsk === ask
-  const outcome = askOutcome(index, asks, ask, {
-    running,
-    stop: input.stops.get(ask),
-  })
+  const outcome = askOutcome(index, asks, ask, { running })
   const last = asks.last.get(ask)
   const stats = askStats(index, asks, ask, input.revisions)
   const digest = input.digests.get(ask)

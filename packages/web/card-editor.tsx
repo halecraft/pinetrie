@@ -70,7 +70,7 @@ import {
   tokensOf,
   uploadImage,
 } from "@pinetrie/interface"
-import { type QueuedCard, writersOfClients } from "@pinetrie/rules"
+import { type QueuedText, writersOfClients } from "@pinetrie/rules"
 import { textClients } from "@pinetrie/schema"
 import {
   chatAtOf,
@@ -295,8 +295,7 @@ export function CardEditor(p: {
             {
               id: next.state.card,
               place: p.place,
-              carries: { kind: "message", command: null },
-              unsent: null,
+              content: { command: null, unsent: null },
             },
             el.value,
             IN_COLUMN(p.how.column),
@@ -838,7 +837,7 @@ export function NoteCardEditor(p: {
  */
 export function QueuedCardEditor(p: {
   session: SessionClient
-  card: QueuedCard
+  card: QueuedText
   /** Its queue is held. */
   held: boolean
   reader: Reader

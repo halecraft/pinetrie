@@ -150,7 +150,7 @@ address and decoder, for a check over every record, as a migration's
   key reader (`entryKey`, `threadKey`, `textKey`, `writerKey`, or `fixedKey`
   for a singleton, in `decode.ts`) and sets the field from it: `decodeAt`
   drops the record when the reader finds no key. So a write and a read cannot disagree on a key, and
-  `StopRecord`, `DigestRecord` and `SeatRecord` carry their key in memory
+  `DigestRecord` and `SeatRecord` carry their key in memory
   though their contents never held it.
 - **A value written before ADR-0062 still decodes.** Ten records kept their
   key in their contents too. typebox's `Value.Check` accepts the extra
@@ -297,38 +297,69 @@ only the host writes. These modules decode a record, decide where a card
 sits, which moves the host accepts, which queued card is popped next, and
 which are swept.
 
+- **A card is an identity, a place and content** (`Card<K>`, core's
+  `places.ts`, ADR-0126): its kind, its id, its owner and placer, its
+  place (`PlaceOf<K>`), and its content (`ContentOf[K]`): a text card's
+  command and why it was not sent, a fact's fact, nothing for a thread's
+  card or a note column. `CardRecord` is the union over the kinds with
+  records (`PlacedKind`), so a thread's card in a queue or a fact anywhere
+  but a queue does not compile. A new kind is a row in `KINDS`, one in
+  `ContentOf`, and one in the page's `RENDERINGS`.
+- **`KINDS` is every kind once** (core's `kinds.ts`, `satisfies
+  Record<CardKind, KindSpec>`): its id's prefix (`kindOfCard` reads them;
+  a bare uuidv7 is a text card's), its places (`PLACES_OF` is read from
+  it), whether a person moves it (`moves`: not a fact), whether it is
+  reordered where it is (`reordered`: not a fact), what a put does to your
+  hand (`put`), and where its words are (`text`). `textSourceOf` turns
+  that into the document, fact or nothing a reader reads, and `wordsOf`
+  (`fact.ts`) reads it: the drain's pop and the pinned cards a run reads
+  (`pinnedReads`) gather through it, so no reader branches on kind.
+- **One rule makes every card** (`planMake`, `moves.ts`): it takes a card
+  already made (`makeCard`, whose place type is its kind's, so a misplaced
+  card does not compile) and refuses `exists`, then as any move into its
+  place is (`refuseInto`). Its sender is a person, or `"host"` for the
+  kinds no person moves (a fact), refused only by a full inventory. A
+  person's creation (`planMove` with no `from`), a copy's card
+  (`planCopy`), a thread's card at its first message (`planThreadCard`),
+  a note column made for a note (`toNotes`), a fact's card (`planFactCard`)
+  and a split's card (`planSplitCall`) all go through it, each made by the
+  person it names. A refusal of the host's own make is a value the host's
+  shell logs, never a silent write; none is refused today.
+
 - **The stored record is flat strings**, "" for none (`encodeCard`,
   `decodeCard`, total). Where a card is goes through core's `placeFields`
   and `placeOfFields` (`core/places.ts`), which the wire's key codec uses
   too, so the two cannot drift. Each stored kind's row has its fields in
   one table (`ROWS`): a row is written through it and read narrowed to its
-  kind, so neither can touch a field its kind does not store. A card's place at a thread's end, or queued, has an `at`
-  that is never the root, and its thread (stored in `lane`), and no root:
-  the thread's record names it (ADR-0116); a fresh card's `column` is
+  kind, so neither can touch a field its kind does not store. Your
+  message, a pinned card and a queued card name their thread alone (stored
+  in `lane`), and resolve to its end (`placeEnd`, `threadEnd`): every entry
+  names its thread (ADR-0125). Their rows keep no `at` (migration
+  `0009-card-content` cleared the old ones); the row's `at` field stays for
+  `fresh`. A fresh card's `column` is
   never "", and it carries its root, its task and its branch point (a
   `Spot`, ADR-0066), the root for a new tab; a canvas card its task, rank
   and width; a queued card has its `order` and `by`, and `seen`, its text's version as its queuer had it (S96), which
   the queue's key carries from the client. Every field is required: the
   host writes a record whole. A
-  `command` this build does not know makes the card malformed. A card
-  carries a message, with its command or none, or a fact the host queued
-  (`CardCarries`, ADR-0080): stored as `command` and `fact`, one of them
-  "". A record with both does not decode; one stored before facts has no
-  `fact`, and is a message. Every move of a fact's card is refused
-  `fact`: it is the host's. Your message (`composing`, ADR-0113) is stored
+  `command` this build does not know makes the card malformed. A text card
+  stores its command (or ""), and a fact card (`x-` id, ADR-0126) its fact,
+  as JSON in `fact`: a fact on a text card's id, a command on a fact, or a
+  fact anywhere but a queue does not decode, and a record stored before
+  facts, with no `fact`, is a text card. Your message (`composing`, ADR-0113) is stored
   under the kind `drafting` it had before notes, so no row changed with
   the split; a note is stored as `note`, its note column in `column` and its
   rank in `order` (ADR-0116). A card at a thread whose stored `lane` is no
   thread's id does not decode: migration `0005-tasks` (deleted once run)
   gave every such row its thread. A card's kind is its id's prefix
   (`kindOfCard`), and its id is parsed where it comes in (`parseCardId`):
-  a text card's is a bare lowercase uuidv7, a note column's, a media
-  card's and a file card's their prefix and one, a thread's any id
+  a text card's is a bare lowercase uuidv7, a note column's, a fact's, a
+  media card's and a file card's their prefix and one, a thread's any id
   `isThreadId` takes. A note column's card (`NoteColumnCard`) is on a
   canvas alone: a row naming an inventory does not decode.
 - **A handoff is a compare-and-set on where a card is** (`planMove`, pure):
   accepted only if the card is still where its sender saw it, its `PlaceKey`
-  (`sameKey`, over its kind, `at` and thread, or an inventory's holder). A
+  (`sameKey`, over its kind and thread, or an inventory's holder). A
   key leaves out a queue's order and queuer, so a reorder does not make
   someone else's unqueue fail. It leaves out a queue's `seen` too. Every
   move, on the host and on a client, is built by core's `moveOf` (from
@@ -359,8 +390,10 @@ which are swept.
   below the line, or into an inventory, it keeps both. A move to where the
   card already is is refused `moved`: it would queue the card last under its
   sender's name, and a card changes its place in line by a reorder.
-  Refusals: `gone` (no record, or discarded), `moved`, `exists`, `full`,
-  `not-yours`.
+  Refusals (`MoveRefusal`): `gone` (no record, or discarded), `moved`,
+  `exists`, `full`, `not-yours`, `no-place` (a place the card's kind is
+  never in, or a kind no person moves: every move of a fact is refused so,
+  with no check of its own), and an undo's `replied`.
 - **A reorder is a card's action in place, not a move** (`planReorder`,
   ADR-0048 step 7). It names the card, its place's key, and the two cards
   it goes between as its sender saw them; the host checks them against the
@@ -372,9 +405,11 @@ which are swept.
   column's notes, its task's pinned cards, its task's canvas, or every
   pinned card in the session (pinned keys are the session's). Only `order`
   changes: `placer`, `by`, `seen` and `unsent` stay, so it changes nobody's
-  trace and adds no history event. Refused `gone`; `fact` for a fact's card,
-  or a queued card whose new place passes a fact (a fact says what already
-  happened); `moved` when the card's key changed; `order-changed` when it
+  trace and adds no history event. Its refusals are its own
+  (`ReorderRefusal`, `ReorderStep`), so a move never returns one: `gone`;
+  `fact` for a card of a kind `KINDS` does not reorder (a fact), or a
+  queued card whose new place passes one (a fact says what already
+  happened, so nothing queued jumps ahead of it); `moved` when the card's key changed; `order-changed` when it
   names no neighbour, a neighbour is no longer a sibling, the two are out of
   order, or, in a queue or a note column, no longer next to each other
   (other threads' pinned cards may sit between two pinned neighbours). With no room between the
@@ -467,8 +502,8 @@ which are swept.
   `UNKNOWN_TARGET`. The archive gate reads a note column's task from its
   card (`writesIn`).
 - **A pinned card** (ADR-0048 step 5) is at a thread's end with an `order`.
-  Pinning moves your message or a queued card to pinned at the same `at`
-  and thread (`pinnedOf`); a note has no thread to pin it to; unpinning
+  Pinning moves your message or a queued card to pinned at the same
+  thread (`pinnedOf`); a note has no thread to pin it to; unpinning
   sends it to the thread's nearest notes (`noteOf`). Anyone may do either in
   a shared place. The host
   orders it after every pinned card in the session (`placeAt`), not only its
@@ -668,13 +703,17 @@ moves between them as any card does (`planMove`, typed at the codec by
   the first of those someone holds (`holderOf`); a copy's first send, at
   its own record's fork, runs in the copy. The host refuses before every
   command and popped card (`refuseHeld`), and the drain asks before it
-  pops (`planNextQueuedCardPop`'s `away`), so the queue waits, held.
-  Refused with `HELD_WORDS`, "put it on a canvas first".
+  pops (`planNextQueuedCardPop`'s `away`), so its messages wait, held. A
+  fact on top is popped there all the same: it starts no run, and a take's
+  stop must be in the thread for its face to say so (ADR-0126). Refused
+  with `HELD_WORDS`, "put it on a canvas first".
 - **A take stops the run** (`takenIn(before, after)`): every thread card
   in an inventory after a change that was not before. The host's
   provenance step reads it from every person's change to the places (a
   move, an undo or a redo, a copy), so no path that writes places can
-  take a running thread and leave it running. The stop is the taker's own.
+  take a running thread and leave it running. The stop is the taker's own,
+  through the one stop command (`handleStop`, `planStop`), so it is a fact
+  in the thread.
 - **A moved thread is told** (`canvas.ts`, `planCanvasFacts`): a running
   thread whose card moved from one task's canvas to another's is steered
   "Bea moved this thread to the task …"; the tasks' other running threads
@@ -683,9 +722,9 @@ moves between them as any card does (`planMove`, typed at the codec by
   the source (`threadAt`), the copy's id is new, and nobody else holds the
   source. Its record's `origin` is `{ kind: "copy", source, fork: end }`,
   kept after its first send, so its fork row can say "copied from". Its
-  card is made by **`planMake`** (`moves.ts`), the one way a person's
-  command makes a card: `exists`, then `refuseInto`'s refusals (a place its
-  kind is never in, another's inventory, a full one). It lands on a canvas
+  card is made by **`planMake`** (`moves.ts`), the one rule every card is
+  made by: `exists`, then `refuseInto`'s refusals (a place its kind is
+  never in, another's inventory, a full one). It lands on a canvas
   by **`rankOnCanvas`**, as a move's drop does. No entry is written: its
   first send is a branch at its fork, which `sendChat` lets through for the
   thread whose record names that fork, and writes no second record or card. (`board.ts`, ADR-0122)
@@ -789,16 +828,31 @@ home).
   decide by it. The decoder checks only the shape (a non-empty title): the
   host is the session's one writer, and stores only parsed titles.
 
-# Stops (`stop.ts`, ADR-0106)
+# Stops (`stop.ts`, ADR-0106, ADR-0126)
 
-Who stopped an ask's run: a host-written `pinetrie.stop` value keyed by the
-ask's prompt, holding who and when. pi's entries say only that a run was
-aborted (S70), so this is the only place a stop is named. `planStop`
-decides it, and writes none when the ask has one: the first press is
-the one named. It also gives the hold the Stop leaves on the queue
-(`holdOnStop`, ADR-0048 step 7), written in the same write, before the
-abort. A stop recorded for a run that answered anyway is ignored
-(`askOutcome`).
+Who stopped an ask's run is a fact in its thread: pi's entries say only
+that a run was aborted (S70). `planStop` queues a fact card (`StopFact`:
+the lane, the ask's prompt, who, when; `planFactCard`) as Stop is pressed,
+before the cards queued there, and none when a stop of that ask is queued
+or appended already: the first press is the one named. The run's end
+appends it first, whatever the hold, as a `pinetrie.fact` history message
+whose `content` the agent's next run reads ("Bea stopped this run.",
+`factContent`), and whose renderable form carries `stopped` (`{ prompt,
+by }`) for core. `planStop` also gives the hold the Stop leaves on the
+queue (`holdOnStop`, ADR-0048 step 7), written before the abort.
+
+- **Who stopped a run is read from the asks**: `indexAsks` records each
+  stopped run's stopper (`AskIndex.stoppedBy`) from its stop's fact, and
+  steers the fact into the ask it names, so the ask is not drawn in two.
+  `askOutcome`, the thread's face and the dock's `nextOf` read it; no
+  reader takes a map of stops. A stop whose run answered anyway is ignored.
+- **Until its fact is appended, the queued fact names the stopper**
+  (`stopperOf`): the run's verdict, written as the run ends, reads the
+  outcome so (`endedOutcome`), and so does the dock.
+- **A run stopped before stops were facts names nobody**: its
+  `pinetrie.stop` record is in no spec now, so a starting host's sweep of
+  undeclared records deleted it (`planUndeclaredSweep`), and its outcome
+  reads "stopped" with no name (`AskOutcome`, `by: null`).
 
 **Carrying on** (ADR-0082). pi cannot continue a run that Stop ended
 (S105), so Resume starts a new run whose prompt is a carry-on message
@@ -810,7 +864,9 @@ Ada"). It is a prompt, so its run is an ask of its own (`PROMPT_ROLES`).
 - **`carryOnState` is the one rule**, read by the host's `planCarryOn` and
   the dock's `nextOf` (`@pinetrie/interface`): the lane does not run and has no cards waiting,
   unless its queue is held (ADR-0048 step 7: held cards wait for a release,
-  not this turn), and the ask at its tip ended stopped (`askOutcome`). A message written after the stop is
+  not this turn), and the ask at its tip ended stopped (`askOutcome`). A
+  stop's fact at the tip is no prompt, so `promptOf` passes it and the
+  stopped ask is still found. A message written after the stop is
   the tip's ask, with no work, so it refuses; an update is no ask, so it
   does not. It refuses with `UNKNOWN_TARGET` (no tip), `BUSY` or
   `REFUSED`.
@@ -1356,14 +1412,17 @@ the tip it must match, and the bookmark to leave on it.
   action has one: an acceptance (`acceptedFact`: the change, the
   bookmark, and that bookmark as the thread knows it, accepted work or a WIP),
   and a description asked for again, a squash, a refresh (`actionFact`).
-- **A fact always reaches the thread through a queued card**
-  (`planFactCard`, at the thread's end, after the cards there), popped in
-  order with the others: at once on an idle lane, when the run ends on a
-  running one. It is never written into a running lane.
+- **A fact always reaches the thread through a fact card** (`planFactCard`,
+  ADR-0126): a card of its own kind (`x-` id, `FactCard`), only ever
+  queued, made by the host for whoever acted, after the cards there; popped
+  in order with the others: at once on an idle lane, when the run ends on a
+  running one. It is never written into a running lane. It has no text
+  document: the drain loads and destroys none for it.
 - **The drain plans before it acts** (`planCarry`, `queue.ts`): a fact, a
   catch-up and what follows it (`after`: the text, or nothing), a split
-  with its brief, or a message. A property named `then` is
-  forbidden by the linter, hence `after`.
+  with its brief, or a message; every case but a fact carries the text
+  card (`QueuedText`), so the shell acts on a typed card. A property named
+  `then` is forbidden by the linter, hence `after`.
 - **`planBaseNews` is one decision** for a lane whose base has new work:
   `tell` (a behind entry, `pinetrie.behind`, before the run's prompt and its
   cards entry, or a steer into a running lane), `catch-up` (a lane whose
@@ -1380,10 +1439,11 @@ the tip it must match, and the bookmark to leave on it.
   missing bookmark was the rename's, not a split's (S114). Each refusal
   says what to do (`catchUpRefusal`); `catchUpAnswer` is the tool's result,
   whose `details.merged` the turn's record reads.
-- **`planSplitCall`** queues a split card, or refuses: no offer open, a
-  split running (the lane's latest prompt is a stack message), or one
-  already queued. The tool answers `SPLIT_QUEUED`, or the refusal
-  (`splitRefusal`).
+- **`planSplitCall`** queues a split card, made through `planMake`, or
+  refuses: no offer open, a split running (the lane's latest prompt is a
+  stack message), or one already queued. The tool answers `SPLIT_QUEUED`,
+  or the refusal (`splitRefusal`); a refusal of its card's make (`unmade`,
+  which none is) is logged and answered `SPLIT_UNMADE`.
 
 # The resolution's prompt (`land.ts`, ADR-0033)
 

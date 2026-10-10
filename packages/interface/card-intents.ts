@@ -14,8 +14,8 @@ import {
   type CardId,
   type CardRecord,
   DISCARDED,
-  isFact,
   isReorderAt,
+  KINDS,
   keyOf,
   type MoveDirection,
   moveOf,
@@ -82,8 +82,7 @@ export const moveCard = (
 export const queueMove = (
   card: TextCard,
   to: { readonly lane: ThreadId; readonly at: Position },
-): QueueMove =>
-  moveOf(card, { kind: "queued", at: to.at, thread: to.lane, seen: "" })
+): QueueMove => moveOf(card, { kind: "queued", thread: to.lane, seen: "" })
 
 /**
  * A card made in `to.lane`'s queue (ADR-0113): a move with no `from`, so
@@ -95,7 +94,7 @@ export const queueNew = (
 ): QueueMove => ({
   card,
   from: null,
-  to: { kind: "queued", at: to.at, thread: to.lane, seen: "" },
+  to: { kind: "queued", thread: to.lane, seen: "" },
 })
 
 /**
@@ -114,7 +113,8 @@ export function reorderOf(
   const from = among.findIndex(c => c.id === card.id)
   const to = from + step
   const passed = among[to]
-  if (from < 0 || passed === undefined || isFact(passed)) return null
+  if (from < 0 || passed === undefined || !KINDS[passed.kind].reordered)
+    return null
   const rest = among.filter(c => c.id !== card.id)
   return {
     card: card.id,
@@ -178,10 +178,11 @@ export function planTakeIntoInventory(
 ): readonly Effect[] {
   const facts = state.cards
   const now = cardOf(facts, card)
-  // A note column is never in an inventory (`PLACES_OF`).
+  // A note column or a fact is never in an inventory (`PLACES_OF`).
   if (
     now === undefined ||
     now.kind === "note-column" ||
+    now.kind === "fact" ||
     now.place.kind === "inventory"
   )
     return []
@@ -222,8 +223,7 @@ export function planTakeCopyIntoInventory(
         owner: facts.me,
         placer: facts.me,
         place: { kind: "inventory", holder: facts.me },
-        carries: { kind: "message", command: null },
-        unsent: null,
+        content: { command: null, unsent: null },
       },
       text,
       how: { actedAt: AT_INVENTORY, slot },
@@ -251,15 +251,17 @@ export function planPut(
   if (target.kind === "state" || target.kind === "sidebar")
     return planSpinOff(card, target, minted, state)
   if (target.kind === "inventory") {
-    // A note column is never in an inventory (`PLACES_OF`).
-    if (now.kind === "note-column") return []
+    // A note column or a fact is never in an inventory (`PLACES_OF`).
+    if (now.kind === "note-column" || now.kind === "fact") return []
     const from = slotOf(facts.slots, card)
     if (from === null || now.place.kind !== "inventory")
       return takeIntoInventoryAt(now, target.slot, state)
     if (from === target.slot) return []
     return [{ kind: "swapSlots", a: from, b: target.slot }]
   }
-  // A thread's card or a note column goes on a canvas (ADR-0117).
+  // A thread's card or a note column goes on a canvas (ADR-0117); a fact
+  // is the host's (`KINDS`).
+  if (now.kind === "fact") return []
   if (now.kind !== "text") return putOnCanvas(now, target, state)
   if (
     (target.kind === "column" || target.kind === "composer") &&
@@ -406,8 +408,7 @@ export function planNewNote(
         owner: state.cards.me,
         placer: state.cards.me,
         place: { kind: "note", column, order: LAST_ORDER },
-        carries: { kind: "message", command: null },
-        unsent: null,
+        content: { command: null, unsent: null },
       },
       text: "",
       how: IN_COLUMN(column),
@@ -493,7 +494,7 @@ export function planDiscard(
   state: IntentState,
 ): readonly Effect[] {
   const now = textCardOf(state.cards, card)
-  if (now === undefined || isFact(now)) return []
+  if (now === undefined) return []
   // Someone else's inventory is theirs to empty (ADR-0059).
   if (now.place.kind === "inventory" && state.cards.me !== now.place.holder)
     return []

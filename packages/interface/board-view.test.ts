@@ -34,7 +34,7 @@ import {
   stateWords,
   tasksWords,
 } from "./board-view.ts"
-import type { KeyLike } from "./inventory-keys.ts"
+import type { KeyLike } from "./page-keys.ts"
 import type { TaskSummary } from "./root-label.ts"
 import { threadCardHeads } from "./thread-card.ts"
 

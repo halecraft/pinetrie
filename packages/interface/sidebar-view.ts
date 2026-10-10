@@ -13,12 +13,12 @@ import type {
 import { blobUrl, PRODUCT_NAME } from "@pinetrie/core"
 import { threadNameOf } from "@pinetrie/rules"
 import type { Moments, Status } from "./attention.ts"
-import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
 import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
 import { type PageName, pageWords } from "./page.ts"
 import { type ColorSlot, taskSlot } from "./palette.ts"
 import { initialsOf, NO_TEXT, type TaskSummary } from "./root-label.ts"
+import type { UnsentSignals } from "./signals.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 
 /** What a task's ⋯ in the sidebar offers. */
@@ -57,7 +57,7 @@ interface ItemCommon {
   readonly icon: ItemIcon
   readonly selected: boolean
   readonly show: Intent
-  /** An unsent card of yours is in it (ADR-0048, `cardMarks`). */
+  /** An unsent card of yours is in it (ADR-0048, `unsentSignals`). */
   readonly pip: boolean
   readonly close: Intent
 }
@@ -108,7 +108,7 @@ export interface SidebarViewInput {
   /** Tasks in the archive. */
   readonly archived: ReadonlySet<TaskId>
   /** Your unsent text: a new tab's pip. */
-  readonly unsent: CardMarks
+  readonly unsent: UnsentSignals
   /** When each task's mark last arrived as you watched (`useAttention`). */
   readonly arrivals: Moments
   /** Each task's sprite (`taskSprites`). */
@@ -240,7 +240,7 @@ export const listKey = (item: ItemView): string =>
 
 /**
  * The window's title: what needs you (`inboxCount`, your inbox's badge),
- * then the page over the workspace (ADR-0098), else the task you are on.
+ * then the page over the stage (ADR-0098), else the task you are on.
  * `here` is null on nothing, and before anything is chosen.
  */
 export const pageTitle = (

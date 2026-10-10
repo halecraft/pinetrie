@@ -307,7 +307,14 @@ export function renderableMessage(message: unknown): AgentMessageLike {
   const stack = decodeStack(message)
   if (stack !== undefined) return { role: "stack", content: stackLine(stack) }
   const fact = decodeFact(message)
-  if (fact !== undefined) return { role: "fact", content: factLine(fact) }
+  if (fact !== undefined)
+    return fact.kind === "stopped"
+      ? {
+          role: "fact",
+          content: factLine(fact),
+          stopped: { prompt: fact.prompt, by: fact.by },
+        }
+      : { role: "fact", content: factLine(fact) }
   const behind = decodeBehind(message)
   if (behind !== undefined)
     return { role: "behind", content: behindLine(behind), behind }

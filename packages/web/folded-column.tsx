@@ -1,21 +1,26 @@
 // web/folded-column — a column folded to a narrow strip with its title, in its
-// place on the canvas (ADR-0116). Pressing it unfolds it. Its head is a drag
-// handle, as an unfolded column's is (`use-column-drag.ts`): folds are yours,
-// the order everyone's.
+// place on the canvas (ADR-0116): its card's face (ADR-0126), worded for a
+// strip (`foldedWords`). Pressing it unfolds it. Its head is a drag handle,
+// as an unfolded column's is (`use-column-drag.ts`): folds are yours, the
+// order everyone's.
 
-import { type FoldedView, type Intent, UNFOLD } from "@pinetrie/interface"
+import {
+  cardOfFace,
+  type FoldedFace,
+  foldedWords,
+  type Intent,
+  UNFOLD,
+} from "@pinetrie/interface"
 
 export function FoldedColumn(p: {
-  view: FoldedView
+  face: FoldedFace
   onIntent: (intent: Intent) => void
 }) {
-  const { view } = p
+  const { face } = p
+  const card = cardOfFace(face)
+  const words = foldedWords(face)
   return (
-    <section
-      className="folded-column"
-      data-card={view.card}
-      data-kind={view.kind}
-    >
+    <section className="folded-column" data-card={card} data-kind={face.kind}>
       {/* The handle a drag starts from; the strip below unfolds. */}
       <header className="column-head folded-head" data-column-head="">
         <span aria-hidden="true" className="folded-grip">
@@ -23,20 +28,18 @@ export function FoldedColumn(p: {
         </span>
       </header>
       <button
-        aria-label={`${UNFOLD.title}: ${view.title}`}
+        aria-label={`${UNFOLD.title}: ${words.title}`}
         className="folded-title"
-        onClick={() =>
-          p.onIntent({ kind: "fold", card: view.card, unfolded: true })
-        }
+        onClick={() => p.onIntent({ kind: "fold", card, unfolded: true })}
         title={UNFOLD.title}
         type="button"
       >
         <span aria-hidden="true" className={UNFOLD.className}>
           {UNFOLD.label}
         </span>
-        <span className="folded-name">{view.title}</span>
-        {view.detail !== null && (
-          <span className="folded-detail">{view.detail}</span>
+        <span className="folded-name">{words.title}</span>
+        {words.detail !== null && (
+          <span className="folded-detail">{words.detail}</span>
         )}
       </button>
     </section>

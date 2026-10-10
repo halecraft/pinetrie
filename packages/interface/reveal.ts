@@ -111,10 +111,25 @@ export function revealOf(
     case "composing":
     case "pinned":
     case "queued": {
-      const end =
-        placeEnd(place, state.index) ??
-        (place.at.kind === "entry" ? place.at.id : null)
-      if (end === null) return { effects: [], actedAt: AT_INVENTORY }
+      const end = placeEnd(place, state.index)
+      // A thread this tab holds no entry of: its card, unfolded in its task.
+      if (end === null) {
+        const task = state.tasks.index.taskOfCard.get(place.thread)
+        return {
+          effects:
+            task === undefined
+              ? []
+              : [
+                  ...showTask(task),
+                  changeViewOf(state, task, {
+                    kind: "fold",
+                    card: place.thread,
+                    unfolded: true,
+                  }),
+                ],
+          actedAt: at(place.thread),
+        }
+      }
       const plan = planOpen(
         state.layout,
         state.index,

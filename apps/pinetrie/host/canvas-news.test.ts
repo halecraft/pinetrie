@@ -1,6 +1,7 @@
 import {
   type CardRecord,
   entryId,
+  NO_CONTENT,
   noteColumnIdFor,
   runId,
   threadIdFor,
@@ -41,6 +42,7 @@ test("a card added to a task's canvas is told to its running threads, as a steer
     owner: BEA,
     placer: BEA,
     place: { kind: "canvas", task: TASK_ID, order: "zzzzzzzzzz", width: 1 },
+    content: NO_CONTENT,
   }
   const change = {
     before,

@@ -1,5 +1,4 @@
 import {
-  atEntry,
   type CardId,
   type CardRecord,
   entryId,
@@ -32,12 +31,10 @@ const pinnedCard = (id: string, order: string): TextCard => ({
   placer: ADA,
   place: {
     kind: "pinned",
-    at: atEntry(entryId("e-1")),
     thread: LANE,
     order,
   },
-  carries: { kind: "message", command: null },
-  unsent: null,
+  content: { command: null, unsent: null },
 })
 
 function setUp(texts: Record<string, string>, port: Partial<CardPort> = {}) {

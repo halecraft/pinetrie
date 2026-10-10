@@ -1,5 +1,6 @@
 import {
   entryId,
+  NO_CONTENT,
   noteColumnIdFor,
   type TextCard,
   textCardId,
@@ -47,8 +48,7 @@ function setUp() {
     owner: ADA,
     placer: ADA,
     place: { kind: "task-pinned", task: TASK_ID, order: "a" },
-    carries: { kind: "message", command: null },
-    unsent: null,
+    content: { command: null, unsent: null },
   }
   applyPlaceSteps(b.places, [
     {
@@ -59,6 +59,7 @@ function setUp() {
         owner: ADA,
         placer: ADA,
         place: { kind: "canvas", task: TASK_ID, order: "zzzzzzzzzz", width: 1 },
+        content: NO_CONTENT,
       },
     },
     { kind: "write", record: pin },

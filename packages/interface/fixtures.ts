@@ -7,6 +7,7 @@ import {
   type EntryId,
   type EntryLike,
   indexTree,
+  NO_CONTENT,
   noteColumnIdFor,
   rootIdFor,
   rootOf,
@@ -97,6 +98,7 @@ export function tasksFor(
       owner: TEST_WRITER,
       placer: TEST_WRITER,
       place: { kind: "canvas", task, order: `a${cards.length}`, width: 1 },
+      content: NO_CONTENT,
     })
     threads.set(thread, {
       thread,

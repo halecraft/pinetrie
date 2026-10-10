@@ -10,6 +10,7 @@ import {
   type CatchUpFrom,
   type EntryId,
   entryId,
+  type FactCardId,
   type FileCardId,
   isNoteColumnId,
   isRootId,
@@ -22,12 +23,13 @@ import {
   parseCardId,
   ROOT,
   type RootId,
-  samePosition,
+  type StopFact,
   type TaskId,
   type TextCardId,
   type ThreadId,
   type WriterId,
 } from "./index.ts"
+import { KINDS } from "./kinds.ts"
 
 /**
  * The commands that catch a thread up (ADR-0108). The first two bring the
@@ -83,36 +85,28 @@ export type OfferFact =
     }
 
 /**
- * What a card carries (ADR-0080): a message, sent through its command when
- * it has one, or a fact the host queued, which has no text and no command,
- * and which nobody moves.
+ * A fact on its way into its thread (ADR-0080, ADR-0126): what a fact card
+ * holds, appended as an entry when the thread's end consumes it. What a
+ * command on the offer did, or who stopped a run.
  */
-export type CardCarries =
-  | { readonly kind: "message"; readonly command: CardCommand | null }
-  | { readonly kind: "fact"; readonly fact: OfferFact }
+export type QueuedFact = OfferFact | StopFact
 
-/** A plain message's carry: no command. */
-export const PLAIN: CardCarries = { kind: "message", command: null }
-
-/** A card's command, or null: a plain message and a fact have none. */
-export const commandOf = (card: {
-  readonly kind?: CardKind
-  readonly carries?: CardCarries
-}): CardCommand | null =>
-  card.carries?.kind === "message" ? card.carries.command : null
+/** A card's command, or null: only a text card has one. */
+export const commandOf = (card: CardRecord): CardCommand | null =>
+  card.kind === "text" ? card.content.command : null
 
 /**
  * Where a card is (ADR-0113, ADR-0116). Composing: your message, in your
- * composer at a thread's end, which only you see; kept as where it started,
- * and resolved to its thread's end (`placeEnd`) whenever it is needed, so it
+ * composer at a thread's end, which only you see; kept as its thread, and
+ * resolved to the thread's end (`placeEnd`) whenever it is needed, so it
  * follows its thread as the thread grows. Note: in a note column, at its
  * rank there, shared by everyone in the task (ADR-0116). Pinned: at the top
  * of a thread's column, kept and resolved the same way; the agent reads it
  * on every run. Queued: above the line, waiting for its thread's lane, until
  * the host pops it or someone unqueues it. Fresh: an unsent branch or new
  * tab, by its column's key, in the root it will start or branch in and the
- * task its column is on. Canvas: a thread card (or, later, a note column or
- * a media card) in a task, at its rank there: the only record of where it is,
+ * task its column is on. Canvas: a thread card or a note column in a
+ * task, at its rank there: the only record of where it is,
  * so a card has one place by construction. Inventory: in its holder's
  * inventory; which slot holds it is the holder's own document
  * (`InventoryDoc`), not the host's (ADR-0059). Gone: discarded, drawn
@@ -122,12 +116,9 @@ export const commandOf = (card: {
 export type CardPlace =
   | {
       readonly kind: "composing"
-      /** Where it started: an entry of its thread, a `Spot` with its root. */
-      readonly at: Position
       /**
-       * The thread `at` is in, which never changes, since a thread's first
-       * entry names it; its root is the thread's (`THREAD`), so the two
-       * cannot disagree.
+       * Its thread, whose end it is at: every entry names its thread
+       * (ADR-0125), so the end is found from it alone.
        */
       readonly thread: ThreadId
     }
@@ -140,7 +131,6 @@ export type CardPlace =
     }
   | {
       readonly kind: "pinned"
-      readonly at: Position
       readonly thread: ThreadId
       /** Sorts the thread's pinned cards, in the order they were pinned. */
       readonly order: string
@@ -154,8 +144,6 @@ export type CardPlace =
     }
   | {
       readonly kind: "queued"
-      /** Where it was queued: an unqueue puts it back here. */
-      readonly at: Position
       /** Its thread, whose lane pops it. */
       readonly thread: ThreadId
       /** Sorts the lane's queue; ties go by id (S69). */
@@ -297,16 +285,11 @@ export function keyOf(place: CardPlace): PlaceKey {
     case "note":
       return { kind: "note", column: place.column }
     case "pinned":
-      return { kind: "pinned", at: place.at, thread: place.thread }
+      return { kind: "pinned", thread: place.thread }
     case "task-pinned":
       return { kind: "task-pinned", task: place.task }
     case "queued":
-      return {
-        kind: "queued",
-        at: place.at,
-        thread: place.thread,
-        seen: place.seen,
-      }
+      return { kind: "queued", thread: place.thread, seen: place.seen }
     case "canvas":
       return { kind: "canvas", task: place.task }
     case "fresh":
@@ -325,24 +308,16 @@ export function keyOf(place: CardPlace): PlaceKey {
 export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
   switch (a.kind) {
     case "composing":
-      return (
-        b.kind === "composing" &&
-        samePosition(a.at, b.at) &&
-        a.thread === b.thread
-      )
+      return b.kind === "composing" && a.thread === b.thread
     // A note's rank is not part of where it is, as a queued card's is not.
     case "note":
       return b.kind === "note" && a.column === b.column
     case "pinned":
-      return (
-        b.kind === "pinned" && samePosition(a.at, b.at) && a.thread === b.thread
-      )
+      return b.kind === "pinned" && a.thread === b.thread
     case "task-pinned":
       return b.kind === "task-pinned" && a.task === b.task
     case "queued":
-      return (
-        b.kind === "queued" && samePosition(a.at, b.at) && a.thread === b.thread
-      )
+      return b.kind === "queued" && a.thread === b.thread
     case "canvas":
       return b.kind === "canvas" && a.task === b.task
     // A column's key names it, wherever it is.
@@ -532,7 +507,7 @@ export const pinnedOf = (
   place: CardPlace | PlaceKey,
 ): Extract<PlaceKey, { readonly kind: "pinned" }> | null =>
   place.kind === "composing" || place.kind === "queued"
-    ? { kind: "pinned", at: place.at, thread: place.thread }
+    ? { kind: "pinned", thread: place.thread }
     : null
 
 /** Why the host refused a move (ADR-0059). */
@@ -547,20 +522,37 @@ export type MoveRefusal =
   | "full"
   /** A move into or out of someone else's inventory. */
   | "not-yours"
-  /** A card carrying a fact: the host's, on its way into the thread (ADR-0080). */
-  | "fact"
-  /**
-   * A reorder whose neighbours are not where its sender saw them: one gone,
-   * in another place, or the two out of order.
-   */
-  | "order-changed"
   /**
    * An undo that would lift back a thread a card was spun into (ADR-0111),
    * after someone wrote there, or the agent started on it.
    */
   | "replied"
-  /** A card moved to a place its kind is never in: a text card on a canvas. */
+  /**
+   * A card moved to a place its kind is never in (`KINDS`): a text card on
+   * a canvas, a thread's card into a queue, a fact out of its queue.
+   */
   | "no-place"
+
+/** Any refusal of a change of place, as the wire carries it: a move's or a reorder's. */
+export type PlaceRefusal = MoveRefusal | ReorderRefusal
+
+/** Why the host refused a reorder (ADR-0048 step 7): never a move's answer. */
+export type ReorderRefusal =
+  /** The card has no record. */
+  | "gone"
+  /** The card is no longer where the sender saw it. */
+  | "moved"
+  /**
+   * Its neighbours are not where its sender saw them: one gone, in another
+   * place, or the two out of order.
+   */
+  | "order-changed"
+  /**
+   * A fact (ADR-0080), which no reorder moves, or a card that would pass
+   * one: a fact says what already happened, so nothing queued jumps ahead
+   * of it.
+   */
+  | "fact"
 
 /**
  * A place as flat strings, "" for none: how the places document stores it,
@@ -667,13 +659,13 @@ export const keyFieldsFrom = (
  *   card's thread in `lane` and its root in `column`.
  */
 const ROWS = {
-  drafting: ["at", "lane"],
+  drafting: ["lane"],
   note: ["column", "order"],
   notes: ["lane", "task"],
   "task-pinned": ["task", "order"],
   "canvas-at": ["task", "column"],
-  pinned: ["at", "lane", "order"],
-  queued: ["at", "lane", "order", "by", "seen"],
+  pinned: ["lane", "order"],
+  queued: ["lane", "order", "by", "seen"],
   fresh: ["root", "task", "at", "column"],
   canvas: ["task", "order", "width"],
   inventory: ["holder"],
@@ -720,7 +712,7 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
     // Your message keeps the stored kind it had as a drafting card, so no
     // stored row changed with the split (ADR-0113).
     case "composing":
-      return row("drafting", { at: entryOrEmpty(place.at), lane: place.thread })
+      return row("drafting", { lane: place.thread })
     case "note":
       return row("note", {
         column: place.column,
@@ -739,13 +731,11 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
       return row("canvas-at", { task: place.task, column: place.after ?? "" })
     case "pinned":
       return row("pinned", {
-        at: entryOrEmpty(place.at),
         lane: place.thread,
         order: "order" in place ? place.order : "",
       })
     case "queued":
       return row("queued", {
-        at: entryOrEmpty(place.at),
         lane: place.thread,
         order: "order" in place ? place.order : "",
         by: "by" in place ? place.by : "",
@@ -799,19 +789,16 @@ const widthOf = (width: string): CardWidth | undefined =>
 const goneTaskOf = (task: string): TaskId | null | undefined =>
   task === "" ? null : isTaskId(task) ? task : undefined
 
-/** A place at a thread's `at` and `thread`; undefined for none. */
+/** A place at a thread: its `thread`, from the row's `lane`; undefined for none. */
 const atThread = (r: {
-  readonly at: string
   readonly lane: string
-}): { readonly at: Position; readonly thread: ThreadId } | undefined =>
-  r.at === "" || !isThreadId(r.lane)
-    ? undefined
-    : { at: atEntry(entryId(r.at)), thread: r.lane }
+}): { readonly thread: ThreadId } | undefined =>
+  isThreadId(r.lane) ? { thread: r.lane } : undefined
 
 /**
  * Flat strings -> a place; undefined for one that is malformed. A card at a
- * thread's end or queued has an entry for its `at`, never the root, and its
- * thread; a fresh card's `at` is either, and it needs its root. A canvas
+ * thread's end, pinned or queued names its thread alone; a fresh card's `at`
+ * is an entry or the root, and it needs its root. A canvas
  * card and a fresh one need their `TaskId`. A fresh card's column is never
  * "", nor an inventory card's holder. A pinned card needs its order, and a
  * canvas card its order and width. A queued card needs its order and who
@@ -954,27 +941,19 @@ export function targetOfFields(f: PlaceFields): MoveTarget | undefined {
 }
 
 /**
- * The places each kind of card is ever in (ADR-0116, ADR-0117): a text
- * card anywhere but a canvas, a thread's card on a canvas or in an
- * inventory, a note column on a canvas, and no other kind yet. `fitsPlace`,
- * `placed` and each record's place type read it.
+ * The places each kind of card is ever in (`KINDS`). `fitsPlace`, `placed`
+ * and each record's place type read it.
  */
-export const PLACES_OF = {
-  text: [
-    "composing",
-    "note",
-    "pinned",
-    "task-pinned",
-    "queued",
-    "fresh",
-    "gone",
-    "inventory",
-  ],
-  thread: ["canvas", "inventory"],
-  "note-column": ["canvas"],
-  media: [],
-  file: [],
-} as const satisfies Record<CardKind, readonly CardPlace["kind"][]>
+export const PLACES_OF: {
+  readonly [K in CardKind]: (typeof KINDS)[K]["places"]
+} = {
+  text: KINDS.text.places,
+  thread: KINDS.thread.places,
+  "note-column": KINDS["note-column"].places,
+  fact: KINDS.fact.places,
+  media: KINDS.media.places,
+  file: KINDS.file.places,
+}
 
 /** The places a card of `K` is ever in (`PLACES_OF`). */
 export type PlaceOf<K extends CardKind> = Extract<
@@ -989,74 +968,106 @@ export type TextPlace = PlaceOf<"text">
 export type HeldPlace = PlaceOf<"thread">
 
 /**
- * A text card's record, in the places document, which only the host writes
- * (ADR-0059). Its text is its own document; who wrote in it is read from
- * that document's operations (`writersOfClients`), never stored here.
+ * What each kind of card holds (ADR-0126), beside its identity and its
+ * place: a new kind is a row here, one in `KINDS`, and one in the page's
+ * `RENDERINGS`.
+ *
+ * - A text card: the command it is sent through when popped (ADR-0108), and
+ *   why the host could not send it, until it is queued again (null when it
+ *   never failed). Its text is its own document; who wrote in it is read
+ *   from that document's operations (`writersOfClients`), never stored.
+ * - A thread's card (ADR-0117): nothing; its id is its thread's.
+ * - A note column (ADR-0116): nothing here; its title is the host's record
+ *   (`NOTE_COLUMN`, absent while untitled), and its notes are text cards
+ *   whose place names it.
+ * - A fact (ADR-0080): the fact, appended to its thread as the thread's end
+ *   consumes it.
  */
-export interface TextCard {
-  /** Its kind, as its id says it (`kindOfCard`): never stored. */
-  readonly kind: "text"
-  readonly id: TextCardId
-  /** Who created it: whose composer it is. */
+export interface ContentOf {
+  readonly text: {
+    readonly command: CardCommand | null
+    readonly unsent: string | null
+  }
+  readonly thread: Readonly<Record<string, never>>
+  readonly "note-column": Readonly<Record<string, never>>
+  readonly fact: { readonly fact: QueuedFact }
+}
+
+/** The kinds of card with records: the reserved `media` and `file` have none yet. */
+export type PlacedKind = keyof ContentOf
+
+/**
+ * A card (ADR-0126): an identity, one place, and content. Its record is in
+ * the places document, which only the host writes (ADR-0059). Its kind is
+ * its id's (`kindOfCard`), never stored.
+ */
+export interface Card<K extends PlacedKind> {
+  readonly kind: K
+  readonly id: IdOf<K>
+  /** Who made it: whose composer it is, who started its thread, who acted. */
   readonly owner: WriterId
-  readonly place: TextPlace
   /**
    * Who put it where it is: the sender of the last move the host accepted.
    * A write the host makes itself (a popped card written back when refused)
-   * keeps it.
-   * When someone else moves the card, the trace is for them (ADR-0048).
+   * keeps it. When someone else moves the card, the trace is for them
+   * (ADR-0048).
    */
   readonly placer: WriterId
-  /** A message, and the command it is sent through when popped (ADR-0108); or a fact (ADR-0080). */
-  readonly carries: CardCarries
-  /** Why the host could not send it, until it is queued again; null when it never failed. */
-  readonly unsent: string | null
+  readonly place: PlaceOf<K>
+  readonly content: ContentOf[K]
 }
+
+/** A text card's record. */
+export type TextCard = Card<"text">
+
+/** A thread's card (ADR-0117): its id is its thread's, and it has no text. */
+export type ThreadCard = Card<"thread">
+
+/** A note column's card (ADR-0116), on a canvas alone. */
+export type NoteColumnCard = Card<"note-column">
+
+/** A fact on its way into its thread (ADR-0080): only ever queued. */
+export type FactCard = Card<"fact">
 
 /** A canvas card's place: a task and a rank there. */
 export type CanvasPlace = Extract<CardPlace, { readonly kind: "canvas" }>
 
 /**
- * A note column's card (ADR-0116): a title (`NOTE_COLUMN`, the host's
- * record, absent while untitled) and its notes, each a text card whose
- * place names it. On a canvas alone for now; an inventory holds one once
- * thread cards move (ADR-0117).
+ * A card's record, by kind (ADR-0116, ADR-0126), so a text card on a canvas,
+ * a thread's card in a queue or a fact anywhere but a queue does not
+ * compile.
  */
-export interface NoteColumnCard {
-  readonly kind: "note-column"
-  readonly id: NoteColumnId
-  /** Who made it: a person's move, or, for a note with nowhere else to go, the mover. */
-  readonly owner: WriterId
-  readonly place: PlaceOf<"note-column">
-  /** Who put it where it is. */
-  readonly placer: WriterId
-}
-
-/** A thread's card (ADR-0117): its id is its thread's, and it has no text. */
-export interface ThreadCard {
-  readonly kind: "thread"
-  readonly id: ThreadId
-  /** Who started the thread. */
-  readonly owner: WriterId
-  readonly place: HeldPlace
-  /** Who put it where it is. */
-  readonly placer: WriterId
-}
-
-/**
- * A card's record, by kind (ADR-0116): a text card, a thread's card or a
- * note column, so a text card on a canvas, or a thread's card in a queue,
- * does not compile. Media cards join as their phase lands.
- */
-export type CardRecord = TextCard | ThreadCard | NoteColumnCard
+export type CardRecord = { [K in PlacedKind]: Card<K> }[PlacedKind]
 
 /** Whether a card is a text card. */
 export const isTextCard = (card: CardRecord): card is TextCard =>
   card.kind === "text"
 
-/** Whether a card carries a fact: the host's, on its way into a thread (ADR-0080). */
-export const isFact = (card: CardRecord): boolean =>
-  card.kind === "text" && card.carries.kind === "fact"
+/** A thread card's content, and a note column's: nothing. */
+export const NO_CONTENT: Readonly<Record<string, never>> = {}
+
+/**
+ * Where a card's words are read (`KINDS`' `text`): its text document, the
+ * fact it holds, or nowhere. Every reader of what cards say (the drain, the
+ * context builders, search) gathers through it, so none branches on kind.
+ */
+export type TextSource =
+  | { readonly kind: "doc"; readonly card: TextCardId }
+  | { readonly kind: "fact"; readonly fact: QueuedFact }
+  | { readonly kind: "none" }
+
+/** Where `card`'s words are read. Pure. */
+export function textSourceOf(card: CardRecord): TextSource {
+  switch (card.kind) {
+    case "text":
+      return { kind: "doc", card: card.id }
+    case "fact":
+      return { kind: "fact", fact: card.content.fact }
+    case "thread":
+    case "note-column":
+      return { kind: "none" }
+  }
+}
 
 /** Whether a card of `kind` is ever at a place of `place` (`PLACES_OF`). */
 export const fitsPlace = (kind: CardKind, place: PlaceKey["kind"]): boolean => {
@@ -1075,6 +1086,7 @@ export type IdOf<K extends CardKind> = {
   readonly text: TextCardId
   readonly thread: ThreadId
   readonly "note-column": NoteColumnId
+  readonly fact: FactCardId
   readonly media: MediaId
   readonly file: FileCardId
 }[K]
@@ -1161,8 +1173,24 @@ export function placed(
       return fits("thread", place) ? { ...card, place } : undefined
     case "note-column":
       return fits("note-column", place) ? { ...card, place } : undefined
+    case "fact":
+      return fits("fact", place) ? { ...card, place } : undefined
   }
 }
+
+/**
+ * A new card of `kind` (ADR-0126), made by `by`, its owner and placer: the
+ * one way a record is built, a person's or the host's, so a place its kind
+ * is never in does not compile. `planMake` (`@pinetrie/rules`) decides
+ * whether the host writes it.
+ */
+export const makeCard = <K extends PlacedKind>(
+  kind: K,
+  id: IdOf<K>,
+  place: PlaceOf<K>,
+  content: ContentOf[K],
+  by: WriterId,
+): Card<K> => ({ kind, id, owner: by, placer: by, place, content })
 
 /**
  * One change to a living card's place (ADR-0048 step 6): who made it, from

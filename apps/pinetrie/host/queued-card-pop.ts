@@ -17,11 +17,12 @@ import {
   type CardRecord,
   errorText,
   noteColumnIdFor,
-  type OfferFact,
-  PLAIN,
   parseMentions,
+  type QueuedFact,
   type RootId,
+  type TextCardId,
   type ThreadId,
+  textSourceOf,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -39,11 +40,13 @@ import {
   displayName,
   encodeFact,
   heldIn,
+  isQueuedText,
   planCarry,
   planNextQueuedCardPop,
   planQueueHold,
   planUnsent,
   type QueuedCard,
+  type QueuedText,
   queuedOn,
   runsIn,
 } from "@pinetrie/rules"
@@ -57,9 +60,18 @@ import type { Records } from "./records.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
-/** A queued card the host popped: its record as it was, and its text at the pop. */
+/**
+ * A queued card the host popped: its record as it was, and its words at the
+ * pop (`textSourceOf`): a text card's text, "" for a fact.
+ */
 export interface PoppedQueuedCard {
   readonly card: QueuedCard
+  readonly text: string
+}
+
+/** A popped text card: a message, sent as its queuer's. */
+export interface PoppedText {
+  readonly card: QueuedText
   readonly text: string
 }
 
@@ -74,9 +86,9 @@ const hostFailedWords = (why: string): string => `the host failed: ${why}`
 export type NextQueuedCardPop =
   | { readonly kind: "idle" }
   | { readonly kind: "held" }
-  | { readonly kind: "typing"; readonly card: QueuedCard }
-  | { readonly kind: "blank"; readonly card: QueuedCard }
-  | { readonly kind: "behind"; readonly card: QueuedCard }
+  | { readonly kind: "typing"; readonly card: QueuedText }
+  | { readonly kind: "blank"; readonly card: QueuedText }
+  | { readonly kind: "behind"; readonly card: QueuedText }
   | { readonly kind: "popped"; readonly popped: PoppedQueuedCard }
 
 /**
@@ -106,8 +118,10 @@ export function popNextQueuedCard(
   const step = planNextQueuedCardPop(cards, lane, { ...facts, blank })
   if (step.kind !== "pop") return step
   const { card } = step
-  if (!texts.holds(card.id, card.place.seen)) return { kind: "behind", card }
-  const text = texts.textNow(card.id)
+  if (isQueuedText(card) && !texts.holds(card.id, card.place.seen))
+    return { kind: "behind", card }
+  const source = textSourceOf(card)
+  const text = source.kind === "doc" ? texts.textNow(source.card) : ""
   applyPlaceSteps(places, [{ kind: "remove", id: card.id }])
   return { kind: "popped", popped: { card, text } }
 }
@@ -117,7 +131,7 @@ export function popNextQueuedCard(
  * `root`, its thread's (`THREAD`).
  */
 export const chatOfPoppedQueuedCard = (
-  popped: PoppedQueuedCard,
+  popped: PoppedText,
   root: RootId,
 ): Chat => ({
   text: popped.text,
@@ -147,13 +161,13 @@ export interface QueuedCardPopDeps {
   readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit">
   readonly start: Runs["start"]
   /** Send a popped card's text as its queuer's message, through `sendChat`. */
-  readonly send: (popped: PoppedQueuedCard) => Promise<Outcome>
+  readonly send: (popped: PoppedText) => Promise<Outcome>
   /** The top card's text is behind: drain the lane again once the host holds it. */
-  readonly behind: (card: QueuedCard) => void
+  readonly behind: (card: QueuedText) => void
   /** Someone is typing in the top card: drain the lane again once they stop. */
-  readonly typing: (card: QueuedCard) => void
+  readonly typing: (card: QueuedText) => void
   /** Only blank cards are queued: drain the lane again once `card` is written in. */
-  readonly blank: (card: QueuedCard) => void
+  readonly blank: (card: QueuedText) => void
   /** Each card's history (ADR-0048 step 6). */
   readonly provenance: Pick<Provenance, "before" | "after">
 }
@@ -177,7 +191,10 @@ export async function drain(
   const loaded = new Set<CardId>()
   for (;;) {
     const loading = queuedOn(readPlaces(places), lane)
-      .map(c => c.id)
+      .flatMap((c): TextCardId[] => {
+        const source = textSourceOf(c)
+        return source.kind === "doc" ? [source.card] : []
+      })
       .filter(id => !loaded.has(id))
     if (loading.length > 0) {
       await deps.texts.hydrate(loading)
@@ -229,13 +246,18 @@ async function carryOut(
   const plan = planCarry(popped.card, popped.text)
   switch (plan.kind) {
     case "fact":
-      return appendFact(deps, lane, popped, plan.fact)
+      return appendFact(deps, lane, plan.fact)
     case "catch-up":
-      return catchUpThenSend(deps, lane, popped, plan)
+      return catchUpThenSend(
+        deps,
+        lane,
+        { card: plan.card, text: popped.text },
+        plan,
+      )
     case "split":
-      return splitThen(deps, lane, popped, plan.intent)
+      return splitThen(deps, lane, plan.card, plan.intent)
     case "send":
-      return sendCard(deps, popped, popped.card)
+      return sendCard(deps, { card: plan.card, text: popped.text }, plan.card)
   }
 }
 
@@ -247,11 +269,9 @@ async function carryOut(
 async function appendFact(
   deps: QueuedCardPopDeps,
   lane: ThreadId,
-  popped: PoppedQueuedCard,
-  fact: OfferFact,
+  fact: QueuedFact,
 ): Promise<"next"> {
   const { session, log, now } = deps.basics
-  await deps.texts.destroy(popped.card.id)
   const appended = await deps.agent
     .lane(lane)
     .append(
@@ -276,7 +296,7 @@ async function appendFact(
 async function catchUpThenSend(
   deps: QueuedCardPopDeps,
   lane: ThreadId,
-  popped: PoppedQueuedCard,
+  popped: PoppedText,
   plan: Extract<CarryPlan, { readonly kind: "catch-up" }>,
 ): Promise<"ran" | "next"> {
   const { card } = popped
@@ -311,7 +331,10 @@ async function catchUpThenSend(
     return "next"
   }
   // Brought up to date: what is left is a plain message.
-  return sendCard(deps, popped, { ...card, carries: PLAIN })
+  return sendCard(deps, popped, {
+    ...card,
+    content: { ...card.content, command: null },
+  })
 }
 
 /**
@@ -321,10 +344,9 @@ async function catchUpThenSend(
 async function splitThen(
   deps: QueuedCardPopDeps,
   lane: ThreadId,
-  popped: PoppedQueuedCard,
+  card: QueuedText,
   intent: string,
 ): Promise<"ran" | "next"> {
-  const { card } = popped
   const message = await deps.work
     .prepareSplit(lane, card.place.by, intent)
     .catch((error: unknown) => ({
@@ -342,8 +364,8 @@ async function splitThen(
 /** A popped card's text sent as its queuer's message; `sending` is what goes back if it cannot be. */
 async function sendCard(
   deps: QueuedCardPopDeps,
-  popped: PoppedQueuedCard,
-  sending: QueuedCard,
+  popped: PoppedText,
+  sending: QueuedText,
 ): Promise<"ran" | "next"> {
   const { card } = popped
   const sent = await deps.send(popped).catch(async (error: unknown) => {
@@ -386,7 +408,7 @@ async function sendCard(
  */
 async function unsent(
   deps: QueuedCardPopDeps,
-  card: QueuedCard,
+  card: QueuedText,
   reason: string,
 ): Promise<void> {
   const { session, places, log, newId, now } = deps.basics

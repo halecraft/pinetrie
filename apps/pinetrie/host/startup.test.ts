@@ -1,5 +1,4 @@
 import {
-  atEntry,
   entryId,
   type ProjectRecord,
   rootIdFor,
@@ -89,14 +88,12 @@ test("recover resumes each interrupted lane before it settles the others, and na
       placer: writerId("ada@x.io"),
       place: {
         kind: "queued",
-        at: atEntry(entryId("e-1")),
         thread: OTHER,
         order: "a",
         by: writerId("ada@x.io"),
         seen: "",
       },
-      carries: { kind: "message", command: null },
-      unsent: null,
+      content: { command: null, unsent: null },
     }),
   )
   const events: string[] = []
@@ -235,11 +232,9 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
       placer: writerId("ada@x.io"),
       place: {
         kind: "composing",
-        at: atEntry(entryId("e-1")),
         thread: TEST_THREAD,
       },
-      carries: { kind: "message", command: null },
-      unsent: null,
+      content: { command: null, unsent: null },
     })
   placesDoc.cards.set(cardIdFor("c100"), card(cardIdFor("c100")))
   placesDoc.cards.set(cardIdFor("c101"), card(cardIdFor("c101")))

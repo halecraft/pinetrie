@@ -235,10 +235,10 @@ While the page syncs, "syncing…" leads its right end.
 
 ### Pages (ADR-0098)
 
-A page covers the workspace: the sidebar and the footer stay, and the
-workspace stays as you left it under the page. It opens with **← back** and
+A page covers the stage: the sidebar and the footer stay, and the
+stage stays as you left it under the page. It opens with **← back** and
 its title. Back, the browser's Back, and choosing a root, a new tab, ＋, ▦
-or a row of your inbox all return to the workspace. The page is in the
+or a row of your inbox all return to the stage. The page is in the
 URL (`#profile`), so a reload stays on it; the window's title names it,
 "(2) Profile · pine·trie". While a page shows, the card and undo keys do
 nothing; Ctrl+Shift+L still folds the sidebar.
@@ -826,9 +826,9 @@ The rail is E; the column is T. Seeing both at once is the product.
 ### A card's frame (ADR-0111)
 
 - **Every text card is drawn in one frame**: a header, its box, and a
-  footer. The header is what you drag it by. It says where the card is (✎
-  your message, ▭ note, a queued card's place in line, ⚑ pinned, ▤
-  inventory), how it
+  footer. The header is what you drag it by. Its icon says what kind of
+  card it is (✎ a text card), and it says where the card is (your message,
+  note, queued, pinned, inventory), how it
   stands ("next", "held · 2nd in line", "not sent: …", "changed since the
   agent last read it"), who put it there, and its command's chip; then ⋯
   and ×. The footer holds ↑ and ↓ in a list, and at most one primary
@@ -1008,9 +1008,11 @@ The rail is E; the column is T. Seeing both at once is the product.
   queue or run, and **put** puts it on the canvas you are on, after the
   column you were last in. Only its holder opens it: a link to it anywhere
   else says "Bea has it". Click a slot, or move with the arrow keys or
-  `hjkl` while the panel has focus, to select it; a click or Enter opens
-  the card whole in place, over its neighbours, and editable, and Escape
-  folds it. Cards keep their slots, gaps included, on every device.
+  `hjkl` while the panel has focus, to select it: beside the grid, on the
+  side away from where the panel is docked, its card is previewed, one
+  column wide and read only (ADR-0126). Enter, or a click on the card
+  already selected, opens it whole in place, over its neighbours, and
+  editable, the preview hidden while it is open, and Escape folds it. Cards keep their slots, gaps included, on every device.
   Dropping a card on a slot that holds one swaps the two, and so do
   Alt+arrows.
 - **Take** moves a card into your inventory (a *take into the inventory*,

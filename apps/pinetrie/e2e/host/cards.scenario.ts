@@ -88,7 +88,6 @@ async function run(check: Checks["check"]): Promise<void> {
     const drafting = (end: EntryId | null) =>
       ({
         kind: "composing",
-        at: at(end),
         thread: threadHolding(ch, end),
       }) as const
     /**
@@ -98,7 +97,6 @@ async function run(check: Checks["check"]): Promise<void> {
     const pinnedIn = (end: EntryId | null) =>
       ({
         kind: "pinned",
-        at: at(end),
         thread: threadHolding(ch, end),
         order: LAST_ORDER,
       }) as const
@@ -113,8 +111,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id,
           place: place === "pinned" ? pinnedIn(end) : drafting(end),
-          carries: { kind: "message", command: null },
-          unsent: null,
+          content: { command: null, unsent: null },
         },
         text,
       )
@@ -368,7 +365,6 @@ async function run(check: Checks["check"]): Promise<void> {
         from: drafting(pinEnd),
         to: {
           kind: "pinned",
-          at: at(pinEnd),
           thread: threadHolding(ch, pinEnd),
         },
       },
@@ -422,7 +418,6 @@ async function run(check: Checks["check"]): Promise<void> {
     ])
     const pinnedHere = {
       kind: "pinned",
-      at: at(editEnd),
       thread: threadHolding(ch, editEnd),
       // The host gives it its order: a key carries none.
       order: "",
@@ -431,8 +426,7 @@ async function run(check: Checks["check"]): Promise<void> {
       {
         id: late,
         place: pinnedHere,
-        carries: { kind: "message", command: null },
-        unsent: null,
+        content: { command: null, unsent: null },
       },
       "typed just before the send",
     )
@@ -456,7 +450,6 @@ async function run(check: Checks["check"]): Promise<void> {
     const pinnedAt = (end: EntryId | null) =>
       ({
         kind: "pinned",
-        at: at(end),
         thread: threadHolding(ch, end),
       }) as const
     const away = newCard(ada, traceEnd, "taken while Ada was away", "pinned")
@@ -666,8 +659,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id,
           place: keeping,
-          carries: { kind: "message", command: null },
-          unsent: null,
+          content: { command: null, unsent: null },
         },
         text,
       )
@@ -727,8 +719,7 @@ async function run(check: Checks["check"]): Promise<void> {
             {
               id: newCardId(),
               place: mine,
-              carries: { kind: "message", command: null },
-              unsent: null,
+              content: { command: null, unsent: null },
             },
             `held ${slot}`,
             into(slot),

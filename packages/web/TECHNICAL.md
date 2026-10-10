@@ -96,7 +96,12 @@ about 55 ms (S59).
   thread's nodes would cost part of what skipping saves. So any change to
   those, a column opened or closed included, builds every column's list
   once. `lane` and `joins` are rebuilt on every render of the column and
-  compared by value; `sameData` compares a `Map` by its entries.
+  compared by value; `sameData` compares a `Map` by its entries. `forks`
+  is compared by identity, and `App` keeps it while its data is the same
+  (`useSameData`): the rail it comes from is rebuilt on every card's
+  change, so another window's typing redrew every list, and the browser
+  suite's check of it failed one run in two whenever its card landed
+  inside the counted window.
 - **The review redraws with its data, not its column.** `ReviewPane` compares
   its target, line and `narrow` by value, since `columnView` and `paneView`
   build them anew, and its `close` is `useStable`'s. A file section (up to 5,000 lines) compares its
@@ -215,7 +220,7 @@ page-colour literal is left in the stylesheet. `--surface` is the colour
 behind a thing, set by context: `--page` by default, `--chrome` in
 `#sidebar` and `#bottom`, the hover fill on a hovered item, `--page` on
 the selected one and on a thread card. A ring that must read as a gap around
-a dot (`.root-status.needs-you`, `.card-pip`) is drawn in `--surface`, so
+a dot (`.root-status.needs-you`, `.signal[data-signal="unsent"]`) is drawn in `--surface`, so
 it matches whatever the dot sits on.
 
 ## Colour carries the link, not geometry
@@ -229,7 +234,7 @@ colour. There are no connector lines, so sibling branches never cross.
   `(seed + 7n) mod 12`. Which slot is the same in any client; the page's
   colour for a slot is `colors.ts`'s (`slotColor`). The seed of the root you are on, or of the root a
   new tab minted, is `TrackSeed`, a context `App` provides around the
-  workspace; `useTrackColors()` turns a track into its colour, slot and
+  stage; `useTrackColors()` turns a track into its colour, slot and
   `--track` style. It changes only with the root, which remounts the
   columns anyway, so memoised messages are not redrawn for it. Context
   reaches the narrow pane's dialog through its portal.
@@ -777,7 +782,7 @@ offer's review, an ask's, a table from a message, or a stored image.
   `App` measures `#strip` with a `ResizeObserver`, so folding the sidebar
   crosses accepted work as a window resize does; crossing it remounts the pane.
   A media query could not: it reads the window, and the sidebar's width
-  varies. The strip comes and goes with what the workspace shows, so the
+  varies. The strip comes and goes with what the stage shows, so the
   hook checks on each render whether it still observes the element there.
 - **Focus goes back to what had it.** The wide frame reads
   `document.activeElement` in render, before `PaneHead`'s layout effect
@@ -1069,6 +1074,32 @@ stays in view; the strip scrolls past 30vh.
   thread lifted back into its card loses its columns, and a page on it
   moves to the sidebar's last root.
 
+## Renderings (`renderings.tsx`, ADR-0126)
+
+Every kind of card is drawn at three levels of detail, and `RENDERINGS`
+has one row per drawn kind with three components (`Face`, `Normal`,
+`Whole`) and its icon (`KIND_ICON`), declared with `satisfies { [K in
+DrawnKind]: Renderings<K> }`: a kind added to `CardRecord` does not
+compile until it draws all three (`renderings.test.ts` proves it with
+`@ts-expect-error`). `DrawFace` and `DrawCard` pick the row by the card's
+kind, in a switch that is total too.
+
+- **The rows wrap what exists.** A text card's face is `TextFaceView`, its
+  normal its text through `MessageText`, read only and bounded at a
+  column's height (`.card-normal`), its whole its editor in its frame
+  (`BoundCardEditor`, with its put). A thread's face is `ThreadFaceView`,
+  its normal its first and last messages, its whole `ThreadPreviewView`.
+  A note column's face is its title and count, its normal its title and
+  first notes, its whole all of them.
+- **A row's components take their card and width alone**; what a surface
+  gives them beyond that (the session, the reader, a thread's preview, the
+  note columns, where a put lands) is `RenderingContext`, given by
+  `RenderingProvider`. The inventory panel gives it.
+- **On a canvas, whole is the column**: `Strip`'s switch over
+  `CardColumn` draws each kind's column, total in the same way, and a
+  folded one draws its face (`FoldedColumn`, `detailOf`). The rows' `Whole`
+  is a card opened off a canvas: the inventory's open card.
+
 ## Selectors in the browser suite
 
 - **A message's own text is `.msg > .text`.**
@@ -1146,7 +1177,7 @@ the email is the only thing pine·trie chooses.
 
 ## Pages (`page.tsx`, `use-page.ts`, ADR-0098)
 
-A page covers the workspace: the profile is the first. Which page, and how
+A page covers the stage: the profile is the first. Which page, and how
 leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
 
 - **The page is in the URL's hash** (`#profile`). `usePage` reads it with
@@ -1157,17 +1188,17 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   (`planLeave`), since Back from a page loaded by its URL would leave
   pine·trie. `pushState` and `replaceState` fire no event, so `goTo` tells
   the subscribers itself.
-- **The page is a sibling of `#workspace` in its grid cell**, after it in
+- **The page is a sibling of `#stage` in its grid cell**, after it in
   the document and at the board's `z-index` (3), so it covers the board
   too; the footer's menus (4) open over it.
-- **The workspace stays mounted, laid out and `inert`** (with
+- **The stage stays mounted, laid out and `inert`** (with
   `aria-hidden`). Remounted, its columns would lose their scroll (the
-  browser suite's Back check, and its mutation keying `#workspace` by the
+  browser suite's Back check, and its mutation keying `#stage` by the
   page). With `display: none`, `useStripNarrow` would measure the strip at
   0 and turn an open pane into a modal dialog over the page.
-- **Showing anything in the workspace leaves the page**: `planIntent` puts
+- **Showing anything in the stage leaves the page**: `planIntent` puts
   `{ kind: "page", to: null }` first when a plan shows a root, a new tab or
-  the board (`showsWorkspace`). The keys that act on cards or undo do
+  the board (`showsStage`). The keys that act on cards or undo do
   nothing while a page shows (`keyAct`'s `page`).
 - **A narrow pane is a modal dialog in the top layer.** Back or Forward onto
   a page while one is open leaves the dialog over the page, and the page

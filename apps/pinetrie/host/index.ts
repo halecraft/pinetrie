@@ -57,7 +57,7 @@ import {
   decodeCommandRenames,
   decodeDigestConfig,
   decodeTitleConfig,
-  type QueuedCard,
+  type QueuedText,
   rootsHeld,
 } from "@pinetrie/rules"
 import {
@@ -556,11 +556,11 @@ export async function startHost({
   // The drain's waits for its top card: its text (S96), someone's typing in
   // it to stop (ADR-0048 step 7), or a blank card to be written in (ADR-0113).
   const wait = createWaits({ places, drain: lane => queueDrain(lane) })
-  const behind = (card: QueuedCard) =>
+  const behind = (card: QueuedText) =>
     wait(card, signal => cardPort.whenHolds(card.id, card.place.seen, signal))
-  const typing = (card: QueuedCard) =>
+  const typing = (card: QueuedText) =>
     wait(card, signal => untilNotTyped(presence, card.id, signal))
-  const blank = (card: QueuedCard) =>
+  const blank = (card: QueuedText) =>
     wait(card, signal => cardPort.whenWritten(card.id, signal))
   const drain = (lane: ThreadId) =>
     drainQueue(

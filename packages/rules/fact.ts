@@ -1,16 +1,21 @@
-// fact — what a command on a thread's offer did, as a fact in the thread
-// (ADR-0080): an acceptance, a description asked for again, a
-// squash, a refresh.
+// fact — what the host records in a thread (ADR-0080, ADR-0126): what a
+// command on its offer did (an acceptance, a description asked for again, a
+// squash, a refresh), and who stopped a run.
 //
 // A history message (`history.ts`): `content` is what the model reads,
-// `details` the fact, which the column words as one line (`factLine`). It reaches the thread through a queued card carrying the
-// fact (`planFactCard`, `card.ts`), popped in order with the other cards: at
-// once on an idle thread, when the run ends on a running one.
+// `details` the fact, which the column words as one line (`factLine`). It
+// reaches the thread through a fact card (`planFactCard`, `queue.ts`),
+// popped with the other cards: at once on an idle thread, when the run ends
+// on a running one.
 
 import type {
   CatchUpFrom,
+  EntryId,
   OfferAcceptanceDecision,
   OfferFact,
+  QueuedFact,
+  TextCardId,
+  TextSource,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
@@ -20,7 +25,7 @@ import { CatchUpFromSchema, catchUpName } from "./catch-up-from.ts"
 import { ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 
-const OfferFactSchema = Type.Union([
+const QueuedFactSchema = Type.Union([
   Type.Object({
     kind: Type.Literal("accepted"),
     lane: ThreadIdSchema,
@@ -38,38 +43,61 @@ const OfferFactSchema = Type.Union([
     lane: ThreadIdSchema,
     by: WriterIdSchema,
   }),
+  Type.Object({
+    kind: Type.Literal("stopped"),
+    lane: ThreadIdSchema,
+    prompt: Type.Unsafe<EntryId>(Type.String({ minLength: 1 })),
+    by: WriterIdSchema,
+    at: Type.Number(),
+  }),
 ])
 
 export const FACT_TYPE = "pinetrie.fact"
 
-export const FACT = historyMessage(FACT_TYPE, OfferFactSchema)
+export const FACT = historyMessage(FACT_TYPE, QueuedFactSchema)
 
 /** The pi `CustomMessage` a fact is stored as. */
-export type FactMessage = HistoryMessage<typeof FACT_TYPE, OfferFact>
+export type FactMessage = HistoryMessage<typeof FACT_TYPE, QueuedFact>
 
 /** A fact as a card carries it, in the places document's flat strings. */
-export const encodeOfferFact = (fact: OfferFact): string => JSON.stringify(fact)
+export const encodeQueuedFact = (fact: QueuedFact): string =>
+  JSON.stringify(fact)
 
 /** A card's stored fact -> the fact; undefined for one malformed. Total. */
-export function decodeOfferFact(stored: string): OfferFact | undefined {
+export function decodeQueuedFact(stored: string): QueuedFact | undefined {
   try {
     const fact: unknown = JSON.parse(stored)
-    return Value.Check(OfferFactSchema, fact) ? fact : undefined
+    return Value.Check(QueuedFactSchema, fact) ? fact : undefined
   } catch {
     return undefined
   }
 }
 
 /** A stored message -> its fact, or undefined if it is not one. */
-export const decodeFact = (message: unknown): OfferFact | undefined =>
+export const decodeFact = (message: unknown): QueuedFact | undefined =>
   FACT.decode(message)
 
 /** Where an acceptance went, after "accepted": nothing for accepted work, else a WIP's name. */
 const into = (to: CatchUpFrom) =>
   to.kind === "accepted" ? "" : ` into ${catchUpName(to)}`
 
+/**
+ * What a card says, from where its words are (`textSourceOf`): a text
+ * card's document, read by `docText`; a fact's line; nothing for a card with
+ * no words. Every reader of card words reads through it.
+ */
+export const wordsOf = (
+  source: TextSource,
+  docText: (card: TextCardId) => string,
+): string =>
+  source.kind === "doc"
+    ? docText(source.card)
+    : source.kind === "fact"
+      ? factLine(source.fact)
+      : ""
+
 /** The one line a column shows for a fact. */
-export function factLine(fact: OfferFact): string {
+export function factLine(fact: QueuedFact): string {
   switch (fact.kind) {
     case "accepted":
       return `✓ accepted${into(fact.to)} as ${fact.as.slice(0, 8)}`
@@ -79,11 +107,13 @@ export function factLine(fact: OfferFact): string {
       return "⇣ the stack was squashed into one revision"
     case "refreshed":
       return "↻ the offer was rebuilt from this thread's work"
+    case "stopped":
+      return "■ the run was stopped"
   }
 }
 
 /** What the model reads of a fact: who did what to this thread's work. */
-export function factContent(fact: OfferFact, name: string): string {
+export function factContent(fact: QueuedFact, name: string): string {
   switch (fact.kind) {
     case "accepted":
       return `${name} accepted this thread's work${into(fact.to)}, as the change ${fact.as}: ${fact.bookmark} moved forward to it. That work is no longer offered; what you do next is offered on top of it.`
@@ -93,12 +123,14 @@ export function factContent(fact: OfferFact, name: string): string {
       return `${name} squashed this thread's offer back into one revision.`
     case "refreshed":
       return `${name} rebuilt this thread's offer from your work as it is now, discarding their edits to it.`
+    case "stopped":
+      return `${name} stopped this run.`
   }
 }
 
 /** The fact message, its content naming the person as `name`. */
 export const encodeFact = (
-  fact: OfferFact,
+  fact: QueuedFact,
   name: string,
   timestamp: number,
 ): FactMessage => FACT.encode(fact, factContent(fact, name), timestamp)

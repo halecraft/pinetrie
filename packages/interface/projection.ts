@@ -29,7 +29,6 @@ import {
   type NoteColumnRecord,
   type RootId,
   type SeatRecord,
-  type StopRecord,
   type TaskId,
   type TaskRecord,
   type ThreadId,
@@ -63,7 +62,6 @@ import {
   readRevisions,
   readRunningLanes,
   readSeats,
-  readStops,
   readTasks,
   readThreads,
   readTraces,
@@ -91,8 +89,6 @@ export interface SessionFacts {
   readonly index: TreeIndex
   /** Every ask (ADR-0106), from `index`: the rail and the columns read one. */
   readonly asks: AskIndex
-  /** Who stopped each ask, by its prompt. */
-  readonly stops: ReadonlyMap<EntryId, StopRecord>
   /** Each ask's model-written digest, when digests are on, by its prompt. */
   readonly digests: ReadonlyMap<EntryId, DigestRecord>
   readonly activity: readonly AgentRun[]
@@ -184,7 +180,6 @@ function readFacts(view: HeldView): SessionFacts {
   return {
     index,
     asks: indexAsks(index),
-    stops: readHeld(roots, readStops),
     digests: readHeld(roots, readDigests),
     activity,
     running: readRunningLanes(doc, live),

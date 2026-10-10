@@ -2,6 +2,7 @@ import {
   atEntry,
   type CardRecord,
   entryId,
+  NO_CONTENT,
   noteColumnIdFor,
   type TextCard,
   taskIdFor,
@@ -36,11 +37,10 @@ const ME = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const LANE = threadIdFor("x")
 const C1 = cardIdFor("c1")
-const at = atEntry(entryId("e-1"))
-const atEnd = { kind: "composing", at, thread: LANE } as const
+const _at = atEntry(entryId("e-1"))
+const atEnd = { kind: "composing", thread: LANE } as const
 const queuedKey = {
   kind: "queued",
-  at,
   thread: LANE,
   seen: "",
 } as const
@@ -51,8 +51,7 @@ const card = (over: Partial<TextCard> = {}): TextCard => ({
   owner: ME,
   placer: ME,
   place: atEnd,
-  carries: { kind: "message", command: null },
-  unsent: null,
+  content: { command: null, unsent: null },
   ...over,
 })
 
@@ -198,8 +197,7 @@ describe("the tab's moves (ADR-0059)", () => {
       owner: ME,
       placer: ME,
       place: { ...queuedKey, order: "\uffff", by: ME },
-      carries: { kind: "message", command: "split" },
-      unsent: null,
+      content: { command: "split", unsent: null },
     })
     const s = run([
       sent(pendingOf("m-2", made, { actedAt: COLUMN, slot: null }, draft)),
@@ -462,6 +460,7 @@ describe("drawnPlace (ADR-0116)", () => {
     owner: ME,
     placer: ME,
     place: { kind: "canvas", task, order: "0000000100", width: 1 },
+    content: NO_CONTENT,
   }
   const column = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
   const notes: CardRecord = {
@@ -470,6 +469,7 @@ describe("drawnPlace (ADR-0116)", () => {
     owner: ME,
     placer: ME,
     place: { kind: "canvas", task, order: "0000000200", width: 1 },
+    content: NO_CONTENT,
   }
   test("a thread's nearest notes are drawn in the column the host would choose; nowhere while the host would make one", () => {
     const to = { kind: "notes", near: "thread", thread: LANE } as const

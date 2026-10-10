@@ -1,7 +1,7 @@
 import { INVENTORY_GRID } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { type GridKeyState, gridKeyAct } from "./grid-keys.ts"
-import type { KeyLike } from "./inventory-keys.ts"
+import type { KeyLike } from "./page-keys.ts"
 
 const key = (k: string, over: Partial<KeyLike> = {}): KeyLike => ({
   key: k,

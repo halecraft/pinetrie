@@ -1,5 +1,6 @@
 import {
   type CardRecord,
+  NO_CONTENT,
   noteColumnIdFor,
   taskIdFor,
   textCardId,
@@ -34,6 +35,7 @@ const canvas = (...ids: (typeof A | typeof N1)[]): readonly CanvasCard[] =>
             owner: ADA,
             placer: ADA,
             place,
+            content: NO_CONTENT,
           }
         : {
             kind: "thread",
@@ -41,6 +43,7 @@ const canvas = (...ids: (typeof A | typeof N1)[]): readonly CanvasCard[] =>
             owner: ADA,
             placer: ADA,
             place,
+            content: NO_CONTENT,
           }
     }),
     TASK,
@@ -53,8 +56,7 @@ test("noteColumnsOf: each note column in the canvas's order, its title or Notes,
     owner: ADA,
     placer: ADA,
     place: { kind: "note", column, order },
-    carries: { kind: "message", command: null },
-    unsent: null,
+    content: { command: null, unsent: null },
   })
   const n1 = note(cardIdFor("c1"), N1, "b")
   const n2 = note(cardIdFor("c2"), N1, "a")

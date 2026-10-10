@@ -1,6 +1,4 @@
 import {
-  atEntry,
-  entryId,
   rootIdFor,
   type TextCard,
   textCardId,
@@ -23,11 +21,9 @@ const card = (id: string, owner = "p-ada"): TextCard => ({
   placer: writerId(owner),
   place: {
     kind: "composing",
-    at: atEntry(entryId("e1")),
     thread: TEST_THREAD,
   },
-  carries: { kind: "message", command: null },
-  unsent: null,
+  content: { command: null, unsent: null },
 })
 
 test("readPlaces: oldest first, malformed ones left out, an unchanged card the same object", () => {

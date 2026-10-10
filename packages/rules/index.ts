@@ -26,6 +26,7 @@ export {
   planSplitCall,
   refusedAnswer,
   SPLIT_QUEUED,
+  SPLIT_UNMADE,
   type SplitRefusal,
   splitRefusal,
   type ToolAnswer,
@@ -207,13 +208,14 @@ export {
   acceptedFact,
   actionFact,
   decodeFact,
-  decodeOfferFact,
+  decodeQueuedFact,
   encodeFact,
-  encodeOfferFact,
+  encodeQueuedFact,
   FACT_TYPE,
   type FactMessage,
   factContent,
   factLine,
+  wordsOf,
 } from "./fact.ts"
 export {
   HELD_WORDS,
@@ -225,7 +227,12 @@ export {
   takenIn,
 } from "./held.ts"
 export { pastedImages, planImages } from "./images.ts"
-export { planReorder, planSetCommand, planWidth } from "./in-place.ts"
+export {
+  planReorder,
+  planSetCommand,
+  planWidth,
+  type ReorderStep,
+} from "./in-place.ts"
 export {
   type ConflictShown,
   decodeLand,
@@ -256,6 +263,7 @@ export {
 export {
   afterSteps,
   type Discards,
+  type MakeStep,
   type MoveCommand,
   type MoveStep,
   type MovesStep,
@@ -337,6 +345,7 @@ export {
 export {
   blankQueued,
   type CarryPlan,
+  isQueuedText,
   type NextQueuedCardPopStep,
   NONE_BLANK,
   planCarry,
@@ -345,6 +354,7 @@ export {
   planUnqueueAll,
   planUnsent,
   type QueuedCard,
+  type QueuedText,
   queuedOn,
   type TaskPinnedCard,
   taskPinnedOf,
@@ -401,9 +411,10 @@ export { planStartup } from "./startup.ts"
 export {
   type CarryOnMessage,
   carryOnState,
+  endedOutcome,
   planCarryOn,
   planStop,
-  STOP,
+  stopperOf,
 } from "./stop.ts"
 export {
   type CanvasCard,
@@ -422,7 +433,6 @@ export {
   taskOfCard,
   taskOfPlace,
   taskOfTarget,
-  threadCardOf,
 } from "./task.ts"
 export {
   decodeTaskPinned,

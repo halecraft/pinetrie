@@ -14,7 +14,6 @@
 // takes its lane only as the verdict's key, never to read its tip.
 
 import {
-  askOutcome,
   type EntryId,
   indexAsks,
   promptOf,
@@ -25,8 +24,8 @@ import type { Keeper } from "@pinetrie/keeper"
 import type { PiSetup } from "@pinetrie/pi"
 import {
   readDigests,
+  readPlaces,
   readReading,
-  readStops,
   readTreeIndex,
   readVerdicts,
 } from "@pinetrie/reads"
@@ -37,10 +36,12 @@ import {
   digestRequest,
   digestToWrite,
   type EndReply,
+  endedOutcome,
   endReplyOf,
   pendingVerdict,
   planDigest,
   planRunEnded,
+  queuedOn,
   readsAsk,
   runEndedToWrite,
   setRecord,
@@ -80,7 +81,7 @@ export interface Digests {
 }
 
 export function createDigests(deps: {
-  readonly basics: Pick<Basics, "session" | "docs" | "log" | "now">
+  readonly basics: Pick<Basics, "session" | "docs" | "places" | "log" | "now">
   readonly keeper: Keeper
   /** Who is reading which thread (ADR-0024): a live digest waits for a reader. */
   readonly presence: PresenceDocHandle
@@ -198,10 +199,14 @@ export function createDigests(deps: {
         const end = asks.last.get(prompt) ?? prompt
         const plan = planRunEnded({
           current: readVerdicts(basics.session).get(lane)?.ask === prompt,
-          outcome: askOutcome(index, asks, prompt, {
-            running: false,
-            stop: readStops(doc).get(prompt),
-          }),
+          // Until its fact is appended, a stop's queued fact names who
+          // stopped the run.
+          outcome: endedOutcome(
+            index,
+            asks,
+            prompt,
+            queuedOn(readPlaces(basics.places), lane),
+          ),
           lines: askLines(index, asks, prompt),
           digest: enabled
             ? planDigest({

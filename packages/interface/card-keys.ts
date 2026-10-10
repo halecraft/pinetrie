@@ -11,7 +11,7 @@
 
 import type { CardId } from "@pinetrie/core"
 import type { ColumnAct } from "./intent.ts"
-import type { KeyLike } from "./inventory-keys.ts"
+import type { KeyLike } from "./page-keys.ts"
 
 /**
  * The act a key in a card's box asks for, or null. `among` is its list as

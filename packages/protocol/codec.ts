@@ -40,7 +40,6 @@ import {
   MOVE_DIRECTIONS,
   type Move,
   type MoveDirection,
-  type MoveRefusal,
   type MoveTarget,
   modeOf,
   normalizeName,
@@ -48,6 +47,7 @@ import {
   type OfferAction,
   type OfferSeen,
   type PlaceKey,
+  type PlaceRefusal,
   type Position,
   parseCardId,
   parseMentions,
@@ -105,7 +105,7 @@ export type Outcome =
    */
   | {
       readonly kind: "unmoved"
-      readonly code: MoveRefusal
+      readonly code: PlaceRefusal
       readonly place: PlaceKey | null
       readonly by: WriterId | null
     }
@@ -764,18 +764,19 @@ const isQueueHoldChange = (h: string): h is QueueHoldChange =>
 const isMoveDirection = (d: string): d is MoveDirection =>
   (MOVE_DIRECTIONS as readonly string[]).includes(d)
 
-const MOVE_REFUSALS: readonly MoveRefusal[] = [
-  "moved",
-  "gone",
-  "exists",
-  "full",
-  "not-yours",
-  "fact",
-  "order-changed",
-  "replied",
-]
-const isMoveRefusal = (c: string): c is MoveRefusal =>
-  (MOVE_REFUSALS as readonly string[]).includes(c)
+/** Every refusal of a move or a reorder, so the wire carries each as itself. */
+const PLACE_REFUSALS = {
+  moved: true,
+  gone: true,
+  exists: true,
+  full: true,
+  "not-yours": true,
+  replied: true,
+  "no-place": true,
+  fact: true,
+  "order-changed": true,
+} as const satisfies Record<PlaceRefusal, true>
+const isPlaceRefusal = (c: string): c is PlaceRefusal => c in PLACE_REFUSALS
 
 const isOfferAction = (a: string): a is OfferAction =>
   (OFFER_ACTIONS as readonly string[]).includes(a)
@@ -1088,7 +1089,7 @@ export function decodeReply(wire: Reply): Outcome {
     case "unmoved":
       return {
         kind: "unmoved",
-        code: isMoveRefusal(wire.errorCode) ? wire.errorCode : "gone",
+        code: isPlaceRefusal(wire.errorCode) ? wire.errorCode : "gone",
         place: decodeKey(wire.place) ?? null,
         by: wire.by === "" ? null : (wire.by as WriterId),
       }

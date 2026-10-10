@@ -23,7 +23,6 @@ import {
   promptOf,
   ROOT,
   type SeatRecord,
-  type StopRecord,
   type StreamRecord,
   type TaskId,
   type TextPlace,
@@ -229,8 +228,6 @@ export interface ColumnProps {
   asks: AskIndex
   /** What the rail draws apart in this column's root, sorted: no fold hides it. */
   landmarks: readonly EntryId[]
-  /** Who stopped each ask, by its prompt (ADR-0106). */
-  stops: ReadonlyMap<EntryId, StopRecord>
   /** Each ask's fold, as the reader chose it, across unmounts. */
   folds: FoldMemory
   /** Each ask's model-written digest, by its prompt (ADR-0106). */
@@ -1063,7 +1060,6 @@ export function Column(p: ColumnProps) {
                   leftAt,
                   view.nodes.map(n => n.id),
                 )}
-                stops={p.stops}
                 live={p.session.live}
                 shown={p.shown}
                 tools={p.live.tools}
@@ -1141,7 +1137,6 @@ export function Column(p: ColumnProps) {
             readOnly={p.readOnly}
             reader={reader}
             session={p.session}
-            stops={p.stops}
           >
             <Composer
               card={mine}

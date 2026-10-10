@@ -8,18 +8,20 @@
 import {
   type BoardPlace,
   type CanvasPlace,
+  type Card,
   type CardId,
   type CardPlace,
   type CardRecord,
   type EntryId,
   isThreadId,
   type MoveTarget,
+  makeCard,
+  NO_CONTENT,
   type NoteColumnCard,
   type PlaceKey,
   type RootId,
   type TaskId,
   type TaskRecord,
-  type ThreadCard,
   type ThreadId,
   type ThreadRecord,
   threadOfPlace,
@@ -31,6 +33,7 @@ import {
 import { Type } from "typebox"
 import { BOARD, placeStarted } from "./board.ts"
 import { decodeAt, taskKey } from "./decode.ts"
+import { type MakeStep, planMake } from "./moves.ts"
 import { branchAfter, rankAfter } from "./rank.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 import { THREAD } from "./thread.ts"
@@ -56,7 +59,7 @@ export const TASK: RecordSpec<TaskRecord, TaskId, "session"> = {
 
 /** A card on a canvas, in its task's order. */
 export type CanvasCard =
-  | (ThreadCard & { readonly place: CanvasPlace })
+  | (Card<"thread"> & { readonly place: CanvasPlace })
   | (NoteColumnCard & { readonly place: CanvasPlace })
 
 /** A canvas card's kinds: what every consumer of a canvas switches over. */
@@ -252,9 +255,10 @@ export const canvasOf = (
 
 /**
  * A thread's card as it first lands on `task`'s canvas, one column wide,
- * its starter its owner and placer: a branch just after the thread it forks
- * from (`parent`, `branchAfter`), anything else at the canvas's end. With
- * it, the cards given new ranks to make room (`rankAfter`). Pure.
+ * made by its starter (`makeCard`, `planMake`): a branch just after the
+ * thread it forks from (`parent`, `branchAfter`), anything else at the
+ * canvas's end. Ranked first, then made; with it, the cards given new ranks
+ * to make room (`rankAfter`), none when the make is refused. Pure.
  */
 export function planThreadCard(input: {
   readonly thread: ThreadId
@@ -263,31 +267,25 @@ export function planThreadCard(input: {
   readonly cards: readonly CardRecord[]
   /** The thread a branch forks from; null for a new root. */
   readonly parent: ThreadId | null
-}): { readonly card: ThreadCard; readonly respaced: readonly CardRecord[] } {
+}): { readonly step: MakeStep; readonly respaced: readonly CardRecord[] } {
   const canvas = canvasOf(input.cards, input.task)
   const { order, respaced } = rankAfter(
     canvas,
     branchAfter(canvas, input.parent),
   )
-  return {
-    card: {
-      kind: "thread",
-      id: input.thread,
-      owner: input.by,
-      place: { kind: "canvas", task: input.task, order, width: 1 },
-      placer: input.by,
-    },
-    respaced,
-  }
+  const step = planMake(
+    input.cards,
+    makeCard(
+      "thread",
+      input.thread,
+      { kind: "canvas", task: input.task, order, width: 1 },
+      NO_CONTENT,
+      input.by,
+    ),
+    input.by,
+  )
+  return { step, respaced: step.kind === "write" ? respaced : [] }
 }
-
-/** A thread's card as it first lands on `task`'s canvas: at its end (`planThreadCard`). */
-export const threadCardOf = (input: {
-  readonly thread: ThreadId
-  readonly task: TaskId
-  readonly by: WriterId
-  readonly cards: readonly CardRecord[]
-}): ThreadCard => planThreadCard({ ...input, parent: null }).card
 
 /** What a thread's first message writes besides itself (ADR-0116, ADR-0117). */
 export interface ThreadStart {
@@ -296,9 +294,11 @@ export interface ThreadStart {
   /**
    * Its card, just after the thread it branches from, else at the end of
    * its task's canvas (`planThreadCard`), then any card given a new rank to
-   * make room.
+   * make room; none when its make is refused.
    */
-  readonly cards: readonly [ThreadCard, ...CardRecord[]]
+  readonly cards: readonly CardRecord[]
+  /** Why its card's make was refused, for the host's shell to log; null when made. */
+  readonly refused: Extract<MakeStep, { kind: "refused" }> | null
 }
 
 /**
@@ -351,14 +351,16 @@ export function planThreadStart(input: {
         ),
       )
   }
-  const { card, respaced } = planThreadCard({
+  const { step, respaced } = planThreadCard({
     thread,
     task,
     by,
     cards: input.cards,
     parent: input.parent,
   })
-  return { records, cards: [card, ...respaced] }
+  return step.kind === "write"
+    ? { records, cards: [step.record, ...respaced], refused: null }
+    : { records, cards: [], refused: step }
 }
 
 /**

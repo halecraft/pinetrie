@@ -162,6 +162,14 @@ export interface AgentMessageLike {
   readonly asked?: true
   /** Role `behind` only: the base's new work the thread was told of (ADR-0080). */
   readonly behind?: BehindView
+  /**
+   * Role `fact` only, for a stop's fact: the ask whose run was stopped, and
+   * who stopped it (ADR-0126).
+   */
+  readonly stopped?: {
+    readonly prompt: EntryId
+    readonly by: WriterId
+  }
 }
 
 export interface EntryLike {

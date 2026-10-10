@@ -1,6 +1,7 @@
 import {
   type CardRecord,
   entryId,
+  NO_CONTENT,
   taskIdFor,
   threadIdFor,
   writerId,
@@ -14,7 +15,14 @@ const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const reader = { me: ADA, nameOf: new Map([[BEA, "Bea"]]) }
 const at = (place: CardRecord["place"]): CardRecord[] => [
-  { kind: "thread", id: T, owner: ADA, placer: ADA, place } as CardRecord,
+  {
+    kind: "thread",
+    id: T,
+    owner: ADA,
+    placer: ADA,
+    place,
+    content: NO_CONTENT,
+  } as CardRecord,
 ]
 const E = entryId("e-1")
 

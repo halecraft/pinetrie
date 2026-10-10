@@ -43,7 +43,6 @@ import {
   branchColors,
   CARD_MIME,
   type Column as ColumnSpec,
-  cardMarks,
   claimFocus,
   columnLandmarks,
   composerPlacesStore,
@@ -119,6 +118,7 @@ import {
   threadPreview,
   threadWork,
   typingDue,
+  unsentSignals,
   viewportStore,
 } from "@pinetrie/interface"
 import {
@@ -157,7 +157,6 @@ import {
 } from "react"
 import { Board, BoardStrip } from "./board.tsx"
 import { CardHistories } from "./card-history.tsx"
-import { CardPip } from "./card-pip.tsx"
 import { Footer } from "./footer.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
@@ -173,6 +172,7 @@ import {
   ReviewPrefsContext,
 } from "./review-prefs.ts"
 import { Sidebar } from "./sidebar.tsx"
+import { SignalMark } from "./signal-mark.tsx"
 import { Strip } from "./strip.tsx"
 import type { DeviceState, TabState } from "./tab-state.ts"
 import { isTextBox } from "./text-box.ts"
@@ -188,6 +188,7 @@ import { NarrowContext, useStripNarrow } from "./use-narrow.ts"
 import { goTo, usePage } from "./use-page.ts"
 import { useReveal, useRevealCard } from "./use-reveal.ts"
 import { useRootDrag } from "./use-root-drag.ts"
+import { useSameData } from "./use-same-data.ts"
 import { useSmallWindow } from "./use-small-window.ts"
 import { useStable } from "./use-stable.ts"
 
@@ -337,7 +338,7 @@ export function App({
 }) {
   const doc = session.session
   const status = useDocStatus(doc)
-  // The page over the workspace, from the URL's hash (ADR-0098).
+  // The page over the stage, from the URL's hash (ADR-0098).
   const page = usePage()
   // The roots this tab holds (ADR-0063): the roots of the sidebar and the one
   // you are on, set by the effect below. Every read of the tree reads them
@@ -377,7 +378,6 @@ export function App({
     verdicts,
     workFacts,
     asks,
-    stops,
     digests,
     histories,
     traces,
@@ -709,7 +709,7 @@ export function App({
     [hereTask, tasks, rootEntries],
   )
   useEffect(() => session.openThreads.here(hereTask), [session, hereTask])
-  // The root whose colours the workspace draws in (ADR-0089): the task
+  // The root whose colours the stage draws in (ADR-0089): the task
   // you are on's first root, or the root a new tab will start, whose id it
   // minted as it opened.
   const seedRoot =
@@ -775,7 +775,7 @@ export function App({
   const filled = useFilledCards(session, mine)
   const unsent = useMemo(
     () =>
-      cardMarks({
+      unsentSignals({
         mine,
         filled,
         layout,
@@ -843,6 +843,9 @@ export function App({
     session.setTyping(end, card)
   }
   const colors = useMemo(() => branchColors(rail, views), [rail, views])
+  // Kept while its data is: the rail is rebuilt on every card's change, and
+  // a message list compares its forks by identity (S59).
+  const forks = useSameData(colors.forks)
   const paths = useMemo(
     () => views.map(v => pathIds(index, v.tipId)),
     [index, views],
@@ -876,8 +879,8 @@ export function App({
   // Each thread column drawn whole, by its key: what the strip draws it from.
   const projected = useMemo(() => {
     const slots =
-      view.workspace.kind === "task" || view.workspace.kind === "new"
-        ? view.workspace.slots
+      view.stage.kind === "task" || view.stage.kind === "new"
+        ? view.stage.slots
         : []
     return new Map(
       columns.flatMap((column, i) => {
@@ -901,7 +904,7 @@ export function App({
             ]
       }),
     )
-  }, [view.workspace, columns, views, paths])
+  }, [view.stage, columns, views, paths])
   const offered = useMemo(
     () => offeredByTask(view.offers, workFacts.names, taskOfThread),
     [view.offers, workFacts.names, taskOfThread],
@@ -1131,29 +1134,27 @@ export function App({
     [cards, session.writer],
   )
   const intents = useMemo(() => intentsOf(moves), [moves])
+  // A thread's face (ADR-0126): its slot's, and its column's when folded.
+  const threadFaceOf = useCallback(
+    (thread: ThreadId) =>
+      threadFace({
+        thread,
+        index,
+        lanes,
+        names: workFacts.names,
+        banners: workFacts.banners,
+      }),
+    [index, lanes, workFacts.names, workFacts.banners],
+  )
   // Each thread you hold, as its slot draws it (ADR-0124).
   const threadFaces = useMemo(
     () =>
       new Map(
         held.flatMap(c =>
-          c.kind === "thread"
-            ? [
-                [
-                  c.id,
-                  threadFace({
-                    thread: c.id,
-                    index,
-                    lanes,
-                    names: workFacts.names,
-                    banners: workFacts.banners,
-                    stops,
-                  }),
-                ] as const,
-              ]
-            : [],
+          c.kind === "thread" ? [[c.id, threadFaceOf(c.id)] as const] : [],
         ),
       ),
-    [held, index, lanes, workFacts.names, workFacts.banners, stops],
+    [held, threadFaceOf],
   )
   const slots = useMemo(
     () =>
@@ -1438,7 +1439,6 @@ export function App({
     activity,
     asks,
     folds,
-    stops,
     live,
     attention: session.attention,
     spots,
@@ -1471,9 +1471,9 @@ export function App({
     [histories, seats, session, nameOf],
   )
 
-  const { workspace } = view
+  const { stage } = view
   const readers = { session, index, taskOfThread, order, nameOf, colorOf }
-  const pip = <CardPip color={colorOf(session.writer)} />
+  const pip = <SignalMark color={colorOf(session.writer)} />
   const reader = { me: session.writer, nameOf }
   /** Where a link to `thread` leads, as you follow it (ADR-0124). */
   const linkOf = (thread: ThreadId) => linkTo(thread, cards, session.writer)
@@ -1493,7 +1493,7 @@ export function App({
   return (
     <Pictures value={pictures}>
       <CardHistories value={historyFacts}>
-        {listView !== null && workspace.kind !== "connecting" ? (
+        {listView !== null && stage.kind !== "connecting" ? (
           <Sidebar
             colorOf={colorOf}
             dragOf={dragOf}
@@ -1522,6 +1522,7 @@ export function App({
             previewOf={thread =>
               threadPreview(thread, index, forkOf.get(thread) ?? null)
             }
+            notes={noteViews}
             threads={threadFaces}
             reader={{ me: session.writer, nameOf }}
             notices={moves.notices.filter(r => r.actedAt.kind === "inventory")}
@@ -1530,31 +1531,31 @@ export function App({
             slots={slots}
           />
         )}
-        {/* Under a page the workspace stays mounted and laid out, only inert
+        {/* Under a page the stage stays mounted and laid out, only inert
           (ADR-0098). Remounted, its columns would lose their scroll; with
           `display: none`, `useStripNarrow` would measure the strip at 0 and
           turn an open pane into a modal dialog over the page. */}
         <main
           aria-hidden={page !== null || undefined}
-          id="workspace"
+          id="stage"
           inert={page !== null}
         >
-          {/* What the workspace's columns draw by (ADR-0087, ADR-0089): the
+          {/* What the stage's columns draw by (ADR-0087, ADR-0089): the
             root's colours, whether the pane covers the page, how you read a
             review. Each changes rarely, and only its readers redraw. */}
           <TrackSeed value={seed}>
             <ThreadStates value={workflow?.open ?? NO_STATES}>
               <NarrowContext value={narrow}>
                 <ReviewPrefsContext value={reviewReach}>
-                  {listView === null || workspace.kind === "connecting" ? (
+                  {listView === null || stage.kind === "connecting" ? (
                     <p className="connecting">connecting…</p>
-                  ) : workspace.kind === "nothing" ? (
+                  ) : stage.kind === "nothing" ? (
                     <p className="nothing-here">
                       Open a thread from the board, or start one with ＋.
                     </p>
                   ) : (
                     <>
-                      {workspace.kind === "task" ? (
+                      {stage.kind === "task" ? (
                         <LiveRail
                           activity={activity}
                           asks={asks}
@@ -1580,8 +1581,8 @@ export function App({
                       )}
                       <Strip
                         canvas={canvas}
-                        names={workFacts.names}
                         noteViews={noteViews}
+                        threadFaceOf={threadFaceOf}
                         onIntent={onIntent}
                         onPointerDown={dragColumn}
                         projected={projected}
@@ -1591,7 +1592,7 @@ export function App({
                           ...shared,
                           landmarks,
                           seenEnd: seenEnds,
-                          forks: colors.forks,
+                          forks,
                           onIntent,
                           shown,
                         }}
@@ -1603,7 +1604,7 @@ export function App({
                         told={told}
                         thread={readerRow}
                         typing={typing}
-                        workspace={workspace}
+                        stage={stage}
                       />
                     </>
                   )}

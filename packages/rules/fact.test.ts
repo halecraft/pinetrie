@@ -10,9 +10,9 @@ import {
   acceptedFact,
   actionFact,
   decodeFact,
-  decodeOfferFact,
+  decodeQueuedFact,
   encodeFact,
-  encodeOfferFact,
+  encodeQueuedFact,
   factContent,
   factLine,
   renderableMessage,
@@ -44,11 +44,11 @@ describe("a fact (ADR-0080)", () => {
   test("round-trips as a message and as a card's field; junk is none", () => {
     for (const fact of FACTS) {
       expect(decodeFact(encodeFact(fact, "Ada", 1))).toEqual(fact)
-      expect(decodeOfferFact(encodeOfferFact(fact))).toEqual(fact)
+      expect(decodeQueuedFact(encodeQueuedFact(fact))).toEqual(fact)
     }
-    expect(decodeOfferFact("{")).toBeUndefined()
+    expect(decodeQueuedFact("{")).toBeUndefined()
     expect(
-      decodeOfferFact(JSON.stringify({ ...ACCEPTED, lane: "main" })),
+      decodeQueuedFact(JSON.stringify({ ...ACCEPTED, lane: "main" })),
     ).toBeUndefined()
     expect(
       decodeFact({ role: "custom", customType: "pinetrie.fact" }),
@@ -57,9 +57,9 @@ describe("a fact (ADR-0080)", () => {
 
   test("an acceptance is stored as the fact it is; one stored under the kind facts began with does not decode", () => {
     expect(encodeFact(ACCEPTED, "Ada", 1).details).toEqual(ACCEPTED)
-    expect(JSON.parse(encodeOfferFact(ACCEPTED))).toEqual(ACCEPTED)
+    expect(JSON.parse(encodeQueuedFact(ACCEPTED))).toEqual(ACCEPTED)
     const older = { ...ACCEPTED, kind: "integrated", to: { kind: "line" } }
-    expect(decodeOfferFact(JSON.stringify(older))).toBeUndefined()
+    expect(decodeQueuedFact(JSON.stringify(older))).toBeUndefined()
     expect(
       decodeFact({ ...encodeFact(ACCEPTED, "Ada", 1), details: older }),
     ).toBeUndefined()

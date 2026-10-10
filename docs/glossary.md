@@ -29,8 +29,10 @@ words they were written with.
 
 | word | what it is | in code | retired |
 |---|---|---|---|
-| **card** | Something present: an identity, one place, and content, which the host keeps; its content's kind decides where it can be, what can be done with it, and how it is drawn (ADR-0126). A text card, a thread card or a note column (ADR-0111, ADR-0116, ADR-0117). | `CardRecord`, `CardId`, `CardKind`, `PLACES_OF` | |
+| **card** | Something present: an identity, one place, and content, which the host keeps; its content's kind decides where it can be, what can be done with it, and how it is drawn (ADR-0126). A text card, a thread card, a note column or a fact card (ADR-0111, ADR-0116, ADR-0117). Every card is made by one rule. | `CardRecord`, `Card<K>`, `CardId`, `CardKind`, `KINDS`, `makeCard`, `planMake` | |
 | **surface** | Where cards are put, which some content or a party has: a team's board, a task's canvas, a thread's dock, a note column's list, a person's inventory. A card is placed on one surface, and has the surfaces its content gives; a surface is data, never a view (ADR-0111, ADR-0126). | `CardPlace` | |
+| **content** | What a card holds, beside its identity and its place: a text card's command, a fact, nothing for a thread's card or a note column; later a task, a reference. Its kind decides the card's places, acts and renderings (ADR-0126). | `Card<K>`, `ContentOf`, `KINDS`, `textSourceOf` | the card's kind (as where it may be), `CardCarries` |
+| **fact card** | A fact on its way into a thread: a card of its own kind, only ever queued, until the thread's end consumes it (ADR-0080, ADR-0126). | `FactCard`, `FactCardId` (`x-`), `planFactCard` | a text card carrying a fact |
 | **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `TextCard`, `TextCardId`, `CardPlace`, `CardFrame`, `cardFrame` | |
 | **thread card** | A thread, as a card: on a task's canvas or in someone's inventory, one place either way (ADR-0117, ADR-0124). | `ThreadCard`, `threadFace` | a root, as the board and the sidebar draw it; board item |
 | **your message** | The text card in your composer at a thread's end, which only you see. | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours) |
@@ -43,6 +45,8 @@ words they were written with.
 | **the dock** | A column's foot: the queue, the line and your message (ADR-0113). | | |
 | **the sidebar** | The column down the left of the page, of your open tasks. | `Sidebar`, `sidebarView`, `OpenThreads` | your list |
 | **your open tasks** | The tasks in the sidebar, yours on every device. | `open:<you>` (stored), `OpenThreads` | your list, your open threads |
+| **the stage** | The page's main area, beside the sidebar: it shows the board or a task's strip, and a page such as the profile covers it (ADR-0126). | `#stage`, `Stage`, `showsStage` | the workspace |
+| **signal** | What a card or a list says by a mark, each named for what it says: unsent text of yours, needs you, running, done (ADR-0126). | `unsentSignals`, `SignalMark`, `.signal[data-signal]` | card marks, pips |
 
 ## Threads
 
@@ -63,7 +67,7 @@ a value is stored.
 |---|---|---|---|
 | **entry** | Anything in a thread's past: immutable, with an author and a time. A message or a fact. To change one, fork. | `EntryId`, `EntryLike` | row (as a kind of thing) |
 | **message** | An entry a person or the agent wrote. | `TranscriptMessage`, roles `chat` and `assistant` | |
-| **fact** | An entry the host wrote: a catch-up, an acceptance, the base's news (ADR-0080). | roles `update`, `land`, `behind`; `OfferFact` | |
+| **fact** | An entry the host wrote: a catch-up, an acceptance, the base's news (ADR-0080), who stopped a run (ADR-0126). | roles `fact`, `update`, `land`, `behind`; `OfferFact`, `StopFact`, `QueuedFact`, `AskIndex.stoppedBy` | `pinetrie.stop` |
 | **run** | The agent's work in answer to an ask: the entries it wrote, and any fact steered into it. A run has an ask (ADR-0106). | `AskIndex.work`, `runOf` | |
 | **ask** | The message that started a run (ADR-0106). | `askOf`, `indexAsks` (by prompt) | |
 | **fork** | The point, at an entry, where threads diverge; not an entry. Forking before an entry edits it (ADR-0043); after it, branches. | `ThreadOrigin.fork` | |
@@ -101,9 +105,7 @@ Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
 | **source** | A folder the host's owner registers, which a thread's lane gets in one of three modes. | ADR-0118 | the host's one project |
 | **branched**, **live**, **read-only** | A source's modes: its own copy in the lane, whose work comes back as an offer; a read-write mount, never branched; a read-only mount. | ADR-0118 | |
 | **runner** | Where a lane runs: the host that holds it, that host's machine, and the model of each run. | ADR-0119 | |
-| **content** | What a card holds: a text, a thread, a note column, a task, a fact, a reference. Its kind decides the card's places, acts and renderings. | ADR-0126 | the card's kind (as where it may be) |
 | **task card** | A task, as a card, on the board's workflow states. | ADR-0126 | `BoardPlace` as a place of its own |
-| **fact card** | A fact on its way into a thread: a card of its own kind, only ever queued, until the thread's end consumes it. | ADR-0126 | a text card carrying a fact |
 | **consume** | What a thread's live end does to a card: a send, a spin, a fact popped. The card ends; the entry it became is the record. | ADR-0126 | |
 | **block** | Part of a message: a paragraph, a table, code, an image, a tool call with its result. | ADR-0126 | |
 | **address** | What names a thread, an entry, a block, a range of text or a card, and optionally its version: with one, a snapshot; without, it follows its target. | ADR-0126 | |
@@ -113,12 +115,10 @@ Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
 | **trash** | A person's surface, one each, of the cards they discarded, until undone or swept. Each remembers the task it left, or none. | ADR-0126 | the `gone` place |
 | **team** | The people who share a board, its tasks and, later, its sources and runners. | ADR-0126 | the host's session, as the board's owner |
 | **party** | A person or a team: what owns a surface that no content does (an inventory, a trash, a board). | ADR-0126 | |
-| **stage** | The page's main area, beside the sidebar: it shows the board or a task's strip, and a page such as the profile covers it. | ADR-0126 | the workspace (`#workspace`, `showsWorkspace`) |
 | **stack** | A card holding two or more threads of one root, one on top, drawn as one column: only the top runs, and which is on top is shared. Not built with the rest. | ADR-0126 | |
 | **comment** | A note on an entry, in its margin: people read it; the agent does once it is queued. | ADR-0126 | annotation |
 | **face**, **normal**, **whole** | The three levels of detail every kind is drawn at, chosen by the surface it is on: a strip, a grid cell or a mark; the card itself, bounded; all of it, as a column or in the pane. Width is the place's, not a level. | ADR-0126 | |
 | **preview** | A selected card in the inventory, drawn normal, one column wide, read only. | ADR-0126 | |
-| **signal** | What a card or a list says by a mark: unsent text of yours, needs you, running, done. Each named for what it says. | ADR-0126 | card marks (the pips, `card-marks.ts`) |
 | **in your hand** | Your inventory's selected slot: what the put key puts. | ADR-0126 | |
 | **put key** | Puts the card in your hand where focus is: a reference into a text box, the card onto a surface. A reference stays in your inventory; a card of the present leaves it. | ADR-0126 | |
 

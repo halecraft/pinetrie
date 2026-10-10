@@ -1,5 +1,4 @@
 import {
-  atEntry,
   entryId,
   rootIdFor,
   type TracedPlace,
@@ -11,21 +10,18 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import { keptTraces, seenBatches, traceGroups, tracesAt } from "./traces.ts"
 
-const TEST_THREAD = threadIdFor("e")
-
 const _ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const CAL = writerId("cal@x.io")
 const HERE = entryId("e-here")
+/** Pinned at the thread named for the entry its end is. */
 const at = (id: string): TracedPlace => ({
   kind: "pinned",
-  at: atEntry(entryId(id)),
-  thread: TEST_THREAD,
+  thread: threadIdFor(id),
 })
 const queued: TracedPlace = {
   kind: "queued",
-  at: atEntry(HERE),
   thread: threadIdFor("x"),
   seen: "",
 }
@@ -43,7 +39,7 @@ const trace = (over: Partial<TraceRecord>): TraceRecord => ({
 
 test("tracesAt: yours, whose place resolves to this end, oldest first", () => {
   const endOf = (from: TracedPlace) =>
-    from.kind === "pinned" && from.at.kind === "entry" ? from.at.id : null
+    from.kind === "pinned" ? entryId(from.thread.slice(2)) : null
   const traces = [
     trace({ id: "late", at: 3 }),
     trace({ id: "early", at: 1 }),

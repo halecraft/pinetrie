@@ -6,6 +6,7 @@
 import {
   type CardId,
   type EntryId,
+  NO_CONTENT,
   NOBODY,
   type NoteColumnId,
   type RootId,
@@ -31,11 +32,11 @@ import {
   encodeChat,
   LANE,
   orderAfter,
+  planThreadCard,
   ROOT,
   setRecord,
   TASK,
   THREAD,
-  threadCardOf,
 } from "@pinetrie/rules"
 import {
   applyRecordWrites,
@@ -373,6 +374,7 @@ export function putNoteColumn(
           order: orderAfter(canvasOf(readPlaces(b.places), task)),
           width: 1,
         },
+        content: NO_CONTENT,
       },
     },
   ])
@@ -395,15 +397,12 @@ export function putTask(
       origin: { kind: "started" },
     }),
   )
-  applyPlaceSteps(b.places, [
-    {
-      kind: "write",
-      record: threadCardOf({
-        thread,
-        task,
-        by: STARTER,
-        cards: readPlaces(b.places),
-      }),
-    },
-  ])
+  const { step } = planThreadCard({
+    thread,
+    task,
+    by: STARTER,
+    cards: readPlaces(b.places),
+    parent: null,
+  })
+  if (step.kind === "write") applyPlaceSteps(b.places, [step])
 }

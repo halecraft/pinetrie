@@ -61,7 +61,7 @@ import {
   type Prefill,
 } from "./columns.ts"
 
-/** What the workspace shows: a task of the sidebar, a new tab, or nothing. */
+/** What the stage shows: a task of the sidebar, a new tab, or nothing. */
 export type Here =
   | { readonly kind: "nothing" }
   | { readonly kind: "task"; readonly task: TaskId }
@@ -345,10 +345,10 @@ export function afterClosing(layout: Layout, closed: Here): Here {
 }
 
 /**
- * Whether `action` shows something in the workspace: a task, a new tab or
- * the board. A page over the workspace (ADR-0098) is left for it.
+ * Whether `action` shows something in the stage: a task, a new tab or
+ * the board. A page over the stage (ADR-0098) is left for it.
  */
-export function showsWorkspace(action: LayoutAction): boolean {
+export function showsStage(action: LayoutAction): boolean {
   switch (action.kind) {
     case "show":
     case "newTab":

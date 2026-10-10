@@ -1,26 +1,28 @@
 // web/inventory-panel — your inventory (ADR-0048 step 4): a panel that
 // floats over the columns, docked left, centre or right by this device's
-// choice, holding a fixed 3 × 6 grid of slots (`CardGrid`, ADR-0113), the
-// selected card opening whole and editable in place. What it draws is
-// `inventoryView`; every click and drop here is an intent, planned like any
+// choice, holding a fixed 3 × 6 grid of slots (`CardGrid`, ADR-0113). The
+// selected card is previewed beside the grid, normal, one column wide and
+// read only, on the side away from the panel's dock edge; Enter opens it
+// whole and editable in place, and the preview hides while it is open
+// (ADR-0126). What it draws is `inventoryView`, each card by its kind's row
+// of `RENDERINGS`; every click and drop here is an intent, planned like any
 // other.
 
 import {
   type CardRecord,
   isTextCard,
+  type NoteColumnId,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import {
-  cardFrame,
   type Dock,
   INVENTORY,
   type Intent,
   inventoryView,
+  type NoteColumnView,
   noticeKey,
   noticeWords,
-  PUT,
-  PUT_TITLE,
   type Reader,
   snapTo,
   type ThreadFace,
@@ -32,16 +34,17 @@ import type {
   SessionClient,
   Slots,
 } from "@pinetrie/session"
-import { type CSSProperties, useRef, useState } from "react"
-import { BoundCardEditor } from "./card-editor.tsx"
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import { CardGrid } from "./card-grid.tsx"
-import { ThreadPreviewView } from "./thread-preview.tsx"
-
-/** A thread's put: onto the canvas you are on, after the column you were in. */
-const PUT_THREAD_TITLE =
-  "put this thread on the canvas you are on, after the column you were in"
-
+import { DrawCard, RenderingProvider } from "./renderings.tsx"
 import { useCardTexts } from "./use-card-texts.ts"
+
+/** The side of the grid the preview is drawn on: away from the dock's edge. */
+const PREVIEW_SIDE: Readonly<Record<Dock, "left" | "right">> = {
+  left: "right",
+  centre: "right",
+  right: "left",
+}
 
 export function InventoryPanel(p: {
   session: SessionClient
@@ -63,11 +66,17 @@ export function InventoryPanel(p: {
   /** Each held thread's face, and its preview when opened (ADR-0124). */
   threads: ReadonlyMap<ThreadId, ThreadFace>
   previewOf: (thread: ThreadId) => ThreadPreview
+  /** Each note column, as its column draws it. */
+  notes: ReadonlyMap<NoteColumnId, NoteColumnView>
 }) {
   const texts = useCardTexts(
     p.session,
     p.held.filter(isTextCard).map(c => c.id),
   )
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (p.openRequest > 0) setOpen(true)
+  }, [p.openRequest])
   const view = inventoryView({
     held: p.held,
     slots: p.slots,
@@ -75,7 +84,13 @@ export function InventoryPanel(p: {
     selected: p.selected,
     texts,
     threads: p.threads,
+    open,
   })
+  const { session, reader, colorOf, previewOf, notes, column, onIntent } = p
+  const context = useMemo(
+    () => ({ session, reader, colorOf, previewOf, notes, column, onIntent }),
+    [session, reader, colorOf, previewOf, notes, column, onIntent],
+  )
   const frame = useRef<HTMLElement>(null)
   // Dragged by its frame, it follows the pointer, then settles at the
   // nearest third.
@@ -120,81 +135,40 @@ export function InventoryPanel(p: {
         {view.grid.cells.length}
       </div>
       <div className="inventory-body">
-        <CardGrid
-          colorOf={p.colorOf}
-          onMove={(card, slot) =>
-            p.onIntent({
-              kind: "put",
-              card: card.id,
-              target: { kind: "inventory", slot },
-            })
-          }
-          onSelect={slot => p.onIntent({ kind: "selectSlot", slot })}
-          openRequest={p.openRequest}
-          reader={p.reader}
-          renderOpen={card =>
-            card.kind === "thread" ? (
-              <ThreadPreviewView
-                foot={
-                  <button
-                    className="put primary"
-                    disabled={p.column === null}
-                    onClick={() => {
-                      if (p.column !== null)
-                        p.onIntent({
-                          kind: "put",
-                          card: card.id,
-                          target: { kind: "column", key: p.column },
-                        })
-                    }}
-                    title={PUT_THREAD_TITLE}
-                    type="button"
-                  >
-                    {PUT}
-                  </button>
-                }
-                preview={p.previewOf(card.id)}
-              />
-            ) : !isTextCard(card) ? null : (
-              <BoundCardEditor
-                among={null}
-                card={card}
-                catchUps={null}
-                foot={
-                  <button
-                    className="put primary"
-                    disabled={p.column === null}
-                    onClick={() => {
-                      if (p.column !== null)
-                        p.onIntent({
-                          kind: "put",
-                          card: card.id,
-                          target: { kind: "column", key: p.column },
-                        })
-                    }}
-                    title={PUT_TITLE}
-                    type="button"
-                  >
-                    {PUT}
-                  </button>
-                }
-                key={card.id}
-                onDiscard={() => p.onIntent({ kind: "discard", card: card.id })}
-                onTyping={() => {}}
-                readOnly={false}
-                reader={p.reader}
-                rows={4}
-                session={p.session}
-                view={cardFrame(card, "inventory", {
-                  me: p.reader.me,
-                  readOnly: false,
-                })}
-              />
-            )
-          }
-          targetOf={slot => ({ kind: "inventory", slot })}
-          view={view.grid}
-        />
+        <RenderingProvider context={context}>
+          <div className="inventory-grid-row">
+            <CardGrid
+              onMove={(card, slot) =>
+                p.onIntent({
+                  kind: "put",
+                  card: card.id,
+                  target: { kind: "inventory", slot },
+                })
+              }
+              onOpen={setOpen}
+              onSelect={slot => p.onIntent({ kind: "selectSlot", slot })}
+              open={open}
+              renderOpen={(card: CardRecord) => (
+                <DrawCard card={card} detail="whole" width={1} />
+              )}
+              targetOf={slot => ({ kind: "inventory", slot })}
+              view={view.grid}
+            />
+            {view.preview !== null && (
+              <div
+                className="preview"
+                data-side={PREVIEW_SIDE[p.dock]}
+                key={view.preview.card.id}
+              >
+                <DrawCard
+                  card={view.preview.card}
+                  detail={view.preview.detail}
+                  width={view.preview.width}
+                />
+              </div>
+            )}
+          </div>
+        </RenderingProvider>
         {p.notices.map(r => (
           <div className="refused-move" key={noticeKey(r)}>
             {noticeWords(r, p.reader)}

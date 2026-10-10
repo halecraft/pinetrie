@@ -2,23 +2,24 @@
 // `GridView` as index cards, empty cells dashed. Every cell is a drop
 // target; a card's cell starts its drag. Its keys are `gridKeyAct`'s: arrows
 // and `hjkl` move the selection, Alt+arrows move the selected card, Enter
-// opens it. The open card is drawn whole and editable in place, over its
-// neighbours, by the caller (`renderOpen`); Escape folds it. What a
+// opens it, as a click on the selected card does. Each cell draws its card's face (`DrawFace`). The open card is
+// drawn whole and editable in place, over its neighbours, by the caller
+// (`renderOpen`); Escape folds it. Whether it is open is the caller's too, so
+// the caller can hide what it draws beside the grid while it is. What a
 // selection, a move or a drop does is the caller's: an intent, planned like
 // any other.
 
-import type { CardRecord, WriterId } from "@pinetrie/core"
+import type { CardRecord } from "@pinetrie/core"
 import {
   dropProps,
   type GridView,
   gridKeyAct,
   type PutTarget,
-  type Reader,
 } from "@pinetrie/interface"
-import { type ReactNode, useEffect, useRef, useState } from "react"
-import { CardFace, dragCard } from "./card-frame.tsx"
+import { type ReactNode, useEffect, useRef } from "react"
+import { dragCard } from "./card-frame.tsx"
+import { DrawFace } from "./renderings.tsx"
 import { isTextBox } from "./text-box.ts"
-import { ThreadFaceView } from "./thread-preview.tsx"
 
 /** The grid's own names: its class, and its cells' class and attribute. */
 const names = { grid: "inventory-grid", cell: "slot", attr: "data-slot" }
@@ -27,29 +28,25 @@ export function CardGrid(p: {
   view: GridView
   /** Where a drop on cell `n` lands. */
   targetOf: (n: number) => PutTarget
-  reader: Reader
-  colorOf: (writer: WriterId) => string
   onSelect: (n: number) => void
   /** The selected card to cell `to`, a card there swapping with it. */
   onMove: (card: CardRecord, to: number) => void
   /** The open card, whole: a `CardFrame` around its box. */
   renderOpen: (card: CardRecord) => ReactNode
-  /** Each change asks to open the selected card: a link to a thread you hold (ADR-0124). */
-  openRequest: number
+  /** The selected card is open, drawn whole. */
+  open: boolean
+  onOpen: (open: boolean) => void
 }) {
   const { view } = p
-  const [open, setOpen] = useState(false)
+  const setOpen = p.onOpen
   const grid = useRef<HTMLDivElement>(null)
   const selectedCard = view.card
-  const shownOpen = open && selectedCard !== null
+  const shownOpen = p.open && selectedCard !== null
   // A card that leaves the selected cell folds: put back there (an undo),
   // it is not open again.
   useEffect(() => {
     if (selectedCard === null) setOpen(false)
-  }, [selectedCard])
-  useEffect(() => {
-    if (p.openRequest > 0) setOpen(true)
-  }, [p.openRequest])
+  }, [selectedCard, setOpen])
   /** Select cell `n`, folded, and give it focus. */
   const select = (n: number) => {
     setOpen(false)
@@ -103,26 +100,19 @@ export function CardGrid(p: {
             {...{ [names.attr]: String(cell.index) }}
             {...dropProps(p.targetOf(cell.index))}
             draggable={cell.card !== null}
+            // A click selects, and the panel previews the card; a click on
+            // the card already selected opens it, as Enter does (ADR-0126).
             onClick={() => {
+              const again = cell.selected && cell.card !== null
               select(cell.index)
-              setOpen(cell.card !== null)
+              if (again) setOpen(true)
             }}
             onDragStart={e => {
               if (cell.card !== null) dragCard(e, cell.card.id)
             }}
             type="button"
           >
-            {cell.thread !== null ? (
-              <ThreadFaceView face={cell.thread} />
-            ) : (
-              cell.face !== null && (
-                <CardFace
-                  colorOf={p.colorOf}
-                  face={cell.face}
-                  reader={p.reader}
-                />
-              )
-            )}
+            {cell.face !== null && <DrawFace face={cell.face} />}
           </button>
           {shownOpen && cell.selected && cell.card !== null && (
             <div

@@ -48,9 +48,9 @@ import {
   useRef,
   useSyncExternalStore,
 } from "react"
-import { CardPip } from "./card-pip.tsx"
 import { useTrackColors } from "./palette-context.ts"
 import { nameFor } from "./presence.tsx"
+import { SignalMark } from "./signal-mark.tsx"
 import { useReadingAt } from "./use-presence.ts"
 
 const ROW = 16
@@ -97,7 +97,7 @@ export function Rail({
   /** Others reading each thread end, with their names and colours: a ring there. */
   here: ReadonlyMap<EntryId, readonly { name: string; color: string }[]>
   /**
-   * Thread ends holding an unsent card of yours (`CardMarks.ends`), with your
+   * Thread ends holding an unsent card of yours (`UnsentSignals.ends`), with your
    * colour: each dot there carries a pip (ADR-0048).
    */
   yours: { readonly ends: ReadonlySet<EntryId>; readonly color: string }
@@ -496,7 +496,7 @@ function Dot(p: {
       {p.people.length > 1 && (
         <span className="here-count">{p.people.length}</span>
       )}
-      {p.yours !== null && <CardPip color={p.yours} />}
+      {p.yours !== null && <SignalMark color={p.yours} />}
     </button>
   )
 }

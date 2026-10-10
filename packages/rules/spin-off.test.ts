@@ -1,10 +1,9 @@
 import {
-  atEntry,
   type CardHistoryRecord,
   type CardId,
   type CardRecord,
-  entryId,
   type LaneRecord,
+  NO_CONTENT,
   noteColumnIdFor,
   rootIdFor,
   type TextCard,
@@ -14,14 +13,10 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
+import { threadCardOf } from "./fixtures.ts"
 import { planRootDelete } from "./root.ts"
 import { planLiftRoot, planSpinOff, type SpunThread } from "./spin-off.ts"
-import {
-  indexTasks,
-  NO_TASK_INDEX,
-  type TaskIndex,
-  threadCardOf,
-} from "./task.ts"
+import { indexTasks, NO_TASK_INDEX, type TaskIndex } from "./task.ts"
 
 const TEST_THREAD = threadIdFor("e")
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -36,7 +31,6 @@ const canvasKey = { kind: "canvas", task: NEW_TASK } as const
 /** Your message at the thread: a card at a thread, in its task. */
 const note = {
   kind: "composing",
-  at: atEntry(entryId("e1")),
   thread: TEST_THREAD,
 } as const
 const spun = {
@@ -49,8 +43,7 @@ const card = (over: Partial<TextCard> = {}): TextCard => ({
   owner: ADA,
   placer: ADA,
   place: note,
-  carries: { kind: "message", command: null },
-  unsent: null,
+  content: { command: null, unsent: null },
   ...over,
 })
 
@@ -250,6 +243,7 @@ describe("planLiftRoot (S139)", () => {
             owner: BEA,
             placer: BEA,
             place: { kind: "canvas", task: NEW_TASK, order: "9", width: 1 },
+            content: NO_CONTENT,
           },
         ],
       },

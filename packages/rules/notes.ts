@@ -2,19 +2,21 @@
 // leaving a thread goes (`nearestNoteColumn`, `toNotes`), and a note's
 // place at its column's end.
 
-import type {
-  CardPlace,
-  CardRecord,
-  NoteColumnId,
-  NotesTarget,
-  TaskId,
-  TextCard,
-  TextPlace,
-  ThreadId,
-  WriterId,
+import {
+  type CardPlace,
+  type CardRecord,
+  makeCard,
+  NO_CONTENT,
+  type NoteColumnId,
+  type NotesTarget,
+  type TaskId,
+  type TextCard,
+  type TextPlace,
+  type ThreadId,
+  type WriterId,
 } from "@pinetrie/core"
 import { byOrder } from "./card.ts"
-import type { PlaceStep } from "./moves.ts"
+import { type PlaceStep, planMake } from "./moves.ts"
 import { orderAfter } from "./order.ts"
 import { rankAfter } from "./rank.ts"
 import { type CanvasCard, canvasOf } from "./task.ts"
@@ -136,7 +138,9 @@ export function notesNear(
  * place, and the writes that go first: a note column made for it (its id
  * `newColumn`'s, owned and placed by `by`), and the canvas cards renumbered
  * to fit it. The one step every write to notes takes: a move's, an unsent
- * card's, a fresh column's followers'. Null for a thread with no card. Pure.
+ * card's, a fresh column's followers'. The column is made through
+ * `planMake`, as every card is. Null for a thread with no card, or a column
+ * whose make is refused, which none is. Pure.
  */
 export function toNotes(input: {
   readonly cards: readonly CardRecord[]
@@ -156,19 +160,26 @@ export function toNotes(input: {
       return { place: noteAt(input.cards, near.column), first: [] }
     case "make": {
       const column = input.newColumn()
-      const made: CardRecord = {
-        kind: "note-column",
-        id: column,
-        owner: input.by,
-        placer: input.by,
-        place: { kind: "canvas", task: near.task, order: near.order, width: 1 },
-      }
+      const made = planMake(
+        input.cards,
+        makeCard(
+          "note-column",
+          column,
+          { kind: "canvas", task: near.task, order: near.order, width: 1 },
+          NO_CONTENT,
+          input.by,
+        ),
+        input.by,
+      )
+      if (made.kind !== "write") return null
       return {
         place: { kind: "note", column, order: orderAfter([]) },
-        first: [...near.renumbered, made].map(record => ({
-          kind: "write",
-          record,
-        })),
+        first: [
+          ...near.renumbered.map(
+            (record): PlaceStep => ({ kind: "write", record }),
+          ),
+          made,
+        ],
       }
     }
   }

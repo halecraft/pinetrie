@@ -101,13 +101,14 @@ export async function openNote(p: Page, card: string): Promise<string> {
     .waitForFunction(
       t =>
         document.querySelector(t) !== null ||
-        document.querySelector('.folded-column[data-kind="notes"]') !== null,
+        document.querySelector('.folded-column[data-kind="note-column"]') !==
+          null,
       textarea,
       { timeout: 10_000 },
     )
     .catch(() => {})
   for (const folded of await p
-    .locator('.folded-column[data-kind="notes"] .folded-title')
+    .locator('.folded-column[data-kind="note-column"] .folded-title')
     .all())
     await folded.click().catch(() => {})
   await p

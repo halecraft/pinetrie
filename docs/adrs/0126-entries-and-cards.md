@@ -149,7 +149,10 @@
   queue it, or a reference to it, and the thread's end consumes it.
 - **A fact is a card of its own kind**, only ever queued, until its
   thread's end consumes it. Nobody can move it because no other place
-  takes its kind, so the refusal `fact` goes.
+  takes its kind, so a move of a fact is refused as any card's to a place
+  its kind is never in, `no-place`. Only a reorder of a fact, or past one,
+  is refused `fact`: a fact says what already happened, so nothing queued
+  may jump ahead of it.
 - **A drop resolves to a place.** A card dropped where its kind cannot be
   lands in a container made for it there: a text card on a canvas lands
   in a new note column, as a note sent to a task with none already does
@@ -225,8 +228,8 @@
 *Keys.*
 
 - **Cmd+C** (Ctrl+C elsewhere) on an entry, a block or a selection takes a
-  copy into your inventory, and writes it as markdown to the system
-  clipboard.
+  reference into your inventory, and writes it as markdown to the system
+  clipboard. The past never changes, so a reference to it is the copy.
 - **Cmd+X** on a card takes it into your inventory.
 - **Cmd+V in a text box pastes markdown**, as it does anywhere.
 - **The put key puts the card in your hand**, your inventory's selected

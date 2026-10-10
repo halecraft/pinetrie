@@ -317,7 +317,8 @@ capsule of its own. A bar names the ask whose work is at the column's top; a
 "since you were here" line marks where you last left a thread, on any
 device of yours; an
 ask's files open a review of its range of revisions, from the paths each
-turn's revision records. Stop records who pressed it (`pinetrie.stop`). Unless
+turn's revision records. Stop queues a fact naming who pressed it, which
+the run's end appends to the thread for the agent to read. Unless
 `{ "digests": { "enabled": false } }` turns it off, a model writes each long
 ask a digest (`pinetrie.digest`, the `ask-digest` skill, ADR-0075), which no
 agent reads: a headline that leads the ask's fold line, and a few points

@@ -13,13 +13,14 @@ import type {
   TaskPinnedView,
   TextCard,
   ThreadId,
-  ThreadName,
   WriterId,
 } from "@pinetrie/core"
 import {
   type CardColumn,
   type Column as ColumnSpec,
   type ColumnView,
+  cardOfFace,
+  detailOf,
   foldedView,
   freshTaskOf,
   heldWords,
@@ -27,10 +28,11 @@ import {
   type NoteColumnView,
   type Reader,
   type ReadOnly,
+  type Stage,
   type Strip as StripView,
   stripCards,
   type TaskColumnView,
-  type Workspace,
+  type ThreadFace,
 } from "@pinetrie/interface"
 import type { CanvasCard } from "@pinetrie/rules"
 import type { PointerEvent, ReactElement, RefObject } from "react"
@@ -76,7 +78,7 @@ interface Projected {
 export function Strip(p: {
   stripRef: RefObject<HTMLDivElement | null>
   onPointerDown: (e: PointerEvent<HTMLDivElement>) => void
-  workspace: Extract<Workspace, { kind: "task" | "new" }>
+  stage: Extract<Stage, { kind: "task" | "new" }>
   /** The task's strip; null for a new tab. */
   strip: StripView | null
   /** Each thread column drawn whole, by its key (`openColumns`). */
@@ -91,7 +93,8 @@ export function Strip(p: {
   /** The canvas list the task's agents are told, its lines. */
   told: readonly string[]
   noteViews: ReadonlyMap<NoteColumnId, NoteColumnView>
-  names: ReadonlyMap<ThreadId, ThreadName>
+  /** A thread's face, which its column draws when folded (ADR-0126). */
+  threadFaceOf: (thread: ThreadId) => ThreadFace
   shared: SharedColumnProps
   reader: Reader
   readers: ReadersProps
@@ -100,9 +103,9 @@ export function Strip(p: {
   /** This window is typing at `end` (null for none), in `card`. */
   typing: (end: EntryId | null, card: CardId | null) => void
 }) {
-  const { workspace } = p
+  const { stage } = p
   const readOnly: ReadOnly | null =
-    workspace.kind === "task" ? workspace.readOnly : null
+    stage.kind === "task" ? stage.readOnly : null
   // Each card's place on the canvas: what its grip moves it from.
   const positions = useMemo(
     () => new Map<string, number>(p.canvas.map((c, i) => [c.id, i])),
@@ -115,7 +118,7 @@ export function Strip(p: {
     const projected = p.projected.get(column.key)
     if (projected === undefined) return null
     const task =
-      workspace.kind === "task" ? workspace.task : (freshTaskOf(column) ?? null)
+      stage.kind === "task" ? stage.task : (freshTaskOf(column) ?? null)
     return (
       <Column
         {...p.shared}
@@ -151,12 +154,20 @@ export function Strip(p: {
     )
   }
   const cardColumn = (item: CardColumn): ReactElement | null => {
-    const folded = item.folded
-      ? foldedView(item, { names: p.names, notes: p.noteViews })
-      : null
+    const folded =
+      detailOf("canvas", item.folded) === "face"
+        ? foldedView(item, {
+            threadFaceOf: p.threadFaceOf,
+            notes: p.noteViews,
+          })
+        : null
     if (folded !== null)
       return (
-        <FoldedColumn key={folded.card} onIntent={p.onIntent} view={folded} />
+        <FoldedColumn
+          face={folded}
+          key={cardOfFace(folded)}
+          onIntent={p.onIntent}
+        />
       )
     // Each kind of column in one component; a new kind does not compile
     // until it is drawn.

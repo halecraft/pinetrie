@@ -50,24 +50,17 @@ describe("rootHolding", () => {
 })
 
 test("composeAt: a composing card at the entry, in the root the client came to hold", async () => {
-  const made: Pick<TextCard, "place" | "carries">[] = []
+  const made: Pick<TextCard, "place" | "content">[] = []
   const client = {
     ...lateClient(3),
-    createCard: (card: Pick<TextCard, "place" | "carries">) => {
+    createCard: (card: Pick<TextCard, "place" | "content">) => {
       made.push(card)
       return Promise.resolve({ kind: "moved" })
     },
   } as unknown as Parameters<typeof composeAt>[0]
   const lane = threadIdFor("1")
   await composeAt(client, { entry: E, lane, command: "split" }, "hi")
-  expect(made.map(c => [c.place, c.carries])).toEqual([
-    [
-      {
-        kind: "composing",
-        at: { kind: "entry", id: E },
-        thread: lane,
-      },
-      { kind: "message", command: "split" },
-    ],
+  expect(made.map(c => [c.place, c.content.command])).toEqual([
+    [{ kind: "composing", thread: lane }, "split"],
   ])
 })

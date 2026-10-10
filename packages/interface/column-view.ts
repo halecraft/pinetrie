@@ -929,7 +929,7 @@ export function composerPlace(
       : { kind: "fresh", column: column.key, root: its, task: in_, at }
   }
   return at.kind === "entry"
-    ? { kind: "composing", at, thread: column.thread }
+    ? { kind: "composing", thread: column.thread }
     : null
 }
 

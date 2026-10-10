@@ -2,7 +2,7 @@ import {
   atEntry,
   type CardRecord,
   entryId,
-  PLAIN,
+  factCardIdFor,
   rootIdFor,
   taskIdFor,
   threadIdFor,
@@ -55,28 +55,31 @@ describe("planQueueHold", () => {
 })
 
 describe("holdOnStop", () => {
+  const place = {
+    kind: "queued",
+    thread: L,
+    order: "a",
+    by: ADA,
+    seen: "",
+  } as const
   const card = (kind: "message" | "fact"): QueuedCard =>
-    ({
-      id: cardIdFor("c1"),
-      owner: ADA,
-      placer: ADA,
-      place: {
-        kind: "queued",
-        at: { kind: "entry", id: "e1" },
-        thread: L,
-        order: "a",
-        by: ADA,
-        seen: "",
-      },
-      carries:
-        kind === "message"
-          ? { kind: "message", command: null }
-          : {
-              kind: "fact",
-              fact: { kind: "described", lane: L, by: ADA },
-            },
-      unsent: null,
-    }) as QueuedCard
+    kind === "message"
+      ? {
+          kind: "text",
+          id: cardIdFor("c1"),
+          owner: ADA,
+          placer: ADA,
+          place,
+          content: { command: null, unsent: null },
+        }
+      : {
+          kind: "fact",
+          id: factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1"),
+          owner: ADA,
+          placer: ADA,
+          place,
+          content: { fact: { kind: "described", lane: L, by: ADA } },
+        }
   const base = { holds: new Map(), lane: L, by: BEA, now: 3 }
   test("a message card queued: the stopper holds the queue", () => {
     expect(holdOnStop({ ...base, queue: [card("message")] })).toEqual({
@@ -121,21 +124,20 @@ test("planHoldSweep: a hold whose thread has no card, or whose task is archived,
 })
 
 describe("planQueueCard (ADR-0113)", () => {
-  const at = atEntry(entryId("e1"))
-  const atEnd = { kind: "composing", at, thread: L } as const
+  const _at = atEntry(entryId("e1"))
+  const atEnd = { kind: "composing", thread: L } as const
   const card: CardRecord = {
     kind: "text",
     id: cardIdFor("c1"),
     owner: ADA,
     placer: ADA,
     place: atEnd,
-    carries: PLAIN,
-    unsent: null,
+    content: { command: null, unsent: null },
   }
   const move = {
     card: card.id,
     from: atEnd,
-    to: { kind: "queued", at, thread: L, seen: "" },
+    to: { kind: "queued", thread: L, seen: "" },
   } as const
   const plan = (
     hold: "keep" | "hold-if-idle" | "release",
@@ -203,14 +205,12 @@ describe("planQueueCard (ADR-0113)", () => {
               placer: BEA,
               place: {
                 kind: "queued",
-                at,
                 thread: L,
                 order: expect.any(String),
                 by: BEA,
                 seen: "",
               },
-              carries: { kind: "message", command: "split" },
-              unsent: null,
+              content: { command: "split", unsent: null },
             },
           },
         ],
@@ -219,7 +219,7 @@ describe("planQueueCard (ADR-0113)", () => {
       holds: [setRecord(QUEUE_HOLD, { lane: L, by: BEA, at: 7 })],
     })
     expect(made(null, true)).toMatchObject({
-      step: { steps: [{ record: { carries: PLAIN } }] },
+      step: { steps: [{ record: { content: { command: null } } }] },
       drain: [],
       holds: [],
     })
@@ -236,7 +236,7 @@ describe("planQueueCard (ADR-0113)", () => {
       running: () => false,
     })
     expect(planned.step).toMatchObject({
-      steps: [{ record: { carries: PLAIN } }],
+      steps: [{ record: { content: { command: null } } }],
     })
   })
   test("a move the host refuses changes no hold", () => {

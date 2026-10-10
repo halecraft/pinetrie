@@ -30,7 +30,6 @@ import {
   type CardId,
   type CardRecord,
   type ChatAt,
-  commandOf,
   type EntryId,
   type Intent,
   isTextCard,
@@ -38,7 +37,6 @@ import {
   keyOf,
   type MoveDirection,
   type OfferAction,
-  PLAIN,
   type QueueHoldChange,
   type QueueMove,
   type Reorder,
@@ -364,7 +362,7 @@ export type HostRequest = Exclude<
 >
 
 /** A card to create: the session makes you its owner and placer. */
-export type NewCard = Pick<TextCard, "id" | "place" | "carries" | "unsent">
+export type NewCard = Pick<TextCard, "id" | "place" | "content">
 
 /**
  * One card's undo, as its box binds it (`@kyneta/react`'s `attach`), saying
@@ -618,12 +616,18 @@ export async function connectSession(
         texts.text(card.id).text.insert(0, text)
       })
       // Made plain: its command is set by a request of its own, after it.
-      const command = commandOf(card)
+      const { command } = card.content
       const answer = sendMove(
         { card: card.id, from: null, to: keyOf(card.place) },
         how,
         null,
-        { ...card, kind: "text", owner: me, placer: me, carries: PLAIN },
+        {
+          ...card,
+          kind: "text",
+          owner: me,
+          placer: me,
+          content: { ...card.content, command: null },
+        },
         null,
       )
       if (command !== null)

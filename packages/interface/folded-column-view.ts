@@ -1,56 +1,55 @@
 // interface/folded-column-view — what a folded column says (ADR-0116): a
 // narrow strip with its card's title, in its place on the canvas, so the
-// arrangement reads the same for everyone whatever you have folded. Pure:
-// `FoldedColumn` (`packages/web/folded-column.tsx`) draws it.
+// arrangement reads the same for everyone whatever you have folded. A folded
+// column is its card's face (ADR-0126). Pure: `FoldedColumn`
+// (`packages/web/folded-column.tsx`) draws it.
 
-import type { CardId, NoteColumnId, ThreadId, ThreadName } from "@pinetrie/core"
+import type { NoteColumnId, ThreadId } from "@pinetrie/core"
 import type { CardColumn } from "./canvas-columns.ts"
 import type { ControlWords } from "./card-words.ts"
+import { type FaceOf, noteColumnFace } from "./face.ts"
 import { type NoteColumnView, noteCountWords } from "./note-column-view.ts"
+import type { ThreadFace } from "./thread-face.ts"
 
-/** A folded column, as drawn. */
-export interface FoldedView {
-  readonly card: CardId
-  /** What the column holds when unfolded: a thread, or notes. */
-  readonly kind: "thread" | "notes"
-  /** Its title: a thread's name, a note column's title. */
-  readonly title: string
-  /** What it holds, under its title, or null. */
-  readonly detail: string | null
-}
+/** The face a folded column draws: a thread's, or a note column's. */
+export type FoldedFace = FaceOf<"thread" | "note-column">
 
 /** A thread not yet named (ADR-0039): its name comes with its first send. */
 export const UNNAMED_THREAD = "a thread"
 
-/** A folded column's words; null for a branch not yet on the canvas, which never folds. */
+/**
+ * A folded column's face (`faceOf`, ADR-0126), the same value a grid's cell
+ * draws for its card; null for a branch not yet on the canvas, which never
+ * folds.
+ */
 export function foldedView(
   column: CardColumn,
   facts: {
-    readonly names: ReadonlyMap<ThreadId, ThreadName>
+    readonly threadFaceOf: (thread: ThreadId) => ThreadFace
     readonly notes: ReadonlyMap<NoteColumnId, NoteColumnView>
   },
-): FoldedView | null {
+): FoldedFace | null {
   switch (column.kind) {
     case "thread":
-      return column.card === null
-        ? null
-        : {
-            card: column.card,
-            kind: "thread",
-            title: facts.names.get(column.card) ?? UNNAMED_THREAD,
-            detail: null,
-          }
-    case "notes": {
-      const notes = facts.notes.get(column.card)
-      return {
-        card: column.card,
-        kind: "notes",
-        title: notes?.title ?? "",
-        detail: notes === undefined ? null : noteCountWords(notes.notes.length),
-      }
-    }
+      return column.card === null ? null : facts.threadFaceOf(column.card)
+    case "notes":
+      return noteColumnFace(column.card, facts.notes)
   }
 }
+
+/** A folded column's words: its title, and what it holds under it, or null. */
+export interface FoldedWords {
+  readonly title: string
+  readonly detail: string | null
+}
+
+export const foldedWords = (face: FoldedFace): FoldedWords =>
+  face.kind === "thread"
+    ? { title: face.name ?? UNNAMED_THREAD, detail: null }
+    : {
+        title: face.title,
+        detail: face.notes === null ? null : noteCountWords(face.notes),
+      }
 
 /** A folded column's own button, which unfolds it. */
 export const UNFOLD: ControlWords = {

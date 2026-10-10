@@ -74,6 +74,7 @@ import {
   planSpinOff,
   planUnqueueAll,
   planWidth,
+  type ReorderStep,
   type SpinOff,
   type SpunThread,
   setRecord,
@@ -144,7 +145,9 @@ export function createCardCommands(deps: CardCommandDeps) {
   const newColumn = (): NoteColumnId => noteColumnIdFor(deps.basics.newId())
 
   /** A refused move: where the card is now and who put it there. */
-  const unmoved = (refusal: Extract<MoveStep, { kind: "refused" }>): Settled =>
+  const unmoved = (
+    refusal: Extract<MoveStep | ReorderStep, { kind: "refused" }>,
+  ): Settled =>
     settled(
       {
         kind: "unmoved",
@@ -163,7 +166,7 @@ export function createCardCommands(deps: CardCommandDeps) {
    * now and who put it there.
    */
   async function carry(
-    step: MovesStep | MoveStep,
+    step: MovesStep | MoveStep | ReorderStep,
     drain: readonly ThreadId[],
     cause: Cause | null,
     gesture?: Gesture,
@@ -621,7 +624,6 @@ export function createCardCommands(deps: CardCommandDeps) {
         [
           moveOf(now, {
             kind: "queued",
-            at: thread.end,
             thread: thread.lane.name,
             seen: chat.card.seen,
           }),

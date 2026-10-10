@@ -1,5 +1,4 @@
 import {
-  atEntry,
   type CardRecord,
   entryId,
   rootIdFor,
@@ -114,14 +113,12 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     placer: writerId("ada@x.io"),
     place: {
       kind: "queued",
-      at: atEntry(entryId("e1")),
       thread: lane,
       order,
       by: writerId(email),
       seen: "",
     },
-    carries: { kind: "message", command: null },
-    unsent: null,
+    content: { command: null, unsent: null },
   })
   const atEnd: CardRecord = {
     kind: "text" as const,
@@ -130,11 +127,9 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     placer: writerId("cy@x.io"),
     place: {
       kind: "composing",
-      at: atEntry(entryId("e1")),
       thread: lane,
     },
-    carries: { kind: "message", command: null },
-    unsent: null,
+    content: { command: null, unsent: null },
   }
   const cards = [
     queued(cardIdFor("c2"), "b", "bea@x.io"),

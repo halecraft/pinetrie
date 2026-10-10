@@ -1,22 +1,30 @@
 import {
   type AgentMessageLike,
-  atEntry,
+  type CardRecord,
   type EntryId,
   type EntryLike,
   ERR,
   entryId,
+  factCardIdFor,
   indexAsks,
   indexTree,
   type LaneView,
-  type StopRecord,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { renderableMessage } from "./chat.ts"
-import type { QueuedCard } from "./queue.ts"
-import { carryOnState, decodeCarryOn, planCarryOn, planStop } from "./stop.ts"
+import { encodeFact } from "./fact.ts"
+import { orderAfter } from "./order.ts"
+import { type QueuedCard, queuedOn } from "./queue.ts"
+import {
+  carryOnState,
+  decodeCarryOn,
+  endedOutcome,
+  planCarryOn,
+  planStop,
+} from "./stop.ts"
 
 describe("planStop", () => {
   const prompt: EntryLike = {
@@ -35,8 +43,11 @@ describe("planStop", () => {
   }
   const i = indexTree({ [prompt.id]: prompt, [work.id]: work })
   const ada = writerId("ada")
+  const bea = writerId("bea")
+  const name = threadIdFor("s")
+  const FACT = factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
   const lane = (running: boolean) => ({
-    name: threadIdFor("s"),
+    name,
     tip: entryId("2-a"),
     running,
     waiting: 0,
@@ -45,58 +56,133 @@ describe("planStop", () => {
     heldBy: null,
   })
   const facts = (
-    stops: ReadonlyMap<EntryId, StopRecord> = new Map(),
-    queue: readonly QueuedCard[] = [],
+    cards: readonly CardRecord[] = [],
+    index = i,
+    by = ada,
+    id = FACT,
   ) => ({
-    index: i,
-    stops,
-    queue,
+    index,
+    asks: indexAsks(index),
+    cards,
     holds: new Map(),
-    by: ada,
+    by,
     now: 7,
+    id,
   })
-  test("a running lane is aborted, and its ask's stop recorded under its prompt", () => {
+  const SECOND = factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
+  const stopped = (by = ada) => ({
+    kind: "stopped" as const,
+    lane: name,
+    prompt: entryId("1-p"),
+    by,
+    at: 7,
+  })
+  const queued: QueuedCard = {
+    kind: "text",
+    id: cardIdFor("c1"),
+    owner: ada,
+    placer: ada,
+    place: {
+      kind: "queued",
+      thread: name,
+      order: orderAfter([]),
+      by: ada,
+      seen: "",
+    },
+    content: { command: null, unsent: null },
+  }
+
+  test("a running lane is aborted, and a fact naming who stopped its ask is queued (ADR-0126)", () => {
     expect(planStop(lane(true), facts())).toEqual({
       kind: "abort",
-      record: { prompt: "1-p", by: ada, at: 7 },
+      fact: [
+        {
+          kind: "write",
+          record: {
+            kind: "fact",
+            id: FACT,
+            owner: ada,
+            placer: ada,
+            place: expect.objectContaining({ kind: "queued", thread: name }),
+            content: { fact: stopped() },
+          },
+        },
+      ],
       hold: null,
     })
   })
-  test("with a message card queued, a stop holds the queue, so the run's end sends nothing (ADR-0048 step 7)", () => {
-    const name = threadIdFor("s")
-    const queued: QueuedCard = {
-      kind: "text",
-      id: cardIdFor("c1"),
-      owner: ada,
-      placer: ada,
-      place: {
-        kind: "queued",
-        at: atEntry(entryId("2-a")),
-        thread: name,
-        order: "a",
-        by: ada,
-        seen: "",
-      },
-      carries: { kind: "message", command: null },
-      unsent: null,
-    }
-    expect(planStop(lane(true), facts(new Map(), [queued]))).toMatchObject({
+  test("with a message card queued, a stop holds the queue, so the run's end sends nothing, and its fact goes first (ADR-0048 step 7)", () => {
+    const planned = planStop(lane(true), facts([queued]))
+    expect(planned).toMatchObject({
       kind: "abort",
       hold: { lane: name, by: ada, at: 7 },
     })
+    const fact = planned.kind === "abort" ? planned.fact[0] : undefined
+    expect(
+      queuedOn(
+        [queued, ...(fact?.kind === "write" ? [fact.record] : [])],
+        name,
+      ).map(c => c.id),
+    ).toEqual([FACT, queued.id])
   })
-  test("the first stop recorded is kept: a second press records nothing", () => {
-    const first = new Map([
-      [entryId("1-p"), { prompt: entryId("1-p"), by: writerId("bea"), at: 1 }],
-    ])
-    expect(planStop(lane(true), facts(first))).toEqual({
-      kind: "abort",
-      record: null,
-      hold: null,
-    })
+  test("the first press is named: a stop of the same ask queued, or one in the thread, queues no second", () => {
+    const first = planStop(lane(true), facts([], i, bea))
+    const queuedStop =
+      first.kind === "abort" && first.fact[0]?.kind === "write"
+        ? first.fact[0].record
+        : undefined
+    expect(
+      planStop(
+        lane(true),
+        facts(queuedStop === undefined ? [] : [queuedStop], i, ada, SECOND),
+      ),
+    ).toEqual({ kind: "abort", fact: [], hold: null })
+    const appended: EntryLike = {
+      id: entryId("3-f"),
+      parentId: work.id,
+      thread: FIXTURE_THREAD,
+      type: "custom_message",
+      message: renderableMessage(encodeFact(stopped(bea), "Bea", 8)),
+    }
+    expect(
+      planStop(
+        lane(true),
+        facts(
+          [],
+          indexTree({ ...i.entries, [appended.id]: appended }),
+          ada,
+          SECOND,
+        ),
+      ),
+    ).toEqual({ kind: "abort", fact: [], hold: null })
   })
   test("an idle lane is already stopped", () => {
     expect(planStop(lane(false), facts())).toEqual({ kind: "idle" })
+  })
+  test("endedOutcome: at the run's end its stop's fact is still queued, and names who stopped it", () => {
+    const stoppedRun = indexTree({
+      [prompt.id]: prompt,
+      [work.id]: {
+        ...work,
+        message: { role: "assistant", content: "wo", stopReason: "aborted" },
+      },
+    })
+    const planned = planStop(lane(true), facts([], stoppedRun, bea))
+    const queue = queuedOn(
+      planned.kind === "abort"
+        ? planned.fact.flatMap(s => (s.kind === "write" ? [s.record] : []))
+        : [],
+      name,
+    )
+    const asks = indexAsks(stoppedRun)
+    expect(endedOutcome(stoppedRun, asks, prompt.id, queue)).toEqual({
+      kind: "stopped",
+      by: bea,
+    })
+    expect(endedOutcome(stoppedRun, asks, prompt.id, [])).toEqual({
+      kind: "stopped",
+      by: null,
+    })
   })
 })
 
@@ -157,6 +243,21 @@ describe("carrying on (ADR-0082)", () => {
   test("a lane whose last ask was stopped mid-reply or mid-command may carry on", () => {
     expect(state(over([ask, aborted]))).toEqual({ kind: "ok" })
     expect(state(over([ask, call, result]))).toEqual({ kind: "ok" })
+  })
+  test("a stop's fact at the tip is no ask: the stopped ask still carries on, and names who stopped it (ADR-0126)", () => {
+    const o = over([ask, aborted])
+    const prompt = entryId("1-e")
+    const fact = renderableMessage(
+      encodeFact(
+        { kind: "stopped", lane: s, prompt, by: writerId("bea"), at: 3 },
+        "Bea",
+        3,
+      ),
+    )
+    const withFact = over([ask, aborted, fact])
+    expect(state(withFact)).toEqual({ kind: "ok" })
+    expect(withFact.facts.asks.stoppedBy.get(prompt)).toBe(writerId("bea"))
+    expect(o.facts.asks.stoppedBy.size).toBe(0)
   })
   test("an update after the stop is no ask: the lane may still carry on", () => {
     const update = { role: "update", content: "caught up" }

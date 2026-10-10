@@ -8,7 +8,6 @@ import {
   ERR,
   entryId,
   NOBODY,
-  PLAIN,
   type PlanMode,
   type Position,
   parseMentions,
@@ -527,14 +526,12 @@ describe("settling and starting up", () => {
     placer: ALICE,
     place: {
       kind: "queued" as const,
-      at: atEntry(E1),
       thread: lane,
       order: "a",
       by: ALICE,
       seen: "",
     },
-    carries: PLAIN,
-    unsent: null,
+    content: { command: null, unsent: null },
   })
   test("settleRun: a refused run keeps the message; an admitted one is done", () => {
     expect(settleRun({ kind: "refused" })).toBe("keep")

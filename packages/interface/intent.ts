@@ -76,7 +76,7 @@ import {
   showTask,
 } from "./effects.ts"
 import type { NameStep } from "./identity.ts"
-import { type Here, showsWorkspace, type ViewChange } from "./layout.ts"
+import { type Here, showsStage, type ViewChange } from "./layout.ts"
 import { otherWidth } from "./list-width.ts"
 import type { MessageAct } from "./message-tools.ts"
 import type { PageName } from "./page.ts"
@@ -312,7 +312,7 @@ export type Intent =
   | { readonly kind: "board"; readonly open: true; readonly focus: boolean }
   /** Fold the sidebar to icons, or unfold it (ADR-0088). */
   | { readonly kind: "foldList" }
-  /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
+  /** Show a page over the stage, or, with null, the stage (ADR-0098). */
   | { readonly kind: "page"; readonly to: PageName | null }
   /** Title a task or a note column, or clear its title with null (ADR-0116). */
   | {
@@ -378,17 +378,15 @@ export function planIntent(
 }
 
 /**
- * `effects`, after leaving the page shown over the workspace when they show
- * something there (`showsWorkspace`): a root, a new tab or the board would
+ * `effects`, after leaving the page shown over the stage when they show
+ * something there (`showsStage`): a root, a new tab or the board would
  * otherwise open under the page, unseen.
  */
 function leavingPage(
   page: PageName | null,
   effects: readonly Effect[],
 ): readonly Effect[] {
-  const shows = effects.some(
-    e => e.kind === "layout" && showsWorkspace(e.action),
-  )
+  const shows = effects.some(e => e.kind === "layout" && showsStage(e.action))
   return page !== null && shows
     ? [{ kind: "page", to: null }, ...effects]
     : effects

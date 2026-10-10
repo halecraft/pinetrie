@@ -16,7 +16,6 @@ import {
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import type { Item, Status } from "./attention.ts"
-import type { CardMarks } from "./card-marks.ts"
 import { NEW_ROOT, NEW_TASK, NEW_THREAD, tree } from "./fixtures.ts"
 import {
   type Here,
@@ -35,6 +34,7 @@ import {
   sidebarView,
   taskSprites,
 } from "./sidebar-view.ts"
+import type { UnsentSignals } from "./signals.ts"
 import { type ThreadCardFacts, threadCardHeads } from "./thread-card.ts"
 
 /** Each root's task, one a root (ADR-0116): `K("r1")` holds root r1's threads. */
@@ -67,7 +67,7 @@ const layout = resolveLayout(
     holders: new Map(),
   },
 )
-const none: CardMarks = {
+const none: UnsentSignals = {
   tasks: new Set(),
   newTabs: new Set(),
   ends: new Set(),
@@ -347,7 +347,7 @@ describe("pageTitle", () => {
   ])("%i needing you, on %s", (count, _, here, words) => {
     expect(pageTitle(count, here ?? null, null)).toBe(words)
   })
-  test("a page over the workspace names the window, not the root under it (ADR-0098)", () => {
+  test("a page over the stage names the window, not the root under it (ADR-0098)", () => {
     expect(pageTitle(2, r1 ?? null, "profile")).toBe("(2) Profile · pine·trie")
     expect(pageTitle(0, null, "profile")).toBe("Profile · pine·trie")
   })

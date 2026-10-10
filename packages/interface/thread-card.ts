@@ -34,7 +34,7 @@ export interface ThreadCardHead {
   readonly status: Status | null
   /** Its threads with work ready to accept (`offeredByTask`): ⇡, for everyone (ADR-0091). */
   readonly ready: readonly string[]
-  /** An unsent card of yours is in it (`CardMarks.tasks`): your pip. */
+  /** An unsent card of yours is in it (`UnsentSignals.tasks`): your pip. */
   readonly pip: boolean
   /** The state it is in on the board; null before the host placed it. */
   readonly state: WorkflowStateId | null
@@ -52,7 +52,7 @@ export interface ThreadCardFacts {
   readonly labels: ReadonlyMap<TaskId, string>
   /** Each task's status (`taskStatus`, ADR-0077). */
   readonly status: ReadonlyMap<TaskId, Status>
-  /** Tasks holding an unsent card of yours (`CardMarks.tasks`). */
+  /** Tasks holding an unsent card of yours (`UnsentSignals.tasks`). */
   readonly pips: ReadonlySet<TaskId>
   /** The threads with an open offer, by task (`offeredByTask`). */
   readonly offered: ReadonlyMap<TaskId, readonly string[]>

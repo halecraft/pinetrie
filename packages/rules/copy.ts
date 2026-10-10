@@ -9,6 +9,8 @@ import {
   type CardRecord,
   type Intent,
   type MoveRefusal,
+  makeCard,
+  NO_CONTENT,
   type ThreadId,
   type ThreadRecord,
   type TreeIndex,
@@ -84,16 +86,17 @@ export function planCopy(input: {
           return { to: ranked.to, ranked }
         })()
   const { to, ranked } = placed
-  const made = planMake(cards, move.card, to, sender, {
-    kind: "thread",
-    id: move.card,
-    owner: sender,
-    placer: sender,
-    place:
-      ranked === null
-        ? { kind: "inventory", holder: sender }
-        : { ...ranked.to, width: 1 },
-  })
+  const made = planMake(
+    cards,
+    makeCard(
+      "thread",
+      move.card,
+      to.kind === "inventory" ? to : { ...to, width: 1 },
+      NO_CONTENT,
+      sender,
+    ),
+    sender,
+  )
   if (made.kind !== "write")
     return {
       kind: "refused",

@@ -7,10 +7,8 @@ import {
   type AskIndex,
   type CardId,
   type CardRecord,
-  type EntryId,
   type LaneView,
   promptOf,
-  type StopRecord,
   type ThreadId,
   type TreeIndex,
   type WriterId,
@@ -20,6 +18,7 @@ import {
   displayName,
   planNextQueuedCardPop,
   queuedOn,
+  stopperOf,
 } from "@pinetrie/rules"
 import type { ControlWords } from "./card-words.ts"
 import type { Reader } from "./send.ts"
@@ -69,8 +68,6 @@ export interface NextFacts {
   readonly blank: ReadonlySet<CardId>
   readonly index: TreeIndex
   readonly asks: AskIndex
-  /** Who stopped each ask, by its prompt. */
-  readonly stops: ReadonlyMap<EntryId, StopRecord>
 }
 
 /**
@@ -97,8 +94,7 @@ export function nextOf(lane: LaneView, facts: NextFacts): Next {
       kind: "held",
       by: lane.heldBy,
       top: released.kind === "pop" ? released.card.id : null,
-      count: queue.filter(c => c.carries.kind === "message" && !blank.has(c.id))
-        .length,
+      count: queue.filter(c => c.kind === "text" && !blank.has(c.id)).length,
       resumable,
     }
   }
@@ -119,7 +115,10 @@ export function nextOf(lane: LaneView, facts: NextFacts): Next {
     const prompt = promptOf(facts.index, lane.tip)
     return {
       kind: "stopped",
-      by: prompt === null ? null : (facts.stops.get(prompt)?.by ?? null),
+      by:
+        prompt === null
+          ? null
+          : stopperOf(facts.asks, queuedOn(facts.cards, lane.name), prompt),
     }
   }
   return { kind: "idle" }
@@ -131,9 +130,8 @@ export function queueHead(lane: LaneView, facts: NextFacts): QueueHead {
     lane: lane.name,
     next: nextOf(lane, facts),
     heldBy: lane.heldBy,
-    messages: queuedOn(facts.cards, lane.name).filter(
-      c => c.carries.kind === "message",
-    ).length,
+    messages: queuedOn(facts.cards, lane.name).filter(c => c.kind === "text")
+      .length,
   }
 }
 

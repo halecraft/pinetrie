@@ -17,11 +17,11 @@ export {
   type RailStub,
   type ReadOnly,
   railStubWords,
+  type Stage,
   type TaskRail,
   taskRail,
   taskWork,
   threadWork,
-  type Workspace,
 } from "./app-view.ts"
 export {
   type AtTop,
@@ -115,10 +115,9 @@ export {
   type TaskView,
 } from "./canvas-columns.ts"
 export {
-  type CardFaceView,
   type CardFrameFacts,
   type CardFrameView,
-  cardFaceWords,
+  type CardTone,
   cardFrame,
   cardFrameWords,
   moveKey,
@@ -126,12 +125,6 @@ export {
   type QueueOn,
 } from "./card-frame.ts"
 export { cardKeyAct } from "./card-keys.ts"
-export {
-  cardMarks,
-  holdsText,
-  ownCards,
-  withFilled,
-} from "./card-marks.ts"
 export {
   type EditorEvent,
   type EditorState,
@@ -237,9 +230,25 @@ export { copyText } from "./copy-text.ts"
 export { plural } from "./counts.ts"
 export type { Effect } from "./effects.ts"
 export {
+  cardOfFace,
+  DETAIL_ON,
+  type Detail,
+  type DrawnKind,
+  detailOf,
+  type Face,
+  type FaceOf,
+  faceOf,
+  KIND_ICON,
+  type NoteColumnFace,
+  noteColumnFace,
+  type TextFace,
+  textFaceWords,
+} from "./face.ts"
+export {
   FOLD,
-  type FoldedView,
+  type FoldedFace,
   foldedView,
+  foldedWords,
   UNFOLD,
   UNNAMED_THREAD,
 } from "./folded-column-view.ts"
@@ -306,8 +315,7 @@ export {
   dockCodec,
   snapTo,
 } from "./inventory-dock.ts"
-export { keyAct } from "./inventory-keys.ts"
-export { inventoryView } from "./inventory-view.ts"
+export { type CardPreview, inventoryView } from "./inventory-view.ts"
 export {
   decodeLayout,
   encodeLayout,
@@ -369,6 +377,7 @@ export {
   planLeave,
   profileWords,
 } from "./page.ts"
+export { keyAct } from "./page-keys.ts"
 export {
   type ColorSlot,
   rootSeed,
@@ -519,6 +528,12 @@ export {
   taskSprites,
 } from "./sidebar-view.ts"
 export {
+  holdsText,
+  ownCards,
+  unsentSignals,
+  withFilled,
+} from "./signals.ts"
+export {
   boardStateWords,
   FOLD_TASK,
   pinnedCountWords,
@@ -542,6 +557,7 @@ export {
   threadCardHeads,
 } from "./thread-card.ts"
 export {
+  bareThreadFace,
   faceStatus,
   type PreviewRow,
   type ThreadFace,

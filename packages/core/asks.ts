@@ -14,7 +14,6 @@ import {
   type DiffSpan,
   type EntryId,
   type RevisionRecord,
-  type StopRecord,
   type WriterId,
 } from "./index.ts"
 import {
@@ -38,10 +37,16 @@ export interface AskIndex {
   readonly last: ReadonlyMap<EntryId, EntryId>
   /**
    * An entry no run wrote, steered in between a run's entries (a base's
-   * news, ADR-0080) -> the run's prompt. The column draws it in the ask's
-   * work and the rail in its capsule, so neither splits the ask in two.
+   * news, ADR-0080), or a stop's fact appended after them (ADR-0126) -> the
+   * run's prompt. The column draws it in the ask's work and the rail in its
+   * capsule, so neither splits the ask in two.
    */
   readonly steered: ReadonlyMap<EntryId, EntryId>
+  /**
+   * A stopped run's prompt -> who stopped it, from its stop's fact
+   * (ADR-0126). A run stopped before stops were facts names nobody.
+   */
+  readonly stoppedBy: ReadonlyMap<EntryId, WriterId>
 }
 
 /** The ask whose work `id` is drawn in: one its run wrote, or steered into it. */
@@ -54,7 +59,8 @@ export type AskOutcome =
   | { readonly kind: "answered" }
   /**
    * Every abort S70 measured was a Stop: a restart resumes the run. `by` is
-   * null for a stop made before stops were recorded.
+   * null for a stop made before stops were facts, and until its fact is
+   * appended, as the run ends.
    */
   | { readonly kind: "stopped"; readonly by: WriterId | null }
   | { readonly kind: "failed"; readonly error: string }
@@ -99,11 +105,20 @@ export function indexAsks(index: TreeIndex): AskIndex {
   const work = new Map<EntryId, EntryId[]>()
   const last = new Map<EntryId, EntryId>()
   const steered = new Map<EntryId, EntryId>()
+  const stoppedBy = new Map<EntryId, WriterId>()
   // Ids are uuidv7, so sorted ids are creation order (S9).
   const entries = Object.values(index.entries).sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
   )
   for (const entry of entries) {
+    // A stop's fact names its ask, and is drawn in it: the first names
+    // who stopped it, as the first press is the one queued.
+    const stop = entry.message?.stopped
+    if (stop !== undefined && index.entries[stop.prompt] !== undefined) {
+      steered.set(entry.id, stop.prompt)
+      if (!stoppedBy.has(stop.prompt)) stoppedBy.set(stop.prompt, stop.by)
+      continue
+    }
     if (!isWork(entry)) continue
     const { id } = entry
     const parent = index.parentOf(id)
@@ -123,7 +138,7 @@ export function indexAsks(index: TreeIndex): AskIndex {
     if (entry.message?.role === "assistant")
       work.set(prompt, [...(work.get(prompt) ?? []), id])
   }
-  const asks: AskIndex = { askOf, work, last, steered }
+  const asks: AskIndex = { askOf, work, last, steered, stoppedBy }
   known.set(index, asks)
   return asks
 }
@@ -143,14 +158,14 @@ export const isLongAsk = (asks: AskIndex, prompt: EntryId): boolean =>
  * How `prompt`'s run ended, from its last entries (S70): an assistant
  * message that `aborted` was stopped, and so was a run whose last entry is a
  * tool result, since only a Stop ends a run before the model reads a result;
- * one with `error` failed; anything else answered. A stop record names who
- * stopped it, and is ignored when the run answered anyway.
+ * one with `error` failed; anything else answered. A stop's fact names who
+ * stopped it (`stoppedBy`), and is ignored when the run answered anyway.
  */
 export function askOutcome(
   index: TreeIndex,
   asks: AskIndex,
   prompt: EntryId,
-  facts: { readonly running: boolean; readonly stop: StopRecord | undefined },
+  facts: { readonly running: boolean },
 ): AskOutcome {
   if (facts.running) return { kind: "running" }
   const reply = asks.work.get(prompt)?.at(-1)
@@ -163,7 +178,7 @@ export function askOutcome(
     lastId !== undefined &&
     index.entries[lastId]?.message?.role === "toolResult"
   return message?.stopReason === "aborted" || endedOnResult
-    ? { kind: "stopped", by: facts.stop?.by ?? null }
+    ? { kind: "stopped", by: asks.stoppedBy.get(prompt) ?? null }
     : { kind: "answered" }
 }
 

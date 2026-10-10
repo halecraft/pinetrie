@@ -1,6 +1,7 @@
 import {
   entryId,
   indexTree,
+  NO_CONTENT,
   type TextCard,
   type ThreadName,
   textCardId,
@@ -32,8 +33,7 @@ describe("inventoryView", () => {
     owner: ADA,
     placer: ADA,
     place: { kind: "inventory", holder: ADA },
-    carries: { kind: "message", command: null },
-    unsent: null,
+    content: { command: null, unsent: null },
   })
 
   test("draws exactly settleSlots, the selection, and first lines", () => {
@@ -46,6 +46,7 @@ describe("inventoryView", () => {
       selected: 10,
       texts: new Map([[B, "\n  plan: ship it\nsecond line"]]),
       threads: new Map(),
+      open: false,
     })
     const drawn = Object.fromEntries(
       view.grid.cells.flatMap(s =>
@@ -79,12 +80,34 @@ describe("inventoryView", () => {
       selected: 0,
       texts: new Map(),
       threads: new Map(),
+      open: false,
     })
-    expect(view.grid.cells[0]?.face?.key).toBe("1")
+    const face = view.grid.cells[0]?.face
+    expect(face?.kind === "text" && face.key).toBe("1")
     expect(Array.from({ length: 18 }, (_, n) => slotKey(n))).toEqual([
       ..."123456789".split(""),
       ...Array(9).fill(null),
     ])
+  })
+
+  test("previews the selected card, normal and one column wide; an empty slot or an open card, none (ADR-0126)", () => {
+    const view = (selected: number, open: boolean) =>
+      inventoryView({
+        held: [record(A)],
+        slots: slotsOf({ "3": cardIdFor("ca") }),
+        intents: NO_INTENTS,
+        selected,
+        texts: new Map(),
+        threads: new Map(),
+        open,
+      }).preview
+    expect(view(3, false)).toEqual({
+      card: record(A),
+      detail: "normal",
+      width: 1,
+    })
+    expect(view(4, false)).toBeNull()
+    expect(view(3, true)).toBeNull()
   })
 })
 
@@ -114,7 +137,6 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
     ],
     names: new Map([[thread, "amber-fox" as ThreadName]]),
     banners: new Map(),
-    stops: new Map(),
   })
   expect(face).toMatchObject({ name: "amber-fox", queued: 2, stopped: false })
   expect(faceStatus(face)).toBe("2 cards queued")
@@ -127,6 +149,7 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
         owner: ADA,
         placer: ADA,
         place: { kind: "inventory", holder: ADA },
+        content: NO_CONTENT,
       },
     ],
     slots: {},
@@ -134,8 +157,12 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
     selected: 0,
     texts: new Map(),
     threads: new Map([[T, { ...face, thread: T }]]),
+    open: false,
   })
-  expect(view.grid.cells[0]?.thread?.name).toBe("amber-fox")
+  expect(view.grid.cells[0]?.face).toMatchObject({
+    kind: "thread",
+    name: "amber-fox",
+  })
 })
 
 test("a thread's face reads its first message, not the context entry its first run wrote above it (ADR-0125)", () => {
@@ -165,7 +192,6 @@ test("a thread's face reads its first message, not the context entry its first r
     lanes: [],
     names: new Map(),
     banners: new Map(),
-    stops: new Map(),
   })
   expect([face.first, face.last]).toEqual(["an aside", "ok"])
 })

@@ -39,7 +39,8 @@ import {
 import type { ComposerSpot } from "./put-target.ts"
 import { afterSpinOff } from "./spin-off.ts"
 
-const TEST_THREAD = threadIdFor("e")
+/** The thread `index` is: its first entry names it (`withThreads`). */
+const TEST_THREAD = threadIdFor("1-r1")
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("ada@x.io")
@@ -51,7 +52,6 @@ const A = entryId("2-a")
 const inventory = { kind: "inventory", holder: ADA } as const
 const atEnd = {
   kind: "composing",
-  at: atEntry(A),
   thread: TEST_THREAD,
 } as const
 /** The note column the fixtures' notes are in (ADR-0116). */
@@ -62,7 +62,6 @@ const noteKey = { kind: "note", column: NOTES } as const
 const toNote = { kind: "notes", near: "thread", thread: TEST_THREAD } as const
 const pinnedKey = {
   kind: "pinned",
-  at: atEntry(A),
   thread: TEST_THREAD,
 } as const
 const pinnedAtA = { ...pinnedKey, order: "a" } as const
@@ -105,8 +104,7 @@ const card = (id: typeof C1, place: TextPlace): TextCard => ({
   owner: ADA,
   placer: ADA,
   place,
-  carries: { kind: "message", command: null },
-  unsent: null,
+  content: { command: null, unsent: null },
 })
 const facts = (over: Partial<CardFacts> = {}): CardFacts => ({
   cards: [],
@@ -207,8 +205,7 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
         owner: ADA,
         placer: ADA,
         place: inventory,
-        carries: { kind: "message", command: null },
-        unsent: null,
+        content: { command: null, unsent: null },
       },
       text: "hello",
       how: { actedAt: { kind: "inventory" }, slot: 0 },
@@ -646,12 +643,7 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
       cards: [
         {
           card: C1,
-          place: {
-            kind: "queued",
-            at: atEntry(A),
-            thread: threadIdFor("x"),
-            seen: "",
-          },
+          place: { kind: "queued", thread: TEST_THREAD, seen: "" },
         },
       ],
     })
@@ -884,8 +876,7 @@ describe("a new note (ADR-0116)", () => {
           owner: ADA,
           placer: ADA,
           place: { kind: "note", column: NOTES, order: LAST_ORDER },
-          carries: { kind: "message", command: null },
-          unsent: null,
+          content: { command: null, unsent: null },
         },
         text: "",
         how: { actedAt: { kind: "column", key: NOTES }, slot: null },

@@ -1,5 +1,4 @@
 import {
-  atEntry,
   entryId,
   runId,
   type ThreadId,
@@ -14,7 +13,7 @@ import {
   encodeCard,
   PARTICIPANT,
   QUEUE_HOLD,
-  STOP,
+  queuedOn,
   setRecord,
 } from "@pinetrie/rules"
 import { newPresenceDoc } from "@pinetrie/schema"
@@ -28,7 +27,6 @@ import {
   NO_BLANK_CARDS,
   putLane,
   putValue,
-  ROOT_ID,
   record,
   row,
 } from "../fakes.ts"
@@ -46,7 +44,7 @@ const ada = writerId("ada@example.com")
 const bea = writerId("bea@example.com")
 
 /** A lane running an ask: Ada's prompt `e-1`, the agent's `e-2`. */
-function running() {
+function running(onAbort: () => void = () => {}) {
   const b = basics()
   const lane = threadIdFor("0123456789abcdef")
   writeEntry(b.root, row(entryId("e-1"), null))
@@ -56,7 +54,11 @@ function running() {
   )
   writeLaneTip(b.root, lane, entryId("e-2"))
   beginRun(b.live, lane, runId("r-1"))
-  const handle = fakeLane(lane, { abort: async () => {} })
+  const handle = fakeLane(lane, {
+    abort: async () => {
+      onAbort()
+    },
+  })
   // The agent and the scribe in one record, so the order of their calls shows.
   const pi = record<Pick<Agent, "lane"> & Pick<Records, "writeValues">>({
     lane: () => handle.lane,
@@ -65,85 +67,81 @@ function running() {
   return { b, lane, handle, pi }
 }
 
-test("stopping a running lane records who stopped its ask, then aborts its run", async () => {
-  const { b, lane, handle, pi } = running()
-  expect(
-    await handleStop(
-      {
-        basics: b,
-        cards: NO_BLANK_CARDS,
-        agent: pi.port,
-        records: pi.port,
-        cancel: () => false,
-      },
-      lane,
-      ada,
-    ),
-  ).toEqual({ kind: "stopped" })
-  expect(pi.calls).toEqual([
-    {
-      method: "writeValues",
-      args: [
-        [
-          setRecord(
-            STOP,
-            { prompt: entryId("e-1"), by: ada, at: 1_000 },
-            ROOT_ID,
-          ),
-        ],
-      ],
-    },
-    { method: "lane", args: [lane] },
-  ])
-  expect(methods(handle.calls)).toEqual(["abort"])
+/** A Stop's dependencies over `running`'s documents. */
+const stopDeps = (
+  r: ReturnType<typeof running>,
+  cancel: (lane: ThreadId) => boolean = () => false,
+) => ({
+  basics: r.b,
+  cards: NO_BLANK_CARDS,
+  agent: r.pi.port,
+  records: r.pi.port,
+  cancel,
+  provenance: createProvenance({
+    basics: r.b,
+    presence: newPresenceDoc(),
+    records: { writeValues: async w => applyWrites(r.b, w) },
+  }),
 })
 
-test("a second stop of the same ask records nothing more", async () => {
-  const { b, lane, handle, pi } = running()
-  putValue(
-    b,
-    setRecord(STOP, { prompt: entryId("e-1"), by: bea, at: 1 }, ROOT_ID),
+/** The stop facts queued on `lane`, as the places hold them. */
+const stopFacts = (r: ReturnType<typeof running>) =>
+  readPlaces(r.b.places).flatMap(c =>
+    c.kind === "fact" && c.content.fact.kind === "stopped"
+      ? [c.content.fact]
+      : [],
   )
-  await handleStop(
+
+test("stopping a running lane queues the fact of who stopped its ask, then aborts its run (ADR-0126)", async () => {
+  let queuedAtAbort = -1
+  const r: ReturnType<typeof running> = running(() => {
+    queuedAtAbort = stopFacts(r).length
+  })
+  expect(await handleStop(stopDeps(r), r.lane, ada)).toEqual({
+    kind: "stopped",
+  })
+  expect(stopFacts(r)).toEqual([
     {
-      basics: b,
-      cards: NO_BLANK_CARDS,
-      agent: pi.port,
-      records: pi.port,
-      cancel: () => false,
+      kind: "stopped",
+      lane: r.lane,
+      prompt: entryId("e-1"),
+      by: ada,
+      at: 1_000,
     },
-    lane,
-    ada,
-  )
-  expect(methods(pi.calls)).toEqual(["lane"])
-  expect(methods(handle.calls)).toEqual(["abort"])
+  ])
+  expect(methods(r.pi.calls)).toEqual(["lane"])
+  expect(methods(r.handle.calls)).toEqual(["abort"])
+  // Queued before the abort, so the run's end finds it.
+  expect(queuedAtAbort).toBe(1)
+})
+
+test("a second stop of the same ask queues nothing more: the first press is named", async () => {
+  const r = running()
+  await handleStop(stopDeps(r), r.lane, bea)
+  await handleStop(stopDeps(r), r.lane, ada)
+  expect(stopFacts(r).map(f => f.by)).toEqual([bea])
+  expect(methods(r.handle.calls)).toEqual(["abort", "abort"])
 })
 
 test("a stop while a chat's run waits for its pinned cards cancels it there, and asks pi to abort nothing", async () => {
-  const { b, lane, handle, pi } = running()
+  const r = running()
   const cancelled: string[] = []
   await handleStop(
-    {
-      basics: b,
-      cards: NO_BLANK_CARDS,
-      agent: pi.port,
-      records: pi.port,
-      cancel: l => {
-        cancelled.push(l)
-        return true
-      },
-    },
-    lane,
+    stopDeps(r, l => {
+      cancelled.push(l)
+      return true
+    }),
+    r.lane,
     ada,
   )
-  expect(cancelled).toEqual([lane])
-  expect(methods(pi.calls)).toEqual(["writeValues"])
-  expect(methods(handle.calls)).toEqual([])
+  expect(cancelled).toEqual([r.lane])
+  expect(stopFacts(r)).toHaveLength(1)
+  expect(methods(r.handle.calls)).toEqual([])
 })
 
-test("a stop with a message card queued holds the queue in the same write as its stop record, before the abort (ADR-0048 step 7)", async () => {
-  const { b, lane, handle, pi } = running()
-  b.places.cards.set(
+test("a stop with a message card queued holds the queue before the abort, and its fact goes before the card (ADR-0048 step 7)", async () => {
+  const r = running()
+  r.b.places.cards.set(
     cardIdFor("c1"),
     encodeCard({
       kind: "text" as const,
@@ -152,41 +150,24 @@ test("a stop with a message card queued holds the queue in the same write as its
       placer: bea,
       place: {
         kind: "queued",
-        at: atEntry(entryId("e-2")),
-        thread: lane,
+        thread: r.lane,
         order: "a",
         by: bea,
         seen: "",
       },
-      carries: { kind: "message", command: null },
-      unsent: null,
+      content: { command: null, unsent: null },
     }),
   )
-  await handleStop(
-    {
-      basics: b,
-      cards: NO_BLANK_CARDS,
-      agent: pi.port,
-      records: pi.port,
-      cancel: () => false,
-    },
-    lane,
-    ada,
-  )
-  expect(pi.calls[0]).toEqual({
+  await handleStop(stopDeps(r), r.lane, ada)
+  expect(r.pi.calls[0]).toEqual({
     method: "writeValues",
-    args: [
-      [
-        setRecord(
-          STOP,
-          { prompt: entryId("e-1"), by: ada, at: 1_000 },
-          ROOT_ID,
-        ),
-        setRecord(QUEUE_HOLD, { lane, by: ada, at: 1_000 }),
-      ],
-    ],
+    args: [[setRecord(QUEUE_HOLD, { lane: r.lane, by: ada, at: 1_000 })]],
   })
-  expect(methods(handle.calls)).toEqual(["abort"])
+  expect(queuedOn(readPlaces(r.b.places), r.lane).map(c => c.kind)).toEqual([
+    "fact",
+    "text",
+  ])
+  expect(methods(r.handle.calls)).toEqual(["abort"])
 })
 
 test("a hold is written once, its release deleted and the lane drained, each answered with how the queue is now; an unknown lane is refused (ADR-0048 step 7)", async () => {
@@ -253,17 +234,16 @@ test("an offer's fact is queued as a card at the thread's end, after the cards t
   )
   expect(readPlaces(b.places)).toMatchObject([
     {
-      kind: "text" as const,
+      kind: "fact" as const,
       owner: ada,
       placer: ada,
       place: {
         kind: "queued",
         thread: lane,
-        at: atEntry(entryId("e-2")),
         by: ada,
         seen: "",
       },
-      carries: { kind: "fact", fact },
+      content: { fact },
     },
   ])
   const [card] = readPlaces(b.places)

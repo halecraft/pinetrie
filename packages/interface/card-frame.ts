@@ -1,9 +1,10 @@
 // interface/card-frame — what one text card's frame shows, in every place
-// (ADR-0111): its header (icon, place, state, who put it there, a command,
-// ⋯ and ×), and its footer (one primary action, and ↑ ↓ in a list); and its
-// face, the card folded in a grid's cell. Pure: `cardFrame` and `cardFace`
-// decide them as values, `cardFrameWords` and `cardFaceWords` word them, and
-// `CardFrame` and `CardFace` (`packages/web/card-frame.tsx`) draw them.
+// (ADR-0111): its header (place, state, who put it there, a command, ⋯ and
+// ×), and its footer (one primary action, and ↑ ↓ in a list). The frame is
+// the place's: its colour says who reads the card. The card's icon and its
+// face are the kind's (`face.ts`, ADR-0126). Pure: `cardFrame` decides it as
+// a value, `cardFrameWords` words it, and `CardFrame`
+// (`packages/web/card-frame.tsx`) draws it.
 
 import type {
   CardCommand,
@@ -13,7 +14,7 @@ import type {
   WorkflowState,
   WriterId,
 } from "@pinetrie/core"
-import { commandOf, isFact } from "@pinetrie/core"
+import { commandOf, KINDS } from "@pinetrie/core"
 import { displayName, type PinnedStatus } from "@pinetrie/rules"
 import { reorderOf } from "./card-intents.ts"
 import {
@@ -200,9 +201,9 @@ const stateOf = (
   }
   if (tone === "pinned" && facts.pinned != null)
     return { kind: "pinned", status: facts.pinned }
-  return card.kind !== "text" || card.unsent === null
+  return card.kind !== "text" || card.content.unsent === null
     ? { kind: "none" }
-    : { kind: "unsent", reason: card.unsent }
+    : { kind: "unsent", reason: card.content.unsent }
 }
 
 const byOf = (card: CardRecord, me: WriterId): WriterId | null => {
@@ -220,8 +221,9 @@ const byOf = (card: CardRecord, me: WriterId): WriterId | null => {
 /**
  * The frame of `card`, drawn as `tone`; with no card, the composer before
  * its first keystroke or the "+ pin" box: its tone and place alone, nothing
- * to move or discard yet. A fact is the host's (ADR-0080): it neither moves
- * nor is discarded, and a read-only column moves nothing.
+ * to move or discard yet. A kind no person moves (`KINDS`: a fact, the
+ * host's, ADR-0080) neither moves nor is discarded, and a read-only column
+ * moves nothing.
  */
 export function cardFrame(
   card: CardRecord | null,
@@ -241,7 +243,7 @@ export function cardFrame(
       moves: [],
       discards: false,
     }
-  const movable = !facts.readOnly && !isFact(card)
+  const movable = !facts.readOnly && KINDS[card.kind].moves
   const among = facts.among ?? null
   return {
     tone,
@@ -280,7 +282,6 @@ export interface MoveWords {
 
 /** A frame in words. */
 export interface CardFrameWords {
-  readonly icon: string
   /** Its place, always shown: the frame says where a card is before it exists. */
   readonly place: string
   readonly state: string | null
@@ -300,13 +301,6 @@ const PLACE: Readonly<Record<CardTone, string>> = {
   note: "note",
   queued: "queued",
   pinned: "pinned",
-}
-
-const ICON: Readonly<Record<Exclude<CardTone, "queued">, string>> = {
-  inventory: "▤",
-  composing: "✎",
-  note: "▭",
-  pinned: "⚑",
 }
 
 const MOVE: Readonly<Record<Exclude<CardMoveTo, object>, MoveWords>> = {
@@ -405,16 +399,9 @@ export function cardFrameWords(
   catchUps: CatchUps | null,
   writers: readonly WriterId[],
 ): CardFrameWords {
-  const { state } = view
   return {
-    icon:
-      view.tone !== "queued"
-        ? ICON[view.tone]
-        : state.kind === "line"
-          ? String(state.n + 1)
-          : "↑",
     place: PLACE[view.tone],
-    state: stateWords(state),
+    state: stateWords(view.state),
     who: whoWords(view, reader, writers),
     command:
       view.command === null || catchUps === null
@@ -425,58 +412,4 @@ export function cardFrameWords(
           },
     tools: view.tools.map(t => reorderWords(t.step)),
   }
-}
-
-// ── a card's face (ADR-0113) ──────────────────────────────────────────────
-
-/** A card folded: a grid's cell, a queued card at rest. */
-export interface CardFaceView {
-  readonly tone: CardTone
-  readonly owner: WriterId
-  readonly command: CardCommand | null
-  /** Its first three lines, leading blank lines left out. */
-  readonly lines: string
-  /** The inventory's 1–9 for its slot; null elsewhere. */
-  readonly key: string | null
-}
-
-/** `card` folded, with `text`, as `tone`; `key` its slot's 1–9 in your inventory. */
-export const cardFace = (
-  card: CardRecord,
-  text: string,
-  facts: { readonly tone: CardTone; readonly key: string | null },
-): CardFaceView => ({
-  tone: facts.tone,
-  owner: card.owner,
-  command: commandOf(card),
-  lines: text.trimStart().split("\n").slice(0, 3).join("\n").trimEnd(),
-  key: facts.key,
-})
-
-/** A face in words: its icon, its command's chip, and whose it is. */
-export interface CardFaceWords {
-  readonly icon: string
-  readonly command: string | null
-  /** Whose it is, for its title and its avatar's label. */
-  readonly owner: string
-}
-
-export const cardFaceWords = (
-  face: CardFaceView,
-  reader: Reader,
-): CardFaceWords => ({
-  icon: face.tone === "queued" ? "↑" : ICON[face.tone],
-  command: face.command === null ? null : COMMAND_CHIP[face.command],
-  owner:
-    face.owner === reader.me
-      ? "you"
-      : displayName(face.owner, reader.nameOf.get(face.owner)),
-})
-
-/** A command on a face: short, since a face has no thread to name (`commandWords` has). */
-const COMMAND_CHIP: Readonly<Record<CardCommand, string>> = {
-  "bring-up-to-date": "catch up",
-  "continue-on-accepted": "continue",
-  "catch-up-with-parent": "catch up with parent",
-  split: "split",
 }

@@ -95,7 +95,6 @@ function MessageListView(p: MessageListProps) {
           ask: row.ask,
           runningAsk: p.runningAsk,
           lastEnded,
-          stops: p.stops,
           revisions: p.revisions,
           digests: p.digests,
           releasedPath,

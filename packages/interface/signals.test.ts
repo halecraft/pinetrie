@@ -1,9 +1,9 @@
 import {
-  atEntry,
   type CardId,
   type CardRecord,
   type EntryLike,
   entryId,
+  NO_CONTENT,
   noteColumnIdFor,
   ROOT,
   rootIdFor,
@@ -15,12 +15,12 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { threadCardOf } from "@pinetrie/rules"
+import { threadCardOf } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
 import { defaultView } from "./canvas-columns.ts"
-import { cardMarks, holdsText, ownCards, withFilled } from "./card-marks.ts"
 import { entry, indexOf } from "./fixtures.ts"
 import { hereOfColumn, initialLayout, type Layout } from "./layout.ts"
+import { holdsText, ownCards, unsentSignals, withFilled } from "./signals.ts"
 import { tasksOf } from "./tasks.ts"
 
 const _TEST_THREAD = threadIdFor("e")
@@ -54,11 +54,9 @@ const atEnd = (id: string, at: string, owner = ADA): TextCard => ({
   placer: owner,
   place: {
     kind: "composing",
-    at: atEntry(entryId(at)),
     thread: threadOf(at),
   },
-  carries: { kind: "message", command: null },
-  unsent: null,
+  content: { command: null, unsent: null },
 })
 const fresh = (id: string, column: string): TextCard => ({
   kind: "text",
@@ -66,8 +64,7 @@ const fresh = (id: string, column: string): TextCard => ({
   owner: ADA,
   placer: ADA,
   place: { kind: "fresh", column, root: TEST_ROOT, task: TEST_TASK, at: ROOT },
-  carries: { kind: "message", command: null },
-  unsent: null,
+  content: { command: null, unsent: null },
 })
 /** Each root's task, one a root (ADR-0116): e1's, g1's and the far f1's. */
 const K = (root: string) => taskIdFor(root)
@@ -92,6 +89,7 @@ const tasks = tasksOf({
       owner: ADA,
       placer: ADA,
       place: { kind: "canvas", task: K("g1"), order: "z", width: 1 },
+      content: NO_CONTENT,
     },
   ],
   threads: new Map(),
@@ -129,7 +127,7 @@ const marks = (
   filled: readonly string[] = cards.map(c => c.id),
   over: { layout?: Layout; index?: TreeIndex; archived?: Set<TaskId> } = {},
 ) =>
-  cardMarks({
+  unsentSignals({
     mine: ownCards(ADA, cards),
     filled: new Set(filled.map(textCardId)),
     layout: over.layout ?? layout,
@@ -174,7 +172,7 @@ test("hereOfColumn: a new tab's column, a branch of a task's open or closed, or 
   expect(hereOfColumn(layout, "elsewhere")).toBeUndefined()
 })
 
-describe("cardMarks", () => {
+describe("unsentSignals", () => {
   test("your message marks its task and its thread's end", () => {
     expect(sets(marks([atEnd("c", "e2")]))).toEqual({
       tasks: [K("e1")],
@@ -204,7 +202,6 @@ describe("cardMarks", () => {
       // In a root this tab does not hold, which your message would mark.
       place: {
         kind: "pinned",
-        at: atEntry(entryId("e2")),
         thread: threadOf("e2"),
         order: "a",
       },

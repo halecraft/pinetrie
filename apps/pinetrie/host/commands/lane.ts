@@ -5,9 +5,9 @@
 
 import {
   type AcceptedAction,
-  atEntry,
   ERR,
   type ErrCode,
+  factCardIdFor,
   type Intent,
   indexAsks,
   type LaneView,
@@ -15,7 +15,6 @@ import {
   type RootId,
   type ThreadId,
   type TreeIndex,
-  textCardId,
   type WriterId,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
@@ -25,7 +24,6 @@ import {
   readParticipantNames,
   readPlaces,
   readQueueHolds,
-  readStops,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
@@ -35,11 +33,9 @@ import {
   planQueueHold,
   planStop,
   QUEUE_HOLD,
-  queuedOn,
-  STOP,
   setRecord,
 } from "@pinetrie/rules"
-import { type RootDocHandle, readLaneTip } from "@pinetrie/schema"
+import type { RootDocHandle } from "@pinetrie/schema"
 import { type Basics, failed, type HostKeeper } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import { applyPlaceSteps } from "../places.ts"
@@ -100,15 +96,20 @@ async function laneAt(
 }
 
 /**
- * Stop a thread's turn, recording who stopped its ask first (ADR-0106), and
- * holding its queue when a message card waits there (ADR-0048 step 7):
- * both are written before the run is stopped, so they are there when the
- * run's end is drawn and drains the lane, which then pops nothing. A chat's
- * run still waiting for its pinned cards' text has not reached pi, whose
- * abort would reach nothing: it is cancelled instead.
+ * Stop a thread's turn, queueing the fact of who stopped its ask first
+ * (ADR-0106, ADR-0126), and holding its queue when a message card waits
+ * there (ADR-0048 step 7): both are written before the run is stopped, so
+ * they are there when the run's end drains the lane, which then appends the
+ * fact and pops nothing else. A chat's run still waiting for its pinned
+ * cards' text has not reached pi, whose abort would reach nothing: it is
+ * cancelled instead. A take's stop is this one too, as the taker
+ * (`onTaken`).
  */
 export async function handleStop(
-  deps: Pick<LaneDeps, "basics" | "cards" | "agent" | "records" | "cancel">,
+  deps: Pick<
+    LaneDeps,
+    "basics" | "cards" | "agent" | "records" | "cancel" | "provenance"
+  >,
   lane: ThreadId,
   by: WriterId,
 ): Promise<Outcome> {
@@ -120,24 +121,25 @@ export async function handleStop(
       code: ERR.UNKNOWN_TARGET,
       message: "no such lane to stop",
     }
-  const { root, doc, index } = here
-  const { places, session } = deps.basics
+  const { index } = here
+  const { places, session, newId } = deps.basics
   const planned = planStop(here.lane, {
     index,
-    stops: readStops(doc),
-    queue: queuedOn(readPlaces(places), lane),
+    asks: indexAsks(index),
+    cards: readPlaces(places),
     holds: readQueueHolds(session),
     by,
     now: deps.basics.now(),
+    id: factCardIdFor(newId()),
   })
   if (planned.kind === "abort") {
-    const writes = [
-      ...(planned.record === null
-        ? []
-        : [setRecord(STOP, planned.record, root)]),
-      ...(planned.hold === null ? [] : [setRecord(QUEUE_HOLD, planned.hold)]),
-    ]
-    if (writes.length > 0) await deps.records.writeValues(writes)
+    if (planned.hold !== null)
+      await deps.records.writeValues([setRecord(QUEUE_HOLD, planned.hold)])
+    if (planned.fact.length > 0) {
+      const before = deps.provenance.before()
+      applyPlaceSteps(places, planned.fact)
+      await deps.provenance.after({ kind: "host" }, before)
+    }
     if (!deps.cancel(lane)) await agent.lane(lane).abort()
   }
   return { kind: "stopped" }
@@ -250,20 +252,20 @@ export async function recordFact(
   deps: Pick<LaneDeps, "basics" | "drain" | "provenance">,
   fact: OfferFact,
 ): Promise<void> {
-  const { docs, places, newId } = deps.basics
-  const root = docs.rootOfLane(fact.lane)
-  if (root === null) return
-  const tip = readLaneTip(await docs.root(root), fact.lane)
-  if (tip === null) return
+  const { docs, places, newId, log } = deps.basics
+  if (docs.rootOfLane(fact.lane) === null) return
   const before = deps.provenance.before()
-  applyPlaceSteps(places, [
-    planFactCard({
-      cards: readPlaces(places),
-      id: textCardId(newId()),
-      fact,
-      at: atEntry(tip),
-    }),
-  ])
+  const steps = planFactCard({
+    cards: readPlaces(places),
+    id: factCardIdFor(newId()),
+    fact,
+  })
+  // The host's own make is refused by no queue: should one be, it is said.
+  if (steps === null) {
+    log(`[host] a fact on ${fact.lane} was not queued: its card was refused`)
+    return
+  }
+  applyPlaceSteps(places, steps)
   await deps.provenance.after({ kind: "host" }, before)
   deps.drain(fact.lane)
 }

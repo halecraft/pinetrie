@@ -113,6 +113,16 @@ export const mutations: readonly Mutation[] = [
     expect: "after restoring, a lane runs again on its newest snapshot",
   },
   {
+    name: "the inventory previews nothing",
+    file: "packages/web/inventory-panel.tsx",
+    from: "            {view.preview !== null && (",
+    to: "            {view.preview !== null && false && (",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "selecting a slot previews its card beside the grid, read only, and Enter opens it in place instead",
+  },
+  {
     name: "a card's × does nothing",
     file: "packages/web/card-frame.tsx",
     from: "      onClick={p.onDiscard}",
@@ -867,26 +877,26 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a picture set on the profile page shows on your avatar in another person's window",
   },
-  // ── a page over the workspace (packages/web/use-page.ts, ADR-0098) ──
+  // ── a page over the stage (packages/web/use-page.ts, ADR-0098) ──
   {
-    name: "opening a page replaces the workspace's history entry",
+    name: "opening a page replaces the stage's history entry",
     file: "packages/web/use-page.ts",
     from: '  if (to !== null) history.pushState(PAGE_STATE, "", hashOfPage(to))',
     to: '  if (to !== null) history.replaceState(PAGE_STATE, "", hashOfPage(to))',
     suite: "browser",
     scenario: "page",
     expect:
-      "the profile page covers the workspace, and the browser's Back returns to the columns as they were",
+      "the profile page covers the stage, and the browser's Back returns to the columns as they were",
   },
   {
-    name: "the workspace is mounted afresh under a page",
+    name: "the stage is mounted afresh under a page",
     file: "packages/web/app.tsx",
-    from: '          id="workspace"\n          inert={page !== null}',
-    to: '          id="workspace"\n          key={page ?? "workspace"}\n          inert={page !== null}',
+    from: '          id="stage"\n          inert={page !== null}',
+    to: '          id="stage"\n          key={page ?? "stage"}\n          inert={page !== null}',
     suite: "browser",
     scenario: "page",
     expect:
-      "the profile page covers the workspace, and the browser's Back returns to the columns as they were",
+      "the profile page covers the stage, and the browser's Back returns to the columns as they were",
   },
   {
     name: "your name does not give way in the corner",
@@ -1077,10 +1087,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "live work is drawn a render behind the document",
     file: "packages/web/app.tsx",
-    from: "  const shared = {\n    menuTasks,\n    labelOf,\n    activity,\n    asks,\n    folds,\n    stops,\n    live,\n",
+    from: "  const shared = {\n    menuTasks,\n    labelOf,\n    activity,\n    asks,\n    folds,\n    live,\n",
     // A frame behind, not a render: a render's passive effect can be
     // flushed before paint by a later update in the same frame.
-    to: "  const [lagged, setLagged] = useState(live)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setLagged(live))\n    return () => cancelAnimationFrame(f)\n  }, [live])\n  const shared = {\n    menuTasks,\n    labelOf,\n    activity,\n    asks,\n    folds,\n    stops,\n    live: lagged,\n",
+    to: "  const [lagged, setLagged] = useState(live)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setLagged(live))\n    return () => cancelAnimationFrame(f)\n  }, [live])\n  const shared = {\n    menuTasks,\n    labelOf,\n    activity,\n    asks,\n    folds,\n    live: lagged,\n",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -1889,8 +1899,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a client cannot read a full inventory",
     file: "packages/protocol/codec.ts",
-    from: '  "full",\n  "not-yours",\n  "fact",\n  "order-changed",\n  "replied",\n]',
-    to: '  "not-yours",\n  "fact",\n  "order-changed",\n  "replied",\n]',
+    from: "  full: true,\n",
+    to: "",
     suite: "host",
     scenario: "cards",
     expect: "the nineteenth card is refused: the inventory is full",
@@ -2253,5 +2263,14 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "Copy to \u25b8 this task makes a copy beside its source, its fork row naming what it was copied from",
+  },
+  {
+    name: "a column's forks are new with every card",
+    file: "packages/web/app.tsx",
+    from: "  const forks = useSameData(colors.forks)",
+    to: "  const forks = colors.forks",
+    suite: "browser",
+    scenario: "page",
+    expect: "another window's card redraws the column and none of its messages",
   },
 ]

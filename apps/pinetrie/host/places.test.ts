@@ -1,12 +1,4 @@
-import {
-  atEntry,
-  entryId,
-  PLAIN,
-  rootIdFor,
-  textCardId,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
+import { rootIdFor, textCardId, threadIdFor, writerId } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { readPlaces, readPlacesRev } from "@pinetrie/reads"
 import { newPlacesDoc } from "@pinetrie/schema"
@@ -25,11 +17,9 @@ const record = (id: string) =>
     placer: ada,
     place: {
       kind: "composing",
-      at: atEntry(entryId("e-1")),
       thread: TEST_THREAD,
     },
-    carries: PLAIN,
-    unsent: null,
+    content: { command: null, unsent: null },
   }) as const
 
 test("applyPlaceSteps: one rev per batch of writes and removals (ADR-0059)", () => {

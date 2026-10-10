@@ -1622,15 +1622,15 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "ownCards counts another writer's card",
-    file: "packages/interface/card-marks.ts",
+    file: "packages/interface/signals.ts",
     from: "): readonly CardRecord[] => cards.filter(c => c.owner === me)",
     to: "): readonly CardRecord[] => cards",
     command: unit,
     expect: "only your cards, only with text",
   },
   {
-    name: "cardMarks counts an emptied card",
-    file: "packages/interface/card-marks.ts",
+    name: "unsentSignals counts an emptied card",
+    file: "packages/interface/signals.ts",
     from: "    if (!input.filled.has(card.id)) continue",
     to: "    if (false) continue",
     command: unit,
@@ -1638,7 +1638,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "holdsText counts a bare @agent",
-    file: "packages/interface/card-marks.ts",
+    file: "packages/interface/signals.ts",
     from: "  needsCard(text, AGENT_PREFILL)",
     to: "  needsCard(text, undefined)",
     command: unit,
@@ -1646,7 +1646,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "withFilled makes a new set on every keystroke",
-    file: "packages/interface/card-marks.ts",
+    file: "packages/interface/signals.ts",
     from: "  if (filled.has(id) === holds) return filled",
     to: "  if (filled.has(id) === holds) return new Set(filled)",
     command: unit,
@@ -1736,7 +1736,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Ctrl+Shift+L does nothing",
-    file: "packages/interface/inventory-keys.ts",
+    file: "packages/interface/page-keys.ts",
     from: '  if (chord && key === "l") return { kind: "foldList" }',
     to: "",
     command: unit,
@@ -2089,7 +2089,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card that could not be sent says nothing",
     file: "packages/interface/card-frame.ts",
-    from: '    : { kind: "unsent", reason: card.unsent }',
+    from: '    : { kind: "unsent", reason: card.content.unsent }',
     to: '    : { kind: "none" }',
     command: unit,
     expect:
@@ -2105,11 +2105,46 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a face shows a card's fourth line",
-    file: "packages/interface/card-frame.ts",
-    from: '  lines: text.trimStart().split("\\n").slice(0, 3).join("\\n").trimEnd(),',
-    to: '  lines: text.trimStart().split("\\n").slice(0, 4).join("\\n").trimEnd(),',
+    file: "packages/interface/face.ts",
+    from: '  text.trimStart().split("\\n").slice(0, 3).join("\\n").trimEnd()',
+    to: '  text.trimStart().split("\\n").slice(0, 4).join("\\n").trimEnd()',
     command: unit,
-    expect: "its first three lines, leading blank lines left out",
+    expect: "a text card: its first three lines, a short command chip, whose",
+  },
+  {
+    name: "a folded note column draws no count",
+    file: "packages/interface/face.ts",
+    from: "    notes: view?.notes.length ?? null,",
+    to: "    notes: null,",
+    command: unit,
+    expect:
+      "a note column: its title and how many notes it holds; unread, none",
+  },
+  {
+    name: "a thread this tab has not read draws no face",
+    file: "packages/interface/face.ts",
+    from: "      return facts.threads.get(card.id) ?? bareThreadFace(card.id)",
+    to: "      return bareThreadFace(card.id)",
+    command: unit,
+    expect: "a thread: its face; one this tab has not read, its id alone",
+  },
+  {
+    name: "a folded column draws whole",
+    file: "packages/interface/face.ts",
+    from: '  folded ? "face" : DETAIL_ON[place]',
+    to: "  DETAIL_ON[place]",
+    command: unit,
+    expect:
+      "a canvas draws whole, a dock or a list normal, an inventory faces; a fold is a face",
+  },
+  {
+    name: "an open card is previewed too",
+    file: "packages/interface/inventory-view.ts",
+    from: "      grid.card === null || input.open",
+    to: "      grid.card === null",
+    command: unit,
+    expect:
+      "previews the selected card, normal and one column wide; an empty slot or an open card, none (ADR-0126)",
   },
   {
     name: "a queued card cannot be pinned from its ⋯",
@@ -2307,7 +2342,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the undo keys reach into a text box",
-    file: "packages/interface/inventory-keys.ts",
+    file: "packages/interface/page-keys.ts",
     from: "  if (focus.inText || event.altKey) return null",
     to: "  if (event.altKey) return null",
     command: unit,
@@ -2323,7 +2358,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Cmd+Ctrl+Shift+I takes too",
-    file: "packages/interface/inventory-keys.ts",
+    file: "packages/interface/page-keys.ts",
     from: "  const chord =\n    event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey",
     to: "  const chord = event.ctrlKey && event.shiftKey && !event.altKey",
     command: unit,
@@ -2380,7 +2415,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a card marks no task",
-    file: "packages/interface/card-marks.ts",
+    file: "packages/interface/signals.ts",
     from: "        if (end !== null) ends.add(end)\n        const task = taskOfPlace(input.tasks, card.place)\n        if (task !== null) tasks.add(task)\n",
     to: "        if (end !== null) ends.add(end)\n        const task = taskOfPlace(input.tasks, card.place)\n",
     command: unit,
@@ -2441,7 +2476,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the undo key ignores the panel",
-    file: "packages/interface/inventory-keys.ts",
+    file: "packages/interface/page-keys.ts",
     from: "      inPanel: focus.inPanel,\n",
     to: "      inPanel: false,\n",
     command: unit,
@@ -2498,7 +2533,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a pinned card marks as a note",
-    file: "packages/interface/card-marks.ts",
+    file: "packages/interface/signals.ts",
     from: '    switch (card.place.kind) {\n      case "composing":',
     to: '    switch (card.place.kind === "pinned" ? "note" : card.place.kind) {\n      case "composing":',
     command: unit,
@@ -2801,8 +2836,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a reorder passes a fact on the page",
     file: "packages/interface/card-intents.ts",
-    from: "  if (from < 0 || passed === undefined || isFact(passed)) return null",
-    to: "  if (from < 0 || passed === undefined) return null",
+    from: "  if (from < 0 || passed === undefined || !KINDS[passed.kind].reordered)",
+    to: "  if (from < 0 || passed === undefined)",
     command: unit,
     expect: "a reorder moves the card one place among the list as drawn",
   },
@@ -2966,11 +3001,11 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a key takes a card into the inventory under a page",
-    file: "packages/interface/inventory-keys.ts",
+    file: "packages/interface/page-keys.ts",
     from: "  if (focus.page) return null\n",
     to: "",
     command: unit,
-    expect: "while a page covers the workspace only the list's fold acts",
+    expect: "while a page covers the stage only the list's fold acts",
   },
   {
     name: "the window's title names the root under the page",
@@ -2978,7 +3013,7 @@ export const mutations: readonly Mutation[] = [
     from: "    page !== null ? pageWords(page).title : here === null ? null : here.label",
     to: "    here === null ? null : here.label",
     command: unit,
-    expect: "a page over the workspace names the window, not the root under it",
+    expect: "a page over the stage names the window, not the root under it",
   },
   {
     name: "a drag moves a picture's crop past the image's edge",

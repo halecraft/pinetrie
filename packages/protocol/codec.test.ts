@@ -6,7 +6,6 @@
 
 import assert from "node:assert/strict"
 import {
-  atEntry,
   type CardId,
   commitId,
   ERR,
@@ -333,12 +332,10 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         card: cardIdFor("c7"),
         from: {
           kind: "composing",
-          at: atEntry(entryId("e-5")),
           thread: threadIdFor("abc"),
         },
         to: {
           kind: "queued",
-          at: atEntry(entryId("e-5")),
           thread: threadIdFor("abc"),
           seen: "v-2",
         },
@@ -353,7 +350,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         from: null,
         to: {
           kind: "queued",
-          at: atEntry(entryId("e-5")),
           thread: threadIdFor("abc"),
           seen: "",
         },
@@ -368,7 +364,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
           card: cardIdFor("c7"),
           from: {
             kind: "composing",
-            at: atEntry(entryId("e-5")),
             thread: TEST_THREAD,
           },
           to: { kind: "gone", why: { kind: "discarded" } },
@@ -477,7 +472,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         card: cardIdFor("c7"),
         at: {
           kind: "queued",
-          at: atEntry(entryId("e-1")),
           thread: threadIdFor("abc"),
           seen: "v1",
         },
@@ -491,7 +485,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         card: cardIdFor("c7"),
         at: {
           kind: "pinned",
-          at: atEntry(entryId("e-1")),
           thread: TEST_THREAD,
         },
         after: null,
@@ -709,7 +702,6 @@ test("decode: a move is typed by its card's kind, refused to or from a place tha
   } as const
   const queued = {
     kind: "queued",
-    at: atEntry(entryId("e1")),
     thread: TEST_THREAD,
     seen: "",
   } as const
@@ -832,7 +824,6 @@ test('decodeKey: "" is none; anything malformed is undefined', () => {
   assert.deepEqual(decodeKey(encodeKey(fresh)), fresh)
   const pinned = {
     kind: "pinned",
-    at: atEntry(entryId("e-1")),
     thread: threadIdFor("x"),
   } as const
   assert.deepEqual(decodeKey(encodeKey(pinned)), pinned)
@@ -966,7 +957,6 @@ test("decode: a spin-off names one move, into a new thread, and a known state or
 test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", () => {
   const queued = {
     kind: "queued",
-    at: "e-1",
     lane: threadIdFor("abc"),
     seen: "",
   }
@@ -991,13 +981,12 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
     "refused",
   )
   const lane = threadIdFor("abc")
-  const at = atEntry(entryId("e-1"))
   const moved = encodeIntent("c", {
     kind: "queue-card",
     move: {
       card: cardIdFor("c1"),
-      from: { kind: "composing", at, thread: lane },
-      to: { kind: "queued", at, thread: lane, seen: "" },
+      from: { kind: "composing", thread: lane },
+      to: { kind: "queued", thread: lane, seen: "" },
     },
     hold: "keep",
     command: "split",
@@ -1062,7 +1051,7 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
   )
   assert.equal(
     reorder(cardIdFor("c1"), {
-      at: { kind: "composing", at: "e-1", thread: "" },
+      at: { kind: "composing", thread: "" },
       after: cardIdFor("c2"),
     }),
     "refused",

@@ -1,19 +1,21 @@
 import {
-  atEntry,
+  type CardCommand,
   type CardId,
   type CardPlace,
   type CardRecord,
   DISCARDED,
   type EntryLike,
   entryId,
+  type FactCard,
+  factCardIdFor,
   INVENTORY_SLOTS,
   indexTree,
   keyOf,
   type Move,
   movesDocId,
+  NO_CONTENT,
   noteColumnIdFor,
   type OfferFact,
-  PLAIN,
   REORDER_PLACES,
   ROOT,
   rootIdFor,
@@ -25,6 +27,7 @@ import {
   type TreeIndex,
   taskIdFor,
   textCardId,
+  textSourceOf,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -44,6 +47,8 @@ import {
   planCardSweep,
   yourCard,
 } from "./card.ts"
+import { factLine, wordsOf } from "./fact.ts"
+import { threadCardOf } from "./fixtures.ts"
 import { planReorder, planSetCommand, planWidth, REORDERS } from "./in-place.ts"
 import { historyOf, planHistorySweep, undoAnswer } from "./move-history.ts"
 import {
@@ -68,16 +73,17 @@ import {
   planUnqueueAll,
   planUnsent,
   type QueuedCard,
+  type QueuedText,
   queuedOn,
   taskPinnedOf,
 } from "./queue.ts"
-import { canvasOf, indexTasks, NO_TASK_INDEX, threadCardOf } from "./task.ts"
+import { canvasOf, indexTasks, NO_TASK_INDEX } from "./task.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
-const E1 = entryId("e1")
+const _E1 = entryId("e1")
 const E2 = entryId("e2")
 const F1 = entryId("f1")
 
@@ -113,9 +119,8 @@ const card = (over: Partial<TextCard> = {}): TextCard => ({
   id: cardIdFor("c1"),
   owner: ADA,
   placer: ADA,
-  place: { kind: "composing", at: atEntry(E2), thread: T_E },
-  carries: { kind: "message", command: null },
-  unsent: null,
+  place: { kind: "composing", thread: T_E },
+  content: { command: null, unsent: null },
   ...over,
 })
 /** The note column the fixtures' notes are in. */
@@ -126,7 +131,6 @@ const note = (over: Partial<TextCard> = {}): TextCard =>
 const LANE = threadIdFor("x")
 const queuedPlace = {
   kind: "queued",
-  at: atEntry(E2),
   thread: LANE,
   order: "m",
   by: ADA,
@@ -140,97 +144,130 @@ const ACCEPTED: OfferFact = {
   bookmark: "pinetrie-accepted",
   to: { kind: "accepted" },
 }
+const FACT_ID = factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
+/** A fact's card, queued as `queuedPlace` is, unless `over` says. */
+const factCard = (over: Partial<FactCard> = {}): FactCard => ({
+  kind: "fact",
+  id: FACT_ID,
+  owner: ADA,
+  placer: ADA,
+  place: queuedPlace,
+  content: { fact: ACCEPTED },
+  ...over,
+})
 
 describe("planCarry (ADR-0080)", () => {
-  const queued = (carries: TextCard["carries"]) =>
-    card({ place: queuedPlace, carries })
+  const queued = (command: CardCommand | null): QueuedText => ({
+    ...card({ content: { command, unsent: null } }),
+    place: queuedPlace,
+  })
   test.each([
     [
-      "a fact",
-      queued({ kind: "fact", fact: ACCEPTED }),
-      "",
-      { kind: "fact", fact: ACCEPTED },
-    ],
-    [
       "a catch-up with text",
-      queued({ kind: "message", command: "bring-up-to-date" }),
+      queued("bring-up-to-date"),
       "then test",
       { kind: "catch-up", command: "bring-up-to-date", after: "send" },
     ],
     [
       "a catch-up with none",
-      queued({ kind: "message", command: "catch-up-with-parent" }),
+      queued("catch-up-with-parent"),
       "  ",
       { kind: "catch-up", command: "catch-up-with-parent", after: "discard" },
     ],
     [
       "a split, its text the brief",
-      queued({ kind: "message", command: "split" }),
+      queued("split"),
       " tests apart ",
       { kind: "split", intent: "tests apart" },
     ],
-    ["a message", queued(PLAIN), "hi", { kind: "send" }],
+    ["a message", queued(null), "hi", { kind: "send" }],
   ] as const)("%s", (_, c, text, plan) => {
-    expect(planCarry(c, text)).toEqual(plan)
+    expect(planCarry(c, text)).toEqual({ ...plan, card: c })
   })
 
-  test("nobody moves a fact, nor sets its command", () => {
-    const fact = queued({ kind: "fact", fact: ACCEPTED })
+  test("a fact is appended", () => {
+    expect(planCarry(factCard(), "")).toEqual({ kind: "fact", fact: ACCEPTED })
+  })
+
+  test("a fact's move is refused as any card's to a place its kind is never in; it has no command to set", () => {
+    const fact = factCard()
+    expect(
+      planMove(
+        [fact],
+        { card: fact.id, from: keyOf(fact.place), to: DISCARDED },
+        ADA,
+        NO_DISCARDS,
+      ),
+    ).toEqual({ kind: "refused", code: "no-place", now: fact })
     expect(
       planMove(
         [fact],
         {
           card: fact.id,
           from: keyOf(fact.place),
-          to: DISCARDED,
+          to: { kind: "queued", thread: T_E, seen: "" },
         },
         ADA,
         NO_DISCARDS,
       ),
-    ).toEqual({ kind: "refused", code: "fact", now: fact })
+    ).toEqual({ kind: "refused", code: "no-place", now: fact })
     expect(planSetCommand([fact], fact.id, "bring-up-to-date")).toEqual({
       kind: "refused",
-      code: "fact",
+      code: "no-place",
       now: fact,
     })
   })
 
-  test("planFactCard: queued after the lane's last card, by whoever acted, with no text to wait for", () => {
-    // Its id sorts after the fact's: only the order puts it first.
+  test("planFactCard: a fact card, queued after the lane's last card, made by whoever acted, with no text to wait for", () => {
     const before = card({
-      id: textCardId("z-9"),
+      id: textCardId("ffffffff-0000-7000-8000-000000000000"),
       place: { ...queuedPlace, order: orderAfter([]) },
     })
-    const step = planFactCard({
+    const [step] = planFactCard({
       cards: [before],
-      id: textCardId("f-1"),
+      id: FACT_ID,
       fact: ACCEPTED,
-      at: atEntry(E1),
-    })
-    if (step.kind !== "write") throw new Error("not a write")
-    expect(step.record).toMatchObject({
+    }) ?? [undefined]
+    expect(step?.kind === "write" && step.record).toEqual({
+      kind: "fact",
+      id: FACT_ID,
       owner: ADA,
       placer: ADA,
       place: {
         kind: "queued",
         thread: LANE,
+        order: expect.any(String),
         by: ADA,
         seen: "",
-        at: atEntry(E1),
       },
-      carries: { kind: "fact", fact: ACCEPTED },
+      content: { fact: ACCEPTED },
     })
-    expect(queuedOn([before, step.record], LANE).map(c => c.id)).toEqual([
-      before.id,
-      "f-1",
-    ])
+    // After it, by its order: a tie would put it first by id.
+    const order = (c: CardRecord | undefined) =>
+      c !== undefined && "order" in c.place ? c.place.order : ""
+    expect(
+      order(step?.kind === "write" ? step.record : undefined) > order(before),
+    ).toBe(true)
   })
 
-  test("the sweep keeps an empty fact card", () => {
-    const fact = queued({ kind: "fact", fact: ACCEPTED })
+  test("wordsOf: a text card's words are its document's, a fact's its line, a thread's none (ADR-0126)", () => {
+    const docs = (id: TextCardId) => `text of ${id}`
+    expect(wordsOf(textSourceOf(card()), docs)).toBe(`text of ${card().id}`)
+    expect(wordsOf(textSourceOf(factCard()), docs)).toBe(factLine(ACCEPTED))
+    expect(
+      wordsOf(
+        textSourceOf(
+          threadCardOf({ thread: LANE, task: TEST_TASK, by: ADA, cards: [] }),
+        ),
+        docs,
+      ),
+    ).toBe("")
+  })
+
+  test("the sweep keeps an empty fact card: its words are no document", () => {
     expect(
       planCardSweep({
-        cards: [fact],
+        cards: [factCard()],
         texts: new Map(),
         stored: [],
         cardOfDoc: () => undefined,
@@ -246,11 +283,10 @@ const freshPlace = (column: string) =>
     task: TEST_TASK,
     at: ROOT,
   }) as const
-const queued = (id: string, order: string, lane = LANE): QueuedCard => ({
+const queued = (id: string, order: string, lane = LANE): QueuedText => ({
   ...card({ id: textCardId(id) }),
   place: {
     kind: "queued",
-    at: atEntry(E2),
     thread: lane,
     order,
     by: BEA,
@@ -260,22 +296,23 @@ const queued = (id: string, order: string, lane = LANE): QueuedCard => ({
 const pinned = (
   id: string,
   order: string,
-  at = E2,
+  thread = T_E,
 ): TextCard & { readonly place: Extract<CardPlace, { kind: "pinned" }> } => ({
   ...card({ id: textCardId(id) }),
-  place: {
-    kind: "pinned",
-    at: atEntry(at),
-    thread: T_E,
-    order,
-  },
+  place: { kind: "pinned", thread, order },
 })
 
 describe("where a card sits", () => {
-  test("placeEnd: the end of the thread its place is in", () => {
-    expect(placeEnd({ at: atEntry(E1) }, tree())).toBe(E2)
-    expect(placeEnd({ at: atEntry(F1) }, tree())).toBe(F1)
-    expect(placeEnd({ at: ROOT }, tree())).toBeNull()
+  test("placeEnd: a queued, pinned or composing place is its thread's end", () => {
+    expect(placeEnd({ thread: T_E }, tree())).toBe(E2)
+    expect(placeEnd({ thread: threadIdFor("f1") }, tree())).toBe(F1)
+    expect(placeEnd({ thread: threadIdFor("none") }, tree())).toBeNull()
+    for (const place of [
+      { kind: "composing", thread: T_E },
+      { kind: "pinned", thread: T_E, order: "a" },
+      { ...queuedPlace, thread: T_E },
+    ] as const)
+      expect(placeEnd(place, tree())).toBe(E2)
   })
 
   test("cardEnd follows its thread as the thread grows", () => {
@@ -287,7 +324,6 @@ describe("where a card sits", () => {
     const onLane = card({
       place: {
         kind: "composing",
-        at: atEntry(E2),
         thread: threadIdFor("e1"),
       },
     })
@@ -296,17 +332,11 @@ describe("where a card sits", () => {
     expect(cardEnd(onLane, forked)).toBe("e3")
   })
 
-  test("cardEnd: null for a fresh card, and for a place that is gone", () => {
+  test("cardEnd: null for a fresh card, and for a thread this index holds no entry of", () => {
     expect(cardEnd(card({ place: freshPlace("k-1") }), tree())).toBeNull()
     expect(
       cardEnd(
-        card({
-          place: {
-            kind: "composing",
-            at: atEntry(entryId("x")),
-            thread: T_E,
-          },
-        }),
+        card({ place: { kind: "composing", thread: threadIdFor("gone") } }),
         tree(),
       ),
     ).toBeNull()
@@ -382,6 +412,7 @@ describe("note columns (ADR-0116)", () => {
     owner: ADA,
     placer: ADA,
     place: { kind: "canvas", task: TEST_TASK, order, width: 1 },
+    content: NO_CONTENT,
   })
   const nearest = (cards: readonly CardRecord[], t = LANE) =>
     nearestNoteColumn(canvasOf(cards, TEST_TASK), t)
@@ -516,6 +547,7 @@ describe("note columns (ADR-0116)", () => {
           owner: BEA,
           placer: BEA,
           place: expect.objectContaining({ kind: "canvas", task: TEST_TASK }),
+          content: NO_CONTENT,
         },
       },
     ])
@@ -751,7 +783,7 @@ describe("pinned cards", () => {
       pinned("p-3", "b"),
       pinned("p-1", "c"),
       pinned("p-2", "b"),
-      pinned("p-4", "a", F1),
+      pinned("p-4", "a", threadIdFor("f1")),
       card(),
     ]
     expect(pinnedAt(E2, cards, tree()).map(c => c.id)).toEqual([
@@ -830,15 +862,18 @@ describe("the queue", () => {
     })
   })
 
-  test("planNextQueuedCardPop: a thread in an inventory pops nothing, a fact neither (ADR-0124)", () => {
+  test("planNextQueuedCardPop: a thread in an inventory pops no message, but a fact on top: it starts no run (ADR-0124, ADR-0126)", () => {
     const top = queued(cardIdFor("c1"), "a")
     const away = { ...idle, away: true }
     expect(planNextQueuedCardPop([top], LANE, away)).toEqual({ kind: "idle" })
-    const fact: QueuedCard = {
-      ...queued(cardIdFor("c0"), "0"),
-      carries: { kind: "fact", fact: ACCEPTED },
-    }
-    expect(planNextQueuedCardPop([fact], LANE, away)).toEqual({ kind: "idle" })
+    const fact = factCard({ place: { ...queuedPlace, order: "0" } })
+    expect(planNextQueuedCardPop([fact, top], LANE, away)).toEqual({
+      kind: "pop",
+      card: fact,
+    })
+    expect(
+      planNextQueuedCardPop([fact, top], LANE, { ...away, running: true }),
+    ).toEqual({ kind: "idle" })
   })
 
   test("planNextQueuedCardPop: a held queue pops no message, nor a card someone types in; a fact on top goes whatever (ADR-0048 step 7)", () => {
@@ -860,10 +895,7 @@ describe("the queue", () => {
         typing: new Set([cardIdFor("c2")]),
       }),
     ).toEqual({ kind: "pop", card: top })
-    const fact: QueuedCard = {
-      ...queued(cardIdFor("c0"), "0"),
-      carries: { kind: "fact", fact: ACCEPTED },
-    }
+    const fact = factCard({ place: { ...queuedPlace, order: "0" } })
     expect(
       planNextQueuedCardPop([fact, ...cards], LANE, {
         ...idle,
@@ -882,10 +914,7 @@ describe("the queue", () => {
   describe("planNextQueuedCardPop passes over a blank message, which stays where it is (ADR-0113)", () => {
     const empty = queued(cardIdFor("c1"), "a")
     const next = queued(cardIdFor("c2"), "b")
-    const fact: QueuedCard = {
-      ...queued(cardIdFor("c3"), "c"),
-      carries: { kind: "fact", fact: ACCEPTED },
-    }
+    const fact = factCard({ place: { ...queuedPlace, order: "c" } })
     test.each([
       [
         "a blank top card with a card behind: the second pops",
@@ -926,17 +955,13 @@ describe("the queue", () => {
       ).toEqual(step)
     })
     test.each([
-      ["whitespace", PLAIN, " \n\t", true],
-      ["text", PLAIN, "go", false],
-      [
-        "a command with no text",
-        { kind: "message", command: "split" },
-        "",
-        false,
-      ],
-      ["a fact", { kind: "fact", fact: ACCEPTED }, "", false],
-    ] as const)("isBlankMessage: %s is %s", (_, carries, text, blank) => {
-      expect(isBlankMessage({ ...empty, carries }, text)).toBe(blank)
+      ["whitespace", null, " \n\t", true],
+      ["text", null, "go", false],
+      ["a command with no text", "split", "", false],
+    ] as const)("isBlankMessage: %s is %s", (_, command, text, blank) => {
+      expect(
+        isBlankMessage({ ...empty, content: { command, unsent: null } }, text),
+      ).toBe(blank)
     })
   })
 
@@ -951,7 +976,7 @@ describe("the queue", () => {
     }
     const command: QueuedCard = {
       ...queued(cardIdFor("c3"), "c"),
-      carries: { kind: "message", command: "split" },
+      content: { command: "split", unsent: null },
     }
     const blank = blankQueued([empty, behind, command, card()], {
       holds: (_, seen) => seen === "",
@@ -961,10 +986,7 @@ describe("the queue", () => {
   })
 
   test("planUnqueueAll: every message card queued on the lane, to the note column nearest its thread, in order; a fact and another lane's stay", () => {
-    const fact: QueuedCard = {
-      ...queued(cardIdFor("c0"), "0"),
-      carries: { kind: "fact", fact: ACCEPTED },
-    }
+    const fact = factCard({ place: { ...queuedPlace, order: "0" } })
     const cards = [
       queued(cardIdFor("c2"), "b"),
       fact,
@@ -976,7 +998,6 @@ describe("the queue", () => {
         card: textCardId(id),
         from: {
           kind: "queued",
-          at: atEntry(E2),
           thread: LANE,
           seen: "",
         },
@@ -989,7 +1010,7 @@ describe("the queue", () => {
     const q: QueuedCard = {
       ...queued(cardIdFor("c1"), "a"),
       placer: BEA,
-      carries: { kind: "message", command: "bring-up-to-date" },
+      content: { command: "bring-up-to-date", unsent: null },
     }
     const onCanvas = threadCardOf({
       thread: LANE,
@@ -1015,7 +1036,7 @@ describe("the queue", () => {
         record: {
           ...q,
           place: { kind: "note", column: MADE, order: expect.any(String) },
-          unsent: "no such image",
+          content: { ...q.content, unsent: "no such image" },
         },
       },
     ])
@@ -1042,7 +1063,12 @@ describe("the queue", () => {
         newColumn,
       }),
     ).toEqual({
-      steps: [{ kind: "write", record: { ...q, unsent: "r" } }],
+      steps: [
+        {
+          kind: "write",
+          record: { ...q, content: { ...q.content, unsent: "r" } },
+        },
+      ],
       hold: true,
     })
     expect(
@@ -1058,7 +1084,7 @@ describe("the queue", () => {
         record: {
           ...q,
           place: { kind: "inventory", holder: BEA },
-          unsent: "r",
+          content: { ...q.content, unsent: "r" },
         },
       },
     ])
@@ -1069,12 +1095,10 @@ describe("handoffs (ADR-0059)", () => {
   const C1 = cardIdFor("c1")
   const atEnd = {
     kind: "composing",
-    at: atEntry(E2),
     thread: LANE,
   } as const
   const queuedKey = {
     kind: "queued",
-    at: atEntry(E2),
     thread: LANE,
     seen: "",
   } as const
@@ -1090,8 +1114,7 @@ describe("handoffs (ADR-0059)", () => {
         owner: BEA,
         placer: BEA,
         place: atEnd,
-        carries: PLAIN,
-        unsent: null,
+        content: { command: null, unsent: null },
       },
     })
     const taken = card()
@@ -1119,8 +1142,7 @@ describe("handoffs (ADR-0059)", () => {
     const before = queued(cardIdFor("c0"), orderAfter([]))
     const c = card({
       place: atEnd,
-      unsent: "refused",
-      carries: { kind: "message", command: "bring-up-to-date" },
+      content: { command: "bring-up-to-date", unsent: "refused" },
     })
     const step = planMove(
       [before, c],
@@ -1134,7 +1156,7 @@ describe("handoffs (ADR-0059)", () => {
         ...c,
         place: { ...queuedKey, order: orderAfter([before]), by: BEA },
         placer: BEA,
-        unsent: null,
+        content: { ...c.content, unsent: null },
       },
     })
   })
@@ -1174,8 +1196,7 @@ describe("handoffs (ADR-0059)", () => {
   test("an unqueue keeps the command and why it was not sent", () => {
     const q = {
       ...queued(cardIdFor("c1"), "a"),
-      carries: { kind: "message", command: "bring-up-to-date" },
-      unsent: "x",
+      content: { command: "bring-up-to-date", unsent: "x" },
     } as const
     const step = planMove(
       [q],
@@ -1184,18 +1205,16 @@ describe("handoffs (ADR-0059)", () => {
       NO_DISCARDS,
     )
     expect(step.kind === "write" && step.record).toMatchObject({
-      carries: { kind: "message", command: "bring-up-to-date" },
-      unsent: "x",
+      content: { command: "bring-up-to-date", unsent: "x" },
     })
   })
 
   test("pinning: after every pinned card in the session, any thread's; placed by the sender, who need not own it", () => {
     const pinnedKey = {
       kind: "pinned",
-      at: atEntry(E2),
       thread: LANE,
     } as const
-    const elsewhere = pinned("p-1", orderAfter([]), F1)
+    const elsewhere = pinned("p-1", orderAfter([]), threadIdFor("f1"))
     const c = card({ place: atEnd })
     expect(
       planMove(
@@ -1218,14 +1237,12 @@ describe("handoffs (ADR-0059)", () => {
     const p = card({
       place: {
         kind: "pinned",
-        at: atEntry(E2),
         thread: LANE,
         order: "a",
       },
     })
     const from = {
       kind: "pinned",
-      at: atEntry(E2),
       thread: LANE,
     } as const
     expect(
@@ -1240,14 +1257,13 @@ describe("handoffs (ADR-0059)", () => {
     {
       name: "queued to pinned",
       place: queuedPlace,
-      to: { kind: "pinned", at: atEntry(E2), thread: LANE },
+      to: { kind: "pinned", thread: LANE },
       lands: { order: orderAfter([]) },
     },
     {
       name: "pinned to the queue",
       place: {
         kind: "pinned",
-        at: atEntry(E2),
         thread: LANE,
         order: "a",
       },
@@ -1285,7 +1301,6 @@ describe("handoffs (ADR-0059)", () => {
         "a pinned card",
         {
           kind: "pinned",
-          at: atEntry(E2),
           thread: LANE,
           order: "a",
         },
@@ -1294,7 +1309,6 @@ describe("handoffs (ADR-0059)", () => {
         "a queued card",
         {
           kind: "queued",
-          at: atEntry(E2),
           thread: LANE,
           order: "a",
           by: BEA,
@@ -1368,8 +1382,7 @@ describe("handoffs (ADR-0059)", () => {
       const c = card({
         owner: BEA,
         place: atEnd,
-        carries: { kind: "message", command: "bring-up-to-date" },
-        unsent: "x",
+        content: { command: "bring-up-to-date", unsent: "x" },
       })
       expect(
         planMove([c], { card: C1, from: atEnd, to: mine }, ADA, NO_DISCARDS),
@@ -1608,11 +1621,8 @@ describe("handoffs (ADR-0059)", () => {
       expect(step).toEqual({
         kind: "steps",
         steps: [
-          { kind: "write", record: { ...inFresh(C3), carries: PLAIN } },
-          {
-            kind: "write",
-            record: { ...inFresh(C3), carries: PLAIN, place: inv },
-          },
+          { kind: "write", record: inFresh(C3) },
+          { kind: "write", record: { ...inFresh(C3), place: inv } },
         ],
       })
     })
@@ -1624,7 +1634,7 @@ describe("handoffs (ADR-0059)", () => {
       kind: "write",
       record: {
         ...c,
-        carries: { kind: "message", command: "bring-up-to-date" },
+        content: { command: "bring-up-to-date", unsent: null },
       },
     })
     expect(planSetCommand([], C1, null)).toEqual({
@@ -1662,7 +1672,7 @@ test("planCardSweep: empty cards and documents with no record go; a card with te
 
 test("planCardSweep: a card with a command stays, whatever its text", () => {
   const command = card({
-    carries: { kind: "message", command: "bring-up-to-date" },
+    content: { command: "bring-up-to-date", unsent: null },
   })
   expect(
     planCardSweep({
@@ -1678,14 +1688,13 @@ describe("planReorder (ADR-0048 step 7)", () => {
   const key = (n: number) => n.toString(36).padStart(10, "0")
   const queuedAt = {
     kind: "queued",
-    at: atEntry(E2),
     thread: LANE,
     seen: "",
   } as const
-  const q = (id: string, n: number): QueuedCard => ({
+  const q = (id: string, n: number): QueuedText => ({
     ...queued(id, key(n)),
     placer: ADA,
-    unsent: "not sent: x",
+    content: { command: null, unsent: "not sent: x" },
   })
   const orderIn = (step: ReturnType<typeof planReorder>, id: string) =>
     step.kind === "write" && step.record.id === id
@@ -1736,10 +1745,7 @@ describe("planReorder (ADR-0048 step 7)", () => {
     expect(
       planReorder([a, b], { card: c.id, at, after: null, before: a.id }),
     ).toEqual({ kind: "refused", code: "gone", now: null })
-    const fact: QueuedCard = {
-      ...q(cardIdFor("cf"), 150),
-      carries: { kind: "fact", fact: ACCEPTED },
-    }
+    const fact = factCard({ place: { ...queuedPlace, order: key(150) } })
     expect(
       planReorder([a, fact], { card: fact.id, at, after: null, before: a.id }),
     ).toMatchObject({ kind: "refused", code: "fact" })
@@ -1747,7 +1753,6 @@ describe("planReorder (ADR-0048 step 7)", () => {
       id: c.id,
       place: {
         kind: "composing",
-        at: atEntry(E2),
         thread: LANE,
       },
     })
@@ -1776,10 +1781,7 @@ describe("planReorder (ADR-0048 step 7)", () => {
 
   test("a queued card never passes a fact, up or down", () => {
     const [a, c] = [q(cardIdFor("ca"), 100), q(cardIdFor("cc"), 300)]
-    const fact: QueuedCard = {
-      ...q(cardIdFor("cf"), 200),
-      carries: { kind: "fact", fact: ACCEPTED },
-    }
+    const fact = factCard({ place: { ...queuedPlace, order: key(200) } })
     expect(
       planReorder([a, fact, c], {
         card: c.id,
@@ -1834,12 +1836,11 @@ describe("planReorder (ADR-0048 step 7)", () => {
   test("pinned cards: neighbours among every pinned card, other threads' between them allowed", () => {
     const pinnedAt = {
       kind: "pinned",
-      at: atEntry(E2),
       thread: T_E,
     } as const
     const [a, other, b, c] = [
       pinned("p-a", key(100)),
-      pinned("p-o", key(200), F1),
+      pinned("p-o", key(200), threadIdFor("f1")),
       pinned("p-b", key(300)),
       pinned("p-c", key(400)),
     ]
@@ -1870,6 +1871,7 @@ describe("a reorder on a canvas (ADR-0116)", () => {
     owner: ADA,
     placer: BEA,
     place: { kind: "canvas", task, order: key(n), width },
+    content: NO_CONTENT,
   })
   const [a, b, c] = [
     onCanvas("a", 100),
@@ -2065,7 +2067,6 @@ describe("storage", () => {
       card({
         place: {
           kind: "composing",
-          at: atEntry(E2),
           thread: lane,
         },
       }),
@@ -2076,18 +2077,16 @@ describe("storage", () => {
       card({
         place: {
           kind: "pinned",
-          at: atEntry(E2),
           thread: lane,
           order: "m",
         },
       }),
       card({ place: { kind: "task-pinned", task: TEST_TASK, order: "m" } }),
       card({
-        carries: { kind: "message", command: "bring-up-to-date" },
-        unsent: "refused",
+        content: { command: "bring-up-to-date", unsent: "refused" },
       }),
       card({ placer: BEA }),
-      card({ place: queuedPlace, carries: { kind: "fact", fact: ACCEPTED } }),
+      factCard(),
     ])
       expect(
         decodeCard(c.id, JSON.parse(JSON.stringify(encodeCard(c)))),
@@ -2101,16 +2100,10 @@ describe("storage", () => {
     expect(decodeCard(C, ok)).toEqual(card())
     // A pinned card needs its order.
     expect(decodeCard(C, { ...ok, kind: "pinned" })).toBeUndefined()
+    // And its thread.
     expect(
-      decodeCard(C, {
-        ...ok,
-        kind: "pinned",
-        at: "",
-        thread: T_E,
-        order: "a",
-      }),
+      decodeCard(C, { ...ok, kind: "pinned", lane: "", order: "a" }),
     ).toBeUndefined()
-    expect(decodeCard(C, { ...ok, at: "" })).toBeUndefined()
     expect(decodeCard(C, { ...ok, kind: "fresh" })).toBeUndefined()
     expect(decodeCard(C, { ...ok, kind: "inventory" })).toBeUndefined()
     expect(decodeCard(C, { ...ok, owner: "" })).toBeUndefined()
@@ -2119,14 +2112,20 @@ describe("storage", () => {
     expect(decodeCard(C, noPlacer)).toBeUndefined()
     expect(decodeCard(C, null)).toBeUndefined()
     expect(decodeCard(C, { ...ok, command: "pull" })).toBeUndefined()
-    // A fact this build cannot read, or a fact with a command (ADR-0080).
-    expect(decodeCard(C, { ...ok, fact: "{" })).toBeUndefined()
+    // A fact on a text card's id, a fact this build cannot read, or a fact
+    // with a command (ADR-0080, ADR-0126).
+    const stored = encodeCard(factCard())
+    expect(decodeCard(C, { ...ok, fact: stored.fact })).toBeUndefined()
+    expect(decodeCard(FACT_ID, { ...stored, fact: "{" })).toBeUndefined()
     expect(
-      decodeCard(C, {
-        ...ok,
-        command: "bring-up-to-date",
-        fact: encodeCard(card({ carries: { kind: "fact", fact: ACCEPTED } }))
-          .fact,
+      decodeCard(FACT_ID, { ...stored, command: "bring-up-to-date" }),
+    ).toBeUndefined()
+    // A fact anywhere but a queue.
+    expect(
+      decodeCard(FACT_ID, {
+        ...stored,
+        ...encodeCard(card()),
+        fact: stored.fact,
       }),
     ).toBeUndefined()
     expect(
@@ -2172,10 +2171,9 @@ describe("historyOf: the task a move enters the sender's history in (ADR-0066, A
   const OTHER_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
   const inv = { kind: "inventory", holder: ADA } as const
   const draftingIn = (thread: ThreadId) =>
-    ({ kind: "composing", at: atEntry(E2), thread }) as const
+    ({ kind: "composing", thread }) as const
   const queuedIn = {
     kind: "queued",
-    at: atEntry(E2),
     thread: T_E,
     seen: "",
   } as const

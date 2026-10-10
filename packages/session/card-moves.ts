@@ -23,8 +23,8 @@ import {
   type CardRecord,
   isTextCardId,
   type Move,
-  type MoveRefusal,
   type MoveTarget,
+  type PlaceRefusal,
   placed,
   type QueueMove,
   type Reorder,
@@ -114,7 +114,7 @@ export type CardNotice = {
   readonly actedAt: ActedAt
 } & (
   | {
-      readonly code: MoveRefusal
+      readonly code: PlaceRefusal
       /**
        * `moved`: who put the card where it is now. `gone` from the queue:
        * who queued it, whose message it was sent as.
@@ -401,8 +401,7 @@ export const queuedDraft = (
         owner: me,
         place,
         placer: me,
-        carries: { kind: "message", command },
-        unsent: null,
+        content: { command, unsent: null },
       }
 }
 

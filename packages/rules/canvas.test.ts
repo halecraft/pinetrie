@@ -1,9 +1,10 @@
 import {
+  factCardIdFor,
+  NO_CONTENT,
   noteColumnIdFor,
   type ThreadId,
   type ThreadName,
   taskIdFor,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -49,8 +50,22 @@ const canvas = (ids: readonly (ThreadId | typeof N)[]): readonly CanvasCard[] =>
       } as const
       const placer = i === 0 ? ADA : BEA
       return id === N
-        ? { kind: "note-column", id: N, owner: ADA, placer, place }
-        : { kind: "thread", id: id as ThreadId, owner: ADA, placer, place }
+        ? {
+            kind: "note-column",
+            id: N,
+            owner: ADA,
+            placer,
+            place,
+            content: NO_CONTENT,
+          }
+        : {
+            kind: "thread",
+            id: id as ThreadId,
+            owner: ADA,
+            placer,
+            place,
+            content: NO_CONTENT,
+          }
     }),
     K,
   )
@@ -193,10 +208,6 @@ describe("the context table (ADR-0116)", () => {
   })
 })
 
-function textCardIdOf(id: string) {
-  return textCardId(id)
-}
-
 function read2(id: string) {
   return { id: threadIdFor(id), text: "t", by: ADA }
 }
@@ -302,10 +313,9 @@ describe("a canvas change during a run (ADR-0116)", () => {
     const [steer] = facts()
     planFactCard({
       cards: [],
-      id: textCardIdOf("c1"),
+      id: factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1"),
       // @ts-expect-error: a canvas fact is no fact card's: it would wait for the run's end
       fact: steer?.fact,
-      at: { kind: "root" },
     })
   })
 })

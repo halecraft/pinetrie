@@ -8,7 +8,6 @@
 
 import {
   canvasInView,
-  isTextCardId,
   type NoteColumnId,
   type RootWork,
   type TaskId,
@@ -122,9 +121,7 @@ export function createTaskContext(deps: {
     })
     const pinned = planTaskPinnedRead({
       inView: taskPinnedInView(index, tip),
-      now: pinnedReads(pins, id =>
-        isTextCardId(id) ? deps.cards.textNow(id) : "",
-      ),
+      now: pinnedReads(pins, deps.cards.textNow),
       task,
     })
     // encode

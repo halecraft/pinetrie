@@ -6,7 +6,6 @@
 
 import {
   type CardId,
-  isFact,
   moveOf,
   type TaskId,
   type WorkflowStateId,
@@ -29,8 +28,8 @@ export type SpinTarget =
  * and for the sidebar, the new task placed there and shown once the host
  * answers. The host names its move's history: the task it leaves, or, from
  * your inventory, the task you will be on, which it carries: the new one,
- * for the sidebar; else the one you are on. Nothing for a fact, or a card
- * in someone else's inventory.
+ * for the sidebar; else the one you are on. Nothing for any card but a text
+ * card, or one in someone else's inventory.
  */
 export function planSpinOff(
   card: CardId,
@@ -39,7 +38,7 @@ export function planSpinOff(
   state: IntentState,
 ): readonly Effect[] {
   const now = cardOf(state.cards, card)
-  if (now === undefined || now.kind !== "text" || isFact(now)) return []
+  if (now === undefined || now.kind !== "text") return []
   const { place } = now
   if (place.kind === "inventory" && place.holder !== state.cards.me) return []
   if (place.kind === "gone") return []

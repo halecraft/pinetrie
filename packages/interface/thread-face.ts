@@ -9,11 +9,11 @@ import {
   type EntryId,
   firstLine,
   firstMessageOf,
+  indexAsks,
   type LaneView,
   messageText,
   projectSpine,
   promptOf,
-  type StopRecord,
   type ThreadId,
   type ThreadName,
   type TreeIndex,
@@ -22,6 +22,7 @@ import {
 
 /** A thread's face in a slot. */
 export interface ThreadFace {
+  readonly kind: "thread"
   readonly thread: ThreadId
   /** Its two-word name; null before it has one. */
   readonly name: ThreadName | null
@@ -40,14 +41,13 @@ export interface ThreadFace {
 /** How long a face's lines are kept. */
 const LINE = 40
 
-/** `thread`'s face, from its tree, its lane, its name and banner, and its stops. */
+/** `thread`'s face, from its tree and its asks, its lane, its name and banner. */
 export function threadFace(input: {
   readonly thread: ThreadId
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   readonly banners: ReadonlyMap<ThreadId, BannerRecord>
-  readonly stops: ReadonlyMap<EntryId, StopRecord>
 }): ThreadFace {
   const { thread, index } = input
   // Its first message, not its first entry, which is often a context entry
@@ -62,15 +62,28 @@ export function threadFace(input: {
       : firstLine(messageText(index.entries[id]?.message), LINE)
   const banner = input.banners.get(thread)
   return {
+    kind: "thread",
     thread,
     name: input.names.get(thread) ?? null,
     sprite: banner === undefined ? null : blobUrl(banner.sha),
     first: line(firstId),
     last: end === null || end === firstId ? null : line(end),
-    stopped: prompt !== null && input.stops.has(prompt),
+    stopped: prompt !== null && indexAsks(index).stoppedBy.has(prompt),
     queued: lane?.waiting ?? 0,
   }
 }
+
+/** A thread's face before this tab has read anything of it: its id alone. */
+export const bareThreadFace = (thread: ThreadId): ThreadFace => ({
+  kind: "thread",
+  thread,
+  name: null,
+  sprite: null,
+  first: "",
+  last: null,
+  stopped: false,
+  queued: 0,
+})
 
 /** A face's status in words: "stopped · 2 cards queued", or null for nothing to say. */
 export function faceStatus(face: ThreadFace): string | null {

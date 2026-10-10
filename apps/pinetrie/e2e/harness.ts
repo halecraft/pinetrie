@@ -475,9 +475,9 @@ export function moveTaskTo(
 }
 
 /**
- * Queue `id` on `lane` from where it is, as a column's queue does: at the
- * card's own position, with its text's version as `client` has it (S96).
- * Throws for a card with no position.
+ * Queue `id` on `lane` from where it is, as a column's queue does, with its
+ * text's version as `client` has it (S96). Throws for any card but a text
+ * card.
  */
 export function queueCard(
   client: Omit<SessionClient, "chat">,
@@ -485,11 +485,9 @@ export function queueCard(
   lane: ThreadId,
 ): ReturnType<SessionClient["queueCard"]> {
   const card = drawnCard(client, id)
-  if (card.kind !== "text" || !("at" in card.place))
-    throw new Error(`${id} has no position to queue from`)
-  const { at } = card.place
+  if (card.kind !== "text") throw new Error(`${id} is no text card`)
   return client.queueCard(
-    moveOf(card, { kind: "queued", at, thread: lane, seen: "" }),
+    moveOf(card, { kind: "queued", thread: lane, seen: "" }),
     "keep",
   )
 }
@@ -646,9 +644,8 @@ export async function composeAt(
   void client.createCard(
     {
       id,
-      place: { kind: "composing", at: atEntry(entry), thread },
-      carries: { kind: "message", command: place.command ?? null },
-      unsent: null,
+      place: { kind: "composing", thread },
+      content: { command: place.command ?? null, unsent: null },
     },
     text,
   )

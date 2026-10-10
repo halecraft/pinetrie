@@ -202,9 +202,9 @@ export const TRACED_PLACES = Object.keys(TRACED) as readonly TracedKind[]
 function tracedKey(p: CardPlace | PlaceKey): TracedPlace | null {
   switch (p.kind) {
     case "queued":
-      return { kind: "queued", at: p.at, thread: p.thread, seen: p.seen }
+      return { kind: "queued", thread: p.thread, seen: p.seen }
     case "pinned":
-      return { kind: "pinned", at: p.at, thread: p.thread }
+      return { kind: "pinned", thread: p.thread }
     default:
       return null
   }
@@ -311,7 +311,7 @@ function eventKind(
     return "followed"
   if (
     after.kind === "text" &&
-    after.unsent !== null &&
+    after.content.unsent !== null &&
     before.place.kind === "queued"
   )
     return "unsent"

@@ -1,7 +1,5 @@
 import {
-  atEntry,
   entryId,
-  PLAIN,
   rootIdFor,
   type TextPlace,
   taskIdFor,
@@ -31,8 +29,7 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
       owner: ADA,
       placer: ADA,
       place,
-      carries: PLAIN,
-      unsent: null,
+      content: { command: null, unsent: null },
     },
   })
   // A thread's root is its record's: LANE's is loaded, AWAY's is not.
@@ -47,13 +44,11 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
   applyPlaceSteps(b.places, [
     card("here", {
       kind: "pinned",
-      at: atEntry(E1),
       thread: LANE,
       order: "a",
     }),
     card("away", {
       kind: "pinned",
-      at: atEntry(E1),
       thread: AWAY,
       order: "a",
     }),

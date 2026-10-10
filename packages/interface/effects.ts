@@ -51,7 +51,7 @@ export type Effect =
   | { readonly kind: "layout"; readonly action: LayoutAction }
   /** Show the sidebar at `width`, and keep that choice for this tab. */
   | { readonly kind: "listWidth"; readonly width: ListWidth }
-  /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
+  /** Show a page over the stage, or, with null, the stage (ADR-0098). */
   | { readonly kind: "page"; readonly to: PageName | null }
   /** Mark what `lane` raised "not needed", in your attention document. */
   | {
@@ -193,7 +193,7 @@ export interface IntentState {
   readonly tasks: Tasks
   /** What the sidebar shows now (`shownWidth`). */
   readonly listWidth: ListWidth
-  /** The page over the workspace, if any (ADR-0098). */
+  /** The page over the stage, if any (ADR-0098). */
   readonly page: PageName | null
 }
 

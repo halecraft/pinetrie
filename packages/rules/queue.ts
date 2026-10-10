@@ -7,14 +7,16 @@ import {
   type CardPlace,
   type CardRecord,
   type CatchUpCommand,
+  type FactCard,
+  type FactCardId,
   INVENTORY_SLOTS,
   isTextCard,
   type Move,
+  makeCard,
   moveOf,
   type NoteColumnId,
   noteOf,
-  type OfferFact,
-  type Position,
+  type QueuedFact,
   type TaskId,
   type TextCard,
   type TextCardId,
@@ -22,19 +24,26 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { byOrder } from "./card.ts"
-import type { PlaceStep } from "./moves.ts"
+import { type PlaceStep, planMake } from "./moves.ts"
 import { toNotes } from "./notes.ts"
-import { orderAfter } from "./order.ts"
+import { orderAfter, orderBetween, respace } from "./order.ts"
 
 // ── the queue (ADR-0048 step 3, S69) ──────────────────────────────────────
 
-/** A queued card, with its place narrowed: only a text card is queued. */
-export type QueuedCard = TextCard & {
+/** A queued text card, with its place narrowed. */
+export type QueuedText = TextCard & {
   readonly place: Extract<CardPlace, { kind: "queued" }>
 }
 
+/** A queued card: a text card, or a fact on its way into its thread (ADR-0126). */
+export type QueuedCard = QueuedText | FactCard
+
+/** Whether a queued card is a text card: a message, not a fact. */
+export const isQueuedText = (c: QueuedCard): c is QueuedText =>
+  c.kind === "text"
+
 const isQueued = (c: CardRecord): c is QueuedCard =>
-  c.place.kind === "queued" && isTextCard(c)
+  c.place.kind === "queued" && (c.kind === "text" || c.kind === "fact")
 
 export const isPinned = (
   c: CardRecord,
@@ -79,12 +88,12 @@ export type NextQueuedCardPopStep =
   /** Its queue is held, and its top card is a message (ADR-0048 step 7). */
   | { readonly kind: "held" }
   /** Someone is typing in its top card: it waits until they stop. */
-  | { readonly kind: "typing"; readonly card: QueuedCard }
+  | { readonly kind: "typing"; readonly card: QueuedText }
   /**
    * Every card queued is a blank message (`isBlankMessage`), passed over:
    * it waits for `card`, the first, to be written in.
    */
-  | { readonly kind: "blank"; readonly card: QueuedCard }
+  | { readonly kind: "blank"; readonly card: QueuedText }
   | { readonly kind: "pop"; readonly card: QueuedCard }
 
 /**
@@ -93,9 +102,7 @@ export type NextQueuedCardPopStep =
  * leaving it where it is, rather than send nothing.
  */
 export const isBlankMessage = (card: TextCard, text: string): boolean =>
-  card.carries.kind === "message" &&
-  card.carries.command === null &&
-  text.trim() === ""
+  card.content.command === null && text.trim() === ""
 
 /**
  * The queued cards that are blank messages (`isBlankMessage`), as whoever
@@ -118,8 +125,7 @@ export function blankQueued(
       .filter(isTextCard)
       .flatMap(c =>
         c.place.kind === "queued" &&
-        c.carries.kind === "message" &&
-        c.carries.command === null &&
+        c.content.command === null &&
         texts.holds(c.id, c.place.seen) &&
         isBlankMessage(c, texts.text(c.id))
           ? [c.id]
@@ -132,8 +138,8 @@ export function blankQueued(
 export const NONE_BLANK: ReadonlySet<CardId> = new Set()
 
 /**
- * The next queued card to pop for a lane: none while it runs or its thread
- * is in an inventory; else its top
+ * The next queued card to pop for a lane: none while it runs; only a fact on
+ * top while its thread is in an inventory; else its top
  * card that is not blank (`blank`, each `isBlankMessage`), unless the queue
  * is held or someone is typing in that card. A blank card is passed over
  * and stays where it is, so the cards behind it are not stuck behind
@@ -154,16 +160,22 @@ export function planNextQueuedCardPop(
     readonly blank: ReadonlySet<CardId>
   },
 ): NextQueuedCardPopStep {
-  // A thread in an inventory has no runner (ADR-0124): its queue waits.
-  if (facts.running || facts.away) return { kind: "idle" }
+  if (facts.running) return { kind: "idle" }
   const queue = queuedOn(cards, lane)
   const top = queue.find(c => !facts.blank.has(c.id))
+  // A thread in an inventory has no runner (ADR-0124): its messages wait.
+  // A fact on top starts no run, so it is appended there too: a take's
+  // stop is in the thread, and its face says so (ADR-0126).
+  if (facts.away)
+    return top !== undefined && !isQueuedText(top)
+      ? { kind: "pop", card: top }
+      : { kind: "idle" }
   if (top === undefined) {
-    const first = queue[0]
+    const first = queue.find(isQueuedText)
     if (first === undefined) return { kind: "idle" }
     return facts.held ? { kind: "held" } : { kind: "blank", card: first }
   }
-  if (top.carries.kind === "fact") return { kind: "pop", card: top }
+  if (!isQueuedText(top)) return { kind: "pop", card: top }
   if (facts.held) return { kind: "held" }
   if (facts.typing.has(top.id)) return { kind: "typing", card: top }
   return { kind: "pop", card: top }
@@ -181,7 +193,7 @@ export const planUnqueueAll = (
   lane: ThreadId,
 ): readonly Move[] =>
   queuedOn(cards, lane)
-    .filter(c => c.carries.kind === "message")
+    .filter(isQueuedText)
     .map(c => moveOf(c, noteOf(c.place)))
 
 /**
@@ -197,7 +209,7 @@ export const planUnqueueAll = (
  */
 export function planUnsent(input: {
   readonly cards: readonly CardRecord[]
-  readonly card: QueuedCard
+  readonly card: QueuedText
   readonly reason: string
   /** Mints the id of a note column made for it. */
   readonly newColumn: () => NoteColumnId
@@ -215,7 +227,12 @@ export function planUnsent(input: {
       inventoryFull(cards, notes.place.holder, card.id))
   )
     return {
-      steps: [{ kind: "write", record: { ...card, unsent: reason } }],
+      steps: [
+        {
+          kind: "write",
+          record: { ...card, content: { ...card.content, unsent: reason } },
+        },
+      ],
       hold: true,
     }
   return {
@@ -223,7 +240,11 @@ export function planUnsent(input: {
       ...notes.first,
       {
         kind: "write",
-        record: { ...card, place: notes.place, unsent: reason },
+        record: {
+          ...card,
+          place: notes.place,
+          content: { ...card.content, unsent: reason },
+        },
       },
     ],
     hold: false,
@@ -244,37 +265,67 @@ export const inventoryFull = (
   ).length >= INVENTORY_SLOTS
 
 /**
- * The card a fact rides in (ADR-0080): queued on its lane after every card
- * there, owned and queued by whoever acted, with no text to wait for (`seen`
- * ""). `at` is the thread's end, where an unqueue would put it, though
- * nobody unqueues a fact. The drain pops it in order. Pure.
+ * A fact's card (ADR-0080, ADR-0126): queued on its lane, made by the host
+ * for whoever acted (`makeCard`, `planMake`), its owner and placer, with no
+ * text to wait for (`seen` ""). What a command on the offer did goes after
+ * every card there, in order with them. A stop goes before them: it
+ * happened before anything queued is sent, so the run's end appends it
+ * first, whatever the hold (`planNextQueuedCardPop`), and nothing queued
+ * may pass it. With no room before the first card, the crowded cards are
+ * given new ranks (`respace`), written with it. Null when the host's own
+ * make is refused, which no queue does: the host's shell logs it. Pure.
  */
 export function planFactCard(input: {
   readonly cards: readonly CardRecord[]
-  readonly id: TextCardId
-  readonly fact: OfferFact
-  readonly at: Position
-}): PlaceStep {
+  readonly id: FactCardId
+  readonly fact: QueuedFact
+}): readonly PlaceStep[] | null {
   const { fact } = input
-  return {
-    kind: "write",
-    record: {
-      kind: "text",
-      id: input.id,
-      owner: fact.by,
-      place: {
+  const queue = queuedOn(input.cards, fact.lane)
+  const first =
+    fact.kind === "stopped"
+      ? orderBetween(null, queue[0]?.place.order ?? null)
+      : orderAfter(queue)
+  const spaced =
+    first === null
+      ? respace(
+          queue.map(c => c.place.order),
+          0,
+        )
+      : null
+  const step = planMake(
+    input.cards,
+    makeCard(
+      "fact",
+      input.id,
+      {
         kind: "queued",
-        at: input.at,
         thread: fact.lane,
-        order: orderAfter(queuedOn(input.cards, fact.lane)),
+        order: first ?? spaced?.inserted ?? "",
         by: fact.by,
         seen: "",
       },
-      placer: fact.by,
-      carries: { kind: "fact", fact },
-      unsent: null,
+      { fact },
+      fact.by,
+    ),
+    // No person places a fact (`KINDS`): the host makes it, for `fact.by`.
+    "host",
+  )
+  if (step.kind === "refused") return null
+  const renumbered = [...(spaced?.changed ?? [])].flatMap(
+    ([i, order]): PlaceStep[] => {
+      const card = queue[i]
+      return card === undefined
+        ? []
+        : [
+            {
+              kind: "write",
+              record: { ...card, place: { ...card.place, order } },
+            },
+          ]
     },
-  }
+  )
+  return [step, ...renumbered]
 }
 
 /**
@@ -284,25 +335,37 @@ export function planFactCard(input: {
  * popped (`isBlankMessage`).
  */
 export type CarryPlan =
-  | { readonly kind: "fact"; readonly fact: OfferFact }
+  | { readonly kind: "fact"; readonly fact: QueuedFact }
   | {
       readonly kind: "catch-up"
+      readonly card: QueuedText
       readonly command: CatchUpCommand
       /** After a clean update or nothing new: the card's text, or nothing to send. */
       readonly after: "send" | "discard"
     }
   /** Split the offer in a run of its own, the card's text its intent. */
-  | { readonly kind: "split"; readonly intent: string }
-  | { readonly kind: "send" }
+  | {
+      readonly kind: "split"
+      readonly card: QueuedText
+      readonly intent: string
+    }
+  | { readonly kind: "send"; readonly card: QueuedText }
 
-/** A popped card and its text -> what the drain does with it. Pure. */
-export function planCarry(card: TextCard, text: string): CarryPlan {
-  if (card.carries.kind === "fact")
-    return { kind: "fact", fact: card.carries.fact }
+/**
+ * A popped card and its words (`textSourceOf`: a text card's document, a
+ * fact's fact) -> what the drain does with it. Pure.
+ */
+export function planCarry(card: QueuedCard, text: string): CarryPlan {
+  if (!isQueuedText(card)) return { kind: "fact", fact: card.content.fact }
   const blank = text.trim() === ""
-  const { command } = card.carries
-  if (command === "split") return { kind: "split", intent: text.trim() }
+  const { command } = card.content
+  if (command === "split") return { kind: "split", card, intent: text.trim() }
   if (command !== null)
-    return { kind: "catch-up", command, after: blank ? "discard" : "send" }
-  return { kind: "send" }
+    return {
+      kind: "catch-up",
+      card,
+      command,
+      after: blank ? "discard" : "send",
+    }
+  return { kind: "send", card }
 }

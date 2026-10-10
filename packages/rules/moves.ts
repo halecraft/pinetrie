@@ -9,16 +9,17 @@ import {
   type CardPlace,
   type CardRecord,
   fitsPlace,
-  isFact,
   isNoteColumnId,
   isTextCard,
   isTextCardId,
+  KINDS,
   keyOf,
   kindOfCard,
   type Move,
   type MoveRefusal,
+  makeCard,
+  NO_CONTENT,
   type NoteColumnId,
-  PLAIN,
   type PlaceKey,
   placed,
   type RankedCanvas,
@@ -53,6 +54,9 @@ export type MoveStep =
       /** The card as it is, or null when it is gone. */
       readonly now: CardRecord | null
     }
+
+/** What the host makes of a card made: its write, or a refusal. */
+export type MakeStep = Extract<MoveStep, { readonly kind: "write" | "refused" }>
 
 /**
  * What names a discard's history (ADR-0066, ADR-0116), the host's to decide:
@@ -138,14 +142,19 @@ function placeAt(
 export const ownsPlace = (key: PlaceKey, sender: WriterId): boolean =>
   key.kind !== "inventory" || key.holder === sender
 
-/** Why a move into `to` is refused before the card is looked at; null for none. */
+/**
+ * Why a move into `to` is refused before the card is looked at; null for
+ * none. A kind no person moves (`KINDS`' `moves`: a fact) and a place the
+ * card's kind is never in are refused alike, `no-place`.
+ */
 function refuseInto(
   to: PlaceKey,
   cards: readonly CardRecord[],
   card: CardId,
   sender: WriterId,
 ): MoveRefusal | null {
-  if (!fitsPlace(kindOfCard(card), to.kind)) return "no-place"
+  const kind = kindOfCard(card)
+  if (!KINDS[kind].moves || !fitsPlace(kind, to.kind)) return "no-place"
   if (!ownsPlace(to, sender)) return "not-yours"
   return to.kind === "inventory" && inventoryFull(cards, sender, card)
     ? "full"
@@ -153,27 +162,56 @@ function refuseInto(
 }
 
 /**
- * A card made by `sender` at `to`, the one way every card is made by a
- * person's command (ADR-0059): refused `exists` for an id in use, else as
- * any move into `to` is (`refuseInto`: a place its kind is never in,
- * someone else's inventory, a full one), else `no-place` where no record
- * could be made there (`made` null). `planMove`'s creations and a copy's
- * card (`planCopy`) go through it, so their refusals cannot drift. Pure.
+ * Whether the host writes `card`, made (`makeCard`): the one rule every card
+ * is made by, a person's or the host's (ADR-0126). Refused `exists` for an
+ * id in use, else as any move into its place is (`refuseInto`: a kind no
+ * person moves, someone else's inventory, a full one); the host makes the
+ * kinds no person moves, so its own make is refused only for a full
+ * inventory. Its place fits its kind by its type, so a misplaced card never
+ * reaches this. `planMove`'s creations, a copy's card (`planCopy`), a
+ * thread's card, a note column made for a note, a fact's card and a
+ * split's card all go through it, so their refusals cannot drift. Pure.
  */
 export function planMake(
   cards: readonly CardRecord[],
-  card: CardId,
-  to: PlaceKey | ResolvedTarget,
-  sender: WriterId,
-  made: CardRecord | null,
-): MoveStep {
-  const now = cards.find(c => c.id === card)
+  card: CardRecord,
+  sender: WriterId | "host",
+): MakeStep {
+  const now = cards.find(c => c.id === card.id)
   if (now !== undefined) return { kind: "refused", code: "exists", now }
-  const refusal = refuseInto(to, cards, card, sender)
-  if (refusal !== null) return { kind: "refused", code: refusal, now: null }
-  return made === null
-    ? { kind: "refused", code: "no-place", now: null }
-    : { kind: "write", record: made }
+  const to = keyOf(card.place)
+  const refusal =
+    sender === "host"
+      ? to.kind === "inventory" && inventoryFull(cards, to.holder, card.id)
+        ? "full"
+        : null
+      : refuseInto(to, cards, card.id, sender)
+  return refusal === null
+    ? { kind: "write", record: card }
+    : { kind: "refused", code: refusal, now: null }
+}
+
+/**
+ * A card a person's move makes at `place`, of the kind its id says: a text
+ * card with no command, or a note column on a canvas; undefined for any
+ * other kind, or a place its kind is never in.
+ */
+function madeAt(
+  card: CardId,
+  place: CardPlace,
+  sender: WriterId,
+): CardRecord | undefined {
+  if (isTextCardId(card) && place.kind !== "canvas")
+    return makeCard(
+      "text",
+      card,
+      place,
+      { command: null, unsent: null },
+      sender,
+    )
+  if (isNoteColumnId(card) && place.kind === "canvas")
+    return makeCard("note-column", card, place, NO_CONTENT, sender)
+  return undefined
 }
 
 /**
@@ -183,9 +221,10 @@ export function planMake(
  * already is refused `moved`: `planReorder` changes a place in line. Every
  * accepted move names its sender as the card's placer. Pure.
  *
- * - No `from`: the card is created, its sender its owner, with no command.
- * - A card carrying a fact is the host's (ADR-0080): every move of it is
- *   refused `fact`.
+ * - No `from`: the card is created, its sender its owner, with no command
+ *   (`planMake`).
+ * - A fact is the host's (ADR-0080): no person moves its kind (`KINDS`),
+ *   so every move of it is refused `no-place`.
  * - To gone: a discard (ADR-0111), from any place the sender may move out
  *   of. A gone card moves only by an undo, which is no handoff: a move out
  *   of gone is refused `gone`.
@@ -206,40 +245,16 @@ export function planMove(
   if (move.from === null) {
     // A move makes a text card, or a note column on a canvas: a thread's
     // card is the host's to make, with its thread's first message or a
-    // copy (`planCopy`).
+    // copy (`planCopy`), and a fact's with its fact (`planFactCard`).
     const place = placeAt(move.to, cards, sender, undefined, discards)
     const made =
-      place === undefined
-        ? undefined
-        : isNoteColumnId(move.card)
-          ? place.kind === "canvas"
-            ? ({
-                kind: "note-column",
-                id: move.card,
-                owner: sender,
-                place,
-                placer: sender,
-              } as const)
-            : undefined
-          : isTextCardId(move.card) && place.kind !== "canvas"
-            ? ({
-                kind: "text",
-                id: move.card,
-                owner: sender,
-                place,
-                placer: sender,
-                carries: PLAIN,
-                unsent: null,
-              } as const)
-            : undefined
+      place === undefined ? undefined : madeAt(move.card, place, sender)
     return made === undefined
-      ? planMake(cards, move.card, move.to, sender, null)
-      : planMake(cards, move.card, move.to, sender, made)
+      ? { kind: "refused", code: "no-place", now: null }
+      : planMake(cards, made, sender)
   }
   if (now === undefined || now.place.kind === "gone")
     return { kind: "refused", code: "gone", now: null }
-  // A fact is the host's, on its way into the thread: nobody moves it.
-  if (isFact(now)) return { kind: "refused", code: "fact", now }
   if (!seenAt(keyOf(now.place), move.from))
     return { kind: "refused", code: "moved", now }
   // A move to where the card is would requeue it last, under its sender's
@@ -256,11 +271,11 @@ export function planMove(
   return {
     kind: "write",
     record:
-      record.kind === "text"
+      record.kind === "text" && move.to.kind === "queued"
         ? {
             ...record,
             placer: sender,
-            unsent: move.to.kind === "queued" ? null : record.unsent,
+            content: { ...record.content, unsent: null },
           }
         : { ...record, placer: sender },
   }

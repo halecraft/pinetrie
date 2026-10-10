@@ -120,17 +120,45 @@ test("isLongAsk: a run of LONG_ASK agent messages, not one fewer", () => {
   expect(isLongAsk(indexAsks(rows(0)), entryId("0-p"))).toBe(false)
 })
 
+test("a stop's fact names who stopped its ask, and is drawn in it: the first press's (ADR-0126)", () => {
+  const stopFact = (by: string): Message => ({
+    role: "fact",
+    content: "■ the run was stopped",
+    stopped: { prompt: entryId("1-p"), by: writerId(by) },
+  })
+  const index = build([
+    entry("1-p", null, chat()),
+    entry("2-a", "1-p", said("word wo", { stopReason: "aborted" })),
+    entry("3-f", "2-a", stopFact("bea")),
+    entry("4-f", "3-f", stopFact("cal")),
+    entry("5-c", "4-f", { role: "carry-on", content: "go on" }),
+  ])
+  const asks = indexAsks(index)
+  expect(asks.stoppedBy.get(entryId("1-p"))).toBe(writerId("bea"))
+  expect(asks.steered.get(entryId("3-f"))).toBe("1-p")
+  expect(asks.askOf.has(entryId("3-f"))).toBe(false)
+  expect(askOutcome(index, asks, entryId("1-p"), { running: false })).toEqual({
+    kind: "stopped",
+    by: writerId("bea"),
+  })
+})
+
 describe("askOutcome and lastWord, over S70's endings", () => {
   const ask = (rows: readonly EntryLike[]) => {
     const index = build([entry("1-p", null, chat()), ...rows])
     const asks = indexAsks(index)
     const p = entryId("1-p")
     return {
+      /** Its outcome, the stop's fact naming `by` when given. */
       outcome: (stop?: { by: ReturnType<typeof writerId>; at: number }) =>
-        askOutcome(index, asks, p, {
-          running: false,
-          stop: stop === undefined ? undefined : { prompt: p, ...stop },
-        }),
+        askOutcome(
+          index,
+          stop === undefined
+            ? asks
+            : { ...asks, stoppedBy: new Map([[p, stop.by]]) },
+          p,
+          { running: false },
+        ),
       word: lastWord(index, asks, p),
     }
   }
@@ -193,10 +221,7 @@ describe("askOutcome and lastWord, over S70's endings", () => {
   test("running is running", () => {
     const index = build([entry("1-p", null, chat())])
     expect(
-      askOutcome(index, indexAsks(index), entryId("1-p"), {
-        running: true,
-        stop: undefined,
-      }),
+      askOutcome(index, indexAsks(index), entryId("1-p"), { running: true }),
     ).toEqual({ kind: "running" })
   })
 })

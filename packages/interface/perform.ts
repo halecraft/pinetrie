@@ -59,7 +59,7 @@ export interface AppPorts {
   readonly reload: () => void
   /** Show the sidebar at a width, and keep the choice for this tab (ADR-0088). */
   readonly listWidth: (width: ListWidth) => void
-  /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
+  /** Show a page over the stage, or, with null, the stage (ADR-0098). */
   readonly page: (to: PageName | null) => void
 }
 

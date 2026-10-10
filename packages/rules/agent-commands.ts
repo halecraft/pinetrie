@@ -10,14 +10,15 @@ import {
   type CommitId,
   type CopyFacts,
   commandOf,
-  type Position,
+  type MoveRefusal,
+  makeCard,
   type TextCardId,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import { type CatchUpNow, type ParentNow, parentAhead } from "./base.ts"
 import type { LandMessage } from "./land.ts"
-import type { PlaceStep } from "./moves.ts"
+import { type PlaceStep, planMake } from "./moves.ts"
 import type { OfferStatus } from "./offer.ts"
 import { orderAfter } from "./order.ts"
 import { queuedOn } from "./queue.ts"
@@ -181,6 +182,10 @@ export function splitRefusal(code: SplitRefusal): string {
   }
 }
 
+/** What `split_offer` answers when the host refused its own card, which it never does. */
+export const SPLIT_UNMADE =
+  "The split was not queued: the host could not make its card."
+
 /** What `split_offer` answers once it queued the split. */
 export const SPLIT_QUEUED =
   "Queued: the split runs when this run ends, as a run of its own."
@@ -201,36 +206,35 @@ export function planSplitCall(input: {
   readonly running: boolean
   readonly by: WriterId
   readonly id: TextCardId
-  readonly at: Position
 }):
   | { readonly kind: "queue"; readonly step: PlaceStep }
-  | { readonly kind: "refused"; readonly why: SplitRefusal } {
+  | { readonly kind: "refused"; readonly why: SplitRefusal }
+  /** The host's own make of the card was refused, which none is: its shell logs it. */
+  | { readonly kind: "unmade"; readonly code: MoveRefusal } {
   if (input.offer.kind !== "open") return { kind: "refused", why: "no-offer" }
   if (input.running && input.prompt === "stack")
     return { kind: "refused", why: "splitting" }
   const queued = queuedOn(input.cards, input.lane)
   if (queued.some(c => commandOf(c) === "split"))
     return { kind: "refused", why: "queued" }
-  return {
-    kind: "queue",
-    step: {
-      kind: "write",
-      record: {
-        kind: "text",
-        id: input.id,
-        owner: input.by,
-        place: {
-          kind: "queued",
-          at: input.at,
-          thread: input.lane,
-          order: orderAfter(queued),
-          by: input.by,
-          seen: "",
-        },
-        placer: input.by,
-        carries: { kind: "message", command: "split" },
-        unsent: null,
+  const step = planMake(
+    input.cards,
+    makeCard(
+      "text",
+      input.id,
+      {
+        kind: "queued",
+        thread: input.lane,
+        order: orderAfter(queued),
+        by: input.by,
+        seen: "",
       },
-    },
-  }
+      { command: "split", unsent: null },
+      input.by,
+    ),
+    input.by,
+  )
+  return step.kind === "refused"
+    ? { kind: "unmade", code: step.code }
+    : { kind: "queue", step }
 }

@@ -13,10 +13,8 @@ import type {
   AskIndex,
   CardId,
   CardRecord,
-  EntryId,
   LaneView,
   Position,
-  StopRecord,
   TreeIndex,
 } from "@pinetrie/core"
 import {
@@ -35,11 +33,12 @@ import {
   type ReadOnly,
 } from "@pinetrie/interface"
 import { readTypingIn } from "@pinetrie/reads"
-import { factLine, type QueuedCard } from "@pinetrie/rules"
+import type { QueuedCard } from "@pinetrie/rules"
 import { newCardId, type SessionClient } from "@pinetrie/session"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { QueuedCardEditor } from "./card-editor.tsx"
 import { Menu } from "./menu.tsx"
+import { RENDERINGS } from "./renderings.tsx"
 
 export function Dock(p: {
   session: SessionClient
@@ -52,7 +51,6 @@ export function Dock(p: {
   blank: ReadonlySet<CardId>
   index: TreeIndex
   asks: AskIndex
-  stops: ReadonlyMap<EntryId, StopRecord>
   /** Where "+ add to queue" makes its card: the thread's end and root. */
   queueAt: { readonly at: Position } | null
   reader: Reader
@@ -76,7 +74,6 @@ export function Dock(p: {
           blank: p.blank,
           index: p.index,
           asks: p.asks,
-          stops: p.stops,
         })
   const plan = head === null ? null : queueHeadPlan(head)
   // "+ add to queue" focuses its card's box once the card is drawn.
@@ -152,12 +149,11 @@ export function Dock(p: {
       {queued.length > 0 && (
         <div className="queue-cards">
           {queued.map(c =>
-            c.carries.kind === "fact" ? (
-              // The host's fact, waiting for the run's end: nobody edits
-              // or moves it (ADR-0080).
-              <div className="queued-fact" key={c.id}>
-                {factLine(c.carries.fact)}
-              </div>
+            c.kind === "fact" ? (
+              // The host's fact, waiting for the run's end: a dock draws
+              // its cards normal (`DETAIL_ON`), and nobody edits or moves
+              // it (ADR-0080).
+              <RENDERINGS.fact.Normal card={c} key={c.id} width={1} />
             ) : (
               <div
                 className="queued-card"

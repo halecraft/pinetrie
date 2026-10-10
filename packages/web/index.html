@@ -20,7 +20,7 @@
       button { padding: .5rem .9rem; border-radius: 6px; border: 0; background: #2f6feb; color: #fff; font: inherit; cursor: pointer; }
       .actions button, .tools button { background: none; border: 1px solid #3a3f48; color: #aaa;
         padding: .05rem .45rem; border-radius: 3px; }
-      /* The sidebar down the left, the workspace beside it, and the footer under
+      /* The sidebar down the left, the stage beside it, and the footer under
          both (ADR-0122). There is no header: the columns start at the top. */
       body {
         margin: 0; height: 100vh; display: grid;
@@ -166,8 +166,8 @@
       :root[data-list="icons"] .list-fold { align-self: center; }
       .connecting, .nothing-here { margin: 1rem; color: #6f7784; }
 
-      /* The workspace: the rail (E, everything in this root) beside the columns (paths). */
-      #workspace { grid-column: 2; grid-row: 1; position: relative; display: flex;
+      /* The stage: the rail (E, everything in this root) beside the columns (paths). */
+      #stage { grid-column: 2; grid-row: 1; position: relative; display: flex;
         min-height: 0; min-width: 0; background: var(--page); }
       .rail { position: relative; flex: 0 0 auto; min-width: 3rem; padding: 0 .25rem;
         overflow-y: auto; border-right: 1px solid #23272e; }
@@ -201,11 +201,11 @@
       @keyframes pulse { 50% { transform: scale(1.8); } }
       /* An unsent card of yours (ADR-0048): a round pip in your colour, ringed in
          the colour behind it (--surface) so it reads on whatever it sits on. */
-      .card-pip { display: inline-block; flex: 0 0 auto; width: 6px; height: 6px;
+      .signal[data-signal="unsent"] { display: inline-block; flex: 0 0 auto; width: 6px; height: 6px;
         border-radius: 50%; box-shadow: 0 0 0 1.5px var(--surface); }
       /* On a rail dot: centred, with no ring, so the track's colour shows
          around it. 4 px in the 8 px dot keeps it on whole pixels. */
-      .rail-dot > .card-pip { position: absolute; left: 2px; top: 2px; width: 4px; height: 4px;
+      .rail-dot > .signal[data-signal="unsent"] { position: absolute; left: 2px; top: 2px; width: 4px; height: 4px;
         box-shadow: none; }
       /* The pane's container: `100cqw` is the strip's width (S109). */
       #strip { flex: 1; display: flex; overflow-x: auto; min-width: 0;
@@ -867,7 +867,7 @@
       .pinned-read-retired { margin: .3rem 0 0 .75rem; font-style: italic; }
       /* Your inventory (ADR-0048): floating over the columns' middle, docked
          left, centre or right, a 3 × 6 card grid. */
-      .inventory { position: fixed; z-index: 5; top: 30vh; width: min(52rem, 94vw);
+      .inventory { position: fixed; z-index: 5; top: 30vh; width: max-content; max-width: 94vw;
         background: #171a1f; border: 1px solid #3a3f48; border-radius: 8px;
         box-shadow: 0 8px 32px rgb(0 0 0 / .5); }
       .inventory[data-dock="left"] { left: 1rem; }
@@ -876,6 +876,22 @@
       .inventory-frame { padding: .3rem .75rem; font-size: .75rem; color: #8b93a1;
         cursor: grab; user-select: none; border-bottom: 1px solid #23272e; touch-action: none; }
       .inventory-body { padding: .75rem; }
+      /* The selected card's preview (ADR-0126): beside the grid, away from the
+         panel's dock edge, one column wide, normal and read only. */
+      .inventory-grid-row { display: flex; gap: .75rem; align-items: flex-start; }
+      .inventory-grid-row > .preview { flex: 0 0 min(28rem, 40vw); width: min(28rem, 40vw); }
+      .inventory-grid-row > .preview[data-side="left"] { order: -1; }
+      /* A card drawn normal: the card itself, bounded at a column's height. */
+      .card-normal { display: flex; flex-direction: column; max-height: 18rem;
+        background: #1b1e24; border: 1px solid #2c313a; border-radius: 6px; font-size: .8rem; }
+      .card-normal-head { padding: .25rem .6rem; color: #8b93a1; border-bottom: 1px solid #23272e; }
+      .card-normal-body { padding: .4rem .75rem; overflow-y: auto; min-height: 0; }
+      .card-normal-title { font-weight: 600; margin-bottom: .3rem; }
+      .card-normal-message { margin-bottom: .5rem; }
+      .note-column-face { display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem;
+        font-size: .72rem; }
+      .note-column-face-title { font-weight: 600; }
+      .note-column-face-count { margin-left: auto; color: #8b93a1; }
       /* A card grid (ADR-0113): index cards about 8 × 5.5rem in their cells,
          empty cells dashed; the open card lifted over its neighbours. */
       .card-grid { display: grid; grid-auto-rows: 5.5rem; gap: .35rem; }
@@ -1203,7 +1219,7 @@
       .menu-badge { background: #e0c080; color: #111; }
       .menu-count { color: #8b93a1; font-weight: 400; }
 
-      /* A page over the workspace (ADR-0098): in the workspace's cell, after
+      /* A page over the stage (ADR-0098): in the stage's cell, after
          it and as high as the board, so it covers both; the footer's menus
          (4) open over it. */
       .page { grid-column: 2; grid-row: 1; position: relative; z-index: 3; min-height: 0;
@@ -1243,7 +1259,7 @@
       /* The sidebar folded (ADR-0088), after the rules these refine: your pip
          on an icon's corner, and the footer's corner holding only your
          avatar, which carries the inbox's badge (ADR-0098). */
-      .open-icon .card-pip { position: absolute; bottom: -2px; right: -2px; }
+      .open-icon .signal[data-signal="unsent"] { position: absolute; bottom: -2px; right: -2px; }
       :root[data-list="icons"] .footer-you { justify-content: center; padding: 0; }
       :root[data-list="icons"] .footer-you .account { flex: none; }
       :root[data-list="icons"] .me-trigger { padding: .2rem; }

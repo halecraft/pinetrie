@@ -1,17 +1,14 @@
 import {
   type AgentMessageLike,
-  atEntry,
   type CardId,
   type CardRecord,
-  type EntryId,
   entryId,
   indexAsks,
   type LaneView,
-  PLAIN,
-  type StopRecord,
   type TextCard,
   textCardId,
   threadIdFor,
+  type WriterId,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
@@ -32,8 +29,8 @@ const A = threadIdFor("a")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 
-/** A prompt and its reply, stopped or answered. */
-const index = (stopped: boolean) =>
+/** A prompt and its reply, stopped or answered; stopped, its stop's fact names `by`. */
+const index = (stopped: boolean, by: WriterId | null = null) =>
   indexOf([
     entry("1", null, { role: "chat", content: "go" }),
     entry("2", "1", {
@@ -41,6 +38,15 @@ const index = (stopped: boolean) =>
       content: [{ type: "text", text: "half" }],
       stopReason: stopped ? "aborted" : "stop",
     } as AgentMessageLike),
+    ...(by === null
+      ? []
+      : [
+          entry("3", "2", {
+            role: "fact",
+            content: "■ the run was stopped",
+            stopped: { prompt: entryId("1"), by },
+          }),
+        ]),
   ])
 
 const lane = (over: Partial<LaneView> = {}): LaneView => ({
@@ -61,14 +67,12 @@ const queued = (id: string, order: string): TextCard => ({
   placer: ADA,
   place: {
     kind: "queued",
-    at: atEntry(entryId("2")),
     thread: A,
     order,
     by: ADA,
     seen: "",
   },
-  carries: PLAIN,
-  unsent: null,
+  content: { command: null, unsent: null },
 })
 const C1 = cardIdFor("c1")
 const C2 = cardIdFor("c2")
@@ -80,17 +84,16 @@ const facts = (
     cards?: readonly CardRecord[]
     typing?: readonly CardId[]
     blank?: readonly string[]
-    stops?: ReadonlyMap<EntryId, StopRecord>
+    stoppedBy?: WriterId
   } = {},
 ): NextFacts => {
-  const i = index(over.stopped ?? false)
+  const i = index(over.stopped ?? false, over.stoppedBy ?? null)
   return {
     cards: over.cards ?? [],
     typing: new Set(over.typing ?? []),
     blank: new Set((over.blank ?? []).map(textCardId)),
     index: i,
     asks: indexAsks(i),
-    stops: over.stops ?? new Map(),
   }
 }
 
@@ -126,12 +129,7 @@ describe("nextOf: what the thread does next, as the host decides it (ADR-0113)",
     [
       "stopped, nothing queued: who stopped it",
       {},
-      {
-        stopped: true,
-        stops: new Map([
-          [entryId("1"), { prompt: entryId("1"), by: BEA, at: 1 }],
-        ]),
-      },
+      { stopped: true, stoppedBy: BEA },
       { kind: "stopped", by: BEA },
     ],
     ["answered, nothing queued", {}, {}, { kind: "idle" }],

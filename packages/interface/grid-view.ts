@@ -3,17 +3,23 @@
 // (core's `grid.ts`). Pure: `inventoryView` builds one,
 // and `CardGrid` (`packages/web/card-grid.tsx`) draws it.
 
-import type { CardId, CardRecord, Grid, ThreadId } from "@pinetrie/core"
-import { type CardFaceView, type CardTone, cardFace } from "./card-frame.ts"
+import type {
+  CardId,
+  CardRecord,
+  Grid,
+  NoteColumnId,
+  ThreadId,
+} from "@pinetrie/core"
+import type { CardTone } from "./card-frame.ts"
+import { type Face, faceOf } from "./face.ts"
+import type { NoteColumnView } from "./note-column-view.ts"
 import type { ThreadFace } from "./thread-face.ts"
 
 export interface GridCell {
   readonly index: number
-  /** Its card, and the card folded; null for an empty cell. */
+  /** Its card, and the card at its least detail (`faceOf`); null for an empty cell. */
   readonly card: CardRecord | null
-  readonly face: CardFaceView | null
-  /** A thread's card: its face (ADR-0124); null for any other. */
-  readonly thread: ThreadFace | null
+  readonly face: Face | null
   readonly selected: boolean
 }
 
@@ -30,6 +36,8 @@ export interface GridView {
  * `placed` (cell to card) drawn on `grid` as `tone`, `selected` selected.
  * `keyOf` labels a cell's face (the inventory's 1–9).
  */
+const NONE: ReadonlyMap<never, never> = new Map<never, never>()
+
 export function gridView(input: {
   readonly grid: Grid
   readonly tone: CardTone
@@ -37,8 +45,10 @@ export function gridView(input: {
   readonly selected: number
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>
-  /** Each thread's face, by its id; one without is drawn by its card's face. */
+  /** Each thread's face, by its id (ADR-0124). */
   readonly threads?: ReadonlyMap<ThreadId, ThreadFace>
+  /** Each note column, as its column draws it. */
+  readonly notes?: ReadonlyMap<NoteColumnId, NoteColumnView>
   readonly keyOf?: (cell: number) => string | null
 }): GridView {
   const { rows } = input.grid
@@ -50,12 +60,13 @@ export function gridView(input: {
       face:
         card === null
           ? null
-          : cardFace(card, input.texts.get(card.id) ?? "", {
+          : faceOf(card, {
               tone: input.tone,
               key: input.keyOf?.(index) ?? null,
+              texts: input.texts,
+              threads: input.threads ?? NONE,
+              notes: input.notes ?? NONE,
             }),
-      thread:
-        card?.kind === "thread" ? (input.threads?.get(card.id) ?? null) : null,
       selected: index === input.selected,
     }
   })

@@ -1,9 +1,9 @@
-// interface/page — a page that covers the workspace (ADR-0098): its name in
+// interface/page — a page that covers the stage (ADR-0098): its name in
 // the URL's hash, how leaving it treats the browser's history, and its words.
 // Pure: the page's shell (`use-page.ts`) reads `location` and `history` and
 // carries these out.
 
-/** A page that covers the workspace. The profile is the first. */
+/** A page that covers the stage. The profile is the first. */
 export type PageName = "profile"
 
 const PAGES: readonly PageName[] = ["profile"]
@@ -11,7 +11,7 @@ const PAGES: readonly PageName[] = ["profile"]
 const isPage = (name: string): name is PageName =>
   (PAGES as readonly string[]).includes(name)
 
-/** The page a URL hash names, or null for the workspace. */
+/** The page a URL hash names, or null for the stage. */
 export function pageOfHash(hash: string): PageName | null {
   const name = hash.startsWith("#") ? hash.slice(1) : ""
   return isPage(name) ? name : null
@@ -25,7 +25,7 @@ export const PAGE_STATE = { pinetrie: "page" } as const
 
 /**
  * How to leave a page. "back" when this tab pushed its entry, so Back
- * returns to the workspace's entry; "replace" when the page was loaded from
+ * returns to the stage's entry; "replace" when the page was loaded from
  * its URL, where Back would leave pine·trie.
  */
 export function planLeave(historyState: unknown): "back" | "replace" {

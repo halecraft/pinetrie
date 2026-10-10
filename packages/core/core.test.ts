@@ -5,6 +5,7 @@ import assert from "node:assert/strict"
 import {
   address,
   atEntry,
+  type CardId,
   type CardPlace,
   type CardRecord,
   type ChatAt,
@@ -24,6 +25,7 @@ import {
   type MoveTarget,
   messageText,
   moveOf,
+  NO_CONTENT,
   NOBODY,
   type NotesTarget,
   nonEmpty,
@@ -344,7 +346,6 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     { kind: "note", column: NOTES, order: "c" },
     {
       kind: "queued",
-      at: atEntry(entryId("e-1")),
       thread: threadIdFor("x"),
       order: "a",
       by: ADA,
@@ -352,7 +353,6 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     },
     {
       kind: "pinned",
-      at: atEntry(entryId("e-1")),
       thread: threadIdFor("x"),
       order: "b",
     },
@@ -381,7 +381,6 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(placeOfFields({ ...f, lane: "" })).toBeUndefined()
     expect(keyOf(pinned)).toEqual({
       kind: "pinned",
-      at: atEntry(entryId("e-1")),
       thread: threadIdFor("x"),
     })
   })
@@ -460,6 +459,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       owner: by,
       place: canvas,
       placer: by,
+      content: NO_CONTENT,
     }
     const thread: CardRecord = {
       kind: "thread",
@@ -467,6 +467,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       owner: by,
       place: canvas,
       placer: by,
+      content: NO_CONTENT,
     }
     expect(placed(thread, held)?.place).toEqual(held)
     expect(placed(column, held)).toBeUndefined()
@@ -480,11 +481,14 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       "",
       "c-1",
       "n-1",
-      `x-${UUID}`,
+      "x-1",
+      `y-${UUID}`,
       UUID.toUpperCase(),
       `${UUID}x`,
     ])
       expect(parseCardId(id)).toBeUndefined()
+    expect(parseCardId(`x-${UUID}`)).toBe(`x-${UUID}`)
+    expect(kindOfCard(`x-${UUID}` as CardId)).toBe("fact")
     expect(parseTextCardId(`n-${UUID}`)).toBeUndefined()
     expect(parseTextCardId(UUID)).toBe(UUID)
   })
@@ -585,15 +589,14 @@ describe("moves, built once (ADR-0059)", () => {
   const ADA = writerId("ada@example.com")
   const LANE = threadIdFor("x")
   const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
-  const at = atEntry(entryId("e-1"))
+  const _at = atEntry(entryId("e-1"))
   const card = (place: TextPlace): TextCard => ({
     kind: "text",
     id: cardIdFor("c1"),
     owner: ADA,
     place,
     placer: ADA,
-    carries: { kind: "message", command: null },
-    unsent: null,
+    content: { command: null, unsent: null },
   })
   const atEnd = card({ kind: "note", column: NOTES, order: "a" })
   test("a move goes from where the card is; a discard names no history: the host's to name", () => {
@@ -679,7 +682,6 @@ describe("moves, built once (ADR-0059)", () => {
     expect(
       noteOf({
         kind: "queued",
-        at,
         thread: LANE,
         order: "a",
         by: ADA,
@@ -689,13 +691,12 @@ describe("moves, built once (ADR-0059)", () => {
   })
 
   test("a pin pins your message or a queued card at the same thread end; a note is at no thread", () => {
-    const pinned = { kind: "pinned", at, thread: LANE }
-    expect(pinnedOf({ kind: "composing", at, thread: LANE })).toEqual(pinned)
+    const pinned = { kind: "pinned", thread: LANE }
+    expect(pinnedOf({ kind: "composing", thread: LANE })).toEqual(pinned)
     expect(pinnedOf({ kind: "note", column: NOTES })).toBeNull()
     expect(
       pinnedOf({
         kind: "queued",
-        at,
         thread: LANE,
         order: "a",
         by: ADA,
@@ -726,13 +727,11 @@ describe("threads, by construction (ADR-0117)", () => {
 test("every place writes only the fields its kind's row stores (`ROWS`)", () => {
   const thread = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
   const task = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ab")
-  const at = atEntry(entryId("e-1"))
   const places: readonly (CardPlace | MoveTarget)[] = [
-    { kind: "composing", at, thread },
-    { kind: "pinned", at, thread, order: "a" },
+    { kind: "composing", thread },
+    { kind: "pinned", thread, order: "a" },
     {
       kind: "queued",
-      at,
       thread,
       order: "a",
       by: writerId("a@x.io"),

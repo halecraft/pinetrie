@@ -3,6 +3,7 @@ import {
   type CardWidth,
   type EntryId,
   entryId,
+  NO_CONTENT,
   type NoteColumnId,
   noteColumnIdFor,
   type ThreadId,
@@ -49,6 +50,7 @@ const canvasFor = (
             owner: ADA,
             placer: ADA,
             place,
+            content: NO_CONTENT,
           }
         : {
             kind: "thread",
@@ -56,6 +58,7 @@ const canvasFor = (
             owner: ADA,
             placer: ADA,
             place,
+            content: NO_CONTENT,
           }
     }),
     TASK,
@@ -168,6 +171,7 @@ describe("canvasColumns (ADR-0116)", () => {
       owner: ADA,
       placer: ADA,
       place: { kind: "inventory", holder },
+      content: NO_CONTENT,
     })
     expect(heldByOthers([card(BEA)], ADA)).toEqual(new Map([[TRUNK, BEA]]))
     expect(heldByOthers([card(ADA)], ADA)).toEqual(new Map())

@@ -143,7 +143,7 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
       return "inventory full"
     case "not-yours":
       return "not moved: that inventory is someone else's"
-    // A fact's card, or a reorder that would pass one: either stays put.
+    // A reorder of a fact's card, or one that would pass it: it stays put.
     case "fact":
       return "not moved: a note the thread will read keeps its place"
     case "order-changed":

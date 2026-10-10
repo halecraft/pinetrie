@@ -3,7 +3,6 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 // record reads back whole from what is stored.
 
 import {
-  atEntry,
   commitId,
   entryId,
   type OfferRecord,
@@ -44,7 +43,6 @@ import {
   ROOT,
   recordsOf,
   SEAT,
-  STOP,
   setIfChanged,
   setRecord,
   TASK,
@@ -57,6 +55,13 @@ const ADA = writerId("ada@x.io")
 const L = threadIdFor("1")
 const E = entryId("e-1")
 const C = commitId("c1")
+const DIGESTED = {
+  prompt: E,
+  headline: "Done",
+  points: [],
+  at: 1,
+  final: true,
+}
 
 const offer: OfferRecord = {
   lane: L,
@@ -142,7 +147,6 @@ const SAMPLES: readonly Sample[] = [
     "task",
   ),
   sample("task", TASK, { task: TEST_TASK, by: ADA, createdAt: 1 }, "task"),
-  sample("stop", STOP, { prompt: E, by: ADA, at: 1 }, "prompt"),
   sample(
     "digest",
     DIGEST,
@@ -249,7 +253,7 @@ const SAMPLES: readonly Sample[] = [
           kind: "created",
           by: ADA,
           from: null,
-          to: { kind: "composing", at: atEntry(E), thread: L },
+          to: { kind: "composing", thread: L },
           at: 1,
         },
         {
@@ -257,7 +261,6 @@ const SAMPLES: readonly Sample[] = [
           by: null,
           from: {
             kind: "composing",
-            at: atEntry(E),
             thread: L,
           },
           to: { kind: "inventory", holder: ADA },
@@ -277,7 +280,6 @@ const SAMPLES: readonly Sample[] = [
       by: writerId("bea@x.io"),
       from: {
         kind: "pinned",
-        at: atEntry(E),
         thread: TEST_THREAD,
       },
       to: null,
@@ -380,7 +382,6 @@ test("each record lives where it is read (ADR-0063): across roots in the session
     board: "session",
     mark: "session",
     task: "session",
-    stop: "root",
     digest: "root",
     seat: "session",
     participant: "session",
@@ -404,20 +405,21 @@ test("each record lives where it is read (ADR-0063): across roots in the session
 
 test("a write goes to the document its home names", () => {
   expect(setRecord(OFFER, offer).target).toEqual({ kind: "session" })
-  expect(
-    setRecord(STOP, { prompt: E, by: ADA, at: 1 }, TEST_ROOT).target,
-  ).toEqual({ kind: "root", root: TEST_ROOT })
+  expect(setRecord(DIGEST, DIGESTED, TEST_ROOT).target).toEqual({
+    kind: "root",
+    root: TEST_ROOT,
+  })
   // @ts-expect-error a root's record names its root
-  setRecord(STOP, { prompt: E, by: ADA, at: 1 })
+  setRecord(DIGEST, DIGESTED)
   // @ts-expect-error a session's record names none
   setRecord(OFFER, offer, TEST_ROOT)
 })
 
 test("deleteRecord names the spec's namespace and the key", () => {
-  expect(deleteRecord(STOP, E, TEST_ROOT)).toEqual({
+  expect(deleteRecord(DIGEST, E, TEST_ROOT)).toEqual({
     kind: "delete",
     target: { kind: "root", root: TEST_ROOT },
-    namespace: "pinetrie.stop",
+    namespace: "pinetrie.digest",
     key: E,
   })
 })
@@ -526,9 +528,8 @@ describe("every spec, and writes by document", () => {
       name: "amber-fox" as ThreadName,
       at: 1,
     })
-    const stop = { prompt: entryId("e-1"), by: writerId("a"), at: 1 }
-    const marked = setRecord(STOP, stop, root)
-    const unmarked = deleteRecord(STOP, entryId("e-1"), root)
+    const marked = setRecord(DIGEST, DIGESTED, root)
+    const unmarked = deleteRecord(DIGEST, E, root)
     expect(byTarget([marked, name, unmarked])).toEqual([
       [{ kind: "root", root }, [marked, unmarked]],
       [{ kind: "session" }, [name]],

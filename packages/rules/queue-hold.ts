@@ -126,12 +126,13 @@ const withCommand = (step: MovesStep, command: CardCommand): MovesStep =>
     : {
         kind: "steps",
         steps: step.steps.map(s =>
-          s.kind === "write" &&
-          s.record.kind === "text" &&
-          s.record.carries.kind === "message"
+          s.kind === "write" && s.record.kind === "text"
             ? {
                 kind: "write",
-                record: { ...s.record, carries: { kind: "message", command } },
+                record: {
+                  ...s.record,
+                  content: { ...s.record.content, command },
+                },
               }
             : s,
         ),
@@ -151,7 +152,7 @@ export function holdOnStop(input: {
 }): QueueHold | null {
   const { lane } = input
   if (input.holds.has(lane)) return null
-  return input.queue.some(c => c.carries.kind === "message")
+  return input.queue.some(c => c.kind === "text")
     ? { lane, by: input.by, at: input.now }
     : null
 }

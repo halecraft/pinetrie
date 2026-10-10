@@ -1,8 +1,6 @@
 import { createInMemoryStore, Exchange } from "@kyneta/exchange"
 import { batch, createDocAs, exportEntirety, merge } from "@kyneta/schema"
 import {
-  atEntry,
-  entryId,
   type TextCard,
   textCardId,
   threadIdFor,
@@ -64,14 +62,12 @@ test("blankQueued: a queued card made empty is blank; one queued with text is no
     placer: ADA,
     place: {
       kind: "queued",
-      at: atEntry(entryId("e-1")),
       thread: threadIdFor("x"),
       order: "a",
       by: ADA,
       seen: s,
     },
-    carries: { kind: "message", command: null },
-    unsent: null,
+    content: { command: null, unsent: null },
   })
   const queue = [queuedAs(cardIdFor("c0"), ""), queuedAs(id, seen)]
   expect([...(await cards.blankQueued(queue))]).toEqual([cardIdFor("c0")])

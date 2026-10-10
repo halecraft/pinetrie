@@ -1,5 +1,4 @@
 import {
-  atEntry,
   type CardRecord,
   entryId,
   rootIdFor,
@@ -67,7 +66,6 @@ type Ports = ReturnType<typeof ports>
 const identity = { email: "a@x.test", name: "Ada" }
 const show = { kind: "show", here: { kind: "nothing" } } as const
 const lane = threadIdFor("x")
-const at = atEntry(entryId("e"))
 const ada = writerId("ada@x.test")
 const move = {
   card: textCardId("c"),
@@ -79,9 +77,8 @@ const card: CardRecord = {
   id: textCardId("c"),
   owner: ada,
   placer: ada,
-  place: { kind: "composing", at, thread: lane },
-  carries: { kind: "message", command: "bring-up-to-date" },
-  unsent: null,
+  place: { kind: "composing", thread: lane },
+  content: { command: "bring-up-to-date", unsent: null },
 }
 
 interface Row {

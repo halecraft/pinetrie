@@ -6,7 +6,7 @@ What the session document says, read once, by the host and the client alike.
 
 - **A root's reads take its `RootDocHandle`**: `readTreeIndex`,
   `readRenderableEntries`, `readLatestPrompt`, `readRevisions`,
-  `readStops`, `readDigests`, and `readRootRecord`, the root's directory
+  `readDigests`, and `readRootRecord`, the root's directory
   record as the host writes it.
 - **The session's reads take its `SessionDocHandle`**: every record read
   across roots (`readLaneRecords`, `readNames`, `readOffers`, `readWorkflow`,
@@ -46,8 +46,7 @@ behind it, `promptAuthor`, ADR-0080),
 archive, derived and kept while the same, since every write to the
 session's values wakes it), `readMarks` (each task's title, ADR-0045,
 ADR-0116), `readTasks`, `readReadingTasks` (each followed end's task, from
-presence), `readStops` and
-`readDigests` (ADR-0106), and
+presence), `readDigests` (ADR-0106), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (the project's root, written only by a host with tools).
 `worksOwn` says whether a send's thread works, or will work, in a copy of

@@ -25,7 +25,7 @@ const remPx = (): number =>
 /**
  * Whether the strip in `strip` is too narrow, kept as it resizes: the sidebar
  * folding or unfolding, or the window. The strip comes and goes with what
- * the workspace shows, so each render checks whether it is still the element
+ * the stage shows, so each render checks whether it is still the element
  * observed. State changes only when the answer does.
  */
 export function useStripNarrow(strip: RefObject<HTMLElement | null>): boolean {

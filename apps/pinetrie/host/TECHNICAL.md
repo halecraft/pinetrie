@@ -245,7 +245,10 @@ until the next compaction (S120), and the host compacts at startup. So
   second start finds nothing to do. It writes under the document's current
   schema, so its hash stays. The backup is taken after the reads, before
   the first write. Each is deleted, with its mutations, once Duane's store
-  has run it. None is registered now: `0003-workflow-archive` (the
+  has run it. Registered now: `0009-card-content` (ADR-0126): each
+  place at a thread loses the `at` its row and its history events kept,
+  and each fact stored on a text card's id moves to an `x-` fact card's,
+  with its history. `0003-workflow-archive` (the
   workflow's `closed` state renamed `archive`), `0004-threads` (each thread
   named in its first message, ADR-0117), `0005-tasks`' records (a task per
   root, ADR-0116), `0006-note-columns` (each thread's notes moved from
@@ -400,12 +403,15 @@ rejects `shutdown()`.
   each command, or a popped card, runs or writes a message; a branch's fork
   is read from its root's tree; `heldIn` finds one in someone's inventory,
   and the command is refused "put it on a canvas first". The drain asks the
-  same before it pops (`away`), so a held thread's queue waits.
+  same before it pops (`away`), so a held thread's messages wait; a fact
+  on top is popped all the same (it starts no run), so a take's stop is in
+  the thread, and its face says it was stopped.
 - **A take stops the run in the step that made it**: `provenance.after`,
   which every person's change to the places goes through, finds the threads
   it took into an inventory (`takenIn`) and calls the dispatcher's
-  `onTaken`, which stops each running one with `handleStop`, as the taker.
-  A move, an undo or a redo take alike.
+  `onTaken`, which stops each running one with `handleStop`, as the taker:
+  the one stop planner, so a take's stop is a fact too. Provenance itself
+  writes no fact. A move, an undo or a redo take alike.
 - **A copy** (`copyThread`, `commands/cards.ts`): `planCopy` over the
   source's record and tree; the copy's `THREAD` record first, then its card,
   then its name (`names.ensure`). Its first send is a branch at its fork:
@@ -638,13 +644,16 @@ rejects `shutdown()`.
 - **`reserve` is answered `reserved`** whether it named the id or the id
   had a name already, so a column may send it again; an id pi holds is
   refused `lane_id_in_use`.
-- **Stop records who pressed it before it aborts** (ADR-0106): `planStop`
-  (`@pinetrie/rules`) gives the `pinetrie.stop` record for the running ask's prompt, unless one is
-  there, and `handleStop` writes it, then asks pi to abort, in one step. So
-  the record is there when the run's end is drawn, and the first press is
-  the one named. With a message card queued it holds the queue in the same
-  write (`holdOnStop`, ADR-0048 step 7), so the run's end, a drain on the
-  same keeper, pops nothing.
+- **Stop queues who pressed it before it aborts** (ADR-0106, ADR-0126):
+  `planStop` (`@pinetrie/rules`) gives the fact card naming the running
+  ask's stopper, unless one is queued or appended already, and
+  `handleStop` writes it (with its history, a host write), then asks pi to
+  abort, in one step. So the fact is queued when the run ends, and the
+  first press is the one named. With a message card queued it holds the
+  queue first (`holdOnStop`, ADR-0048 step 7); the run's end, a drain on
+  the same keeper, appends the stop's fact, which goes before the cards,
+  and pops nothing else. The run's verdict names the stopper from the
+  queued fact (`endedOutcome`).
 - **`queue-hold` holds or releases a thread's queue** (`handleQueueHold`,
   `planQueueHold`): it answers how the queue is now, `held` or `released`,
   whether it wrote or the queue was already so. A release asks for the lane's drain: nothing else
@@ -666,7 +675,7 @@ rejects `shutdown()`.
   `move`, so it is one step one undo reverses; with nothing queued it
   answers `nothing`.
 - **A command on an offer leaves a fact** (ADR-0080): `actOnOffer`
-  answers first, then writes the action's fact as a queued card in a keeper
+  answers first, then writes the action's fact as a queued fact card in a keeper
   step of its own (`recordFact`), with its history (`provenance`, cause
   `host`, as for the split card `split_offer` queues), and asks for the
   lane's drain. An idle

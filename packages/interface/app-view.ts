@@ -1,7 +1,7 @@
 // interface/app-view — what the page shows, decided. PURE.
 //
 // `appView` decides; it does not project. The projections (`projectColumns`,
-// `pathIds`, `branchColors`, `cardMarks`) stay in `App`'s own `useMemo`s and
+// `pathIds`, `branchColors`, `unsentSignals`) stay in `App`'s own `useMemo`s and
 // their results come in: one tree rebuilt each render would give every
 // memoised child new props (S54, S59).
 
@@ -57,7 +57,7 @@ export interface ColumnSlot {
   readonly track: number
 }
 
-export type Workspace =
+export type Stage =
   /** Before the first `prune`: nothing is chosen yet. */
   | { readonly kind: "connecting" }
   /** No task and no new tab: the board, and ＋ (ADR-0122). */
@@ -164,14 +164,14 @@ export interface OpenOffer {
 }
 
 export function appView(input: AppViewInput): {
-  readonly workspace: Workspace
+  readonly stage: Stage
   /** Open offers whose lane has a tip, for your inbox and the board. */
   readonly offers: readonly OpenOffer[]
 } {
-  return { workspace: workspaceOf(input), offers: openOffers(input) }
+  return { stage: stageOf(input), offers: openOffers(input) }
 }
 
-function workspaceOf(input: AppViewInput): Workspace {
+function stageOf(input: AppViewInput): Stage {
   const { active, columns, tracks } = input
   if (active === null) return { kind: "connecting" }
   const slots = (closable: (c: Column) => boolean): readonly ColumnSlot[] =>

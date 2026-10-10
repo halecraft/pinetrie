@@ -5,8 +5,10 @@ import {
   type CardRecord,
   type EntryId,
   entryId,
+  factCardIdFor,
   INVENTORY_SLOTS,
   indexAsks,
+  NO_CONTENT,
   rootIdFor,
   type TaskId,
   type TextCard,
@@ -133,6 +135,7 @@ const inventoryOf = (holder: WriterId): ThreadCard => ({
   owner: ME,
   placer: holder,
   place: { kind: "inventory", holder },
+  content: NO_CONTENT,
 })
 /** A link to a thread on `task`'s canvas. */
 const linkOn = (task: TaskId) =>
@@ -366,8 +369,7 @@ describe("planIntent", () => {
       owner: ME,
       placer: ME,
       place,
-      carries: { kind: "message", command: null },
-      unsent: null,
+      content: { command: null, unsent: null },
     }
     const holding = { ...NO_CARDS, cards: [held] }
     const R1 = at(onRoot("1-r1"), undefined, holding)
@@ -559,6 +561,7 @@ describe("planIntent", () => {
         work: new Map([[entryId("2-a"), [entryId("4-c")]]]),
         last: new Map([[entryId("2-a"), entryId("4-c")]]),
         steered: new Map(),
+        stoppedBy: new Map(),
       }
       const effects = plan(
         { kind: "openAt", entry: entryId("4-c") },
@@ -646,6 +649,7 @@ describe("planIntent", () => {
         owner: ME,
         placer: ME,
         place: { kind: "inventory", holder: ME },
+        content: NO_CONTENT,
       }
       const state = at(onRoot("1-r1"), indexAsks(index), {
         ...NO_CARDS,
@@ -731,9 +735,8 @@ describe("planIntent", () => {
       id: cardIdFor("c105"),
       owner: ada,
       placer: ada,
-      place: { kind: "composing", at: where, thread: lane },
-      carries: { kind: "message", command: null },
-      unsent: null,
+      place: { kind: "composing", thread: lane },
+      content: { command: null, unsent: null },
     }
     const here = { kind: "column", key: F } as const
     const inColumn = { actedAt: here, slot: null }
@@ -743,12 +746,10 @@ describe("planIntent", () => {
     ])
     const atEnd = {
       kind: "composing",
-      at: where,
       thread: lane,
     } as const
     const queuedPlace = {
       kind: "queued",
-      at: where,
       thread: lane,
       order: "a",
       by: ada,
@@ -773,7 +774,7 @@ describe("planIntent", () => {
         const move = {
           card: c,
           from: atEnd,
-          to: { kind: "queued", at: where, thread: lane, seen: "" },
+          to: { kind: "queued", thread: lane, seen: "" },
         }
         expect(plan(queue, state)).toEqual([
           {
@@ -792,7 +793,7 @@ describe("planIntent", () => {
       const state = at(onRoot("1-r1"), undefined, withCard(queuedPlace))
       const move = {
         card: c,
-        from: { kind: "queued", at: where, thread: lane, seen: "v" },
+        from: { kind: "queued", thread: lane, seen: "v" },
         to: { kind: "notes", near: "thread", thread: lane },
       }
       expect(plan(unqueue, state)).toEqual([
@@ -818,11 +819,12 @@ describe("planIntent", () => {
         }) satisfies CardRecord
       const [a, b] = [q(cardIdFor("ca"), "a"), q(cardIdFor("cb"), "b")]
       const fact = {
-        ...q(cardIdFor("cf"), "c"),
-        carries: {
-          kind: "fact",
-          fact: { kind: "described", lane, by: ada },
-        },
+        kind: "fact",
+        id: factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1"),
+        owner: ada,
+        placer: ada,
+        place: { ...queuedPlace, order: "c" },
+        content: { fact: { kind: "described", lane, by: ada } },
       } satisfies CardRecord
       const state = at(onRoot("1-r1"), undefined, {
         ...NO_CARDS,
@@ -836,7 +838,7 @@ describe("planIntent", () => {
           kind: "reorderCard",
           reorder: {
             card: b.id,
-            at: { kind: "queued", at: where, thread: lane, seen: "v" },
+            at: { kind: "queued", thread: lane, seen: "v" },
             after: null,
             before: a.id,
           },
@@ -886,7 +888,7 @@ describe("planIntent", () => {
           move: {
             card: fresh.id,
             from: null,
-            to: { kind: "queued", at: where, thread: lane, seen: "" },
+            to: { kind: "queued", thread: lane, seen: "" },
           },
           hold: "keep",
           command: "bring-up-to-date",
@@ -977,7 +979,7 @@ test("foldList asks for the width the sidebar does not show", () => {
   ])
 })
 
-describe("a page over the workspace (ADR-0098)", () => {
+describe("a page over the stage (ADR-0098)", () => {
   const onPage: IntentState = { ...R1, page: "profile" }
   const leave: Effect = { kind: "page", to: null }
   const r2: Intent = {
@@ -1009,7 +1011,7 @@ describe("a page over the workspace (ADR-0098)", () => {
     }
     expect(plan(inbox, onPage)[0]).toEqual(leave)
   })
-  test("what shows nothing in the workspace leaves the page where it is", () => {
+  test("what shows nothing in the stage leaves the page where it is", () => {
     for (const intent of [
       { kind: "board", open: false },
       { kind: "foldList" },

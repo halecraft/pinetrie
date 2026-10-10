@@ -5,7 +5,7 @@
 // key-system redesign replaces this file.
 
 import { type Grid, type GridStep, step } from "@pinetrie/core"
-import type { KeyLike } from "./inventory-keys.ts"
+import type { KeyLike } from "./page-keys.ts"
 
 export type GridAct =
   | { readonly kind: "select"; readonly cell: number }

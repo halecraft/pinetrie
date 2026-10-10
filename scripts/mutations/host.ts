@@ -83,8 +83,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a split card is sent as a message",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "      return splitThen(deps, lane, popped, plan.intent)",
-    to: "      return sendCard(deps, popped, popped.card)",
+    from: "      return splitThen(deps, lane, plan.card, plan.intent)",
+    to: "      return sendCard(deps, { card: plan.card, text: popped.text }, plan.card)",
     command: unit,
     expect: "a split card starts the split's own run",
   },
@@ -149,7 +149,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queued fact is dropped",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "      return appendFact(deps, lane, popped, plan.fact)",
+    from: "      return appendFact(deps, lane, plan.fact)",
     to: '      return "next"',
     command: unit,
     expect: "a queued fact is appended as the fact",
@@ -492,8 +492,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card that brings the thread up to date is sent as a plain one",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "      return catchUpThenSend(deps, lane, popped, plan)",
-    to: "      return sendCard(deps, popped, popped.card)",
+    from: "      return catchUpThenSend(\n        deps,\n        lane,\n        { card: plan.card, text: popped.text },\n        plan,\n      )",
+    to: "      return sendCard(deps, { card: plan.card, text: popped.text }, plan.card)",
     command: unit,
     expect: "clean: the update, then the card's text as a message",
   },
@@ -517,7 +517,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a command carried out is kept on a card sent back",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "  return sendCard(deps, popped, { ...card, carries: PLAIN })",
+    from: "  return sendCard(deps, popped, {\n    ...card,\n    content: { ...card.content, command: null },\n  })",
     to: "  return sendCard(deps, popped, card)",
     command: unit,
     expect: "its text refused after a clean update",
@@ -942,10 +942,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop is recorded after the abort",
     file: "apps/pinetrie/host/commands/lane.ts",
-    from: "    if (writes.length > 0) await deps.records.writeValues(writes)\n    if (!deps.cancel(lane)) await agent.lane(lane).abort()\n",
-    to: "    if (!deps.cancel(lane)) await agent.lane(lane).abort()\n    if (writes.length > 0) await deps.records.writeValues(writes)\n",
+    from: '    if (planned.fact.length > 0) {\n      const before = deps.provenance.before()\n      applyPlaceSteps(places, planned.fact)\n      await deps.provenance.after({ kind: "host" }, before)\n    }\n    if (!deps.cancel(lane)) await agent.lane(lane).abort()\n',
+    to: '    if (!deps.cancel(lane)) await agent.lane(lane).abort()\n    if (planned.fact.length > 0) {\n      const before = deps.provenance.before()\n      applyPlaceSteps(places, planned.fact)\n      await deps.provenance.after({ kind: "host" }, before)\n    }\n',
     command: unit,
-    expect: "records who stopped its ask, then aborts",
+    expect:
+      "stopping a running lane queues the fact of who stopped its ask, then aborts its run (ADR-0126)",
   },
   {
     name: "a late live digest overwrites the final one",
@@ -1030,8 +1031,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the pop ignores whether the host holds the text",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: '  if (!texts.holds(card.id, card.place.seen)) return { kind: "behind", card }',
-    to: '  if (false) return { kind: "behind", card }',
+    from: "  if (isQueuedText(card) && !texts.holds(card.id, card.place.seen))",
+    to: "  if (isQueuedText(card) && false)",
     command: unit,
     expect: "a top card whose text the host does not yet hold is behind",
   },
@@ -1594,10 +1595,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop holds nothing",
     file: "apps/pinetrie/host/commands/lane.ts",
-    from: "      ...(planned.hold === null ? [] : [setRecord(QUEUE_HOLD, planned.hold)]),",
+    from: "    if (planned.hold !== null)\n      await deps.records.writeValues([setRecord(QUEUE_HOLD, planned.hold)])\n",
     to: "",
     command: unit,
-    expect: "a stop with a message card queued holds the queue",
+    expect:
+      "a stop with a message card queued holds the queue before the abort, and its fact goes before the card (ADR-0048 step 7)",
   },
   {
     name: "a release drains nothing",
@@ -1880,5 +1882,30 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "an undo that puts a running thread back in an inventory stops it too: the stop follows the places change, whatever wrote it",
+  },
+  {
+    name: "0009 keeps a row's at",
+    file: "apps/pinetrie/host/migrations/0009-card-content.ts",
+    from: "    } else if (keepsAt(row)) rows[id] = withoutAt(row)\n",
+    to: "    }\n",
+    command: unit,
+    expect: "a row at a thread loses its `at`, and still decodes as it did",
+  },
+  {
+    name: "0009 leaves a fact on a text card's id",
+    file: "apps/pinetrie/host/migrations/0009-card-content.ts",
+    from: "    if (isOldFact(id, row)) {",
+    to: "    if (false) {",
+    command: unit,
+    expect:
+      "a fact on a text card's id moves to an `x-` id, a fact card, with its history",
+  },
+  {
+    name: "0009 runs again",
+    file: "apps/pinetrie/host/migrations/0009-card-content.ts",
+    from: '  AT_THREAD.has(row.kind ?? "") && (row.at ?? "") !== ""',
+    to: '  AT_THREAD.has(row.kind ?? "")',
+    command: unit,
+    expect: "a second run finds nothing",
   },
 ]

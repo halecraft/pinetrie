@@ -3,6 +3,7 @@ import {
   entryId,
   INVENTORY_SLOTS,
   indexTree,
+  NO_CONTENT,
   rootIdFor,
   type ThreadRecord,
   taskIdFor,
@@ -12,7 +13,7 @@ import {
 import { cardIdFor, fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { type CopyThread, planCopy } from "./copy.ts"
-import { threadCardOf } from "./task.ts"
+import { threadCardOf } from "./fixtures.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -74,6 +75,7 @@ describe("planCopy (ADR-0117, ADR-0124)", () => {
         owner: ADA,
         placer: ADA,
         place: { kind: "canvas", task: TASK, width: 1 },
+        content: NO_CONTENT,
       },
     })
     // Into the copier's own inventory.
@@ -128,8 +130,7 @@ describe("planCopy (ADR-0117, ADR-0124)", () => {
       owner: ADA,
       placer: ADA,
       place: { kind: "inventory" as const, holder: ADA },
-      carries: { kind: "message" as const, command: null },
-      unsent: null,
+      content: { command: null, unsent: null },
     }))
     expect(
       plan(

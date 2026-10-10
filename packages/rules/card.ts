@@ -11,31 +11,28 @@
 import {
   asPlaceFields,
   CARD_COMMANDS,
-  type CardCarries,
   type CardCommand,
   type CardId,
   type CardPlace,
   type CardRecord,
   type EntryId,
-  isNoteColumnId,
   isTextCard,
-  isTextCardId,
-  isThreadId,
+  kindOfCard,
+  NO_CONTENT,
   type OrderedPlace,
-  PLAIN,
-  type Position,
   parseCardId,
+  placed,
   placeFields,
   placeOfFields,
   type TextCard,
+  type ThreadId,
   type TreeIndex,
-  threadAt,
   threadEnd,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
-import { decodeOfferFact, encodeOfferFact } from "./fact.ts"
+import { decodeQueuedFact, encodeQueuedFact } from "./fact.ts"
 
 /**
  * A card as the places document stores it: flat strings, "" for none. The
@@ -84,48 +81,29 @@ interface StoredCardFields {
 }
 
 /**
- * A card record -> the flat value the places document stores under its id.
- * A thread's card has no text, so no command, fact or reason unsent.
+ * A card record -> the flat value the places document stores under its id:
+ * its place's fields, and its content's. A text card's command and reason
+ * unsent, a fact card's fact; a thread's card and a note column hold none.
  */
 export const encodeCard = (card: CardRecord): StoredCardFields => ({
   owner: card.owner,
   ...placeFields(card.place),
-  command:
-    card.kind === "text" && card.carries.kind === "message"
-      ? (card.carries.command ?? "")
-      : "",
-  fact:
-    card.kind === "text" && card.carries.kind === "fact"
-      ? encodeOfferFact(card.carries.fact)
-      : "",
-  unsent: card.kind === "text" ? (card.unsent ?? "") : "",
+  command: card.kind === "text" ? (card.content.command ?? "") : "",
+  fact: card.kind === "fact" ? encodeQueuedFact(card.content.fact) : "",
+  unsent: card.kind === "text" ? (card.content.unsent ?? "") : "",
   placer: card.placer,
 })
 
 const isCommand = (s: string): s is CardCommand =>
   (CARD_COMMANDS as readonly string[]).includes(s)
 
-/** A card's stored command and fact -> what it carries; undefined for neither readable, or both. */
-function carriesOf(command: string, fact: string): CardCarries | undefined {
-  if (fact === "")
-    return command === ""
-      ? PLAIN
-      : isCommand(command)
-        ? { kind: "message", command }
-        : undefined
-  if (command !== "") return undefined
-  const decoded = decodeOfferFact(fact)
-  return decoded === undefined ? undefined : { kind: "fact", fact: decoded }
-}
-
 /**
  * A stored card -> its record, of the kind its id says (`kindOfCard`);
- * undefined for one that is malformed, in a place its kind is never in, a
- * command or a fact this build does not know among them, or a fact with a
- * command. Total. Where it is is read by core's `placeOfFields`, as a move's
- * key on the wire is by `keyOfFields`. A record stored before facts has no
- * `fact`, and is a message. A kind of card this build does not hold yet is
- * left out.
+ * undefined for one that is malformed, in a place its kind is never in
+ * (`placed`), with a command this build does not know, with content its kind
+ * does not hold (a fact on a text card, a command on a fact), or of a kind
+ * this build holds no records of yet. Total. Where it is is read by core's
+ * `placeOfFields`, as a move's key on the wire is by `keyOfFields`.
  */
 export const decodeCard = (
   id: string,
@@ -137,41 +115,68 @@ export const decodeCard = (
     if (place === undefined || card === undefined) return undefined
     const owner = c.owner as WriterId
     const placer = c.placer as WriterId
-    if (isThreadId(card))
-      return place.kind === "canvas" || place.kind === "inventory"
-        ? { kind: "thread", id: card, owner, place, placer }
-        : undefined
-    if (isNoteColumnId(card))
-      return place.kind === "canvas"
-        ? { kind: "note-column", id: card, owner, place, placer }
-        : undefined
-    if (!isTextCardId(card) || place.kind === "canvas") return undefined
-    const carries = carriesOf(c.command, c.fact ?? "")
-    if (carries === undefined) return undefined
-    return {
-      kind: "text",
-      id: card,
-      owner,
-      place,
-      placer,
-      carries,
-      unsent: c.unsent === "" ? null : c.unsent,
-    }
+    const fact = c.fact ?? ""
+    const record = ((): CardRecord | undefined => {
+      const kind = kindOfCard(card)
+      switch (kind) {
+        case "thread":
+        case "note-column":
+          return c.command !== "" || fact !== ""
+            ? undefined
+            : ({
+                kind,
+                id: card,
+                owner,
+                placer,
+                place,
+                content: NO_CONTENT,
+              } as CardRecord)
+        case "fact": {
+          const decoded = c.command === "" ? decodeQueuedFact(fact) : undefined
+          return decoded === undefined
+            ? undefined
+            : ({
+                kind,
+                id: card,
+                owner,
+                placer,
+                place,
+                content: { fact: decoded },
+              } as CardRecord)
+        }
+        case "text":
+          return fact !== "" || (c.command !== "" && !isCommand(c.command))
+            ? undefined
+            : ({
+                kind,
+                id: card,
+                owner,
+                placer,
+                place,
+                content: {
+                  command: c.command === "" ? null : (c.command as CardCommand),
+                  unsent: c.unsent === "" ? null : c.unsent,
+                },
+              } as CardRecord)
+        case "media":
+        case "file":
+          return undefined
+      }
+    })()
+    // Built with its place unchecked above; `placed` refuses a place its
+    // kind is never in.
+    return record === undefined ? undefined : placed(record, place)
   })
 
 /**
- * Where a place kept at a thread's end resolves now: the end of the thread
- * its `at` is in (`threadAt`, `threadEnd`), so it follows its thread as the
- * thread grows. Null when `at` is in no thread.
+ * Where a place at a thread resolves now: its thread's end (`threadEnd`), so
+ * it follows its thread as the thread grows. Null when the thread has no
+ * entry this index holds.
  */
-export function placeEnd(
-  place: { readonly at: Position },
+export const placeEnd = (
+  place: { readonly thread: ThreadId },
   index: TreeIndex,
-): EntryId | null {
-  if (place.at.kind !== "entry") return null
-  const thread = threadAt(index, place.at.id)
-  return thread === null ? null : threadEnd(index, thread)
-}
+): EntryId | null => threadEnd(index, place.thread)
 
 /**
  * Your message's thread end now (ADR-0113); null for any other card, or a
@@ -242,8 +247,10 @@ export function yourCard(
 }
 
 /**
- * What a starting host deletes: records whose text is empty and that carry
- * no command and no fact, and stored `card:` documents with no record. Pure.
+ * What a starting host deletes: text cards whose text is empty and that
+ * carry no command, and stored `card:` documents with no record. Only a
+ * text card's words are a document (`KINDS`' `text`), so no other kind is
+ * swept for its lack of one. Pure.
  */
 export function planCardSweep(input: {
   readonly cards: readonly CardRecord[]
@@ -253,14 +260,10 @@ export function planCardSweep(input: {
   readonly stored: readonly string[]
   readonly cardOfDoc: (docId: string) => CardId | undefined
 }): { readonly records: CardId[]; readonly docs: string[] } {
-  // A thread's card has no text, and is never swept for its lack of one.
   const records = input.cards
     .filter(isTextCard)
     .filter(
-      c =>
-        c.carries.kind === "message" &&
-        c.carries.command === null &&
-        (input.texts.get(c.id) ?? "") === "",
+      c => c.content.command === null && (input.texts.get(c.id) ?? "") === "",
     )
     .map(c => c.id)
   const live = new Set<string>(

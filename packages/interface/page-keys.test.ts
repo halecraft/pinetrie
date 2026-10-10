@@ -1,6 +1,6 @@
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import { type KeyFocus, type KeyLike, keyAct } from "./inventory-keys.ts"
+import { type KeyFocus, type KeyLike, keyAct } from "./page-keys.ts"
 
 const C1 = cardIdFor("c1")
 const C2 = cardIdFor("c2")
@@ -77,7 +77,7 @@ describe("keyAct", () => {
   })
 })
 
-test("while a page covers the workspace only the list's fold acts (ADR-0098)", () => {
+test("while a page covers the stage only the list's fold acts (ADR-0098)", () => {
   const onPage = focus({ page: true, card: C1 })
   expect(keyAct(key("L", chord), onPage)).toEqual({ kind: "foldList" })
   expect(keyAct(key("I", chord), onPage)).toBeNull()

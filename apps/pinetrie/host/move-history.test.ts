@@ -1,8 +1,6 @@
 import { createInMemoryStore, Exchange, whenHydrated } from "@kyneta/exchange"
 import {
-  atEntry,
   type CardRecord,
-  entryId,
   movesDocId,
   rootIdFor,
   type TaskId,
@@ -30,7 +28,6 @@ const _ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const atEnd = (_task: TaskId) =>
   ({
     kind: "pinned",
-    at: atEntry(entryId("e-1")),
     thread: TEST_THREAD,
     order: "a",
   }) as const
@@ -48,8 +45,7 @@ async function setUp() {
     owner: ADA,
     placer: ADA,
     place: atEnd(root),
-    carries: { kind: "message", command: null },
-    unsent: null,
+    content: { command: null, unsent: null },
   })
   /** The host's own write, outside any history. */
   const seed = (c: CardRecord) =>

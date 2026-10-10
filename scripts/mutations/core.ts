@@ -704,8 +704,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a pinned key keeps its order",
     file: places,
-    from: '      return { kind: "pinned", at: place.at, thread: place.thread }',
-    to: "      return place",
+    from: '      return { kind: "pinned", thread: place.thread }\n',
+    to: "      return place\n",
     command: unit,
     expect:
       "a pinned card needs its order and its thread; its key has no order",
@@ -877,9 +877,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note column fits an inventory",
-    file: "packages/core/places.ts",
-    from: '  "note-column": ["canvas"],',
-    to: '  "note-column": ["canvas", "inventory"],',
+    file: "packages/core/kinds.ts",
+    from: '    prefix: "n-",\n    places: ["canvas"],',
+    to: '    prefix: "n-",\n    places: ["canvas", "inventory"],',
     command: unit,
     expect:
       "fitsPlace: a text card anywhere but a canvas, a thread's card on a canvas or in an inventory, a note column on a canvas alone",
@@ -969,5 +969,41 @@ export const mutations: readonly Mutation[] = [
     ],
     expect:
       "decode: a move is typed by its card's kind, refused to or from a place that kind is never in (ADR-0117)",
+  },
+  {
+    name: "a fact may be moved by a person",
+    file: "packages/core/kinds.ts",
+    from: '    prefix: "x-",\n    places: ["queued"],\n    moves: false,',
+    to: '    prefix: "x-",\n    places: ["queued"],\n    moves: true,',
+    command: ["pnpm", "exec", "vitest", "run", "packages/core/kinds.test.ts"],
+    expect:
+      "a kind's places are PLACES_OF's; a fact is only ever queued, and no person moves it",
+  },
+  {
+    name: "a fact's id takes a file card's prefix",
+    file: "packages/core/kinds.ts",
+    from: '    prefix: "x-",',
+    to: '    prefix: "f-",',
+    command: ["pnpm", "exec", "vitest", "run", "packages/core/kinds.test.ts"],
+    expect:
+      "every id prefix is distinct, and none can begin a uuidv7: a bare id is a text card's",
+  },
+  {
+    name: "a stop's fact is drawn apart from its ask",
+    file: asks,
+    from: "      steered.set(entry.id, stop.prompt)\n",
+    to: "",
+    command: unit,
+    expect:
+      "a stop's fact names who stopped its ask, and is drawn in it: the first press's (ADR-0126)",
+  },
+  {
+    name: "the last stop's fact names the stopper",
+    file: asks,
+    from: "      if (!stoppedBy.has(stop.prompt)) stoppedBy.set(stop.prompt, stop.by)",
+    to: "      stoppedBy.set(stop.prompt, stop.by)",
+    command: unit,
+    expect:
+      "a stop's fact names who stopped its ask, and is drawn in it: the first press's (ADR-0126)",
   },
 ]

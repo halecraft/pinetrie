@@ -14,11 +14,14 @@ import {
   firstLine,
   type PinnedCardRead,
   type PinnedView,
+  type TextCardId,
   type ThreadId,
+  textSourceOf,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { CardIdSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
+import { wordsOf } from "./fact.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 
 export const PINNED_TYPE = "pinetrie.pinned"
@@ -193,16 +196,16 @@ export function planPinnedRead(input: {
 }
 
 /**
- * A thread's pinned cards as a run reads them, in order: each with its text
- * and owner. A card with no text yet is left out: the model would read an
+ * A thread's pinned cards as a run reads them, in order: each with its words
+ * (`wordsOf`) and owner. A card with no text yet is left out: the model would read an
  * empty card. The host reads a run's cards with it, and the column each
  * card's status, so the two agree on which cards count. Pure.
  */
 export const pinnedReads = (
   pinned: readonly CardRecord[],
-  textOf: (id: CardId) => string,
+  docText: (card: TextCardId) => string,
 ): PinnedCardRead[] =>
   pinned.flatMap(c => {
-    const text = textOf(c.id)
+    const text = wordsOf(textSourceOf(c), docText)
     return text.trim() === "" ? [] : [{ id: c.id, text, by: c.owner }]
   })

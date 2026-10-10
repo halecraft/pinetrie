@@ -19,6 +19,7 @@
 // uses one already depends on core.
 
 import type { Sha256 } from "./images.ts"
+import { KINDS } from "./kinds.ts"
 import type { OfferLedger, OfferSeen, WorkChanges } from "./offers.ts"
 import type {
   CanvasKey,
@@ -349,26 +350,49 @@ export type MediaId = string & { readonly [mediaIdBrand]: true }
 declare const fileCardIdBrand: unique symbol
 /** A file card's id (ADR-0118): `f-` and a uuidv7. */
 export type FileCardId = string & { readonly [fileCardIdBrand]: true }
+declare const factCardIdBrand: unique symbol
+/**
+ * A fact card's id (ADR-0126): `x-` and a uuidv7, minted by the host as it
+ * queues the fact (`f-` is a file card's).
+ */
+export type FactCardId = string & { readonly [factCardIdBrand]: true }
+
+const FACT_CARD_PREFIX = "x-"
+
+/** A fact card's id from the text after its prefix: for minters, fixtures and parsers. */
+export const factCardIdFor = (id: string): FactCardId =>
+  `${FACT_CARD_PREFIX}${id}` as FactCardId
 
 /**
  * Any card's id: the key of its record in the places document. Its kind is
- * its prefix (`kindOfCard`), so no record stores a kind that could disagree
- * with its id. A uuidv7's second character is a hex digit, never `-`, so no
- * prefix matches a text card's bare id.
+ * its prefix (`kindOfCard`, `KINDS`), so no record stores a kind that could
+ * disagree with its id.
  */
-export type CardId = TextCardId | ThreadId | NoteColumnId | MediaId | FileCardId
+export type CardId =
+  | TextCardId
+  | ThreadId
+  | NoteColumnId
+  | FactCardId
+  | MediaId
+  | FileCardId
 
-/** What a card is, from its id. */
-export type CardKind = "text" | "thread" | "note-column" | "media" | "file"
+/** What a card is, from its id (`KINDS`). */
+export type CardKind =
+  | "text"
+  | "thread"
+  | "note-column"
+  | "fact"
+  | "media"
+  | "file"
 
-const CARD_PREFIXES: readonly (readonly [string, CardKind])[] = [
-  ["t-", "thread"],
-  ["n-", "note-column"],
-  ["m-", "media"],
-  ["f-", "file"],
-]
+/** Each prefixed kind's prefix, from `KINDS`. */
+const CARD_PREFIXES: readonly (readonly [string, CardKind])[] = Object.entries(
+  KINDS,
+).flatMap(([kind, spec]) =>
+  spec.prefix === null ? [] : [[spec.prefix, kind as CardKind] as const],
+)
 
-/** A card's kind, read from its id's prefix: a bare id is a text card's. */
+/** A card's kind, read from its id's prefix (`KINDS`): a bare id is a text card's. */
 export const kindOfCard = (id: CardId): CardKind =>
   CARD_PREFIXES.find(([p]) => id.startsWith(p))?.[1] ?? "text"
 
@@ -379,15 +403,15 @@ export const isTextCardId = (id: CardId): id is TextCardId =>
 const UUIDV7 =
   "[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
 const TEXT_CARD_RE = new RegExp(`^${UUIDV7}$`)
-const PREFIXED_CARD_RE = new RegExp(`^[nmf]-${UUIDV7}$`)
+const PREFIXED_CARD_RE = new RegExp(`^[nmfx]-${UUIDV7}$`)
 
 /**
  * A card's id as it comes in from the wire or the store; undefined for text
  * that is none. A text card's is a bare lowercase uuidv7; a note column's,
- * a media card's and a file card's are their prefix and one. A thread's is
- * any id `isThreadId` takes, as everywhere a thread is read, so a thread
- * the store names is never dropped for its id's shape. The one way text
- * becomes a `CardId` outside a minter.
+ * a fact's, a media card's and a file card's are their prefix and one. A
+ * thread's is any id `isThreadId` takes, as everywhere a thread is read, so
+ * a thread the store names is never dropped for its id's shape. The one way
+ * text becomes a `CardId` outside a minter.
  */
 export function parseCardId(id: string): CardId | undefined {
   if (isThreadId(id)) return id
@@ -980,13 +1004,18 @@ export interface NoteColumnRecord {
   readonly at: number
 }
 
-// --- stops (ADR-0106) --------------------------------------------------------
+// --- stops (ADR-0106, ADR-0126) --------------------------------------------
 
 /**
- * Who stopped an ask's run: a host-written `pinetrie.stop` value keyed by the
- * ask's prompt. pi's entries say a run was aborted, never by whom (S70).
+ * Who stopped an ask's run, as a fact in its thread (ADR-0126): queued as a
+ * fact card when Stop is pressed, and appended as the run ends, so the
+ * agent's next run reads it. pi's entries say a run was aborted, never by
+ * whom (S70).
  */
-export interface StopRecord {
+export interface StopFact {
+  readonly kind: "stopped"
+  readonly lane: ThreadId
+  /** The ask whose run was stopped: its prompt. */
   readonly prompt: EntryId
   readonly by: WriterId
   /** When Stop was pressed, in ms since the epoch. */
@@ -1834,6 +1863,7 @@ export * from "./edits.ts"
 export * from "./errors.ts"
 export * from "./grid.ts"
 export * from "./images.ts"
+export * from "./kinds.ts"
 export * from "./live.ts"
 export * from "./offers.ts"
 export * from "./paths.ts"

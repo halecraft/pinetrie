@@ -7,7 +7,6 @@ import type {
   DigestRecord,
   EntryId,
   RevisionRecord,
-  StopRecord,
   ThreadLane,
   TreeIndex,
   WriterId,
@@ -58,8 +57,6 @@ export interface MessageListProps {
   releasedTip: EntryId | null
   /** The prompt of the ask this column's lane runs, if it runs. */
   runningAsk: EntryId | null
-  /** Who stopped each ask, by its prompt. */
-  stops: ReadonlyMap<EntryId, StopRecord>
   /** The turns' revisions, whose paths an ask's digest counts. */
   revisions: ReadonlyMap<EntryId, RevisionRecord>
   /** Each ask's fold, as the reader chose it. */
@@ -102,7 +99,6 @@ const MESSAGE_LIST_PROPS = {
   density: "value",
   releasedTip: "value",
   runningAsk: "value",
-  stops: "value",
   revisions: "value",
   folds: "identity",
   leftBefore: "value",

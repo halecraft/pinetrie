@@ -8,7 +8,7 @@
 // and Move to ▸ moves it on the board for everyone: to the archive, it
 // is archived. A root someone else
 // starts is not added here. An item holding an unsent card of yours carries a
-// pip (ADR-0048, `cardMarks`), and before its label, its status (ADR-0077).
+// pip (ADR-0048, `unsentSignals`), and before its label, its status (ADR-0077).
 
 import type { TaskId, ThreadId, TreeIndex, WriterId } from "@pinetrie/core"
 import {
@@ -37,10 +37,10 @@ import {
   useRef,
   useState,
 } from "react"
-import { CardPip } from "./card-pip.tsx"
 import { slotColor } from "./colors.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Readers, type ReadersProps, RootStatus } from "./root-signals.tsx"
+import { SignalMark } from "./signal-mark.tsx"
 import { ThreadHead } from "./thread-card.tsx"
 import { TitleField } from "./title-field.tsx"
 import { startRootDrag } from "./use-root-drag.ts"
@@ -87,7 +87,7 @@ export function Sidebar({
   /** A task's drag. */
   dragOf: (task: TaskId) => RootDrag
 }) {
-  const pip = <CardPip color={colorOf(session.writer)} />
+  const pip = <SignalMark color={colorOf(session.writer)} />
   // The task whose item is a title field now. Never stored.
   const [renaming, setRenaming] = useState<TaskId | null>(null)
   // The task whose item takes focus once its field has gone.

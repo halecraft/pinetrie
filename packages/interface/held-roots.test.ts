@@ -7,7 +7,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { threadCardOf } from "@pinetrie/rules"
+import { threadCardOf } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
 import { planHeldRoots } from "./held-roots.ts"
 import { tasksOf } from "./tasks.ts"

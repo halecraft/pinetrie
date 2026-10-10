@@ -56,7 +56,7 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   (`compactRail`'s `spanOf`, the page's `stretchSpan`); a long ask is core's
   (`LONG_ASK`), since the host digests it.
 - **The projections stay separate functions** (`projectColumns`, `pathIds`,
-  `branchColors`, `cardMarks`): the page memoises each on its own inputs. A
+  `branchColors`, `unsentSignals`): the page memoises each on its own inputs. A
   single function projecting the whole screen would hand every memoised
   component of the page new props each render (S54, S59).
 
@@ -77,7 +77,7 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   the held roots' messages, of every root's), the participants
   (`participantsIn`), and the root entries of offers (`laneRootsOf`). A
   card drafted in a root not held marks its thread's task, from the task
-  index alone (`cardMarks`).
+  index alone (`unsentSignals`).
   The board's search covers labels: a search of every message would hold
   every root.
 - **A record's read keeps its map while its namespace is unchanged**
@@ -171,17 +171,17 @@ function is proven by a unit test in a second.
   mark, whose root it finds. Whether a move animates is the plan's too
   (`moveCard`'s `fly`).
 - **`appView` decides; it does not project.** The projections
-  (`projectColumns`, `pathIds`, `branchColors`, `cardMarks`) stay in `App`'s
+  (`projectColumns`, `pathIds`, `branchColors`, `unsentSignals`) stay in `App`'s
   own `useMemo`s, and their results come in. One tree rebuilt each render
   would give every memoised child new props (S54, S59). `appView` gives the
-  workspace (`connecting`, `archive`, a root's or a new tab's columns as
+  stage (`connecting`, `archive`, a root's or a new tab's columns as
   `ColumnSlot`s), the read-only words, and the open offers your inbox and the board read. A slot
   is new each render; `Column` is not memoised, so this costs nothing, and
   a slot must never reach a memoised component by identity.
-- **A page over the workspace is a value too** (`page.ts`, ADR-0098): the
+- **A page over the stage is a value too** (`page.ts`, ADR-0098): the
   `page` intent and effect open or leave it through the `page` port, and
   `planIntent` leaves it first whenever a plan shows something in the
-  workspace (`showsWorkspace`, `layout.ts`). Which hash names a page and
+  stage (`showsStage`, `layout.ts`). Which hash names a page and
   how leaving treats the browser's history (`planLeave`) are decided here;
   `use-page.ts` carries them out (`packages/web/TECHNICAL.md`, "Pages").
 - **`main.tsx` boots the page:** it builds the device's stores, asks who you
@@ -243,7 +243,7 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   decided there once: `App` titles the window from it (`pageTitle`) and
   `Sidebar` scrolls it into view, keyed by `listKey`.
 - **The chrome is the sidebar, then the footer** (ADR-0122): the body is a
-  grid, `--side` wide on the left, the workspace beside it, and `#bottom`
+  grid, `--side` wide on the left, the stage beside it, and `#bottom`
   under both. `#sidebar` holds `.sidebar-item` wraps, each around its
   `.open-root` (or `.open-new`) button, ⋯ and ×; the selected wrap carries
   `data-selected`, set from `ItemView.selected`, and is filled with
@@ -290,7 +290,7 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   `moved-root`, as `afterKeep` does for a keep.
 - **`hereOfColumn` is the one lookup from a fresh column's key to where it
   is**: a new tab's, or a branch of a task whether or not that task is in
-  the sidebar. The card marks and the reveal place a fresh card with it.
+  the sidebar. The unsent signal and the reveal place a fresh card with it.
 - **Column keys hold no `:`.** A presence key is
   `${writer}:${seat}:${columnKey}`, and `readReading` takes the writer from
   before the first colon (ADR-0037). A writer holds none (`normalizeEmail`
@@ -396,7 +396,7 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   column's head (`StateSignalMarks`, `board.tsx`), `ReaderMenus` (a
   menu of each reader's threads there, `peopleIn`) for a thread card, so a
   presence write redraws them and not `App` (S59).
-- **The board is `#board`, absolutely placed in `#workspace`** from its
+- **The board is `#board`, absolutely placed in `#stage`** from its
   foot: it covers the columns and moves none of them.
 - **A root is a thread card** (ADR-0111): `threadCardHeads` builds each
   root's header once in `App` (label, status, ⇡, your pip, its state and
@@ -436,7 +436,9 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   (`branchAfter`, `@pinetrie/rules`), two there in id order: the same rule
   ranks its card when its first send lands (`planThreadCard`), so the
   column does not move.
-- **Folded, a column is a strip with its title** (`foldedView`), in its
+- **Folded, a column is its card's face** (`foldedView`, ADR-0126): the
+  same `Face` a grid's cell draws for that card (`faceOf`), worded for a
+  strip by `foldedWords` (its title, and a note column's count), in its
   place; `projectColumns` lays the paths out over the unfolded thread
   columns alone (`openColumns`), so folding the trunk shows it in the next
   unfolded column. Going to a card unfolds it: `planOpen`'s `unfold`, a
@@ -688,7 +690,7 @@ pending.
   else its highest item; **`taskStatus`** is each task's, its threads'
   together, working winning, through `taskOfThread` (ADR-0116). `markOf`
   folds it over several tasks: `unlisted` (`layout.ts`) gives ▦'s, as it
-  gives `cardMarks.elsewhere`.
+  gives `unsentSignals.elsewhere`.
 - **Motion is a change you saw, never a state.** `arrivals` compares two
   statuses, and `useArrivals` takes the first status after the session has
   settled and your `since` is known as the baseline, so a load moves
@@ -779,7 +781,7 @@ else reads those rows (tab summaries, archive search, `branchColors`).
   across that send. `.rail-tree` is `fit-content` and centred, and the SVG is
   `PAD` wide on both sides of its outermost places.
 - **A capsule's background depends on its fill** (the panel's colour, the
-  track's, or the two blended half and half), so a colour check reads a `.rail-dot`. Signals (`.pulse`, `[data-here]`, a `.card-pip`) are always on dots.
+  track's, or the two blended half and half), so a colour check reads a `.rail-dot`. Signals (`.pulse`, `[data-here]`, a `.signal[data-signal="unsent"]`) are always on dots.
 
 ## Asks, densities and folds (ADR-0106)
 
@@ -1149,7 +1151,7 @@ composer*).
   no hold, and whether the turn may also carry on, `carryOnState`); else
   the pop the drain would make now (`sending`, or waiting on typing), a
   blank message passed over (`blankQueued`, read from the page's texts by
-  `useBlankQueued`, the rule the host's drain and `readLanes` use); else stopped (who, from `stops`); else idle.
+  `useBlankQueued`, the rule the host's drain and `readLanes` use); else stopped (who, from its stop's fact, `stopperOf`); else idle.
   `queueHead` adds the lane, the holder and the message cards queued, and
   `queueHeadPlan` decides the one button (stop, send queue, resume), the
   ⋯ items (resume, hold, release, unqueue all) and where ▸ sits.
@@ -1274,15 +1276,15 @@ composer*).
   colour, class `initial`. `Avatar` is an `Initial` with class `avatar`,
   which means a person shown here (Gotchas).
 
-## Marks for your cards (ADR-0048, step 2)
+## The unsent signal (ADR-0048, step 2, ADR-0126)
 
-A pip in your colour (`CardPip`, `.card-pip`, the one selector the suites
-use) marks where an unsent card of yours holds text: its root's item in your
+A pip in your colour (`SignalMark`, `.signal[data-signal="unsent"]`, the one
+selector the suites use) marks where an unsent card of yours holds text: its root's item in your
 list or its new tab, the rail dot at its thread end, and the
 root's item on the board. ▦ itself is marked only for a root not in your
 list: an archived root's work is done, so it never lights ▦ (`elsewhere`).
 
-- **`cardMarks` (`card-marks.ts`) decides, purely,** from your cards, the
+- **`unsentSignals` (`signals.ts`) decides, purely,** from your cards, the
   ones holding text, the layout, the lanes and the index. Your message and
   a note you own are placed by `placeEnd` and `rootOf` (ADR-0113); a fresh card by `tabOfColumn`, so one
   typed in another browser tab or device, whose layout this one lacks, marks
@@ -1312,12 +1314,18 @@ list: an archived root's work is done, so it never lights ▦ (`elsewhere`).
 A panel floating over the columns (`inventory-panel.tsx`, drawn by `App`),
 docked left, centre or right by this device's choice (`inventory-dock.ts`,
 `snapTo`, kept as a `deviceState`), holding a 3 × 6 card grid (`CardGrid`,
-*Card grids* below), the selected card opening whole in place. Open or
-closed is `App`'s state, never stored.
+*Card grids* below). Open or closed is `App`'s state, never stored.
 
+- **The selected card is previewed** (ADR-0126): `inventoryView`'s
+  `preview` is the selected card, normal and one column wide (`CardPreview`),
+  or null for an empty slot or while the card is open. The panel draws it
+  beside the grid, on the side away from its dock edge, read only, by its
+  kind's row of `RENDERINGS` (`packages/web/TECHNICAL.md`, *Renderings*).
+  A click selects; Enter, or a click on the card already selected, opens it
+  whole in place, which is the panel's state, so the preview can hide.
 - **A thread's card is drawn by its face** (`thread-face.ts`, ADR-0124):
   `threadFace` (name, banner, first line, the first line of where it ended,
-  stopped, cards queued), `GridCell.thread`; opened, `threadPreview`, its
+  stopped, cards queued), a case of `Face`; opened, `threadPreview`, its
   path read only, a `ThreadPreview` that no composer, dock or queue takes.
 - **Two layers**: the host's records say which cards are in your
   inventory, and your inventory document which slot holds each. The session
@@ -1378,8 +1386,8 @@ closed is `App`'s state, never stored.
   list for `ITEM_HOVER_MS` opens it. A root's drag is not a card's
   (`ROOT_MIME`, The board, above). `NOT_A_HANDLE` includes `[draggable='true']`, so
   a card's drag never starts a column's.
-- **Keys** (`inventory-keys.ts`, `keyAct`): one table, read by one
-  `keydown` listener in `App` that decides nothing. Ctrl+Shift+I takes the
+- **Keys** (`page-keys.ts`, `keyAct`): one table of the page's own keys,
+  not only the inventory's, read by one `keydown` listener in `App` that decides nothing. Ctrl+Shift+I takes the
   focused card into the inventory (`data-card` on the focused element, a box's included);
   Ctrl+Shift+O puts the selected one in the column whose element last held
   focus; Cmd or Ctrl with Z, Shift+Z, or Ctrl+Y undo and redo a move, only
@@ -1401,7 +1409,8 @@ closed is `App`'s state, never stored.
   panel is closed opens it briefly.
 - **Selectors for the browser suite:** `.inventory` (the panel),
   `.inventory .slot[data-slot][data-card]` and its `.card-face-lines`, the
-  open card's `.card-grid-open`, `.inventory .put`, `.inventory
+  preview's `.inventory .preview .card-normal[data-card]`, the open card's
+  `.card-grid-open`, `.inventory .put`, `.inventory
   .discard-card`, `#bottom .inventory-toggle` (`.account-inventory` in the
   account menu while the sidebar is folded), a message's
   `.take-copy-into-inventory`, and a fresh column's `.close-keep`,
@@ -1413,8 +1422,18 @@ Your inventory is a grid (`CardGrid`, `packages/web/card-grid.tsx`):
 core's `grid.ts` says what a cell is (`INVENTORY_GRID`, 6 × 3), the first
 empty one (`firstEmpty`) and a step (`step`).
 
-- **`gridView`** lays cards out by cell, each folded (`cardFace`), with the
-  selection and the selected card. `inventoryView` places them by
+- **`gridView`** lays cards out by cell, each at its least detail
+  (`faceOf`), with the selection and the selected card.
+- **A face is one value for every surface** (`face.ts`, ADR-0126): `Face`
+  is a union with a case per drawn kind (a text card's `TextFace`, a
+  thread's `ThreadFace`, a note column's `NoteColumnFace`), so a grid's
+  cell, a folded column and later a margin's mark draw the same value. The
+  face is the kind's; the frame (tone, state, actions) is the place's
+  (`card-frame.ts`), and the two modules never share a signal: the icon is
+  the kind's (`KIND_ICON`), the colour the place's.
+- **Which level a place draws its cards at** is `DETAIL_ON`, total over
+  `CardPlace["kind"]` (ADR-0126's table), so a new place does not compile
+  until it says; `detailOf(place, folded)` makes a folded column a face. `inventoryView` places them by
   `settleSlots`, each of the first nine labelled 1–9 (`slotKey`).
 - **`gridKeyAct`** is the grid's keys while it has focus: arrows and `hjkl`
   select, Alt+arrows move the selected card (a put on that slot, which

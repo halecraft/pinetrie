@@ -2,6 +2,7 @@ import {
   atEntry,
   type CardRecord,
   entryId,
+  factCardIdFor,
   noteColumnIdFor,
   type TextCard,
   type TextPlace,
@@ -14,8 +15,6 @@ import { describe, expect, test } from "vitest"
 import {
   type CardFrameFacts,
   type CardTone,
-  cardFace,
-  cardFaceWords,
   cardFrame,
   cardFrameWords,
   moveWords,
@@ -38,8 +37,7 @@ const card = (place: TextPlace, over: Partial<TextCard> = {}): TextCard => ({
   owner: ME,
   placer: ME,
   place,
-  carries: { kind: "message", command: null },
-  unsent: null,
+  content: { command: null, unsent: null },
   ...over,
 })
 const FACTS: CardFrameFacts = {
@@ -50,7 +48,6 @@ const FACTS: CardFrameFacts = {
 
 const composing: TextPlace = {
   kind: "composing",
-  at,
   thread: LANE,
 }
 const note: TextPlace = {
@@ -60,7 +57,6 @@ const note: TextPlace = {
 }
 const queued: TextPlace = {
   kind: "queued",
-  at,
   thread: LANE,
   order: "a",
   by: BEA,
@@ -68,7 +64,6 @@ const queued: TextPlace = {
 }
 const pinned: TextPlace = {
   kind: "pinned",
-  at,
   thread: LANE,
   order: "a",
 }
@@ -187,7 +182,6 @@ describe("cardFrame (ADR-0111)", () => {
       discards: false,
     })
     expect(cardFrameWords(view, READER, CATCH_UPS, [])).toMatchObject({
-      icon: "⚑",
       place: "pinned",
       state: null,
       who: null,
@@ -197,9 +191,13 @@ describe("cardFrame (ADR-0111)", () => {
   test("a read-only column, or a fact, moves and discards nothing", () => {
     const read = cardFrame(card(queued), "queued", { ...FACTS, readOnly: true })
     expect(read).toMatchObject({ moves: [], tools: [], discards: false })
-    const fact = card(queued, {
-      carries: {
-        kind: "fact",
+    const fact: CardRecord = {
+      kind: "fact",
+      id: factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1"),
+      owner: ME,
+      placer: ME,
+      place: { kind: "queued", thread: LANE, order: "a", by: ME, seen: "" },
+      content: {
         fact: {
           kind: "accepted",
           lane: LANE,
@@ -209,7 +207,7 @@ describe("cardFrame (ADR-0111)", () => {
           to: { kind: "accepted" },
         },
       },
-    })
+    }
     expect(cardFrame(fact, "queued", FACTS)).toMatchObject({
       moves: [],
       discards: false,
@@ -260,19 +258,12 @@ describe("cardFrameWords", () => {
   }
 
   test.each([
-    ["the top of the queue is next", [card(queued)], false, "next", "1"],
-    [
-      "then its place in line",
-      [second, card(queued)],
-      false,
-      "2nd in line",
-      "2",
-    ],
-    ["held, it says so", [card(queued)], true, "held · next", "1"],
-  ])("a queued card's state: %s", (_, among, held, state, icon) => {
+    ["the top of the queue is next", [card(queued)], false, "next"],
+    ["then its place in line", [second, card(queued)], false, "2nd in line"],
+    ["held, it says so", [card(queued)], true, "held · next"],
+  ])("a queued card's state: %s", (_, among, held, state) => {
     expect(words(card(queued), "queued", { among, held })).toMatchObject({
       state,
-      icon,
       place: "queued",
       who: "queued by Bea",
     })
@@ -289,9 +280,11 @@ describe("cardFrameWords", () => {
 
   test("a note: yours names nobody, another's its owner and who else wrote; not sent says why", () => {
     expect(
-      words(card(note, { unsent: "no such image" }), "note"),
+      words(
+        card(note, { content: { command: null, unsent: "no such image" } }),
+        "note",
+      ),
     ).toMatchObject({
-      icon: "▭",
       place: "note",
       who: null,
       state: "not sent: no such image",
@@ -309,7 +302,6 @@ describe("cardFrameWords", () => {
 
   test("your message names nobody: only you see it", () => {
     expect(words(card(composing), "composing")).toMatchObject({
-      icon: "✎",
       place: "your message",
       who: null,
     })
@@ -318,7 +310,7 @@ describe("cardFrameWords", () => {
   test("in your inventory, a command has no thread to name: no chip", () => {
     const c = card(
       { kind: "inventory", holder: ME },
-      { carries: { kind: "message", command: "bring-up-to-date" } },
+      { content: { command: "bring-up-to-date", unsent: null } },
     )
     expect(
       cardFrameWords(cardFrame(c, "inventory", FACTS), READER, null, [])
@@ -328,7 +320,7 @@ describe("cardFrameWords", () => {
 
   test("a command is a chip, what it does its title", () => {
     const c = card(queued, {
-      carries: { kind: "message", command: "bring-up-to-date" },
+      content: { command: "bring-up-to-date", unsent: null },
     })
     expect(words(c, "queued").command).toEqual({
       label: "catch up with accepted work",
@@ -340,31 +332,5 @@ describe("cardFrameWords", () => {
     expect(moveWords("inventory").label).toBe("Move to your inventory")
     expect(moveWords("note").label).toBe("Move to notes")
     expect(moveWords("message").label).toBe("Move to your message")
-  })
-})
-
-describe("cardFace (ADR-0113)", () => {
-  test("its first three lines, leading blank lines left out; a short command chip; whose", () => {
-    const c = card(note, {
-      kind: "text" as const,
-      owner: BEA,
-      carries: { kind: "message", command: "bring-up-to-date" },
-    })
-    const face = cardFace(c, "\n\none\ntwo\nthree\nfour", {
-      tone: "note",
-      key: null,
-    })
-    expect(face).toEqual({
-      tone: "note",
-      owner: BEA,
-      command: "bring-up-to-date",
-      lines: "one\ntwo\nthree",
-      key: null,
-    })
-    expect(cardFaceWords(face, READER)).toEqual({
-      icon: "▭",
-      command: "catch up",
-      owner: "Bea",
-    })
   })
 })

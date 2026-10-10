@@ -22,7 +22,7 @@ export function railKeep(input: {
   readonly activity: readonly AgentRun[]
   /** Each open column's end (`ColumnView.tipId`). */
   readonly ends: Iterable<EntryId | null>
-  /** Thread ends holding a card of yours (`CardMarks.ends`). */
+  /** Thread ends holding a card of yours (`UnsentSignals.ends`). */
   readonly cards: ReadonlySet<EntryId>
 }): ReadonlySet<EntryId> {
   const keep = new Set([...input.rings.keys(), ...input.cards])

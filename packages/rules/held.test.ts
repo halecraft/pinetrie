@@ -2,6 +2,7 @@ import {
   type CardRecord,
   entryId,
   type Intent,
+  NO_CONTENT,
   rootIdFor,
   taskIdFor,
   threadIdFor,
@@ -87,6 +88,7 @@ describe("runsIn: what each command runs or writes a message in (ADR-0124)", () 
         owner: BEA,
         placer: BEA,
         place: { kind: "inventory", holder: BEA },
+        content: NO_CONTENT,
       },
     ]
     const none = new Map()
@@ -121,6 +123,7 @@ test("takenIn: the threads a change puts in an inventory that were not in one (A
     owner: BEA,
     placer: BEA,
     place: { kind: "canvas", task: TASK, order: "1", width: 1 },
+    content: NO_CONTENT,
   }
   const held: CardRecord = { ...on, place: { kind: "inventory", holder: BEA } }
   expect(takenIn([on], [held])).toEqual([T])

@@ -1,8 +1,9 @@
-// stop — who stopped an ask's run (ADR-0106), and carrying on after it
-// (ADR-0082). pi's entries say that a run was aborted, never by whom (S70),
-// so the host records it under the ask's prompt as it asks pi to abort
-// (`planStop`). The first press is the one recorded: `planStop` writes no
-// second.
+// stop — who stopped an ask's run (ADR-0106, ADR-0126), and carrying on
+// after it (ADR-0082). pi's entries say that a run was aborted, never by
+// whom (S70), so Stop queues a fact naming who pressed it (`planStop`), a
+// fact card the run's end appends to the thread first: the agent's next run
+// reads it, and the asks read who stopped a run from it (`stoppedBy`). The
+// first press is the one named: `planStop` queues no second.
 //
 // pi cannot continue a run Stop ended (S105), so carrying on is a new run
 // whose prompt is a carry-on message, a history message (`history.ts`):
@@ -12,87 +13,138 @@
 
 import {
   type AskIndex,
+  type AskOutcome,
   askOutcome,
+  type CardRecord,
   type EntryId,
   ERR,
   type ErrCode,
+  type FactCardId,
   isBusy,
   type LaneView,
   promptOf,
   type QueueHold,
   type Refusal,
   refused,
-  type StopRecord,
   type ThreadId,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
-import { decodeAt, entryKey, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
+import { ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
-import type { QueuedCard } from "./queue.ts"
+import type { PlaceStep } from "./moves.ts"
+import { planFactCard, type QueuedCard, queuedOn } from "./queue.ts"
 import { holdOnStop } from "./queue-hold.ts"
-import type { RecordSpec } from "./records.ts"
-
-const StopSchema = Type.Object({
-  by: Type.String({ minLength: 1 }),
-  at: Type.Number(),
-})
-
-/** Each ask's stop, at its prompt's entry id. */
-export const STOP: RecordSpec<StopRecord, EntryId, "root"> = {
-  namespace: "pinetrie.stop",
-  home: "root",
-  keyOf: r => r.prompt,
-  encode: ({ prompt, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeAt(StopSchema, contents, entryKey(key), (r, prompt) => ({
-      prompt,
-      by: r.by as WriterId,
-      at: r.at,
-    })),
-}
 
 /** What stopping a thread's lane does (`planStop`). */
 type StopPlan =
   | {
       readonly kind: "abort"
-      /** Who stopped the ask; null when it is recorded already. */
-      readonly record: StopRecord | null
+      /**
+       * The stop's fact card, queued first (`planFactCard`); empty when
+       * someone's stop is named already, or none of its ask is known.
+       */
+      readonly fact: readonly PlaceStep[]
       /** The hold it leaves on the queue (`holdOnStop`); null for none. */
       readonly hold: QueueHold | null
     }
   | { readonly kind: "idle" }
 
+/** Who stopped `prompt`'s run, by a stop's fact queued on its lane and not yet appended. */
+const queuedStopper = (
+  queue: readonly QueuedCard[],
+  prompt: EntryId,
+): WriterId | null => {
+  for (const c of queue)
+    if (
+      c.kind === "fact" &&
+      c.content.fact.kind === "stopped" &&
+      c.content.fact.prompt === prompt
+    )
+      return c.content.fact.by
+  return null
+}
+
 /**
- * What stopping a thread's lane does: abort its running turn, recording who
- * stopped its ask (ADR-0106), unless someone's stop is recorded already, so
- * the first press is the one named; and hold its queue when a message card
- * waits there, so the run's end does not send the next one (ADR-0048 step
- * 7). Nothing when it is idle (stopping is idempotent). Pure.
+ * What stopping a thread's lane does: abort its running turn, queueing a
+ * fact that names who stopped its ask (ADR-0106, ADR-0126), unless a stop of
+ * it is queued already or the thread names its stopper, so the first press
+ * is the one named; and hold its queue when a message card waits there, so
+ * the run's end does not send the next one (ADR-0048 step 7). The fact goes
+ * before the cards queued, and the run's end pops it whatever the hold.
+ * Nothing when it is idle (stopping is idempotent). Pure.
  */
 export function planStop(
   lane: LaneView,
   facts: {
     readonly index: TreeIndex
-    readonly stops: ReadonlyMap<EntryId, StopRecord>
-    /** The lane's queue, in order. */
-    readonly queue: readonly QueuedCard[]
+    readonly asks: AskIndex
+    readonly cards: readonly CardRecord[]
     readonly holds: ReadonlyMap<ThreadId, QueueHold>
     readonly by: WriterId
     readonly now: number
+    /** The id its fact card would have. */
+    readonly id: FactCardId
   },
 ): StopPlan {
   if (!lane.running) return { kind: "idle" }
+  const queue = queuedOn(facts.cards, lane.name)
   const prompt = promptOf(facts.index, lane.tip)
+  const named =
+    prompt === null ||
+    facts.asks.stoppedBy.has(prompt) ||
+    queuedStopper(queue, prompt) !== null
   return {
     kind: "abort",
-    record:
-      prompt === null || facts.stops.has(prompt)
-        ? null
-        : { prompt, by: facts.by, at: facts.now },
-    hold: holdOnStop({ ...facts, lane: lane.name }),
+    fact: named
+      ? []
+      : (planFactCard({
+          cards: facts.cards,
+          id: facts.id,
+          fact: {
+            kind: "stopped",
+            lane: lane.name,
+            prompt,
+            by: facts.by,
+            at: facts.now,
+          },
+        }) ?? []),
+    hold: holdOnStop({
+      queue,
+      holds: facts.holds,
+      by: facts.by,
+      now: facts.now,
+      lane: lane.name,
+    }),
   }
+}
+
+/**
+ * Who stopped `prompt`'s run (ADR-0126): its stop's fact, appended
+ * (`stoppedBy`), or still queued on its lane, as it is from Stop until the
+ * run's end appends it; null for nobody named. Pure.
+ */
+export const stopperOf = (
+  asks: AskIndex,
+  queue: readonly QueuedCard[],
+  prompt: EntryId,
+): WriterId | null => asks.stoppedBy.get(prompt) ?? queuedStopper(queue, prompt)
+
+/**
+ * How `prompt`'s run ended, as its run's end reads it: who stopped it named
+ * by `stopperOf`, since its fact is still queued then. Pure.
+ */
+export function endedOutcome(
+  index: TreeIndex,
+  asks: AskIndex,
+  prompt: EntryId,
+  queue: readonly QueuedCard[],
+): AskOutcome {
+  const outcome = askOutcome(index, asks, prompt, { running: false })
+  return outcome.kind === "stopped"
+    ? { kind: "stopped", by: stopperOf(asks, queue, prompt) }
+    : outcome
 }
 
 // ── carrying on (ADR-0082) ───────────────────────────────────────────────
@@ -132,8 +184,10 @@ const refusedFor = (code: ErrCode): CarryOnState => ({ kind: "refused", code })
 
 /**
  * Whether `lane` may carry on: it is not running, has no cards waiting
- * unless its queue is held, and the ask at its tip ended stopped. A message written after the stop is the tip's ask, with no work,
- * so it refuses; an update is no ask, so it does not. Pure.
+ * unless its queue is held, and the ask at its tip ended stopped. A stop's
+ * fact at the tip is no ask (`promptOf` passes it), so the stopped ask is
+ * still found. A message written after the stop is the tip's ask, with no
+ * work, so it refuses; an update is no ask, so it does not. Pure.
  */
 export function carryOnState(
   lane: LaneView,
@@ -147,7 +201,6 @@ export function carryOnState(
   if (prompt === null) return refusedFor(ERR.REFUSED)
   const outcome = askOutcome(facts.index, facts.asks, prompt, {
     running: false,
-    stop: undefined,
   })
   return outcome.kind === "stopped" ? OK : refusedFor(ERR.REFUSED)
 }

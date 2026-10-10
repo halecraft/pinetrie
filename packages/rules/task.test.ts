@@ -1,5 +1,6 @@
 import {
   type CardRecord,
+  NO_CONTENT,
   noteColumnIdFor,
   rootIdFor,
   type ThreadId,
@@ -39,8 +40,22 @@ const onCanvas = (
       width: 1,
     } as const
     return id === N
-      ? { kind: "note-column", id: N, owner: ADA, placer: ADA, place }
-      : { kind: "thread", id: id as ThreadId, owner: ADA, placer: ADA, place }
+      ? {
+          kind: "note-column",
+          id: N,
+          owner: ADA,
+          placer: ADA,
+          place,
+          content: NO_CONTENT,
+        }
+      : {
+          kind: "thread",
+          id: id as ThreadId,
+          owner: ADA,
+          placer: ADA,
+          place,
+          content: NO_CONTENT,
+        }
   })
 
 const start = (cards: readonly CardRecord[], parent: ThreadId | null) =>
@@ -75,6 +90,7 @@ describe("where a thread's card lands (ADR-0116)", () => {
       owner: ADA,
       placer: ADA,
       place: { kind: "canvas", task: K, width: 1 },
+      content: NO_CONTENT,
     })
     expect(ranked([...cards, ...start(cards, B).cards])).toEqual([A, N, B, NEW])
     expect(ranked([...cards, ...start(cards, null).cards])).toEqual([

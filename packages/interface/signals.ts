@@ -1,15 +1,14 @@
-// interface/card-marks — where your unsent cards are, as marks (ADR-0048, step
-// 2): on the sidebar's tasks and new tabs, on the rail at a thread's end, on
-// the board's items, and on ▦ for a task not in the sidebar (ADR-0122). An
-// archived task's work is done, so it lights only its own item on the board,
-// never ▦. They answer "where was I?",
-// so they count only the cards you own (contributors wait for Kyneta,
-// ADR-0048's *Who contributed*). A card counts while it holds text, not while its record exists:
-// a record outlives its text. Only your messages, your notes and fresh cards
-// count (ADR-0113): a queued card is on its way to being sent, not left
-// somewhere. A trace marks
-// nothing yet: raising it is for `attentionOf` (ADR-0077), beside verdicts
-// and offers. Pure.
+// interface/signals — the unsent signal (ADR-0126): where your unsent cards
+// are (ADR-0048, step 2), on the sidebar's tasks and new tabs, on the rail at
+// a thread's end, on the board's items, and on ▦ for a task not in the
+// sidebar (ADR-0122). An archived task's work is done, so it lights only its
+// own item on the board, never ▦. They answer "where was I?", so they count
+// only the cards you own (contributors wait for Kyneta, ADR-0048's *Who
+// contributed*). A card counts while it holds text, not while its record
+// exists: a record outlives its text. Only your messages, your notes and
+// fresh cards count (ADR-0113): a queued card is on its way to being sent,
+// not left somewhere. A trace marks nothing yet: raising it is for
+// `attentionOf` (ADR-0077), beside verdicts and offers. Pure.
 
 import type {
   CardId,
@@ -58,7 +57,7 @@ export function withFilled(
 }
 
 /** Where your unsent cards are: the marks that answer "where was I?". */
-export interface CardMarks {
+export interface UnsentSignals {
   /** Tasks holding a card of yours: their items in the sidebar and on the board. */
   readonly tasks: ReadonlySet<TaskId>
   /** New tabs, by key, whose column holds a card of yours. */
@@ -72,7 +71,7 @@ export interface CardMarks {
   readonly elsewhere: boolean
 }
 
-export function cardMarks(input: {
+export function unsentSignals(input: {
   /** Your cards (`ownCards`). */
   readonly mine: readonly CardRecord[]
   /** Cards that hold text (`holdsText`), by id. */
@@ -83,7 +82,7 @@ export function cardMarks(input: {
   /** Every task: a card at a thread marks the thread's task. */
   readonly tasks: TaskIndex
   readonly index: TreeIndex
-}): CardMarks {
+}): UnsentSignals {
   const tasks = new Set<TaskId>()
   const newTabs = new Set<string>()
   const ends = new Set<EntryId>()

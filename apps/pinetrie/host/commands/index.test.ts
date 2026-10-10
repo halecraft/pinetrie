@@ -1,5 +1,4 @@
 import {
-  atEntry,
   ERR,
   entryId,
   type Intent,
@@ -258,11 +257,9 @@ test("a chat command spends its card once written, record then text, answering w
           placer: ALICE,
           place: {
             kind: "composing",
-            at: atEntry(ROOT_ENTRY),
             thread: TEST_THREAD,
           },
-          carries: { kind: "message", command: null },
-          unsent: null,
+          content: { command: null, unsent: null },
         },
       },
     ])

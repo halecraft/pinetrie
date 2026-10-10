@@ -8,8 +8,8 @@ import {
   type EntryId,
   entryId,
   keyOf,
+  NO_CONTENT,
   noteColumnIdFor,
-  PLAIN,
   type PlaceKey,
   rootIdFor,
   type TextCard,
@@ -50,7 +50,6 @@ const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
 const DRAFTING: CardPlace = { kind: "note", column: NOTES, order: "1" }
 const QUEUED: CardPlace = {
   kind: "queued",
-  at,
   thread: LANE,
   order: "1",
   by: ADA,
@@ -58,7 +57,6 @@ const QUEUED: CardPlace = {
 }
 const PINNED: CardPlace = {
   kind: "pinned",
-  at,
   thread: LANE,
   order: "1",
 }
@@ -93,8 +91,7 @@ const card = (
   owner: ADA,
   place,
   placer,
-  carries: PLAIN,
-  unsent: null,
+  content: { command: null, unsent: null },
   ...over,
 })
 
@@ -151,7 +148,7 @@ describe("planProvenance: each card's history", () => {
     [
       "the host writes back a card it could not send",
       [card(QUEUED)],
-      [card(DRAFTING, ADA, { unsent: "no" })],
+      [card(DRAFTING, ADA, { content: { command: null, unsent: "no" } })],
       { kind: "host" },
       "unsent",
     ],
@@ -173,7 +170,15 @@ describe("planProvenance: each card's history", () => {
     const thread = (
       place: CardPlace & { kind: "canvas" | "inventory" },
       placer: WriterId,
-    ) => ({ kind: "thread", id: LANE, owner: ADA, placer, place }) as const
+    ) =>
+      ({
+        kind: "thread",
+        id: LANE,
+        owner: ADA,
+        placer,
+        place,
+        content: NO_CONTENT,
+      }) as const
     const on = (task: typeof TEST_TASK) =>
       ({ kind: "canvas", task, order: "1", width: 1 }) as const
     const moved = plan({
@@ -270,8 +275,8 @@ describe("planProvenance: traces", () => {
         for: ADA,
         card: C1,
         by: BEA,
-        from: { kind: "pinned", at, thread: LANE },
-        to: { kind: "queued", at, thread: LANE, seen: "" },
+        from: { kind: "pinned", thread: LANE },
+        to: { kind: "queued", thread: LANE, seen: "" },
         message: null,
         at: 7,
       },
@@ -350,7 +355,7 @@ describe("planProvenance: traces", () => {
       for: ADA,
       card: C1,
       by: BEA,
-      from: { kind: "queued", at, thread: LANE, seen: "" },
+      from: { kind: "queued", thread: LANE, seen: "" },
       to: { kind: "note", column: NOTES },
       message: null,
       at: 1,
@@ -384,9 +389,9 @@ test.each([
     p === null
       ? null
       : p.kind === "queued"
-        ? { kind: "queued", at: p.at, thread: p.thread, seen: p.seen }
+        ? { kind: "queued", thread: p.thread, seen: p.seen }
         : p.kind === "pinned"
-          ? { kind: "pinned", at: p.at, thread: p.thread }
+          ? { kind: "pinned", thread: p.thread }
           : p.kind === "task-pinned"
             ? { kind: "task-pinned", task: p.task }
             : p
@@ -400,7 +405,7 @@ describe("movedBackBy", () => {
       {
         kind: "moved",
         by,
-        from: { kind: "queued", at, thread: LANE, seen: "" },
+        from: { kind: "queued", thread: LANE, seen: "" },
         to: { kind: "note", column: NOTES },
         at: 1,
       },
@@ -423,7 +428,7 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
     for: ADA,
     card: C1,
     by: BEA,
-    from: { kind: "queued", at, thread: LANE, seen: "" },
+    from: { kind: "queued", thread: LANE, seen: "" },
     to: null,
     message: null,
     at: when,

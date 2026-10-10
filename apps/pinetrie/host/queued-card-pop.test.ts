@@ -1,10 +1,10 @@
 import {
-  atEntry,
   type CardCommand,
   type CardId,
   commitId,
   ERR,
   entryId,
+  factCardIdFor,
   isTextCard,
   rootIdFor,
   runId,
@@ -21,6 +21,7 @@ import {
   decodeFact,
   deleteRecord,
   encodeCard,
+  isQueuedText,
   planStack,
   QUEUE_HOLD,
   setRecord,
@@ -45,7 +46,7 @@ import {
   drain,
   givenUp,
   type NextQueuedCardPop,
-  type PoppedQueuedCard,
+  type PoppedText,
   popNextQueuedCard,
   type QueuedCardPopDeps,
   untilNotTyped,
@@ -56,7 +57,7 @@ const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const LANE = threadIdFor("0123456789abcdef")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
-const E1 = entryId("e-1")
+const _E1 = entryId("e-1")
 
 const queue = (
   cards: ReturnType<typeof newPlacesDoc>,
@@ -73,14 +74,12 @@ const queue = (
       placer: ADA,
       place: {
         kind: "queued",
-        at: atEntry(E1),
         thread: LANE,
         order,
         by: BEA,
         seen: "",
       },
-      carries: { kind: "message", command },
-      unsent: null,
+      content: { command, unsent: null },
     }),
   )
 
@@ -99,8 +98,12 @@ const IDLE = {
   held: false,
   typing: new Set<CardId>(),
 }
-const poppedOf = (top: NextQueuedCardPop): PoppedQueuedCard | null =>
-  top.kind === "popped" ? top.popped : null
+const poppedOf = (top: NextQueuedCardPop): PoppedText | null =>
+  top.kind === "popped" && isQueuedText(top.popped.card)
+    ? { card: top.popped.card, text: top.popped.text }
+    : null
+
+const FACT = factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
 
 describe("popNextQueuedCard", () => {
   test("reads the top queued card and deletes its record before it returns", () => {
@@ -282,7 +285,7 @@ function setUp(
       events.push(`start ${s.kind === "prompt" ? s.message.customType : ""}`)
       return runId("r-1")
     },
-    send: async (popped: PoppedQueuedCard) => {
+    send: async (popped: PoppedText) => {
       events.push(`send ${popped.card.id}: ${popped.text}`)
       return sends.shift() ?? { kind: "appended", id: entryId("e-9") }
     },
@@ -508,7 +511,7 @@ describe("drain", () => {
       expect.objectContaining({
         id: cardIdFor("c1"),
         place: expect.objectContaining({ kind: "note" }),
-        unsent: "no such image",
+        content: expect.objectContaining({ unsent: "no such image" }),
       }),
     ])
     expect(b.lines.some(l => l.includes("no such image"))).toBe(true)
@@ -543,7 +546,9 @@ describe("drain", () => {
       expect.objectContaining({
         id: cardIdFor("c1"),
         place: expect.objectContaining({ kind: "note" }),
-        unsent: "the host failed: store closed",
+        content: expect.objectContaining({
+          unsent: "the host failed: store closed",
+        }),
       }),
     ])
     expect(events).toEqual([
@@ -642,8 +647,7 @@ describe("drain: bring up to date (ADR-0108)", () => {
       expect.objectContaining({
         kind: "text" as const,
         id: cardIdFor("c1"),
-        carries: { kind: "message", command: CMD },
-        unsent: "the lane has no copy of its own",
+        content: { command: CMD, unsent: "the lane has no copy of its own" },
         place: expect.objectContaining({ kind: "note" }),
       }),
     ])
@@ -663,8 +667,7 @@ describe("drain: bring up to date (ADR-0108)", () => {
     queue(b.places, cardIdFor("c1"), "a", CMD)
     await drain(throwing, LANE)
     expect(textsIn(b.places)[0]).toMatchObject({
-      carries: { kind: "message", command: CMD },
-      unsent: "the host failed: jj broke",
+      content: { command: CMD, unsent: "the host failed: jj broke" },
     })
   })
 
@@ -677,8 +680,7 @@ describe("drain: bring up to date (ADR-0108)", () => {
     queue(b.places, cardIdFor("c1"), "a", CMD)
     await drain(deps, LANE)
     expect(textsIn(b.places)[0]).toMatchObject({
-      carries: { kind: "message", command: null },
-      unsent: "pi refused",
+      content: { command: null, unsent: "pi refused" },
     })
   })
 })
@@ -764,29 +766,27 @@ describe("drain: a fact (ADR-0080)", () => {
       to: { kind: "accepted" },
     } as const
     b.places.cards.set(
-      cardIdFor("c1"),
+      FACT,
       encodeCard({
-        kind: "text" as const,
-        id: cardIdFor("c1"),
+        kind: "fact" as const,
+        id: FACT,
         owner: ADA,
         placer: ADA,
         place: {
           kind: "queued",
-          at: atEntry(E1),
           thread: LANE,
           order: "a",
           by: ADA,
           seen: "",
         },
-        carries: { kind: "fact", fact },
-        unsent: null,
+        content: { fact },
       }),
     )
     queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
+    // A fact has no text: nothing of it is hydrated or destroyed.
     expect(events).toEqual([
-      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
-      `destroy ${cardIdFor("c1")}`,
+      `hydrate ${cardIdFor("c2")}`,
       "append pinetrie.fact",
       `send ${cardIdFor("c2")}: next`,
       `destroy ${cardIdFor("c2")}`,
@@ -833,8 +833,7 @@ describe("drain: a split (ADR-0080)", () => {
       expect.objectContaining({
         kind: "text" as const,
         id: cardIdFor("c1"),
-        carries: { kind: "message", command: "split" },
-        unsent: "nothing to split",
+        content: { command: "split", unsent: "nothing to split" },
       }),
     ])
   })

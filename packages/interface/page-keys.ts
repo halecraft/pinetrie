@@ -1,6 +1,6 @@
-// interface/inventory-keys — the keys that take into the inventory, put, undo
-// and redo moves (ADR-0048 step 4), and fold the sidebar (ADR-0088). A grid's
-// own keys are `grid-keys.ts`'s.
+// interface/page-keys — the page's own keys, wherever focus is: take into
+// the inventory, put, undo and redo moves (ADR-0048 step 4), and fold the
+// sidebar (ADR-0088). A grid's own keys are `grid-keys.ts`'s.
 // Pure: one table, from a key and where focus is to an intent or nothing.
 // The key-system redesign replaces this file.
 //
@@ -36,7 +36,7 @@ export interface KeyFocus {
   /** The column that last held focus, by key: where a put lands. */
   readonly column: string | null
   /**
-   * A page covers the workspace (ADR-0098): no key but the list's fold acts,
+   * A page covers the stage (ADR-0098): no key but the list's fold acts,
    * since a take, a put or an undo would act on columns no one can see.
    */
   readonly page: boolean

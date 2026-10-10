@@ -264,14 +264,22 @@ would refuse each whole undo of a move (S82).
 - **A fresh row names its root, its task and its branch point** (`root`,
   `task`, `at`, "" at for a new tab, ADR-0066, ADR-0116). One without a
   root or a task does not decode.
-- **A row at a thread names its thread in `lane`, and no root** (your
-  message, a note, a pinned or a queued card, ADR-0116): the root is the
-  thread's record's, so the two cannot disagree.
+- **A row at a thread names its thread in `lane`, and nothing else of
+  where it is** (your message, a pinned or a queued card, ADR-0116,
+  ADR-0126): no root, which is the thread's record's, and no `at`, since its
+  end is found from the thread (every entry names its thread, ADR-0125). The
+  row keeps its `at` field, for `fresh`, so the schema's hash held; record
+  migration `0009-card-content` cleared the `at` these rows and their
+  history events kept.
+- **A fact is a card of its own kind** (ADR-0126): its id starts `x-` (`f-`
+  is a file card's), its row is a `queued` one, and its fact is JSON in
+  `fact`. Record migration `0009-card-content` moved each fact stored on a
+  text card's bare id to a new `x-` id, with its history.
 - **A canvas row** (`canvas`, ADR-0116) names its task, its rank in
   `order` and its width (`"1"` or `"2"`): a thread's card on its task's
   canvas. A gone row names the task whose history it is in, or "".
-- **A pinned row carries `order`**, as a queued one does, and no `by` or
-  `seen`: `kind`, `at` and `lane` are a note's.
+- **A pinned row carries `lane` and `order`**, as a queued one does, and
+  no `by` or `seen`.
 - **Your message is stored as kind `drafting`**, the kind every card at a
   thread's end had before notes (ADR-0113). So no stored row changed with
   the split.

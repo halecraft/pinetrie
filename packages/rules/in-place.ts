@@ -8,15 +8,16 @@ import {
   type CardId,
   type CardRecord,
   type CardWidth,
-  isFact,
+  KINDS,
   keyOf,
   placed,
   type Reorder,
   type ReorderAt,
+  type ReorderRefusal,
   sameKey,
 } from "@pinetrie/core"
 import { byOrder, isOrdered, orderOf } from "./card.ts"
-import type { MoveStep, MovesStep, PlaceStep } from "./moves.ts"
+import type { MoveStep, PlaceStep } from "./moves.ts"
 import { notesIn } from "./notes.ts"
 import { orderBetween, respace } from "./order.ts"
 import { isPinned, queuedOn, taskPinnedOf } from "./queue.ts"
@@ -109,6 +110,20 @@ const withOrder = (card: CardRecord, order: string): CardRecord =>
     ? (placed(card, { ...card.place, order }) ?? card)
     : card
 
+/** What the host makes of a reorder: its steps, or why it refused it. */
+export type ReorderStep =
+  | PlaceStep
+  | { readonly kind: "steps"; readonly steps: readonly PlaceStep[] }
+  | {
+      readonly kind: "refused"
+      readonly code: ReorderRefusal
+      /** The card as it is, or null when it is gone. */
+      readonly now: CardRecord | null
+    }
+
+/** Whether a card stays where it is among its neighbours (`KINDS`): a fact. */
+const staysPut = (card: CardRecord): boolean => !KINDS[card.kind].reordered
+
 /**
  * A reorder: a queued or pinned card, a note, or a card on a canvas, moved
  * among its neighbours, as its sender saw them (ADR-0048, *Physics* 5,
@@ -116,7 +131,8 @@ const withOrder = (card: CardRecord, order: string): CardRecord =>
  * placer, its queuer, its text's version, why it was not sent and its width
  * stay, so nobody's trace or history changes with it. Refused:
  * - `gone`: no card;
- * - `fact`: a fact, or a card that would pass one where its rule forbids it;
+ * - `fact`: a card of a kind `KINDS` does not reorder (a fact), or one
+ *   that would pass one where its rule forbids it;
  * - `moved`: the card is no longer where its sender saw it;
  * - `order-changed`: it names no neighbour, a neighbour is no longer among
  *   its siblings, or, where its rule says so, the two are no longer next to
@@ -128,13 +144,17 @@ const withOrder = (card: CardRecord, order: string): CardRecord =>
 export function planReorder(
   cards: readonly CardRecord[],
   reorder: Reorder,
-): MovesStep | MoveStep {
+): ReorderStep {
   const now = cards.find(c => c.id === reorder.card)
   if (now === undefined) return { kind: "refused", code: "gone", now: null }
-  if (isFact(now)) return { kind: "refused", code: "fact", now }
+  if (staysPut(now)) return { kind: "refused", code: "fact", now }
   if (!sameKey(keyOf(now.place), reorder.at))
     return { kind: "refused", code: "moved", now }
-  const changed: MoveStep = { kind: "refused", code: "order-changed", now }
+  const changed: ReorderStep = {
+    kind: "refused",
+    code: "order-changed",
+    now,
+  }
   const rule = reorderRule(reorder.at)
   const siblings = rule.siblings(cards, reorder.at).filter(c => c.id !== now.id)
   const find = (id: CardId | null): number | null | undefined => {
@@ -160,7 +180,7 @@ export function planReorder(
     const from = was < 0 ? siblings.length : was
     const passed =
       index < from ? siblings.slice(index, from) : siblings.slice(from, index)
-    if (passed.some(isFact)) return { kind: "refused", code: "fact", now }
+    if (passed.some(staysPut)) return { kind: "refused", code: "fact", now }
   }
   const bound = (i: number | null): string | null => {
     const c = i === null ? undefined : siblings[i]
@@ -210,7 +230,10 @@ export function planWidth(
     : { kind: "write", record }
 }
 
-/** Set a card's command, or clear it: its place and placer kept. Pure. */
+/**
+ * Set a text card's command, or clear it: its place and placer kept;
+ * refused `no-place` for any other kind, which has none. Pure.
+ */
 export function planSetCommand(
   cards: readonly CardRecord[],
   card: CardId,
@@ -218,11 +241,10 @@ export function planSetCommand(
 ): MoveStep {
   const now = cards.find(c => c.id === card)
   if (now === undefined) return { kind: "refused", code: "gone", now: null }
-  if (now.kind !== "text") return { kind: "refused", code: "no-place", now }
-  return now.carries.kind === "fact"
-    ? { kind: "refused", code: "fact", now }
+  return now.kind !== "text"
+    ? { kind: "refused", code: "no-place", now }
     : {
         kind: "write",
-        record: { ...now, carries: { kind: "message", command } },
+        record: { ...now, content: { ...now.content, command } },
       }
 }

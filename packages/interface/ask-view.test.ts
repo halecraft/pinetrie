@@ -130,7 +130,6 @@ describe("askView", () => {
       ask: entryId("1-p"),
       runningAsk: null,
       lastEnded: null,
-      stops: new Map(),
       revisions: noRevisions,
       digests: new Map([
         [
@@ -225,6 +224,11 @@ describe("askView", () => {
     const stopped = indexOf([
       entry("1-p", null, chat),
       entry("2-a", "1-p", { ...said("wo"), stopReason: "aborted" }),
+      entry("3-f", "2-a", {
+        role: "fact",
+        content: "■ the run was stopped",
+        stopped: { prompt: entryId("1-p"), by: writerId("bea") },
+      }),
     ])
     expect(
       askView({
@@ -233,12 +237,6 @@ describe("askView", () => {
         ask: entryId("1-p"),
         runningAsk: null,
         lastEnded: null,
-        stops: new Map([
-          [
-            entryId("1-p"),
-            { prompt: entryId("1-p"), by: writerId("bea"), at: 1 },
-          ],
-        ]),
         revisions: noRevisions,
         digests: new Map(),
         releasedPath: null,

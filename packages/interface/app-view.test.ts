@@ -3,6 +3,7 @@ import {
   entryId,
   indexTree,
   type LaneView,
+  NO_CONTENT,
   type OfferRecord,
   rootIdFor,
   type ThreadId,
@@ -59,17 +60,16 @@ const input = (over: Partial<AppViewInput>): AppViewInput => ({
   laneRoots: new Map(),
   ...over,
 })
-const workspace = (over: Partial<AppViewInput>) =>
-  appView(input(over)).workspace
+const stage = (over: Partial<AppViewInput>) => appView(input(over)).stage
 
-describe("appView's workspace", () => {
+describe("appView's stage", () => {
   test("before anything is chosen, the page is connecting; nothing is its own", () => {
-    expect(workspace({ active: null }).kind).toBe("connecting")
-    expect(workspace({ active: { kind: "nothing" } }).kind).toBe("nothing")
+    expect(stage({ active: null }).kind).toBe("connecting")
+    expect(stage({ active: { kind: "nothing" } }).kind).toBe("nothing")
   })
 
   test("a new tab has its own kind, and its one column closes the tab", () => {
-    expect(workspace({ active: { kind: "new", key: "t" } })).toEqual({
+    expect(stage({ active: { kind: "new", key: "t" } })).toEqual({
       kind: "new",
       key: "t",
       slots: [{ key: "a", closable: true, track: 3 }],
@@ -79,7 +79,7 @@ describe("appView's workspace", () => {
   test("in a task, only a branch not yet sent closes: a card's column folds (ADR-0116)", () => {
     const [a, b] = columns("a", "b")
     const fresh: Column = { ...(b as Column), mode: { kind: "fresh" } }
-    const two = workspace({ columns: [a as Column, fresh], tracks: [3] })
+    const two = stage({ columns: [a as Column, fresh], tracks: [3] })
     expect(two.kind === "task" && two.slots).toEqual([
       { key: "a", closable: false, track: 3 },
       { key: "b", closable: true, track: PENDING_TRACK },
@@ -87,7 +87,7 @@ describe("appView's workspace", () => {
   })
 
   test("an archived task is read-only, with Restore to the first open state; one not archived is not", () => {
-    const here = workspace({ archived: new Map([[K, archived]]) })
+    const here = stage({ archived: new Map([[K, archived]]) })
     expect(here.kind === "task" && here.readOnly).toEqual({
       label: "archived by Ada",
       action: {
@@ -102,7 +102,7 @@ describe("appView's workspace", () => {
         },
       },
     })
-    expect(workspace({}).kind === "task" && workspace({})).toMatchObject({
+    expect(stage({}).kind === "task" && stage({})).toMatchObject({
       readOnly: null,
     })
   })
@@ -197,6 +197,7 @@ test("a task's rail is a forest: a tree for each root of its threads, in order, 
           owner: ADA,
           placer: ADA,
           place: { kind: "canvas", task: elsewhere, order: "1", width: 1 },
+          content: NO_CONTENT,
         },
       ],
       ADA,
@@ -274,6 +275,7 @@ test("a rail stub for a branch whose first run wrote a context entry above its p
             owner: ADA,
             placer: ADA,
             place: { kind: "canvas", task: elsewhere, order: "1", width: 1 },
+            content: NO_CONTENT,
           },
         ],
         ADA,

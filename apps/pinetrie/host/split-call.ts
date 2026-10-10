@@ -6,7 +6,7 @@
 // after it (`packages/keeper/TECHNICAL.md`), even when a Stop ends the run
 // while the step waits.
 
-import { atEntry, type ThreadId, textCardId } from "@pinetrie/core"
+import { type ThreadId, textCardId } from "@pinetrie/core"
 import {
   readLatestPrompt,
   readOffers,
@@ -18,6 +18,7 @@ import {
   offerStatus,
   planSplitCall,
   SPLIT_QUEUED,
+  SPLIT_UNMADE,
   splitRefusal,
   type ToolAnswer,
 } from "@pinetrie/rules"
@@ -37,7 +38,7 @@ export const createSplitCall =
   (deps: {
     readonly basics: Pick<
       Basics,
-      "docs" | "session" | "live" | "places" | "newId"
+      "docs" | "session" | "live" | "places" | "newId" | "log"
     >
     readonly keeper: Pick<HostKeeper, "run">
     /** Each card's history: the split's card is the host's write. */
@@ -62,10 +63,13 @@ export const createSplitCall =
         running: readRunning(live, lane),
         by,
         id: textCardId(newId()),
-        at: atEntry(tip),
       })
       if (planned.kind === "refused")
         return { text: splitRefusal(planned.why), isError: true, details: null }
+      if (planned.kind === "unmade") {
+        deps.basics.log(`[host] a split's card was not queued: ${planned.code}`)
+        return { text: SPLIT_UNMADE, isError: true, details: null }
+      }
       // execute
       const before = deps.provenance.before()
       applyPlaceSteps(places, [planned.step])

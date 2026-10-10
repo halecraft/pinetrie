@@ -301,7 +301,7 @@ async function run(check: Checks["check"]): Promise<void> {
           }
           return {
             item: look("#sidebar .sidebar-item[data-selected]"),
-            page: look("#workspace"),
+            page: look("#stage"),
             list: look("#sidebar"),
           }
         })
@@ -1163,7 +1163,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await idle()
       await other.close()
 
-      // ── a page over the workspace (ADR-0098): the browser's Back leaves it,
+      // ── a page over the stage (ADR-0098): the browser's Back leaves it,
       // and the columns under it kept their place. ──
       const body = `${col(0)} .column-body`
       const scrolled = await page
@@ -1190,7 +1190,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       const stayed = await page.$eval(body, n => n.scrollTop).catch(() => -1)
       check(
-        "the profile page covers the workspace, and the browser's Back returns to the columns as they were",
+        "the profile page covers the stage, and the browser's Back returns to the columns as they were",
         scrolled !== null && covered && left && stayed === scrolled,
         `scrollTop ${scrolled} → ${stayed}, covered ${covered}, left ${left}`,
       )
@@ -2886,8 +2886,14 @@ async function run(check: Checks["check"]): Promise<void> {
           avatar,
         )
         // Its typing makes a card, new in `cards`, so the column redraws; its
-        // message list does not (S59).
-        await componentRenders(page)
+        // message list does not (S59). What earlier steps set going (a
+        // thread's name, a title) lands first, so the renders counted are
+        // the card's alone.
+        for (let quiet = 0; quiet < 20; quiet++) {
+          await componentRenders(page)
+          await page.waitForTimeout(250)
+          if ((await componentRenders(page)).length === 0) break
+        }
         await second.fill(`${col(0)} .composer .input`, "thinking")
         const typing = await page
           .waitForSelector(".composer .typing", { timeout: 15_000 })
@@ -3182,14 +3188,20 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         // Marks (ADR-0048, step 2): a pip where a card of yours holds text.
         const pipIn = (p: typeof page, sel: string) =>
-          p.waitForSelector(`${sel} .card-pip`, { timeout: 5_000 }).then(
-            () => true,
-            () => false,
-          )
+          p
+            .waitForSelector(`${sel} .signal[data-signal="unsent"]`, {
+              timeout: 5_000,
+            })
+            .then(
+              () => true,
+              () => false,
+            )
         const pipGone = (p: typeof page, sel: string) =>
           p
             .waitForFunction(
-              s => document.querySelector(`${s} .card-pip`) === null,
+              s =>
+                document.querySelector(`${s} .signal[data-signal="unsent"]`) ===
+                null,
               sel,
               { timeout: 5_000 },
             )
@@ -3203,7 +3215,9 @@ async function run(check: Checks["check"]): Promise<void> {
         const tabMarked = await pipIn(page, itemSel(here))
         const otherBare =
           (await page
-            .locator(`${itemSel(taskOf(downRoot))} .card-pip`)
+            .locator(
+              `${itemSel(taskOf(downRoot))} .signal[data-signal="unsent"]`,
+            )
             .count()) === 0
         await page.click(itemSel(here))
         const markedEnd = await page
@@ -3266,7 +3280,9 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         // The item leaving and ▦'s pip are one render's facts.
         const archiveBare =
-          (await page.locator("#bottom .board-toggle .card-pip").count()) === 0
+          (await page
+            .locator('#bottom .board-toggle .signal[data-signal="unsent"]')
+            .count()) === 0
         await openBoard(page)
         const archivedRow = await pipIn(
           page,
@@ -3426,6 +3442,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // Discarded with its ×, and back in its slot with the undo key: a
       // discard is a move the host's history holds (ADR-0111).
       await page.click(slotOf(parked))
+      await page.keyboard.press("Enter")
       await page.click(".inventory .discard-card")
       await waitFor(() => placeOf(parked)?.kind === "gone", 5_000)
       await page.evaluate(() =>
@@ -3481,10 +3498,49 @@ async function run(check: Checks["check"]): Promise<void> {
         spun >= 0 && landed === target && lifted >= 0,
         `spun ${spun} ms into ${thread} in ${landed}, not ${target}; lifted ${lifted} ms, ${placeOf(parked)?.kind}`,
       )
-      // Selected, a card opens whole in place, over its neighbours, its box
-      // focusable; Escape there folds it, and focus is back on its slot
-      // (ADR-0113).
+      // Selected, a card is previewed beside the grid, read only (ADR-0126);
+      // Enter opens it whole in place, over its neighbours, its box
+      // focusable, and the preview hides; Escape there folds it, and focus
+      // is back on its slot (ADR-0113). An empty slot first, since a click on
+      // the card already selected opens it.
+      await page.click(slotAt(emptySlot))
       await page.click(slotOf(parked))
+      const previewed = await page
+        .waitForFunction(
+          id => {
+            const preview = document.querySelector(
+              `.inventory .preview .card-normal[data-card="${id}"]`,
+            )
+            return (
+              preview?.textContent?.includes("for later: a plan") === true &&
+              preview.querySelector("textarea, [contenteditable]") === null
+            )
+          },
+          parked,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      await page.keyboard.press("Enter")
+      const previewHidden = await page
+        .waitForFunction(
+          () =>
+            document.querySelector(".inventory .card-grid-open") !== null &&
+            document.querySelector(".inventory .preview") === null,
+          undefined,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "selecting a slot previews its card beside the grid, read only, and Enter opens it in place instead",
+        previewed && previewHidden,
+        `previewed ${previewed}, hidden once open ${previewHidden}`,
+      )
       const openInPlace = await page
         .$eval(slotOf(parked), slot => {
           const open = slot.parentElement?.querySelector(".card-grid-open")
@@ -3518,6 +3574,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `opened ${openInPlace}, folded ${foldedBack}`,
       )
       await page.click(slotOf(parked))
+      await page.keyboard.press("Enter")
       await page.click(".inventory .discard-card")
       await waitFor(() => placeOf(parked)?.kind === "gone", 5_000)
       const columnsBefore = await page.locator(".column").count()
@@ -3809,7 +3866,6 @@ async function run(check: Checks["check"]): Promise<void> {
           ? null
           : ({
               kind: "pinned",
-              at: atEntry(entryId(aboveEnd)),
               thread: threadHolding(host, entryId(aboveEnd)),
             } as const)
       if (tracedFrom?.kind === "pinned" && pinTo !== null)
@@ -3924,6 +3980,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       check("a reload keeps your inventory's cards in their slots", stillInSlot)
       await page.click(`.inventory .slot[data-card="${thought}"]`)
+      await page.keyboard.press("Enter")
       await page.click(".inventory .discard-card")
       await page.click("#bottom .inventory-toggle")
       await page.fill(`${col(0)} .composer .input`, "")

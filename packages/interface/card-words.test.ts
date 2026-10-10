@@ -1,7 +1,5 @@
 import {
-  atEntry,
   type CardEvent,
-  entryId,
   noteColumnIdFor,
   type PlaceKey,
   rootIdFor,
@@ -185,7 +183,6 @@ describe("history and traces (ADR-0048 step 6)", () => {
   }
   const queued: PlaceKey = {
     kind: "queued",
-    at: atEntry(entryId("e-1")),
     thread: threadIdFor("x"),
     seen: "",
   }

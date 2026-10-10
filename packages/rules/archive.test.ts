@@ -1,6 +1,5 @@
 import {
   type ArchivedTask,
-  atEntry,
   type CardRecord,
   commitId,
   type EntryLike,
@@ -9,6 +8,7 @@ import {
   type Intent,
   indexTree,
   type LaneView,
+  NO_CONTENT,
   noteColumnIdFor,
   type RevisionRecord,
   ROOT,
@@ -24,7 +24,8 @@ import {
 import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { archivedIn, planArchive, writesIn } from "./archive.ts"
-import { indexTasks, threadCardOf } from "./task.ts"
+import { threadCardOf } from "./fixtures.ts"
+import { indexTasks } from "./task.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const OTHER_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
@@ -202,11 +203,9 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
       placer: BEA,
       place: {
         kind: "composing",
-        at: atEntry(entryId("b")),
         thread: T_B,
       },
-      carries: { kind: "message", command: null },
-      unsent: null,
+      content: { command: null, unsent: null },
     },
     {
       kind: "note-column",
@@ -214,6 +213,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
       owner: BEA,
       placer: BEA,
       place: { kind: "canvas", task: OTHER_TASK, order: "z", width: 1 },
+      content: NO_CONTENT,
     },
   ]
   const tasks = indexTasks(cards, new Map())
@@ -221,7 +221,6 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
   const chat = (p: Intent & { kind: "chat" }) => p
   const atB = {
     kind: "composing",
-    at: atEntry(entryId("b")),
     thread: T_B,
   } as const
   test.each([
@@ -287,7 +286,6 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
           card: cardIdFor("c1"),
           at: {
             kind: "queued",
-            at: atEntry(entryId("a")),
             thread: LANE_X,
             seen: "",
           },

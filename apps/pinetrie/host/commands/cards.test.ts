@@ -1,5 +1,4 @@
 import {
-  atEntry,
   type CardCommand,
   type CardId,
   ERR,
@@ -78,11 +77,10 @@ const noteKey = { kind: "note", column: NOTES } as const
 /** Pinned at the lane's end: a place a trace is left at (`TRACED`). */
 const pinnedPlace = {
   kind: "pinned",
-  at: atEntry(E1),
   thread: LANE,
   order: "a",
 } as const
-const pinnedKey = { kind: "pinned", at: atEntry(E1), thread: LANE } as const
+const pinnedKey = { kind: "pinned", thread: LANE } as const
 /** Texts the host holds whole. */
 const held = { textNow: () => "x", holds: () => true }
 /** An idle lane, its queue not held, nobody typing. */
@@ -94,7 +92,6 @@ const idle = {
 }
 const queuedKey = {
   kind: "queued",
-  at: atEntry(E1),
   thread: LANE,
   seen: "",
 } as const
@@ -196,8 +193,7 @@ function setUp() {
           owner: ADA,
           placer: ADA,
           place: atEnd,
-          carries: { kind: "message", command: null },
-          unsent: null,
+          content: { command: null, unsent: null },
           ...over,
         },
       },
@@ -533,7 +529,7 @@ test("a card made in the queue is written there with its command, never in anoth
       kind: "text" as const,
       id: C1,
       place: { kind: "queued", by: ADA },
-      carries: { kind: "message", command: "bring-up-to-date" },
+      content: { command: "bring-up-to-date" },
     },
   ])
   expect(drains).toEqual([LANE])
@@ -638,8 +634,7 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
           owner: ADA,
           placer: ADA,
           place: queuedAt("0000000300"),
-          carries: { kind: "message", command: null },
-          unsent: null,
+          content: { command: null, unsent: null },
         },
       },
     ])
@@ -713,8 +708,7 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
           owner: BEA,
           placer: BEA,
           place: queuedAt("b"),
-          carries: { kind: "message", command: null },
-          unsent: null,
+          content: { command: null, unsent: null },
         },
       },
     ])
@@ -766,7 +760,7 @@ test("setCommand: the command set, its place and placer kept", async () => {
   const done = await commands.setCommand(C1, "bring-up-to-date")
   expect(done).toEqual({ outcome: { kind: "moved" }, rev: 4 })
   expect(textsIn(b.places)[0]).toMatchObject({
-    carries: { kind: "message", command: "bring-up-to-date" },
+    content: { command: "bring-up-to-date" },
     placer: BEA,
     place: atEnd,
   })
@@ -892,7 +886,7 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
       [
         {
           card: C1,
-          from: { kind: "pinned", at: pinned.at, thread: LANE },
+          from: { kind: "pinned", thread: LANE },
           to: queuedKey,
         },
       ],

@@ -1,8 +1,6 @@
 import {
-  atEntry,
   type CardRecord,
   commitId,
-  entryId,
   type OfferRecord,
   rootIdFor,
   type ThreadName,
@@ -205,7 +203,6 @@ describe("planSplitCall (ADR-0080)", () => {
       running: true,
       by: ADA,
       id: textCardId("s-1"),
-      at: atEntry(entryId("e-1")),
       ...over,
     })
   const queuedSplit: CardRecord = {
@@ -215,14 +212,12 @@ describe("planSplitCall (ADR-0080)", () => {
     placer: ADA,
     place: {
       kind: "queued",
-      at: atEntry(entryId("e-1")),
       thread: LANE,
       order: "0000000001",
       by: ADA,
       seen: "",
     },
-    carries: { kind: "message", command: "split" },
-    unsent: null,
+    content: { command: "split", unsent: null },
   }
 
   test("a split card queued by the person behind the run, with no text, from any run", () => {
@@ -235,7 +230,7 @@ describe("planSplitCall (ADR-0080)", () => {
             kind: "text",
             owner: ADA,
             place: { kind: "queued", thread: LANE, by: ADA, seen: "" },
-            carries: { kind: "message", command: "split" },
+            content: { command: "split", unsent: null },
           },
         },
       })

@@ -6,6 +6,7 @@ import path from "node:path"
 import type { Store } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import {
+  indexAsks,
   projectSpine,
   ROOT,
   rootDocId,
@@ -14,7 +15,7 @@ import {
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
-import { readParticipantNames, readPlaces, readStops } from "@pinetrie/reads"
+import { readParticipantNames, readPlaces } from "@pinetrie/reads"
 import { readStreams } from "@pinetrie/schema"
 import { beginRun } from "@pinetrie/schema/fixtures"
 import { openStore } from "../../host/store.ts"
@@ -29,7 +30,6 @@ import {
   lanesOf,
   noQueued,
   queueCard,
-  rootRecordsOf,
   START_AGENT,
   setUpAccepted,
   treeOf,
@@ -222,15 +222,27 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     )
     if (l5 !== undefined) await u.request({ kind: "stop", lane: l5.name })
     await u.request({ kind: "stop", lane: threadIdFor("no-such-lane") })
-    // Who stopped it is recorded under the ask (ADR-0106): pi's entries say
-    // only that the run was aborted. Stopping it again, idle, records nothing.
+    // Who stopped it is a fact in its thread (ADR-0106, ADR-0126): pi's
+    // entries say only that the run was aborted. The run's end appends it,
+    // the thread's last entry, and the asks name the stopper from it.
+    // Stopping it again, idle, queues nothing.
     const sleepAsk = idOfIn(th, "sleep")
-    const stop =
-      sleepAsk === null ? undefined : rootRecordsOf(th, readStops).get(sleepAsk)
+    const stopFacts = () =>
+      Object.values(ttree().entries).filter(
+        e => e.message?.stopped !== undefined,
+      )
+    await waitFor(() => stopFacts().length > 0, 10_000)
+    const tip = tlane()?.tip ?? null
+    const fact = tip === null ? undefined : ttree().entries[tip]?.message
     check(
       "the stop is recorded under its ask, naming who stopped it",
-      stop?.by === u.writer && rootRecordsOf(th, readStops).size === 1,
-      `${stop?.by ?? "none"}, ${rootRecordsOf(th, readStops).size} recorded`,
+      fact?.role === "fact" &&
+        fact.stopped?.prompt === sleepAsk &&
+        fact.stopped?.by === u.writer &&
+        sleepAsk !== null &&
+        indexAsks(ttree()).stoppedBy.get(sleepAsk) === u.writer &&
+        stopFacts().length === 1,
+      `${fact?.role ?? "none"} by ${fact?.stopped?.by ?? "none"}, ${stopFacts().length} stop fact(s)`,
     )
 
     // Resume (ADR-0082): a new run whose prompt is the host's carry-on
