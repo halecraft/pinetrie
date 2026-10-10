@@ -11,10 +11,12 @@
 // host's to decide (`historyOf`); an undo names only the root you are on.
 
 import {
+  type Address,
   type CardId,
   type CardRecord,
   DISCARDED,
   isReorderAt,
+  isTargetOf,
   KINDS,
   keyOf,
   type MoveDirection,
@@ -27,6 +29,8 @@ import {
   parseCardId,
   pinnedOf,
   type QueueMove,
+  type ReferenceCard,
+  type ReferenceCardId,
   type Reorder,
   sameKey,
   type TaskId,
@@ -39,8 +43,9 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { taskOfPlace } from "@pinetrie/rules"
+import { addressLink, taskOfPlace } from "@pinetrie/rules"
 import {
+  type ActedAt,
   AT_INVENTORY,
   atColumn,
   type CardNotice,
@@ -59,6 +64,7 @@ import {
   type IntentState,
   planOpenAt,
 } from "./effects.ts"
+import { addressWords } from "./face.ts"
 import { intoMessage, type PutTarget, placeOfTarget } from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
 import { planSpinOff } from "./spin-off.ts"
@@ -153,9 +159,12 @@ export const full = (card: CardId): CardNotice => ({
   fromQueue: false,
 })
 
+/** A card your hand may hold: a text card, a thread's card or a reference (`PLACES_OF`). */
+type InHand = TextCard | ThreadCard | ReferenceCard
+
 /** A handoff into your inventory, at `slot`. */
 const moveIntoInventorySlot = (
-  card: TextCard | ThreadCard,
+  card: InHand,
   slot: number,
   me: CardFacts["me"],
 ) =>
@@ -191,7 +200,7 @@ export function planTakeIntoInventory(
 }
 
 function takeIntoInventoryAt(
-  now: TextCard | ThreadCard,
+  now: InHand,
   start: number,
   state: IntentState,
 ): readonly Effect[] {
@@ -202,32 +211,115 @@ function takeIntoInventoryAt(
 }
 
 /**
- * A copy of a message's text, or of a selection in it, as a new card in your
- * inventory. A creation, so it enters no history: discarding removes it.
+ * Take a reference to the past into your inventory (ADR-0126): a card
+ * naming `taken.address`, its quote `taken.markdown` (`markdownOf`) kept as
+ * a blob, in the selected slot if it is empty, else the first empty one; and
+ * the markdown on the system clipboard. A creation, so it enters no
+ * history: discarding removes it. Full, it is refused here, as the host
+ * would; the clipboard is written all the same.
  */
-export function planTakeCopyIntoInventory(
-  card: TextCardId,
-  text: string,
+export function planTakeReference(
+  card: ReferenceCardId,
+  taken: Taken,
   state: IntentState,
 ): readonly Effect[] {
   const facts = state.cards
   const slot = firstEmpty(facts.slots, facts.selected)
   const show: Effect = { kind: "showInventory", brief: true }
-  if (slot === null) return [show, { kind: "refuse", refusal: full(card) }]
+  const copied: Effect = { kind: "copyText", text: taken.markdown }
+  if (slot === null)
+    return [copied, show, { kind: "refuse", refusal: full(card) }]
   return [
+    copied,
     show,
     {
-      kind: "createCard",
-      card: {
-        kind: "text",
-        id: card,
-        owner: facts.me,
-        placer: facts.me,
-        place: { kind: "inventory", holder: facts.me },
-        content: { command: null, unsent: null },
-      },
-      text,
+      kind: "takeReference",
+      card,
+      address: taken.address,
+      markdown: taken.markdown,
+      to: { kind: "inventory", holder: facts.me },
       how: { actedAt: AT_INVENTORY, slot },
+    },
+  ]
+}
+
+/**
+ * Edit a reference as text (ADR-0126): one request, the new text card in
+ * its place with the quote as its text and the reference to the trash, in
+ * the history of the task it is in, else of the one you are on. Nothing for
+ * a card that is no reference, or one not yours to move.
+ */
+export function planEditAsText(
+  edit: {
+    readonly reference: CardId
+    readonly card: TextCardId
+    readonly text: string
+  },
+  state: IntentState,
+): readonly Effect[] {
+  const now = cardOf(state.cards, edit.reference)
+  if (now?.kind !== "reference") return []
+  if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)
+    return []
+  return [
+    {
+      kind: "editAsText",
+      reference: now.id,
+      from: keyOf(now.place),
+      card: edit.card,
+      text: edit.text,
+      here: taskOfTab(state),
+    },
+  ]
+}
+
+/** What taking from the past takes: an address, and its markdown (`markdownOf`). */
+export interface Taken {
+  readonly address: Address
+  readonly markdown: string
+}
+
+/**
+ * A reference put where `target` is (ADR-0126). From your hand it stays
+ * there, as a tool does in a game (`KINDS`' `put`): a new reference with the
+ * same address and quote is made where it lands, `minted`. Into a text box,
+ * that is a link to its address at the caret. From anywhere else it moves,
+ * as a text card does; it never becomes your message, which is a text
+ * card's. Pure.
+ */
+function putReference(
+  now: ReferenceCard,
+  target: PutTarget,
+  state: IntentState,
+  minted: Minted,
+): readonly Effect[] {
+  const facts = state.cards
+  const { address, quote } = now.content
+  if (target.kind === "text-box")
+    return [
+      {
+        kind: "insertText",
+        text: addressLink(address, addressWords(address)),
+      },
+    ]
+  const to = placeOfTarget(target, facts.composers, facts.me)
+  // Only where a reference is ever (`KINDS`): a note, an inventory.
+  if (to === null || !isTargetOf("reference", to)) return []
+  const how = { actedAt: actedAtOf(target), slot: null }
+  // What a put does to your hand is its kind's (`KINDS`' `put`).
+  const inHand = now.place.kind === "inventory" && now.place.holder === facts.me
+  if (!inHand || KINDS.reference.put !== "copies") {
+    if (to.kind !== "notes" && sameKey(keyOf(now.place), to)) return []
+    return [moveCard(moveOf(now, to), how, true)]
+  }
+  return [
+    {
+      kind: "makeReference",
+      card: minted.reference,
+      address,
+      quote,
+      to,
+      how,
     },
   ]
 }
@@ -255,6 +347,7 @@ export function planPut(
     // A note column, a fact or an ask is never in an inventory (`PLACES_OF`).
     if (now.kind === "note-column" || now.kind === "fact" || now.kind === "ask")
       return []
+    // A reference in your hand moves within it: a put copies it elsewhere.
     const from = slotOf(facts.slots, card)
     if (from === null || now.place.kind !== "inventory")
       return takeIntoInventoryAt(now, target.slot, state)
@@ -262,8 +355,10 @@ export function planPut(
     return [{ kind: "swapSlots", a: from, b: target.slot }]
   }
   // A thread's card or a note column goes on a canvas (ADR-0117); a fact
-  // or an ask is the host's (`KINDS`).
+  // or an ask is the host's (`KINDS`); a reference copies from your hand.
   if (now.kind === "fact" || now.kind === "ask") return []
+  if (now.kind === "reference") return putReference(now, target, state, minted)
+  if (target.kind === "text-box") return []
   if (now.kind !== "text") return putOnCanvas(now, target, state)
   if (
     (target.kind === "column" || target.kind === "composer") &&
@@ -276,14 +371,30 @@ export function planPut(
     return []
   // Where a refusal is said: the column the card was put on; a task's pins,
   // its task column's.
-  const key =
-    target.kind === "notes"
-      ? target.column
-      : target.kind === "taskPinned"
-        ? target.task
-        : target.key
   const move = moveOf(now, to)
-  return [moveCard(move, { actedAt: atColumn(key), slot: null }, true)]
+  return [moveCard(move, { actedAt: actedAtOf(target), slot: null }, true)]
+}
+
+/**
+ * Where a put's refusal is said: the column it was put on; a task's pins,
+ * its task column's; a note column, its own; elsewhere, the inventory.
+ */
+const actedAtOf = (target: PutTarget): ActedAt => {
+  switch (target.kind) {
+    case "notes":
+      return atColumn(target.column)
+    case "taskPinned":
+      return atColumn(target.task)
+    case "column":
+    case "composer":
+    case "pinned":
+      return atColumn(target.key)
+    case "inventory":
+    case "state":
+    case "sidebar":
+    case "text-box":
+      return AT_INVENTORY
+  }
 }
 
 /**
@@ -410,7 +521,7 @@ export function planNewNote(
         owner: state.cards.me,
         placer: state.cards.me,
         place: { kind: "note", column, order: LAST_ORDER },
-        content: { command: null, unsent: null },
+        content: { command: null, unsent: null, origin: null },
       },
       text: "",
       how: IN_COLUMN(column),

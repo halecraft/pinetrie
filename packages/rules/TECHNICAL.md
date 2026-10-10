@@ -314,6 +314,23 @@ which are swept.
   that into the document, fact or nothing a reader reads, and `wordsOf`
   (`fact.ts`) reads it: the drain's pop and the pinned cards a run reads
   (`pinnedReads`) gather through it, so no reader branches on kind.
+- **An address names a thread, an entry, a block, a range or a card**
+  (core's `address.ts`, ADR-0126): one codec, `printAddress` and
+  `parseAddress`, total, for the record, the wire, the pane and links in
+  text (`/a/<address>`, `addressLink`, `addressLinks`). An entry names its
+  thread, so it resolves without a walk. A block is numbered once
+  (`blocks.ts`: `numberBlocks`, `blocksOf`, `blockSource`), the walk the
+  page draws by too; a past address's markdown is `pastMarkdown`.
+- **A reference is a card holding an address** (`ReferenceCard`, `q-`
+  ids): its content is the address and its quote's blob, so it draws
+  without loading the referent's root. It is a note, in an inventory, or
+  discarded: nothing that reads a queue or pinned cards reads a quote yet
+  (`wordsOf` reads none), so it is in neither. A put from your hand copies
+  it (`KINDS`' `put`). It is made by `planMakeReference`
+  (through `planMake`), the host's `make-reference`; a creation, so in no
+  history. *Edit as text* is `planEditAsText`: one move set, a new text card
+  in its place, its `origin` the address, and the reference to the trash,
+  undone whole. A text card's `origin` is stored printed ("" for none).
 - **One rule makes every card** (`planMake`, `moves.ts`): it takes a card
   already made (`makeCard`, whose place type is its kind's, so a misplaced
   card does not compile) and refuses `exists`, then as any move into its

@@ -11,6 +11,7 @@ import {
   type EntryId,
   type LaneView,
   type NoteColumnId,
+  type ReferenceCardId,
   type RootId,
   type TaskId,
   type TextCardId,
@@ -52,6 +53,8 @@ export interface Minted {
   readonly task: TaskId
   readonly thread: ThreadId
   readonly noteColumn: NoteColumnId
+  /** A reference a put makes where it lands (ADR-0126). */
+  readonly reference: ReferenceCardId
 }
 
 export interface Column {

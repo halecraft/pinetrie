@@ -7,6 +7,7 @@ import {
   type BlobStore,
   ERR,
   type Intent,
+  isImageRef,
   refused,
   type StoredImage,
   type WriterId,
@@ -35,7 +36,9 @@ export async function handlePicture(
 ): Promise<Outcome> {
   const { blobs, records } = deps
   // gather: the reference, without the bytes
-  const ref = intent.sha256 === null ? undefined : blobs.ref(intent.sha256)
+  const stored = intent.sha256 === null ? undefined : blobs.ref(intent.sha256)
+  // A picture is an image: a quote's markdown is none.
+  const ref = stored !== undefined && isImageRef(stored) ? stored : undefined
   // plan (pure)
   const plan = planPicture(intent.sha256, ref)
   // execute

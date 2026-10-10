@@ -538,7 +538,7 @@ describe("settling and starting up", () => {
       by: ALICE,
       seen: "",
     },
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   })
   test("settleRun: a refused run keeps the message; an admitted one is done", () => {
     expect(settleRun({ kind: "refused" })).toBe("keep")

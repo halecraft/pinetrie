@@ -10,6 +10,7 @@ import { afterTaskMove, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
 import type { ListWidth } from "./list-width.ts"
 import type { PageName } from "./page.ts"
+import type { TextUpload } from "./paste.ts"
 import { afterSpinOff } from "./spin-off.ts"
 
 export interface AppPorts {
@@ -19,6 +20,8 @@ export interface AppPorts {
     | "request"
     | "offer"
     | "createCard"
+    | "makeReference"
+    | "editAsText"
     | "moveCard"
     | "queueCard"
     | "moveCards"
@@ -61,6 +64,12 @@ export interface AppPorts {
   readonly listWidth: (width: ListWidth) => void
   /** Show a page over the stage, or, with null, the stage (ADR-0098). */
   readonly page: (to: PageName | null) => void
+  /** Keep markdown as a blob: a reference's quote (`uploadText`). */
+  readonly uploadText: (markdown: string) => Promise<TextUpload>
+  /** Put markdown on the system clipboard. */
+  readonly clipboard: (text: string) => void
+  /** Put text at the caret of the text box that has focus, as typed. */
+  readonly insertText: (text: string) => void
 }
 
 export function perform(effects: readonly Effect[], ports: AppPorts): void {
@@ -115,6 +124,49 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "createCard":
       void ports.session.createCard(effect.card, effect.text, effect.how)
+      return
+    case "takeReference":
+      void ports.uploadText(effect.markdown).then(upload => {
+        if (upload.ok)
+          void ports.session.makeReference(
+            {
+              card: effect.card,
+              to: effect.to,
+              address: effect.address,
+              quote: upload.ref.sha256,
+            },
+            effect.how,
+          )
+        // The quote could not be kept: nothing is taken, said where it was.
+        else
+          ports.session.refuse({
+            card: effect.card,
+            actedAt: effect.how.actedAt,
+            code: "no-place",
+            by: null,
+            fromQueue: false,
+          })
+      })
+      return
+    case "makeReference":
+      void ports.session.makeReference(
+        {
+          card: effect.card,
+          to: effect.to,
+          address: effect.address,
+          quote: effect.quote,
+        },
+        effect.how,
+      )
+      return
+    case "editAsText":
+      void ports.session.editAsText(effect)
+      return
+    case "copyText":
+      ports.clipboard(effect.text)
+      return
+    case "insertText":
+      ports.insertText(effect.text)
       return
     case "moveCard":
       if (effect.fly) ports.fly(effect.move.card)

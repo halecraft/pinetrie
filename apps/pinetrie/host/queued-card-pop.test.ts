@@ -79,7 +79,7 @@ const queue = (
         by: BEA,
         seen: "",
       },
-      content: { command, unsent: null },
+      content: { command, unsent: null, origin: null },
     }),
   )
 
@@ -649,7 +649,11 @@ describe("drain: bring up to date (ADR-0108)", () => {
       expect.objectContaining({
         kind: "text" as const,
         id: cardIdFor("c1"),
-        content: { command: CMD, unsent: "the lane has no copy of its own" },
+        content: {
+          command: CMD,
+          unsent: "the lane has no copy of its own",
+          origin: null,
+        },
         place: expect.objectContaining({ kind: "note" }),
       }),
     ])
@@ -669,7 +673,11 @@ describe("drain: bring up to date (ADR-0108)", () => {
     queue(b.places, cardIdFor("c1"), "a", CMD)
     await drain(throwing, LANE)
     expect(textsIn(b.places)[0]).toMatchObject({
-      content: { command: CMD, unsent: "the host failed: jj broke" },
+      content: {
+        command: CMD,
+        unsent: "the host failed: jj broke",
+        origin: null,
+      },
     })
   })
 
@@ -682,7 +690,7 @@ describe("drain: bring up to date (ADR-0108)", () => {
     queue(b.places, cardIdFor("c1"), "a", CMD)
     await drain(deps, LANE)
     expect(textsIn(b.places)[0]).toMatchObject({
-      content: { command: null, unsent: "pi refused" },
+      content: { command: null, unsent: "pi refused", origin: null },
     })
   })
 })
@@ -835,7 +843,7 @@ describe("drain: a split (ADR-0080)", () => {
       expect.objectContaining({
         kind: "text" as const,
         id: cardIdFor("c1"),
-        content: { command: "split", unsent: "nothing to split" },
+        content: { command: "split", unsent: "nothing to split", origin: null },
       }),
     ])
   })

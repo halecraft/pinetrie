@@ -12,6 +12,7 @@ import {
   MOVES_DOC_PREFIX,
   type RootId,
   rootDocId,
+  textSourceOf,
 } from "@pinetrie/core"
 import {
   LIVE_DOC_ID,
@@ -74,10 +75,11 @@ export async function compactAfter(
 }
 
 /**
- * Delete the images nothing shows any more: gather every card's text
- * (`CardPort.texts` of the cards `places` holds), then the store's list and the session's references
- * (`readReferencedBlobs`: roots' images, banners and people's pictures)
- * with no await between them, `planSweep`, delete.
+ * Delete the blobs nothing shows or quotes any more: gather every card's
+ * text (`CardPort.texts` of the cards `places` holds) and every
+ * reference's quote (`textSourceOf`, ADR-0126), then the store's list and
+ * the session's references (`readReferencedBlobs`: roots' images, banners
+ * and people's pictures) with no await between them, `planSweep`, delete.
  */
 export async function sweepBlobs(input: {
   readonly basics: Pick<Basics, "session" | "places" | "log" | "now">
@@ -88,13 +90,17 @@ export async function sweepBlobs(input: {
 }): Promise<void> {
   const { session: doc, log } = input.basics
   const { blobs } = input
-  const ids = readPlaces(input.basics.places)
-    .filter(isTextCard)
-    .map(c => c.id)
+  const cards = readPlaces(input.basics.places)
+  const ids = cards.filter(isTextCard).map(c => c.id)
   const texts = (await input.texts(ids)).map(t => t.text)
+  // A reference's quote is a blob its card holds (ADR-0126).
+  const quotes = cards.flatMap(c => {
+    const source = textSourceOf(c)
+    return source.kind === "blob" ? [source.sha] : []
+  })
   const doomed = planSweep({
     stored: blobs.list(),
-    referenced: readReferencedBlobs(doc, texts),
+    referenced: new Set([...readReferencedBlobs(doc, texts), ...quotes]),
     now: input.basics.now(),
     grace: input.grace,
   })

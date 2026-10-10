@@ -110,6 +110,7 @@ function setUp(begin: ErrCode | null = null) {
     base: null,
     pinned: [],
     start: null,
+    quotes: [],
   }
   return { b, pi, work, started, seen, titles, deps, context }
 }
@@ -521,6 +522,7 @@ describe("sendChat", () => {
         base: null,
         pinned: [],
         start: null,
+        quotes: [],
       },
     )
     expect(out).toEqual({ kind: "conflict", by: BEA })

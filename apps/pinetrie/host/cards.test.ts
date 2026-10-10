@@ -67,7 +67,7 @@ test("blankQueued: a queued card made empty is blank; one queued with text is no
       by: ADA,
       seen: s,
     },
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   })
   const queue = [queuedAs(cardIdFor("c0"), ""), queuedAs(id, seen)]
   expect([...(await cards.blankQueued(queue))]).toEqual([cardIdFor("c0")])

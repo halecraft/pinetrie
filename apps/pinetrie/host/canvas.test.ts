@@ -48,7 +48,7 @@ function setUp() {
     owner: ADA,
     placer: ADA,
     place: { kind: "task-pinned", task: TASK_ID, order: "a" },
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   }
   applyPlaceSteps(b.places, [
     {

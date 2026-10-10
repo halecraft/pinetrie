@@ -118,7 +118,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
       by: writerId(email),
       seen: "",
     },
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   })
   const atEnd: CardRecord = {
     kind: "text" as const,
@@ -129,7 +129,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
       kind: "composing",
       thread: lane,
     },
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   }
   const cards = [
     queued(cardIdFor("c2"), "b", "bea@x.io"),

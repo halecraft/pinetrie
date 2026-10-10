@@ -1,7 +1,20 @@
 // web/markdown — message text as the tree `MessageText` draws
 // (docs/findings/S27-markdown-rendering.md).
 
-import { blobOfUrl, type ImageRef, type Sha256 } from "@pinetrie/core"
+import {
+  addressOfUrl,
+  type BlockRef,
+  blobOfUrl,
+  type ImageRef,
+  printAddress,
+  type Sha256,
+} from "@pinetrie/core"
+import {
+  BLOCK_PROPERTY,
+  type BlockNode,
+  blockKey,
+  markBlocks,
+} from "@pinetrie/rules"
 import type { Element, ElementContent, Root, RootContent } from "hast"
 import remarkGfm from "remark-gfm"
 import remarkParse from "remark-parse"
@@ -28,6 +41,9 @@ export const REMEND: RemendOptions = {
 const toHast = unified()
   .use(remarkParse)
   .use(remarkGfm, { singleTilde: false })
+  // Every block numbered by the walk an address counts with (`blocksOf`),
+  // carried onto its element as `data-block`.
+  .use(() => (tree: unknown) => markBlocks(tree as BlockNode))
   // Raw HTML arrives as `raw` nodes, which become text below rather than
   // being dropped: a model writing about `<details>` keeps its words.
   .use(remarkRehype, { allowDangerousHtml: true })
@@ -49,9 +65,10 @@ export const imageLookup = (
 /**
  * The tree to draw for a message's text. A `/blob/` image found in `images`
  * gets its stored size, so its box is laid out before it loads: alignment
- * and following measure a message once (ADR-0042). Each table is numbered
- * in document order (`dataTable`), so the column's pane can name it
- * (ADR-0078).
+ * and following measure a message once (ADR-0042). Each block (a table, a
+ * code block, an image, a paragraph) carries its number (`data-block`,
+ * `markBlocks`), so the column's pane and an address can name it
+ * (ADR-0078, ADR-0126).
  */
 export function messageTree(
   source: string,
@@ -61,25 +78,35 @@ export function messageTree(
   const text = mode === "streaming" ? remend(source, REMEND) : source
   const tree = toHast.runSync(toHast.parse(text))
   tree.children = finish(tree.children, false, images)
-  let n = 0
-  for (const table of tables(tree)) table.properties.dataTable = n++
   return tree
 }
 
-/** The tree's tables in document order, nested ones included. */
-function* tables(node: Root | Element): Generator<Element> {
+/** The element of a tree `messageTree` made that draws block `ref`, or null. */
+export function blockAt(node: Root | Element, ref: BlockRef): Element | null {
+  const key = blockKey(ref)
   for (const child of node.children) {
     if (child.type !== "element") continue
-    if (child.tagName === "table") yield child
-    yield* tables(child)
+    if (child.properties[BLOCK_PROPERTY] === key) return child
+    const found = blockAt(child, ref)
+    if (found !== null) return found
   }
+  return null
 }
 
-/** The `nth` table of a tree `messageTree` made, or null. */
-export function tableAt(tree: Root, nth: number): Element | null {
-  for (const table of tables(tree))
-    if (table.properties.dataTable === nth) return table
-  return null
+/** The block an element draws, from its `data-block`; null for none. */
+export function blockOfProperty(value: unknown): BlockRef | null {
+  if (typeof value !== "string") return null
+  const dash = value.lastIndexOf("-")
+  const kind = value.slice(0, dash)
+  const n = Number(value.slice(dash + 1))
+  return (kind === "table" ||
+    kind === "code" ||
+    kind === "image" ||
+    kind === "paragraph") &&
+    Number.isInteger(n) &&
+    n >= 0
+    ? { kind, n }
+    : null
 }
 
 /** The text of each cell of a table's header row; none without one. */
@@ -116,6 +143,7 @@ function finish(
         if (typeof url === "string") child.properties[key] = safeUrl(url)
       }
       if (child.tagName === "img") sizeImage(child, images)
+      if (child.tagName === "a") markAddress(child)
       child.children = finish(
         child.children,
         inPre || child.tagName === "pre",
@@ -165,6 +193,18 @@ export function safeUrl(url: string): string {
   )
     return url
   return ""
+}
+
+/**
+ * A link to an address (ADR-0126), `/a/<address>`, drawn as a chip: marked
+ * with what it names (`data-address`), which the page's click opens.
+ */
+function markAddress(a: Element): void {
+  const href = a.properties.href
+  const address = typeof href === "string" ? addressOfUrl(href) : undefined
+  if (address === undefined) return
+  a.properties.dataAddress = printAddress(address)
+  a.properties.className = ["address-link"]
 }
 
 /** A `/blob/` image its message holds: its stored size, and loaded lazily. */

@@ -51,7 +51,7 @@ const card = (over: Partial<TextCard> = {}): TextCard => ({
   owner: ME,
   placer: ME,
   place: atEnd,
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
   ...over,
 })
 
@@ -197,7 +197,7 @@ describe("the tab's moves (ADR-0059)", () => {
       owner: ME,
       placer: ME,
       place: { ...queuedKey, order: "\uffff", by: ME },
-      content: { command: "split", unsent: null },
+      content: { command: "split", unsent: null, origin: null },
     })
     const s = run([
       sent(pendingOf("m-2", made, { actedAt: COLUMN, slot: null }, draft)),

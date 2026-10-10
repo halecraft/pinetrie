@@ -12,6 +12,7 @@ import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
 import { cardContent } from "./0009-card-content.ts"
+import { referenceFields } from "./0010-reference-fields.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -40,13 +41,13 @@ export interface Migration {
 }
 
 /**
- * Every migration this build carries, oldest first. Empty: 0001-live-row,
- * 0002-records (ADR-0095), 0005-tasks' places and sidebars (ADR-0116) and
- * 0008-entry-thread (ADR-0125) ran on Duane's store and were deleted;
- * restore one from the revision that deleted it for a store still on its
- * hash.
+ * Every migration this build carries, oldest first: 0010-reference-fields
+ * (ADR-0126). 0001-live-row, 0002-records (ADR-0095), 0005-tasks' places and
+ * sidebars (ADR-0116) and 0008-entry-thread (ADR-0125) ran on Duane's store
+ * and were deleted; restore one from the revision that deleted it for a
+ * store still on its hash.
  */
-export const MIGRATIONS: readonly Migration[] = []
+export const MIGRATIONS: readonly Migration[] = [referenceFields]
 
 /**
  * A one-time change to stored contents that keeps every schema's hash: a

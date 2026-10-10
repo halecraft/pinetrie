@@ -9,9 +9,12 @@
 // for itself; the panel's buttons and drag still work. Folding the sidebar is
 // Ctrl+Shift+L, the same way, beside the control at its foot. Undo and redo of a
 // move are Cmd or Ctrl with Z (Shift+Z, or Ctrl+Y, to redo), only outside a
-// text box, where they are the box's own text undo (ADR-0052).
+// text box, where they are the box's own text undo (ADR-0052). Cmd or Ctrl
+// with X outside a text box takes as Ctrl+Shift+I does, and the put key in a
+// text box puts a reference there as a link (ADR-0126). Cmd+C is the page's
+// `copy` event's (`copyFrom`), not a key here; Cmd+V is the browser's.
 
-import type { CardId } from "@pinetrie/core"
+import { type CardId, kindOfCard } from "@pinetrie/core"
 import type { Intent } from "./intent.ts"
 
 /** The part of a `KeyboardEvent` read here. */
@@ -54,16 +57,32 @@ export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
     return focus.card === null
       ? null
       : { kind: "takeIntoInventory", card: focus.card }
-  if (chord && key === "o")
-    return focus.selectedCard === null || focus.column === null
+  if (chord && key === "o") {
+    if (focus.selectedCard === null) return null
+    // The put key in a text box puts a reference there as a link
+    // (ADR-0126); any other card goes to the column, as ever.
+    if (focus.inText && kindOfCard(focus.selectedCard) === "reference")
+      return {
+        kind: "put",
+        card: focus.selectedCard,
+        target: { kind: "text-box" },
+      }
+    return focus.column === null
       ? null
       : {
           kind: "put",
           card: focus.selectedCard,
           target: { kind: "column", key: focus.column },
         }
+  }
   if (focus.inText || event.altKey) return null
   const command = event.metaKey !== event.ctrlKey
+  // Cmd+X outside a text box takes the focused card into your inventory
+  // (ADR-0126), as Ctrl+Shift+I does.
+  if (command && !event.shiftKey && key === "x")
+    return focus.card === null
+      ? null
+      : { kind: "takeIntoInventory", card: focus.card }
   if (command && key === "z")
     return {
       kind: "undoMove",

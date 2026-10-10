@@ -2887,8 +2887,9 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         // Its typing makes a card, new in `cards`, so the column redraws; its
         // message list does not (S59). What earlier steps set going (a
-        // thread's name, a title) lands first, so the renders counted are
-        // the card's alone.
+        // thread's name, a title, a run's end and the facts its drain
+        // appends) lands first, so the renders counted are the card's alone.
+        await idle()
         for (let quiet = 0; quiet < 20; quiet++) {
           await componentRenders(page)
           await page.waitForTimeout(250)

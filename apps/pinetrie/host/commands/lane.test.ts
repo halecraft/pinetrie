@@ -155,7 +155,7 @@ test("a stop with a message card queued holds the queue before the abort, and it
         by: bea,
         seen: "",
       },
-      content: { command: null, unsent: null },
+      content: { command: null, unsent: null, origin: null },
     }),
   )
   await handleStop(stopDeps(r), r.lane, ada)

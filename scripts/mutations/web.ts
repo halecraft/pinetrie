@@ -183,17 +183,17 @@ export const mutations: readonly Mutation[] = [
     name: "the pane names a table by its message alone",
     file: "packages/web/pane.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "      return `table:${subject.entry}:${subject.nth}`",
+    from: "      return `block:${printAddress(subject.address)}`",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "      return `table:${subject.entry}`",
+    to: "      return `block:${subject.address.entry}`",
     command: unit,
     expect: "anything else replaces it: another kind, table or message",
   },
   {
     name: "the pane draws a table its column no longer draws",
     file: "packages/web/pane.ts",
-    from: "      const node = facts.nodes.find(n => n.id === subject.entry)\n      if (node === undefined) return null",
-    to: "      const node = facts.nodes.find(n => n.id === subject.entry) ?? facts.nodes[0]\n      if (node === undefined) return null",
+    from: "      const node = facts.nodes.find(n => n.id === address.entry)\n      if (node === undefined) return null",
+    to: "      const node = facts.nodes.find(n => n.id === address.entry) ?? facts.nodes[0]\n      if (node === undefined) return null",
     command: unit,
     expect:
       "a table closes when its message is not drawn, or has no such table",
@@ -224,9 +224,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a table in a list item is not numbered",
-    file: markdown,
-    from: '    if (child.tagName === "table") yield child\n    yield* tables(child)',
-    to: '    if (child.tagName === "table") yield child\n    else if (child.tagName !== "ul") yield* tables(child)',
+    file: "packages/rules/blocks.ts",
+    from: "    for (const child of node.children ?? []) walk(child)",
+    to: '    if (node.type !== "list") for (const child of node.children ?? []) walk(child)',
     command: unit,
     expect:
       "each table is numbered in document order, one in a list item included",
@@ -295,4 +295,21 @@ export const mutations: readonly Mutation[] = [
   // ── the publish button (ADR-0076, ADR-0090) ──
   // ── queue control (ADR-0048 step 7) ──
   // ── the sidebar and the board (ADR-0122) ──
+  {
+    name: "blocks of a kind are all numbered 0",
+    file: "packages/rules/blocks.ts",
+    from: "      counts.set(kind, n + 1)",
+    to: "      counts.set(kind, n)",
+    command: unit,
+    expect:
+      "each table is numbered in document order, one in a list item included",
+  },
+  {
+    name: "a link to an address is drawn as any link",
+    file: "packages/web/markdown.ts",
+    from: '      if (child.tagName === "a") markAddress(child)\n',
+    to: "",
+    command: unit,
+    expect: "a link to an address is drawn as a chip naming it",
+  },
 ]

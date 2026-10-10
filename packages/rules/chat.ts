@@ -14,7 +14,6 @@
 // itself stays text.
 
 import {
-  type Address,
   type AgentCandidate,
   type AgentId,
   type AgentMessageLike,
@@ -32,6 +31,7 @@ import {
   type PlanMode,
   type Position,
   planModeOf,
+  type Recipients,
   type Refusal,
   type Responder,
   refused,
@@ -51,6 +51,7 @@ import { canvasFactLine, decodeCanvas, decodeCanvasFact } from "./canvas.ts"
 import { decodeWith, ThreadIdSchema } from "./decode.ts"
 import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
+import { type LinkedQuote, withQuotes } from "./links.ts"
 import { decodePinned } from "./pinned.ts"
 import {
   type AnswerMessage,
@@ -173,13 +174,19 @@ export type PromptMessage =
 export const attributed = (d: ChatDetails): string =>
   `${d.authorName}: ${d.command?.expanded ?? d.text}`
 
+/**
+ * A chat as stored: what the model reads is its attributed text, then each
+ * past referent it links to quoted under it (`withQuotes`, ADR-0126),
+ * frozen as it was sent, as the past never changes.
+ */
 export const encodeChat = (
   details: ChatDetails,
   timestamp: number,
+  quotes: readonly LinkedQuote[] = [],
 ): ChatMessage => ({
   role: "custom",
   customType: CHAT_TYPE,
-  content: attributed(details),
+  content: withQuotes(attributed(details), quotes),
   display: true,
   details,
   timestamp,
@@ -517,7 +524,7 @@ export function addressChat(input: {
   readonly asksAgent: boolean
   /** The text is a command. */
   readonly command: boolean
-}): Address {
+}): Recipients {
   const to = address({
     mentions: input.mentions,
     participants: input.participants,

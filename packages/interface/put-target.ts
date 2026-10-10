@@ -44,6 +44,11 @@ export type PutTarget =
   | { readonly kind: "state"; readonly state: WorkflowStateId }
   /** A place in the sidebar, before a task or at its end: a new thread there. */
   | { readonly kind: "sidebar"; readonly before: TaskId | null }
+  /**
+   * The text box that has focus (ADR-0126): a reference put there is a link
+   * to its address at the caret. No other card is put into one.
+   */
+  | { readonly kind: "text-box" }
 
 /** The drag data type a card's id travels under, pinetrie's own. */
 export const CARD_MIME = "application/x-pinetrie-card"
@@ -88,6 +93,9 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       return { [PUT_STATE]: target.state }
     case "sidebar":
       return { [PUT_SIDEBAR]: target.before ?? END }
+    // A text box is put into by the put key alone: no drop lands there.
+    case "text-box":
+      return {}
   }
 }
 
@@ -158,7 +166,12 @@ export function placeOfTarget(
   if (target.kind === "notes") return { kind: "note", column: target.column }
   if (target.kind === "taskPinned")
     return { kind: "task-pinned", task: target.task }
-  if (target.kind === "state" || target.kind === "sidebar") return null
+  if (
+    target.kind === "state" ||
+    target.kind === "sidebar" ||
+    target.kind === "text-box"
+  )
+    return null
   const place = places.get(target.key)?.place
   if (place === undefined) return null
   if (target.kind === "pinned") return pinnedOf(place)

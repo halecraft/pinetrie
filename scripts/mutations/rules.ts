@@ -1238,8 +1238,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card with a command this build does not know decodes",
     file: "packages/rules/card.ts",
-    from: '          return fact !== "" || (c.command !== "" && !isCommand(c.command))',
-    to: '          return fact !== ""',
+    from: '          return fact !== "" ||\n            (c.command !== "" && !isCommand(c.command)) ||',
+    to: '          return fact !== "" ||',
     command: unit,
     expect: "a malformed card is dropped, never thrown",
   },
@@ -3007,8 +3007,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fact's words are read as no text",
     file: "packages/rules/fact.ts",
-    from: "      ? factLine(source.fact)\n",
-    to: '      ? ""\n',
+    from: "      return factLine(source.fact)\n",
+    to: '      return ""\n',
     command: unit,
     expect:
       "wordsOf: a text card's words are its document's, a fact's its line, a thread's none (ADR-0126)",
@@ -3030,5 +3030,43 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "endedOutcome: at the run's end its stop's fact is still queued, and names who stopped it",
+  },
+  {
+    name: "a link to a thread is quoted",
+    file: "packages/rules/links.ts",
+    from: "    if (!isPastAddress(address)) return []",
+    to: "    if (!isPastAddress(address)) return [{ label, markdown: label }]",
+    command: unit,
+    expect:
+      "linkedQuotes: each past referent a message links to, from the message it is in; a thread's link, or an entry not held, none",
+  },
+  {
+    name: "a link's label keeps its brackets",
+    file: "packages/rules/links.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  `[${label.replace(/[[\\]]/g, "")}](${addressUrl(address)})`',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "  `[${label}](${addressUrl(address)})`",
+    command: unit,
+    expect:
+      "a put's link is found again in the text, with its label; one in code is text",
+  },
+  {
+    name: "a reference is made on a canvas",
+    file: "packages/rules/moves.ts",
+    from: "  if (place === undefined || !isReferenceCardId(card))",
+    to: "  if (!isReferenceCardId(card))",
+    command: unit,
+    expect:
+      "planMakeReference makes a reference where its move lands, through planMake; never on a canvas",
+  },
+  {
+    name: "a reference edited as text forgets where it came from",
+    file: "packages/rules/moves.ts",
+    from: "      { command: null, unsent: null, origin: now.content.address },",
+    to: "      { command: null, unsent: null, origin: null },",
+    command: unit,
+    expect:
+      "planEditAsText: one move set, a text card in the reference's place with its origin, and the reference to the trash",
   },
 ]

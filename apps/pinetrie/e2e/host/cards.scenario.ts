@@ -111,7 +111,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id,
           place: place === "pinned" ? pinnedIn(end) : drafting(end),
-          content: { command: null, unsent: null },
+          content: { command: null, unsent: null, origin: null },
         },
         text,
       )
@@ -426,7 +426,7 @@ async function run(check: Checks["check"]): Promise<void> {
       {
         id: late,
         place: pinnedHere,
-        content: { command: null, unsent: null },
+        content: { command: null, unsent: null, origin: null },
       },
       "typed just before the send",
     )
@@ -528,6 +528,9 @@ async function run(check: Checks["check"]): Promise<void> {
         holder: "",
         task: "",
         width: "",
+        address: "",
+        quote: "",
+        origin: "",
       }),
     )
     await sleep(500)
@@ -659,7 +662,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id,
           place: keeping,
-          content: { command: null, unsent: null },
+          content: { command: null, unsent: null, origin: null },
         },
         text,
       )
@@ -719,7 +722,7 @@ async function run(check: Checks["check"]): Promise<void> {
             {
               id: newCardId(),
               place: mine,
-              content: { command: null, unsent: null },
+              content: { command: null, unsent: null, origin: null },
             },
             `held ${slot}`,
             into(slot),

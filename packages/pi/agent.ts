@@ -16,6 +16,7 @@ import {
 import {
   type BlobStore,
   ERR,
+  isImageMime,
   isThreadId,
   type RootId,
   type Spot,
@@ -135,7 +136,8 @@ function providerMessages(
   const found = new Map(
     chatImageShas(messages).flatMap(sha => {
       const blob = blobs.get(sha)
-      return blob === undefined
+      // A chat's images alone: a quote's markdown is no image.
+      return blob === undefined || !isImageMime(blob.mimeType)
         ? []
         : [
             [

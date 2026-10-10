@@ -59,6 +59,12 @@ const StoredCard = Schema.struct.json({
   task: Schema.string(),
   /** A canvas card's width: `1` or `2` columns (ADR-0116). */
   width: Schema.string(),
+  /** A reference's address, printed (`printAddress`, ADR-0126). */
+  address: Schema.string(),
+  /** A reference's quote's blob: its markdown's SHA-256. */
+  quote: Schema.string(),
+  /** A text card's origin, a printed address: "" for none (ADR-0126). */
+  origin: Schema.string(),
 })
 
 const placesSchema = Schema.struct({

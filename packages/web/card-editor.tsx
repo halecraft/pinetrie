@@ -299,7 +299,7 @@ export function CardEditor(p: {
             {
               id: next.state.card,
               place: p.place,
-              content: { command: null, unsent: null },
+              content: { command: null, unsent: null, origin: null },
             },
             el.value,
             IN_COLUMN(p.how.column),

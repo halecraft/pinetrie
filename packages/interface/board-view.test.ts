@@ -30,6 +30,7 @@ import {
   parseSearch,
   readyWords,
   removeWords,
+  searchedText,
   searchWords,
   stateWords,
   tasksWords,
@@ -499,4 +500,9 @@ test("nameStateIntent renames a state; addStateIntent adds one where it was aske
     kind: "editWorkflow",
     edit: { action: "add", state: null, name: "Review", before: null },
   })
+})
+
+test("search reads a link to an address by its label, not its address (ADR-0126)", () => {
+  const text = "see [the plan table](/a/b/t-1/e-1/table-0) now"
+  expect(searchedText(text)).toBe("see the plan table now")
 })

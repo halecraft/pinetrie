@@ -4,7 +4,9 @@
 import {
   type NoteColumnId,
   noteColumnIdFor,
+  type ReferenceCardId,
   type RootId,
+  referenceCardIdFor,
   rootIdFor,
   type TaskId,
   type TextCardId,
@@ -32,6 +34,10 @@ export const newCardId = (): TextCardId => textCardId(newUuidv7())
  * move (ADR-0116). `parseCardId` accepts only this shape.
  */
 export const newNoteColumnId = (): NoteColumnId => noteColumnIdFor(newUuidv7())
+
+/** A new reference card's id (ADR-0126): minted by the page that takes or puts it. */
+export const newReferenceCardId = (): ReferenceCardId =>
+  referenceCardIdFor(newUuidv7())
 
 /**
  * A new thread's lane id, reserved by a column before the lane exists

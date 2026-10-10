@@ -55,17 +55,16 @@ const facts = (over: Partial<PaneFacts> = {}): PaneFacts => ({
   ...over,
 })
 
-const table = (entry: string, nth: number): PaneSubject => ({
-  kind: "table",
-  entry: entryId(entry),
-  nth,
+const table = (entry: string, n: number): PaneSubject => ({
+  kind: "block",
+  address: {
+    kind: "block",
+    thread: FIXTURE_THREAD,
+    entry: entryId(entry),
+    block: { kind: "table", n },
+  },
 })
-const image = (from: string | null): PaneSubject => ({
-  kind: "image",
-  sha256: SHA,
-  from: from === null ? null : entryId(from),
-  alt: "",
-})
+const image = (alt = ""): PaneSubject => ({ kind: "image", sha256: SHA, alt })
 
 describe("togglePane", () => {
   test("opening what is shown closes it", () => {
@@ -77,8 +76,8 @@ describe("togglePane", () => {
     expect(togglePane({ kind: "offer" }, next)).toBe(next)
     expect(togglePane(table("m1", 0), next)).toBe(next)
     expect(togglePane(table("m2", 1), next)).toBe(next)
-    const there = image("m2")
-    expect(togglePane(image("m1"), there)).toBe(there)
+    const there = image("another")
+    expect(togglePane(table("m1", 0), there)).toBe(there)
     expect(togglePane(null, there)).toBe(there)
   })
 })
@@ -103,11 +102,11 @@ describe("paneView", () => {
     const shown = (nth: number) => {
       const view = paneView(table("m1", nth), facts())
       return view?.kind === "table"
-        ? [view.title, view.table.properties.dataTable]
+        ? [view.title, view.table.properties.dataBlock]
         : null
     }
-    expect(shown(0)).toEqual(["State · When", 0])
-    expect(shown(1)).toEqual(["a", 1])
+    expect(shown(0)).toEqual(["State · When", "table-0"])
+    expect(shown(1)).toEqual(["a", "table-1"])
   })
   test("the same node gives the same table, so the pane draws it once", () => {
     const nodes = [node("m1", TABLES)]
@@ -122,13 +121,28 @@ describe("paneView", () => {
     expect(paneView(table("m2", 0), facts())).toBeNull()
     expect(paneView(table("m1", 2), facts())).toBeNull()
   })
-  test("an image closes when its message is not drawn; a streaming one stays", () => {
-    expect(paneView(image("m2"), facts())).toBeNull()
-    expect(paneView(image("m1"), facts())).toMatchObject({
+  test("an image of a message is a block, closing when its message is not drawn; one that is no block's is drawn by its blob", () => {
+    const pictured = [node("m1", `![a cat](/blob/${SHA})`)]
+    const block: PaneSubject = {
+      kind: "block",
+      address: {
+        kind: "block",
+        thread: FIXTURE_THREAD,
+        entry: entryId("m1"),
+        block: { kind: "image", n: 0 },
+      },
+    }
+    expect(paneView(block, facts({ nodes: pictured }))).toMatchObject({
+      kind: "image",
+      src: `/blob/${SHA}`,
+      title: "a cat",
+    })
+    expect(paneView(block, facts())).toBeNull()
+    expect(paneView(image(), facts())).toMatchObject({
       kind: "image",
       src: `/blob/${SHA}`,
     })
-    expect(paneView(image(null), facts({ nodes: [] }))?.kind).toBe("image")
+    expect(paneView(image(), facts({ nodes: [] }))?.kind).toBe("image")
   })
 })
 

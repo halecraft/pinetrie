@@ -38,6 +38,8 @@ import { batch, createDoc, subscribe } from "@kyneta/schema"
 import {
   type BlobStore,
   type ImageRef,
+  isImageMime,
+  isImageRef,
   type ThreadId,
   tailEdit,
 } from "@pinetrie/core"
@@ -256,7 +258,13 @@ export class KynetaStorage implements Storage {
   }
 
   /** A blob's bytes, for the rejoin: none without a store. */
-  #blobOf: BlobOf = sha => this.#blobs?.get(sha)
+  #blobOf: BlobOf = sha => {
+    const blob = this.#blobs?.get(sha)
+    // A session holds images alone: a quote's markdown is never one.
+    return blob === undefined || !isImageMime(blob.mimeType)
+      ? undefined
+      : { bytes: blob.bytes, mimeType: blob.mimeType }
+  }
 
   #located = (id: string): Located | undefined => {
     const row = this.#doc.entries.get(id)
@@ -302,7 +310,7 @@ export class KynetaStorage implements Storage {
       for (const data of writes.flatMap(imagesOf)) {
         if (refs.has(data)) continue
         const ref = blobs.ref(sha256Of(Buffer.from(data, "base64")))
-        if (ref !== undefined) refs.set(data, ref)
+        if (ref !== undefined && isImageRef(ref)) refs.set(data, ref)
       }
     return data => refs.get(data)
   }

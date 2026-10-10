@@ -205,7 +205,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
         kind: "composing",
         thread: T_B,
       },
-      content: { command: null, unsent: null },
+      content: { command: null, unsent: null, origin: null },
     },
     {
       kind: "note-column",

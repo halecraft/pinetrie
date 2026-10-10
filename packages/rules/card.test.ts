@@ -17,8 +17,11 @@ import {
   noteColumnIdFor,
   type OfferFact,
   REORDER_PLACES,
+  type ReferenceCard,
   ROOT,
+  referenceCardIdFor,
   rootIdFor,
+  type Sha256,
   type TaskId,
   type TextCard,
   type TextCardId,
@@ -55,7 +58,9 @@ import {
   type Discards,
   NO_DISCARDS,
   ownsPlace,
+  planEditAsText,
   planFreshFollow,
+  planMakeReference,
   planMove,
   planMoveCommand,
   planMoveRequest,
@@ -120,7 +125,7 @@ const card = (over: Partial<TextCard> = {}): TextCard => ({
   owner: ADA,
   placer: ADA,
   place: { kind: "composing", thread: T_E },
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
   ...over,
 })
 /** The note column the fixtures' notes are in. */
@@ -158,7 +163,7 @@ const factCard = (over: Partial<FactCard> = {}): FactCard => ({
 
 describe("planCarry (ADR-0080)", () => {
   const queued = (command: CardCommand | null): QueuedText => ({
-    ...card({ content: { command, unsent: null } }),
+    ...card({ content: { command, unsent: null, origin: null } }),
     place: queuedPlace,
   })
   test.each([
@@ -960,7 +965,10 @@ describe("the queue", () => {
       ["a command with no text", "split", "", false],
     ] as const)("isBlankMessage: %s is %s", (_, command, text, blank) => {
       expect(
-        isBlankMessage({ ...empty, content: { command, unsent: null } }, text),
+        isBlankMessage(
+          { ...empty, content: { command, unsent: null, origin: null } },
+          text,
+        ),
       ).toBe(blank)
     })
   })
@@ -976,7 +984,7 @@ describe("the queue", () => {
     }
     const command: QueuedCard = {
       ...queued(cardIdFor("c3"), "c"),
-      content: { command: "split", unsent: null },
+      content: { command: "split", unsent: null, origin: null },
     }
     const blank = blankQueued([empty, behind, command, card()], {
       holds: (_, seen) => seen === "",
@@ -1010,7 +1018,7 @@ describe("the queue", () => {
     const q: QueuedCard = {
       ...queued(cardIdFor("c1"), "a"),
       placer: BEA,
-      content: { command: "bring-up-to-date", unsent: null },
+      content: { command: "bring-up-to-date", unsent: null, origin: null },
     }
     const onCanvas = threadCardOf({
       thread: LANE,
@@ -1114,7 +1122,7 @@ describe("handoffs (ADR-0059)", () => {
         owner: BEA,
         placer: BEA,
         place: atEnd,
-        content: { command: null, unsent: null },
+        content: { command: null, unsent: null, origin: null },
       },
     })
     const taken = card()
@@ -1142,7 +1150,7 @@ describe("handoffs (ADR-0059)", () => {
     const before = queued(cardIdFor("c0"), orderAfter([]))
     const c = card({
       place: atEnd,
-      content: { command: "bring-up-to-date", unsent: "refused" },
+      content: { command: "bring-up-to-date", unsent: "refused", origin: null },
     })
     const step = planMove(
       [before, c],
@@ -1196,7 +1204,7 @@ describe("handoffs (ADR-0059)", () => {
   test("an unqueue keeps the command and why it was not sent", () => {
     const q = {
       ...queued(cardIdFor("c1"), "a"),
-      content: { command: "bring-up-to-date", unsent: "x" },
+      content: { command: "bring-up-to-date", unsent: "x", origin: null },
     } as const
     const step = planMove(
       [q],
@@ -1205,7 +1213,7 @@ describe("handoffs (ADR-0059)", () => {
       NO_DISCARDS,
     )
     expect(step.kind === "write" && step.record).toMatchObject({
-      content: { command: "bring-up-to-date", unsent: "x" },
+      content: { command: "bring-up-to-date", unsent: "x", origin: null },
     })
   })
 
@@ -1382,7 +1390,7 @@ describe("handoffs (ADR-0059)", () => {
       const c = card({
         owner: BEA,
         place: atEnd,
-        content: { command: "bring-up-to-date", unsent: "x" },
+        content: { command: "bring-up-to-date", unsent: "x", origin: null },
       })
       expect(
         planMove([c], { card: C1, from: atEnd, to: mine }, ADA, NO_DISCARDS),
@@ -1634,7 +1642,7 @@ describe("handoffs (ADR-0059)", () => {
       kind: "write",
       record: {
         ...c,
-        content: { command: "bring-up-to-date", unsent: null },
+        content: { command: "bring-up-to-date", unsent: null, origin: null },
       },
     })
     expect(planSetCommand([], C1, null)).toEqual({
@@ -1672,7 +1680,7 @@ test("planCardSweep: empty cards and documents with no record go; a card with te
 
 test("planCardSweep: a card with a command stays, whatever its text", () => {
   const command = card({
-    content: { command: "bring-up-to-date", unsent: null },
+    content: { command: "bring-up-to-date", unsent: null, origin: null },
   })
   expect(
     planCardSweep({
@@ -1694,7 +1702,7 @@ describe("planReorder (ADR-0048 step 7)", () => {
   const q = (id: string, n: number): QueuedText => ({
     ...queued(id, key(n)),
     placer: ADA,
-    content: { command: null, unsent: "not sent: x" },
+    content: { command: null, unsent: "not sent: x", origin: null },
   })
   const orderIn = (step: ReturnType<typeof planReorder>, id: string) =>
     step.kind === "write" && step.record.id === id
@@ -2083,7 +2091,11 @@ describe("storage", () => {
       }),
       card({ place: { kind: "task-pinned", task: TEST_TASK, order: "m" } }),
       card({
-        content: { command: "bring-up-to-date", unsent: "refused" },
+        content: {
+          command: "bring-up-to-date",
+          unsent: "refused",
+          origin: null,
+        },
       }),
       card({ placer: BEA }),
       factCard(),
@@ -2363,5 +2375,110 @@ describe("planHistorySweep (ADR-0066)", () => {
   })
   test("at startup, a task the session does not hold is retired too; an id that names no task is left", () => {
     expect(sweep(true)).toEqual([doc(K("1")), doc(K("5"))])
+  })
+})
+
+describe("references (ADR-0126)", () => {
+  const REF = referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e1")
+  const NEW = textCardId("01a0ffd2-0000-7000-8000-0000000000e2")
+  const address = {
+    kind: "block",
+    thread: T_E,
+    entry: E2,
+    block: { kind: "table", n: 0 },
+  } as const
+  const quote = "a".repeat(64) as Sha256
+  const inv = { kind: "inventory", holder: ADA } as const
+  const reference: ReferenceCard = {
+    kind: "reference",
+    id: REF,
+    owner: ADA,
+    placer: ADA,
+    place: inv,
+    content: { address, quote },
+  }
+
+  test("planMakeReference makes a reference where its move lands, through planMake; never on a canvas", () => {
+    expect(
+      planMakeReference(
+        [],
+        { card: REF, from: null, to: inv },
+        { address, quote },
+        ADA,
+      ),
+    ).toEqual({ kind: "write", record: reference })
+    expect(
+      planMakeReference(
+        [],
+        {
+          card: REF,
+          from: null,
+          to: { kind: "canvas", task: TEST_TASK, order: "a" },
+        },
+        { address, quote },
+        ADA,
+      ),
+    ).toMatchObject({ kind: "refused", code: "no-place" })
+    expect(
+      planMakeReference(
+        [reference],
+        { card: REF, from: null, to: inv },
+        { address, quote },
+        ADA,
+      ),
+    ).toMatchObject({ kind: "refused", code: "exists" })
+  })
+
+  test("planEditAsText: one move set, a text card in the reference's place with its origin, and the reference to the trash", () => {
+    const step = planEditAsText(
+      [reference],
+      { reference: REF, from: inv, card: NEW },
+      ADA,
+      NO_DISCARDS,
+    )
+    expect(step).toEqual({
+      kind: "steps",
+      steps: [
+        {
+          kind: "write",
+          record: {
+            kind: "text",
+            id: NEW,
+            owner: ADA,
+            placer: ADA,
+            place: inv,
+            content: { command: null, unsent: null, origin: address },
+          },
+        },
+        {
+          kind: "write",
+          record: expect.objectContaining({
+            id: REF,
+            place: expect.objectContaining({ kind: "gone" }),
+          }),
+        },
+      ],
+    })
+    expect(
+      planEditAsText(
+        [reference],
+        { reference: REF, from: { kind: "inventory", holder: BEA }, card: NEW },
+        ADA,
+        NO_DISCARDS,
+      ),
+    ).toMatchObject({ kind: "refused" })
+  })
+
+  test("a reference and a text card's origin round-trip through their stored form", () => {
+    const edited: TextCard = card({
+      content: { command: null, unsent: null, origin: address },
+    })
+    for (const c of [reference, edited] as const)
+      expect(
+        decodeCard(c.id, JSON.parse(JSON.stringify(encodeCard(c)))),
+      ).toEqual(c)
+    expect(
+      decodeCard(REF, { ...encodeCard(reference), quote: "nope" }),
+    ).toBeUndefined()
   })
 })

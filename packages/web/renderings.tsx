@@ -8,17 +8,22 @@
 // `cardFrame`, `threadPreview`); what a row needs beyond its card comes from
 // the surface drawing it (`RenderingContext`).
 
-import type {
-  CardRecord,
-  CardWidth,
-  NoteColumnId,
-  ThreadId,
-  WriterId,
+import {
+  blobUrl,
+  type CardRecord,
+  type CardWidth,
+  type NoteColumnId,
+  type Sha256,
+  type ThreadId,
+  type ThreadName,
+  type WriterId,
 } from "@pinetrie/core"
 import {
+  addressWords,
   cardFrame,
   type Detail,
   type DrawnKind,
+  EDIT_AS_TEXT,
   type Face,
   type FaceOf,
   type Intent,
@@ -31,13 +36,14 @@ import {
   textFaceWords,
 } from "@pinetrie/interface"
 import { askLine, factLine } from "@pinetrie/rules"
-import type { SessionClient } from "@pinetrie/session"
+import { newCardId, type SessionClient } from "@pinetrie/session"
 import { createContext, type ReactNode, useContext } from "react"
 import { BoundCardEditor } from "./card-editor.tsx"
 import { MessageText } from "./message-text.tsx"
 import { Initial } from "./presence.tsx"
 import { ThreadFaceView, ThreadPreviewView } from "./thread-preview.tsx"
 import { useCardTexts } from "./use-card-texts.ts"
+import { useFetched } from "./use-fetched.ts"
 
 /** What a surface gives the cards it draws, beyond each card. */
 export interface RenderingContext {
@@ -48,6 +54,8 @@ export interface RenderingContext {
   readonly previewOf: (thread: ThreadId) => ThreadPreview
   /** Each note column, as its column draws it. */
   readonly notes: ReadonlyMap<NoteColumnId, NoteColumnView>
+  /** Each thread's name, which a reference to it names. */
+  readonly threadNames: ReadonlyMap<ThreadId, ThreadName>
   /** The column a put lands in: the one last focused; null for none. */
   readonly column: string | null
   readonly onIntent: (intent: Intent) => void
@@ -270,6 +278,80 @@ function NoteList(p: {
   )
 }
 
+/** A reference's quote, fetched from its blob: it never changes (ADR-0126). */
+function useQuote(quote: Sha256): string | null {
+  const [loaded] = useFetched([blobUrl(quote)], r => r.text())
+  return loaded?.kind === "ready" ? loaded.value : null
+}
+
+/** A reference's face: a chip naming what it names, with its slot's key. */
+function ReferenceFaceView({ face }: { face: FaceOf<"reference"> }) {
+  return (
+    <span className="reference-face" data-card={face.card}>
+      <span aria-hidden className="card-icon">
+        {KIND_ICON.reference}
+      </span>
+      <span className="reference-face-label">{addressWords(face.address)}</span>
+      {face.key !== null && <span className="card-face-key">{face.key}</span>}
+    </span>
+  )
+}
+
+/** A reference, normal: its quote, read only. */
+function ReferenceNormal(p: { card: CardOf<"reference">; width: CardWidth }) {
+  const quote = useQuote(p.card.content.quote)
+  return (
+    <NormalFrame card={p.card} kind="reference" width={p.width}>
+      <div className="card-normal-title">
+        {addressWords(p.card.content.address)}
+      </div>
+      <blockquote className="reference-quote">
+        <MessageText mode="committed" text={quote ?? ""} />
+      </blockquote>
+    </NormalFrame>
+  )
+}
+
+/**
+ * A reference opened: its quote with the thread it is from, read only, and
+ * *Edit as text*, which makes it a text card you can change (ADR-0126).
+ */
+function ReferenceWhole(p: { card: CardOf<"reference">; width: CardWidth }) {
+  const { onIntent, threadNames } = useRendering()
+  const quote = useQuote(p.card.content.quote)
+  const { address } = p.card.content
+  const from =
+    address.kind === "card" ? null : (threadNames.get(address.thread) ?? null)
+  return (
+    <NormalFrame card={p.card} kind="reference" width={p.width}>
+      <div className="card-normal-title">
+        {addressWords(address)}
+        {from !== null && <span className="reference-from"> · {from}</span>}
+      </div>
+      <blockquote className="reference-quote">
+        <MessageText mode="committed" text={quote ?? ""} />
+      </blockquote>
+      <button
+        className="edit-as-text"
+        disabled={quote === null}
+        onClick={() => {
+          if (quote !== null)
+            onIntent({
+              kind: "editAsText",
+              reference: p.card.id,
+              card: newCardId(),
+              text: quote,
+            })
+        }}
+        title={EDIT_AS_TEXT.title}
+        type="button"
+      >
+        {EDIT_AS_TEXT.label}
+      </button>
+    </NormalFrame>
+  )
+}
+
 /** How many notes a note column shows, normal. */
 const NOTES_SHOWN = 3
 
@@ -347,6 +429,12 @@ export const RENDERINGS = {
     Normal: FactLine,
     Whole: FactLine,
   },
+  reference: {
+    icon: KIND_ICON.reference,
+    Face: ReferenceFaceView,
+    Normal: ReferenceNormal,
+    Whole: ReferenceWhole,
+  },
   ask: {
     icon: KIND_ICON.ask,
     Face: AskFaceView,
@@ -368,6 +456,8 @@ export function DrawFace({ face }: { face: Face }) {
       return <NoteColumnRow.Face face={face} />
     case "fact":
       return <RENDERINGS.fact.Face face={face} />
+    case "reference":
+      return <RENDERINGS.reference.Face face={face} />
     case "ask":
       return <RENDERINGS.ask.Face face={face} />
   }
@@ -405,6 +495,12 @@ export function DrawCard(p: {
         <RENDERINGS.fact.Whole card={card} width={width} />
       ) : (
         <RENDERINGS.fact.Normal card={card} width={width} />
+      )
+    case "reference":
+      return whole ? (
+        <RENDERINGS.reference.Whole card={card} width={width} />
+      ) : (
+        <RENDERINGS.reference.Normal card={card} width={width} />
       )
     case "ask":
       return <RENDERINGS.ask.Normal card={card} width={width} />

@@ -2,9 +2,9 @@
 // (ADR-0078), with no prop through the memoised list and messages: a context
 // change redraws only the components that read it.
 
-import type { EntryId } from "@pinetrie/core"
+import type { EntryId, ThreadId } from "@pinetrie/core"
 import { createContext } from "react"
-import type { PaneSubject } from "./pane.ts"
+import type { BlockAddress, PaneSubject } from "./pane.ts"
 
 /**
  * The column's pane: what it shows, and `open`, which toggles a subject
@@ -14,6 +14,8 @@ import type { PaneSubject } from "./pane.ts"
 export interface PaneReach {
   readonly shown: PaneSubject | null
   readonly open: (subject: PaneSubject) => void
+  /** Take a reference to a block into your inventory (ADR-0126); stable. */
+  readonly take: (address: BlockAddress) => void
 }
 
 export const PaneReach = createContext<PaneReach | null>(null)
@@ -24,7 +26,11 @@ export const PaneReach = createContext<PaneReach | null>(null)
  * digest), where a table has no bar and an image names no message.
  */
 export type MessageSource =
-  | { readonly kind: "entry"; readonly entry: EntryId }
+  | {
+      readonly kind: "entry"
+      readonly thread: ThreadId
+      readonly entry: EntryId
+    }
   | { readonly kind: "streaming" }
 
 export const MessageSource = createContext<MessageSource | null>(null)

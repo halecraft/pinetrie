@@ -269,8 +269,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a trace opens someone else's inventory",
     file: "packages/interface/card-intents.ts",
-    from: '  if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)\n    return []\n',
-    to: "",
+    from: '    return trace.message === null ? [] : planOpenAt(trace.message, state)\n  if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)\n    return []\n',
+    to: "    return trace.message === null ? [] : planOpenAt(trace.message, state)\n",
     command: unit,
     expect: "a card in someone else's inventory",
   },
@@ -1064,8 +1064,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a read-only column offers no copy",
     file: "packages/interface/message-tools.ts",
-    from: "    return {\n      copy,\n      takeCopyIntoInventory: false,",
-    to: "    return {\n      copy: false,\n      takeCopyIntoInventory: false,",
+    from: "    return {\n      copy,\n      takeReference: false,",
+    to: "    return {\n      copy: false,\n      takeReference: false,",
     command: unit,
     expect: "a column that can't be written offers only copy",
   },
@@ -2373,12 +2373,13 @@ export const mutations: readonly Mutation[] = [
     expect: "snapTo: the nearest third",
   },
   {
-    name: "a copy into the inventory copies a selection outside the message",
-    file: "packages/interface/copy-into-inventory-text.ts",
-    from: '  selection?.inside === true && selection.text.trim() !== ""',
-    to: '  selection !== null && selection.text.trim() !== ""',
+    name: "a take from the past takes a selection outside the message",
+    file: "packages/interface/message-tools.ts",
+    from: '    selection?.inside === true && selection.text.trim() !== ""',
+    to: '    selection !== null && selection.text.trim() !== ""',
     command: unit,
-    expect: "copyIntoInventoryText: a selection inside the message",
+    expect:
+      "a selection inside the message is a range of its text; one outside, or not in its text, the whole message",
   },
   {
     name: "a keep closes whatever its answers",
@@ -3611,5 +3612,49 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a rail stub for a branch whose first run wrote a context entry above its prompt opens at its first message",
+  },
+  {
+    name: "a take from the past copies nothing",
+    file: "packages/interface/card-intents.ts",
+    from: '  const copied: Effect = { kind: "copyText", text: taken.markdown }',
+    to: '  const copied: Effect = { kind: "copyText", text: "" }',
+    command: unit,
+    expect:
+      "a take from the past is a reference in your inventory, its markdown on the clipboard too (ADR-0126)",
+  },
+  {
+    name: "Cmd+X cuts nothing",
+    file: "packages/interface/page-keys.ts",
+    from: '  if (command && !event.shiftKey && key === "x")',
+    to: '  if (command && !event.shiftKey && key === "never")',
+    command: unit,
+    expect:
+      "Cmd+X outside a text box takes the focused card; in a box it is the box's own cut (ADR-0126)",
+  },
+  {
+    name: "the put key puts a reference in a text box to the column",
+    file: "packages/interface/page-keys.ts",
+    from: '    if (focus.inText && kindOfCard(focus.selectedCard) === "reference")',
+    to: "    if (false)",
+    command: unit,
+    expect:
+      "the put key in a text box puts a reference there; any other card goes to the column (ADR-0126)",
+  },
+  {
+    name: "search reads a link's address",
+    file: "packages/interface/board-view.ts",
+    from: '  label.replace(ADDRESS_LINK, "$1")',
+    to: "  label",
+    command: unit,
+    expect:
+      "search reads a link to an address by its label, not its address (ADR-0126)",
+  },
+  {
+    name: "an entry's markdown leaves out its tool calls",
+    file: "packages/interface/markdown-of.ts",
+    from: '  return address.kind === "entry"',
+    to: '  return address.kind === "thread"',
+    command: unit,
+    expect: "an entry's markdown is its copy, as `copyText` gives it",
   },
 ]

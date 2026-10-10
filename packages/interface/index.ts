@@ -226,22 +226,25 @@ export {
   threadAnchor,
 } from "./columns.ts"
 export { matchCommands } from "./commands.ts"
-export { copyIntoInventoryText } from "./copy-into-inventory-text.ts"
+
 export { copyText } from "./copy-text.ts"
 export { plural } from "./counts.ts"
 export type { Effect } from "./effects.ts"
 export {
+  addressWords,
   cardOfFace,
   DETAIL_ON,
   type Detail,
   type DrawnKind,
   detailOf,
+  EDIT_AS_TEXT,
   type Face,
   type FaceOf,
   faceOf,
   KIND_ICON,
   type NoteColumnFace,
   noteColumnFace,
+  type ReferenceFace,
   type TextFace,
   textFaceWords,
 } from "./face.ts"
@@ -340,10 +343,13 @@ export {
   callStreams,
   type LiveWork,
 } from "./live.ts"
+export { markdownOf } from "./markdown-of.ts"
 export {
   type MessageAct,
   type MessageTools,
   messageTools,
+  referenceOf,
+  type SelectionLike,
   showsText,
 } from "./message-tools.ts"
 export {
@@ -391,7 +397,9 @@ export {
   insertAt,
   pastedFiles,
   type Selection,
+  type TextUpload,
   uploadImage,
+  uploadText,
 } from "./paste.ts"
 export {
   type AppPorts,

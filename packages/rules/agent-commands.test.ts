@@ -217,7 +217,7 @@ describe("planSplitCall (ADR-0080)", () => {
       by: ADA,
       seen: "",
     },
-    content: { command: "split", unsent: null },
+    content: { command: "split", unsent: null, origin: null },
   }
 
   test("a split card queued by the person behind the run, with no text, from any run", () => {
@@ -230,7 +230,7 @@ describe("planSplitCall (ADR-0080)", () => {
             kind: "text",
             owner: ADA,
             place: { kind: "queued", thread: LANE, by: ADA, seen: "" },
-            content: { command: "split", unsent: null },
+            content: { command: "split", unsent: null, origin: null },
           },
         },
       })

@@ -5,6 +5,7 @@
 // Showing a root and an entry are here because all three plan them. Pure.
 
 import type {
+  Address,
   AskIndex,
   CardCommand,
   CardId,
@@ -14,11 +15,16 @@ import type {
   LaneView,
   MoveDirection,
   OfferAction,
+  PlaceKey,
   QueueHoldChange,
   QueueMove,
+  ReferenceCardId,
   Reorder,
+  Sha256,
+  TargetOf,
   TaskId,
   TextCard,
+  TextCardId,
   ThreadId,
   TreeIndex,
   TypedMove,
@@ -87,6 +93,40 @@ export type Effect =
       readonly text: string
       readonly how: MoveHow
     }
+  /**
+   * Take a reference from the past (ADR-0126): its quote kept as a blob,
+   * then the reference made where `to` is.
+   */
+  | {
+      readonly kind: "takeReference"
+      readonly card: ReferenceCardId
+      readonly address: Address
+      readonly markdown: string
+      readonly to: TargetOf<"reference">
+      readonly how: MoveHow
+    }
+  /** A reference made with a quote already kept: a put of one in your hand. */
+  | {
+      readonly kind: "makeReference"
+      readonly card: ReferenceCardId
+      readonly address: Address
+      readonly quote: Sha256
+      readonly to: TargetOf<"reference">
+      readonly how: MoveHow
+    }
+  /** A reference edited as text: its quote written into the new card first. */
+  | {
+      readonly kind: "editAsText"
+      readonly reference: ReferenceCardId
+      readonly from: PlaceKey
+      readonly card: TextCardId
+      readonly text: string
+      readonly here: TaskId | null
+    }
+  /** Markdown on the system clipboard. */
+  | { readonly kind: "copyText"; readonly text: string }
+  /** Text at the caret of the text box that has focus. */
+  | { readonly kind: "insertText"; readonly text: string }
   /** A move (ADR-0059): a take into the inventory, a put, an unqueue, a discard. */
   | {
       readonly kind: "moveCard"

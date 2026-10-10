@@ -114,17 +114,24 @@ const into = (to: CatchUpFrom) =>
  * card's document, read by `docText`; a fact's line; nothing for a card with
  * no words. Every reader of card words reads through it.
  */
-export const wordsOf = (
+export function wordsOf(
   source: TextSource,
   docText: (card: TextCardId) => string,
-): string =>
-  source.kind === "doc"
-    ? docText(source.card)
-    : source.kind === "fact"
-      ? factLine(source.fact)
-      : source.kind === "ask"
-        ? askLine(source.relay)
-        : ""
+): string {
+  switch (source.kind) {
+    case "doc":
+      return docText(source.card)
+    case "fact":
+      return factLine(source.fact)
+    case "ask":
+      return askLine(source.relay)
+    // A reference is never queued or pinned (`KINDS`): no reader of these
+    // meets a quote, which only the page reads.
+    case "blob":
+    case "none":
+      return ""
+  }
+}
 
 /** The one line a column shows for a fact. */
 export function factLine(fact: QueuedFact): string {

@@ -56,7 +56,7 @@ test("noteColumnsOf: each note column in the canvas's order, its title or Notes,
     owner: ADA,
     placer: ADA,
     place: { kind: "note", column, order },
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   })
   const n1 = note(cardIdFor("c1"), N1, "b")
   const n2 = note(cardIdFor("c2"), N1, "a")

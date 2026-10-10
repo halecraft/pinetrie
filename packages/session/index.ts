@@ -29,6 +29,7 @@ export {
 export {
   newCardId,
   newNoteColumnId,
+  newReferenceCardId,
   newRootId,
   newTaskId,
   newThreadId,

@@ -1,3 +1,4 @@
+import { referenceCardIdFor } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { type KeyFocus, type KeyLike, keyAct } from "./page-keys.ts"
@@ -24,6 +25,32 @@ const focus = (over: Partial<KeyFocus> = {}): KeyFocus => ({
 const chord = { ctrlKey: true, shiftKey: true }
 
 describe("keyAct", () => {
+  test("Cmd+X outside a text box takes the focused card; in a box it is the box's own cut (ADR-0126)", () => {
+    const take = { kind: "takeIntoInventory", card: C1 }
+    expect(keyAct(key("x", { metaKey: true }), focus({ card: C1 }))).toEqual(
+      take,
+    )
+    expect(keyAct(key("x", { ctrlKey: true }), focus({ card: C1 }))).toEqual(
+      take,
+    )
+    expect(
+      keyAct(key("x", { metaKey: true }), focus({ card: C1, inText: true })),
+    ).toBeNull()
+    expect(keyAct(key("x", { metaKey: true }), focus())).toBeNull()
+  })
+
+  test("the put key in a text box puts a reference there; any other card goes to the column (ADR-0126)", () => {
+    const REF = referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e1")
+    expect(
+      keyAct(key("O", chord), focus({ selectedCard: REF, inText: true })),
+    ).toEqual({ kind: "put", card: REF, target: { kind: "text-box" } })
+    expect(keyAct(key("O", chord), focus({ inText: true }))).toEqual({
+      kind: "put",
+      card: C2,
+      target: { kind: "column", key: "k-1" },
+    })
+  })
+
   test("Ctrl+Shift+L folds or unfolds the sidebar, in a text box too, and not with Meta or Alt", () => {
     const fold = { kind: "foldList" }
     expect(keyAct(key("L", chord), focus())).toEqual(fold)

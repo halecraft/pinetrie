@@ -1665,8 +1665,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a chat's images never reach the model",
     file: "packages/pi/agent.ts",
-    from: "      const blob = blobs.get(sha)\n      return blob === undefined",
-    to: "      const blob = undefined as ReturnType<typeof blobs.get>\n      return blob === undefined",
+    from: "      const blob = blobs.get(sha)\n      // A chat's images alone: a quote's markdown is no image.\n",
+    to: "      const blob = undefined as ReturnType<typeof blobs.get>\n      // A chat's images alone: a quote's markdown is no image.\n",
     suite: "host",
     scenario: "images",
     expect: "the model reads the message's text, then its image",
@@ -1674,8 +1674,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a chat's images never reach a real model",
     file: "packages/pi/agent.ts",
-    from: "      const blob = blobs.get(sha)\n      return blob === undefined",
-    to: "      const blob = undefined as ReturnType<typeof blobs.get>\n      return blob === undefined",
+    from: "      const blob = blobs.get(sha)\n      // A chat's images alone: a quote's markdown is no image.\n",
+    to: "      const blob = undefined as ReturnType<typeof blobs.get>\n      // A chat's images alone: a quote's markdown is no image.\n",
     suite: "live",
     scenario: "live",
     expect: "a real model reads a pasted image: it names its colour",
@@ -2335,5 +2335,34 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect: "another window's card redraws the column and none of its messages",
+  },
+  {
+    name: "a table's take takes nothing",
+    file: "packages/web/message-table.tsx",
+    from: '            if (mine?.kind === "block") reach.take(mine.address)',
+    to: '            if (mine?.kind === "block") return',
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "a table taken from a reply is a reference in the inventory, previewed as its quote, put in a composer as a link, and kept in the hand",
+  },
+  {
+    name: "the page's copy takes nothing",
+    file: "packages/web/app.tsx",
+    from: "      if (isTextBox(focused)) return\n      const selection = window.getSelection()",
+    to: "      if (isTextBox(focused) || true) return\n      const selection = window.getSelection()",
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "Cmd+C on a table's bar takes a reference to it, its markdown on the clipboard",
+  },
+  {
+    name: "an image's take takes nothing",
+    file: "packages/web/pane.tsx",
+    from: "                onClick={take}",
+    to: "                onClick={() => {}}",
+    suite: "browser",
+    scenario: "images",
+    expect: "an image shown beside the thread is taken as a reference by its ❝",
   },
 ]

@@ -229,7 +229,7 @@ export function planSplitCall(input: {
         by: input.by,
         seen: "",
       },
-      { command: "split", unsent: null },
+      { command: "split", unsent: null, origin: null },
       input.by,
     ),
     input.by,

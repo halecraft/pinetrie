@@ -16,14 +16,17 @@ import {
   type CardPlace,
   type CardRecord,
   type EntryId,
+  isSha256,
   isTextCard,
   kindOfCard,
   NO_CONTENT,
   type OrderedPlace,
+  parseAddress,
   parseCardId,
   placed,
   placeFields,
   placeOfFields,
+  printAddress,
   type TextCard,
   type ThreadId,
   type TreeIndex,
@@ -59,6 +62,12 @@ const StoredCard = Type.Object({
   task: Type.Optional(Type.String()),
   /** A canvas card's width; absent before tasks. */
   width: Type.Optional(Type.String()),
+  /** A reference's address, printed (ADR-0126); absent before references. */
+  address: Type.Optional(Type.String()),
+  /** A reference's quote's blob; absent before references. */
+  quote: Type.Optional(Type.String()),
+  /** A text card's origin, a printed address, "" for none; absent before origins. */
+  origin: Type.Optional(Type.String()),
 })
 
 /** The flat value the places document stores under a card's id. */
@@ -79,6 +88,9 @@ interface StoredCardFields {
   readonly holder: string
   readonly task: string
   readonly width: string
+  readonly address: string
+  readonly quote: string
+  readonly origin: string
 }
 
 /**
@@ -99,6 +111,12 @@ export const encodeCard = (card: CardRecord): StoredCardFields => ({
         : "",
   unsent: card.kind === "text" ? (card.content.unsent ?? "") : "",
   placer: card.placer,
+  address: card.kind === "reference" ? printAddress(card.content.address) : "",
+  quote: card.kind === "reference" ? card.content.quote : "",
+  origin:
+    card.kind === "text" && card.content.origin !== null
+      ? printAddress(card.content.origin)
+      : "",
 })
 
 const isCommand = (s: string): s is CardCommand =>
@@ -164,8 +182,12 @@ export const decodeCard = (
                 content: { relay },
               } as CardRecord)
         }
-        case "text":
-          return fact !== "" || (c.command !== "" && !isCommand(c.command))
+        case "text": {
+          const origin = c.origin ?? ""
+          const parsed = origin === "" ? null : parseAddress(origin)
+          return fact !== "" ||
+            (c.command !== "" && !isCommand(c.command)) ||
+            parsed === undefined
             ? undefined
             : ({
                 kind,
@@ -176,8 +198,27 @@ export const decodeCard = (
                 content: {
                   command: c.command === "" ? null : (c.command as CardCommand),
                   unsent: c.unsent === "" ? null : c.unsent,
+                  origin: parsed,
                 },
               } as CardRecord)
+        }
+        case "reference": {
+          const address = parseAddress(c.address ?? "")
+          const quote = c.quote ?? ""
+          return c.command !== "" ||
+            fact !== "" ||
+            address === undefined ||
+            !isSha256(quote)
+            ? undefined
+            : ({
+                kind,
+                id: card,
+                owner,
+                placer,
+                place,
+                content: { address, quote },
+              } as CardRecord)
+        }
         case "media":
         case "file":
           return undefined

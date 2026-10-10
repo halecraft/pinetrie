@@ -7,7 +7,9 @@
 // draws each.
 
 import type {
+  Address,
   AskCardId,
+  BlockKind,
   CardCommand,
   CardId,
   CardPlace,
@@ -15,7 +17,9 @@ import type {
   FactCardId,
   NoteColumnId,
   QueuedFact,
+  ReferenceCardId,
   RelayDetails,
+  Sha256,
   TextCardId,
   ThreadId,
   WriterId,
@@ -59,6 +63,16 @@ export interface FactFace {
   readonly fact: QueuedFact
 }
 
+/** A reference's face (ADR-0126): a chip naming what it names. */
+export interface ReferenceFace {
+  readonly kind: "reference"
+  readonly card: ReferenceCardId
+  readonly address: Address
+  readonly quote: Sha256
+  /** The inventory's 1–9 for its slot; null elsewhere. */
+  readonly key: string | null
+}
+
 /** An ask card's face (ADR-0128): the ask relayed, worded by `askLine`. */
 export interface AskFace {
   readonly kind: "ask"
@@ -67,7 +81,13 @@ export interface AskFace {
 }
 
 /** A card at its least detail, by kind. */
-export type Face = TextFace | ThreadFace | NoteColumnFace | FactFace | AskFace
+export type Face =
+  | TextFace
+  | ThreadFace
+  | NoteColumnFace
+  | FactFace
+  | ReferenceFace
+  | AskFace
 
 /** The face of a card of `K`. */
 export type FaceOf<K extends DrawnKind> = Extract<Face, { readonly kind: K }>
@@ -113,9 +133,51 @@ export function faceOf(card: CardRecord, facts: FaceFacts): Face {
       return noteColumnFace(card.id, facts.notes)
     case "fact":
       return { kind: "fact", card: card.id, fact: card.content.fact }
+    case "reference":
+      return {
+        kind: "reference",
+        card: card.id,
+        address: card.content.address,
+        quote: card.content.quote,
+        key: facts.key,
+      }
     case "ask":
       return { kind: "ask", card: card.id, relay: card.content.relay }
   }
+}
+
+/**
+ * What a reference names, in words: the chip's label and a link's
+ * (`addressLink`). The past's kinds by what they are; a thread or a card by
+ * its kind, which its own words name once drawn (`linkTo`).
+ */
+export function addressWords(address: Address): string {
+  switch (address.kind) {
+    case "thread":
+      return "a thread"
+    case "entry":
+      return "a message"
+    case "range":
+      return "a quote"
+    case "card":
+      return "a card"
+    case "block":
+      return BLOCK_WORDS[address.block.kind]
+  }
+}
+
+/** A reference's *Edit as text* (ADR-0126). */
+export const EDIT_AS_TEXT = {
+  label: "Edit as text",
+  title:
+    "a text card of its quote, in its place, which you can change: the reference goes to your trash",
+} as const
+
+const BLOCK_WORDS: Readonly<Record<BlockKind, string>> = {
+  table: "a table",
+  code: "code",
+  image: "an image",
+  paragraph: "a paragraph",
 }
 
 /** A note column's face, from its column as drawn. */
@@ -141,6 +203,7 @@ export const KIND_ICON: Readonly<Record<DrawnKind, string>> = {
   thread: "≡",
   "note-column": "▤",
   fact: "※",
+  reference: "❝",
   ask: "⇢",
 }
 

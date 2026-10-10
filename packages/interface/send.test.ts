@@ -1,10 +1,10 @@
 import {
   type AcceptedRecord,
-  type Address,
   commitId,
   ERR,
   entryId,
   NOBODY,
+  type Recipients,
   runId,
   THE_AGENT,
   type ThreadLane,
@@ -35,7 +35,7 @@ const ME = writerId("duane@example.com")
 const BEA = writerId("bea@example.com")
 const CY = writerId("cy@example.com")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
-const AGENT: Address = {
+const AGENT: Recipients = {
   compels: { kind: "agent", agent: THE_AGENT },
   people: [],
   asks: [],
@@ -278,7 +278,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
 })
 
 describe("sendButton: the plan in words, and whether it can be pressed", () => {
-  const sent = (to: Address, mode: ComposerMode = "reply"): SendPlan => ({
+  const sent = (to: Recipients, mode: ComposerMode = "reply"): SendPlan => ({
     mode,
     createsLane: false,
     agentNames: new Map(),
@@ -289,7 +289,7 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
     command: null,
   })
   const IDLE = { uploading: false, sending: false }
-  const people = (...names: string[]): Address => ({
+  const people = (...names: string[]): Recipients => ({
     compels: NOBODY,
     people: names,
     asks: [],

@@ -45,7 +45,7 @@ async function setUp() {
     owner: ADA,
     placer: ADA,
     place: atEnd(root),
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   })
   /** The host's own write, outside any history. */
   const seed = (c: CardRecord) =>

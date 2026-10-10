@@ -193,7 +193,7 @@ function setUp() {
           owner: ADA,
           placer: ADA,
           place: atEnd,
-          content: { command: null, unsent: null },
+          content: { command: null, unsent: null, origin: null },
           ...over,
         },
       },
@@ -634,7 +634,7 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
           owner: ADA,
           placer: ADA,
           place: queuedAt("0000000300"),
-          content: { command: null, unsent: null },
+          content: { command: null, unsent: null, origin: null },
         },
       },
     ])
@@ -708,7 +708,7 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
           owner: BEA,
           placer: BEA,
           place: queuedAt("b"),
-          content: { command: null, unsent: null },
+          content: { command: null, unsent: null, origin: null },
         },
       },
     ])

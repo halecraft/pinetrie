@@ -260,7 +260,7 @@ test("a chat command spends its card once written, record then text, answering w
             kind: "composing",
             thread: TEST_THREAD,
           },
-          content: { command: null, unsent: null },
+          content: { command: null, unsent: null, origin: null },
         },
       },
     ])

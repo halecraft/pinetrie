@@ -77,6 +77,7 @@ import {
   type LiveWork,
   leftLine,
   linkTo,
+  markdownOf,
   NEW_PIN,
   NEW_PIN_TITLE,
   newPinAt,
@@ -115,7 +116,12 @@ import {
 } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
 import type { AttentionStore } from "@pinetrie/session"
-import { drawnPlace, newCardId, type SessionClient } from "@pinetrie/session"
+import {
+  drawnPlace,
+  newCardId,
+  newReferenceCardId,
+  type SessionClient,
+} from "@pinetrie/session"
 import {
   useCallback,
   useEffect,
@@ -137,6 +143,7 @@ import { MessageText } from "./message-text.tsx"
 import { useTrackColors } from "./palette-context.ts"
 import {
   askReviewTarget,
+  type BlockAddress,
   type PaneSubject,
   paneKey,
   paneView,
@@ -592,9 +599,21 @@ export function Column(p: ColumnProps) {
     setPane(shown => togglePane(shown, subject)),
   )
   const closePane = useStable(() => setPane(null))
+  // A block taken from the past (ADR-0126): its markdown from the message
+  // this column draws, the same rule a reference's quote is kept by.
+  const takeBlock = useStable((address: BlockAddress) =>
+    act({
+      kind: "takeReference",
+      card: newReferenceCardId(),
+      address,
+      markdown: markdownOf(address, {
+        messageOf: entry => view.nodes.find(n => n.id === entry),
+      }),
+    }),
+  )
   const reach = useMemo(
-    () => ({ shown: pane, open: openPane }),
-    [pane, openPane],
+    () => ({ shown: pane, open: openPane, take: takeBlock }),
+    [pane, openPane, takeBlock],
   )
   const review = shows.strip.kind === "offer" ? shows.strip.review : null
   const paneShows =
@@ -1203,6 +1222,7 @@ export function Column(p: ColumnProps) {
             close={closePane}
             id={paneId}
             key={paneKey(pane)}
+            take={pane.kind === "block" ? () => takeBlock(pane.address) : null}
             track={p.track}
             view={paneShows}
           />

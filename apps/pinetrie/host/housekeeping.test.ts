@@ -1,5 +1,14 @@
 import type { Exchange } from "@kyneta/exchange"
-import { rootDocId, rootIdFor, type Sha256 } from "@pinetrie/core"
+import {
+  makeCard,
+  referenceCardIdFor,
+  rootDocId,
+  rootIdFor,
+  type Sha256,
+  storedText,
+  threadIdFor,
+  writerId,
+} from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   LIVE_DOC_ID,
@@ -13,8 +22,10 @@ import { expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
 import { basics, putValue } from "./fakes.ts"
 import { compactAfter, planCompaction, sweepBlobs } from "./housekeeping.ts"
+import { applyPlaceSteps } from "./places.ts"
 
 // A 1×1 PNG: what the store keeps is only its bytes, type and size.
+const ADA = writerId("ada@x.io")
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])
 
 test("an image only a card's text shows is kept past its grace", async () => {
@@ -87,4 +98,31 @@ test("the image sweep keeps what a root's directory record shows, though no root
   )
   await sweepBlobs({ basics: b, blobs, grace: 0, texts: async () => [] })
   expect(blobs.list().map(x => x.sha256)).toEqual([shown.sha256])
+})
+
+test("the blob sweep keeps a reference's quote, and deletes one no card holds (ADR-0126)", async () => {
+  const b = basics()
+  const blobs = memoryBlobs(() => 0)
+  const kept = blobs.put(storedText("| a |"))
+  const dropped = blobs.put(storedText("nobody quotes this"))
+  const card = referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e1")
+  applyPlaceSteps(b.places, [
+    {
+      kind: "write",
+      record: makeCard(
+        "reference",
+        card,
+        { kind: "inventory", holder: ADA },
+        {
+          address: { kind: "thread", thread: threadIdFor("a") },
+          quote: kept.sha256,
+        },
+        ADA,
+      ),
+    },
+  ])
+  await sweepBlobs({ basics: b, blobs, grace: 0, texts: async () => [] })
+  const left = blobs.list().map(x => x.sha256)
+  expect(left).toContain(kept.sha256)
+  expect(left).not.toContain(dropped.sha256)
 })

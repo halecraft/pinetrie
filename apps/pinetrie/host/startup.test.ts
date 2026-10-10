@@ -93,7 +93,7 @@ test("recover resumes each interrupted lane before it settles the others, and na
         by: writerId("ada@x.io"),
         seen: "",
       },
-      content: { command: null, unsent: null },
+      content: { command: null, unsent: null, origin: null },
     }),
   )
   const events: string[] = []
@@ -234,7 +234,7 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
         kind: "composing",
         thread: TEST_THREAD,
       },
-      content: { command: null, unsent: null },
+      content: { command: null, unsent: null, origin: null },
     })
   placesDoc.cards.set(cardIdFor("c100"), card(cardIdFor("c100")))
   placesDoc.cards.set(cardIdFor("c101"), card(cardIdFor("c101")))

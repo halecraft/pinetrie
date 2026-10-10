@@ -401,7 +401,7 @@ export const queuedDraft = (
         owner: me,
         place,
         placer: me,
-        content: { command, unsent: null },
+        content: { command, unsent: null, origin: null },
       }
 }
 

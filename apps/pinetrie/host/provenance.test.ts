@@ -29,7 +29,7 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
       owner: ADA,
       placer: ADA,
       place,
-      content: { command: null, unsent: null },
+      content: { command: null, unsent: null, origin: null },
     },
   })
   // A thread's root is its record's: LANE's is loaded, AWAY's is not.

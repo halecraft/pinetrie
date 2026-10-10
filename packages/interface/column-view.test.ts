@@ -1198,7 +1198,7 @@ test("pinnedStatus: read, changed or unread against what the agent reads, by the
     owner: ADA,
     placer: ADA,
     place: { kind: "inventory", holder: ADA } as const,
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   }
   const inView: PinnedView = {
     lane: A,

@@ -1023,4 +1023,21 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a stop's fact names who stopped its ask, and is drawn in it: the first press's (ADR-0126)",
   },
+  {
+    name: "a range may end before it starts",
+    file: "packages/core/address.ts",
+    from: "      return from === undefined || from > tail",
+    to: "      return from === undefined",
+    command: unit,
+    expect: "malformed text is no address",
+  },
+  {
+    name: "a reference's words are said to be a document",
+    file: "packages/core/kinds.ts",
+    from: '    put: "copies",\n    text: "blob",',
+    to: '    put: "copies",\n    text: "doc",',
+    command: ["pnpm", "exec", "vitest", "run", "packages/core/kinds.test.ts"],
+    expect:
+      "a card's words are where its kind says (`KINDS`' text): textSourceOf agrees for every kind with records",
+  },
 ]

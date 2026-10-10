@@ -9,7 +9,6 @@ import {
   callMark,
   callStatus,
   canvasMarkerWords,
-  copyIntoInventoryText,
   copyText,
   joinWords,
   type MessageAct,
@@ -20,6 +19,7 @@ import {
   REVEAL_MS,
   type RowMemory,
   type Run,
+  referenceOf,
   retiredWords,
   rowSummary,
   rowView,
@@ -35,7 +35,7 @@ import {
 } from "@pinetrie/interface"
 import { canvasLines } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
-import { newCardId } from "@pinetrie/session"
+import { newReferenceCardId } from "@pinetrie/session"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
 import { COPIED, useCopy } from "./copy.ts"
@@ -77,8 +77,8 @@ function MessageView(p: MessageProps) {
   ].filter(c => c !== "")
   // What its tables and images name it by, in the column's pane (ADR-0078).
   const source = useMemo<MessageSource>(
-    () => ({ kind: "entry", entry: node.id }),
-    [node.id],
+    () => ({ kind: "entry", thread: node.thread, entry: node.id }),
+    [node.thread, node.id],
   )
   return (
     <MessageSource value={source}>
@@ -213,7 +213,7 @@ function Tools({
   return (
     <div className="tools">
       {tools.copy && <CopyButton node={node} />}
-      {tools.takeCopyIntoInventory && (
+      {tools.takeReference && (
         <button
           aria-label={TAKE_COPY_INTO_INVENTORY}
           className="take-copy-into-inventory"
@@ -225,9 +225,9 @@ function Tools({
                 ? null
                 : selection.getRangeAt(0)
             onAct({
-              kind: "takeCopyIntoInventory",
-              card: newCardId(),
-              text: copyIntoInventoryText(
+              kind: "takeReference",
+              card: newReferenceCardId(),
+              ...referenceOf(
                 node,
                 range === null || selection === null
                   ? null
@@ -236,6 +236,7 @@ function Tools({
                       inside:
                         msg?.contains(range.commonAncestorContainer) === true,
                     },
+                null,
               ),
             })
           }}

@@ -39,7 +39,7 @@ wires them.
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
-| `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the image store, the SQLite store |
+| `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the blob store (images, and references' quotes as markdown, ADR-0126), the SQLite store |
 | `work/` | lane containers and disks (§ Lane work) |
 | `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers); accepted work's record and commands are `work/accepted.ts`'s |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
@@ -257,6 +257,25 @@ until the next compaction (S120), and the host compacts at startup. So
   its notes board's cells into a note column beside it, ADR-0116) and
   `0007-thread-origin` (each thread record's `fork` replaced by its
   `origin`, ADR-0117) ran, and were deleted.
+
+## Blobs hold text (`blobs.ts`, ADR-0126)
+
+- **A reference's quote is a blob**, `text/markdown`: immutable,
+  deduplicated by its hash, swept by reference as images are. `POST /blob`
+  takes markdown beside images (`planUploadHeaders` answers its type), and
+  keeps it as it is; an image is judged and fitted first.
+- **A text blob has no size**: `TextRef`'s `width` and `height` are null.
+  `pinetrie_blobs`' columns are `NOT NULL` from before, so its row holds 0
+  in each, read as none (`rowRef`). Every reader of images takes images
+  alone (`isImageRef`, `isImageMime`): a chat's, a session's, a picture.
+- **`GET /blob/` serves it as `text/markdown`**, which no browser draws as
+  HTML.
+- **The sweep keeps a reference's quote** (`sweepBlobs`): every card's
+  words that are a blob (`textSourceOf`) count as referenced.
+- **A message's links are quoted for the model** (`linkedQuotes`,
+  `withQuotes`): `sendChat` gathers each past referent its text links to
+  from the root it is in, and the chat's content quotes it under the text,
+  frozen as sent.
 
 ## Startup
 

@@ -229,6 +229,10 @@ export function createCommands(deps: CommandDeps): Commands {
         return cardCommands.move(writer, intent.moves, intent.here, tasks)
       case "copy-thread":
         return cardCommands.copyThread(writer, intent)
+      case "make-reference":
+        return cardCommands.makeReference(writer, intent)
+      case "edit-as-text":
+        return cardCommands.editAsText(writer, intent, tasks)
       case "spin-off":
         return cardCommands.spinOff(
           writer,

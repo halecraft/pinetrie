@@ -33,7 +33,7 @@ describe("inventoryView", () => {
     owner: ADA,
     placer: ADA,
     place: { kind: "inventory", holder: ADA },
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   })
 
   test("draws exactly settleSlots, the selection, and first lines", () => {

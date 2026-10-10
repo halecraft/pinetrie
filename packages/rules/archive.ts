@@ -200,7 +200,11 @@ export function writesIn(
     // A copy writes in the task its card lands in alone: an archived
     // thread is copied, since archiving freezes its end, not its history.
     case "copy-thread":
+    case "make-reference":
       return only(tasksOf.place(intent.move.to))
+    // An edit as text writes where the reference is.
+    case "edit-as-text":
+      return only(tasksOf.card(intent.reference))
     // A reorder stays in the place it names.
     case "reorder":
       return only(tasksOf.place(intent.reorder.at))

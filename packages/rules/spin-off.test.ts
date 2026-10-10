@@ -43,7 +43,7 @@ const card = (over: Partial<TextCard> = {}): TextCard => ({
   owner: ADA,
   placer: ADA,
   place: note,
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
   ...over,
 })
 

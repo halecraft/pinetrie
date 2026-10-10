@@ -527,9 +527,9 @@
       .text .table-wrap { margin: .45rem 0; }
       .text .table-wrap > table { margin: 0; }
       .table-bar { display: flex; justify-content: flex-end; line-height: 1; }
-      .table-open { padding: 0 .3rem; border: none; border-radius: 3px; background: none;
+      .table-open, .take-block { padding: 0 .3rem; border: none; border-radius: 3px; background: none;
         color: #6f7784; font-size: .85rem; line-height: 1.2; }
-      .table-open:hover:not(:disabled), .table-open:focus-visible { color: #e6e6e6; }
+      .table-open:hover:not(:disabled), .table-open:focus-visible, .take-block:hover:not(:disabled) { color: #e6e6e6; }
       .table-open[aria-pressed="true"] { color: var(--track, #9ecbff); }
       .table-open:disabled { opacity: .4; cursor: default; }
       .table-wrap[data-shown] > table, img.blob-image[data-shown] {
@@ -893,6 +893,17 @@
       .card-normal-body { padding: .4rem .75rem; overflow-y: auto; min-height: 0; }
       .card-normal-title { font-weight: 600; margin-bottom: .3rem; }
       .card-normal-message { margin-bottom: .5rem; }
+      /* A reference (ADR-0126): a chip in a slot, its quote when previewed. */
+      .reference-face { display: flex; align-items: center; gap: .3rem; height: 100%;
+        padding: .2rem .35rem; font-size: .72rem; border-top: 3px solid var(--you, #e3b341); }
+      .reference-face-label { font-style: italic; color: #c3c8d0; }
+      .reference-quote { margin: .3rem 0; padding-left: .6rem; border-left: 2px solid #3a3f48; }
+      .reference-from { color: #8b93a1; font-weight: normal; }
+      .edit-as-text { align-self: flex-start; margin-top: .3rem; }
+      /* A link to an address in text: a chip, which opens what it names. */
+      a.address-link { padding: 0 .3rem; border-radius: 3px; background: #23272e;
+        color: #d2a8ff; text-decoration: none; }
+      a.address-link::before { content: "❝ "; color: #8b93a1; }
       .note-column-face { display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem;
         font-size: .72rem; }
       .note-column-face-title { font-weight: 600; }

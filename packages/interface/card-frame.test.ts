@@ -37,7 +37,7 @@ const card = (place: TextPlace, over: Partial<TextCard> = {}): TextCard => ({
   owner: ME,
   placer: ME,
   place,
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
   ...over,
 })
 const FACTS: CardFrameFacts = {
@@ -281,7 +281,9 @@ describe("cardFrameWords", () => {
   test("a note: yours names nobody, another's its owner and who else wrote; not sent says why", () => {
     expect(
       words(
-        card(note, { content: { command: null, unsent: "no such image" } }),
+        card(note, {
+          content: { command: null, unsent: "no such image", origin: null },
+        }),
         "note",
       ),
     ).toMatchObject({
@@ -310,7 +312,7 @@ describe("cardFrameWords", () => {
   test("in your inventory, a command has no thread to name: no chip", () => {
     const c = card(
       { kind: "inventory", holder: ME },
-      { content: { command: "bring-up-to-date", unsent: null } },
+      { content: { command: "bring-up-to-date", unsent: null, origin: null } },
     )
     expect(
       cardFrameWords(cardFrame(c, "inventory", FACTS), READER, null, [])
@@ -320,7 +322,7 @@ describe("cardFrameWords", () => {
 
   test("a command is a chip, what it does its title", () => {
     const c = card(queued, {
-      content: { command: "bring-up-to-date", unsent: null },
+      content: { command: "bring-up-to-date", unsent: null, origin: null },
     })
     expect(words(c, "queued").command).toEqual({
       label: "catch up with accepted work",

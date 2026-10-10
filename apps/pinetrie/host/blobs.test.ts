@@ -1,7 +1,7 @@
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import type { BlobStore, Sha256 } from "@pinetrie/core"
+import { type BlobStore, type Sha256, storedText } from "@pinetrie/core"
 import { sha256Of } from "@pinetrie/pi"
 import { describe, expect, test } from "vitest"
 import {
@@ -97,11 +97,37 @@ test("sqlite blobs outlive their connection: a reopened file serves them", () =>
   expect(sqliteBlobs(openDatabase(file)).ref(RED_SHA)?.width).toBe(40)
 })
 
-test("planUploadHeaders reads a body only for an image type within the limit", () => {
+test("markdown is kept as a blob too, with no size, and read back as itself (ADR-0126)", () => {
+  for (const blobs of [memoryBlobs(), sqliteBlobs(openDatabase(":memory:"))]) {
+    const ref = blobs.put(storedText("| a |\n|---|\n| 1 |"))
+    expect(ref).toMatchObject({
+      mimeType: "text/markdown",
+      width: null,
+      height: null,
+    })
+    expect(blobs.ref(ref.sha256)).toEqual(ref)
+    const got = blobs.get(ref.sha256)
+    expect(got === undefined ? null : new TextDecoder().decode(got.bytes)).toBe(
+      "| a |\n|---|\n| 1 |",
+    )
+  }
+})
+
+test("planUploadHeaders reads a body only for an image type, or markdown, within the limit", () => {
   const plan = (contentType?: string, contentLength?: string) =>
     planUploadHeaders({ contentType, contentLength })
-  expect(plan("image/png", "100")).toEqual({ kind: "accept" })
-  expect(plan("image/jpeg; charset=binary")).toEqual({ kind: "accept" })
+  expect(plan("image/png", "100")).toEqual({
+    kind: "accept",
+    mime: "image/png",
+  })
+  expect(plan("image/jpeg; charset=binary")).toEqual({
+    kind: "accept",
+    mime: "image/jpeg",
+  })
+  expect(plan("text/markdown; charset=utf-8", "10")).toEqual({
+    kind: "accept",
+    mime: "text/markdown",
+  })
   for (const type of [
     undefined,
     "text/plain",

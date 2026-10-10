@@ -25,7 +25,9 @@ import { useDocStatus, useSelector } from "@kyneta/react"
 import {
   type CardId,
   type EntryId,
+  isPastAddress,
   namedThreads,
+  parseAddress,
   parseCardId,
   pathIds,
   type TaskId,
@@ -120,6 +122,7 @@ import {
   threadWork,
   typingDue,
   unsentSignals,
+  uploadText,
   viewportStore,
 } from "@pinetrie/interface"
 import {
@@ -140,6 +143,7 @@ import {
   heldBy,
   intentsOf,
   newNoteColumnId,
+  newReferenceCardId,
   newRootId,
   newTaskId,
   newThreadId,
@@ -161,6 +165,7 @@ import { CardHistories } from "./card-history.tsx"
 import { Footer } from "./footer.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
+import { blockOfProperty } from "./markdown.ts"
 import { Page } from "./page.tsx"
 import { TrackSeed } from "./palette-context.ts"
 import { Pictures } from "./pictures-context.ts"
@@ -638,15 +643,19 @@ export function App({
     [layout, active, canvases, forkOf, index, lanes, holders],
   )
   // The tab's thread columns drawn whole: the task's, or a new tab's one
-  // fresh column. Every projection below is keyed on this one.
-  const columns: readonly ColumnSpec[] = useMemo(
-    () =>
-      strip !== null
-        ? openColumns(stripCards(strip))
-        : active?.kind === "new"
-          ? layout.newTabs.filter(c => c.key === active.key)
-          : [],
-    [strip, layout, active],
+  // fresh column. Every projection below is keyed on this one, so it keeps
+  // its identity while its data does: the strip is rebuilt on every card's
+  // change, and another window's card redraws no message list (S59).
+  const columns: readonly ColumnSpec[] = useSameData(
+    useMemo(
+      () =>
+        strip !== null
+          ? openColumns(stripCards(strip))
+          : active?.kind === "new"
+            ? layout.newTabs.filter(c => c.key === active.key)
+            : [],
+      [strip, layout, active],
+    ),
   )
   // The column you just opened, whose composer takes focus once when it
   // mounts (`claimFocus`). Never stored: a column restored, or shown again
@@ -1232,6 +1241,22 @@ export function App({
       stores.list.save(width)
     },
     page: goTo,
+    uploadText,
+    clipboard: text => {
+      void navigator.clipboard?.writeText(text).catch(() => {})
+    },
+    // As typed: the box's own text undo and its binding see an insert.
+    insertText: text => {
+      const box = document.activeElement
+      if (box instanceof HTMLTextAreaElement || box instanceof HTMLInputElement)
+        box.setRangeText(
+          text,
+          box.selectionStart ?? box.value.length,
+          box.selectionEnd ?? box.value.length,
+          "end",
+        )
+      box?.dispatchEvent(new Event("input", { bubbles: true }))
+    },
     inventory: {
       // A take into the inventory while the panel is closed shows it for the
       // card's flight.
@@ -1277,6 +1302,7 @@ export function App({
           task: newTaskId(),
           thread: newThreadId(),
           noteColumn: newNoteColumnId(),
+          reference: newReferenceCardId(),
         },
       ),
     ),
@@ -1308,6 +1334,74 @@ export function App({
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
   }, [onIntent, selected, slots, page])
+  // Cmd+C outside a text box (ADR-0126): a selection inside one message,
+  // or the focused message's table or image, is taken as a reference, its
+  // markdown on the clipboard. With nothing to take, the browser copies as
+  // usual; in a text box, its own copy stands.
+  useEffect(() => {
+    const onCopy = (e: ClipboardEvent) => {
+      const focused = document.activeElement
+      if (isTextBox(focused)) return
+      const selection = window.getSelection()
+      const range =
+        selection === null || selection.rangeCount === 0
+          ? null
+          : selection.getRangeAt(0)
+      const around =
+        range === null
+          ? null
+          : range.commonAncestorContainer instanceof Element
+            ? range.commonAncestorContainer
+            : range.commonAncestorContainer.parentElement
+      const selected =
+        selection !== null && !selection.isCollapsed
+          ? (around?.closest<HTMLElement>(".msg[data-entry]") ?? null)
+          : null
+      const blockEl =
+        focused instanceof HTMLElement
+          ? focused.closest<HTMLElement>("[data-block]")
+          : null
+      const msg =
+        selected ??
+        (focused instanceof HTMLElement
+          ? focused.closest<HTMLElement>(".msg[data-entry]")
+          : null)
+      const entry = msg?.dataset.entry
+      if (entry === undefined || msg === null) return
+      e.preventDefault()
+      onIntent({
+        kind: "copyFrom",
+        entry,
+        selection:
+          selected === null || selection === null
+            ? null
+            : { text: selection.toString(), inside: true },
+        block:
+          selected === null && blockEl !== null && msg.contains(blockEl)
+            ? blockOfProperty(blockEl.dataset.block)
+            : null,
+      })
+    }
+    document.addEventListener("copy", onCopy)
+    return () => document.removeEventListener("copy", onCopy)
+  }, [onIntent])
+  // A link to an address in text (ADR-0126): a past one opens its entry,
+  // where its thread is; any other is followed by no page yet.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const link =
+        e.target instanceof Element
+          ? e.target.closest<HTMLElement>("a[data-address]")
+          : null
+      if (link === null) return
+      e.preventDefault()
+      const address = parseAddress(link.dataset.address ?? "")
+      if (address !== undefined && isPastAddress(address))
+        onIntent({ kind: "openAt", entry: address.entry })
+    }
+    document.addEventListener("click", onClick)
+    return () => document.removeEventListener("click", onClick)
+  }, [onIntent])
   // Where focus last was in a column: its key.
   useEffect(() => {
     const onFocus = (e: FocusEvent) => {
@@ -1520,6 +1614,7 @@ export function App({
               threadPreview(thread, index, forkOf.get(thread) ?? null)
             }
             notes={noteViews}
+            threadNames={workFacts.names}
             threads={threadFaces}
             reader={{ me: session.writer, nameOf }}
             notices={moves.notices.filter(r => r.actedAt.kind === "inventory")}

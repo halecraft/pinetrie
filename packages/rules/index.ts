@@ -77,6 +77,16 @@ export {
   planBaseNews,
 } from "./behind.ts"
 export {
+  BLOCK_PROPERTY,
+  type Block,
+  type BlockNode,
+  blockKey,
+  blockSource,
+  blocksOf,
+  markBlocks,
+  numberBlocks,
+} from "./blocks.ts"
+export {
   archivedOf,
   BOARD,
   type Board,
@@ -259,6 +269,15 @@ export {
   resolutionFloor,
 } from "./land.ts"
 export {
+  type AddressLink,
+  addressLink,
+  addressLinks,
+  type LinkedQuote,
+  linkedQuotes,
+  pastMarkdown,
+  withQuotes,
+} from "./links.ts"
+export {
   closeStreams,
   isCurrentReply,
   planClear,
@@ -282,8 +301,10 @@ export {
   type MovesStep,
   NO_DISCARDS,
   type PlaceStep,
+  planEditAsText,
   planFreshFollow,
   planMake,
+  planMakeReference,
   planMoveCommand,
   planMoveRequest,
   planMoveTargets,

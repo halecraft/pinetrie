@@ -16,6 +16,7 @@ import {
   type CardCommand,
   type CardId,
   type CardRecord,
+  DISCARDED,
   type EntryId,
   ERR,
   type Intent,
@@ -52,6 +53,7 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
+  afterSteps,
   type Cause,
   type CopyPlan,
   type CopyThread,
@@ -63,10 +65,13 @@ import {
   NO_DISCARDS,
   type PlaceStep,
   planCopy,
+  planEditAsText,
   planFreshFollow,
   planLiftRoot,
+  planMakeReference,
   planMoveCommand,
   planMoveRequest,
+  planMoveTargets,
   planQueueCard,
   planReorder,
   planRootDelete,
@@ -529,6 +534,68 @@ export function createCardCommands(deps: CardCommandDeps) {
      * copy's record, its card and the canvas re-ranked for it, then its
      * name. No entry is written: its first send branches at its fork.
      */
+    /**
+     * A reference made where its move sends it (ADR-0126): the target
+     * resolved first (a thread's nearest notes, made where its task has
+     * none), then made through `planMakeReference`. A creation, so it
+     * enters no history, as a text card's does not.
+     */
+    async makeReference(
+      writer: WriterId,
+      made: Extract<Intent, { kind: "make-reference" }>,
+    ): Promise<Settled> {
+      // plan
+      const cards = readPlaces(places)
+      const resolved = planMoveTargets({
+        cards,
+        moves: [made.move],
+        sender: writer,
+        newColumn,
+      })
+      if (resolved.kind === "refused") return unmoved(resolved)
+      const [move] = resolved.moves
+      if (move === undefined) return settled({ kind: "nothing" })
+      const step = planMakeReference(
+        afterSteps(cards, resolved.first),
+        move,
+        { address: made.address, quote: made.quote },
+        writer,
+      )
+      // execute
+      return carry(
+        step.kind === "refused"
+          ? step
+          : { kind: "steps", steps: [...resolved.first, step] },
+        [],
+        { kind: "move", by: writer },
+      )
+    },
+
+    /**
+     * A reference edited as text (ADR-0126): the new text card and the
+     * reference's discard as one step of the sender's history in the task
+     * it is in (`planEditAsText`), so one undo takes back both.
+     */
+    async editAsText(
+      writer: WriterId,
+      edit: Extract<Intent, { kind: "edit-as-text" }>,
+      tasks: TaskIndex,
+    ): Promise<Settled> {
+      // gather: the history's stack, loaded before the places are read
+      const discards = { tasks, here: edit.here }
+      const task = historyOf(
+        [{ card: edit.reference, from: edit.from, to: DISCARDED }],
+        readPlaces(places),
+        discards,
+      )
+      const gesture =
+        task === null ? undefined : await deps.histories.gestureOf(writer, task)
+      // plan
+      const step = planEditAsText(readPlaces(places), edit, writer, discards)
+      // execute
+      return carry(step, [], { kind: "move", by: writer }, gesture)
+    },
+
     async copyThread(writer: WriterId, copy: CopyThread): Promise<Settled> {
       // gather
       const threads = readThreads(session)

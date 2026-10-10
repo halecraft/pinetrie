@@ -10,7 +10,13 @@ import {
   type WebsocketServerTransport,
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
-import { type BlobStore, errorText, type Sha256 } from "@pinetrie/core"
+import {
+  type BlobStore,
+  errorText,
+  type Sha256,
+  storedText,
+  TEXT_MIME,
+} from "@pinetrie/core"
 import { prepareImage } from "@pinetrie/pi"
 import type { OfferAsk } from "@pinetrie/rules"
 import { createServer as createViteServer } from "vite"
@@ -168,7 +174,13 @@ export async function startHttp(input: {
     } catch {
       return
     }
-    const prepared = await prepareImage(Buffer.concat(chunks))
+    const bytes = Buffer.concat(chunks)
+    // A reference's quote is kept as it is (ADR-0126); an image is judged
+    // and fitted first.
+    const prepared =
+      headers.mime === TEXT_MIME
+        ? ({ ok: true, image: storedText(bytes.toString("utf8")) } as const)
+        : await prepareImage(bytes)
     if (!prepared.ok) {
       send(res, uploadRefusal(415, prepared.reason))
       return

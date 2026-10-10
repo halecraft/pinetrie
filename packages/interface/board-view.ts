@@ -330,6 +330,16 @@ export function parseSearch(query: string, mine: boolean): BoardSearch | null {
   return words.length === 0 && !mine ? null : { words, mine }
 }
 
+/** A link to an address (ADR-0126), `[label](/a/…)`, as its label alone. */
+const ADDRESS_LINK = /\[([^\]]*)\]\(\/a\/[^)\s]*\)/g
+
+/**
+ * A label as search reads it: a link to an address by its label, never its
+ * address, which names ids nobody types.
+ */
+export const searchedText = (label: string): string =>
+  label.replace(ADDRESS_LINK, "$1")
+
 /**
  * What `search` keeps: the tasks whose label (`labelsOf`, so a title is
  * found) holds every word, in any order, and with `mine`, those `me` wrote a
@@ -341,7 +351,7 @@ function boardFilter(
   me: WriterId,
 ): (root: Pick<ThreadCard, "label" | "writers">) => boolean {
   return root => {
-    const label = root.label.toLowerCase()
+    const label = searchedText(root.label).toLowerCase()
     return (
       (!search.mine || root.writers.includes(me)) &&
       search.words.every(w => label.includes(w))

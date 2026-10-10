@@ -5,6 +5,7 @@
 import { blobOfUrl, blobUrl, type ImageRef } from "@pinetrie/core"
 import { type ComponentProps, type CSSProperties, useContext } from "react"
 import { imageClick } from "./image-click.ts"
+import { blockOfProperty } from "./markdown.ts"
 import { type PaneSubject, samePane } from "./pane.ts"
 import { MessageSource, PaneReach } from "./pane-context.ts"
 
@@ -12,20 +13,35 @@ import { MessageSource, PaneReach } from "./pane-context.ts"
  * An image; a `/blob/` one, clicked, opens in the column's pane, outlined
  * while it shows there. Outside a column it is only drawn.
  */
-export function BlobImage(props: ComponentProps<"img">) {
+export function BlobImage(
+  props: ComponentProps<"img"> & { readonly "data-block"?: string },
+) {
   const { src, alt, title } = props
   const reach = useContext(PaneReach)
   const source = useContext(MessageSource)
   const sha = typeof src === "string" ? blobOfUrl(src) : null
   if (typeof src !== "string" || sha === null || reach === null)
     return <img {...props} alt={alt ?? ""} />
-  const mine: PaneSubject = {
-    kind: "image",
-    sha256: sha,
-    from: source?.kind === "entry" ? source.entry : null,
-    alt: alt ?? "",
-    ...(title === undefined ? {} : { title }),
-  }
+  // A block of a committed message is named by its address (ADR-0126); an
+  // image of a tool's result, or of a reply still streaming, by its blob.
+  const block = blockOfProperty(props["data-block"])
+  const mine: PaneSubject =
+    block !== null && source?.kind === "entry"
+      ? {
+          kind: "block",
+          address: {
+            kind: "block",
+            thread: source.thread,
+            entry: source.entry,
+            block,
+          },
+        }
+      : {
+          kind: "image",
+          sha256: sha,
+          alt: alt ?? "",
+          ...(title === undefined ? {} : { title }),
+        }
   const shown = reach.shown !== null && samePane(reach.shown, mine)
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: a shortcut for the mouse; the image is not a control

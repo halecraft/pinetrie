@@ -10,7 +10,9 @@ import {
   baseKnown,
   ERR,
   type Intent,
+  isImageRef,
   membersOf,
+  messageText,
   planModeOf,
   type SendAt,
   type SentCard,
@@ -45,6 +47,8 @@ import {
   type ChatDetails,
   displayName,
   encodeChat,
+  type LinkedQuote,
+  linkedQuotes,
   parseCommand,
   pastedImages,
   planBaseNews,
@@ -109,6 +113,8 @@ export interface ChatContext {
    * starts none.
    */
   readonly start: ThreadStart | null
+  /** The past its text links to, quoted for the model (ADR-0126). */
+  readonly quotes: readonly LinkedQuote[]
 }
 
 /**
@@ -236,7 +242,7 @@ export async function sendChat(
   const refs = new Map(
     shas.flatMap(sha => {
       const ref = blobs.ref(sha)
-      return ref === undefined ? [] : [[sha, ref] as const]
+      return ref === undefined || !isImageRef(ref) ? [] : [[sha, ref] as const]
     }),
   )
 
@@ -313,12 +319,18 @@ export async function sendChat(
           cards: readPlaces(deps.basics.places),
         })
 
+  // gather: the past its text links to, from the root it is in
+  const quotes = linkedQuotes(chat.text, address => {
+    const message = index.entries[address.entry]?.message
+    return message === undefined ? undefined : messageText(message)
+  })
   const sent = await executeChat(deps, planned, {
     view,
     writer,
     base: chat.base,
     pinned: chat.pinned,
     start,
+    quotes,
   })
   // Other threads' agents it asks or invites are relayed to once the chat
   // is written (ADR-0128), in a step of their own.
@@ -383,7 +395,8 @@ export async function executeChat(
   const { log, now } = deps.basics
   const { view, writer } = context
   const { root } = view
-  const message = (details: ChatDetails) => encodeChat(details, now())
+  const message = (details: ChatDetails) =>
+    encodeChat(details, now(), context.quotes)
   // A thread's first message: its record, its card on its task's canvas
   // and a new task's record and board place first, so a reader that finds
   // the message finds its thread's root and task (ADR-0117, ADR-0116).

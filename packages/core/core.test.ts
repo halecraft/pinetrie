@@ -667,7 +667,7 @@ describe("moves, built once (ADR-0059)", () => {
     owner: ADA,
     place,
     placer: ADA,
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   })
   const atEnd = card({ kind: "note", column: NOTES, order: "a" })
   test("a move goes from where the card is; a discard names no history: the host's to name", () => {

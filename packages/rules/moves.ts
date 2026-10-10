@@ -8,8 +8,11 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
+  type ContentOf,
+  DISCARDED,
   fitsPlace,
   isNoteColumnId,
+  isReferenceCardId,
   isTextCard,
   isTextCardId,
   KINDS,
@@ -22,6 +25,7 @@ import {
   type NoteColumnId,
   type PlaceKey,
   placed,
+  placeOfKind,
   type RankedCanvas,
   type ResolvedMove,
   type ResolvedTarget,
@@ -29,6 +33,7 @@ import {
   sameKey,
   seenAt,
   type TaskId,
+  type TextCardId,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
@@ -192,6 +197,78 @@ export function planMake(
 }
 
 /**
+ * A reference made by `sender` (ADR-0126), at the place a creation's move
+ * resolves to, holding `content`: through `planMake`, as every card is.
+ * Refused `no-place` for an id that is no reference's, or a place no
+ * reference is in. A copy, so it enters no history. Pure.
+ */
+export function planMakeReference(
+  cards: readonly CardRecord[],
+  move: ResolvedMove,
+  content: ContentOf["reference"],
+  sender: WriterId,
+): MakeStep {
+  const resolved = placeAt(move.to, cards, sender, undefined, NO_DISCARDS)
+  const place =
+    resolved === undefined ? undefined : placeOfKind("reference", resolved)
+  const { card } = move
+  if (place === undefined || !isReferenceCardId(card))
+    return { kind: "refused", code: "no-place", now: null }
+  return planMake(
+    cards,
+    makeCard("reference", card, place, content, sender),
+    sender,
+  )
+}
+
+/**
+ * A reference edited as text (ADR-0126), one move set (`planMoves`'s
+ * shape): a new text card, `card`, in the reference's place, its `origin`
+ * the reference's address, made by `sender` through `planMake`; and the
+ * reference to the trash (`DISCARDED`), as a discard. One gesture, one undo.
+ * The new card's text, the quote, is its sender's to write, as a creation's
+ * is. Refused as a discard of the reference would be, or a make of the card.
+ * Pure.
+ */
+export function planEditAsText(
+  cards: readonly CardRecord[],
+  edit: {
+    readonly reference: CardId
+    /** Where its sender saw it. */
+    readonly from: PlaceKey
+    readonly card: TextCardId
+  },
+  sender: WriterId,
+  discards: Discards,
+): MovesStep {
+  const now = cards.find(c => c.id === edit.reference)
+  if (now === undefined || now.kind !== "reference")
+    return { kind: "refused", code: "gone", now: null }
+  const place = placeOfKind("text", now.place)
+  if (place === undefined) return { kind: "refused", code: "no-place", now }
+  const made = planMake(
+    cards,
+    makeCard(
+      "text",
+      edit.card,
+      place,
+      { command: null, unsent: null, origin: now.content.address },
+      sender,
+    ),
+    sender,
+  )
+  if (made.kind === "refused") return made
+  const trashed = planMove(
+    afterStep(cards, made),
+    { card: now.id, from: edit.from, to: DISCARDED },
+    sender,
+    discards,
+  )
+  if (trashed.kind === "refused") return trashed
+  return { kind: "steps", steps: [made, trashed] }
+}
+
+/**
  * A card a person's move makes at `place`, of the kind its id says: a text
  * card with no command, or a note column on a canvas; undefined for any
  * other kind, or a place its kind is never in.
@@ -206,7 +283,7 @@ function madeAt(
       "text",
       card,
       place,
-      { command: null, unsent: null },
+      { command: null, unsent: null, origin: null },
       sender,
     )
   if (isNoteColumnId(card) && place.kind === "canvas")

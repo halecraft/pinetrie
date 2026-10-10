@@ -130,7 +130,7 @@ describe("planCopy (ADR-0117, ADR-0124)", () => {
       owner: ADA,
       placer: ADA,
       place: { kind: "inventory" as const, holder: ADA },
-      content: { command: null, unsent: null },
+      content: { command: null, unsent: null, origin: null },
     }))
     expect(
       plan(

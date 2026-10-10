@@ -32,7 +32,7 @@ const card: CardRecord = {
   owner: ADA,
   placer: ADA,
   place: { kind: "composing", thread: TEST_THREAD },
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
 }
 
 test("a chat fills in what its column left out, and carries each card's version as this client has it", () => {

@@ -6,12 +6,14 @@
 // under its key, and a message's acts (`MessageAct`) are among them.
 
 import {
+  type BlockRef,
   type CardCommand,
   type CardId,
   type CardWidth,
   type EntryId,
   type MarkTarget,
   type MoveDirection,
+  messageAt,
   moveOf,
   type NoteColumnId,
   noteOf,
@@ -38,14 +40,15 @@ import {
   full,
   moveCard,
   planDiscard,
+  planEditAsText,
   planKeep,
   planNewNote,
   planOpenTrace,
   planPin,
   planPinToTask,
   planPut,
-  planTakeCopyIntoInventory,
   planTakeIntoInventory,
+  planTakeReference,
   planToNote,
   planUndoMove,
   planUnpin,
@@ -79,7 +82,11 @@ import {
 import type { NameStep } from "./identity.ts"
 import { type Here, showsStage, type ViewChange } from "./layout.ts"
 import { otherWidth } from "./list-width.ts"
-import type { MessageAct } from "./message-tools.ts"
+import {
+  type MessageAct,
+  referenceOf,
+  type SelectionLike,
+} from "./message-tools.ts"
 import type { PageName } from "./page.ts"
 import type { PutTarget } from "./put-target.ts"
 import { planSpinOff } from "./spin-off.ts"
@@ -340,6 +347,28 @@ export type Intent =
   | { readonly kind: "put"; readonly card: CardId; readonly target: PutTarget }
   /** Discard a card in your inventory; the undo key brings it back (ADR-0111). */
   | { readonly kind: "discard"; readonly card: CardId }
+  /**
+   * Edit a reference as text (ADR-0126): a text card `card` in its place,
+   * its text the quote `text`, and the reference to the trash.
+   */
+  | {
+      readonly kind: "editAsText"
+      readonly reference: CardId
+      readonly card: TextCardId
+      readonly text: string
+    }
+  /**
+   * Cmd+C outside a text box (ADR-0126): a reference to the message at
+   * `entry`, a block of it, or the selection in it, taken into your
+   * inventory and its markdown on the clipboard (`referenceOf`).
+   */
+  | {
+      readonly kind: "copyFrom"
+      /** The message's entry, as the page read it from `data-entry`. */
+      readonly entry: string
+      readonly selection: SelectionLike | null
+      readonly block: BlockRef | null
+    }
   /** Select an inventory slot. */
   | { readonly kind: "selectSlot"; readonly slot: number }
   /**
@@ -548,6 +577,22 @@ function planOf(
       return planTakeIntoInventory(intent.card, state)
     case "put":
       return planPut(intent.card, intent.target, state, minted)
+    case "editAsText":
+      return planEditAsText(intent, state)
+    case "copyFrom": {
+      // An id the page read is this tab's entry only if its index has it.
+      const entry = (Object.keys(state.index.entries) as EntryId[]).find(
+        id => id === intent.entry,
+      )
+      const message = entry === undefined ? null : messageAt(state.index, entry)
+      return message === null
+        ? []
+        : planTakeReference(
+            minted.reference,
+            referenceOf(message, intent.selection, intent.block),
+            state,
+          )
+    }
     case "discard":
       return planDiscard(
         intent.card,
@@ -651,8 +696,8 @@ function planColumn(
       return planDiscard(act.card, IN_COLUMN(key), state)
     case "takeIntoInventory":
       return planTakeIntoInventory(act.card, state)
-    case "takeCopyIntoInventory":
-      return planTakeCopyIntoInventory(act.card, act.text, state)
+    case "takeReference":
+      return planTakeReference(act.card, act, state)
     case "density":
       return reading({ kind: "density", density: act.density })
     case "details":

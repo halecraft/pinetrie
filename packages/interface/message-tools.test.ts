@@ -12,6 +12,7 @@ import {
   branchPrefill,
   type MessageTools,
   messageTools,
+  referenceOf,
   showsText,
 } from "./message-tools.ts"
 
@@ -137,7 +138,7 @@ describe("copy", () => {
   test("offered for a message with text or tool calls, and none with neither", () => {
     const call = { id: "c", name: "bash", subject: "ls" }
     expect(tools(chat("x", false)).copy).toBe(true)
-    expect(tools(chat("x", false)).takeCopyIntoInventory).toBe(true)
+    expect(tools(chat("x", false)).takeReference).toBe(true)
     expect(
       tools({
         id: entryId("5-m"),
@@ -162,7 +163,7 @@ describe("copy", () => {
 test("a column that can't be written offers only copy", () => {
   expect(tools(chat("x", true), { writable: false })).toEqual({
     copy: true,
-    takeCopyIntoInventory: false,
+    takeReference: false,
     edit: undefined,
     branch: undefined,
   })
@@ -201,4 +202,35 @@ test("showsText: a message that only called tools shows only its rows", () => {
       toolCalls: [call],
     }),
   ).toBe(true)
+})
+
+describe("referenceOf (ADR-0126)", () => {
+  const node = {
+    id: entryId("5-m"),
+    thread: FIXTURE_THREAD,
+    role: "assistant",
+    text: "Plan:\n\n| a |\n|---|\n| 1 |",
+    branches: [],
+  } as const
+  const at = { thread: FIXTURE_THREAD, entry: entryId("5-m") }
+
+  test("a selection inside the message is a range of its text; one outside, or not in its text, the whole message", () => {
+    expect(referenceOf(node, { text: "Plan", inside: true }, null)).toEqual({
+      address: { kind: "range", ...at, from: 0, to: 4 },
+      markdown: "Plan",
+    })
+    expect(
+      referenceOf(node, { text: "Plan", inside: false }, null).address,
+    ).toEqual({ kind: "entry", ...at })
+    expect(
+      referenceOf(node, { text: "**Plan**", inside: true }, null).address,
+    ).toEqual({ kind: "entry", ...at })
+  })
+
+  test("a block named is the block, its markdown its source", () => {
+    expect(referenceOf(node, null, { kind: "table", n: 0 })).toEqual({
+      address: { kind: "block", ...at, block: { kind: "table", n: 0 } },
+      markdown: "| a |\n|---|\n| 1 |",
+    })
+  })
 })

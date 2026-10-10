@@ -3,6 +3,7 @@
 // moves between them, reorders, the places row's fields, and a card's
 // history and traces. Re-exported from `index.ts`.
 
+import type { Address } from "./address.ts"
 import {
   type AskCardId,
   atEntry,
@@ -24,10 +25,12 @@ import {
   type NoteColumnId,
   type Position,
   parseCardId,
+  type ReferenceCardId,
   type RelayDetails,
   ROOT,
   type RootId,
   type RoundFact,
+  type Sha256,
   type StopFact,
   type TaskId,
   type TextCardId,
@@ -469,12 +472,16 @@ export function moveOf<To extends TargetOf<"thread">>(
   card: ThreadCard,
   to: To,
 ): MoveOf<"thread"> & { readonly to: To }
+export function moveOf<To extends TargetOf<"reference">>(
+  card: ReferenceCard,
+  to: To,
+): MoveOf<"reference"> & { readonly to: To }
 export function moveOf<To extends TargetOf<"note-column">>(
   card: NoteColumnCard,
   to: To,
 ): MoveOf<"note-column"> & { readonly to: To }
 export function moveOf(
-  card: TextCard | ThreadCard,
+  card: TextCard | ThreadCard | ReferenceCard,
   to: Extract<PlaceKey, { readonly kind: "inventory" }>,
 ): TypedMove
 export function moveOf(
@@ -964,6 +971,7 @@ export const PLACES_OF: {
   thread: KINDS.thread.places,
   "note-column": KINDS["note-column"].places,
   fact: KINDS.fact.places,
+  reference: KINDS.reference.places,
   ask: KINDS.ask.places,
   media: KINDS.media.places,
   file: KINDS.file.places,
@@ -996,11 +1004,22 @@ export type HeldPlace = PlaceOf<"thread">
  *   whose place names it.
  * - A fact (ADR-0080): the fact, appended to its thread as the thread's end
  *   consumes it.
+ * - A reference (ADR-0126): an address, and the quote of what it names,
+ *   kept as a blob: the past never changes, so the quote is exact, and the
+ *   reference draws without loading its referent's root.
  */
 export interface ContentOf {
   readonly text: {
     readonly command: CardCommand | null
     readonly unsent: string | null
+    /** Where it was copied from: a reference edited as text (ADR-0126); null for none. */
+    readonly origin: Address | null
+  }
+  readonly reference: {
+    /** What it names. */
+    readonly address: Address
+    /** Its quote's blob: the markdown of what it names, which never changes. */
+    readonly quote: Sha256
   }
   readonly thread: Readonly<Record<string, never>>
   readonly "note-column": Readonly<Record<string, never>>
@@ -1044,6 +1063,9 @@ export type NoteColumnCard = Card<"note-column">
 /** A fact on its way into its thread (ADR-0080): only ever queued. */
 export type FactCard = Card<"fact">
 
+/** A reference to an address (ADR-0126). */
+export type ReferenceCard = Card<"reference">
+
 /** An ask from another thread for a busy agent (ADR-0128): only ever queued. */
 export type AskCard = Card<"ask">
 
@@ -1072,6 +1094,7 @@ export const NO_CONTENT: Readonly<Record<string, never>> = {}
 export type TextSource =
   | { readonly kind: "doc"; readonly card: TextCardId }
   | { readonly kind: "fact"; readonly fact: QueuedFact }
+  | { readonly kind: "blob"; readonly sha: Sha256 }
   | { readonly kind: "ask"; readonly relay: RelayDetails }
   | { readonly kind: "none" }
 
@@ -1082,6 +1105,8 @@ export function textSourceOf(card: CardRecord): TextSource {
       return { kind: "doc", card: card.id }
     case "fact":
       return { kind: "fact", fact: card.content.fact }
+    case "reference":
+      return { kind: "blob", sha: card.content.quote }
     case "ask":
       return { kind: "ask", relay: card.content.relay }
     case "thread":
@@ -1102,12 +1127,19 @@ const fits = <K extends CardKind>(
   place: CardPlace,
 ): place is PlaceOf<K> => fitsPlace(kind, place.kind)
 
+/** `place` as a place of a card of `kind`; undefined for one its kind is never in. */
+export const placeOfKind = <K extends CardKind>(
+  kind: K,
+  place: CardPlace,
+): PlaceOf<K> | undefined => (fits(kind, place) ? place : undefined)
+
 /** The id of a card of `K`. */
 export type IdOf<K extends CardKind> = {
   readonly text: TextCardId
   readonly thread: ThreadId
   readonly "note-column": NoteColumnId
   readonly fact: FactCardId
+  readonly reference: ReferenceCardId
   readonly ask: AskCardId
   readonly media: MediaId
   readonly file: FileCardId
@@ -1170,6 +1202,12 @@ const fitsTarget = (kind: CardKind, to: MoveTarget): boolean =>
       : to.kind,
   )
 
+/** Whether `to` is a target a card of `kind` may be sent to (`TargetOf`). */
+export const isTargetOf = <K extends CardKind>(
+  kind: K,
+  to: MoveTarget,
+): to is TargetOf<K> => fitsTarget(kind, to)
+
 /**
  * `move` typed by its card's kind; undefined when its `from` or `to` is a
  * place that kind is never in.
@@ -1197,6 +1235,8 @@ export function placed(
       return fits("note-column", place) ? { ...card, place } : undefined
     case "fact":
       return fits("fact", place) ? { ...card, place } : undefined
+    case "reference":
+      return fits("reference", place) ? { ...card, place } : undefined
     case "ask":
       return fits("ask", place) ? { ...card, place } : undefined
   }

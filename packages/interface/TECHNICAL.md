@@ -893,6 +893,26 @@ them in one row: *copy*, *edit* or *new tab*, `→`.
   result's images, a `write`'s content and an `edit`'s change are not in
   the view, so they are not copied. It only reads, so a column that can't
   be written offers it too, alone.
+- **Taking from the past is a reference** (`referenceOf`, ADR-0126): *take
+  a copy into your inventory* takes the selection when it lies in the
+  message and its text is in the message's text as written (a range of
+  it), else the whole message; a table's ❝ takes its block. Its markdown is
+  `markdownOf`'s (an entry's is `copyText`, a block's and a range's their
+  slices, `pastMarkdown`), so the quote kept and the clipboard say the
+  same. `planTakeReference` plans the clipboard's write, and the take:
+  `perform` keeps the quote as a blob (`uploadText`), then asks the host to
+  make the reference (`makeReference`). A reference's put (`putReference`)
+  copies from your hand: a new reference with the same address and quote
+  is made where it lands, and into a text box (`PutTarget` `text-box`) it is
+  a link at the caret (`addressLink`). *Edit as text* (`planEditAsText`) is
+  one request: its sender writes the quote into a new text card, and the
+  host makes it in the reference's place, its `origin` the address, and
+  trashes the reference, one step of history.
+- **Keys** (`page-keys.ts`): Cmd+X outside a text box takes as Ctrl+Shift+I
+  does; the put key in a text box puts a reference as a link. Cmd+C is the
+  page's `copy` event, not a key: outside a text box, a selection inside
+  one message, or the focused table's bar (`data-block` on its wrap), plans
+  `copyFrom`; with nothing to take the browser copies as usual.
 - **The copied text is built on a press**, not by `messageTools`: every
   build of a column's list would otherwise join every call's output, and
   `sameMessageProps` would compare it. `MessageTools.copy` only says

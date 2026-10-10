@@ -5,12 +5,12 @@
 
 import {
   type AcceptedRecord,
-  type Address,
   type AgentCandidate,
   type CardCommand,
   type ChatMode,
   parseMentions,
   type QueueHoldChange,
+  type Recipients,
   sendWaits,
   type TaskId,
   type ThreadId,
@@ -156,7 +156,7 @@ export interface SendPlan {
   /** The send creates a lane: the chip then says where it works. */
   readonly createsLane: boolean
   /** Who it is for: `addressChat`'s answer, unchanged. */
-  readonly to: Address
+  readonly to: Recipients
   /** Where a queued send would wait: the button's in `queue` mode, and a conflict's. */
   readonly queue: QueuePlace
   /**
@@ -281,7 +281,7 @@ export function sendButton(plan: SendPlan, busy: EditorBusy): SendButton {
  * people are (ADR-0128): `names` gives each its thread's name.
  */
 export function recipientWords(
-  to: Address,
+  to: Recipients,
   names: ReadonlyMap<ThreadId, string> = new Map(),
 ): ButtonWords {
   const nameOf = (t: ThreadId) => names.get(t) ?? "another agent"
@@ -291,7 +291,10 @@ export function recipientWords(
   return { label: `${prefix}${words.label}`, title: words.title }
 }
 
-function sendWords(to: Address, nameOf: (t: ThreadId) => string): ButtonWords {
+function sendWords(
+  to: Recipients,
+  nameOf: (t: ThreadId) => string,
+): ButtonWords {
   if (to.compels.kind === "agent")
     return { label: "send to agent", title: null }
   const named = [...to.asks.map(nameOf), ...to.people]

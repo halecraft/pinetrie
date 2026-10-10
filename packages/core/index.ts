@@ -18,6 +18,7 @@
 // several packages share (`paths.ts`, `errorText`), since every package that
 // uses one already depends on core.
 
+import type { Address } from "./address.ts"
 import type { Sha256 } from "./images.ts"
 import { KINDS } from "./kinds.ts"
 import type { OfferLedger, OfferSeen, WorkChanges } from "./offers.ts"
@@ -310,7 +311,8 @@ declare const runIdBrand: unique symbol
  * Entry ids and run ids are both uuidv7 strings and cannot be told apart at
  * runtime. Positions take an entry id; `activeRuns` holds run ids. Passing
  * one where the other belongs would otherwise compile, run, and fail
- * silently. Mint them only where they enter: the protocol codec, the reads,
+ * silently. Mint them only where they enter: the protocol codec, an
+ * address's parser (`parseAddress`), the reads,
  * the schema's readers, `@pinetrie/rules`' decoders, the pi adapter, the client's
  * stored forms, and the host's id generator. `biome.json` refuses an
  * `entryId` import in core, the client and the host, and a `runId` import in
@@ -364,6 +366,21 @@ const FACT_CARD_PREFIX = "x-"
 export const factCardIdFor = (id: string): FactCardId =>
   `${FACT_CARD_PREFIX}${id}` as FactCardId
 
+declare const referenceCardIdBrand: unique symbol
+/**
+ * A reference card's id (ADR-0126): `q-` and a uuidv7, minted by the page
+ * that takes it (`a-` is an ask's, `r-` a root's).
+ */
+export type ReferenceCardId = string & {
+  readonly [referenceCardIdBrand]: true
+}
+
+const REFERENCE_CARD_PREFIX = "q-"
+
+/** A reference card's id from the text after its prefix: for minters, fixtures and parsers. */
+export const referenceCardIdFor = (id: string): ReferenceCardId =>
+  `${REFERENCE_CARD_PREFIX}${id}` as ReferenceCardId
+
 declare const askCardIdBrand: unique symbol
 /**
  * An ask card's id (ADR-0128): `a-` and a uuidv7, minted by the host as it
@@ -387,6 +404,7 @@ export type CardId =
   | ThreadId
   | NoteColumnId
   | FactCardId
+  | ReferenceCardId
   | AskCardId
   | MediaId
   | FileCardId
@@ -397,6 +415,7 @@ export type CardKind =
   | "thread"
   | "note-column"
   | "fact"
+  | "reference"
   | "ask"
   | "media"
   | "file"
@@ -412,6 +431,10 @@ const CARD_PREFIXES: readonly (readonly [string, CardKind])[] = Object.entries(
 export const kindOfCard = (id: CardId): CardKind =>
   CARD_PREFIXES.find(([p]) => id.startsWith(p))?.[1] ?? "text"
 
+/** Whether a card's id is a reference's (ADR-0126). */
+export const isReferenceCardId = (id: CardId): id is ReferenceCardId =>
+  kindOfCard(id) === "reference"
+
 /** Whether a card's id is a text card's, which has a text document. */
 export const isTextCardId = (id: CardId): id is TextCardId =>
   kindOfCard(id) === "text"
@@ -419,13 +442,13 @@ export const isTextCardId = (id: CardId): id is TextCardId =>
 const UUIDV7 =
   "[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
 const TEXT_CARD_RE = new RegExp(`^${UUIDV7}$`)
-const PREFIXED_CARD_RE = new RegExp(`^[nmfxa]-${UUIDV7}$`)
+const PREFIXED_CARD_RE = new RegExp(`^[nmfxaq]-${UUIDV7}$`)
 
 /**
  * A card's id as it comes in from the wire or the store; undefined for text
  * that is none. A text card's is a bare lowercase uuidv7; a note column's,
- * a fact's, an ask's, a media card's and a file card's are their prefix and
- * one. A
+ * a fact's, a reference's, an ask's, a media card's and a file card's are
+ * their prefix and one. A
  * thread's is any id `isThreadId` takes, as everywhere a thread is read, so
  * a thread the store names is never dropped for its id's shape. The one way
  * text becomes a `CardId` outside a minter.
@@ -443,7 +466,7 @@ export const parseTextCardId = (id: string): TextCardId | undefined =>
 declare const agentIdBrand: unique symbol
 /**
  * The agent a message compels in its own thread: the host has one, `@agent`.
- * Other threads' agents are named by their threads (`Address.asks`, ADR-0128).
+ * Other threads' agents are named by their threads (`Recipients.asks`, ADR-0128).
  */
 export type AgentId = string & { readonly [agentIdBrand]: true }
 /** The host's agent, addressed as `@agent`. */
@@ -830,6 +853,31 @@ export type Intent =
       readonly source: ThreadId
       readonly end: EntryId
       readonly move: MoveOf<"thread"> & { readonly from: null }
+    }
+  /**
+   * Make a reference (ADR-0126): a card naming `address`, its quote's blob
+   * `quote`, made where `move` sends it (a creation, so it enters no
+   * history): your inventory as you take it from the past, or where a
+   * reference in your hand is put.
+   */
+  | {
+      readonly kind: "make-reference"
+      readonly move: MoveOf<"reference"> & { readonly from: null }
+      readonly address: Address
+      readonly quote: Sha256
+    }
+  /**
+   * Edit a reference as text (ADR-0126): a new text card, `card`, in its
+   * place, its origin the reference's address, and the reference to the
+   * trash, as one step of the sender's history. Its sender writes the new
+   * card's text, the quote.
+   */
+  | {
+      readonly kind: "edit-as-text"
+      readonly reference: ReferenceCardId
+      readonly from: PlaceKey
+      readonly card: TextCardId
+      readonly here: TaskId | null
     }
   /**
    * Move a queued or pinned card among its neighbours (ADR-0048 step 7),
@@ -1844,7 +1892,7 @@ export interface AgentCandidate {
 }
 
 /** Who a message is for. */
-export interface Address {
+export interface Recipients {
   /** This thread's own agent, if it must answer: a run. */
   readonly compels: Responder
   /** Participants the message names, by display name. Never compelled. */
@@ -1877,7 +1925,7 @@ export function address(input: {
   /** Other threads' agents on the task's canvas (ADR-0128). */
   readonly agents: readonly AgentCandidate[]
   readonly agentByDefault: boolean
-}): Address {
+}): Recipients {
   const byHandle = new Map(input.participants.map(n => [handleOf(n), n]))
   const agentByHandle = new Map(
     input.agents.map(a => [handleOf(a.name), a] as const),
@@ -2034,6 +2082,7 @@ export function orderNewEntries(
 
 // ── the tree ──────────────────────────────────────────────────────────────
 
+export * from "./address.ts"
 export * from "./agents.ts"
 export * from "./asks.ts"
 export * from "./edits.ts"

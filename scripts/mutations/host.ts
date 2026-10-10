@@ -346,7 +346,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "planUploadHeaders reads any type",
     file: "apps/pinetrie/host/blobs.ts",
-    from: "  if (type === undefined || !isImageMime(type))",
+    from: "  if (type === undefined || !isBlobMime(type))",
     to: "  if (type === undefined)",
     command: unit,
     expect: "planUploadHeaders reads a body only",
@@ -1612,8 +1612,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a reorder is recorded in no history",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '      return carry(step, [], { kind: "move", by: writer }, gesture)',
-    to: '      return carry(step, [], { kind: "move", by: writer })',
+    from: '      const step = planReorder(readPlaces(places), reorder)\n      // execute\n      return carry(step, [], { kind: "move", by: writer }, gesture)',
+    to: '      const step = planReorder(readPlaces(places), reorder)\n      // execute\n      return carry(step, [], { kind: "move", by: writer })',
     command: unit,
     expect: "a reorder writes only the card's order",
   },
@@ -1907,5 +1907,14 @@ export const mutations: readonly Mutation[] = [
     to: '  AT_THREAD.has(row.kind ?? "")',
     command: unit,
     expect: "a second run finds nothing",
+  },
+  {
+    name: "the blob sweep forgets references' quotes",
+    file: "apps/pinetrie/host/housekeeping.ts",
+    from: "    referenced: new Set([...readReferencedBlobs(doc, texts), ...quotes]),",
+    to: "    referenced: new Set([...readReferencedBlobs(doc, texts)]),",
+    command: unit,
+    expect:
+      "the blob sweep keeps a reference's quote, and deletes one no card holds (ADR-0126)",
   },
 ]

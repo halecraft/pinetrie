@@ -19,7 +19,7 @@ const record = (id: string) =>
       kind: "composing",
       thread: TEST_THREAD,
     },
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   }) as const
 
 test("applyPlaceSteps: one rev per batch of writes and removals (ADR-0059)", () => {

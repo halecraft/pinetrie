@@ -101,7 +101,8 @@ about 55 ms (S59).
   (`useSameData`): the rail it comes from is rebuilt on every card's
   change, so another window's typing redrew every list, and the browser
   suite's check of it failed one run in two whenever its card landed
-  inside the counted window.
+  inside the counted window. The tab's `columns` are kept the same way,
+  since the strip they come from is rebuilt with every card too.
 - **The review redraws with its data, not its column.** `ReviewPane` compares
   its target, line and `narrow` by value, since `columnView` and `paneView`
   build them anew, and its `close` is `useStable`'s. A file section (up to 5,000 lines) compares its
@@ -755,8 +756,9 @@ offer's review, an ask's, a table from a message, or a stored image.
 
 - **A subject is a name, never data** (`PaneSubject`): the offer,
   board (drawn while the column has a thread end), an ask by
-  its entry, a table by its entry and its number in that message, an image
-  by its hash and the message it is in (null in a reply still streaming).
+  its entry, a table or an image of a message's text by its block's
+  address (ADR-0126), an image that is no block (a tool's result, a reply
+  still streaming) by its hash.
   `paneKey` names it as a string; `samePane` compares keys, and the pane is
   keyed by it, so another subject mounts afresh and comes into view.
 - **`paneView` decides what a subject draws, and null closes the pane.**
@@ -831,11 +833,19 @@ pipeline keeps the tree a pure function, testable without a DOM.
   streaming one's) is drawn unsized. A click on a blob image
   (`.blob-image`) opens it in the column's pane, and a Cmd- or Ctrl-click
   in a new tab (`imageClick`).
-- **Each table is numbered in the tree** (`dataTable`, in document order,
-  nested ones included), so the pane names a table by its message and
-  number (`tableAt`, `tableHeads` for its title). `drawTree` draws a tree;
-  in a message, `<table>` is `MessageTable`, with its bar, and `<img>`
-  `BlobImage`.
+- **Every block is numbered once** (ADR-0126): each table, code block,
+  image and paragraph, the `n`th of its kind in document order, nested ones
+  included, by `@pinetrie/rules`' walk over mdast (`markBlocks`), run as a
+  remark step, which `remark-rehype` carries onto each element as
+  `data-block` (`table-0`). `blocksOf` gives each block's source range
+  from the same walk, so the table drawn and the table an address names
+  cannot be counted differently (`blockAt`, `tableHeads` for a table's
+  title). `drawTree` draws a tree; in a message, `<table>` is
+  `MessageTable`, with its bar (❝ takes a reference to it, ⤢ opens it),
+  and `<img>` `BlobImage`.
+- **A link to an address is a chip** (`/a/<address>`, ADR-0126): a
+  relative URL, so `safeUrl` keeps it, marked `data-address` and
+  `.address-link`; the page's click opens a past one at its entry.
 - **Streaming text goes through remend**, which closes an unfinished `**`,
   fence or link, with `singleTilde` and `comparisonOperators` off: those
   escape mid-text, and the message would change when it commits. Committed

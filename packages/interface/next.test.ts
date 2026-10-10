@@ -72,7 +72,7 @@ const queued = (id: string, order: string): TextCard => ({
     by: ADA,
     seen: "",
   },
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
 })
 const C1 = cardIdFor("c1")
 const C2 = cardIdFor("c2")

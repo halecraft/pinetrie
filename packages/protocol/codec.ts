@@ -19,15 +19,18 @@ import {
   type ChatMode,
   type CommitId,
   commitId,
+  DISCARDED,
   type EntryId,
   ERR,
   type ErrCode,
   entryId,
   type Intent,
   isNoteColumnId,
+  isReferenceCardId,
   isReorderAt,
   isRootId,
   isSha256,
+  isTargetOf,
   isTaskId,
   isThreadId,
   isWorkflowStateId,
@@ -49,6 +52,7 @@ import {
   type PlaceKey,
   type PlaceRefusal,
   type Position,
+  parseAddress,
   parseCardId,
   parseMentions,
   parseNewRoot,
@@ -57,6 +61,7 @@ import {
   parseTextCardId,
   parseTitle,
   placeFields,
+  printAddress,
   QUEUE_HOLD_CHANGES,
   type QueueHoldChange,
   type Refusal,
@@ -367,6 +372,55 @@ export function decodeCommand(
       end: at.id,
       move: { card: first.card, from: null, to: first.to },
     }
+  }
+  if (kind === "make-reference") {
+    const moves = decodeMoves(text(wire?.moves))
+    if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
+    const [first, ...more] = moves
+    const address = parseAddress(text(wire?.text))
+    const quote = text(wire?.seen)
+    if (
+      first === undefined ||
+      more.length > 0 ||
+      first.from !== null ||
+      !isReferenceCardId(first.card) ||
+      !isTargetOf("reference", first.to)
+    )
+      return refused(
+        ERR.UNKNOWN_TARGET,
+        "a reference is one new card, where a reference may be",
+      )
+    if (address === undefined)
+      return refused(ERR.UNKNOWN_TARGET, "a reference names an address")
+    if (!isSha256(quote))
+      return refused(ERR.UNKNOWN_TARGET, "a reference names its quote's blob")
+    return {
+      kind,
+      move: { card: first.card, from: null, to: first.to },
+      address,
+      quote,
+    }
+  }
+  if (kind === "edit-as-text") {
+    const reference = parseCardId(text(wire?.targetId))
+    const card = parseTextCardId(text(wire?.cardId))
+    const moves = decodeMoves(text(wire?.moves))
+    if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
+    const from = moves[0]?.from
+    const here = hereOf(wire)
+    if (
+      reference === undefined ||
+      !isReferenceCardId(reference) ||
+      card === undefined ||
+      from === undefined ||
+      from === null ||
+      here === undefined
+    )
+      return refused(
+        ERR.UNKNOWN_TARGET,
+        "an edit as text names a reference where it is, and a new text card",
+      )
+    return { kind, reference, from, card, here }
   }
   if (kind === "undo-move") {
     const task = text(wire?.task)
@@ -922,6 +976,25 @@ export function encodeIntent(id: string, intent: Intent): Command {
         lane: intent.source,
         parentId: intent.end,
         moves: encodeMoves([intent.move]),
+      })
+    case "make-reference":
+      return command({
+        id,
+        kind: "make-reference",
+        moves: encodeMoves([intent.move]),
+        text: printAddress(intent.address),
+        seen: intent.quote,
+      })
+    case "edit-as-text":
+      return command({
+        id,
+        kind: "edit-as-text",
+        targetId: intent.reference,
+        cardId: intent.card,
+        moves: encodeMoves([
+          { card: intent.reference, from: intent.from, to: DISCARDED },
+        ]),
+        here: intent.here ?? "",
       })
     case "undo-move":
       return command({

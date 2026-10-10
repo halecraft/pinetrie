@@ -2,7 +2,7 @@
 // image blob (ADR-0042), an upload's outcome, an offer's read (ADR-0047).
 // `http.ts` writes each one with `send`.
 
-import type { ImageRef, StoredImage } from "@pinetrie/core"
+import type { BlobRef, StoredBlob } from "@pinetrie/core"
 import type { OfferAnswer } from "@pinetrie/rules"
 
 export interface HttpAnswer<
@@ -54,9 +54,12 @@ export function offerResponse(answer: OfferAnswer): HttpAnswer<string> {
   }
 }
 
-/** `GET /blob/<sha256>`: the stored image, or 404 for one the store lacks. */
+/**
+ * `GET /blob/<sha256>`: the stored blob, or 404 for one the store lacks. A
+ * quote is served as `text/markdown`, which no browser draws as HTML.
+ */
 export function blobResponse(
-  blob: Pick<StoredImage, "bytes" | "mimeType"> | undefined,
+  blob: Pick<StoredBlob, "bytes" | "mimeType"> | undefined,
 ): HttpAnswer {
   if (blob === undefined) return { status: 404, headers: {}, body: "" }
   return {
@@ -88,7 +91,7 @@ export const uploadRefusal = (
 })
 
 /** `POST /blob` kept: the image's reference. */
-export const uploaded = (ref: ImageRef): HttpAnswer<string> => ({
+export const uploaded = (ref: BlobRef): HttpAnswer<string> => ({
   status: 201,
   headers: { "content-type": "application/json" },
   body: JSON.stringify(ref),

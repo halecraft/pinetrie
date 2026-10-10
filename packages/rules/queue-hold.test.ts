@@ -70,7 +70,7 @@ describe("holdOnStop", () => {
           owner: ADA,
           placer: ADA,
           place,
-          content: { command: null, unsent: null },
+          content: { command: null, unsent: null, origin: null },
         }
       : {
           kind: "fact",
@@ -132,7 +132,7 @@ describe("planQueueCard (ADR-0113)", () => {
     owner: ADA,
     placer: ADA,
     place: atEnd,
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   }
   const move = {
     card: card.id,
@@ -210,7 +210,7 @@ describe("planQueueCard (ADR-0113)", () => {
                 by: BEA,
                 seen: "",
               },
-              content: { command: "split", unsent: null },
+              content: { command: "split", unsent: null, origin: null },
             },
           },
         ],

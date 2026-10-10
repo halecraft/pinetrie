@@ -1,14 +1,21 @@
 import { describe, expect, test } from "vitest"
 import {
+  askCardIdFor,
   type CardKind,
   type FactCardId,
   KINDS,
   kindOfCard,
   makeCard,
   NO_CONTENT,
+  type NoteColumnId,
   PLACES_OF,
+  type RelayDetails,
+  referenceCardIdFor,
+  type Sha256,
+  type TaskId,
   type ThreadId,
   textCardId,
+  textSourceOf,
   writerId,
 } from "./index.ts"
 
@@ -67,4 +74,54 @@ describe("KINDS (ADR-0126)", () => {
     // @ts-expect-error: a fact is never in an inventory
     makeCard("fact", fact, inventory, { fact: null as never }, ADA)
   })
+})
+
+test("a card's words are where its kind says (`KINDS`' text): textSourceOf agrees for every kind with records", () => {
+  const place = { kind: "inventory", holder: ADA } as const
+  const thread = "t-1" as ThreadId
+  const cards = [
+    makeCard(
+      "text",
+      textCardId(UUID),
+      place,
+      { command: null, unsent: null, origin: null },
+      ADA,
+    ),
+    makeCard("thread", thread, place, NO_CONTENT, ADA),
+    makeCard(
+      "note-column",
+      `n-${UUID}` as NoteColumnId,
+      { kind: "canvas", task: `k-${UUID}` as TaskId, order: "a", width: 1 },
+      NO_CONTENT,
+      ADA,
+    ),
+    makeCard(
+      "fact",
+      `x-${UUID}` as FactCardId,
+      { kind: "queued", thread, order: "a", by: ADA, seen: "" },
+      { fact: { kind: "described", lane: thread, by: ADA } },
+      ADA,
+    ),
+    makeCard(
+      "ask",
+      askCardIdFor(UUID),
+      { kind: "queued", thread, order: "a", by: ADA, seen: "" },
+      { relay: { text: "?" } as RelayDetails },
+      ADA,
+    ),
+    makeCard(
+      "reference",
+      referenceCardIdFor(UUID),
+      place,
+      { address: { kind: "thread", thread }, quote: "a".repeat(64) as Sha256 },
+      ADA,
+    ),
+  ]
+  expect(cards.map(c => c.kind).sort()).toEqual(
+    (Object.keys(KINDS) as CardKind[])
+      .filter(k => k !== "media" && k !== "file")
+      .sort(),
+  )
+  for (const card of cards)
+    expect(textSourceOf(card).kind).toBe(KINDS[card.kind].text)
 })

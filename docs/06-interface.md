@@ -1046,9 +1046,18 @@ The rail is E; the column is T. Seeing both at once is the product.
   ADR-0083): Ctrl+Shift+I in its box, **Move to your inventory** in its ⋯,
   or a drag of its header onto the panel. It lands in the selected slot if that is empty, else the first
   empty one, and flies there; a take into the inventory while the panel is
-  closed shows it briefly. A message's **take** copies its
-  text, or your selection in it, as a new card: the message keeps it. Full
-  means full: the nineteenth card is refused with "inventory full".
+  closed shows it briefly. Full means full: the nineteenth card is refused
+  with "inventory full".
+- **Taking from the past** (ADR-0126): a message's **take**, a table's ❝,
+  or Cmd+C outside a text box, takes a *reference*, a card naming the
+  message, the table or your selection in it, with its quote, and puts its
+  markdown on the clipboard. The past never changes, so the reference is
+  the copy. It shows as a chip; selected, its quote; opened, its quote and
+  thread, and **Edit as text**, which makes it a text card you can change,
+  in its place, one undo. Put with the put key, it stays in your hand and
+  a new one lands; in a text box, it is a link, which opens what it names.
+  The agent reads each linked message, table or quote under the message
+  that links it.
 - **Put** moves the selected card to the notes of the column you were last
   in: Ctrl+Shift+O, the panel's **put** button, or a drag out
   of the panel onto a column: a note in the note column nearest its thread,

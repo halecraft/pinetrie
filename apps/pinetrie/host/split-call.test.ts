@@ -75,7 +75,7 @@ test("split_offer queues a split card by the person behind the run, once (ADR-00
   expect(readPlaces(b.places)).toMatchObject([
     {
       place: { kind: "queued", thread: LANE },
-      content: { command: "split", unsent: null },
+      content: { command: "split", unsent: null, origin: null },
     },
   ])
 })

@@ -56,7 +56,7 @@ const atEnd = (id: string, at: string, owner = ADA): TextCard => ({
     kind: "composing",
     thread: threadOf(at),
   },
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
 })
 const fresh = (id: string, column: string): TextCard => ({
   kind: "text",
@@ -64,7 +64,7 @@ const fresh = (id: string, column: string): TextCard => ({
   owner: ADA,
   placer: ADA,
   place: { kind: "fresh", column, root: TEST_ROOT, task: TEST_TASK, at: ROOT },
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
 })
 /** Each root's task, one a root (ADR-0116): e1's, g1's and the far f1's. */
 const K = (root: string) => taskIdFor(root)

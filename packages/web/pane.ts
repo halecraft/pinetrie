@@ -3,10 +3,12 @@
 // Pure; `pane.tsx` draws it.
 
 import {
+  type Address,
   type AskIndex,
   askSpan,
   blobUrl,
   type EntryId,
+  printAddress,
   type RevisionRecord,
   type Sha256,
   type SpineNode,
@@ -14,21 +16,25 @@ import {
 } from "@pinetrie/core"
 import type { ReviewTarget } from "@pinetrie/interface"
 import type { Element, Root } from "hast"
-import { imageLookup, messageTree, tableAt, tableHeads } from "./markdown.ts"
+import { blockAt, imageLookup, messageTree, tableHeads } from "./markdown.ts"
+
+/** A block of a message, by its address (ADR-0126). */
+export type BlockAddress = Extract<Address, { readonly kind: "block" }>
 
 /**
  * What a column's pane shows: a name, never data, so the pane can tell when
- * its subject is gone. Kept while the column is mounted, never stored.
+ * its subject is gone. Kept while the column is mounted, never stored. A
+ * table or an image of a message's text is a block, named by its address
+ * (ADR-0126); an image that is no block of a message (a tool's result, or
+ * one in a reply still streaming, which has no entry yet) by its blob.
  */
 export type PaneSubject =
   | { readonly kind: "offer" }
   | { readonly kind: "ask"; readonly ask: EntryId }
-  | { readonly kind: "table"; readonly entry: EntryId; readonly nth: number }
+  | { readonly kind: "block"; readonly address: BlockAddress }
   | {
       readonly kind: "image"
       readonly sha256: Sha256
-      /** The message it is drawn in; null for a reply still streaming. */
-      readonly from: EntryId | null
       readonly alt: string
       readonly title?: string
     }
@@ -43,10 +49,10 @@ export function paneKey(subject: PaneSubject): string {
       return "offer"
     case "ask":
       return `ask:${subject.ask}`
-    case "table":
-      return `table:${subject.entry}:${subject.nth}`
+    case "block":
+      return `block:${printAddress(subject.address)}`
     case "image":
-      return `image:${subject.sha256}:${subject.from ?? ""}`
+      return `image:${subject.sha256}`
   }
 }
 
@@ -105,20 +111,40 @@ export function paneView(
         ? null
         : { kind: "review", target, line: ASK_REVIEW_LINE }
     }
-    case "table": {
-      const node = facts.nodes.find(n => n.id === subject.entry)
+    case "block": {
+      const { address } = subject
+      const node = facts.nodes.find(n => n.id === address.entry)
       if (node === undefined) return null
-      const table = tableAt(treeOf(node), subject.nth)
-      return table === null
-        ? null
-        : { kind: "table", table, title: tableTitle(tableHeads(table)) }
+      const block = blockAt(treeOf(node), address.block)
+      if (block === null) return null
+      const { src, alt, title } = block.properties
+      switch (address.block.kind) {
+        case "table":
+          return {
+            kind: "table",
+            table: block,
+            title: tableTitle(tableHeads(block)),
+          }
+        case "image":
+          return typeof src !== "string"
+            ? null
+            : {
+                kind: "image",
+                src,
+                alt: typeof alt === "string" ? alt : "",
+                title: imageTitle(
+                  typeof alt === "string" ? alt : "",
+                  typeof title === "string" ? title : undefined,
+                ),
+              }
+        // A paragraph or code is read in its message: the pane opens none.
+        case "paragraph":
+        case "code":
+          return null
+      }
+      return null
     }
     case "image":
-      if (
-        subject.from !== null &&
-        !facts.nodes.some(n => n.id === subject.from)
-      )
-        return null
       return {
         kind: "image",
         src: blobUrl(subject.sha256),
@@ -191,6 +217,13 @@ export const narrowStrip = (width: number, rem: number): boolean =>
 
 /** The line heading an ask's review. */
 export const ASK_REVIEW_LINE = "what this ask changed"
+
+/** A block's take into your inventory: a reference to it (ADR-0126). */
+export const TAKE_BLOCK = {
+  glyph: "❝",
+  label: "take a reference into your inventory",
+  title: "take a reference into your inventory, and copy it as markdown",
+} as const
 
 /** The image pane's link to the image alone. */
 export const OPEN_IN_TAB = "open in a new tab"

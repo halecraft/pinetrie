@@ -2,6 +2,7 @@ import {
   type CardRecord,
   entryId,
   rootIdFor,
+  type Sha256,
   taskIdFor,
   textCardId,
   threadIdFor,
@@ -18,6 +19,7 @@ import { type AppPorts, perform } from "./perform.ts"
 
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
+const SHA = "a".repeat(64) as Sha256
 const accepted: MoveAnswer = { kind: "accepted", rev: 1 }
 const how: MoveHow = { actedAt: { kind: "inventory" }, slot: null }
 const ports = () => {
@@ -28,6 +30,8 @@ const ports = () => {
       request: vi.fn(async (): Promise<Outcome> => answer),
       offer: vi.fn(async (): Promise<Outcome> => answer),
       createCard: vi.fn(async () => accepted),
+      makeReference: vi.fn(async (): Promise<MoveAnswer> => accepted),
+      editAsText: vi.fn(async (): Promise<Outcome> => answer),
       moveCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
       queueCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
       moveCards: vi.fn(async (): Promise<MoveAnswer> => accepted),
@@ -58,6 +62,17 @@ const ports = () => {
     identity: { save: vi.fn(), clear: vi.fn() },
     reload: vi.fn(),
     listWidth: vi.fn(),
+    uploadText: vi.fn(async () => ({
+      ok: true as const,
+      ref: {
+        sha256: SHA,
+        mimeType: "text/markdown" as const,
+        width: null,
+        height: null,
+      },
+    })),
+    clipboard: vi.fn(),
+    insertText: vi.fn(),
     page: vi.fn(),
   } satisfies AppPorts
 }
@@ -78,7 +93,7 @@ const card: CardRecord = {
   owner: ada,
   placer: ada,
   place: { kind: "composing", thread: lane },
-  content: { command: "bring-up-to-date", unsent: null },
+  content: { command: "bring-up-to-date", unsent: null, origin: null },
 }
 
 interface Row {

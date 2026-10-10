@@ -1,7 +1,8 @@
 import type { Sha256 } from "@pinetrie/core"
+import { blocksOf } from "@pinetrie/rules"
 import type { Element, ElementContent, Root } from "hast"
 import { describe, expect, test } from "vitest"
-import { messageTree, safeUrl, tableAt, tableHeads } from "./markdown.ts"
+import { blockAt, messageTree, safeUrl, tableHeads } from "./markdown.ts"
 
 function* walk(node: Root | Element): Generator<ElementContent> {
   for (const child of node.children) {
@@ -160,19 +161,39 @@ describe("tables (ADR-0078)", () => {
 
   test("each table is numbered in document order, one in a list item included", () => {
     expect(
-      elements(committed(TWO), "table").map(t => t.properties.dataTable),
-    ).toEqual([0, 1])
+      elements(committed(TWO), "table").map(t => t.properties.dataBlock),
+    ).toEqual(["table-0", "table-1"])
   })
 
-  test("tableAt finds a table by its number, and none past the count", () => {
+  test("blockAt finds a block by its number, and none past the count", () => {
     const tree = committed(TWO)
-    expect(tableAt(tree, 1)).toBe(elements(tree, "table")[1])
-    expect(tableAt(tree, 2)).toBeNull()
+    expect(blockAt(tree, { kind: "table", n: 1 })).toBe(
+      elements(tree, "table")[1],
+    )
+    expect(blockAt(tree, { kind: "table", n: 2 })).toBeNull()
+  })
+
+  test("blocksOf numbers tables as the drawn tree does, and a table's slice is its source (ADR-0126)", () => {
+    const tables = blocksOf(TWO).filter(b => b.ref.kind === "table")
+    expect(tables.map(b => b.ref.n)).toEqual(
+      elements(committed(TWO), "table").map(t =>
+        Number(String(t.properties.dataBlock).slice("table-".length)),
+      ),
+    )
+    expect(
+      tables[0] === undefined ? null : TWO.slice(tables[0].from, tables[0].to),
+    ).toBe("| State | When |\n|---|---|\n| **Working** | a run |")
+    const paragraphs = blocksOf("one\n\n![x](/blob/a)").map(b => b.ref)
+    expect(paragraphs).toEqual([
+      { kind: "paragraph", n: 0 },
+      { kind: "paragraph", n: 1 },
+      { kind: "image", n: 0 },
+    ])
   })
 
   test("tableHeads is the header row's text, and empty without one", () => {
     const tree = committed(TWO)
-    const first = tableAt(tree, 0)
+    const first = blockAt(tree, { kind: "table", n: 0 })
     expect(first === null ? null : tableHeads(first)).toEqual(["State", "When"])
     expect(
       tableHeads({
@@ -183,4 +204,17 @@ describe("tables (ADR-0078)", () => {
       }),
     ).toEqual([])
   })
+})
+
+test("a link to an address is drawn as a chip naming it; any other link is a link (ADR-0126)", () => {
+  const tree = messageTree(
+    "[the table](/a/b/t-1/e1/table-0) and [docs](https://x.test)",
+    "committed",
+  )
+  const links = elements(tree, "a")
+  expect(links.map(a => a.properties.dataAddress)).toEqual([
+    "b/t-1/e1/table-0",
+    undefined,
+  ])
+  expect(links[0]?.properties.className).toEqual(["address-link"])
 })

@@ -89,7 +89,7 @@ describe("planStop", () => {
       by: ada,
       seen: "",
     },
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   }
 
   test("a running lane is aborted, and a fact naming who stopped its ask is queued (ADR-0126)", () => {

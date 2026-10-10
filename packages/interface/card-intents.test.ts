@@ -4,6 +4,7 @@ import {
   entryId,
   indexAsks,
   noteColumnIdFor,
+  referenceCardIdFor,
   rootIdFor,
   type TextCard,
   type TextPlace,
@@ -104,7 +105,7 @@ const card = (id: typeof C1, place: TextPlace): TextCard => ({
   owner: ADA,
   placer: ADA,
   place,
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
 })
 const facts = (over: Partial<CardFacts> = {}): CardFacts => ({
   cards: [],
@@ -139,6 +140,7 @@ const plan = (intent: Intent, s: IntentState) =>
     task: NEW_TASK,
     thread: NEW_THREAD,
     noteColumn: NEW_NOTE_COLUMN,
+    reference: referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e1"),
   })
 /** The trunk's column and the note column, as keys an intent names. */
 const TRUNK_COLUMN: ColumnKey = { kind: "card", card: threadOfEntry("1-r1") }
@@ -191,25 +193,31 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
     })
   })
 
-  test("a copy of a message's text is a new card in your inventory", () => {
+  test("a take from the past is a reference in your inventory, its markdown on the clipboard too (ADR-0126)", () => {
+    const address = { kind: "entry", thread: TEST_THREAD, entry: A } as const
+    const ref = referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e2")
     expect(
       plan(
-        inColumn({ kind: "takeCopyIntoInventory", card: C2, text: "hello" }),
+        inColumn({
+          kind: "takeReference",
+          card: ref,
+          address,
+          markdown: "hello",
+        }),
         state(),
-      )[1],
-    ).toEqual({
-      kind: "createCard",
-      card: {
-        kind: "text" as const,
-        id: C2,
-        owner: ADA,
-        placer: ADA,
-        place: inventory,
-        content: { command: null, unsent: null },
+      ),
+    ).toEqual([
+      { kind: "copyText", text: "hello" },
+      { kind: "showInventory", brief: true },
+      {
+        kind: "takeReference",
+        card: ref,
+        address,
+        markdown: "hello",
+        to: inventory,
+        how: { actedAt: { kind: "inventory" }, slot: 0 },
       },
-      text: "hello",
-      how: { actedAt: { kind: "inventory" }, slot: 0 },
-    })
+    ])
   })
 })
 
@@ -876,7 +884,7 @@ describe("a new note (ADR-0116)", () => {
           owner: ADA,
           placer: ADA,
           place: { kind: "note", column: NOTES, order: LAST_ORDER },
-          content: { command: null, unsent: null },
+          content: { command: null, unsent: null, origin: null },
         },
         text: "",
         how: { actedAt: { kind: "column", key: NOTES }, slot: null },

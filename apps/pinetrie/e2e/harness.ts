@@ -645,7 +645,7 @@ export async function composeAt(
     {
       id,
       place: { kind: "composing", thread },
-      content: { command: place.command ?? null, unsent: null },
+      content: { command: place.command ?? null, unsent: null, origin: null },
     },
     text,
   )

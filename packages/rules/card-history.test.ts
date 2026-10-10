@@ -91,7 +91,7 @@ const card = (
   owner: ADA,
   place,
   placer,
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
   ...over,
 })
 
@@ -148,7 +148,11 @@ describe("planProvenance: each card's history", () => {
     [
       "the host writes back a card it could not send",
       [card(QUEUED)],
-      [card(DRAFTING, ADA, { content: { command: null, unsent: "no" } })],
+      [
+        card(DRAFTING, ADA, {
+          content: { command: null, unsent: "no", origin: null },
+        }),
+      ],
       { kind: "host" },
       "unsent",
     ],

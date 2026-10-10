@@ -23,7 +23,7 @@ const card = (id: string, owner = "p-ada"): TextCard => ({
     kind: "composing",
     thread: TEST_THREAD,
   },
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
 })
 
 test("readPlaces: oldest first, malformed ones left out, an unchanged card the same object", () => {

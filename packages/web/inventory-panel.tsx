@@ -13,6 +13,7 @@ import {
   isTextCard,
   type NoteColumnId,
   type ThreadId,
+  type ThreadName,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -68,6 +69,8 @@ export function InventoryPanel(p: {
   previewOf: (thread: ThreadId) => ThreadPreview
   /** Each note column, as its column draws it. */
   notes: ReadonlyMap<NoteColumnId, NoteColumnView>
+  /** Each thread's name, which a reference names. */
+  threadNames: ReadonlyMap<ThreadId, ThreadName>
 }) {
   const texts = useCardTexts(
     p.session,
@@ -87,9 +90,19 @@ export function InventoryPanel(p: {
     open,
   })
   const { session, reader, colorOf, previewOf, notes, column, onIntent } = p
+  const { threadNames } = p
   const context = useMemo(
-    () => ({ session, reader, colorOf, previewOf, notes, column, onIntent }),
-    [session, reader, colorOf, previewOf, notes, column, onIntent],
+    () => ({
+      session,
+      reader,
+      colorOf,
+      previewOf,
+      notes,
+      threadNames,
+      column,
+      onIntent,
+    }),
+    [session, reader, colorOf, previewOf, notes, threadNames, column, onIntent],
   )
   const frame = useRef<HTMLElement>(null)
   // Dragged by its frame, it follows the pointer, then settles at the

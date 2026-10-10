@@ -9,6 +9,7 @@ import {
   INVENTORY_SLOTS,
   indexAsks,
   NO_CONTENT,
+  referenceCardIdFor,
   rootIdFor,
   type TaskId,
   type TextCard,
@@ -167,6 +168,7 @@ const plan = (intent: Intent, state: IntentState = R1) =>
     task: NEW_TASK,
     thread: NEW_THREAD,
     noteColumn: NEW_NOTE_COLUMN,
+    reference: referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e1"),
   })
 /** The column keys these tests name: a branch's, a new tab's, a card's. */
 const FRESH: FreshKey = { kind: "fresh", thread: F }
@@ -369,7 +371,7 @@ describe("planIntent", () => {
       owner: ME,
       placer: ME,
       place,
-      content: { command: null, unsent: null },
+      content: { command: null, unsent: null, origin: null },
     }
     const holding = { ...NO_CARDS, cards: [held] }
     const R1 = at(onRoot("1-r1"), undefined, holding)
@@ -722,7 +724,7 @@ describe("planIntent", () => {
       owner: ada,
       placer: ada,
       place: { kind: "composing", thread: lane },
-      content: { command: null, unsent: null },
+      content: { command: null, unsent: null, origin: null },
     }
     const here = { kind: "column", key: F } as const
     const inColumn = { actedAt: here, slot: null }

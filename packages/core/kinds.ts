@@ -23,10 +23,11 @@ export interface KindSpec {
   /** What a put does to your hand: moves the card, or leaves it and makes another. */
   readonly put: "moves" | "copies"
   /**
-   * Where what it says is read: its own text document, a blob, the fact
-   * it holds, or nowhere (it says nothing a reader takes as text).
+   * Where what it says is read (`textSourceOf`): its own text document, a
+   * blob, the fact it holds, the ask it relays, or nowhere (it says
+   * nothing a reader takes as text).
    */
-  readonly text: "doc" | "blob" | "fact" | "none"
+  readonly text: "doc" | "blob" | "fact" | "ask" | "none"
 }
 
 /**
@@ -35,6 +36,10 @@ export interface KindSpec {
  * - a text card, anywhere but a canvas;
  * - a thread's card, on a canvas or in an inventory;
  * - a note column, on a canvas;
+ * - a reference, holding an address and its quote: a note, or in an
+ *   inventory, or discarded. Nothing that reads a queue or a thread's or a
+ *   task's pinned cards reads a quote yet, so it is in none of them; a put
+ *   leaves it in your hand and makes another where it lands;
  * - a fact, only ever queued, until its thread's end consumes it: the
  *   host places it, no person moves it (a move is refused `no-place`), and
  *   nothing passes it in its queue (`planReorder`, refused `fact`);
@@ -90,13 +95,21 @@ export const KINDS = {
     put: "moves",
     text: "fact",
   },
+  reference: {
+    prefix: "q-",
+    places: ["note", "gone", "inventory"],
+    moves: true,
+    reordered: true,
+    put: "copies",
+    text: "blob",
+  },
   ask: {
     prefix: "a-",
     places: ["queued"],
     moves: false,
     reordered: true,
     put: "moves",
-    text: "fact",
+    text: "ask",
   },
   media: {
     prefix: "m-",

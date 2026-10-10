@@ -26,6 +26,7 @@ import { type CommitOptions, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 import {
   type AcceptedAction,
+  type Address,
   type CardCommand,
   type CardId,
   type CardRecord,
@@ -36,11 +37,17 @@ import {
   isTextCardId,
   keyOf,
   type MoveDirection,
+  makeCard,
   type OfferAction,
+  type PlaceKey,
+  placeOfKind,
   type QueueHoldChange,
   type QueueMove,
+  type ReferenceCardId,
   type Reorder,
   type RootId,
+  type Sha256,
+  type TargetOf,
   type TaskId,
   type TextCard,
   type TextCardId,
@@ -94,6 +101,7 @@ import {
   answerOf,
   type CardNotice,
   cardOfPending,
+  drawnPlace,
   intentsOf,
   type LocalEvent,
   type LocalState,
@@ -239,6 +247,32 @@ export interface SessionClient {
    * inventory, `how.slot` is the slot it takes.
    */
   createCard(card: NewCard, text: string, how?: MoveHow): Promise<MoveAnswer>
+  /**
+   * Ask the host to make a reference where `to` is (ADR-0126): drawn there
+   * until the host answers, as a creation is. Into your inventory,
+   * `how.slot` is the slot it takes.
+   */
+  /**
+   * Edit a reference as text (ADR-0126): `text` written into the new card
+   * `card` first, as a creation's is, then one request that makes the card
+   * where the reference is and trashes the reference.
+   */
+  editAsText(edit: {
+    readonly reference: ReferenceCardId
+    readonly from: PlaceKey
+    readonly card: TextCardId
+    readonly text: string
+    readonly here: TaskId | null
+  }): Promise<Outcome>
+  makeReference(
+    made: {
+      readonly card: ReferenceCardId
+      readonly to: TargetOf<"reference">
+      readonly address: Address
+      readonly quote: Sha256
+    },
+    how?: MoveHow,
+  ): Promise<MoveAnswer>
   /**
    * Ask the host to move a card (ADR-0059), as the page planned it: a take
    * into the inventory, a put, an unqueue, or a discard (to gone); a queue is
@@ -633,6 +667,44 @@ export async function connectSession(
       if (command !== null)
         void send({ kind: "set-command", card: card.id, command })
       return answer
+    },
+    editAsText(edit) {
+      undo.gesture(() => {
+        texts.text(edit.card).text.insert(0, edit.text)
+      })
+      return send({
+        kind: "edit-as-text",
+        reference: edit.reference,
+        from: edit.from,
+        card: edit.card,
+        here: edit.here,
+      })
+    },
+    makeReference(made, how = OFF_PAGE) {
+      const move = { card: made.card, from: null, to: made.to }
+      const drawn = drawnPlace(made.to, me, readPlaces(places))
+      const place =
+        drawn === undefined ? undefined : placeOfKind("reference", drawn)
+      const draft =
+        place === undefined
+          ? null
+          : makeCard(
+              "reference",
+              made.card,
+              place,
+              { address: made.address, quote: made.quote },
+              me,
+            )
+      return tracked(
+        {
+          kind: "make-reference",
+          move,
+          address: made.address,
+          quote: made.quote,
+        },
+        [pendingOf(crypto.randomUUID(), move, how, draft)],
+        null,
+      ).then(r => r.answer)
     },
     moveCard(move, how = OFF_PAGE, queuedBy = null, here = null) {
       return sendMove(move, how, queuedBy, null, here)

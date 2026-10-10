@@ -38,7 +38,7 @@ const text: TextCard = {
   owner: BEA,
   placer: BEA,
   place: { kind: "inventory", holder: ADA },
-  content: { command: "bring-up-to-date", unsent: null },
+  content: { command: "bring-up-to-date", unsent: null, origin: null },
 }
 const note: NoteCard = {
   ...text,

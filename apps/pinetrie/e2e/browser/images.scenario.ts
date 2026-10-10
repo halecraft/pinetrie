@@ -35,9 +35,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         model: { kind: "scripted", script: suiteModel() },
         log: () => {},
       })
-      const pp = await (
-        await browser.newContext({ viewport: PANE_VIEWPORT })
-      ).newPage()
+      const ppContext = await browser.newContext({ viewport: PANE_VIEWPORT })
+      // Taking from the past writes its markdown on the clipboard (ADR-0126).
+      await ppContext.grantPermissions(["clipboard-read", "clipboard-write"])
+      const pp = await ppContext.newPage()
       await asPerson(pp, "pia@browser.test", "Pia")
       const qp = await (await browser.newContext()).newPage()
       await asPerson(qp, "quinn@browser.test", "Quinn")
@@ -215,6 +216,22 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             pp.url() === url,
           `${JSON.stringify({ full, folded })}, ${pages.length} new pages`,
         )
+        // An image of a message is a block: the pane's ❝ takes a reference
+        // to it into Pia's inventory (ADR-0126).
+        const refSlot = ".inventory .slot:has(.reference-face)"
+        await pp.click("#bottom .inventory-toggle")
+        await pp.click(`${pane} .take-block`)
+        const imageTaken = await pp
+          .waitForSelector(refSlot, { timeout: 10_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        await pp.click("#bottom .inventory-toggle")
+        check(
+          "an image shown beside the thread is taken as a reference by its ❝",
+          imageTaken,
+        )
         await pp.click(`${pane} .pane-close`)
         // A person's table, long enough to scroll the pane.
         await waitFor(() => idleNow(imageHost))
@@ -307,6 +324,88 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             back,
           `${JSON.stringify(covers)}, focus back ${back}`,
         )
+        // Taking from the past (ADR-0126): the table's ❝ takes a reference to
+        // it into Pia's inventory and its markdown onto the clipboard; the
+        // slot shows a reference, and selected, the preview its quote, a
+        // table. The put key in her composer puts it there as a link, and
+        // the reference stays in her hand. Cmd+C on the table's bar takes
+        // another, by the page's copy event.
+        const take = `${col(0)} .msg[data-entry] .table-wrap .take-block`
+        // Open first: a take into a closed inventory shows it only briefly.
+        await pp.click("#bottom .inventory-toggle")
+        await pp.click(take)
+        const taken = await pp
+          .waitForFunction(
+            sel => document.querySelectorAll(sel).length === 2,
+            refSlot,
+            { timeout: 10_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        const copied = await pp
+          .evaluate(() => navigator.clipboard.readText())
+          .catch(() => "")
+        // The image's reference is in the selected slot: a click on the
+        // table's selects it, and the preview shows its quote.
+        await pp.locator(refSlot).nth(1).click()
+        const previewed = await pp
+          .waitForSelector(".inventory .preview .reference-quote table", {
+            timeout: 10_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        await pp.click(box)
+        await pp.keyboard.press("Control+Shift+O")
+        const linked = await pp
+          .waitForFunction(
+            sel =>
+              (
+                document.querySelector(sel) as HTMLTextAreaElement | null
+              )?.value.includes("](/a/b/") === true,
+            box,
+            { timeout: 5_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        const stays = (await pp.locator(refSlot).count()) === 2
+        check(
+          "a table taken from a reply is a reference in the inventory, previewed as its quote, put in a composer as a link, and kept in the hand",
+          taken &&
+            previewed &&
+            linked &&
+            stays &&
+            copied.startsWith("| n | what |"),
+          `taken ${taken}, previewed ${previewed}, linked ${linked}, stays ${stays}, copied ${JSON.stringify(copied.slice(0, 12))}`,
+        )
+        await pp.fill(box, "")
+        await pp.evaluate(() => navigator.clipboard.writeText(""))
+        await pp.focus(take)
+        await pp.evaluate(() => document.execCommand("copy"))
+        const byKey = await pp
+          .waitForFunction(
+            sel => document.querySelectorAll(sel).length === 3,
+            refSlot,
+            { timeout: 10_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        const copiedByKey = await pp
+          .evaluate(() => navigator.clipboard.readText())
+          .catch(() => "")
+        check(
+          "Cmd+C on a table's bar takes a reference to it, its markdown on the clipboard",
+          byKey && copiedByKey.startsWith("| n | what |"),
+          `taken ${byKey}, copied ${JSON.stringify(copiedByKey.slice(0, 12))}`,
+        )
+        await pp.click("#bottom .inventory-toggle")
         // Pia's picture (ADR-0098): chosen on her profile page, cropped to a
         // square in the browser and sent at 256, then drawn in her circle in
         // Quinn's window, where she reads the thread he has open.

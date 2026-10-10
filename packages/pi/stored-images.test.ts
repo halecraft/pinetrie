@@ -43,8 +43,12 @@ const RED_IMAGE: StoredImage = {
   height: 30,
 }
 
-/** A store in a map, as the host's `memoryBlobs` keeps one. */
-function mapBlobs(): Pick<BlobStore, "get" | "put" | "ref"> {
+/** A store of images in a map, as the host's `memoryBlobs` keeps one. */
+function mapBlobs(): {
+  put(image: StoredImage): ImageRef
+  ref(sha: Sha256): ImageRef | undefined
+  get(sha: Sha256): StoredImage | undefined
+} {
   const blobs = new Map<Sha256, StoredImage>()
   const refOf = (sha256: Sha256, i: StoredImage): ImageRef => ({
     sha256,

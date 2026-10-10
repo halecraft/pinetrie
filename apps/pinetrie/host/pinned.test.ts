@@ -34,7 +34,7 @@ const pinnedCard = (id: string, order: string): TextCard => ({
     thread: LANE,
     order,
   },
-  content: { command: null, unsent: null },
+  content: { command: null, unsent: null, origin: null },
 })
 
 function setUp(texts: Record<string, string>, port: Partial<CardPort> = {}) {

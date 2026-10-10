@@ -195,7 +195,7 @@ test("pinnedReads: each card with its text and owner, in order; a card with no t
     owner,
     placer: owner,
     place: { kind: "inventory", holder: owner } as const,
-    content: { command: null, unsent: null },
+    content: { command: null, unsent: null, origin: null },
   })
   const texts: Record<string, string> = {
     [cardIdFor("c1")]: "ship it",
