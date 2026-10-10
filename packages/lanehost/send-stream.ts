@@ -106,7 +106,11 @@ const CHANGES: ReadonlySet<number> = new Set([
   C.UPDATE_EXTENT,
 ])
 
-/** The commands folded into one change per path, sorted by path. */
+/**
+ * The commands folded into one change per path, sorted by path. Throws when
+ * a path is still under an orphan name at the end: a case this fold does not
+ * know, which a turn's record must not report as the turn's file.
+ */
 export function foldSendStream(
   commands: readonly Command[],
 ): readonly DiskChange[] {
@@ -137,6 +141,14 @@ export function foldSendStream(
     if (was?.change === "added") changes.delete(path)
     else changes.set(path, { path, change: "deleted", kind })
   }
+  const moveUnder = (from: string, to: string) => {
+    for (const [p, c] of [...changes])
+      if (p.startsWith(`${from}/`)) {
+        changes.delete(p)
+        const moved = `${to}${p.slice(from.length)}`
+        changes.set(moved, { ...c, path: moved })
+      }
+  }
   const changed = (path: string) => {
     if (path === "" || changes.has(path)) return
     changes.set(path, { path, change: "changed", kind: "other" })
@@ -159,7 +171,11 @@ export function foldSendStream(
         if (madeKind !== undefined) {
           made.delete(path)
           orphans.delete(path)
-          added(resolve(pathTo), madeKind)
+          const to = resolve(pathTo)
+          added(to, madeKind)
+          // A new directory may be filled under its orphan name before it
+          // is renamed into place: what is under it moves with it.
+          moveUnder(path, to)
         } else if (ORPHAN.test(pathTo)) orphans.set(pathTo, resolve(path))
         else {
           const from = resolve(path)
@@ -182,6 +198,9 @@ export function foldSendStream(
         if (CHANGES.has(cmd) && !made.has(path)) changed(resolve(path))
     }
   }
+  const left = [...changes.keys()].find(p => ORPHAN.test(p.split("/")[0] ?? ""))
+  if (left !== undefined)
+    throw new Error(`a send stream left an orphan unresolved: ${left}`)
   return [...changes.values()].sort((a, b) =>
     a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
   )

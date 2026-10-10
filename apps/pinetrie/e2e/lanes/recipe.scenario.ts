@@ -180,7 +180,13 @@ async function recipeSection(
     check(
       "a turn's record names the ignored files it wrote, and no recipe output",
       wrote?.ignored?.paths.includes(".env") === true &&
-        !wrote.ignored.paths.some(p => p.startsWith("out-")),
+        !wrote.ignored.paths.some(p => p.startsWith("out-")) &&
+        // No record names a path only the diff's own machinery made.
+        !recordsOf(first).some(r =>
+          (r.ignored?.paths ?? []).some(
+            p => /^o\d+-\d+-\d+(\/|$)/.test(p) || p.startsWith(".git/"),
+          ),
+        ),
       JSON.stringify(wrote),
     )
   } finally {

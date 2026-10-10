@@ -8,6 +8,14 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a new directory's entries keep its orphan name",
+    file: "packages/lanehost/send-stream.ts",
+    from: "          moveUnder(path, to)\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
+    expect: "a new directory filled under its orphan name",
+  },
+  {
     name: "a recipe runs over the outputs of the run before",
     file: plan,
     from: "  const remove = input.outputs.filter(isOutputPath)\n",

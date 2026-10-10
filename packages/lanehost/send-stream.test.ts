@@ -71,3 +71,81 @@ describe("a send stream folded into one change per path", () => {
     )
   })
 })
+
+/** A version 1 send stream from commands, as the kernel writes one. */
+function streamOf(
+  commands: readonly (readonly [cmd: number, path: string, pathTo?: string])[],
+): Uint8Array {
+  const attr = (type: number, text: string) => {
+    const data = Buffer.from(text, "utf8")
+    const head = Buffer.alloc(4)
+    head.writeUInt16LE(type, 0)
+    head.writeUInt16LE(data.length, 2)
+    return Buffer.concat([head, data])
+  }
+  const command = (cmd: number, attrs: Buffer) => {
+    const head = Buffer.alloc(10)
+    head.writeUInt32LE(attrs.length, 0)
+    head.writeUInt16LE(cmd, 4)
+    return Buffer.concat([head, attrs])
+  }
+  const version = Buffer.alloc(4)
+  version.writeUInt32LE(1, 0)
+  return new Uint8Array(
+    Buffer.concat([
+      Buffer.from("btrfs-stream\0", "utf8"),
+      version,
+      ...commands.map(([cmd, p, to]) =>
+        command(
+          cmd,
+          Buffer.concat([
+            attr(15, p),
+            ...(to === undefined ? [] : [attr(16, to)]),
+          ]),
+        ),
+      ),
+      command(21, Buffer.alloc(0)),
+    ]),
+  )
+}
+
+const MKFILE = 3
+const MKDIR = 4
+const RENAME = 9
+
+test("a new directory filled under its orphan name, then renamed into place, takes what is under it", () => {
+  const changes = foldSendStream(
+    readSendStream(
+      streamOf([
+        [MKDIR, "o10-5-0"],
+        [MKFILE, "o11-5-0"],
+        [RENAME, "o11-5-0", "o10-5-0/98a1"],
+        [MKDIR, "o12-5-0"],
+        [RENAME, "o12-5-0", "o10-5-0/sub"],
+        [MKFILE, "o13-5-0"],
+        [RENAME, "o13-5-0", "o10-5-0/sub/g"],
+        [RENAME, "o10-5-0", ".git/objects/98"],
+      ]),
+    ),
+  )
+  expect(changes.map(c => `${c.path} ${c.change} ${c.kind}`)).toEqual([
+    ".git/objects/98 added dir",
+    ".git/objects/98/98a1 added file",
+    ".git/objects/98/sub added dir",
+    ".git/objects/98/sub/g added file",
+  ])
+})
+
+test("a path left under an orphan name is refused, never reported as the turn's", () => {
+  expect(() =>
+    foldSendStream(
+      readSendStream(
+        streamOf([
+          [MKDIR, "o10-5-0"],
+          [MKFILE, "o11-5-0"],
+          [RENAME, "o11-5-0", "o10-5-0/x"],
+        ]),
+      ),
+    ),
+  ).toThrow("left an orphan unresolved: o10-5-0")
+})
