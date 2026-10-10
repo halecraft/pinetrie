@@ -61,7 +61,7 @@ export const tree = (
 export const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 /** A root a new tab minted as it opened (ADR-0066), in the shape the host accepts. */
 export const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
-/** A thread a fresh column minted as it opened (ADR-0117), in the shape the host accepts. */
+/** A thread a column minted as it opened (ADR-0117, ADR-0126), in the shape the host accepts. */
 export const NEW_THREAD = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
 
 /** A note column minted for an intent (ADR-0116), in `parseCardId`'s shape. */

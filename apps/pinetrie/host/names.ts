@@ -21,7 +21,10 @@ export interface Names {
    * start, for a new lane, and for a thread's first message.
    */
   ensure(): Promise<void>
-  /** Name the thread a column is about to create a lane for (ADR-0057). */
+  /**
+   * Name the thread a column is about to create a lane for (ADR-0057), and
+   * make its banner due, named already or not.
+   */
   reserve(lane: ThreadId): Promise<ReservePlan["kind"]>
 }
 
@@ -76,6 +79,9 @@ export function createNames(deps: {
           now(),
         )
         if (plan.kind === "name") await write(plan.record, true)
+        // A thread opened before its lane (ADR-0126) was named as a
+        // conversation's, with no banner: its lane to come is due one.
+        if (plan.kind === "known") deps.onNamed(lane)
         return plan.kind
       }),
   }

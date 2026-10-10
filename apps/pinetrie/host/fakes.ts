@@ -9,6 +9,7 @@ import {
   NO_CONTENT,
   NOBODY,
   type NoteColumnId,
+  ROOT_ORIGIN,
   type RootId,
   rootIdFor,
   type Target,
@@ -32,11 +33,10 @@ import {
   encodeChat,
   LANE,
   orderAfter,
-  planThreadCard,
+  planThreadOpen,
   ROOT,
   setRecord,
   TASK,
-  THREAD,
 } from "@pinetrie/rules"
 import {
   applyRecordWrites,
@@ -348,10 +348,6 @@ export const NO_BLANK_CARDS = {
 export const TASK_ID: TaskId = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 /**
- * A task as a thread's first message makes one (`planThreadStart`): its
- * record, the thread's, and the thread's card on its canvas, in `root`.
- */
-/**
  * A note column on `task`'s canvas, after its last card (ADR-0116): where a
  * test's notes are.
  */
@@ -380,6 +376,10 @@ export function putNoteColumn(
   ])
 }
 
+/**
+ * A task as a thread's opening makes one (`planThreadOpen`): its record,
+ * the thread's, and the thread's card on its canvas, in `root`.
+ */
 export function putTask(
   b: WriteDocs & Pick<FakeBasics, "places">,
   thread: ThreadId,
@@ -387,22 +387,17 @@ export function putTask(
   root: RootId = ROOT_ID,
 ): void {
   putValue(b, setRecord(TASK, { task, by: STARTER, createdAt: 0 }))
-  putValue(
-    b,
-    setRecord(THREAD, {
-      thread,
-      root,
-      by: STARTER,
-      createdAt: 0,
-      origin: { kind: "root" },
-    }),
-  )
-  const { step } = planThreadCard({
+  const opened = planThreadOpen({
     thread,
-    task,
+    origin: ROOT_ORIGIN,
+    root,
     by: STARTER,
+    now: 0,
+    placement: { kind: "after", task, parent: null },
+    opens: null,
     cards: readPlaces(b.places),
-    parent: null,
   })
-  if (step.kind === "write") applyPlaceSteps(b.places, [step])
+  if (opened.kind !== "open") return
+  applyWrites(b, opened.records)
+  applyPlaceSteps(b.places, opened.steps)
 }

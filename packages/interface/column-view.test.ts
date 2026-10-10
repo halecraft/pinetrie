@@ -343,9 +343,23 @@ describe("columnView: the header", () => {
     ],
     ["unnamed", { thread: B, createsLane: true }, { kind: "ask", lane: B }],
     [
-      "named",
-      { thread: A, createsLane: true, work: work({ names: NAMES }) },
+      "named, with its banner",
+      {
+        thread: A,
+        createsLane: true,
+        work: work({
+          names: NAMES,
+          banners: new Map([
+            [A, { lane: A, sha: "a".repeat(64) as Sha256, at: 1 }],
+          ]),
+        }),
+      },
       { kind: "none" },
+    ],
+    [
+      "named as a conversation's thread, opened before its lane: its banner is due (ADR-0126)",
+      { thread: A, createsLane: true, work: work({ names: NAMES }) },
+      { kind: "ask", lane: A },
     ],
   ] as const)("the reserve step: %s (ADR-0057, ADR-0117)", (_, over, step) => {
     expect(columnView(facts(1, over)).reserve).toEqual(step)

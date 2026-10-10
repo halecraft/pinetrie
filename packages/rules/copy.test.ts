@@ -58,13 +58,18 @@ describe("planCopy (ADR-0117, ADR-0124)", () => {
     const planned = plan()
     expect(planned).toMatchObject({
       kind: "copy",
-      record: {
-        thread: COPY,
-        root: ROOT,
-        by: ADA,
-        createdAt: 7,
-        origin: { kind: "fork", at: "b", how: "copy" },
-      },
+      records: [
+        {
+          namespace: "pinetrie.thread",
+          key: COPY,
+          value: {
+            root: ROOT,
+            by: ADA,
+            createdAt: 7,
+            origin: { kind: "fork", at: "b", how: "copy" },
+          },
+        },
+      ],
     })
     const card = planned.kind === "copy" ? planned.steps.at(-1) : undefined
     expect(card).toMatchObject({

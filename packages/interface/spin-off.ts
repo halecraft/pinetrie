@@ -1,11 +1,12 @@
 // interface/spin-off — a text card made a thread (ADR-0111): dropped on a
 // workflow state, on the board or the footer's strip, or in the sidebar,
-// or chosen from its ⋯. The page mints the new root's and task's ids; the
-// host starts the thread in the task and moves the card to gone, spun into
-// it. Pure.
+// or chosen from its ⋯. The page mints the new root's, thread's and task's
+// ids; the host opens the thread in the task, sends the card's text as its
+// first message, and moves the card to its sender's trash (ADR-0126). Pure.
 
 import {
   type CardId,
+  DISCARDED,
   moveOf,
   type TaskId,
   type WorkflowStateId,
@@ -42,13 +43,11 @@ export function planSpinOff(
   const { place } = now
   if (place.kind === "inventory" && place.holder !== state.cards.me) return []
   if (place.kind === "trash") return []
-  const move = moveOf(now, {
-    kind: "trash",
-    why: { kind: "spun", into: minted.root, thread: minted.thread },
-  })
   const request: Extract<HostRequest, { kind: "spin-off" }> = {
     kind: "spin-off",
-    move,
+    move: moveOf(now, DISCARDED),
+    root: minted.root,
+    thread: minted.thread,
     task: minted.task,
     state: to.kind === "state" ? to.state : null,
     here: to.kind === "sidebar" ? minted.task : taskOfTab(state),

@@ -64,7 +64,6 @@ export const KINDS = {
       "task-pinned",
       "queued",
       "margin",
-      "fresh",
       "trash",
       "inventory",
     ],

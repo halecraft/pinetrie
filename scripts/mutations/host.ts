@@ -5,6 +5,68 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a thread opened before its lane draws no banner",
+    file: "apps/pinetrie/host/names.ts",
+    from: '        if (plan.kind === "known") deps.onNamed(lane)\n',
+    to: "",
+    command: unit,
+    expect:
+      "a thread opened before its lane, named as a conversation's, makes its banner due once a column reserves its lane",
+  },
+  {
+    name: "a new tab's first send is refused for its own task",
+    file: "apps/pinetrie/host/commands/chat.ts",
+    from: "    if (chat.at.at === null && known && !opened)\n",
+    to: "    if (chat.at.at === null && known)\n",
+    command: unit,
+    expect:
+      "a new tab's first send, its thread and task opened as it opened, writes its entry alone",
+  },
+  {
+    name: "an ask's relay stays in its fact column",
+    file: "apps/pinetrie/host/migrations/0012-unstarted-threads.ts",
+    from: '    relay: ask ? (row.fact ?? "") : "",\n',
+    to: '    relay: "",\n',
+    command: unit,
+    expect:
+      "a spun card is in its spinner's trash; an ask's relay is in `relay`",
+  },
+  {
+    name: "a fresh column's oldest card becomes its message",
+    file: "apps/pinetrie/host/migrations/0012-unstarted-threads.ts",
+    from: '      if ((newest.get(row.owner ?? "") ?? "") < id)\n',
+    to: '      if (!newest.has(row.owner ?? ""))\n',
+    command: unit,
+    expect: "a fresh column becomes its thread opened",
+  },
+  {
+    name: "a refused spin-off keeps its thread's records",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "        await deps.records.writeValues(plan.open.records.map(unwritten))\n",
+    to: "",
+    command: unit,
+    expect:
+      "a thread that is not started leaves the card where it was; a blank card starts none",
+  },
+  {
+    name: "a closed new tab's task stays",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "    if (emptied.length > 0)\n",
+    to: "    if (emptied.length < 0)\n",
+    command: unit,
+    expect:
+      "a new tab's thread to the trash before its first send leaves its task empty: the task goes",
+  },
+  {
+    name: "an undo of a spin-off lifts no thread",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: '      if (origin.kind !== "spun" || !lifting.includes(origin.card)) continue\n',
+    to: "      continue\n",
+    command: unit,
+    expect:
+      "an undo while the thread holds its first message alone lifts it back",
+  },
+  {
     name: "a started thread's origin is migrated as a copy",
     file: "apps/pinetrie/host/migrations/0011-thread-origin.ts",
     from: '            how: origin?.kind === "copy" ? "copy" : "branch",\n',
@@ -69,7 +131,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a spend records nothing",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '        { kind: "spend", by: writer, message: followed.message },',
+    from: '        { kind: "spend", by: writer, message },',
     to: "        null,",
     command: unit,
     expect: "a spend: the history goes with the card",
@@ -886,14 +948,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a tab's undo stack is shared with no one",
   },
   {
-    name: "a fresh column's first send strands its other cards",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: "      const followed = await followers(writer, cards, card, sent)\n",
-    to: "      const followed: PlaceStep[] = []\n",
-    command: unit,
-    expect: "spend: a fresh column's first send leaves its other cards notes",
-  },
-  {
     name: "the policy shares every person's document with everyone",
     file: "packages/protocol/writers.ts",
     from: "    : writerOfPrincipal(principal) === owner.writer",
@@ -1217,8 +1271,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move is recorded in no history",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '    return carry(step, drain, { kind: "move", by: writer }, gesture)\n  }\n\n  /**\n   * A card queued',
-    to: '    return carry(step, drain, { kind: "move", by: writer })\n  }\n\n  /**\n   * A card queued',
+    from: '    const done = await carry(step, drain, { kind: "move", by: writer }, gesture)\n',
+    to: '    const done = await carry(step, drain, { kind: "move", by: writer })\n',
     command: unit,
     expect:
       "a take into the inventory is one step of the taker's history in the root it left; a creation is in none",
@@ -1764,7 +1818,7 @@ export const mutations: readonly Mutation[] = [
     from: "  if (start !== null) {\n    await deps.records.writeValues(start.records)",
     to: "  if (start !== null && false) {\n    await deps.records.writeValues(start.records)",
     command: unit,
-    expect: "its record is written with it",
+    expect: "a branch's record is written with its first",
   },
   {
     name: "a conversation thread goes unnamed",
@@ -1788,7 +1842,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (planned.kind === "appendToTree") void deps.names.ensure()\n',
     to: "",
     command: unit,
-    expect: "its record is written with it, then named",
+    expect: "a branch's record is written with its first, then named",
   },
   {
     name: "the host's discard history ignores the sender's task",

@@ -26,7 +26,7 @@ const AGENT_PREFIX = `@${THE_AGENT} `
 /** `@agent ` as a box starts with it: the one blank prefill, nothing typed. */
 export const AGENT_PREFILL: Prefill = { text: AGENT_PREFIX, blank: true }
 
-/** A fresh column to open: a branch at `at`. */
+/** A branch to open at `at` (ADR-0126). */
 export interface OpenBranch {
   readonly at: EntryId
   readonly prefill: Prefill | undefined

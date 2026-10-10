@@ -182,6 +182,16 @@ export const mutations: readonly Mutation[] = [
       "selecting a slot previews its card beside the grid, read only, and Enter opens it in place instead",
   },
   {
+    name: "a new tab closed unsent keeps its task",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "    if (emptied.length > 0)\n",
+    to: "    if (emptied.length < 0)\n",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "an unsent new tab closed with discard takes its task away, and its thread's card to your trash (ADR-0126)",
+  },
+  {
     name: "a card's × does nothing",
     file: "packages/web/card-frame.tsx",
     from: "      onClick={p.onDiscard}",
@@ -659,8 +669,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a send does not follow",
     file: "packages/web/column.tsx",
-    from: "    end.follow()\n    if (!fresh) return undefined\n",
-    to: "    if (!fresh) return undefined\n",
+    from: '    end.follow()\n    if (unstarted) p.onIntent({ kind: "sentFirst", card: p.column.thread })\n',
+    to: '    if (unstarted) p.onIntent({ kind: "sentFirst", card: p.column.thread })\n',
     suite: "browser",
     scenario: "tools",
     expect: "your own send brings the column back to its end",
@@ -688,8 +698,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new root takes the page to it",
     file: "packages/web/app.tsx",
-    from: "    forkOf,\n    holders,\n  ])\n  // Every change is saved",
-    to: '    forkOf,\n    holders,\n  ])\n  const othersTasks = tasks.byId.size\n  useEffect(() => {\n    const newest = [...tasks.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "task", task: newest } })\n  }, [othersTasks])\n  // Every change is saved',
+    from: "    unstarted,\n    holders,\n  ])\n  // Every change is saved",
+    to: '    unstarted,\n    holders,\n  ])\n  const othersTasks = tasks.byId.size\n  useEffect(() => {\n    const newest = [...tasks.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "task", task: newest } })\n  }, [othersTasks])\n  // Every change is saved',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1124,8 +1134,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the column does not know who you are",
     file: "packages/web/column.tsx",
-    from: "                  reader={{ me: p.session.writer, nameOf: p.nameOf }}\n                  prefill={freshMode?.prefill}",
-    to: '                  reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n                  prefill={freshMode?.prefill}',
+    from: "                  reader={{ me: p.session.writer, nameOf: p.nameOf }}\n                  prefill={opening?.prefill}",
+    to: '                  reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n                  prefill={opening?.prefill}',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1137,8 +1147,8 @@ export const mutations: readonly Mutation[] = [
     // the strip reading the tree a frame late is what brings it back.
     name: "the strip reads the tree a frame behind the document",
     file: "packages/web/app.tsx",
-    from: '  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, {\n            canvases,\n            forks: forkOf,\n            holders,\n            index,\n            lanes,\n          })\n        : null,\n    [layout, active, canvases, forkOf, index, lanes, holders],\n  )\n',
-    to: '  const [behind, setBehind] = useState(index)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setBehind(index))\n    return () => cancelAnimationFrame(f)\n  }, [index])\n  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, {\n            canvases,\n            forks: forkOf,\n            holders,\n            index: behind,\n            lanes,\n          })\n        : null,\n    [layout, active, canvases, forkOf, behind, lanes, holders],\n  )\n',
+    from: '  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, {\n            canvases,\n            unstarted,\n            holders,\n            index,\n            lanes,\n          })\n        : null,\n    [layout, active, canvases, unstarted, index, lanes, holders],\n  )\n',
+    to: '  const [behind, setBehind] = useState(index)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setBehind(index))\n    return () => cancelAnimationFrame(f)\n  }, [index])\n  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, {\n            canvases,\n            unstarted,\n            holders,\n            index: behind,\n            lanes,\n          })\n        : null,\n    [layout, active, canvases, unstarted, behind, lanes, holders],\n  )\n',
     suite: "browser",
     scenario: "tools",
     expect: "no branch chip is painted in the agent's column while it works",
@@ -1561,8 +1571,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a started root is never placed",
     file: "packages/rules/task.ts",
-    from: "    if (input.workflow !== null)\n      records.push(",
-    to: "    if (input.workflow !== null && false)\n      records.push(",
+    from: "    if (input.opens.workflow !== null)\n      records.push(",
+    to: "    if (input.opens.workflow !== null && false)\n      records.push(",
     suite: "host",
     scenario: "board",
     expect:
@@ -2006,11 +2016,12 @@ export const mutations: readonly Mutation[] = [
   {
     name: "keep in inventory only closes",
     file: "packages/web/column.tsx",
-    from: '                        kind: "keepFresh",',
-    to: '                        kind: "closeFresh",\n                        discard: [],',
+    from: "                      keep: true,",
+    to: "                      keep: false,",
     suite: "browser",
     scenario: "page",
-    expect: "closing a fresh column with text keeps its card in your inventory",
+    expect:
+      "closing an unstarted branch with text keeps its card in your inventory",
   },
   {
     name: "the host neither stores nor relays an inventory",

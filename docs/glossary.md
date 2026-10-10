@@ -38,8 +38,9 @@ words they were written with.
 | **in your hand** | Your inventory's selected slot: what the put key puts. A reference stays there when put; any other card leaves (ADR-0126). | `KINDS`' `put` | |
 | **put key** | Puts the card in your hand where focus is: a reference into a text box as a link, the card onto a surface (ADR-0126). | Ctrl+Shift+O, `keyAct`, `PutTarget` `text-box` | |
 | **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `TextCard`, `TextCardId`, `CardPlace`, `CardFrame`, `cardFrame` | |
-| **thread card** | A thread, as a card: on a task's canvas or in someone's inventory, one place either way (ADR-0117, ADR-0124). | `ThreadCard`, `threadFace` | a root, as the board and the sidebar draw it; board item |
-| **your message** | The text card in your composer at a thread's end, which only you see. | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours) |
+| **thread card** | A thread, as a card: on a task's canvas, in someone's inventory or their trash, one place either way (ADR-0117, ADR-0124). A thread is a card from the moment its column opens, before its first entry (ADR-0126). | `ThreadCard`, `threadFace`, `planThreadOpen`, `unstartedThreads` | a root, as the board and the sidebar draw it; board item; a fresh column, a new tab's column |
+| **your message** | The text card in your composer at a thread's end, which only you see; at a thread not yet started too (ADR-0126). | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours); a fresh card |
+| **trash** | A person's surface, one each, of the cards they discarded, until undone or swept. Each remembers the task it left, or none, whose history its discard is in (ADR-0126). | `trash` (stored as `discarded`), `DISCARDED`, `planTrashSweep`, `MoveHistoryScope` | the `gone` place |
 | **note** | A text card in a note column, which everyone in the task sees and no agent reads (ADR-0116). | `note`, `noteOf`, `notesIn`, `NoteCardEditor` | drafting card, draft; a note below the line on its thread's notes board |
 | **note column** | A card on a task's canvas whose content is a list of notes, titled or "Notes" (ADR-0116). Named by how it is drawn (ADR-0126). | `NoteColumnId`, `NoteColumnCard`, `NOTE_COLUMN`, `nearestNoteColumn`, `NoteColumn` | notes board |
 | **queued card** | A text card above the line, which the agent reads once, when the host pops it. | `queued`, `queuedOn`, `QueuedCardEditor` | |
@@ -118,8 +119,7 @@ Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
 | **branched**, **live**, **read-only** | A source's modes: its own copy in the lane, whose work comes back as an offer; a read-write mount, never branched; a read-only mount. | ADR-0118 | |
 | **runner** | Where a lane runs: the host that holds it, that host's machine, and the model of each run. | ADR-0119 | |
 | **task card** | A task, as a card, on the board's workflow states. | ADR-0126 | `BoardPlace` as a place of its own |
-| **consume** | What a thread's live end does to a card: a send, a spin, a fact popped. The card ends; the entry it became is the record. | ADR-0126 | |
-| **trash** | A person's surface, one each, of the cards they discarded, until undone or swept. Each remembers the task it left, or none. | ADR-0126 | the `gone` place |
+| **consume** | What a thread's live end does to a card: a send, a fact popped. The card ends; the entry it became is the record. A spin sends its card to the trash instead, so it can be undone. | ADR-0126 | |
 | **team** | The people who share a board, its tasks and, later, its sources and runners. | ADR-0126 | the host's session, as the board's owner |
 | **party** | A person or a team: what owns a surface that no content does (an inventory, a trash, a board). | ADR-0126 | |
 | **stack** | A card holding two or more threads of one root, one on top, drawn as one column: only the top runs, and which is on top is shared. Not built with the rest. | ADR-0126 | |

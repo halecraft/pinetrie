@@ -155,8 +155,8 @@ export function CardEditor(p: {
    * Start Agent column, and a new tab's root (ADR-0117).
    */
   how: ColumnHow
-  /** A fresh column: its first message starts the thread (`branch`). */
-  fresh: boolean
+  /** A unstarted column: its first message starts the thread (`branch`). */
+  unstarted: boolean
   /** The commands the host's pi loaded, for completion (ADR-0036). */
   commands: readonly CommandSummary[]
   /** Everyone who can be mentioned, as shown. */
@@ -165,14 +165,14 @@ export function CardEditor(p: {
   agents: readonly AgentCandidate[]
   /** Who is sending, and everyone's names. */
   reader: Reader
-  /** What the box starts with, unsent: a fresh column's (`Prefill`). */
+  /** What the box starts with, unsent: a unstarted column's (`Prefill`). */
   prefill: Prefill | undefined
   /** A first message to send at once: this column was opened to send it. */
   pending: Pending | undefined
   /** Where a lane the send creates works; absent for the "+ pin" box. */
   where: Where | undefined
   readOnly: ReadOnly | null
-  /** A fresh column's send id, recorded before its message is sent. */
+  /** A unstarted column's send id, recorded before its message is sent. */
   onSend: () => string | undefined
   /** After a conflict: open a branch at `at`, which sends the card's text. */
   onBranchInstead: (pending: Pending) => void
@@ -228,7 +228,7 @@ export function CardEditor(p: {
   const command = card === undefined ? null : commandOf(card)
   const plan = planSend({
     text,
-    fresh: p.fresh,
+    unstarted: p.unstarted,
     lane: p.lane,
     asksAgent: p.how.asksAgent,
     participants: p.participants,
@@ -384,7 +384,8 @@ export function CardEditor(p: {
       return
     }
     const { thread, task, ...how } = p.how
-    // A new tab's task is known as it opens; until then nothing is sent.
+    // A column's task is known once its card is on a canvas; until then
+    // nothing is sent.
     if (task === null) {
       step({ kind: "settled", spent: false })
       return

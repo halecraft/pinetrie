@@ -1,5 +1,4 @@
 import {
-  atEntry,
   type CardPlace,
   type CardRecord,
   cardIdOfKind,
@@ -47,7 +46,7 @@ import { afterSpinOff } from "./spin-off.ts"
 
 /** The thread `index` is: its first entry names it (`withThreads`). */
 const TEST_THREAD = threadIdFor("1-r1")
-const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("ada@x.io")
 const C1 = cardIdFor("c1")
@@ -74,15 +73,10 @@ const pinnedKey = {
   thread: TEST_THREAD,
 } as const
 const pinnedAtA = { ...pinnedKey, order: "a" } as const
-/** A branch's thread, and its column's key (ADR-0116). */
+/** A branch not yet started, and its column's key (ADR-0126). */
 const F1 = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
-const freshF1 = {
-  kind: "fresh",
-  column: F1,
-  root: TEST_ROOT,
-  task: TEST_TASK,
-  at: atEntry(A),
-} as const
+/** Your message at it: it has no end yet. */
+const freshF1 = { kind: "composing", thread: F1 } as const
 const onR1: Layout = resolveLayout(
   layoutReducer(initialLayout(), {
     kind: "show",
@@ -94,7 +88,7 @@ const onR1: Layout = resolveLayout(
     archived: new Set(),
     list: [TEST_TASK],
     canvases: tasksFor(index, [TEST_TASK, R1]).index.canvases,
-    forks: new Map(),
+    unstarted: new Map(),
     holders: new Map(),
   },
 )
@@ -102,7 +96,7 @@ const withFresh: Layout = layoutReducer(onR1, {
   kind: "view",
   task: TEST_TASK,
   first: null,
-  change: { kind: "openFresh", thread: F1, at: A },
+  change: { kind: "opened", card: F1 },
 })
 /** The trunk's column: its thread's card's. */
 const threadKey: string = threadOfEntry("1-r1")
@@ -159,7 +153,7 @@ const TRUNK_COLUMN: ColumnKey = { kind: "card", card: threadOfEntry("1-r1") }
 const NOTES_COLUMN: ColumnKey = { kind: "card", card: NOTES }
 const inColumn = (
   act: Extract<Intent, { kind: "column" }>["act"],
-  column: ColumnKey = { kind: "fresh", thread: F1 },
+  column: ColumnKey = { kind: "card", card: F1 },
 ): Intent => ({ kind: "column", column, act })
 
 describe("take into the inventory (ADR-0048 step 4)", () => {
@@ -568,24 +562,6 @@ describe("your message (ADR-0113)", () => {
     })
   })
 
-  test("in a fresh column, a message with text refuses a card from anywhere but your inventory", () => {
-    const s = withMessage(true, [card(C1, note)], F1, freshF1)
-    expect(plan(toComposer(F1), s)).toEqual([
-      {
-        kind: "refuse",
-        refusal: {
-          card: C1,
-          actedAt: { kind: "column", key: F1 },
-          code: "message-holds-text",
-        },
-      },
-    ])
-    const fromInventory = withMessage(true, [card(C1, inventory)], F1, freshF1)
-    expect(plan(toComposer(F1), fromInventory)[0]).toMatchObject({
-      kind: "keep",
-    })
-  })
-
   test("Move to ▸ notes: your message goes to the note column nearest its thread", () => {
     const s = state({ cards: [card(C1, atEnd)] })
     expect(
@@ -682,9 +658,8 @@ describe("pin and unpin (ADR-0048 step 5)", () => {
     })
   })
 
-  test("a fresh card has no thread to pin to; an unpin of a card not pinned is nothing", () => {
-    const s = state({ cards: [card(C1, freshF1), card(C2, atEnd)] })
-    expect(plan(inColumn({ kind: "pin", card: C1 }), s)).toEqual([])
+  test("an unpin of a card not pinned is nothing", () => {
+    const s = state({ cards: [card(C2, atEnd)] })
     expect(
       plan(inColumn({ kind: "unpin", card: C2 }, TRUNK_COLUMN), s),
     ).toEqual([])
@@ -752,64 +727,10 @@ describe("pin and unpin (ADR-0048 step 5)", () => {
   })
 })
 
-describe("keep on close (ADR-0066)", () => {
-  test("one move of every card into successive slots, then the close", () => {
-    const s = state({
-      cards: [card(C1, freshF1), card(C2, freshF1)],
-      slots: { "0": textCardId("x") },
-    })
-    const [keep] = plan(
-      {
-        kind: "keepFresh",
-        column: { kind: "fresh", thread: F1 },
-        cards: [C1, C2],
-      },
-      s,
-    )
-    expect(keep).toMatchObject({
-      kind: "keep",
-      moves: [
-        { move: { card: C1, from: freshF1, to: inventory }, slot: 1 },
-        { move: { card: C2, from: freshF1, to: inventory }, slot: 2 },
-      ],
-      actedAt: { kind: "column", key: F1 },
-      close: [
-        {
-          kind: "layout",
-          action: {
-            kind: "view",
-            change: { kind: "closeFresh", thread: F1 },
-          },
-        },
-      ],
-      here: null,
-    })
-  })
-
-  test("a keep whose cards have all gone closes its column and sends no move", () => {
-    const s = state({ cards: [], slots: {} })
-    const effects = plan(
-      {
-        kind: "keepFresh",
-        column: { kind: "fresh", thread: F1 },
-        cards: [C1, C2],
-      },
-      s,
-    )
-    expect(effects).toHaveLength(1)
-    expect(effects).toMatchObject([
-      {
-        kind: "layout",
-        action: { kind: "view", change: { kind: "closeFresh", thread: F1 } },
-      },
-    ])
-  })
-
-  test("afterKeep closes only when the keep was accepted", () => {
-    const close = [{ kind: "reload" }] as const
-    expect(afterKeep({ kind: "accepted", rev: 1 }, close)).toBe(close)
-    expect(afterKeep({ kind: "refused", refusal: null }, close)).toEqual([])
-  })
+test("afterKeep closes only when the keep was accepted", () => {
+  const close = [{ kind: "reload" }] as const
+  expect(afterKeep({ kind: "accepted", rev: 1 }, close)).toBe(close)
+  expect(afterKeep({ kind: "refused", refusal: null }, close)).toEqual([])
 })
 
 describe("undo and redo of moves (ADR-0066)", () => {
@@ -819,19 +740,6 @@ describe("undo and redo of moves (ADR-0066)", () => {
     expect(plan(undo, state({}, onR1))).toEqual([
       { kind: "undoMoves", task: TEST_TASK, direction: "undo" },
     ])
-  })
-
-  test("in a new tab: the task it minted as it opened", () => {
-    const newTab = layoutReducer(onR1, {
-      kind: "newTab",
-      key: NEW_THREAD,
-      root: NEW_ROOT,
-      task: NEW_TASK,
-      asksAgent: false,
-    })
-    expect(
-      plan({ ...undo, direction: "redo" } as Intent, state({}, newTab)),
-    ).toEqual([{ kind: "undoMoves", task: NEW_TASK, direction: "redo" }])
   })
 
   test("with the inventory panel focused: this tab's swaps", () => {
@@ -887,30 +795,23 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
     ).toEqual([{ kind: "showInventory", brief: false }])
   })
 
-  test("back in a fresh column the layout holds: its task shown, once for a keep's cards", () => {
+  test("your message back at a thread not yet started: its card unfolded in its task (ADR-0126)", () => {
+    const base = tasksFor(index, [TEST_TASK, R1])
+    const opened: IntentState = {
+      ...state({}, onR1),
+      tasks: {
+        ...base,
+        index: {
+          ...base.index,
+          taskOfCard: new Map([...base.index.taskOfCard, [F1, TEST_TASK]]),
+        },
+      },
+    }
     expect(
       answered(
-        {
-          kind: "undone",
-          cards: [
-            { card: C1, place: freshF1 },
-            { card: C2, place: freshF1 },
-          ],
-        },
-        state({}, withFresh),
+        { kind: "undone", cards: [{ card: C1, place: freshF1 }] },
+        opened,
       ),
-    ).toEqual([
-      {
-        kind: "layout",
-        action: { kind: "show", here: { kind: "task", task: TEST_TASK } },
-      },
-      { kind: "list", act: { kind: "ensure", task: TEST_TASK } },
-    ])
-  })
-
-  test("back in a fresh column it no longer holds: opened again, under the thread it minted, after the thread it forks from", () => {
-    expect(
-      answered({ kind: "undone", cards: [{ card: C1, place: freshF1 }] }),
     ).toEqual([
       {
         kind: "layout",
@@ -923,7 +824,7 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
           kind: "view",
           task: TEST_TASK,
           first: threadOfEntry("1-r1"),
-          change: { kind: "openFresh", thread: F1, at: A },
+          change: { kind: "fold", card: F1, unfolded: true },
         },
       },
     ])
@@ -998,10 +899,7 @@ describe("openTrace: where a trace leads (ADR-0048, Other people)", () => {
 describe("a card made a thread (ADR-0111)", () => {
   const S1 = workflowStateIdFor("s-1")
   // The host names the move's history (ADR-0116): the page names none.
-  const spun = {
-    kind: "trash",
-    why: { kind: "spun", into: NEW_ROOT, thread: NEW_THREAD },
-  } as const
+  const spun = { kind: "trash" } as const
   test.each([
     [
       "a note dropped on a state: its thread there, sent with the task you are on",
@@ -1035,6 +933,8 @@ describe("a card made a thread (ADR-0111)", () => {
         request: {
           kind: "spin-off",
           move: { card: C1, from: want.from, to: spun },
+          root: NEW_ROOT,
+          thread: NEW_THREAD,
           task: NEW_TASK,
           state: want.state,
           here: want.here,

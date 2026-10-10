@@ -261,23 +261,19 @@ would refuse each whole undo of a move (S82).
   over 10,000 moves, accepted.
 - **A new id, not the old one** (ADR-0066), so a store's `json` places and
   the Yjs schema never meet under one id.
-- **A fresh row names its root, its task and its branch point** (`root`,
-  `task`, `at`, "" at for a new tab, ADR-0066, ADR-0116). One without a
-  root or a task does not decode.
 - **A row at a thread names its thread in `lane`, and nothing else of
   where it is** (your message, a pinned or a queued card, ADR-0116,
   ADR-0126): no root, which is the thread's record's, and no `at`, since its
-  end is found from the thread (every entry names its thread, ADR-0125). The
-  row keeps its `at` field, for `fresh`, so the schema's hash held; record
-  migration `0009-card-content` cleared the `at` these rows and their
-  history events kept.
+  end is found from the thread (every entry names its thread, ADR-0125);
+  record migration `0009-card-content` cleared the `at` these rows and
+  their history events kept. The row's `at` is a comment's entry.
 - **A fact is a card of its own kind** (ADR-0126): its id starts `x-` (`f-`
   is a file card's), its row is a `queued` one, and its fact is JSON in
-  `fact`. Record migration `0009-card-content` moved each fact stored on a
+  `fact`. An ask card's relay is JSON in its own `relay` (ADR-0128). Record migration `0009-card-content` moved each fact stored on a
   text card's bare id to a new `x-` id, with its history.
 - **A canvas row** (`canvas`, ADR-0116) names its task, its rank in
   `order` and its width (`"1"` or `"2"`): a thread's card on its task's
-  canvas. A gone row names the task whose history it is in, or "".
+  canvas: a thread not yet started's too (ADR-0126).
 - **A pinned row carries `lane` and `order`**, as a queued one does, and
   no `by` or `seen`.
 - **A comment is stored as `margin`** (ADR-0126): its entry in `at`, the
@@ -314,10 +310,15 @@ would refuse each whole undo of a move (S82).
   from before ADR-0066 a `json` `pinetrie:places` document, that no code
   opens; delete them by hand. The startup sweep removes the texts no record
   names.
-- **A gone card is stored under its reason** (ADR-0111): kind `discarded`,
-  or `spun` for a card made a thread, with that thread's root in `column`;
-  its history's root in `root` ("" for none), and who moved it there in
-  `holder`. No new field, so no migration.
+- **A card in a trash is stored `discarded`** (ADR-0111, ADR-0126): whose
+  trash in `holder`, the task it left in `task` ("" for none), whose
+  history its discard is in. A card spun into a thread is in its spinner's
+  trash too; its thread's record names it (`origin` `spun`).
+- **The row has no `root`** (ADR-0126): only a fresh card's row named one,
+  and a branch or a new tab is a thread card now. Migration
+  `0012-unstarted-threads` dropped it with its data moved: each fresh
+  column became its thread opened, a spun card a discarded one, an ask's
+  relay moved from `fact` to `relay`.
 - **`holder`** is whose inventory holds a card (`CardPlace` `inventory`);
   rows written before it existed do not decode, and no stored session held
   any.

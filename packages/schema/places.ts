@@ -26,15 +26,13 @@ import { type TextCardId, textCardId } from "@pinetrie/core"
  */
 const StoredCard = Schema.struct.json({
   owner: Schema.string(),
-  /** `drafting`, `note`, `pinned`, `queued`, `fresh`, `canvas`, `inventory`, or why it is gone: the place's kind (`CardPlace`). */
+  /** `drafting`, `note`, `pinned`, `queued`, `margin`, `canvas`, `inventory` or `discarded`: the place's kind (`CardPlace`). */
   kind: Schema.string(),
-  /** A fresh card's root (ADR-0063): a card at a thread's is its thread's. */
-  root: Schema.string(),
-  /** A card at a thread's entry; a fresh card's branch point, "" for a new tab. */
+  /** A comment's entry (ADR-0126). */
   at: Schema.string(),
-  /** A card at a thread's thread, which names its lane; a spun card's thread. */
+  /** A card at a thread's thread, which names its lane. */
   lane: Schema.string(),
-  /** A fresh card's column key; a note's note column (ADR-0116); a spun card's root. */
+  /** A note's note column (ADR-0116). */
   column: Schema.string(),
   /** A queued, pinned or canvas card's rank, or a note's in its column (S69). */
   order: Schema.string(),
@@ -49,13 +47,15 @@ const StoredCard = Schema.struct.json({
    * before facts were, which reads as a message.
    */
   fact: Schema.string(),
+  /** An ask card's relay (ADR-0128), as JSON. */
+  relay: Schema.string(),
   /** Why the host could not send it. */
   unsent: Schema.string(),
   /** Who put it where it is. */
   placer: Schema.string(),
-  /** Whose inventory holds it. */
+  /** Whose inventory or trash holds it. */
   holder: Schema.string(),
-  /** A canvas card's, a fresh column's or a gone card's task (ADR-0116). */
+  /** A canvas card's, or a trashed card's, task (ADR-0116). */
   task: Schema.string(),
   /** A canvas card's width: `1` or `2` columns (ADR-0116). */
   width: Schema.string(),

@@ -31,7 +31,7 @@ import type { Prefill } from "./columns.ts"
 export type ColumnHow = Pick<ChatHow, "base" | "root" | "pinned"> & {
   readonly asksAgent: boolean
   readonly column: string
-  /** The column's thread (ADR-0117): the one a fresh column's first send starts. */
+  /** The column's thread (ADR-0117): the one a unstarted column's first send starts. */
   readonly thread: ThreadId
   /**
    * The task the column is on (ADR-0116), where a thread its send starts
@@ -184,17 +184,17 @@ export interface SendPlan {
  * the message is for is `addressChat`, which `@pinetrie/rules`' `planChat`
  * runs too, over the thread `threadOf` gives (ADR-0021).
  *
- * - A fresh column sends `branch`. Elsewhere, a send to a busy lane, plain or
+ * - A unstarted column sends `branch`. Elsewhere, a send to a busy lane, plain or
  *   asking the agent, queues its card behind the others; so does a card with
  *   a command, even on an idle lane, since only the host's pop carries a
  *   command out (ADR-0108).
  * - A send that asks the agent creates a lane where there is none, and in a
- *   fresh column always, since a branch never continues a lane: then a chip
+ *   an unstarted thread's column always, since a branch never continues a lane: then a chip
  *   says where that lane will work (ADR-0032).
  */
 export function planSend(input: {
   readonly text: string
-  readonly fresh: boolean
+  readonly unstarted: boolean
   readonly lane: ThreadLane
   readonly asksAgent: boolean
   readonly participants: readonly string[]
@@ -204,9 +204,9 @@ export function planSend(input: {
   /** The card's command (ADR-0108), or null. */
   readonly command: CardCommand | null
 }): SendPlan {
-  const { fresh, lane } = input
+  const { unstarted, lane } = input
   const how = {
-    mode: fresh ? "branch" : "reply",
+    mode: unstarted ? "branch" : "reply",
     lane,
     asksAgent: input.asksAgent,
   } as const
@@ -220,11 +220,11 @@ export function planSend(input: {
   const compelled = to.compels.kind === "agent"
   const queued =
     lane.kind === "lane" && (sendWaits(lane) || input.command !== null)
-  const mode: ComposerMode = fresh ? "branch" : queued ? "queue" : "reply"
+  const mode: ComposerMode = unstarted ? "branch" : queued ? "queue" : "reply"
   const releases = lane.kind === "lane" && !lane.running && lane.heldBy !== null
   return {
     mode,
-    createsLane: compelled && (fresh || lane.kind === "none"),
+    createsLane: compelled && (unstarted || lane.kind === "none"),
     to,
     queue: releases
       ? { kind: "releases", count: lane.waiting + 1 }

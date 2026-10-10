@@ -7,16 +7,21 @@
 
 import {
   type BoardPlace,
+  type CanvasKey,
+  type CanvasTarget,
   type CardId,
   type CardInPlace,
   type CardPlace,
   type CardRecord,
+  type EntryId,
+  forkEntry,
   hasPlaceKind,
   isThreadId,
   type MoveTarget,
   makeCard,
   NO_CONTENT,
   type PlaceKey,
+  type PlaceOf,
   type RootId,
   type TaskId,
   type TaskRecord,
@@ -24,6 +29,7 @@ import {
   type ThreadId,
   type ThreadOrigin,
   type ThreadRecord,
+  type TreeIndex,
   threadOfPlace,
   type ValueWrite,
   type Workflow,
@@ -33,7 +39,12 @@ import {
 import { Type } from "typebox"
 import { BOARD, placeStarted } from "./board.ts"
 import { decodeAt, taskKey } from "./decode.ts"
-import { type MakeStep, planMake } from "./moves.ts"
+import {
+  type MakeStep,
+  type PlaceStep,
+  planMake,
+  rankOnCanvas,
+} from "./moves.ts"
 import { branchAfter, rankAfter } from "./rank.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 import { THREAD } from "./thread.ts"
@@ -166,15 +177,14 @@ export function indexTasks(
 }
 
 /**
- * The root a place is in: a fresh column's own; a place at a thread, its
- * thread's (`rootOfThread`). Undefined for any other, or a thread with no
- * record. Pure.
+ * The root a place is in: a place at a thread, its thread's
+ * (`rootOfThread`). Undefined for any other, or a thread with no record.
+ * Pure.
  */
 export const rootOfPlace = (
   place: CardPlace | PlaceKey,
   rootOfThread: ReadonlyMap<ThreadId, RootId>,
 ): RootId | undefined => {
-  if (place.kind === "fresh") return place.root
   const thread = threadOfPlace(place)
   return thread === null ? undefined : rootOfThread.get(thread)
 }
@@ -183,8 +193,8 @@ export const rootOfPlace = (
 export const NO_TASK_INDEX: TaskIndex = indexTasks([], new Map())
 
 /**
- * The task a place is in (ADR-0116): a canvas card's, a fresh column's, a
- * card pinned to a task's or a gone card's own; a note, its note column's; a card at a thread or
+ * The task a place is in (ADR-0116): a canvas card's, a card pinned to a
+ * task's or a trashed card's own; a note, its note column's; a card at a thread or
  * in an entry's margin, its thread's task (a queued card's thread is its
  * lane). Null for an
  * inventory, or a thread or a note column in none. Pure.
@@ -195,7 +205,6 @@ export function taskOfPlace(
 ): TaskId | null {
   switch (place.kind) {
     case "canvas":
-    case "fresh":
     case "task-pinned":
       return place.task
     // A trash key names no history: the host gives it one (`historyOf`).
@@ -254,79 +263,95 @@ export const canvasOf = (
     .sort(byRank)
 
 /**
- * A thread's card as it first lands on `task`'s canvas, one column wide,
- * made by its starter (`makeCard`, `planMake`): a branch just after the
- * thread it forks from (`parent`, `branchAfter`), anything else at the
- * canvas's end. Ranked first, then made; with it, the cards given new ranks
- * to make room (`rankAfter`), none when the make is refused. Pure.
+ * Where a thread's card lands as the thread opens (ADR-0126): on `task`'s
+ * canvas just after the thread it forks from (`branchAfter`), else at the
+ * canvas's end; where it was dropped on a canvas (`rankOnCanvas`); or in an
+ * inventory.
  */
-export function planThreadCard(input: {
-  readonly thread: ThreadId
-  readonly task: TaskId
-  readonly by: WriterId
-  readonly cards: readonly CardRecord[]
-  /** The thread a branch forks from; null for a new root. */
-  readonly parent: ThreadId | null
-}): { readonly step: MakeStep; readonly respaced: readonly CardRecord[] } {
-  const canvas = canvasOf(input.cards, input.task)
-  const { order, respaced } = rankAfter(
-    canvas,
-    branchAfter(canvas, input.parent),
-  )
-  const step = planMake(
-    input.cards,
-    makeCard(
-      "thread",
-      input.thread,
-      { kind: "canvas", task: input.task, order, width: 1 },
-      NO_CONTENT,
-      input.by,
-    ),
-    input.by,
-  )
-  return { step, respaced: step.kind === "write" ? respaced : [] }
-}
+export type ThreadPlacement =
+  | {
+      readonly kind: "after"
+      readonly task: TaskId
+      /** The thread it forks from; null for a root's first thread. */
+      readonly parent: ThreadId | null
+    }
+  | { readonly kind: "spot"; readonly to: CanvasKey | CanvasTarget }
+  | { readonly kind: "inventory"; readonly holder: WriterId }
 
-/** What a thread's first message writes besides itself (ADR-0116, ADR-0117). */
-export interface ThreadStart {
-  /** Its record; and for a new task, the task's record and its board place. */
-  readonly records: readonly ValueWrite[]
-  /**
-   * Its card, just after the thread it branches from, else at the end of
-   * its task's canvas (`planThreadCard`), then any card given a new rank to
-   * make room; none when its make is refused.
-   */
-  readonly cards: readonly CardRecord[]
-  /** Why its card's make was refused, for the host's shell to log; null when made. */
-  readonly refused: Extract<MakeStep, { kind: "refused" }> | null
-}
-
-/**
- * A thread's start, planned: its record, its card on `task`'s canvas just
- * after the thread it branches from (`parent`), else at its end, and, when
- * `task` is new (a new tab's), the task's record and its place at the end
- * of `state` on the board, or of the first open state. With no workflow
- * yet, a new task gets no board place. Pure.
- */
-export function planThreadStart(input: {
-  readonly thread: ThreadId
-  /** The thread a branch forks from; null for a new root. */
-  readonly parent: ThreadId | null
-  /** Where it forks, or a root's first thread. */
-  readonly origin: ThreadOrigin
-  readonly root: RootId
-  readonly task: TaskId
-  readonly by: WriterId
-  readonly now: number
+/** The task a thread opens in, when the session does not hold it yet: a new tab's. */
+export interface TaskOpening {
+  /** The workflow state it lands in; null for the first open one (ADR-0122). */
   readonly state: WorkflowStateId | null
-  /** Every task the session holds. */
-  readonly tasks: ReadonlySet<TaskId>
   readonly workflow: Workflow | null
   readonly board: ReadonlyMap<TaskId, BoardPlace>
+}
+
+/** What a thread's opening writes, or why its card's make was refused. */
+export type ThreadOpen =
+  | {
+      readonly kind: "open"
+      /**
+       * Its record; for a task the session lacks, the task's record and its
+       * board place, at the end of its state (`placeStarted`), none with no
+       * workflow yet.
+       */
+      readonly records: readonly ValueWrite[]
+      /** The cards re-ranked to make room, then its card. */
+      readonly steps: readonly PlaceStep[]
+    }
+  | Extract<MakeStep, { kind: "refused" }>
+
+/**
+ * A thread opened (ADR-0126): the one way a thread begins, before its first
+ * entry, as its column opens, a copy is made or a card is spun into it. Its
+ * record says how it began (`origin`); its card is made by `by`
+ * (`makeCard`, `planMake`) where `placement` says; and a task the session
+ * does not hold (`opens`) is written with it. Its first send writes only
+ * its entry. Pure.
+ */
+export function planThreadOpen(input: {
+  readonly thread: ThreadId
+  readonly origin: ThreadOrigin
+  readonly root: RootId
+  readonly by: WriterId
+  readonly now: number
+  readonly placement: ThreadPlacement
+  readonly opens: TaskOpening | null
   readonly cards: readonly CardRecord[]
-}): ThreadStart {
-  const { thread, task, by, now } = input
-  const opens = !input.tasks.has(task)
+}): ThreadOpen {
+  const { thread, by, now, placement, cards } = input
+  const ranked = ((): {
+    readonly to: PlaceOf<"thread">
+    readonly first: readonly PlaceStep[]
+  } => {
+    switch (placement.kind) {
+      case "inventory":
+        return { to: placement, first: [] }
+      case "spot": {
+        const { to, first } = rankOnCanvas(cards, thread, placement.to)
+        return { to: { ...to, width: 1 }, first }
+      }
+      case "after": {
+        const canvas = canvasOf(cards, placement.task)
+        const { order, respaced } = rankAfter(
+          canvas,
+          branchAfter(canvas, placement.parent),
+        )
+        return {
+          to: { kind: "canvas", task: placement.task, order, width: 1 },
+          first: respaced.map(
+            (record): PlaceStep => ({ kind: "write", record }),
+          ),
+        }
+      }
+    }
+  })()
+  const made = planMake(
+    cards,
+    makeCard("thread", thread, ranked.to, NO_CONTENT, by),
+    by,
+  )
+  if (made.kind === "refused") return made
   const records: ValueWrite[] = [
     setRecord(THREAD, {
       thread,
@@ -336,44 +361,70 @@ export function planThreadStart(input: {
       origin: input.origin,
     }),
   ]
-  if (opens) {
+  const task = ranked.to.kind === "canvas" ? ranked.to.task : null
+  if (input.opens !== null && task !== null) {
     records.push(setRecord(TASK, { task, by, createdAt: now }))
-    if (input.workflow !== null)
+    if (input.opens.workflow !== null)
       records.push(
         setRecord(
           BOARD,
           placeStarted({
             task,
-            state: input.state,
+            state: input.opens.state,
             by,
             now,
-            workflow: input.workflow,
-            places: input.board,
+            workflow: input.opens.workflow,
+            places: input.opens.board,
           }),
         ),
       )
   }
-  const { step, respaced } = planThreadCard({
-    thread,
-    task,
-    by,
-    cards: input.cards,
-    parent: input.parent,
-  })
-  return step.kind === "write"
-    ? { records, cards: [step.record, ...respaced], refused: null }
-    : { records, cards: [], refused: step }
+  return { kind: "open", records, steps: [...ranked.first, made] }
+}
+
+/** Where a thread not yet started begins: its root, and its fork, or null for a new root's first. */
+export interface ThreadOpening {
+  readonly root: RootId
+  readonly fork: EntryId | null
+}
+
+/**
+ * Each thread opened and not yet started (ADR-0126): no entry of it in
+ * `index`, and either its fork in `index` (a branch's or a copy's, its root
+ * held here), or its root one the directory does not name yet (`started`:
+ * a new tab's, whose root gets its document with its first entry). A
+ * thread whose root this tab does not hold is in neither. Pure.
+ */
+export function unstartedThreads(
+  threads: ReadonlyMap<ThreadId, ThreadRecord>,
+  index: TreeIndex,
+  started: ReadonlySet<RootId>,
+): ReadonlyMap<ThreadId, ThreadOpening> {
+  const out = new Map<ThreadId, ThreadOpening>()
+  for (const [thread, r] of threads) {
+    if (index.firstOf.has(thread)) continue
+    const fork = forkEntry(r.origin)
+    if (
+      fork === null ? !started.has(r.root) : index.entries[fork] !== undefined
+    )
+      out.set(thread, { root: r.root, fork })
+  }
+  return out
 }
 
 /**
  * The roots something still holds (ADR-0116): those with a thread whose
  * card is on the canvas of a task outside `archived`, or in an inventory.
- * What a starting host loads (`planLoads`), and what archiving keeps. Pure.
+ * What a starting host loads (`planLoads`), and what archiving keeps. A
+ * root gets its document with its first entry (ADR-0063), so one the
+ * directory does not name (`started`) is not held: an unstarted new tab's
+ * thread names a root with nothing to load (ADR-0126). Pure.
  */
 export function rootsHeld(
   cards: readonly CardRecord[],
   threads: ReadonlyMap<ThreadId, ThreadRecord>,
   archived: ReadonlySet<TaskId>,
+  started: ReadonlySet<RootId>,
 ): ReadonlySet<RootId> {
   const held = new Set<RootId>()
   for (const c of cards) {
@@ -382,7 +433,7 @@ export function rootsHeld(
       c.place.kind === "inventory" ||
       (c.place.kind === "canvas" && !archived.has(c.place.task))
     const root = threads.get(c.id)?.root
-    if (live && root !== undefined) held.add(root)
+    if (live && root !== undefined && started.has(root)) held.add(root)
   }
   return held
 }

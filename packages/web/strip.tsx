@@ -1,8 +1,7 @@
-// web/strip — the columns of the task you are on, or a new tab's one column
-// (ADR-0116): the task column first, then each card of the canvas in its
-// order, folded to a strip or drawn whole (a thread's column, a note
-// column), with your branches not yet sent after the thread each forks
-// from. What is drawn is decided in `@pinetrie/interface` (`taskStrip`);
+// web/strip — the columns of the task you are on (ADR-0116): the task
+// column first, then each card of the canvas in its order, folded to a
+// strip or drawn whole (a thread's column, a note column), a branch not yet
+// sent among them (ADR-0126). What is drawn is decided in `@pinetrie/interface` (`taskStrip`);
 // this draws it. A column's header is its drag handle (`use-column-drag.ts`).
 
 import type {
@@ -24,7 +23,6 @@ import {
   detailOf,
   dropProps,
   foldedView,
-  freshTaskOf,
   heldWords,
   type Intent,
   type NoteColumnView,
@@ -85,13 +83,13 @@ export function Strip(p: {
   stripRef: RefObject<HTMLDivElement | null>
   onPointerDown: (e: PointerEvent<HTMLDivElement>) => void
   stage: Extract<Stage, { kind: "task" | "new" }>
-  /** The task's strip; null for a new tab. */
+  /** The task's strip; null off a task. */
   strip: StripView | null
   /** Each thread column drawn whole, by its key (`openColumns`). */
   projected: ReadonlyMap<string, Projected>
   /** The task's canvas, for each card's place in it. */
   canvas: readonly CanvasCard[]
-  /** The task column, as drawn; null for a new tab. */
+  /** The task column, as drawn; null off a task. */
   taskColumn: TaskColumnView | null
   taskPins: readonly TextCard[]
   /** What the agent of the task's first column last read of its pins. */
@@ -118,26 +116,19 @@ export function Strip(p: {
     [p.canvas],
   )
   const threadColumn = (
-    item: Extract<CardColumn, { kind: "thread" }> | null,
+    item: Extract<CardColumn, { kind: "thread" }>,
     column: ColumnSpec,
   ): ReactElement | null => {
     const projected = p.projected.get(column.key)
     if (projected === undefined) return null
-    const task =
-      stage.kind === "task" ? stage.task : (freshTaskOf(column) ?? null)
+    const task = stage.kind === "task" ? stage.task : null
     return (
       <Column
         {...p.shared}
         closable={projected.closable}
         column={projected.column}
         drawnAt={projected.at}
-        columnKey={
-          item === null
-            ? { kind: "newTab", thread: column.thread }
-            : item.card === null
-              ? { kind: "fresh", thread: column.thread }
-              : { kind: "card", card: item.card }
-        }
+        columnKey={{ kind: "card", card: item.card }}
         count={p.canvas.length}
         key={column.key}
         onTyping={card => p.typing(projected.view.tipId, card)}
@@ -233,11 +224,7 @@ export function Strip(p: {
           view={p.taskColumn}
         />
       )}
-      {p.strip === null
-        ? [...p.projected.values()].map(({ column }) =>
-            threadColumn(null, column),
-          )
-        : stripCards(p.strip).map(cardColumn)}
+      {p.strip !== null && stripCards(p.strip).map(cardColumn)}
       {endDrop !== null && <div aria-hidden="true" className="canvas-end" />}
     </div>
   )

@@ -122,8 +122,6 @@ export const DISCARDED_NOTICE =
  */
 export function noticeWords(notice: CardNotice, reader: Reader): string {
   if (notice.code === "discarded") return DISCARDED_NOTICE
-  if (notice.code === "message-holds-text")
-    return "not moved: your message here holds text"
   if (notice.code === "slots-changed")
     return "not undone: those slots have changed since"
   const { by } = notice
@@ -255,7 +253,6 @@ const PARTICIPLE: Readonly<Record<Verb, string>> = {
   "took-into-inventory": "taken",
   put: "put",
   discarded: "discarded",
-  spun: "spun off into a thread",
   moved: "moved",
 }
 
@@ -267,8 +264,6 @@ export function historyWords(event: CardEvent, reader: Reader): string {
       return `created${by}`
     case "unsent":
       return "not sent: back below the line"
-    case "followed":
-      return "moved to the new thread"
     case "moved":
     case "undone":
     case "redone": {
@@ -295,7 +290,6 @@ const ACTIVE: Readonly<Record<Verb, string>> = {
   "took-into-inventory": "took",
   put: "put",
   discarded: "discarded",
-  spun: "made a thread of",
   moved: "moved",
 }
 

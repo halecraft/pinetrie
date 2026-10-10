@@ -16,7 +16,7 @@ import {
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import type { Item, Status } from "./attention.ts"
-import { NEW_ROOT, NEW_TASK, NEW_THREAD, tree } from "./fixtures.ts"
+import { tree } from "./fixtures.ts"
 import {
   type Here,
   initialLayout,
@@ -44,32 +44,21 @@ const R2: Here = { kind: "task", task: K("r2") }
 const R3: Here = { kind: "task", task: K("r3") }
 const reduce = (l: Layout, ...actions: Parameters<typeof layoutReducer>[1][]) =>
   actions.reduce(layoutReducer, l)
-// The sidebar: r1, r2, r3, then a new agent tab; you are on r1.
+// The sidebar: r1, r2, r3; you are on r1.
 const layout = resolveLayout(
-  reduce(
-    initialLayout(),
-    {
-      kind: "newTab",
-      key: NEW_THREAD,
-      root: NEW_ROOT,
-      task: NEW_TASK,
-      asksAgent: true,
-    },
-    { kind: "show", here: R1 },
-  ),
+  reduce(initialLayout(), { kind: "show", here: R1 }),
   {
     index: tree({ r1: null, r2: null, r3: null }),
     lanes: [],
     archived: new Set(),
     list: [K("r1"), K("r2"), K("r3")],
     canvases: new Map(),
-    forks: new Map(),
+    unstarted: new Map(),
     holders: new Map(),
   },
 )
 const none: UnsentSignals = {
   tasks: new Set(),
-  newTabs: new Set(),
   ends: new Set(),
   elsewhere: false,
 }
@@ -93,7 +82,11 @@ const WORKFLOW: Workflow = {
 }
 /** What the sidebar's items are read from, its thread cards' facts among them. */
 type Facts = Omit<SidebarViewInput, "heads"> &
-  Omit<ThreadCardFacts, "pips"> & { readonly shown: readonly TaskId[] }
+  Omit<ThreadCardFacts, "pips"> & {
+    readonly shown: readonly TaskId[]
+    /** Your unsent text: each task's pip. */
+    readonly unsent: UnsentSignals
+  }
 const input = (over: Partial<Facts> = {}): SidebarViewInput => {
   const f: Facts = {
     layout,
@@ -130,7 +123,6 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
     summaries: f.summaries,
     marks: f.marks,
     archived: f.archived,
-    unsent: f.unsent,
     arrivals: f.arrivals,
     sprites: f.sprites,
   }
@@ -143,9 +135,9 @@ const kinds = (
 ) => (r?.kind === "task" ? r.menu.map(i => i.kind) : null)
 
 describe("sidebarView", () => {
-  test("your roots, then new tabs, in listOf's order", () => {
-    expect(items().map(t => t.kind)).toEqual(["task", "task", "task", "new"])
-    expect(items().map(t => t.selected)).toEqual([true, false, false, false])
+  test("your tasks, in listOf's order", () => {
+    expect(items().map(t => t.kind)).toEqual(["task", "task", "task"])
+    expect(items().map(t => t.selected)).toEqual([true, false, false])
   })
 
   test("a root is labelled, and its rename field starts from its title", () => {
@@ -163,7 +155,6 @@ describe("sidebarView", () => {
       [],
       ["rename", "retitle", "moveTo", "moveTo"],
       ["rename", "retitle", "moveTo", "moveTo"],
-      null,
     ])
   })
 
@@ -249,18 +240,9 @@ describe("sidebarView", () => {
   })
 
   test("a pip on each item holding a card of yours", () => {
-    const unsent = {
-      ...none,
-      tasks: new Set([K("r2")]),
-      newTabs: new Set([NEW_THREAD]),
-    }
-    expect(items({ unsent }).map(t => t.pip)).toEqual([
-      false,
-      true,
-      false,
-      true,
-    ])
-    expect(items().map(t => t.pip)).toEqual([false, false, false, false])
+    const unsent = { ...none, tasks: new Set([K("r2")]) }
+    expect(items({ unsent }).map(t => t.pip)).toEqual([false, true, false])
+    expect(items().map(t => t.pip)).toEqual([false, false, false])
   })
 
   test("a root draws its status, and what arrived as you watched (ADR-0077)", () => {
@@ -304,14 +286,9 @@ describe("sidebarView", () => {
     })
   })
 
-  test("× closes it for you; a new tab's label says what it starts", () => {
-    const [r1, , , t] = items()
+  test("× closes it for you", () => {
+    const [r1] = items()
     expect(r1?.close).toEqual({ kind: "close", here: R1 })
-    expect(t).toMatchObject({
-      kind: "new",
-      label: "new agent",
-      close: { kind: "close", here: { kind: "new", key: NEW_THREAD } },
-    })
   })
 })
 
@@ -329,7 +306,6 @@ test("selected is the item you are on, and each item has its own key", () => {
     `task:${K("r1")}`,
     `task:${K("r2")}`,
     `task:${K("r3")}`,
-    `new:${NEW_THREAD}`,
   ])
   expect(sidebarView(input({ active: R3 })).selected).toMatchObject({
     task: K("r3"),
@@ -337,13 +313,12 @@ test("selected is the item you are on, and each item has its own key", () => {
 })
 
 describe("pageTitle", () => {
-  const [r1, , , t] = items()
+  const [r1] = items()
   test.each([
     [0, "nothing", null, "pine·trie"],
     [3, "nothing", null, "(3) pine·trie"],
     [0, "a root", r1, "Tab names · pine·trie"],
     [3, "a root", r1, "(3) Tab names · pine·trie"],
-    [0, "a new tab", t, "new agent · pine·trie"],
   ])("%i needing you, on %s", (count, _, here, words) => {
     expect(pageTitle(count, here ?? null, null)).toBe(words)
   })
@@ -355,8 +330,8 @@ describe("pageTitle", () => {
 
 describe("icons (ADR-0088)", () => {
   const SHA = "b".repeat(64) as Sha256
-  test("a task with a sprite draws it; one without, its initials on a colour its id seeds; a new tab, a hollow tile", () => {
-    const [r1, r2, r3, fresh] = items({
+  test("a task with a sprite draws it; one without, its initials on a colour its id seeds", () => {
+    const [r1, r2, r3] = items({
       sprites: new Map([[K("r2"), SHA]]),
     })
     expect(r1?.icon).toEqual({
@@ -370,7 +345,6 @@ describe("icons (ADR-0088)", () => {
       letters: "NT",
       slot: taskSlot(K("r3")),
     })
-    expect(fresh?.icon).toEqual({ kind: "fresh" })
   })
 })
 

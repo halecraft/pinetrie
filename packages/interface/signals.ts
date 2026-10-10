@@ -1,12 +1,12 @@
 // interface/signals — the unsent signal (ADR-0126): where your unsent cards
-// are (ADR-0048, step 2), on the sidebar's tasks and new tabs, on the rail at
+// are (ADR-0048, step 2), on the sidebar's tasks, on the rail at
 // a thread's end, on the board's items, and on ▦ for a task not in the
 // sidebar (ADR-0122). An archived task's work is done, so it lights only its
 // own item on the board, never ▦. They answer "where was I?", so they count
 // only the cards you own (contributors wait for Kyneta, ADR-0048's *Who
 // contributed*). A card counts while it holds text, not while its record
-// exists: a record outlives its text. Only your messages, your notes and
-// fresh cards count (ADR-0113): a queued card is on its way to being sent,
+// exists: a record outlives its text. Only your messages and your notes
+// count (ADR-0113): a queued card is on its way to being sent,
 // not left somewhere. A trace marks nothing yet: raising it is for
 // `attentionOf` (ADR-0077), beside verdicts and offers. Pure.
 
@@ -20,7 +20,7 @@ import type {
 } from "@pinetrie/core"
 import { placeEnd, type TaskIndex, taskOfPlace } from "@pinetrie/rules"
 import { needsCard } from "./card-state.ts"
-import { hereOfColumn, type Layout, unlisted } from "./layout.ts"
+import { type Layout, unlisted } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
 
 /**
@@ -60,8 +60,6 @@ export function withFilled(
 export interface UnsentSignals {
   /** Tasks holding a card of yours: their items in the sidebar and on the board. */
   readonly tasks: ReadonlySet<TaskId>
-  /** New tabs, by key, whose column holds a card of yours. */
-  readonly newTabs: ReadonlySet<string>
   /** Thread ends holding your message: dots on the rail. */
   readonly ends: ReadonlySet<EntryId>
   /**
@@ -84,7 +82,6 @@ export function unsentSignals(input: {
   readonly index: TreeIndex
 }): UnsentSignals {
   const tasks = new Set<TaskId>()
-  const newTabs = new Set<string>()
   const ends = new Set<EntryId>()
   for (const card of input.mine) {
     if (!input.filled.has(card.id)) continue
@@ -104,14 +101,6 @@ export function unsentSignals(input: {
         if (task !== null) tasks.add(task)
         break
       }
-      case "fresh": {
-        // A column this browser tab's layout lacks was typed in another
-        // browser tab, and is marked nowhere here.
-        const tab = hereOfColumn(input.layout, card.place.column)
-        if (tab?.kind === "new") newTabs.add(tab.key)
-        if (tab?.kind === "task") tasks.add(tab.task)
-        break
-      }
       // The inventory is no tab, a pinned card is a thread's or a task's
       // direction, not unsent work (ADR-0048), and a canvas holds no text
       // card.
@@ -126,7 +115,6 @@ export function unsentSignals(input: {
   }
   return {
     tasks,
-    newTabs,
     ends,
     elsewhere: unlisted(input.layout, input.archived, tasks).length > 0,
   }

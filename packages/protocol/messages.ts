@@ -122,6 +122,7 @@ export const COMMAND_KINDS = [
   "queue-hold",
   "unqueue-all",
   "spin-off",
+  "open-thread",
   "copy-thread",
   "make-reference",
   "edit-as-text",

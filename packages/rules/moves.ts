@@ -14,7 +14,6 @@ import {
   fitsPlace,
   isNoteColumnId,
   isReferenceCardId,
-  isTextCard,
   isTextCardId,
   KINDS,
   keyOf,
@@ -30,7 +29,6 @@ import {
   type RankedCanvas,
   type ResolvedMove,
   type ResolvedTarget,
-  type RootId,
   sameKey,
   seenAt,
   type TaskId,
@@ -365,56 +363,6 @@ export function planMove(
           }
         : { ...record, placer: sender },
   }
-}
-
-/**
- * What a fresh column's first send does to the column's other cards: each
- * becomes a note in the note column nearest `thread` (`notesOf`, ADR-0116),
- * the thread the send started, made in this step when its task has none.
- * The column has become that thread's, and a card left fresh under its key
- * would be drawn nowhere. The host's write, not a person's move, so each
- * card keeps its placer, as `planUnsent` does. Nothing when the sent card was
- * not fresh, its column is in another root than the message, or the thread
- * has no card yet. Pure.
- */
-export function planFreshFollow(input: {
-  readonly cards: readonly CardRecord[]
-  readonly sent: CardId
-  readonly root: RootId
-  readonly thread: ThreadId
-  /** Mints the id of a note column made for them. */
-  readonly newColumn: () => NoteColumnId
-  /** Who sent it: a note column made here is theirs. */
-  readonly by: WriterId
-}): readonly PlaceStep[] {
-  const { cards, thread } = input
-  const place = cards.find(c => c.id === input.sent)?.place
-  if (place?.kind !== "fresh" || place.root !== input.root) return []
-  const steps: PlaceStep[] = []
-  let now = cards
-  for (const c of cards.filter(isTextCard)) {
-    if (
-      c.id === input.sent ||
-      c.place.kind !== "fresh" ||
-      c.place.column !== place.column
-    )
-      continue
-    const notes = toNotes({
-      cards: now,
-      to: { kind: "notes", near: "thread", thread },
-      newColumn: input.newColumn,
-      by: input.by,
-    })
-    if (notes === null) return steps
-    for (const step of [
-      ...notes.first,
-      { kind: "write", record: { ...c, place: notes.place } } as const,
-    ]) {
-      steps.push(step)
-      now = afterStep(now, step)
-    }
-  }
-  return steps
 }
 
 /**

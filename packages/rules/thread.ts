@@ -1,12 +1,13 @@
 // thread — a thread's record (ADR-0117): its root, who started it and when,
-// and how it began: a root's first thread, or a fork at an entry, a branch
-// or a copy. Where a thread starts and ends is the
+// and how it began: a root's first thread, spun from a card or not, or a
+// fork at an entry, a branch or a copy. Where a thread starts and ends is the
 // tree's (each entry's `thread`, `firstOf` and `threadEnd` in @pinetrie/core,
 // ADR-0125), never a record's.
 
 import {
   entryId,
   isRootId,
+  parseTextCardId,
   ROOT_ORIGIN,
   type ThreadId,
   type ThreadRecord,
@@ -22,6 +23,7 @@ const ThreadRecordSchema = Type.Object({
   createdAt: Type.Number(),
   origin: Type.Union([
     Type.Object({ kind: Type.Literal("root") }),
+    Type.Object({ kind: Type.Literal("spun"), card: Type.String() }),
     Type.Object({
       kind: Type.Literal("fork"),
       at: Type.String({ minLength: 1 }),
@@ -40,6 +42,9 @@ export const THREAD: RecordSpec<ThreadRecord, ThreadId, "session"> = {
     decodeAt(ThreadRecordSchema, contents, threadKey(key), (r, thread) => {
       if (!isRootId(r.root)) return undefined
       const { origin } = r
+      const spun =
+        origin.kind === "spun" ? parseTextCardId(origin.card) : undefined
+      if (origin.kind === "spun" && spun === undefined) return undefined
       return {
         thread,
         root: r.root,
@@ -48,7 +53,9 @@ export const THREAD: RecordSpec<ThreadRecord, ThreadId, "session"> = {
         origin:
           origin.kind === "fork"
             ? { kind: "fork", at: entryId(origin.at), how: origin.how }
-            : ROOT_ORIGIN,
+            : spun !== undefined
+              ? { kind: "spun", card: spun }
+              : ROOT_ORIGIN,
       }
     }),
 }

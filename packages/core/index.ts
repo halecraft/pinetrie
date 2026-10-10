@@ -69,12 +69,21 @@ export interface ThreadRecord {
 }
 
 /**
- * How a thread began (ADR-0117, ADR-0126): a root's first thread, or a
- * fork at `at`, a branch or a copy. A fork's source is the thread its
- * entry is in (ADR-0125), so it is not stored. Before its first send a
- * thread's column ends at its fork, and its first send branches there.
+ * How a thread began (ADR-0117, ADR-0126): a root's first thread, a root's
+ * first thread spun from a text card (ADR-0111), or a fork at `at`, a
+ * branch or a copy. A fork's source is the thread its entry is in
+ * (ADR-0125), so it is not stored. Before its first send a thread's column
+ * ends at its fork, and its first send branches there.
  */
-export type ThreadOrigin = { readonly kind: "root" } | ThreadFork
+export type ThreadOrigin =
+  | { readonly kind: "root" }
+  /**
+   * Spun from `card`, which went to its spinner's trash: the undo key
+   * lifts the thread back into it while the thread holds that first
+   * message alone (`planLiftRoot`).
+   */
+  | { readonly kind: "spun"; readonly card: TextCardId }
+  | ThreadFork
 
 /** A thread forked at an entry: a branch, or a copy, whose fork row says so. */
 export interface ThreadFork {
@@ -86,7 +95,7 @@ export interface ThreadFork {
 /** A root's first thread. */
 export const ROOT_ORIGIN: ThreadOrigin = { kind: "root" }
 
-/** The entry a thread forks at, where its first send branches; null for a root's first thread. */
+/** The entry a thread forks at, where its first send branches; null for a root's first thread, spun or not. */
 export const forkEntry = (origin: ThreadOrigin): EntryId | null =>
   origin.kind === "fork" ? origin.at : null
 
@@ -375,14 +384,17 @@ export type Intent =
   /** Take every message card queued on a thread back below the line. */
   | { readonly kind: "unqueue-all"; readonly lane: ThreadId }
   /**
-   * Make a text card a thread (ADR-0111): a conversation root, the one its
-   * move names (`spun`), whose first message is the card's text, in a new
-   * task, `task`, in `state`, or the first open state for null; the card
-   * goes to gone, in the history `here` names when it leaves no task.
+   * Make a text card a thread (ADR-0111, ADR-0126): a new conversation root,
+   * `root`, its thread `thread`, whose first message is the card's text, in
+   * a new task, `task`, in `state`, or the first open state for null; the
+   * card goes to its sender's trash, in the history `here` names when it
+   * leaves no task.
    */
   | {
       readonly kind: "spin-off"
       readonly move: Move<Extract<PlaceKey, { readonly kind: "trash" }>>
+      readonly root: RootId
+      readonly thread: ThreadId
       readonly task: TaskId
       readonly state: WorkflowStateId | null
       /**
@@ -441,6 +453,21 @@ export type Intent =
       readonly kind: "move"
       readonly moves: readonly TypedMove[]
       readonly here: TaskId | null
+    }
+  /**
+   * Open a thread before its first entry (ADR-0126), as its column opens:
+   * its record, and its card on `task`'s canvas. A branch at `at` in
+   * `root`, just after the thread `at` is in; or, with `at` null, a new
+   * tab's: a new root's first thread in a new task, which lands in `state`
+   * (the first open state for null).
+   */
+  | {
+      readonly kind: "open-thread"
+      readonly thread: ThreadId
+      readonly root: RootId
+      readonly at: EntryId | null
+      readonly task: TaskId
+      readonly state: WorkflowStateId | null
     }
   /**
    * Copy the thread `source` (ADR-0117, ADR-0124): a new thread, its id the

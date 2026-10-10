@@ -1,6 +1,7 @@
 import {
   type CardRecord,
   cardIdOfKind,
+  entryId,
   NO_CONTENT,
   ROOT_ORIGIN,
   rootIdFor,
@@ -14,7 +15,7 @@ import { describe, expect, test } from "vitest"
 import { BOARD } from "./board.ts"
 import { orderKey } from "./order.ts"
 import { branchAfter, rankAfter } from "./rank.ts"
-import { canvasOf, planThreadStart, TASK } from "./task.ts"
+import { canvasOf, planThreadOpen, TASK, type ThreadPlacement } from "./task.ts"
 import { THREAD } from "./thread.ts"
 
 const ADA = writerId("ada@x.io")
@@ -59,26 +60,29 @@ const onCanvas = (
         }
   })
 
-const start = (cards: readonly CardRecord[], parent: ThreadId | null) =>
-  planThreadStart({
+/** A thread opened just after `parent` on K's canvas: its records, and the cards it writes. */
+const start = (cards: readonly CardRecord[], parent: ThreadId | null) => {
+  const opened = planThreadOpen({
     thread: NEW,
-    parent,
     origin: ROOT_ORIGIN,
     root: ROOT,
-    task: K,
     by: ADA,
     now: 7,
-    state: null,
-    tasks: new Set([K]),
-    workflow: null,
-    board: new Map(),
+    placement: { kind: "after", task: K, parent },
+    opens: null,
     cards,
   })
+  if (opened.kind !== "open") throw new Error(`refused: ${opened.code}`)
+  return {
+    records: opened.records,
+    cards: opened.steps.flatMap(s => (s.kind === "write" ? [s.record] : [])),
+  }
+}
 
 const ranked = (cards: readonly CardRecord[]) =>
   canvasOf(cards, K).map(c => c.id)
 
-describe("where a thread's card lands (ADR-0116)", () => {
+describe("where a thread's card lands as it opens (ADR-0116, ADR-0126)", () => {
   test("a branch just after the thread it forks from; a new root at the end", () => {
     const cards = onCanvas(
       [A, N, B],
@@ -86,7 +90,7 @@ describe("where a thread's card lands (ADR-0116)", () => {
     )
     const branch = start(cards, A)
     expect(ranked([...cards, ...branch.cards])).toEqual([A, NEW, N, B])
-    expect(branch.cards[0]).toMatchObject({
+    expect(branch.cards.at(-1)).toMatchObject({
       kind: "thread",
       id: NEW,
       owner: ADA,
@@ -115,24 +119,56 @@ describe("where a thread's card lands (ADR-0116)", () => {
     expect(ranked([...now.values()])).toEqual([A, NEW, N, B])
   })
 
+  test("where it was dropped on a canvas, or into an inventory", () => {
+    const cards = onCanvas(
+      [A, N, B],
+      [100, 200, 300].map(n => n * 2 ** 20),
+    )
+    const at = (placement: ThreadPlacement) => {
+      const opened = planThreadOpen({
+        thread: NEW,
+        origin: { kind: "fork", at: entryId("e"), how: "copy" },
+        root: ROOT,
+        by: ADA,
+        now: 7,
+        placement,
+        opens: null,
+        cards,
+      })
+      return opened.kind === "open" ? opened.steps.at(-1) : opened
+    }
+    const spot = at({
+      kind: "spot",
+      to: { kind: "canvas-at", task: K, after: N },
+    })
+    expect(
+      spot?.kind === "write" ? ranked([...cards, spot.record]) : null,
+    ).toEqual([A, N, NEW, B])
+    expect(at({ kind: "inventory", holder: ADA })).toMatchObject({
+      kind: "write",
+      record: { id: NEW, place: { kind: "inventory", holder: ADA } },
+    })
+  })
+
   test("a new task's record and its board place come with its first thread; an existing one's do not", () => {
-    const opened = planThreadStart({
+    const opened = planThreadOpen({
       thread: NEW,
-      parent: null,
       origin: ROOT_ORIGIN,
       root: ROOT,
-      task: taskIdFor("new"),
       by: ADA,
       now: 7,
-      state: DOING,
-      tasks: new Set([K]),
-      workflow: {
-        open: [{ id: DOING, name: "Doing" }],
-        archive: { id: workflowStateIdFor("x"), name: "Done" },
+      placement: { kind: "after", task: taskIdFor("new"), parent: null },
+      opens: {
+        state: DOING,
+        workflow: {
+          open: [{ id: DOING, name: "Doing" }],
+          archive: { id: workflowStateIdFor("x"), name: "Done" },
+        },
+        board: new Map(),
       },
-      board: new Map(),
       cards: [],
     })
+    if (opened.kind !== "open") throw new Error("refused")
     expect(opened.records.map(w => w.namespace)).toEqual([
       THREAD.namespace,
       TASK.namespace,

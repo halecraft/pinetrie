@@ -32,6 +32,7 @@ import {
   readQueueHolds,
   readReading,
   readRoots,
+  readTasks,
   readThreads,
   readTyping,
   readWorkflow,
@@ -1547,7 +1548,8 @@ async function run(check: Checks["check"]): Promise<void> {
       const first = `${agentCol} ${msg("say exactly: DOWN-ONE")}`
       await page.hover(first)
       await page.click(`${first} > .tools > .edit-new-tab`)
-      await page.waitForSelector('#sidebar .open-new[aria-current="true"]', {
+      // A new tab is a task of its own from the start (ADR-0126).
+      await page.waitForSelector(`${col(0)}[data-card] .composer`, {
         timeout: 15_000,
       })
       await page.click(`${col(0)} .close`)
@@ -2047,26 +2049,43 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
+        const tasksBefore = readTasks(host.session).size
         await page.keyboard.press("Enter")
-        await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
+        await page.waitForSelector(`${col(0)}[data-card] .composer`, {
+          timeout: 15_000,
+        })
         const convo = await label(0)
+        const opened = await waitFor(
+          () => readTasks(host.session).size === tasksBefore + 1,
+          5_000,
+        )
+        const tab = (await page.getAttribute(col(0), "data-card")) ?? ""
         check(
           "＋'s conversation, chosen by keyboard, opens a new tab that only sends",
           focused &&
             convo === TO_NOBODY &&
-            (await page.textContent(
-              '#sidebar .open-new[aria-current="true"]',
-            )) === "new conversation",
-          `"${convo}"`,
+            opened >= 0 &&
+            (await page.$('#sidebar .open-root[aria-current="true"]')) !==
+              null &&
+            readPlaces(host.places).find(c => c.id === tab)?.place.kind ===
+              "canvas",
+          `"${convo}", ${opened}`,
         )
+        // Closed unsent, discarding what it holds: its task goes too.
         await page.fill(`${col(0)} .composer .input`, "never sent")
-        await page.hover("#sidebar .open-new")
-        await page.click("#sidebar .open-new ~ .open-close")
-        await page
-          .waitForFunction(
-            () => document.querySelector("#sidebar .open-new") === null,
-          )
-          .catch(() => null)
+        await page.click(`${col(0)} .close`)
+        await page.click(`${col(0)} .close-discard`).catch(() => {})
+        const gone = await waitFor(
+          () => readTasks(host.session).size === tasksBefore,
+          10_000,
+        )
+        check(
+          "an unsent new tab closed with discard takes its task away, and its thread's card to your trash (ADR-0126)",
+          gone >= 0 &&
+            readPlaces(host.places).find(c => c.id === tab)?.place.kind ===
+              "trash",
+          `${gone}, ${readPlaces(host.places).find(c => c.id === tab)?.place.kind}`,
+        )
 
         // 6. Mentions: the inbox badge counts what you have not seen, and
         // the inbox takes you there. With no lanes of their own here there are
@@ -3222,7 +3241,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.keyboard.press("ControlOrMeta+z")
         await hasValue(page, box, "")
         await idle()
-        // A fresh column's card is kept by its key; closing it asks, and discards.
+        // A branch's message is kept at its thread; closing it asks, and discards.
         // A message's tools show on hover.
         const branchable = page
           .locator(`${col(0)} .msg[data-entry]:has(> .tools > .branch)`)
@@ -3267,9 +3286,10 @@ async function run(check: Checks["check"]): Promise<void> {
         const shown = () =>
           readPlaces(host.places).filter(c => c.place.kind !== "trash").length
         await waitFor(() => shown() < cardsBefore, 5_000)
+        // Its message and its thread's card, both to your trash.
         check(
           "closing a new branch that holds text asks first, and discarding takes its card away",
-          asks && closed && shown() === cardsBefore - 1,
+          asks && closed && shown() === cardsBefore - 2,
         )
         // Marks (ADR-0048, step 2): a pip where a card of yours holds text.
         const pipIn = (p: typeof page, sel: string) =>
@@ -3700,7 +3720,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.click(".inventory .discard-card")
       await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       const columnsBefore = await page.locator(".column").count()
-      // Closing a fresh column with text keeps its card, in the slot selected.
+      // Closing an unstarted branch with text keeps its card, in the slot selected.
       const branchable = page
         .locator(
           `${col(columnsBefore - 1)} .msg[data-entry]:has(> .tools > .branch)`,
@@ -3736,7 +3756,7 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check(
-        "closing a fresh column with text keeps its card in your inventory",
+        "closing an unstarted branch with text keeps its card in your inventory",
         keptOnClose && closedFresh && placeOf(thought)?.kind === "inventory",
         `slot ${keptOnClose}, closed ${closedFresh}, ${placeOf(thought)?.kind}`,
       )

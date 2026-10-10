@@ -169,9 +169,11 @@
 
 - **One rule makes every card**, a person's or the host's: the host is
   one more author.
-- **A thread's live end consumes a card**: a send, a spin into a new
-  thread (ADR-0111), a fact popped. The card ends, and the entry it became
-  is the record.
+- **A thread's live end consumes a card**: a send, a fact popped. The
+  card ends, and the entry it became is the record. A spin into a new
+  thread (ADR-0111) sends its card to its spinner's trash instead, so the
+  undo key can lift the thread back into it; the thread's record names the
+  card it was spun from.
 - **A copy records its origin**, for every kind, as a thread's copy does.
   Copying from the past (an entry, a block, a selection) makes a card.
 - **One gesture is one undo step**, whatever it does: a drop that makes a

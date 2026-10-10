@@ -180,6 +180,6 @@ test("opening starts empty, on the task it is opened on, and another task's sear
   expect(searchReducer(null, { kind: "type", query: "x" }, 9)).toBeNull()
   expect(searchOn(typed, { kind: "task", task: t1 })).toBe(typed)
   expect(searchOn(typed, { kind: "task", task: taskIdFor("t2") })).toBeNull()
-  expect(searchOn(typed, { kind: "new", key: "t" })).toBeNull()
+  expect(searchOn(typed, { kind: "nothing" })).toBeNull()
   expect(searchOn(typed, null)).toBeNull()
 })

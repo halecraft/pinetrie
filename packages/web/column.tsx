@@ -65,7 +65,6 @@ import {
   earlierWords,
   FOLD,
   type FoldMemory,
-  freshOf,
   gridKeyAct,
   type HeadBanner,
   type HeadIdentity,
@@ -105,6 +104,7 @@ import {
   traceGroups,
   tracesAt,
   traceWords,
+  unstartedOf,
   type ViewportStore,
   type WorkFacts,
   type WorkStrip,
@@ -173,14 +173,13 @@ import { useViewport } from "./use-viewport.ts"
 
 export interface ColumnProps {
   session: SessionClient
-  /** The column as the reducer holds it: its lane, and whether it is fresh. */
+  /** The column as drawn: its thread, and whether it has started. */
   column: ColumnSpec
-  /** The task it is on (ADR-0116): a new tab's, minted as it opened; null before it is known. */
+  /** The task it is on (ADR-0116); null before it is known. */
   task: TaskId | null
   /**
    * Which column it is (ADR-0116): its thread's card on the canvas, which
-   * folds and moves; a branch not yet sent, or a new tab's column, which
-   * close.
+   * folds and moves, and, its thread not yet started, closes.
    */
   columnKey: ColumnKey
   /** Its card's index on the canvas; -1 with no card. */
@@ -331,17 +330,15 @@ export function Column(p: ColumnProps) {
       spacer.current.style.height = "0px"
   }, [view.forkFrom])
 
-  // A fresh column, or a copy before its first send: its next send is a
-  // branch at its anchor, its thread's first message (ADR-0117).
-  const fresh = branchesAt(p.column)
-  const freshMode = freshOf(p.column)
-  // A card's column folds and moves; a fresh one closes and sends first.
+  // A thread not yet started (ADR-0126): its next send is a branch at its
+  // anchor, its thread's first message (ADR-0117).
+  const unstarted = branchesAt(p.column)
+  const opening = unstartedOf(p.column)
+  // A card's column folds and moves; an unstarted one closes too.
   const { columnKey } = p
   const card = columnKey.kind === "card" ? columnKey.card : null
-  const freshKey =
-    columnKey.kind === "fresh" || columnKey.kind === "newTab" ? columnKey : null
-  // Where a send attaches: a fresh column's branch point, else the column's end.
-  const at: Position = fresh
+  // Where a send attaches: an unstarted thread's fork, else the column's end.
+  const at: Position = unstarted
     ? p.column.anchor === null
       ? ROOT
       : atEntry(p.column.anchor)
@@ -614,8 +611,8 @@ export function Column(p: ColumnProps) {
   }, [attention, leftLane, view.tipId, end.releasedTip, visible, covered])
   // This thread's lane, as the host will find it: busy means a compelled
   // message waits.
-  // A fresh column's thread starts with its first send: it has no lane yet.
-  const lane: ThreadLane = fresh
+  // An unstarted thread starts with its first send: it has no lane yet.
+  const lane: ThreadLane = unstarted
     ? { kind: "none" }
     : laneOf(p.lanes, p.column.thread)
   const running = lane.kind === "lane" && lane.running
@@ -660,12 +657,12 @@ export function Column(p: ColumnProps) {
   const working = workingWords(running, askLineOf(runningAsk))
   // The cards at this column's end (ADR-0048): yours, which the composer
   // edits, and everyone else's, drawn above it. A thread's cards are found
-  // by where its thread ends now; a fresh column's by its key.
+  // by where its thread ends now; an unstarted one's by its thread.
   const threadEnd = at.kind === "entry" ? at.id : null
-  const mine = fresh
+  const mine = unstarted
     ? yourCard(
         p.session.writer,
-        { kind: "fresh", column: p.column.key },
+        { kind: "thread", thread: p.column.thread },
         p.cards,
         index,
       )
@@ -678,10 +675,10 @@ export function Column(p: ColumnProps) {
           index,
         )
   // The thread's pinned cards (ADR-0048 step 5), and what the agent reads of
-  // them now, from the walk the host plans a run's cards from. A fresh
+  // them now, from the walk the host plans a run's cards from. A unstarted
   // column has no thread, so none.
   const pinned =
-    fresh || threadEnd === null ? [] : pinnedAt(threadEnd, p.cards, index)
+    unstarted || threadEnd === null ? [] : pinnedAt(threadEnd, p.cards, index)
   const inView = threadEnd === null ? null : pinnedInView(index, threadEnd)
   // Your last offer command on this lane: in flight, refused or failed.
   const acting = useSyncExternalStore(
@@ -749,7 +746,7 @@ export function Column(p: ColumnProps) {
     asksAgent: p.column.asksAgent === true,
     thread,
     task: p.task,
-    ...(freshMode?.root === undefined ? {} : { root: freshMode.root }),
+    ...(opening?.root === undefined ? {} : { root: opening.root }),
     ...(pinned.length === 0 ? {} : { pinned: pinned.map(c => c.id) }),
   }
   // This thread's members and its budget, in its header (ADR-0128).
@@ -899,13 +896,7 @@ export function Column(p: ColumnProps) {
   const forkConflicts =
     above.commit === null ? [] : conflictsAt(p.work.revisions, above.commit)
 
-  const place =
-    composerPlace(
-      p.column,
-      at,
-      at.kind === "entry" ? p.session.rootOf(at.id) : undefined,
-      p.task,
-    ) ?? undefined
+  const place = composerPlace(p.column, at) ?? undefined
   // Where this composer creates your message, and the message there: what
   // a put here reads (`ComposerSpot`). A column that can be written
   // publishes them; one leaving takes them back.
@@ -920,15 +911,12 @@ export function Column(p: ColumnProps) {
     )
   })
   useEffect(() => () => composers.set(key, null), [composers, key])
-  // A send from any card here: a fresh column's first one names the message
-  // the column then follows.
+  // A send from any card here: an unstarted thread's first one spends what
+  // it started with.
   const onSend = () => {
     end.follow()
-    if (!fresh) return undefined
-    const sendId = crypto.randomUUID()
-    if (freshKey !== null)
-      p.onIntent({ kind: "sentFresh", column: freshKey, sendId })
-    return sendId
+    if (unstarted) p.onIntent({ kind: "sentFirst", card: p.column.thread })
+    return undefined
   }
   // Where a queue from a card's ⋯ puts it: on this thread's lane, at its end.
   const queueOn =
@@ -944,7 +932,7 @@ export function Column(p: ColumnProps) {
   const [pinBox, setPinBox] = useState<EditorState | undefined>(undefined)
   const pinShown = pinning && pinBox !== undefined ? shownBy(pinBox) : null
   const newPin = newPinAt({
-    canPin: pinKey !== null && !fresh && threadEnd !== null,
+    canPin: pinKey !== null && !unstarted && threadEnd !== null,
     pinning,
     pinned: pinned.length,
   })
@@ -980,19 +968,23 @@ export function Column(p: ColumnProps) {
       void p.session.request({ kind: "traces-seen", traces })
   }, [traceIds, visible])
   const traceRows = traceGroups(keptTraces(keptHere, traces))
-  // Closing a fresh column whose cards hold text asks first: they have no
+  // Closing a unstarted column whose cards hold text asks first: they have no
   // thread to stay on. Keeping them in your inventory is the default, and can
   // be undone; discarding them is final (ADR-0048).
   const [askClose, setAskClose] = useState<readonly CardId[] | null>(null)
   const close = () => {
-    const typed = fresh
+    const typed = unstarted
       ? (mine === undefined ? [] : [mine])
           .filter(c => p.session.cardText(c.id).text().trim() !== "")
           .map(c => c.id)
       : []
     if (typed.length > 0) setAskClose(typed)
-    else if (freshKey !== null)
-      p.onIntent({ kind: "closeFresh", column: freshKey, discard: [] })
+    else if (unstarted)
+      p.onIntent({
+        kind: "closeUnstarted",
+        card: p.column.thread,
+        keep: false,
+      })
   }
   const branchInstead = (pending: Pending) => {
     if (at.kind === "entry") act({ kind: "branchInstead", at: at.id, pending })
@@ -1176,12 +1168,11 @@ export function Column(p: ColumnProps) {
                   className="close-keep"
                   onClick={() => {
                     setAskClose(null)
-                    if (freshKey !== null)
-                      p.onIntent({
-                        kind: "keepFresh",
-                        column: freshKey,
-                        cards: askClose,
-                      })
+                    p.onIntent({
+                      kind: "closeUnstarted",
+                      card: p.column.thread,
+                      keep: true,
+                    })
                   }}
                   type="button"
                 >
@@ -1191,12 +1182,11 @@ export function Column(p: ColumnProps) {
                   className="close-discard"
                   onClick={() => {
                     setAskClose(null)
-                    if (freshKey !== null)
-                      p.onIntent({
-                        kind: "closeFresh",
-                        column: freshKey,
-                        discard: askClose,
-                      })
+                    p.onIntent({
+                      kind: "closeUnstarted",
+                      card: p.column.thread,
+                      keep: false,
+                    })
                   }}
                   type="button"
                 >
@@ -1231,7 +1221,7 @@ export function Column(p: ColumnProps) {
                     working={working}
                   />
                 )}
-              {!fresh && threadEnd !== null && (
+              {!unstarted && threadEnd !== null && (
                 <PinnedStrip
                   box={
                     pinning && pinKey !== null ? (
@@ -1240,7 +1230,7 @@ export function Column(p: ColumnProps) {
                         card={pinned.find(c => c.id === pinShown)}
                         catchUps={catchUps}
                         commands={[]}
-                        fresh={false}
+                        unstarted={false}
                         how={how}
                         lane={lane}
                         onAct={act}
@@ -1443,9 +1433,9 @@ export function Column(p: ColumnProps) {
                   commands={p.work.commands}
                   at={at}
                   how={how}
-                  fresh={fresh}
+                  unstarted={unstarted}
                   reader={{ me: p.session.writer, nameOf: p.nameOf }}
-                  prefill={freshMode?.prefill}
+                  prefill={opening?.prefill}
                   lane={lane}
                   onBranchInstead={branchInstead}
                   onSend={onSend}
@@ -1458,7 +1448,7 @@ export function Column(p: ColumnProps) {
                   putColumn={putColumn}
                   participants={p.participants}
                   agents={agents}
-                  pending={freshMode?.pending}
+                  pending={opening?.pending}
                   readOnly={p.readOnly}
                   typingAt={view.tipId}
                   session={p.session}

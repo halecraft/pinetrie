@@ -9,6 +9,7 @@ import {
   rootDocId,
   type TaskId,
   type ThreadId,
+  type ThreadRecord,
   type ValueWrite,
 } from "@pinetrie/core"
 import { BOARD } from "./board.ts"
@@ -18,6 +19,49 @@ import { deleteRecord } from "./records.ts"
 import { ROOT } from "./roots.ts"
 import { rootOfPlace, TASK } from "./task.ts"
 import { THREAD } from "./thread.ts"
+
+/** A task deleted (ADR-0116): its record, its board place and its title. */
+export const planTaskDelete = (task: TaskId): readonly ValueWrite[] => [
+  deleteRecord(TASK, task),
+  deleteRecord(BOARD, task),
+  deleteRecord(MARK, task),
+]
+
+/**
+ * The tasks a step leaves empty that were a new tab's (ADR-0126): a thread
+ * card that left `task`'s canvas for a trash, its thread a new root's not
+ * yet started (its root one the directory does not name, `started`), and
+ * nothing left on that canvas or pinned to the task. Closing an unsent new
+ * tab deletes its task (`planTaskDelete`), not undone. Pure.
+ */
+export function emptiedTasks(input: {
+  readonly before: readonly CardRecord[]
+  readonly after: readonly CardRecord[]
+  readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
+  readonly started: ReadonlySet<RootId>
+}): readonly TaskId[] {
+  const now = new Map(input.after.map(c => [c.id, c] as const))
+  const out: TaskId[] = []
+  for (const c of input.before) {
+    if (c.kind !== "thread" || c.place.kind !== "canvas") continue
+    const { task } = c.place
+    const record = input.threads.get(c.id)
+    if (
+      now.get(c.id)?.place.kind !== "trash" ||
+      record?.origin.kind !== "root" ||
+      input.started.has(record.root) ||
+      out.includes(task)
+    )
+      continue
+    const holds = input.after.some(
+      d =>
+        (d.place.kind === "canvas" || d.place.kind === "task-pinned") &&
+        d.place.task === task,
+    )
+    if (!holds) out.push(task)
+  }
+  return out
+}
 
 /** What deleting a root writes, and what it lets go. */
 export interface RootDelete {
@@ -46,9 +90,7 @@ export function planRootDelete(
     values: [
       deleteRecord(ROOT, root),
       deleteRecord(THREAD, thread),
-      deleteRecord(TASK, task),
-      deleteRecord(BOARD, task),
-      deleteRecord(MARK, task),
+      ...planTaskDelete(task),
     ],
     cards: cards
       .filter(

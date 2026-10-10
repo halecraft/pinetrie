@@ -89,7 +89,7 @@ describe("threadCardHead (ADR-0111, ADR-0116)", () => {
         archived: new Set(),
         list: [K1],
         canvases: new Map(),
-        forks: new Map(),
+        unstarted: new Map(),
         holders: new Map(),
       },
     )
@@ -100,12 +100,6 @@ describe("threadCardHead (ADR-0111, ADR-0116)", () => {
       summaries: new Map(),
       marks: new Map(),
       archived: new Set(),
-      unsent: {
-        tasks: new Set(),
-        newTabs: new Set(),
-        ends: new Set(),
-        elsewhere: false,
-      },
       arrivals: { arrived: new Map(), done: new Map() },
       sprites: new Map(),
     })

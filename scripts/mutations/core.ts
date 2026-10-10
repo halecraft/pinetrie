@@ -881,10 +881,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a gone key carries a task on the wire",
     file: "packages/core/places.ts",
-    from: '    kinds: ["fresh", "canvas", "canvas-at", "task-pinned", "notes"],',
-    to: '    kinds: ["fresh", "canvas", "canvas-at", "task-pinned", "notes", "discarded"],',
+    from: '    kinds: ["canvas", "canvas-at", "task-pinned", "notes"],',
+    to: '    kinds: ["canvas", "canvas-at", "task-pinned", "notes", "discarded"],',
     command: unit,
-    expect: "no task but a canvas's and a fresh one's",
+    expect: "no task but a canvas's and a spot's",
   },
   {
     name: "the Line drops a command's task",

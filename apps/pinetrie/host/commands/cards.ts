@@ -15,7 +15,6 @@
 import {
   type CardCommand,
   type CardId,
-  type CardRecord,
   cardIdOfKind,
   DISCARDED,
   type EntryId,
@@ -39,11 +38,13 @@ import {
   type ThreadId,
   type TreeIndex,
   threadOfSend,
+  type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
+  readBoardPlaces,
   readCardHistories,
   readLaneRecords,
   readLanes,
@@ -51,8 +52,10 @@ import {
   readQueueHolds,
   readRoots,
   readRunning,
+  readTasks,
   readThreads,
   readTreeIndex,
+  readWorkflow,
 } from "@pinetrie/reads"
 import {
   afterSteps,
@@ -60,34 +63,35 @@ import {
   type CopyPlan,
   type CopyThread,
   cardsOfParts,
+  emptiedTasks,
   historyOf,
   type LiftPlan,
   lanesToDrain,
   type MoveStep,
   type MovesStep,
   NO_DISCARDS,
-  type PlaceStep,
+  type OpenPlan,
+  type OpenThread,
   planCopy,
   planEditAsText,
-  planFreshFollow,
   planLiftRoot,
   planMakeReference,
   planMoveCommand,
   planMoveRequest,
   planMoveTargets,
+  planOpenThread,
   planQueueCard,
   planReorder,
   planRootDelete,
   planSetCommand,
   planSpinOff,
+  planTaskDelete,
   planUnqueueAll,
   planWidth,
   type ReorderStep,
   type SpinOff,
   type SpunThread,
-  setRecord,
   type TaskIndex,
-  THREAD,
   taskOfPlace,
   undoAnswer,
 } from "@pinetrie/rules"
@@ -214,9 +218,10 @@ export function createCardCommands(deps: CardCommandDeps) {
   }
 
   /**
-   * What an undo of `writer`'s newest step in `task` does to the threads its
-   * cards were spun into (S139): the cards its step moves, read before it
-   * is tried, and each thread they spun off, as its tree is now.
+   * What an undo of `writer`'s newest step in `scope` does to the threads
+   * its cards were spun into (S139): the cards its step moves, read before
+   * it is tried, and each thread whose record says it was spun from one of
+   * them, as its tree is now.
    */
   async function liftOf(
     writer: WriterId,
@@ -227,23 +232,22 @@ export function createCardCommands(deps: CardCommandDeps) {
     const lifting =
       top === undefined ? [] : cardsOfParts(top.parts, PLACES_DOC_ID)
     const known = readRoots(session)
-    const threads = new Map<RootId, SpunThread>()
-    for (const card of readPlaces(places)) {
-      if (!lifting.includes(card.id)) continue
-      if (card.place.kind !== "trash" || card.place.why.kind !== "spun")
-        continue
-      const { into } = card.place.why
-      const held = known.has(into)
-      threads.set(into, {
-        thread: into,
+    const spun: SpunThread[] = []
+    for (const [thread, record] of readThreads(session)) {
+      const { origin, root } = record
+      if (origin.kind !== "spun" || !lifting.includes(origin.card)) continue
+      const held = known.has(root)
+      spun.push({
+        thread,
+        root,
         known: held,
-        writers: held ? writersOf(readTreeIndex(await docs.root(into))) : [],
+        writers: held ? writersOf(readTreeIndex(await docs.root(root))) : [],
       })
     }
     return planLiftRoot({
       lifting,
+      spun,
       cards: readPlaces(places),
-      threads,
       lanes: [...readLaneRecords(session).values()],
       rootOfThread: tasks.rootOfThread,
       histories: readCardHistories(session),
@@ -281,34 +285,14 @@ export function createCardCommands(deps: CardCommandDeps) {
   }
 
   /**
-   * Where a fresh column's other cards go once its first message is written:
-   * that message, by the send's id, on its thread's lane once pi holds it,
-   * else on none.
+   * The message a send wrote, by its send's id; null before pi holds it.
    */
-  async function followers(
-    writer: WriterId,
-    cards: readonly CardRecord[],
-    card: CardId,
-    sent: { readonly sendId: string; readonly chat: Chat },
-  ): Promise<{
-    readonly message: EntryId | null
-    readonly steps: readonly PlaceStep[]
-  }> {
-    const { root } = sent.chat
-    const index = readTreeIndex(await docs.root(root))
-    const at = index.bySend.get(sent.sendId)
-    if (at === undefined) return { message: null, steps: [] }
-    return {
-      message: at,
-      steps: planFreshFollow({
-        cards,
-        sent: card,
-        root,
-        thread: sent.chat.at.thread,
-        newColumn,
-        by: writer,
-      }),
-    }
+  async function sentMessage(sent: {
+    readonly sendId: string
+    readonly chat: Chat
+  }): Promise<EntryId | null> {
+    const index = readTreeIndex(await docs.root(sent.chat.root))
+    return index.bySend.get(sent.sendId) ?? null
   }
 
   /**
@@ -341,7 +325,19 @@ export function createCardCommands(deps: CardCommandDeps) {
       entryThreads,
     )
     // execute
-    return carry(step, drain, { kind: "move", by: writer }, gesture)
+    const before = readPlaces(places)
+    const done = await carry(step, drain, { kind: "move", by: writer }, gesture)
+    // A new tab closed before its first send leaves its task empty: it goes
+    // (ADR-0126), not undone.
+    const emptied = emptiedTasks({
+      before,
+      after: readPlaces(places),
+      threads: readThreads(session),
+      started: new Set(readRoots(session).keys()),
+    })
+    if (emptied.length > 0)
+      await deps.records.writeValues(emptied.flatMap(planTaskDelete))
+    return done
   }
 
   /**
@@ -482,11 +478,13 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A text card made a thread (ADR-0111), in one step of the keeper:
-     * planned (`planSpinOff`), then the new conversation root started by
-     * `start` (its first message, the card's text, and its board place),
-     * then the card's move to gone, spun into it, in its history's step.
-     * The answer is the thread's start, its first message's id among it.
+     * A text card made a thread (ADR-0111, ADR-0126), in one step of the
+     * keeper: planned (`planSpinOff`), then the thread's records (its own,
+     * spun from the card, and its new task's), its first message, the
+     * card's text, sent by `start`, then its card on its task's canvas and
+     * the card's move to its sender's trash, in its history's step. A send
+     * that took nothing deletes the records again. The answer is the
+     * thread's start, its first message's id among it.
      */
     async spinOff(
       writer: WriterId,
@@ -517,6 +515,13 @@ export function createCardCommands(deps: CardCommandDeps) {
         tasks,
         text,
         roots: new Set(readRoots(session).keys()),
+        threads: new Set(readThreads(session).keys()),
+        opens: {
+          state: request.state,
+          workflow: readWorkflow(session),
+          board: readBoardPlaces(session),
+        },
+        now: deps.basics.now(),
       })
       switch (plan.kind) {
         case "refused":
@@ -538,7 +543,9 @@ export function createCardCommands(deps: CardCommandDeps) {
             message: "that root's id is in use",
           })
       }
-      // execute: the thread, then the card's move
+      // execute: the thread's records, its first message, then its card and
+      // the card's move; a send that took nothing takes its records back
+      await deps.records.writeValues(plan.open.records)
       const sent = await start({
         text: plan.text,
         root: plan.root,
@@ -555,7 +562,12 @@ export function createCardCommands(deps: CardCommandDeps) {
         base: null,
         state: request.state,
       })
-      if (!spendsCard(sent)) return settled(sent)
+      if (!spendsCard(sent)) {
+        await deps.records.writeValues(plan.open.records.map(unwritten))
+        return settled(sent)
+      }
+      await carry({ kind: "steps", steps: plan.open.steps }, [], null)
+      await deps.ensureNames()
       const moved = await carry(
         plan.step,
         [],
@@ -563,6 +575,42 @@ export function createCardCommands(deps: CardCommandDeps) {
         gesture,
       )
       return settled(sent, moved.rev)
+    },
+
+    /**
+     * A thread opened as its column opens (ADR-0126), in one step of the
+     * keeper: planned (`planOpenThread`) from its root's tree for a branch,
+     * then its record (and a new tab's task's), its card on its task's
+     * canvas and the canvas re-ranked for it, then its name. No entry is
+     * written: its first send is a branch at its fork, or a new root.
+     */
+    async openThread(writer: WriterId, open: OpenThread): Promise<Settled> {
+      // gather
+      const index =
+        open.at === null ? null : readTreeIndex(await docs.root(open.root))
+      // plan
+      const plan = planOpenThread({
+        open,
+        sender: writer,
+        cards: readPlaces(places),
+        threads: readThreads(session),
+        roots: new Set(readRoots(session).keys()),
+        tasks: new Set(readTasks(session).keys()),
+        index,
+        workflow: readWorkflow(session),
+        board: readBoardPlaces(session),
+        now: deps.basics.now(),
+      })
+      if (plan.kind === "refused") return settled(openRefusal(plan.why))
+      // execute: the records first, so a reader that finds the card finds
+      // its thread's root
+      await deps.records.writeValues(plan.records)
+      const done = await carry({ kind: "steps", steps: plan.steps }, [], {
+        kind: "move",
+        by: writer,
+      })
+      await deps.ensureNames()
+      return done
     },
 
     /**
@@ -661,7 +709,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       if (plan.kind === "refused") return settled(copyRefusal(plan.why))
       // execute: the record first, so a reader that finds the card finds
       // its thread's root
-      await deps.records.writeValues([setRecord(THREAD, plan.record)])
+      await deps.records.writeValues(plan.records)
       const done = await carry({ kind: "steps", steps: plan.steps }, [], {
         kind: "move",
         by: writer,
@@ -675,29 +723,21 @@ export function createCardCommands(deps: CardCommandDeps) {
       return carry(planSetCommand(readPlaces(places), card, command), [], null)
     },
 
-    /**
-     * A sent card's record goes, then its text (S64). Sent from a fresh
-     * column, the column's other cards follow it to the message it became
-     * (`planFreshFollow`), in this step. Its `rev` after.
-     */
+    /** A sent card's record goes, then its text (S64). Its `rev` after. */
     async spend(
       writer: WriterId,
       card: TextCardId,
       sent: { readonly sendId: string; readonly chat: Chat },
     ): Promise<number> {
-      const cards = readPlaces(places)
-      const followed = await followers(writer, cards, card, sent)
-      const held = cards.some(c => c.id === card)
+      const message = await sentMessage(sent)
+      const held = readPlaces(places).some(c => c.id === card)
       const { rev } = await carry(
         {
           kind: "steps",
-          steps: [
-            ...followed.steps,
-            ...(held ? [{ kind: "remove", id: card } as const] : []),
-          ],
+          steps: held ? [{ kind: "remove", id: card }] : [],
         },
         [],
-        { kind: "spend", by: writer, message: followed.message },
+        { kind: "spend", by: writer, message },
       )
       // A card the host no longer holds may still have a text.
       if (!held) await deps.cards.destroy(card)
@@ -758,6 +798,39 @@ export function createCardCommands(deps: CardCommandDeps) {
       await deps.provenance.seen(writer, ids)
       return settled({ kind: "seen" })
     },
+  }
+}
+
+/** A record's write undone: the same record deleted. */
+const unwritten = (write: ValueWrite): ValueWrite =>
+  write.kind === "set"
+    ? {
+        kind: "delete",
+        target: write.target,
+        namespace: write.namespace,
+        key: write.key,
+      }
+    : write
+
+/** Why an opening was refused, as its sender is answered. */
+function openRefusal(
+  why: Extract<OpenPlan, { kind: "refused" }>["why"],
+): Outcome {
+  switch (why) {
+    case "unknown":
+      return {
+        kind: "refused",
+        code: ERR.UNKNOWN_TARGET,
+        message: "no such entry, or no such task, to branch in",
+      }
+    case "taken":
+      return {
+        kind: "refused",
+        code: ERR.THREAD_TAKEN,
+        message: "that thread has started already",
+      }
+    default:
+      return { kind: "unmoved", code: why, place: null, by: null }
   }
 }
 

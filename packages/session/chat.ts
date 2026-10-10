@@ -22,7 +22,7 @@ import { IN_COLUMN, type Pending, sendPendingOf } from "./card-moves.ts"
 export interface ChatHow {
   /** A Start Agent column. */
   readonly asksAgent?: boolean
-  /** The send's id, minted by a fresh column so it can find its message. */
+  /** The send's id, when its sender names one. */
   readonly id?: string
   /** The card the text is sent from, which the host spends once it is sent. */
   readonly card?: TextCardId
@@ -45,9 +45,10 @@ export interface ChatHow {
 }
 
 /**
- * Where a send from a column goes (`ChatAt`): a fresh column's starts its
- * thread at its fork, its card in `task`, the task the column is on; any
- * other continues its thread from the end it shows.
+ * Where a send from a column goes (`ChatAt`): an unstarted thread's
+ * starts it at its fork, or at the root for a new tab's, in `task`, the
+ * task the column is on; any other continues its thread from the end it
+ * shows.
  */
 export const chatAtOf = (
   mode: ChatMode,

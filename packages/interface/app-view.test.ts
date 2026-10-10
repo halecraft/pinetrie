@@ -68,17 +68,16 @@ describe("appView's stage", () => {
     expect(stage({ active: { kind: "nothing" } }).kind).toBe("nothing")
   })
 
-  test("a new tab has its own kind, and its one column closes the tab", () => {
-    expect(stage({ active: { kind: "new", key: "t" } })).toEqual({
-      kind: "new",
-      key: "t",
-      slots: [{ key: "a", closable: true, track: 3 }],
-    })
-  })
-
-  test("in a task, only a branch not yet sent closes: a card's column folds (ADR-0116)", () => {
+  test("in a task, only a thread not yet started closes: a card's column folds (ADR-0116, ADR-0126)", () => {
     const [a, b] = columns("a", "b")
-    const fresh: Column = { ...(b as Column), mode: { kind: "fresh" } }
+    const fresh: Column = {
+      ...(b as Column),
+      mode: {
+        kind: "unstarted",
+        fork: null,
+        root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+      },
+    }
     const two = stage({ columns: [a as Column, fresh], tracks: [3] })
     expect(two.kind === "task" && two.slots).toEqual([
       { key: "a", closable: false, track: 3 },
@@ -234,7 +233,7 @@ test("a task's rail is a forest: a tree for each root of its threads, in order, 
   expect(
     taskRail({
       index,
-      active: { kind: "new", key: "t" },
+      active: { kind: "nothing" },
       roots,
       ends: new Map(),
       linkOf,

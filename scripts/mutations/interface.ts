@@ -6,6 +6,14 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a named thread opened before its lane asks for no banner",
+    file: "packages/interface/column-view.ts",
+    from: "  return f.work.names.has(f.thread) && f.work.banners.has(f.thread)\n",
+    to: "  return f.work.names.has(f.thread)\n",
+    command: unit,
+    expect: "named as a conversation's thread, opened before its lane",
+  },
+  {
     name: "the undo key on no task does nothing",
     file: "packages/interface/card-intents.ts",
     from: '  return [{ kind: "undoMoves", task: taskOfTab(state), direction }]\n',
@@ -559,14 +567,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "edited, and conflicting",
   },
-  {
-    name: "a fresh column takes the newest child of its anchor",
-    file: "packages/interface/columns.ts",
-    from: "      fresh.sendId === undefined ? undefined : index.bySend.get(fresh.sendId)",
-    to: '      (index.childrenOf.get(column.anchor ?? "") ?? []).at(-1)',
-    command: unit,
-    expect: "whatever came first",
-  },
 
   {
     name: "a renamed writer shows only the name they sent under",
@@ -576,15 +576,6 @@ export const mutations: readonly Mutation[] = [
     to: "  return asSent",
     command: unit,
     expect: "renamed since",
-  },
-
-  {
-    name: "a fresh column waits for its own message though its thread started",
-    file: "packages/interface/columns.ts",
-    from: "    return own === undefined && !started",
-    to: "    return own === undefined",
-    command: unit,
-    expect: "a new tab whose thread starts becomes that root's tab",
   },
 
   {
@@ -630,35 +621,28 @@ export const mutations: readonly Mutation[] = [
 
   {
     name: "a column keeps its pending message after sending it",
-    file: "packages/interface/columns.ts",
-    from: '            mode: {\n              kind: "fresh",\n              sendId: action.sendId,',
-    to: '            mode: {\n              ...fresh,\n              kind: "fresh",\n              sendId: action.sendId,',
+    file: "packages/interface/layout.ts",
+    from: '        set(set(c, "pending", undefined), "prefill", undefined),\n',
+    to: '        set(c, "prefill", undefined),\n',
     command: unit,
-    expect: "a fresh column's first send spends its prefill and keeps its task",
+    expect:
+      "a thread you opened is unfolded with what it starts with, until its first send spends it; reader settings stay (ADR-0126)",
   },
   {
     name: "a pending message is stored",
     file: "packages/interface/layout.ts",
-    from: "            ...(fresh.sendId === undefined ? {} : { sendId: fresh.sendId }),",
-    to: "            ...fresh,",
+    from: "        ...(v.asksAgent ? { asksAgent: true } : {}),\n      },\n    ]),\n  ),",
+    to: "        ...(v.asksAgent ? { asksAgent: true } : {}),\n        ...(v.pending === undefined ? {} : { pending: v.pending.text }),\n      },\n    ]),\n  ),",
     command: unit,
     expect: "never stored, nor restored",
   },
   {
     name: "a stored pending message is restored",
     file: "packages/interface/layout.ts",
-    from: "            ...(s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId }),",
-    to: "            ...s.fresh,",
+    from: "      ...(v.asksAgent ? { asksAgent: true } : {}),\n    })\n  }",
+    to: '      ...(v.asksAgent ? { asksAgent: true } : {}),\n      ...("pending" in v ? { pending: { text: String(v.pending) } } : {}),\n    })\n  }',
     command: unit,
     expect: "never stored, nor restored",
-  },
-  {
-    name: "any string is restored as a thread",
-    file: "packages/interface/layout.ts",
-    from: "  Type.String({ pattern: THREAD_PATTERN }),\n)",
-    to: "  Type.String(),\n)",
-    command: unit,
-    expect: "another version, or partly malformed",
   },
 
   {
@@ -703,15 +687,6 @@ export const mutations: readonly Mutation[] = [
   },
 
   {
-    name: "a new task becomes the task you are on",
-    file: "packages/interface/layout.ts",
-    from: '    if (sameHere(active, { kind: "new", key: tab.key }))\n      active = { kind: "task", task }',
-    to: '    active = { kind: "task", task }',
-    command: unit,
-    expect:
-      "a sent new tab you have left becomes its task's columns, and you stay where you went",
-  },
-  {
     name: "prune leaves nothing chosen",
     file: "packages/interface/layout.ts",
     from: "  const shown = stays ? active : fallback",
@@ -722,10 +697,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "prune keeps an archived task you were on",
     file: "packages/interface/layout.ts",
-    from: "        !facts.archived.has(active.task)) ||",
-    to: "        true) ||",
+    from: "        !facts.archived.has(active.task)))",
+    to: "        true))",
     command: unit,
-    expect: "prune replaces a root you were on that is archived or gone",
+    expect: "prune replaces a task you were on that is archived or gone",
   },
   {
     name: "a v1 layout is decoded",
@@ -766,7 +741,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const list = facts.list.filter(t => known.has(t) && !facts.archived.has(t))",
     to: "  const list = facts.list.filter(t => known.has(t))",
     command: unit,
-    expect: "prune replaces a root you were on that is archived or gone",
+    expect: "prune replaces a task you were on that is archived or gone",
   },
   {
     name: "closing the root you are on leaves nothing",
@@ -779,10 +754,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every root anyone starts is in the sidebar",
     file: "packages/interface/layout.ts",
-    from: "  const open = drawnList(facts.list, facts.archived, synced.active)",
-    to: "  const open = drawnList([...new Set([...facts.list, ...facts.index.roots])], facts.archived, synced.active)",
+    from: "  const open = drawnList(facts.list, facts.archived, stored.active)",
+    to: "  const open = drawnList([...new Set([...facts.list, ...[...facts.canvases.keys()]])], facts.archived, stored.active)",
     command: unit,
-    expect: "a root someone else starts is not in the sidebar",
+    expect:
+      "the sidebar is the facts', in its order, and the task you are on wherever it lacks it",
   },
 
   {
@@ -976,8 +952,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a busy lane never queues",
     file: "packages/interface/send.ts",
-    from: '  const mode: ComposerMode = fresh ? "branch" : queued ? "queue" : "reply"',
-    to: '  const mode: ComposerMode = fresh ? "branch" : "reply"',
+    from: '  const mode: ComposerMode = unstarted ? "branch" : queued ? "queue" : "reply"',
+    to: '  const mode: ComposerMode = unstarted ? "branch" : "reply"',
     command: unit,
     expect: "a busy lane queues the next card",
   },
@@ -1080,11 +1056,11 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a new tab drops its prefill",
-    file: "packages/interface/layout.ts",
-    from: "              ...(action.prefill === undefined\n                ? {}\n                : { prefill: action.prefill }),",
+    file: "packages/interface/intent.ts",
+    from: "          ...(intent.prefill === undefined ? {} : { prefill: intent.prefill }),\n",
     to: "",
     command: unit,
-    expect: "a new tab can start with a prefill",
+    expect: "a new tab from a first message's edit starts with its text",
   },
   {
     name: "a read-only column offers no copy",
@@ -1744,14 +1720,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a task takes the banner of its earliest thread with one",
   },
   {
-    name: "a new tab borrows a root's colour",
-    file: "packages/interface/sidebar-view.ts",
-    from: '        icon: { kind: "fresh" },',
-    to: '        icon: { kind: "initials", letters: "", slot: "pending" },',
-    command: unit,
-    expect: "a root with a sprite draws it",
-  },
-  {
     name: "a small window starts full",
     file: "packages/interface/list-width.ts",
     from: '): ListWidth => chosen ?? (small ? "icons" : "full")',
@@ -1787,8 +1755,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "× writes to the host",
     file: "packages/interface/intent.ts",
-    from: "          return closeTask(intent.here.task)",
-    to: '          return [{ kind: "request", intent: { kind: "name", name: "x" } }, ...closeTask(intent.here.task)]',
+    from: '      return intent.here.kind === "task" ? closeTask(intent.here.task) : []',
+    to: '      return intent.here.kind === "task" ? [{ kind: "request", intent: { kind: "name", name: "x" } }, ...closeTask(intent.here.task)] : []',
     command: unit,
     expect:
       "× on a root closes it for you: it leaves the sidebar, and nothing shared is written",
@@ -1812,11 +1780,11 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a closed branch's card is not discarded",
-    file: "packages/interface/intent.ts",
-    from: "        ...intent.discard.flatMap(id => planDiscard(id, at, state)),",
-    to: "        ...intent.discard.slice(0, 0).flatMap(id => planDiscard(id, at, state)),",
+    file: "packages/interface/card-intents.ts",
+    from: "  const away: SlotMove = { move: moveOf(card, DISCARDED), slot: null }",
+    to: '  const away: SlotMove = { move: moveOf(card, { kind: "inventory", holder: facts.me }), slot: null }',
     command: unit,
-    expect: "closing a branch discards its card first",
+    expect: "closing an unstarted thread's column: its card to your trash",
   },
   {
     name: "every column takes focus when it mounts",
@@ -1890,8 +1858,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a task's ⋯ shows only on the task you are on",
     file: "packages/interface/sidebar-view.ts",
-    from: "        menu: archived ? [] : menuOf(task, head),",
-    to: "        menu: archived || !common.selected ? [] : menuOf(task, head),",
+    from: "    menu: archived ? [] : menuOf(task, head),",
+    to: "    menu: archived || !sameHere(here, input.active) ? [] : menuOf(task, head),",
     command: unit,
     expect: "every root not archived offers ⋯",
   },
@@ -1917,8 +1885,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the sidebar draws no mark",
     file: "packages/interface/sidebar-view.ts",
-    from: "        pip: head.pip,",
-    to: "        pip: false,",
+    from: "    pip: head.pip,",
+    to: "    pip: false,",
     command: unit,
     expect: "a pip on each item holding a card of yours",
   },
@@ -1968,10 +1936,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's open details are not stored",
     file: "packages/interface/layout.ts",
-    from: "  ...(c.details ? { details: true } : {}),",
-    to: "",
+    from: "        ...(v.details ? { details: true } : {}),\n        ...(v.prefill === undefined\n",
+    to: "        ...(v.prefill === undefined\n",
     command: unit,
-    expect: "a column's open details are kept",
+    expect:
+      "a round trip keeps what you are on, each task's view and the board",
   },
 
   {
@@ -2324,15 +2293,6 @@ export const mutations: readonly Mutation[] = [
       "a column no composer publishes, or where the card already is: nothing",
   },
   {
-    name: "a keep with no card left asks the host",
-    file: "packages/interface/card-intents.ts",
-    from: "  if (first === undefined) return close\n",
-    to: '  if (first === undefined) return [{ kind: "keep", moves: moves as never, actedAt: atColumn(key), close }]\n',
-    command: unit,
-    expect:
-      "a keep whose cards have all gone closes its column and sends no move",
-  },
-  {
     name: "a keep closes when any card is kept",
     file: "packages/interface/card-intents.ts",
     from: ' (answer.kind === "accepted" ? close : [])',
@@ -2359,11 +2319,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fresh column takes cards at its end",
     file: "packages/interface/column-view.ts",
-    from: '  if (column.mode.kind !== "bound") {\n',
-    to: "  if (false) {\n",
+    from: '  return column.mode.kind === "unstarted" || at.kind === "entry"\n',
+    to: '  return at.kind === "entry"\n',
     command: unit,
     expect:
-      "composerPlace: your message at the end with the lane, in its root; fresh by key, in its root",
+      "composerPlace: your message at its thread, at its end once it has one, or at an unstarted thread's",
   },
   {
     name: "the undo keys reach into a text box",
@@ -2457,29 +2417,12 @@ export const mutations: readonly Mutation[] = [
     expect:
       "your message in a root this tab does not hold marks its thread's task",
   },
-  {
-    name: "a new tab is stored without its root",
-    file: "packages/interface/layout.ts",
-    from: "            ...(fresh.root === undefined ? {} : { root: fresh.root }),\n",
-    to: "",
-    command: unit,
-    expect: "a round trip keeps what you are on, each root's columns, new tabs",
-  },
 
-  {
-    name: "a new tab's fresh place takes no root of its own",
-    file: "packages/interface/column-view.ts",
-    from: "    const its = fresh?.root ?? root\n",
-    to: "    const its = root\n",
-    command: unit,
-    expect:
-      "composerPlace: your message at the end with the lane, in its root; fresh by key, in its root",
-  },
   {
     name: "an undo in a task names no task",
     file: "packages/interface/card-intents.ts",
-    from: "  return active.task\n}",
-    to: "  return null\n}",
+    from: '  return active?.kind === "task" ? active.task : null',
+    to: "  return null",
     command: unit,
     expect: "on a task: that task's history",
   },
@@ -3003,11 +2946,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new tab opens under the page",
     file: "packages/interface/layout.ts",
-    from: '    case "show":\n    case "newTab":\n      return true',
-    to: '    case "show":\n      return true',
+    from: '    case "show":\n      return true\n    case "board":',
+    to: '    case "show":\n      return false\n    case "board":',
     command: unit,
-    expect:
-      "showing a root, a new tab or the board leaves the page first, once",
+    expect: "showing a root",
   },
   {
     name: "leaving a page loaded from its URL goes back out of pine·trie",
@@ -3237,9 +3179,9 @@ export const mutations: readonly Mutation[] = [
     expect: "marks the message last",
   },
   {
-    name: "a fresh column opens under the search",
+    name: "a column opened opens under the search",
     file: "packages/interface/intent.ts",
-    from: '    (action.change.kind === "openFresh" ||',
+    from: '    (action.change.kind === "opened" ||',
     to: '    (action.change.kind === "never" ||',
     command: unit,
     expect: "a new column close it too",
@@ -3306,7 +3248,8 @@ export const mutations: readonly Mutation[] = [
     from: "  return [moveCard(moveOf(now, DISCARDED), how, false, null, taskOfTab(state))]",
     to: "  return [moveCard(moveOf(now, DISCARDED), how, false, null, null)]",
     command: unit,
-    expect: "closing a column discards its card first",
+    expect:
+      "goes back to its thread's notes from its ⋯, and to the trash from its ×",
   },
   {
     name: "a sidebar drop's move is in the tab's task, not the new one",
@@ -3368,60 +3311,46 @@ export const mutations: readonly Mutation[] = [
   },
   // ── the canvas (ADR-0116) ──────────────────────────────────────────────
   {
-    name: "sync does not move a column to its thread's end",
-    file: "packages/interface/columns.ts",
-    from: "  return end === column.anchor ? column : { ...column, anchor: end }",
-    to: "  return column",
-    command: unit,
-    expect: "sync follows its thread to its end, never into a newer branch",
-  },
-  {
     name: "a thread with no entry yet ignores its lane",
     file: "packages/interface/columns.ts",
     from: "  threadEnd(index, thread) ?? lanes.find(l => l.name === thread)?.tip ?? null",
     to: "  threadEnd(index, thread) ?? null",
     command: unit,
-    expect: "a thread with no entry yet follows its lane's tip",
+    expect: "with no entry yet, its lane's tip",
   },
   {
     name: "a branch drops its prefill",
     file: "packages/interface/layout.ts",
-    from: "          ...(change.prefill === undefined ? {} : { prefill: change.prefill }),",
-    to: "          ...{},",
+    from: '          set(set(c, "pending", change.pending), "prefill", change.prefill),',
+    to: '          set(c, "pending", change.pending),',
     command: unit,
-    expect: "a branch holds its first message and its prefill",
+    expect: "a thread you opened is unfolded with what it starts with",
   },
   {
     name: "a branch drops its first message",
-    file: "packages/interface/layout.ts",
-    from: "          ...(change.pending === undefined ? {} : { pending: change.pending }),",
-    to: "          ...{},",
+    file: "packages/interface/canvas-columns.ts",
+    from: "              ...(seen?.pending === undefined ? {} : { pending: seen.pending }),\n",
+    to: "",
     command: unit,
-    expect: "a branch holds its first message and its prefill",
+    expect: "a thread not yet started ends at its fork",
   },
   {
     name: "a branch's prefill is not stored",
     file: "packages/interface/layout.ts",
-    from: "          : { prefill: storedPrefill(f.prefill) }),",
-    to: "          : {}),",
+    from: "        ...(v.prefill === undefined\n          ? {}\n          : { prefill: storedPrefill(v.prefill) }),\n",
+    to: "",
     command: unit,
-    expect: "a round trip keeps what you are on, each task's view",
+    expect:
+      "a round trip keeps what you are on, each task's view and the board",
   },
   {
     name: "a stored branch's prefill is not restored",
     file: "packages/interface/layout.ts",
-    from: "      ...(f.prefill === undefined ? {} : { prefill: storedPrefill(f.prefill) }),",
-    to: "      ...{},",
+    from: "      ...(v.prefill === undefined ? {} : { prefill: storedPrefill(v.prefill) }),\n",
+    to: "",
     command: unit,
-    expect: "a round trip keeps what you are on, each task's view",
-  },
-  {
-    name: "a sent new tab stays a new tab",
-    file: "packages/interface/layout.ts",
-    from: "    const task = taskOnCanvas(facts.canvases, tab.thread)",
-    to: "    const task = undefined",
-    command: unit,
-    expect: "a sent new tab becomes its task once its card is on the canvas",
+    expect:
+      "a round trip keeps what you are on, each task's view and the board",
   },
   {
     name: "a view change changes every task",
@@ -3448,47 +3377,6 @@ export const mutations: readonly Mutation[] = [
     expect: "every card is a column in the canvas's order",
   },
   {
-    name: "a branch is drawn at the canvas's end",
-    file: "packages/interface/canvas-columns.ts",
-    from: "    const at = branchAfter(canvas, threadAt(index, fresh.at))",
-    to: "    const at = canvas.length - 1",
-    command: unit,
-    expect:
-      "a branch not yet sent is drawn just after the thread it forks from",
-  },
-  {
-    name: "two branches at one thread go in the order they were kept",
-    file: "packages/interface/canvas-columns.ts",
-    from: "[...view.fresh].sort(([a], [b]) =>\n    a < b ? -1 : a > b ? 1 : 0,\n  )",
-    to: "[...view.fresh]",
-    command: unit,
-    expect: "two there in the order they were opened",
-  },
-  {
-    name: "a branch on the canvas is drawn twice",
-    file: "packages/interface/canvas-columns.ts",
-    from: "    if (onCanvas.has(thread) || index.entries[fresh.at] === undefined) continue",
-    to: "    if (index.entries[fresh.at] === undefined) continue",
-    command: unit,
-    expect: "it is drawn once, there",
-  },
-  {
-    name: "a branch whose card landed stays a branch",
-    file: "packages/interface/layout.ts",
-    from: "      if (canvas.some(c => c.id === thread))",
-    to: "      if (false)",
-    command: unit,
-    expect: "a branch is yours until its card is on the canvas",
-  },
-  {
-    name: "prune keeps a branch whose fork is gone",
-    file: "packages/interface/layout.ts",
-    from: "    [...view.fresh].filter(([, f]) => index.entries[f.at] !== undefined),",
-    to: "    [...view.fresh],",
-    command: unit,
-    expect: "prune drops a branch whose fork is gone",
-  },
-  {
     name: "planOpen unfolds where a column already shows the entry",
     file: "packages/interface/layout.ts",
     from: '  if (key !== undefined) return { kind: "scroll", task, key }\n',
@@ -3508,34 +3396,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a v7 layout is decoded",
     file: "packages/interface/layout.ts",
-    from: "  v: Type.Literal(8),",
-    to: "  v: Type.Union([Type.Literal(7), Type.Literal(8)]),",
+    from: "  v: Type.Literal(9),",
+    to: "  v: Type.Union([Type.Literal(8), Type.Literal(9)]),",
     command: unit,
     expect: "another version, or partly malformed",
   },
   {
-    name: "hereOfColumn finds only new tabs",
-    file: "packages/interface/layout.ts",
-    from: '      if (thread === key) return { kind: "task", task }',
-    to: '      if (false) return { kind: "task", task }',
-    command: unit,
-    expect: "hereOfColumn: a new tab's column",
-  },
-  {
-    name: "a new tab restored without a root is kept",
-    file: "packages/interface/layout.ts",
-    from: "  if (s.fresh !== undefined && (root === undefined || task === undefined))\n    return undefined",
-    to: "  if (false) return undefined",
-    command: unit,
-    expect: "a new tab with no root or task of its own restores nothing",
-  },
-  {
     name: "a branch's column is keyed apart from its thread",
     file: "packages/interface/intent.ts",
-    from: '      return opened(\n        minted.thread,\n        onTask({\n          kind: "openFresh",\n          thread: minted.thread,\n          at: act.branch.at,',
-    to: '      return opened(\n        minted.key,\n        onTask({\n          kind: "openFresh",\n          thread: minted.thread,\n          at: act.branch.at,',
+    from: "  return opened(thread, [",
+    to: '  return opened("k", [',
     command: unit,
-    expect: "a branch opens a fresh column under the thread it minted",
+    expect: "a branch is opened on the host, just after its thread",
   },
   {
     name: "an unfolded column does not reveal the picked message",
@@ -3546,20 +3418,12 @@ export const mutations: readonly Mutation[] = [
     expect: "an entry no unfolded column shows unfolds its thread's, revealed",
   },
   {
-    name: "a new tab has no rail",
-    file: "packages/interface/app-view.ts",
-    from: '      return { kind: "new", key: active.key, slots: slots(() => true) }',
-    to: '      return { kind: "archive" }',
-    command: unit,
-    expect: "a new tab has its own kind",
-  },
-  {
     name: "a card's column offers close",
     file: "packages/interface/app-view.ts",
-    from: "        slots: slots(isClosable),",
-    to: "        slots: slots(() => true),",
+    from: "      closable: isClosable(c),",
+    to: "      closable: true,",
     command: unit,
-    expect: "only a branch not yet sent closes",
+    expect: "only a thread not yet started closes",
   },
   {
     name: "the tab's rail draws every tree",
@@ -3570,28 +3434,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a task's rail is a forest: a tree for each root of its threads",
   },
   {
-    name: "a new tab's reader settings go to a task, and are dropped",
-    file: "packages/interface/intent.ts",
-    from: '      case "newTab":\n        return [layout({ kind: "newTabColumn", key: column.thread, action })]',
-    to: '      case "newTab":\n        return []',
-    command: unit,
-    expect: "a column's details (ADR-0073) is your view of its card",
-  },
-  {
     name: "a column move goes before the card it lands after",
     file: "packages/interface/intent.ts",
     from: "        after: rest[to - 1]?.id ?? null,\n        before: rest[to]?.id ?? null,",
     to: "        after: rest[to]?.id ?? null,\n        before: rest[to - 1]?.id ?? null,",
     command: unit,
     expect: "a move reorders the column's card on the canvas",
-  },
-  {
-    name: "a closed fresh column is not opened again",
-    file: "packages/interface/reveal.ts",
-    from: '      if (place.at.kind !== "entry" || !isThreadId(column))',
-    to: "      if (true)",
-    command: unit,
-    expect: "opened again, under the thread it minted",
   },
   {
     name: "an archived task's column offers its moves",
@@ -3717,11 +3565,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy's column is left out before its first send",
     file: "packages/interface/canvas-columns.ts",
-    from: "      const fork = forks.get(c.id)?.at\n",
-    to: "      const fork = forks.get(c.id)?.at && undefined\n",
+    from: "      const opening = facts.unstarted.get(c.id)\n",
+    to: "      const opening = facts.unstarted.get(c.id) && undefined\n",
     command: unit,
-    expect:
-      "a copy before its first send ends at its fork, and sends as a branch there (ADR-0117)",
+    expect: "a thread not yet started ends at its fork",
   },
   {
     name: "a column from elsewhere folds nothing above",
@@ -3753,29 +3600,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy's column closes",
     file: "packages/interface/columns.ts",
-    from: 'export const isClosable = (column: Column): column is ClosableColumn =>\n  column.mode.kind === "fresh"',
-    to: 'export const isClosable = (column: Column): column is ClosableColumn =>\n  column.mode.kind !== "bound"',
+    from: '  column.mode.kind === "unstarted"\n',
+    to: '  column.mode.kind !== "unstarted"\n',
     command: unit,
-    expect:
-      "a copy's column is a card's: shared, never closable as a fresh one is (ADR-0117)",
-  },
-  {
-    name: "a copy's column never follows its thread",
-    file: "packages/interface/columns.ts",
-    from: "    return started ? settle({ ...column, mode: BOUND }, index, lanes) : column",
-    to: "    return column",
-    command: unit,
-    expect:
-      "a copy's column waits at its fork, then follows its thread once its first entry is written by anyone (ADR-0117)",
+    expect: "a thread not yet started closes with ×",
   },
   {
     name: "a branch in a held thread is drawn as any other",
     file: "packages/interface/canvas-columns.ts",
-    from: "      ...heldAt(index, fresh.at, holders),\n",
-    to: "",
+    from: "                : heldAt(index, opening.fork, facts.holders)),\n",
+    to: "                : {}),\n",
     command: unit,
-    expect:
-      "a branch not yet sent in a thread someone else holds says who, and is drawn without that thread's entries; one you hold is drawn whole (ADR-0124)",
+    expect: "a thread not yet started in a thread someone else holds says who",
   },
   {
     name: "your own held threads are others'",
@@ -3783,8 +3619,7 @@ export const mutations: readonly Mutation[] = [
     from: "      c.place.holder !== me\n",
     to: "      c.place.holder !== null\n",
     command: unit,
-    expect:
-      "a branch not yet sent in a thread someone else holds says who, and is drawn without that thread's entries; one you hold is drawn whole (ADR-0124)",
+    expect: "a thread not yet started in a thread someone else holds says who",
   },
   {
     name: "the rail draws every row of a task's roots",

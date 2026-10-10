@@ -19,7 +19,6 @@ import {
   cardFrameWords,
   moveWords,
 } from "./card-frame.ts"
-import { TEST_ROOT } from "./fixtures.ts"
 
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
@@ -134,12 +133,6 @@ describe("cardFrame (ADR-0111)", () => {
         { to: "note", act: { kind: "unpin", card: C1 } },
         { to: "inventory", act: take },
       ],
-    ],
-    [
-      "in a fresh column: your inventory",
-      { kind: "fresh", column: "k", root: TEST_ROOT, task: TEST_TASK, at },
-      "composing",
-      [{ to: "inventory", act: take }],
     ],
     [
       "a comment: a reference queued on its thread, which leaves it where it is; your inventory (ADR-0126)",

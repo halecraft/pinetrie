@@ -230,6 +230,8 @@ export function createCommands(deps: CommandDeps): Commands {
         return cardCommands.move(writer, intent.moves, intent.here, tasks)
       case "copy-thread":
         return cardCommands.copyThread(writer, intent)
+      case "open-thread":
+        return cardCommands.openThread(writer, intent)
       case "make-reference":
         return cardCommands.makeReference(writer, intent)
       case "edit-as-text":

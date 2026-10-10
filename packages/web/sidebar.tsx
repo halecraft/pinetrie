@@ -1,5 +1,5 @@
 // web/sidebar — the sidebar, down the left edge: the roots you have open,
-// in your order, then new tabs, then ＋ (ADR-0030, ADR-0122); full, or folded
+// in your order, then ＋ (ADR-0030, ADR-0122); full, or folded
 // to an icon per item (ADR-0088, `FoldedItem`).
 //
 // The sidebar is yours, on every device: × closes a root for you and writes
@@ -48,9 +48,7 @@ import { startRootDrag } from "./use-root-drag.ts"
 /** Up and Down move focus between items. */
 function moveFocus(e: KeyboardEvent<HTMLElement>) {
   if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return
-  const items = [
-    ...e.currentTarget.querySelectorAll<HTMLElement>(".open-root, .open-new"),
-  ]
+  const items = [...e.currentTarget.querySelectorAll<HTMLElement>(".open-root")]
   const at = items.indexOf(document.activeElement as HTMLElement)
   if (at < 0) return
   e.preventDefault()
@@ -128,7 +126,7 @@ export function Sidebar({
                 pip={pip}
                 readers={readers}
                 rename={
-                  item.kind === "task" && renaming === item.task
+                  renaming === item.task
                     ? {
                         onEnd: focusItem => {
                           setRenaming(null)
@@ -139,39 +137,8 @@ export function Sidebar({
                       }
                     : null
                 }
-                startDrag={
-                  item.kind === "task"
-                    ? startRootDrag(dragOf(item.task))
-                    : undefined
-                }
+                startDrag={startRootDrag(dragOf(item.task))}
               />
-            )
-          if (item.kind === "new")
-            return (
-              <span
-                className="sidebar-item"
-                data-selected={item.selected || undefined}
-                key={key}
-              >
-                <button
-                  aria-current={item.selected || undefined}
-                  className="open-new"
-                  data-new={item.key}
-                  onClick={() => onIntent(item.show)}
-                  type="button"
-                >
-                  <span className="open-label">{item.label}</span>
-                  {item.pip && pip}
-                </button>
-                <button
-                  aria-label="close this new thread; nothing has been written"
-                  className="open-close"
-                  onClick={() => onIntent(item.close)}
-                  type="button"
-                >
-                  ×
-                </button>
-              </span>
             )
           const { task } = item
           if (renaming === task)
@@ -302,8 +269,6 @@ function IconFace({ icon }: { icon: ItemIcon }) {
           {icon.letters}
         </span>
       )
-    case "fresh":
-      return <span className="open-fresh" />
   }
 }
 
@@ -401,22 +366,12 @@ function FoldedItem({
             {item.pip && pip}
           </span>
         }
-        triggerClassName={
-          item.kind === "new"
-            ? "open-new"
-            : item.archived
-              ? "open-root archived"
-              : "open-root"
-        }
+        triggerClassName={item.archived ? "open-root archived" : "open-root"}
         triggerProps={{
           "aria-current": item.selected || undefined,
-          ...(item.kind === "new"
-            ? { "data-new": item.key }
-            : {
-                "data-task": item.task,
-                draggable: true,
-                onDragStart: startDrag,
-              }),
+          "data-task": item.task,
+          draggable: true,
+          onDragStart: startDrag,
           onBlur: () => setTip(false),
           onClick: () => onIntent(item.show),
           onFocus: showTip,

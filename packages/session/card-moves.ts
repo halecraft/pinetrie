@@ -127,11 +127,6 @@ export type CardNotice = {
   | { readonly code: "slots-changed" }
   /** Your discard, accepted. */
   | { readonly code: "discarded" }
-  /**
-   * A put in a fresh column's composer while your message there holds text,
-   * from anywhere but your inventory (ADR-0113).
-   */
-  | { readonly code: "message-holds-text" }
 )
 
 export interface MovesState {

@@ -54,8 +54,6 @@ import {
   DROP_ZONE,
   type Effect,
   foldMemory,
-  freshOf,
-  freshRootOf,
   type HeldView,
   heldByOthers,
   type Identity,
@@ -131,6 +129,7 @@ import {
   threadWork,
   typingDue,
   unsentSignals,
+  unstartedOf,
   uploadText,
   viewportStore,
 } from "@pinetrie/interface"
@@ -148,6 +147,7 @@ import {
   canvasList,
   reachableAgents,
   taskPinnedOf,
+  unstartedThreads,
 } from "@pinetrie/rules"
 import {
   heldBy,
@@ -523,6 +523,12 @@ export function App({
   // a column opened at a lane's tip is bound at once. The effect below stores
   // it, so an action reduces from it: React runs pending effects before it
   // handles the next event.
+  // Each thread opened and not yet started (ADR-0126): its column ends at
+  // its fork, or a new tab's at its root.
+  const unstarted = useMemo(
+    () => unstartedThreads(threads, index, new Set(directory.keys())),
+    [threads, index, directory],
+  )
   // Each thread someone else holds (ADR-0124): a branch not yet sent from
   // one is drawn without its entries.
   const holders = useMemo(
@@ -537,10 +543,10 @@ export function App({
         archived: archivedTasks,
         list,
         canvases,
-        forks: forkOf,
+        unstarted,
         holders,
       }),
-    [stored, index, lanes, archivedTasks, list, canvases, forkOf, holders],
+    [stored, index, lanes, archivedTasks, list, canvases, unstarted, holders],
   )
   useEffect(() => {
     if (layout !== stored)
@@ -551,7 +557,7 @@ export function App({
         archived: archivedTasks,
         list,
         canvases,
-        forks: forkOf,
+        unstarted,
         holders,
       })
   }, [
@@ -562,7 +568,7 @@ export function App({
     archivedTasks,
     list,
     canvases,
-    forkOf,
+    unstarted,
     holders,
   ])
   // Every change is saved, the document's too, so a restored column's anchor
@@ -631,7 +637,7 @@ export function App({
         archived: archivedTasks,
         list,
         canvases,
-        forks: forkOf,
+        unstarted,
         holders,
         known: new Set(tasks.byId.keys()),
       })
@@ -654,7 +660,7 @@ export function App({
         archived: archivedTasks,
         list,
         canvases,
-        forks: forkOf,
+        unstarted,
         holders,
         known: now,
       })
@@ -668,27 +674,22 @@ export function App({
       active?.kind === "task"
         ? taskStrip(layout, active.task, {
             canvases,
-            forks: forkOf,
+            unstarted,
             holders,
             index,
             lanes,
           })
         : null,
-    [layout, active, canvases, forkOf, index, lanes, holders],
+    [layout, active, canvases, unstarted, index, lanes, holders],
   )
-  // The tab's thread columns drawn whole: the task's, or a new tab's one
-  // fresh column. Every projection below is keyed on this one, so it keeps
-  // its identity while its data does: the strip is rebuilt on every card's
-  // change, and another window's card redraws no message list (S59).
+  // The task's thread columns drawn whole. Every projection below is keyed
+  // on this one, so it keeps its identity while its data does: the strip is
+  // rebuilt on every card's change, and another window's card redraws no
+  // message list (S59).
   const columns: readonly ColumnSpec[] = useSameData(
     useMemo(
-      () =>
-        strip !== null
-          ? openColumns(stripCards(strip))
-          : active?.kind === "new"
-            ? layout.newTabs.filter(c => c.key === active.key)
-            : [],
-      [strip, layout, active],
+      () => (strip !== null ? openColumns(stripCards(strip)) : []),
+      [strip],
     ),
   )
   // The column you just opened, whose composer takes focus once when it
@@ -706,7 +707,7 @@ export function App({
       projectColumns(
         index,
         columns.map(c => {
-          const held = freshOf(c)?.held
+          const held = unstartedOf(c)?.held
           return {
             anchor: c.anchor,
             ...(c.foldAbove === undefined ? {} : { foldAbove: c.foldAbove }),
@@ -764,14 +765,17 @@ export function App({
     [hereTask, tasks, rootEntries],
   )
   useEffect(() => session.openThreads.here(hereTask), [session, hereTask])
-  // The root whose colours the stage draws in (ADR-0089): the task
-  // you are on's first root, or the root a new tab will start, whose id it
-  // minted as it opened.
+  // The root whose colours the stage draws in (ADR-0089): the task you are
+  // on's first root, or the root its first thread will start, which its
+  // record names (ADR-0126).
   const seedRoot =
-    (hereTask === null ? undefined : tasks.byId.get(hereTask)?.roots[0]) ??
-    (active?.kind === "new"
-      ? (freshRootOf(layout.newTabs.find(c => c.key === active.key)) ?? null)
-      : null)
+    hereTask === null
+      ? null
+      : (tasks.byId.get(hereTask)?.roots[0] ??
+        (tasks.byId.get(hereTask)?.threads ?? [])
+          .map(t => unstarted.get(t)?.root)
+          .find(r => r !== undefined) ??
+        null)
   const seed = seedRoot === null ? 0 : rootSeed(seedRoot)
   // Where each thread on the canvas ends, which the rail cuts its trees to
   // (ADR-0117): its end, its lane's tip before its first entry, a copy's fork.
@@ -783,13 +787,13 @@ export function App({
           : (tasks.byId.get(hereTask)?.threads ?? [])
         ).flatMap(thread => {
           const end =
-            threadAnchor(index, lanes, thread) ?? forkOf.get(thread)?.at
+            threadAnchor(index, lanes, thread) ?? unstarted.get(thread)?.fork
           return end === undefined || end === null
             ? []
             : [[thread, end] as const]
         }),
       ),
-    [hereTask, tasks, index, lanes, forkOf],
+    [hereTask, tasks, index, lanes, unstarted],
   )
   const taskRailView = useMemo(
     () =>
@@ -973,10 +977,7 @@ export function App({
   )
   // Each thread column drawn whole, by its key: what the strip draws it from.
   const projected = useMemo(() => {
-    const slots =
-      view.stage.kind === "task" || view.stage.kind === "new"
-        ? view.stage.slots
-        : []
+    const slots = view.stage.kind === "task" ? view.stage.slots : []
     return new Map(
       columns.flatMap((column, i) => {
         const columnView = views[i]
@@ -993,7 +994,7 @@ export function App({
                   path: paths[i] ?? new Set<EntryId>(),
                   closable: slot.closable,
                   track: slot.track,
-                  heldBy: freshOf(column)?.held?.by ?? null,
+                  heldBy: unstartedOf(column)?.held?.by ?? null,
                   matches: search === null ? null : (matches?.[i] ?? null),
                 },
               ] as const,
@@ -1123,7 +1124,6 @@ export function App({
           summaries,
           marks,
           archived: archivedTasks,
-          unsent,
           arrivals: attention.arrivals,
           sprites,
         })
@@ -1743,7 +1743,10 @@ export function App({
                               />
                             </div>
                           )}
-                          {stage.kind === "task" ? (
+                          {/* A task whose threads have no message yet, a new
+                            tab's (ADR-0126), draws a hollow dot where its
+                            first message will be. */}
+                          {rail.length > 0 ? (
                             <LiveRail
                               activity={activity}
                               asks={asks}

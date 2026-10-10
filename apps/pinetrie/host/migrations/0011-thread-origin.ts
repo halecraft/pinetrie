@@ -8,7 +8,10 @@
 // - `copy` at `fork` becomes a fork there, `how: "copy"`.
 // - `started` becomes a fork at its first entry's parent, `how: "branch"`;
 //   or a root's first thread when that parent is none (a new root's first
-//   message), or its root holds no entry of it.
+//   message), or its root holds no entry of it; spun from a card when a
+//   card's place row says it was spun into it (`spun`, its thread in
+//   `lane`): the card goes to its spinner's trash (0012), and the record
+//   keeps what lifts the thread back into it.
 //
 // One-time: delete this file once Duane's store has run it.
 
@@ -18,16 +21,18 @@ import {
   type RootId,
   rootDocId,
   SESSION_TARGET,
+  type TextCardId,
   type ThreadId,
   type ThreadOrigin,
   type TreeIndex,
   type ValueWrite,
 } from "@pinetrie/core"
-import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
+import { PLACES_DOC_ID, SESSION_DOC_ID } from "@pinetrie/protocol/messages"
 import { readTreeIndex } from "@pinetrie/reads"
 import { THREAD } from "@pinetrie/rules"
 import {
   applyRecordWrites,
+  PlacesDoc,
   RootDoc,
   readNamespace,
   SessionDoc,
@@ -62,6 +67,21 @@ export const rootsToRead = (
   ),
 ]
 
+/** A stored place row, its fields as strings. */
+type Row = Readonly<Record<string, string>>
+
+/** Each thread a stored card was spun into, by the card's id: its `spun` rows. */
+export const spunFrom = (
+  rows: Readonly<Record<string, Readonly<Record<string, string>>>>,
+): ReadonlyMap<string, string> =>
+  new Map(
+    Object.entries(rows).flatMap(([id, row]) =>
+      row.kind === "spun" && (row.lane ?? "") !== ""
+        ? [[row.lane ?? "", id] as const]
+        : [],
+    ),
+  )
+
 /** Where a started thread forks: its first entry's parent; null for none. */
 const parentOfFirst = (
   index: TreeIndex | undefined,
@@ -81,10 +101,13 @@ export function planThreadOrigins(input: {
   readonly stored: Readonly<Record<string, unknown>>
   /** The tree of each root `rootsToRead` named that loaded. */
   readonly trees: ReadonlyMap<string, TreeIndex>
+  /** Each thread a card was spun into, by the card (`spunFrom`). */
+  readonly spun: ReadonlyMap<string, string>
 }): readonly ValueWrite[] {
   return Object.entries(input.stored).flatMap(([key, stored]) => {
     if (!isOld(stored)) return []
     const { origin } = stored
+    const card = input.spun.get(key)
     const fork =
       origin?.kind === "copy"
         ? typeof origin.fork === "string"
@@ -97,13 +120,15 @@ export function planThreadOrigins(input: {
             key,
           )
     const next: ThreadOrigin =
-      fork === null
-        ? { kind: "root" }
-        : {
-            kind: "fork",
-            at: fork,
-            how: origin?.kind === "copy" ? "copy" : "branch",
-          }
+      card !== undefined && origin?.kind === "started"
+        ? { kind: "spun", card: card as TextCardId }
+        : fork === null
+          ? { kind: "root" }
+          : {
+              kind: "fork",
+              at: fork,
+              how: origin?.kind === "copy" ? "copy" : "branch",
+            }
     return [
       {
         kind: "set",
@@ -123,6 +148,12 @@ export const threadOrigin: RecordMigration = {
     const session = exchange.get(SESSION_DOC_ID, SessionDoc)
     await hydrated(SESSION_DOC_ID)
     const stored = readNamespace(session, THREAD.namespace)
+    const places = docIds.includes(PLACES_DOC_ID)
+      ? exchange.get(PLACES_DOC_ID, PlacesDoc)
+      : null
+    if (places !== null) await hydrated(PLACES_DOC_ID)
+    const rows: Readonly<Record<string, Readonly<Record<string, string>>>> =
+      places === null ? {} : (places.cards() as Readonly<Record<string, Row>>)
     const trees = new Map<string, TreeIndex>()
     for (const root of rootsToRead(stored)) {
       const id = rootDocId(root)
@@ -131,7 +162,7 @@ export const threadOrigin: RecordMigration = {
       await hydrated(id)
       trees.set(root, readTreeIndex(doc))
     }
-    const writes = planThreadOrigins({ stored, trees })
+    const writes = planThreadOrigins({ stored, trees, spun: spunFrom(rows) })
     if (writes.length === 0) return null
     return async () => applyRecordWrites(session, writes)
   },

@@ -33,10 +33,7 @@ const note = {
   kind: "composing",
   thread: TEST_THREAD,
 } as const
-const spun = {
-  kind: "trash",
-  why: { kind: "spun", into: THREAD, thread: STARTS },
-} as const
+const spun = { kind: "trash" } as const
 const card = (over: Partial<TextCard> = {}): TextCard => ({
   kind: "text",
   id: C1,
@@ -61,6 +58,8 @@ describe("planSpinOff (ADR-0111)", () => {
       cards: over.cards ?? [card()],
       request: {
         move: { card: C1, from: note, to: spun },
+        root: THREAD,
+        thread: STARTS,
         task: NEW_TASK,
         state: null,
         here: TEST_TASK,
@@ -69,10 +68,14 @@ describe("planSpinOff (ADR-0111)", () => {
       tasks: over.tasks ?? NO_TASK_INDEX,
       text: over.text ?? " plan it @agent ",
       roots: over.roots ?? new Set(),
+      threads: new Set(),
+      opens: { state: null, workflow: null, board: new Map() },
+      now: 5,
     })
 
-  test("the thread's first message is the card's text, trimmed, naming no agent; the card goes gone, spun into it", () => {
-    expect(plan()).toEqual({
+  test("the thread opens spun from the card in its new task, its first message the card's text, trimmed, naming no agent; the card goes to its sender's trash (ADR-0126)", () => {
+    const planned = plan()
+    expect(planned).toMatchObject({
       kind: "spin",
       root: THREAD,
       thread: STARTS,
@@ -82,6 +85,18 @@ describe("planSpinOff (ADR-0111)", () => {
         kind: "write",
         record: { ...card(), place: { ...spun, holder: ADA, task: TEST_TASK } },
       },
+    })
+    const opened = planned.kind === "spin" ? planned.open : null
+    expect(opened?.records.map(r => r.namespace)).toEqual([
+      "pinetrie.thread",
+      "pinetrie.task",
+    ])
+    expect(
+      opened?.records.find(r => r.namespace === "pinetrie.thread"),
+    ).toMatchObject({ value: { origin: { kind: "spun", card: C1 } } })
+    expect(opened?.steps.at(-1)).toMatchObject({
+      kind: "write",
+      record: { id: STARTS, place: { kind: "canvas", task: NEW_TASK } },
     })
   })
 
@@ -123,7 +138,8 @@ describe("planLiftRoot (S139)", () => {
     writers: SpunThread["writers"],
     known = true,
   ): SpunThread => ({
-    thread: THREAD,
+    thread: STARTS,
+    root: THREAD,
     known,
     writers,
   })
@@ -144,8 +160,8 @@ describe("planLiftRoot (S139)", () => {
   ) =>
     planLiftRoot({
       lifting: [C1],
+      spun: [t],
       cards: over.cards ?? [gone, spunCard],
-      threads: new Map([[THREAD, t]]),
       lanes: over.lanes ?? [],
       rootOfThread: new Map([[STARTS, THREAD]]),
       histories: over.histories ?? new Map(),
@@ -297,8 +313,8 @@ describe("planLiftRoot (S139)", () => {
     expect(
       planLiftRoot({
         lifting: [C1],
+        spun: [],
         cards: [card()],
-        threads: new Map(),
         lanes: [],
         rootOfThread: new Map(),
         histories: new Map(),

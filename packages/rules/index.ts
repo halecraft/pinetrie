@@ -304,7 +304,6 @@ export {
   NO_DISCARDS,
   type PlaceStep,
   planEditAsText,
-  planFreshFollow,
   planMake,
   planMakeReference,
   planMoveCommand,
@@ -351,6 +350,7 @@ export {
   offerSeen,
   offerView,
 } from "./offer-view.ts"
+export { type OpenPlan, type OpenThread, planOpenThread } from "./open.ts"
 export {
   keyAfter,
   orderAfter,
@@ -459,7 +459,12 @@ export {
   planOfferRead,
   reviewUrl,
 } from "./review.ts"
-export { planRootDelete, type RootDelete } from "./root.ts"
+export {
+  emptiedTasks,
+  planRootDelete,
+  planTaskDelete,
+  type RootDelete,
+} from "./root.ts"
 export { ROOT } from "./roots.ts"
 export {
   NOTHING_NEXT,
@@ -500,16 +505,19 @@ export {
   indexTasks,
   isCanvasCard,
   NO_TASK_INDEX,
-  planThreadCard,
-  planThreadStart,
+  planThreadOpen,
   rootOfPlace,
   rootsHeld,
   TASK,
   type TaskIndex,
-  type ThreadStart,
+  type TaskOpening,
+  type ThreadOpen,
+  type ThreadOpening,
+  type ThreadPlacement,
   taskOfCard,
   taskOfPlace,
   taskOfTarget,
+  unstartedThreads,
 } from "./task.ts"
 export {
   decodeTaskPinned,

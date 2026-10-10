@@ -38,13 +38,13 @@ import {
 
 const _TEST_THREAD = threadIdFor("e")
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
-const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const _ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const LANE = threadIdFor("x")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const END = entryId("e-end")
 const C1 = cardIdFor("c1")
-const at = atEntry(entryId("e-1"))
+const _at = atEntry(entryId("e-1"))
 
 const NOTES = cardIdOfKind(
   "note-column",
@@ -68,13 +68,6 @@ const TASK_PINNED: CardPlace = {
   kind: "task-pinned",
   task: TEST_TASK,
   order: "1",
-}
-const FRESH: CardPlace = {
-  kind: "fresh",
-  column: "k",
-  root: ROOT,
-  task: TEST_TASK,
-  at,
 }
 const BEAS: CardPlace = { kind: "inventory", holder: BEA }
 const ADAS: CardPlace = { kind: "inventory", holder: ADA }
@@ -158,13 +151,6 @@ describe("planProvenance: each card's history", () => {
       ],
       { kind: "host" },
       "unsent",
-    ],
-    [
-      "a fresh column's first send carries its other cards",
-      [card(FRESH)],
-      [card(DRAFTING)],
-      { kind: "host" },
-      "followed",
     ],
   ] as const)("%s: the event it records", (_, before, after, cause, kind) => {
     const events = eventsOf(plan({ before, after, cause }))
@@ -348,7 +334,6 @@ describe("planProvenance: traces", () => {
     ["it was unqueued", card(QUEUED), card(DRAFTING, BEA), BY_BEA, []],
     ["it was unpinned", card(PINNED), card(DRAFTING, BEA), BY_BEA, []],
     ["the host wrote it", card(QUEUED), card(DRAFTING), { kind: "host" }, []],
-    ["it was a fresh column's", card(FRESH), card(BEAS, BEA), BY_BEA, []],
     ["it was in an inventory", card(ADAS), card(BEAS, BEA), BY_BEA, []],
   ] as const)("no trace when %s", (_, before, after, cause, reading) => {
     expect(
@@ -463,7 +448,6 @@ test("planTrashSweep: a card discarded a week ago or more, or with no history to
     kind: "trash",
     task: TEST_TASK,
     holder: ADA,
-    why: { kind: "discarded" },
   }
   const event = (when: number) => ({
     kind: "moved" as const,

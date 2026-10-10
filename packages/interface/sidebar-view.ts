@@ -18,7 +18,6 @@ import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
 import { type PageName, pageWords } from "./page.ts"
 import { type ColorSlot, taskSlot } from "./palette.ts"
 import { initialsOf, NO_TEXT, type TaskSummary } from "./root-label.ts"
-import type { UnsentSignals } from "./signals.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 
 /** What a task's ⋯ in the sidebar offers. */
@@ -39,8 +38,7 @@ export type ItemMenuItem =
 /**
  * What an item draws while the sidebar is folded (ADR-0088): the sprite of the
  * task's earliest thread with one (`taskSprites`), else its initials on a
- * colour seeded by its id (ADR-0089). A new tab has neither yet: a hollow tile, as its rail
- * has a hollow dot where its first message will be.
+ * colour seeded by its id (ADR-0089).
  */
 export type ItemIcon =
   | { readonly kind: "sprite"; readonly src: string }
@@ -49,7 +47,6 @@ export type ItemIcon =
       readonly letters: string
       readonly slot: ColorSlot
     }
-  | { readonly kind: "fresh" }
 
 interface ItemCommon {
   /** What the item says, and what the window's title names (`pageTitle`). */
@@ -62,34 +59,32 @@ interface ItemCommon {
   readonly close: Intent
 }
 
-export type ItemView =
-  | (ItemCommon & { readonly kind: "new"; readonly key: string })
-  | (ItemCommon & {
-      readonly kind: "task"
-      readonly task: TaskId
-      /** Its thread card's header, the board's too (`threadCardHead`). */
-      readonly head: ThreadCardHead
-      /** Its first line: the rename field's placeholder. */
-      readonly line: string
-      /** Its stored title, or null: what the rename field starts with. */
-      readonly title: string | null
-      /** What its mark draws (`taskStatus`), or null for none. */
-      readonly status: Status | null
-      /**
-       * When its status last rose to needs you as you watched, or null: the
-       * mark pulses as it mounts then, and stays (`moving`).
-       */
-      readonly arrived: number | null
-      /** When its agent last stopped with a run you follow done, or null: a ✓ fades. */
-      readonly done: number | null
-      /** Only the task you are on can be archived and still in the sidebar. */
-      readonly archived: boolean
-      /** On every task not archived, the one you are on or not. */
-      readonly menu: readonly ItemMenuItem[]
-    })
+export type ItemView = ItemCommon & {
+  readonly kind: "task"
+  readonly task: TaskId
+  /** Its thread card's header, the board's too (`threadCardHead`). */
+  readonly head: ThreadCardHead
+  /** Its first line: the rename field's placeholder. */
+  readonly line: string
+  /** Its stored title, or null: what the rename field starts with. */
+  readonly title: string | null
+  /** What its mark draws (`taskStatus`), or null for none. */
+  readonly status: Status | null
+  /**
+   * When its status last rose to needs you as you watched, or null: the
+   * mark pulses as it mounts then, and stays (`moving`).
+   */
+  readonly arrived: number | null
+  /** When its agent last stopped with a run you follow done, or null: a ✓ fades. */
+  readonly done: number | null
+  /** Only the task you are on can be archived and still in the sidebar. */
+  readonly archived: boolean
+  /** On every task not archived, the one you are on or not. */
+  readonly menu: readonly ItemMenuItem[]
+}
 
 export interface SidebarView {
-  /** The sidebar, then new tabs (`listOf`). */
+  /** The sidebar (`listOf`). */
   readonly items: readonly ItemView[]
   /** The item you are on, or null when the list lacks it. */
   readonly selected: ItemView | null
@@ -107,8 +102,6 @@ export interface SidebarViewInput {
   readonly marks: ReadonlyMap<TaskId, MarkRecord>
   /** Tasks in the archive. */
   readonly archived: ReadonlySet<TaskId>
-  /** Your unsent text: a new tab's pip. */
-  readonly unsent: UnsentSignals
   /** When each task's mark last arrived as you watched (`useAttention`). */
   readonly arrivals: Moments
   /** Each task's sprite (`taskSprites`). */
@@ -128,49 +121,30 @@ export function sidebarView(input: SidebarViewInput): SidebarView {
   }
 }
 
-function itemView(here: Here, input: SidebarViewInput): ItemView {
-  const common = {
+function itemView(
+  here: Extract<Here, { kind: "task" }>,
+  input: SidebarViewInput,
+): ItemView {
+  const { task } = here
+  const archived = input.archived.has(task)
+  const head = input.heads.get(task) ?? noHead(task)
+  return {
     selected: sameHere(here, input.active),
-    show: { kind: "show", here } as const,
-    close: { kind: "close", here } as const,
-  }
-  switch (here.kind) {
-    case "nothing":
-    case "new":
-      return {
-        ...common,
-        kind: "new",
-        key: here.kind === "new" ? here.key : "",
-        label:
-          input.layout.newTabs.find(
-            c => here.kind === "new" && c.key === here.key,
-          )?.asksAgent === true
-            ? "new agent"
-            : "new conversation",
-        pip: here.kind === "new" && input.unsent.newTabs.has(here.key),
-        icon: { kind: "fresh" },
-      }
-    case "task": {
-      const { task } = here
-      const archived = input.archived.has(task)
-      const head = input.heads.get(task) ?? noHead(task)
-      return {
-        ...common,
-        kind: "task",
-        task,
-        head,
-        label: head.label,
-        icon: iconOf(head, input),
-        line: input.summaries.get(task)?.line ?? NO_TEXT,
-        title: input.marks.get(task)?.title ?? null,
-        status: head.status,
-        arrived: input.arrivals.arrived.get(task) ?? null,
-        done: input.arrivals.done.get(task) ?? null,
-        archived,
-        menu: archived ? [] : menuOf(task, head),
-        pip: head.pip,
-      }
-    }
+    show: { kind: "show", here },
+    close: { kind: "close", here },
+    kind: "task",
+    task,
+    head,
+    label: head.label,
+    icon: iconOf(head, input),
+    line: input.summaries.get(task)?.line ?? NO_TEXT,
+    title: input.marks.get(task)?.title ?? null,
+    status: head.status,
+    arrived: input.arrivals.arrived.get(task) ?? null,
+    done: input.arrivals.done.get(task) ?? null,
+    archived,
+    menu: archived ? [] : menuOf(task, head),
+    pip: head.pip,
   }
 }
 
@@ -235,8 +209,7 @@ function menuOf(task: TaskId, head: ThreadCardHead): readonly ItemMenuItem[] {
 }
 
 /** An item's key in the sidebar: its React key, and what the list scrolls to. */
-export const listKey = (item: ItemView): string =>
-  item.kind === "new" ? `new:${item.key}` : `task:${item.task}`
+export const listKey = (item: ItemView): string => `task:${item.task}`
 
 /**
  * The window's title: what needs you (`inboxCount`, your inbox's badge),

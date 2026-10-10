@@ -11,7 +11,6 @@ import {
   type LaneView,
   NO_CONTENT,
   type RevisionRecord,
-  ROOT,
   rootIdFor,
   snapshotId,
   type TaskId,
@@ -377,17 +376,21 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
       [TASK],
     ],
     [
-      "a keep's moves into a fresh column of each of two tasks: both",
+      "a thread opened: the task its card lands in (ADR-0126)",
       {
-        kind: "move",
-        moves: [OTHER_TASK, TASK].map(task => ({
-          card: textCardId(task),
-          from: null,
-          to: { kind: "fresh", column: "k", root: TEST_ROOT, task, at: ROOT },
-        })),
-        here: null,
+        kind: "open-thread",
+        thread: threadIdFor("new"),
+        root: TEST_ROOT,
+        at: null,
+        task: OTHER_TASK,
+        state: null,
       },
-      [OTHER_TASK, TASK],
+      [OTHER_TASK],
+    ],
+    [
+      "an undo of moves outside any task: none (ADR-0126)",
+      { kind: "undo-move", task: null, direction: "undo" },
+      [],
     ],
     [
       "an undo of moves: its task",

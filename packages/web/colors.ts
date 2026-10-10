@@ -26,7 +26,7 @@ export const PALETTE: readonly string[] = [
   "#e67dac",
 ]
 
-/** A fresh branch, which has no track yet. */
+/** A branch not yet started, which has no track yet. */
 export const PENDING_COLOR = "#777"
 
 export const slotColor = (slot: ColorSlot): string =>

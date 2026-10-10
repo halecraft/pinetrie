@@ -6,6 +6,42 @@ const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   // ── a card's content as stored (ADR-0126) ──
+  // ── threads opened before their first entry (ADR-0126) ──
+  {
+    name: "a branch opens at an entry in no root it holds",
+    file: "packages/rules/open.ts",
+    from: "  if (parent === null || !input.tasks.has(open.task))\n",
+    to: "  if (!input.tasks.has(open.task))\n",
+    command: unit,
+    expect: "refused: its entry is in no root it holds",
+  },
+  {
+    name: "a started new root is drawn not yet started",
+    file: "packages/rules/task.ts",
+    from: "      fork === null ? !started.has(r.root) : index.entries[fork] !== undefined\n",
+    to: "      fork === null ? true : index.entries[fork] !== undefined\n",
+    command: unit,
+    expect:
+      "a thread with no entry: a branch at its fork when its fork is held here",
+  },
+  {
+    name: "closing a branch deletes its task",
+    file: "packages/rules/root.ts",
+    from: "      input.started.has(record.root) ||\n",
+    to: "",
+    command: unit,
+    expect:
+      "never a task that holds another card, nor one whose root has started",
+  },
+  {
+    name: "a starting host loads an unstarted new tab's root",
+    file: "packages/rules/task.ts",
+    from: "    if (live && root !== undefined && started.has(root)) held.add(root)\n",
+    to: "    if (live && root !== undefined) held.add(root)\n",
+    command: unit,
+    expect:
+      "rootsHeld: a root with a thread on an open canvas or in an inventory",
+  },
   {
     name: "a person's history outside any task is retired at startup",
     file: "packages/rules/move-history.ts",
@@ -187,8 +223,7 @@ export const mutations: readonly Mutation[] = [
     from: '    mentions: parseMentions(text).filter(m => m.kind !== "agent"),',
     to: "    mentions: parseMentions(text),",
     command: unit,
-    expect:
-      "the thread's first message is the card's text, trimmed, naming no agent; the card goes gone, spun into it",
+    expect: "its first message the card's text, trimmed, naming no agent",
   },
   {
     name: "a blank message holds up the queue",
@@ -222,7 +257,7 @@ export const mutations: readonly Mutation[] = [
     from: "    if (by === null || by === was.placer || from === null) continue",
     to: "    if (by === null || by === was.placer) continue",
     command: unit,
-    expect: "no trace when it was a fresh column's",
+    expect: "no trace when it was in an inventory",
   },
   {
     name: "a trace is left while its placer reads the thread",
@@ -1232,7 +1267,7 @@ export const mutations: readonly Mutation[] = [
     from: "    if (c.owner !== me) continue",
     to: '    if (c.owner === "") continue',
     command: unit,
-    expect: "yourCard: by thread end or fresh column",
+    expect: "yourCard: by thread end, or by its thread before it starts",
   },
   {
     name: "planCardSweep keeps empty cards",
@@ -1550,15 +1585,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a gone card is moved by no handoff, and a popped one is gone",
   },
   {
-    name: "a first send carries every column's fresh cards",
-    file: "packages/rules/moves.ts",
-    from: "      c.place.column !== place.column\n",
-    to: "      false\n",
-    command: unit,
-    expect:
-      "planFreshFollow: the sent card's column's other cards become notes",
-  },
-  {
     name: "anyone takes into anyone's inventory",
     file: "packages/rules/moves.ts",
     from: '  key.kind !== "inventory" || key.holder === sender',
@@ -1654,15 +1680,6 @@ export const mutations: readonly Mutation[] = [
     to: "      mark: false,",
     command: unit,
     expect: "continue on accepted work marks a move from a WIP",
-  },
-  {
-    name: "a fresh column's cards follow a message in another root",
-    file: "packages/rules/moves.ts",
-    from: '  if (place?.kind !== "fresh" || place.root !== input.root) return []',
-    to: '  if (place?.kind !== "fresh") return []',
-    command: unit,
-    expect:
-      "planFreshFollow: the sent card's column's other cards become notes in the column nearest the new thread",
   },
   {
     name: "a move's history is the task it leaves",
@@ -2740,13 +2757,13 @@ export const mutations: readonly Mutation[] = [
     expect: "a branch just after the thread it forks from",
   },
   {
-    name: "a branch's fresh column is drawn at the canvas's end",
+    name: "a branch's card lands at the canvas's end",
     file: "packages/rules/rank.ts",
     from: "  return at < 0 ? canvas.length - 1 : at",
     to: "  return canvas.length - 1",
-    command: ["pnpm", "exec", "vitest", "run", "packages/interface"],
+    command: unit,
     expect:
-      "a branch not yet sent is drawn just after the thread it forks from",
+      "a branch just after the thread it forks from; a new root at the end",
   },
   {
     name: "a branch with no room overwrites a neighbour's rank",
@@ -3003,8 +3020,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy forgets its fork",
     file: "packages/rules/copy.ts",
-    from: '      origin: { kind: "fork", at: copy.end, how: "copy" },\n',
-    to: '      origin: { kind: "root" },\n',
+    from: '    origin: { kind: "fork", at: copy.end, how: "copy" },\n',
+    to: '    origin: { kind: "root" },\n',
     command: unit,
     expect:
       "a copy is a new thread forked at the end its copier saw, its card where it was dropped, and no entry",

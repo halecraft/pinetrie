@@ -78,6 +78,9 @@ export function runsIn(command: Intent | QueuePop): readonly RunAt[] {
             ]
     case "carry-on":
       return [thread(command.lane)]
+    // Opening a thread runs nothing: its first send is the branch.
+    case "open-thread":
+      return []
     // Describing an offer asks its agent, and a squash or a refresh asks
     // it again when its description is wanted; an acceptance acts in your
     // repo alone (ADR-0117: offers stay there while a thread is held).

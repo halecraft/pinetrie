@@ -60,7 +60,7 @@ export interface ColumnSlot {
 export type Stage =
   /** Before the first `prune`: nothing is chosen yet. */
   | { readonly kind: "connecting" }
-  /** No task and no new tab: the board, and ＋ (ADR-0122). */
+  /** No task: the board, and ＋ (ADR-0122). */
   | { readonly kind: "nothing" }
   | {
       readonly kind: "task"
@@ -68,17 +68,11 @@ export type Stage =
       readonly readOnly: ReadOnly | null
       readonly slots: readonly ColumnSlot[]
     }
-  /** A new tab: an empty rail, and its one fresh column. */
-  | {
-      readonly kind: "new"
-      readonly key: string
-      readonly slots: readonly ColumnSlot[]
-    }
 
 /** Facts `App` already holds; nothing here is projected again. */
 export interface AppViewInput {
   readonly active: Here | null
-  /** The tab's thread columns drawn whole (`openColumns`), or the new tab's one. */
+  /** The task's thread columns drawn whole (`openColumns`). */
   readonly columns: readonly Column[]
   /** `branchColors(rail, views).track`, memoised by `App`. */
   readonly tracks: readonly number[]
@@ -174,17 +168,16 @@ export function appView(input: AppViewInput): {
 function stageOf(input: AppViewInput): Stage {
   const { active, columns, tracks } = input
   if (active === null) return { kind: "connecting" }
-  const slots = (closable: (c: Column) => boolean): readonly ColumnSlot[] =>
-    columns.map((c, position) => ({
+  const slots = columns.map(
+    (c, position): ColumnSlot => ({
       key: c.key,
-      closable: closable(c),
+      closable: isClosable(c),
       track: tracks[position] ?? PENDING_TRACK,
-    }))
+    }),
+  )
   switch (active.kind) {
     case "nothing":
       return { kind: "nothing" }
-    case "new":
-      return { kind: "new", key: active.key, slots: slots(() => true) }
     case "task": {
       const archived = input.archived.get(active.task)
       return {
@@ -194,7 +187,7 @@ function stageOf(input: AppViewInput): Stage {
           archived === undefined
             ? null
             : readOnlyWords(archived, input.workflow, input.nameOf),
-        slots: slots(isClosable),
+        slots,
       }
     }
   }

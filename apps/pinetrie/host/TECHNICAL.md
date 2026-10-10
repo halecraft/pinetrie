@@ -438,15 +438,18 @@ rejects `shutdown()`.
   then its name (`names.ensure`). Its first send is a branch at its fork:
   `sendChat` refuses a branch naming a recorded thread anywhere else, and
   writes no record or card for it.
-- **A thread's start is planned with its send** (ADR-0116, ADR-0117):
-  `planChat`'s decision names the thread it writes in (`thread`), and for a
-  branch what its card needs (`starts`), and
-  `sendChat`, after its last await, plans what it writes
-  (`planThreadStart`): the thread's record, its card at the end of its
-  task's canvas, and for a new task its record and its board place, at the
-  end of the state the chat names (`Command.state`, a board column's ＋),
-  else of the first open state. `executeChat` writes that before the
-  message and reads nothing for it.
+- **A thread is opened before its first send** (ADR-0126, `open-thread`
+  below), so its first send writes only its entry; a branch at the root in
+  a task the session holds is refused unless that task's thread is the one
+  it opened. A branch naming a thread no column opened (a script's) is
+  opened with its send (ADR-0116, ADR-0117): `planChat`'s decision names
+  the thread it writes in (`thread`), and for a branch what its card needs
+  (`starts`), and `sendChat`, after its last await, plans its opening
+  (`planThreadOpen`): the thread's record, its card just after the thread
+  it forks from on its task's canvas, and for a new task its record and
+  its board place, at the end of the state the chat names
+  (`Command.state`, a board column's ＋), else of the first open state.
+  `executeChat` writes that before the message and reads nothing for it.
 - **A move on the board** (`commands/board.ts`): `planTaskMove` over the
   workflow and the places; a move within open states writes its place and
   answers; one that crosses the archive's edge gathers the task's roots'
@@ -457,10 +460,8 @@ rejects `shutdown()`.
   card's other writers as contributors, through the card port, and spends
   nothing. The dispatcher's `chat` case spends the card when the answer
   takes its text (`spendsCard`: `appended` or `started`): the record goes,
-  then the text, and the reply carries the places' `rev`. Sent from a fresh
-  column, the spend first makes the column's other cards notes at the
-  message it wrote (`planFreshFollow`, found by the send's id), in the same
-  step, so no move gets between. The drain destroys
+  then the text, and the reply carries the places' `rev`, its trace naming
+  the message the send wrote (found by the send's id). The drain destroys
   a popped card's text itself, since the pop removed the record. The command's
   text is what is sent: the text its sender saw.
 - **A chat carries its sender's pinned versions** (`pinned`, each card
@@ -514,29 +515,39 @@ rejects `shutdown()`.
   never fitted at all.
 - **`traces-seen` deletes the sender's own traces**, ignoring any other
   id, and answers `seen`. A client sends it for the traces a column drew.
-- **`undo-move` undoes or redoes the sender's newest move in a task**
-  (§ Moves' history). It answers `undone` with each card it moved and its
+- **`undo-move` undoes or redoes the sender's newest move in a task, or,
+  naming none, in their history outside any task** (§ Moves' history). It answers `undone` with each card it moved and its
   place now, `unmoved` (shaped as a refused move) when someone moved a card
   since, or `nothing`. An undo first reads the cards its step moves
-  (`MoveHistories.top`, S139): one spun into a thread lifts that thread
-  back (`planLiftRoot`) only while it holds its first message alone, with
+  (`MoveHistories.top`, S139): one a thread's record says it was spun from
+  lifts that thread back (`planLiftRoot`) only while it holds its first
+  message alone, with
   no lane and no other card; else it answers `unmoved` `replied`, naming
   who wrote second, and reverts nothing. A lift deletes the thread after
   the revert (`deleteRoot`, `planRootDelete`): its directory record, its
   thread's, its task's record, board place and title, any card in it or on
   the task's canvas, its document (`HostDocuments.destroy`, which tells
   every peer), and the task's stacks, unloaded for the startup sweep to
-  retire. A redo after a lift moves the card back to gone, its thread
-  deleted: a discard in all but name.
-- **`spin-off` makes a text card a thread** (ADR-0111, `spinOff`), in one
-  keeper step: the card's text loaded whole, `planSpinOff` (refused for a
-  blank card, a root id in use, or as `planMove` refuses the move), then a
-  chat at the root of the new root its tab minted, in the new task it
-  names (`sendChat`, never asking the agent, the card's writers its
-  contributors, which plans the task's start), then the card's move to
-  gone, spun into it, in the history of the task it leaves, or from an
-  inventory the new task's. The answer is the chat's: `appended`, with the
-  first message's id.
+  retire. A redo after a lift moves the card back to the trash, its thread
+  deleted: a discard.
+- **`spin-off` makes a text card a thread** (ADR-0111, ADR-0126,
+  `spinOff`), in one keeper step: the card's text loaded whole,
+  `planSpinOff` (refused for a blank card, a root or thread id in use, or
+  as `planMove` refuses the move), then the thread's records (its own,
+  spun from the card, and its new task's), a chat at the root of the new
+  root its tab minted (`sendChat`, never asking the agent, the card's
+  writers its contributors), then, once the chat took the card's text, the
+  thread's card on its task's canvas and the card's move to its sender's
+  trash, in the history of the task it leaves, or from an inventory the
+  new task's; a chat that took nothing deletes the records again. The
+  answer is the chat's: `appended`, with the first message's id.
+- **`open-thread` opens a thread before its first entry** (ADR-0126,
+  `openThread`), in one keeper step: a branch's root's tree loaded,
+  `planOpenThread`, then its record (and a new tab's task's record and
+  board place), its card and the canvas re-ranked for it, then its name
+  (`names.ensure`). No entry is written. A move that takes a new tab's only
+  thread to a trash before its first send deletes its emptied task after
+  it (`emptiedTasks`, `planTaskDelete`), not undone.
 - **A person's documents are clients' documents the host only keeps**
   (ADR-0059, ADR-0077, ADR-0122): their inventory, their attention and
   their list. `resolveDoc` names a `<kind>:<writer>` id's kind, and the host
@@ -560,7 +571,8 @@ rejects `shutdown()`.
 ## Moves' history (`move-history.ts`, ADR-0066)
 
 - **One Kyneta undo stack per person and task**, `moves:<writer>:<TaskId>`
-  (ADR-0116), key `moves`, scope the places document, made on first use
+  (ADR-0116), and one per person outside any task, `moves:<writer>`
+  (ADR-0126): a `MoveHistoryScope`. Key `moves`, scope the places document, made on first use
   and kept in the store. Kyneta undoes only its own runtime's writes, and
   only the host writes `places`, so the stacks are the host's: `policy.ts`
   shares them with no one and rejects one a client announces, and
@@ -568,9 +580,10 @@ rejects `shutdown()`.
 - **Which history a move enters is the host's** (`historyOf`): the task the
   card goes to, else the one it leaves, read from its record; a discard's,
   the task it leaves, else, from an inventory, the task its sender is on
-  (`here`); a creation or a removal enters none. `move` writes inside that
+  (`here`), else, on none, its sender's history outside any task; a
+  creation or a removal enters none. `move` writes inside that
   stack's `gesture`. The host's own writes (a queued card's pop, a spend,
-  an unsent card, a fresh column's followers, the sweep) are outside every
+  an unsent card, a thread's card as it opens, the sweep) are outside every
   gesture, so every stack rebases over them, and an undo of a move the
   host overtook is refused.
 - **Every undo is `whole`.** Without it a step someone else's move broke is
@@ -580,8 +593,9 @@ rejects `shutdown()`.
   revert, which Kyneta writes itself.
 - **Retired 7 days after their task is archived** (`planHistorySweep`,
   `ARCHIVED_HISTORY_MS`), at startup and after each run's end; and at
-  startup only, those of a task the session does not hold (a new tab that
-  never sent). The stored ids come from the store's listing by `moves:`;
+  startup only, those of a task the session does not hold (a new tab's,
+  deleted as it closed unsent). A person's history outside any task is
+  never retired. The stored ids come from the store's listing by `moves:`;
   `retire` destroys a stack loaded or not (S91).
 - **Unloaded when nobody can use them:** a person's when their last seat
   leaves (the seats step, `idleWriters`), a task's when it is archived

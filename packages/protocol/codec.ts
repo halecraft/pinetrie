@@ -324,17 +324,19 @@ export function decodeCommand(
     if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
     const [first, ...more] = moves
     const to = first?.to
-    if (
-      first === undefined ||
-      more.length > 0 ||
-      to?.kind !== "trash" ||
-      to.why.kind !== "spun"
-    )
+    if (first === undefined || more.length > 0 || to?.kind !== "trash")
       return refused(
         ERR.UNKNOWN_TARGET,
-        "a spin-off names one move, into a new thread",
+        "a spin-off names one move, to its sender's trash",
       )
     const move = { ...first, to }
+    const root = parseNewRoot(text(wire?.root))
+    const thread = parseNewThread(text(wire?.lane))
+    if (root === undefined || thread === undefined)
+      return refused(
+        ERR.UNKNOWN_TARGET,
+        "a spin-off names a new root and its new thread",
+      )
     const state = text(wire?.state)
     if (state !== "" && !isWorkflowStateId(state))
       return refused(ERR.UNKNOWN_TARGET, `not a workflow state: ${state}`)
@@ -344,7 +346,40 @@ export function decodeCommand(
     const here = hereOf(wire)
     if (here === undefined)
       return refused(ERR.UNKNOWN_TARGET, "its sender's task is not a task")
-    return { kind, move, task, state: state === "" ? null : state, here }
+    return {
+      kind,
+      move,
+      root,
+      thread,
+      task,
+      state: state === "" ? null : state,
+      here,
+    }
+  }
+  if (kind === "open-thread") {
+    const thread = parseNewThread(text(wire?.lane))
+    if (thread === undefined) return notNewLane(text(wire?.lane))
+    // A new tab's thread starts a new root in a new task; a branch is in
+    // the root and the task its column is on.
+    const rootText = text(wire?.root)
+    const root = at.kind === "root" ? parseNewRoot(rootText) : rootText
+    if (root === undefined || !isRootId(root))
+      return refused(ERR.UNKNOWN_TARGET, `not a root: ${rootText}`)
+    const taskText = text(wire?.task)
+    const task = at.kind === "root" ? parseNewTask(taskText) : taskText
+    if (task === undefined || !isTaskId(task))
+      return refused(ERR.UNKNOWN_TARGET, `not a task: ${taskText}`)
+    const state = text(wire?.state)
+    if (state !== "" && !isWorkflowStateId(state))
+      return refused(ERR.UNKNOWN_STATE, `not a workflow state: ${state}`)
+    return {
+      kind,
+      thread,
+      root,
+      at: at.kind === "entry" ? at.id : null,
+      task,
+      state: state === "" ? null : state,
+    }
   }
   if (kind === "copy-thread") {
     const source = text(wire?.lane)
@@ -966,9 +1001,21 @@ export function encodeIntent(id: string, intent: Intent): Command {
         id,
         kind: "spin-off",
         moves: encodeMoves([intent.move]),
+        root: intent.root,
+        lane: intent.thread,
         task: intent.task,
         state: intent.state ?? "",
         here: intent.here ?? "",
+      })
+    case "open-thread":
+      return command({
+        id,
+        kind: "open-thread",
+        lane: intent.thread,
+        root: intent.root,
+        parentId: intent.at ?? "",
+        task: intent.task,
+        state: intent.state ?? "",
       })
     case "copy-thread":
       return command({

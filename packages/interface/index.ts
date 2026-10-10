@@ -213,18 +213,17 @@ export {
   BOUND,
   branchesAt,
   type CardKey,
+  type ClosableColumn,
   type Column,
   type ColumnKey,
   type ColumnMode,
-  type FreshKey,
-  type FreshMode,
-  freshOf,
-  freshRootOf,
-  freshTaskOf,
+  isClosable,
   keyText,
   type Pending,
   type Prefill,
   threadAnchor,
+  type UnstartedMode,
+  unstartedOf,
 } from "./columns.ts"
 export { matchCommands } from "./commands.ts"
 export { copyText } from "./copy-text.ts"

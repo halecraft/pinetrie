@@ -1,15 +1,17 @@
-// rules/fixtures — test support: a thread's card as its first message makes
-// it (`planThreadCard`). Rules' tests use it, and other packages' tests as
+// rules/fixtures — test support: a thread's card as its opening makes it
+// (`planThreadOpen`). Rules' tests use it, and other packages' tests as
 // `@pinetrie/rules/fixtures`; production code never imports it.
 
-import type {
-  CardRecord,
-  TaskId,
-  ThreadCard,
-  ThreadId,
-  WriterId,
+import {
+  type CardRecord,
+  ROOT_ORIGIN,
+  rootIdFor,
+  type TaskId,
+  type ThreadCard,
+  type ThreadId,
+  type WriterId,
 } from "@pinetrie/core"
-import { planThreadCard } from "./task.ts"
+import { planThreadOpen } from "./task.ts"
 
 /** A thread's card as it first lands on `task`'s canvas: at its end. */
 export function threadCardOf(input: {
@@ -18,8 +20,18 @@ export function threadCardOf(input: {
   readonly by: WriterId
   readonly cards: readonly CardRecord[]
 }): ThreadCard {
-  const { step } = planThreadCard({ ...input, parent: null })
-  if (step.kind !== "write" || step.record.kind !== "thread")
+  const opened = planThreadOpen({
+    thread: input.thread,
+    origin: ROOT_ORIGIN,
+    root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000f0"),
+    by: input.by,
+    now: 0,
+    placement: { kind: "after", task: input.task, parent: null },
+    opens: null,
+    cards: input.cards,
+  })
+  const made = opened.kind === "open" ? opened.steps.at(-1) : undefined
+  if (made?.kind !== "write" || made.record.kind !== "thread")
     throw new Error(`a test's thread card was refused: ${input.thread}`)
-  return step.record
+  return made.record
 }

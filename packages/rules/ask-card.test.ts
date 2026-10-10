@@ -36,10 +36,10 @@ describe("an ask card (ADR-0128)", () => {
       content: { relay },
     })
   })
-  test("it is stored in the fact field, and reads back whole", () => {
+  test("it is stored in its relay field, and reads back whole", () => {
     if (card === undefined) throw new Error("no card")
     const stored = encodeCard(card)
-    expect(JSON.parse(stored.fact)).toEqual(relay)
+    expect(JSON.parse(stored.relay)).toEqual(relay)
     expect(decodeCard(ID, stored)).toEqual(card)
   })
   test("popped, it is relayed; a held queue keeps it, as it keeps a message", () => {

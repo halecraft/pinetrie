@@ -223,7 +223,6 @@ export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
   margin: "normal",
   "task-pinned": "normal",
   canvas: "whole",
-  fresh: "whole",
   inventory: "face",
   trash: "face",
 }

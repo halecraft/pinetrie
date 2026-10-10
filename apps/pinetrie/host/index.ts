@@ -417,6 +417,7 @@ export async function startHost({
       readPlaces(places),
       threadsNow,
       new Set(readArchived(session).keys()),
+      new Set(readRoots(session).keys()),
     ),
   )
   for (const root of roots) await docs.root(root)

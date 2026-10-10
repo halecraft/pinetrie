@@ -56,9 +56,9 @@ import {
   planBaseNews,
   planChat,
   planImages,
-  planThreadStart,
+  planThreadOpen,
   resolveCommand,
-  type ThreadStart,
+  type ThreadOpen,
 } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
@@ -110,11 +110,12 @@ export interface ChatContext {
   /** The thread's pinned cards as the sender had them: a run waits for them. */
   readonly pinned: readonly SentCard[]
   /**
-   * What the thread the send starts writes before its first message
-   * (ADR-0116, ADR-0117), planned with the send; null for a send that
-   * starts none.
+   * What a branch to a thread not yet opened writes before its first
+   * message (ADR-0116, ADR-0117, ADR-0126): the thread's opening
+   * (`planThreadOpen`), planned with the send; null for a send to a thread
+   * that is open already, or to its end.
    */
-  readonly start: ThreadStart | null
+  readonly start: Extract<ThreadOpen, { kind: "open" }> | null
   /** The past its text links to, quoted for the model (ADR-0126). */
   readonly quotes: readonly LinkedQuote[]
 }
@@ -145,16 +146,18 @@ export async function sendChat(
 
   // A thread at the root starts a root (ADR-0063), under the id its tab
   // minted, in a new task (ADR-0116): one the session already holds is
-  // another's. A branch elsewhere goes in a task the session holds.
+  // another's, but for the task its thread was opened in, in that root
+  // (ADR-0126). A branch elsewhere goes in a task the session holds.
   if (chat.at.kind === "branch") {
     const known = readTasks(session).has(chat.at.task)
+    const opened = readThreads(session).get(chat.at.thread)?.root === chat.root
     if (chat.at.at === null && readRoots(session).has(chat.root))
       return {
         kind: "refused",
         code: ERR.ROOT_ID_IN_USE,
         message: "that root's id is in use",
       }
-    if (chat.at.at === null && known)
+    if (chat.at.at === null && known && !opened)
       return {
         kind: "refused",
         code: ERR.TASK_ID_IN_USE,
@@ -299,18 +302,14 @@ export async function sendChat(
     planned.kind === "appendToTree" || planned.kind === "createAndRun"
       ? planned
       : null
-  // A copy's record and card were written as it was made.
-  const start =
+  // A thread opened as its column opened, or made by a copy or a
+  // spin-off, has its record and card already; a branch to one not yet
+  // opened opens it with its first message, as its column would have.
+  const opened =
     begun === null || begun.starts === null || copied !== undefined
       ? null
-      : planThreadStart({
-          ...begun.starts,
+      : planThreadOpen({
           thread: begun.thread,
-          // A branch's card goes just after the thread it forks from.
-          parent:
-            chat.at.kind === "branch" && chat.at.at !== null
-              ? threadAt(index, chat.at.at)
-              : null,
           origin:
             chat.at.kind === "branch" && chat.at.at !== null
               ? { kind: "fork", at: chat.at.at, how: "branch" }
@@ -318,12 +317,30 @@ export async function sendChat(
           root: chat.root,
           by: writer,
           now: deps.basics.now(),
-          tasks: new Set(readTasks(session).keys()),
-          workflow: readWorkflow(session),
-          board: readBoardPlaces(session),
+          // A branch's card goes just after the thread it forks from.
+          placement: {
+            kind: "after",
+            task: begun.starts.task,
+            parent:
+              chat.at.kind === "branch" && chat.at.at !== null
+                ? threadAt(index, chat.at.at)
+                : null,
+          },
+          opens: readTasks(session).has(begun.starts.task)
+            ? null
+            : {
+                state: begun.starts.state,
+                workflow: readWorkflow(session),
+                board: readBoardPlaces(session),
+              },
           // As they are now, after the gathering's awaits.
           cards: readPlaces(deps.basics.places),
         })
+  if (opened?.kind === "refused")
+    deps.basics.log(
+      `[host] a thread's card was refused as its first message opened it: ${opened.code}`,
+    )
+  const start = opened?.kind === "open" ? opened : null
 
   // gather: the past its text links to, from the root it is in
   const quotes = linkedQuotes(chat.text, address => {
@@ -403,16 +420,14 @@ export async function executeChat(
   const { root } = view
   const message = (details: ChatDetails) =>
     encodeChat(details, now(), context.quotes)
-  // A thread's first message: its record, its card on its task's canvas
-  // and a new task's record and board place first, so a reader that finds
-  // the message finds its thread's root and task (ADR-0117, ADR-0116).
+  // A thread opened by its first message: its record, its card on its
+  // task's canvas and a new task's record and board place first, so a
+  // reader that finds the message finds its thread's root and task
+  // (ADR-0117, ADR-0116).
   const { start } = context
   if (start !== null) {
     await deps.records.writeValues(start.records)
-    applyPlaceSteps(
-      deps.basics.places,
-      start.cards.map(record => ({ kind: "write", record })),
-    )
+    applyPlaceSteps(deps.basics.places, start.steps)
     // A conversation's thread is named once its record is (ADR-0117); a new
     // lane's is named as its lane is made, which draws its banner.
     if (planned.kind === "appendToTree") void deps.names.ensure()

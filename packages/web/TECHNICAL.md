@@ -169,15 +169,14 @@ error.
   your tabs were yours, ADR-0030) is dropped once and overwritten by the first
   save; so is a `v: 5` one (before a column named its thread, ADR-0117),
   and the page opens on the sidebar's last root, else the board.
-- **A column's `thread` is stored** (ADR-0117), as `isThreadId`'s pattern,
-  so a reload keeps a fresh column's thread and its name. The device slot
-  copies it into a new browser tab, where the column follows the thread once
-  either copy sends. A fresh column with no thread, or a new tab with no
-  root, fails the whole layout.
-- **`fresh.pending` is never stored**, by either side: restoring it would send
-  its message again. A "branch here" column comes back empty. `fresh.prefill`
-  is stored, blank or content: only `pending` is sent on opening. What was
-  typed over it is a card, kept by the column's key (Your message and notes, below).
+- **A thread you opened is a card** (ADR-0126): its record and card are the
+  host's, so a reload or another device has it; the layout keeps only your
+  view of it (`CardView`), by its card's id, which must parse as one.
+- **`CardView.pending` is never stored**, by either side: restoring it would
+  send its message again. A "branch here" column comes back empty.
+  `prefill` is stored, blank or content: only `pending` is sent on opening.
+  What was typed over it is a card, your message at its thread (Your
+  message and notes, below).
 - **Restored anchors the document lacks are pruned once, after
   `whenSettled`.** Until then, missing means not yet arrived: `connectSession`
   returns before the document does (S29: 0 of 50 had it). Neither
@@ -369,8 +368,8 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
 - **A thread in your inventory** is a `ThreadFaceView` in its slot and a
   `ThreadPreviewView` opened (`thread-preview.tsx`), whose **put** puts it
   on the canvas you are on.
-- **Only a fresh column has ×** (`closable` in `ColumnSlot`); a card's
-  folds (⇤, `.fold`).
+- **Only an unstarted thread's column has ×** (`closable` in `ColumnSlot`);
+  every column folds (⇤, `.fold`).
 
 ## A column's view (`viewport.ts`, `use-viewport.ts`, ADR-0058)
 
@@ -938,9 +937,8 @@ the session sends moves and draws them until its copy holds them
 
 - **Where the column's cards are.** `Column`'s anchor is its thread's end
   (`threadEnd`), where a reply goes, and it finds your message there with
-  `yourCard` (`composing` only). A fresh column's cards are found by its
-  key (`CardPlace` `fresh`); its first send sends every one there but your
-  message to the new thread's nearest notes (`planFreshFollow`). So a tab switch, a
+  `yourCard` (`composing` only); before its thread starts, by its thread
+  (ADR-0126). So a tab switch, a
   reload or another device finds the same card: it belongs to the thread,
   not to the mounted column. Nobody else's message is drawn.
 - **A column publishes its composer** (`ComposerSpot`: its place and your
@@ -1029,10 +1027,10 @@ the session sends moves and draws them until its copy holds them
   someone who undid everything they wrote is still named. It stays until
   Kyneta can name the writers whose text still stands
   (ADR-0048, *Who contributed*); marks do not use it.
-- **Closing a fresh column whose cards hold text** asks in its header: keep
-  in inventory, the default (`keep`, below), or discard, which asks the host
-  to remove them, outside any history, since no column could show them
-  again.
+- **Closing an unstarted thread's column whose message holds text** asks
+  in its header: keep in inventory, the default, or discard (`closeUnstarted`):
+  one move, its thread's card to your trash with your message kept or
+  trashed, undone by the undo key (ADR-0126).
 
 ## Pinned cards (ADR-0048 step 5)
 
@@ -1040,9 +1038,10 @@ A thread's pinned cards are drawn in a strip under its column's header,
 outside the scrolling body (`pinned-strip.tsx`), so the thread's direction
 stays in view; the strip scrolls past 30vh.
 
-- **`Column` finds them with `pinnedAt(threadEnd, …)`.** A fresh
-  column, or one with no thread end, has no strip: a card is pinned at a
-  thread's end, and a fresh column has none until its first send.
+- **`Column` finds them with `pinnedAt(threadEnd, …)`.** An unstarted
+  thread's column, or one with no thread end, has no strip: a card is
+  pinned at a thread's end, and an unstarted thread has none until its first
+  send.
 - **Each is a `PinnedCardEditor`** (`card-editor.tsx`), a `BoundCardEditor`
   with its size (`tokensOf`, four characters a token, as pi estimates) and
   its status in its header. It has no send: Enter is a new line. Its ⋯
@@ -1331,8 +1330,8 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   ancestor's inset shadow. The item reaches the list's right edge (the list
   has no right padding), so it meets the rail.
 - **A column's × (`.close`) is `closable`** (`ColumnSlot`, `appView`):
-  only a branch not yet sent and a new tab's column close; a card's column
-  folds (⇤, `.fold`).
+  only an unstarted thread's column closes (a branch not yet sent, a new
+  tab's); every column folds (⇤, `.fold`).
 - **A popover opens above its trigger in the window's lower half, and from
   its left edge in the left half** (`placeBox`, `popover-place.ts`). A
   composer's `▾`, and the footer, are at the window's foot, so a list below
@@ -1379,10 +1378,10 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   `aria-current="true"` and its wrap `data-selected`, its × is the
   `.open-close` after it, its `⋯` (`.open-menu`) holds `.rename-root`,
   `.retitle-root` and `.move-to` (`.closes` for
-  the archive), a root being renamed is `.open-title-input`, new tabs
-  are `.open-new`, and ＋'s buttons are `.add-agent`, `.add-menu` and
-  `.add-conversation`. Folded, an item's `.open-root` or `.open-new` holds
-  `.open-icon` (`.open-sprite`, `.open-initials` or `.open-fresh`), its
+  the archive), a root being renamed is `.open-title-input`, and ＋'s
+  buttons are `.add-agent`, `.add-menu` and `.add-conversation`; a new tab
+  is a task's `.open-root` (ADR-0126). Folded, an item's `.open-root` holds
+  `.open-icon` (`.open-sprite` or `.open-initials`), its
   menu ends in `.open-close-item`, its tooltip is `.open-tip` and its
   rename field sits in `.open-rename`; the fold control is `.list-fold`, and
   the inventory's toggle is the account menu's `.account-inventory`. The board is `#board`: a `.board-column[data-state]`
@@ -1423,8 +1422,8 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
 - **A page with nothing in the sidebar opens on the board**, so a browser check
   that opens a second page opens its thread from there (`openFromBoard`), or
   from a reader on a thread card. To step away from a root so its columns
-  unmount, a check opens a new tab and closes it again (`stepAway`,
-  `stepBack`).
+  unmount, a check opens a new tab and closes its column again, which
+  discards its task (`stepAway`, `stepBack`).
 - **`.column` must stay `#strip`'s direct child**: `use-column-drag.ts`
   queries `:scope > .column`. A column's `.column-body` is inside
   `.column-thread`.

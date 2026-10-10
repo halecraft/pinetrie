@@ -70,7 +70,9 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
     w.kind === "set" ? (w.value as { name: string }).name : null,
   )
   expect(new Set(all).size).toBe(2)
-  expect(named.sort()).toEqual([lane, reserved].sort())
+  // A reservation of a thread named already makes its banner due again,
+  // which `due` does once.
+  expect([...new Set(named)].sort()).toEqual([lane, reserved].sort())
   // A lane pi holds, not yet named, is no thread to come.
   const other = threadIdFor("b")
   putLane(b, other)
@@ -101,4 +103,31 @@ test("a conversation thread is named as a lane is, and draws no banner: every th
   await names.ensure()
   expect(readNames(b.session).has(thread)).toBe(true)
   expect(named).toEqual([])
+})
+
+test("a thread opened before its lane, named as a conversation's, makes its banner due once a column reserves its lane (ADR-0126)", async () => {
+  const b = basics()
+  const thread = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f4")
+  applyWrites(b, [
+    setRecord(THREAD, {
+      thread,
+      root: ROOT_ID,
+      by: writerId("ada@x.io"),
+      createdAt: 1,
+      origin: { kind: "root" },
+    }),
+  ])
+  const scribe = record<Pick<Records, "writeValues">>({
+    writeValues: async writes => applyWrites(b, writes),
+  })
+  const named: string[] = []
+  const names = createNames({
+    basics: b,
+    records: scribe.port,
+    onNamed: lane => named.push(lane),
+  })
+  await names.ensure()
+  expect(named).toEqual([])
+  expect(await names.reserve(thread)).toBe("known")
+  expect(named).toEqual([thread])
 })

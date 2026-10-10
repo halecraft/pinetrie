@@ -183,7 +183,7 @@ export type Effect =
    */
   | {
       readonly kind: "keep"
-      /** At least one: a keep with no card left closes at once (`planKeep`). */
+      /** At least one. */
       readonly moves: readonly [SlotMove, ...SlotMove[]]
       readonly actedAt: ActedAt
       readonly close: readonly Effect[]
@@ -285,6 +285,12 @@ export const layout = (action: LayoutAction): Effect => ({
   action,
 })
 export const list = (act: ListAct): Effect => ({ kind: "list", act })
+
+/** `task` leaves the sidebar, and if you are on it, its neighbour is shown. */
+export const closeTaskEffects = (task: TaskId): readonly Effect[] => [
+  list({ kind: "close", task }),
+  layout({ kind: "closeTask", task }),
+]
 
 /** Show `here`; a task shown is opened in the sidebar, at its end if it was not there. */
 export function show(here: Here): readonly Effect[] {

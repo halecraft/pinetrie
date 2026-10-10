@@ -234,13 +234,7 @@ export const makeCard = <K extends PlacedKind>(
  * the inventory, pinned) is read from the two places when it is worded (`verbOf`).
  */
 export interface CardEvent {
-  readonly kind:
-    | "created"
-    | "moved"
-    | "undone"
-    | "redone"
-    | "unsent"
-    | "followed"
+  readonly kind: "created" | "moved" | "undone" | "redone" | "unsent"
   /** Who made it; null for the host's own write. */
   readonly by: WriterId | null
   readonly from: PlaceKey | null

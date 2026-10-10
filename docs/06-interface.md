@@ -58,8 +58,7 @@ under the sidebar, what is yours; to the right, what is everyone's (ADR-0122).
 
 ### The sidebar: the roots you have open (ADR-0030, ADR-0045, ADR-0077, ADR-0122)
 
-Down the left edge: the roots you have open, in your order, then new tabs,
-then ＋. It is darker than the page, and the root you are on is the page's
+Down the left edge: the roots you have open, in your order, then ＋. It is darker than the page, and the root you are on is the page's
 colour, with a light edge on its left, and opens into the rail and columns
 beside it (ADR-0081, turned sideways).
 
@@ -122,7 +121,7 @@ beside it (ADR-0081, turned sideways).
   - **An item's icon** is the sprite of its root's earliest thread that has
     one (ADR-0053), else two initials on the root's colour, the colour of
     its trunk (ADR-0089): "Kanban outside click" is **KO**, "Sidebar" is
-    **SI**. A new tab is a hollow tile until its first message.
+    **SI**.
   - **Its signals stay on it:** the blue ring round it while the agent
     works, the amber dot and the fading ✓ on its top-right corner, your
     dot on its bottom-right. Hovering or focusing it shows its label and
@@ -419,13 +418,14 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   above its own first message folded behind "↑ N earlier messages" when
   the thread it forks from is on no column of the canvas. A canvas with
   threads of several roots draws each root's tree on the rail.
-- **Only a branch you have not sent closes** (×); asked first when it holds
-  text, which you keep in your inventory or discard. A branch not yet sent
-  from a thread someone else has since taken keeps its text, but its
-  column says "Bea has it" in place of that thread's messages and sends
-  nothing until the thread is on a canvas again. A card's column folds
-  instead. A new tab's × closes the new tab. The cards at a thread's end
-  stay with the thread.
+- **Only a thread not yet sent closes** (×), a branch or a new tab: its
+  card goes to your trash, asked first when your message there holds text,
+  which you keep in your inventory or discard with it, undone by the undo
+  key. A new tab's task, then empty, goes too. A branch not yet sent from a
+  thread someone else has since taken keeps its text, but its column says
+  "Bea has it" in place of that thread's messages and sends nothing until
+  the thread is on a canvas again. Every column folds. The cards at a
+  thread's end stay with the thread.
 - **Each column's foot is its dock** (ADR-0113), pinned there while the
   messages scroll above it: the queue's header, which says what happens
   next, the cards queued, **+ add to queue**, the line, and your message.
@@ -626,7 +626,7 @@ the tree.
   takes a colour the root's id picks from twelve, and each later branch
   steps on round them, so roots don't all start alike, and neighbouring
   branches are far apart. The tree is centred in the rail.
-- **A new tab has a rail too**: a hollow dot where its first message will be.
+- **A new tab has a rail too**: a hollow dot where its first message will be, until its task has one.
   It is as wide as the rail it becomes, so the columns do not move when the
   first message lands.
 - **A column wears its rail track's colour**, so you can see which branches are
@@ -799,12 +799,12 @@ The rail is E; the column is T. Seeing both at once is the product.
   unless a message names someone, so its first message creates the lane.
   **Conversation**, in its menu, opens a new tab whose column is a
   conversation.
-- **A new tab is yours until its first send**, as any fresh column is. It sits
-  at the end of the sidebar, labelled "new agent" or "new conversation", and
-  closing it leaves no trace. Its first send makes the root, which joins
-  the sidebar and the board: at the end of the first open state from your
-  list's ＋, of its own state from a board column's (ADR-0122). Others find
-  it on the board, and see you in it there.
+- **A new tab is a task from the moment it opens** (ADR-0126): its thread,
+  not yet started, is a card on its canvas, and the task is in your sidebar
+  and on the board, at the end of the first open state from your list's ＋,
+  of its own state from a board column's (ADR-0122). Others find it on the
+  board, and its agent can be asked. Closing it unsent with discard takes
+  the task away. Its first send makes the root.
 - **An empty session** shows the board, with nothing in it, and ＋.
 - **A page with nothing in the sidebar** (a first visit, or a list you
   emptied) opens on the board, which shows every root to open: nothing opens
@@ -938,8 +938,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   branch's `@agent `) makes it. It belongs to the thread, not the column:
   switching roots, reloading, closing and reopening the column, or the
   host restarting, you find it where you left it, and it follows the
-  thread as the thread grows. A new tab's or a new branch's card belongs to
-  its column until its first message is sent. Others writing at the
+  thread as the thread grows, a thread not yet started's too (ADR-0126). Others writing at the
   thread's end show above it as "Bea is writing…".
 - **A note is a card in a note column** (ADR-0116), which everyone in the
   task sees and anyone can type in; no agent reads it. A **note column** is
@@ -1141,11 +1140,12 @@ The rail is E; the column is T. Seeing both at once is the product.
   Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it (ADR-0066). It undoes your
   newest move in the root you are on, from any of your tabs, after a reload
   or a restart too. As it acts it shows where the card went back: the
-  panel, the thread's column, or a branch you closed since, opened again at
-  the end of its root's columns. If anyone moved the card since, it is refused, saying
-  who, and nothing moves. A keep of a branch's cards is undone whole. Sends
-  and copies are final; so is a keep that closed a new tab, whose
-  cards you take back from the panel. An archived root's moves cannot be
+  panel, the thread's column, or, for a thread not yet started, its card's
+  column unfolded. If anyone moved the card since, it is refused, saying
+  who, and nothing moves. Closing a branch is undone whole, its card and
+  your message back; a new tab's task, closed empty, is gone for good.
+  Sends and copies are final. On no task, the undo key undoes your moves
+  outside any task: a discard from your inventory. An archived root's moves cannot be
   undone, and are forgotten 7 days after it was archived.
 - **Undo a swap** with the same keys while the panel has focus: this tab's
   newest swap goes back, unless those slots have changed since.
@@ -1200,7 +1200,7 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
   moved it and when). A root in the archive is archived; the host
   refuses commands that would write in it (ADR-0029).
 - **Which task you are on, each task's view (which of its columns you
-  unfolded, how each reads, your branches not yet sent), new tabs and
+  unfolded, how each reads, what a thread you opened starts with) and
   whether the board is open** are view state, kept in the browser per
   browser tab, with
   the device's latest for a new one, and never in the document (ADR-0027,

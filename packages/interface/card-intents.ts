@@ -49,7 +49,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { addressLink, taskOfPlace } from "@pinetrie/rules"
+import { addressLink, taskOfPlace, yourCard } from "@pinetrie/rules"
 import {
   type ActedAt,
   AT_INVENTORY,
@@ -60,13 +60,15 @@ import {
   LAST_ORDER,
   type MoveAnswer,
   type MoveHow,
+  type SlotMove,
   type Slots,
 } from "@pinetrie/session"
 import { addressWords } from "./address-words.ts"
-import { freshTaskOf, type Minted } from "./columns.ts"
+import type { Minted } from "./columns.ts"
 import {
   type CardFacts,
   changeViewOf,
+  closeTaskEffects,
   type Effect,
   type IntentState,
   planOpenAt,
@@ -341,8 +343,7 @@ function putReference(
  * there (`planSpinOff`). A thread's column: a note in the note column
  * nearest it; a note column: a note at its end (ADR-0116). A spot on a
  * canvas: a text card in a note column made for it there (`WRAPS`,
- * ADR-0126). A composer, or a
- * fresh column: your message there (`putInMessage`). A slot: a card already
+ * ADR-0126). A composer: your message there (`putInMessage`). A slot: a card already
  * in your inventory swaps with what is there; any other card is taken into
  * the inventory, into that slot if it is empty.
  */
@@ -383,7 +384,7 @@ export function planPut(
     ]
   if (
     (target.kind === "column" || target.kind === "composer") &&
-    intoMessage(target, facts.composers)
+    intoMessage(target)
   )
     return putInMessage(now, target.key, state)
   const to = placeOfTarget(target, facts.composers, facts.me)
@@ -478,9 +479,7 @@ function putOnCanvas(
  * `now` as your message in column `key`'s composer (ADR-0113). A message
  * there with text takes `now`'s place, a slot of your inventory included,
  * in one move the host accepts or refuses whole, so one undo; an empty one
- * is discarded. In a fresh column a message with text gives way only to a
- * card from your inventory: anywhere else, it would land in another
- * thread, so the put is refused.
+ * is discarded.
  */
 function putInMessage(
   now: TextCard,
@@ -511,13 +510,6 @@ function putInMessage(
       },
     ]
   }
-  if (spot.place.kind === "fresh" && now.place.kind !== "inventory")
-    return [
-      {
-        kind: "refuse",
-        refusal: { card: now.id, actedAt, code: "message-holds-text" },
-      },
-    ]
   const back = {
     move: moveOf(message, from),
     slot: now.place.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
@@ -709,37 +701,52 @@ export function planDiscard(
 }
 
 /**
- * Close fresh column `key`, keeping `cards` in your inventory: one move the
- * host accepts or refuses whole (ADR-0066), each card into the next empty
- * slot from the selected one. Without room for all of them, the host refuses
- * it `full`, and the column stays open, saying so.
+ * Close the column of `thread`, not yet started (ADR-0126): its card to
+ * your trash, and your message there, if you have one, to your inventory
+ * (`keep`, into the first empty slot from the selected one) or your trash,
+ * one move the host accepts or refuses whole. The only thread of a new
+ * tab's task leaves the task empty: it leaves the sidebar once the host
+ * accepts. Nothing for a thread whose card is not on a canvas.
  */
-export function planKeep(
-  cards: readonly CardId[],
-  key: string,
-  close: readonly Effect[],
+export function planCloseUnstarted(
+  thread: ThreadId,
+  keep: boolean,
   state: IntentState,
 ): readonly Effect[] {
   const facts = state.cards
+  const card = facts.cards.find(c => c.id === thread)
+  if (card?.kind !== "thread" || card.place.kind !== "canvas") return []
+  const { task } = card.place
+  const message = yourCard(
+    facts.me,
+    { kind: "thread", thread },
+    facts.cards,
+    state.index,
+  )
   const slots: Record<string, CardId> = { ...facts.slots }
-  const moves = cards.flatMap(id => {
-    const now = textCardOf(facts, id)
-    if (now === undefined) return []
-    const slot = firstEmpty(slots, facts.selected)
-    if (slot !== null) slots[String(slot)] = now.id
-    const move = moveOf(now, { kind: "inventory", holder: facts.me })
-    return [{ move, slot }]
-  })
-  const [first, ...rest] = moves
-  // Every card already gone: nothing to ask the host, so the column closes.
-  if (first === undefined) return close
+  const slot = keep ? firstEmpty(slots, facts.selected) : null
+  const away: SlotMove = { move: moveOf(card, DISCARDED), slot: null }
+  const moves: readonly [SlotMove, ...SlotMove[]] =
+    message === undefined
+      ? [away]
+      : [
+          {
+            move: moveOf(
+              message,
+              keep ? { kind: "inventory", holder: facts.me } : DISCARDED,
+            ),
+            slot,
+          },
+          away,
+        ]
+  const alone = (state.tasks.index.canvases.get(task) ?? []).length === 1
   return [
     {
       kind: "keep",
-      moves: [first, ...rest],
-      actedAt: atColumn(key),
-      close,
-      here: null,
+      moves,
+      actedAt: atColumn(thread),
+      close: alone ? closeTaskEffects(task) : [],
+      here: task,
     },
   ]
 }
@@ -752,17 +759,11 @@ export const afterKeep = (
 
 /**
  * The task an undo of moves acts in, and a discard's history: the task you
- * are on, or the one a new tab minted as it opened (ADR-0066, ADR-0116).
- * None on nothing.
+ * are on (ADR-0066, ADR-0116). None on nothing.
  */
 export function taskOfTab(state: IntentState): TaskId | null {
   const active = state.layout.active
-  if (active === null || active.kind === "nothing") return null
-  if (active.kind === "new")
-    return (
-      freshTaskOf(state.layout.newTabs.find(c => c.key === active.key)) ?? null
-    )
-  return active.task
+  return active?.kind === "task" ? active.task : null
 }
 
 /**

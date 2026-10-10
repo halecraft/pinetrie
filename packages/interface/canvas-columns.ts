@@ -1,11 +1,12 @@
 // interface/canvas-columns — a task's columns, from its canvas (ADR-0116).
 //
 // Every card on a task's canvas is a column, in the canvas's order, the
-// same for everyone. What is yours is the task's view (`TaskView`): which
-// columns you unfolded, how you read each, and the branches you opened and
-// have not sent. It holds maps and a flag and no list, so it has nowhere to
-// keep an order of its own (`canvasColumns` reads the order from the
-// canvas alone). Pure.
+// same for everyone: a thread opened and not yet sent is a card there too
+// (ADR-0126). What is yours is the task's view (`TaskView`): which columns
+// you unfolded, how you read each, and what a thread you opened starts
+// with. It holds maps and a flag and no list, so it has nowhere to keep an
+// order of its own (`canvasColumns` reads the order from the canvas alone).
+// Pure.
 
 import {
   type CardId,
@@ -15,21 +16,20 @@ import {
   type LaneView,
   type NoteColumnId,
   type TaskId,
-  type ThreadFork,
   type ThreadId,
   type TreeIndex,
   threadAt,
   type WriterId,
 } from "@pinetrie/core"
-import { branchAfter, type CanvasCard } from "@pinetrie/rules"
+import type { CanvasCard, ThreadOpening } from "@pinetrie/rules"
 import type { Density } from "./ask-words.ts"
 import {
   BOUND,
   type Column,
-  type FreshMode,
   type Pending,
   type Prefill,
   threadAnchor,
+  type UnstartedMode,
 } from "./columns.ts"
 
 /** Your view of one column, by its card: none of it is shared (ADR-0116). */
@@ -40,21 +40,16 @@ export interface CardView {
   readonly density?: Density
   /** The thread's details are open under the header (ADR-0073). */
   readonly details?: true
-}
-
-/**
- * A branch you opened and have not sent (ADR-0021): yours until its first
- * send, kept under the thread it minted, which its card will have.
- */
-export interface FreshColumn {
-  /** Its fork: where its first send writes. */
-  readonly at: EntryId
-  /** Its first send's id, once sent: the entry it wrote is `bySend`'s. */
-  readonly sendId?: string
-  /** A first message it sends as it opens ("branch here" after a conflict). */
+  /**
+   * A thread you opened, until its first send (ADR-0126): a first message
+   * its column sends as it opens ("branch here" after a conflict), never
+   * stored, since a reload would send it twice.
+   */
   readonly pending?: Pending
-  /** What its composer starts with, unsent. */
+  /** What a thread you opened starts its composer with, unsent. */
   readonly prefill?: Prefill
+  /** A Start Agent column: its first message with no mention asks the agent. */
+  readonly asksAgent?: true
 }
 
 /**
@@ -66,8 +61,6 @@ export interface TaskView {
   readonly cards: ReadonlyMap<CardId, CardView>
   /** The task column's fold. */
   readonly task: { readonly unfolded: boolean }
-  /** Branches not yet sent, by the thread each minted. */
-  readonly fresh: ReadonlyMap<ThreadId, FreshColumn>
 }
 
 /**
@@ -77,7 +70,6 @@ export interface TaskView {
 export const defaultView = (first: CardId | null): TaskView => ({
   cards: first === null ? new Map() : new Map([[first, { unfolded: true }]]),
   task: { unfolded: false },
-  fresh: new Map(),
 })
 
 /** The view of a task: as kept, else `defaultView` for its canvas. */
@@ -91,8 +83,7 @@ export const viewOf = (
 export type CardColumn =
   | {
       readonly kind: "thread"
-      /** Its card; null for a branch not yet on the canvas. */
-      readonly card: ThreadId | null
+      readonly card: ThreadId
       readonly column: Column
       readonly folded: boolean
       readonly width: CardWidth
@@ -128,7 +119,7 @@ export const stripOf = (
 /** A strip's card columns: all but its task column. */
 export const stripCards = ([, ...cards]: Strip): readonly CardColumn[] => cards
 
-/** The key a strip column is drawn by: its card's, or a fresh one's thread. */
+/** The key a strip column is drawn by: its card's. */
 export const keyOfColumn = (c: CardColumn): string =>
   c.kind === "thread" ? c.column.key : c.card
 
@@ -141,101 +132,71 @@ const readerOf = (
 })
 
 /**
- * A task's columns: each card of its canvas in its order, and each branch
- * you have not sent just after the thread its fork is in (`branchAfter`, as
- * the host will rank its card), two at one thread in the order they were
- * opened. A thread whose root this tab does not hold yet is left out, as is
- * a branch whose fork it lacks. Pure.
+ * A task's columns: each card of its canvas in its order. A thread whose
+ * root this tab does not hold yet is left out. Pure.
  */
 export function canvasColumns(input: {
   readonly canvas: readonly CanvasCard[]
   readonly view: TaskView
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
-  /** Each forked thread's fork (`TaskIndex.forkOf`): its column's end before its first send. */
-  readonly forks: ReadonlyMap<ThreadId, ThreadFork>
+  /** Each thread opened and not yet started (`unstartedThreads`): where its column ends. */
+  readonly unstarted: ReadonlyMap<ThreadId, ThreadOpening>
   /** Each thread someone else holds in their inventory, by its holder (`heldByOthers`). */
   readonly holders: ReadonlyMap<ThreadId, WriterId>
 }): readonly CardColumn[] {
-  const { canvas, view, index, lanes } = input
-  const onCanvas = new Set<string>(canvas.map(c => c.id))
-  // Each branch not yet on the canvas, under the card index it goes after.
-  const after = new Map<number, CardColumn[]>()
-  for (const [thread, fresh] of [...view.fresh].sort(([a], [b]) =>
-    a < b ? -1 : a > b ? 1 : 0,
-  )) {
-    if (onCanvas.has(thread) || index.entries[fresh.at] === undefined) continue
-    const at = branchAfter(canvas, threadAt(index, fresh.at))
-    after.set(at, [
-      ...(after.get(at) ?? []),
-      {
-        kind: "thread",
-        card: null,
-        column: freshColumn(
-          thread,
-          fresh,
-          view.cards.get(thread),
-          index,
-          input.holders,
-        ),
-        folded: false,
-        width: 1,
-      },
-    ])
-  }
-  const out: CardColumn[] = [...(after.get(-1) ?? [])]
-  for (const [i, c] of canvas.entries()) {
-    const drawn = cardColumn(
-      c,
-      view.cards.get(c.id),
-      index,
-      lanes,
-      input.forks,
-      onCanvas,
-    )
-    if (drawn !== null) out.push(drawn)
-    out.push(...(after.get(i) ?? []))
-  }
-  return out
+  const onCanvas = new Set<string>(input.canvas.map(c => c.id))
+  return input.canvas.flatMap(c => {
+    const drawn = cardColumn(c, input.view.cards.get(c.id), input, onCanvas)
+    return drawn === null ? [] : [drawn]
+  })
 }
 
 /**
  * A card's column; null for a thread whose root this tab does not hold. A
- * copy before its first send ends at its fork, and its first send is a
- * branch there, as a fresh column's is (ADR-0117).
+ * thread not yet started ends at its fork, or, a new tab's, at its root,
+ * and its first send is a branch there (ADR-0117, ADR-0126).
  */
 function cardColumn(
   c: CanvasCard,
   seen: CardView | undefined,
-  index: TreeIndex,
-  lanes: readonly LaneView[],
-  forks: ReadonlyMap<ThreadId, ThreadFork>,
+  facts: Pick<
+    Parameters<typeof canvasColumns>[0],
+    "index" | "lanes" | "unstarted" | "holders"
+  >,
   onCanvas: ReadonlySet<string>,
 ): CardColumn | null {
+  const { index } = facts
   const folded = seen?.unfolded !== true
   const width = c.place.width
   switch (c.kind) {
     case "thread": {
-      const anchor = threadAnchor(index, lanes, c.id)
-      const fork = forks.get(c.id)?.at
-      if (
-        anchor === null &&
-        fork !== undefined &&
-        index.entries[fork] !== undefined
-      )
+      const opening = facts.unstarted.get(c.id)
+      if (opening !== undefined)
         return {
           kind: "thread",
           card: c.id,
           column: {
             key: c.id,
-            anchor: fork,
+            anchor: opening.fork,
             thread: c.id,
             ...readerOf(seen),
-            mode: { kind: "copy", fork },
+            ...(seen?.asksAgent === true ? { asksAgent: true } : {}),
+            mode: {
+              kind: "unstarted",
+              fork: opening.fork,
+              root: opening.root,
+              ...(opening.fork === null
+                ? {}
+                : heldAt(index, opening.fork, facts.holders)),
+              ...(seen?.pending === undefined ? {} : { pending: seen.pending }),
+              ...(seen?.prefill === undefined ? {} : { prefill: seen.prefill }),
+            },
           },
           folded,
           width,
         }
+      const anchor = threadAnchor(index, facts.lanes, c.id)
       if (anchor === null) return null
       const above = foldAboveOf(index, c.id, onCanvas)
       const column = {
@@ -274,50 +235,12 @@ function foldAboveOf(
   return from === null || onCanvas.has(from) ? null : thread
 }
 
-/**
- * A branch's column: fresh until its thread's first entry is written, then
- * following its thread, as the card the host makes for it will.
- */
-function freshColumn(
-  thread: ThreadId,
-  fresh: FreshColumn,
-  seen: CardView | undefined,
-  index: TreeIndex,
-  holders: ReadonlyMap<ThreadId, WriterId>,
-): Column {
-  const own =
-    fresh.sendId === undefined ? undefined : index.bySend.get(fresh.sendId)
-  const started = own !== undefined || index.firstOf.has(thread)
-  const reader = readerOf(seen)
-  if (started)
-    return {
-      key: thread,
-      anchor: threadAnchor(index, [], thread) ?? own ?? fresh.at,
-      thread,
-      ...reader,
-      mode: BOUND,
-    }
-  return {
-    key: thread,
-    anchor: fresh.at,
-    thread,
-    ...reader,
-    mode: {
-      kind: "fresh",
-      ...heldAt(index, fresh.at, holders),
-      ...(fresh.sendId === undefined ? {} : { sendId: fresh.sendId }),
-      ...(fresh.pending === undefined ? {} : { pending: fresh.pending }),
-      ...(fresh.prefill === undefined ? {} : { prefill: fresh.prefill }),
-    },
-  }
-}
-
 /** The thread `at` is in, and who holds it, when someone else does (ADR-0124). */
 const heldAt = (
   index: TreeIndex,
   at: EntryId,
   holders: ReadonlyMap<ThreadId, WriterId>,
-): Pick<FreshMode, "held"> => {
+): Pick<UnstartedMode, "held"> => {
   const thread = threadAt(index, at)
   const by = thread === null ? undefined : holders.get(thread)
   return thread === null || by === undefined ? {} : { held: { thread, by } }
@@ -325,7 +248,7 @@ const heldAt = (
 
 /**
  * Each thread someone other than `me` holds in their inventory, by its
- * holder: what `canvasColumns` decides a branch not yet sent from it by.
+ * holder: what `canvasColumns` decides a thread not yet started from it by.
  */
 export const heldByOthers = (
   cards: readonly CardRecord[],

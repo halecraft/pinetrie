@@ -25,6 +25,7 @@ import {
   type TextCardId,
   type ThreadId,
   type TraceRecord,
+  threadAt,
   type WorkflowEdit,
   type WorkflowStateId,
   type WriterId,
@@ -40,10 +41,10 @@ import {
   cardOf,
   full,
   moveCard,
+  planCloseUnstarted,
   planComment,
   planDiscard,
   planEditAsText,
-  planKeep,
   planNewNote,
   planOpenTrace,
   planPin,
@@ -64,16 +65,16 @@ import {
 import {
   type CardKey,
   type ColumnKey,
-  type FreshKey,
   keyText,
   type Minted,
-  type NewTabAction,
   type Pending,
   type Prefill,
+  type ReaderAction,
   threadAnchor,
 } from "./columns.ts"
 import {
   changeViewOf,
+  closeTaskEffects,
   type Effect,
   type IntentState,
   layout,
@@ -99,9 +100,9 @@ import { openOf, type ThreadLink } from "./thread-link.ts"
 
 /**
  * What a reader asks of one column, whatever its kind. A message's acts are
- * among them. What only one kind of column does (a card's moves, a fresh
- * column's close and first send) is an intent of its own that names a key of
- * that kind (`ColumnKey`), so it cannot be asked of another.
+ * among them. What only one kind of column does (a card's moves, an
+ * unstarted thread's close and first send) is an intent of its own that
+ * names a key of that kind (`ColumnKey`), so it cannot be asked of another.
  */
 export type ColumnAct =
   | MessageAct
@@ -113,7 +114,7 @@ export type ColumnAct =
   | { readonly kind: "density"; readonly density: Density }
   /** Open or close the thread's details under the header (ADR-0073). */
   | { readonly kind: "details"; readonly open: boolean }
-  /** After a conflict: a fresh column at `at`, which sends `pending` there. */
+  /** After a conflict: a thread opened at `at`, whose column sends `pending` there. */
   | {
       readonly kind: "branchInstead"
       readonly at: EntryId
@@ -234,27 +235,18 @@ export type Intent =
       readonly column: CardKey
       readonly to: number
     }
-  /** Close a fresh column, discarding `discard` first: its cards. */
-  | {
-      readonly kind: "closeFresh"
-      readonly column: FreshKey
-      readonly discard: readonly CardId[]
-    }
   /**
-   * Close a fresh column, keeping `cards` (its cards with text) in your
-   * inventory first; it closes once every one is accepted.
+   * Close the column of a thread not yet started (ADR-0126): its card to
+   * your trash, and your message there to your inventory (`keep`) or your
+   * trash, in one move. A new tab's task, then empty, leaves the sidebar.
    */
   | {
-      readonly kind: "keepFresh"
-      readonly column: FreshKey
-      readonly cards: readonly CardId[]
+      readonly kind: "closeUnstarted"
+      readonly card: ThreadId
+      readonly keep: boolean
     }
-  /** A fresh column's first send, as send `sendId`. */
-  | {
-      readonly kind: "sentFresh"
-      readonly column: FreshKey
-      readonly sendId: string
-    }
+  /** A thread you opened sent its first message: what it started with is spent. */
+  | { readonly kind: "sentFirst"; readonly card: ThreadId }
   /** Unfold a column of the task you are on, or fold it (ADR-0116). */
   | {
       readonly kind: "fold"
@@ -284,8 +276,12 @@ export type Intent =
       readonly card: CardId
       readonly width: CardWidth
     }
-  /** Show a task, opening it in the sidebar, or a new tab, or nothing. */
+  /** Show a task, opening it in the sidebar, or nothing. */
   | { readonly kind: "show"; readonly here: Here }
+  /**
+   * Open a new tab (ADR-0126): a new task, its new root's first thread not
+   * yet started on its canvas, shown and in the sidebar.
+   */
   | {
       readonly kind: "newTab"
       readonly asksAgent: boolean
@@ -293,7 +289,7 @@ export type Intent =
       /** The workflow state its task lands in: the board column it came from (ADR-0122). */
       readonly state?: WorkflowStateId
     }
-  /** Close a task of the sidebar, or a new tab, for you: nothing shared is written. */
+  /** Close a task of the sidebar for you: nothing shared is written. */
   | { readonly kind: "close"; readonly here: Here }
   /** Move a task of the sidebar before `before`, or to its end (ADR-0122). */
   | {
@@ -447,7 +443,7 @@ function leavingSearch(
 const opensOrShows = (action: LayoutAction): boolean =>
   showsStage(action) ||
   (action.kind === "view" &&
-    (action.change.kind === "openFresh" ||
+    (action.change.kind === "opened" ||
       (action.change.kind === "fold" && action.change.unfolded)))
 
 /**
@@ -480,34 +476,10 @@ function planOf(
         ? planColumnMove(intent.column.card, intent.to, active.task, state)
         : []
     }
-    case "closeFresh": {
-      const at = IN_COLUMN(keyText(intent.column))
-      return [
-        ...intent.discard.flatMap(id => planDiscard(id, at, state)),
-        ...closeFresh(intent.column, state),
-      ]
-    }
-    case "keepFresh":
-      return planKeep(
-        intent.cards,
-        keyText(intent.column),
-        closeFresh(intent.column, state),
-        state,
-      )
-    case "sentFresh":
-      return intent.column.kind === "newTab"
-        ? [
-            layout({
-              kind: "newTabColumn",
-              key: intent.column.thread,
-              action: { kind: "sent", sendId: intent.sendId },
-            }),
-          ]
-        : onTaskYouAreOn(state, {
-            kind: "sent",
-            thread: intent.column.thread,
-            sendId: intent.sendId,
-          })
+    case "closeUnstarted":
+      return planCloseUnstarted(intent.card, intent.keep, state)
+    case "sentFirst":
+      return onTaskYouAreOn(state, { kind: "sent", card: intent.card })
     case "fold":
     case "foldTask": {
       const active = state.layout.active
@@ -551,29 +523,30 @@ function planOf(
     case "show":
       return show(intent.here)
     case "newTab":
-      // Keyed by the thread it minted, as its card will be.
+      // Its column is keyed by the thread it minted, as its card is.
       return [
-        { kind: "armFocus", key: minted.thread },
-        layout({
-          kind: "newTab",
-          key: minted.thread,
-          root: minted.root,
-          task: minted.task,
-          asksAgent: intent.asksAgent,
+        {
+          kind: "request",
+          intent: {
+            kind: "open-thread",
+            thread: minted.thread,
+            root: minted.root,
+            at: null,
+            task: minted.task,
+            state: intent.state ?? null,
+          },
+        },
+        ...show({ kind: "task", task: minted.task }),
+        changeViewOf(state, minted.task, {
+          kind: "opened",
+          card: minted.thread,
           ...(intent.prefill === undefined ? {} : { prefill: intent.prefill }),
-          ...(intent.state === undefined ? {} : { state: intent.state }),
+          ...(intent.asksAgent ? { asksAgent: true } : {}),
         }),
+        { kind: "armFocus", key: minted.thread },
       ]
     case "close":
-      switch (intent.here.kind) {
-        case "task":
-          return closeTask(intent.here.task)
-        case "new":
-          return [layout({ kind: "closeNewTab", key: intent.here.key })]
-        case "nothing":
-          return []
-      }
-      return []
+      return intent.here.kind === "task" ? closeTask(intent.here.task) : []
     case "moveInList":
       return [list({ kind: "place", task: intent.task, before: intent.before })]
     case "moveTask":
@@ -675,16 +648,9 @@ const onTaskYouAreOn = (
     : []
 }
 
-/** Closing a fresh column: a new tab's closes the tab, a branch's leaves your view. */
-const closeFresh = (column: FreshKey, state: IntentState): readonly Effect[] =>
-  column.kind === "newTab"
-    ? [layout({ kind: "closeNewTab", key: column.thread })]
-    : onTaskYouAreOn(state, { kind: "closeFresh", thread: column.thread })
-
 /**
  * A column's act, said in `column`. A reader's setting is your view of its
- * card, of the branch, or of a new tab's one column; the task column has
- * none.
+ * card; the task column has none.
  */
 function planColumn(
   column: ColumnKey,
@@ -694,25 +660,15 @@ function planColumn(
 ): readonly Effect[] {
   const key = keyText(column)
   const onTask = (change: ViewChange) => onTaskYouAreOn(state, change)
-  /** A reader's setting: of a card, a branch, or a new tab's column. */
-  const reading = (
-    action: Extract<NewTabAction, { kind: "density" | "details" }>,
-  ): readonly Effect[] => {
-    switch (column.kind) {
-      case "newTab":
-        return [layout({ kind: "newTabColumn", key: column.thread, action })]
-      case "task":
-        return []
-      case "card":
-      case "fresh": {
-        const card = column.kind === "card" ? column.card : column.thread
-        return onTask(
-          action.kind === "density"
-            ? { kind: "density", card, density: action.density }
-            : { kind: "details", card, open: action.open },
-        )
-      }
-    }
+  /** A reader's setting, of a card's column. */
+  const reading = (action: ReaderAction): readonly Effect[] => {
+    if (column.kind !== "card") return []
+    const { card } = column
+    return onTask(
+      action.kind === "density"
+        ? { kind: "density", card, density: action.density }
+        : { kind: "details", card, open: action.open },
+    )
   }
   switch (act.kind) {
     case "openAt":
@@ -723,28 +679,20 @@ function planColumn(
         state,
         minted,
       )
-    // A branch is keyed by the thread it minted, as its card will be.
+    // A branch is keyed by the thread it minted, as its card is.
     case "branch":
-      return opened(
+      return planOpenBranch(
         minted.thread,
-        onTask({
-          kind: "openFresh",
-          thread: minted.thread,
-          at: act.branch.at,
-          ...(act.branch.prefill === undefined
-            ? {}
-            : { prefill: act.branch.prefill }),
-        }),
+        act.branch.at,
+        act.branch.prefill === undefined ? {} : { prefill: act.branch.prefill },
+        state,
       )
     case "branchInstead":
-      return opened(
+      return planOpenBranch(
         minted.thread,
-        onTask({
-          kind: "openFresh",
-          thread: minted.thread,
-          at: act.at,
-          pending: act.pending,
-        }),
+        act.at,
+        { pending: act.pending },
+        state,
       )
     case "discard":
       return planDiscard(act.card, IN_COLUMN(key), state)
@@ -983,15 +931,48 @@ function planCopyThread(
   ]
 }
 
+/**
+ * A branch at `at` opened on the task you are on (ADR-0126): its thread
+ * `thread` written now, its card just after the thread `at` is in, and its
+ * column unfolded with what it starts with, taking focus. Nothing off a
+ * task, or for an entry in no root this tab holds.
+ */
+function planOpenBranch(
+  thread: ThreadId,
+  at: EntryId,
+  starts: { readonly pending?: Pending; readonly prefill?: Prefill },
+  state: IntentState,
+): readonly Effect[] {
+  const active = state.layout.active
+  const parent = threadAt(state.index, at)
+  const root =
+    parent === null ? undefined : state.tasks.index.rootOfThread.get(parent)
+  if (active?.kind !== "task" || root === undefined) return []
+  return opened(thread, [
+    {
+      kind: "request",
+      intent: {
+        kind: "open-thread",
+        thread,
+        root,
+        at,
+        task: active.task,
+        state: null,
+      },
+    },
+    changeViewOf(state, active.task, {
+      kind: "opened",
+      card: thread,
+      ...starts,
+    }),
+  ])
+}
+
 /** A column opened with `key` takes focus; nothing opened, nothing armed. */
 const opened = (key: string, effects: readonly Effect[]): readonly Effect[] =>
   effects.length === 0 ? [] : [{ kind: "armFocus", key }, ...effects]
 
-/** `task` leaves the sidebar, and if you are on it, its neighbour is shown. */
-const closeTask = (task: TaskId): readonly Effect[] => [
-  list({ kind: "close", task }),
-  layout({ kind: "closeTask", task }),
-]
+const closeTask = closeTaskEffects
 
 /**
  * After a move on the board is answered (ADR-0122): `moved` runs only once

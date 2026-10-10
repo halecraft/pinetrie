@@ -47,7 +47,6 @@ import {
   placeFields,
   placeOfFields,
   projectTranscript,
-  ROOT,
   rootIdFor,
   rowFieldsOf,
   sameKey,
@@ -67,7 +66,7 @@ import {
 import { describe, expect, test } from "vitest"
 import { cardIdFor } from "./fixtures.ts"
 
-const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const TEST_THREAD = threadIdFor("e")
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
@@ -449,15 +448,9 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       thread: threadIdFor("x"),
       order: "b",
     },
-    { kind: "fresh", column: "k", root: TEST_ROOT, task: TEST_TASK, at: ROOT },
-    {
-      kind: "fresh",
-      column: "k",
-      root: TEST_ROOT,
-      task: TEST_TASK,
-      at: atEntry(entryId("e-1")),
-    },
     { kind: "inventory", holder: ADA },
+    { kind: "trash", holder: ADA, task: TEST_TASK },
+    { kind: "trash", holder: ADA, task: null },
   ]
 
   test("every place, and its key, round-trips", () => {
@@ -516,7 +509,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(keyOfFields(keyFieldsFrom(k => f[k]))).toEqual(keyOf(canvas))
   })
 
-  test("a key's fields on the wire are the table's: no width, no order, no task but a canvas's and a fresh one's", () => {
+  test("a key's fields on the wire are the table's: no width, no order, no task but a canvas's and a spot's, a task pin's or a task's notes", () => {
     const f = placeFields({
       kind: "canvas",
       task: TEST_TASK,
@@ -533,7 +526,6 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       kind: "trash",
       task: TEST_TASK,
       holder: writerId("ada@example.com"),
-      why: { kind: "discarded" },
     })
     expect(keyFieldsOf(gone)).not.toHaveProperty("task")
   })
@@ -643,17 +635,6 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     })
   })
 
-  test("a fresh card needs its root", () => {
-    const f = placeFields({
-      kind: "fresh",
-      column: "k",
-      root: TEST_ROOT,
-      task: TEST_TASK,
-      at: ROOT,
-    })
-    expect(placeOfFields({ ...f, root: "" })).toBeUndefined()
-  })
-
   test("an inventory needs its holder", () => {
     const f = placeFields({ kind: "inventory", holder: ADA })
     expect(placeOfFields({ ...f, holder: "" })).toBeUndefined()
@@ -674,18 +655,9 @@ describe("a card's place as flat fields (ADR-0059)", () => {
         { kind: "inventory", holder: bea },
       ),
     ).toBe(false)
-    expect(
-      sameKey(
-        { kind: "inventory", holder: ADA },
-        {
-          kind: "fresh",
-          column: "k",
-          root: TEST_ROOT,
-          task: TEST_TASK,
-          at: ROOT,
-        },
-      ),
-    ).toBe(false)
+    expect(sameKey({ kind: "inventory", holder: ADA }, { kind: "trash" })).toBe(
+      false,
+    )
   })
 
   test("sameKey leaves out a queue's text version, not its thread", () => {
@@ -703,7 +675,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
 describe("moves, built once (ADR-0059)", () => {
   const ADA = writerId("ada@example.com")
   const LANE = threadIdFor("x")
-  const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
+  const _OTHER = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
   const _at = atEntry(entryId("e-1"))
   const card = (place: TextPlace): TextCard => ({
     kind: "text",
@@ -718,24 +690,19 @@ describe("moves, built once (ADR-0059)", () => {
     expect(moveOf(atEnd, DISCARDED)).toEqual({
       card: cardIdFor("c1"),
       from: { kind: "note", column: NOTES },
-      to: { kind: "trash", why: { kind: "discarded" } },
+      to: { kind: "trash" },
     })
   })
 
-  test("a gone place is stored under its reason, with who discarded it", () => {
-    const place = {
-      kind: "trash",
-      task: TEST_TASK,
-      holder: ADA,
-      why: { kind: "discarded" },
-    } as const
+  test("a trash place is stored as discarded, with whose trash it is (ADR-0126)", () => {
+    const place = { kind: "trash", task: TEST_TASK, holder: ADA } as const
     const fields = placeFields(place)
     expect(fields).toMatchObject({ kind: "discarded", holder: ADA })
     expect(placeOfFields(fields)).toEqual(place)
     expect(keyOfFields({ ...fields, holder: "" })).toEqual(keyOf(place))
     expect(placeOfFields({ ...fields, task: "" })).toMatchObject({ task: null })
     expect(placeOfFields({ ...fields, holder: "" })).toBeUndefined()
-    expect(keyOfFields(fields)).toEqual({ kind: "trash", why: place.why })
+    expect(keyOfFields(fields)).toEqual({ kind: "trash" })
   })
 
   test("seenAt: a note is where its sender saw it in its column, whatever its rank", () => {
@@ -764,33 +731,6 @@ describe("moves, built once (ADR-0059)", () => {
       kind: "note",
       column: NOTES,
     })
-  })
-
-  test("a spun card is stored as spun, its root in its column and its thread in its lane; a spun place with neither is malformed", () => {
-    const thread = threadIdFor("spun")
-    const place = {
-      kind: "trash",
-      task: TEST_TASK,
-      holder: ADA,
-      why: { kind: "spun", into: OTHER, thread },
-    } as const
-    const fields = placeFields(place)
-    expect(fields).toMatchObject({
-      kind: "spun",
-      column: OTHER,
-      lane: thread,
-      holder: ADA,
-    })
-    expect(placeOfFields(fields)).toEqual(place)
-    expect(keyOfFields({ ...fields, holder: "" })).toEqual(keyOf(place))
-    expect(placeOfFields({ ...fields, column: "" })).toBeUndefined()
-    expect(placeOfFields({ ...fields, lane: "" })).toBeUndefined()
-    expect(
-      sameKey(keyOf(place), {
-        kind: "trash",
-        why: { kind: "spun", into: TEST_ROOT, thread },
-      }),
-    ).toBe(false)
   })
 
   test("an unqueue sends a card to the note column nearest its thread, for the host to resolve", () => {
@@ -858,16 +798,7 @@ test("every place writes only the fields its kind's row stores (`ROWS`)", () => 
     { kind: "notes", near: "thread", thread },
     { kind: "notes", near: "task", task },
     { kind: "inventory", holder: writerId("a@x.io") },
-    {
-      kind: "trash",
-      task,
-      holder: writerId("a@x.io"),
-      why: {
-        kind: "spun",
-        into: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ac"),
-        thread,
-      },
-    },
+    { kind: "trash", task, holder: writerId("a@x.io") },
   ]
   for (const place of places) {
     const { kind, ...fields } = placeFields(place)

@@ -22,7 +22,6 @@ import {
   type PlacedKind,
   REORDER_PLACES,
   type ReferenceCard,
-  ROOT,
   rootIdFor,
   type Sha256,
   type TaskId,
@@ -63,7 +62,6 @@ import {
   NO_DISCARDS,
   ownsPlace,
   planEditAsText,
-  planFreshFollow,
   planMakeReference,
   planMove,
   planMoveCommand,
@@ -324,14 +322,9 @@ describe("planCarry (ADR-0080)", () => {
     ).toEqual([])
   })
 })
-const freshPlace = (column: string) =>
-  ({
-    kind: "fresh",
-    column,
-    root: TEST_ROOT,
-    task: TEST_TASK,
-    at: ROOT,
-  }) as const
+/** Your message at a thread not yet started (ADR-0126): a thread with no entry. */
+const freshPlace = (thread: string) =>
+  ({ kind: "composing", thread: threadIdFor(thread) }) as const
 const queued = (id: string, order: string, lane = LANE): QueuedText => ({
   ...card({ id: textCardId(id) }),
   place: {
@@ -381,7 +374,7 @@ describe("where a card sits", () => {
     expect(cardEnd(onLane, forked)).toBe("e3")
   })
 
-  test("cardEnd: null for a fresh card, and for a thread this index holds no entry of", () => {
+  test("cardEnd: null for your message at a thread not yet started, and at a thread this index holds no entry of", () => {
     expect(cardEnd(card({ place: freshPlace("k-1") }), tree())).toBeNull()
     expect(
       cardEnd(
@@ -403,7 +396,7 @@ describe("where a card sits", () => {
     ).toBeUndefined()
   })
 
-  test("yourCard: by thread end or fresh column, never another writer's", () => {
+  test("yourCard: by thread end, or by its thread before it starts (ADR-0126), never another writer's", () => {
     const beas = card({
       id: cardIdFor("c2"),
       owner: BEA,
@@ -417,8 +410,12 @@ describe("where a card sits", () => {
       yourCard(me, where, cards, tree())?.id
     expect(at({ kind: "end", end: entryId("e2") })).toBe(cardIdFor("c1"))
     expect(at({ kind: "end", end: entryId("e2") }, BEA)).toBe(cardIdFor("c2"))
-    expect(at({ kind: "fresh", column: "k-1" })).toBe(cardIdFor("c3"))
-    expect(at({ kind: "fresh", column: "k-1" }, BEA)).toBeUndefined()
+    expect(at({ kind: "thread", thread: threadIdFor("k-1") })).toBe(
+      cardIdFor("c3"),
+    )
+    expect(
+      at({ kind: "thread", thread: threadIdFor("k-1") }, BEA),
+    ).toBeUndefined()
     expect(at({ kind: "end", end: entryId("f1") })).toBeUndefined()
   })
 
@@ -1499,7 +1496,6 @@ describe("handoffs (ADR-0059)", () => {
     }
     test.each([
       ["your message", atEnd],
-      ["a fresh column's card", freshPlace("k")],
       [
         "a pinned card",
         {
@@ -1535,7 +1531,6 @@ describe("handoffs (ADR-0059)", () => {
             kind: "trash",
             task: TEST_TASK,
             holder: ADA,
-            why: { kind: "discarded" },
           },
           placer: ADA,
         },
@@ -1548,7 +1543,6 @@ describe("handoffs (ADR-0059)", () => {
           kind: "trash",
           task: TEST_TASK,
           holder: ADA,
-          why: { kind: "discarded" },
         },
       })
       expect(
@@ -1692,61 +1686,6 @@ describe("handoffs (ADR-0059)", () => {
       expect(ownsPlace(queuedKey, ADA)).toBe(true)
       expect(ownsPlace(freshPlace("k"), ADA)).toBe(true)
     })
-  })
-
-  test("planFreshFollow: the sent card's column's other cards become notes in the column nearest the new thread, placer kept; nothing else moves", () => {
-    const fresh = freshPlace("k")
-    const sent = card({ place: fresh })
-    const other = card({
-      id: cardIdFor("c2"),
-      owner: BEA,
-      placer: BEA,
-      place: fresh,
-    })
-    const elsewhere = card({
-      id: cardIdFor("c3"),
-      place: freshPlace("j"),
-    })
-    const onCanvas = threadCardOf({
-      thread: LANE,
-      task: TEST_TASK,
-      by: ADA,
-      cards: [],
-    })
-    const column = cardIdOfKind("note-column", "made")
-    const follow = (
-      cards: readonly CardRecord[],
-      c: TextCard,
-      root = TEST_ROOT,
-    ) =>
-      planFreshFollow({
-        cards,
-        sent: c.id,
-        root,
-        thread: LANE,
-        newColumn: () => column,
-        by: ADA,
-      })
-    expect(follow([onCanvas, sent, other, elsewhere], sent)).toEqual([
-      {
-        kind: "write",
-        record: expect.objectContaining({ kind: "note-column", id: column }),
-      },
-      {
-        kind: "write",
-        record: {
-          ...other,
-          place: { kind: "note", column, order: expect.any(String) },
-        },
-      },
-    ])
-    const draft = card({ place: atEnd })
-    expect(follow([onCanvas, draft, other], draft)).toEqual([])
-    // A message written in another root than the column's: nothing follows.
-    const elsewhereRoot = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
-    expect(follow([onCanvas, sent, other], sent, elsewhereRoot)).toEqual([])
-    // A thread with no card yet: nothing follows.
-    expect(follow([sent, other], sent)).toEqual([])
   })
 
   test("planMoveCommand: the lanes to drain where a card ends queued on a lane not running", () => {
@@ -2414,12 +2353,6 @@ describe("historyOf: the task a move enters the sender's history in (ADR-0066, A
       [{ card: C1, from: draftingIn(T_E), to: draftingIn(T_OTHER) }],
       at(draftingIn(T_E)),
       OTHER_TASK,
-    ],
-    [
-      "a keep from a fresh column: its task",
-      [{ card: C1, from: freshPlace("k"), to: inv }],
-      at(freshPlace("k")),
-      TEST_TASK,
     ],
     [
       "a queue: its thread's task",

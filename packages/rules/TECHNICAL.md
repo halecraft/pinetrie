@@ -366,15 +366,23 @@ which are swept.
   card does not compile) and refuses `exists`, then as any move into its
   place is (`refuseInto`). Its sender is a person, or `"host"` for the
   kinds no person moves (a fact), refused only by a full inventory. A
-  person's creation (`planMove` with no `from`), a copy's card
-  (`planCopy`), a thread's card at its first message (`planThreadCard`),
-  a note column made for a note (`toNotes`), a fact's card (`planFactCard`)
-  and a split's card (`planSplitCall`) all go through it, each made by the
-  person it names. A refusal of the host's own make is a value the host's
+  person's creation (`planMove` with no `from`), a thread's card as it
+  opens (`planThreadOpen`: a branch, a new tab, a copy, a spin-off, or a
+  branch's first send that names no thread opened yet), a note column made
+  for a note (`toNotes`), a fact's card (`planFactCard`) and a split's card
+  (`planSplitCall`) all go through it, each made by the person it names. A refusal of the host's own make is a value the host's
   shell logs, never a silent write; none is refused today.
 
 - **The stored record is flat strings**, "" for none (`encodeCard`,
-  `decodeCard`, total). Where a card is goes through core's `placeFields`
+  `decodeCard`, total): its place's fields and its content's. A kind's
+  content columns are one table (`CARD_CODEC`, a row per kind with
+  records, so a kind without one does not compile): the columns it holds,
+  and their codec. A row holding a column of another kind's is refused by
+  comparing with the codec's own columns, and a decoded card needs no
+  cast (`kindedId` gives the id its kind's type). A text card holds its
+  `command`, `unsent` and `origin`; a reference its `address` and `quote`;
+  a fact its `fact`; an ask its `relay` (ADR-0128); a thread's card and a
+  note column none. Where a card is goes through core's `placeFields`
   and `placeOfFields` (`core/places.ts`), which the wire's key codec uses
   too, so the two cannot drift. Each stored kind's row has its fields in
   one table (`ROWS`): a row is written through it and read narrowed to its
@@ -382,11 +390,10 @@ which are swept.
   message, a pinned card and a queued card name their thread alone (stored
   in `lane`), and resolve to its end (`placeEnd`, `threadEnd`): every entry
   names its thread (ADR-0125). Their rows keep no `at` (migration
-  `0009-card-content` cleared the old ones); the row's `at` field stays for
-  `fresh`. A fresh card's `column` is
-  never "", and it carries its root, its task and its branch point (a
-  `Spot`, ADR-0066), the root for a new tab; a canvas card its task, rank
-  and width; a queued card has its `order` and `by`, and `seen`, its text's version as its queuer had it (S96), which
+  `0009-card-content` cleared the old ones); the row's `at` field is a
+  comment's entry. A canvas card has its task, rank and width; a card in a
+  trash is stored `discarded`, whose trash in `holder` and the task it left
+  in `task` ("" for none); a queued card has its `order` and `by`, and `seen`, its text's version as its queuer had it (S96), which
   the queue's key carries from the client. Every field is required: the
   host writes a record whole. A
   `command` this build does not know makes the card malformed. A text card
@@ -420,17 +427,21 @@ which are swept.
   history. Where each kind of card may be is one table, core's
   `PLACES_OF`, which `fitsPlace`, `placed` and each record's place type
   (`PlaceOf`) read. Nobody removes a card:
-  `Move.to` is never null. A discard is a move to `gone` (`DISCARDED`,
-  ADR-0111), from any place the sender may move out of. Its key names no
-  task: the host names its history (`placeAt`, `historyOf`, over
-  `Discards`), the task the card leaves (`taskOfPlace`), or for a card in
-  an inventory the task its sender is on (`here`, which a `move` carries).
-  A spin-off's `here` is the task its sender will be on: the new one for a
-  drop in the sidebar, else the tab's. A queueing passes `NO_DISCARDS`,
-  since its target is a queue. A gone card keeps its
-  record and text, is drawn nowhere (every read of a place names the kinds
-  it draws), and moves only by an undo:
-  a handoff from gone is refused `gone`. `planTrashSweep`
+  `Move.to` is never null. A discard is a move to its sender's trash
+  (`DISCARDED`, ADR-0111, ADR-0126), from any place the sender may move
+  out of: a text card, a reference or a thread's card (`KINDS`). Its key
+  names neither whose trash nor which history: the host fills in its
+  sender (`placeAt`) and names its history (`historyOf`, over `Discards`),
+  the task the card leaves (`taskOfPlace`), or for a card in an inventory
+  the task its sender is on (`here`, which a `move` carries), or, on none,
+  its sender's history outside any task. A spin-off's `here` is the task
+  its sender will be on: the new one for a drop in the sidebar, else the
+  tab's. A queueing passes `NO_DISCARDS`, since its target is a queue. A
+  card in a trash keeps its record and text, is drawn nowhere (every read
+  of a place names the kinds it draws), and moves only by an undo: a
+  handoff from a trash is refused `gone`. A thread's card in a trash is
+  held as in an inventory (`holderOf`, `takenIn`): its run stops, and its
+  queue waits. `planTrashSweep`
   (`card-history.ts`) deletes it once its newest history event is older
   than `TRASH_KEEP_MS` (7 days). Queueing puts it after the lane's
   last card, queued by the sender, and clears why it was not sent before;
@@ -473,12 +484,6 @@ which are swept.
   move into yours `full` once it holds `INVENTORY_SLOTS` cards, the card
   itself not counted. A creation obeys both. A card taken into the
   inventory keeps its owner: the take moves its place, not who wrote it.
-- **A fresh column's first send carries its other cards**
-  (`planFreshFollow`): each card fresh in the sent card's column becomes a
-  note in the note column nearest the thread the send started, made in the
-  same step when its task has none, when the message is in the column's
-  root and the thread's card is on a canvas. The host's write, so it keeps
-  each card's placer, as `planUnsent` does.
 - **The placer is who put the card where it is**: the sender of every
   accepted move. A write the host makes itself keeps it (`planUnsent`,
   `planSetCommand`), so a refusal never names the host.
@@ -487,31 +492,32 @@ which are swept.
   that is, naming its card. A keep's cards are one command, so it is undone
   whole too (ADR-0066). `planMoveCommand` is that and the lanes to drain:
   each one a card ends queued on, when it is not running.
-- **Which history a move enters is `historyOf`'s** (ADR-0066): none for a
-  creation (a composer's new card, a copy) or a send, which is no move,
-  but a note column's, which enters its canvas's task, so the undo key takes
-  it back;
-  else the task the card goes to, when it goes to one, else the task it
-  leaves, read from its record, since a move is accepted only from there;
-  a discard's is `discardHistory`'s. A place is in a task by `taskOfPlace`,
-  so no tree is read. An inventory is in no task.
+- **Which history a move enters is `historyOf`'s** (ADR-0066), a
+  `MoveHistoryScope` (core): a task's, or a person's outside any task.
+  None for a creation (a composer's new card, a copy) or a send, which is
+  no move, but a note column's, which enters its canvas's task, so the undo
+  key takes it back; else the task the card goes to, when it goes to one,
+  else the task it leaves, read from its record, since a move is accepted
+  only from there; a discard's is `discardHistory`'s task, or with none its
+  sender's history outside any task (ADR-0126). A place is in a task by
+  `taskOfPlace`, so no tree is read. An inventory is in no task.
 - **`undoAnswer`** reads what a whole undo did: the cards its step wrote,
   from their footprints in the places document (`["cards", <id>]`), each
   with its place now; or, refused, the first card it could not undo as it is
   now, `moved` (its placer names who) or `gone`; or `nothing`.
 - **`planHistorySweep`** gives the histories of moves to retire: a task's
   `ARCHIVED_HISTORY_MS` (7 days) after it was archived, and, at startup
-  only, those of a task the session does not hold. After a run's end that
-  second rule would retire a new tab's history while it is open. An id
-  that names no task is left: the histories once kept by root were
-  retired by migration `0005-tasks`, since deleted.
+  only, those of a task the session does not hold. A person's history
+  outside any task (`moves:<writer>`) is kept, and an id that names no
+  history is left: the histories once kept by root were retired by
+  migration `0005-tasks`, since deleted.
 - **A card at a thread's end is resolved, never stored as an end**: your
-  message, a pinned card. `placeEnd` takes the thread its place's entry is
-  in (`threadAt`) and that thread's end (`threadEnd`), so the card follows
-  its thread as the thread grows. `pinnedAt(end, …)` is everyone's pinned
+  message, a pinned card. `placeEnd` is its thread's end (`threadEnd`), so
+  the card follows its thread as the thread grows; a thread not yet
+  started has none. `pinnedAt(end, …)` is everyone's pinned
   cards whose end is `end`, by `order`, then by id. `cardEnd` is your
   message's end only (`composing`), and `yourCard` finds yours through it,
-  at an end or a fresh column, never another writer's and never a note,
+  at an end, or by its thread before it starts (ADR-0126), never another writer's and never a note,
   the newest of yours there (ids are uuidv7). Were `cardEnd` to resolve
   pinned cards too, your composer could bind to one of yours.
 - **A note is in a note column** (ADR-0116), at a rank there (`order`), the
@@ -529,8 +535,7 @@ which are swept.
   around it), or, for a thread whose card is in an inventory, that
   inventory (ADR-0117). `toNotes` turns that into a place and the steps to
   write first, minting a column's id (`newColumn`, `n-` and a uuidv7 on
-  the host) only when one is made; moves, unsent cards and a fresh
-  column's followers all go through it. The page names the target `notes`
+  the host) only when one is made; moves and unsent cards go through it. The page names the target `notes`
   (`noteOf`), and the host resolves it (`planMoveTargets`, inside
   `planMoveRequest`, which ranks a spot on a canvas, `canvas-at`, too), each move against the cards the ones before it
   left, so a column made for the first takes the rest, and writes the
@@ -636,37 +641,48 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   the drain popped the card plain. A card is never made elsewhere to be
   queued: a note is a place of its own, not a step on the way.
 
-# A card made a thread (`spin-off.ts`, `root.ts`, ADR-0111)
+# A card made a thread (`spin-off.ts`, `root.ts`, ADR-0111, ADR-0126)
 
 - **`planSpinOff`** checks a spin-off before anything is written: its move
-  must be to gone, spun into a root (`GoneWhy` `spun`, the thread in it),
-  in a new task the request names;
-  that root's id must be free; the card's text, trimmed, not blank; and the
-  move as `planMove` decides it, so a card someone moved first, or one in
-  another's inventory, is refused as any move is. It returns the thread's
-  first message (the text, its mentions without the agent: a conversation
-  root has no lane) and the card's write.
+  must be a text card's to its sender's trash; the new root's and thread's
+  ids, which the request names with its new task, must be free; the card's
+  text, trimmed, not blank; and the move as `planMove` decides it, so a
+  card someone moved first, or one in another's inventory, is refused as
+  any move is. It returns the thread's opening (`planThreadOpen`: its
+  record, `origin` `spun` from the card, its new task's record and board
+  place, its card on that task's canvas), its first message (the text, its
+  mentions without the agent: a conversation root has no lane) and the
+  card's write. The host writes the records, sends the message, and only
+  once the send took the card writes the thread's card and the card's move
+  to the trash, in its history's step; a send that took nothing deletes
+  the records again.
 - **`planLiftRoot`** decides an undo that would move cards spun into
-  threads (S139: the host reads them from the stack's `top` first). Each
-  thread the directory still names must hold its first message alone (its
-  tree's writers, oldest first), with no lane and no card in it but those
-  the undo moves; otherwise `replied`, naming who wrote second (null for
-  the agent, a lane or a card). A card is in the root by `rootOfPlace`.
-  Its thread's card must also be where the spin-off put it (ADR-0124): on
-  a canvas, never moved since (its card history holds its making alone),
-  with no other card on that canvas and none pinned to the task, so an
-  undo restores exactly what was there or does nothing. A
+  threads (S139: the host reads the step's cards from the stack's `top`
+  first, then the threads whose record says they were spun from one of
+  them, `SpunThread`). Each thread the directory still names must hold its
+  first message alone (its tree's writers, oldest first), with no lane and
+  no card in it but those the undo moves; otherwise `replied`, naming who
+  wrote second (null for the agent, a lane or a card). A card is in the
+  root by `rootOfPlace`. Its thread's card must also be where the spin-off
+  put it (ADR-0124): on a canvas, never moved since (its card history holds
+  its making alone), with no other card on that canvas and none pinned to
+  the task, so an undo restores exactly what was there or does nothing. A
   thread already gone lifts nothing; `delete` names each root and its
   thread, read before the undo reverts the card.
 - **`planRootDelete`** (`root.ts`) is what deleting a lifted thread
   writes: its directory record (`ROOT`), its thread's (`THREAD`), and its
-  task's record, board place and title deleted, every card still in the
-  root or on the task's canvas removed, its document named for
-  destruction, and the task for its stacks to be unloaded;
+  task's (`planTaskDelete`: record, board place and title), every card
+  still in the root or on the task's canvas removed, its document named
+  for destruction, and the task for its stacks to be unloaded;
   `planHistorySweep` retires those stacks at the next start, as for any
   task the session lacks.
-- **The history's verb is `spun`** (`verbOf`): "spun off into a thread by
-  Ada", and a trace "Ada made a thread of this".
+- **`emptiedTasks`** (`root.ts`): the tasks a step leaves empty that were
+  a new tab's: a thread card that left its canvas for a trash, its thread a
+  new root's not yet started (its root one the directory does not name),
+  and nothing left on that canvas or pinned to the task. The host deletes
+  each (`planTaskDelete`) after the move, not undone.
+- **The history's verb is `discarded`** (`verbOf`): the spin-off's card is
+  in its sender's trash, as any discard's is.
 
 # Card history and traces (`card-history.ts`, ADR-0048 step 6)
 
@@ -683,9 +699,8 @@ read is dropped, not its history.
   shared card's thread end before the write (`ends`). It diffs, so an undo,
   whose revert Kyneta writes, is read like any other write.
   - A card that appeared is `created`; one whose key changed gets `moved`,
-    `undone`, `redone`, `unsent` (the host wrote a queued card back below
-    the line with `unsent`) or `followed` (a fresh card to a note); one
-    that went has its history deleted. A reorder changes no key, and adds
+    `undone`, `redone` or `unsent` (the host wrote a queued card back below
+    the line with `unsent`); one that went has its history deleted. A reorder changes no key, and adds
     nothing.
   - **A trace** is left for the card's placer when a person (not the host)
     other than the placer moved it out of a traced place (queued or
@@ -746,24 +761,40 @@ by construction.
   queued; the thread in the row's `lane`). Its task is its
   thread's (`taskOfPlace`), and its root its thread's record's
   (`rootOfPlace`): one field per fact, so the two cannot disagree.
-- **`planThreadStart`**: a thread's record, its card on its task's canvas
-  just after the thread it forks from (`planThreadCard`, `branchAfter`,
-  `rankAfter`), a new root's at the end, and for a task the session does not hold, the task's
-  record and its board place (`placeStarted`). `planChat` decides that a
-  send starts one (`starts: ThreadStarts`: its card's task and board state;
-  the thread is the decision's `thread`); `sendChat` plans it with the
-  send, and `executeChat` writes it before the message.
+- **A thread opens before its first entry** (`planThreadOpen`, ADR-0126):
+  its record, which says how it began (`ThreadOrigin`: a root's first
+  thread, spun from a card or not, or a fork at an entry, a branch or a
+  copy, whose source is the thread its entry is in), its card where its
+  `ThreadPlacement` says (on a task's canvas just after the thread it forks
+  from, `branchAfter` and `rankAfter`, else at its end; where it was
+  dropped, `rankOnCanvas`; or in an inventory), and for a task the session
+  does not hold (`TaskOpening`, a new tab's) the task's record and its
+  board place (`placeStarted`). The one planner for a branch or a new tab
+  as its column opens (`planOpenThread`, `open.ts`: refused `taken` for an
+  id in use, `unknown` for a branch's entry its root lacks or a task the
+  session lacks), a copy (`planCopy`) and a spin-off (`planSpinOff`). A
+  first send to a thread opened writes only its entry; a branch's first
+  send that names no thread opened yet (a script's) opens it with the send
+  (`sendChat`), as its column would have, and `executeChat` writes that
+  before the message.
+- **`unstartedThreads`**: each thread opened and not yet started, and where
+  its column ends: no entry of it in the tree, and either its fork in the
+  tree (its root held here), or its root one the directory does not name
+  yet (a new tab's). The page draws its card's column from it.
 - **`rootsHeld`**: the roots with a thread on the canvas of a task outside
   the archive, or in an inventory: what a starting host loads, and what
-  archiving keeps.
-- **`forkOf`**: each copy's fork, from its record's `origin`: where its
-  column ends before its first send.
+  archiving keeps. A root the directory does not name has no document
+  yet (an unstarted new tab's, ADR-0063) and is not held.
+- **`forkOf`**: each forked thread's fork (`ThreadFork`), a branch's or a
+  copy's, from its record's `origin`: where its column ends before its
+  first send, and whether its fork row says "copied from".
 
 # Threads as cards (`held.ts`, `copy.ts`, ADR-0117, ADR-0124)
 
-A thread's card is a canvas's or an inventory's (`PLACES_OF.thread`), and
-moves between them as any card does (`planMove`, typed at the codec by
-`typedMove`). An inventory has no agent and no runner.
+A thread's card is a canvas's, an inventory's or a trash's
+(`PLACES_OF.thread`), and moves between them as any card does
+(`planMove`, typed at the codec by `typedMove`). An inventory, and a
+trash, have no agent and no runner.
 
 - **One gate, per command kind** (`runsIn`, beside `writesIn`): what each
   `Intent`, or a queue's pop, runs or writes a message in: a send at a
@@ -779,7 +810,7 @@ moves between them as any card does (`planMove`, typed at the codec by
   stop must be in the thread for its face to say so (ADR-0126). Refused
   with `HELD_WORDS`, "put it on a canvas first".
 - **A take stops the run** (`takenIn(before, after)`): every thread card
-  in an inventory after a change that was not before. The host's
+  in an inventory or a trash after a change that was not there before. The host's
   provenance step reads it from every person's change to the places (a
   move, an undo or a redo, a copy), so no path that writes places can
   take a running thread and leave it running. The stop is the taker's own,
@@ -791,14 +822,17 @@ moves between them as any card does (`planMove`, typed at the codec by
   are told it was taken and added.
 - **`planCopy`**: a copy of `source` at `end`, refused unless `end` is in
   the source (`threadAt`), the copy's id is new, and nobody else holds the
-  source. Its record's `origin` is `{ kind: "copy", source, fork: end }`,
-  kept after its first send, so its fork row can say "copied from". Its
-  card is made by **`planMake`** (`moves.ts`), the one rule every card is
-  made by: `exists`, then `refuseInto`'s refusals (a place its kind is
-  never in, another's inventory, a full one). It lands on a canvas
-  by **`rankOnCanvas`**, as a move's drop does. No entry is written: its
-  first send is a branch at its fork, which `sendChat` lets through for the
-  thread whose record names that fork, and writes no second record or card. (`board.ts`, ADR-0122)
+  source. It opens through `planThreadOpen`: its record's `origin` is
+  `{ kind: "fork", at: end, how: "copy" }`, kept after its first send, so
+  its fork row can say "copied from"; its card is made by **`planMake`**
+  (`moves.ts`), the one rule every card is made by: `exists`, then
+  `refuseInto`'s refusals (a place its kind is never in, another's
+  inventory, a full one). It lands on a canvas by **`rankOnCanvas`**, as a
+  move's drop does. No entry is written: its first send is a branch at its
+  fork, which `sendChat` lets through for the thread whose record names
+  that fork (`forkEntry`), and writes no second record or card.
+
+# The board (`board.ts`, ADR-0122)
 
 Every task is in one workflow state. The workflow is a host-written
 singleton (`WORKFLOW`): the open states in board order, then the closed

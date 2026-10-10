@@ -7,36 +7,28 @@
 // document, the same on every device (`openThreads`, `@pinetrie/session`),
 // and comes in here as a fact, so the layout draws it but never stores it.
 // The layout keeps your view of each task you have opened (`TaskView`:
-// which columns are unfolded, how each is read, branches not yet sent), and
-// new tabs: each one fresh column at the root, in a task of its own that
-// joins the sidebar once its first message is written. Which task you are
-// on, the views, the new tabs and whether the board is open are this
-// browser tab's view state, never written to the document; they are stored
-// per browser tab (ADR-0027) in the form at the end of this file. Pure.
+// which columns are unfolded, how each is read, what a thread you opened
+// starts with). A branch or a new tab is a thread card on its task's canvas
+// from the moment it opens (ADR-0126), so it is a column like any other,
+// and a new tab is its own task. Which task you are on, the views and
+// whether the board is open are this browser tab's view state, never
+// written to the document; they are stored per browser tab (ADR-0027) in
+// the form at the end of this file. Pure.
 
 import {
   type CardId,
   type EntryId,
-  entryId,
   isTaskId,
-  isThreadId,
-  isWorkflowStateId,
   type LaneView,
   parseCardId,
-  parseNewRoot,
-  parseNewTask,
   pathIds,
-  type RootId,
   type TaskId,
-  THREAD_PATTERN,
-  type ThreadFork,
   type ThreadId,
   type TreeIndex,
   threadAt,
-  type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
-import type { CanvasCard, TaskIndex } from "@pinetrie/rules"
+import type { CanvasCard, TaskIndex, ThreadOpening } from "@pinetrie/rules"
 import { type Static, Type } from "typebox"
 import { Value } from "typebox/value"
 import type { Density } from "./ask-words.ts"
@@ -44,7 +36,6 @@ import {
   type CardView,
   canvasColumns,
   defaultView,
-  type FreshColumn,
   openColumns,
   type Strip,
   stripOf,
@@ -52,21 +43,12 @@ import {
   viewOf,
 } from "./canvas-columns.ts"
 import { projectColumns } from "./column-paths.ts"
-import {
-  BOUND,
-  type Column,
-  freshOf,
-  type NewTabAction,
-  newTabReducer,
-  type Pending,
-  type Prefill,
-} from "./columns.ts"
+import type { Pending, Prefill } from "./columns.ts"
 
-/** What the stage shows: a task of the sidebar, a new tab, or nothing. */
+/** What the stage shows: a task of the sidebar, or nothing. */
 export type Here =
   | { readonly kind: "nothing" }
   | { readonly kind: "task"; readonly task: TaskId }
-  | { readonly kind: "new"; readonly key: string }
 
 export const NOTHING: Here = { kind: "nothing" }
 
@@ -88,13 +70,6 @@ export interface Layout {
    * none is drawn as `defaultView` says.
    */
   readonly tasks: ReadonlyMap<TaskId, TaskView>
-  /**
-   * New tabs: each one fresh column at the root, local until its first
-   * message is written and its thread's card is on its task's canvas. Its
-   * key is the thread it minted, as the card's id will be, so the column
-   * stays mounted as it becomes its task's.
-   */
-  readonly newTabs: readonly Column[]
   /** Whether the board is open over the columns (ADR-0122). */
   readonly board: boolean
 }
@@ -113,43 +88,25 @@ export type ViewChange =
     }
   /** Whether a thread's details are open under its header (ADR-0073). */
   | { readonly kind: "details"; readonly card: CardId; readonly open: boolean }
-  /** Open a branch at `at`, its first send to start `thread`. */
+  /**
+   * A thread you opened (ADR-0126): its column unfolded, with what it
+   * starts with, until its first send.
+   */
   | {
-      readonly kind: "openFresh"
-      readonly thread: ThreadId
-      readonly at: EntryId
+      readonly kind: "opened"
+      readonly card: ThreadId
       /** A first message the column sends as soon as it opens. */
       readonly pending?: Pending
       /** What its composer starts with, unsent. */
       readonly prefill?: Prefill
+      /** A Start Agent column: its first message with no mention asks the agent. */
+      readonly asksAgent?: true
     }
-  /** A branch sent its first message, as send `sendId`. */
-  | {
-      readonly kind: "sent"
-      readonly thread: ThreadId
-      readonly sendId: string
-    }
-  /** Close a branch not yet sent; nothing was written. */
-  | { readonly kind: "closeFresh"; readonly thread: ThreadId }
+  /** A thread you opened sent its first message: what it started with is spent. */
+  | { readonly kind: "sent"; readonly card: ThreadId }
 
 export type LayoutAction =
   | { readonly kind: "show"; readonly here: Here }
-  | {
-      readonly kind: "newTab"
-      /** Its key: the thread it minted (`Layout.newTabs`). */
-      readonly key: ThreadId
-      /** Its root, minted with its key (ADR-0066). */
-      readonly root: RootId
-      /** Its task, minted with its key (ADR-0116). */
-      readonly task: TaskId
-      readonly asksAgent: boolean
-      /** What its composer starts with. */
-      readonly prefill?: Prefill
-      /** The workflow state its task lands in: the board column it was opened from. */
-      readonly state?: WorkflowStateId
-    }
-  /** Close an unsent new tab; nothing was written. */
-  | { readonly kind: "closeNewTab"; readonly key: string }
   /**
    * A task leaves the sidebar (its document is written apart): if you are on
    * it, show its neighbour. Your view of it is kept.
@@ -164,15 +121,6 @@ export type LayoutAction =
       readonly task: TaskId
       readonly first: CardId | null
       readonly change: ViewChange
-    }
-  /**
-   * A column action on new tab `key`'s one column: its first send, or a
-   * reader's setting (`ReaderAction`).
-   */
-  | {
-      readonly kind: "newTabColumn"
-      readonly key: string
-      readonly action: Exclude<NewTabAction, { kind: "sync" }>
     }
   /** Open or close the board. */
   | { readonly kind: "board"; readonly open: boolean }
@@ -189,8 +137,8 @@ export type LayoutAction =
 export interface CanvasFacts {
   /** Each task's canvas, in order (`TaskIndex.canvases`). */
   readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
-  /** Each forked thread's fork (`TaskIndex.forkOf`, ADR-0117). */
-  readonly forks: ReadonlyMap<ThreadId, ThreadFork>
+  /** Each thread opened and not yet started (`unstartedThreads`, ADR-0126). */
+  readonly unstarted: ReadonlyMap<ThreadId, ThreadOpening>
   /** Each thread someone else holds, by its holder (`heldByOthers`, ADR-0124). */
   readonly holders: ReadonlyMap<ThreadId, WriterId>
   readonly index: TreeIndex
@@ -209,28 +157,13 @@ export const initialLayout = (): Layout => ({
   active: null,
   open: [],
   tasks: new Map(),
-  newTabs: [],
   board: false,
 })
-
-/**
- * Where a column is, by its key: a new tab's, or a task's branch not yet
- * sent, whether or not that task is in the sidebar. Undefined for any other
- * key: a column on a canvas is found by its card.
- */
-export function hereOfColumn(layout: Layout, key: string): Here | undefined {
-  if (layout.newTabs.some(c => c.key === key)) return { kind: "new", key }
-  for (const [task, view] of layout.tasks)
-    for (const thread of view.fresh.keys())
-      if (thread === key) return { kind: "task", task }
-  return undefined
-}
 
 export const sameHere = (a: Here | null, b: Here): boolean =>
   a !== null &&
   a.kind === b.kind &&
-  (a.kind !== "task" || b.kind !== "task" || a.task === b.task) &&
-  (a.kind !== "new" || b.kind !== "new" || a.key === b.key)
+  (a.kind !== "task" || b.kind !== "task" || a.task === b.task)
 
 /** `views` with `task`'s view as `view`. */
 const withView = (
@@ -257,7 +190,10 @@ const withCard = (
 const sameCardView = (a: CardView, b: CardView): boolean =>
   a.unfolded === b.unfolded &&
   a.density === b.density &&
-  a.details === b.details
+  a.details === b.details &&
+  a.pending === b.pending &&
+  a.prefill === b.prefill &&
+  a.asksAgent === b.asksAgent
 
 /** `seen` with `key` set to `value`, or left out for undefined. */
 const set = <K extends keyof CardView>(
@@ -286,33 +222,19 @@ export function changeView(view: TaskView, change: ViewChange): TaskView {
       return withCard(view, change.card, c =>
         set(c, "details", change.open ? true : undefined),
       )
-    case "openFresh":
-      return {
-        ...view,
-        fresh: new Map(view.fresh).set(change.thread, {
-          at: change.at,
-          ...(change.pending === undefined ? {} : { pending: change.pending }),
-          ...(change.prefill === undefined ? {} : { prefill: change.prefill }),
-        }),
-      }
-    case "sent": {
-      const fresh = view.fresh.get(change.thread)
-      if (fresh === undefined) return view
-      // Sent: its prefill and pending message are spent.
-      return {
-        ...view,
-        fresh: new Map(view.fresh).set(change.thread, {
-          at: fresh.at,
-          sendId: change.sendId,
-        }),
-      }
-    }
-    case "closeFresh": {
-      if (!view.fresh.has(change.thread)) return view
-      const fresh = new Map(view.fresh)
-      fresh.delete(change.thread)
-      return { ...view, fresh }
-    }
+    case "opened":
+      return withCard(view, change.card, c => ({
+        ...set(
+          set(set(c, "pending", change.pending), "prefill", change.prefill),
+          "asksAgent",
+          change.asksAgent,
+        ),
+        unfolded: true,
+      }))
+    case "sent":
+      return withCard(view, change.card, c =>
+        set(set(c, "pending", undefined), "prefill", undefined),
+      )
   }
 }
 
@@ -346,13 +268,12 @@ export function afterClosing(layout: Layout, closed: Here): Here {
 }
 
 /**
- * Whether `action` shows something in the stage: a task, a new tab or
- * the board. A page over the stage (ADR-0098) is left for it.
+ * Whether `action` shows something in the stage: a task or the board. A
+ * page over the stage (ADR-0098) is left for it.
  */
 export function showsStage(action: LayoutAction): boolean {
   switch (action.kind) {
     case "show":
-    case "newTab":
       return true
     case "board":
       return action.open
@@ -370,40 +291,6 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
         ? state
         : { ...state, active: action.here, board }
     }
-    case "newTab":
-      return {
-        ...state,
-        board: false,
-        active: { kind: "new", key: action.key },
-        newTabs: [
-          ...state.newTabs,
-          {
-            key: action.key,
-            anchor: null,
-            thread: action.key,
-            mode: {
-              kind: "fresh",
-              root: action.root,
-              task: action.task,
-              ...(action.prefill === undefined
-                ? {}
-                : { prefill: action.prefill }),
-              ...(action.state === undefined ? {} : { state: action.state }),
-            },
-            ...(action.asksAgent ? { asksAgent: true } : {}),
-          },
-        ],
-      }
-    case "closeNewTab": {
-      const here: Here = { kind: "new", key: action.key }
-      return {
-        ...state,
-        newTabs: state.newTabs.filter(c => c.key !== action.key),
-        active: sameHere(state.active, here)
-          ? afterClosing(state, here)
-          : state.active,
-      }
-    }
     case "closeTask": {
       const here: Here = { kind: "task", task: action.task }
       if (!sameHere(state.active, here)) return state
@@ -416,13 +303,6 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
         ? state
         : { ...state, tasks: withView(state.tasks, action.task, after) }
     }
-    case "newTabColumn":
-      return {
-        ...state,
-        newTabs: state.newTabs.map(c =>
-          c.key === action.key ? newTabReducer(c, action.action) : c,
-        ),
-      }
     case "board":
       return state.board === action.open
         ? state
@@ -441,85 +321,14 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
  * Returns `stored` itself when nothing changes.
  */
 export function resolveLayout(stored: Layout, facts: LayoutFacts): Layout {
-  const synced = syncLayout(stored, facts)
-  const open = drawnList(facts.list, facts.archived, synced.active)
-  return sameList(open, synced.open) ? synced : { ...synced, open }
-}
-
-/** The task whose canvas holds `card`, if any. */
-const taskOnCanvas = (
-  canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>,
-  card: CardId,
-): TaskId | undefined => {
-  for (const [task, canvas] of canvases)
-    if (canvas.some(c => c.id === card)) return task
-  return undefined
-}
-
-/**
- * Every view and new tab brought up to the facts. A branch whose thread's
- * card is on its task's canvas is that card's column now: it leaves the
- * branches, unfolded (ADR-0116). A new tab's one column follows the tree,
- * and once its thread's card is on a canvas the tab becomes that task, and
- * the task you are on if you were on the tab, its column unfolded and read
- * as it was; the session puts that task in the sidebar as its send is
- * answered.
- */
-function syncLayout(state: Layout, facts: LayoutFacts): Layout {
-  let changed = false
-  let tasks = state.tasks
-  for (const [task, view] of state.tasks) {
-    const canvas = facts.canvases.get(task) ?? []
-    let next = view
-    for (const thread of view.fresh.keys())
-      if (canvas.some(c => c.id === thread))
-        next = changeView(changeView(next, { kind: "closeFresh", thread }), {
-          kind: "fold",
-          card: thread,
-          unfolded: true,
-        })
-    if (next !== view) {
-      changed = true
-      tasks = withView(tasks, task, next)
-    }
-  }
-  let active = state.active
-  const newTabs: Column[] = []
-  for (const tab of state.newTabs) {
-    const task = taskOnCanvas(facts.canvases, tab.thread)
-    if (task === undefined) {
-      const column = newTabReducer(tab, {
-        kind: "sync",
-        index: facts.index,
-        lanes: facts.lanes,
-      })
-      if (column !== tab) changed = true
-      newTabs.push(column)
-      continue
-    }
-    changed = true
-    const view = tasks.get(task) ?? defaultView(null)
-    tasks = withView(
-      tasks,
-      task,
-      withCard(view, tab.thread, c => ({
-        ...c,
-        unfolded: true,
-        ...(tab.density === undefined ? {} : { density: tab.density }),
-        ...(tab.details ? { details: true } : {}),
-      })),
-    )
-    if (sameHere(active, { kind: "new", key: tab.key }))
-      active = { kind: "task", task }
-  }
-  return changed ? { ...state, active, tasks, newTabs } : state
+  const open = drawnList(facts.list, facts.archived, stored.active)
+  return sameList(open, stored.open) ? stored : { ...stored, open }
 }
 
 /**
  * Once the documents have settled: tasks the session lacks go (`known`), and
- * what to show is chosen. In a task whose roots this tab holds (one of its
- * threads is in the index), a branch whose fork is gone goes. The view of a
- * card no longer on the canvas goes as the layout is stored (`storedLayout`). A task you were on that is
+ * what to show is chosen. The view of a card no longer on the canvas goes
+ * as the layout is stored (`storedLayout`). A task you were on that is
  * gone or archived gives way to the last task of the sidebar, else nothing,
  * and with nothing the board opens: nothing opens a task by itself
  * (ADR-0030).
@@ -530,17 +339,11 @@ function pruneLayout(
   known: ReadonlySet<TaskId>,
 ): Layout {
   let tasks = state.tasks
-  for (const [task, view] of state.tasks) {
-    if (!known.has(task)) {
-      const next = new Map(tasks)
-      next.delete(task)
-      tasks = next
-      continue
-    }
-    const canvas = facts.canvases.get(task) ?? []
-    if (!canvas.some(c => facts.index.firstOf.has(c.id as ThreadId))) continue
-    const kept = prunedView(view, facts.index)
-    if (kept !== view) tasks = withView(tasks, task, kept)
+  for (const task of state.tasks.keys()) {
+    if (known.has(task)) continue
+    const next = new Map(tasks)
+    next.delete(task)
+    tasks = next
   }
   const list = facts.list.filter(t => known.has(t) && !facts.archived.has(t))
   const active = state.active
@@ -550,8 +353,7 @@ function pruneLayout(
     (active.kind === "nothing" ||
       (active.kind === "task" &&
         known.has(active.task) &&
-        !facts.archived.has(active.task)) ||
-      (active.kind === "new" && state.newTabs.some(c => c.key === active.key)))
+        !facts.archived.has(active.task)))
   if (tasks === state.tasks && stays) return state
   const last = list.at(-1)
   const fallback: Here =
@@ -565,19 +367,10 @@ function pruneLayout(
   }
 }
 
-/** `view` without a branch whose fork the settled index has not. */
-function prunedView(view: TaskView, index: TreeIndex): TaskView {
-  const fresh = new Map(
-    [...view.fresh].filter(([, f]) => index.entries[f.at] !== undefined),
-  )
-  return fresh.size === view.fresh.size ? view : { ...view, fresh }
-}
-
 /**
- * `layout` as it is stored (ADR-0027): without the view of a card on
- * neither its task's canvas nor one of your branches. Only a task whose
- * canvas holds a card is read: an empty one may not have arrived. The same
- * layout when nothing goes. Pure.
+ * `layout` as it is stored (ADR-0027): without the view of a card not on
+ * its task's canvas. Only a task whose canvas holds a card is read: an
+ * empty one may not have arrived. The same layout when nothing goes. Pure.
  */
 export function storedLayout(
   layout: Layout,
@@ -588,11 +381,7 @@ export function storedLayout(
     const canvas = canvases.get(task) ?? []
     if (canvas.length === 0) continue
     const cards = new Map(
-      [...view.cards].filter(
-        ([card]) =>
-          canvas.some(c => c.id === card) ||
-          [...view.fresh.keys()].some(t => t === card),
-      ),
+      [...view.cards].filter(([card]) => canvas.some(c => c.id === card)),
     )
     if (cards.size !== view.cards.size)
       tasks = withView(tasks, task, { ...view, cards })
@@ -601,15 +390,13 @@ export function storedLayout(
 }
 
 /**
- * The sidebar as drawn, then new tabs: what the sidebar shows. An archived
- * task you are on is still in `open` (`resolveLayout` keeps it), so it keeps
- * its place.
+ * The sidebar as drawn: what the sidebar shows. An archived task you are on
+ * is still in `open` (`resolveLayout` keeps it), so it keeps its place.
  */
-export function listOf(layout: Layout): readonly Here[] {
-  return [
-    ...layout.open.map(task => ({ kind: "task", task }) as const),
-    ...layout.newTabs.map(c => ({ kind: "new", key: c.key }) as const),
-  ]
+export function listOf(
+  layout: Layout,
+): readonly Extract<Here, { kind: "task" }>[] {
+  return layout.open.map(task => ({ kind: "task", task }) as const)
 }
 
 /**
@@ -639,7 +426,7 @@ export const taskColumns = (
     view: viewOf(layout.tasks, task, canvas),
     index: facts.index,
     lanes: facts.lanes,
-    forks: facts.forks,
+    unstarted: facts.unstarted,
     holders: facts.holders,
   })
 }
@@ -679,7 +466,7 @@ export function planOpen(
   layout: Layout,
   index: TreeIndex,
   id: EntryId,
-  tasks: Pick<TaskIndex, "taskOfThread" | "canvases" | "forkOf">,
+  tasks: Pick<TaskIndex, "taskOfThread" | "canvases">,
   lanes: readonly LaneView[],
   holders: ReadonlyMap<ThreadId, WriterId>,
 ): OpenPlan | null {
@@ -690,7 +477,8 @@ export function planOpen(
   const columns = openColumns(
     taskColumns(layout, task, {
       canvases: tasks.canvases,
-      forks: tasks.forkOf,
+      // An entry shown is in a started thread.
+      unstarted: new Map(),
       holders,
       index,
       lanes,
@@ -711,17 +499,11 @@ export function planOpen(
 // ── stored form (ADR-0027) ────────────────────────────────────────────────
 //
 // Kept per browser tab through `tab-state.ts`. Built field by field both ways,
-// so a field the schema does not name is never stored or restored.
-// A fresh column's `pending` is one: restoring it would send its message
-// again. Its `prefill` is stored: only `pending` is sent on opening. A new
-// tab's `thread` is stored, so a reload keeps it and its name (ADR-0057,
-// ADR-0117). The reader's settings, `density` and `details`, are kept so a
-// reload shows the column as it was left.
-
-/** A thread's id as stored: `isThreadId`'s pattern. */
-const StoredThread = Type.Unsafe<ThreadId>(
-  Type.String({ pattern: THREAD_PATTERN }),
-)
+// so a field the schema does not name is never stored or restored. A thread
+// you opened keeps its `prefill` and Start Agent; its `pending` is not
+// kept: restoring it would send its message again. The reader's settings,
+// `density` and `details`, are kept so a reload shows the column as it was
+// left.
 
 const StoredDensity = Type.Union([
   Type.Literal("outline"),
@@ -734,127 +516,38 @@ const StoredPrefill = Type.Object({
   blank: Type.Boolean(),
 })
 
-const StoredColumn = Type.Object({
-  key: Type.String(),
-  anchor: Type.Union([Type.String(), Type.Null()]),
-  thread: StoredThread,
-  asksAgent: Type.Optional(Type.Literal(true)),
-  density: Type.Optional(StoredDensity),
-  details: Type.Optional(Type.Literal(true)),
-  fresh: Type.Optional(
-    Type.Object({
-      sendId: Type.Optional(Type.String()),
-      root: Type.Optional(Type.String()),
-      task: Type.Optional(Type.String()),
-      state: Type.Optional(Type.String()),
-      prefill: Type.Optional(StoredPrefill),
-    }),
-  ),
-})
-
 const StoredCardView = Type.Object({
   unfolded: Type.Optional(Type.Literal(true)),
   density: Type.Optional(StoredDensity),
   details: Type.Optional(Type.Literal(true)),
-})
-
-const StoredFresh = Type.Object({
-  at: Type.String({ minLength: 1 }),
-  sendId: Type.Optional(Type.String()),
   prefill: Type.Optional(StoredPrefill),
+  asksAgent: Type.Optional(Type.Literal(true)),
 })
 
 /** A task's view as stored: records by id, so no order can be kept (ADR-0116). */
 const StoredTaskView = Type.Object({
   cards: Type.Record(Type.String(), StoredCardView),
   task: Type.Object({ unfolded: Type.Boolean() }),
-  fresh: Type.Record(Type.String(), StoredFresh),
 })
 
 const StoredHere = Type.Union([
   Type.Object({ kind: Type.Literal("nothing") }),
   Type.Object({ kind: Type.Literal("task"), task: Type.String() }),
-  Type.Object({ kind: Type.Literal("new"), key: Type.String() }),
 ])
 
 /**
  * `v` changes when the shape does; an older layout is dropped, not migrated.
- * `v: 8` (ADR-0116): a task's columns are its canvas's, and each task keeps
- * only your view of them.
+ * `v: 9` (ADR-0126): a thread you opened is a card, so no task view keeps
+ * branches of its own, and no new tab is kept apart from its task.
  */
 const StoredLayout = Type.Object({
-  v: Type.Literal(8),
+  v: Type.Literal(9),
   active: Type.Union([StoredHere, Type.Null()]),
   tasks: Type.Record(Type.String(), StoredTaskView),
-  newTabs: Type.Array(StoredColumn),
   board: Type.Boolean(),
 })
 
-type Stored = Static<typeof StoredColumn>
-
 const storedPrefill = (p: Prefill) => ({ text: p.text, blank: p.blank })
-
-const toStored = (c: Column): Stored => {
-  const fresh = freshOf(c)
-  return {
-    key: c.key,
-    anchor: c.anchor,
-    thread: c.thread,
-    ...(c.asksAgent ? { asksAgent: true } : {}),
-    ...(c.density === undefined ? {} : { density: c.density }),
-    ...(c.details ? { details: true } : {}),
-    ...(fresh === undefined
-      ? {}
-      : {
-          fresh: {
-            ...(fresh.sendId === undefined ? {} : { sendId: fresh.sendId }),
-            ...(fresh.root === undefined ? {} : { root: fresh.root }),
-            ...(fresh.task === undefined ? {} : { task: fresh.task }),
-            ...(fresh.state === undefined ? {} : { state: fresh.state }),
-            ...(fresh.prefill === undefined
-              ? {}
-              : { prefill: storedPrefill(fresh.prefill) }),
-          },
-        }),
-  }
-}
-
-/**
- * A stored new tab's column, or undefined for one that cannot be restored:
- * a fresh one with no root or task of its own.
- */
-const fromStored = (s: Stored): Column | undefined => {
-  const root =
-    s.fresh?.root === undefined ? undefined : parseNewRoot(s.fresh.root)
-  const task =
-    s.fresh?.task === undefined ? undefined : parseNewTask(s.fresh.task)
-  if (s.fresh !== undefined && (root === undefined || task === undefined))
-    return undefined
-  return {
-    key: s.key,
-    anchor: s.anchor === null ? null : entryId(s.anchor),
-    thread: s.thread,
-    ...(s.asksAgent ? { asksAgent: true } : {}),
-    ...(s.density === undefined ? {} : { density: s.density }),
-    ...(s.details ? { details: true } : {}),
-    ...(s.fresh === undefined
-      ? { mode: BOUND }
-      : {
-          mode: {
-            kind: "fresh" as const,
-            ...(s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId }),
-            ...(root === undefined ? {} : { root }),
-            ...(task === undefined ? {} : { task }),
-            ...(s.fresh.state !== undefined && isWorkflowStateId(s.fresh.state)
-              ? { state: s.fresh.state }
-              : {}),
-            ...(s.fresh.prefill === undefined
-              ? {}
-              : { prefill: storedPrefill(s.fresh.prefill) }),
-          },
-        }),
-  }
-}
 
 const toStoredView = (view: TaskView): Static<typeof StoredTaskView> => ({
   cards: Object.fromEntries(
@@ -864,25 +557,17 @@ const toStoredView = (view: TaskView): Static<typeof StoredTaskView> => ({
         ...(v.unfolded ? { unfolded: true } : {}),
         ...(v.density === undefined ? {} : { density: v.density }),
         ...(v.details ? { details: true } : {}),
+        ...(v.prefill === undefined
+          ? {}
+          : { prefill: storedPrefill(v.prefill) }),
+        ...(v.asksAgent ? { asksAgent: true } : {}),
       },
     ]),
   ),
   task: { unfolded: view.task.unfolded },
-  fresh: Object.fromEntries(
-    [...view.fresh].map(([thread, f]) => [
-      thread,
-      {
-        at: f.at,
-        ...(f.sendId === undefined ? {} : { sendId: f.sendId }),
-        ...(f.prefill === undefined
-          ? {}
-          : { prefill: storedPrefill(f.prefill) }),
-      },
-    ]),
-  ),
 })
 
-/** A stored task view, or undefined when a key is no card's or no thread's. */
+/** A stored task view, or undefined when a key is no card's. */
 const fromStoredView = (
   s: Static<typeof StoredTaskView>,
 ): TaskView | undefined => {
@@ -894,27 +579,19 @@ const fromStoredView = (
       ...(v.unfolded ? { unfolded: true } : {}),
       ...(v.density === undefined ? {} : { density: v.density }),
       ...(v.details ? { details: true } : {}),
+      ...(v.prefill === undefined ? {} : { prefill: storedPrefill(v.prefill) }),
+      ...(v.asksAgent ? { asksAgent: true } : {}),
     })
   }
-  const fresh = new Map<ThreadId, FreshColumn>()
-  for (const [key, f] of Object.entries(s.fresh)) {
-    if (!isThreadId(key)) return undefined
-    fresh.set(key, {
-      at: entryId(f.at),
-      ...(f.sendId === undefined ? {} : { sendId: f.sendId }),
-      ...(f.prefill === undefined ? {} : { prefill: storedPrefill(f.prefill) }),
-    })
-  }
-  return { cards, task: { unfolded: s.task.unfolded }, fresh }
+  return { cards, task: { unfolded: s.task.unfolded } }
 }
 
 export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
-  v: 8,
+  v: 9,
   active: layout.active,
   tasks: Object.fromEntries(
     [...layout.tasks].map(([task, view]) => [task, toStoredView(view)]),
   ),
-  newTabs: layout.newTabs.map(toStored),
   board: layout.board,
 })
 
@@ -930,8 +607,6 @@ export function decodeLayout(raw: unknown): Layout | undefined {
     if (view === undefined || !isTaskId(task)) return undefined
     tasks.set(task, view)
   }
-  const newTabs = raw.newTabs.map(fromStored)
-  if (!newTabs.every(c => c !== undefined)) return undefined
   const { active } = raw
   if (active?.kind === "task" && !isTaskId(active.task)) return undefined
   return {
@@ -941,7 +616,6 @@ export function decodeLayout(raw: unknown): Layout | undefined {
         : active,
     open: [],
     tasks,
-    newTabs: newTabs.filter(c => c !== undefined),
     board: raw.board,
   }
 }

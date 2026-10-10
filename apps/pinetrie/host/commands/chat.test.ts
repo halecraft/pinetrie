@@ -266,6 +266,31 @@ describe("sendChat", () => {
     expect([pi.calls, started]).toEqual([[], []])
   })
 
+  test("a new tab's first send, its thread and task opened as it opened, writes its entry alone; a root's thread in a task in use is refused (ADR-0126)", async () => {
+    const { b, pi, records, deps } = setUp()
+    putTask(b, NEW, NEW_TASK)
+    const first = {
+      ...chat("do it", true),
+      at: { kind: "branch", thread: NEW, at: null, task: NEW_TASK },
+    } as const
+    expect(await sendChat(deps, ALICE, "s-1", first)).toEqual({
+      kind: "started",
+      runId: "r-1",
+    })
+    expect(
+      pi.calls.filter(c => c.method === "createThreadLane").map(c => c.args[1]),
+    ).toEqual([NEW])
+    expect(records.calls).toEqual([])
+    // Another thread at the root, in that task: its id is in use.
+    const other = threadIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
+    expect(
+      await sendChat(deps, ALICE, "s-2", {
+        ...first,
+        at: { ...first.at, thread: other },
+      }),
+    ).toMatchObject({ kind: "refused", code: ERR.TASK_ID_IN_USE })
+  })
+
   test("a Start Agent column's message, naming nobody, starts a run", async () => {
     const { started, deps } = setUp()
     const out = await sendChat(deps, ALICE, "s-1", chat("do it", true))

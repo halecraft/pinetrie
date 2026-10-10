@@ -49,7 +49,6 @@ import { decodeStoredRelay, encodeRelay } from "./relay.ts"
 const StoredCard = Type.Object({
   owner: Type.String({ minLength: 1 }),
   kind: Type.String(),
-  root: Type.String(),
   at: Type.String(),
   lane: Type.String(),
   column: Type.String(),
@@ -59,10 +58,12 @@ const StoredCard = Type.Object({
   command: Type.String(),
   /** A fact the card carries (ADR-0080), as JSON; absent before facts were. */
   fact: Type.Optional(Type.String()),
+  /** An ask card's relay (ADR-0128), as JSON; absent before it had its own. */
+  relay: Type.Optional(Type.String()),
   unsent: Type.String(),
   placer: Type.String({ minLength: 1 }),
   holder: Type.String(),
-  /** A canvas, fresh or gone card's task (ADR-0116); absent before tasks. */
+  /** A canvas or trashed card's task (ADR-0116); absent before tasks. */
   task: Type.Optional(Type.String()),
   /** A canvas card's width; absent before tasks. */
   width: Type.Optional(Type.String()),
@@ -78,7 +79,6 @@ const StoredCard = Type.Object({
 interface StoredCardFields {
   readonly owner: string
   readonly kind: string
-  readonly root: string
   readonly at: string
   readonly lane: string
   readonly column: string
@@ -87,6 +87,7 @@ interface StoredCardFields {
   readonly seen: string
   readonly command: string
   readonly fact: string
+  readonly relay: string
   readonly unsent: string
   readonly placer: string
   readonly holder: string
@@ -103,7 +104,7 @@ const isCommand = (s: string): s is CardCommand =>
 /** The columns a card's content is stored in: "" for none. */
 type ContentFields = Pick<
   StoredCardFields,
-  "command" | "fact" | "unsent" | "address" | "quote" | "origin"
+  "command" | "fact" | "relay" | "unsent" | "address" | "quote" | "origin"
 >
 
 type ContentColumn = keyof ContentFields
@@ -111,6 +112,7 @@ type ContentColumn = keyof ContentFields
 const NO_CONTENT_FIELDS: ContentFields = {
   command: "",
   fact: "",
+  relay: "",
   unsent: "",
   address: "",
   quote: "",
@@ -128,8 +130,7 @@ interface ContentCodec<K extends PlacedKind> {
 
 /**
  * Each kind's content as the places document stores it (ADR-0126): a row
- * per kind with records, so a kind without one does not compile. An ask
- * keeps its relay in the `fact` column, as JSON.
+ * per kind with records, so a kind without one does not compile.
  */
 export const CARD_CODEC: { readonly [K in PlacedKind]: ContentCodec<K> } = {
   text: {
@@ -172,10 +173,10 @@ export const CARD_CODEC: { readonly [K in PlacedKind]: ContentCodec<K> } = {
     },
   },
   ask: {
-    columns: ["fact"],
-    encode: c => ({ fact: encodeRelay(c.relay) }),
+    columns: ["relay"],
+    encode: c => ({ relay: encodeRelay(c.relay) }),
     decode: f => {
-      const relay = decodeStoredRelay(f.fact)
+      const relay = decodeStoredRelay(f.relay)
       return relay === undefined ? undefined : { relay }
     },
   },
@@ -255,6 +256,7 @@ export const decodeCard = (
     const fields: ContentFields = {
       command: c.command,
       fact: c.fact ?? "",
+      relay: c.relay ?? "",
       unsent: c.unsent,
       address: c.address ?? "",
       quote: c.quote ?? "",
@@ -330,10 +332,13 @@ export const byOrder = (a: CardRecord, b: CardRecord): number => {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
-/** Where a column's composer is: a thread's end, or a fresh column by its key. */
+/**
+ * Where a column's composer is: a thread's end, or a thread not yet started
+ * (ADR-0126), which has no end yet.
+ */
 type CardWhere =
   | { readonly kind: "end"; readonly end: EntryId }
-  | { readonly kind: "fresh"; readonly column: string }
+  | { readonly kind: "thread"; readonly thread: ThreadId }
 
 /**
  * Your message where a column's composer is (ADR-0113); never another
@@ -352,7 +357,7 @@ export function yourCard(
     const here =
       where.kind === "end"
         ? cardEnd(c, index) === where.end
-        : c.place.kind === "fresh" && c.place.column === where.column
+        : c.place.kind === "composing" && c.place.thread === where.thread
     if (here && (found === undefined || c.id > found.id)) found = c
   }
   return found

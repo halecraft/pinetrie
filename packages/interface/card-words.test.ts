@@ -207,7 +207,6 @@ describe("history and traces (ADR-0048 step 6)", () => {
       event({ kind: "unsent", by: null, from: queued, to: atEnd }),
       "not sent: back below the line",
     ],
-    [event({ kind: "followed", by: null }), "moved to the new thread"],
   ] as const)("historyWords: %o", (e, words) => {
     expect(historyWords(e, READER)).toBe(words)
   })

@@ -42,7 +42,6 @@ import {
   lateFor,
   queueCard,
   refusedWrite,
-  rootHolding,
   START_AGENT,
   startSuiteHost,
   taskHolding,
@@ -514,8 +513,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const placesRefused = refusedWrite(() =>
       mallory.exchange.get(PLACES_DOC_ID, PlacesDoc).cards.set(forged, {
         owner: mallory.writer,
-        kind: "fresh",
-        root: "",
+        kind: "drafting",
         at: "",
         lane: "",
         column: "forged",
@@ -524,6 +522,7 @@ async function run(check: Checks["check"]): Promise<void> {
         seen: "",
         command: "",
         fact: "",
+        relay: "",
         unsent: "",
         placer: mallory.writer,
         holder: "",
@@ -597,8 +596,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // Ada's second session undoes, in this root, the take into the inventory
     // her first session made here; her take in another root stays. An undo after Bea moved the
     // card is refused, naming Bea. A keep of three cards is one move.
-    // A history is a task's (ADR-0116); a fresh column's place names its root too.
-    const hereRoot = rootHolding(ch, tipOf())
+    // A history is a task's (ADR-0116).
     const here = taskHolding(ch, tipOf())
     const other = await ada.chat("a root of its own", ROOT, { mode: "branch" })
     const otherEnd = other.kind === "appended" ? other.id : null
@@ -618,12 +616,10 @@ async function run(check: Checks["check"]): Promise<void> {
     const undoneHere = await ada2.undoMoves(here, "undo")
     const a1Back = onHost(a1)?.place.kind === "composing"
     const b1Stays = onHost(b1)?.place.kind === "inventory"
+    // Pinned at the thread's end: a place in its task's history.
     const parked = {
-      kind: "fresh",
-      column: "k-parked",
-      root: hereRoot,
-      task: here,
-      at: at(tipOf()),
+      kind: "pinned",
+      thread: threadHolding(ch, tipOf()),
     } as const
     await ada.moveCard(
       { card: a1, from: drafting(tipOf()), to: parked },
@@ -631,7 +627,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     await waitFor(
       () =>
-        bea.cards.current().some(c => c.id === a1 && c.place.kind === "fresh"),
+        bea.cards.current().some(c => c.id === a1 && c.place.kind === "pinned"),
       5_000,
     )
     await bea.moveCard(
@@ -650,13 +646,8 @@ async function run(check: Checks["check"]): Promise<void> {
         onHost(a1)?.place.kind === "composing",
       `${undoneHere.kind}, ${a1Back}, ${b1Stays}; ${JSON.stringify(refused)}`,
     )
-    const keeping = {
-      kind: "fresh",
-      column: "k-keep",
-      root: hereRoot,
-      task: here,
-      at: at(tipOf()),
-    } as const
+    const keeping = pinnedIn(tipOf())
+    const keepingKey = { kind: "pinned", thread: keeping.thread } as const
     const three = ["one", "two", "three"].map(text => {
       const id = newCardId()
       void ada.createCard(
@@ -672,7 +663,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await waitFor(() => three.every(id => onHost(id) !== undefined), 5_000)
     const [k1, k2, k3] = three as [TextCardId, TextCardId, TextCardId]
     const keepAt = (card: TextCardId, slot: number) => ({
-      move: { card, from: keeping, to: mine },
+      move: { card, from: keepingKey, to: mine },
       slot,
     })
     const keep3 = () =>
@@ -683,13 +674,13 @@ async function run(check: Checks["check"]): Promise<void> {
     // Bea moves one first: the keep is refused whole.
     await waitFor(() => bea.cards.current().some(c => c.id === k3), 5_000)
     await bea.moveCard(
-      { card: k3, from: keeping, to: drafting(tipOf()) },
+      { card: k3, from: keepingKey, to: drafting(tipOf()) },
       { actedAt: { kind: "column", key: "k" }, slot: null },
     )
     const refusedWhole = await keep3()
-    const noneMoved = [k1, k2].every(id => onHost(id)?.place.kind === "fresh")
+    const noneMoved = [k1, k2].every(id => onHost(id)?.place.kind === "pinned")
     await bea.moveCard(
-      { card: k3, from: drafting(tipOf()), to: keeping },
+      { card: k3, from: drafting(tipOf()), to: keepingKey },
       { actedAt: { kind: "column", key: "k" }, slot: null },
     )
     const keptAll = await keep3()
@@ -703,7 +694,7 @@ async function run(check: Checks["check"]): Promise<void> {
         allKept &&
         keepUndone.kind === "undone" &&
         keepUndone.cards.length === 3 &&
-        three.every(id => onHost(id)?.place.kind === "fresh"),
+        three.every(id => onHost(id)?.place.kind === "pinned"),
       `${refusedWhole.kind}, ${noneMoved}, ${keptAll.kind}, ${allKept}; ${keepUndone.kind}`,
     )
     // A text card dropped on the canvas lands in a note column made for it

@@ -24,7 +24,7 @@ import {
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { BOARD_SEARCH } from "./board-view.ts"
-import type { ColumnKey, FreshKey } from "./columns.ts"
+import type { ColumnKey } from "./columns.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"
 import {
   NEW_NOTE_COLUMN,
@@ -50,7 +50,7 @@ import {
 } from "./layout.ts"
 import { threadLink } from "./thread-link.ts"
 
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 /** Each root's task, by its root entry: the sidebar's key (ADR-0116). */
@@ -92,18 +92,14 @@ const onRoot = (root: string): Layout =>
       archived: new Set(),
       list: [TASK_OF(root)],
       canvases: TASKS.index.canvases,
-      forks: new Map(),
+      unstarted: new Map(),
       holders: new Map(),
     },
   )
-/** A new tab, keyed by the thread it minted. */
-const T = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
-const onNewTab: Layout = layoutReducer(initialLayout(), {
-  kind: "newTab",
-  key: T,
-  root: NEW_ROOT,
-  task: NEW_TASK,
-  asksAgent: false,
+/** On no task. */
+const onNothing: Layout = layoutReducer(initialLayout(), {
+  kind: "show",
+  here: { kind: "nothing" },
 })
 const at = (
   layout: Layout,
@@ -173,9 +169,8 @@ const plan = (intent: Intent, state: IntentState = R1) =>
       "01a0ffd2-0000-7000-8000-0000000000e1",
     ),
   })
-/** The column keys these tests name: a branch's, a new tab's, a card's. */
-const FRESH: FreshKey = { kind: "fresh", thread: F }
-const NEW_TAB: FreshKey = { kind: "newTab", thread: T }
+/** The column keys these tests name: a branch's card's, a card's. */
+const FRESH: ColumnKey = { kind: "card", card: F }
 const CARD_C: ColumnKey = { kind: "card", card: C }
 const column = (
   act: Extract<Intent, { kind: "column" }>["act"],
@@ -198,10 +193,7 @@ describe("planIntent", () => {
     ])
   })
 
-  test("× on a new tab closes it; nothing has none", () => {
-    expect(plan({ kind: "close", here: { kind: "new", key: T } })).toEqual([
-      { kind: "layout", action: { kind: "closeNewTab", key: T } },
-    ])
+  test("× on nothing closes nothing", () => {
     expect(plan({ kind: "close", here: { kind: "nothing" } })).toEqual([])
   })
 
@@ -282,158 +274,203 @@ describe("planIntent", () => {
     ])
   })
 
-  test("a new tab from a board column carries its state", () => {
-    const state = workflowStateIdFor("d")
-    expect(plan({ kind: "newTab", asksAgent: true, state })).toContainEqual({
-      kind: "layout",
-      action: {
-        kind: "newTab",
-        key: NEW_THREAD,
-        root: NEW_ROOT,
-        task: NEW_TASK,
-        asksAgent: true,
-        state,
-      },
-    })
-  })
-
-  test("a branch opens a fresh column under the thread it minted, which takes focus", () => {
-    expect(
-      plan(
-        column({
-          kind: "branch",
-          branch: { at: entryId("2-a"), prefill: undefined },
-        }),
-      ),
-    ).toEqual([
-      { kind: "armFocus", key: NEW_THREAD },
-      onR1({ kind: "openFresh", thread: NEW_THREAD, at: "2-a" }),
-    ])
-  })
-
-  test("branch here, after a conflict, opens a fresh column holding the text", () => {
+  test("branch here, after a conflict, opens a thread holding the text, which its column sends", () => {
     const pending = { text: "hi", card: textCardId("c") }
     expect(
-      plan(column({ kind: "branchInstead", at: entryId("3-b"), pending })),
-    ).toEqual([
-      { kind: "armFocus", key: NEW_THREAD },
-      onR1({ kind: "openFresh", thread: NEW_THREAD, at: "3-b", pending }),
-    ])
+      plan(column({ kind: "branchInstead", at: entryId("3-b"), pending })).at(
+        -1,
+      ),
+    ).toEqual(onR1({ kind: "opened", card: NEW_THREAD, pending }))
   })
 
   test("a new tab from a first message's edit starts with its text", () => {
     const prefill = { text: "again", blank: false }
-    expect(plan(column({ kind: "newTab", prefill, asksAgent: true }))).toEqual([
-      { kind: "armFocus", key: NEW_THREAD },
-      {
-        kind: "layout",
-        action: {
-          kind: "newTab",
-          key: NEW_THREAD,
-          root: NEW_ROOT,
-          task: NEW_TASK,
-          asksAgent: true,
+    expect(
+      plan(column({ kind: "newTab", prefill, asksAgent: true })),
+    ).toContainEqual({
+      kind: "layout",
+      action: {
+        kind: "view",
+        task: NEW_TASK,
+        first: null,
+        change: {
+          kind: "opened",
+          card: NEW_THREAD,
           prefill,
+          asksAgent: true,
         },
       },
-    ])
+    })
   })
 
-  test("＋ opens a new tab, keyed by the thread it minted, which takes focus", () => {
-    expect(plan({ kind: "newTab", asksAgent: false })).toEqual([
-      { kind: "armFocus", key: NEW_THREAD },
+  test("＋ opens a new tab: its task and its thread written now, shown and in the sidebar, its column unfolded, taking focus (ADR-0126)", () => {
+    expect(
+      plan({ kind: "newTab", asksAgent: true, state: workflowStateIdFor("d") }),
+    ).toEqual([
+      {
+        kind: "request",
+        intent: {
+          kind: "open-thread",
+          thread: NEW_THREAD,
+          root: NEW_ROOT,
+          at: null,
+          task: NEW_TASK,
+          state: workflowStateIdFor("d"),
+        },
+      },
+      {
+        kind: "layout",
+        action: { kind: "show", here: { kind: "task", task: NEW_TASK } },
+      },
+      { kind: "list", act: { kind: "ensure", task: NEW_TASK } },
       {
         kind: "layout",
         action: {
-          kind: "newTab",
-          key: NEW_THREAD,
-          root: NEW_ROOT,
+          kind: "view",
           task: NEW_TASK,
-          asksAgent: false,
+          first: null,
+          change: { kind: "opened", card: NEW_THREAD, asksAgent: true },
         },
       },
+      { kind: "armFocus", key: NEW_THREAD },
     ])
   })
 
-  test("closing a branch discards its card first; a new tab's closes the tab", () => {
-    const close = (on: FreshKey): Intent => ({
-      kind: "closeFresh",
-      column: on,
-      discard: [textCardId("c")],
-    })
-    const place = {
-      kind: "fresh",
-      column: F,
-      root: TEST_ROOT,
-      task: TEST_TASK,
-      at: atEntry(entryId("2-a")),
-    } as const
-    const held: CardRecord = {
-      kind: "text" as const,
+  test("a branch is opened on the host, just after its thread, its column unfolded with what it starts with, taking focus (ADR-0126)", () => {
+    const at2 = entryId("2-a")
+    expect(
+      plan(
+        column(
+          {
+            kind: "branch",
+            branch: { at: at2, prefill: { text: "hi", blank: false } },
+          },
+          CARD_C,
+        ),
+      ),
+    ).toEqual([
+      { kind: "armFocus", key: NEW_THREAD },
+      {
+        kind: "request",
+        intent: {
+          kind: "open-thread",
+          thread: NEW_THREAD,
+          root: TEST_ROOT,
+          at: at2,
+          task: R1_ID,
+          state: null,
+        },
+      },
+      onR1({
+        kind: "opened",
+        card: NEW_THREAD,
+        prefill: { text: "hi", blank: false },
+      }),
+    ])
+    // Off a task, nothing.
+    expect(
+      plan(
+        column(
+          { kind: "branch", branch: { at: at2, prefill: undefined } },
+          CARD_C,
+        ),
+        at(onNothing),
+      ),
+    ).toEqual([])
+  })
+
+  test("closing an unstarted thread's column: its card to your trash, your message there kept or trashed with it, in one move; a new tab's task, then empty, leaves the sidebar (ADR-0126)", () => {
+    const thread: CardRecord = {
+      kind: "thread",
+      id: F,
+      owner: ME,
+      placer: ME,
+      place: { kind: "canvas", task: R1_ID, order: "zz", width: 1 },
+      content: NO_CONTENT,
+    }
+    const message: CardRecord = {
+      kind: "text",
       id: textCardId("c"),
       owner: ME,
       placer: ME,
-      place,
+      place: { kind: "composing", thread: F },
       content: { command: null, unsent: null, origin: null },
     }
-    const holding = { ...NO_CARDS, cards: [held] }
-    const R1 = at(onRoot("1-r1"), undefined, holding)
-    // Sent with the task you are on, or the new tab's: from no task, a
-    // discard's history is its sender's (ADR-0116).
-    const discard = (task: TaskId) => ({
-      kind: "moveCard",
-      move: {
-        card: "c",
-        from: place,
-        to: { kind: "trash", why: { kind: "discarded" } },
-      },
-      how: {
-        actedAt: { kind: "column", key: F },
-        slot: null,
-      },
-      queuedBy: null,
-      fly: false,
-      here: task,
+    const state = at(onRoot("1-r1"), undefined, {
+      ...NO_CARDS,
+      cards: [thread, message],
     })
-    expect(plan(close(FRESH), R1)).toEqual([
-      discard(R1_ID),
-      onR1({ kind: "closeFresh", thread: F }),
-    ])
-    // The new tab's discard is said in its own column.
-    expect(plan(close(NEW_TAB), at(onNewTab, undefined, holding))).toEqual([
-      {
-        ...discard(NEW_TASK),
-        how: { actedAt: { kind: "column", key: T }, slot: null },
+    const away = {
+      move: {
+        card: F,
+        from: { kind: "canvas", task: R1_ID },
+        to: { kind: "trash" },
       },
-      { kind: "layout", action: { kind: "closeNewTab", key: T } },
-    ])
-    expect(
-      plan({ kind: "closeFresh", column: NEW_TAB, discard: [] }, at(onNewTab)),
-    ).toEqual([{ kind: "layout", action: { kind: "closeNewTab", key: T } }])
-    const closeCard: Intent = {
-      kind: "closeFresh",
-      // @ts-expect-error: a card's column does not close; it folds
-      column: CARD_C,
-      discard: [],
+      slot: null,
     }
-    expect(closeCard.kind).toBe("closeFresh")
-  })
-
-  test("a column's first send is its branch's, or its new tab's", () => {
-    expect(plan({ kind: "sentFresh", column: FRESH, sendId: "s" })).toEqual([
-      onR1({ kind: "sent", thread: F, sendId: "s" }),
-    ])
     expect(
-      plan({ kind: "sentFresh", column: NEW_TAB, sendId: "s" }, at(onNewTab)),
+      plan({ kind: "closeUnstarted", card: F, keep: true }, state),
     ).toEqual([
       {
-        kind: "layout",
-        action: {
-          kind: "newTabColumn",
-          key: T,
-          action: { kind: "sent", sendId: "s" },
-        },
+        kind: "keep",
+        moves: [
+          {
+            move: {
+              card: "c",
+              from: { kind: "composing", thread: F },
+              to: { kind: "inventory", holder: ME },
+            },
+            slot: 0,
+          },
+          away,
+        ],
+        actedAt: { kind: "column", key: F },
+        close: [],
+        here: R1_ID,
       },
+    ])
+    expect(
+      plan({ kind: "closeUnstarted", card: F, keep: false }, state)[0],
+    ).toMatchObject({
+      moves: [{ move: { card: "c", to: { kind: "trash" } }, slot: null }, away],
+    })
+    // Alone on its task's canvas: a new tab's, whose task then leaves the sidebar.
+    const alone = { ...thread, place: { ...thread.place, task: NEW_TASK } }
+    const onTab = {
+      ...at(onRoot("1-r1"), undefined, { ...NO_CARDS, cards: [alone] }),
+      tasks: {
+        ...TASKS,
+        index: { ...TASKS.index, canvases: new Map([[NEW_TASK, [alone]]]) },
+      },
+    } as IntentState
+    expect(
+      plan({ kind: "closeUnstarted", card: F, keep: false }, onTab),
+    ).toEqual([
+      {
+        kind: "keep",
+        moves: [
+          {
+            move: {
+              card: F,
+              from: { kind: "canvas", task: NEW_TASK },
+              to: { kind: "trash" },
+            },
+            slot: null,
+          },
+        ],
+        actedAt: { kind: "column", key: F },
+        close: [
+          { kind: "list", act: { kind: "close", task: NEW_TASK } },
+          { kind: "layout", action: { kind: "closeTask", task: NEW_TASK } },
+        ],
+        here: NEW_TASK,
+      },
+    ])
+  })
+
+  test("an unstarted thread's first send spends what it started with", () => {
+    expect(plan({ kind: "sentFirst", card: F })).toEqual([
+      onR1({ kind: "sent", card: F }),
     ])
   })
 
@@ -442,19 +479,15 @@ describe("planIntent", () => {
       "density (ADR-0106)",
       { kind: "density", density: "outline" },
       { kind: "density", card: C, density: "outline" },
-      { kind: "density", density: "outline" },
     ],
     [
       "details (ADR-0073)",
       { kind: "details", open: true },
       { kind: "details", card: C, open: true },
-      { kind: "details", open: true },
     ],
-  ] as const)("a column's %s is your view of its card, or of its new tab's column", (_, act, change, action) => {
+  ] as const)("a column's %s is your view of its card", (_, act, change) => {
     expect(plan(column(act, CARD_C))).toEqual([onR1(change)])
-    expect(plan(column(act, NEW_TAB), at(onNewTab))).toEqual([
-      { kind: "layout", action: { kind: "newTabColumn", key: T, action } },
-    ])
+    expect(plan(column(act, CARD_C), at(onNothing))).toEqual([])
   })
 
   test("a fold is your view of the task you are on; off a task, nothing (ADR-0116)", () => {
@@ -462,12 +495,14 @@ describe("planIntent", () => {
       onR1({ kind: "fold", card: C, unfolded: true }),
     ])
     expect(
-      plan({ kind: "fold", card: C, unfolded: false }, at(onNewTab)),
+      plan({ kind: "fold", card: C, unfolded: false }, at(onNothing)),
     ).toEqual([])
     expect(plan({ kind: "foldTask", unfolded: true })).toEqual([
       onR1({ kind: "foldTask", unfolded: true }),
     ])
-    expect(plan({ kind: "foldTask", unfolded: true }, at(onNewTab))).toEqual([])
+    expect(plan({ kind: "foldTask", unfolded: true }, at(onNothing))).toEqual(
+      [],
+    )
   })
 
   test("a note column is made just after a card, or first, on the task you are on, and unfolded; off a task, nothing (ADR-0116)", () => {
@@ -489,7 +524,7 @@ describe("planIntent", () => {
     expect(plan({ kind: "addNoteColumn", after: null })[0]).toMatchObject({
       move: { to: { kind: "canvas-at", task: R1_ID, after: null } },
     })
-    expect(plan({ kind: "addNoteColumn", after: C }, at(onNewTab))).toEqual([])
+    expect(plan({ kind: "addNoteColumn", after: C }, at(onNothing))).toEqual([])
   })
 
   test("a width is asked of the host, from the canvas the card is on; a card on none, nothing (ADR-0116)", () => {
@@ -513,13 +548,13 @@ describe("planIntent", () => {
       column: { kind: "card", card },
       to,
     })
-    const moveBranch: Intent = {
+    const moveTask: Intent = {
       kind: "moveColumn",
-      // @ts-expect-error: a branch has no place on the canvas to move from
-      column: FRESH,
+      // @ts-expect-error: the task column has no place on the canvas to move from
+      column: { kind: "task", task: R1_ID },
       to: 0,
     }
-    expect(moveBranch.kind).toBe("moveColumn")
+    expect(moveTask.kind).toBe("moveColumn")
     expect(plan(move(C, 0))).toEqual([
       {
         kind: "reorderCard",
@@ -539,7 +574,7 @@ describe("planIntent", () => {
     expect(plan(move(C, 1))).toEqual([])
     expect(plan(move(C, 5))).toEqual([])
     expect(plan(move(F, 0))).toEqual([])
-    expect(plan(move(C, 0), at(onNewTab))).toEqual([])
+    expect(plan(move(C, 0), at(onNothing))).toEqual([])
   })
 
   describe("openAt", () => {
@@ -760,7 +795,7 @@ describe("planIntent", () => {
         at: where,
         hold: "release",
       })
-      for (const layout of [onRoot("1-r1"), onNewTab]) {
+      for (const layout of [onRoot("1-r1"), onNothing]) {
         const state = at(layout, undefined, withCard(atEnd))
         const move = {
           card: c,
@@ -1006,7 +1041,7 @@ describe("a page over the stage (ADR-0098)", () => {
     for (const intent of [
       { kind: "board", open: false },
       { kind: "foldList" },
-      { kind: "close", here: { kind: "new", key: "t" } },
+      { kind: "close", here: { kind: "nothing" } },
     ] satisfies Intent[])
       expect(plan(intent, onPage)).toEqual(plan(intent))
   })
@@ -1027,7 +1062,7 @@ describe("a search over the root you are on (ADR-0101)", () => {
       { kind: "search", act: { kind: "open", task: R1_ID } },
     ])
     expect(
-      plan({ kind: "search", act: { kind: "open" } }, at(onNewTab)),
+      plan({ kind: "search", act: { kind: "open" } }, at(onNothing)),
     ).toEqual([])
   })
   test("openAt while searching closes the search first and marks the message last", () => {

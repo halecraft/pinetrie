@@ -15,7 +15,6 @@ import {
   type MoveOf,
   type MoveTarget,
   type PlaceKey,
-  ROOT,
   rootIdFor,
   runId,
   type Sha256,
@@ -318,13 +317,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         {
           card: cardIdFor("c7"),
           from: null,
-          to: {
-            kind: "fresh",
-            column: "k-1",
-            root: TEST_ROOT,
-            task: TEST_TASK,
-            at: ROOT,
-          },
+          to: { kind: "composing", thread: NEW_THREAD },
         },
       ],
       here: null,
@@ -369,12 +362,12 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
             kind: "composing",
             thread: TEST_THREAD,
           },
-          to: { kind: "trash", why: { kind: "discarded" } },
+          to: { kind: "trash" },
         },
         {
           card: cardIdFor("c8"),
           from: { kind: "inventory", holder: writerId("ada@example.com") },
-          to: { kind: "trash", why: { kind: "discarded" } },
+          to: { kind: "trash" },
         },
       ],
       here: TEST_TASK,
@@ -384,15 +377,10 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       move: {
         card: cardIdFor("c9"),
         from: { kind: "inventory", holder: writerId("ada@example.com") },
-        to: {
-          kind: "trash",
-          why: {
-            kind: "spun",
-            into: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
-            thread: NEW_THREAD,
-          },
-        },
+        to: { kind: "trash" },
       },
+      root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
+      thread: NEW_THREAD,
       task: NEW_TASK,
       state: null,
       here: TEST_TASK,
@@ -402,13 +390,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       moves: [
         {
           card: cardIdFor("c7"),
-          from: {
-            kind: "fresh",
-            column: "k-1",
-            root: TEST_ROOT,
-            task: TEST_TASK,
-            at: ROOT,
-          },
+          from: { kind: "composing", thread: NEW_THREAD },
           to: { kind: "inventory", holder: writerId("ada@example.com") },
         },
       ],
@@ -419,13 +401,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       moves: [cardIdFor("c7"), cardIdFor("c8")].map(
         (id): MoveOf<"text"> => ({
           card: textCardId(id),
-          from: {
-            kind: "fresh",
-            column: "k-1",
-            root: TEST_ROOT,
-            task: TEST_TASK,
-            at: ROOT,
-          },
+          from: { kind: "composing", thread: NEW_THREAD },
           to: { kind: "inventory", holder: writerId("ada@example.com") },
         }),
       ),
@@ -590,13 +566,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
       cards: [
         {
           card: cardIdFor("c1"),
-          place: {
-            kind: "fresh",
-            column: "k-1",
-            root: TEST_ROOT,
-            task: TEST_TASK,
-            at: ROOT,
-          },
+          place: { kind: "composing", thread: NEW_THREAD },
         },
         {
           card: cardIdFor("c2"),
@@ -608,13 +578,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     {
       kind: "unmoved",
       code: "moved",
-      place: {
-        kind: "fresh",
-        column: "k-1",
-        root: TEST_ROOT,
-        task: TEST_TASK,
-        at: ROOT,
-      },
+      place: { kind: "composing", thread: NEW_THREAD },
       by: writerId("bea@example.com"),
     },
     { kind: "unmoved", code: "gone", place: null, by: null },
@@ -823,31 +787,19 @@ test('decodeKey: "" is none; anything malformed is undefined', () => {
     '{"kind":"inventory","holder":""}',
   ])
     assert.equal(decodeKey(bad), undefined)
-  const fresh = {
-    kind: "fresh",
-    column: "k",
-    root: TEST_ROOT,
-    task: TEST_TASK,
-    at: ROOT,
-  } as const
+  const fresh = { kind: "composing", thread: NEW_THREAD } as const
   assert.deepEqual(decodeKey(encodeKey(fresh)), fresh)
   const pinned = {
     kind: "pinned",
     thread: threadIdFor("x"),
   } as const
   assert.deepEqual(decodeKey(encodeKey(pinned)), pinned)
-  // A fresh key with no root names no place the host can record.
+  // A place no build records any more.
   assert.equal(decodeKey('{"kind":"fresh","column":"k"}'), undefined)
 })
 
 test("decode: a move needs its cards, each with a place, and its sender's task a task or none; set-command a known command; an undo a root and a direction", () => {
-  const fresh = {
-    kind: "fresh",
-    column: "k",
-    root: TEST_ROOT,
-    task: TEST_TASK,
-    at: ROOT,
-  } as const
+  const fresh = { kind: "composing", thread: NEW_THREAD } as const
   for (const wire of [
     { kind: "move", moves: encodeMoves([]) },
     { kind: "move", moves: "{" },
@@ -924,41 +876,62 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
   assert.equal(out.kind === "refused" ? out.code : "", ERR.UNKNOWN_KIND)
 })
 
-test("decode: a spin-off names one move, into a new thread, and a known state or none (ADR-0111)", () => {
-  const spunTo = {
-    kind: "spun",
-    task: TEST_TASK,
-    column: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
-    lane: NEW_THREAD,
-  }
+test("decode: a spin-off names one move to the trash, a new root and its thread, a new task, and a known state or none (ADR-0111, ADR-0126)", () => {
+  const trash = { kind: "discarded" }
   const from = { kind: "inventory", holder: "ada@example.com" }
   const moves = (to: unknown) =>
     JSON.stringify([{ card: cardIdFor("c1"), from, to }])
-  assert.equal(
-    decodeCommand({ kind: "spin-off", moves: moves(spunTo), task: NEW_TASK })
-      .kind,
-    "spin-off",
-  )
+  const good = {
+    kind: "spin-off",
+    moves: moves(trash),
+    root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
+    lane: NEW_THREAD,
+    task: NEW_TASK,
+  }
+  assert.equal(decodeCommand(good).kind, "spin-off")
   for (const wire of [
-    {
-      kind: "spin-off",
-      moves: moves({ ...spunTo, kind: "discarded" }),
-      task: NEW_TASK,
-    },
-    {
-      kind: "spin-off",
-      moves: moves({ ...spunTo, column: "" }),
-      task: NEW_TASK,
-    },
-    { kind: "spin-off", moves: moves({ ...spunTo, lane: "" }), task: NEW_TASK },
-    {
-      kind: "spin-off",
-      moves: moves(spunTo),
-      state: "not a state",
-      task: NEW_TASK,
-    },
+    { ...good, moves: moves({ kind: "inventory", holder: "w" }) },
+    { ...good, root: "" },
+    { ...good, lane: "" },
+    { ...good, state: "not a state" },
     // A spin-off starts a new task, under the id its tab minted.
-    { kind: "spin-off", moves: moves(spunTo), task: "" },
+    { ...good, task: "" },
+  ])
+    assert.equal(decodeCommand(wire).kind, "refused")
+})
+
+test("decode: a thread opened names a new thread, a branch's root and task or a new tab's new ones, and a known state or none (ADR-0126)", () => {
+  const branch = encodeIntent("c", {
+    kind: "open-thread",
+    thread: NEW_THREAD,
+    root: TEST_ROOT,
+    at: entryId("e-1"),
+    task: TEST_TASK,
+    state: null,
+  })
+  assert.deepEqual(decodeCommand(branch), {
+    kind: "open-thread",
+    thread: NEW_THREAD,
+    root: TEST_ROOT,
+    at: "e-1",
+    task: TEST_TASK,
+    state: null,
+  })
+  const tab = encodeIntent("c", {
+    kind: "open-thread",
+    thread: NEW_THREAD,
+    root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
+    at: null,
+    task: NEW_TASK,
+    state: null,
+  })
+  assert.equal(decodeCommand(tab).kind, "open-thread")
+  for (const wire of [
+    { ...branch, lane: "t-not-new" },
+    { ...branch, task: "r-x" },
+    { ...tab, root: "r-x" },
+    { ...tab, task: "k-x" },
+    { ...tab, state: "not a state" },
   ])
     assert.equal(decodeCommand(wire).kind, "refused")
 })

@@ -9,16 +9,16 @@ import {
   type CardRecord,
   type Intent,
   type MoveRefusal,
-  makeCard,
-  NO_CONTENT,
   type ThreadId,
   type ThreadRecord,
   type TreeIndex,
   threadAt,
+  type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
 import { holderOf } from "./held.ts"
-import { type PlaceStep, planMake, rankOnCanvas } from "./moves.ts"
+import type { PlaceStep } from "./moves.ts"
+import { planThreadOpen } from "./task.ts"
 
 /** A copy as its copier asks for it: the source, the end they saw, and where its card goes. */
 export type CopyThread = Omit<Extract<Intent, { kind: "copy-thread" }>, "kind">
@@ -27,7 +27,7 @@ export type CopyPlan =
   | {
       readonly kind: "copy"
       /** The copy's record: its root and fork are its source's end's. */
-      readonly record: ThreadRecord
+      readonly records: readonly ValueWrite[]
       /** The cards re-ranked to make room, then the copy's card. */
       readonly steps: readonly PlaceStep[]
     }
@@ -77,41 +77,19 @@ export function planCopy(input: {
   if (holder !== null && holder !== sender)
     return { kind: "refused", why: "held" }
   // Onto a canvas, ranked where it was dropped; or into an inventory.
-  const { to: target } = move
-  if (target.kind === "trash") return { kind: "refused", why: "no-place" }
-  const placed =
-    target.kind === "inventory"
-      ? { to: target, ranked: null }
-      : (() => {
-          const ranked = rankOnCanvas(cards, move.card, target)
-          return { to: ranked.to, ranked }
-        })()
-  const { to, ranked } = placed
-  const made = planMake(
+  const { to } = move
+  if (to.kind === "trash") return { kind: "refused", why: "no-place" }
+  const opened = planThreadOpen({
+    thread: move.card,
+    origin: { kind: "fork", at: copy.end, how: "copy" },
+    root: source.root,
+    by: sender,
+    now: input.now,
+    placement: to.kind === "inventory" ? to : { kind: "spot", to },
+    opens: null,
     cards,
-    makeCard(
-      "thread",
-      move.card,
-      to.kind === "inventory" ? to : { ...to, width: 1 },
-      NO_CONTENT,
-      sender,
-    ),
-    sender,
-  )
-  if (made.kind !== "write")
-    return {
-      kind: "refused",
-      why: made.kind === "refused" ? made.code : "no-place",
-    }
-  return {
-    kind: "copy",
-    record: {
-      thread: move.card,
-      root: source.root,
-      by: sender,
-      createdAt: input.now,
-      origin: { kind: "fork", at: copy.end, how: "copy" },
-    },
-    steps: [...(ranked?.first ?? []), made],
-  }
+  })
+  return opened.kind === "refused"
+    ? { kind: "refused", why: opened.code }
+    : { kind: "copy", records: opened.records, steps: opened.steps }
 }

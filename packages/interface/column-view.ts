@@ -28,7 +28,6 @@ import {
   pinnedInView,
   promptOf,
   type RevisionRecord,
-  type RootId,
   type TaskId,
   type TaskPinnedView,
   type TextPlace,
@@ -63,7 +62,7 @@ import {
 import type { OfferActing } from "@pinetrie/session"
 import { commandWords } from "./card-words.ts"
 import type { ColumnView } from "./column-paths.ts"
-import { type Column, freshOf } from "./columns.ts"
+import type { Column } from "./columns.ts"
 import { ago, count } from "./counts.ts"
 import { speakerWords } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
@@ -431,7 +430,9 @@ function reserveStep(f: ColumnFacts): ReserveStep {
     f.lane.kind !== "none"
   )
     return { kind: "none" }
-  return f.work.names.has(f.thread)
+  // A thread opened before its lane is named already, as a conversation's,
+  // with no banner (ADR-0126): the reservation makes its banner due.
+  return f.work.names.has(f.thread) && f.work.banners.has(f.thread)
     ? { kind: "none" }
     : { kind: "ask", lane: f.thread }
 }
@@ -908,32 +909,17 @@ export function joinWords(join: LaneJoin): string {
 }
 
 /**
- * Where a column takes a card (ADR-0048): a fresh column's own key, at its
- * branch point or a new tab's root, in the task it is on, else your message
- * at its end (ADR-0113). `root` is the root `at` is in (ADR-0063), and
- * `task` the task the column is on; a new tab's are the ones it minted
- * (`fresh.root`, `fresh.task`). The composer creates its card here, and a
- * drop on it lands here (`placeOfTarget`). None where the root is not known,
- * nor a fresh column's task, nor at the root but in a new tab: a column
- * there has no end yet.
+ * Where a column takes a card (ADR-0048): your message at its thread, its
+ * end once it has one, or its first message's while it is not yet started
+ * (ADR-0113, ADR-0126). The composer creates its card here, and a drop on
+ * it lands here (`placeOfTarget`). None for a started thread's column with
+ * no end in this tab.
  */
 export function composerPlace(
-  column: Pick<Column, "key" | "mode" | "thread">,
+  column: Pick<Column, "mode" | "thread">,
   at: Position,
-  root: RootId | undefined,
-  task: TaskId | null,
 ): TextPlace | null {
-  // A copy before its first send writes nothing of its own yet either: its
-  // composer's card waits under its key, as a fresh column's does.
-  if (column.mode.kind !== "bound") {
-    const fresh = freshOf(column)
-    const its = fresh?.root ?? root
-    const in_ = fresh?.task ?? task
-    return its === undefined || in_ === null
-      ? null
-      : { kind: "fresh", column: column.key, root: its, task: in_, at }
-  }
-  return at.kind === "entry"
+  return column.mode.kind === "unstarted" || at.kind === "entry"
     ? { kind: "composing", thread: column.thread }
     : null
 }

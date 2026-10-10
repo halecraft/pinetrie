@@ -2,7 +2,6 @@ import {
   atEntry,
   cardIdOfKind,
   entryId,
-  ROOT,
   rootIdFor,
   taskIdFor,
   threadIdFor,
@@ -12,7 +11,6 @@ import {
 import { describe, expect, test } from "vitest"
 import { composerPlace } from "./column-view.ts"
 import { BOUND } from "./columns.ts"
-import { NEW_TASK } from "./fixtures.ts"
 import {
   composerPlacesStore,
   dropProps,
@@ -33,21 +31,19 @@ const marked = (attrs: Readonly<Record<string, string>>) => ({
   getAttribute: (name: string) => attrs[name] ?? null,
 })
 const LANE = threadIdFor("x")
+/** A thread opened and not yet started (ADR-0126). */
+const UNSTARTED = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
 const E1 = atEntry(entryId("e-1"))
 
 describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   const store = composerPlacesStore()
-  const thread = composerPlace(
-    { key: "k-thread", thread: LANE, mode: BOUND },
-    E1,
-    TEST_ROOT,
-    TEST_TASK,
-  )
+  const thread = composerPlace({ thread: LANE, mode: BOUND }, E1)
   const fresh = composerPlace(
-    { key: "k-fresh", thread: LANE, mode: { kind: "fresh" } },
+    {
+      thread: UNSTARTED,
+      mode: { kind: "unstarted", fork: entryId("e-1"), root: TEST_ROOT },
+    },
     E1,
-    TEST_ROOT,
-    TEST_TASK,
   )
   store.set(
     "k-thread",
@@ -86,7 +82,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     ).toEqual(placeOfTarget(target, store.current(), ME))
   })
 
-  test("a column lands at its thread's nearest notes, its composer as your message; a fresh column as its message; a slot as your inventory; a note column at its end; a column no store holds as nothing", () => {
+  test("a column lands at its thread's nearest notes, an unstarted thread's too, its composer as your message; a slot as your inventory; a note column at its end; a column no store holds as nothing", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
     const end = { thread: LANE }
     expect(at(targets[0] as PutTarget)).toEqual({
@@ -102,11 +98,9 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
       ),
     })
     expect(at(targets[1] as PutTarget)).toEqual({
-      kind: "fresh",
-      column: "k-fresh",
-      root: TEST_ROOT,
-      task: TEST_TASK,
-      at: E1,
+      kind: "notes",
+      near: "thread",
+      thread: UNSTARTED,
     })
     expect(at(targets[2] as PutTarget)).toEqual({ kind: "composing", ...end })
     expect(at(targets[3] as PutTarget)).toEqual({
@@ -116,13 +110,16 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     expect(at(targets[5] as PutTarget)).toBeNull()
   })
 
-  test("a column's pinned strip lands pinned at its composer's thread end; a fresh column has none", () => {
+  test("a column's pinned strip lands pinned at its composer's thread, an unstarted one's too (ADR-0126)", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
     expect(at(targets[6] as PutTarget)).toEqual({
       kind: "pinned",
       thread: LANE,
     })
-    expect(at(targets[7] as PutTarget)).toBeNull()
+    expect(at(targets[7] as PutTarget)).toEqual({
+      kind: "pinned",
+      thread: UNSTARTED,
+    })
   })
 
   test("a task column's pins land pinned to the task (ADR-0116)", () => {
@@ -131,10 +128,10 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     ).toEqual({ kind: "task-pinned", task: TEST_TASK })
   })
 
-  test("a composer, or a fresh column, takes a put as your message", () => {
-    expect(intoMessage(targets[2] as PutTarget, store.current())).toBe(true)
-    expect(intoMessage(targets[1] as PutTarget, store.current())).toBe(true)
-    expect(intoMessage(targets[0] as PutTarget, store.current())).toBe(false)
+  test("a composer takes a put as your message; a column, at its notes", () => {
+    expect(intoMessage(targets[2] as PutTarget)).toBe(true)
+    expect(intoMessage(targets[1] as PutTarget)).toBe(false)
+    expect(intoMessage(targets[0] as PutTarget)).toBe(false)
   })
 
   test("an element with no mark, or a slot that is no number, is no target", () => {
@@ -143,83 +140,21 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   })
 })
 
-test("composerPlace: your message at the end of its thread; fresh by key, in its root and the task it is on; none at the root, nor a fresh one in no root", () => {
-  expect(
-    composerPlace(
-      { key: "k", thread: LANE, mode: BOUND },
-      E1,
-      TEST_ROOT,
-      TEST_TASK,
-    ),
-  ).toEqual({
+test("composerPlace: your message at its thread, at its end once it has one, or at an unstarted thread's; none for a started thread with no end here (ADR-0126)", () => {
+  expect(composerPlace({ thread: LANE, mode: BOUND }, E1)).toEqual({
     kind: "composing",
     thread: LANE,
   })
-  // A branch: its tab's root, at its branch point, on the task you are on.
-  expect(
-    composerPlace(
-      { key: "k", thread: LANE, mode: { kind: "fresh" } },
-      E1,
-      TEST_ROOT,
-      TEST_TASK,
-    ),
-  ).toEqual({
-    kind: "fresh",
-    column: "k",
-    root: TEST_ROOT,
-    task: TEST_TASK,
-    at: E1,
-  })
-  // A new tab: the root and the task it minted as it opened (ADR-0066).
   expect(
     composerPlace(
       {
-        key: "k",
-        thread: LANE,
-        mode: { kind: "fresh", root: NEW_ROOT, task: NEW_TASK },
+        thread: UNSTARTED,
+        mode: { kind: "unstarted", fork: null, root: NEW_ROOT },
       },
       { kind: "root" },
-      undefined,
-      null,
     ),
-  ).toEqual({
-    kind: "fresh",
-    column: "k",
-    root: NEW_ROOT,
-    task: NEW_TASK,
-    at: ROOT,
-  })
+  ).toEqual({ kind: "composing", thread: UNSTARTED })
   expect(
-    composerPlace(
-      { key: "k", thread: LANE, mode: { kind: "fresh" } },
-      { kind: "root" },
-      undefined,
-      TEST_TASK,
-    ),
+    composerPlace({ thread: LANE, mode: BOUND }, { kind: "root" }),
   ).toBeNull()
-  expect(
-    composerPlace(
-      { key: "k", thread: LANE, mode: { kind: "fresh", root: NEW_ROOT } },
-      { kind: "root" },
-      undefined,
-      null,
-    ),
-  ).toBeNull()
-  expect(
-    composerPlace(
-      { key: "k", thread: LANE, mode: BOUND },
-      { kind: "root" },
-      undefined,
-      TEST_TASK,
-    ),
-  ).toBeNull()
-  // A thread's place needs no root: the thread's record names it.
-  expect(
-    composerPlace(
-      { key: "k", thread: LANE, mode: BOUND },
-      E1,
-      undefined,
-      TEST_TASK,
-    ),
-  ).toEqual({ kind: "composing", thread: LANE })
 })

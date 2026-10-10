@@ -31,6 +31,7 @@ import {
   readPlaces,
   readQueueHolds,
   readRevisions,
+  readRoots,
   readTasks,
   readThreads,
   readTreeIndex,
@@ -192,7 +193,12 @@ async function planCrossing(
     revisions,
     trees,
     roots,
-    stillHeld: rootsHeld(cards, readThreads(session), archived),
+    stillHeld: rootsHeld(
+      cards,
+      readThreads(session),
+      archived,
+      new Set(readRoots(session).keys()),
+    ),
   })
 }
 

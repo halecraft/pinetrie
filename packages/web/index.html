@@ -52,16 +52,15 @@
       /* The root you are on is the page's colour, and covers the list's edge. */
       .sidebar-item[data-selected] { background: var(--page); --surface: var(--page);
         border-color: var(--edge); border-left-color: var(--on); }
-      .open-root, .open-new { flex: 1; display: flex; gap: .35rem; align-items: center;
+      .open-root { flex: 1; display: flex; gap: .35rem; align-items: center;
         min-width: 0; padding: .45rem .6rem; border-radius: 0; background: none;
         color: #aab4c3; text-align: left; }
-      .sidebar-item[data-selected] > .open-root, .sidebar-item[data-selected] > .open-new {
+      .sidebar-item[data-selected] > .open-root {
         color: #e6e6e6; font-weight: 600; }
       /* A title wraps to two lines before it is cut. */
       .open-label { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box;
         -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
       .open-root.archived .open-label { text-decoration: line-through; color: #777; }
-      .open-new { font-style: italic; }
       /* A root while it is renamed: a field in the item's place. */
       .open-title-input { flex: 1; min-width: 0; margin: .2rem .3rem; padding: .2rem .5rem;
         border-radius: 4px; background: #1b1e24; color: #e6e6e6; border: 1px solid #3a3f48;
@@ -135,18 +134,17 @@
          fill and its left edge are the full list's. */
       :root[data-list="icons"] #sidebar { padding-left: .3rem; }
       .open-icon-menu { position: relative; flex: 1; min-width: 0; display: flex; }
-      .open-icon-menu > .open-root, .open-icon-menu > .open-new { justify-content: center;
+      .open-icon-menu > .open-root { justify-content: center;
         padding: .35rem 0; }
       .open-icon { position: relative; flex: 0 0 auto; display: inline-flex; width: 1.75rem;
         height: 1.75rem; }
-      .open-sprite, .open-initials, .open-fresh { width: 100%; height: 100%; border-radius: 6px; }
+      .open-sprite, .open-initials { width: 100%; height: 100%; border-radius: 6px; }
       /* A sprite is drawn on black, which lighten takes out (ADR-0053). */
       .open-sprite { object-fit: contain; mix-blend-mode: lighten; }
       .open-initials { display: flex; align-items: center; justify-content: center; color: var(--page);
         font-size: .68rem; font-weight: 700; font-style: normal; line-height: 1; letter-spacing: .02em; }
       .open-root.archived .open-initials { opacity: .45; }
       /* A new tab: hollow, as its rail's dot is, until its first message. */
-      .open-fresh { border: 1.5px dashed #777; }
       /* Its signals sit on its corners: the working ring round it. */
       .open-icon .root-status { position: absolute; top: -3px; right: -3px; }
       .open-icon .root-status.working { inset: -4px; width: auto; height: auto; border-radius: 9px; }

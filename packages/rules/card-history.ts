@@ -47,7 +47,6 @@ export const TRACE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
 const Str = Type.String()
 const FieldsSchema = Type.Object({
   kind: Str,
-  root: Str,
   at: Str,
   lane: Str,
   column: Str,
@@ -69,7 +68,6 @@ const EventSchema = Type.Object({
     Type.Literal("undone"),
     Type.Literal("redone"),
     Type.Literal("unsent"),
-    Type.Literal("followed"),
   ]),
   by: Type.Union([Str, Type.Null()]),
   from: OrNull(FieldsSchema),
@@ -173,7 +171,6 @@ export type Verb =
   | "took-into-inventory"
   | "put"
   | "discarded"
-  | "spun"
   | "moved"
 
 /**
@@ -246,7 +243,7 @@ export function verbOf(from: PlaceKey | null, to: PlaceKey | null): Verb {
   if (from === null) return "created"
   const back = movedBack(from, to)
   if (back !== null) return back
-  if (to.kind === "trash") return to.why.kind === "spun" ? "spun" : "discarded"
+  if (to.kind === "trash") return "discarded"
   if (to.kind === "queued") return "queued"
   if (to.kind === "pinned" || to.kind === "task-pinned") return "pinned"
   if (to.kind === "inventory") return "took-into-inventory"
@@ -307,8 +304,6 @@ function eventKind(
   if (cause.kind === "undo") return "undone"
   if (cause.kind === "redo") return "redone"
   if (cause.kind !== "host") return "moved"
-  if (before.place.kind === "fresh" && after.place.kind === "note")
-    return "followed"
   if (
     after.kind === "text" &&
     after.content.unsent !== null &&

@@ -167,7 +167,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
   ) =>
     planSend({
       text,
-      fresh: false,
+      unstarted: false,
       lane: { kind: "none" },
       asksAgent: false,
       participants: ["Ada", "Bea", "Cy"],
@@ -261,16 +261,16 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
     expect(plan("check it", { lane: lane() }).mode).toBe("reply")
     expect(plan("hi", { command: "bring-up-to-date" }).mode).toBe("reply")
     expect(
-      plan("hi", { fresh: true, lane: lane(), command: "bring-up-to-date" })
+      plan("hi", { unstarted: true, lane: lane(), command: "bring-up-to-date" })
         .mode,
     ).toBe("branch")
   })
-  test("a fresh column branches, and creates a lane when it asks the agent", () => {
-    expect(plan("hi", { fresh: true })).toMatchObject({
+  test("a unstarted column branches, and creates a lane when it asks the agent", () => {
+    expect(plan("hi", { unstarted: true })).toMatchObject({
       mode: "branch",
       createsLane: false,
     })
-    expect(plan("@agent hi", { fresh: true })).toMatchObject({
+    expect(plan("@agent hi", { unstarted: true })).toMatchObject({
       mode: "branch",
       createsLane: true,
     })

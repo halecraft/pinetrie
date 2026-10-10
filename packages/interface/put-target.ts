@@ -29,7 +29,7 @@ import {
 export type PutTarget =
   /**
    * A thread's column: a note in the note column nearest it (`noteOf`,
-   * ADR-0116); in a fresh column, your message there.
+   * ADR-0116).
    */
   | { readonly kind: "column"; readonly key: string }
   /** A column's composer: your message, which a message with text there gives way to by a swap. */
@@ -167,24 +167,15 @@ export interface ComposerSpot {
 /** Column key to its composer (`ComposerSpot`). */
 export type ComposerPlaces = ReadonlyMap<string, ComposerSpot>
 
-/**
- * Whether a put on `target` lands in a composer, as your message: a
- * composer, or a fresh column, which has no notes (ADR-0113).
- */
-export const intoMessage = (
-  target: PutTarget,
-  places: ComposerPlaces,
-): boolean =>
-  target.kind === "composer" ||
-  (target.kind === "column" && places.get(target.key)?.place.kind === "fresh")
+/** Whether a put on `target` lands in a composer, as your message (ADR-0113). */
+export const intoMessage = (target: PutTarget): boolean =>
+  target.kind === "composer"
 
 /**
  * The place `target` names: the note column nearest a column's thread
  * (`noteOf`), a note column's end, its composer's place, the same thread
  * end pinned (`pinnedOf`), a task's pinned cards, or your inventory; null
- * for a column no composer
- * publishes, and for a fresh column's strip, which it has none of; and for
- * a state or the sidebar, which name a new thread, not a place
+ * for a column no composer publishes; and for a state or the sidebar, which name a new thread, not a place
  * (`planSpinOff`); and for a spot on a canvas, which the host ranks.
  */
 export function placeOfTarget(

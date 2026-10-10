@@ -2,12 +2,9 @@
 // acted (ADR-0052, ADR-0066). Pure.
 //
 // The host answers an undo with each card it moved and where it is now, so
-// the place is shown as the undo acts. A fresh column the layout no longer
-// holds is opened again from its place alone, in its task: its key (the
-// thread it minted), its task and its branch point are in the place
-// (`openFresh`).
+// the place is shown as the undo acts.
 
-import { type CardId, isThreadId, type PlaceKey } from "@pinetrie/core"
+import type { CardId, PlaceKey } from "@pinetrie/core"
 import { placeEnd } from "@pinetrie/rules"
 import { type ActedAt, AT_INVENTORY } from "@pinetrie/session"
 import { heldByOthers } from "./canvas-columns.ts"
@@ -16,10 +13,9 @@ import {
   type Effect,
   type IntentState,
   planOpenAt,
-  show,
   showTask,
 } from "./effects.ts"
-import { hereOfColumn, planOpen } from "./layout.ts"
+import { planOpen } from "./layout.ts"
 
 const at = (key: string): ActedAt => ({ kind: "column", key })
 
@@ -27,11 +23,9 @@ const at = (key: string): ActedAt => ({ kind: "column", key })
  * The effects that show `place`, and where a refusal there is said: your
  * inventory's panel; a thread's end, or a comment's entry, as `openAt`
  * shows an entry; a note
- * column, unfolded; or a fresh column, shown where it is, or opened again
- * after the thread it forks from. A fresh column whose task has no message
- * yet belongs to a new tab, whose history only that tab reaches while it is
- * open, so the layout holds it. A queued `card` is scrolled to in its
- * column's dock, which scrolls apart from the thread (ADR-0113).
+ * column, unfolded; your message at a thread not yet started, its card,
+ * unfolded in its task. A queued `card` is scrolled to in its column's
+ * dock, which scrolls apart from the thread (ADR-0113).
  */
 export function revealOf(
   place: PlaceKey,
@@ -44,25 +38,6 @@ export function revealOf(
         effects: [{ kind: "showInventory", brief: false }],
         actedAt: AT_INVENTORY,
       }
-    case "fresh": {
-      const here = hereOfColumn(state.layout, place.column)
-      if (here !== undefined)
-        return { effects: show(here), actedAt: at(place.column) }
-      const { task, column } = place
-      if (place.at.kind !== "entry" || !isThreadId(column))
-        return { effects: [], actedAt: at(column) }
-      return {
-        effects: [
-          ...showTask(task),
-          changeViewOf(state, task, {
-            kind: "openFresh",
-            thread: column,
-            at: place.at.id,
-          }),
-        ],
-        actedAt: at(column),
-      }
-    }
     // A card on a canvas: its column, unfolded in its task (ADR-0116).
     case "canvas":
       return {

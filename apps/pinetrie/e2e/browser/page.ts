@@ -364,21 +364,22 @@ export const itemSel = (task: string) =>
 export const boardSel = (task: string) => `.thread-card[data-task="${task}"]`
 /**
  * Step away from the root you are on, so its columns unmount: to a new tab,
- * which is closed again by `stepBack`. The sidebar has nothing else to step to
- * that every scenario holds.
+ * a task of its own holding one thread not yet started (ADR-0126), which
+ * `stepBack` closes again. The sidebar has nothing else to step to that
+ * every scenario holds.
  */
 export async function stepAway(p: Page): Promise<void> {
   await p.click("#sidebar .add-agent")
-  await p.waitForSelector('#sidebar .open-new[aria-current="true"]', {
-    timeout: 15_000,
-  })
+  await p.waitForSelector(".column[data-card] .close", { timeout: 15_000 })
 }
-/** Back on `task` from `stepAway`, and the new tab closed. */
+/**
+ * Back on `task` from `stepAway`: the new tab's column closed, discarding
+ * its thread and its task, then `task` shown.
+ */
 export async function stepBack(p: Page, task: string): Promise<void> {
+  await p.click(".column[data-card] .close")
+  await p.click(".column .close-discard", { timeout: 2_000 }).catch(() => {})
   await p.click(itemSel(task))
-  await p.$$eval("#sidebar .open-new ~ .open-close", bs => {
-    for (const b of bs) (b as HTMLButtonElement).click()
-  })
 }
 /**
  * Open the board, unless it is open. A page with nothing in its list opens

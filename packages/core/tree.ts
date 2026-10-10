@@ -678,8 +678,8 @@ export interface TreeIndex {
   /** Entries whose parent is absent from the set. Never dropped. Ascending. */
   readonly orphans: readonly EntryId[]
   /**
-   * Chat entries by the send that wrote them. A fresh column knows its send's
-   * id before the entry exists, so it finds its first message here, exactly.
+   * Chat entries by the send that wrote them: a sender that knows its send's
+   * id before the entry exists finds its message here, exactly.
    */
   readonly bySend: ReadonlyMap<string, EntryId>
   /**

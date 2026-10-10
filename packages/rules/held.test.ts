@@ -151,7 +151,6 @@ test("a thread in a trash is held as in an inventory: its discard stops its run,
       kind: "trash",
       holder: BEA,
       task: TASK,
-      why: { kind: "discarded" },
     },
   }
   expect(takenIn([on], [trashed])).toEqual([T])

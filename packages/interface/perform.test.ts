@@ -325,17 +325,15 @@ test("a move on the board runs what follows it only once the host accepts it (AD
 })
 
 test("a spin-off into the sidebar places and shows its thread only once the host started it (ADR-0111)", async () => {
-  const thread = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
   const request = {
     kind: "spin-off",
     move: {
       card: textCardId("c"),
       from: { kind: "inventory", holder: writerId("ada@x.io") },
-      to: {
-        kind: "trash",
-        why: { kind: "spun", into: thread, thread: threadIdFor("spun") },
-      },
+      to: { kind: "trash" },
     },
+    root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
+    thread: threadIdFor("01a0ffd2-0000-7000-8000-0000000000f5"),
     task: NEW_TASK,
     state: null,
     here: NEW_TASK,

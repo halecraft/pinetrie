@@ -153,7 +153,7 @@ Kyneta has let go.
   unchecked (S95).
 - **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index
   carries each chat's writer, whether it compelled the agent, and its send
-  id: `threadOfSend`'s race reads the first two, a fresh column the third.
+  id: `threadOfSend`'s race reads the first two, a sender that names its send the third.
 - **Each entry's thread is its row's** (ADR-0125), from which `indexTree`
   builds each thread's first entry and end (`TreeIndex.firstOf`, `endOf`).
   A row whose thread fails `isThreadId` is left out, as `readStoredLanes`

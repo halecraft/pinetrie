@@ -29,7 +29,7 @@ import { useTypingAt } from "./use-presence.ts"
 
 /**
  * The column's foot. What you type here is your message at this thread's
- * end, or this fresh column's: created with the first keystroke worth
+ * end, or at it before it starts: created with the first keystroke worth
  * keeping, and kept across tab switches, reloads and restarts (ADR-0048,
  * ADR-0113). Sending it spends it; a conflict or a refusal leaves it; a busy
  * thread, or a command, queues it above the line. A card dropped here
@@ -44,7 +44,7 @@ export function Composer(p: {
   at: Position
   lane: ThreadLane
   how: ColumnHow
-  fresh: boolean
+  unstarted: boolean
   commands: readonly CommandSummary[]
   participants: readonly string[]
   /** Other threads' agents a mention may reach (ADR-0128). */
@@ -89,7 +89,7 @@ export function Composer(p: {
         how={p.how}
         card={p.card}
         commands={p.commands}
-        fresh={p.fresh}
+        unstarted={p.unstarted}
         lane={p.lane}
         onBranchInstead={p.onBranchInstead}
         onAct={p.onAct}
