@@ -1811,6 +1811,10 @@ export function App({
                   )}
                   {layout.board && boardShown !== null && (
                     <Board
+                      notices={moves.notices.filter(
+                        r => r.actedAt.kind === "board",
+                      )}
+                      reader={historyFacts.reader}
                       onClearFilter={clearBoardFilter}
                       onIntent={onIntent}
                       pip={pip}

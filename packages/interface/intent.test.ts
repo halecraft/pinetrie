@@ -5,6 +5,7 @@ import {
   type CardRecord,
   cardIdOfKind,
   type EntryId,
+  ERR,
   entryId,
   INVENTORY_SLOTS,
   indexAsks,
@@ -170,11 +171,11 @@ const plan = (intent: Intent, state: IntentState = R1) =>
     ),
   })
 /** The column keys these tests name: a branch's card's, a card's. */
-const FRESH: ColumnKey = { kind: "card", card: F }
+const UNSTARTED: ColumnKey = { kind: "card", card: F }
 const CARD_C: ColumnKey = { kind: "card", card: C }
 const column = (
   act: Extract<Intent, { kind: "column" }>["act"],
-  key: ColumnKey = FRESH,
+  key: ColumnKey = UNSTARTED,
 ): Intent => ({ kind: "column", column: key, act })
 /** A change to your view of r1's task, as an effect. */
 const onR1 = (change: object): Effect =>
@@ -756,7 +757,7 @@ describe("planIntent", () => {
     const where = atEntry(entryId("3-b"))
     const ada = writerId("ada@x.test")
     const c = cardIdFor("c1")
-    const fresh: TextCard = {
+    const yours: TextCard = {
       kind: "text",
       id: cardIdFor("c105"),
       owner: ada,
@@ -784,7 +785,7 @@ describe("planIntent", () => {
     const withCard = (place: TextPlace, records = laneRecords) =>
       ({
         ...NO_CARDS,
-        cards: [{ ...fresh, id: c, place }],
+        cards: [{ ...yours, id: c, place }],
         laneRecords: records,
       }) satisfies CardFacts
     test("a queue is one queueCard, onto its lane, with the hold change asked, said in the column; with no card, nothing", () => {
@@ -839,7 +840,7 @@ describe("planIntent", () => {
     test("a reorder moves the card one place among the list as drawn, said in the column; at an edge, or past a fact, nothing (ADR-0048 step 7)", () => {
       const q = (id: string, order: string) =>
         ({
-          ...fresh,
+          ...yours,
           id: textCardId(id),
           place: { ...queuedPlace, order },
         }) satisfies CardRecord
@@ -901,7 +902,7 @@ describe("planIntent", () => {
         plan(
           column({
             kind: "queueNew",
-            card: fresh.id,
+            card: yours.id,
             command: "bring-up-to-date",
             hold: "keep",
             lane,
@@ -912,7 +913,7 @@ describe("planIntent", () => {
         {
           kind: "queueCard",
           move: {
-            card: fresh.id,
+            card: yours.id,
             from: null,
             to: { kind: "queued", thread: lane, seen: "" },
           },
@@ -932,7 +933,7 @@ describe("planIntent", () => {
         plan(
           column({
             kind: "queueNew",
-            card: fresh.id,
+            card: yours.id,
             command: "continue-on-accepted",
             hold: "keep",
             lane,
@@ -966,17 +967,39 @@ describe("planIntent", () => {
   })
 })
 
-test("afterTaskMove: what follows a move runs only once the host accepts it", () => {
+test("afterTaskMove: what follows a move runs only once the host accepts it; a refusal of its card's move is said on the board (ADR-0126)", () => {
   const moved: Effect[] = [
     { kind: "layout", action: { kind: "closeTask", task: TASK_OF("1-r1") } },
   ]
   expect(afterTaskMove({ kind: "moved" }, moved)).toBe(moved)
   expect(
     afterTaskMove(
-      { kind: "refused", code: "task_moved", message: "no" },
+      { kind: "refused", code: ERR.TASK_BUSY, message: "no" },
       moved,
     ),
   ).toEqual([])
+  expect(
+    afterTaskMove(
+      {
+        kind: "unmoved",
+        code: "moved",
+        place: { kind: "board", state: workflowStateIdFor("d") },
+        by: writerId("bea@x.io"),
+      },
+      moved,
+    ),
+  ).toEqual([
+    {
+      kind: "refuse",
+      refusal: {
+        card: null,
+        actedAt: { kind: "board" },
+        code: "moved",
+        by: writerId("bea@x.io"),
+        fromQueue: false,
+      },
+    },
+  ])
 })
 
 test("reconcileName's step: the session learns a name, or this device does", () => {

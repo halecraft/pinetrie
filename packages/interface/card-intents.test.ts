@@ -76,7 +76,7 @@ const pinnedAtA = { ...pinnedKey, order: "a" } as const
 /** A branch not yet started, and its column's key (ADR-0126). */
 const F1 = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
 /** Your message at it: it has no end yet. */
-const freshF1 = { kind: "composing", thread: F1 } as const
+const unstartedF1 = { kind: "composing", thread: F1 } as const
 const onR1: Layout = resolveLayout(
   layoutReducer(initialLayout(), {
     kind: "show",
@@ -92,7 +92,7 @@ const onR1: Layout = resolveLayout(
     holders: new Map(),
   },
 )
-const withFresh: Layout = layoutReducer(onR1, {
+const withUnstarted: Layout = layoutReducer(onR1, {
   kind: "view",
   task: TEST_TASK,
   first: null,
@@ -119,13 +119,13 @@ const facts = (over: Partial<CardFacts> = {}): CardFacts => ({
   selected: 0,
   composers: new Map<string, ComposerSpot>([
     [threadKey, { place: atEnd, message: null }],
-    [F1, { place: freshF1, message: null }],
+    [F1, { place: unstartedF1, message: null }],
   ]),
   ...over,
 })
 const state = (
   cards: Partial<CardFacts> = {},
-  layout = withFresh,
+  layout = withUnstarted,
 ): IntentState => ({
   layout,
   index,
@@ -810,7 +810,7 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
     }
     expect(
       answered(
-        { kind: "undone", cards: [{ card: C1, place: freshF1 }] },
+        { kind: "undone", cards: [{ card: C1, place: unstartedF1 }] },
         opened,
       ),
     ).toEqual([
@@ -836,10 +836,10 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
       {
         kind: "unmoved",
         code: "moved",
-        place: freshF1,
+        place: unstartedF1,
         by: writerId("bea@x.io"),
       },
-      state({}, withFresh),
+      state({}, withUnstarted),
     )
     expect(effects.at(-1)).toEqual({
       kind: "refuse",

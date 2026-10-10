@@ -29,6 +29,7 @@ import {
   type Count,
   clickClosesBoard,
   dropProps,
+  elsewhereWords,
   filterTitle,
   filterWords,
   type Intent,
@@ -37,34 +38,29 @@ import {
   type MessageCount,
   messageCountTitle,
   nameStateIntent,
+  noticeKey,
+  noticeWords,
+  type Reader,
   rootDropProps,
   rootGroupProps,
   type StateSignals,
   type StripState,
   searchWords,
   signalOfLevel,
-  signalWords,
   stateWords,
   type ThreadCard,
   tasksWords,
 } from "@pinetrie/interface"
 import { TASK_BUSY_REASON } from "@pinetrie/rules"
+import type { CardNotice } from "@pinetrie/session"
 import { type RefObject, useEffect, useRef, useState } from "react"
 import { Menu, type MenuItem } from "./menu.tsx"
-import {
-  ReaderMenus,
-  Readers,
-  type ReadersProps,
-  StatusMark,
-} from "./root-signals.tsx"
+import { ReaderMenus, Readers, type ReadersProps } from "./root-signals.tsx"
 import { AddButton } from "./sidebar.tsx"
+import { SignalMark } from "./signal-mark.tsx"
 import { isTextBox } from "./text-box.ts"
 import { ThreadHead } from "./thread-card.tsx"
 import { startRootDrag } from "./use-root-drag.ts"
-
-/** ▦'s mark's title: what the roots not in the sidebar raise. */
-const elsewhereWords = (level: Level): string =>
-  `a thread not in the sidebar: ${signalWords(signalOfLevel(level)).label}`
 
 /**
  * The strip: ▦, then, while the board is closed, each state's name, count,
@@ -134,9 +130,8 @@ export function BoardStrip({
         </span>{" "}
         Board
         {elsewhere !== null && (
-          <StatusMark
-            arrived={null}
-            level={elsewhere}
+          <SignalMark
+            signal={signalOfLevel(elsewhere)}
             title={elsewhereWords(elsewhere)}
           />
         )}
@@ -292,13 +287,7 @@ function StateSignalMarks({
       {signals.tasks.length > 0 && (
         <Readers {...readers} tasks={signals.tasks} />
       )}
-      {mark !== null && (
-        <StatusMark
-          arrived={null}
-          level={mark}
-          title={signalWords(signalOfLevel(mark)).title}
-        />
-      )}
+      {mark !== null && <SignalMark signal={signalOfLevel(mark)} />}
       {signals.working > 0 && (
         <span className="state-working" title={words.working}>
           ◌{signals.working}
@@ -322,6 +311,8 @@ export function Board({
   readers,
   thread,
   pip,
+  notices,
+  reader,
 }: {
   view: BoardView
   onIntent: (intent: Intent) => void
@@ -333,6 +324,9 @@ export function Board({
   /** A thread as a row of a reader's menu, which opens it. */
   thread: (end: EntryId, task: TaskId) => MenuItem | null
   pip: React.ReactNode
+  /** Your refused moves on the board, said above its states (ADR-0126). */
+  notices: readonly CardNotice[]
+  reader: Reader
 }) {
   // The board's keys are `boardKeyAct`'s: Escape closes the board, as ▦
   // does, once a menu open on it (`Popover`) and then a filter have taken
@@ -425,6 +419,11 @@ export function Board({
   )
   return (
     <section aria-label="board" className="board" id="board" ref={self}>
+      {notices.map(r => (
+        <div className="refused-move" key={noticeKey(r)}>
+          {noticeWords(r, reader)}
+        </div>
+      ))}
       <div className="board-states">
         {view.open.map(column => [
           newState(column.state.id),

@@ -32,7 +32,12 @@ import {
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { isQueuedMessage } from "@pinetrie/rules"
-import { AT_INVENTORY, firstEmpty, IN_COLUMN } from "@pinetrie/session"
+import {
+  AT_BOARD,
+  AT_INVENTORY,
+  firstEmpty,
+  IN_COLUMN,
+} from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
 import { BOARD_SEARCH } from "./board-view.ts"
@@ -978,12 +983,33 @@ const closeTask = closeTaskEffects
  * After a move on the board is answered (ADR-0122): `moved` runs only once
  * the host accepts. A task you move into the archive leaves the sidebar,
  * the one you are on too; only a task someone else archives stays while you
- * are on it (`resolveLayout`). A refusal changes nothing.
+ * are on it (`resolveLayout`). A refusal of its card's move (ADR-0126) is
+ * said on the board, naming who moved it first; any other changes nothing.
  */
-export const afterTaskMove = (
+export function afterTaskMove(
   outcome: Outcome,
   moved: readonly Effect[],
-): readonly Effect[] => (outcome.kind === "moved" ? moved : [])
+): readonly Effect[] {
+  switch (outcome.kind) {
+    case "moved":
+      return moved
+    case "unmoved":
+      return [
+        {
+          kind: "refuse",
+          refusal: {
+            card: null,
+            actedAt: AT_BOARD,
+            code: outcome.code,
+            by: outcome.by,
+            fromQueue: false,
+          },
+        },
+      ]
+    default:
+      return []
+  }
+}
 
 /** `reconcileName`'s step, as effects. */
 export function nameEffects(step: NameStep | null): readonly Effect[] {

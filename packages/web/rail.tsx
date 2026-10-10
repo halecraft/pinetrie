@@ -33,6 +33,7 @@ import {
   railView,
   type SearchResult,
   type StretchFill,
+  signalWords,
   stretchFill,
   stretchWords,
   type ThreadLink,
@@ -493,7 +494,7 @@ function Dot(p: {
             ? undefined
             : matchCountWords(p.matches),
           here,
-          p.yours === null ? undefined : "your unsent card is here",
+          p.yours === null ? undefined : signalWords("unsent"),
         ]
           .filter(t => t !== undefined)
           .join(" · ") || undefined

@@ -118,7 +118,7 @@ export function editorState(
 }
 
 /**
- * What the box starts with: a fresh column's prefill, unless it opens with a
+ * What the box starts with: an unstarted thread's prefill, unless it opens with a
  * message to send (`pending`) or a card that holds its own text.
  */
 export const startText = (input: {

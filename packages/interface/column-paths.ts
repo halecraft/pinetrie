@@ -13,8 +13,8 @@ import {
 
 export interface ColumnSpec {
   /**
-   * Where the column's path ends: its thread's end, or a fresh column's fork;
-   * null only for a fresh column at the root.
+   * Where the column's path ends: its thread's end, or an unstarted
+   * thread's fork; null only for a new tab's thread, at the root.
    */
   readonly anchor: EntryId | null
   /**

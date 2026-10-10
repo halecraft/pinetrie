@@ -786,8 +786,8 @@ test('decodeKey: "" is none; anything malformed is undefined', () => {
     '{"kind":"inventory","holder":""}',
   ])
     assert.equal(decodeKey(bad), undefined)
-  const fresh = { kind: "composing", thread: NEW_THREAD } as const
-  assert.deepEqual(decodeKey(encodeKey(fresh)), fresh)
+  const unstarted = { kind: "composing", thread: NEW_THREAD } as const
+  assert.deepEqual(decodeKey(encodeKey(unstarted)), unstarted)
   const pinned = {
     kind: "pinned",
     thread: threadIdFor("x"),
@@ -798,7 +798,7 @@ test('decodeKey: "" is none; anything malformed is undefined', () => {
 })
 
 test("decode: a move needs its cards, each with a place, and its sender's task a task or none; set-command a known command; an undo a root and a direction", () => {
-  const fresh = { kind: "composing", thread: NEW_THREAD } as const
+  const unstarted = { kind: "composing", thread: NEW_THREAD } as const
   for (const wire of [
     { kind: "move", moves: encodeMoves([]) },
     { kind: "move", moves: "{" },
@@ -817,7 +817,7 @@ test("decode: a move needs its cards, each with a place, and its sender's task a
         {
           card: cardIdFor("c1"),
           from: null,
-          to: fresh,
+          to: unstarted,
         },
         {
           card: cardIdFor("c2"),
@@ -832,7 +832,7 @@ test("decode: a move needs its cards, each with a place, and its sender's task a
         {
           card: cardIdFor("c1"),
           from: null,
-          to: fresh,
+          to: unstarted,
         },
       ]),
       here: "r-not-a-task",

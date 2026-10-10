@@ -5,6 +5,7 @@
 
 import {
   type CardId,
+  type CardRecord,
   type EntryId,
   makeCard,
   NO_CONTENT,
@@ -383,6 +384,46 @@ export function putNoteColumn(
 }
 
 /**
+ * The step that puts `task`'s card on the board in `state`, placed by `by`:
+ * made, at the end of its state, when there is none; moved, keeping its
+ * rank, when it is elsewhere; none when it is there already.
+ */
+function taskCardStep(
+  cards: readonly CardRecord[],
+  task: TaskId,
+  state: WorkflowStateId,
+  by: WriterId,
+): readonly PlaceStep[] {
+  const now = cards.find(c => c.id === task)
+  if (now === undefined)
+    return [
+      {
+        kind: "write",
+        record: makeCard(
+          "task",
+          task,
+          {
+            kind: "board",
+            state,
+            order: orderAfter(cards.filter(isBoardCard)),
+          },
+          NO_CONTENT,
+          by,
+        ),
+      },
+    ]
+  if (now.kind !== "task" || (isBoardCard(now) && now.place.state === state))
+    return []
+  const order = isBoardCard(now) ? now.place.order : orderAfter([])
+  return [
+    {
+      kind: "write",
+      record: { ...now, place: { kind: "board", state, order }, placer: by },
+    },
+  ]
+}
+
+/**
  * `task`'s card on the board in `state`, put there by `by` at `at`, as its
  * card's history says (ADR-0126): how a test archives a task. A card
  * already there is not written again.
@@ -394,32 +435,8 @@ export function placeTask(
   by: WriterId,
   at = 1,
 ): void {
-  const now = readPlaces(b.places).find(c => c.id === task)
-  const card =
-    now?.kind === "task"
-      ? now
-      : makeCard(
-          "task",
-          task,
-          { kind: "board", state, order: "m" },
-          NO_CONTENT,
-          by,
-        )
-  if (card.place.kind !== "board" || card.place.state !== state || now !== card)
-    applyPlaceSteps(b.places, [
-      {
-        kind: "write",
-        record: {
-          ...card,
-          place: {
-            kind: "board",
-            state,
-            order: card.place.kind === "board" ? card.place.order : "m",
-          },
-          placer: by,
-        },
-      },
-    ])
+  const steps = taskCardStep(readPlaces(b.places), task, state, by)
+  if (steps.length > 0) applyPlaceSteps(b.places, steps)
   putValue(
     b,
     setRecord(CARD_HISTORY, {
@@ -447,24 +464,10 @@ export function putTask(
   state: WorkflowStateId = TASK_STATE,
 ): void {
   const cards = readPlaces(b.places)
-  const made: readonly PlaceStep[] = cards.some(c => c.id === task)
+  // A task already made keeps its place, wherever a test put it.
+  const made = cards.some(c => c.id === task)
     ? []
-    : [
-        {
-          kind: "write",
-          record: makeCard(
-            "task",
-            task,
-            {
-              kind: "board",
-              state,
-              order: orderAfter(cards.filter(isBoardCard)),
-            },
-            NO_CONTENT,
-            STARTER,
-          ),
-        },
-      ]
+    : taskCardStep(cards, task, state, STARTER)
   const opened = planThreadOpen({
     thread,
     origin: ROOT_ORIGIN,

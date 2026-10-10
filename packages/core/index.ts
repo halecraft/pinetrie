@@ -134,11 +134,6 @@ export const ERR = {
   TASK_ARCHIVED: "task_archived",
   /** Moving a task into the archive while an agent of its works or cards are queued. */
   TASK_BUSY: "task_busy",
-  /**
-   * Moving a task from a state it has left (ADR-0122). The message names who
-   * moved it, and where.
-   */
-  TASK_MOVED: "task_moved",
   /** A workflow state the session's workflow does not hold (ADR-0122). */
   UNKNOWN_STATE: "unknown_state",
   /** Removing a workflow state that still holds a task (ADR-0122). */

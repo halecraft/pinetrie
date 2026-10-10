@@ -139,7 +139,7 @@ export function notesNear(
  * place, and the writes that go first: a note column made for it (its id
  * `newColumn`'s, owned and placed by `by`), and the canvas cards renumbered
  * to fit it. The one step every write to notes takes: a move's, an unsent
- * card's, a fresh column's followers'. The column is made through
+ * card's, a migrated fresh column's cards'. The column is made through
  * `planMake`, as every card is. Null for a thread with no card, or a column
  * whose make is refused, which none is. Pure.
  */

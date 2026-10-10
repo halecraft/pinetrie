@@ -70,7 +70,7 @@ describe("appView's stage", () => {
 
   test("in a task, only a thread not yet started closes: a card's column folds (ADR-0116, ADR-0126)", () => {
     const [a, b] = columns("a", "b")
-    const fresh: Column = {
+    const unstarted: Column = {
       ...(b as Column),
       mode: {
         kind: "unstarted",
@@ -78,7 +78,7 @@ describe("appView's stage", () => {
         root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
       },
     }
-    const two = stage({ columns: [a as Column, fresh], tracks: [3] })
+    const two = stage({ columns: [a as Column, unstarted], tracks: [3] })
     expect(two.kind === "task" && two.slots).toEqual([
       { key: "a", closable: false, track: 3 },
       { key: "b", closable: true, track: PENDING_TRACK },

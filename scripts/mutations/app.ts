@@ -182,10 +182,10 @@ export const mutations: readonly Mutation[] = [
       "selecting a slot previews its card beside the grid, read only, and Enter opens it in place instead",
   },
   {
-    name: "a new tab closed unsent keeps its task",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: "              ...planTasksTrashed(cards, emptied, writer),\n",
-    to: "              ...planTasksTrashed(cards, [], writer),\n",
+    name: "discarding a new tab's text closes nothing",
+    file: "packages/web/column.tsx",
+    from: '                    p.onIntent({\n                      kind: "closeUnstarted",\n                      card: p.column.thread,\n                      keep: false,\n                    })\n',
+    to: "",
     suite: "browser",
     scenario: "page",
     expect:
@@ -2477,20 +2477,20 @@ export const mutations: readonly Mutation[] = [
       "a comment is a note in its message's margin, written where it opens; shut, the message shows how many it holds",
   },
   {
-    name: "a move on the board enters no history",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: "          ? await deps.histories.gestureOf(writer, PERSON_HISTORY)\n",
-    to: "          ? undefined\n",
+    name: "an undo on no task undoes in a task's history",
+    file: "apps/pinetrie/host/commands/index.ts",
+    from: "          historyScope(intent.task),\n",
+    to: '          historyScope(intent.task ?? ("k-none" as TaskId)),\n',
     suite: "host",
     scenario: "board",
     expect:
       "a move on the board is undone by its mover's undo key outside any task, the task back in its state",
   },
   {
-    name: "a closed new tab is in its task's history",
+    name: "a closed new tab's task leaves outside the close's step",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "      emptied.length > 0 ? PERSON_HISTORY : historyOf(moves, cards, discards)",
-    to: "      historyOf(moves, cards, discards)",
+    from: '    return carry(step, planned.drain, { kind: "move", by: writer }, gesture)\n',
+    to: '    const out = await carry(planned.step, planned.drain, { kind: "move", by: writer }, gesture)\n    if (step.kind === "steps" && planned.step.kind === "steps")\n      applyPlaceSteps(places, step.steps.slice(planned.step.steps.length))\n    return out\n',
     suite: "host",
     scenario: "board",
     expect:

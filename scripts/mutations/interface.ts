@@ -2667,8 +2667,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused move closes the root",
     file: "packages/interface/intent.ts",
-    from: '): readonly Effect[] => (outcome.kind === "moved" ? moved : [])',
-    to: "): readonly Effect[] => moved",
+    from: '  switch (outcome.kind) {\n    case "moved":\n      return moved\n',
+    to: '  switch ("moved" as string) {\n    case "moved":\n      return moved\n',
     command: unit,
     expect:
       "afterTaskMove: what follows a move runs only once the host accepts it",
@@ -3876,9 +3876,26 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a signal has no words",
     file: "packages/interface/signals.ts",
-    from: '  done: { label: "the agent has finished", title: "the agent has finished" },',
-    to: '  done: { label: "", title: "the agent has finished" },',
+    from: '  done: "the agent has finished",',
+    to: '  done: "",',
     command: unit,
     expect: "signalWords is total",
+  },
+  {
+    name: "a board move's refusal is said nowhere",
+    file: "packages/interface/intent.ts",
+    from: '    case "unmoved":\n      return [\n        {\n          kind: "refuse",',
+    to: '    case "unmoved":\n      return []\n      return [\n        {\n          kind: "refuse",',
+    command: unit,
+    expect: "a refusal of its card's move is said on the board",
+  },
+  {
+    name: "a move on the board keeps the refusal said there",
+    file: "packages/interface/perform.ts",
+    from: "      ports.session.acted(AT_BOARD)\n",
+    to: "",
+    command: unit,
+    expect:
+      "a move on the board runs what follows it only once the host accepts it",
   },
 ]

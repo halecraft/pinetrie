@@ -15,7 +15,6 @@ import type {
 } from "@pinetrie/core"
 import {
   attentionWords,
-  type Level,
   moving,
   type OpenMenus,
   peopleHere,
@@ -23,7 +22,6 @@ import {
   readerHeading,
   readersByTask,
   type Status,
-  signalOfLevel,
   signalWords,
   statusSignal,
   toggleOpenMenu,
@@ -35,22 +33,6 @@ import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, Avatars, nameFor } from "./presence.tsx"
 import { SignalMark } from "./signal-mark.tsx"
 import { useReadingAt, useReadingTasks } from "./use-presence.ts"
-
-/** A level's mark: an amber dot, bright for needs you, dim for worth a read. */
-export function StatusMark({
-  level,
-  title,
-  arrived,
-}: {
-  level: Level
-  title: string
-  /** When it arrived as you watched, or null: it pulses only as it mounts fresh. */
-  arrived: number | null
-}) {
-  return (
-    <SignalMark arrived={arrived} signal={signalOfLevel(level)} title={title} />
-  )
-}
 
 /**
  * A root's status, before its label (ADR-0077): a still ring while its
@@ -78,7 +60,7 @@ export function RootStatus({
     <SignalMark
       arrived={arrived}
       signal={signal}
-      title={`${signalWords(signal).title}: ${attentionWords(status.item.raised, w => nameFor(nameOf, w))}`}
+      title={`${signalWords(signal)}: ${attentionWords(status.item.raised, w => nameFor(nameOf, w))}`}
     />
   )
 }

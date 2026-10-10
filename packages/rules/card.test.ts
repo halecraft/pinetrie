@@ -330,7 +330,7 @@ describe("planCarry (ADR-0080)", () => {
   })
 })
 /** Your message at a thread not yet started (ADR-0126): a thread with no entry. */
-const freshPlace = (thread: string) =>
+const unstartedPlace = (thread: string) =>
   ({ kind: "composing", thread: threadIdFor(thread) }) as const
 const queued = (id: string, order: string, lane = LANE): QueuedText => ({
   ...card({ id: textCardId(id) }),
@@ -382,7 +382,7 @@ describe("where a card sits", () => {
   })
 
   test("cardEnd: null for your message at a thread not yet started, and at a thread this index holds no entry of", () => {
-    expect(cardEnd(card({ place: freshPlace("k-1") }), tree())).toBeNull()
+    expect(cardEnd(card({ place: unstartedPlace("k-1") }), tree())).toBeNull()
     expect(
       cardEnd(
         card({ place: { kind: "composing", thread: threadIdFor("gone") } }),
@@ -408,11 +408,11 @@ describe("where a card sits", () => {
       id: cardIdFor("c2"),
       owner: BEA,
     })
-    const fresh = card({
+    const unstarted = card({
       id: cardIdFor("c3"),
-      place: freshPlace("k-1"),
+      place: unstartedPlace("k-1"),
     })
-    const cards = [beas, card(), fresh]
+    const cards = [beas, card(), unstarted]
     const at = (where: Parameters<typeof yourCard>[1], me = ADA) =>
       yourCard(me, where, cards, tree())?.id
     expect(at({ kind: "end", end: entryId("e2") })).toBe(cardIdFor("c1"))
@@ -1334,7 +1334,7 @@ describe("handoffs (ADR-0059)", () => {
     expect(
       planMove([], { card: C1, from: atEnd, to: queuedKey }, BEA, NO_DISCARDS),
     ).toEqual({ kind: "refused", code: "gone", now: null })
-    const elsewhere = card({ place: freshPlace("k") })
+    const elsewhere = card({ place: unstartedPlace("k") })
     expect(
       planMove(
         [elsewhere],
@@ -1691,7 +1691,7 @@ describe("handoffs (ADR-0059)", () => {
       expect(ownsPlace(beas, ADA)).toBe(false)
       expect(ownsPlace(atEnd, ADA)).toBe(true)
       expect(ownsPlace(queuedKey, ADA)).toBe(true)
-      expect(ownsPlace(freshPlace("k"), ADA)).toBe(true)
+      expect(ownsPlace(unstartedPlace("k"), ADA)).toBe(true)
     })
   })
 
@@ -1722,17 +1722,17 @@ describe("handoffs (ADR-0059)", () => {
     const C2 = cardIdFor("c2")
     const C3 = cardIdFor("c3")
     const inv = { kind: "inventory", holder: ADA } as const
-    const fresh = freshPlace("k")
-    const inFresh = (id: TextCardId) => card({ id, place: fresh })
+    const unstarted = unstartedPlace("k")
+    const inUnstarted = (id: TextCardId) => card({ id, place: unstarted })
 
     test("two moves, the second refused: nothing written, the refusal naming its card", () => {
       const moved = card({ id: C2, place: atEnd })
       expect(
         planMoves(
-          [inFresh(C1), moved],
+          [inUnstarted(C1), moved],
           [
-            { card: C1, from: fresh, to: inv },
-            { card: C2, from: fresh, to: inv },
+            { card: C1, from: unstarted, to: inv },
+            { card: C2, from: unstarted, to: inv },
           ],
           ADA,
           NO_DISCARDS,
@@ -1745,10 +1745,10 @@ describe("handoffs (ADR-0059)", () => {
         card({ id: textCardId(`h-${n}`), place: inv }),
       )
       const step = planMoves(
-        [...held, inFresh(C1), inFresh(C2)],
+        [...held, inUnstarted(C1), inUnstarted(C2)],
         [
-          { card: C1, from: fresh, to: inv },
-          { card: C2, from: fresh, to: inv },
+          { card: C1, from: unstarted, to: inv },
+          { card: C2, from: unstarted, to: inv },
         ],
         ADA,
         NO_DISCARDS,
@@ -1761,8 +1761,8 @@ describe("handoffs (ADR-0059)", () => {
       const step = planMoves(
         [],
         [
-          { card: C3, from: null, to: fresh },
-          { card: C3, from: fresh, to: inv },
+          { card: C3, from: null, to: unstarted },
+          { card: C3, from: unstarted, to: inv },
         ],
         ADA,
         NO_DISCARDS,
@@ -1770,8 +1770,8 @@ describe("handoffs (ADR-0059)", () => {
       expect(step).toEqual({
         kind: "steps",
         steps: [
-          { kind: "write", record: inFresh(C3) },
-          { kind: "write", record: { ...inFresh(C3), place: inv } },
+          { kind: "write", record: inUnstarted(C3) },
+          { kind: "write", record: { ...inUnstarted(C3), place: inv } },
         ],
       })
     })
@@ -2223,7 +2223,7 @@ describe("storage", () => {
           thread: lane,
         },
       }),
-      card({ place: freshPlace("k-1") }),
+      card({ place: unstartedPlace("k-1") }),
       card({ place: { kind: "inventory", holder: BEA } }),
       queued(cardIdFor("c2"), "k"),
       pinned(cardIdFor("c3"), "k"),

@@ -26,7 +26,7 @@ export function SignalMark({
   const words = signalWords(signal)
   return (
     <span
-      aria-label={words.label}
+      aria-label={words}
       className="signal"
       data-arrived={moving(arrived, Date.now()) ? "" : undefined}
       data-signal={signal}
@@ -34,7 +34,7 @@ export function SignalMark({
       key={arrived ?? "still"}
       role="img"
       style={color === undefined ? undefined : { background: color }}
-      title={title ?? words.title}
+      title={title ?? words}
     >
       {signal === "done" ? "✓" : null}
     </span>

@@ -337,6 +337,8 @@ export interface SessionClient {
   undoSwap(direction: MoveDirection): Promise<void>
   /** Keep a refusal: one made before anything was sent, or an undo's. */
   refuse(refusal: CardNotice): void
+  /** You acted at `at` with no move of a card: the notices there go (a move on the board). */
+  acted(at: ActedAt): void
   /** This tab's moves: in flight and refused (`card-moves.ts`). */
   readonly moves: Readable<MovesState>
   /**
@@ -782,6 +784,9 @@ export async function connectSession(
     },
     refuse(refusal) {
       step({ kind: "refused", refusal })
+    },
+    acted(at) {
+      step({ kind: "acted", at })
     },
     offer(lane, action, to = null) {
       // An acceptance names the offer this tab shows now: its record, as the strip

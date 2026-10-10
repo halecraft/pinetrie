@@ -117,7 +117,7 @@ describe("editorState", () => {
   })
 })
 
-test("startText: a fresh column's prefill, unless it opens with a message or a card", () => {
+test("startText: an unstarted thread's prefill, unless it opens with a message or a card", () => {
   const prefill = { text: "@agent ", blank: true }
   expect(startText({ pending: undefined, card: undefined, prefill })).toBe(
     "@agent ",

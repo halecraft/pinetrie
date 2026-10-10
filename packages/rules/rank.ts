@@ -17,7 +17,7 @@ import type { CanvasCard } from "./task.ts"
  * card it goes just after, its parent thread's; the last card's when the
  * parent is not on this canvas or there is none (a new root lands at the
  * end); -1 on an empty canvas. The host ranks a branch's card by it and the
- * page draws a fresh column there (`canvasColumns`), so the column does not
+ * page draws the branch's column there (`canvasColumns`), so the column does not
  * move as its first send lands. Pure.
  */
 export function branchAfter(

@@ -47,26 +47,24 @@ export const SIGNALS: readonly Signal[] = [
   "done",
 ]
 
-/** A signal in words: its mark's name, and what its title says. */
-export interface SignalWords {
-  readonly label: string
-  readonly title: string
+const SIGNAL_WORDS: Readonly<Record<Signal, string>> = {
+  unsent: "your unsent card is here",
+  "needs-you": "needs you",
+  "worth-a-read": "worth a read",
+  running: "the agent is working",
+  done: "the agent has finished",
 }
 
-const SIGNAL_WORDS: Readonly<Record<Signal, SignalWords>> = {
-  unsent: { label: "your unsent card", title: "your unsent card is here" },
-  "needs-you": { label: "needs you", title: "needs you" },
-  "worth-a-read": { label: "worth a read", title: "worth a read" },
-  running: { label: "the agent is working", title: "the agent is working" },
-  done: { label: "the agent has finished", title: "the agent has finished" },
-}
-
-/** What a signal says: the one place each is worded. */
-export const signalWords = (signal: Signal): SignalWords => SIGNAL_WORDS[signal]
+/** What a signal says, its mark's name and title: the one place each is worded. */
+export const signalWords = (signal: Signal): string => SIGNAL_WORDS[signal]
 
 /** The signal an attention level raises (`LEVELS`): the one mapping of the two. */
 export const signalOfLevel = (level: Level): Signal =>
   level === "needsYou" ? "needs-you" : "worth-a-read"
+
+/** ▦'s mark's title: what the tasks not in the sidebar raise (ADR-0122). */
+export const elsewhereWords = (level: Level): string =>
+  `a thread not in the sidebar: ${signalWords(signalOfLevel(level))}`
 
 /**
  * The signal a thread's or a task's status draws (ADR-0077): running while

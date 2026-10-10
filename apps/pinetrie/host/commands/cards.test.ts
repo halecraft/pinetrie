@@ -693,16 +693,16 @@ describe("moves' history (ADR-0066)", () => {
 
   test("several moves are one, refused whole: nothing written when one has moved", async () => {
     const { b, commands, put } = setUp()
-    const fresh = { kind: "composing", thread: threadIdFor("new") } as const
-    put({ place: fresh })
+    const unstarted = { kind: "composing", thread: threadIdFor("new") } as const
+    put({ place: unstarted })
     const before = textsIn(b.places)
     const done = await commands.move(
       ADA,
       [
-        { card: C1, from: fresh, to: inventory },
+        { card: C1, from: unstarted, to: inventory },
         {
           card: cardIdFor("c9"),
-          from: fresh,
+          from: unstarted,
           to: inventory,
         },
       ],

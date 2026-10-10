@@ -8,6 +8,7 @@ export type { AcceptedActing, OfferActing, Unsuccessful } from "./acting.ts"
 export type { AttentionStore, SeenMentions } from "./attention-doc.ts"
 export {
   type ActedAt,
+  AT_BOARD,
   AT_INVENTORY,
   atColumn,
   type CardNotice,

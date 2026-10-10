@@ -38,7 +38,7 @@ const E1 = atEntry(entryId("e-1"))
 describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   const store = composerPlacesStore()
   const thread = composerPlace({ thread: LANE, mode: BOUND }, E1)
-  const fresh = composerPlace(
+  const unstarted = composerPlace(
     {
       thread: UNSTARTED,
       mode: { kind: "unstarted", fork: entryId("e-1"), root: TEST_ROOT },
@@ -49,16 +49,19 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     "k-thread",
     thread === null ? null : { place: thread, message: null },
   )
-  store.set("k-fresh", fresh === null ? null : { place: fresh, message: null })
+  store.set(
+    "k-unstarted",
+    unstarted === null ? null : { place: unstarted, message: null },
+  )
   const targets: PutTarget[] = [
     { kind: "column", key: "k-thread" },
-    { kind: "column", key: "k-fresh" },
+    { kind: "column", key: "k-unstarted" },
     { kind: "composer", key: "k-thread" },
     { kind: "inventory", slot: 0 },
     { kind: "inventory", slot: 17 },
     { kind: "column", key: "k-closed" },
     { kind: "pinned", key: "k-thread" },
-    { kind: "pinned", key: "k-fresh" },
+    { kind: "pinned", key: "k-unstarted" },
     {
       kind: "notes",
       column: cardIdOfKind(

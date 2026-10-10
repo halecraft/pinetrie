@@ -8,7 +8,12 @@ import type {
   ReferenceCardId,
   TargetOf,
 } from "@pinetrie/core"
-import type { AttentionStore, MoveHow, SessionClient } from "@pinetrie/session"
+import {
+  AT_BOARD,
+  type AttentionStore,
+  type MoveHow,
+  type SessionClient,
+} from "@pinetrie/session"
 import { afterKeep } from "./card-intents.ts"
 import type { Effect } from "./effects.ts"
 import type { Identity } from "./identity.ts"
@@ -39,6 +44,7 @@ export interface AppPorts {
     | "swapSlots"
     | "undoSwap"
     | "refuse"
+    | "acted"
     | "openThreads"
   >
   /** Your attention document: what "not needed" marks (ADR-0077). */
@@ -165,6 +171,8 @@ function performOne(effect: Effect, ports: AppPorts): void {
         )
       return
     case "moveTask":
+      // A move made on the board: the refusal said there before goes.
+      ports.session.acted(AT_BOARD)
       void ports.session
         .request(effect.move)
         .then(outcome => perform(afterTaskMove(outcome, effect.moved), ports))

@@ -46,6 +46,7 @@ const ports = () => {
       swapSlots: vi.fn(),
       undoSwap: vi.fn(async () => {}),
       refuse: vi.fn(),
+      acted: vi.fn(),
       openThreads: {
         tasks: { current: () => [], subscribe: () => () => {} },
         open: vi.fn(),
@@ -294,7 +295,7 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
   )
 })
 
-test("a move on the board runs what follows it only once the host accepts it (ADR-0122)", async () => {
+test("a move on the board runs what follows it only once the host accepts it, the refusal said there before gone; a refusal is said there (ADR-0122, ADR-0126)", async () => {
   const request = {
     kind: "move-task",
     task: TEST_TASK,
@@ -311,16 +312,26 @@ test("a move on the board runs what follows it only once the host accepts it (AD
   const p = ports()
   p.session.request.mockImplementationOnce(async () => ({ kind: "moved" }))
   perform([effect], p)
+  expect(p.session.acted).toHaveBeenCalledWith({ kind: "board" })
   expect(p.session.request).toHaveBeenCalledWith(request)
   await vi.waitFor(() => expect(p.dispatch).toHaveBeenCalledWith(closed))
   const q = ports()
   q.session.request.mockImplementationOnce(async () => ({
-    kind: "refused",
-    code: "task_moved",
-    message: "not moved",
+    kind: "unmoved",
+    code: "moved",
+    place: { kind: "board", state: workflowStateIdFor("d") },
+    by: writerId("bea@x.io"),
   }))
   perform([effect], q)
-  await new Promise(r => setTimeout(r, 0))
+  await vi.waitFor(() =>
+    expect(q.session.refuse).toHaveBeenCalledWith({
+      card: null,
+      actedAt: { kind: "board" },
+      code: "moved",
+      by: writerId("bea@x.io"),
+      fromQueue: false,
+    }),
+  )
   expect(q.dispatch).not.toHaveBeenCalled()
 })
 

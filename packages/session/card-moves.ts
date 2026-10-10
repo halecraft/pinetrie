@@ -36,14 +36,19 @@ import { canvasOf, notesNear, planReorder, rankOfDrop } from "@pinetrie/rules"
 import type { Intents } from "./inventory.ts"
 
 /**
- * Where you were looking when you acted: a column, by key, or the inventory.
- * A refusal is drawn there (`CardNotice`).
+ * Where you were looking when you acted: a column, by key, the inventory,
+ * or the board (a task's card moved there, ADR-0126). A refusal is drawn
+ * there (`CardNotice`).
  */
 export type ActedAt =
   | { readonly kind: "column"; readonly key: string }
   | { readonly kind: "inventory" }
+  | { readonly kind: "board" }
 
 export const AT_INVENTORY: ActedAt = { kind: "inventory" }
+
+/** The board, where a task's move was made. */
+export const AT_BOARD: ActedAt = { kind: "board" }
 
 /** Column `key`, where a move was made. */
 export const atColumn = (key: string): ActedAt => ({ kind: "column", key })
@@ -159,7 +164,10 @@ export type MovesEvent =
   | { readonly kind: "changed"; readonly rev: number }
   /** The host left: the session is over, as a client does not reconnect. */
   | { readonly kind: "hostLeft" }
-  /** You acted at `at` with no host to ask (a swap): the notices there go. */
+  /**
+   * You acted at `at` (a swap, which asks no host; a move on the board,
+   * as it is sent): the notices there go.
+   */
   | { readonly kind: "acted"; readonly at: ActedAt }
   /** Something refused before anything was sent, or by an undo. */
   | { readonly kind: "refused"; readonly refusal: CardNotice }

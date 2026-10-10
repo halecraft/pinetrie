@@ -3250,19 +3250,19 @@ async function run(check: Checks["check"]): Promise<void> {
           .first()
         await branchable.hover()
         await branchable.locator(":scope > .tools > .branch").click()
-        const freshBox = `${col(1)} .composer .input`
-        await page.waitForSelector(freshBox, { timeout: 15_000 })
-        await page.focus(freshBox)
+        const unstartedBox = `${col(1)} .composer .input`
+        await page.waitForSelector(unstartedBox, { timeout: 15_000 })
+        await page.focus(unstartedBox)
         await page.keyboard.press("End")
         await page.keyboard.type("a fresh thought")
-        const freshText = await boxValue(page, freshBox)
+        const unstartedText = await boxValue(page, unstartedBox)
         await page.click(itemSel(taskOf(downRoot)))
         await page.click(itemSel(here))
-        const freshKept = await hasValue(page, freshBox, freshText)
+        const unstartedKept = await hasValue(page, unstartedBox, unstartedText)
         check(
           "a new branch's text is kept across a tab switch",
-          freshKept && freshText.endsWith("a fresh thought"),
-          `${await boxValue(page, freshBox)}`,
+          unstartedKept && unstartedText.endsWith("a fresh thought"),
+          `${await boxValue(page, unstartedBox)}`,
         )
         const cardsBefore = readPlaces(host.places).filter(
           c => c.place.kind !== "trash",
@@ -3730,20 +3730,20 @@ async function run(check: Checks["check"]): Promise<void> {
         .first()
       await branchable.hover()
       await branchable.locator(":scope > .tools > .branch").click()
-      const fresh = col(columnsBefore)
-      const freshBox = `${fresh} .composer .input`
-      await page.waitForSelector(freshBox, { timeout: 15_000 })
-      await page.click(freshBox)
+      const branch = col(columnsBefore)
+      const unstartedBox = `${branch} .composer .input`
+      await page.waitForSelector(unstartedBox, { timeout: 15_000 })
+      await page.click(unstartedBox)
       await page.keyboard.type("half a thought")
       await page.waitForFunction(
         s => document.querySelector(s)?.getAttribute("data-card") != null,
-        freshBox,
+        unstartedBox,
         { timeout: 10_000 },
       )
-      const thought = (await page.getAttribute(freshBox, "data-card")) ?? ""
+      const thought = (await page.getAttribute(unstartedBox, "data-card")) ?? ""
       await page.click('.inventory .slot[data-slot="5"]')
-      await page.click(`${fresh} .close`)
-      await page.click(`${fresh} .close-keep`)
+      await page.click(`${branch} .close`)
+      await page.click(`${branch} .close-keep`)
       const keptOnClose = await appears(
         `.inventory .slot[data-slot="5"][data-card="${thought}"]`,
       )

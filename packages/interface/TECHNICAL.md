@@ -329,7 +329,9 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   cards (`BoardViewInput.cards`), the board's task cards among them, and
   draws each task with a message (`summaries`), so a new tab's task joins
   it with its first send. A move's answer is a card move's: `moved`, then
-  what follows it (`afterTaskMove`); `unmoved` changes nothing. The
+  what follows it (`afterTaskMove`); `unmoved` is said on the board
+  (`AT_BOARD`, drawn above its states), naming who moved it first, and
+  goes with your next move there. The
   archive (`archivedOf`) is `App`'s, from the cards and their histories,
   kept while it reads the same (`useSameData`). The undo key on no task
   undoes a move on the board; one that crossed the archive's edge is

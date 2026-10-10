@@ -167,8 +167,9 @@ session or someone else's inventory throws before it is made.
   next move where you acted): a refusal, or a discard the host accepted
   (ADR-0111), which says the undo key brings it back. The page words them
   (`noticeWords`). Each move carries where you were looking when you made it
-  (`ActedAt`: a column's key, or the inventory), and its notice is drawn
-  there.
+  (`ActedAt`: a column's key, the inventory, or the board, ADR-0126), and
+  its notice is drawn there. A move on the board asks for no card's move:
+  it says it acted there (`acted`), and the refusal said there before goes.
 - **A send is pending as a send** (`sendPendingOf`): its card is drawn
   nowhere until the copy holds what the host did with it. A move always
   names where the card goes.

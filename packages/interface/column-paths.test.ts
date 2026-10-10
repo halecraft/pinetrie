@@ -127,7 +127,7 @@ describe("projectColumns", () => {
     ])
     expect([c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([null, ["8-r1", "9-r2"]])
   })
-  test("a column ends at its anchor: a fresh column has nothing of its own", () => {
+  test("a column ends at its anchor: an unstarted thread's column has nothing of its own", () => {
     const [, c] = projectColumns(i, [
       { anchor: entryId("3-t3") },
       { anchor: entryId("2-t2") },
@@ -137,7 +137,7 @@ describe("projectColumns", () => {
       "2-t2",
       [],
     ])
-    // A fresh column at the root: nothing at all, and no fork.
+    // A new tab's thread, at the root: nothing at all, and no fork.
     const [, root] = projectColumns(i, [
       { anchor: entryId("3-t3") },
       { anchor: null },

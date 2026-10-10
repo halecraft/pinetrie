@@ -557,11 +557,11 @@ export {
   taskSprites,
 } from "./sidebar-view.ts"
 export {
+  elsewhereWords,
   holdsText,
   ownCards,
   SIGNALS,
   type Signal,
-  type SignalWords,
   signalOfLevel,
   signalWords,
   statusSignal,

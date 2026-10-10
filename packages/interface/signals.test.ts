@@ -20,6 +20,7 @@ import { LEVELS, type Status } from "./attention.ts"
 import { entry, indexOf, tasksWith } from "./fixtures.ts"
 import { initialLayout, type Layout } from "./layout.ts"
 import {
+  elsewhereWords,
   holdsText,
   ownCards,
   SIGNALS,
@@ -66,7 +67,7 @@ const atEnd = (id: string, at: string, owner = ADA): TextCard => ({
   content: { command: null, unsent: null, origin: null },
 })
 /** Your message at a thread not yet started (ADR-0126): it has no end. */
-const fresh = (id: string, thread: ThreadId): TextCard => ({
+const atUnstarted = (id: string, thread: ThreadId): TextCard => ({
   kind: "text",
   id: textCardId(id),
   owner: ADA,
@@ -142,14 +143,11 @@ describe("signals as one family (ADR-0126)", () => {
     expect(signals).toEqual(["worth-a-read", "needs-you"])
     expect(signals.every(s => SIGNALS.includes(s))).toBe(true)
   })
-  test("signalWords is total: every signal has a name and a title", () => {
-    for (const signal of SIGNALS) {
-      const words = signalWords(signal)
-      expect(words.label).not.toBe("")
-      expect(words.title).not.toBe("")
-    }
-    expect(new Set(SIGNALS.map(s => signalWords(s).label)).size).toBe(
-      SIGNALS.length,
+  test("signalWords is total: every signal has words of its own", () => {
+    for (const signal of SIGNALS) expect(signalWords(signal)).not.toBe("")
+    expect(new Set(SIGNALS.map(signalWords)).size).toBe(SIGNALS.length)
+    expect(elsewhereWords("needsYou")).toBe(
+      "a thread not in the sidebar: needs you",
     )
   })
   test("a status's signal: running while its agent works, its level's when raised, done while a finished run fades, else none", () => {
@@ -234,7 +232,7 @@ describe("unsentSignals", () => {
   })
 
   test("your message at a thread not yet started marks its task, with no end (ADR-0126)", () => {
-    expect(sets(marks([fresh("c", BRANCH)]))).toEqual({
+    expect(sets(marks([atUnstarted("c", BRANCH)]))).toEqual({
       tasks: [K("e1")],
       ends: [],
       elsewhere: false,
@@ -242,9 +240,9 @@ describe("unsentSignals", () => {
   })
 
   test("your message at a thread on no canvas marks nothing", () => {
-    expect(sets(marks([fresh("c", threadIdFor("elsewhere"))])).tasks).toEqual(
-      [],
-    )
+    expect(
+      sets(marks([atUnstarted("c", threadIdFor("elsewhere"))])).tasks,
+    ).toEqual([])
   })
 
   test("only your cards, only with text, only where their place still is", () => {
@@ -256,7 +254,7 @@ describe("unsentSignals", () => {
 
   test("elsewhere: a marked task you closed", () => {
     expect(marks([atEnd("c", "g1")]).elsewhere).toBe(true)
-    expect(marks([fresh("c", G_BRANCH)]).elsewhere).toBe(true)
+    expect(marks([atUnstarted("c", G_BRANCH)]).elsewhere).toBe(true)
     const closed = { ...layout, open: [] }
     expect(marks([atEnd("c", "e2")], ["c"], { layout: closed }).elsewhere).toBe(
       true,
