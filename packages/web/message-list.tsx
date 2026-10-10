@@ -15,9 +15,10 @@ import {
   promptParent,
   segmentPath,
 } from "@pinetrie/interface"
-import { memo, useEffect } from "react"
+import { Fragment, memo, useEffect } from "react"
 import { AskWork } from "./ask-work.tsx"
 import { markCommit } from "./commit-marks.ts"
+import { MarginFace } from "./margin.tsx"
 import { Message } from "./message.tsx"
 import {
   type MessageListProps,
@@ -35,28 +36,40 @@ function MessageListView(p: MessageListProps) {
     const i = at.get(id)
     const node = i === undefined ? undefined : view.nodes[i]
     if (i === undefined || node === undefined) return null
+    const comments = p.margins.get(node.id) ?? 0
+    // Its margin (ADR-0126): open under it, else its face while it holds
+    // comments.
+    const margin =
+      p.openMargin === node.id ? (
+        p.marginSlot
+      ) : comments > 0 ? (
+        <MarginFace count={comments} onOpen={() => p.onMargin(node.id)} />
+      ) : null
     return (
-      <Message
-        live={p.live}
-        rows={p.rows}
-        streams={callStreams(node.toolCalls, p.tools)}
-        closedBranches={node.branches.filter(b => !p.shown.has(b.rootId))}
-        forkTracks={p.forks.get(node.id) ?? []}
-        join={p.joins.get(node.id)}
-        crossTaskLink={p.crossTaskLinks.get(node.id)}
-        onLink={p.onLink}
-        key={node.id}
-        pinned={markers.get(node.id)}
-        nameOf={p.nameOf}
-        node={node}
-        onAct={p.onAct}
-        tools={messageTools(node, {
-          parentId: promptParent(index, node.id),
-          isLast: i === view.nodes.length - 1,
-          lane: p.lane,
-          writable: p.writable,
-        })}
-      />
+      <Fragment key={node.id}>
+        <Message
+          live={p.live}
+          rows={p.rows}
+          streams={callStreams(node.toolCalls, p.tools)}
+          closedBranches={node.branches.filter(b => !p.shown.has(b.rootId))}
+          forkTracks={p.forks.get(node.id) ?? []}
+          join={p.joins.get(node.id)}
+          crossTaskLink={p.crossTaskLinks.get(node.id)}
+          onLink={p.onLink}
+          key={node.id}
+          pinned={markers.get(node.id)}
+          nameOf={p.nameOf}
+          node={node}
+          onAct={p.onAct}
+          tools={messageTools(node, {
+            parentId: promptParent(index, node.id),
+            isLast: i === view.nodes.length - 1,
+            lane: p.lane,
+            writable: p.writable,
+          })}
+        />
+        {margin}
+      </Fragment>
     )
   }
   const segments = segmentPath(

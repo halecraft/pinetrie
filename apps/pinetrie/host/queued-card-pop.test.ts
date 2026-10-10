@@ -1,13 +1,14 @@
 import {
   type CardCommand,
   type CardId,
+  cardIdOfKind,
   commitId,
   ERR,
   entryId,
-  factCardIdFor,
   isTextCard,
   rootIdFor,
   runId,
+  storedText,
   textCardId,
   threadIdFor,
   writerId,
@@ -29,6 +30,7 @@ import {
 import { newPlacesDoc, newPresenceDoc, seatKey } from "@pinetrie/schema"
 import { beginRun } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
+import { memoryBlobs } from "./blobs.ts"
 import type { CardPort } from "./cards.ts"
 import {
   applyWrites,
@@ -46,6 +48,7 @@ import {
   drain,
   givenUp,
   type NextQueuedCardPop,
+  type PoppedMessage,
   type PoppedText,
   popNextQueuedCard,
   type QueuedCardPopDeps,
@@ -103,7 +106,7 @@ const poppedOf = (top: NextQueuedCardPop): PoppedText | null =>
     ? { card: top.popped.card, text: top.popped.text }
     : null
 
-const FACT = factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
+const FACT = cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f1")
 
 describe("popNextQueuedCard", () => {
   test("reads the top queued card and deletes its record before it returns", () => {
@@ -240,8 +243,10 @@ function setUp(
   const events: string[] = []
   const appended: unknown[] = []
   const sends = [...answers]
+  const blobs = memoryBlobs()
   const deps: QueuedCardPopDeps = {
     basics: b,
+    blobs,
     relay: async () => "next",
     appendLaneless: async () => false,
     records: { writeValues: async writes => applyWrites(b, writes) },
@@ -287,7 +292,7 @@ function setUp(
       events.push(`start ${s.kind === "prompt" ? s.message.customType : ""}`)
       return runId("r-1")
     },
-    send: async (popped: PoppedText) => {
+    send: async (popped: PoppedMessage) => {
       events.push(`send ${popped.card.id}: ${popped.text}`)
       return sends.shift() ?? { kind: "appended", id: entryId("e-9") }
     },
@@ -307,7 +312,7 @@ function setUp(
       records: { writeValues: async w => applyWrites(b, w) },
     }),
   }
-  return { b, events, deps, appended, presence }
+  return { b, events, deps, appended, presence, blobs }
 }
 
 describe("drain", () => {
@@ -416,6 +421,37 @@ describe("drain", () => {
       `destroy ${cardIdFor("c2")}`,
     ])
     expect(textsIn(b.places).map(c => c.id)).toEqual([cardIdFor("c3")])
+  })
+
+  test("a queued reference's quote, read from its blob, is sent as its queuer's message; its record goes, and nothing is destroyed (ADR-0126)", async () => {
+    const { b, events, deps, blobs } = setUp({ [cardIdFor("c2")]: "after" }, [])
+    const quote = blobs.put(storedText("> the quote")).sha256
+    const reference = cardIdOfKind(
+      "reference",
+      "01a0ffd2-0000-7000-8000-0000000000e7",
+    )
+    b.places.cards.set(
+      reference,
+      encodeCard({
+        kind: "reference",
+        id: reference,
+        owner: ADA,
+        placer: ADA,
+        place: { kind: "queued", thread: LANE, order: "a", by: BEA, seen: "" },
+        content: { address: { kind: "thread", thread: LANE }, quote },
+      }),
+    )
+    queue(b.places, cardIdFor("c2"), "b")
+    await drain(deps, LANE)
+    expect(events).toEqual([
+      `hydrate ${cardIdFor("c2")}`,
+      `send ${reference}: > the quote`,
+      `send ${cardIdFor("c2")}: after`,
+      `destroy ${cardIdFor("c2")}`,
+    ])
+    expect(readPlaces(b.places).filter(c => c.place.kind === "queued")).toEqual(
+      [],
+    )
   })
 
   test("a card popped and sent leaves no history (ADR-0048 step 6)", async () => {

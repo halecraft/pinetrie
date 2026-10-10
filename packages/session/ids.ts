@@ -2,11 +2,10 @@
 // no two writers mint one key (ADR-0016).
 
 import {
+  cardIdOfKind,
   type NoteColumnId,
-  noteColumnIdFor,
   type ReferenceCardId,
   type RootId,
-  referenceCardIdFor,
   rootIdFor,
   type TaskId,
   type TextCardId,
@@ -33,11 +32,12 @@ export const newCardId = (): TextCardId => textCardId(newUuidv7())
  * A new note column's id, minted by the page that makes the column with a
  * move (ADR-0116). `parseCardId` accepts only this shape.
  */
-export const newNoteColumnId = (): NoteColumnId => noteColumnIdFor(newUuidv7())
+export const newNoteColumnId = (): NoteColumnId =>
+  cardIdOfKind("note-column", newUuidv7())
 
 /** A new reference card's id (ADR-0126): minted by the page that takes or puts it. */
 export const newReferenceCardId = (): ReferenceCardId =>
-  referenceCardIdFor(newUuidv7())
+  cardIdOfKind("reference", newUuidv7())
 
 /**
  * A new thread's lane id, reserved by a column before the lane exists

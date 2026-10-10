@@ -9,6 +9,7 @@ import {
   type CardPlace,
   type CardRecord,
   type ChatAt,
+  cardIdOfKind,
   DISCARDED,
   emailLocalPart,
   entryId,
@@ -31,7 +32,6 @@ import {
   nonEmpty,
   normalizeEmail,
   normalizeName,
-  noteColumnIdFor,
   noteOf,
   parseCardId,
   parseMentions,
@@ -463,6 +463,28 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     }
   })
 
+  test("a comment in an entry's margin round-trips, its entry in `at` and its thread in `lane`; it needs both and its order, and its key keeps both (ADR-0126)", () => {
+    const margin = {
+      kind: "margin",
+      entry: entryId("e-1"),
+      thread: threadIdFor("x"),
+      order: "c",
+    } as const
+    const f = placeFields(margin)
+    expect(f).toMatchObject({ kind: "margin", at: "e-1", order: "c" })
+    expect(placeOfFields(f)).toEqual(margin)
+    expect(placeOfFields({ ...f, at: "" })).toBeUndefined()
+    expect(placeOfFields({ ...f, lane: "" })).toBeUndefined()
+    expect(placeOfFields({ ...f, order: "" })).toBeUndefined()
+    expect(keyOf(margin)).toEqual({
+      kind: "margin",
+      entry: entryId("e-1"),
+      thread: threadIdFor("x"),
+    })
+    expect(keyOfFields(keyFieldsFrom(k => f[k]))).toEqual(keyOf(margin))
+    expect(rowFieldsOf("margin")).toEqual(["at", "lane", "order"])
+  })
+
   test("a pinned card needs its order and its thread; its key has no order, and keeps its thread", () => {
     const pinned = places[2] as CardPlace
     const f = placeFields(pinned)
@@ -589,9 +611,9 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(
       sameKey(note, keyOf({ kind: "note", column: NOTES, order: "z" })),
     ).toBe(true)
-    expect(sameKey(note, { kind: "note", column: noteColumnIdFor("x") })).toBe(
-      false,
-    )
+    expect(
+      sameKey(note, { kind: "note", column: cardIdOfKind("note-column", "x") }),
+    ).toBe(false)
   })
 
   test("a note needs its column and its order; the nearest notes are a target, never a stored place", () => {
@@ -715,9 +737,9 @@ describe("moves, built once (ADR-0059)", () => {
   test("seenAt: a note is where its sender saw it in its column, whatever its rank", () => {
     const now = { kind: "note", column: NOTES } as const
     expect(seenAt(now, now)).toBe(true)
-    expect(seenAt(now, { kind: "note", column: noteColumnIdFor("x") })).toBe(
-      false,
-    )
+    expect(
+      seenAt(now, { kind: "note", column: cardIdOfKind("note-column", "x") }),
+    ).toBe(false)
   })
 
   test("a thread's nearest notes are a move's target alone: read as a target, never as a key", () => {
@@ -873,4 +895,4 @@ test("a notes target says by its tag which notes it is near, a thread's or a tas
 })
 
 const UUID = "01a0ffd2-0000-7000-8000-00000000000a"
-const NOTES = noteColumnIdFor(UUID)
+const NOTES = cardIdOfKind("note-column", UUID)

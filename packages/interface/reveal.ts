@@ -25,7 +25,8 @@ const at = (key: string): ActedAt => ({ kind: "column", key })
 
 /**
  * The effects that show `place`, and where a refusal there is said: your
- * inventory's panel; a thread's end, as `openAt` shows an entry; a note
+ * inventory's panel; a thread's end, or a comment's entry, as `openAt`
+ * shows an entry; a note
  * column, unfolded; or a fresh column, shown where it is, or opened again
  * after the thread it forks from. A fresh column whose task has no message
  * yet belongs to a new tab, whose history only that tab reaches while it is
@@ -110,8 +111,15 @@ export function revealOf(
       return { effects: [], actedAt: AT_INVENTORY }
     case "composing":
     case "pinned":
-    case "queued": {
-      const end = placeEnd(place, state.index)
+    case "queued":
+    case "margin": {
+      // A comment's entry, as a thread end is opened (ADR-0126).
+      const end =
+        place.kind === "margin"
+          ? place.entry in state.index.entries
+            ? place.entry
+            : null
+          : placeEnd(place, state.index)
       // A thread this tab holds no entry of: its card, unfolded in its task.
       if (end === null) {
         const task = state.tasks.index.taskOfCard.get(place.thread)

@@ -1,10 +1,13 @@
 import {
   atEntry,
+  type CardPlace,
   type CardRecord,
+  cardIdOfKind,
   entryId,
+  fitsPlace,
   indexAsks,
-  noteColumnIdFor,
-  referenceCardIdFor,
+  KINDS,
+  type PlacedKind,
   rootIdFor,
   type TextCard,
   type TextPlace,
@@ -56,7 +59,10 @@ const atEnd = {
   thread: TEST_THREAD,
 } as const
 /** The note column the fixtures' notes are in (ADR-0116). */
-const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const NOTES = cardIdOfKind(
+  "note-column",
+  "01a0ffd2-0000-7000-8000-0000000000a1",
+)
 const note = { kind: "note", column: NOTES, order: "a" } as const
 const noteKey = { kind: "note", column: NOTES } as const
 /** A move's target at the thread's nearest notes, which the host resolves. */
@@ -140,7 +146,10 @@ const plan = (intent: Intent, s: IntentState) =>
     task: NEW_TASK,
     thread: NEW_THREAD,
     noteColumn: NEW_NOTE_COLUMN,
-    reference: referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e1"),
+    reference: cardIdOfKind(
+      "reference",
+      "01a0ffd2-0000-7000-8000-0000000000e1",
+    ),
   })
 /** The trunk's column and the note column, as keys an intent names. */
 const TRUNK_COLUMN: ColumnKey = { kind: "card", card: threadOfEntry("1-r1") }
@@ -195,7 +204,10 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
 
   test("a take from the past is a reference in your inventory, its markdown on the clipboard too (ADR-0126)", () => {
     const address = { kind: "entry", thread: TEST_THREAD, entry: A } as const
-    const ref = referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e2")
+    const ref = cardIdOfKind(
+      "reference",
+      "01a0ffd2-0000-7000-8000-0000000000e2",
+    )
     expect(
       plan(
         inColumn({
@@ -221,6 +233,118 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
   })
 })
 
+/** A card of each kind with records, at the first of its places that is no inventory. */
+const ofEveryKind = (): readonly CardRecord[] => {
+  const at: Partial<Record<CardPlace["kind"], CardPlace>> = {
+    composing: atEnd,
+    note,
+    canvas: { kind: "canvas", task: TEST_TASK, order: "a", width: 1 },
+    queued: {
+      kind: "queued",
+      thread: TEST_THREAD,
+      order: "a",
+      by: ADA,
+      seen: "",
+    },
+  }
+  return (Object.keys(KINDS) as PlacedKind[]).flatMap((kind, n) => {
+    const place = KINDS[kind].places.flatMap(p => at[p] ?? [])[0]
+    if (place === undefined) return []
+    const id = cardIdOfKind(kind, `01a0ffd2-0000-7000-8000-0000000000${n}9`)
+    return [
+      { kind, id, owner: ADA, placer: ADA, place, content: {} } as CardRecord,
+    ]
+  })
+}
+
+describe("which kinds are taken and put (KINDS)", () => {
+  test("a card is taken into your inventory, or put in a slot, if its kind is ever in one (PLACES_OF)", () => {
+    expect(ofEveryKind().map(c => c.kind)).toEqual(
+      Object.keys(KINDS).filter(k => KINDS[k as PlacedKind].places.length > 0),
+    )
+    for (const c of ofEveryKind()) {
+      const s = state({ cards: [c] })
+      const holds = fitsPlace(c.kind, "inventory")
+      const take = plan({ kind: "takeIntoInventory", card: c.id }, s)
+      const put = plan(
+        { kind: "put", card: c.id, target: { kind: "inventory", slot: 7 } },
+        s,
+      )
+      expect([c.kind, take.length > 0, put.length > 0]).toEqual([
+        c.kind,
+        holds,
+        holds,
+      ])
+    }
+  })
+
+  test("a kind no person moves is put nowhere (KINDS' moves)", () => {
+    for (const c of ofEveryKind().filter(c => !KINDS[c.kind].moves))
+      expect(
+        plan(
+          {
+            kind: "put",
+            card: c.id,
+            target: { kind: "column", key: threadKey },
+          },
+          state({ cards: [c] }),
+        ),
+      ).toEqual([])
+  })
+})
+
+describe("comments (ADR-0126)", () => {
+  test("a comment is a new, empty note made at the end of its entry's margin; a reference to it is queued on its thread, its quote the comment", () => {
+    const card = textCardId("01a0ffd2-0000-7000-8000-0000000000d1")
+    expect(
+      plan(
+        inColumn(
+          { kind: "comment", card, entry: A, thread: TEST_THREAD },
+          { kind: "card", card: TEST_THREAD },
+        ),
+        state(),
+      ),
+    ).toEqual([
+      {
+        kind: "createCard",
+        card: {
+          kind: "text",
+          id: card,
+          owner: ADA,
+          placer: ADA,
+          place: {
+            kind: "margin",
+            entry: A,
+            thread: TEST_THREAD,
+            order: LAST_ORDER,
+          },
+          content: { command: null, unsent: null, origin: null },
+        },
+        text: "",
+        how: { actedAt: { kind: "column", key: TEST_THREAD }, slot: null },
+      },
+    ])
+    expect(
+      plan(
+        inColumn(
+          { kind: "queueReference", card, entry: A, thread: TEST_THREAD },
+          { kind: "card", card: TEST_THREAD },
+        ),
+        state(),
+      ),
+    ).toEqual([
+      {
+        kind: "queueComment",
+        card: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1"),
+        comment: card,
+        entry: { kind: "entry", thread: TEST_THREAD, entry: A },
+        to: { kind: "queued", thread: TEST_THREAD, seen: "" },
+        how: { actedAt: { kind: "column", key: TEST_THREAD }, slot: null },
+      },
+    ])
+  })
+})
+
 describe("put", () => {
   test("to a column: a note at its end, said there (ADR-0113)", () => {
     const s = state({ cards: [card(C1, inventory)], slots: { "3": C1 } })
@@ -235,6 +359,29 @@ describe("put", () => {
         kind: "moveCard",
         move,
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
+        queuedBy: null,
+        fly: true,
+        here: null,
+      },
+    ])
+  })
+
+  test("to a spot on a canvas: a text card goes there for the host to make it a note column (WRAPS, ADR-0126)", () => {
+    const target = {
+      kind: "canvas",
+      task: TEST_TASK,
+      after: TEST_THREAD,
+    } as const
+    const s = state({ cards: [card(C1, inventory)], slots: { "3": C1 } })
+    expect(plan({ kind: "put", card: C1, target }, s)).toEqual([
+      {
+        kind: "moveCard",
+        move: {
+          card: C1,
+          from: inventory,
+          to: { kind: "canvas-at", task: TEST_TASK, after: TEST_THREAD },
+        },
+        how: { actedAt: { kind: "inventory" }, slot: null },
         queuedBy: null,
         fly: true,
         here: null,
@@ -388,7 +535,10 @@ describe("your message (ADR-0113)", () => {
 
 describe("a note column (ADR-0116)", () => {
   const C3 = cardIdFor("c3")
-  const OTHER = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a2")
+  const OTHER = cardIdOfKind(
+    "note-column",
+    "01a0ffd2-0000-7000-8000-0000000000a2",
+  )
   const into = (card: typeof C1, column = OTHER): Intent => ({
     kind: "put",
     card,

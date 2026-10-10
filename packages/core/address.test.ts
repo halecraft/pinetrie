@@ -3,8 +3,8 @@ import {
   type Address,
   addressOfUrl,
   addressUrl,
+  cardIdOfKind,
   entryId,
-  factCardIdFor,
   parseAddress,
   printAddress,
   threadIdFor,
@@ -22,7 +22,7 @@ describe("addresses (ADR-0126)", () => {
     { kind: "range", thread: T, entry: E, from: 3, to: 17 },
     {
       kind: "card",
-      card: factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1"),
+      card: cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f1"),
     },
   ]
 

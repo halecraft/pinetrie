@@ -6,21 +6,30 @@
 
 import {
   cardOfFace,
+  dropProps,
   type FoldedFace,
   foldedWords,
   type Intent,
+  type PutTarget,
   UNFOLD,
 } from "@pinetrie/interface"
 
 export function FoldedColumn(p: {
   face: FoldedFace
+  /** Where a drop on it lands: a spot on its canvas just after it; null where none does. */
+  drop: PutTarget | null
   onIntent: (intent: Intent) => void
 }) {
   const { face } = p
   const card = cardOfFace(face)
   const words = foldedWords(face)
   return (
-    <section className="folded-column" data-card={card} data-kind={face.kind}>
+    <section
+      {...(p.drop === null ? {} : dropProps(p.drop))}
+      className="folded-column"
+      data-card={card}
+      data-kind={face.kind}
+    >
       {/* The handle a drag starts from; the strip below unfolds. */}
       <header className="column-head folded-head" data-column-head="">
         <span aria-hidden="true" className="folded-grip">

@@ -163,6 +163,7 @@ export {
   type Verb,
   verbOf,
 } from "./card-history.ts"
+export { wordsOf } from "./card-words.ts"
 export {
   baseMovedOn,
   catchUpName,
@@ -238,7 +239,6 @@ export {
   factContent,
   factLine,
   tokensWords,
-  wordsOf,
 } from "./fact.ts"
 export {
   HELD_WORDS,
@@ -284,6 +284,7 @@ export {
   planEndRun,
   planStream,
 } from "./live.ts"
+export { type MarginCard, marginCards, marginCounts } from "./margin.ts"
 export { MARK, planMark } from "./mark.ts"
 export {
   cardsOfParts,
@@ -295,6 +296,7 @@ export {
 export {
   afterSteps,
   type Discards,
+  lanesToDrain,
   type MakeStep,
   type MoveCommand,
   type MoveStep,
@@ -379,6 +381,7 @@ export {
 export {
   blankQueued,
   type CarryPlan,
+  isQueuedMessage,
   isQueuedText,
   type NextQueuedCardPopStep,
   NONE_BLANK,
@@ -389,6 +392,7 @@ export {
   planUnqueueAll,
   planUnsent,
   type QueuedCard,
+  type QueuedMessage,
   type QueuedText,
   queuedOn,
   type TaskPinnedCard,

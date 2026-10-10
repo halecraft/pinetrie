@@ -882,7 +882,7 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
 ## A message's tools (`message-tools.ts`, ADR-0043)
 
 `messageTools` decides which tools a message offers, and `Message` draws
-them in one row: *copy*, *edit* or *new tab*, `→`.
+them in one row: *copy*, *take*, *comment*, *edit* or *new tab*, `→`.
 
 - **Copy is the message as markdown** (`copyText`, `copy-text.ts`): its
   text as stored, not as drawn (mentions, a `/command` and
@@ -904,7 +904,8 @@ them in one row: *copy*, *edit* or *new tab*, `→`.
   make the reference (`makeReference`). A reference's put (`putReference`)
   copies from your hand: a new reference with the same address and quote
   is made where it lands, and into a text box (`PutTarget` `text-box`) it is
-  a link at the caret (`addressLink`). *Edit as text* (`planEditAsText`) is
+  a link at the caret (`addressLink`, labelled by `addressWords`,
+  `address-words.ts`). *Edit as text* (`planEditAsText`) is
   one request: its sender writes the quote into a new text card, and the
   host makes it in the reference's place, its `origin` the address, and
   trashes the reference, one step of history.
@@ -930,6 +931,39 @@ them in one row: *copy*, *edit* or *new tab*, `→`.
   by a person would be a reply the agent never gave (ADR-0018).
 - **`→` is hidden at a conversation's last message**, where a branch would be
   the same as replying. At agent work's end it is a thread of its own.
+
+## Margins and comments (`margin.ts`, ADR-0126)
+
+An entry's margin holds comments: notes on it, read by everyone on the
+task and never by the agent. A comment is a text card at a `margin` place,
+which names the entry and its thread (`packages/rules/TECHNICAL.md`,
+*Cards*).
+
+- **A message's *comment*** (`messageTools`' `comment`, where the column
+  can be written) is the `comment` act: `planComment` makes an empty note
+  at the margin's end, and the column opens that margin and focuses the
+  new box once it is drawn.
+- **Shut, a margin is a face**: its count under the entry
+  (`marginFaceWords`, `MarginFace`), from `marginCounts` over the cards.
+  Open (one per column, the column's state), its comments are drawn normal
+  under the entry (`DETAIL_ON.margin`), each a `NoteCardEditor`, with
+  *+ comment* and *shut*. The list carries the open margin as a slot
+  (`marginSlot`), so opening it rebuilds the list once and typing in it
+  rebuilds nothing.
+- **A comment's ⋯ has *Queue a reference*** (`queueReference`): a
+  reference to it (`{ kind: "card" }`) queued on its thread. Its quote is
+  the comment's text as it is then, under a link to its entry
+  (`commentMarkdown`), kept as a blob (`queueComment`, `perform`). The
+  agent reads the quote, and the entry under the link (the host's
+  `linkedQuotes`), so it reads the comment under what it is about. The
+  comment stays where it is.
+- **Entries by keys** (`onEntryKey`, `Column`): while focus is in a
+  column's messages and in no text box, they are a grid one cell wide,
+  read by `gridKeyAct` (`comments: true`): `j` and `k` select (a click
+  selects too), Enter opens or shuts the selected entry's margin, Escape
+  shuts it, `c` comments, and Cmd+C with nothing selected in the text
+  takes a reference to the selected entry. The selection is the column's
+  view state, marked `data-selected` on its message.
 
 ## What a column shows (`column-view.ts`, ADR-0040)
 
@@ -1220,7 +1254,8 @@ composer*).
 - **A paste with image files is an upload.** `pastedFiles` keeps the
   `image/*` files; with none, the paste is the browser's own. With some, the
   composer prevents the default, records the selection, and `POST`s each
-  file to `/blob` (`uploadImage`, same origin, so the key cookie goes too).
+  file to `/blob` (`uploadImage`, `upload.ts`, same origin, so the key
+  cookie goes too; a reference's quote is kept the same way, `uploadText`).
   When all are answered, `insertAt` puts every accepted one's
   `![name](/blob/<sha256>)` (`imageMarkdown`) in place of that selection, on
   lines of their own, at once. A refused one is left out, and the host's
@@ -1382,9 +1417,14 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
 - **One landing rule** (`put-target.ts`). A put and a drop name a
   `PutTarget`: a thread's column by key (a note in the note column nearest
   its thread, `noteOf`), its composer (your message), a note column (a
-  note at its end, ADR-0116), its pinned strip, a slot, or a new thread: a
-  workflow state or a place in the sidebar (`data-put-state`,
-  `data-put-sidebar`, *The board*). Each writable `Column` publishes its
+  note at its end, ADR-0116), its pinned strip, a slot, a spot on a
+  canvas (`canvas`: just after a folded column, or past the last, where
+  `.canvas-end` leaves room; `data-put-canvas` and `data-put-after`), or a
+  new thread: a workflow state or a place in the sidebar
+  (`data-put-state`, `data-put-sidebar`, *The board*). On a spot, a
+  thread's card or a note column lands there, and a text card or a
+  reference is sent to it for the host to make a note column for it
+  (`WRAPS`, ADR-0126); the put key never names a spot, which is a drop's. Each writable `Column` publishes its
   composer as it renders (`ComposerSpot`: its place, `composerPlace` in
   `column-view.ts`, and your message there); reading it redraws nothing. A
   drop target carries `data-put-column`, `data-put-composer`,

@@ -1,6 +1,6 @@
 import {
-  askCardIdFor,
   type CardRecord,
+  cardIdOfKind,
   entryId,
   type RelayDetails,
   threadIdFor,
@@ -22,7 +22,7 @@ const relay: RelayDetails = {
   budget: entryId("1"),
   by: ada,
 }
-const ID = askCardIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const ID = cardIdOfKind("ask", "01a0ffd2-0000-7000-8000-0000000000a1")
 
 describe("an ask card (ADR-0128)", () => {
   const step = planAskCard({ cards: [], id: ID, lane, relay })

@@ -1,7 +1,7 @@
 import type { Exchange } from "@kyneta/exchange"
 import {
+  cardIdOfKind,
   makeCard,
-  referenceCardIdFor,
   rootDocId,
   rootIdFor,
   type Sha256,
@@ -105,7 +105,7 @@ test("the blob sweep keeps a reference's quote, and deletes one no card holds (A
   const blobs = memoryBlobs(() => 0)
   const kept = blobs.put(storedText("| a |"))
   const dropped = blobs.put(storedText("nobody quotes this"))
-  const card = referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e1")
+  const card = cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1")
   applyPlaceSteps(b.places, [
     {
       kind: "write",

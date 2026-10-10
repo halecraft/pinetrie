@@ -705,6 +705,33 @@ async function run(check: Checks["check"]): Promise<void> {
         three.every(id => onHost(id)?.place.kind === "fresh"),
       `${refusedWhole.kind}, ${noneMoved}, ${keptAll.kind}, ${allKept}; ${keepUndone.kind}`,
     )
+    // A text card dropped on the canvas lands in a note column made for it
+    // there (ADR-0126); one undo takes back both.
+    const onCanvas = newCard(ada, tipOf(), "dropped on the canvas")
+    await waitFor(() => onHost(onCanvas) !== undefined, 5_000)
+    const drop = await ada.moveCard(
+      {
+        card: onCanvas,
+        from: drafting(tipOf()),
+        to: { kind: "canvas-at", task: here, after: null },
+      },
+      { actedAt: { kind: "inventory" }, slot: null },
+    )
+    await waitFor(() => onHost(onCanvas)?.place.kind === "note", 5_000)
+    const landed = onHost(onCanvas)?.place
+    const wrapper = landed?.kind === "note" ? onHost(landed.column) : undefined
+    const dropUndone = await ada.undoMoves(here, "undo")
+    await waitFor(() => onHost(onCanvas)?.place.kind === "composing", 5_000)
+    check(
+      "a text card dropped on a canvas lands in a note column made for it there, and one undo removes the column and returns the card",
+      drop.kind === "accepted" &&
+        wrapper?.place.kind === "canvas" &&
+        wrapper.place.task === here &&
+        dropUndone.kind === "undone" &&
+        onHost(wrapper.id) === undefined &&
+        onHost(onCanvas)?.place.kind === "composing",
+      `${drop.kind}; ${landed?.kind}, ${wrapper?.place.kind}; ${dropUndone.kind}, ${onHost(onCanvas)?.place.kind}`,
+    )
     // Ada's last move in this root, to undo after a restart (section 6).
     const lastMove = newCard(ada, tipOf(), "moved before the restart")
     await waitFor(() => onHost(lastMove) !== undefined, 5_000)

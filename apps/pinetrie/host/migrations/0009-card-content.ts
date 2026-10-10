@@ -14,7 +14,7 @@
 import { batch } from "@kyneta/schema"
 import {
   type CardId,
-  factCardIdFor,
+  cardIdOfKind,
   parseTextCardId,
   SESSION_TARGET,
   type ValueWrite,
@@ -140,7 +140,7 @@ export const cardContent: RecordMigration = {
     const plan = planCardContent({
       rows: places.cards() as Readonly<Record<string, Row>>,
       histories: readNamespace(session, CARD_HISTORY.namespace),
-      newFact: () => factCardIdFor(newId()),
+      newFact: () => cardIdOfKind("fact", newId()),
     })
     if (
       Object.keys(plan.rows).length === 0 &&

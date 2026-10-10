@@ -12,9 +12,14 @@
 
 import {
   type Address,
+  type CanvasTarget,
+  type CardFittingPlace,
   type CardId,
   type CardRecord,
+  cardFitsPlace,
   DISCARDED,
+  type EntryId,
+  isMovable,
   isReorderAt,
   isTargetOf,
   KINDS,
@@ -27,6 +32,7 @@ import {
   type PlaceKey,
   type Position,
   parseCardId,
+  parseTextCardId,
   pinnedOf,
   type QueueMove,
   type ReferenceCard,
@@ -56,6 +62,7 @@ import {
   type MoveHow,
   type Slots,
 } from "@pinetrie/session"
+import { addressWords } from "./address-words.ts"
 import { freshTaskOf, type Minted } from "./columns.ts"
 import {
   type CardFacts,
@@ -64,7 +71,7 @@ import {
   type IntentState,
   planOpenAt,
 } from "./effects.ts"
-import { addressWords } from "./face.ts"
+import type { MessageAct } from "./message-tools.ts"
 import { intoMessage, type PutTarget, placeOfTarget } from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
 import { planSpinOff } from "./spin-off.ts"
@@ -149,7 +156,6 @@ export const textCardOf = (
   return now?.kind === "text" ? now : undefined
 }
 
-/** A take into the inventory refused before it is sent: it is full, as the host would say. */
 /** Your inventory is full: said where a take into it was made. */
 export const full = (card: CardId): CardNotice => ({
   card,
@@ -159,8 +165,8 @@ export const full = (card: CardId): CardNotice => ({
   fromQueue: false,
 })
 
-/** A card your hand may hold: a text card, a thread's card or a reference (`PLACES_OF`). */
-type InHand = TextCard | ThreadCard | ReferenceCard
+/** A card your hand may hold: a kind ever in an inventory (`PLACES_OF`). */
+type InHand = CardFittingPlace<"inventory">
 
 /** A handoff into your inventory, at `slot`. */
 const moveIntoInventorySlot = (
@@ -187,12 +193,9 @@ export function planTakeIntoInventory(
 ): readonly Effect[] {
   const facts = state.cards
   const now = cardOf(facts, card)
-  // A note column, a fact or an ask is never in an inventory (`PLACES_OF`).
   if (
     now === undefined ||
-    now.kind === "note-column" ||
-    now.kind === "fact" ||
-    now.kind === "ask" ||
+    !cardFitsPlace(now, "inventory") ||
     now.place.kind === "inventory"
   )
     return []
@@ -302,14 +305,23 @@ function putReference(
         text: addressLink(address, addressWords(address)),
       },
     ]
-  const to = placeOfTarget(target, facts.composers, facts.me)
-  // Only where a reference is ever (`KINDS`): a note, an inventory.
+  const to =
+    target.kind === "canvas"
+      ? canvasSpot(target)
+      : placeOfTarget(target, facts.composers, facts.me)
+  // Only where a reference is ever (`KINDS`): a note, an inventory, or a
+  // note column made for it on a canvas (`WRAPS`).
   if (to === null || !isTargetOf("reference", to)) return []
   const how = { actedAt: actedAtOf(target), slot: null }
   // What a put does to your hand is its kind's (`KINDS`' `put`).
   const inHand = now.place.kind === "inventory" && now.place.holder === facts.me
   if (!inHand || KINDS.reference.put !== "copies") {
-    if (to.kind !== "notes" && sameKey(keyOf(now.place), to)) return []
+    if (
+      to.kind !== "notes" &&
+      to.kind !== "canvas-at" &&
+      sameKey(keyOf(now.place), to)
+    )
+      return []
     return [moveCard(moveOf(now, to), how, true)]
   }
   return [
@@ -327,7 +339,9 @@ function putReference(
 /**
  * Put `card` at `target`. A state or a place in the sidebar: a new thread
  * there (`planSpinOff`). A thread's column: a note in the note column
- * nearest it; a note column: a note at its end (ADR-0116). A composer, or a
+ * nearest it; a note column: a note at its end (ADR-0116). A spot on a
+ * canvas: a text card in a note column made for it there (`WRAPS`,
+ * ADR-0126). A composer, or a
  * fresh column: your message there (`putInMessage`). A slot: a card already
  * in your inventory swaps with what is there; any other card is taken into
  * the inventory, into that slot if it is empty.
@@ -344,9 +358,7 @@ export function planPut(
   if (target.kind === "state" || target.kind === "sidebar")
     return planSpinOff(card, target, minted, state)
   if (target.kind === "inventory") {
-    // A note column, a fact or an ask is never in an inventory (`PLACES_OF`).
-    if (now.kind === "note-column" || now.kind === "fact" || now.kind === "ask")
-      return []
+    if (!cardFitsPlace(now, "inventory")) return []
     // A reference in your hand moves within it: a put copies it elsewhere.
     const from = slotOf(facts.slots, card)
     if (from === null || now.place.kind !== "inventory")
@@ -354,12 +366,21 @@ export function planPut(
     if (from === target.slot) return []
     return [{ kind: "swapSlots", a: from, b: target.slot }]
   }
-  // A thread's card or a note column goes on a canvas (ADR-0117); a fact
-  // or an ask is the host's (`KINDS`); a reference copies from your hand.
-  if (now.kind === "fact" || now.kind === "ask") return []
+  // A thread's card or a note column goes on a canvas (ADR-0117); a kind
+  // the host alone places is put nowhere; a reference copies from your hand.
+  if (!isMovable(now)) return []
   if (now.kind === "reference") return putReference(now, target, state, minted)
   if (target.kind === "text-box") return []
-  if (now.kind !== "text") return putOnCanvas(now, target, state)
+  if (cardFitsPlace(now, "canvas")) return putOnCanvas(now, target, state)
+  // A text card on a canvas lands in a note column made for it (`WRAPS`).
+  if (target.kind === "canvas")
+    return [
+      moveCard(
+        moveOf(now, canvasSpot(target)),
+        { actedAt: actedAtOf(target), slot: null },
+        true,
+      ),
+    ]
   if (
     (target.kind === "column" || target.kind === "composer") &&
     intoMessage(target, facts.composers)
@@ -393,14 +414,25 @@ const actedAtOf = (target: PutTarget): ActedAt => {
     case "state":
     case "sidebar":
     case "text-box":
+    case "canvas":
       return AT_INVENTORY
   }
 }
 
+/** A spot on a canvas a put names, as the target the host ranks (`canvas-at`). */
+const canvasSpot = (
+  target: Extract<PutTarget, { kind: "canvas" }>,
+): CanvasTarget => ({
+  kind: "canvas-at",
+  task: target.task,
+  after: target.after,
+})
+
 /**
  * A card that lives on a canvas, put from your inventory (ADR-0117): on the
  * canvas of the task you are on, just after the column it was put on, or
- * first on a task's pinned cards' column; unfolded, so you see it land.
+ * first on a task's pinned cards' column, or at the spot on a canvas it was
+ * dropped on; unfolded, so you see it land.
  * Nothing on the canvas it is on already, where a reorder moves it, nor on
  * a state or the sidebar, which make a thread from a text card alone.
  */
@@ -411,19 +443,21 @@ function putOnCanvas(
 ): readonly Effect[] {
   const here = taskOfTab(state)
   const spot: { task: TaskId; after: CardId | null } | null =
-    target.kind === "taskPinned"
-      ? { task: target.task, after: null }
-      : target.kind === "notes"
-        ? here === null
-          ? null
-          : { task: here, after: target.column }
-        : target.kind === "column" ||
-            target.kind === "composer" ||
-            target.kind === "pinned"
+    target.kind === "canvas"
+      ? { task: target.task, after: target.after }
+      : target.kind === "taskPinned"
+        ? { task: target.task, after: null }
+        : target.kind === "notes"
           ? here === null
             ? null
-            : { task: here, after: parseCardId(target.key) ?? null }
-          : null
+            : { task: here, after: target.column }
+          : target.kind === "column" ||
+              target.kind === "composer" ||
+              target.kind === "pinned"
+            ? here === null
+              ? null
+              : { task: here, after: parseCardId(target.key) ?? null }
+            : null
   if (spot === null) return []
   if (now.place.kind === "canvas" && now.place.task === spot.task) return []
   return [
@@ -527,6 +561,65 @@ export function planNewNote(
       how: IN_COLUMN(column),
     },
   ]
+}
+
+/**
+ * A comment on an entry (ADR-0126): a new, empty note in its margin, made
+ * by you, which the host places at the margin's end.
+ */
+export function planComment(
+  act: Extract<MessageAct, { kind: "comment" }>,
+  state: IntentState,
+): readonly Effect[] {
+  return [
+    {
+      kind: "createCard",
+      card: {
+        kind: "text",
+        id: act.card,
+        owner: state.cards.me,
+        placer: state.cards.me,
+        place: {
+          kind: "margin",
+          entry: act.entry,
+          thread: act.thread,
+          order: LAST_ORDER,
+        },
+        content: { command: null, unsent: null, origin: null },
+      },
+      text: "",
+      how: IN_COLUMN(act.thread),
+    },
+  ]
+}
+
+/**
+ * A reference to a comment, `card`, queued on its thread as `reference`
+ * (ADR-0126): its quote is the comment's text under a link to its entry
+ * (`commentMarkdown`), read and kept as it is queued; the comment stays.
+ */
+export function planQueueReference(
+  act: {
+    readonly card: CardId
+    readonly entry: EntryId
+    readonly thread: ThreadId
+  },
+  reference: ReferenceCardId,
+  how: MoveHow,
+): readonly Effect[] {
+  const comment = parseTextCardId(act.card)
+  return comment === undefined
+    ? []
+    : [
+        {
+          kind: "queueComment",
+          card: reference,
+          comment,
+          entry: { kind: "entry", thread: act.thread, entry: act.entry },
+          to: { kind: "queued", thread: act.thread, seen: "" },
+          how,
+        },
+      ]
 }
 
 /**

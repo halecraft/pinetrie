@@ -1330,11 +1330,43 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       const tops = row.map(b => b.top)
       check(
-        "a message's tools are one row: copy, take, edit, →",
+        "a message's tools are one row: copy, take, comment, edit, →",
         row.map(b => b.name).join(" ") ===
-          "copy take-copy-into-inventory edit branch" &&
+          "copy take-copy-into-inventory comment edit branch" &&
           Math.max(...tops) - Math.min(...tops) <= 1,
         `${JSON.stringify(row)}`,
+      )
+      // ── a comment (ADR-0126): a note in the message's margin, which opens
+      // under it with its box focused; shut, the message shows its count.
+      await page.click(`${person} > .tools > .comment`)
+      const commentBox = `${agentCol} .margin textarea`
+      await page
+        .waitForSelector(`${commentBox}:focus`, { timeout: 10_000 })
+        .catch(() => null)
+      await page.keyboard.type("a comment on this")
+      const commented = await waitFor(
+        () =>
+          readPlaces(host.places).some(
+            c =>
+              c.place.kind === "margin" &&
+              c.kind === "text" &&
+              host.cardText(c.id) === "a comment on this",
+          ),
+        10_000,
+      )
+      await page.click(`${agentCol} .margin .shut-margin`)
+      const counted = await page
+        .waitForSelector(`${agentCol} .margin-face:text-is("💬 1")`, {
+          timeout: 10_000,
+        })
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "a comment is a note in its message's margin, written where it opens; shut, the message shows how many it holds",
+        commented >= 0 && counted,
+        `written ${commented} ms; count shown ${counted}`,
       )
       // Copy puts the message's markdown on the clipboard, not what it draws.
       const still = stillMsg(downCol)
@@ -3440,6 +3472,43 @@ async function run(check: Checks["check"]): Promise<void> {
         (document.activeElement as HTMLElement | null)?.blur(),
       )
       await page.keyboard.press("ControlOrMeta+z")
+      // Dropped on the canvas past its last column, a text card lands in a
+      // note column made for it there (ADR-0126); the undo key takes back
+      // both.
+      await waitFor(() => placeOf(parked)?.kind === "inventory", 5_000)
+      await page.dragAndDrop(slotOf(parked), "#strip > .canvas-end")
+      await waitFor(() => placeOf(parked)?.kind === "note", 5_000)
+      const wrapPlace = placeOf(parked)
+      const wrapColumn =
+        wrapPlace?.kind === "note" ? wrapPlace.column : undefined
+      const columnPlace =
+        wrapColumn === undefined ? undefined : placeOf(wrapColumn)
+      // Last on its canvas: ranked after every other card there.
+      const wrapped =
+        columnPlace?.kind === "canvas" &&
+        readPlaces(host.places).every(
+          c =>
+            c.id === wrapColumn ||
+            c.place.kind !== "canvas" ||
+            c.place.task !== columnPlace.task ||
+            c.place.order < columnPlace.order,
+        )
+      await page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.blur(),
+      )
+      await page.keyboard.press("ControlOrMeta+z")
+      const unwrapped = await waitFor(
+        () =>
+          placeOf(parked)?.kind === "inventory" &&
+          wrapColumn !== undefined &&
+          placeOf(wrapColumn) === undefined,
+        5_000,
+      )
+      check(
+        "a card dropped on the canvas past its last column lands in a note column made for it there, and the undo key takes back both",
+        wrapped && unwrapped >= 0,
+        `${wrapped}, ${wrapPlace?.kind}; undone ${unwrapped} ms, ${placeOf(parked)?.kind}`,
+      )
       // Discarded with its ×, and back in its slot with the undo key: a
       // discard is a move the host's history holds (ADR-0111).
       await page.click(slotOf(parked))

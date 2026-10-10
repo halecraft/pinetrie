@@ -4,11 +4,11 @@
 // it as `@pinetrie/interface/fixtures`.
 
 import {
+  cardIdOfKind,
   type EntryId,
   type EntryLike,
   indexTree,
   NO_CONTENT,
-  noteColumnIdFor,
   rootIdFor,
   rootOf,
   type TaskId,
@@ -65,7 +65,8 @@ export const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 export const NEW_THREAD = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
 
 /** A note column minted for an intent (ADR-0116), in `parseCardId`'s shape. */
-export const NEW_NOTE_COLUMN = noteColumnIdFor(
+export const NEW_NOTE_COLUMN = cardIdOfKind(
+  "note-column",
   "01a0ffd2-0000-7000-8000-0000000000cc",
 )
 

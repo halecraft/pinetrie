@@ -3481,7 +3481,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread put from the inventory goes in a note column",
     file: "packages/interface/card-intents.ts",
-    from: '  if (now.kind !== "text") return putOnCanvas(now, target, state)\n',
+    from: '  if (cardFitsPlace(now, "canvas")) return putOnCanvas(now, target, state)\n',
     to: "",
     command: unit,
     expect:
@@ -3665,5 +3665,84 @@ export const mutations: readonly Mutation[] = [
     to: '  return address.kind === "thread"',
     command: unit,
     expect: "an entry's markdown is its copy, as `copyText` gives it",
+  },
+  {
+    name: "a fact is taken into your inventory",
+    file: "packages/interface/card-intents.ts",
+    from: '    !cardFitsPlace(now, "inventory") ||\n',
+    to: '    now.kind === "note-column" ||\n',
+    command: unit,
+    expect:
+      "a card is taken into your inventory, or put in a slot, if its kind is ever in one (PLACES_OF)",
+  },
+  {
+    name: "a fact is put in a slot",
+    file: "packages/interface/card-intents.ts",
+    from: '    if (!cardFitsPlace(now, "inventory")) return []\n',
+    to: '    if (now.kind === "note-column") return []\n',
+    command: unit,
+    expect:
+      "a card is taken into your inventory, or put in a slot, if its kind is ever in one (PLACES_OF)",
+  },
+  {
+    name: "an ask is put in a column",
+    file: "packages/interface/card-intents.ts",
+    from: "  if (!isMovable(now)) return []\n",
+    to: '  if (now.kind === "fact") return []\n',
+    command: unit,
+    expect: "a kind no person moves is put nowhere (KINDS' moves)",
+  },
+  {
+    name: "a text card put on a canvas is put nowhere",
+    file: "packages/interface/card-intents.ts",
+    from: '  if (target.kind === "canvas")\n    return [\n      moveCard(\n        moveOf(now, canvasSpot(target)),',
+    to: "  if (false)\n    return [\n      moveCard(\n        moveOf(now, canvasSpot(target)),",
+    command: unit,
+    expect:
+      "to a spot on a canvas: a text card goes there for the host to make it a note column (WRAPS, ADR-0126)",
+  },
+  {
+    name: "a drop on a canvas names no card it is after",
+    file: "packages/interface/put-target.ts",
+    from: "    const after = el.getAttribute(PUT_AFTER)\n",
+    to: "    const after = null\n",
+    command: unit,
+    expect: "lands where a put to it lands",
+  },
+  {
+    name: "a comment queues no reference",
+    file: "packages/interface/card-frame.ts",
+    from: '    case "margin":\n      return [\n        {\n          to: "reference",',
+    to: '    case "margin":\n      return [take]\n    case "fresh-x" as never:\n      return [\n        {\n          to: "reference",',
+    command: unit,
+    expect:
+      "a comment: a reference queued on its thread, which leaves it where it is; your inventory (ADR-0126)",
+  },
+  {
+    name: "a comment is made as a note",
+    file: "packages/interface/card-intents.ts",
+    from: '          kind: "margin",\n          entry: act.entry,',
+    to: '          kind: "composing",\n          entry: act.entry,',
+    command: unit,
+    expect:
+      "a comment is a new, empty note made at the end of its entry's margin; a reference to it is queued on its thread, its quote the comment",
+  },
+  {
+    name: "a queued comment's quote names no entry",
+    file: "packages/interface/markdown-of.ts",
+    from: 'addressLink(entry, "a message")',
+    to: '"a message"',
+    command: unit,
+    expect:
+      "a comment queued as a reference keeps its text under a link to its entry, then makes the reference in the queue (ADR-0126)",
+  },
+  {
+    name: "every grid's cell takes a comment",
+    file: "packages/interface/grid-keys.ts",
+    from: "    return at.comments && at.hasCard && !event.altKey\n",
+    to: "    return at.hasCard && !event.altKey\n",
+    command: unit,
+    expect:
+      "a column's messages are a grid one cell wide (ADR-0126): j and k step through them, stopping at either end; Enter opens the margin, c comments, Escape shuts it",
   },
 ]

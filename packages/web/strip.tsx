@@ -21,11 +21,13 @@ import {
   type ColumnView,
   cardOfFace,
   detailOf,
+  dropProps,
   foldedView,
   freshTaskOf,
   heldWords,
   type Intent,
   type NoteColumnView,
+  type PutTarget,
   type Reader,
   type ReadOnly,
   type Stage,
@@ -153,6 +155,14 @@ export function Strip(p: {
       />
     )
   }
+  // A drop where no column takes one is a spot on the canvas (ADR-0126):
+  // just after a folded column, or past the last, where `.canvas-end`
+  // leaves room for it.
+  const canvasDrop = (after: CardId | null): PutTarget | null =>
+    stage.kind === "task" && readOnly === null
+      ? { kind: "canvas", task: stage.task, after }
+      : null
+  const endDrop = canvasDrop(p.canvas.at(-1)?.id ?? null)
   const cardColumn = (item: CardColumn): ReactElement | null => {
     const folded =
       detailOf("canvas", item.folded) === "face"
@@ -164,6 +174,7 @@ export function Strip(p: {
     if (folded !== null)
       return (
         <FoldedColumn
+          drop={canvasDrop(cardOfFace(folded))}
           face={folded}
           key={cardOfFace(folded)}
           onIntent={p.onIntent}
@@ -196,7 +207,12 @@ export function Strip(p: {
     }
   }
   return (
-    <div id="strip" onPointerDown={p.onPointerDown} ref={p.stripRef}>
+    <div
+      {...(endDrop === null ? {} : dropProps(endDrop))}
+      id="strip"
+      onPointerDown={p.onPointerDown}
+      ref={p.stripRef}
+    >
       {p.taskColumn !== null && (
         <TaskColumn
           onIntent={p.onIntent}
@@ -217,6 +233,7 @@ export function Strip(p: {
             threadColumn(null, column),
           )
         : stripCards(p.strip).map(cardColumn)}
+      {endDrop !== null && <div aria-hidden="true" className="canvas-end" />}
     </div>
   )
 }

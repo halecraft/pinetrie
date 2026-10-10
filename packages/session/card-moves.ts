@@ -351,6 +351,7 @@ export function drawnPlace(
     case "pinned":
     case "task-pinned":
     case "note":
+    case "margin":
       return { ...key, order: LAST_ORDER }
     case "canvas":
       return { ...key, order: LAST_ORDER, width: 1 }

@@ -1,6 +1,7 @@
 import {
   type ArchivedTask,
   type CardRecord,
+  cardIdOfKind,
   commitId,
   type EntryLike,
   ERR,
@@ -9,7 +10,6 @@ import {
   indexTree,
   type LaneView,
   NO_CONTENT,
-  noteColumnIdFor,
   type RevisionRecord,
   ROOT,
   rootIdFor,
@@ -189,7 +189,10 @@ describe("planArchive (ADR-0116)", () => {
 
 const LANE_X = threadIdFor("x")
 const T_B = threadIdFor("b-thread")
-const NOTES_X = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const NOTES_X = cardIdOfKind(
+  "note-column",
+  "01a0ffd2-0000-7000-8000-0000000000a1",
+)
 
 describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
   // LANE_X's card is on OTHER_TASK's canvas, T_B's on TASK's.

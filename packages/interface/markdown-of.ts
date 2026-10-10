@@ -3,7 +3,7 @@
 // quote, from one rule. Pure.
 
 import type { Address, EntryId, TranscriptMessage } from "@pinetrie/core"
-import { pastMarkdown } from "@pinetrie/rules"
+import { addressLink, pastMarkdown } from "@pinetrie/rules"
 import { copyText } from "./copy-text.ts"
 
 /**
@@ -26,3 +26,12 @@ export function markdownOf(
     ? copyText(message)
     : (pastMarkdown(address, message.text) ?? "")
 }
+
+/**
+ * A comment's quote, as a queued reference to it sends it (ADR-0126): a
+ * link to the entry it is on, then its text. The agent reads the entry
+ * quoted under the link (`pastMarkdown`, the host's), so the comment reads
+ * under what it is about.
+ */
+export const commentMarkdown = (entry: Address, text: string): string =>
+  `A comment on ${addressLink(entry, "a message")}:\n\n${text.trim()}`

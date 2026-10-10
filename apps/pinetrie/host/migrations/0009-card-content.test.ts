@@ -1,4 +1,4 @@
-import { type CardId, factCardIdFor } from "@pinetrie/core"
+import { type CardId, cardIdOfKind } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { CARD_HISTORY, decodeCard } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
@@ -26,7 +26,7 @@ const LANE = "t-0123456789abcdef"
 const FACT = JSON.stringify({ kind: "described", lane: LANE, by: "w-ada@x.io" })
 const MESSAGE = cardIdFor("c1")
 const OLD_FACT = cardIdFor("c2")
-const NEW_FACT = factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
+const NEW_FACT = cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f1")
 
 const stored = {
   [MESSAGE]: { ...ROW, kind: "drafting", at: "e-1", lane: LANE },

@@ -16,6 +16,7 @@ import type {
   MoveDirection,
   OfferAction,
   PlaceKey,
+  QueuedKey,
   QueueHoldChange,
   QueueMove,
   ReferenceCardId,
@@ -103,6 +104,19 @@ export type Effect =
       readonly address: Address
       readonly markdown: string
       readonly to: TargetOf<"reference">
+      readonly how: MoveHow
+    }
+  /**
+   * A reference to a comment queued on its thread (ADR-0126): its quote,
+   * the comment's text as it is now under a link to `entry`
+   * (`commentMarkdown`), kept as a blob, then the reference made there.
+   */
+  | {
+      readonly kind: "queueComment"
+      readonly card: ReferenceCardId
+      readonly comment: TextCardId
+      readonly entry: Address
+      readonly to: QueuedKey
       readonly how: MoveHow
     }
   /** A reference made with a quote already kept: a put of one in your hand. */

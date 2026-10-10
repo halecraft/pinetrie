@@ -325,6 +325,10 @@
         box-shadow: 0 0 0 1px #3a3f48, 0 8px 24px rgb(0 0 0 / .5); }
       #strip > [data-drop="before"] { box-shadow: inset 3px 0 0 #8ab4f8; }
       #strip > [data-drop="after"] { box-shadow: inset -3px 0 0 #8ab4f8; }
+      /* Past the last column: a drop there is a spot on the canvas (ADR-0126),
+         marked while a card is dragged. */
+      #strip > .canvas-end { flex: 0 0 4rem; }
+      body[data-card-drag] #strip > .canvas-end { box-shadow: inset 2px 0 0 #555; }
       /* A column folded to a strip with its title, in its place on the canvas
          (ADR-0116): its head a drag handle, the rest a button that unfolds it. */
       .folded-column { flex: 0 0 2.2rem; width: 2.2rem; min-height: 0; display: flex; flex-direction: column;
@@ -767,6 +771,20 @@
       .note-count { font-size: .72rem; color: #8b93a1; }
       .note-column-notes { flex: 1; overflow-y: auto; padding: .4rem .75rem; }
       .note-column-notes .card-editor.note { margin-bottom: .3rem; }
+      /* An entry's margin (ADR-0126): shut, its count under the entry; open,
+         its comments, indented as notes beside what they are on. */
+      .margin-face { background: none; border: 0; padding: 0 .75rem; color: #999;
+        font-size: .8rem; cursor: pointer; }
+      .margin-face:hover { color: #ddd; }
+      .margin { margin: 0 .75rem .5rem 1.5rem; border-left: 2px solid #555;
+        padding-left: .5rem; }
+      .margin .card-editor.note { margin-bottom: .3rem; }
+      .margin-foot { display: flex; gap: .75rem; font-size: .8rem; }
+      .margin-foot button { background: none; border: 0; padding: 0; color: #999; cursor: pointer; }
+      .margin-foot button:hover { color: #ddd; }
+      /* The entry the column's keys select (`j`, `k`). */
+      .column-content:focus { outline: none; }
+      .msg[data-selected] { box-shadow: inset 2px 0 0 #8ab4f8; }
       .notes-empty { font-size: .75rem; color: #6f7784; }
       .add-note { margin: 0 .75rem .5rem; padding: 0; background: none; border: 0;
         font-size: .72rem; color: #8b93a1; cursor: pointer; text-align: left; }

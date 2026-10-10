@@ -1,16 +1,17 @@
 import {
   atEntry,
   type CardRecord,
+  cardIdOfKind,
   entryId,
-  factCardIdFor,
   rootIdFor,
+  type Sha256,
   taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import type { QueuedCard } from "./queue.ts"
+import { planUnqueueAll, type QueuedCard } from "./queue.ts"
 import {
   holdOnStop,
   planHoldSweep,
@@ -74,7 +75,7 @@ describe("holdOnStop", () => {
         }
       : {
           kind: "fact",
-          id: factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1"),
+          id: cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f1"),
           owner: ADA,
           placer: ADA,
           place,
@@ -87,6 +88,31 @@ describe("holdOnStop", () => {
       by: BEA,
       at: 3,
     })
+  })
+  test("a reference queued is a message too: the stopper holds the queue (ADR-0126)", () => {
+    const reference: QueuedCard = {
+      kind: "reference",
+      id: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1"),
+      owner: ADA,
+      placer: ADA,
+      place,
+      content: {
+        address: { kind: "thread", thread: L },
+        quote: "0".repeat(64) as Sha256,
+      },
+    }
+    expect(holdOnStop({ ...base, queue: [reference] })).toEqual({
+      lane: L,
+      by: BEA,
+      at: 3,
+    })
+    expect(planUnqueueAll([reference], L)).toEqual([
+      {
+        card: reference.id,
+        from: { kind: "queued", thread: L, seen: "" },
+        to: { kind: "notes", near: "thread", thread: L },
+      },
+    ])
   })
   test("nothing queued, only facts, or already held: no hold", () => {
     expect(holdOnStop({ ...base, queue: [] })).toBeNull()

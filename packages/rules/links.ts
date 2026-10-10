@@ -1,7 +1,7 @@
 // rules/links — links to addresses in text (ADR-0126): `[label](/a/<address>)`,
 // a relative URL `safeUrl` keeps, as it keeps `/blob/`. What the agent reads
 // of a message quotes each linked referent under it, gathered by the host.
-// Pure; the same mdast walk the client draws by (`images.ts`, `blocks.ts`).
+// Pure; read from the tree the client draws (`parseMarkdown`).
 
 import {
   type Address,
@@ -10,10 +10,8 @@ import {
   isPastAddress,
   type PastAddress,
 } from "@pinetrie/core"
-import { fromMarkdown } from "mdast-util-from-markdown"
-import { gfmFromMarkdown } from "mdast-util-gfm"
-import { gfm } from "micromark-extension-gfm"
 import { blockSource } from "./blocks.ts"
+import { parseMarkdown } from "./markdown.ts"
 
 interface LinkNode {
   readonly type: string
@@ -33,10 +31,7 @@ const textOf = (node: LinkNode): string =>
 
 /** Every link to an address in `text`, in document order. A link in code is text. */
 export function addressLinks(text: string): readonly AddressLink[] {
-  const tree = fromMarkdown(text, {
-    extensions: [gfm()],
-    mdastExtensions: [gfmFromMarkdown()],
-  }) as LinkNode
+  const tree = parseMarkdown(text) as LinkNode
   const out: AddressLink[] = []
   const walk = (node: LinkNode): void => {
     const address =

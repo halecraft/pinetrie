@@ -1048,4 +1048,31 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a card's words are where its kind says (`KINDS`' text): textSourceOf agrees for every kind with records",
   },
+  {
+    name: "an ask's id is no card's",
+    file: "packages/core/index.ts",
+    from: "CARD_PREFIXES.map(([p]) => p)",
+    to: 'CARD_PREFIXES.filter(([, k]) => k !== "ask").map(([p]) => p)',
+    command: ["pnpm", "exec", "vitest", "run", "packages/core/kinds.test.ts"],
+    expect:
+      "a card of every kind, minted (cardIdOfKind), parses as that kind's id",
+  },
+  {
+    name: "a text card is never sent to a spot on a canvas",
+    file: "packages/core/places.ts",
+    from: '    return wrap !== null && fitsPlace(wrap, "canvas")\n',
+    to: "    return false\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/core/kinds.test.ts"],
+    expect:
+      "a spot on a canvas is a target of each kind a canvas takes, and of each WRAPS makes a container for; of no other",
+  },
+  {
+    name: "a comment's row loses its entry",
+    file: "packages/core/places.ts",
+    from: "        at: place.entry,\n",
+    to: '        at: "",\n',
+    command: ["pnpm", "exec", "vitest", "run", "packages/core/core.test.ts"],
+    expect:
+      "a comment in an entry's margin round-trips, its entry in `at` and its thread in `lane`; it needs both and its order, and its key keeps both (ADR-0126)",
+  },
 ]

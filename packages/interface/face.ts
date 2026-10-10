@@ -9,7 +9,6 @@
 import type {
   Address,
   AskCardId,
-  BlockKind,
   CardCommand,
   CardId,
   CardPlace,
@@ -146,40 +145,6 @@ export function faceOf(card: CardRecord, facts: FaceFacts): Face {
   }
 }
 
-/**
- * What a reference names, in words: the chip's label and a link's
- * (`addressLink`). The past's kinds by what they are; a thread or a card by
- * its kind, which its own words name once drawn (`threadLink`).
- */
-export function addressWords(address: Address): string {
-  switch (address.kind) {
-    case "thread":
-      return "a thread"
-    case "entry":
-      return "a message"
-    case "range":
-      return "a quote"
-    case "card":
-      return "a card"
-    case "block":
-      return BLOCK_WORDS[address.block.kind]
-  }
-}
-
-/** A reference's *Edit as text* (ADR-0126). */
-export const EDIT_AS_TEXT = {
-  label: "Edit as text",
-  title:
-    "a text card of its quote, in its place, which you can change: the reference goes to your trash",
-} as const
-
-const BLOCK_WORDS: Readonly<Record<BlockKind, string>> = {
-  table: "a table",
-  code: "code",
-  image: "an image",
-  paragraph: "a paragraph",
-}
-
 /** A note column's face, from its column as drawn. */
 export function noteColumnFace(
   card: NoteColumnId,
@@ -245,14 +210,17 @@ export type Detail = "face" | "normal" | "whole"
  * The level each place draws its cards at (ADR-0126's table), total, so a
  * new place does not compile until it says how its cards draw. A dock and a
  * list draw normal, a canvas whole, an inventory faces in its grid (its
- * selected card normal in the preview, and whole when opened). A discarded
- * card is drawn nowhere; were it drawn, it would be a face.
+ * selected card normal in the preview, and whole when opened). An entry's
+ * margin draws its comments normal under the entry while it is open, and a
+ * face, their count, while it is shut (`detailOf`). A discarded card is
+ * drawn nowhere; were it drawn, it would be a face.
  */
 export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
   composing: "normal",
   pinned: "normal",
   queued: "normal",
   note: "normal",
+  margin: "normal",
   "task-pinned": "normal",
   canvas: "whole",
   fresh: "whole",
@@ -260,6 +228,6 @@ export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
   gone: "face",
 }
 
-/** The level a card at a place of `place` is drawn at: a folded column is a face. */
+/** The level a card at a place of `place` is drawn at: a folded column, or a shut margin, is a face. */
 export const detailOf = (place: CardPlace["kind"], folded: boolean): Detail =>
   folded ? "face" : DETAIL_ON[place]

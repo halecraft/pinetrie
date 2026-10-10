@@ -5,11 +5,11 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
+  cardIdOfKind,
   type EntryId,
   entryId,
   keyOf,
   NO_CONTENT,
-  noteColumnIdFor,
   type PlaceKey,
   rootIdFor,
   type TextCard,
@@ -46,7 +46,10 @@ const END = entryId("e-end")
 const C1 = cardIdFor("c1")
 const at = atEntry(entryId("e-1"))
 
-const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const NOTES = cardIdOfKind(
+  "note-column",
+  "01a0ffd2-0000-7000-8000-0000000000a1",
+)
 const DRAFTING: CardPlace = { kind: "note", column: NOTES, order: "1" }
 const QUEUED: CardPlace = {
   kind: "queued",
@@ -77,7 +80,7 @@ const BEAS: CardPlace = { kind: "inventory", holder: BEA }
 const ADAS: CardPlace = { kind: "inventory", holder: ADA }
 const ELSEWHERE: CardPlace = {
   kind: "note",
-  column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a2"),
+  column: cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a2"),
   order: "1",
 }
 

@@ -1,7 +1,6 @@
 import {
-  factCardIdFor,
+  cardIdOfKind,
   NO_CONTENT,
-  noteColumnIdFor,
   type ThreadId,
   type ThreadName,
   taskIdFor,
@@ -37,7 +36,7 @@ const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const K = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const [A, B] = [threadIdFor("a"), threadIdFor("b")]
-const N = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const N = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1")
 
 const canvas = (ids: readonly (ThreadId | typeof N)[]): readonly CanvasCard[] =>
   canvasOf(
@@ -313,7 +312,7 @@ describe("a canvas change during a run (ADR-0116)", () => {
     const [steer] = facts()
     planFactCard({
       cards: [],
-      id: factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1"),
+      id: cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f1"),
       // @ts-expect-error: a canvas fact is no fact card's: it would wait for the run's end
       fact: steer?.fact,
     })

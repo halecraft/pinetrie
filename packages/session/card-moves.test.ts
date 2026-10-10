@@ -1,9 +1,9 @@
 import {
   atEntry,
   type CardRecord,
+  cardIdOfKind,
   entryId,
   NO_CONTENT,
-  noteColumnIdFor,
   type TextCard,
   taskIdFor,
   textCardId,
@@ -462,7 +462,10 @@ describe("drawnPlace (ADR-0116)", () => {
     place: { kind: "canvas", task, order: "0000000100", width: 1 },
     content: NO_CONTENT,
   }
-  const column = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+  const column = cardIdOfKind(
+    "note-column",
+    "01a0ffd2-0000-7000-8000-0000000000a1",
+  )
   const notes: CardRecord = {
     kind: "note-column",
     id: column,

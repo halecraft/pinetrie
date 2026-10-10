@@ -1,7 +1,7 @@
 import {
   type CardRecord,
+  cardIdOfKind,
   NO_CONTENT,
-  noteColumnIdFor,
   taskIdFor,
   textCardId,
   threadIdFor,
@@ -16,8 +16,8 @@ const ADA = writerId("ada@x.io")
 const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const [A, B] = [threadIdFor("a"), threadIdFor("b")]
 const [N1, N2] = [
-  noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
-  noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a2"),
+  cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1"),
+  cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a2"),
 ]
 const canvas = (...ids: (typeof A | typeof N1)[]): readonly CanvasCard[] =>
   canvasOf(

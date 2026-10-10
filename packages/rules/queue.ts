@@ -3,14 +3,15 @@
 // the cards a run's facts make.
 
 import {
-  type AskCard,
   type AskCardId,
   type CardId,
+  type CardInPlace,
   type CardPlace,
   type CardRecord,
   type CatchUpCommand,
   type FactCard,
   type FactCardId,
+  hasPlaceKind,
   INVENTORY_SLOTS,
   isTextCard,
   type Move,
@@ -33,24 +34,38 @@ import { orderAfter, orderBetween, respace } from "./order.ts"
 
 // ── the queue (ADR-0048 step 3, S69) ──────────────────────────────────────
 
-/** A queued text card, with its place narrowed. */
-export type QueuedText = TextCard & {
-  readonly place: Extract<CardPlace, { kind: "queued" }>
-}
+/**
+ * A queued card: a card of any kind `KINDS` queues (a text card, a fact on
+ * its way into its thread, an ask from another thread for its busy agent),
+ * with its place narrowed.
+ */
+export type QueuedCard = CardInPlace<"queued">
+
+/** A queued text card. */
+export type QueuedText = Extract<QueuedCard, { readonly kind: "text" }>
 
 /**
- * A queued card: a text card, a fact on its way into its thread (ADR-0126),
- * or an ask from another thread for its busy agent (ADR-0128).
+ * A queued card sent as its queuer's message: a text card, or a reference,
+ * whose quote is sent (ADR-0126).
  */
-export type QueuedCard = QueuedText | FactCard | AskCard
+export type QueuedMessage = Extract<
+  QueuedCard,
+  { readonly kind: "text" | "reference" }
+>
 
 /** Whether a queued card is a text card: a message, not a fact. */
 export const isQueuedText = (c: QueuedCard): c is QueuedText =>
   c.kind === "text"
 
-const isQueued = (c: CardRecord): c is QueuedCard =>
-  c.place.kind === "queued" &&
-  (c.kind === "text" || c.kind === "fact" || c.kind === "ask")
+/**
+ * Whether a queued card is sent as its queuer's message (`QueuedMessage`):
+ * what a Stop holds the queue for, the dock counts, and unqueue all takes
+ * back below the line.
+ */
+export const isQueuedMessage = (c: QueuedCard): c is QueuedMessage =>
+  c.kind === "text" || c.kind === "reference"
+
+const isQueued = (c: CardRecord): c is QueuedCard => hasPlaceKind(c, "queued")
 
 /** Whether a queued card is a fact: nobody's instruction, and it starts no run. */
 const isQueuedFact = (c: QueuedCard): c is FactCard => c.kind === "fact"
@@ -205,7 +220,7 @@ export const planUnqueueAll = (
   lane: ThreadId,
 ): readonly Move[] =>
   queuedOn(cards, lane)
-    .filter(isQueuedText)
+    .filter(isQueuedMessage)
     .map(c => moveOf(c, noteOf(c.place)))
 
 /**
@@ -221,7 +236,7 @@ export const planUnqueueAll = (
  */
 export function planUnsent(input: {
   readonly cards: readonly CardRecord[]
-  readonly card: QueuedText
+  readonly card: QueuedMessage
   readonly reason: string
   /** Mints the id of a note column made for it. */
   readonly newColumn: () => NoteColumnId
@@ -233,31 +248,21 @@ export function planUnsent(input: {
     newColumn: input.newColumn,
     by: card.placer,
   })
+  // Only a text card keeps why: a reference's content is its address and quote.
+  const said: QueuedMessage =
+    card.kind === "text"
+      ? { ...card, content: { ...card.content, unsent: reason } }
+      : card
   if (
     notes === null ||
     (notes.place.kind === "inventory" &&
       inventoryFull(cards, notes.place.holder, card.id))
   )
-    return {
-      steps: [
-        {
-          kind: "write",
-          record: { ...card, content: { ...card.content, unsent: reason } },
-        },
-      ],
-      hold: true,
-    }
+    return { steps: [{ kind: "write", record: said }], hold: true }
   return {
     steps: [
       ...notes.first,
-      {
-        kind: "write",
-        record: {
-          ...card,
-          place: notes.place,
-          content: { ...card.content, unsent: reason },
-        },
-      },
+      { kind: "write", record: { ...said, place: notes.place } },
     ],
     hold: false,
   }
@@ -395,17 +400,19 @@ export type CarryPlan =
       readonly card: QueuedText
       readonly intent: string
     }
-  | { readonly kind: "send"; readonly card: QueuedText }
+  | { readonly kind: "send"; readonly card: QueuedMessage }
   /** Relay an ask from another thread: its run starts here (ADR-0128). */
   | { readonly kind: "relay"; readonly relay: RelayDetails }
 
 /**
  * A popped card and its words (`textSourceOf`: a text card's document, a
- * fact's fact) -> what the drain does with it. Pure.
+ * reference's quote, a fact's fact) -> what the drain does with it: a
+ * reference's quote is sent as a message, with no command. Pure.
  */
 export function planCarry(card: QueuedCard, text: string): CarryPlan {
   if (card.kind === "fact") return { kind: "fact", fact: card.content.fact }
   if (card.kind === "ask") return { kind: "relay", relay: card.content.relay }
+  if (card.kind === "reference") return { kind: "send", card }
   const blank = text.trim() === ""
   const { command } = card.content
   if (command === "split") return { kind: "split", card, intent: text.trim() }

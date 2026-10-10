@@ -26,6 +26,7 @@ import type {
   CanvasKey,
   CardCommand,
   CardWidth,
+  IdOf,
   Move,
   MoveDirection,
   MoveOf,
@@ -338,15 +339,10 @@ declare const noteColumnIdBrand: unique symbol
  */
 export type NoteColumnId = string & { readonly [noteColumnIdBrand]: true }
 
-const NOTE_COLUMN_PREFIX = "n-"
-
-/** A note column's id from the text after its prefix: for minters, fixtures and parsers. */
-export const noteColumnIdFor = (id: string): NoteColumnId =>
-  `${NOTE_COLUMN_PREFIX}${id}` as NoteColumnId
-
 /** Whether text names a note column: the check wherever one is read. */
 export const isNoteColumnId = (s: string): s is NoteColumnId =>
-  s.startsWith(NOTE_COLUMN_PREFIX) && s.length > NOTE_COLUMN_PREFIX.length
+  s.startsWith(KINDS["note-column"].prefix) &&
+  s.length > KINDS["note-column"].prefix.length
 declare const mediaIdBrand: unique symbol
 /** A media card's id (ADR-0116): `m-` and a uuidv7. */
 export type MediaId = string & { readonly [mediaIdBrand]: true }
@@ -360,12 +356,6 @@ declare const factCardIdBrand: unique symbol
  */
 export type FactCardId = string & { readonly [factCardIdBrand]: true }
 
-const FACT_CARD_PREFIX = "x-"
-
-/** A fact card's id from the text after its prefix: for minters, fixtures and parsers. */
-export const factCardIdFor = (id: string): FactCardId =>
-  `${FACT_CARD_PREFIX}${id}` as FactCardId
-
 declare const referenceCardIdBrand: unique symbol
 /**
  * A reference card's id (ADR-0126): `q-` and a uuidv7, minted by the page
@@ -375,24 +365,12 @@ export type ReferenceCardId = string & {
   readonly [referenceCardIdBrand]: true
 }
 
-const REFERENCE_CARD_PREFIX = "q-"
-
-/** A reference card's id from the text after its prefix: for minters, fixtures and parsers. */
-export const referenceCardIdFor = (id: string): ReferenceCardId =>
-  `${REFERENCE_CARD_PREFIX}${id}` as ReferenceCardId
-
 declare const askCardIdBrand: unique symbol
 /**
  * An ask card's id (ADR-0128): `a-` and a uuidv7, minted by the host as it
  * queues an ask for a busy agent.
  */
 export type AskCardId = string & { readonly [askCardIdBrand]: true }
-
-const ASK_CARD_PREFIX = "a-"
-
-/** An ask card's id from the text after its prefix: for minters, fixtures and parsers. */
-export const askCardIdFor = (id: string): AskCardId =>
-  `${ASK_CARD_PREFIX}${id}` as AskCardId
 
 /**
  * Any card's id: the key of its record in the places document. Its kind is
@@ -427,6 +405,15 @@ const CARD_PREFIXES: readonly (readonly [string, CardKind])[] = Object.entries(
   spec.prefix === null ? [] : [[spec.prefix, kind as CardKind] as const],
 )
 
+/**
+ * A card of `kind`'s id from the text after its prefix (`KINDS`), a uuidv7
+ * where it is minted: for minters, fixtures and parsers.
+ */
+export const cardIdOfKind = <K extends CardKind>(
+  kind: K,
+  rest: string,
+): IdOf<K> => `${KINDS[kind].prefix ?? ""}${rest}` as IdOf<K>
+
 /** A card's kind, read from its id's prefix (`KINDS`): a bare id is a text card's. */
 export const kindOfCard = (id: CardId): CardKind =>
   CARD_PREFIXES.find(([p]) => id.startsWith(p))?.[1] ?? "text"
@@ -442,7 +429,9 @@ export const isTextCardId = (id: CardId): id is TextCardId =>
 const UUIDV7 =
   "[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
 const TEXT_CARD_RE = new RegExp(`^${UUIDV7}$`)
-const PREFIXED_CARD_RE = new RegExp(`^[nmfxaq]-${UUIDV7}$`)
+const PREFIXED_CARD_RE = new RegExp(
+  `^(?:${CARD_PREFIXES.map(([p]) => p).join("|")})${UUIDV7}$`,
+)
 
 /**
  * A card's id as it comes in from the wire or the store; undefined for text

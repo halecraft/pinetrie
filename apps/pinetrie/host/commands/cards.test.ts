@@ -1,11 +1,11 @@
 import {
   type CardCommand,
   type CardId,
+  cardIdOfKind,
   ERR,
   entryId,
   isTextCard,
   type MoveDirection,
-  noteColumnIdFor,
   type QueueHoldChange,
   type QueueMove,
   type Reorder,
@@ -70,7 +70,10 @@ const LANE = threadIdFor("0123456789abcdef")
 const E1 = entryId("e-1")
 const C1 = cardIdFor("c1")
 /** A note column on the lane's task's canvas (`putNoteColumn`, ADR-0116). */
-const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const NOTES = cardIdOfKind(
+  "note-column",
+  "01a0ffd2-0000-7000-8000-0000000000a1",
+)
 /** A note in it: a shared place, in the lane's task. */
 const atEnd = { kind: "note", column: NOTES, order: "a" } as const
 const noteKey = { kind: "note", column: NOTES } as const

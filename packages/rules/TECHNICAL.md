@@ -45,6 +45,10 @@ follow this list. A name only this package uses is imported from its module.
   each kind of host message in a thread is (below).
 - `land.ts`, `update.ts`, `stack.ts`, `pinned.ts`: the resolution's prompt,
   the update and stack messages, the pinned cards a run reads.
+- `markdown.ts`: `parseMarkdown`, the one mdast parse every reader of a
+  message's markdown here uses (`images.ts`, `blocks.ts`, `links.ts`).
+- `card-words.ts`: `wordsOf`, what a card says from where its kind keeps
+  its words (`textSourceOf`).
 - `fact.ts`, `behind.ts`, `agent-commands.ts`: what a command on an offer
   did, as a fact in the thread; the base's new work, told or caught up; the
   agent's `catch_up` and `split_offer` (ADR-0080).
@@ -250,10 +254,12 @@ are the only code that builds or reads the shape.
 - **`imageSources` is which images a text shows**: `image` nodes, and
   `imageReference` nodes resolved through the text's definitions (the first
   definition of an identifier wins), in order, each once. It parses with
-  `mdast-util-from-markdown` and the GFM extensions, the packages under the
-  client's remark-parse and remark-gfm at the same versions
-  (`workspace.test.ts`), so the host and the drawing read one tree. An image
-  in code is text; a link to an image is a link.
+  `parseMarkdown` (`markdown.ts`): `mdast-util-from-markdown` and the GFM
+  extensions, the packages under the client's remark-parse and remark-gfm
+  at the same versions (`workspace.test.ts`), so the host and the drawing
+  read one tree. Blocks (`blocks.ts`) and links to addresses (`links.ts`)
+  parse through it too, so every reader counts the same tree. An image in
+  code is text; a link to an image is a link.
 - **`pastedImages`** keeps the sources `blobOfUrl` accepts: exactly
   `/blob/<64 lower-case hex>`.
 - **`planImages`** turns those hashes and the store's refs into the message's
@@ -316,8 +322,22 @@ which are swept.
   reordered where it is (`reordered`: not a fact), what a put does to your
   hand (`put`), and where its words are (`text`). `textSourceOf` turns
   that into the document, fact or nothing a reader reads, and `wordsOf`
-  (`fact.ts`) reads it: the drain's pop and the pinned cards a run reads
+  (`card-words.ts`) reads it: the drain's pop and the pinned cards a run reads
   (`pinnedReads`) gather through it, so no reader branches on kind.
+- **What may be where is read from `PLACES_OF`, never listed by hand.**
+  `hasPlaceKind(card, place)` (a `CardInPlace<P>`: every kind `KINDS` puts
+  at `P`, its place narrowed) is how the queue (`queuedOn`), the canvas
+  (`isCanvasCard`) and a margin (`marginCards`) find their cards;
+  `cardFitsPlace(card, place)` is whether its kind is ever there (the
+  page's take and put into an inventory); and
+  `isMovable(card)` is `KINDS`' `moves`. A kind added to a place's row is
+  queued, taken or put there with no other change. A test of what a kind
+  *is* (a fact's row in the dock) still reads its kind.
+- **A card's id is built from `KINDS`** (`cardIdOfKind(kind, uuid)`, core's
+  `index.ts`): its prefix and the rest, typed by `IdOf<K>`. `parseCardId`'s
+  pattern is built from the same prefixes, so a kind's id parses as soon
+  as its row has one. Each kind keeps its own brand (`NoteColumnId`,
+  `FactCardId`, …).
 - **An address names a thread, an entry, a block, a range or a card**
   (core's `address.ts`, ADR-0126): one codec, `printAddress` and
   `parseAddress`, total, for the record, the wire, the pane and links in
@@ -327,9 +347,13 @@ which are swept.
   page draws by too; a past address's markdown is `pastMarkdown`.
 - **A reference is a card holding an address** (`ReferenceCard`, `q-`
   ids): its content is the address and its quote's blob, so it draws
-  without loading the referent's root. It is a note, in an inventory, or
-  discarded: nothing that reads a queue or pinned cards reads a quote yet
-  (`wordsOf` reads none), so it is in neither. A put from your hand copies
+  without loading the referent's root. It is a note, a comment, queued, in
+  an inventory, or discarded; never pinned, since the readers of pinned
+  cards read no quote. Queued, it is a message (`QueuedMessage`,
+  `isQueuedMessage`): the drain reads its quote's blob before the pop
+  (`queuedQuotes`, `wordsOf`'s `blob` reader) and sends it as its queuer's,
+  a Stop holds the queue for it, and unqueue all takes it back. A put from
+  your hand copies
   it (`KINDS`' `put`). It is made by `planMakeReference`
   (through `planMake`), the host's `make-reference`; a creation, so in no
   history. *Edit as text* is `planEditAsText`: one move set, a new text card
@@ -511,6 +535,30 @@ which are swept.
   column in the same step as the moves. The page draws a pending one in
   the column the host would choose (`drawnPlace`), or where it was while
   the host would make one.
+- **A margin is an entry's place for comments** (ADR-0126): `{ kind:
+  "margin", entry, thread, order }`, stored as a `margin` row, the entry in
+  `at` and its thread in `lane`. It is a text card's and a reference's
+  place, and a reorder place (`REORDERS`: the entry's comments,
+  `marginCards`, the neighbours next to each other); a move or a make puts
+  a card at its end (`marginEnd`). Its task is its thread's
+  (`taskOfPlace`), so it is found without a tree; the host checks that
+  thread against the entry's own before it plans (`planMoveTargets`'
+  `entryThreads`, read from the entry's root by `marginEntryThreads` in
+  `commands/cards.ts`), and refuses one naming another, `no-place`.
+- **A drop resolves to a place** (ADR-0126). A card of a kind no canvas
+  takes, sent to a spot on one (`canvas-at`), lands in the container its
+  kind is made in there: `WRAPS` (core's `places.ts`) says which, a note
+  column for a text card or a reference, so a later kind is a row. It is
+  part of `TargetOf` (`isTargetOf`, the wire's check), and
+  `planMoveTargets` resolves it: the spot ranked as any card's there
+  (`rankOnCanvas`), a note column made at that rank by the mover
+  (`makeNoteColumn`, through `planMake`, as `toNotes` makes one), and the
+  card moved in as its first note. Both are one `planMoveRequest` write, so
+  one gesture: the mover's history in that task (`historyOf`) undoes both.
+  The page draws the card where it was until the host writes the column,
+  as it does for a column `toNotes` would make. A reference copied from
+  your hand to a spot (`make-reference`) resolves the same way; a creation
+  enters no history, so its column is not undone with it.
 - **A card the host could not send** (`planUnsent`) goes to the note column
   nearest its thread the same way, saying why. Where it has nowhere to go
   (its thread's holder's inventory full, or a thread with no card) it stays

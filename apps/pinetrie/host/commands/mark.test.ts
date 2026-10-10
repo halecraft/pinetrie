@@ -1,4 +1,4 @@
-import { noteColumnIdFor, threadIdFor, writerId } from "@pinetrie/core"
+import { cardIdOfKind, threadIdFor, writerId } from "@pinetrie/core"
 import { deleteRecord, MARK, NOTE_COLUMN, setRecord } from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import {
@@ -46,7 +46,10 @@ test("a note column on a canvas takes its title in its own record (ADR-0116)", a
   const b = basics()
   const ada = writerId("ada@example.com")
   putTask(b, threadIdFor("t"))
-  const column = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+  const column = cardIdOfKind(
+    "note-column",
+    "01a0ffd2-0000-7000-8000-0000000000a1",
+  )
   putNoteColumn(b, column)
   const scribe = record<MarkDeps["records"]>({ writeValues: async () => {} })
   const out = await handleMark({ basics: b, records: scribe.port }, ada, {

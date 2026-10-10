@@ -1,9 +1,8 @@
 // rules/images — the images a message's markdown shows (ADR-0042).
 //
-// The host decides what a sent message's images are with the micromark and
-// mdast packages that the client's remark-parse and remark-gfm wrap, at the
-// same versions, so the images it finds are the ones the client draws. A
-// pasted image is `![name](/blob/<sha256>)`.
+// The host decides what a sent message's images are from the tree the client
+// draws (`parseMarkdown`), so the images it finds are the ones the client
+// draws. A pasted image is `![name](/blob/<sha256>)`.
 
 import {
   blobOfUrl,
@@ -13,9 +12,7 @@ import {
   refused,
   type Sha256,
 } from "@pinetrie/core"
-import { fromMarkdown } from "mdast-util-from-markdown"
-import { gfmFromMarkdown } from "mdast-util-gfm"
-import { gfm } from "micromark-extension-gfm"
+import { parseMarkdown } from "./markdown.ts"
 
 /** The fields of an mdast node this reads; the rest are ignored. */
 interface MdNode {
@@ -31,10 +28,7 @@ interface MdNode {
  * image inside code is text, and a link to an image is not an image.
  */
 export function imageSources(text: string): string[] {
-  const tree = fromMarkdown(text, {
-    extensions: [gfm()],
-    mdastExtensions: [gfmFromMarkdown()],
-  }) as MdNode
+  const tree = parseMarkdown(text) as MdNode
   const definitions = new Map<string, string>()
   const images: ({ url: string } | { ref: string })[] = []
   const walk = (node: MdNode): void => {

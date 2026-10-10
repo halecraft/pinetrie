@@ -1926,4 +1926,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "the blob sweep keeps a reference's quote, and deletes one no card holds (ADR-0126)",
   },
+  {
+    name: "the drain reads no queued quote",
+    file: "apps/pinetrie/host/queued-card-pop.ts",
+    from: '    blob: sha => quotes.get(sha) ?? "",\n',
+    to: '    blob: () => "",\n',
+    command: unit,
+    expect:
+      "a queued reference's quote, read from its blob, is sent as its queuer's message; its record goes, and nothing is destroyed (ADR-0126)",
+  },
 ]

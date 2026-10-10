@@ -7,17 +7,16 @@
 
 import {
   type BoardPlace,
-  type CanvasPlace,
-  type Card,
   type CardId,
+  type CardInPlace,
   type CardPlace,
   type CardRecord,
   type EntryId,
+  hasPlaceKind,
   isThreadId,
   type MoveTarget,
   makeCard,
   NO_CONTENT,
-  type NoteColumnCard,
   type PlaceKey,
   type RootId,
   type TaskId,
@@ -58,16 +57,14 @@ export const TASK: RecordSpec<TaskRecord, TaskId, "session"> = {
 }
 
 /** A card on a canvas, in its task's order. */
-export type CanvasCard =
-  | (Card<"thread"> & { readonly place: CanvasPlace })
-  | (NoteColumnCard & { readonly place: CanvasPlace })
+export type CanvasCard = CardInPlace<"canvas">
 
 /** A canvas card's kinds: what every consumer of a canvas switches over. */
 export type CanvasKind = CanvasCard["kind"]
 
 /** Whether `c` is on a canvas. */
 export const isCanvasCard = (c: CardRecord): c is CanvasCard =>
-  c.kind !== "text" && c.place.kind === "canvas"
+  hasPlaceKind(c, "canvas")
 
 const onCanvas = isCanvasCard
 
@@ -186,8 +183,9 @@ export const NO_TASK_INDEX: TaskIndex = indexTasks([], new Map())
 
 /**
  * The task a place is in (ADR-0116): a canvas card's, a fresh column's, a
- * card pinned to a task's or a gone card's own; a note, its note column's; a card at a thread, its
- * thread's task (a queued card's thread is its lane). Null for an
+ * card pinned to a task's or a gone card's own; a note, its note column's; a card at a thread or
+ * in an entry's margin, its thread's task (a queued card's thread is its
+ * lane). Null for an
  * inventory, or a thread or a note column in none. Pure.
  */
 export function taskOfPlace(
@@ -209,6 +207,7 @@ export function taskOfPlace(
     case "queued":
     case "composing":
     case "pinned":
+    case "margin":
       return tasks.taskOfThread.get(place.thread) ?? null
   }
 }

@@ -7,13 +7,13 @@
 import assert from "node:assert/strict"
 import {
   type CardId,
+  cardIdOfKind,
   commitId,
   ERR,
   entryId,
   type Intent,
   type MoveOf,
   type MoveTarget,
-  noteColumnIdFor,
   type PlaceKey,
   ROOT,
   rootIdFor,
@@ -280,7 +280,10 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "mark",
       of: {
         kind: "note-column",
-        column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+        column: cardIdOfKind(
+          "note-column",
+          "01a0ffd2-0000-7000-8000-0000000000a1",
+        ),
       },
       title: "Ideas",
     },
@@ -645,7 +648,7 @@ test("a reply carries the places document's rev when its step wrote it; none is 
 test("a note's key carries its column, and a thread's nearest notes its thread (ADR-0116)", () => {
   const note = {
     kind: "note",
-    column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+    column: cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1"),
   } as const
   assert.deepEqual(decodeKey(encodeKey(note)), note)
   assert.equal(decodeKey('{"kind":"note","column":"t-x"}'), undefined)
@@ -665,7 +668,10 @@ test("a note's key carries its column, and a thread's nearest notes its thread (
 })
 
 test("a move's target may be a spot on a canvas, after a card or first, and no place (ADR-0116)", () => {
-  const made = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+  const made = cardIdOfKind(
+    "note-column",
+    "01a0ffd2-0000-7000-8000-0000000000a1",
+  )
   for (const after of [TEST_THREAD, null]) {
     const to = { kind: "canvas-at", task: TEST_TASK, after } as const
     const moves = decodeMoves(encodeMoves([{ card: made, from: null, to }]))
@@ -694,7 +700,7 @@ test("a move's target may be a spot on a canvas, after a card or first, and no p
   )
 })
 
-test("decode: a move is typed by its card's kind, refused to or from a place that kind is never in (ADR-0117)", () => {
+test("decode: a move is typed by its card's kind, refused to or from a place that kind is never in (ADR-0117); a spot on a canvas for a kind WRAPS (ADR-0126)", () => {
   const canvas = { kind: "canvas", task: TEST_TASK } as const
   const inventory = {
     kind: "inventory",
@@ -727,15 +733,18 @@ test("decode: a move is typed by its card's kind, refused to or from a place tha
     }),
     "string",
   )
-  // A text card never onto a canvas, by a key or a spot.
+  // A text card never onto a canvas by its key; at a spot there, the host
+  // makes it a note column (`WRAPS`, ADR-0126). A fact, at neither.
   assert.equal(decoded(cardIdFor("c1"), inventory, queued), "object")
   assert.equal(decoded(cardIdFor("c1"), inventory, canvas), "string")
+  const spot = { ...canvas, kind: "canvas-at", after: null } as const
+  assert.equal(decoded(cardIdFor("c1"), inventory, spot), "object")
   assert.equal(
-    decoded(cardIdFor("c1"), inventory, {
-      ...canvas,
-      kind: "canvas-at",
-      after: null,
-    }),
+    decoded(
+      cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f9"),
+      queued,
+      spot,
+    ),
     "string",
   )
   const thread: MoveOf<"thread"> = {
@@ -793,7 +802,7 @@ test("decode: a copy names its source, the end it forks at, and one new thread's
 })
 
 test("decode: a mark names a task or a note column, never both or neither (ADR-0116)", () => {
-  const N = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+  const N = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1")
   assert.equal(
     refusalCode(decodeCommand({ kind: "mark", task: TEST_TASK, cardId: N })),
     ERR.UNKNOWN_TARGET,
@@ -1022,7 +1031,7 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
   // A reorder is in a queue, among pinned cards or in a note column alone.
   const note = {
     kind: "note",
-    column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+    column: cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1"),
   }
   const after = cardIdFor("c2")
   assert.equal(reorder(cardIdFor("c1"), { at: note, after }), "reorder")

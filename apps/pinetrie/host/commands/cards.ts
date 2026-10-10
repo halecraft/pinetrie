@@ -16,6 +16,7 @@ import {
   type CardCommand,
   type CardId,
   type CardRecord,
+  cardIdOfKind,
   DISCARDED,
   type EntryId,
   ERR,
@@ -26,7 +27,6 @@ import {
   type MoveDirection,
   moveOf,
   type NoteColumnId,
-  noteColumnIdFor,
   type QueueHoldChange,
   type QueueMove,
   type Reorder,
@@ -60,6 +60,7 @@ import {
   cardsOfParts,
   historyOf,
   type LiftPlan,
+  lanesToDrain,
   type MoveStep,
   type MovesStep,
   NO_DISCARDS,
@@ -147,7 +148,8 @@ export function createCardCommands(deps: CardCommandDeps) {
   const { docs, live, places, session } = deps.basics
   const running = (lane: ThreadId) => readRunning(deps.basics.live, lane)
   /** A note column's id, for one made for a note with nowhere else to go. */
-  const newColumn = (): NoteColumnId => noteColumnIdFor(deps.basics.newId())
+  const newColumn = (): NoteColumnId =>
+    cardIdOfKind("note-column", deps.basics.newId())
 
   /** A refused move: where the card is now and who put it there. */
   const unmoved = (
@@ -187,6 +189,26 @@ export function createCardCommands(deps: CardCommandDeps) {
       await deps.provenance.after(cause, before)
     for (const lane of drain) deps.drain(lane)
     return settled({ kind: "moved" }, rev)
+  }
+
+  /**
+   * The thread of each entry whose margin a move sends a card to (ADR-0126),
+   * from its root's index, so `planMoveTargets` can refuse a margin that
+   * names another thread. An entry not found is left out.
+   */
+  async function marginEntryThreads(
+    moves: readonly Move[],
+  ): Promise<ReadonlyMap<EntryId, ThreadId>> {
+    const threads = readThreads(session)
+    const found = new Map<EntryId, ThreadId>()
+    for (const { to } of moves) {
+      if (to.kind !== "margin") continue
+      const root = threads.get(to.thread)?.root
+      if (root === undefined) continue
+      const entry = readTreeIndex(await docs.root(root)).entries[to.entry]
+      if (entry !== undefined) found.set(to.entry, entry.thread)
+    }
+    return found
   }
 
   /**
@@ -303,6 +325,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     const task = historyOf(moves, readPlaces(places), discards)
     const gesture =
       task === null ? undefined : await deps.histories.gestureOf(writer, task)
+    const entryThreads = await marginEntryThreads(moves)
     // plan: each move to a thread's notes to its nearest note column, made
     // first where its task has none, then the moves
     const { step, drain } = planMoveRequest(
@@ -312,6 +335,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       running,
       discards,
       newColumn,
+      entryThreads,
     )
     // execute
     return carry(step, drain, { kind: "move", by: writer }, gesture)
@@ -537,13 +561,16 @@ export function createCardCommands(deps: CardCommandDeps) {
     /**
      * A reference made where its move sends it (ADR-0126): the target
      * resolved first (a thread's nearest notes, made where its task has
-     * none), then made through `planMakeReference`. A creation, so it
-     * enters no history, as a text card's does not.
+     * none; a margin checked against its entry's thread), then made through
+     * `planMakeReference`. A creation, so it enters no history, as a text
+     * card's does not. Queued on an idle thread, it is drained.
      */
     async makeReference(
       writer: WriterId,
       made: Extract<Intent, { kind: "make-reference" }>,
     ): Promise<Settled> {
+      // gather
+      const entryThreads = await marginEntryThreads([made.move])
       // plan
       const cards = readPlaces(places)
       const resolved = planMoveTargets({
@@ -551,6 +578,7 @@ export function createCardCommands(deps: CardCommandDeps) {
         moves: [made.move],
         sender: writer,
         newColumn,
+        entryThreads,
       })
       if (resolved.kind === "refused") return unmoved(resolved)
       const [move] = resolved.moves
@@ -561,12 +589,12 @@ export function createCardCommands(deps: CardCommandDeps) {
         { address: made.address, quote: made.quote },
         writer,
       )
-      // execute
+      if (step.kind === "refused") return unmoved(step)
+      const steps = [...resolved.first, step]
+      // execute: a reference queued on an idle thread is popped at once
       return carry(
-        step.kind === "refused"
-          ? step
-          : { kind: "steps", steps: [...resolved.first, step] },
-        [],
+        { kind: "steps", steps },
+        lanesToDrain(cards, steps, running),
         { kind: "move", by: writer },
       )
     },

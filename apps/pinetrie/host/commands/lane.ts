@@ -5,9 +5,9 @@
 
 import {
   type AcceptedAction,
+  cardIdOfKind,
   ERR,
   type ErrCode,
-  factCardIdFor,
   type Intent,
   indexAsks,
   type LaneView,
@@ -133,7 +133,7 @@ export async function handleStop(
     holds: readQueueHolds(session),
     by,
     now: deps.basics.now(),
-    id: factCardIdFor(newId()),
+    id: cardIdOfKind("fact", newId()),
   })
   if (planned.kind === "abort") {
     if (planned.hold !== null)
@@ -280,7 +280,7 @@ export async function recordFact(
   const before = deps.provenance.before()
   const steps = planFactCard({
     cards: readPlaces(places),
-    id: factCardIdFor(newId()),
+    id: cardIdOfKind("fact", newId()),
     fact,
   })
   // The host's own make is refused by no queue: should one be, it is said.

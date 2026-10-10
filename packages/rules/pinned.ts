@@ -20,8 +20,8 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
+import { wordsOf } from "./card-words.ts"
 import { CardIdSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
-import { wordsOf } from "./fact.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 
 export const PINNED_TYPE = "pinetrie.pinned"
@@ -206,6 +206,7 @@ export const pinnedReads = (
   docText: (card: TextCardId) => string,
 ): PinnedCardRead[] =>
   pinned.flatMap(c => {
-    const text = wordsOf(textSourceOf(c), docText)
+    // A reference is never pinned (`KINDS`): no quote is read here.
+    const text = wordsOf(textSourceOf(c), { doc: docText, blob: () => "" })
     return text.trim() === "" ? [] : [{ id: c.id, text, by: c.owner }]
   })

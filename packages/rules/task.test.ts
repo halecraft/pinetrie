@@ -1,7 +1,7 @@
 import {
   type CardRecord,
+  cardIdOfKind,
   NO_CONTENT,
-  noteColumnIdFor,
   rootIdFor,
   type ThreadId,
   taskIdFor,
@@ -24,7 +24,7 @@ const [A, B, NEW] = ["a", "b", "new"].map(threadIdFor) as [
   ThreadId,
   ThreadId,
 ]
-const N = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const N = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1")
 const DOING = workflowStateIdFor("d")
 
 /** `ids` on `K`'s canvas, ranked `orders`. */

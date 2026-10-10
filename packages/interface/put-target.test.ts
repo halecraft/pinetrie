@@ -1,7 +1,7 @@
 import {
   atEntry,
+  cardIdOfKind,
   entryId,
-  noteColumnIdFor,
   ROOT,
   rootIdFor,
   taskIdFor,
@@ -65,12 +65,17 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     { kind: "pinned", key: "k-fresh" },
     {
       kind: "notes",
-      column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+      column: cardIdOfKind(
+        "note-column",
+        "01a0ffd2-0000-7000-8000-0000000000a1",
+      ),
     },
     { kind: "state", state: workflowStateIdFor("s-1") },
     { kind: "sidebar", before: TEST_TASK },
     { kind: "sidebar", before: null },
     { kind: "taskPinned", task: TEST_TASK },
+    { kind: "canvas", task: TEST_TASK, after: LANE },
+    { kind: "canvas", task: TEST_TASK, after: null },
   ]
 
   test.each(targets)("a drop on %o lands where a put to it lands", target => {
@@ -91,7 +96,10 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     })
     expect(at(targets[8] as PutTarget)).toEqual({
       kind: "note",
-      column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+      column: cardIdOfKind(
+        "note-column",
+        "01a0ffd2-0000-7000-8000-0000000000a1",
+      ),
     })
     expect(at(targets[1] as PutTarget)).toEqual({
       kind: "fresh",

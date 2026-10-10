@@ -66,6 +66,7 @@ export function CardGrid(p: {
           hasCard: selectedCard !== null,
           open: shownOpen,
           inText: isTextBox(document.activeElement),
+          comments: false,
         })
         if (act === null) return
         e.preventDefault()
@@ -81,6 +82,9 @@ export function CardGrid(p: {
             return
           case "fold":
             select(view.selected)
+            return
+          // An inventory's cells take no comments.
+          case "comment":
             return
         }
       }}

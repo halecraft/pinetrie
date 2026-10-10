@@ -53,6 +53,8 @@ export type CardMoveTo =
   | "message"
   | "note"
   | "queue"
+  /** A reference to it, queued on its thread; it stays (ADR-0126). */
+  | "reference"
   | "pinned"
   | "task"
   | "inventory"
@@ -177,6 +179,21 @@ const moveItems = (
     // Unpinned from the task, it goes to the task's first note column.
     case "task-pinned":
       return [{ to: "note", act: { kind: "unpin", card: id } }, take]
+    // A comment stays beside its entry: a reference to it tells the agent
+    // (ADR-0126).
+    case "margin":
+      return [
+        {
+          to: "reference",
+          act: {
+            kind: "queueReference",
+            card: id,
+            entry: place.entry,
+            thread: place.thread,
+          },
+        },
+        take,
+      ]
     case "fresh":
       return [take]
     // Put is an inventory card's move, × discards it, and a drag moves it
@@ -329,6 +346,11 @@ const MOVE: Readonly<Record<Exclude<CardMoveTo, object>, MoveWords>> = {
   inventory: {
     label: "Move to your inventory",
     title: "take into your inventory (Ctrl+Shift+I)",
+  },
+  reference: {
+    label: "Queue a reference",
+    title:
+      "queue a reference to this comment on its thread: the agent reads it, under the message it is on, once; the comment stays",
   },
 }
 

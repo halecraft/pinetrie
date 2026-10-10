@@ -1,4 +1,4 @@
-import { noteColumnIdFor, threadIdFor } from "@pinetrie/core"
+import { cardIdOfKind, threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { columnMenu } from "./column-menu.ts"
 
@@ -26,6 +26,6 @@ test("a thread's ⋯ copies it here or into your inventory, and takes it; it lis
     ],
     ["Move to your inventory", { kind: "takeIntoInventory", card }],
   ])
-  const notes = columnMenu({ card: noteColumnIdFor("n"), width: 1 })
+  const notes = columnMenu({ card: cardIdOfKind("note-column", "n"), width: 1 })
   expect(notes.map(s => s.key)).toEqual(["canvas"])
 })

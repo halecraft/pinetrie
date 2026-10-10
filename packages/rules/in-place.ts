@@ -17,6 +17,7 @@ import {
   sameKey,
 } from "@pinetrie/core"
 import { byOrder, isOrdered, orderOf } from "./card.ts"
+import { marginCards } from "./margin.ts"
 import type { MoveStep, PlaceStep } from "./moves.ts"
 import { notesIn } from "./notes.ts"
 import { orderBetween, respace } from "./order.ts"
@@ -54,6 +55,8 @@ interface ReorderRule<K extends ReorderAt["kind"]> {
  * - A task's pinned cards (ADR-0116): its own, the neighbours next to each
  *   other.
  * - A note column: its notes, the neighbours next to each other.
+ * - An entry's margin (ADR-0126): its comments, the neighbours next to each
+ *   other.
  * - A canvas: its task's cards (`canvasOf`), the neighbours next to each
  *   other.
  */
@@ -75,6 +78,11 @@ export const REORDERS: { readonly [K in ReorderAt["kind"]]: ReorderRule<K> } = {
   },
   note: {
     siblings: (cards, at) => notesIn(cards, at.column),
+    adjacent: true,
+    passesFacts: true,
+  },
+  margin: {
+    siblings: (cards, at) => marginCards(cards, at.entry),
     adjacent: true,
     passesFacts: true,
   },

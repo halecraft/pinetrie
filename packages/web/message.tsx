@@ -5,6 +5,7 @@
 import { useSelector } from "@kyneta/react"
 import type { StreamId, ToolCall, TranscriptMessage } from "@pinetrie/core"
 import {
+  COMMENT,
   callLabel,
   callMark,
   callStatus,
@@ -36,7 +37,7 @@ import {
 } from "@pinetrie/interface"
 import { canvasLines } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
-import { newReferenceCardId } from "@pinetrie/session"
+import { newCardId, newReferenceCardId } from "@pinetrie/session"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
 import { COPIED, useCopy } from "./copy.ts"
@@ -226,7 +227,13 @@ function Tools({
   onAct: (act: MessageAct) => void
 }) {
   const { edit, branch } = tools
-  if (!tools.copy && edit === undefined && branch === undefined) return null
+  if (
+    !tools.copy &&
+    !tools.comment &&
+    edit === undefined &&
+    branch === undefined
+  )
+    return null
   return (
     <div className="tools">
       {tools.copy && <CopyButton node={node} />}
@@ -261,6 +268,24 @@ function Tools({
           type="button"
         >
           {TAKE_COPY}
+        </button>
+      )}
+      {tools.comment && (
+        <button
+          aria-label={COMMENT.title}
+          className="comment"
+          onClick={() =>
+            onAct({
+              kind: "comment",
+              card: newCardId(),
+              entry: node.id,
+              thread: node.thread,
+            })
+          }
+          title={COMMENT.title}
+          type="button"
+        >
+          {COMMENT.label}
         </button>
       )}
       {edit?.kind === "branch" && (

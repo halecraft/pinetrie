@@ -1,5 +1,7 @@
 import {
+  addressUrl,
   type CardRecord,
+  cardIdOfKind,
   entryId,
   rootIdFor,
   type Sha256,
@@ -30,6 +32,10 @@ const ports = () => {
       request: vi.fn(async (): Promise<Outcome> => answer),
       offer: vi.fn(async (): Promise<Outcome> => answer),
       createCard: vi.fn(async () => accepted),
+      // Every card's text, as the comment queued below has it.
+      cardText: vi.fn(
+        () => ({ text: () => "  look at this  " }) as never,
+      ) as AppPorts["session"]["cardText"],
       makeReference: vi.fn(async (): Promise<MoveAnswer> => accepted),
       editAsText: vi.fn(async (): Promise<Outcome> => answer),
       moveCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
@@ -336,6 +342,25 @@ test("a spin-off into the sidebar places and shows its thread only once the host
   expect(p.session.request).toHaveBeenCalledWith(request)
   await vi.waitFor(() =>
     expect(p.session.openThreads.open).toHaveBeenCalledWith(NEW_TASK, null),
+  )
+})
+
+test("a comment queued as a reference keeps its text under a link to its entry, then makes the reference in the queue (ADR-0126)", async () => {
+  const p = ports()
+  const thread = threadIdFor("1-r1")
+  const entry = { kind: "entry", thread, entry: entryId("e-1") } as const
+  const comment = textCardId("01a0ffd2-0000-7000-8000-0000000000d1")
+  const card = cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000d2")
+  const to = { kind: "queued", thread, seen: "" } as const
+  perform([{ kind: "queueComment", card, comment, entry, to, how }], p)
+  expect(p.uploadText).toHaveBeenCalledWith(
+    `A comment on [a message](${addressUrl(entry)}):\n\nlook at this`,
+  )
+  await vi.waitFor(() =>
+    expect(p.session.makeReference).toHaveBeenCalledWith(
+      { card, to, address: { kind: "card", card: comment }, quote: SHA },
+      how,
+    ),
   )
 })
 

@@ -164,6 +164,7 @@ test("a column that can't be written offers only copy", () => {
   expect(tools(chat("x", true), { writable: false })).toEqual({
     copy: true,
     takeReference: false,
+    comment: false,
     edit: undefined,
     branch: undefined,
   })

@@ -280,6 +280,9 @@ would refuse each whole undo of a move (S82).
   canvas. A gone row names the task whose history it is in, or "".
 - **A pinned row carries `lane` and `order`**, as a queued one does, and
   no `by` or `seen`.
+- **A comment is stored as `margin`** (ADR-0126): its entry in `at`, the
+  entry's thread in `lane`, its rank in `order`. Fields the row already
+  had, so the schema's hash held.
 - **Your message is stored as kind `drafting`**, the kind every card at a
   thread's end had before notes (ADR-0113). So no stored row changed with
   the split.

@@ -16,6 +16,7 @@ import {
 import {
   carryOnState,
   displayName,
+  isQueuedMessage,
   planNextQueuedCardPop,
   queuedOn,
   stopperOf,
@@ -94,7 +95,7 @@ export function nextOf(lane: LaneView, facts: NextFacts): Next {
       kind: "held",
       by: lane.heldBy,
       top: released.kind === "pop" ? released.card.id : null,
-      count: queue.filter(c => c.kind === "text" && !blank.has(c.id)).length,
+      count: queue.filter(c => isQueuedMessage(c) && !blank.has(c.id)).length,
       resumable,
     }
   }
@@ -130,8 +131,7 @@ export function queueHead(lane: LaneView, facts: NextFacts): QueueHead {
     lane: lane.name,
     next: nextOf(lane, facts),
     heldBy: lane.heldBy,
-    messages: queuedOn(facts.cards, lane.name).filter(c => c.kind === "text")
-      .length,
+    messages: queuedOn(facts.cards, lane.name).filter(isQueuedMessage).length,
   }
 }
 

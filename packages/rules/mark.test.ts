@@ -1,8 +1,8 @@
 import {
+  cardIdOfKind,
   ERR,
   type MarkRecord,
   type NoteColumnRecord,
-  noteColumnIdFor,
   THE_AGENT,
   taskIdFor,
   writerId,
@@ -16,7 +16,7 @@ const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
 const K1 = taskIdFor("01a0ffd2-0000-7000-8000-000000000001")
 const K2 = taskIdFor("01a0ffd2-0000-7000-8000-000000000002")
-const N1 = noteColumnIdFor("01a0ffd2-0000-7000-8000-000000000003")
+const N1 = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-000000000003")
 
 const mark = (title: string): MarkRecord => ({
   task: K1,

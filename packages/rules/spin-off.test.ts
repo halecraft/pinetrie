@@ -2,9 +2,9 @@ import {
   type CardHistoryRecord,
   type CardId,
   type CardRecord,
+  cardIdOfKind,
   type LaneRecord,
   NO_CONTENT,
-  noteColumnIdFor,
   rootIdFor,
   type TextCard,
   taskIdFor,
@@ -239,7 +239,10 @@ describe("planLiftRoot (S139)", () => {
           spunCard,
           {
             kind: "note-column",
-            id: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a9"),
+            id: cardIdOfKind(
+              "note-column",
+              "01a0ffd2-0000-7000-8000-0000000000a9",
+            ),
             owner: BEA,
             placer: BEA,
             place: { kind: "canvas", task: NEW_TASK, order: "9", width: 1 },

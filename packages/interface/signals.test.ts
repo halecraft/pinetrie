@@ -1,10 +1,10 @@
 import {
   type CardId,
   type CardRecord,
+  cardIdOfKind,
   type EntryLike,
   entryId,
   NO_CONTENT,
-  noteColumnIdFor,
   ROOT,
   rootIdFor,
   type TaskId,
@@ -69,7 +69,10 @@ const fresh = (id: string, column: string): TextCard => ({
 /** Each root's task, one a root (ADR-0116): e1's, g1's and the far f1's. */
 const K = (root: string) => taskIdFor(root)
 /** A note column on g1's task's canvas. */
-const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const NOTES = cardIdOfKind(
+  "note-column",
+  "01a0ffd2-0000-7000-8000-0000000000a1",
+)
 /** Thread `far` is recorded in the far root. */
 const FAR_THREAD = threadIdFor("far")
 const tasks = tasksOf({

@@ -1,4 +1,4 @@
-import { referenceCardIdFor } from "@pinetrie/core"
+import { cardIdOfKind } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { type KeyFocus, type KeyLike, keyAct } from "./page-keys.ts"
@@ -40,7 +40,10 @@ describe("keyAct", () => {
   })
 
   test("the put key in a text box puts a reference there; any other card goes to the column (ADR-0126)", () => {
-    const REF = referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e1")
+    const REF = cardIdOfKind(
+      "reference",
+      "01a0ffd2-0000-7000-8000-0000000000e1",
+    )
     expect(
       keyAct(key("O", chord), focus({ selectedCard: REF, inText: true })),
     ).toEqual({ kind: "put", card: REF, target: { kind: "text-box" } })

@@ -13,14 +13,16 @@
 
 import { subscribe } from "@kyneta/schema"
 import {
+  type BlobStore,
   type CardId,
   type CardRecord,
+  cardIdOfKind,
   errorText,
-  noteColumnIdFor,
   parseMentions,
   type QueuedFact,
   type RelayDetails,
   type RootId,
+  type Sha256,
   type TextCardId,
   type ThreadId,
   textSourceOf,
@@ -47,9 +49,11 @@ import {
   planQueueHold,
   planUnsent,
   type QueuedCard,
+  type QueuedMessage,
   type QueuedText,
   queuedOn,
   runsIn,
+  wordsOf,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
@@ -63,7 +67,7 @@ import type { LaneWork } from "./work/index.ts"
 
 /**
  * A queued card the host popped: its record as it was, and its words at the
- * pop (`textSourceOf`): a text card's text, "" for a fact.
+ * pop (`wordsOf`): a text card's text, a reference's quote, a fact's line.
  */
 export interface PoppedQueuedCard {
   readonly card: QueuedCard
@@ -73,6 +77,12 @@ export interface PoppedQueuedCard {
 /** A popped text card: a message, sent as its queuer's. */
 export interface PoppedText {
   readonly card: QueuedText
+  readonly text: string
+}
+
+/** A popped card sent as its queuer's message: a text card, or a reference's quote (ADR-0126). */
+export interface PoppedMessage {
+  readonly card: QueuedMessage
   readonly text: string
 }
 
@@ -103,13 +113,15 @@ export type NextQueuedCardPop =
  * between documents, so its record can arrive before its text (S96). Such a
  * card is not blank, though its text reads empty so far: passing over it
  * would send the cards behind it first. `texts` must answer from texts
- * already loaded.
+ * already loaded, and `quotes` holds each queued reference's quote, read
+ * before (ADR-0126).
  */
 export function popNextQueuedCard(
   places: PlacesDocHandle,
   lane: ThreadId,
   facts: Omit<Parameters<typeof planNextQueuedCardPop>[2], "blank">,
   texts: Pick<CardPort, "textNow" | "holds">,
+  quotes: ReadonlyMap<Sha256, string> = new Map(),
 ): NextQueuedCardPop {
   const cards = readPlaces(places)
   const blank = blankQueued(queuedOn(cards, lane), {
@@ -121,8 +133,10 @@ export function popNextQueuedCard(
   const { card } = step
   if (isQueuedText(card) && !texts.holds(card.id, card.place.seen))
     return { kind: "behind", card }
-  const source = textSourceOf(card)
-  const text = source.kind === "doc" ? texts.textNow(source.card) : ""
+  const text = wordsOf(textSourceOf(card), {
+    doc: texts.textNow,
+    blob: sha => quotes.get(sha) ?? "",
+  })
   applyPlaceSteps(places, [{ kind: "remove", id: card.id }])
   return { kind: "popped", popped: { card, text } }
 }
@@ -132,7 +146,7 @@ export function popNextQueuedCard(
  * `root`, its thread's (`THREAD`).
  */
 export const chatOfPoppedQueuedCard = (
-  popped: PoppedText,
+  popped: PoppedMessage,
   root: RootId,
 ): Chat => ({
   text: popped.text,
@@ -140,7 +154,11 @@ export const chatOfPoppedQueuedCard = (
   at: { kind: "queue", thread: popped.card.place.thread },
   asksAgent: false,
   mentions: parseMentions(popped.text),
-  card: { id: popped.card.id, seen: popped.card.place.seen },
+  // A reference is sent from no text card: nothing is spent with it.
+  card:
+    popped.card.kind === "text"
+      ? { id: popped.card.id, seen: popped.card.place.seen }
+      : null,
   // Its thread's pinned cards were edited long before it was popped.
   pinned: [],
   base: null,
@@ -162,7 +180,9 @@ export interface QueuedCardPopDeps {
   readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit">
   readonly start: Runs["start"]
   /** Send a popped card's text as its queuer's message, through `sendChat`. */
-  readonly send: (popped: PoppedText) => Promise<Outcome>
+  readonly send: (popped: PoppedMessage) => Promise<Outcome>
+  /** Where a queued reference's quote is read (ADR-0126). */
+  readonly blobs: Pick<BlobStore, "get">
   /** The top card's text is behind: drain the lane again once the host holds it. */
   readonly behind: (card: QueuedText) => void
   /** Someone is typing in the top card: drain the lane again once they stop. */
@@ -215,6 +235,7 @@ export async function drain(
       for (const id of loading) loaded.add(id)
       continue
     }
+    const quotes = queuedQuotes(deps.blobs, readPlaces(places), lane)
     // No await between the check above and the pop.
     const before = deps.provenance.before()
     const top = popNextQueuedCard(
@@ -233,6 +254,7 @@ export async function drain(
         typing: readTypingIn(deps.presence),
       },
       deps.texts,
+      quotes,
     )
     // Nothing to pop, or a held queue: its release drains it again.
     if (top.kind === "idle" || top.kind === "held") return
@@ -245,6 +267,23 @@ export async function drain(
     await deps.provenance.after({ kind: "host" }, before)
     if (done === "ran") return
   }
+}
+
+/** The quote of each reference queued on `lane`, read from its blob (ADR-0126). */
+function queuedQuotes(
+  blobs: Pick<BlobStore, "get">,
+  cards: readonly CardRecord[],
+  lane: ThreadId,
+): ReadonlyMap<Sha256, string> {
+  const quotes = new Map<Sha256, string>()
+  for (const c of queuedOn(cards, lane)) {
+    const source = textSourceOf(c)
+    if (source.kind !== "blob") continue
+    const blob = blobs.get(source.sha)
+    if (blob !== undefined)
+      quotes.set(source.sha, new TextDecoder().decode(blob.bytes))
+  }
+  return quotes
 }
 
 /**
@@ -381,8 +420,8 @@ async function splitThen(
 /** A popped card's text sent as its queuer's message; `sending` is what goes back if it cannot be. */
 async function sendCard(
   deps: QueuedCardPopDeps,
-  popped: PoppedText,
-  sending: QueuedText,
+  popped: PoppedMessage,
+  sending: QueuedMessage,
 ): Promise<"ran" | "next"> {
   const { card } = popped
   const sent = await deps.send(popped).catch(async (error: unknown) => {
@@ -393,7 +432,8 @@ async function sendCard(
   switch (sent.kind) {
     case "appended":
     case "started":
-      await deps.texts.destroy(card.id)
+      // A reference has no text document; its quote's blob is swept.
+      if (card.kind === "text") await deps.texts.destroy(card.id)
       return sent.kind === "started" ? "ran" : "next"
     case "busy":
       // A run started under the pop: the card goes back on top, as it was.
@@ -425,7 +465,7 @@ async function sendCard(
  */
 async function unsent(
   deps: QueuedCardPopDeps,
-  card: QueuedText,
+  card: QueuedMessage,
   reason: string,
 ): Promise<void> {
   const { session, places, log, newId, now } = deps.basics
@@ -433,7 +473,7 @@ async function unsent(
     cards: readPlaces(places),
     card,
     reason,
-    newColumn: () => noteColumnIdFor(newId()),
+    newColumn: () => cardIdOfKind("note-column", newId()),
   })
   // The hold first, so the drain this card ends finds the queue held.
   if (plan.hold)

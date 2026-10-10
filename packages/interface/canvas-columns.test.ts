@@ -1,11 +1,11 @@
 import {
   type CardRecord,
   type CardWidth,
+  cardIdOfKind,
   type EntryId,
   entryId,
   NO_CONTENT,
   type NoteColumnId,
-  noteColumnIdFor,
   type ThreadId,
   taskIdFor,
   threadIdFor,
@@ -28,7 +28,7 @@ import { threadOfEntry, tree } from "./fixtures.ts"
 
 const ADA = writerId("ada@x.io")
 const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
-const N1 = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const N1 = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1")
 
 /** `ids` on `TASK`'s canvas, in that order: thread cards and note columns. */
 const canvasFor = (

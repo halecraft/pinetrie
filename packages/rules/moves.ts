@@ -10,6 +10,7 @@ import {
   type CardRecord,
   type ContentOf,
   DISCARDED,
+  type EntryId,
   fitsPlace,
   isNoteColumnId,
   isReferenceCardId,
@@ -36,8 +37,10 @@ import {
   type TextCardId,
   type ThreadId,
   type WriterId,
+  wrapperKind,
 } from "@pinetrie/core"
-import { noteAt, toNotes } from "./notes.ts"
+import { marginEnd } from "./margin.ts"
+import { makeNoteColumn, noteAt, toNotes } from "./notes.ts"
 import { orderAfter } from "./order.ts"
 import { inventoryFull, isPinned, queuedOn, taskPinnedOf } from "./queue.ts"
 import { rankAfter, rankOfDrop } from "./rank.ts"
@@ -125,6 +128,12 @@ function placeAt(
       return noteAt(
         cards.filter(c => c.id !== now?.id),
         key.column,
+      )
+    case "margin":
+      return marginEnd(
+        cards.filter(c => c.id !== now?.id),
+        key.entry,
+        key.thread,
       )
     case "gone":
       return {
@@ -418,7 +427,15 @@ export function planFreshFollow(input: {
  *   for a thread with no card;
  * - a spot on a canvas (`canvas-at`), ranked just after its `after` there,
  *   or at the end when that card is no longer on the canvas (`rankAfter`),
- *   the cards given new ranks to make room written first.
+ *   the cards given new ranks to make room written first. A card of a kind
+ *   no canvas takes lands in the container its kind is made in there
+ *   (`WRAPS`): a text card or a reference as the first note of a note
+ *   column made at that rank, written first.
+ *
+ * A move into an entry's margin (ADR-0126) is refused `no-place` unless the
+ * margin names the thread its entry is in (`entryThreads`): a margin's task
+ * is read from its thread, so one naming another would put a comment in
+ * the wrong task.
  *
  * Pure.
  */
@@ -428,6 +445,8 @@ export function planMoveTargets(input: {
   readonly sender: WriterId
   /** Mints the id of a note column made for them. */
   readonly newColumn: () => NoteColumnId
+  /** The thread of each entry a move's margin names, as its root's index says; absent for one not found. */
+  readonly entryThreads: ReadonlyMap<EntryId, ThreadId>
 }):
   | {
       readonly kind: "resolved"
@@ -474,9 +493,43 @@ export function planMoveTargets(input: {
         const ranked = rankOnCanvas(now, move.card, to)
         first.push(...ranked.first)
         now = afterSteps(now, ranked.first)
-        moves.push({ ...move, to: ranked.to })
+        const kind = kindOfCard(move.card)
+        const wrap = fitsPlace(kind, "canvas") ? null : wrapperKind(kind)
+        if (wrap === null) {
+          moves.push({ ...move, to: ranked.to })
+          break
+        }
+        // Each container a kind is made in (`WRAPS`) is made here: a new
+        // one does not compile until it is.
+        const made =
+          wrap === "note-column"
+            ? makeNoteColumn(
+                now,
+                input.newColumn(),
+                { ...ranked.to, width: 1 },
+                input.sender,
+              )
+            : (wrap satisfies never)
+        if (made === null)
+          return {
+            kind: "refused",
+            code: "no-place",
+            now: now.find(c => c.id === move.card) ?? null,
+          }
+        first.push(made.step)
+        now = afterSteps(now, [made.step])
+        moves.push({ ...move, to: { kind: "note", column: made.place.column } })
         break
       }
+      case "margin":
+        if (input.entryThreads.get(to.entry) !== to.thread)
+          return {
+            kind: "refused",
+            code: "no-place",
+            now: now.find(c => c.id === move.card) ?? null,
+          }
+        moves.push({ ...move, to })
+        break
       default:
         moves.push({ ...move, to })
     }
@@ -519,8 +572,15 @@ export function planMoveRequest(
   running: (lane: ThreadId) => boolean,
   discards: Discards,
   newColumn: () => NoteColumnId,
+  entryThreads: ReadonlyMap<EntryId, ThreadId>,
 ): MoveCommand {
-  const resolved = planMoveTargets({ cards, moves, sender, newColumn })
+  const resolved = planMoveTargets({
+    cards,
+    moves,
+    sender,
+    newColumn,
+    entryThreads,
+  })
   if (resolved.kind === "refused") return REFUSED(resolved)
   const command = planMoveCommand(
     afterSteps(cards, resolved.first),
@@ -604,10 +664,21 @@ export function planMoveCommand(
 ): MoveCommand {
   const step = planMoves(cards, moves, sender, discards)
   if (step.kind === "refused") return REFUSED(step)
+  return { step, drain: lanesToDrain(cards, step.steps, running) }
+}
+
+/**
+ * The lanes `steps` leave to drain, those not running: each a step leaves
+ * a card queued on (a move's, or a reference made there), and each thread
+ * put out of an inventory, whose queue waited there (ADR-0124). Pure.
+ */
+export function lanesToDrain(
+  cards: readonly CardRecord[],
+  steps: readonly PlaceStep[],
+  running: (lane: ThreadId) => boolean,
+): readonly ThreadId[] {
   const was = new Map(cards.map(c => [c.id, c.place.kind] as const))
-  // A card queued, or a thread put out of an inventory, whose queue waited
-  // there (ADR-0124).
-  const lanes = step.steps.flatMap(s => {
+  const lanes = steps.flatMap(s => {
     if (s.kind !== "write") return []
     const { record } = s
     if (record.place.kind === "queued") return [record.place.thread]
@@ -617,8 +688,5 @@ export function planMoveCommand(
       ? [record.id]
       : []
   })
-  return {
-    step,
-    drain: [...new Set(lanes)].filter(l => !running(l)),
-  }
+  return [...new Set(lanes)].filter(l => !running(l))
 }

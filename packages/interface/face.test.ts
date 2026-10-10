@@ -1,8 +1,8 @@
 import {
   type CardPlace,
+  cardIdOfKind,
   NO_CONTENT,
   type NoteColumnCard,
-  noteColumnIdFor,
   type TextCard,
   taskIdFor,
   threadIdFor,
@@ -29,7 +29,7 @@ const ADA = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
 const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const T = threadIdFor("t")
-const N = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
+const N = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000aa")
 const C = cardIdFor("c1")
 
 const text: TextCard = {
@@ -44,7 +44,7 @@ const note: NoteCard = {
   ...text,
   place: {
     kind: "note",
-    column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000aa"),
+    column: cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000aa"),
     order: "a",
   },
 }

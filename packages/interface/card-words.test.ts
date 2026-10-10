@@ -1,6 +1,6 @@
 import {
   type CardEvent,
-  noteColumnIdFor,
+  cardIdOfKind,
   type PlaceKey,
   rootIdFor,
   type ThreadName,
@@ -179,7 +179,7 @@ describe("history and traces (ADR-0048 step 6)", () => {
   const _ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
   const atEnd: PlaceKey = {
     kind: "note",
-    column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+    column: cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1"),
   }
   const queued: PlaceKey = {
     kind: "queued",

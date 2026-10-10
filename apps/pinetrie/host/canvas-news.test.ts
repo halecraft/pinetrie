@@ -1,8 +1,8 @@
 import {
   type CardRecord,
+  cardIdOfKind,
   entryId,
   NO_CONTENT,
-  noteColumnIdFor,
   runId,
   threadIdFor,
   writerId,
@@ -17,7 +17,10 @@ import { basics, putLane, putTask, record, TASK_ID } from "./fakes.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
 const BEA = writerId("bea@x.io")
-const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const NOTES = cardIdOfKind(
+  "note-column",
+  "01a0ffd2-0000-7000-8000-0000000000a1",
+)
 
 test("a card added to a task's canvas is told to its running threads, as a steer (ADR-0116)", async () => {
   const b = basics()

@@ -121,7 +121,10 @@ export const commandOf = (card: CardRecord): CardCommand | null =>
  * rank there, shared by everyone in the task (ADR-0116). Pinned: at the top
  * of a thread's column, kept and resolved the same way; the agent reads it
  * on every run. Queued: above the line, waiting for its thread's lane, until
- * the host pops it or someone unqueues it. Fresh: an unsent branch or new
+ * the host pops it or someone unqueues it. Margin: beside an entry, a
+ * comment on it, shared by everyone in the task and never read by the agent
+ * (ADR-0126); it names the entry's thread too, so its task is found without
+ * reading a tree. Fresh: an unsent branch or new
  * tab, by its column's key, in the root it will start or branch in and the
  * task its column is on. Canvas: a thread card or a note column in a
  * task, at its rank there: the only record of where it is,
@@ -173,6 +176,15 @@ export type CardPlace =
        * the host pops the card only once it holds that much (S96).
        */
       readonly seen: string
+    }
+  | {
+      readonly kind: "margin"
+      /** The entry it comments on. */
+      readonly entry: EntryId
+      /** The entry's thread (ADR-0125): its task's, read without a tree. */
+      readonly thread: ThreadId
+      /** Its rank among the entry's comments: an order key (S69), the host's to give. */
+      readonly order: string
     }
   | {
       readonly kind: "fresh"
@@ -308,6 +320,8 @@ export function keyOf(place: CardPlace): PlaceKey {
       return { kind: "task-pinned", task: place.task }
     case "queued":
       return { kind: "queued", thread: place.thread, seen: place.seen }
+    case "margin":
+      return { kind: "margin", entry: place.entry, thread: place.thread }
     case "canvas":
       return { kind: "canvas", task: place.task }
     case "fresh":
@@ -336,6 +350,9 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
       return b.kind === "task-pinned" && a.task === b.task
     case "queued":
       return b.kind === "queued" && a.thread === b.thread
+    // An entry names its thread, so the entry alone says which margin.
+    case "margin":
+      return b.kind === "margin" && a.entry === b.entry
     case "canvas":
       return b.kind === "canvas" && a.task === b.task
     // A column's key names it, wherever it is.
@@ -419,14 +436,15 @@ export type QueueMove = Move<QueuedKey>
 
 /**
  * The places a reorder moves a card among (ADR-0048 step 7, ADR-0116): a
- * queue, a thread's pinned cards, a task's pinned cards, a note column, or
- * a task's canvas. Each has its rule in `@pinetrie/rules`' `REORDERS`.
+ * queue, a thread's pinned cards, a task's pinned cards, a note column, an
+ * entry's margin (ADR-0126), or a task's canvas. Each has its rule in `@pinetrie/rules`' `REORDERS`.
  */
 export const REORDER_PLACES = [
   "queued",
   "pinned",
   "task-pinned",
   "note",
+  "margin",
   "canvas",
 ] as const
 
@@ -463,8 +481,9 @@ export interface Reorder {
 /**
  * `card`'s move from where it is now to `to`, typed by its kind
  * (`MoveOf`): `to` must be a target its kind is ever sent to, so a thread's
- * card is never moved into a queue, nor a text card onto a canvas. A card
- * whose kind is not known goes only where every kind may: an inventory.
+ * card is never moved into a queue, nor a text card onto a canvas but at a
+ * spot there, where a note column is made for it (`WRAPS`). A card whose
+ * kind is not known goes only where every kind may: an inventory.
  */
 export function moveOf<To extends TargetOf<"text">>(
   card: TextCard,
@@ -487,8 +506,12 @@ export function moveOf(
   to: Extract<PlaceKey, { readonly kind: "inventory" }>,
 ): TypedMove
 export function moveOf(
-  card: ThreadCard | NoteColumnCard,
+  card: ThreadCard | NoteColumnCard | TextCard | ReferenceCard,
   to: CanvasTarget,
+): TypedMove
+export function moveOf(
+  card: TextCard | ReferenceCard,
+  to: NotesTarget,
 ): TypedMove
 export function moveOf(card: CardRecord, to: MoveTarget): Move {
   return { card: card.id, from: keyOf(card.place), to }
@@ -677,6 +700,7 @@ export const keyFieldsFrom = (
  *   `lane` (a lane is named by its thread), its root the thread's;
  * - a thread's nearest notes, its id in `lane`; a task's, its id in `task`;
  * - a spot on a canvas, the card it goes after in `column` ("" for first);
+ * - a comment, its entry in `at` and the entry's thread in `lane`;
  * - a gone card, under its reason, who discarded it in `holder`, a spun
  *   card's thread in `lane` and its root in `column`.
  */
@@ -688,6 +712,7 @@ const ROWS = {
   "canvas-at": ["task", "column"],
   pinned: ["lane", "order"],
   queued: ["lane", "order", "by", "seen"],
+  margin: ["at", "lane", "order"],
   fresh: ["root", "task", "at", "column"],
   canvas: ["task", "order", "width"],
   inventory: ["holder"],
@@ -762,6 +787,12 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
         order: "order" in place ? place.order : "",
         by: "by" in place ? place.by : "",
         seen: place.seen,
+      })
+    case "margin":
+      return row("margin", {
+        at: place.entry,
+        lane: place.thread,
+        order: "order" in place ? place.order : "",
       })
     case "fresh":
       return row("fresh", {
@@ -892,6 +923,12 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
             seen: r.seen,
           }
     }
+    case "margin": {
+      const at = atThread(r)
+      return at === undefined || r.at === "" || r.order === ""
+        ? undefined
+        : { kind: "margin", entry: entryId(r.at), ...at, order: r.order }
+    }
   }
 }
 
@@ -929,6 +966,12 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
       return at === undefined
         ? undefined
         : { kind: "queued", ...at, seen: r.seen }
+    }
+    case "margin": {
+      const at = atThread(r)
+      return at === undefined || r.at === ""
+        ? undefined
+        : { kind: "margin", entry: entryId(r.at), ...at }
     }
     default:
       return placeOfFields(f)
@@ -1081,6 +1124,28 @@ export type CanvasPlace = Extract<CardPlace, { readonly kind: "canvas" }>
  */
 export type CardRecord = { [K in PlacedKind]: Card<K> }[PlacedKind]
 
+/** The kinds of card ever at a place of `P` (`PLACES_OF`). */
+export type KindsInPlace<P extends CardPlace["kind"]> = {
+  [K in PlacedKind]: P extends (typeof PLACES_OF)[K][number] ? K : never
+}[PlacedKind]
+
+/** A card at a place of `P`: one of `KindsInPlace<P>`, with its place narrowed. */
+export type CardInPlace<P extends CardPlace["kind"]> = {
+  [K in KindsInPlace<P>]: Card<K> & {
+    readonly place: Extract<CardPlace, { readonly kind: P }>
+  }
+}[KindsInPlace<P>]
+
+/**
+ * Whether `card` is at a place of `P`. A record's place fits its kind
+ * (`placed`), so the place alone decides it, for every kind `KINDS` puts
+ * there.
+ */
+export const hasPlaceKind = <P extends CardPlace["kind"]>(
+  card: CardRecord,
+  place: P,
+): card is CardRecord & CardInPlace<P> => card.place.kind === place
+
 /** Whether a card is a text card. */
 export const isTextCard = (card: CardRecord): card is TextCard =>
   card.kind === "text"
@@ -1122,6 +1187,32 @@ export const fitsPlace = (kind: CardKind, place: PlaceKey["kind"]): boolean => {
   const places: readonly PlaceKey["kind"][] = PLACES_OF[kind]
   return places.includes(place)
 }
+
+/** A card of a kind ever at a place of `P` (`PLACES_OF`), wherever it is now. */
+export type CardFittingPlace<P extends CardPlace["kind"]> = Extract<
+  CardRecord,
+  { readonly kind: KindsInPlace<P> }
+>
+
+/** Whether `card`'s kind is ever at a place of `P` (`PLACES_OF`). */
+export const cardFitsPlace = <P extends CardPlace["kind"]>(
+  card: CardRecord,
+  place: P,
+): card is CardFittingPlace<P> => fitsPlace(card.kind, place)
+
+/** The kinds a person's move takes anywhere (`KINDS`' `moves`). */
+export type MovableKind = {
+  [K in PlacedKind]: (typeof KINDS)[K]["moves"] extends true ? K : never
+}[PlacedKind]
+
+/**
+ * Whether a person may move `card` (`KINDS`' `moves`): false for a kind the
+ * host alone places.
+ */
+export const isMovable = (
+  card: CardRecord,
+): card is Extract<CardRecord, { readonly kind: MovableKind }> =>
+  KINDS[card.kind].moves
 
 /** Whether `place` is one a card of `kind` is ever in (`PLACES_OF`). */
 const fits = <K extends CardKind>(
@@ -1167,12 +1258,38 @@ const TARGET_PLACES = {
 
 type TargetKind = keyof typeof TARGET_PLACES
 
-/** The targets that resolve to a place a card of `K` is ever in. */
-type TargetKindOf<K extends CardKind> = {
-  [T in TargetKind]: (typeof TARGET_PLACES)[T] extends (typeof PLACES_OF)[K][number]
-    ? T
-    : never
-}[TargetKind]
+/**
+ * The container a card of a kind no canvas takes is made in when it is
+ * dropped on one (ADR-0126): a text card or a reference lands as the first
+ * note of a new note column at that spot. The host resolves it
+ * (`planMoveTargets`); a kind not here, sent to a spot on a canvas, is
+ * refused at the edge as any target its kind is never sent to is.
+ */
+export const WRAPS = {
+  text: "note-column",
+  reference: "note-column",
+} as const satisfies Partial<Record<CardKind, CardKind>>
+
+/** The kinds a drop on a canvas makes a container for (`WRAPS`). */
+export type WrappedKind = keyof typeof WRAPS
+
+/** The container `kind` is made in on a canvas (`WRAPS`); null for a kind with none. */
+export const wrapperKind = (
+  kind: CardKind,
+): (typeof WRAPS)[WrappedKind] | null =>
+  kind in WRAPS ? WRAPS[kind as WrappedKind] : null
+
+/**
+ * The targets that resolve to a place a card of `K` is ever in, and a spot
+ * on a canvas for a kind made into a container there (`WRAPS`).
+ */
+type TargetKindOf<K extends CardKind> =
+  | {
+      [T in TargetKind]: (typeof TARGET_PLACES)[T] extends (typeof PLACES_OF)[K][number]
+        ? T
+        : never
+    }[TargetKind]
+  | (K extends WrappedKind ? "canvas-at" : never)
 
 /** Where a move may send a card of `K`: a key or a target of a place it is ever in. */
 export type TargetOf<K extends CardKind> =
@@ -1196,13 +1313,18 @@ export type TypedMove = MovesOf<CardKind>
 export type MovesOf<K extends CardKind> = K extends CardKind ? MoveOf<K> : never
 
 /** Whether a target is one a card of `kind` may be sent to (`TargetOf`). */
-const fitsTarget = (kind: CardKind, to: MoveTarget): boolean =>
-  fitsPlace(
+const fitsTarget = (kind: CardKind, to: MoveTarget): boolean => {
+  if (to.kind === "canvas-at" && !fitsPlace(kind, "canvas")) {
+    const wrap = wrapperKind(kind)
+    return wrap !== null && fitsPlace(wrap, "canvas")
+  }
+  return fitsPlace(
     kind,
     to.kind === "notes" || to.kind === "canvas-at"
       ? TARGET_PLACES[to.kind]
       : to.kind,
   )
+}
 
 /** Whether `to` is a target a card of `kind` may be sent to (`TargetOf`). */
 export const isTargetOf = <K extends CardKind>(

@@ -52,6 +52,10 @@ const shared = {
   revisions: new Map(),
   folds: foldMemory(),
   digests: new Map(),
+  margins: new Map(),
+  openMargin: null,
+  marginSlot: null,
+  onMargin: () => {},
 }
 const props = (over: Partial<MessageListProps> = {}): MessageListProps => ({
   ...shared,

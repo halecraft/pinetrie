@@ -14,10 +14,9 @@
 // and a thread out of reach is refused before any root is opened.
 
 import {
-  askCardIdFor,
   askOutcome,
+  cardIdOfKind,
   type EntryId,
-  factCardIdFor,
   indexAsks,
   isRoundAnswered,
   laneOf,
@@ -260,7 +259,7 @@ export function createRelays(deps: {
     }
     const card = planAskCard({
       cards: readPlaces(places),
-      id: askCardIdFor(basics.newId()),
+      id: cardIdOfKind("ask", basics.newId()),
       lane: to,
       relay: planned.relay,
     })
@@ -276,7 +275,7 @@ export function createRelays(deps: {
   function queueFact(fact: QueuedFact): void {
     const steps = planFactCard({
       cards: readPlaces(places),
-      id: factCardIdFor(basics.newId()),
+      id: cardIdOfKind("fact", basics.newId()),
       fact,
     })
     if (steps !== null) applyPlaceSteps(places, steps)

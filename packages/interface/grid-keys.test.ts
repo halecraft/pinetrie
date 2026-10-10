@@ -18,6 +18,7 @@ const at = (over: Partial<GridKeyState> = {}): GridKeyState => ({
   hasCard: true,
   open: false,
   inText: false,
+  comments: false,
   ...over,
 })
 
@@ -74,5 +75,28 @@ describe("gridKeyAct (ADR-0113)", () => {
       kind: "select",
       cell: 13,
     })
+  })
+
+  test("a column's messages are a grid one cell wide (ADR-0126): j and k step through them, stopping at either end; Enter opens the margin, c comments, Escape shuts it", () => {
+    const column = (selected: number, over: Partial<GridKeyState> = {}) =>
+      at({
+        grid: { width: 1, rows: 4 },
+        rows: 4,
+        selected,
+        comments: true,
+        ...over,
+      })
+    expect(gridKeyAct(key("j"), column(1))).toEqual({ kind: "select", cell: 2 })
+    expect(gridKeyAct(key("k"), column(1))).toEqual({ kind: "select", cell: 0 })
+    expect(gridKeyAct(key("j"), column(3))).toEqual({ kind: "select", cell: 3 })
+    expect(gridKeyAct(key("k"), column(0))).toEqual({ kind: "select", cell: 0 })
+    expect(gridKeyAct(key("l"), column(1))).toEqual({ kind: "select", cell: 1 })
+    expect(gridKeyAct(key("Enter"), column(1))).toEqual({ kind: "open" })
+    expect(gridKeyAct(key("c"), column(1))).toEqual({ kind: "comment" })
+    expect(gridKeyAct(key("Escape"), column(1, { open: true }))).toEqual({
+      kind: "fold",
+    })
+    // An inventory's cells take no comment.
+    expect(gridKeyAct(key("c"), at())).toBeNull()
   })
 })

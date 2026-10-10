@@ -1,15 +1,12 @@
 // rules/blocks — the blocks of a message's text, numbered once (ADR-0126):
 // each table, code block, image and paragraph, the `n`th of its kind in
-// document order. One walk over mdast, the tree the client's remark-parse
-// and remark-gfm build at these packages' versions (as `images.ts` reads),
-// so the block the page draws and the block an address names cannot be
-// counted differently: `markBlocks` labels a tree the page draws, and
-// `blocksOf` gives each block's source range.
+// document order. One walk over the mdast tree the page draws
+// (`parseMarkdown`), so the block the page draws and the block an address
+// names cannot be counted differently: `markBlocks` labels a tree the page
+// draws, and `blocksOf` gives each block's source range.
 
 import type { BlockKind, BlockRef } from "@pinetrie/core"
-import { fromMarkdown } from "mdast-util-from-markdown"
-import { gfmFromMarkdown } from "mdast-util-gfm"
-import { gfm } from "micromark-extension-gfm"
+import { parseMarkdown } from "./markdown.ts"
 
 /** The fields of an mdast node this reads and writes; the rest are kept. */
 export interface BlockNode {
@@ -79,10 +76,7 @@ export interface Block {
 
 /** The blocks of `text`, as `markBlocks` numbers them. Pure. */
 export function blocksOf(text: string): readonly Block[] {
-  const tree = fromMarkdown(text, {
-    extensions: [gfm()],
-    mdastExtensions: [gfmFromMarkdown()],
-  }) as BlockNode
+  const tree = parseMarkdown(text) as BlockNode
   return numberBlocks(tree).flatMap(({ node, ref }) => {
     const from = node.position?.start.offset
     const to = node.position?.end.offset

@@ -10,7 +10,9 @@ import {
   type EntryId,
   parseMentions,
   type ReferenceCardId,
+  type TextCardId,
   THE_AGENT,
+  type ThreadId,
   type ThreadLane,
   type TranscriptMessage,
 } from "@pinetrie/core"
@@ -43,6 +45,8 @@ export interface MessageTools {
    * the column can be written. Built on a press too (`referenceOf`).
    */
   readonly takeReference: boolean
+  /** Comment on it: a note in its margin (ADR-0126), where the column can be written. */
+  readonly comment: boolean
   /** Send it again: a sibling at its parent, or a root's first message in a new tab. */
   readonly edit: Extract<MessageAct, { kind: "branch" | "newTab" }> | undefined
   /** `→`: a branch at the message. */
@@ -76,6 +80,16 @@ export type MessageAct =
       readonly kind: "takeReference"
       readonly card: ReferenceCardId
     } & Taken)
+  /**
+   * Comment on the message `entry`, in `thread`: a new, empty note `card`
+   * in its margin (ADR-0126).
+   */
+  | {
+      readonly kind: "comment"
+      readonly card: TextCardId
+      readonly entry: EntryId
+      readonly thread: ThreadId
+    }
 
 export function messageTools(
   node: TranscriptMessage,
@@ -94,12 +108,14 @@ export function messageTools(
     return {
       copy,
       takeReference: false,
+      comment: false,
       edit: undefined,
       branch: undefined,
     }
   return {
     copy,
     takeReference: copy,
+    comment: true,
     edit: node.role === "chat" ? editOf(node, at.parentId) : undefined,
     // Below a conversation's last message, a branch would be the same as
     // replying. Agent work follows its lane, so there a branch at the end is

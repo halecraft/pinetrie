@@ -23,7 +23,7 @@ import type {
 import { Type } from "typebox"
 import { decodeAt, threadKey } from "./decode.ts"
 import { type MovesStep, NO_DISCARDS, planMoveCommand } from "./moves.ts"
-import type { QueuedCard } from "./queue.ts"
+import { isQueuedMessage, type QueuedCard } from "./queue.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
 const QueueHoldSchema = Type.Object({
@@ -152,7 +152,7 @@ export function holdOnStop(input: {
 }): QueueHold | null {
   const { lane } = input
   if (input.holds.has(lane)) return null
-  return input.queue.some(c => c.kind === "text")
+  return input.queue.some(isQueuedMessage)
     ? { lane, by: input.by, at: input.now }
     : null
 }

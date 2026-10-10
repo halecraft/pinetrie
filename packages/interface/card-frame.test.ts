@@ -1,9 +1,8 @@
 import {
   atEntry,
   type CardRecord,
+  cardIdOfKind,
   entryId,
-  factCardIdFor,
-  noteColumnIdFor,
   type TextCard,
   type TextPlace,
   taskIdFor,
@@ -52,7 +51,7 @@ const composing: TextPlace = {
 }
 const note: TextPlace = {
   kind: "note",
-  column: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+  column: cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1"),
   order: "a",
 }
 const queued: TextPlace = {
@@ -142,6 +141,23 @@ describe("cardFrame (ADR-0111)", () => {
       [{ to: "inventory", act: take }],
     ],
     [
+      "a comment: a reference queued on its thread, which leaves it where it is; your inventory (ADR-0126)",
+      { kind: "margin", entry: entryId("e-1"), thread: LANE, order: "a" },
+      "note",
+      [
+        {
+          to: "reference",
+          act: {
+            kind: "queueReference",
+            card: C1,
+            entry: entryId("e-1"),
+            thread: LANE,
+          },
+        },
+        { to: "inventory", act: take },
+      ],
+    ],
+    [
       "in your inventory: none, put is its primary",
       { kind: "inventory", holder: ME },
       "inventory",
@@ -193,7 +209,7 @@ describe("cardFrame (ADR-0111)", () => {
     expect(read).toMatchObject({ moves: [], tools: [], discards: false })
     const fact: CardRecord = {
       kind: "fact",
-      id: factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1"),
+      id: cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f1"),
       owner: ME,
       placer: ME,
       place: { kind: "queued", thread: LANE, order: "a", by: ME, seen: "" },

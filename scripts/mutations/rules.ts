@@ -1231,8 +1231,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "planUnsent writes queued",
     file: "packages/rules/queue.ts",
-    from: "          place: notes.place,\n          content: { ...card.content, unsent: reason },",
-    to: "          content: { ...card.content, unsent: reason },",
+    from: '      { kind: "write", record: { ...said, place: notes.place } },',
+    to: '      { kind: "write", record: said },',
     command: unit,
     expect:
       "planUnsent: the whole record, a note in the column nearest its thread",
@@ -1548,8 +1548,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queue move asks for no drain (unit)",
     file: "packages/rules/moves.ts",
-    from: "    drain: [...new Set(lanes)].filter(l => !running(l)),\n",
-    to: "    drain: [],\n",
+    from: "  return [...new Set(lanes)].filter(l => !running(l))\n",
+    to: "  return []\n",
     command: unit,
     expect: "planMoveCommand: the lanes to drain",
   },
@@ -2275,7 +2275,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop holds an empty queue",
     file: "packages/rules/queue-hold.ts",
-    from: '  return input.queue.some(c => c.kind === "text")',
+    from: "  return input.queue.some(isQueuedMessage)",
     to: "  return true",
     command: unit,
     expect: "nothing queued, only facts, or already held",
@@ -2299,7 +2299,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "unqueue all moves a fact",
     file: "packages/rules/queue.ts",
-    from: "    .filter(isQueuedText)\n    .map(c => moveOf(c, noteOf(c.place)))",
+    from: "    .filter(isQueuedMessage)\n    .map(c => moveOf(c, noteOf(c.place)))",
     to: "    .map(c => moveOf(c as QueuedText, noteOf(c.place)))",
     command: unit,
     expect: "planUnqueueAll",
@@ -2544,8 +2544,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an unsent card with nowhere to go holds no queue",
     file: "packages/rules/queue.ts",
-    from: "      hold: true,",
-    to: "      hold: false,",
+    from: '    return { steps: [{ kind: "write", record: said }], hold: true }',
+    to: '    return { steps: [{ kind: "write", record: said }], hold: false }',
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
     expect: "planUnsent: a thread in a full inventory keeps its card queued",
   },
@@ -3032,7 +3032,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fact's words are read as no text",
-    file: "packages/rules/fact.ts",
+    file: "packages/rules/card-words.ts",
     from: "      return factLine(source.fact)\n",
     to: '      return ""\n',
     command: unit,
@@ -3094,5 +3094,66 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "planEditAsText: one move set, a text card in the reference's place with its origin, and the reference to the trash",
+  },
+  {
+    name: "a queued ask is no queued card",
+    file: "packages/rules/queue.ts",
+    from: 'const isQueued = (c: CardRecord): c is QueuedCard => hasPlaceKind(c, "queued")',
+    to: 'const isQueued = (c: CardRecord): c is QueuedCard =>\n  hasPlaceKind(c, "queued") && c.kind !== "ask"',
+    command: unit,
+    expect: "queuedOn: a queued card of every kind KINDS queues",
+  },
+  {
+    name: "a text card dropped on a canvas is put there itself",
+    file: "packages/rules/moves.ts",
+    from: "        if (wrap === null) {\n",
+    to: "        if (true) {\n",
+    command: unit,
+    expect:
+      "planMoveRequest, a text card or a reference dropped on a canvas: a note column made at the spot, the card its first note, in one step (WRAPS)",
+  },
+  {
+    name: "a queued reference is no message",
+    file: "packages/rules/queue.ts",
+    from: '  c.kind === "text" || c.kind === "reference"\n',
+    to: '  c.kind === "text"\n',
+    command: unit,
+    expect:
+      "a reference queued is a message too: the stopper holds the queue (ADR-0126)",
+  },
+  {
+    name: "a margin holds every entry's comments",
+    file: "packages/rules/margin.ts",
+    from: '        hasPlaceKind(c, "margin") && c.place.entry === entry,\n',
+    to: '        hasPlaceKind(c, "margin"),\n',
+    command: unit,
+    expect:
+      "a comment goes to its margin's end; it reorders among that entry's comments alone, next to each other; a move into a margin naming another thread is refused (ADR-0126)",
+  },
+  {
+    name: "a margin may name any thread",
+    file: "packages/rules/moves.ts",
+    from: "        if (input.entryThreads.get(to.entry) !== to.thread)\n",
+    to: "        if (false)\n",
+    command: unit,
+    expect:
+      "a comment goes to its margin's end; it reorders among that entry's comments alone, next to each other; a move into a margin naming another thread is refused (ADR-0126)",
+  },
+  {
+    name: "a comment reorders past its neighbours",
+    file: "packages/rules/in-place.ts",
+    from: "    siblings: (cards, at) => marginCards(cards, at.entry),\n    adjacent: true,\n",
+    to: "    siblings: (cards, at) => marginCards(cards, at.entry),\n    adjacent: false,\n",
+    command: unit,
+    expect:
+      "a comment goes to its margin's end; it reorders among that entry's comments alone, next to each other; a move into a margin naming another thread is refused (ADR-0126)",
+  },
+  {
+    name: "a reference's quote is read as no words",
+    file: "packages/rules/card-words.ts",
+    from: "      return read.blob(source.sha)\n",
+    to: '      return ""\n',
+    command: unit,
+    expect: "wordsOf: a reference's words are its quote's blob (ADR-0126)",
   },
 ]

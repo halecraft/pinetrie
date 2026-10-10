@@ -39,6 +39,7 @@ import {
   cardOf,
   full,
   moveCard,
+  planComment,
   planDiscard,
   planEditAsText,
   planKeep,
@@ -47,6 +48,7 @@ import {
   planPin,
   planPinToTask,
   planPut,
+  planQueueReference,
   planTakeIntoInventory,
   planTakeReference,
   planToNote,
@@ -136,6 +138,16 @@ export type ColumnAct =
   | { readonly kind: "pinToTask"; readonly card: CardId }
   /** Your message to the note column nearest its thread (ADR-0116). */
   | { readonly kind: "toNote"; readonly card: CardId }
+  /**
+   * A reference to the comment `card` on `entry`, queued on `thread`: the
+   * agent reads it; the comment stays (ADR-0126).
+   */
+  | {
+      readonly kind: "queueReference"
+      readonly card: CardId
+      readonly entry: EntryId
+      readonly thread: ThreadId
+    }
   /** A new, empty note at the end of note column `column` (ADR-0116). */
   | {
       readonly kind: "newNote"
@@ -755,6 +767,10 @@ function planColumn(
       return planToNote(act.card, key, state)
     case "newNote":
       return planNewNote(act.card, act.column, state)
+    case "comment":
+      return planComment(act, state)
+    case "queueReference":
+      return planQueueReference(act, minted.reference, IN_COLUMN(key))
     case "toMessage":
       return planPut(act.card, { kind: "composer", key }, state, minted)
     case "spinOff":

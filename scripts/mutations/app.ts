@@ -1013,7 +1013,7 @@ export const mutations: readonly Mutation[] = [
     to: "      .tools .branch { color: #9ecbff; position: relative; top: 1.1rem; }",
     suite: "browser",
     scenario: "page",
-    expect: "a message's tools are one row: copy, take, edit, →",
+    expect: "a message's tools are one row: copy, take, comment, edit, →",
   },
   {
     name: "the row has no copy",
@@ -1022,7 +1022,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     suite: "browser",
     scenario: "page",
-    expect: "a message's tools are one row: copy, take, edit, →",
+    expect: "a message's tools are one row: copy, take, comment, edit, →",
   },
   {
     name: "copy puts the drawn text on the clipboard",
@@ -1054,8 +1054,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a row holding only copy is not drawn",
     file: "packages/web/message.tsx",
-    from: "  if (!tools.copy && edit === undefined && branch === undefined) return null",
-    to: "  if (edit === undefined && branch === undefined) return null",
+    from: "    !tools.copy &&\n    !tools.comment &&\n",
+    to: "    !tools.comment &&\n",
     suite: "browser",
     scenario: "page",
     expect:
@@ -2385,5 +2385,35 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "images",
     expect: "an image shown beside the thread is taken as a reference by its ❝",
+  },
+  {
+    name: "a gesture's first write is outside it",
+    file: "apps/pinetrie/host/places.ts",
+    from: "  else gesture(write)\n",
+    to: '  else {\n    const [s] = steps\n    if (s?.kind === "write") batch(places, d => d.cards.set(s.record.id, encodeCard(s.record)))\n    gesture(write)\n  }\n',
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a text card dropped on a canvas lands in a note column made for it there, and one undo removes the column and returns the card",
+  },
+  {
+    name: "the canvas takes no drop",
+    file: "packages/web/strip.tsx",
+    from: "      {...(endDrop === null ? {} : dropProps(endDrop))}\n",
+    to: "",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a card dropped on the canvas past its last column lands in a note column made for it there, and the undo key takes back both",
+  },
+  {
+    name: "a shut margin draws no count",
+    file: "packages/web/message-list.tsx",
+    from: "      ) : comments > 0 ? (\n",
+    to: "      ) : false ? (\n",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a comment is a note in its message's margin, written where it opens; shut, the message shows how many it holds",
   },
 ]

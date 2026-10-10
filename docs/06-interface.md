@@ -907,7 +907,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   with none, a note column titled "Notes" is made just after the thread.
   So does your message's **Move to notes**, a card the host could not send,
   and a card put or dropped on a thread's column. A card dropped on a note
-  column is a note at its end. Dropped on the composer a note becomes your
+  column is a note at its end. A card dropped on the canvas itself, on a
+  folded column or past the last column, lands in a new note column made
+  for it there; the undo key takes back both. Dropped on the composer a note becomes your
   message, and a message there with text takes the note's place, in one
   move the undo key outside a box undoes; an empty one is discarded. In a
   new branch, a message with text takes a card only from your inventory
@@ -1065,6 +1067,15 @@ The rail is E; the column is T. Seeing both at once is the product.
   a new one lands; in a text box, it is a link, which opens what it names.
   The agent reads each linked message, table or quote under the message
   that links it.
+- **Comments** (ADR-0126): a message's **comment** opens its margin under
+  it with a new note focused. Everyone on the task reads it; the agent does
+  not. Shut, the message shows how many comments it has (💬 2); a press
+  opens them, **+ comment** adds one, **shut** closes them. A comment's ⋯
+  has **Queue a reference**, which queues the comment on its thread, under
+  a link to the message, so the agent reads it once with what it is about;
+  the comment stays. With a column's messages focused (a click on one), `j`
+  and `k` select a message, Enter opens its comments, `c` comments on it,
+  Escape shuts them, and Cmd+C takes a reference to it.
 - **Put** moves the selected card to the notes of the column you were last
   in: Ctrl+Shift+O, the panel's **put** button, or a drag out
   of the panel onto a column: a note in the note column nearest its thread,

@@ -1,17 +1,24 @@
 // interface/perform — carry out the effects `planIntent` decided (`intent.ts`).
 // The shell: one port call per effect, and nothing decided here.
 
-import type { CardId, EntryId } from "@pinetrie/core"
-import type { AttentionStore, SessionClient } from "@pinetrie/session"
+import type {
+  Address,
+  CardId,
+  EntryId,
+  ReferenceCardId,
+  TargetOf,
+} from "@pinetrie/core"
+import type { AttentionStore, MoveHow, SessionClient } from "@pinetrie/session"
 import { afterKeep } from "./card-intents.ts"
 import type { Effect } from "./effects.ts"
 import type { Identity } from "./identity.ts"
 import { afterTaskMove, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
 import type { ListWidth } from "./list-width.ts"
+import { commentMarkdown } from "./markdown-of.ts"
 import type { PageName } from "./page.ts"
-import type { TextUpload } from "./paste.ts"
 import { afterSpinOff } from "./spin-off.ts"
+import type { TextUpload } from "./upload.ts"
 
 export interface AppPorts {
   readonly dispatch: (action: LayoutAction) => void
@@ -20,6 +27,7 @@ export interface AppPorts {
     | "request"
     | "offer"
     | "createCard"
+    | "cardText"
     | "makeReference"
     | "editAsText"
     | "moveCard"
@@ -76,6 +84,43 @@ export function perform(effects: readonly Effect[], ports: AppPorts): void {
   for (const effect of effects) performOne(effect, ports)
 }
 
+/**
+ * A reference's quote, `markdown`, kept as a blob, then the reference made
+ * where `made.to` is (ADR-0126). A quote that could not be kept makes
+ * nothing, said where it was asked for.
+ */
+function keepThenMake(
+  made: {
+    readonly card: ReferenceCardId
+    readonly address: Address
+    readonly to: TargetOf<"reference">
+    readonly how: MoveHow
+  },
+  markdown: string,
+  ports: AppPorts,
+): void {
+  void ports.uploadText(markdown).then(upload => {
+    if (upload.ok)
+      void ports.session.makeReference(
+        {
+          card: made.card,
+          to: made.to,
+          address: made.address,
+          quote: upload.ref.sha256,
+        },
+        made.how,
+      )
+    else
+      ports.session.refuse({
+        card: made.card,
+        actedAt: made.how.actedAt,
+        code: "no-place",
+        by: null,
+        fromQueue: false,
+      })
+  })
+}
+
 function performOne(effect: Effect, ports: AppPorts): void {
   switch (effect.kind) {
     case "layout":
@@ -126,27 +171,22 @@ function performOne(effect: Effect, ports: AppPorts): void {
       void ports.session.createCard(effect.card, effect.text, effect.how)
       return
     case "takeReference":
-      void ports.uploadText(effect.markdown).then(upload => {
-        if (upload.ok)
-          void ports.session.makeReference(
-            {
-              card: effect.card,
-              to: effect.to,
-              address: effect.address,
-              quote: upload.ref.sha256,
-            },
-            effect.how,
-          )
-        // The quote could not be kept: nothing is taken, said where it was.
-        else
-          ports.session.refuse({
-            card: effect.card,
-            actedAt: effect.how.actedAt,
-            code: "no-place",
-            by: null,
-            fromQueue: false,
-          })
-      })
+      keepThenMake(effect, effect.markdown, ports)
+      return
+    case "queueComment":
+      keepThenMake(
+        {
+          card: effect.card,
+          address: { kind: "card", card: effect.comment },
+          to: effect.to,
+          how: effect.how,
+        },
+        commentMarkdown(
+          effect.entry,
+          ports.session.cardText(effect.comment).text(),
+        ),
+        ports,
+      )
       return
     case "makeReference":
       void ports.session.makeReference(

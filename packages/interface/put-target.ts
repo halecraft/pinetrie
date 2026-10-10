@@ -8,6 +8,7 @@
 // reachable by put, and every place put reaches accepts a drop.
 
 import {
+  type CanvasTarget,
   type CardId,
   isNoteColumnId,
   isTaskId,
@@ -15,6 +16,7 @@ import {
   keyOf,
   type NoteColumnId,
   noteOf,
+  parseCardId,
   pinnedOf,
   sameKey,
   type TargetOf,
@@ -34,6 +36,17 @@ export type PutTarget =
   | { readonly kind: "composer"; readonly key: string }
   /** A note column (ADR-0116): a note at its end. */
   | { readonly kind: "notes"; readonly column: NoteColumnId }
+  /**
+   * A spot on a task's canvas, just after `after` (first for null), where
+   * no column takes a drop: a folded column, or the canvas past its last.
+   * A thread's card or a note column lands there; a text card or a
+   * reference in a note column made for it there (`WRAPS`, ADR-0126).
+   */
+  | {
+      readonly kind: "canvas"
+      readonly task: TaskId
+      readonly after: CardId | null
+    }
   /** The pinned strip at the top of a thread's column (ADR-0048). */
   | { readonly kind: "pinned"; readonly key: string }
   /** The cards pinned to a task, in its task column (ADR-0116). */
@@ -65,6 +78,10 @@ const PUT_TASK_PINNED = "data-put-task-pinned"
 const PUT_SLOT = "data-put-slot"
 /** The attribute a note column carries: its id. */
 const PUT_NOTES = "data-put-notes"
+/** The attribute a spot on a canvas carries: its task. */
+const PUT_CANVAS = "data-put-canvas"
+/** Beside `PUT_CANVAS`: the card the spot is after, absent for first. */
+const PUT_AFTER = "data-put-after"
 /** The attribute a workflow state carries, on the board and the footer's strip: its id. */
 const PUT_STATE = "data-put-state"
 /** The attribute a place in the sidebar carries: the task it goes before, or `end`. */
@@ -72,7 +89,7 @@ const PUT_SIDEBAR = "data-put-sidebar"
 const END = "end"
 
 /** What an element a drop may land on matches: any mark. */
-export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_TASK_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_STATE}],[${PUT_SIDEBAR}]`
+export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_TASK_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_CANVAS}],[${PUT_STATE}],[${PUT_SIDEBAR}]`
 
 /** The attributes that mark an element as `target`, spread onto it by the page. */
 export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
@@ -89,6 +106,10 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       return { [PUT_SLOT]: String(target.slot) }
     case "notes":
       return { [PUT_NOTES]: target.column }
+    case "canvas":
+      return target.after === null
+        ? { [PUT_CANVAS]: target.task }
+        : { [PUT_CANVAS]: target.task, [PUT_AFTER]: target.after }
     case "state":
       return { [PUT_STATE]: target.state }
     case "sidebar":
@@ -121,6 +142,15 @@ export function targetOfElement(el: {
   const notes = el.getAttribute(PUT_NOTES)
   if (notes !== null && isNoteColumnId(notes))
     return { kind: "notes", column: notes }
+  const canvas = el.getAttribute(PUT_CANVAS)
+  if (canvas !== null && isTaskId(canvas)) {
+    const after = el.getAttribute(PUT_AFTER)
+    if (after === null) return { kind: "canvas", task: canvas, after: null }
+    const card = parseCardId(after)
+    return card === undefined
+      ? null
+      : { kind: "canvas", task: canvas, after: card }
+  }
   const slot = el.getAttribute(PUT_SLOT)
   if (slot === null || !/^\d+$/.test(slot)) return null
   return { kind: "inventory", slot: Number(slot) }
@@ -155,13 +185,13 @@ export const intoMessage = (
  * for a column no composer
  * publishes, and for a fresh column's strip, which it has none of; and for
  * a state or the sidebar, which name a new thread, not a place
- * (`planSpinOff`).
+ * (`planSpinOff`); and for a spot on a canvas, which the host ranks.
  */
 export function placeOfTarget(
   target: PutTarget,
   places: ComposerPlaces,
   me: WriterId,
-): TargetOf<"text"> | null {
+): Exclude<TargetOf<"text">, CanvasTarget> | null {
   if (target.kind === "inventory") return { kind: "inventory", holder: me }
   if (target.kind === "notes") return { kind: "note", column: target.column }
   if (target.kind === "taskPinned")
@@ -169,7 +199,8 @@ export function placeOfTarget(
   if (
     target.kind === "state" ||
     target.kind === "sidebar" ||
-    target.kind === "text-box"
+    target.kind === "text-box" ||
+    target.kind === "canvas"
   )
     return null
   const place = places.get(target.key)?.place

@@ -15,8 +15,6 @@ import type {
   OfferAcceptanceDecision,
   OfferFact,
   QueuedFact,
-  TextCardId,
-  TextSource,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
@@ -30,7 +28,6 @@ import {
   WriterIdSchema,
 } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
-import { askLine } from "./relay.ts"
 
 const QueuedFactSchema = Type.Union([
   Type.Object({
@@ -134,30 +131,6 @@ export const decodeFact = (message: unknown): QueuedFact | undefined =>
 /** Where an acceptance went, after "accepted": nothing for accepted work, else a WIP's name. */
 const into = (to: CatchUpFrom) =>
   to.kind === "accepted" ? "" : ` into ${catchUpName(to)}`
-
-/**
- * What a card says, from where its words are (`textSourceOf`): a text
- * card's document, read by `docText`; a fact's line; nothing for a card with
- * no words. Every reader of card words reads through it.
- */
-export function wordsOf(
-  source: TextSource,
-  docText: (card: TextCardId) => string,
-): string {
-  switch (source.kind) {
-    case "doc":
-      return docText(source.card)
-    case "fact":
-      return factLine(source.fact)
-    case "ask":
-      return askLine(source.relay)
-    // A reference is never queued or pinned (`KINDS`): no reader of these
-    // meets a quote, which only the page reads.
-    case "blob":
-    case "none":
-      return ""
-  }
-}
 
 /**
  * Why a thread is out of reach, naming no person: a fact's words are fixed

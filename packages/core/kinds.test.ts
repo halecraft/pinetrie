@@ -1,21 +1,24 @@
 import { describe, expect, test } from "vitest"
 import {
-  askCardIdFor,
   type CardKind,
+  cardIdOfKind,
   type FactCardId,
+  fitsPlace,
+  isTargetOf,
   KINDS,
   kindOfCard,
   makeCard,
   NO_CONTENT,
   type NoteColumnId,
   PLACES_OF,
+  parseCardId,
   type RelayDetails,
-  referenceCardIdFor,
   type Sha256,
   type TaskId,
   type ThreadId,
   textCardId,
   textSourceOf,
+  WRAPS,
   writerId,
 } from "./index.ts"
 
@@ -39,6 +42,14 @@ describe("KINDS (ADR-0126)", () => {
         expect(kindOfCard(`${KINDS[kind].prefix}${UUID}` as never)).toBe(kind)
   })
 
+  test("a card of every kind, minted (cardIdOfKind), parses as that kind's id", () => {
+    for (const kind of Object.keys(KINDS) as CardKind[]) {
+      const id = cardIdOfKind(kind, UUID)
+      expect([kind, parseCardId(id), kindOfCard(id)]).toEqual([kind, id, kind])
+    }
+    expect(parseCardId(`z-${UUID}`)).toBeUndefined()
+  })
+
   test("a kind's places are PLACES_OF's; a fact is only ever queued, and no person moves it", () => {
     for (const kind of Object.keys(KINDS) as CardKind[])
       expect(PLACES_OF[kind]).toEqual(KINDS[kind].places)
@@ -48,6 +59,20 @@ describe("KINDS (ADR-0126)", () => {
       reordered: false,
       text: "fact",
     })
+  })
+
+  test("a spot on a canvas is a target of each kind a canvas takes, and of each WRAPS makes a container for; of no other", () => {
+    const spot = {
+      kind: "canvas-at",
+      task: "k-1" as TaskId,
+      after: null,
+    } as const
+    for (const kind of Object.keys(KINDS) as CardKind[])
+      expect([kind, isTargetOf(kind, spot)]).toEqual([
+        kind,
+        fitsPlace(kind, "canvas") || kind in WRAPS,
+      ])
+    expect(Object.keys(WRAPS).sort()).toEqual(["reference", "text"])
   })
 
   test("makeCard makes a card of its kind, at a place its kind is in, by its maker", () => {
@@ -104,14 +129,14 @@ test("a card's words are where its kind says (`KINDS`' text): textSourceOf agree
     ),
     makeCard(
       "ask",
-      askCardIdFor(UUID),
+      cardIdOfKind("ask", UUID),
       { kind: "queued", thread, order: "a", by: ADA, seen: "" },
       { relay: { text: "?" } as RelayDetails },
       ADA,
     ),
     makeCard(
       "reference",
-      referenceCardIdFor(UUID),
+      cardIdOfKind("reference", UUID),
       place,
       { address: { kind: "thread", thread }, quote: "a".repeat(64) as Sha256 },
       ADA,

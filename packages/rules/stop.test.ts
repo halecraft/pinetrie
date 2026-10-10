@@ -1,11 +1,11 @@
 import {
   type AgentMessageLike,
   type CardRecord,
+  cardIdOfKind,
   type EntryId,
   type EntryLike,
   ERR,
   entryId,
-  factCardIdFor,
   indexAsks,
   indexTree,
   type LaneView,
@@ -45,7 +45,7 @@ describe("planStop", () => {
   const ada = writerId("ada")
   const bea = writerId("bea")
   const name = threadIdFor("s")
-  const FACT = factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
+  const FACT = cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f1")
   const lane = (running: boolean) => ({
     name,
     tip: entryId("2-a"),
@@ -69,7 +69,7 @@ describe("planStop", () => {
     now: 7,
     id,
   })
-  const SECOND = factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
+  const SECOND = cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f2")
   const stopped = (by = ada) => ({
     kind: "stopped" as const,
     lane: name,

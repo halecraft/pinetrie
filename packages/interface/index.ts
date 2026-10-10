@@ -8,6 +8,7 @@ export {
   accountWords,
   inventoryWords,
 } from "./account-view.ts"
+export { addressWords, EDIT_AS_TEXT } from "./address-words.ts"
 export { type AgentsRow, agentsRow, agentsWords } from "./agents-view.ts"
 export { placement } from "./align.ts"
 export {
@@ -226,18 +227,15 @@ export {
   threadAnchor,
 } from "./columns.ts"
 export { matchCommands } from "./commands.ts"
-
 export { copyText } from "./copy-text.ts"
 export { plural } from "./counts.ts"
 export type { Effect } from "./effects.ts"
 export {
-  addressWords,
   cardOfFace,
   DETAIL_ON,
   type Detail,
   type DrawnKind,
   detailOf,
-  EDIT_AS_TEXT,
   type Face,
   type FaceOf,
   faceOf,
@@ -343,6 +341,12 @@ export {
   callStreams,
   type LiveWork,
 } from "./live.ts"
+export {
+  ADD_COMMENT,
+  COMMENT,
+  marginFaceWords,
+  SHUT_MARGIN,
+} from "./margin.ts"
 export { markdownOf } from "./markdown-of.ts"
 export {
   type MessageAct,
@@ -397,9 +401,6 @@ export {
   insertAt,
   pastedFiles,
   type Selection,
-  type TextUpload,
-  uploadImage,
-  uploadText,
 } from "./paste.ts"
 export {
   type AppPorts,
@@ -607,6 +608,11 @@ export {
   traceGroups,
   tracesAt,
 } from "./traces.ts"
+export {
+  type TextUpload,
+  uploadImage,
+  uploadText,
+} from "./upload.ts"
 export {
   type Box,
   keepSpot,

@@ -1,7 +1,7 @@
 import {
+  cardIdOfKind,
   entryId,
   NO_CONTENT,
-  noteColumnIdFor,
   type TextCard,
   textCardId,
   threadIdFor,
@@ -33,7 +33,10 @@ import { applyPlaceSteps } from "./places.ts"
 const LANE = threadIdFor("0123456789abcdef")
 const OTHER = threadIdFor("fedcba9876543210")
 const ADA = writerId("ada@x.io")
-const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const NOTES = cardIdOfKind(
+  "note-column",
+  "01a0ffd2-0000-7000-8000-0000000000a1",
+)
 
 function setUp() {
   const b = basics()

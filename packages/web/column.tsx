@@ -66,6 +66,7 @@ import {
   FOLD,
   type FoldMemory,
   freshOf,
+  gridKeyAct,
   type HeadBanner,
   type HeadIdentity,
   type HeadOrigin,
@@ -89,6 +90,7 @@ import {
   type ReadOnly,
   type ReserveStep,
   type RowMemory,
+  referenceOf,
   type ScreenMemory,
   type SeenEnd,
   type SpotStore,
@@ -110,6 +112,8 @@ import {
 } from "@pinetrie/interface"
 import {
   effectiveBase,
+  marginCards,
+  marginCounts,
   type OfferButton,
   pinnedAt,
   queuedOn,
@@ -126,6 +130,7 @@ import {
   type SessionClient,
 } from "@pinetrie/session"
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -140,6 +145,7 @@ import { ColumnMenu } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { Dock } from "./dock.tsx"
+import { Margin } from "./margin.tsx"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
@@ -156,6 +162,7 @@ import { Pane } from "./pane.tsx"
 import { MessageSource, PaneReach, STREAMING } from "./pane-context.ts"
 import { PinnedStrip } from "./pinned-strip.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
+import { isTextBox } from "./text-box.ts"
 import { useAskBar } from "./use-ask-bar.ts"
 import { PLACED, useFollow } from "./use-follow.ts"
 import { useSeenBy } from "./use-presence.ts"
@@ -338,13 +345,161 @@ export function Column(p: ColumnProps) {
   // What this column's reader asks, a message's acts among it: the one
   // handler every message shares, so none of them redraws when this column
   // does.
-  const act = useStable((act: ColumnAct) =>
-    p.onIntent({ kind: "column", column: p.columnKey, act }),
-  )
+  const act = useStable((act: ColumnAct) => {
+    // A comment opens its entry's margin, its box taking focus once drawn.
+    if (act.kind === "comment") {
+      setOpenMargin(act.entry)
+      setCommenting(act.card)
+    }
+    p.onIntent({ kind: "column", column: p.columnKey, act })
+  })
+
   // A linked thread opened: a fork row's, or a row from another task's.
   const openLink = useStable((link: ThreadLink, at: EntryId) =>
     p.onIntent({ kind: "openLink", link, entry: at }),
   )
+
+  // Margins (ADR-0126): the comments beside each entry, one open at a time,
+  // and the entry the keys select.
+  const [openMargin, setOpenMargin] = useState<EntryId | null>(null)
+  const [commenting, setCommenting] = useState<CardId | null>(null)
+  const [selected, setSelected] = useState<EntryId | null>(null)
+  const margins = useMemo(() => marginCounts(p.cards), [p.cards])
+  const openComments = useMemo(
+    () => (openMargin === null ? [] : marginCards(p.cards, openMargin)),
+    [p.cards, openMargin],
+  )
+  const comment = useStable((entry: EntryId) => {
+    const thread = index.entries[entry]?.thread
+    if (thread !== undefined)
+      act({ kind: "comment", card: newCardId(), entry, thread })
+  })
+  const typedIn = useStable((card: CardId) => p.onTyping(card))
+  const marginReader = useMemo(
+    () => ({ me: p.session.writer, nameOf: p.nameOf }),
+    [p.session.writer, p.nameOf],
+  )
+  const onMargin = useStable((entry: EntryId) => setOpenMargin(entry))
+  const marginSlot = useMemo(
+    () =>
+      openMargin === null ? null : (
+        <Margin
+          comments={openComments}
+          onAct={act}
+          onComment={() => comment(openMargin)}
+          onShut={() => setOpenMargin(null)}
+          onTyping={typedIn}
+          readOnly={p.readOnly}
+          reader={marginReader}
+          seats={p.seats}
+          session={p.session}
+        />
+      ),
+    [
+      openMargin,
+      openComments,
+      act,
+      comment,
+      typedIn,
+      p.readOnly,
+      marginReader,
+      p.seats,
+      p.session,
+    ],
+  )
+  useEffect(() => {
+    if (commenting === null) return
+    const box = content.current?.querySelector<HTMLTextAreaElement>(
+      `.margin textarea[data-card="${commenting}"]`,
+    )
+    if (box == null) return
+    box.focus()
+    setCommenting(null)
+  })
+  // The selected entry is marked where it is drawn, again as the messages
+  // are drawn anew; the selection's change alone brings it into view, so the
+  // reader's own scrolling is left alone.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `view` redraws the messages the mark is on
+  useLayoutEffect(() => {
+    const el = content.current
+    if (el === null) return
+    for (const msg of el.querySelectorAll(".msg[data-selected]"))
+      msg.removeAttribute("data-selected")
+    if (selected === null) return
+    el.querySelector(`.msg[data-entry="${selected}"]`)?.setAttribute(
+      "data-selected",
+      "",
+    )
+  }, [selected, view])
+  useLayoutEffect(() => {
+    if (selected === null) return
+    content.current
+      ?.querySelector(`.msg[data-entry="${selected}"]`)
+      ?.scrollIntoView({ block: "nearest" })
+  }, [selected])
+  /**
+   * The column's messages as a grid one cell wide (ADR-0126), while focus is
+   * in it and in no text box: `j` and `k` select, Enter opens the selected
+   * entry's margin, Escape shuts it, `c` comments, and Cmd+C with no text
+   * selected takes a reference to it.
+   */
+  const onEntryKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (isTextBox(document.activeElement)) return
+    const ids = view.nodes.map(n => n.id)
+    if (ids.length === 0) return
+    const at = selected === null ? -1 : ids.indexOf(selected)
+    const from = at < 0 ? ids.length - 1 : at
+    const entry = ids[from]
+    if (entry === undefined) return
+    const copying =
+      e.metaKey !== e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "c"
+    if (copying) {
+      const node = view.nodes[from]
+      if (
+        at < 0 ||
+        node === undefined ||
+        !writable ||
+        window.getSelection()?.isCollapsed === false
+      )
+        return
+      e.preventDefault()
+      act({
+        kind: "takeReference",
+        card: newReferenceCardId(),
+        ...referenceOf(node, null, null),
+      })
+      return
+    }
+    const grid = { width: 1, rows: ids.length }
+    const step = gridKeyAct(e, {
+      grid,
+      rows: ids.length,
+      selected: from,
+      hasCard: at >= 0,
+      open: openMargin !== null && openMargin === entry,
+      inText: false,
+      comments: writable,
+    })
+    if (step === null) return
+    e.preventDefault()
+    switch (step.kind) {
+      case "select":
+        setSelected(ids[step.cell] ?? null)
+        return
+      case "open":
+        setOpenMargin(openMargin === entry ? null : entry)
+        return
+      case "fold":
+        setOpenMargin(null)
+        return
+      case "comment":
+        comment(entry)
+        return
+      // A message is not moved.
+      case "move":
+        return
+    }
+  }
   const openAt = useStable((entry: EntryId) =>
     p.onIntent({ kind: "openAt", entry }),
   )
@@ -1112,7 +1267,24 @@ export function Column(p: ColumnProps) {
             {/* `useFollow` watches its height. Keep it unpositioned: it would
             become the messages' offsetParent, and `alignOnOpen` measures
             their offsetTop against the body's. */}
-            <div className="column-content" ref={content}>
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: the column's entry keys (`onEntryKey`); each message's tools are buttons */}
+            <div
+              className="column-content"
+              onClick={e => {
+                const msg =
+                  e.target instanceof Element
+                    ? e.target.closest<HTMLElement>(".msg[data-entry]")
+                    : null
+                // The drawn entry, branded as the view holds it.
+                const entry = view.nodes.find(
+                  n => n.id === msg?.dataset.entry,
+                )?.id
+                if (entry !== undefined) setSelected(entry)
+              }}
+              onKeyDown={onEntryKey}
+              ref={content}
+              tabIndex={-1}
+            >
               {/* Room above the first message, so opening can bring it level with
             its fork point even when the column is short. */}
               <div className="spacer" ref={spacer} />
@@ -1134,6 +1306,10 @@ export function Column(p: ColumnProps) {
                 revisions={p.work.revisions}
                 runningAsk={runningAsk}
                 digests={p.digests}
+                margins={margins}
+                marginSlot={marginSlot}
+                onMargin={onMargin}
+                openMargin={openMargin}
                 leftBefore={leftLine(
                   index,
                   leftAt,

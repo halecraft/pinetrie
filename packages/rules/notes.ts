@@ -3,6 +3,7 @@
 // place at its column's end.
 
 import {
+  type CanvasPlace,
   type CardPlace,
   type CardRecord,
   makeCard,
@@ -16,7 +17,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { byOrder } from "./card.ts"
-import { type PlaceStep, planMake } from "./moves.ts"
+import { afterSteps, type PlaceStep, planMake } from "./moves.ts"
 import { orderAfter } from "./order.ts"
 import { rankAfter } from "./rank.ts"
 import { type CanvasCard, canvasOf } from "./task.ts"
@@ -159,30 +160,43 @@ export function toNotes(input: {
     case "column":
       return { place: noteAt(input.cards, near.column), first: [] }
     case "make": {
-      const column = input.newColumn()
-      const made = planMake(
-        input.cards,
-        makeCard(
-          "note-column",
-          column,
-          { kind: "canvas", task: near.task, order: near.order, width: 1 },
-          NO_CONTENT,
-          input.by,
-        ),
+      const renumbered = near.renumbered.map(
+        (record): PlaceStep => ({ kind: "write", record }),
+      )
+      const made = makeNoteColumn(
+        afterSteps(input.cards, renumbered),
+        input.newColumn(),
+        { kind: "canvas", task: near.task, order: near.order, width: 1 },
         input.by,
       )
-      if (made.kind !== "write") return null
-      return {
-        place: { kind: "note", column, order: orderAfter([]) },
-        first: [
-          ...near.renumbered.map(
-            (record): PlaceStep => ({ kind: "write", record }),
-          ),
-          made,
-        ],
-      }
+      if (made === null) return null
+      return { place: made.place, first: [...renumbered, made.step] }
     }
   }
+}
+
+/**
+ * A new note column, `column`, at `at` on a canvas, made by `by` through
+ * `planMake` as every card is, and the place of its first note. Null when
+ * the make is refused, which none is. Pure.
+ */
+export function makeNoteColumn(
+  cards: readonly CardRecord[],
+  column: NoteColumnId,
+  at: CanvasPlace,
+  by: WriterId,
+): {
+  readonly step: PlaceStep
+  readonly place: Extract<CardPlace, { kind: "note" }>
+} | null {
+  const made = planMake(
+    cards,
+    makeCard("note-column", column, at, NO_CONTENT, by),
+    by,
+  )
+  return made.kind !== "write"
+    ? null
+    : { step: made, place: { kind: "note", column, order: orderAfter([]) } }
 }
 
 /** A note at the end of `column`. */

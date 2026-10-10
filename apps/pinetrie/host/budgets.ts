@@ -7,8 +7,8 @@
 // session write is not made for every model request.
 
 import {
+  cardIdOfKind,
   type EntryId,
-  factCardIdFor,
   indexAsks,
   type ThreadId,
   type WriterId,
@@ -132,7 +132,7 @@ export function createBudgets(deps: {
         await deps.records.writeValues([setRecord(BUDGET, over)])
         const fact = planFactCard({
           cards: readPlaces(places),
-          id: factCardIdFor(deps.basics.newId()),
+          id: cardIdOfKind("fact", deps.basics.newId()),
           fact: {
             kind: "budget-spent",
             lane: over.thread,
@@ -174,7 +174,7 @@ export function createBudgets(deps: {
       holds: readQueueHolds(session),
       by: over.by,
       now: deps.basics.now(),
-      id: factCardIdFor(deps.basics.newId()),
+      id: cardIdOfKind("fact", deps.basics.newId()),
       budget: over.message,
     })
     if (planned.kind === "abort" && planned.fact.length > 0)

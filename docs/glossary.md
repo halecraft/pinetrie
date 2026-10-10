@@ -81,6 +81,8 @@ a value is stored.
 | **run** | The agent's work in answer to an ask: the entries it wrote, and any fact steered into it. A run has an ask (ADR-0106). | `AskIndex.work`, `runOf` | |
 | **ask** | The message that started a run (ADR-0106). | `askOf`, `indexAsks` (by prompt) | |
 | **fork** | The point, at an entry, where threads diverge; not an entry. Forking before an entry edits it (ADR-0043); after it, branches. | `ThreadOrigin.fork` | |
+| **margin** | An entry's surface, for comments on it; shut, a count beside the entry; open, the comments under it (ADR-0126). | place `margin`, `marginCards`, `marginCounts`, `Margin`, `MarginFace` | |
+| **comment** | A note on an entry, in its margin: people read it; the agent does once a reference to it is queued (ADR-0126). | `comment`, `planComment`, `queueReference`, `commentMarkdown` | annotation |
 | **derivation** | What the host computes from a thread's entries and replaces as they grow: a digest, a verdict. Never an entry, never a card, never read by the agent; one a model made says so. | `DigestRecord`, `VerdictRecord` | host record (for these), annotation |
 
 ## The board
@@ -117,12 +119,10 @@ Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
 | **runner** | Where a lane runs: the host that holds it, that host's machine, and the model of each run. | ADR-0119 | |
 | **task card** | A task, as a card, on the board's workflow states. | ADR-0126 | `BoardPlace` as a place of its own |
 | **consume** | What a thread's live end does to a card: a send, a spin, a fact popped. The card ends; the entry it became is the record. | ADR-0126 | |
-| **margin** | An entry's surface, for notes on it. | ADR-0126 | |
 | **trash** | A person's surface, one each, of the cards they discarded, until undone or swept. Each remembers the task it left, or none. | ADR-0126 | the `gone` place |
 | **team** | The people who share a board, its tasks and, later, its sources and runners. | ADR-0126 | the host's session, as the board's owner |
 | **party** | A person or a team: what owns a surface that no content does (an inventory, a trash, a board). | ADR-0126 | |
 | **stack** | A card holding two or more threads of one root, one on top, drawn as one column: only the top runs, and which is on top is shared. Not built with the rest. | ADR-0126 | |
-| **comment** | A note on an entry, in its margin: people read it; the agent does once it is queued. | ADR-0126 | annotation |
 | **face**, **normal**, **whole** | The three levels of detail every kind is drawn at, chosen by the surface it is on: a strip, a grid cell or a mark; the card itself, bounded; all of it, as a column or in the pane. Width is the place's, not a level. | ADR-0126 | |
 | **preview** | A selected card in the inventory, drawn normal, one column wide, read only. | ADR-0126 | |
 

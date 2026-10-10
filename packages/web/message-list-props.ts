@@ -24,6 +24,7 @@ import type {
   ThreadLink,
 } from "@pinetrie/interface"
 import type { LiveDocHandle } from "@pinetrie/schema"
+import type { ReactNode } from "react"
 import { type PropRule, sameProps } from "./same-props.ts"
 
 export interface MessageListProps {
@@ -71,6 +72,14 @@ export interface MessageListProps {
   leftBefore: EntryId | null
   /** Each ask's model-written digest, by its prompt. */
   digests: ReadonlyMap<EntryId, DigestRecord>
+  /** How many comments each entry's margin holds (`marginCounts`, ADR-0126). */
+  margins: ReadonlyMap<EntryId, number>
+  /** The entry whose margin is open, drawn as `marginSlot` under it; null for none. */
+  openMargin: EntryId | null
+  /** The open margin, as its column draws it. */
+  marginSlot: ReactNode
+  /** Open an entry's margin. */
+  onMargin: (entry: EntryId) => void
 }
 
 /**
@@ -111,6 +120,10 @@ const MESSAGE_LIST_PROPS = {
   folds: "identity",
   leftBefore: "value",
   digests: "value",
+  margins: "value",
+  openMargin: "value",
+  marginSlot: "identity",
+  onMargin: "identity",
 } as const satisfies { readonly [K in keyof MessageListProps]-?: PropRule }
 
 /** Whether a column's message list would draw the same. */

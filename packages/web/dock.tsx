@@ -157,6 +157,10 @@ export function Dock(p: {
             ) : c.kind === "ask" ? (
               // An ask from another thread, the host's (ADR-0128).
               <RENDERINGS.ask.Normal card={c} key={c.id} width={1} />
+            ) : c.kind === "reference" ? (
+              // A reference queued to tell the agent (ADR-0126): its quote,
+              // read only.
+              <RENDERINGS.reference.Normal card={c} key={c.id} width={1} />
             ) : (
               <div
                 className="queued-card"

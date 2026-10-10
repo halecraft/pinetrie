@@ -610,6 +610,7 @@ export async function startHost({
         basics,
         records,
         texts: cardPort,
+        blobs,
         agent,
         work,
         start: runs.start,

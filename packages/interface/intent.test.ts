@@ -3,13 +3,12 @@ import {
   atEntry,
   type CardId,
   type CardRecord,
+  cardIdOfKind,
   type EntryId,
   entryId,
-  factCardIdFor,
   INVENTORY_SLOTS,
   indexAsks,
   NO_CONTENT,
-  referenceCardIdFor,
   rootIdFor,
   type TaskId,
   type TextCard,
@@ -168,7 +167,10 @@ const plan = (intent: Intent, state: IntentState = R1) =>
     task: NEW_TASK,
     thread: NEW_THREAD,
     noteColumn: NEW_NOTE_COLUMN,
-    reference: referenceCardIdFor("01a0ffd2-0000-7000-8000-0000000000e1"),
+    reference: cardIdOfKind(
+      "reference",
+      "01a0ffd2-0000-7000-8000-0000000000e1",
+    ),
   })
 /** The column keys these tests name: a branch's, a new tab's, a card's. */
 const FRESH: FreshKey = { kind: "fresh", thread: F }
@@ -808,7 +810,7 @@ describe("planIntent", () => {
       const [a, b] = [q(cardIdFor("ca"), "a"), q(cardIdFor("cb"), "b")]
       const fact = {
         kind: "fact",
-        id: factCardIdFor("01a0ffd2-0000-7000-8000-0000000000f1"),
+        id: cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f1"),
         owner: ada,
         placer: ada,
         place: { ...queuedPlace, order: "c" },
