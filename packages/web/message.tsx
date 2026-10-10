@@ -14,6 +14,7 @@ import {
   type MessageAct,
   type MessageTools,
   NO_MEMORY,
+  opens,
   pinnedMarkerWords,
   plural,
   REVEAL_MS,
@@ -134,6 +135,22 @@ function MessageView(p: MessageProps) {
         )}
       <div className={classes.join(" ")} data-entry={node.id}>
         <span className="role">{speaker}</span>
+        {p.crossTaskLink !== undefined && (
+          // Another task's thread it came from (ADR-0128), opened as a
+          // fork row's link is; held elsewhere, it opens nothing.
+          <button
+            className="cross-task-link"
+            disabled={!opens(p.crossTaskLink.link)}
+            onClick={() =>
+              p.crossTaskLink !== undefined &&
+              p.onLink(p.crossTaskLink.link, node.id)
+            }
+            title="show that thread"
+            type="button"
+          >
+            · {p.crossTaskLink.words}
+          </button>
+        )}
         {node.command !== undefined && (
           <span
             className="command-label"

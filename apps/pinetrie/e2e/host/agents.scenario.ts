@@ -1,22 +1,35 @@
-// e2e/host/agents — another thread's agent invited, asked by this thread's
-// agent, and its answer waking the asker; then a budget spent, which wakes
-// nobody (ADR-0128).
+// e2e/host/agents — another task's thread's agent invited, asked by this
+// thread's agent, and its answer waking the asker; then its task archived,
+// which refuses the next ask; then a budget spent, which wakes nobody
+// (ADR-0128).
 
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
-  type EntryId,
+  messageText,
   projectTranscript,
   ROOT,
   type ThreadId,
   threadEnd,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
-import { readNames, readRecords } from "@pinetrie/reads"
+import {
+  readBoardPlaces,
+  readNames,
+  readRecords,
+  readThreads,
+  readWorkflow,
+} from "@pinetrie/reads"
 import { BUDGET } from "@pinetrie/rules"
 import type { Checks } from "../checks.ts"
-import { at, BRANCH, START_AGENT, SUITE_CONFIG, treeOf } from "../harness.ts"
+import {
+  at,
+  START_AGENT,
+  SUITE_CONFIG,
+  taskHolding,
+  treeOf,
+} from "../harness.ts"
 import type { LaneHosts, SectionHost } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -43,22 +56,22 @@ function configWith(budget: number): string {
   return file
 }
 
-/** Two agent threads on one task, A and B; B's name; A's end. */
+/**
+ * Two agent threads, A and B, each started at the root, so each is a task
+ * of its own (ADR-0128): every check below crosses tasks and root
+ * documents. B's name.
+ */
 async function twoThreads(section: SectionHost) {
   const { user, idle, host } = section
+  const threadsNow = () => [...treeOf(host).endOf.keys()]
   await user.chat("@agent you are A", ROOT, START_AGENT)
   await idle()
-  const first = Object.values(treeOf(host).entries).find(
-    e => e.parentId === null,
-  )?.id as EntryId
-  await user.chat("@agent you are B", at(first), BRANCH)
+  const [a] = threadsNow()
+  await user.chat("@agent you are B", ROOT, START_AGENT)
   await idle()
-  const tree = treeOf(host)
-  const names = readNames(host.session)
-  const threads = [...tree.endOf.keys()]
-  const a = tree.entries[first]?.thread as ThreadId
-  const b = threads.find(t => t !== a) as ThreadId
-  return { a, b, bName: names.get(b) ?? "" }
+  const b = threadsNow().find(t => t !== a)
+  if (a === undefined || b === undefined) throw new Error("two threads start")
+  return { a, b, bName: readNames(host.session).get(b) ?? "" }
 }
 
 /** The transcript of `thread`, as its texts with their roles. */
@@ -118,6 +131,40 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         "what the other thread's agent spent is counted in the budget",
         budget !== undefined && budget.spent > 0 && !budget.over,
         JSON.stringify(budget ?? null),
+      )
+
+      // B's task archived: its root is let go, and A's ask of it is
+      // refused with why, never opening that root again.
+      const done = readWorkflow(host.session)?.archive
+      const bTask = taskHolding(host, threadEnd(treeOf(host), b))
+      const bRoot = readThreads(host.session).get(b)?.root
+      const state = readBoardPlaces(host.session).get(bTask)?.state
+      if (done === undefined || state === undefined || bRoot === undefined)
+        throw new Error("B's task is on the board")
+      await user.request({
+        kind: "move-task",
+        task: bTask,
+        from: state,
+        to: done.id,
+        before: null,
+      })
+      await idle()
+      script.use([{ tool: "ask", args: { to: bName, text: "and now?" } }])
+      await user.chat("@agent ask it again", at(threadEnd(treeOf(host), a)), {
+        thread: a,
+      })
+      await idle()
+      // A tool's result is no transcript message: read the results stored.
+      const refused = Object.values(treeOf(host).entries).flatMap(e =>
+        e.message?.role === "toolResult" &&
+        messageText(e.message).includes("archived by")
+          ? [messageText(e.message)]
+          : [],
+      )
+      check(
+        "an ask of a member whose task was archived says why, and its root stays unloaded",
+        refused.length > 0 && host.docs.view(bRoot) === null,
+        `${refused.at(-1) ?? "no refusal"} · loaded ${host.docs.view(bRoot) !== null}`,
       )
     } finally {
       await close()

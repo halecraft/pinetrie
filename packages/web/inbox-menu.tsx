@@ -82,7 +82,7 @@ export interface InboxMenuProps {
   readonly inbox: InboxSeen
   readonly thread: ThreadRow
   readonly names: ReadonlyMap<ThreadId, ThreadName>
-  /** Where each thread's link leads (`linkTo`): a raised item or a mention opens there. */
+  /** Where each thread's link leads (`threadLink`): a raised item or a mention opens there. */
   readonly linkOf: (thread: ThreadId) => ThreadLink
   readonly labelOf: (task: TaskId | null) => string
   readonly reader: Reader

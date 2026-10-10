@@ -49,7 +49,7 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
-import { linkTo } from "./thread-link.ts"
+import { threadLink } from "./thread-link.ts"
 
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
@@ -140,7 +140,7 @@ const inventoryOf = (holder: WriterId): ThreadCard => ({
 })
 /** A link to a thread on `task`'s canvas. */
 const linkOn = (task: TaskId) =>
-  linkTo(
+  threadLink(
     LINKED,
     [
       {
@@ -679,7 +679,7 @@ describe("planIntent", () => {
     })
 
     test("openLink: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing (ADR-0124)", () => {
-      const mine = linkTo(LINKED, [inventoryOf(ME)], ME)
+      const mine = threadLink(LINKED, [inventoryOf(ME)], ME)
       const slots = { "4": LINKED }
       expect(
         plan(
@@ -691,14 +691,14 @@ describe("planIntent", () => {
         { kind: "select", slot: 4 },
         { kind: "openSelected" },
       ])
-      const held = linkTo(LINKED, [inventoryOf(writerId("bea@x.io"))], ME)
+      const held = threadLink(LINKED, [inventoryOf(writerId("bea@x.io"))], ME)
       expect(
         plan({ kind: "openLink", link: held, entry: entryId("3-b") }),
       ).toEqual([])
       expect(
         plan({
           kind: "openLink",
-          link: linkTo(LINKED, [], ME),
+          link: threadLink(LINKED, [], ME),
           entry: entryId("3-b"),
         }),
       ).toEqual([])

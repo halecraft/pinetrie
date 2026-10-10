@@ -575,13 +575,15 @@ export {
   threadPreview,
 } from "./thread-face.ts"
 export {
+  type CrossTaskLink,
+  crossTaskLinks,
   heldWords,
   type LinkOpen,
-  linkTo,
   linkWords,
   openOf,
   opens,
   type ThreadLink,
+  threadLink,
 } from "./thread-link.ts"
 export {
   callMark,

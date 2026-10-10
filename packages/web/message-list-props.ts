@@ -13,6 +13,7 @@ import type {
 } from "@pinetrie/core"
 import type {
   ColumnView,
+  CrossTaskLink,
   Density,
   FoldMemory,
   LaneJoin,
@@ -20,6 +21,7 @@ import type {
   MessageAct,
   RowMemory,
   ScreenMemory,
+  ThreadLink,
 } from "@pinetrie/interface"
 import type { LiveDocHandle } from "@pinetrie/schema"
 import { type PropRule, sameProps } from "./same-props.ts"
@@ -32,6 +34,10 @@ export interface MessageListProps {
   writable: boolean
   /** Where a lane starts on this path (`columnView`). */
   joins: ReadonlyMap<EntryId, LaneJoin>
+  /** Where each row from another thread's task is (`crossTaskLinks`, ADR-0128). */
+  crossTaskLinks: ReadonlyMap<EntryId, CrossTaskLink>
+  /** Open a row's other thread, as a fork row's link opens (`Origin`). */
+  onLink: (link: ThreadLink, at: EntryId) => void
   /** Fork dots, by the message they sit on. */
   forks: ReadonlyMap<EntryId, readonly number[]>
   /** Ids any column of this tab shows. */
@@ -87,6 +93,8 @@ const MESSAGE_LIST_PROPS = {
   lane: "value",
   writable: "value",
   joins: "value",
+  crossTaskLinks: "value",
+  onLink: "identity",
   forks: "identity",
   shown: "identity",
   tools: "identity",

@@ -53,7 +53,7 @@ export interface RunBudget {
  * answer's, else the prompt's own (a person's message, or a carry-on). Pure
  * over the stored message.
  */
-export function budgetOfPrompt(prompt: EntryId, message: unknown): RunBudget {
+export function promptBudget(prompt: EntryId, message: unknown): RunBudget {
   const relay = decodeRelay(message)
   if (relay !== undefined)
     return {
@@ -120,7 +120,7 @@ export function createBudgets(deps: {
     if (prompt === null) return null
     const known = byPrompt.get(prompt.id)
     if (known !== undefined) return known
-    const budget = budgetOfPrompt(prompt.id, prompt.message)
+    const budget = promptBudget(prompt.id, prompt.message)
     byPrompt.set(prompt.id, budget)
     return budget
   }

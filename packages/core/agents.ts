@@ -4,13 +4,7 @@
 // the path, as a thread's mode is (ADR-0021): nothing about them is stored
 // beside the entries.
 
-import {
-  type AgentCandidate,
-  type EntryId,
-  isThreadId,
-  type ThreadId,
-  type ThreadName,
-} from "./index.ts"
+import type { AgentCandidate, EntryId, ThreadId, ThreadName } from "./index.ts"
 import { ancestry, newestOnPath, type TreeIndex } from "./tree.ts"
 
 /**
@@ -19,7 +13,7 @@ import { ancestry, newestOnPath, type TreeIndex } from "./tree.ts"
  * dismissed or left. A branch has the members its thread had where it
  * forked. Pure.
  */
-export function membersOf(
+export function threadMembers(
   index: TreeIndex,
   tip: EntryId | null,
 ): readonly ThreadId[] {
@@ -42,7 +36,7 @@ export function membersOf(
  * agent; null when none did. What it is told when first asked starts there.
  * Pure.
  */
-export const invitedAt = (
+export const lastInvitation = (
   index: TreeIndex,
   tip: EntryId | null,
   thread: ThreadId,
@@ -61,7 +55,7 @@ export const invitedAt = (
  * next ask copies it again, as base news is told again past one (ADR-0080).
  * Pure.
  */
-export const heardFrom = (
+export const lastHeardEntry = (
   index: TreeIndex,
   tip: EntryId | null,
   from: ThreadId,
@@ -81,7 +75,7 @@ export const heardFrom = (
  * on the path ending at `tip`: each answer names the entry its relay came
  * from (`AnswerDetails.source`). False for a chat that asked none. Pure.
  */
-export function roundOf(
+export function isRoundAnswered(
   index: TreeIndex,
   tip: EntryId | null,
   chat: EntryId,
@@ -99,10 +93,10 @@ export function roundOf(
 
 /**
  * The other threads' agents a message in `here` may name (ADR-0128): every
- * named thread on its task's canvas but `here`, each a member when
- * `members` (`membersOf` its path) holds it. The host and the composer both
- * build them so, so the button's promise and the host's decision agree.
- * Pure.
+ * thread in `canvas` (every open task's named threads, `reachableAgents` in
+ * rules) but `here`, each a member when `members` (`threadMembers` of its
+ * path) holds it. The host and the composer both build them so, so the
+ * button's promise and the host's decision agree. Pure.
  */
 export const agentCandidates = (
   canvas: readonly { readonly thread: ThreadId; readonly name: ThreadName }[],
@@ -112,18 +106,3 @@ export const agentCandidates = (
   canvas
     .filter(t => t.thread !== here)
     .map(t => ({ ...t, member: members.includes(t.thread) }))
-
-/**
- * The named threads among a task's canvas cards (ADR-0128): whose agents a
- * message on that task may name. The host and the page read them alike.
- * Pure.
- */
-export const namedThreads = (
-  canvas: readonly { readonly kind: string; readonly id: string }[],
-  names: ReadonlyMap<ThreadId, ThreadName>,
-): readonly { readonly thread: ThreadId; readonly name: ThreadName }[] =>
-  canvas.flatMap(c => {
-    if (c.kind !== "thread" || !isThreadId(c.id)) return []
-    const name = names.get(c.id)
-    return name === undefined ? [] : [{ thread: c.id, name }]
-  })

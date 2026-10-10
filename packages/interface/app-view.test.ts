@@ -28,7 +28,7 @@ import { PENDING_TRACK } from "./column-paths.ts"
 import { BOUND, type Column } from "./columns.ts"
 import { threadOfEntry, tree } from "./fixtures.ts"
 import { rootSeed, trackSlot } from "./palette.ts"
-import { linkTo } from "./thread-link.ts"
+import { threadLink } from "./thread-link.ts"
 
 const ADA = writerId("ada@x.test")
 const nameOf = new Map([[ADA, "Ada"]])
@@ -188,7 +188,7 @@ test("a task's rail is a forest: a tree for each root of its threads, in order, 
   const C = threadOfEntry("4-c")
   const elsewhere = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
   const linkOf = (thread: ThreadId) =>
-    linkTo(
+    threadLink(
       thread,
       [
         {
@@ -266,7 +266,7 @@ test("a rail stub for a branch whose first run wrote a context entry above its p
     roots: [{ root: R, entry: entryId("1-r") }],
     ends: new Map([[T, entryId("1-r")]]),
     linkOf: thread =>
-      linkTo(
+      threadLink(
         thread,
         [
           {

@@ -6,6 +6,16 @@
 import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "an ask of an archived member opens its root first",
+    file: "apps/pinetrie/host/relays.ts",
+    from: '    if (away !== null) return { kind: "refused", why: away }\n',
+    to: "",
+    suite: "host",
+    scenario: "agents",
+    expect:
+      "an ask of a member whose task was archived says why, and its root stays unloaded",
+  },
   // ── agents talking (ADR-0128), the host suite's agents scenario ──
   {
     name: "a chat stores none of the agents it invites",

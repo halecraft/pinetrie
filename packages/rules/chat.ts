@@ -517,7 +517,7 @@ export const agentByDefault = (send: {
 export function addressChat(input: {
   readonly mentions: readonly Mention[]
   readonly participants: readonly string[]
-  /** Other threads' agents on the task's canvas (ADR-0128). */
+  /** Other threads' agents on open tasks' canvases (ADR-0128). */
   readonly agents: readonly AgentCandidate[]
   readonly mode: PlanMode
   readonly lane: ThreadLane
@@ -622,7 +622,7 @@ export function planChat(input: {
   readonly mentions: readonly Mention[]
   /** Every participant's display name (`participants`). */
   readonly participants: readonly string[]
-  /** Other threads' agents on the task's canvas (ADR-0128). */
+  /** Other threads' agents on open tasks' canvases (ADR-0128). */
   readonly agents: readonly AgentCandidate[]
   readonly asksAgent: boolean
   /** The command's id. */

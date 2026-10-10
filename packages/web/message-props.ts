@@ -3,17 +3,20 @@
 
 import type {
   BranchSummary,
+  EntryId,
   SpineNode,
   StreamId,
   WriterId,
 } from "@pinetrie/core"
 import type {
+  CrossTaskLink,
   LaneJoin,
   MessageAct,
   MessageTools,
   PinnedMarker,
   RowMemory,
   ScreenMemory,
+  ThreadLink,
 } from "@pinetrie/interface"
 import type { LiveDocHandle } from "@pinetrie/schema"
 import { type PropRule, sameProps } from "./same-props.ts"
@@ -38,6 +41,10 @@ export interface MessageProps {
   onAct: (act: MessageAct) => void
   /** A lane starts here: a divider above the message names it. */
   join: LaneJoin | undefined
+  /** Another task's thread it came from, and where that is (ADR-0128). */
+  crossTaskLink: CrossTaskLink | undefined
+  /** Open `crossTaskLink`'s thread, as a fork row's link opens. */
+  onLink: (link: ThreadLink, at: EntryId) => void
   /** The pinned cards its run read, when it is a run's prompt (`pinnedMarkers`). */
   pinned: PinnedMarker | undefined
   /** Tracks of open columns that fork here: a dot of each colour. */
@@ -59,6 +66,8 @@ const MESSAGE_PROPS = {
   rows: "identity",
   tools: "value",
   join: "value",
+  crossTaskLink: "value",
+  onLink: "identity",
   pinned: "value",
   forkTracks: "value",
   closedBranches: "value",

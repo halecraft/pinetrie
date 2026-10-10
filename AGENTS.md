@@ -47,6 +47,12 @@ spent spikes: history, which search skips unless you name the folder.
   storage, pi).
 - Decide a label as a value; word it in one function
   (`packages/interface/TECHNICAL.md`, "Words come from values").
+- A function's name says, on its own, what it returns or does: a noun for
+  what it builds (`threadLink`, `threadReach`), a verb for what it does
+  (`planRelay`), `is` for a yes or no (`isRoundAnswered`). Never end one in
+  a bare *of*, *to* or *at* (`linkTo`, `reachOf`) that leans on its
+  arguments to finish the phrase. Older names that do are renamed when
+  their code is next changed for its own reasons.
 - Only `packages/pi` imports pi (ADR-0003). Package boundaries are enforced by
   resolution; `workspace.test.ts` checks the manifests.
 - Verify, don't assume: read the source of pi and Kyneta, or measure with a

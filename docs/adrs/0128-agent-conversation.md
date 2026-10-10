@@ -47,10 +47,19 @@ lanes run at once; and a tool can start another lane's run without waiting.
 
 - **Another thread's agent is named by its thread's name** (ADR-0039):
   `@amber-fox`. `@agent` is still the agent of the thread you are in. A
-  mention reaches the threads on the same task's canvas, which the
-  composer offers as you type. A thread with no lane has no agent to name,
-  and a thread taken into an inventory (ADR-0124) or in an archived task
-  runs nothing: a mention of either is refused, with why.
+  mention reaches the threads on **any open task's canvas**, which the
+  composer offers as you type; every root of an open task is loaded
+  already, and names are unique across the session. A thread with no lane
+  has no agent to name.
+- **A member out of reach is refused with why.** A thread in an archived
+  task, taken into an inventory (ADR-0124), or with no card any more runs
+  nothing: an ask of it says so ("amber-fox's task was archived by Bea",
+  "Bea has amber-fox"), and its root is never opened to find out. The
+  column's header names such a member as away. An ask waiting as a card
+  whose asker went out of reach since is refused the same way.
+- **A mention in code is no mention.** A `@word-word` in an inline code
+  span or a fenced block is text, for people as for agents, so pasted code
+  or a log line invites nobody.
 - **The first mention of another thread's agent invites it.** It becomes
   a **member** of the thread, and is told, but not asked; the message goes
   where it would have gone without that mention (ADR-0021). Where that is
@@ -110,7 +119,12 @@ lanes run at once; and a tool can start another lane's run without waiting.
   request works for a run but is gone at compaction, and needs the other
   root loaded at every request.
 - **Its own people see it**: the heard entry, the ask and its answer are in
-  its thread, and their own asks queue behind, as any are.
+  its thread, and their own asks queue behind, as any are. A row from a
+  thread on another task says which task, and opens it.
+- **An answer to a thread gone out of reach is not sent.** Archiving
+  refuses only a busy task (ADR-0122), and an asker waiting for an answer
+  is not busy, so its task can be archived meanwhile. The answering thread
+  is told instead, as an `undelivered` fact.
 
 *A budget of tokens.*
 
@@ -146,11 +160,12 @@ lanes run at once; and a tool can start another lane's run without waiting.
 
 *Reading another thread.*
 
-- **An agent can read any thread on its task's canvas with a tool**,
-  `read_thread`, in steps of growing cost: a thread's asks with their
-  digests (ADR-0075), then its entries, a page at a time, with a cap on a
-  page. Which threads there are, and whether each is working, every run
-  is told already, in the canvas list (ADR-0116). The result says how many tokens it holds. Each
+- **An agent can read any thread in reach with a tool**, `read_thread`,
+  as far as a mention reaches: any open task's canvas. It reads in steps
+  of growing cost: a thread's asks with their digests (ADR-0075), then its
+  entries, a page at a time, with a cap on a page. Which threads its own
+  task has, and whether each is working, every run is told already, in the
+  canvas list (ADR-0116). The result says how many tokens it holds. Each
   read is a tool row in the reader's thread, so people see what it read,
   and in a run an agent started its tokens are spent from the budget like
   any other.
@@ -186,6 +201,13 @@ lanes run at once; and a tool can start another lane's run without waiting.
 
 **Alternatives rejected.**
 
+- **The same task's canvas only.** Readable, since the other column is on
+  screen, but two open threads on different tasks could not talk, which is
+  the common case.
+- **Any named thread in the session.** It reaches archived tasks, whose
+  roots are unloaded and whose threads are read only, and threads in
+  inventories, which nobody else may run: every ask would need checks the
+  open-task reach gives for free.
 - **Members as a record on the thread.** A second copy of what its
   messages say, which a branch would not inherit, and which archiving and
   startup would have to sweep.

@@ -402,6 +402,12 @@ export {
 } from "./queue-hold.ts"
 export { branchAfter, rankAfter, rankOfDrop } from "./rank.ts"
 export {
+  awayWords,
+  reachableAgents,
+  reachWords,
+  threadReach,
+} from "./reach.ts"
+export {
   byTarget,
   deleteRecord,
   type Home,
@@ -435,6 +441,7 @@ export {
   type RelayPlan,
   type RelayRefusal,
   relayRefusalText,
+  unreachableRefusal,
 } from "./relay.ts"
 export { describeRequest, transcriptLines } from "./request.ts"
 export {

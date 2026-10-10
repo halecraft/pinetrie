@@ -3,6 +3,7 @@
 import { useSelector } from "@kyneta/react"
 import {
   type AgentRun,
+  type ArchivedTask,
   type AskIndex,
   agentCandidates,
   atEntry,
@@ -16,7 +17,6 @@ import {
   isThreadId,
   type LaneView,
   laneOf,
-  membersOf,
   messageAt,
   nearestRevision,
   type Position,
@@ -33,6 +33,7 @@ import {
   type ThreadName,
   type TraceRecord,
   type TreeIndex,
+  threadMembers,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -54,6 +55,7 @@ import {
   columnMenu,
   columnView,
   composerPlace,
+  crossTaskLinks,
   DENSITIES,
   type Density,
   DISCARD,
@@ -76,7 +78,6 @@ import {
   keyMove,
   type LiveWork,
   leftLine,
-  linkTo,
   markdownOf,
   NEW_PIN,
   NEW_PIN_TITLE,
@@ -98,6 +99,7 @@ import {
   startedWords,
   type ThreadDetails,
   type ThreadLink,
+  threadLink,
   traceGroups,
   tracesAt,
   traceWords,
@@ -111,6 +113,7 @@ import {
   type OfferButton,
   pinnedAt,
   queuedOn,
+  threadReach,
   traceEnd,
   yourCard,
 } from "@pinetrie/rules"
@@ -193,11 +196,13 @@ export interface ColumnProps {
   nameOf: ReadonlyMap<WriterId, string>
   /** Everyone who can be mentioned (`readParticipants`). */
   participants: readonly string[]
-  /** The named threads on the task's canvas, whose agents a mention may reach (ADR-0128). */
-  canvasAgents: readonly {
+  /** Every named thread on an open task's canvas, whose agents a mention may reach (ADR-0128). */
+  inReach: readonly {
     readonly thread: ThreadId
     readonly name: ThreadName
   }[]
+  /** The tasks in the archive: a member there is away (ADR-0128). */
+  archived: ReadonlyMap<TaskId, ArchivedTask>
   /** Each person's colour (`presenceColors`). */
   colorOf: (writer: WriterId) => string
   /** This window is typing in this column, in the card its box shows. */
@@ -335,6 +340,10 @@ export function Column(p: ColumnProps) {
   // does.
   const act = useStable((act: ColumnAct) =>
     p.onIntent({ kind: "column", column: p.columnKey, act }),
+  )
+  // A linked thread opened: a fork row's, or a row from another task's.
+  const openLink = useStable((link: ThreadLink, at: EntryId) =>
+    p.onIntent({ kind: "openLink", link, entry: at }),
   )
   const openAt = useStable((entry: EntryId) =>
     p.onIntent({ kind: "openAt", entry }),
@@ -507,7 +516,7 @@ export function Column(p: ColumnProps) {
   const origins = useMemo(
     () => ({
       task: p.task,
-      linkOf: (t: ThreadId) => linkTo(t, p.cards, p.session.writer),
+      linkOf: (t: ThreadId) => threadLink(t, p.cards, p.session.writer),
       labelOf: p.labelOf,
       reader: { me: p.session.writer, nameOf: p.nameOf },
     }),
@@ -570,24 +579,51 @@ export function Column(p: ColumnProps) {
   }
   // This thread's members and its budget, in its header (ADR-0128).
   const agentsHere = useMemo(
-    () => membersOf(p.index, view.tipId),
+    () => threadMembers(p.index, view.tipId),
     [p.index, view.tipId],
+  )
+  const reachable = useMemo(
+    () => new Set(p.inReach.map(a => a.thread)),
+    [p.inReach],
   )
   const agentsLine = useMemo(
     () =>
       agentsRow({
         thread,
         members: agentsHere,
+        inReach: reachable,
+        threadReach: t =>
+          threadReach(t, { cards: p.cards, archived: p.archived }),
         names: p.work.names,
+        nameOf: w => nameFor(p.nameOf, w),
         budgets: p.work.budgets,
       }),
-    [thread, agentsHere, p.work.names, p.work.budgets],
+    [
+      thread,
+      agentsHere,
+      reachable,
+      p.cards,
+      p.archived,
+      p.work.names,
+      p.nameOf,
+      p.work.budgets,
+    ],
+  )
+  // Where each row from another task's thread is (ADR-0128).
+  const crossTasks = useMemo(
+    () =>
+      crossTaskLinks(view.nodes, {
+        cards: p.cards,
+        reader: { me: p.session.writer, nameOf: p.nameOf },
+        here: p.task,
+        labelOf: p.labelOf,
+      }),
+    [view.nodes, p.cards, p.session.writer, p.nameOf, p.task, p.labelOf],
   )
   // Other threads' agents a message here may name (ADR-0128).
   const agents = useMemo(
-    () =>
-      agentCandidates(p.canvasAgents, thread, membersOf(p.index, view.tipId)),
-    [p.canvasAgents, thread, p.index, view.tipId],
+    () => agentCandidates(p.inReach, thread, agentsHere),
+    [p.inReach, thread, agentsHere],
   )
   // The column's pane (ADR-0078): what you opened beside the thread, kept
   // only while the column is mounted. One subject at a time, named, so
@@ -921,13 +957,7 @@ export function Column(p: ColumnProps) {
                 </button>
               )}
             </div>
-            <Origin
-              onLink={(link, at) =>
-                p.onIntent({ kind: "openLink", link, entry: at })
-              }
-              onOpen={openAt}
-              origin={shows.origin}
-            />
+            <Origin onLink={openLink} onOpen={openAt} origin={shows.origin} />
             {agentsLine !== null && (
               // Other threads' agents in this thread, and what agents
               // talking from it spent (ADR-0128).
@@ -1090,6 +1120,8 @@ export function Column(p: ColumnProps) {
                 forks={p.forks}
                 index={index}
                 joins={shows.joins}
+                crossTaskLinks={crossTasks}
+                onLink={openLink}
                 lane={lane}
                 nameOf={p.nameOf}
                 onAct={act}

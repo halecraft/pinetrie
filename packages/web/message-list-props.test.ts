@@ -41,6 +41,7 @@ const shared = {
   nameOf: new Map(),
   live: {} as MessageListProps["live"],
   onAct: () => {},
+  onLink: () => {},
   asks: {
     askOf: new Map(),
     work: new Map(),
@@ -57,6 +58,7 @@ const props = (over: Partial<MessageListProps> = {}): MessageListProps => ({
   view,
   lane: lane(),
   joins: joins(),
+  crossTaskLinks: new Map(),
   landmarks: [entryId("e1")],
   density: "story",
   releasedTip: null,

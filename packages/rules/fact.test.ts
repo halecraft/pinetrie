@@ -1,7 +1,9 @@
 import {
   type OfferFact,
   type OfferRecord,
+  type QueuedFact,
   type ThreadName,
+  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -53,6 +55,26 @@ describe("a fact (ADR-0080)", () => {
     expect(
       decodeFact({ role: "custom", customType: "pinetrie.fact" }),
     ).toBeUndefined()
+  })
+
+  test("an answer not sent says where its asker went, and round-trips (ADR-0128)", () => {
+    const fact: QueuedFact = {
+      kind: "undelivered",
+      lane: LANE,
+      to: threadIdFor("2"),
+      toName: "sable-meadow",
+      why: {
+        kind: "archived",
+        task: taskIdFor("t"),
+        record: { task: taskIdFor("t"), by: ADA, at: 1 },
+      },
+      by: ADA,
+    }
+    expect(decodeFact(encodeFact(fact, "Ada", 1))).toEqual(fact)
+    expect(decodeQueuedFact(encodeQueuedFact(fact))).toEqual(fact)
+    expect(factLine(fact)).toBe(
+      "■ the answer was not sent: sable-meadow's task is archived",
+    )
   })
 
   test("an acceptance is stored as the fact it is; one stored under the kind facts began with does not decode", () => {

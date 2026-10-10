@@ -10,6 +10,7 @@
 // on a running one.
 
 import type {
+  Away,
   CatchUpFrom,
   OfferAcceptanceDecision,
   OfferFact,
@@ -22,7 +23,12 @@ import type {
 import { Type } from "typebox"
 import { Value } from "typebox/value"
 import { CatchUpFromSchema, catchUpName } from "./catch-up-from.ts"
-import { EntryIdSchema, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
+import {
+  EntryIdSchema,
+  TaskIdSchema,
+  ThreadIdSchema,
+  WriterIdSchema,
+} from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { askLine } from "./relay.ts"
 
@@ -56,6 +62,26 @@ const QueuedFactSchema = Type.Union([
     kind: Type.Union([Type.Literal("dismissed"), Type.Literal("left")]),
     lane: ThreadIdSchema,
     member: ThreadIdSchema,
+    by: WriterIdSchema,
+  }),
+  Type.Object({
+    kind: Type.Literal("undelivered"),
+    lane: ThreadIdSchema,
+    to: ThreadIdSchema,
+    toName: Type.String(),
+    why: Type.Union([
+      Type.Object({
+        kind: Type.Literal("archived"),
+        task: TaskIdSchema,
+        record: Type.Object({
+          task: TaskIdSchema,
+          by: WriterIdSchema,
+          at: Type.Number(),
+        }),
+      }),
+      Type.Object({ kind: Type.Literal("held"), by: WriterIdSchema }),
+      Type.Object({ kind: Type.Literal("gone") }),
+    ]),
     by: WriterIdSchema,
   }),
   Type.Object({
@@ -133,6 +159,17 @@ export function wordsOf(
   }
 }
 
+/**
+ * Why a thread is out of reach, naming no person: a fact's words are fixed
+ * when it is written, and only its own `by` is named then.
+ */
+const awayLine = (name: string, why: Away): string =>
+  why.kind === "archived"
+    ? `${name}'s task is archived`
+    : why.kind === "held"
+      ? `${name} is in someone's inventory`
+      : `${name} is no longer on any task`
+
 /** The one line a column shows for a fact. */
 export function factLine(fact: QueuedFact): string {
   switch (fact.kind) {
@@ -154,6 +191,8 @@ export function factLine(fact: QueuedFact): string {
       return "− an agent left this thread"
     case "budget-spent":
       return `■ agents spent the budget of ${tokensWords(fact.limit)}`
+    case "undelivered":
+      return `■ the answer was not sent: ${awayLine(fact.toName, fact.why)}`
     case "round":
       return `↳ ${fact.line}`
     case "unanswered":
@@ -190,6 +229,8 @@ export function factContent(fact: QueuedFact, name: string): string {
       return `${name} dismissed another thread's agent from this thread's members; it is no longer asked here.`
     case "left":
       return "Another thread's agent left this thread's members; it is no longer asked here."
+    case "undelivered":
+      return `Your answer was not sent to ${fact.toName}, which asked: ${awayLine(fact.toName, fact.why)}.`
     case "round":
       return `After the agents answered: ${fact.line}`
     case "unanswered":

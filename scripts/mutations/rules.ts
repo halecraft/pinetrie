@@ -5,6 +5,32 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── agents across tasks (ADR-0128) ──
+  {
+    name: "a thread's reach ignores the archive",
+    file: "packages/rules/reach.ts",
+    from: "  const record = facts.archived.get(place.task)\n",
+    to: "  const record = undefined\n",
+    command: unit,
+    expect: "open, archived with its record, held by whom, or gone",
+  },
+  {
+    name: "an ask card whose asker is out of reach is relayed anyway",
+    file: "packages/rules/relay.ts",
+    from: '  if (input.fromReach.kind !== "open")\n',
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "a thread out of reach is refused first, the asked one's or the asker's (ADR-0128)",
+  },
+  {
+    name: "an answer is sent to a thread out of reach",
+    file: "packages/rules/relay.ts",
+    from: '  if (fromReach.kind !== "open")\n',
+    to: "  if (false)\n",
+    command: unit,
+    expect: "an answer to a thread gone out of reach is not sent (ADR-0128)",
+  },
   // ── agents talking (ADR-0128) ──
   {
     name: "a budget goes over at every spend past its limit",

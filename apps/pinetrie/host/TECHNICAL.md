@@ -46,7 +46,7 @@ wires them.
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
 | `digests.ts` | each ask's digest (ADR-0106), unless the user config turns them off (ADR-0071) |
 | `relays.ts` | another thread's agent asked, and its answer (ADR-0128): `ask` and `leave` (the tools' hooks), `relayChat` (a person's chat that asks or invites), `relayCard` (an ask card popped), `ended` (a relayed run's answer, then the round) |
-| `budgets.ts` | what agents talking spend (ADR-0128): the budget a run spends, read from its prompt (`budgetOfPrompt`), counted per request, written when it goes over and at a run's end, and the gate before each request |
+| `budgets.ts` | what agents talking spend (ADR-0128): the budget a run spends, read from its prompt (`promptBudget`), counted per request, written when it goes over and at a run's end, and the gate before each request |
 | `outside.ts` | `requestOutside`: a model request outside a keeper, its answer written in a step of its own |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names, through the real `applyRecordWrites`), `writesOf`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
 
@@ -771,6 +771,16 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   starts the run with the heard entry first (`RunStart.heard`), or makes an
   ask card on a busy lane and asks for its drain. Every step is one keeper
   step; the `ask` hook's too, as `split-call.ts` is.
+- **Whose agents a send may name is every open task's named threads**
+  (`readReachableAgents`, over `reachableAgents`), wherever it is sent, so
+  a branch's first message, whose thread has no card yet, names them too.
+- **Reach is read before any root is opened.** Each step gathers both
+  threads' `threadReach` from the session and the places, and refuses one
+  out of reach (`unreachableRefusal`) before `threadNow`: `docs.root`
+  would load an archived task's unloaded root, and hold it until restart.
+  `planRelay` and `planAnswer` take the reaches too, so an ask card whose
+  asker was archived since is refused, and an answer for it becomes an
+  `undelivered` fact in the answering thread.
 - **A person's chat is relayed after it is written** (`relayChat`, queued
   by `sendChat`, not awaited inside its step): it finds the chat by its
   send's id, sets its budget, and relays each member it asks.
@@ -781,7 +791,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   something to answer. A restart drops what waited.
 - **A thread with no lane** is told its facts at its end through the
   scribe (`appendLaneless`, the drain's), since only a lane appends.
-- **The budget is read from the run's prompt** (`budgetOfPrompt`): a
+- **The budget is read from the run's prompt** (`promptBudget`): a
   relay's or an answer's names it, a person's message is its own, and only
   a run an agent started spends. Its count is kept in memory and written
   when it crosses the limit (with a `budget-spent` fact in the thread that

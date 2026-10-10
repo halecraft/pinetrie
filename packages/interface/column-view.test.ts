@@ -53,7 +53,7 @@ import {
   workingWords,
 } from "./column-view.ts"
 import { entry, indexOf, TEST_ROOT } from "./fixtures.ts"
-import { linkTo } from "./thread-link.ts"
+import { threadLink } from "./thread-link.ts"
 
 const A = threadIdFor("a")
 const B = threadIdFor("b")
@@ -266,7 +266,7 @@ const facts = (
     work: work(),
     origins: {
       task: null,
-      linkOf: thread => linkTo(thread, [], ADA),
+      linkOf: thread => threadLink(thread, [], ADA),
       labelOf: () => "",
       reader: { me: ADA, nameOf: new Map() },
     },

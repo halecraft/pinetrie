@@ -12,6 +12,8 @@ import { type MessageProps, sameMessageProps } from "./message-props.ts"
 
 const ROWS = screenMemory<RowMemory>()
 
+const LINK: MessageProps["onLink"] = () => {}
+
 /** A message's props as `Column` builds them, from entries built afresh. */
 const props = (
   text: string,
@@ -38,6 +40,8 @@ const props = (
     }),
     onAct: ACT,
     join: undefined,
+    crossTaskLink: undefined,
+    onLink: LINK,
     pinned: undefined,
     forkTracks: [],
     closedBranches: [],

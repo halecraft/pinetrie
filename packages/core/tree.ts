@@ -230,7 +230,7 @@ export interface TranscriptMessage {
   readonly toolCalls?: readonly ToolCall[]
   /** Roles `update` and `land` only: the commits merged into the lane (ADR-0072). */
   readonly merged?: readonly CommitId[]
-  /** Roles `relay` and `answer` only: the thread it came from (ADR-0128). */
+  /** Roles `relay`, `answer` and `heard` only: the thread it came from (ADR-0128). */
   readonly from?: ThreadId
 }
 
@@ -393,6 +393,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   const merged = entry.message?.merged
   if ((role === "update" || role === "land") && merged !== undefined)
     return { ...message, merged }
+  const heard = entry.message?.heard
+  if (role === "heard" && heard !== undefined)
+    return { ...message, from: heard.from }
   const calls = role === "assistant" ? toolCallsOf(entry.message) : []
   return calls.length === 0 ? message : { ...message, toolCalls: calls }
 }

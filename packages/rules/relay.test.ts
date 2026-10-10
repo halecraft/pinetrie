@@ -1,14 +1,16 @@
 import {
   entryId,
+  type Reach,
   type RelayDetails,
   type ThreadLane,
   type TranscriptMessage,
+  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { planDelivery } from "./chat.ts"
-import { planAnswer, planRelay } from "./relay.ts"
+import { planAnswer, planRelay, relayRefusalText } from "./relay.ts"
 
 const here = threadIdFor("here")
 const fox = threadIdFor("fox")
@@ -22,6 +24,13 @@ const idle: ThreadLane = {
   askedBy: null,
   lastWaiting: null,
   heldBy: null,
+}
+const OPEN: Reach = { kind: "open", task: taskIdFor("t") }
+const BEA = writerId("bea@example.com")
+const ARCHIVED: Reach = {
+  kind: "archived",
+  task: taskIdFor("t"),
+  record: { task: taskIdFor("t"), by: BEA, at: 1 },
 }
 const said = (
   id: string,
@@ -48,11 +57,13 @@ const relay = (over: Partial<Parameters<typeof planRelay>[0]> = {}) =>
     fromName: "sable-meadow",
     to: fox,
     toName: "amber-fox",
+    fromReach: OPEN,
+    toReach: OPEN,
     members: [fox],
     toLane: idle,
     path,
     heard: null,
-    invitedAt: entryId("1"),
+    lastInvitation: entryId("1"),
     source: entryId("5"),
     asker: { kind: "agent", thread: here },
     askerName: "sable-meadow",
@@ -83,6 +94,18 @@ describe("planRelay (ADR-0128)", () => {
   test("after what it heard last; nothing new, nothing heard", () => {
     const plan = relay({ heard: entryId("4") })
     expect(plan.kind === "relay" && plan.heard).toBeNull()
+  })
+  test("a thread out of reach is refused first, the asked one's or the asker's (ADR-0128)", () => {
+    expect(relay({ toReach: ARCHIVED, members: [] })).toEqual({
+      kind: "refused",
+      why: { kind: "away", side: "to", name: "amber-fox", reach: ARCHIVED },
+    })
+    const asker = relay({ fromReach: { kind: "held", by: BEA } })
+    expect(asker).toMatchObject({ why: { kind: "away", side: "from" } })
+    if (asker.kind !== "refused") return
+    expect(relayRefusalText(asker.why, () => "Bea")).toBe(
+      "Bea has sable-meadow: its ask was not relayed.",
+    )
   })
   test("only a member with a lane, while the budget lasts, is asked", () => {
     expect(relay({ members: [] })).toEqual({
@@ -116,6 +139,7 @@ describe("planAnswer (ADR-0128)", () => {
       name: "amber-fox",
       end: { kind: "answered", text: "this" },
       spent: false,
+      fromReach: OPEN,
       ...over,
     })
   test("an answer to an agent's ask wakes it", () => {
@@ -140,6 +164,12 @@ describe("planAnswer (ADR-0128)", () => {
     expect(person.kind === "answer" && person.answer.wakes).toBe(false)
     const spent = answer({ spent: true })
     expect(spent.kind === "answer" && spent.answer.wakes).toBe(false)
+  })
+  test("an answer to a thread gone out of reach is not sent (ADR-0128)", () => {
+    expect(answer({ fromReach: ARCHIVED })).toEqual({
+      kind: "undelivered",
+      reach: ARCHIVED,
+    })
   })
   test("a stopped or failed run sends no answer", () => {
     expect(answer({ end: { kind: "stopped" } })).toEqual({

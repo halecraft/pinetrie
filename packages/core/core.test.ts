@@ -276,6 +276,24 @@ test("messageText: flattens pi's content parts", () => {
   assert.equal(messageText(undefined), "")
 })
 
+describe("parseMentions: no mention inside code (ADR-0128)", () => {
+  const names = (t: string) =>
+    parseMentions(t).map(m => (m.kind === "agent" ? "agent" : m.name))
+  test("an inline code span, of one backtick or several, is text", () => {
+    expect(names("ping `@amber-fox` and @ada")).toEqual(["ada"])
+    expect(names("``a `@x` b`` @bea")).toEqual(["bea"])
+    expect(names("`@agent` is how you ask")).toEqual([])
+  })
+  test("a fenced block, closed or running to the end, is text", () => {
+    expect(names("```\n@ada\n```\n@bea")).toEqual(["bea"])
+    expect(names("~~~ts\n@ada\n")).toEqual([])
+  })
+  test("an unclosed backtick, and an indented block, are not code here", () => {
+    expect(names("an unclosed `@ada")).toEqual(["ada"])
+    expect(names("    @ada indented")).toEqual(["ada"])
+  })
+})
+
 describe("address: other threads' agents are invited, then asked (ADR-0128)", () => {
   const fox = threadIdFor("01a00000-0000-7000-8000-00000000f0c5")
   const owl = threadIdFor("01a00000-0000-7000-8000-0000000000e1")

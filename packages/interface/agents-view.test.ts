@@ -1,4 +1,10 @@
-import { entryId, type ThreadName, threadIdFor, writerId } from "@pinetrie/core"
+import {
+  entryId,
+  type Reach,
+  type ThreadName,
+  threadIdFor,
+  writerId,
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { agentsRow, agentsWords } from "./agents-view.ts"
 
@@ -20,9 +26,30 @@ const budget = (spent: number, over = false) =>
     ],
   ])
 
+const owl = threadIdFor("owl")
+const bea = writerId("bea@example.com")
+const reach = {
+  inReach: new Set([fox]),
+  threadReach: (): Reach => ({ kind: "held", by: bea }),
+  nameOf: () => "Bea",
+}
+
 describe("other threads' agents in a column's header (ADR-0128)", () => {
+  test("a member out of reach is named away, with why", () => {
+    const row = agentsRow({
+      ...reach,
+      thread: here,
+      members: [fox, owl],
+      names: new Map([...names, [owl, "slate-owl" as ThreadName]]),
+      budgets: new Map(),
+    })
+    expect(row === null ? "" : agentsWords(row)).toBe(
+      "with amber-fox, slate-owl (Bea has it)",
+    )
+  })
   test("its members, and what agents talking from it spent", () => {
     const row = agentsRow({
+      ...reach,
       thread: here,
       members: [fox],
       names,
@@ -34,6 +61,7 @@ describe("other threads' agents in a column's header (ADR-0128)", () => {
   })
   test("a spent budget says so; no member and no budget is no row", () => {
     const row = agentsRow({
+      ...reach,
       thread: here,
       members: [],
       names,
@@ -43,7 +71,13 @@ describe("other threads' agents in a column's header (ADR-0128)", () => {
       "agents spent the budget of 200k tokens",
     )
     expect(
-      agentsRow({ thread: fox, members: [], names, budgets: budget(1) }),
+      agentsRow({
+        ...reach,
+        thread: fox,
+        members: [],
+        names,
+        budgets: budget(1),
+      }),
     ).toBeNull()
   })
 })

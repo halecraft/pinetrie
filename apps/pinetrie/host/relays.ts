@@ -9,35 +9,38 @@
 // else appended. When every member a person's message asked has answered,
 // one request decides what comes next (the round). Each step gathers, plans
 // with `@pinetrie/rules` (`planRelay`, `planAnswer`, `planDelivery`,
-// `roundReplyOf`) and then writes, in one keeper step.
+// `roundReplyOf`) and then writes, in one keeper step. Where both threads
+// are (`threadReach`) is gathered first, from the session and the places,
+// and a thread out of reach is refused before any root is opened.
 
 import {
   askCardIdFor,
   askOutcome,
   type EntryId,
   factCardIdFor,
-  heardFrom,
   indexAsks,
-  invitedAt,
+  isRoundAnswered,
   laneOf,
+  lastHeardEntry,
+  lastInvitation,
   lastWord,
-  membersOf,
   messageAt,
   messageText,
-  namedThreads,
   projectTranscript,
   type QueuedFact,
+  type Reach,
   type RelayDetails,
-  roundOf,
   type ThreadId,
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
   threadEnd,
+  threadMembers,
   type WriterId,
 } from "@pinetrie/core"
 import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
 import {
+  readArchived,
   readLanes,
   readNames,
   readParticipantNames,
@@ -61,11 +64,14 @@ import {
   planFactCard,
   planRelay,
   type RelayRefusal,
+  reachableAgents,
   relayRefusalText,
   roundReplyOf,
   roundRequest,
   type ToolAnswer,
+  threadReach,
   transcriptLines,
+  unreachableRefusal,
 } from "@pinetrie/rules"
 import { readEntryMessage, readLaneTip } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "./basics.ts"
@@ -83,19 +89,18 @@ const said = (text: string, isError = false): ToolAnswer => ({
 })
 
 /**
- * The named threads on `thread`'s task's canvas (ADR-0128): whose agents a
- * message there may name. `agentCandidates` leaves `thread` out.
+ * Every named thread on an open task's canvas (ADR-0128): whose agents a
+ * message may name, wherever it is sent. `agentCandidates` leaves its own
+ * thread out.
  */
-export function canvasThreadsOf(
+export function readReachableAgents(
   docs: Pick<Basics, "places" | "session">,
-  thread: ThreadId,
 ): readonly { readonly thread: ThreadId; readonly name: ThreadName }[] {
-  const tasks = tasksNow(docs)
-  const task = tasks.taskOfThread.get(thread)
-  return namedThreads(
-    task === undefined ? [] : (tasks.canvases.get(task) ?? []),
-    readNames(docs.session),
-  )
+  return reachableAgents({
+    canvases: tasksNow(docs).canvases,
+    archived: readArchived(docs.session),
+    names: readNames(docs.session),
+  })
 }
 
 export interface Relays {
@@ -167,37 +172,62 @@ export function createRelays(deps: {
     return { thread, index, end, lane }
   }
 
-  const canvasThreads = (thread: ThreadId) =>
-    canvasThreadsOf({ places, session }, thread)
+  /** Where `thread` is now, from the session and the places: no root is opened. */
+  const reachNow = (thread: ThreadId): Reach =>
+    threadReach(thread, {
+      cards: readPlaces(places),
+      archived: readArchived(session),
+    })
+
+  /** Both threads of an ask, named, and where each is: gathered once, before any root is opened. */
+  const bothReaches = (from: ThreadId, to: ThreadId) => ({
+    fromName: nameOf(from),
+    fromReach: reachNow(from),
+    toName: nameOf(to),
+    toReach: reachNow(to),
+  })
 
   /**
-   * Relay `relay` into `to`, from `from` as it is now: plan with
-   * `planRelay`, then run it there, or queue it as an ask card while the
-   * agent is busy. Inside a keeper step.
+   * Relay `relay` into `to`, from `from`: gather both threads' reach and
+   * refuse one out of reach before either root is opened (an archived one
+   * stays unloaded); then gather both threads, plan with `planRelay`, and
+   * run it there, or queue it as an ask card while the agent is busy. `end`
+   * is where the asking thread's path ends, when not at its end now. Inside
+   * a keeper step.
    */
   async function deliverRelay(
-    from: ThreadNow,
+    fromThread: ThreadId,
     to: ThreadId,
     relay: Omit<RelayDetails, "from" | "fromName">,
+    end?: EntryId,
   ): Promise<
     | { readonly kind: "ran" }
     | { readonly kind: "queued"; readonly held: boolean }
     | { readonly kind: "refused"; readonly why: RelayRefusal }
   > {
+    const reaches = bothReaches(fromThread, to)
+    const away = unreachableRefusal(reaches)
+    if (away !== null) return { kind: "refused", why: away }
+    const now = await threadNow(fromThread)
+    if (now === null)
+      return {
+        kind: "refused",
+        why: { kind: "unknown", name: nameOf(fromThread) },
+      }
+    const from: ThreadNow = end === undefined ? now : { ...now, end }
     const target = await threadNow(to)
     const planned = planRelay({
+      ...reaches,
       from: from.thread,
-      fromName: nameOf(from.thread),
       to,
-      toName: nameOf(to),
-      members: membersOf(from.index, from.end),
+      members: threadMembers(from.index, from.end),
       toLane: target?.lane ?? { kind: "none" },
       path: projectTranscript(from.index, from.end),
       heard:
         target === null
           ? null
-          : heardFrom(target.index, target.end, from.thread),
-      invitedAt: invitedAt(from.index, from.end, to),
+          : lastHeardEntry(target.index, target.end, from.thread),
+      lastInvitation: lastInvitation(from.index, from.end, to),
       source: relay.source,
       asker: relay.asker,
       askerName: relay.askerName,
@@ -253,9 +283,17 @@ export function createRelays(deps: {
     deps.drain(fact.lane)
   }
 
-  /** The member of `thread`'s canvas named `name`, or null. */
-  const findAgent = (thread: ThreadId, name: string) =>
-    canvasThreads(thread).find(t => t.name === name.toLowerCase()) ?? null
+  /** The thread named `name`, anywhere in the session, or null. */
+  const findAgent = (name: string) => {
+    const wanted = name.toLowerCase()
+    for (const [thread, n] of readNames(session))
+      if (n === wanted) return { thread, name: n }
+    return null
+  }
+
+  /** A refusal, in the words its asker reads. */
+  const refusal = (why: RelayRefusal): string =>
+    relayRefusalText(why, personName)
 
   async function ask(
     lane: ThreadId,
@@ -264,17 +302,17 @@ export function createRelays(deps: {
   ): Promise<ToolAnswer> {
     return deps.keeper.run(async () => {
       const from = await threadNow(lane)
-      const target = findAgent(lane, to)
+      const target = findAgent(to)
       const budget = budgets.runBudget(lane)
       if (from === null || budget === null)
         return said("This call reached no thread.", true)
       if (target === null)
-        return said(relayRefusalText({ kind: "unknown", name: to }), true)
+        return said(refusal({ kind: "unknown", name: to }), true)
       // A person's message whose run asks sets its budget now (ADR-0128).
       const by = budget.by
       if (by === null) return said("This call reached no thread.", true)
       await budgets.ensure(budget.key, lane, by)
-      const delivered = await deliverRelay(from, target.thread, {
+      const delivered = await deliverRelay(lane, target.thread, {
         source: from.end ?? budget.key,
         asker: { kind: "agent", thread: lane },
         askerName: nameOf(lane),
@@ -284,7 +322,7 @@ export function createRelays(deps: {
       })
       switch (delivered.kind) {
         case "refused":
-          return said(relayRefusalText(delivered.why), true)
+          return said(refusal(delivered.why), true)
         case "ran":
           return said(
             `Asked ${target.name}. Its answer will come as a message; this call does not wait for it.`,
@@ -301,12 +339,16 @@ export function createRelays(deps: {
 
   async function leave(lane: ThreadId, name: string): Promise<ToolAnswer> {
     return deps.keeper.run(async () => {
-      const left = findAgent(lane, name)
-      const there = left === null ? null : await threadNow(left.thread)
+      const left = findAgent(name)
       const by = budgets.runBudget(lane)?.by ?? null
-      if (left === null || there === null || by === null)
-        return said(relayRefusalText({ kind: "unknown", name }), true)
-      if (!membersOf(there.index, there.end).includes(lane))
+      if (left === null || by === null)
+        return said(refusal({ kind: "unknown", name }), true)
+      // A thread out of reach is told nothing, and its root is not opened.
+      const away = unreachableRefusal(bothReaches(lane, left.thread))
+      if (away !== null) return said(refusal(away), true)
+      const there = await threadNow(left.thread)
+      if (there === null) return said(refusal({ kind: "unknown", name }), true)
+      if (!threadMembers(there.index, there.end).includes(lane))
         return said(`You are not a member of ${left.name}.`, true)
       queueFact({
         kind: "left",
@@ -332,19 +374,23 @@ export function createRelays(deps: {
       if (asks.length === 0 && (chat.invites ?? []).length === 0) return
       await budgets.ensure(source, thread, author)
       // What came after the chat is not heard with it: its path ends there.
-      const at: ThreadNow = { ...from, end: source }
       for (const to of asks) {
-        const delivered = await deliverRelay(at, to, {
+        const delivered = await deliverRelay(
+          thread,
+          to,
+          {
+            source,
+            asker: { kind: "person", writer: author },
+            askerName: chat.author ?? "",
+            text: messageText(chat),
+            budget: source,
+            by: author,
+          },
           source,
-          asker: { kind: "person", writer: author },
-          askerName: chat.author ?? "",
-          text: messageText(chat),
-          budget: source,
-          by: author,
-        })
+        )
         if (delivered.kind === "refused")
           basics.log(
-            `[host] ${nameOf(to)} was not asked: ${relayRefusalText(delivered.why)}`,
+            `[host] ${nameOf(to)} was not asked: ${refusal(delivered.why)}`,
           )
       }
     })
@@ -354,12 +400,10 @@ export function createRelays(deps: {
     lane: ThreadId,
     relay: RelayDetails,
   ): Promise<"ran" | "next"> {
-    const from = await threadNow(relay.from)
-    if (from === null) return "next"
-    const delivered = await deliverRelay(from, lane, relay)
+    const delivered = await deliverRelay(relay.from, lane, relay)
     if (delivered.kind === "refused")
       basics.log(
-        `[host] an ask for ${nameOf(lane)} was dropped: ${relayRefusalText(delivered.why)}`,
+        `[host] an ask for ${nameOf(lane)} was dropped: ${refusal(delivered.why)}`,
       )
     return delivered.kind === "ran" ? "ran" : "next"
   }
@@ -370,6 +414,17 @@ export function createRelays(deps: {
     relay: RelayDetails,
     plan: AnswerPlan,
   ): Promise<void> {
+    if (plan.kind === "undelivered") {
+      queueFact({
+        kind: "undelivered",
+        lane,
+        to: relay.from,
+        toName: nameOf(relay.from),
+        why: plan.reach,
+        by: relay.by,
+      })
+      return
+    }
     if (plan.kind === "unanswered") {
       queueFact({
         kind: "unanswered",
@@ -461,6 +516,7 @@ export function createRelays(deps: {
               ? { kind: "failed" }
               : { kind: "answered", text },
         spent: budgets.spent(relay.budget),
+        fromReach: reachNow(relay.from),
       })
       await sendAnswer(lane, relay, planned)
     })
@@ -472,10 +528,15 @@ export function createRelays(deps: {
    * when it asked two or more, one request decides what comes next.
    */
   async function round(relay: RelayDetails): Promise<void> {
+    if (reachNow(relay.from).kind !== "open") return
     const from = await threadNow(relay.from)
     if (from === null) return
     const asked = from.index.entries[relay.source]?.message?.asks ?? []
-    if (asked.length < 2 || !roundOf(from.index, from.end, relay.source)) return
+    if (
+      asked.length < 2 ||
+      !isRoundAnswered(from.index, from.end, relay.source)
+    )
+      return
     if (budgets.spent(relay.budget)) return
     const skill = await deps.piSetup.skill("pinetrie:skill:agents-round")
     if (skill === null) {
@@ -483,7 +544,7 @@ export function createRelays(deps: {
       return
     }
     const members = new Map(
-      membersOf(from.index, from.end).map(t => [nameOf(t), t] as const),
+      threadMembers(from.index, from.end).map(t => [nameOf(t), t] as const),
     )
     const request = roundRequest({
       skill: skill.content,
@@ -511,7 +572,7 @@ export function createRelays(deps: {
         if (next.kind === "ask") {
           const now = await threadNow(relay.from)
           if (now === null) return
-          await deliverRelay(now, next.thread, {
+          await deliverRelay(relay.from, next.thread, {
             source: now.end ?? relay.source,
             asker: { kind: "person", writer: relay.by },
             askerName: personName(relay.by),

@@ -26,7 +26,6 @@ import {
   type CardId,
   type EntryId,
   isPastAddress,
-  namedThreads,
   parseAddress,
   parseCardId,
   pathIds,
@@ -68,7 +67,6 @@ import {
   labelsOf,
   laneRootsOf,
   layoutReducer,
-  linkTo,
   mentionsOf,
   messageCount,
   NO_TEXT,
@@ -118,6 +116,7 @@ import {
   threadAnchor,
   threadCardHeads,
   threadFace,
+  threadLink,
   threadPreview,
   threadWork,
   typingDue,
@@ -137,6 +136,7 @@ import {
   type CanvasCard,
   canvasLines,
   canvasList,
+  reachableAgents,
   taskPinnedOf,
 } from "@pinetrie/rules"
 import {
@@ -694,10 +694,16 @@ export function App({
       active?.kind === "task" ? (canvases.get(active.task) ?? NO_CANVAS) : [],
     [active, canvases],
   )
-  // The named threads on the canvas, whose agents a mention may reach (ADR-0128).
-  const canvasAgents = useMemo(
-    () => namedThreads(canvas, workFacts.names),
-    [canvas, workFacts.names],
+  // Every named thread on an open task's canvas, whose agents a mention may
+  // reach (ADR-0128), as the host builds them.
+  const inReach = useMemo(
+    () =>
+      reachableAgents({
+        canvases,
+        archived: archivedTasks,
+        names: workFacts.names,
+      }),
+    [canvases, archivedTasks, workFacts.names],
   )
   const noteViews = useMemo(
     () =>
@@ -757,7 +763,7 @@ export function App({
         active,
         roots: hereRoots,
         ends: threadEnds,
-        linkOf: thread => linkTo(thread, cards, session.writer),
+        linkOf: thread => threadLink(thread, cards, session.writer),
         seed,
       }),
     [index, active, hereRoots, threadEnds, cards, session.writer, seed],
@@ -1542,7 +1548,8 @@ export function App({
     lanes,
     nameOf,
     participants,
-    canvasAgents,
+    inReach,
+    archived,
     rows,
     seats,
     session,
@@ -1567,7 +1574,7 @@ export function App({
   const pip = <SignalMark color={colorOf(session.writer)} />
   const reader = { me: session.writer, nameOf }
   /** Where a link to `thread` leads, as you follow it (ADR-0124). */
-  const linkOf = (thread: ThreadId) => linkTo(thread, cards, session.writer)
+  const linkOf = (thread: ThreadId) => threadLink(thread, cards, session.writer)
   const thread = threadRow({ index, labelOf, reader, onOpen: openLink })
   /**
    * A reader's thread, by the end they read at: a link to its thread, or,

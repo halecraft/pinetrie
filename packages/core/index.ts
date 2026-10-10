@@ -1097,7 +1097,7 @@ export interface StopFact {
 
 /**
  * Who joined or left a thread's members (ADR-0128): a person dismissed an
- * agent, or the agent left. Read back by `membersOf`.
+ * agent, or the agent left. Read back by `threadMembers`.
  */
 export type MemberFact =
   | {
@@ -1124,6 +1124,34 @@ export interface UnansweredFact {
   readonly lane: ThreadId
   readonly member: ThreadId
   readonly why: "stopped" | "failed"
+  readonly by: WriterId
+}
+
+/** Where a thread is (ADR-0128): `threadReach` (`@pinetrie/rules`) reads it. */
+export type Reach =
+  | { readonly kind: "open"; readonly task: TaskId }
+  | {
+      readonly kind: "archived"
+      readonly task: TaskId
+      readonly record: ArchivedTask
+    }
+  | { readonly kind: "held"; readonly by: WriterId }
+  | { readonly kind: "gone" }
+
+/** A thread out of reach: its task archived, held in an inventory, or gone. */
+export type Away = Exclude<Reach, { readonly kind: "open" }>
+
+/**
+ * An answer that could not be sent (ADR-0128): the thread that asked went
+ * out of reach while it was answered. In the answering thread; `to` is the
+ * thread that asked, `why` where it is now.
+ */
+export interface UndeliveredFact {
+  readonly kind: "undelivered"
+  readonly lane: ThreadId
+  readonly to: ThreadId
+  readonly toName: string
+  readonly why: Away
   readonly by: WriterId
 }
 
@@ -1792,10 +1820,27 @@ export const NOBODY: Responder = { kind: "none" }
 const HANDLE_CHARS = "\\p{L}\\p{N}_\\-"
 
 /**
- * Every `@handle` in `text`, in order, without repeats. `@agent` is the agent;
- * any other handle is read as a person here, and `address` finds whether it
- * names another thread's agent instead (ADR-0128). A handle starts a word, so
- * an e-mail address is not a mention.
+ * `text` with its code blanked out, each character a space and each line
+ * break kept: fenced blocks (``` or ~~~, to their closing fence or the end)
+ * and inline code spans (a run of backticks to the next run as long). A
+ * four-space indented block is left as it is: it needs the block's context,
+ * which a line scan does not have. Pure.
+ */
+function withoutCode(text: string): string {
+  const blank = (s: string) => s.replace(/[^\n]/g, " ")
+  const fenced = text.replace(
+    /^([ \t]{0,3})(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]{0,3}\2[`~]*[ \t]*$|(?![\s\S]))/gm,
+    blank,
+  )
+  return fenced.replace(/(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g, blank)
+}
+
+/**
+ * Every `@handle` in `text`, in order, without repeats, outside code
+ * (`withoutCode`): a handle in a code span or a fenced block is text.
+ * `@agent` is the agent; any other handle is read as a person here, and
+ * `address` finds whether it names another thread's agent instead
+ * (ADR-0128). A handle starts a word, so an e-mail address is not a mention.
  */
 export function parseMentions(text: string): Mention[] {
   const seen = new Set<string>()
@@ -1804,7 +1849,7 @@ export function parseMentions(text: string): Mention[] {
     `(?<![${HANDLE_CHARS}@])@([${HANDLE_CHARS}]+)`,
     "gu",
   )
-  for (const [, handle] of text.matchAll(pattern)) {
+  for (const [, handle] of withoutCode(text).matchAll(pattern)) {
     if (handle === undefined || seen.has(handle)) continue
     seen.add(handle)
     out.push(
@@ -1882,7 +1927,7 @@ export interface HeardDetails {
 
 /**
  * Another thread's agent a mention may reach (ADR-0128): a thread on the
- * task's canvas other than the one written in, by its name. `member` says
+ * open task's canvas other than the one written in, by its name. `member` says
  * whether it was invited into the thread written in already.
  */
 export interface AgentCandidate {
@@ -1922,7 +1967,7 @@ export function address(input: {
   readonly mentions: readonly Mention[]
   /** Every participant's display name, as shown. */
   readonly participants: readonly string[]
-  /** Other threads' agents on the task's canvas (ADR-0128). */
+  /** Other threads' agents on open tasks' canvases (ADR-0128). */
   readonly agents: readonly AgentCandidate[]
   readonly agentByDefault: boolean
 }): Recipients {

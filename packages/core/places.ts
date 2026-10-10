@@ -36,6 +36,7 @@ import {
   type TextCardId,
   type ThreadId,
   type UnansweredFact,
+  type UndeliveredFact,
   type WriterId,
 } from "./index.ts"
 import { KINDS } from "./kinds.ts"
@@ -105,6 +106,7 @@ export type QueuedFact =
   | MemberFact
   | BudgetSpentFact
   | UnansweredFact
+  | UndeliveredFact
   | RoundFact
 
 /** A card's command, or null: only a text card has one. */

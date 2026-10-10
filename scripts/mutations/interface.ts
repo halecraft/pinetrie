@@ -6,6 +6,15 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a row from this task's thread names its task too",
+    file: "packages/interface/thread-link.ts",
+    from: '    if (link.kind === "open" && link.task === facts.here) continue\n',
+    to: "",
+    command: unit,
+    expect:
+      "a row from another task's thread says where it is; from this task, nothing (ADR-0128)",
+  },
+  {
     name: "a send to a held idle queue keeps the hold",
     file: "packages/interface/send.ts",
     from: '  const releases = lane.kind === "lane" && !lane.running && lane.heldBy !== null',
@@ -3436,8 +3445,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a link to someone else's held thread opens it",
     file: "packages/interface/thread-link.ts",
-    from: "        ? place.holder === me\n",
-    to: "        ? place.holder !== null\n",
+    from: "        ? reach.by === me\n",
+    to: "        ? reach.by !== null\n",
     command: unit,
     expect:
       "a link opens a thread's task, your own held thread's preview, and nothing for someone else's (ADR-0117, ADR-0124)",

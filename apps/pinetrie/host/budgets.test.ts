@@ -1,7 +1,7 @@
 import { entryId, THE_AGENT, threadIdFor, writerId } from "@pinetrie/core"
 import { encodeAnswer, encodeChat, encodeRelayMessage } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
-import { budgetOfPrompt } from "./budgets.ts"
+import { promptBudget } from "./budgets.ts"
 
 const ada = writerId("ada@example.com")
 const here = threadIdFor("here")
@@ -26,12 +26,12 @@ const relay = (asker: "person" | "agent") =>
 
 describe("the budget a run spends is read from its prompt (ADR-0128)", () => {
   test("an agent's ask spends its chain's budget; a person's ask names it, and spends nothing", () => {
-    expect(budgetOfPrompt(entryId("p"), relay("agent"))).toEqual({
+    expect(promptBudget(entryId("p"), relay("agent"))).toEqual({
       key: budget,
       spends: true,
       by: ada,
     })
-    expect(budgetOfPrompt(entryId("p"), relay("person"))).toEqual({
+    expect(promptBudget(entryId("p"), relay("person"))).toEqual({
       key: budget,
       spends: false,
       by: ada,
@@ -52,8 +52,8 @@ describe("the budget a run spends is read from its prompt (ADR-0128)", () => {
         },
         1,
       )
-    expect(budgetOfPrompt(entryId("p"), answer(true)).spends).toBe(true)
-    expect(budgetOfPrompt(entryId("p"), answer(false)).spends).toBe(false)
+    expect(promptBudget(entryId("p"), answer(true)).spends).toBe(true)
+    expect(promptBudget(entryId("p"), answer(false)).spends).toBe(false)
     const chat = encodeChat(
       {
         author: ada,
@@ -64,7 +64,7 @@ describe("the budget a run spends is read from its prompt (ADR-0128)", () => {
       },
       1,
     )
-    expect(budgetOfPrompt(entryId("p"), chat)).toEqual({
+    expect(promptBudget(entryId("p"), chat)).toEqual({
       key: entryId("p"),
       spends: false,
       by: ada,

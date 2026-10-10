@@ -149,7 +149,7 @@ export function faceOf(card: CardRecord, facts: FaceFacts): Face {
 /**
  * What a reference names, in words: the chip's label and a link's
  * (`addressLink`). The past's kinds by what they are; a thread or a card by
- * its kind, which its own words name once drawn (`linkTo`).
+ * its kind, which its own words name once drawn (`threadLink`).
  */
 export function addressWords(address: Address): string {
   switch (address.kind) {

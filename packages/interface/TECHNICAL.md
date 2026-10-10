@@ -94,7 +94,7 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   or not, which holds it, and `openWhenHeld` shows the entry once the index
   has it.
 - **A link to a thread is a `ThreadLink`** (`thread-link.ts`, ADR-0117,
-  ADR-0124), which only `linkTo(thread, cards, me)` makes (a brand): `open`
+  ADR-0124), which only `threadLink(thread, cards, me)` makes (a brand): `open`
   in a task, `mine` in your inventory (its preview opens: `openSelected`),
   `held` in someone else's, `gone` with no card. The inbox's rows, a
   mention, a reader's thread, a copy's or a parent elsewhere's fork row and
@@ -1494,14 +1494,23 @@ gone.
 
 ## Other threads' agents (`agents-view.ts`, `send.ts`, ADR-0128)
 
-- **The composer's candidates** are the named threads on the task's canvas
-  (the app's `canvasAgents`), each a member when `membersOf` the column's
-  path holds it (`agentCandidates`, core): the host builds them the same
-  way, so the send button and the host agree.
+- **The composer's candidates** are every open task's named threads (the
+  app's `inReach`, `reachableAgents` in rules), each a member when
+  `threadMembers` of the column's path holds it (`agentCandidates`, core):
+  the host builds them the same way, so the send button and the host agree.
 - **`recipientWords`** puts the agents a send invites first ("invite
   amber-fox · send to agent") and names those it asks as people are named.
 - **`agentsRow`** is the header's row: the thread's members by name, and
   the newest budget a message of the thread set, worded by `agentsWords`.
+  A member is away exactly when it is not in `inReach`, so `threadReach`
+  is read for those alone, to say why (`awayWords`).
+- **`crossTaskLinks`** gives each ask, answer and heard row from a thread
+  on another task its `ThreadLink` and words ("Sync bug", "Bea has it"),
+  one value-compared map per column, as `joins` is; the message draws it
+  beside its speaker and opens it through the column's `onLink`, as a fork
+  row does. A thread on the column's own task gets none.
+- **`threadLink` reads `threadReach`**, the one reader of where a thread's
+  card is; an archived task's thread still opens its task.
 
 ## Names
 

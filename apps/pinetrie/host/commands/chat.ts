@@ -11,13 +11,13 @@ import {
   ERR,
   type Intent,
   isImageRef,
-  membersOf,
   messageText,
   planModeOf,
   type SendAt,
   type SentCard,
   type ThreadId,
   threadAt,
+  threadMembers,
   threadOfSend,
   type WriterId,
 } from "@pinetrie/core"
@@ -63,7 +63,7 @@ import type { CardPort } from "../cards.ts"
 import type { Names } from "../names.ts"
 import { applyPlaceSteps } from "../places.ts"
 import type { Records } from "../records.ts"
-import { canvasThreadsOf, type Relays } from "../relays.ts"
+import { type Relays, readReachableAgents } from "../relays.ts"
 import type { Runs } from "../runs.ts"
 import type { Titles } from "../titles.ts"
 import type { LaneWork } from "../work/index.ts"
@@ -282,9 +282,9 @@ export async function sendChat(
     mentions: chat.mentions,
     participants: readParticipants(session, index),
     agents: agentCandidates(
-      canvasThreadsOf({ places: deps.basics.places, session }, chat.at.thread),
+      readReachableAgents({ places: deps.basics.places, session }),
       chat.at.thread,
-      membersOf(index, thread.end.kind === "entry" ? thread.end.id : null),
+      threadMembers(index, thread.end.kind === "entry" ? thread.end.id : null),
     ),
     asksAgent: chat.asksAgent,
     sendId,

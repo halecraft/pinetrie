@@ -176,6 +176,10 @@ the author (a `WriterId`, from the transport), the display name as written, the
 text, and the `Responder` it compels. `encodeChat` and the total `decodeChat`
 are the only code that builds or reads the shape.
 
+- **A mention in code is no mention** (`parseMentions`, `withoutCode`,
+  core, ADR-0128): inline code spans and fenced blocks are blanked first.
+  A four-space indented block is not: a line scan cannot tell it from a
+  paragraph's continuation.
 - **Who a message is for is `address`** (`@pinetrie/core`, ADR-0021): `@agent`
   asks the agent; a message naming only participants is for them; with no
   mention that resolves, the thread decides (`agentByDefault`: the agent where
@@ -1523,8 +1527,8 @@ Another thread's agent, invited into a thread, is asked there and answers
 from its own thread. Who a message invites and asks is `address`
 (`@pinetrie/core`), and the chat stores both (`ChatDetails.asks`,
 `invites`, absent when none); members, what an agent has heard and whether
-a round is done are read from the path (`membersOf`, `heardFrom`,
-`roundOf`, core). Nothing about them is stored beside the entries.
+a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
+`isRoundAnswered`, core). Nothing about them is stored beside the entries.
 
 - **Three history messages.** `pinetrie.heard` (role `heard`, a one-line
   message): what an asked agent was told of the thread that asked, its text
@@ -1540,7 +1544,7 @@ a round is done are read from the path (`membersOf`, `heardFrom`,
   answers plan with it. Only an answer that wakes `steers` into a running
   lane; one that wakes nobody waits for the run's end.
 - **`planRelay`** hears the asking thread's path after the newest entry
-  `heardFrom` names, or from the message that invited it, never the ask
+  `lastHeardEntry` names, or from the message that invited it, never the ask
   itself nor the asked agent's own answers; it refuses a non-member, a
   thread with no lane, itself and a spent budget (`relayRefusalText`).
 - **`planAnswer`** wakes the asker only when an agent asked and the budget
@@ -1557,10 +1561,18 @@ a round is done are read from the path (`membersOf`, `heardFrom`,
   counts, and returns the record to write only when a spend crosses the
   limit; `mayRequest` reads it. The user config's
   `agents.budget` is `decodeAgentsConfig`'s.
-- **Facts**: `dismissed` and `left` (a member gone, read by `membersOf`),
+- **Facts**: `dismissed` and `left` (a member gone, read by `threadMembers`),
   `unanswered`, `round` (what the round told the people) and
   `budget-spent`; a stop the budget made names it (`StopFact.budget`) and
   holds no queue (`planStop`).
+- **Reach** (`reach.ts`): `threadReach` is the one reader of where a
+  thread is (open, archived with its record, held by whom, gone), and
+  `reachableAgents` every named thread on an open task's canvas.
+  `reachWords` and `awayWords` say why one is out of reach.
+  `unreachableRefusal` refuses an ask whose either thread is out of reach,
+  first in `planRelay`; `planAnswer` makes an answer to an asker out of
+  reach `undelivered`, a fact in the answering thread, worded without
+  naming anyone, since a fact's words are fixed when it is written.
 - **The round** (`round.ts`): `roundRequest` is the `agents-round` skill,
   the members and the thread's newest lines; `roundReplyOf` reads
   `nothing`, `ask <member>: <text>` or `people: <line>`, and anything else

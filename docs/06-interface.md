@@ -684,8 +684,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   `ada@example.com`, ADR-0037). A name with no such character, or spelled
   `agent`, is refused: no mention could reach it.
 - **Another thread's agent can be brought in** (ADR-0128, proposed). A
-  mention can name the agent of another thread on the task's canvas by its
-  thread's name (`@amber-fox`); a person's name may not be a thread's.
+  mention can name the agent of a thread on any open task's canvas by its
+  thread's name (`@amber-fox`); a person's name may not be a thread's. A
+  mention in an inline code span or a fenced block is no mention, of an
+  agent or a person.
   - **The first mention invites it**: it becomes a **member** of the
     thread, and the message goes where it would have gone without that
     mention, so "Please talk to @amber-fox" in agent work asks the thread's
@@ -694,8 +696,10 @@ The rail is E; the column is T. Seeing both at once is the product.
     own agent out, as a person's mention does.
   - **Members are read from the thread's path**: a branch has the members
     its thread had where it forked. The column's header names them ("with
-    amber-fox"), and what agents talking from the thread spent ("agents
-    spent 38k of 200k tokens").
+    amber-fox"), a member out of reach as away ("slate-owl (Bea has it)",
+    "(archived by Bea)"), and what agents talking from the thread spent
+    ("agents spent 38k of 200k tokens"). An ask of a member out of reach is
+    refused, saying why.
   - **The send button names them**: "invite amber-fox · send to agent",
     "send to amber-fox", "send to amber-fox +1".
   - **An agent asks another with its `ask` tool**, which never waits: its
@@ -703,7 +707,10 @@ The rail is E; the column is T. Seeing both at once is the product.
     a "heard in sable-meadow: 3 messages" line, then the ask, spoken by its
     asker. Its last message comes back as an answer, spoken by its thread's
     name; an answer to an agent's ask runs that agent again, and nothing
-    else does. An ask for a busy agent waits in its dock as an ask card,
+    else does. A row from a thread on another task names that task beside
+    its speaker ("· Sync bug"), and opens it. An answer for a thread whose
+    task was archived, or which was taken, since it asked is not sent: the
+    answering thread says so. An ask for a busy agent waits in its dock as an ask card,
     which a held queue holds.
   - **A budget of tokens** (200k unless the user config's `agents.budget`
     says otherwise) is set by the person's message the talk began from;

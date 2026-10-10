@@ -5,6 +5,15 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a relay opens its threads before their reach is read",
+    file: "apps/pinetrie/host/relays.ts",
+    from: '    if (away !== null) return { kind: "refused", why: away }\n',
+    to: "",
+    command: unit,
+    expect: "an ask of an archived thread says why, and never opens its root",
+  },
+
+  {
     name: "a host whose lanes cannot run starts anyway",
     file: "apps/pinetrie/host/index.ts",
     from: '  if (found?.kind === "refused") throw new HostRefused(found.words)\n',

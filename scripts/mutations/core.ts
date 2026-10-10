@@ -10,6 +10,14 @@ const places = "packages/core/places.ts"
 const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a mention in code counts",
+    file: core,
+    from: "  for (const [, handle] of withoutCode(text).matchAll(pattern)) {\n",
+    to: "  for (const [, handle] of text.matchAll(pattern)) {\n",
+    command: unit,
+    expect: "an inline code span, of one backtick or several, is text",
+  },
   // ── agents talking (ADR-0128) ──
   {
     name: "a first mention asks rather than invites",

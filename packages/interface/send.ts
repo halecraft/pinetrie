@@ -198,7 +198,7 @@ export function planSend(input: {
   readonly lane: ThreadLane
   readonly asksAgent: boolean
   readonly participants: readonly string[]
-  /** Other threads' agents on the task's canvas (ADR-0128). */
+  /** Other threads' agents on open tasks' canvases (ADR-0128). */
   readonly agents: readonly AgentCandidate[]
   readonly reader: Reader
   /** The card's command (ADR-0108), or null. */

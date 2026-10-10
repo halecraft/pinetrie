@@ -10,9 +10,11 @@
 import {
   type AnswerDetails,
   type Asker,
+  type Away,
   type EntryId,
   firstLine,
   type HeardDetails,
+  type Reach,
   type RelayDetails,
   type ThreadId,
   type ThreadLane,
@@ -28,6 +30,7 @@ import {
   WriterIdSchema,
 } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
+import { reachWords } from "./reach.ts"
 import { transcriptLines } from "./request.ts"
 
 const HEARD_TYPE = "pinetrie.heard"
@@ -147,16 +150,30 @@ export const heardLine = (d: HeardDetails): string =>
 /** Why an ask was refused, as a value; `relayRefusalText` words it. */
 export type RelayRefusal =
   | { readonly kind: "unknown"; readonly name: string }
+  /** The asked thread, or the one that asked, is out of reach (ADR-0128). */
+  | {
+      readonly kind: "away"
+      readonly side: "to" | "from"
+      readonly name: string
+      readonly reach: Away
+    }
   | { readonly kind: "self" }
   | { readonly kind: "not-member"; readonly name: string }
   | { readonly kind: "no-lane"; readonly name: string }
   | { readonly kind: "spent" }
 
-/** A refused ask, in the words its asker reads. */
-export function relayRefusalText(why: RelayRefusal): string {
+/** A refused ask, in the words its asker reads; `nameOf` names people. */
+export function relayRefusalText(
+  why: RelayRefusal,
+  nameOf: (w: WriterId) => string,
+): string {
   switch (why.kind) {
     case "unknown":
-      return `There is no thread named ${why.name} on this task's canvas.`
+      return `There is no open thread named ${why.name}.`
+    case "away":
+      return why.side === "to"
+        ? `${reachWords(why.name, why.reach, nameOf)}: it cannot be asked.`
+        : `${reachWords(why.name, why.reach, nameOf)}: its ask was not relayed.`
     case "self":
       return "That is this thread: ask another thread's agent."
     case "not-member":
@@ -182,12 +199,42 @@ export type RelayPlan =
   | { readonly kind: "refused"; readonly why: RelayRefusal }
 
 /**
+ * Whether both threads of an ask are in reach (ADR-0128): the asked one, and
+ * the one that asked, which may have gone while its ask waited as a card.
+ * Null when both are open. The host asks it before it opens either thread's
+ * root, and `planRelay` again. Pure.
+ */
+export function unreachableRefusal(input: {
+  readonly fromName: string
+  readonly fromReach: Reach
+  readonly toName: string
+  readonly toReach: Reach
+}): RelayRefusal | null {
+  if (input.toReach.kind !== "open")
+    return {
+      kind: "away",
+      side: "to",
+      name: input.toName,
+      reach: input.toReach,
+    }
+  if (input.fromReach.kind !== "open")
+    return {
+      kind: "away",
+      side: "from",
+      name: input.fromName,
+      reach: input.fromReach,
+    }
+  return null
+}
+
+/**
  * An ask relayed from thread `from` into `to`'s thread (ADR-0128). Pure.
  *
+ * - Both threads must be in reach (`unreachableRefusal`), before anything else.
  * - Only a member is asked, and only a thread with a lane has an agent to
  *   ask; a spent budget asks nobody.
  * - What `to` has not heard is the asking thread's messages after the
- *   newest it heard (`heardFrom`), or, having heard none, from the message
+ *   newest it heard (`lastHeardEntry`), or, having heard none, from the message
  *   that invited it on; never the ask itself, which the relay carries, nor
  *   `to`'s own answers.
  */
@@ -197,14 +244,16 @@ export function planRelay(input: {
   /** The asked thread, and its name. */
   readonly to: ThreadId
   readonly toName: string
+  readonly fromReach: Reach
+  readonly toReach: Reach
   readonly members: readonly ThreadId[]
   readonly toLane: ThreadLane
   /** The asking thread's path, root first (`projectTranscript`). */
   readonly path: readonly TranscriptMessage[]
-  /** The newest entry of `from` that `to` has heard (`heardFrom`). */
+  /** The newest entry of `from` that `to` has heard (`lastHeardEntry`). */
   readonly heard: EntryId | null
   /** The message that invited `to`, on the path; null when none is. */
-  readonly invitedAt: EntryId | null
+  readonly lastInvitation: EntryId | null
   readonly source: EntryId
   readonly asker: Asker
   readonly askerName: string
@@ -214,6 +263,8 @@ export function planRelay(input: {
   readonly by: WriterId
 }): RelayPlan {
   const refuse = (why: RelayRefusal): RelayPlan => ({ kind: "refused", why })
+  const away = unreachableRefusal(input)
+  if (away !== null) return refuse(away)
   if (input.to === input.from) return refuse({ kind: "self" })
   if (!input.members.includes(input.to))
     return refuse({ kind: "not-member", name: input.toName })
@@ -224,19 +275,18 @@ export function planRelay(input: {
   const start =
     input.heard !== null
       ? at(input.heard) + 1
-      : input.invitedAt !== null
-        ? Math.max(0, at(input.invitedAt))
+      : input.lastInvitation !== null
+        ? Math.max(0, at(input.lastInvitation))
         : 0
   const unheard = input.path
     .slice(start)
     .filter(m => m.id !== input.source && !isAnswerFrom(m, input.to))
   const lines = transcriptLines(unheard)
-  const last = unheard.at(-1)
   return {
     kind: "relay",
     to: input.to,
     heard:
-      lines.length === 0 || last === undefined
+      lines.length === 0
         ? null
         : {
             details: {
@@ -275,6 +325,8 @@ export type AnswerPlan =
       readonly kind: "unanswered"
       readonly why: "stopped" | "failed"
     }
+  /** The thread that asked is out of reach: the answering thread is told. */
+  | { readonly kind: "undelivered"; readonly reach: Away }
 
 /**
  * What a relayed run's end sends back to the thread that asked (ADR-0128).
@@ -285,6 +337,9 @@ export type AnswerPlan =
  *   ask wakes nobody, and nothing else wakes anyone.
  * - A stopped or failed run sends no answer, and wakes nobody: the asking
  *   thread is told it went unanswered.
+ * - Nothing is sent to a thread that asked and has since gone out of reach
+ *   (ADR-0128): its task archived, or taken into an inventory. The answering
+ *   thread is told instead.
  */
 export function planAnswer(input: {
   /** The relayed run's prompt, and its entry. */
@@ -295,8 +350,12 @@ export function planAnswer(input: {
   readonly name: string
   readonly end: RelayEnd
   readonly spent: boolean
+  /** Where the thread that asked is now. */
+  readonly fromReach: Reach
 }): AnswerPlan {
-  const { relay, end } = input
+  const { relay, end, fromReach } = input
+  if (fromReach.kind !== "open")
+    return { kind: "undelivered", reach: fromReach }
   if (end.kind !== "answered") return { kind: "unanswered", why: end.kind }
   return {
     kind: "answer",
