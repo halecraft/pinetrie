@@ -5,6 +5,23 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a card's content as stored (ADR-0126) ──
+  {
+    name: "a text card's origin is not stored",
+    file: "packages/rules/card.ts",
+    from: '      origin: c.origin === null ? "" : printAddress(c.origin),\n',
+    to: '      origin: "",\n',
+    command: unit,
+    expect: "a text card round-trips",
+  },
+  {
+    name: "a row holding another kind's column is read",
+    file: "packages/rules/card.ts",
+    from: '    column => fields[column] !== "" && !codec.columns.includes(column),\n',
+    to: "    column => false,\n",
+    command: unit,
+    expect: "a row holding a column of another kind's content is refused",
+  },
   // ── agents across tasks (ADR-0128) ──
   {
     name: "a thread's reach ignores the archive",
@@ -1264,24 +1281,24 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card with a command this build does not know decodes",
     file: "packages/rules/card.ts",
-    from: '          return fact !== "" ||\n            (c.command !== "" && !isCommand(c.command)) ||',
-    to: '          return fact !== "" ||',
+    from: '      if (command !== "" && !isCommand(command)) return undefined\n',
+    to: "",
     command: unit,
     expect: "a malformed card is dropped, never thrown",
   },
   {
     name: "a fact with a command decodes",
     file: "packages/rules/card.ts",
-    from: '          const decoded = c.command === "" ? decodeQueuedFact(fact) : undefined',
-    to: "          const decoded = decodeQueuedFact(fact)",
+    from: '    column => fields[column] !== "" && !codec.columns.includes(column),\n',
+    to: '    column => fields[column] !== "" && column !== "command" && !codec.columns.includes(column),\n',
     command: unit,
     expect: "a malformed card is dropped, never thrown",
   },
   {
     name: "a card stored before facts is malformed",
     file: "packages/rules/card.ts",
-    from: '    const fact = c.fact ?? ""',
-    to: '    const fact = c.fact ?? "{"',
+    from: '      fact: c.fact ?? "",\n',
+    to: '      fact: c.fact ?? "{",\n',
     command: unit,
     expect: "a card stored before facts is a message (ADR-0080)",
   },

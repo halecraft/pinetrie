@@ -11,21 +11,25 @@
 import {
   asPlaceFields,
   CARD_COMMANDS,
+  type Card,
   type CardCommand,
   type CardId,
   type CardPlace,
   type CardRecord,
+  type ContentOf,
   type EntryId,
+  type IdOf,
   isSha256,
   isTextCard,
-  kindOfCard,
+  kindedId,
   NO_CONTENT,
   type OrderedPlace,
+  type PlacedKind,
   parseAddress,
   parseCardId,
-  placed,
   placeFields,
   placeOfFields,
+  placeOfKind,
   printAddress,
   type TextCard,
   type ThreadId,
@@ -93,42 +97,151 @@ interface StoredCardFields {
   readonly origin: string
 }
 
-/**
- * A card record -> the flat value the places document stores under its id:
- * its place's fields, and its content's. A text card's command and reason
- * unsent, a fact card's fact, an ask card's relay (ADR-0128), both as JSON
- * in `fact`; a thread's card and a note column hold none.
- */
-export const encodeCard = (card: CardRecord): StoredCardFields => ({
-  owner: card.owner,
-  ...placeFields(card.place),
-  command: card.kind === "text" ? (card.content.command ?? "") : "",
-  fact:
-    card.kind === "fact"
-      ? encodeQueuedFact(card.content.fact)
-      : card.kind === "ask"
-        ? encodeRelay(card.content.relay)
-        : "",
-  unsent: card.kind === "text" ? (card.content.unsent ?? "") : "",
-  placer: card.placer,
-  address: card.kind === "reference" ? printAddress(card.content.address) : "",
-  quote: card.kind === "reference" ? card.content.quote : "",
-  origin:
-    card.kind === "text" && card.content.origin !== null
-      ? printAddress(card.content.origin)
-      : "",
-})
-
 const isCommand = (s: string): s is CardCommand =>
   (CARD_COMMANDS as readonly string[]).includes(s)
 
+/** The columns a card's content is stored in: "" for none. */
+type ContentFields = Pick<
+  StoredCardFields,
+  "command" | "fact" | "unsent" | "address" | "quote" | "origin"
+>
+
+type ContentColumn = keyof ContentFields
+
+const NO_CONTENT_FIELDS: ContentFields = {
+  command: "",
+  fact: "",
+  unsent: "",
+  address: "",
+  quote: "",
+  origin: "",
+}
+
+/** How one kind's content is stored: the columns it holds, and their codec. */
+interface ContentCodec<K extends PlacedKind> {
+  /** The columns it holds: a row holding any other is another kind's, refused. */
+  readonly columns: readonly ContentColumn[]
+  readonly encode: (content: ContentOf[K]) => Partial<ContentFields>
+  /** Its columns -> its content; undefined for a value this build cannot read. */
+  readonly decode: (fields: ContentFields) => ContentOf[K] | undefined
+}
+
 /**
- * A stored card -> its record, of the kind its id says (`kindOfCard`);
- * undefined for one that is malformed, in a place its kind is never in
- * (`placed`), with a command this build does not know, with content its kind
- * does not hold (a fact on a text card, a command on a fact), or of a kind
- * this build holds no records of yet. Total. Where it is is read by core's
- * `placeOfFields`, as a move's key on the wire is by `keyOfFields`.
+ * Each kind's content as the places document stores it (ADR-0126): a row
+ * per kind with records, so a kind without one does not compile. An ask
+ * keeps its relay in the `fact` column, as JSON.
+ */
+export const CARD_CODEC: { readonly [K in PlacedKind]: ContentCodec<K> } = {
+  text: {
+    columns: ["command", "unsent", "origin"],
+    encode: c => ({
+      command: c.command ?? "",
+      unsent: c.unsent ?? "",
+      origin: c.origin === null ? "" : printAddress(c.origin),
+    }),
+    decode: f => {
+      const origin = f.origin === "" ? null : parseAddress(f.origin)
+      if (origin === undefined) return undefined
+      const { command } = f
+      if (command !== "" && !isCommand(command)) return undefined
+      return {
+        command: command === "" ? null : command,
+        unsent: f.unsent === "" ? null : f.unsent,
+        origin,
+      }
+    },
+  },
+  reference: {
+    columns: ["address", "quote"],
+    encode: c => ({ address: printAddress(c.address), quote: c.quote }),
+    decode: f => {
+      const address = parseAddress(f.address)
+      return address === undefined || !isSha256(f.quote)
+        ? undefined
+        : { address, quote: f.quote }
+    },
+  },
+  thread: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
+  "note-column": { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
+  fact: {
+    columns: ["fact"],
+    encode: c => ({ fact: encodeQueuedFact(c.fact) }),
+    decode: f => {
+      const fact = decodeQueuedFact(f.fact)
+      return fact === undefined ? undefined : { fact }
+    },
+  },
+  ask: {
+    columns: ["fact"],
+    encode: c => ({ fact: encodeRelay(c.relay) }),
+    decode: f => {
+      const relay = decodeStoredRelay(f.fact)
+      return relay === undefined ? undefined : { relay }
+    },
+  },
+}
+
+/** A card's content as its columns (`CARD_CODEC`), every other one "". */
+const contentFields = <K extends PlacedKind>(card: {
+  readonly kind: K
+  readonly content: ContentOf[K]
+}): ContentFields => {
+  const codec: ContentCodec<K> = CARD_CODEC[card.kind]
+  return { ...NO_CONTENT_FIELDS, ...codec.encode(card.content) }
+}
+
+/**
+ * A card record -> the flat value the places document stores under its id:
+ * its place's fields (`placeFields`) and its content's (`CARD_CODEC`).
+ */
+export const encodeCard = (card: CardRecord): StoredCardFields => ({
+  owner: card.owner,
+  placer: card.placer,
+  ...placeFields(card.place),
+  ...contentFields(card),
+})
+
+/**
+ * A kind's content from a stored row; undefined when the row holds a column
+ * that is not the kind's (`CARD_CODEC`' `columns`), or one its codec cannot
+ * read.
+ */
+const decodeContent = <K extends PlacedKind>(
+  kind: K,
+  fields: ContentFields,
+): ContentOf[K] | undefined => {
+  const codec: ContentCodec<K> = CARD_CODEC[kind]
+  const foreign = (Object.keys(fields) as ContentColumn[]).some(
+    column => fields[column] !== "" && !codec.columns.includes(column),
+  )
+  return foreign ? undefined : codec.decode(fields)
+}
+
+/**
+ * A card of `kind` at `place`, from its stored row; undefined for a place
+ * its kind is never in (`placeOfKind`) or content it cannot hold.
+ */
+const decodeOfKind = <K extends PlacedKind>(
+  kind: K,
+  id: IdOf<K>,
+  row: { readonly owner: WriterId; readonly placer: WriterId },
+  place: CardPlace,
+  fields: ContentFields,
+): Card<K> | undefined => {
+  const at = placeOfKind(kind, place)
+  const content = decodeContent(kind, fields)
+  return at === undefined || content === undefined
+    ? undefined
+    : { kind, id, owner: row.owner, placer: row.placer, place: at, content }
+}
+
+/**
+ * A stored card -> its record, of the kind its id says (`kindedId`);
+ * undefined for one that is malformed, in a place its kind is never in,
+ * with content its kind does not hold or this build cannot read
+ * (`CARD_CODEC`), or of a kind this build holds no records of yet. Total.
+ * Where it is is read by core's `placeOfFields`, as a move's key on the
+ * wire is by `keyOfFields`.
  */
 export const decodeCard = (
   id: string,
@@ -138,95 +251,33 @@ export const decodeCard = (
     const place = placeOfFields(asPlaceFields(c))
     const card = parseCardId(id)
     if (place === undefined || card === undefined) return undefined
-    const owner = c.owner as WriterId
-    const placer = c.placer as WriterId
-    const fact = c.fact ?? ""
-    const record = ((): CardRecord | undefined => {
-      const kind = kindOfCard(card)
-      switch (kind) {
-        case "thread":
-        case "note-column":
-          return c.command !== "" || fact !== ""
-            ? undefined
-            : ({
-                kind,
-                id: card,
-                owner,
-                placer,
-                place,
-                content: NO_CONTENT,
-              } as CardRecord)
-        case "fact": {
-          const decoded = c.command === "" ? decodeQueuedFact(fact) : undefined
-          return decoded === undefined
-            ? undefined
-            : ({
-                kind,
-                id: card,
-                owner,
-                placer,
-                place,
-                content: { fact: decoded },
-              } as CardRecord)
-        }
-        case "ask": {
-          const relay = c.command === "" ? decodeStoredRelay(fact) : undefined
-          return relay === undefined
-            ? undefined
-            : ({
-                kind,
-                id: card,
-                owner,
-                placer,
-                place,
-                content: { relay },
-              } as CardRecord)
-        }
-        case "text": {
-          const origin = c.origin ?? ""
-          const parsed = origin === "" ? null : parseAddress(origin)
-          return fact !== "" ||
-            (c.command !== "" && !isCommand(c.command)) ||
-            parsed === undefined
-            ? undefined
-            : ({
-                kind,
-                id: card,
-                owner,
-                placer,
-                place,
-                content: {
-                  command: c.command === "" ? null : (c.command as CardCommand),
-                  unsent: c.unsent === "" ? null : c.unsent,
-                  origin: parsed,
-                },
-              } as CardRecord)
-        }
-        case "reference": {
-          const address = parseAddress(c.address ?? "")
-          const quote = c.quote ?? ""
-          return c.command !== "" ||
-            fact !== "" ||
-            address === undefined ||
-            !isSha256(quote)
-            ? undefined
-            : ({
-                kind,
-                id: card,
-                owner,
-                placer,
-                place,
-                content: { address, quote },
-              } as CardRecord)
-        }
-        case "media":
-        case "file":
-          return undefined
-      }
-    })()
-    // Built with its place unchecked above; `placed` refuses a place its
-    // kind is never in.
-    return record === undefined ? undefined : placed(record, place)
+    const row = { owner: c.owner as WriterId, placer: c.placer as WriterId }
+    const fields: ContentFields = {
+      command: c.command,
+      fact: c.fact ?? "",
+      unsent: c.unsent,
+      address: c.address ?? "",
+      quote: c.quote ?? "",
+      origin: c.origin ?? "",
+    }
+    const of = kindedId(card)
+    switch (of.kind) {
+      case "text":
+        return decodeOfKind(of.kind, of.id, row, place, fields)
+      case "thread":
+        return decodeOfKind(of.kind, of.id, row, place, fields)
+      case "note-column":
+        return decodeOfKind(of.kind, of.id, row, place, fields)
+      case "fact":
+        return decodeOfKind(of.kind, of.id, row, place, fields)
+      case "reference":
+        return decodeOfKind(of.kind, of.id, row, place, fields)
+      case "ask":
+        return decodeOfKind(of.kind, of.id, row, place, fields)
+      case "media":
+      case "file":
+        return undefined
+    }
   })
 
 /**

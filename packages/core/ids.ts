@@ -342,6 +342,15 @@ export const cardIdOfKind = <K extends CardKind>(
 export const kindOfCard = (id: CardId): CardKind =>
   CARD_PREFIXES.find(([p]) => id.startsWith(p))?.[1] ?? "text"
 
+/** A card's id with its kind (`kindOfCard`), so a switch on one narrows the other. */
+export type KindedId = {
+  [K in CardKind]: { readonly kind: K; readonly id: IdOf<K> }
+}[CardKind]
+
+/** `id` with its kind, read from its prefix (`KINDS`). */
+export const kindedId = (id: CardId): KindedId =>
+  ({ kind: kindOfCard(id), id }) as KindedId
+
 /** Whether a card's id is a reference's (ADR-0126). */
 export const isReferenceCardId = (id: CardId): id is ReferenceCardId =>
   kindOfCard(id) === "reference"
