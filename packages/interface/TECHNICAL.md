@@ -447,10 +447,12 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
 - **A column moves for everyone**: `moveColumn` is a reorder of its card
   on the canvas (`planColumnMove`), host-ordered and undone by the undo
   key; its width is the card's too (`cardWidth`, `columnMenu`).
-- **A thread column's ⋯ moves and copies it** (`columnMenu`'s `move` and
-  `copy` sections, ADR-0117): `moveThread` to another task's canvas end,
-  `takeIntoInventory`, and `copyThread` (a `copy-thread` request at the
-  source's end, `threadAnchor`, its id `Minted.thread`). A thread's card put
+- **A thread column's ⋯ copies and takes it** (`columnMenu`'s `thread`
+  section, ADR-0127): `copyThread` (a `copy-thread` request at the
+  source's end, `threadAnchor`, its id `Minted.thread`), `here` just after
+  the source on its canvas (`taskOfCard`) or into your inventory, and
+  `takeIntoInventory`. It lists no task: a thread reaches another task
+  through your inventory. A thread's card put
   from your inventory lands on the canvas you are on after the column it
   was put on (`putOnCanvas`).
 - **A copy before its first send** is a column of mode `copy`, ending at its

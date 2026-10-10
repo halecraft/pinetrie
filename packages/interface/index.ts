@@ -169,9 +169,9 @@ export type { Codec } from "./codec.ts"
 export {
   COLUMN_MENU_LABEL,
   type ColumnMenuItem,
+  type ColumnMenuSection,
   columnMenu,
   FIRST_NOTE_COLUMN,
-  type TaskChoice,
 } from "./column-menu.ts"
 export {
   branchColors,

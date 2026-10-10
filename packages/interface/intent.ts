@@ -18,6 +18,7 @@ import {
   type OfferAction,
   type Position,
   type QueueHoldChange,
+  type TargetOf,
   type TaskId,
   type TextCardId,
   type ThreadId,
@@ -246,23 +247,14 @@ export type Intent =
    */
   | { readonly kind: "addNoteColumn"; readonly after: CardId | null }
   /**
-   * Move the thread `thread`'s card to the end of `task`'s canvas, for
-   * everyone (ADR-0117); a running thread keeps running.
-   */
-  | {
-      readonly kind: "moveThread"
-      readonly thread: ThreadId
-      readonly task: TaskId
-    }
-  /**
    * Copy the thread `source` at its end as you see it (ADR-0117): its new
-   * card just after the source on `task`'s canvas, at that canvas's end
-   * when the source is not on it, or into your inventory with null.
+   * card just after the source on the source's canvas, or into your
+   * inventory (ADR-0127).
    */
   | {
       readonly kind: "copyThread"
       readonly source: ThreadId
-      readonly task: TaskId | null
+      readonly to: "here" | "inventory"
     }
   /** Draw a card's column one column wide or two, for everyone (ADR-0116). */
   | {
@@ -456,10 +448,8 @@ function planOf(
         ? planAddNoteColumn(active.task, intent.after, minted.noteColumn, state)
         : []
     }
-    case "moveThread":
-      return planMoveThread(intent.thread, intent.task, state)
     case "copyThread":
-      return planCopyThread(intent.source, intent.task, minted.thread, state)
+      return planCopyThread(intent.source, intent.to, minted.thread, state)
     // From the canvas its sender sees it on: the host refuses it moved since.
     case "cardWidth": {
       const task = state.tasks.index.taskOfCard.get(intent.card)
@@ -846,56 +836,32 @@ function planAddNoteColumn(
 }
 
 /**
- * `thread`'s card from where you see it to the end of `task`'s canvas
- * (ADR-0117): nothing where it is on that canvas already, or has no card.
- */
-function planMoveThread(
-  thread: ThreadId,
-  task: TaskId,
-  state: IntentState,
-): readonly Effect[] {
-  const now = cardOf(state.cards, thread)
-  if (now?.kind !== "thread") return []
-  if (now.place.kind === "canvas" && now.place.task === task) return []
-  const canvas = state.tasks.index.canvases.get(task) ?? []
-  return [
-    moveCard(
-      moveOf(now, {
-        kind: "canvas-at",
-        task,
-        after: canvas.at(-1)?.id ?? null,
-      }),
-      IN_COLUMN(thread),
-      false,
-    ),
-  ]
-}
-
-/**
  * A copy of `source` at its end as this tab holds it (ADR-0117), its id
- * `thread`: just after the source on `task`'s canvas, or at that canvas's
- * end, or into your inventory's first empty slot for null. Nothing for a
- * thread with no end here; refused here, as the host would, into a full
- * inventory.
+ * `thread`: just after the source on its canvas, or into your inventory's
+ * first empty slot. Nothing for a thread with no end here, or copied here
+ * from no canvas; refused here, as the host would, into a full inventory.
  */
 function planCopyThread(
   source: ThreadId,
-  task: TaskId | null,
+  to: "here" | "inventory",
   thread: ThreadId,
   state: IntentState,
 ): readonly Effect[] {
   const end = threadAnchor(state.index, state.cards.lanes, source)
   if (end === null) return []
-  if (task === null && firstEmpty(state.cards.slots, 0) === null)
+  if (to === "inventory" && firstEmpty(state.cards.slots, 0) === null)
     return [
       { kind: "showInventory", brief: true },
       { kind: "refuse", refusal: full(thread) },
     ]
-  const canvas =
-    task === null ? [] : (state.tasks.index.canvases.get(task) ?? [])
-  const after = canvas.some(c => c.id === source)
-    ? source
-    : (canvas.at(-1)?.id ?? null)
+  const task = state.tasks.index.taskOfCard.get(source)
+  const target: TargetOf<"thread"> | null =
+    to === "inventory"
+      ? { kind: "inventory", holder: state.cards.me }
+      : task === undefined
+        ? null
+        : { kind: "canvas-at", task, after: source }
+  if (target === null) return []
   return [
     {
       kind: "request",
@@ -903,14 +869,7 @@ function planCopyThread(
         kind: "copy-thread",
         source,
         end,
-        move: {
-          card: thread,
-          from: null,
-          to:
-            task === null
-              ? { kind: "inventory", holder: state.cards.me }
-              : { kind: "canvas-at", task, after },
-        },
+        move: { card: thread, from: null, to: target },
       },
     },
   ]

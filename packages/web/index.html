@@ -107,9 +107,10 @@
       /* It ends taking no room, so nothing need be redrawn to remove it. */
       @keyframes done-fade { to { opacity: 0; width: 0; } }
       @media (prefers-reduced-motion: reduce) { .root-status { animation: none; } }
-      /* Above the floating inventory (5): a card's ⋯ opens over it. */
-      .popover { position: absolute; z-index: 6; top: 100%; right: 0; display: flex;
-        flex-direction: column; min-width: 12rem; padding: .25rem; background: #1b1e24;
+      /* In the top layer, placed inline (`popover.tsx`). `margin`, `inset`,
+         `color` and `overflow` undo the browser's own `[popover]` rules. */
+      .popover { display: flex; flex-direction: column; min-width: 12rem; margin: 0; inset: auto;
+        padding: .25rem; overflow-y: auto; color: inherit; background: #1b1e24;
         border: 1px solid #3a3f48; border-radius: 6px; }
       .menu-items { display: flex; flex-direction: column; }
       .menu button { text-align: left; background: none; color: #ddd; padding: .3rem .5rem; }
@@ -239,7 +240,10 @@
          `isolation` on what holds it makes that element's own background what
          `lighten` blends with, so the sprite's black goes. A new banner fades
          in once loaded, and the star out; the one there as the column mounts
-         does not. The head row is the square's height, with or without one. */
+         does not. The head row is the square's height, with or without one.
+         That isolation would trap a menu opened in the header under the
+         column's messages, were it not in the top layer: the browser check
+         "a column's ⋯ opens over the column's messages" relies on it. */
       .column-head { isolation: isolate; background: var(--page); }
       .column-head .agent-name { flex: 0 0 auto; display: inline-flex; align-items: center;
         gap: .3rem; white-space: nowrap; font-size: .85rem;

@@ -7,6 +7,14 @@ const tabState = "packages/web/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a popover's box is as tall as the window",
+    file: "packages/web/popover-place.ts",
+    from: "        maxHeight: view.height - trigger.bottom - EDGE,\n",
+    to: "        maxHeight: view.height - EDGE,\n",
+    command: unit,
+    expect: "a box opens below and leftwards from the top right",
+  },
+  {
     name: "everyone present has the first colour",
     file: "packages/web/presence.tsx",
     from: "    return (i === undefined ? undefined : FIRST[i]) ?? hashed(writer)",

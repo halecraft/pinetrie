@@ -296,9 +296,11 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   on the canvas, is the grip's.
 - **A column's ⋯** (`column-menu.tsx`, `columnMenu`) is its card's, for
   everyone: its width, one column or two (`cardWidth`), and a note column
-  after it; a thread's adds **Move to ▸** and **Copy to ▸** sections
-  (ADR-0117), over the sidebar's tasks (`menuTasks`). The task column's
-  **+ note column** puts one first.
+  after it; a thread's adds a section of Copy to this task, Copy to your
+  inventory and Move to your inventory, and no task (ADR-0127).
+  `columnMenu` returns the sections, and each item's class is
+  `column-<key>` (`.column-copy`, `.column-copy-inventory`,
+  `.column-take`). The task column's **+ note column** puts one first.
 - **⇲ in a thread column's header** is a card drag (`dragCard`), which a
   slot of your inventory takes; the header's own drag reorders.
 - **A copy's fork row and a parent elsewhere's** (`Origin`, kind `source`)
@@ -1190,7 +1192,7 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   the subscribers itself.
 - **The page is a sibling of `#stage` in its grid cell**, after it in
   the document and at the board's `z-index` (3), so it covers the board
-  too; the footer's menus (4) open over it.
+  too; the footer's menus open over it, in the top layer.
 - **The stage stays mounted, laid out and `inert`** (with
   `aria-hidden`). Remounted, its columns would lose their scroll (the
   browser suite's Back check, and its mutation keying `#stage` by the
@@ -1259,18 +1261,37 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   only a branch not yet sent and a new tab's column close; a card's column
   folds (⇤, `.fold`).
 - **A popover opens above its trigger in the window's lower half, and from
-  its left edge in the left half.** A composer's `▾`, and the footer, are at
-  the window's foot, so a list below would be out of sight; the sidebar's `⋯`
-  and your avatar are at its left, so a box anchored by its right edge
-  would open past it. Since `.popover` sets a `top` and a `right` in the
-  stylesheet, an upward box sets `top: auto`, and a leftward one `right:
-  auto`, or the stylesheet's wins.
-- **Anything that pops out of a scrolling list is `position: fixed`.** Your
-  list and the board scroll, so a menu positioned inside either is clipped
-  by it. `Popover`
-  places its box from its trigger's rect when opened, and closes on a
-  resize or a scroll of an element holding the trigger, since a fixed box
-  would drift from its trigger. Not on any scroll outside the box: a column
+  its left edge in the left half** (`placeBox`, `popover-place.ts`). A
+  composer's `▾`, and the footer, are at the window's foot, so a list below
+  would be out of sight; the sidebar's `⋯` and your avatar are at its left,
+  so a box anchored by its right edge would open past it. Its `maxHeight`
+  is the room on the side it opens to, less `EDGE`, so a long list scrolls
+  inside it rather than past the window.
+- **A popover's box is in the top layer** (`popover="manual"`, shown with
+  `showPopover()` in `Popover`'s layout effect). A stacking context on
+  anything holding the box trapped it: `.column-head` isolates for its
+  banner's blend, so a column's ⋯ opened under the column's messages,
+  which are positioned and come later. The top layer is above every
+  stacking context and clipping container, the narrow pane's modal dialog
+  too when the box opens inside it, and the box stays where it is in the
+  DOM, so `contains`, events and inherited styles work as before.
+  `manual` leaves light dismiss and Escape to `Popover`.
+  - `.popover` undoes the browser's own `[popover]` rules (`margin`,
+    `inset`, `color`, `overflow`) and sets no position: the browser makes
+    a popover `position: fixed`, and the placement is inline.
+  - The stylesheet's `.popover { display: flex }` beats the browser's
+    `[popover]:not(:popover-open) { display: none }`, so a box not yet
+    shown is drawn in its stacking context. `showPopover()` runs in a
+    layout effect, before paint, so none is seen that way.
+  - StrictMode runs the effect twice, and `showPopover()` throws on a box
+    already shown, so it is guarded with `:popover-open`.
+  - The browser check "a column's ⋯ opens over the column's messages"
+    fails without the top layer only while `.column-head` isolates. If
+    that isolation goes, its mutation goes uncaught, and the check needs
+    another trap.
+- **A popover closes on a resize or a scroll of an element holding its
+  trigger**, since its box, placed from the trigger's rect when opened,
+  would drift from it. Not on any scroll outside the box: a column
   following its end scrolls whenever an entry arrives, which closed every
   open menu without the person doing anything.
 - **Playwright clicks what a person cannot see.** It scrolls a clipped element

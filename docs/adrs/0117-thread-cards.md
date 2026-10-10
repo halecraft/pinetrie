@@ -17,6 +17,8 @@
   - ADR-0124: taking a running thread stops it, and the inventory previews a
     thread read only; a thread moved between tasks keeps running.
   - ADR-0125: each entry of a thread names it, not only its first message.
+  - ADR-0127: a column's ⋯ copies a thread beside itself or into your
+    inventory, and takes it; another task is reached through your inventory.
 
 **Context.**
 

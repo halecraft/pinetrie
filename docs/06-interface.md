@@ -397,15 +397,16 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   either end. A column's ⋯ sets its width, one or two columns wide, for
   everyone.
 - **A thread is a card** (ADR-0117, ADR-0124): one place, on a task's canvas
-  or in someone's inventory. A thread column's ⋯ has **Move to ▸** each
-  other task in your sidebar, or your inventory, and **Copy to ▸** this
-  task, another, or your inventory; ⇲ in its header, dragged onto a slot,
-  takes it too. Moved between tasks, a running thread keeps running, and
-  its agent is told it moved. Taken into an inventory, its run stops at
-  once, the taker's own stop ("Bea stopped it"); nothing is sent in it
-  there, nor branched from its entries ("put it on a canvas first"), and
-  its queue waits, held. Put on a canvas again, from its slot or by a drop
-  on a column, it lands after that column and takes sends again.
+  or in someone's inventory. A thread column's ⋯ has **Copy to this
+  task**, **Copy to your inventory** and **Move to your inventory**, and
+  lists no tasks (ADR-0127); ⇲ in its header, dragged onto a slot, takes
+  it too. A thread reaches another task through your inventory: taken,
+  then put down there, so a running thread moved that way stops. Taken
+  into an inventory, its run stops at once, the taker's own stop ("Bea
+  stopped it"); nothing is sent in it there, nor branched from its entries
+  ("put it on a canvas first"), and its queue waits, held. Put on a canvas
+  again, from its slot or by a drop on a column, it lands after that
+  column and takes sends again.
 - **A copy is a branch at its source's end** as you saw it, its card where
   you put it: a new thread, with a new name, and no message yet. Its first
   send writes its first message there, and its lane is made when it first

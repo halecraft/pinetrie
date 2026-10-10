@@ -90,7 +90,6 @@ import {
   shownBy,
   spotOf,
   startedWords,
-  type TaskChoice,
   type ThreadDetails,
   type ThreadLink,
   traceGroups,
@@ -166,8 +165,6 @@ export interface ColumnProps {
   drawnAt: number
   /** How many columns wide its card is drawn (ADR-0116); 1 with no card. */
   width: CardWidth
-  /** The tasks its ⋯ moves or copies its thread to (ADR-0117). */
-  menuTasks: readonly TaskChoice[]
   /** A task's label: what a fork row names a source's task by (ADR-0117). */
   labelOf: (task: TaskId) => string
   /** How many cards the canvas holds: with two or more, a card's column can move. */
@@ -844,14 +841,8 @@ export function Column(p: ColumnProps) {
               )}
               {card !== null && (
                 <ColumnMenu
-                  items={columnMenu({
-                    card,
-                    width: p.width,
-                    ...(p.task === null
-                      ? {}
-                      : { thread: { here: p.task, tasks: p.menuTasks } }),
-                  })}
                   onIntent={p.onIntent}
+                  sections={columnMenu({ card, width: p.width })}
                 />
               )}
               {card !== null && (

@@ -4051,7 +4051,74 @@ async function run(check: Checks["check"]): Promise<void> {
         "a thread moved onto the canvas from another task's makes a canvas of two roots: its column, and its root's tree on the rail",
         twoRoots,
       )
-      // Copy to ▸ this task: a new thread forked at its source's end, its
+      // A column's ⋯ is in the top layer: `.column-head` isolates for its
+      // banner, so a box drawn in the header would be under the messages. The
+      // far thread's column has no pinned strip, so its messages start just
+      // under its header, where the ⋯ opens. An item must lie over a message
+      // the column shows, or the hit test proves nothing. A column following
+      // its end closes a menu as it scrolls, so it opens again until it is
+      // measured. Moved onto the canvas, the column arrives folded.
+      await page
+        .click(`.folded-column[data-card="${farThread}"] .folded-title`, {
+          timeout: 15_000,
+        })
+        .catch(() => {})
+      const farColumn = `#strip .column[data-card="${farThread}"]`
+      let layered: {
+        under: boolean
+        onTop: boolean
+        items: number
+      } | null = null
+      for (let tries = 0; tries < 3 && layered === null; tries++) {
+        const opened = await page
+          .click(`${farColumn} .column-menu`, { timeout: 15_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        if (!opened) break
+        await page
+          .waitForSelector(`${farColumn} .column-more .menu`, {
+            timeout: 5_000,
+          })
+          .catch(() => null)
+        layered = await page.evaluate(column => {
+          const box = document.querySelector(`${column} .column-more .menu`)
+          const body = document
+            .querySelector(`${column} .column-body`)
+            ?.getBoundingClientRect()
+          if (box === null || body === undefined) return null
+          const within = (r: DOMRect, x: number, y: number) =>
+            r.left <= x && x <= r.right && r.top <= y && y <= r.bottom
+          const messages = [
+            ...document.querySelectorAll(`${column} .msg[data-entry]`),
+          ].map(m => m.getBoundingClientRect())
+          const centres = [...box.querySelectorAll('[role="menuitem"]')].map(
+            item => {
+              const r = item.getBoundingClientRect()
+              return { item, x: r.left + r.width / 2, y: r.top + r.height / 2 }
+            },
+          )
+          const under = centres.some(
+            ({ x, y }) =>
+              within(body, x, y) && messages.some(m => within(m, x, y)),
+          )
+          const onTop =
+            centres.length > 0 &&
+            centres.every(({ item, x, y }) => {
+              const hit = document.elementFromPoint(x, y)
+              return hit !== null && item.contains(hit)
+            })
+          return { under, onTop, items: centres.length }
+        }, farColumn)
+        await page.keyboard.press("Escape")
+      }
+      check(
+        "a column's ⋯ opens over the column's messages, each item on top where it is drawn",
+        layered?.under === true && layered.onTop,
+        JSON.stringify(layered),
+      )
+      // Copy to this task: a new thread forked at its source's end, its
       // card beside its source, its fork row naming where it came from.
       const copiesBefore = new Set(
         [...readThreads(host.session)].flatMap(([t, r]) =>
@@ -4095,7 +4162,7 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check(
-        "Copy to ▸ this task makes a copy beside its source, its fork row naming what it was copied from",
+        "Copy to this task makes a copy beside its source, its fork row naming what it was copied from",
         copy !== "" && copiedRow,
         copy,
       )

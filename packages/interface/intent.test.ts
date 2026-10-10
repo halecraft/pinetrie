@@ -580,32 +580,8 @@ describe("planIntent", () => {
       ).toBe(false)
     })
 
-    test("moveThread: the card to the end of another task's canvas; nothing onto its own (ADR-0117)", () => {
-      const trunk = TASKS.index.canvases
-        .get(R1_ID)
-        ?.find(c => c.id === TRUNK) as CardRecord
-      const facts = { ...NO_CARDS, cards: [trunk] }
-      const state = at(onRoot("1-r1"), indexAsks(index), facts)
-      const last = TASKS.index.canvases.get(R2_ID)?.at(-1)?.id ?? null
-      expect(
-        plan({ kind: "moveThread", thread: TRUNK, task: R2_ID }, state),
-      ).toMatchObject([
-        {
-          kind: "moveCard",
-          move: {
-            card: TRUNK,
-            from: { kind: "canvas", task: R1_ID },
-            to: { kind: "canvas-at", task: R2_ID, after: last },
-          },
-        },
-      ])
-      expect(
-        plan({ kind: "moveThread", thread: TRUNK, task: R1_ID }, state),
-      ).toEqual([])
-    })
-
-    test("copyThread: a copy at the source's end, just after it, or into your inventory; refused here into a full one (ADR-0117)", () => {
-      expect(plan({ kind: "copyThread", source: TRUNK, task: R1_ID })).toEqual([
+    test("copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas (ADR-0127)", () => {
+      expect(plan({ kind: "copyThread", source: TRUNK, to: "here" })).toEqual([
         {
           kind: "request",
           intent: {
@@ -621,7 +597,7 @@ describe("planIntent", () => {
         },
       ])
       expect(
-        plan({ kind: "copyThread", source: TRUNK, task: null }),
+        plan({ kind: "copyThread", source: TRUNK, to: "inventory" }),
       ).toMatchObject([
         {
           kind: "request",
@@ -636,10 +612,20 @@ describe("planIntent", () => {
       )
       expect(
         plan(
-          { kind: "copyThread", source: TRUNK, task: null },
+          { kind: "copyThread", source: TRUNK, to: "inventory" },
           at(onRoot("1-r1"), indexAsks(index), { ...NO_CARDS, slots }),
         ).map(e => e.kind),
       ).toEqual(["showInventory", "refuse"])
+      const nowhere = {
+        ...R1,
+        tasks: {
+          ...TASKS,
+          index: { ...TASKS.index, taskOfCard: new Map() },
+        },
+      }
+      expect(
+        plan({ kind: "copyThread", source: TRUNK, to: "here" }, nowhere),
+      ).toEqual([])
     })
 
     test("put: a thread's card from your inventory lands on the canvas you are on, just after the column it was put on, unfolded (ADR-0117)", () => {

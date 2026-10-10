@@ -1423,18 +1423,8 @@ export function App({
     )
   }, [settled, myName, session, stores, run])
 
-  // The tasks a thread's ⋯ moves or copies it to: the sidebar's, by label
-  // (ADR-0117). Archived ones take no card.
-  const menuTasks = useMemo(
-    () =>
-      layout.open
-        .filter(t => !archivedTasks.has(t))
-        .map(task => ({ task, label: labels.get(task) ?? NO_TEXT })),
-    [layout.open, archivedTasks, labels],
-  )
   /** The props every column shares, whichever tab draws it. */
   const shared = {
-    menuTasks,
     labelOf,
     activity,
     asks,

@@ -1,14 +1,15 @@
 // web/popover — a trigger button and the box it opens: every menu
 // (`menu.tsx`).
 //
-// The box is `position: fixed`, placed under its trigger from the trigger's
-// rect when it opens (above it, for a trigger in the window's lower half): the
-// tab list scrolls sideways, which clips it vertically too, so a box
-// positioned inside it would be cut off (`TECHNICAL.md`, Gotchas). Being
-// fixed, it would drift from its trigger on a scroll that moves the trigger
-// or a resize, so either closes it, as do Escape and a click elsewhere. Only
-// a scroll of an element holding the trigger moves it: a column following
-// its end scrolls as entries arrive, and must not close a menu elsewhere.
+// The box is shown in the top layer (`popover="manual"`), which is above
+// every stacking context and clipping container on the page: drawn inside
+// `.column-head`, which isolates for its banner's blend, it would be under
+// the column's messages. It is placed from the trigger's rect when it opens
+// (`placeBox`), so it would drift from its trigger on a scroll that moves
+// the trigger or a resize: either closes it, as do Escape and a click
+// elsewhere. Only a scroll of an element holding the trigger moves it: a
+// column following its end scrolls as entries arrive, and must not close a
+// menu elsewhere. `manual` leaves all closing to this file.
 //
 // Nothing else closes it, so a trigger drawn from live data that has gone
 // (`gone`) stays while its box is open, and leaves when the person closes it.
@@ -22,6 +23,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { type Placement, placeBox } from "./popover-place.ts"
 
 export interface PopoverApi {
   /** Close the box, and give the trigger focus back if `refocus`. */
@@ -37,10 +39,6 @@ export interface PopoverApi {
 export type TriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   readonly [data: `data-${string}`]: string | undefined
 }
-
-/** Where the box goes: from its trigger's foot or top, and its left or right edge. */
-type Placement = ({ readonly top: number } | { readonly bottom: number }) &
-  ({ readonly right: number } | { readonly left: number })
 
 export function Popover({
   className,
@@ -98,11 +96,6 @@ export function Popover({
   triggerProps?: TriggerProps
   children: (api: PopoverApi) => ReactNode
 }) {
-  // Below its trigger; above it when the trigger is in the window's lower
-  // half (a composer's, the footer's), or the box would open past the
-  // window's foot. Its right edge at the trigger's; its left edge at the
-  // trigger's when the trigger is in the window's left half (the sidebar's, your
-  // avatar's), or the box would open past the window's left.
   const [at, setAt] = useState<Placement | null>(null)
   const open = at !== null
   const wrapper = useRef<HTMLSpanElement>(null)
@@ -115,24 +108,21 @@ export function Popover({
   const show = () => {
     const r = button.current?.getBoundingClientRect()
     if (r === undefined) return
-    const side =
-      r.left < window.innerWidth / 2
-        ? { left: r.left }
-        : { right: window.innerWidth - r.right }
-    setAt(
-      r.bottom > window.innerHeight / 2
-        ? { bottom: window.innerHeight - r.top, ...side }
-        : { top: r.bottom, ...side },
-    )
+    setAt(placeBox(r, { width: window.innerWidth, height: window.innerHeight }))
   }
   const close = (refocus: boolean) => {
     setAt(null)
     if (refocus) button.current?.focus()
   }
 
+  // StrictMode runs this twice, and `showPopover` throws on a box already
+  // shown.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per opening, with that render's `onOpen`
   useLayoutEffect(() => {
-    if (open && box.current !== null) onOpen(box.current)
+    const el = box.current
+    if (!open || el === null) return
+    if (!el.matches(":popover-open")) el.showPopover()
+    onOpen(el)
   }, [open])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per opening and closing, with that render's `onToggle`
@@ -190,15 +180,9 @@ export function Popover({
   const boxProps = (at: Placement) => ({
     className: boxClassName,
     id: boxId,
+    popover: "manual" as const,
     ref: box,
-    // `top: auto` too: the stylesheet's `.popover` sets a `top`, which would
-    // win over `bottom`.
-    style: {
-      position: "fixed" as const,
-      ...("bottom" in at ? { top: "auto" } : {}),
-      ...("left" in at ? { right: "auto" } : {}),
-      ...at,
-    },
+    style: at,
   })
   const body = (
     <>

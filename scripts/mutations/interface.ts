@@ -3451,22 +3451,22 @@ export const mutations: readonly Mutation[] = [
       "openLink: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing (ADR-0124)",
   },
   {
-    name: "a thread moved onto its own canvas moves",
+    name: "a copy lands first on the canvas, not after its source",
     file: "packages/interface/intent.ts",
-    from: '  if (now.place.kind === "canvas" && now.place.task === task) return []\n  const canvas = state.tasks.index.canvases.get(task) ?? []',
-    to: "  const canvas = state.tasks.index.canvases.get(task) ?? []",
+    from: '        : { kind: "canvas-at", task, after: source }\n',
+    to: '        : { kind: "canvas-at", task, after: null }\n',
     command: unit,
     expect:
-      "moveThread: the card to the end of another task's canvas; nothing onto its own (ADR-0117)",
+      "copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas (ADR-0127)",
   },
   {
-    name: "a copy lands at the canvas's end, not after its source",
+    name: "a copy here from no canvas is sent anyway",
     file: "packages/interface/intent.ts",
-    from: "  const after = canvas.some(c => c.id === source)\n",
-    to: "  const after = canvas.some(c => c.id === thread)\n",
+    from: "  if (target === null) return []\n",
+    to: "",
     command: unit,
     expect:
-      "copyThread: a copy at the source's end, just after it, or into your inventory; refused here into a full one (ADR-0117)",
+      "copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas (ADR-0127)",
   },
   {
     name: "a thread put from the inventory goes in a note column",

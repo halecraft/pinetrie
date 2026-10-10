@@ -103,8 +103,8 @@ export function NoteColumn(p: {
         )}
         <span className="note-count">{noteCountWords(view.notes.length)}</span>
         <ColumnMenu
-          items={columnMenu({ card: column, width: p.width })}
           onIntent={p.onIntent}
+          sections={columnMenu({ card: column, width: p.width })}
         />
         <button
           aria-label={FOLD.title}

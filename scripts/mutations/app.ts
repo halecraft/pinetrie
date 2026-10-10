@@ -637,10 +637,10 @@ export const mutations: readonly Mutation[] = [
       "a root another writer starts is not added to the sidebar, and the page stays where it is",
   },
   {
-    name: "a root's menu is drawn inside the sidebar, which clips it",
+    name: "a popover's box stays out of the top layer",
     file: "packages/web/popover.tsx",
-    from: '      position: "fixed" as const,',
-    to: '      position: "absolute" as const,',
+    from: '    if (!el.matches(":popover-open")) el.showPopover()\n',
+    to: "",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1087,10 +1087,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "live work is drawn a render behind the document",
     file: "packages/web/app.tsx",
-    from: "  const shared = {\n    menuTasks,\n    labelOf,\n    activity,\n    asks,\n    folds,\n    live,\n",
+    from: "  const shared = {\n    labelOf,\n    activity,\n    asks,\n    folds,\n    live,\n",
     // A frame behind, not a render: a render's passive effect can be
     // flushed before paint by a later update in the same frame.
-    to: "  const [lagged, setLagged] = useState(live)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setLagged(live))\n    return () => cancelAnimationFrame(f)\n  }, [live])\n  const shared = {\n    menuTasks,\n    labelOf,\n    activity,\n    asks,\n    folds,\n    live: lagged,\n",
+    to: "  const [lagged, setLagged] = useState(live)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setLagged(live))\n    return () => cancelAnimationFrame(f)\n  }, [live])\n  const shared = {\n    labelOf,\n    activity,\n    asks,\n    folds,\n    live: lagged,\n",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -2255,14 +2255,28 @@ export const mutations: readonly Mutation[] = [
       "a thread moved onto the canvas from another task's makes a canvas of two roots: its column, and its root's tree on the rail",
   },
   {
-    name: "a thread's column offers no copy",
+    name: "a column's ⋯ acts on nothing",
     file: "packages/web/column.tsx",
-    from: "                      : { thread: { here: p.task, tasks: p.menuTasks } }),",
-    to: "                      : {}),",
+    from: "                <ColumnMenu\n                  onIntent={p.onIntent}\n",
+    to: "                <ColumnMenu\n                  onIntent={() => {}}\n",
     suite: "browser",
     scenario: "page",
     expect:
-      "Copy to \u25b8 this task makes a copy beside its source, its fork row naming what it was copied from",
+      "Copy to this task makes a copy beside its source, its fork row naming what it was copied from",
+  },
+  // Out of the top layer, a box opened in a column's header is drawn in
+  // `.column-head`'s stacking context, under the column's messages. Caught
+  // only while that header isolates (its banner's blend). The sidebar's
+  // menus are kept in the top layer, or their check fails first.
+  {
+    name: "a column header's popover stays out of the top layer",
+    file: "packages/web/popover.tsx",
+    from: '    if (!el.matches(":popover-open")) el.showPopover()\n',
+    to: '    if (!el.matches(":popover-open") && el.closest(".column-head") === null)\n      el.showPopover()\n',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a column's ⋯ opens over the column's messages, each item on top where it is drawn",
   },
   {
     name: "a column's forks are new with every card",
