@@ -2380,8 +2380,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the page's copy takes nothing",
     file: "packages/web/app.tsx",
-    from: "      if (entry !== undefined)\n        onIntent({ kind: \"copySelection\"",
-    to: "      if (entry === undefined)\n        onIntent({ kind: \"copySelection\"",
+    from: '      if (entry !== undefined)\n        onIntent({ kind: "copySelection"',
+    to: '      if (entry === undefined)\n        onIntent({ kind: "copySelection"',
     suite: "browser",
     scenario: "page",
     expect: "Cmd+C on a selection a range names takes it as a quote",

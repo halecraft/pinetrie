@@ -8,6 +8,7 @@ import {
   isTextCard,
   rootIdFor,
   runId,
+  type Sha256,
   storedText,
   textCardId,
   threadIdFor,
@@ -452,6 +453,39 @@ describe("drain", () => {
     expect(readPlaces(b.places).filter(c => c.place.kind === "queued")).toEqual(
       [],
     )
+  })
+
+  test("a queued reference whose quote is not found is skipped, not sent empty; the card behind it is sent (ADR-0126)", async () => {
+    const { b, events, deps } = setUp({ [cardIdFor("c2")]: "after" }, [])
+    const reference = cardIdOfKind(
+      "reference",
+      "01a0ffd2-0000-7000-8000-0000000000e8",
+    )
+    b.places.cards.set(
+      reference,
+      encodeCard({
+        kind: "reference",
+        id: reference,
+        owner: ADA,
+        placer: ADA,
+        place: { kind: "queued", thread: LANE, order: "a", by: BEA, seen: "" },
+        content: {
+          address: { kind: "thread", thread: LANE },
+          quote: "0".repeat(64) as Sha256,
+        },
+      }),
+    )
+    queue(b.places, cardIdFor("c2"), "b")
+    await drain(deps, LANE)
+    expect(events).toEqual([
+      `hydrate ${cardIdFor("c2")}`,
+      `send ${cardIdFor("c2")}: after`,
+      `destroy ${cardIdFor("c2")}`,
+    ])
+    expect(readPlaces(b.places).some(c => c.id === reference)).toBe(false)
+    expect(
+      b.lines.some(l => l.includes("a queued reference was skipped")),
+    ).toBe(true)
   })
 
   test("a card popped and sent leaves no history (ADR-0048 step 6)", async () => {

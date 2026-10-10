@@ -313,6 +313,12 @@ async function carryOut(
       return sendCard(deps, { card: plan.card, text: popped.text }, plan.card)
     case "relay":
       return deps.relay(lane, plan.relay)
+    // Its record went with the pop: logged, and the queue goes on.
+    case "skip":
+      deps.basics.log(
+        `[host] ${readThreadName(deps.basics.session, lane)}: a queued reference was skipped: its quote was not found`,
+      )
+      return "next"
   }
 }
 

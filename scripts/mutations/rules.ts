@@ -3156,4 +3156,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "wordsOf: a reference's words are its quote's blob (ADR-0126)",
   },
+  {
+    name: "a reference with no quote is sent empty",
+    file: "packages/rules/queue.ts",
+    from: '    return text.trim() === "" ? { kind: "skip", card } : { kind: "send", card }\n',
+    to: '    return { kind: "send", card }\n',
+    command: unit,
+    expect:
+      "a reference's quote is sent; one with none is skipped, not sent empty (ADR-0126)",
+  },
 ]

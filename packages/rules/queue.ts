@@ -401,18 +401,25 @@ export type CarryPlan =
       readonly intent: string
     }
   | { readonly kind: "send"; readonly card: QueuedMessage }
+  /**
+   * A reference whose quote was not read (its blob is missing), or is
+   * empty: nothing is sent, and the queue goes on (ADR-0126).
+   */
+  | { readonly kind: "skip"; readonly card: QueuedMessage }
   /** Relay an ask from another thread: its run starts here (ADR-0128). */
   | { readonly kind: "relay"; readonly relay: RelayDetails }
 
 /**
  * A popped card and its words (`textSourceOf`: a text card's document, a
  * reference's quote, a fact's fact) -> what the drain does with it: a
- * reference's quote is sent as a message, with no command. Pure.
+ * reference's quote is sent as a message, with no command, and one with no
+ * quote is skipped rather than sent empty. Pure.
  */
 export function planCarry(card: QueuedCard, text: string): CarryPlan {
   if (card.kind === "fact") return { kind: "fact", fact: card.content.fact }
   if (card.kind === "ask") return { kind: "relay", relay: card.content.relay }
-  if (card.kind === "reference") return { kind: "send", card }
+  if (card.kind === "reference")
+    return text.trim() === "" ? { kind: "skip", card } : { kind: "send", card }
   const blank = text.trim() === ""
   const { command } = card.content
   if (command === "split") return { kind: "split", card, intent: text.trim() }

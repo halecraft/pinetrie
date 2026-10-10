@@ -197,6 +197,28 @@ describe("planCarry (ADR-0080)", () => {
     expect(planCarry(c, text)).toEqual({ ...plan, card: c })
   })
 
+  test("a reference's quote is sent; one with none is skipped, not sent empty (ADR-0126)", () => {
+    const reference: QueuedCard = {
+      kind: "reference",
+      id: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e9"),
+      owner: ADA,
+      placer: ADA,
+      place: queuedPlace,
+      content: {
+        address: { kind: "thread", thread: LANE },
+        quote: "0".repeat(64) as Sha256,
+      },
+    }
+    expect(planCarry(reference, "> said")).toEqual({
+      kind: "send",
+      card: reference,
+    })
+    expect(planCarry(reference, "  ")).toEqual({
+      kind: "skip",
+      card: reference,
+    })
+  })
+
   test("a fact is appended", () => {
     expect(planCarry(factCard(), "")).toEqual({ kind: "fact", fact: ACCEPTED })
   })

@@ -611,7 +611,10 @@ rejects `shutdown()`.
   ADR-0080), then carried out (`carryOut`): a fact is appended to the
   thread; a catch-up runs `prepareUpdate`, then sends the text; a split
   starts the split's own run, its text the brief; a message is sent; a card
-  with no text and no command is discarded. A catch-up's `prepareUpdate`:
+  with no text and no command is discarded. A queued reference's quote is
+  read from its blob before the pop (`queuedQuotes`) and sent as a
+  message; one whose blob is missing is skipped, logged, and the drain goes
+  on (ADR-0126). A catch-up's `prepareUpdate`:
   clean, the update is written, then the text, if any, is sent;
   conflicted, the resolution run carries the text; nothing new, the text
   alone; refused, the card goes back. The text is sent through

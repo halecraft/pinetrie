@@ -1935,4 +1935,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a queued reference's quote, read from its blob, is sent as its queuer's message; its record goes, and nothing is destroyed (ADR-0126)",
   },
+  {
+    name: "a skipped reference ends the drain",
+    file: "apps/pinetrie/host/queued-card-pop.ts",
+    from: '    case "skip":\n      deps.basics.log(\n',
+    to: '    case "skip":\n      return "ran"\n      deps.basics.log(\n',
+    command: unit,
+    expect:
+      "a queued reference whose quote is not found is skipped, not sent empty; the card behind it is sent (ADR-0126)",
+  },
 ]

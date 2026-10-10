@@ -351,8 +351,10 @@ which are swept.
   an inventory, or discarded; never pinned, since the readers of pinned
   cards read no quote. Queued, it is a message (`QueuedMessage`,
   `isQueuedMessage`): the drain reads its quote's blob before the pop
-  (`queuedQuotes`, `wordsOf`'s `blob` reader) and sends it as its queuer's,
-  a Stop holds the queue for it, and unqueue all takes it back. A put from
+  (`queuedQuotes`, `wordsOf`'s `blob` reader) and sends it as its queuer's;
+  one whose quote reads empty (its blob missing) is skipped, not sent
+  (`planCarry`'s `skip`); a Stop holds the queue for it, and unqueue all
+  takes it back. A put from
   your hand copies
   it (`KINDS`' `put`). It is made by `planMakeReference`
   (through `planMake`), the host's `make-reference`; a creation, so in no
