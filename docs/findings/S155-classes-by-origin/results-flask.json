@@ -1,0 +1,229 @@
+{
+  "repo": "flask",
+  "head": ["d086db856be187255b8ec61ef409357393020f32\n"],
+  "trackedFiles": 236,
+  "commands": [
+    {
+      "command": "uv sync",
+      "exit": 0,
+      "seconds": 6.1,
+      "stderrTail": "",
+      "added": 9761,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {
+        "untracked, not ignored": 1,
+        "ignored": 9760
+      },
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": [
+        ".venv/.gitignore",
+        ".venv/.lock",
+        ".venv/CACHEDIR.TAG",
+        ".venv/bin",
+        ".venv/lib",
+        ".venv/lib64",
+        ".venv/pyvenv.cfg",
+        ".venv/share"
+      ],
+      "ignoredWhere": {
+        ".venv/lib": 9714,
+        ".venv/bin": 37,
+        ".venv/share": 4,
+        ".venv/CACHEDIR.TAG": 1,
+        ".venv/.gitignore": 1,
+        ".venv/pyvenv.cfg": 1,
+        ".venv/lib64": 1,
+        ".venv/.lock": 1
+      },
+      "untrackedNotIgnored": [".venv"],
+      "home": {
+        "added": 9920,
+        "modified": 0,
+        "deleted": 0,
+        "where": {
+          ".cache/uv/archive-v0": 9708,
+          ".cache/uv/wheels-v7": 187,
+          ".cache/uv/sdists-v10": 12,
+          ".cache/uv/interpreter-v4": 4,
+          ".cache/uv/simple-v26": 3,
+          ".cache": 1,
+          ".cache/uv": 1,
+          ".cache/uv/CACHEDIR.TAG": 1,
+          ".cache/uv/.gitignore": 1,
+          ".cache/uv/.lock": 1,
+          ".cache/uv/builds-v0": 1
+        }
+      }
+    },
+    {
+      "command": "uv run pytest -q -x",
+      "exit": 0,
+      "seconds": 1.1,
+      "stderrTail": "",
+      "added": 305,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {
+        "untracked, not ignored": 1,
+        "ignored": 304
+      },
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": [
+        ".pytest_cache/.gitignore",
+        ".pytest_cache/CACHEDIR.TAG",
+        ".pytest_cache/README.md",
+        ".pytest_cache/v",
+        ".venv/lib/python3.13/site-packages/__pycache__",
+        ".venv/lib/python3.13/site-packages/_pytest/__pycache__",
+        ".venv/lib/python3.13/site-packages/_pytest/_code/__pycache__",
+        ".venv/lib/python3.13/site-packages/_pytest/_io/__pycache__",
+        ".venv/lib/python3.13/site-packages/_pytest/_py/__pycache__",
+        ".venv/lib/python3.13/site-packages/_pytest/assertion/__pycache__",
+        ".venv/lib/python3.13/site-packages/_pytest/config/__pycache__",
+        ".venv/lib/python3.13/site-packages/_pytest/mark/__pycache__",
+        ".venv/lib/python3.13/site-packages/asgiref/__pycache__",
+        ".venv/lib/python3.13/site-packages/blinker/__pycache__",
+        ".venv/lib/python3.13/site-packages/click/__pycache__",
+        ".venv/lib/python3.13/site-packages/dotenv/__pycache__",
+        ".venv/lib/python3.13/site-packages/iniconfig/__pycache__",
+        ".venv/lib/python3.13/site-packages/itsdangerous/__pycache__",
+        ".venv/lib/python3.13/site-packages/jinja2/__pycache__",
+        ".venv/lib/python3.13/site-packages/markupsafe/__pycache__",
+        ".venv/lib/python3.13/site-packages/pluggy/__pycache__",
+        ".venv/lib/python3.13/site-packages/pre_commit_uv/__pycache__",
+        ".venv/lib/python3.13/site-packages/pygments/__pycache__",
+        ".venv/lib/python3.13/site-packages/pygments/filters/__pycache__",
+        ".venv/lib/python3.13/site-packages/pygments/formatters/__pycache__",
+        ".venv/lib/python3.13/site-packages/pygments/lexers/__pycache__",
+        ".venv/lib/python3.13/site-packages/pygments/styles/__pycache__",
+        ".venv/lib/python3.13/site-packages/pytest/__pycache__",
+        ".venv/lib/python3.13/site-packages/werkzeug/__pycache__",
+        ".venv/lib/python3.13/site-packages/werkzeug/datastructures/__pycache__",
+        ".venv/lib/python3.13/site-packages/werkzeug/routing/__pycache__",
+        ".venv/lib/python3.13/site-packages/werkzeug/sansio/__pycache__",
+        ".venv/lib/python3.13/site-packages/werkzeug/wrappers/__pycache__",
+        "src/flask/__pycache__",
+        "src/flask/json/__pycache__",
+        "src/flask/sansio/__pycache__",
+        "tests/__pycache__",
+        "tests/test_apps/blueprintapp/__pycache__",
+        "tests/test_apps/blueprintapp/apps/__pycache__",
+        "tests/test_apps/blueprintapp/apps/admin/__pycache__"
+      ],
+      "ignoredWhere": {
+        ".venv/lib": 232,
+        "src/flask": 26,
+        "tests/__pycache__": 24,
+        "tests/test_apps": 16,
+        ".pytest_cache/v": 3,
+        ".pytest_cache/README.md": 1,
+        ".pytest_cache/.gitignore": 1,
+        ".pytest_cache/CACHEDIR.TAG": 1
+      },
+      "untrackedNotIgnored": [".pytest_cache"],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "uv build",
+      "exit": 0,
+      "seconds": 0.2,
+      "stderrTail": "",
+      "added": 4,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {
+        "ignored": 4
+      },
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": ["dist"],
+      "ignoredWhere": {
+        "dist": 1,
+        "dist/.gitignore": 1,
+        "dist/flask-3.2.0.dev0.tar.gz": 1,
+        "dist/flask-3.2.0.dev0-py3-none-any.whl": 1
+      },
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "uvx ruff format .",
+      "exit": 0,
+      "seconds": 1.1,
+      "stderrTail": "",
+      "added": 34,
+      "modified": 1,
+      "deleted": 0,
+      "byClass": {
+        "untracked, not ignored": 4,
+        "ignored": 30,
+        "tracked": 1
+      },
+      "tracked": {
+        "modified": ["README.md"],
+        "deleted": []
+      },
+      "ignoredTopmost": [
+        ".ruff_cache/.gitignore",
+        ".ruff_cache/0.17.0",
+        ".ruff_cache/CACHEDIR.TAG",
+        "examples/celery/.ruff_cache/.gitignore",
+        "examples/celery/.ruff_cache/0.17.0",
+        "examples/celery/.ruff_cache/CACHEDIR.TAG",
+        "examples/javascript/.ruff_cache/.gitignore",
+        "examples/javascript/.ruff_cache/0.17.0",
+        "examples/javascript/.ruff_cache/CACHEDIR.TAG",
+        "examples/tutorial/.ruff_cache/.gitignore",
+        "examples/tutorial/.ruff_cache/0.17.0",
+        "examples/tutorial/.ruff_cache/CACHEDIR.TAG"
+      ],
+      "ignoredWhere": {
+        ".ruff_cache/0.17.0": 13,
+        "examples/tutorial": 5,
+        "examples/javascript": 5,
+        "examples/celery": 5,
+        ".ruff_cache/CACHEDIR.TAG": 1,
+        ".ruff_cache/.gitignore": 1
+      },
+      "untrackedNotIgnored": [
+        ".ruff_cache",
+        "examples/celery/.ruff_cache",
+        "examples/javascript/.ruff_cache",
+        "examples/tutorial/.ruff_cache"
+      ],
+      "home": {
+        "added": 66,
+        "modified": 0,
+        "deleted": 0,
+        "where": {
+          ".cache/uv/archive-v0": 52,
+          ".cache/uv/wheels-v7": 4,
+          ".local/share/uv": 4,
+          ".cache/uv/environments-v2": 3,
+          ".cache/uv/simple-v26": 1,
+          ".cache/uv/interpreter-v4": 1,
+          ".local/share": 1
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "lane (whole disk)": {
+    "files": 38959,
+    "emptyDirs": 78,
+    "symlinks": 1137,
+    "hardlinked": 4,
+    "caseCollisions": 0,
+    "modesOtherThan644or755": {},
+    "sizes": {
+      ">1MiB (jj's default limit)": 42
+    }
+  },
+  "lane (tracked)": {
+    "files": 1259,
+    "caseCollisions": 0,
+    "modesOtherThan644or755": {},
+    "sizes": {}
+  },
+  "pinetrie": {
+    "files": 21321,
+    "symlinks": 1137,
+    "caseCollisions": 0,
+    "modesOtherThan644or755": {},
+    "sizes": {
+      ">1MiB (jj's default limit)": 23
+    }
+  },
+  "ripgrep": {
+    "files": 1059,
+    "emptyDirs": 23,
+    "symlinks": 1,
+    "hardlinked": 48,
+    "caseCollisions": 0,
+    "modesOtherThan644or755": {},
+    "sizes": {
+      ">1MiB (jj's default limit)": 107
+    }
+  },
+  "flask": {
+    "files": 9051,
+    "symlinks": 4,
+    "caseCollisions": 0,
+    "modesOtherThan644or755": {
+      "0o600": 1,
+      "0o666": 1
+    },
+    "sizes": {
+      ">1MiB (jj's default limit)": 10
+    }
+  },
+  "linux": {
+    "files": 96080,
+    "symlinks": 102,
+    "caseCollisions": 13,
+    "modesOtherThan644or755": {},
+    "sizes": {
+      ">1MiB (jj's default limit)": 112
+    }
+  }
+}

@@ -1,0 +1,240 @@
+{
+  "environment": {
+    "platform": "darwin",
+    "release": "25.6.0",
+    "arch": "arm64",
+    "node": "v24.19.0",
+    "cpus": "Apple M3 Max",
+    "dir": "/Users/duane/.s150-probe-ujsvkn",
+    "swVers": "ProductName:\t\tmacOS\nProductVersion:\t\t26.7.1\nBuildVersion:\t\t25G241",
+    "diskutil": [
+      "Mount Point:               /",
+      "File System Personality:   APFS",
+      "Type (Bundle):             apfs",
+      "Solid State:               Yes",
+      "Encrypted:                 No"
+    ]
+  },
+  "options": {
+    "files": 10000,
+    "tree": 100000,
+    "big": 2048
+  },
+  "names": {
+    "lowerExists": true,
+    "afterWritingLower": {
+      "entries": ["Probe.txt"],
+      "upperReads": "B"
+    },
+    "afterCaseOnlyRename": ["PROBE.txt"],
+    "nfcFirst": {
+      "otherFormExists": true,
+      "storedAs": ["636166c3a92e747874"],
+      "exclusiveCreateOfOtherForm": "EEXIST",
+      "entriesAfter": ["636166c3a92e747874"]
+    },
+    "nfdFirst": {
+      "otherFormExists": true,
+      "storedAs": ["63616665cc812e747874"],
+      "exclusiveCreateOfOtherForm": "EEXIST",
+      "entriesAfter": ["63616665cc812e747874"]
+    },
+    "hexNfc": "636166c3a92e747874",
+    "hexNfd": "63616665cc812e747874"
+  },
+  "mtime": {
+    "writesWithSameMtimeOf1000": 0,
+    "medianDeltaNs": 34124,
+    "minDeltaNs": 27207,
+    "sampleMtimeNs": "1791680194952841364"
+  },
+  "live": [
+    {
+      "round": "create",
+      "opMs": 495,
+      "changedPaths": 10100,
+      "events": 10100,
+      "byType": {
+        "create": 10100
+      },
+      "firstEventAfterOpStartMs": 495,
+      "lastEventAfterOpEndMs": 30,
+      "errors": [],
+      "missingStrict": 0,
+      "missingEvenViaAncestor": 0,
+      "sample": []
+    },
+    {
+      "round": "modifyInPlace",
+      "opMs": 504,
+      "changedPaths": 10000,
+      "events": 10000,
+      "byType": {
+        "update": 10000
+      },
+      "firstEventAfterOpStartMs": 504,
+      "lastEventAfterOpEndMs": 24,
+      "errors": [],
+      "missingStrict": 0,
+      "missingEvenViaAncestor": 0,
+      "sample": []
+    },
+    {
+      "round": "saveByRename",
+      "opMs": 1332,
+      "changedPaths": 10000,
+      "events": 20002,
+      "byType": {
+        "delete": 10001,
+        "create": 10001
+      },
+      "firstEventAfterOpStartMs": 1332,
+      "lastEventAfterOpEndMs": 72,
+      "errors": [],
+      "missingStrict": 0,
+      "missingEvenViaAncestor": 0,
+      "sample": []
+    },
+    {
+      "round": "renameFiles",
+      "opMs": 285,
+      "changedPaths": 10000,
+      "events": 9995,
+      "byType": {
+        "delete": 4997,
+        "create": 4998
+      },
+      "firstEventAfterOpStartMs": 285,
+      "lastEventAfterOpEndMs": 85,
+      "errors": [
+        "Error: Events were dropped by the FSEvents client. File system must be re-scanned."
+      ],
+      "missingStrict": 6,
+      "missingEvenViaAncestor": 6,
+      "sample": [
+        "d66/f40.txt.moved",
+        "d66/f42.txt.moved",
+        "d66/f76.txt.moved",
+        "d66/f40.txt",
+        "d66/f42.txt",
+        "d66/f76.txt"
+      ]
+    },
+    {
+      "round": "renameDirs",
+      "opMs": 1,
+      "changedPaths": 2020,
+      "events": 20,
+      "byType": {
+        "delete": 10,
+        "create": 10
+      },
+      "firstEventAfterOpStartMs": 18,
+      "lastEventAfterOpEndMs": 17,
+      "errors": [],
+      "missingStrict": 2000,
+      "missingEvenViaAncestor": 0,
+      "sample": []
+    },
+    {
+      "round": "caseOnlyRename",
+      "opMs": 0,
+      "changedPaths": 20,
+      "events": 20,
+      "byType": {
+        "create": 10,
+        "delete": 10
+      },
+      "firstEventAfterOpStartMs": 14,
+      "lastEventAfterOpEndMs": 14,
+      "errors": [],
+      "missingStrict": 0,
+      "missingEvenViaAncestor": 0,
+      "sample": []
+    },
+    {
+      "round": "deleteAll",
+      "opMs": 364,
+      "changedPaths": 10100,
+      "events": 10100,
+      "byType": {
+        "delete": 10100
+      },
+      "firstEventAfterOpStartMs": 364,
+      "lastEventAfterOpEndMs": 79,
+      "errors": [],
+      "missingStrict": 0,
+      "missingEvenViaAncestor": 0,
+      "sample": []
+    }
+  ],
+  "since": [
+    {
+      "rounds": "create",
+      "changedPaths": 10100,
+      "events": 10100,
+      "queryMs": 225,
+      "error": null,
+      "missingStrict": 0,
+      "missingEvenViaAncestor": 0,
+      "sample": []
+    },
+    {
+      "rounds": "modifyInPlace+saveByRename",
+      "changedPaths": 10000,
+      "events": 20000,
+      "queryMs": 665,
+      "error": null,
+      "missingStrict": 0,
+      "missingEvenViaAncestor": 0,
+      "sample": []
+    },
+    {
+      "rounds": "renameFiles+renameDirs+caseOnlyRename",
+      "changedPaths": 11040,
+      "events": 10040,
+      "queryMs": 198,
+      "error": null,
+      "missingStrict": 1500,
+      "missingEvenViaAncestor": 0,
+      "sample": []
+    },
+    {
+      "rounds": "deleteAll",
+      "changedPaths": 10100,
+      "events": 10100,
+      "queryMs": 212,
+      "error": null,
+      "missingStrict": 0,
+      "missingEvenViaAncestor": 0,
+      "sample": []
+    }
+  ],
+  "tree": {
+    "files": 100000,
+    "createMs": 3206,
+    "statWalks": [
+      {
+        "ms": 329,
+        "entries": 101050
+      },
+      {
+        "ms": 324,
+        "entries": 101050
+      },
+      {
+        "ms": 323,
+        "entries": 101050
+      }
+    ]
+  },
+  "hash": {
+    "sizeMB": 2048,
+    "writeMBps": 3229,
+    "sha256-firstMBps": 2782,
+    "sha256-secondMBps": 2839,
+    "blake3-wasm-firstMBps": 964,
+    "blake3-wasm-secondMBps": 965,
+    "cloneMs": "ENOSYS"
+  }
+}

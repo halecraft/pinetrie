@@ -1,0 +1,119 @@
+{
+  "pnpm install": {
+    "samePath": {
+      "files": 19985,
+      "differ": 2,
+      "causes": {
+        "other": 1,
+        "contains the absolute path": 1
+      },
+      "otherSample": ["node_modules/.modules.yaml"]
+    },
+    "otherPath": {
+      "files": 19985,
+      "differ": 66,
+      "causes": {
+        "contains the absolute path": 65,
+        "other": 1
+      },
+      "otherSample": ["node_modules/.modules.yaml"]
+    }
+  },
+  "vite build": {
+    "samePath": {
+      "files": 2,
+      "differ": 0,
+      "causes": {},
+      "otherSample": []
+    },
+    "otherPath": {
+      "files": 2,
+      "differ": 0,
+      "causes": {},
+      "otherSample": []
+    }
+  },
+  "cargo build": {
+    "samePath": {
+      "files": 370,
+      "differ": 4,
+      "causes": {
+        "other": 4
+      },
+      "otherSample": [
+        "target/debug/.fingerprint/ripgrep-57ec51419ed00f28/run-build-script-build-script-build",
+        "target/debug/.fingerprint/ripgrep-57ec51419ed00f28/run-build-script-build-script-build.json",
+        "target/debug/.fingerprint/ripgrep-8c1543a46baf0f0e/bin-rg",
+        "target/debug/.fingerprint/ripgrep-8c1543a46baf0f0e/bin-rg.json"
+      ]
+    },
+    "otherPath": {
+      "files": 370,
+      "differ": 82,
+      "causes": {
+        "other": 6,
+        "contains the absolute path": 76
+      },
+      "otherSample": [
+        "target/debug/.fingerprint/ripgrep-57ec51419ed00f28/run-build-script-build-script-build",
+        "target/debug/.fingerprint/ripgrep-57ec51419ed00f28/run-build-script-build-script-build.json",
+        "target/debug/.fingerprint/ripgrep-8c1543a46baf0f0e/bin-rg",
+        "target/debug/.fingerprint/ripgrep-8c1543a46baf0f0e/bin-rg.json",
+        "target/debug/deps/libserde_json-fe18f6f9d9be026b.rlib",
+        "target/debug/deps/libserde_json-fe18f6f9d9be026b.rmeta"
+      ]
+    }
+  },
+  "cargo build --release": {
+    "samePath": {
+      "files": 1,
+      "differ": 0,
+      "causes": {},
+      "otherSample": []
+    },
+    "otherPath": {
+      "files": 1,
+      "differ": 1,
+      "causes": {
+        "contains the absolute path": 1
+      },
+      "otherSample": []
+    }
+  },
+  "uv sync": {
+    "samePath": {
+      "files": 8523,
+      "differ": 2,
+      "causes": {
+        "other": 2
+      },
+      "otherSample": [
+        ".venv/lib/python3.13/site-packages/flask-3.2.0.dev0.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/flask-3.2.0.dev0.dist-info/uv_cache.json"
+      ]
+    },
+    "otherPath": {
+      "files": 8523,
+      "differ": 40,
+      "causes": {
+        "contains the absolute path": 27,
+        "other": 13
+      },
+      "otherSample": [
+        ".venv/lib/python3.13/site-packages/cffi-2.1.0.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/flask-3.2.0.dev0.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/flask-3.2.0.dev0.dist-info/uv_cache.json",
+        ".venv/lib/python3.13/site-packages/identify-2.6.19.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/mypy-2.3.0.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/nodeenv-1.10.0.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/pre_commit-4.6.1.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/pygments-2.20.0.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/pyright-1.1.411.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/pytest-9.1.1.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/python_dotenv-1.2.2.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/tox-4.58.0.dist-info/RECORD",
+        ".venv/lib/python3.13/site-packages/virtualenv-21.7.1.dist-info/RECORD"
+      ]
+    }
+  }
+}

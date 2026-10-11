@@ -10,6 +10,11 @@
     whose lockfile differs starts from a layer of its own; a lane runs the
     recipe again when its inputs change; `installWhen` is one lockfile or a
     list, and `installCaches` names what is carried.
+- **Amended by:**
+  - ADR-0135: a recipe is any recorded run of a command that made derived
+    files, learned rather than declared (`lanes.install`, `installWhen` and
+    `installCaches` go). pine·trie runs none itself; a disk made for a new
+    state carries each output whose recipe's key still holds there.
 
 **Context.** A package deleted from accepted work left its `node_modules/`
 in the base, and in every lane forked from it. The base was refreshed by

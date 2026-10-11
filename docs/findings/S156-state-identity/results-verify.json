@@ -1,0 +1,38 @@
+{
+  "pinetrie": {
+    "files": 1248,
+    "MB": 9.5,
+    "gitTree": "5d523aeffd3090dbac96d0ec77505deb61ffa3f5",
+    "sha1Ms": 12.7,
+    "equal": true,
+    "sha256Ms": 11.8,
+    "statWalkMs": 31.7
+  },
+  "ripgrep": {
+    "files": 237,
+    "MB": 3.3,
+    "gitTree": "856ed9162d23416ee7dc5f4389975b54ca062f60",
+    "sha1Ms": 3.0,
+    "equal": true,
+    "sha256Ms": 2.5,
+    "statWalkMs": 2.7
+  },
+  "flask": {
+    "files": 236,
+    "MB": 1.8,
+    "gitTree": "b7c01f0b37b4ebe6c21d107b5f02632211f1c18b",
+    "sha1Ms": 2.3,
+    "equal": true,
+    "sha256Ms": 2.1,
+    "statWalkMs": 17.3
+  },
+  "linux": {
+    "files": 96080,
+    "MB": 1641.3,
+    "gitTree": "5c9cec398cc29997a149322823efd5733187d8e8",
+    "sha1Ms": 1540.6,
+    "equal": true,
+    "sha256Ms": 1186.0,
+    "statWalkMs": 71.8
+  }
+}

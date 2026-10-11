@@ -1,0 +1,60 @@
+{
+  "mode": "tree",
+  "changedFiles": [
+    ".cache/watch.json",
+    "dist/app.js",
+    "notes/a.md",
+    "notes/c.md",
+    "out/ipc.html",
+    "out/mm.bin",
+    "package-lock.json",
+    "site/a.html",
+    "site/b.html",
+    "site2/a.md.html",
+    "site2/b.md.html",
+    "site2/c.md.html"
+  ],
+  "changedInNodeModules": 12,
+  "changedCount": 24,
+  "inotifyOverflows": 0,
+  "windowsS": {
+    "T0 npm install": [0.0, 0.44],
+    "T2 build (slow)": [0.45, 1.5],
+    "T1 cat > notes/c.md": [0.46, 0.87],
+    "T3 start daemon": [3.0, 3.02],
+    "T4 sd edits a note": [3.02, 3.54],
+    "T5 esbuild (static)": [3.55, 3.58],
+    "T6 env -i node": [3.59, 3.64],
+    "T7 mmap writer": [3.65, 3.7],
+    "T8 client asks daemon": [3.72, 3.75]
+  },
+  "processTree": {
+    "score": {
+      "right": 23,
+      "noise": 1
+    },
+    "attribution": {
+      "one call": 23,
+      "unattributed": 1
+    },
+    "loss": [],
+    "noise": [],
+    "noiseInNodeModules": 1
+  },
+  "timeWindow": {
+    "score": {
+      "right": 15,
+      "noise": 8,
+      "loss": 1
+    },
+    "attribution": {
+      "several calls": 4,
+      "unattributed": 8,
+      "one call": 12
+    },
+    "loss": ["notes/c.md"],
+    "noise": ["dist/app.js"],
+    "noiseInNodeModules": 7
+  },
+  "daemonWrites": [".cache/watch.json", "out/ipc.html"]
+}

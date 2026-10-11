@@ -1,7 +1,7 @@
 # S146 — `btrfs send --no-data` diffs two snapshots of a lane in about 2 ms for a turn's change and reports deletions; `find-new` does not report them; a whole-disk stat walk costs about 100 ms at any size
 
 - **Status:** Answered
-- **Led to:** ADR-0129, ADR-0131
+- **Led to:** ADR-0129, ADR-0131, ADR-0135
 
 **Question.** Lanes kept a deleted package's `node_modules`, because the base
 snapshot carries ignored files from refresh to refresh while jj manages only

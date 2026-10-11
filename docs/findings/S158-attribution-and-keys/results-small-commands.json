@@ -1,0 +1,65 @@
+{
+  "true": {
+    "plainMs": 1.3,
+    "allCallsMs": 1.3,
+    "allCallsEvents": 5,
+    "opensOnlyMs": 1.3,
+    "opensOnlyEvents": 2
+  },
+  "cat a file": {
+    "plainMs": 1.4,
+    "allCallsMs": 3.4,
+    "allCallsEvents": 19,
+    "opensOnlyMs": 3.5,
+    "opensOnlyEvents": 11
+  },
+  "ls -R packages": {
+    "plainMs": 1.3,
+    "allCallsMs": 15.9,
+    "allCallsEvents": 182,
+    "opensOnlyMs": 7.7,
+    "opensOnlyEvents": 93
+  },
+  "rg over the repo": {
+    "plainMs": 7.7,
+    "allCallsMs": 32.0,
+    "allCallsEvents": 1347,
+    "opensOnlyMs": 15.8,
+    "opensOnlyEvents": 1288
+  },
+  "git status": {
+    "plainMs": 3.6,
+    "allCallsMs": 70.0,
+    "allCallsEvents": 1566,
+    "opensOnlyMs": 15.7,
+    "opensOnlyEvents": 159
+  },
+  "fd *.ts": {
+    "plainMs": 15.8,
+    "allCallsMs": 15.8,
+    "allCallsEvents": 137,
+    "opensOnlyMs": 15.8,
+    "opensOnlyEvents": 84
+  },
+  "node -e 1": {
+    "plainMs": 16.0,
+    "allCallsMs": 16.1,
+    "allCallsEvents": 23,
+    "opensOnlyMs": 16.0,
+    "opensOnlyEvents": 16
+  },
+  "pnpm --version": {
+    "plainMs": 168.1,
+    "allCallsMs": 167.3,
+    "allCallsEvents": 255,
+    "opensOnlyMs": 165.8,
+    "opensOnlyEvents": 92
+  },
+  "tsc one package": {
+    "plainMs": 3905.1,
+    "allCallsMs": 4741.3,
+    "allCallsEvents": 14962,
+    "opensOnlyMs": 4295.1,
+    "opensOnlyEvents": 2673
+  }
+}

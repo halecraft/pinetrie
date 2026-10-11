@@ -1,0 +1,48 @@
+{
+  "mode": "preload",
+  "changedFiles": [
+    "dist/app.js",
+    "notes/a.md",
+    "notes/c.md",
+    "out/mm.bin",
+    "package-lock.json",
+    "site/a.html",
+    "site/b.html",
+    "site2/a.md.html",
+    "site2/b.md.html",
+    "site2/c.md.html"
+  ],
+  "changedInNodeModules": 12,
+  "changedCount": 22,
+  "inotifyOverflows": 0,
+  "windowsS": {
+    "T0 npm install": [0.0, 0.28],
+    "T2 build (slow)": [0.29, 1.32],
+    "T1 cat > notes/c.md": [0.29, 0.71],
+    "T3 start daemon": [2.84, 2.86],
+    "T4 sd edits a note": [2.86, 3.38],
+    "T5 esbuild (static)": [3.38, 3.4],
+    "T6 env -i node": [3.4, 3.45],
+    "T7 mmap writer": [3.47, 3.49],
+    "T8 client asks daemon": [3.51, 3.55]
+  },
+  "fsatrace": {
+    "score": {
+      "right": 17,
+      "noise": 5
+    },
+    "attribution": {
+      "one call": 16,
+      "unattributed": 6
+    },
+    "loss": [],
+    "noise": [
+      "dist/app.js",
+      "site2/a.md.html",
+      "site2/b.md.html",
+      "site2/c.md.html"
+    ],
+    "noiseInNodeModules": 1
+  },
+  "daemonWrites": []
+}

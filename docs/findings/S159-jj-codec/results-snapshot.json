@@ -1,0 +1,38 @@
+{
+  "pinetrie": {
+    "files": 1248,
+    "firstSnapshotMs": 5.4,
+    "snapshotAgainMs": 5.3,
+    "stateNameMs": 13.2,
+    "jjTreeEqualsStateName": true,
+    "inJjNotSource": [],
+    "inSourceNotJj": []
+  },
+  "ripgrep": {
+    "files": 237,
+    "firstSnapshotMs": 5.4,
+    "snapshotAgainMs": 4.8,
+    "stateNameMs": 3.3,
+    "jjTreeEqualsStateName": true,
+    "inJjNotSource": [],
+    "inSourceNotJj": []
+  },
+  "flask": {
+    "files": 236,
+    "firstSnapshotMs": 4.9,
+    "snapshotAgainMs": 5.2,
+    "stateNameMs": 2.5,
+    "jjTreeEqualsStateName": true,
+    "inJjNotSource": [],
+    "inSourceNotJj": []
+  },
+  "linux": {
+    "files": 96080,
+    "firstSnapshotMs": 28.3,
+    "snapshotAgainMs": 27.9,
+    "stateNameMs": 1304.9,
+    "jjTreeEqualsStateName": true,
+    "inJjNotSource": [],
+    "inSourceNotJj": []
+  }
+}

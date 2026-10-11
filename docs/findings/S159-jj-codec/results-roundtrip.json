@@ -1,0 +1,8 @@
+{
+  "commitTreeEqualsStateName": true,
+  "checkoutRenamesTheSameState": true,
+  "emptyDirKept": false,
+  "execKept": true,
+  "symlinkKept": true,
+  "oddModeComesBackAs": "0o644"
+}

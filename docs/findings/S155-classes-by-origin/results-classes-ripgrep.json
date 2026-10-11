@@ -1,0 +1,261 @@
+{
+  "repo": "ripgrep",
+  "commands": [
+    {
+      "step": "cargo build",
+      "exit": 0,
+      "secondsTraced": 3.2,
+      "processes": 500,
+      "classes": {
+        "derived": 376
+      },
+      "why": {
+        "made from source": 376
+      },
+      "inputsRead": [
+        ".cargo/config.toml",
+        ".gitignore",
+        "Cargo.lock",
+        "Cargo.toml",
+        "HomebrewFormula",
+        "build.rs",
+        "crates/cli/Cargo.toml",
+        "crates/cli/src/decompress.rs",
+        "crates/cli/src/escape.rs",
+        "crates/cli/src/hostname.rs",
+        "crates/cli/src/human.rs",
+        "crates/cli/src/lib.rs",
+        "crates/cli/src/pattern.rs",
+        "crates/cli/src/process.rs",
+        "crates/cli/src/wtr.rs"
+      ],
+      "inputsReadCount": 99,
+      "derivedWhere": {
+        "target/debug": 374,
+        "target/CACHEDIR.TAG": 1,
+        "target/.rustc_info.json": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.1,
+        "added": 0,
+        "modified": 1,
+        "deleted": 0,
+        "rewroteWhere": {
+          "target/debug": 1
+        }
+      },
+      "outputsReadBack": {
+        "target/debug": 141,
+        "target/.rustc_info.json": 1
+      },
+      "homeReads": {
+        ".cargo/registry/src": 430,
+        ".cargo/registry/index": 52,
+        ".rustup/toolchains/stable-aarch64-unknown-linux-gnu": 42,
+        ".cargo/registry/cache": 25,
+        "(absent) .cargo/config": 1,
+        "(absent) .config/git/config": 1,
+        "(absent) .gitconfig": 1,
+        ".cargo": 1,
+        ".rustup/settings.toml": 1,
+        ".rustup/toolchains": 1
+      },
+      "projectAbsentProbes": [
+        "benches",
+        "examples",
+        "libgcc_s.so.1",
+        "rust-toolchain",
+        "rust-toolchain.toml"
+      ]
+    },
+    {
+      "step": "cargo test -q",
+      "exit": 0,
+      "secondsTraced": 3.7,
+      "processes": 3755,
+      "classes": {
+        "derived": 72
+      },
+      "why": {
+        "made from source": 72
+      },
+      "inputsRead": [
+        ".cargo/config.toml",
+        ".gitignore",
+        "Cargo.lock",
+        "Cargo.toml",
+        "HomebrewFormula",
+        "crates/cli/Cargo.toml",
+        "crates/core/flags/complete/bash.rs",
+        "crates/core/flags/complete/encodings.sh",
+        "crates/core/flags/complete/fish.rs",
+        "crates/core/flags/complete/mod.rs",
+        "crates/core/flags/complete/powershell.rs",
+        "crates/core/flags/complete/prelude.fish",
+        "crates/core/flags/complete/rg.zsh",
+        "crates/core/flags/complete/zsh.rs",
+        "crates/core/flags/config.rs"
+      ],
+      "inputsReadCount": 62,
+      "derivedWhere": {
+        "target/debug": 72
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 1.4,
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "rewroteWhere": {}
+      },
+      "outputsReadBack": {
+        "target/debug": 28
+      },
+      "homeReads": {
+        ".cargo/registry/src": 154,
+        ".cargo/registry/index": 52,
+        ".rustup/toolchains/stable-aarch64-unknown-linux-gnu": 52,
+        ".cargo/registry/cache": 30,
+        "(absent) .cargo/config": 1,
+        "(absent) .config/git/config": 1,
+        "(absent) .gitconfig": 1,
+        ".cargo": 1,
+        ".rustup/settings.toml": 1,
+        ".rustup/toolchains": 1
+      },
+      "projectAbsentProbes": [
+        "benches",
+        "examples",
+        "libgcc_s.so.1",
+        "rust-toolchain",
+        "rust-toolchain.toml"
+      ]
+    },
+    {
+      "step": "cargo fmt",
+      "exit": 0,
+      "secondsTraced": 0.2,
+      "processes": 20,
+      "classes": {},
+      "why": {},
+      "inputsRead": [
+        ".cargo/config.toml",
+        "Cargo.toml",
+        "build.rs",
+        "crates/cli/Cargo.toml",
+        "crates/cli/src/decompress.rs",
+        "crates/cli/src/escape.rs",
+        "crates/cli/src/hostname.rs",
+        "crates/cli/src/human.rs",
+        "crates/cli/src/lib.rs",
+        "crates/cli/src/pattern.rs",
+        "crates/cli/src/process.rs",
+        "crates/cli/src/wtr.rs",
+        "crates/core/flags/complete/bash.rs",
+        "crates/core/flags/complete/fish.rs",
+        "crates/core/flags/complete/mod.rs"
+      ],
+      "inputsReadCount": 122,
+      "derivedWhere": {},
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.2,
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "rewroteWhere": {}
+      },
+      "outputsReadBack": {},
+      "homeReads": {
+        ".rustup/toolchains/stable-aarch64-unknown-linux-gnu": 3,
+        "(absent) .cargo/config": 1,
+        ".rustup/settings.toml": 1,
+        ".rustup/toolchains": 1
+      },
+      "projectAbsentProbes": [
+        "benches",
+        "examples",
+        "rust-toolchain",
+        "rust-toolchain.toml"
+      ]
+    },
+    {
+      "step": "cargo build --release",
+      "exit": 0,
+      "secondsTraced": 5.3,
+      "processes": 688,
+      "classes": {
+        "derived": 374
+      },
+      "why": {
+        "made from source": 374
+      },
+      "inputsRead": [
+        ".cargo/config.toml",
+        ".gitignore",
+        "Cargo.lock",
+        "Cargo.toml",
+        "HomebrewFormula",
+        "build.rs",
+        "crates/cli/Cargo.toml",
+        "crates/cli/src/decompress.rs",
+        "crates/cli/src/escape.rs",
+        "crates/cli/src/hostname.rs",
+        "crates/cli/src/human.rs",
+        "crates/cli/src/lib.rs",
+        "crates/cli/src/pattern.rs",
+        "crates/cli/src/process.rs",
+        "crates/cli/src/wtr.rs"
+      ],
+      "inputsReadCount": 99,
+      "derivedWhere": {
+        "target/release": 374
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.1,
+        "added": 0,
+        "modified": 1,
+        "deleted": 0,
+        "rewroteWhere": {
+          "target/release": 1
+        }
+      },
+      "outputsReadBack": {
+        "target/release": 141
+      },
+      "homeReads": {
+        ".cargo/registry/src": 430,
+        ".cargo/registry/index": 52,
+        ".rustup/toolchains/stable-aarch64-unknown-linux-gnu": 42,
+        ".cargo/registry/cache": 25,
+        "(absent) .cargo/config": 1,
+        "(absent) .config/git/config": 1,
+        "(absent) .gitconfig": 1,
+        ".rustup/settings.toml": 1,
+        ".rustup/toolchains": 1
+      },
+      "projectAbsentProbes": [
+        "benches",
+        "examples",
+        "libgcc_s.so.1",
+        "rust-toolchain",
+        "rust-toolchain.toml"
+      ]
+    }
+  ],
+  "agreement": {
+    "derived": 822
+  },
+  "disagreements": 0,
+  "disagreementGroups": []
+}

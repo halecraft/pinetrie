@@ -1,0 +1,20 @@
+{
+  "newTwoMiBTrackedBySnapshot": false,
+  "snapshotWarning": "onfig set --repo snapshot.max-new-file-size 2097152`\n    This will increase the maximum file size allowed for new files, in this repository only.\n  * Run `jj --config snapshot.max-new-file-size=2097152 status`\n    This will increase the maximum file size allowed for new files, for this command only.",
+  "explicitTrack": {
+    "exit": 0,
+    "stderr": "n this repository only.\n  * Run `jj --config snapshot.max-new-file-size=2097152 file track two-mib.bin`\n    This will increase the maximum file size allowed for new files, for this command only.\n  * Run `jj file track --include-ignored two-mib.bin`\n    This will track the file(s) regardless of size.",
+    "tracked": false
+  },
+  "explicitTrackLimit0": {
+    "exit": 0,
+    "stderr": "",
+    "tracked": true
+  },
+  "trackedFileGrowsPastLimitStaysTracked": true,
+  "oneGbBySnapshotMs": 815.5,
+  "oneGbTracked": false,
+  "oneGbByGitHashObjectMs": 271258.7,
+  "oneGbHashOnlyMs": 93942.5,
+  "gitObjectsMBAfter": 1030
+}

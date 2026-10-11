@@ -1,0 +1,124 @@
+{
+  "glob": {
+    "newNoteBreaksKey": {
+      "readsOnly": false,
+      "opened": true,
+      "parents": true,
+      "ancestors": true
+    },
+    "unrelatedFileBreaksKey": {
+      "readsOnly": false,
+      "opened": false,
+      "parents": true,
+      "ancestors": true
+    }
+  },
+  "pnpm install": {
+    "exit": 0,
+    "lookupsFailedInProject": 21,
+    "lookupsFailedInHome": [".config/pnpm/rc", ".npmrc"],
+    "opened": {
+      "listingsInKey": 22,
+      "projectLookupsCovered": 21,
+      "uncovered": []
+    },
+    "parents": {
+      "listingsInKey": 22,
+      "projectLookupsCovered": 21,
+      "uncovered": []
+    },
+    "ancestors": {
+      "listingsInKey": 22,
+      "projectLookupsCovered": 21,
+      "uncovered": []
+    }
+  },
+  "vite build": {
+    "exit": 0,
+    "lookupsFailedInProject": 2,
+    "lookupsFailedInHome": [".config/pnpm/rc", ".npmrc"],
+    "opened": {
+      "listingsInKey": 22,
+      "projectLookupsCovered": 2,
+      "uncovered": []
+    },
+    "parents": {
+      "listingsInKey": 22,
+      "projectLookupsCovered": 2,
+      "uncovered": []
+    },
+    "ancestors": {
+      "listingsInKey": 22,
+      "projectLookupsCovered": 2,
+      "uncovered": []
+    }
+  },
+  "cargo build": {
+    "exit": 0,
+    "lookupsFailedInProject": 46,
+    "lookupsFailedInHome": [
+      ".cargo/config",
+      ".config/git/config",
+      ".gitconfig"
+    ],
+    "opened": {
+      "listingsInKey": 65,
+      "projectLookupsCovered": 43,
+      "uncovered": [
+        ".git/commondir",
+        ".git/objects/3f",
+        ".git/objects/info/alternates"
+      ]
+    },
+    "parents": {
+      "listingsInKey": 69,
+      "projectLookupsCovered": 44,
+      "uncovered": [".git/objects/3f", ".git/objects/info/alternates"]
+    },
+    "ancestors": {
+      "listingsInKey": 72,
+      "projectLookupsCovered": 45,
+      "uncovered": [".git/objects/info/alternates"]
+    }
+  },
+  "uv sync": {
+    "exit": 0,
+    "lookupsFailedInProject": 1,
+    "lookupsFailedInHome": [".config/uv/uv.toml", ".local/share/uv/python"],
+    "opened": {
+      "listingsInKey": 2,
+      "projectLookupsCovered": 0,
+      "uncovered": ["uv.toml"]
+    },
+    "parents": {
+      "listingsInKey": 5,
+      "projectLookupsCovered": 1,
+      "uncovered": []
+    },
+    "ancestors": {
+      "listingsInKey": 6,
+      "projectLookupsCovered": 1,
+      "uncovered": []
+    }
+  },
+  "pytest": {
+    "exit": 0,
+    "lookupsFailedInProject": 5,
+    "lookupsFailedInHome": [".config/uv/uv.toml", ".inputrc"],
+    "opened": {
+      "listingsInKey": 27,
+      "projectLookupsCovered": 5,
+      "uncovered": []
+    },
+    "parents": {
+      "listingsInKey": 37,
+      "projectLookupsCovered": 5,
+      "uncovered": []
+    },
+    "ancestors": {
+      "listingsInKey": 37,
+      "projectLookupsCovered": 5,
+      "uncovered": []
+    }
+  }
+}

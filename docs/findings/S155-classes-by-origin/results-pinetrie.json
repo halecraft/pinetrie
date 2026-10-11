@@ -1,0 +1,234 @@
+{
+  "repo": "pinetrie",
+  "head": ["d7a99abd4d4ed4d98117aae38be61a7ac0166189\n"],
+  "trackedFiles": 1248,
+  "commands": [
+    {
+      "command": "pnpm install --frozen-lockfile",
+      "exit": 0,
+      "seconds": 1.0,
+      "stderrTail": "",
+      "added": 22950,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {
+        "ignored": 22950
+      },
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": [
+        "apps/conformance/node_modules",
+        "apps/pinetrie/node_modules",
+        "node_modules",
+        "packages/docker/node_modules",
+        "packages/interface/node_modules",
+        "packages/lanehost/node_modules",
+        "packages/lanes/node_modules",
+        "packages/pi/node_modules",
+        "packages/protocol/node_modules",
+        "packages/reads/node_modules",
+        "packages/repo/node_modules",
+        "packages/rules/node_modules",
+        "packages/schema/node_modules",
+        "packages/session/node_modules",
+        "packages/shell/node_modules",
+        "packages/vm/node_modules",
+        "packages/web/node_modules"
+      ],
+      "ignoredWhere": {
+        "node_modules/.pnpm": 22778,
+        "packages/web": 33,
+        "apps/pinetrie": 32,
+        "packages/pi": 16,
+        "packages/session": 14,
+        "packages/interface": 10,
+        "packages/rules": 7,
+        "packages/schema": 6,
+        "packages/protocol": 6,
+        "packages/docker": 6,
+        "apps/conformance": 6,
+        "node_modules/.bin": 5,
+        "packages/repo": 5,
+        "packages/reads": 5,
+        "packages/lanehost": 4,
+        "packages/vm": 3,
+        "packages/lanes": 3,
+        "node_modules/@biomejs": 2,
+        "node_modules/@types": 2,
+        "packages/shell": 2,
+        "node_modules": 1,
+        "node_modules/typescript": 1,
+        "node_modules/vitest": 1,
+        "node_modules/.modules.yaml": 1,
+        "node_modules/.pnpm-workspace-state-v1.json": 1
+      },
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "pnpm run typecheck",
+      "exit": 0,
+      "seconds": 11.2,
+      "stderrTail": "",
+      "added": 0,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {},
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": [],
+      "ignoredWhere": {},
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "pnpm run lint",
+      "exit": 1,
+      "seconds": 0.4,
+      "stderrTail": " 47     \u2502 - \u00b7\u00b7\u00b7\u00b7\u00b7\u00b7\u00b7\u00b7\"63616665cc812e747874\"\n     48     \u2502 - \u00b7\u00b7\u00b7\u00b7\u00b7\u00b7],\n         38 \u2502 + \u00b7\u00b7\u00b7\u00b7\u00b7\u00b7\"storedAs\":\u00b7[\"63616665cc812e747874\"],\n     49  39 \u2502         \"exclusiveCreateOfOtherForm\": \"EEXIST\",\n     50     \u2502 - \u00b7\u00b7\u00b7\u00b7\u00b7\u00b7\"entriesAfter\":\u00b7[\n     51     \u2502 - \u00b7\u00b7\u00b7\u00b7\u00b7\u00b7\u00b7\u00b7\"63616665cc812e747874\"\n     52     \u2502 - \u00b7\u00b7\u00b7\u00b7\u00b7\u00b7]\n         40 \u2502 + \u00b7\u00b7\u00b7\u00b7\u00b7\u00b7\"entriesAfter\":\u00b7[\"63616665cc812e747874\"]\n     53  41 \u2502       },\n     54  42 \u2502       \"hexNfc\": \"636166c3a92e747874\",\n  \n\ncheck \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n  \u00d7 Some errors were emitted while running checks.\n  \n\n",
+      "added": 0,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {},
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": [],
+      "ignoredWhere": {},
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "pnpm run format",
+      "exit": 0,
+      "seconds": 0.3,
+      "stderrTail": "",
+      "added": 0,
+      "modified": 1,
+      "deleted": 0,
+      "byClass": {
+        "tracked": 1
+      },
+      "tracked": {
+        "modified": [
+          "docs/findings/archive/S150-mac-folder/results-auto-darwin-2026-10-11T00-56-34-683Z.json"
+        ],
+        "deleted": []
+      },
+      "ignoredTopmost": [],
+      "ignoredWhere": {},
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "pnpm run record",
+      "exit": 0,
+      "seconds": 0.3,
+      "stderrTail": "",
+      "added": 1,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {
+        "ignored": 1
+      },
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": ["docs/record.md"],
+      "ignoredWhere": {
+        "docs/record.md": 1
+      },
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "pnpm run build",
+      "exit": 0,
+      "seconds": 2.5,
+      "stderrTail": "",
+      "added": 5,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {
+        "ignored": 5
+      },
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": [
+        "packages/web/dist",
+        "packages/web/node_modules/.vite-temp"
+      ],
+      "ignoredWhere": {
+        "packages/web": 5
+      },
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "pnpm exec vitest run packages/rules packages/interface",
+      "exit": 0,
+      "seconds": 3.6,
+      "stderrTail": "",
+      "added": 5,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {
+        "ignored": 5
+      },
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": ["node_modules/.vite", "node_modules/.vite-temp"],
+      "ignoredWhere": {
+        "node_modules/.vite": 4,
+        "node_modules/.vite-temp": 1
+      },
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    }
+  ]
+}

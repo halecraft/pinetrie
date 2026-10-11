@@ -1,0 +1,100 @@
+{
+  "edit, edit, apart": {
+    "ours": {
+      "f.txt": "clean"
+    },
+    "oneSided": [],
+    "jjConflicts": [],
+    "jjFiles": ["f.txt"],
+    "gitConflicts": [],
+    "gitFiles": ["f.txt"]
+  },
+  "edit, edit, same line": {
+    "ours": {
+      "f.txt": "conflict: text"
+    },
+    "oneSided": [],
+    "jjConflicts": ["f.txt"],
+    "jjFiles": ["f.txt"],
+    "gitConflicts": ["f.txt"],
+    "gitFiles": ["f.txt"]
+  },
+  "same edit both": {
+    "ours": {
+      "f.txt": "clean"
+    },
+    "oneSided": [],
+    "jjConflicts": [],
+    "jjFiles": ["f.txt"],
+    "gitConflicts": [],
+    "gitFiles": ["f.txt"]
+  },
+  "delete, edit": {
+    "ours": {
+      "f.txt": "conflict: deleted against changed"
+    },
+    "oneSided": [],
+    "jjConflicts": ["f.txt"],
+    "jjFiles": ["f.txt"],
+    "gitConflicts": ["f.txt"],
+    "gitFiles": ["f.txt"]
+  },
+  "rename, edit": {
+    "ours": {
+      "old.txt": "conflict: deleted against changed"
+    },
+    "oneSided": ["new.txt"],
+    "jjConflicts": ["old.txt"],
+    "jjFiles": ["new.txt", "old.txt"],
+    "gitConflicts": [],
+    "gitFiles": ["new.txt"]
+  },
+  "rename, rename elsewhere": {
+    "ours": {
+      "f.txt": "clean"
+    },
+    "oneSided": ["g.txt", "h.txt"],
+    "jjConflicts": [],
+    "jjFiles": ["g.txt", "h.txt"],
+    "gitConflicts": ["f.txt", "g.txt", "h.txt"],
+    "gitFiles": ["g.txt", "h.txt"]
+  },
+  "directory, file": {
+    "ours": {},
+    "oneSided": ["d", "d/f.txt"],
+    "jjConflicts": ["d"],
+    "jjFiles": ["d"],
+    "gitConflicts": ["d~239be4139a92753e1b2afe66715125acc7666a5a"],
+    "gitFiles": ["d/f.txt", "d~239be4139a92753e1b2afe66715125acc7666a5a"]
+  },
+  "binary both": {
+    "ours": {
+      "img.png": "conflict: binary"
+    },
+    "oneSided": [],
+    "jjConflicts": ["img.png"],
+    "jjFiles": ["img.png"],
+    "gitConflicts": ["img.png"],
+    "gitFiles": ["img.png"]
+  },
+  "add, add, same name": {
+    "ours": {
+      "n.txt": "conflict: text"
+    },
+    "oneSided": [],
+    "jjConflicts": ["n.txt"],
+    "jjFiles": ["n.txt"],
+    "gitConflicts": ["n.txt"],
+    "gitFiles": ["n.txt"]
+  },
+  "mode, edit": {
+    "ours": {
+      "run.sh": "conflict: mode"
+    },
+    "oneSided": [],
+    "jjConflicts": [],
+    "jjFiles": ["run.sh"],
+    "gitConflicts": [],
+    "gitFiles": ["run.sh"]
+  }
+}

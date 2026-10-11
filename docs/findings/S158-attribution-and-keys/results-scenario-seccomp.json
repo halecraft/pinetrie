@@ -1,0 +1,43 @@
+{
+  "mode": "seccomp",
+  "changedFiles": [
+    ".cache/watch.json",
+    "dist/app.js",
+    "notes/a.md",
+    "notes/c.md",
+    "out/ipc.html",
+    "out/mm.bin",
+    "package-lock.json",
+    "site/a.html",
+    "site/b.html",
+    "site2/a.md.html",
+    "site2/b.md.html",
+    "site2/c.md.html"
+  ],
+  "changedInNodeModules": 12,
+  "changedCount": 24,
+  "inotifyOverflows": 0,
+  "windowsS": {
+    "T0 npm install": [0.0, 0.73],
+    "T2 build (slow)": [0.74, 1.76],
+    "T1 cat > notes/c.md": [0.74, 1.15],
+    "T3 start daemon": [3.28, 3.29],
+    "T4 sd edits a note": [3.3, 3.8],
+    "T5 esbuild (static)": [3.82, 3.84],
+    "T6 env -i node": [3.85, 3.87],
+    "T7 mmap writer": [3.89, 3.92],
+    "T8 client asks daemon": [3.93, 3.95]
+  },
+  "seccomp": {
+    "score": {
+      "right": 24
+    },
+    "attribution": {
+      "one call": 24
+    },
+    "loss": [],
+    "noise": [],
+    "noiseInNodeModules": 0
+  },
+  "daemonWrites": [".cache/watch.json", "out/ipc.html"]
+}

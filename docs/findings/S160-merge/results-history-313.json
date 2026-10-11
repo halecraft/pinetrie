@@ -1,0 +1,465 @@
+{
+  "stats313": {
+    "merges": 313,
+    "pathsChangedOnOneSide": 35651,
+    "pathsChangedOnBothSides": 5788,
+    "mergesWithNoPathChangedOnBothSides": 113,
+    "oursClean": 5132,
+    "oursConflictText": 614,
+    "oursConflictDeletedAgainstChanged": 40,
+    "oursConflictBinary": 2,
+    "agreesWithJj": 5775,
+    "agreesWithGit": 5762,
+    "cleanAndRecordedKeptIt": 5075,
+    "jjConflictsOutsideBothChanged": 7,
+    "gitConflictsOutsideBothChanged": 18
+  },
+  "note": "Counted from the first full run (313 merges). Disagreements re-read from the second run's list, keeping only merges that are not the probe's own (subject 'probe' or empty).",
+  "disagreementKinds": {
+    "ours clean | jj clean | git conflict | recorded = ours True, jj True, git False": 2,
+    "conflicts only outside both-changed paths: jj False, git True": 5,
+    "ours conflict (deleted against changed) | jj conflict | git clean | recorded = ours False, jj False, git False": 15,
+    "ours conflict (deleted against changed) | jj conflict | git clean | recorded = ours False, jj False, git True": 8,
+    "ours clean | jj conflict | git clean | recorded = ours False, jj False, git False": 12,
+    "conflicts only outside both-changed paths: jj True, git False": 1,
+    "ours conflict (text) | jj clean | git clean | recorded = ours False, jj True, git True": 1
+  },
+  "disagreements": [
+    {
+      "merge": "ed1aefa0be38",
+      "path": "packages/interface/inventory-keys.test.ts",
+      "ours": "clean",
+      "jj": "clean",
+      "git": "conflict",
+      "recordedEqualsOurs": true,
+      "recordedEqualsJj": true,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "ed1aefa0be38",
+      "path": "packages/interface/inventory-keys.ts",
+      "ours": "clean",
+      "jj": "clean",
+      "git": "conflict",
+      "recordedEqualsOurs": true,
+      "recordedEqualsJj": true,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "ed1aefa0be38",
+      "outside": true,
+      "jj": [],
+      "git": [
+        "packages/interface/keys.test.ts",
+        "packages/interface/keys.ts",
+        "packages/interface/page-keys.test.ts",
+        "packages/interface/page-keys.ts"
+      ]
+    },
+    {
+      "merge": "99df8c364c36",
+      "path": "docs/adrs/0085-board.md",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "99df8c364c36",
+      "path": "packages/interface/inventory-keys.test.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": true
+    },
+    {
+      "merge": "99df8c364c36",
+      "path": "packages/interface/inventory-keys.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": true
+    },
+    {
+      "merge": "99df8c364c36",
+      "outside": true,
+      "jj": [],
+      "git": ["docs/adrs/archive/0085-board.md", "packages/interface/keys.ts"]
+    },
+    {
+      "merge": "7bdb9692b336",
+      "path": "docs/adrs/0085-board.md",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": true
+    },
+    {
+      "merge": "5eab2f8af49d",
+      "path": "docs/adrs/0038-offers.md",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "67a1ea9c0320",
+      "path": "apps/pineta/host/TECHNICAL.md",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "67a1ea9c0320",
+      "path": "apps/pineta/host/commands/lane.test.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "67a1ea9c0320",
+      "path": "apps/pineta/host/commands/lane.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "8eb794fb5e80",
+      "path": "apps/pineta/host/take.test.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": true
+    },
+    {
+      "merge": "8eb794fb5e80",
+      "path": "apps/pineta/host/take.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "8eb794fb5e80",
+      "outside": true,
+      "jj": [],
+      "git": [
+        "apps/pineta/host/queued-card-pop.test.ts",
+        "apps/pineta/host/queued-card-pop.ts"
+      ]
+    },
+    {
+      "merge": "08906af32576",
+      "path": "packages/client/card-moves.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": true
+    },
+    {
+      "merge": "f453135c23ca",
+      "path": "packages/client/inventory-slots.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "f453135c23ca",
+      "path": "packages/client/session-view.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "8c049091cf06",
+      "path": "packages/client/card-moves.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": true
+    },
+    {
+      "merge": "40338b94344b",
+      "path": "packages/marginalia/TECHNICAL.md",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "40338b94344b",
+      "path": "packages/marginalia/offer-view.test.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "40338b94344b",
+      "path": "packages/marginalia/offer.test.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "40338b94344b",
+      "path": "packages/marginalia/records.test.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "40338b94344b",
+      "path": "scripts/mutations/marginalia.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "40338b94344b",
+      "outside": true,
+      "jj": [],
+      "git": ["packages/rules/TECHNICAL.md", "scripts/mutations/rules.ts"]
+    },
+    {
+      "merge": "1a5bfae46c05",
+      "path": "packages/marginalia/TECHNICAL.md",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "1a5bfae46c05",
+      "path": "packages/marginalia/request.test.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": true
+    },
+    {
+      "merge": "1a5bfae46c05",
+      "path": "packages/marginalia/request.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": true
+    },
+    {
+      "merge": "1a5bfae46c05",
+      "path": "scripts/mutations/marginalia.ts",
+      "ours": "conflict (deleted against changed)",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "1a5bfae46c05",
+      "outside": true,
+      "jj": [],
+      "git": [
+        "packages/rules/TECHNICAL.md",
+        "packages/rules/line.test.ts",
+        "packages/rules/line.ts",
+        "packages/rules/offer-view.test.ts",
+        "packages/rules/offer-view.ts"
+      ]
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "apps/pineta/e2e/host/cards.scenario.ts",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "apps/pineta/host/TECHNICAL.md",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "apps/pineta/host/index.ts",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "apps/pineta/host/startup.test.ts",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "packages/client/TECHNICAL.md",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "packages/core/index.ts",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "packages/marginalia/TECHNICAL.md",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "packages/marginalia/card.test.ts",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "packages/marginalia/card.ts",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "packages/reads/index.test.ts",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "scripts/mutations/lanes.ts",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "path": "scripts/mutations/marginalia.ts",
+      "ours": "clean",
+      "jj": "conflict",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": false,
+      "recordedEqualsGit": false
+    },
+    {
+      "merge": "94944fd901e7",
+      "outside": true,
+      "jj": [
+        "apps/pineta/host/cards.ts",
+        "apps/pineta/host/take.test.ts",
+        "apps/pineta/host/take.ts",
+        "packages/client/session-view.ts",
+        "packages/marginalia/chat.test.ts"
+      ],
+      "git": []
+    },
+    {
+      "merge": "b91a4a8c0a07",
+      "path": "scripts/mutations/client.ts",
+      "ours": "conflict (text)",
+      "jj": "clean",
+      "git": "clean",
+      "recordedEqualsOurs": false,
+      "recordedEqualsJj": true,
+      "recordedEqualsGit": true
+    }
+  ]
+}

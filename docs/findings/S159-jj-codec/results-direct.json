@@ -1,0 +1,20 @@
+{
+  "pinetrie": {
+    "changedPaths": 7,
+    "codecWriteMs": 3.6,
+    "jjGitImportMs": 10.0,
+    "jjSeesCodecCommitWithStateName": true,
+    "lastOperation": "import git refs",
+    "jjCommitMs": 17.4,
+    "jjCommitTreeEqualsStateName": true
+  },
+  "linux": {
+    "changedPaths": 7,
+    "codecWriteMs": 4.8,
+    "jjGitImportMs": 87.8,
+    "jjSeesCodecCommitWithStateName": true,
+    "lastOperation": "import git refs",
+    "jjCommitMs": 189.1,
+    "jjCommitTreeEqualsStateName": true
+  }
+}

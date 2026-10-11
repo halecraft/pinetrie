@@ -1,0 +1,282 @@
+{
+  "repo": "novcs",
+  "commands": [
+    {
+      "step": "write notes, images, a 50 MB asset, build.mjs, package.json",
+      "kind": "tool",
+      "written": 9
+    },
+    {
+      "step": "cat > notes/todo.md <<'EOF'\n# Todo\n\n- ship\nEOF",
+      "exit": 0,
+      "secondsTraced": 0.0,
+      "processes": 2,
+      "classes": {
+        "source": 1
+      },
+      "why": {
+        "no source read": 1
+      },
+      "inputsRead": [],
+      "inputsReadCount": 0,
+      "derivedWhere": {},
+      "sourceWritten": ["notes/todo.md"],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.0,
+        "added": 0,
+        "modified": 1,
+        "deleted": 0,
+        "rewroteWhere": {
+          "notes/todo.md": 1
+        }
+      },
+      "outputsReadBack": {},
+      "homeReads": {},
+      "projectAbsentProbes": []
+    },
+    {
+      "step": "npm install --no-audit --no-fund",
+      "exit": 0,
+      "secondsTraced": 0.4,
+      "processes": 13,
+      "classes": {
+        "derived": 19
+      },
+      "why": {
+        "made from source": 19
+      },
+      "inputsRead": ["package.json"],
+      "inputsReadCount": 1,
+      "derivedWhere": {
+        "node_modules/marked": 16,
+        "package-lock.json": 1,
+        "node_modules/.package-lock.json": 1,
+        "node_modules/.bin": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.3,
+        "added": 0,
+        "modified": 2,
+        "deleted": 0,
+        "rewroteWhere": {
+          "package-lock.json": 1,
+          "node_modules/.package-lock.json": 1
+        }
+      },
+      "outputsReadBack": {
+        "node_modules/.package-lock.json": 1,
+        "package-lock.json": 1
+      },
+      "homeReads": {
+        ".npm/_cacache/content-v2": 2,
+        "(absent) .npmrc": 1,
+        ".npm/_cacache/index-v5": 1
+      },
+      "projectAbsentProbes": [
+        ".npmrc",
+        "node_modules",
+        "npm-shrinkwrap.json",
+        "package-lock.json",
+        "yarn.lock"
+      ]
+    },
+    {
+      "step": "node build.mjs",
+      "exit": 0,
+      "secondsTraced": 0.0,
+      "processes": 8,
+      "classes": {
+        "derived": 5
+      },
+      "why": {
+        "made from source": 5
+      },
+      "inputsRead": [
+        "build.mjs",
+        "images/logo.png",
+        "notes/ideas.md",
+        "notes/plan.md",
+        "notes/todo.md",
+        "package.json"
+      ],
+      "inputsReadCount": 6,
+      "derivedWhere": {
+        ".cache/build.json": 1,
+        "site/ideas.html": 1,
+        "site/plan.html": 1,
+        "site/todo.html": 1,
+        "site/img": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.0,
+        "added": 0,
+        "modified": 5,
+        "deleted": 0,
+        "rewroteWhere": {
+          ".cache/build.json": 1,
+          "site/ideas.html": 1,
+          "site/plan.html": 1,
+          "site/todo.html": 1,
+          "site/img": 1
+        }
+      },
+      "outputsReadBack": {},
+      "homeReads": {},
+      "projectAbsentProbes": []
+    },
+    {
+      "step": "edit notes/plan.md",
+      "kind": "tool",
+      "written": 1
+    },
+    {
+      "step": "node build.mjs",
+      "exit": 0,
+      "secondsTraced": 0.0,
+      "processes": 8,
+      "classes": {
+        "derived": 5
+      },
+      "why": {
+        "rewrote a derived file": 5
+      },
+      "inputsRead": [
+        "build.mjs",
+        "images/logo.png",
+        "notes/ideas.md",
+        "notes/plan.md",
+        "notes/todo.md",
+        "package.json"
+      ],
+      "inputsReadCount": 6,
+      "derivedWhere": {
+        ".cache/build.json": 1,
+        "site/ideas.html": 1,
+        "site/plan.html": 1,
+        "site/todo.html": 1,
+        "site/img": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.0,
+        "added": 0,
+        "modified": 5,
+        "deleted": 0,
+        "rewroteWhere": {
+          ".cache/build.json": 1,
+          "site/ideas.html": 1,
+          "site/plan.html": 1,
+          "site/todo.html": 1,
+          "site/img": 1
+        }
+      },
+      "outputsReadBack": {},
+      "homeReads": {},
+      "projectAbsentProbes": []
+    },
+    {
+      "step": "sed -i 's/foo/bar/' notes/ideas.md",
+      "exit": 0,
+      "secondsTraced": 0.0,
+      "processes": 2,
+      "classes": {
+        "source": 1
+      },
+      "why": {
+        "edited in place": 1
+      },
+      "inputsRead": [],
+      "inputsReadCount": 0,
+      "derivedWhere": {},
+      "sourceWritten": ["notes/ideas.md"],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.0,
+        "added": 0,
+        "modified": 1,
+        "deleted": 0,
+        "rewroteWhere": {
+          "notes/ideas.md": 1
+        }
+      },
+      "outputsReadBack": {
+        "notes/ideas.md": 1
+      },
+      "homeReads": {},
+      "projectAbsentProbes": []
+    },
+    {
+      "step": "add a dependency to package.json",
+      "kind": "tool",
+      "written": 1
+    },
+    {
+      "step": "npm install --no-audit --no-fund",
+      "exit": 0,
+      "secondsTraced": 0.5,
+      "processes": 13,
+      "classes": {
+        "derived": 236
+      },
+      "why": {
+        "made from source": 234,
+        "rewrote a derived file": 2
+      },
+      "inputsRead": ["package.json"],
+      "inputsReadCount": 1,
+      "derivedWhere": {
+        "node_modules/yaml": 233,
+        "node_modules/.bin": 1,
+        "package-lock.json": 1,
+        "node_modules/.package-lock.json": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.3,
+        "added": 0,
+        "modified": 2,
+        "deleted": 0,
+        "rewroteWhere": {
+          "package-lock.json": 1,
+          "node_modules/.package-lock.json": 1
+        }
+      },
+      "outputsReadBack": {
+        "node_modules/.package-lock.json": 1,
+        "package-lock.json": 1
+      },
+      "homeReads": {
+        "(absent) .npmrc": 1
+      },
+      "projectAbsentProbes": [".npmrc", "npm-shrinkwrap.json", "yarn.lock"]
+    }
+  ],
+  "agreement": {
+    "source": 7,
+    "derived": 257
+  },
+  "disagreements": 1,
+  "disagreementGroups": [
+    {
+      "origin": "derived",
+      "why": "rewrote a derived file",
+      "git": "source",
+      "step": "npm install --no-audit --no-fund",
+      "where": "package-lock.json",
+      "count": 1
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "files": 35,
+  "source": 13,
+  "plainJj": {
+    "equalsStateName": false,
+    "tracked": 33
+  },
+  "codecJj": {
+    "equalsStateNameBeforeTrackingKept": false,
+    "trackKeptExit": 0,
+    "trackKeptStderr": "",
+    "equalsStateName": true,
+    "envTracked": false,
+    "keptTracked": true,
+    "derivedTracked": []
+  },
+  "afterEdits": {
+    "keptStillTracked": true,
+    "newDerivedTracked": false
+  },
+  "trackedThenExcludedStaysTracked": true
+}

@@ -1,0 +1,267 @@
+{
+  "repo": "flask",
+  "commands": [
+    {
+      "step": "uv sync",
+      "exit": 0,
+      "secondsTraced": 1.2,
+      "processes": 27,
+      "classes": {
+        "derived": 8523
+      },
+      "why": {
+        "made from source": 8523
+      },
+      "inputsRead": [
+        "LICENSE.txt",
+        "README.md",
+        "pyproject.toml",
+        "src/flask/__init__.py",
+        "uv.lock"
+      ],
+      "inputsReadCount": 5,
+      "derivedWhere": {
+        ".venv/lib": 8481,
+        ".venv/bin": 36,
+        ".venv/CACHEDIR.TAG": 1,
+        ".venv/.gitignore": 1,
+        ".venv/pyvenv.cfg": 1,
+        ".venv/lib64": 1,
+        ".venv/.lock": 1,
+        ".venv/share": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.0,
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "rewroteWhere": {}
+      },
+      "outputsReadBack": {
+        ".venv/lib": 49,
+        ".venv/pyvenv.cfg": 1
+      },
+      "homeReads": {
+        ".cache/uv/archive-v0": 8412,
+        ".cache/uv/wheels-v7": 48,
+        ".cache/uv/builds-v0": 21,
+        "(absent) .cache/uv/archive-v0": 1,
+        "(absent) .cache/uv/builds-v0": 1,
+        "(absent) .cache/uv/sdists-v10": 1,
+        "(absent) .config/uv/uv.toml": 1,
+        ".cache/uv/.tmpJwIs12": 1,
+        ".cache/uv/interpreter-v4": 1,
+        ".cache/uv/sdists-v10": 1,
+        ".cache/uv/simple-v26": 1,
+        ".cargo/bin": 1,
+        ".local/bin": 1
+      },
+      "projectAbsentProbes": [".venv", "uv.toml"]
+    },
+    {
+      "step": "uv run pytest -q -x",
+      "exit": 0,
+      "secondsTraced": 1.4,
+      "processes": 31,
+      "classes": {
+        "derived": 263
+      },
+      "why": {
+        "made from source": 263
+      },
+      "inputsRead": [
+        "pyproject.toml",
+        "src/flask/__init__.py",
+        "src/flask/app.py",
+        "src/flask/blueprints.py",
+        "src/flask/cli.py",
+        "src/flask/config.py",
+        "src/flask/ctx.py",
+        "src/flask/debughelpers.py",
+        "src/flask/globals.py",
+        "src/flask/helpers.py",
+        "src/flask/json/__init__.py",
+        "src/flask/json/provider.py",
+        "src/flask/json/tag.py",
+        "src/flask/logging.py",
+        "src/flask/sansio/app.py"
+      ],
+      "inputsReadCount": 77,
+      "derivedWhere": {
+        ".venv/lib": 203,
+        "tests/__pycache__": 23,
+        "src/flask": 23,
+        "tests/test_apps": 10,
+        ".pytest_cache/README.md": 1,
+        ".pytest_cache/.gitignore": 1,
+        ".pytest_cache/CACHEDIR.TAG": 1,
+        ".pytest_cache/v": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.8,
+        "added": 0,
+        "modified": 1,
+        "deleted": 0,
+        "rewroteWhere": {
+          ".pytest_cache/v": 1
+        }
+      },
+      "outputsReadBack": {
+        ".venv/lib": 203,
+        "src/flask": 23,
+        "tests/__pycache__": 23,
+        "tests/test_apps": 10,
+        ".pytest_cache/v": 1
+      },
+      "homeReads": {
+        "(absent) .config/uv/uv.toml": 1,
+        "(absent) .inputrc": 1,
+        ".cache/uv/interpreter-v4": 1
+      },
+      "projectAbsentProbes": ["<unknown>", "uv.toml"]
+    },
+    {
+      "step": "uv build",
+      "exit": 0,
+      "secondsTraced": 0.4,
+      "processes": 27,
+      "classes": {
+        "derived": 3
+      },
+      "why": {
+        "made from source": 3
+      },
+      "inputsRead": [
+        "CHANGES.rst",
+        "LICENSE.txt",
+        "README.md",
+        "docs/Makefile",
+        "docs/_static/debugger.png",
+        "docs/_static/flask-icon.svg",
+        "docs/_static/flask-logo.svg",
+        "docs/_static/flask-name.svg",
+        "docs/_static/pycharm-run-config.png",
+        "docs/api.rst",
+        "docs/appcontext.rst",
+        "docs/async-await.rst",
+        "docs/blueprints.rst",
+        "docs/changes.rst",
+        "docs/cli.rst"
+      ],
+      "inputsReadCount": 221,
+      "derivedWhere": {
+        "dist/.gitignore": 1,
+        "dist/flask-3.2.0.dev0.tar.gz": 1,
+        "dist/flask-3.2.0.dev0-py3-none-any.whl": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.4,
+        "added": 0,
+        "modified": 2,
+        "deleted": 0,
+        "rewroteWhere": {
+          "dist/flask-3.2.0.dev0.tar.gz": 1,
+          "dist/flask-3.2.0.dev0-py3-none-any.whl": 1
+        }
+      },
+      "outputsReadBack": {
+        "dist/flask-3.2.0.dev0.tar.gz": 1
+      },
+      "homeReads": {
+        ".cache/uv/builds-v0": 40,
+        ".cache/uv/sdists-v10": 29,
+        ".cache/uv/archive-v0": 22,
+        "(absent) .cache/uv/builds-v0": 2,
+        ".cache/uv/wheels-v7": 2,
+        "(absent) .config/uv/uv.toml": 1,
+        ".cache/uv/interpreter-v4": 1,
+        ".cache/uv/simple-v26": 1
+      },
+      "projectAbsentProbes": ["uv.toml"]
+    },
+    {
+      "step": "uvx ruff format .",
+      "exit": 0,
+      "secondsTraced": 0.0,
+      "processes": 39,
+      "classes": {
+        "derived": 26,
+        "source": 1
+      },
+      "why": {
+        "made from source": 26,
+        "edited in place": 1
+      },
+      "inputsRead": [
+        ".github/ISSUE_TEMPLATE/bug-report.md",
+        ".github/ISSUE_TEMPLATE/feature-request.md",
+        ".github/pull_request_template.md",
+        ".gitignore",
+        "docs/conf.py",
+        "examples/celery/README.md",
+        "examples/celery/make_celery.py",
+        "examples/celery/pyproject.toml",
+        "examples/celery/src/task_app/__init__.py",
+        "examples/celery/src/task_app/tasks.py",
+        "examples/celery/src/task_app/views.py",
+        "examples/javascript/.gitignore",
+        "examples/javascript/js_example/__init__.py",
+        "examples/javascript/js_example/views.py",
+        "examples/javascript/pyproject.toml"
+      ],
+      "inputsReadCount": 95,
+      "derivedWhere": {
+        ".ruff_cache/0.17.0": 12,
+        "examples/tutorial": 4,
+        "examples/javascript": 4,
+        "examples/celery": 4,
+        ".ruff_cache/CACHEDIR.TAG": 1,
+        ".ruff_cache/.gitignore": 1
+      },
+      "sourceWritten": ["README.md"],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.0,
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "rewroteWhere": {}
+      },
+      "outputsReadBack": {
+        ".ruff_cache/0.17.0": 12,
+        "examples/celery": 3,
+        "examples/javascript": 3,
+        "examples/tutorial": 3,
+        ".ruff_cache/.gitignore": 1
+      },
+      "homeReads": {
+        ".cache/uv/interpreter-v4": 2,
+        "(absent) .config/git/config": 1,
+        "(absent) .config/uv/uv.toml": 1,
+        "(absent) .gitconfig": 1,
+        ".cache/uv/archive-v0": 1,
+        ".cache/uv/simple-v26": 1,
+        ".cache/uv/wheels-v7": 1,
+        ".cargo/bin": 1,
+        ".local/bin": 1
+      },
+      "projectAbsentProbes": []
+    }
+  ],
+  "agreement": {
+    "derived": 8815,
+    "source": 1
+  },
+  "disagreements": 0,
+  "disagreementGroups": []
+}

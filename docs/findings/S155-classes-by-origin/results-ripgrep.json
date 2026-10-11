@@ -1,0 +1,150 @@
+{
+  "repo": "ripgrep",
+  "head": ["3fce3b5bb0236da2df6d99672afb8a719642eca7\n"],
+  "trackedFiles": 237,
+  "commands": [
+    {
+      "command": "cargo build",
+      "exit": 0,
+      "seconds": 3.0,
+      "stderrTail": "",
+      "added": 467,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {
+        "ignored": 467
+      },
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": ["target"],
+      "ignoredWhere": {
+        "target/debug": 464,
+        "target": 1,
+        "target/CACHEDIR.TAG": 1,
+        "target/.rustc_info.json": 1
+      },
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "cargo test -q",
+      "exit": 0,
+      "seconds": 3.0,
+      "stderrTail": "",
+      "added": 90,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {
+        "ignored": 90
+      },
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": [
+        "target/debug/.fingerprint/proc-macro2-2d059c59c6896b19",
+        "target/debug/.fingerprint/proc-macro2-2ee5eece5bca6354",
+        "target/debug/.fingerprint/proc-macro2-62659fbd4f5892b0",
+        "target/debug/.fingerprint/quote-1ff441d10695fb81",
+        "target/debug/.fingerprint/quote-2b455548790e8add",
+        "target/debug/.fingerprint/quote-8da311aacc62e421",
+        "target/debug/.fingerprint/ripgrep-293f7b57a44edd55",
+        "target/debug/.fingerprint/ripgrep-5650ecbc74d121df",
+        "target/debug/.fingerprint/serde_derive-9e72f479b82157a7",
+        "target/debug/.fingerprint/syn-e383a7e82b87a1cb",
+        "target/debug/.fingerprint/unicode-ident-6b0b4c847a7ba4b4",
+        "target/debug/build/proc-macro2-2d059c59c6896b19",
+        "target/debug/build/proc-macro2-2ee5eece5bca6354",
+        "target/debug/build/quote-1ff441d10695fb81",
+        "target/debug/build/quote-2b455548790e8add",
+        "target/debug/deps/integration-5650ecbc74d121df",
+        "target/debug/deps/integration-5650ecbc74d121df.d",
+        "target/debug/deps/libproc_macro2-62659fbd4f5892b0.rlib",
+        "target/debug/deps/libproc_macro2-62659fbd4f5892b0.rmeta",
+        "target/debug/deps/libquote-8da311aacc62e421.rlib",
+        "target/debug/deps/libquote-8da311aacc62e421.rmeta",
+        "target/debug/deps/libserde_derive-9e72f479b82157a7.so",
+        "target/debug/deps/libsyn-e383a7e82b87a1cb.rlib",
+        "target/debug/deps/libsyn-e383a7e82b87a1cb.rmeta",
+        "target/debug/deps/libunicode_ident-6b0b4c847a7ba4b4.rlib",
+        "target/debug/deps/libunicode_ident-6b0b4c847a7ba4b4.rmeta",
+        "target/debug/deps/proc_macro2-62659fbd4f5892b0.d",
+        "target/debug/deps/quote-8da311aacc62e421.d",
+        "target/debug/deps/rg-293f7b57a44edd55",
+        "target/debug/deps/rg-293f7b57a44edd55.d",
+        "target/debug/deps/serde_derive-9e72f479b82157a7.d",
+        "target/debug/deps/syn-e383a7e82b87a1cb.d",
+        "target/debug/deps/unicode_ident-6b0b4c847a7ba4b4.d",
+        "target/tmp"
+      ],
+      "ignoredWhere": {
+        "target/debug": 89,
+        "target/tmp": 1
+      },
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "cargo fmt",
+      "exit": 0,
+      "seconds": 0.2,
+      "stderrTail": "",
+      "added": 0,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {},
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": [],
+      "ignoredWhere": {},
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    },
+    {
+      "command": "cargo build --release",
+      "exit": 0,
+      "seconds": 5.5,
+      "stderrTail": "",
+      "added": 464,
+      "modified": 0,
+      "deleted": 0,
+      "byClass": {
+        "ignored": 464
+      },
+      "tracked": {
+        "modified": [],
+        "deleted": []
+      },
+      "ignoredTopmost": ["target/release"],
+      "ignoredWhere": {
+        "target/release": 464
+      },
+      "untrackedNotIgnored": [],
+      "home": {
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "where": {}
+      }
+    }
+  ]
+}

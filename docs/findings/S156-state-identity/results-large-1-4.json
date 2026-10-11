@@ -1,0 +1,118 @@
+[
+  {
+    "GB": 1,
+    "writeMs": 983.0,
+    "flatsha1Ms": 583.5,
+    "flatsha256Ms": 592.3,
+    "chunkAllMs": 975.7,
+    "chunks": 894,
+    "edits": {
+      "append": {
+        "flatSha1Ms": 601.3,
+        "fiemapMs": 1.6,
+        "extentsBefore": 3,
+        "extentsNow": 4,
+        "changedMB": 1.05,
+        "chunkIncrementalMs": 1.9,
+        "hashedMB": 1.76,
+        "chunkAllMs": 957.8,
+        "incrementalEqualsFull": true,
+        "newChunkMB": 1.76
+      },
+      "overwrite1MiBMiddle": {
+        "flatSha1Ms": 613.4,
+        "fiemapMs": 0.1,
+        "extentsBefore": 4,
+        "extentsNow": 6,
+        "changedMB": 1.05,
+        "chunkIncrementalMs": 3.7,
+        "hashedMB": 3.77,
+        "chunkAllMs": 962.6,
+        "incrementalEqualsFull": true,
+        "newChunkMB": 3.77
+      },
+      "rewriteSmallChange": {
+        "flatSha1Ms": 583.4,
+        "fiemapMs": 0.1,
+        "extentsBefore": 6,
+        "extentsNow": 2,
+        "changedMB": 1074.79,
+        "chunkIncrementalMs": 876.9,
+        "hashedMB": 1074.79,
+        "chunkAllMs": 883.4,
+        "incrementalEqualsFull": true,
+        "newChunkMB": 1.17
+      },
+      "rewrite": {
+        "flatSha1Ms": 588.4,
+        "fiemapMs": 0.1,
+        "extentsBefore": 2,
+        "extentsNow": 2,
+        "changedMB": 1074.79,
+        "chunkIncrementalMs": 972.9,
+        "hashedMB": 1074.79,
+        "chunkAllMs": 957.0,
+        "incrementalEqualsFull": true,
+        "newChunkMB": 1074.79
+      }
+    }
+  },
+  {
+    "GB": 4,
+    "writeMs": 5183.4,
+    "flatsha1Ms": 2851.7,
+    "flatsha256Ms": 2758.6,
+    "chunkAllMs": 4701.7,
+    "chunks": 3564,
+    "edits": {
+      "append": {
+        "flatSha1Ms": 2867.8,
+        "fiemapMs": 1.0,
+        "extentsBefore": 57,
+        "extentsNow": 58,
+        "changedMB": 1.05,
+        "chunkIncrementalMs": 2.2,
+        "hashedMB": 1.43,
+        "chunkAllMs": 4997.2,
+        "incrementalEqualsFull": true,
+        "newChunkMB": 1.43
+      },
+      "overwrite1MiBMiddle": {
+        "flatSha1Ms": 2817.6,
+        "fiemapMs": 1.0,
+        "extentsBefore": 58,
+        "extentsNow": 60,
+        "changedMB": 1.05,
+        "chunkIncrementalMs": 6.7,
+        "hashedMB": 6.17,
+        "chunkAllMs": 5007.8,
+        "incrementalEqualsFull": true,
+        "newChunkMB": 6.17
+      },
+      "rewriteSmallChange": {
+        "flatSha1Ms": 2827.8,
+        "fiemapMs": 11.2,
+        "extentsBefore": 60,
+        "extentsNow": 5144,
+        "changedMB": 4296.02,
+        "chunkIncrementalMs": 4986.1,
+        "hashedMB": 4296.02,
+        "chunkAllMs": 4923.5,
+        "incrementalEqualsFull": true,
+        "newChunkMB": 1.23
+      },
+      "rewrite": {
+        "flatSha1Ms": 2805.4,
+        "fiemapMs": 9.4,
+        "extentsBefore": 5144,
+        "extentsNow": 31,
+        "changedMB": 4296.02,
+        "chunkIncrementalMs": 4931.0,
+        "hashedMB": 4296.02,
+        "chunkAllMs": 4856.6,
+        "incrementalEqualsFull": true,
+        "newChunkMB": 4296.02
+      }
+    }
+  }
+]

@@ -1,0 +1,401 @@
+[
+  {
+    "task": "pnpm install",
+    "command": "pnpm install --frozen-lockfile",
+    "untracedS": 1.06,
+    "exit": 0,
+    "straceS": 1.7,
+    "fsatraceS": 0.98,
+    "fsatraceExit": 0,
+    "atimeResetS": 0.0,
+    "inotifySetupS": 0.0,
+    "inotifyWatches": 77,
+    "watchedS": 0.97,
+    "inotifyOverflows": 0,
+    "fsatrace": {
+      "tracked": {
+        "strace": 22,
+        "seen": 22,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 267,
+        "seen": 102,
+        "recall": 0.382,
+        "extra": 0
+      }
+    },
+    "inotify": {
+      "tracked": {
+        "strace": 22,
+        "seen": 22,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 267,
+        "seen": 22,
+        "recall": 0.082,
+        "extra": 0
+      }
+    },
+    "atime": {
+      "tracked": {
+        "strace": 22,
+        "seen": 22,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 267,
+        "seen": 22,
+        "recall": 0.082,
+        "extra": 0
+      }
+    },
+    "fsatraceMissedTracked": []
+  },
+  {
+    "task": "tsc",
+    "command": "pnpm run typecheck",
+    "untracedS": 11.89,
+    "exit": 0,
+    "straceS": 13.2,
+    "fsatraceS": 11.97,
+    "fsatraceExit": 0,
+    "atimeResetS": 0.05,
+    "inotifySetupS": 0.03,
+    "inotifyWatches": 2957,
+    "watchedS": 12.02,
+    "inotifyOverflows": 0,
+    "fsatrace": {
+      "tracked": {
+        "strace": 878,
+        "seen": 878,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 2716,
+        "seen": 2498,
+        "recall": 0.898,
+        "extra": 59
+      }
+    },
+    "inotify": {
+      "tracked": {
+        "strace": 878,
+        "seen": 878,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 2716,
+        "seen": 2498,
+        "recall": 0.898,
+        "extra": 59
+      }
+    },
+    "atime": {
+      "tracked": {
+        "strace": 878,
+        "seen": 878,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 2716,
+        "seen": 2498,
+        "recall": 0.898,
+        "extra": 59
+      }
+    },
+    "fsatraceMissedTracked": []
+  },
+  {
+    "task": "vite build",
+    "command": "pnpm run build",
+    "untracedS": 2.81,
+    "exit": 0,
+    "straceS": 57.2,
+    "fsatraceS": 2.56,
+    "fsatraceExit": 0,
+    "atimeResetS": 0.05,
+    "inotifySetupS": 0.03,
+    "inotifyWatches": 2956,
+    "watchedS": 2.57,
+    "inotifyOverflows": 0,
+    "fsatrace": {
+      "tracked": {
+        "strace": 331,
+        "seen": 331,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 1392,
+        "seen": 1379,
+        "recall": 0.989,
+        "extra": 3
+      }
+    },
+    "inotify": {
+      "tracked": {
+        "strace": 331,
+        "seen": 331,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 1392,
+        "seen": 1381,
+        "recall": 0.989,
+        "extra": 4
+      }
+    },
+    "atime": {
+      "tracked": {
+        "strace": 331,
+        "seen": 331,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 1392,
+        "seen": 1381,
+        "recall": 0.989,
+        "extra": 4
+      }
+    },
+    "fsatraceMissedTracked": []
+  },
+  {
+    "task": "vitest",
+    "command": "pnpm exec vitest run packages/rules packages/interface",
+    "untracedS": 3.94,
+    "exit": 0,
+    "straceS": 7.3,
+    "fsatraceS": 3.85,
+    "fsatraceExit": 0,
+    "atimeResetS": 0.05,
+    "inotifySetupS": 0.03,
+    "inotifyWatches": 2962,
+    "watchedS": 3.9,
+    "inotifyOverflows": 0,
+    "fsatrace": {
+      "tracked": {
+        "strace": 354,
+        "seen": 354,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 1597,
+        "seen": 1419,
+        "recall": 0.885,
+        "extra": 6
+      }
+    },
+    "inotify": {
+      "tracked": {
+        "strace": 354,
+        "seen": 354,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 1597,
+        "seen": 1421,
+        "recall": 0.885,
+        "extra": 7
+      }
+    },
+    "atime": {
+      "tracked": {
+        "strace": 354,
+        "seen": 354,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 1597,
+        "seen": 1421,
+        "recall": 0.885,
+        "extra": 7
+      }
+    },
+    "fsatraceMissedTracked": []
+  },
+  {
+    "task": "cargo build",
+    "command": "cargo build -q",
+    "untracedS": 3.36,
+    "exit": 0,
+    "straceS": 3.5,
+    "fsatraceS": 3.28,
+    "fsatraceExit": 0,
+    "atimeResetS": 0.0,
+    "inotifySetupS": 0.0,
+    "inotifyWatches": 63,
+    "watchedS": 3.3,
+    "inotifyOverflows": 0,
+    "fsatrace": {
+      "tracked": {
+        "strace": 99,
+        "seen": 98,
+        "recall": 0.99,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 530,
+        "seen": 440,
+        "recall": 0.83,
+        "extra": 0
+      }
+    },
+    "inotify": {
+      "tracked": {
+        "strace": 99,
+        "seen": 98,
+        "recall": 0.99,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 530,
+        "seen": 98,
+        "recall": 0.185,
+        "extra": 0
+      }
+    },
+    "atime": {
+      "tracked": {
+        "strace": 99,
+        "seen": 98,
+        "recall": 0.99,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 530,
+        "seen": 98,
+        "recall": 0.185,
+        "extra": 0
+      }
+    },
+    "fsatraceMissedTracked": ["HomebrewFormula"]
+  },
+  {
+    "task": "uv sync",
+    "command": "uv sync -q",
+    "untracedS": 0.17,
+    "exit": 0,
+    "straceS": 1.1,
+    "fsatraceS": 0.25,
+    "fsatraceExit": 0,
+    "atimeResetS": 0.0,
+    "inotifySetupS": 0.0,
+    "inotifyWatches": 74,
+    "watchedS": 0.25,
+    "inotifyOverflows": 0,
+    "fsatrace": {
+      "tracked": {
+        "strace": 2,
+        "seen": 2,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 7,
+        "seen": 7,
+        "recall": 1.0,
+        "extra": 0
+      }
+    },
+    "inotify": {
+      "tracked": {
+        "strace": 2,
+        "seen": 5,
+        "recall": 1.0,
+        "extra": 3
+      },
+      "allProjectFiles": {
+        "strace": 7,
+        "seen": 5,
+        "recall": 0.286,
+        "extra": 3
+      }
+    },
+    "atime": {
+      "tracked": {
+        "strace": 2,
+        "seen": 5,
+        "recall": 1.0,
+        "extra": 3
+      },
+      "allProjectFiles": {
+        "strace": 7,
+        "seen": 5,
+        "recall": 0.286,
+        "extra": 3
+      }
+    },
+    "fsatraceMissedTracked": []
+  },
+  {
+    "task": "pytest",
+    "command": "uv run pytest -q -x",
+    "untracedS": 0.96,
+    "exit": 0,
+    "straceS": 0.9,
+    "fsatraceS": 0.66,
+    "fsatraceExit": 0,
+    "atimeResetS": 0.02,
+    "inotifySetupS": 0.01,
+    "inotifyWatches": 1341,
+    "watchedS": 0.74,
+    "inotifyOverflows": 0,
+    "fsatrace": {
+      "tracked": {
+        "strace": 33,
+        "seen": 33,
+        "recall": 1.0,
+        "extra": 0
+      },
+      "allProjectFiles": {
+        "strace": 364,
+        "seen": 363,
+        "recall": 0.997,
+        "extra": 0
+      }
+    },
+    "inotify": {
+      "tracked": {
+        "strace": 33,
+        "seen": 36,
+        "recall": 1.0,
+        "extra": 3
+      },
+      "allProjectFiles": {
+        "strace": 364,
+        "seen": 365,
+        "recall": 0.989,
+        "extra": 5
+      }
+    },
+    "atime": {
+      "tracked": {
+        "strace": 33,
+        "seen": 36,
+        "recall": 1.0,
+        "extra": 3
+      },
+      "allProjectFiles": {
+        "strace": 364,
+        "seen": 374,
+        "recall": 0.997,
+        "extra": 11
+      }
+    },
+    "fsatraceMissedTracked": []
+  }
+]

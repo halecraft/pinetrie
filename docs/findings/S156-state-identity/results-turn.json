@@ -1,0 +1,16 @@
+{
+  "pinetrie": {
+    "changedPaths": 8,
+    "updateMs": 0.3,
+    "equalsGitWriteTree": true
+  },
+  "linux": {
+    "changedPaths": 8,
+    "updateMs": 0.5,
+    "equalsGitWriteTree": true
+  },
+  "pnpmInstall": {
+    "changedPaths": 20070,
+    "updateMs": 1203.3
+  }
+}

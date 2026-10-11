@@ -1,0 +1,385 @@
+{
+  "repo": "pinetrie",
+  "commands": [
+    {
+      "step": "pnpm install --frozen-lockfile",
+      "exit": 0,
+      "secondsTraced": 1.8,
+      "processes": 28,
+      "classes": {
+        "derived": 20070
+      },
+      "why": {
+        "made from source": 20070
+      },
+      "inputsRead": [
+        "apps/conformance/package.json",
+        "apps/pinetrie/package.json",
+        "package.json",
+        "packages/channel/package.json",
+        "packages/core/package.json",
+        "packages/docker/package.json",
+        "packages/interface/package.json",
+        "packages/keeper/package.json",
+        "packages/lanehost/package.json",
+        "packages/lanes/package.json",
+        "packages/pi/package.json",
+        "packages/protocol/package.json",
+        "packages/reads/package.json",
+        "packages/repo/package.json",
+        "packages/rules/package.json"
+      ],
+      "inputsReadCount": 22,
+      "derivedWhere": {
+        "node_modules/.pnpm": 19948,
+        "packages/web": 27,
+        "apps/pinetrie": 26,
+        "packages/session": 11,
+        "packages/pi": 11,
+        "packages/interface": 8,
+        "packages/rules": 5,
+        "node_modules/.bin": 4,
+        "packages/docker": 4,
+        "packages/schema": 3,
+        "packages/repo": 3,
+        "packages/reads": 3,
+        "packages/protocol": 3,
+        "apps/conformance": 3,
+        "packages/lanehost": 2,
+        "node_modules/typescript": 1,
+        "node_modules/vitest": 1,
+        "node_modules/.modules.yaml": 1,
+        "node_modules/.pnpm-workspace-state-v1.json": 1,
+        "node_modules/@types": 1,
+        "node_modules/@biomejs": 1,
+        "packages/vm": 1,
+        "packages/shell": 1,
+        "packages/lanes": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.4,
+        "added": 0,
+        "modified": 24,
+        "deleted": 0,
+        "rewroteWhere": {
+          "node_modules/.pnpm": 13,
+          "node_modules/.bin": 4,
+          "packages/pi": 2,
+          "apps/pinetrie": 2,
+          "node_modules/.pnpm-workspace-state-v1.json": 1,
+          "node_modules/.modules.yaml": 1,
+          "packages/web": 1
+        }
+      },
+      "outputsReadBack": {
+        "node_modules/.pnpm": 37,
+        "node_modules/.modules.yaml": 1
+      },
+      "homeReads": {
+        ".local/share/pnpm": 17621,
+        ".cache/node/corepack": 7,
+        "(absent) .config/pnpm/rc": 1,
+        "(absent) .npmrc": 1
+      },
+      "projectAbsentProbes": [".corepack.env", ".npmrc", "node_modules"]
+    },
+    {
+      "step": "pnpm run typecheck",
+      "exit": 0,
+      "secondsTraced": 12.1,
+      "processes": 50,
+      "classes": {},
+      "why": {},
+      "inputsRead": [
+        "apps/conformance/package.json",
+        "apps/conformance/run-conformance.ts",
+        "apps/pinetrie/e2e/browser.ts",
+        "apps/pinetrie/e2e/browser/banner.scenario.ts",
+        "apps/pinetrie/e2e/browser/images.scenario.ts",
+        "apps/pinetrie/e2e/browser/page.scenario.ts",
+        "apps/pinetrie/e2e/browser/page.ts",
+        "apps/pinetrie/e2e/browser/tools.scenario.ts",
+        "apps/pinetrie/e2e/checks.test.ts",
+        "apps/pinetrie/e2e/checks.ts",
+        "apps/pinetrie/e2e/e2e.ts",
+        "apps/pinetrie/e2e/harness.test.ts",
+        "apps/pinetrie/e2e/harness.ts",
+        "apps/pinetrie/e2e/host/admission.scenario.ts",
+        "apps/pinetrie/e2e/host/agents.scenario.ts"
+      ],
+      "inputsReadCount": 878,
+      "derivedWhere": {},
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 11.9,
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "rewroteWhere": {}
+      },
+      "outputsReadBack": {},
+      "homeReads": {
+        ".cache/node/corepack": 6,
+        "(absent) .config/pnpm/rc": 1,
+        "(absent) .npmrc": 1
+      },
+      "projectAbsentProbes": [".corepack.env", ".npmrc"]
+    },
+    {
+      "step": "pnpm run lint",
+      "exit": 0,
+      "secondsTraced": 0.5,
+      "processes": 47,
+      "classes": {},
+      "why": {},
+      "inputsRead": [
+        "apps/conformance/package.json",
+        "apps/conformance/run-conformance.ts",
+        "apps/pinetrie/e2e/browser.ts",
+        "apps/pinetrie/e2e/browser/banner.scenario.ts",
+        "apps/pinetrie/e2e/browser/images.scenario.ts",
+        "apps/pinetrie/e2e/browser/page.scenario.ts",
+        "apps/pinetrie/e2e/browser/page.ts",
+        "apps/pinetrie/e2e/browser/tools.scenario.ts",
+        "apps/pinetrie/e2e/checks.test.ts",
+        "apps/pinetrie/e2e/checks.ts",
+        "apps/pinetrie/e2e/e2e.ts",
+        "apps/pinetrie/e2e/harness.test.ts",
+        "apps/pinetrie/e2e/harness.ts",
+        "apps/pinetrie/e2e/host/admission.scenario.ts",
+        "apps/pinetrie/e2e/host/agents.scenario.ts"
+      ],
+      "inputsReadCount": 894,
+      "derivedWhere": {},
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.5,
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "rewroteWhere": {}
+      },
+      "outputsReadBack": {},
+      "homeReads": {
+        ".cache/node/corepack": 6,
+        "(absent) .config/pnpm/rc": 1,
+        "(absent) .npmrc": 1
+      },
+      "projectAbsentProbes": [".corepack.env", ".npmrc"]
+    },
+    {
+      "step": "pnpm run format",
+      "exit": 0,
+      "secondsTraced": 0.3,
+      "processes": 47,
+      "classes": {},
+      "why": {},
+      "inputsRead": [
+        "apps/conformance/package.json",
+        "apps/pinetrie/package.json",
+        "biome.json",
+        "package.json",
+        "packages/channel/package.json",
+        "packages/core/package.json",
+        "packages/docker/package.json",
+        "packages/interface/package.json",
+        "packages/interface/tsconfig.json",
+        "packages/keeper/package.json",
+        "packages/lanehost/package.json",
+        "packages/lanes/package.json",
+        "packages/pi/fixtures/fixture-pkg/package.json",
+        "packages/pi/fixtures/other-pkg/package.json",
+        "packages/pi/package.json"
+      ],
+      "inputsReadCount": 27,
+      "derivedWhere": {},
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.3,
+        "added": 0,
+        "modified": 0,
+        "deleted": 0,
+        "rewroteWhere": {}
+      },
+      "outputsReadBack": {},
+      "homeReads": {
+        ".cache/node/corepack": 6,
+        "(absent) .config/pnpm/rc": 1,
+        "(absent) .npmrc": 1
+      },
+      "projectAbsentProbes": [".corepack.env", ".npmrc"]
+    },
+    {
+      "step": "pnpm run record",
+      "exit": 0,
+      "secondsTraced": 0.6,
+      "processes": 21,
+      "classes": {
+        "derived": 1
+      },
+      "why": {
+        "made from source": 1
+      },
+      "inputsRead": [
+        "AGENTS.md",
+        "ARCHITECTURE.md",
+        "apps/conformance/run-conformance.ts",
+        "apps/pinetrie/e2e/TECHNICAL.md",
+        "apps/pinetrie/e2e/browser.ts",
+        "apps/pinetrie/e2e/browser/banner.scenario.ts",
+        "apps/pinetrie/e2e/browser/images.scenario.ts",
+        "apps/pinetrie/e2e/browser/page.scenario.ts",
+        "apps/pinetrie/e2e/browser/page.ts",
+        "apps/pinetrie/e2e/browser/tools.scenario.ts",
+        "apps/pinetrie/e2e/checks.test.ts",
+        "apps/pinetrie/e2e/checks.ts",
+        "apps/pinetrie/e2e/e2e.ts",
+        "apps/pinetrie/e2e/harness.test.ts",
+        "apps/pinetrie/e2e/harness.ts"
+      ],
+      "inputsReadCount": 1180,
+      "derivedWhere": {
+        "docs/record.md": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 0.6,
+        "added": 0,
+        "modified": 1,
+        "deleted": 0,
+        "rewroteWhere": {
+          "docs/record.md": 1
+        }
+      },
+      "outputsReadBack": {},
+      "homeReads": {
+        ".cache/node/corepack": 6,
+        "(absent) .config/pnpm/rc": 1,
+        "(absent) .npmrc": 1
+      },
+      "projectAbsentProbes": [".corepack.env", ".npmrc"]
+    },
+    {
+      "step": "pnpm run build",
+      "exit": 0,
+      "secondsTraced": 183.5,
+      "processes": 63,
+      "classes": {
+        "derived": 2
+      },
+      "why": {
+        "made from source": 2
+      },
+      "inputsRead": [
+        "apps/conformance/package.json",
+        "apps/pinetrie/package.json",
+        "package.json",
+        "packages/channel/package.json",
+        "packages/core/address.ts",
+        "packages/core/agents.ts",
+        "packages/core/asks.ts",
+        "packages/core/cards.ts",
+        "packages/core/edits.ts",
+        "packages/core/errors.ts",
+        "packages/core/grid.ts",
+        "packages/core/ids.ts",
+        "packages/core/images.ts",
+        "packages/core/index.ts",
+        "packages/core/kinds.ts"
+      ],
+      "inputsReadCount": 331,
+      "derivedWhere": {
+        "packages/web": 2
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 121.1,
+        "added": 0,
+        "modified": 2,
+        "deleted": 0,
+        "rewroteWhere": {
+          "packages/web": 2
+        }
+      },
+      "outputsReadBack": {},
+      "homeReads": {
+        ".cache/node/corepack": 6,
+        "(absent) .config/pnpm/rc": 1,
+        "(absent) .npmrc": 1
+      },
+      "projectAbsentProbes": [".corepack.env", ".npmrc"]
+    },
+    {
+      "step": "pnpm exec vitest run packages/rules packages/interface",
+      "exit": 0,
+      "secondsTraced": 36.4,
+      "processes": 2820,
+      "classes": {
+        "derived": 1
+      },
+      "why": {
+        "made from source": 1
+      },
+      "inputsRead": [
+        "package.json",
+        "packages/core/address.ts",
+        "packages/core/agents.ts",
+        "packages/core/asks.ts",
+        "packages/core/cards.ts",
+        "packages/core/edits.ts",
+        "packages/core/errors.ts",
+        "packages/core/fixtures.ts",
+        "packages/core/grid.ts",
+        "packages/core/ids.ts",
+        "packages/core/images.ts",
+        "packages/core/index.ts",
+        "packages/core/kinds.ts",
+        "packages/core/live.ts",
+        "packages/core/offers.ts"
+      ],
+      "inputsReadCount": 354,
+      "derivedWhere": {
+        "node_modules/.vite": 1
+      },
+      "sourceWritten": [],
+      "deleted": 0,
+      "secondRun": {
+        "exit": 0,
+        "seconds": 29.2,
+        "added": 0,
+        "modified": 1,
+        "deleted": 0,
+        "rewroteWhere": {
+          "node_modules/.vite": 1
+        }
+      },
+      "outputsReadBack": {
+        "node_modules/.vite": 1
+      },
+      "homeReads": {
+        ".cache/node/corepack": 6,
+        "(absent) .config/pnpm/rc": 1,
+        "(absent) .npmrc": 1
+      },
+      "projectAbsentProbes": [".corepack.env", ".npmrc"]
+    }
+  ],
+  "agreement": {
+    "derived": 20074
+  },
+  "disagreements": 0,
+  "disagreementGroups": []
+}

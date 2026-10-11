@@ -8,6 +8,11 @@ what to configure. Why each piece is shaped as it is: ADR-0105 (offers),
 ADR-0039 (thread names), ADR-0104 (accepted work and the ledger),
 ADR-0076 and ADR-0090 (publishing).
 
+ADR-0135, proposed, would make jj one codec of a state that pine·trie
+names itself: pine·trie would write each turn's commit and jj would import
+it. Until it is accepted, a lane's turns are committed with `jj commit`,
+as described here.
+
 Two parties act on the repo. **The host** runs its jj commands as the
 operation user `pinetrie-host@<hostname>`. **The owner** is whoever runs the
 host, and works in the repo with jj directly. People in a session never

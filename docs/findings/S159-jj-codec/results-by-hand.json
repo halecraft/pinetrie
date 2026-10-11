@@ -1,0 +1,20 @@
+{
+  "note": "Run by hand in the lane after codec.py's large step, which reported oneGbTracked false: jj was killed for memory, not refused.",
+  "laneMemoryMax": "4294967296 (/sys/fs/cgroup/memory.max)",
+  "jjFileTrackIncludeIgnored": {
+    "64MB": { "exit": 0, "seconds": 0.6, "maxRssMB": 293 },
+    "256MB": { "exit": 0, "seconds": 2.7, "maxRssMB": 1064 },
+    "512MB": { "exit": 0, "seconds": 5.1, "maxRssMB": 2089 },
+    "1GB": { "exit": 137, "seconds": 0.84, "killed": true }
+  },
+  "gitHashObject": {
+    "256MB": { "hashOnlySeconds": 1.86 },
+    "1GB": { "hashOnlySeconds": 98.9, "writeSeconds": 271.3 },
+    "gitVersion": "2.47.3"
+  },
+  "sha1sum1GB": { "seconds": 2.5 },
+  "streamedBlobWrite1GB": {
+    "sha1PlusZlibLevel1Seconds": 15.1,
+    "sha1PlusZlibLevel0Seconds": 0.98
+  }
+}

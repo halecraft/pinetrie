@@ -12,6 +12,9 @@
   - ADR-0129: the disks helper, its shell scripts and the firewall's throwaway
     container are replaced by lanehost's roles, each a container the host
     reaches over one held `docker exec -i`.
+  - ADR-0135: a change to `pinetrie.json` that widens what a lane may do or
+    share takes effect only from accepted work; a lane's own copy can only
+    narrow it.
 
 Restates ADR-0103 as amended by ADR-0118 and its revisions of 2026-10-07;
 decides nothing new. ADR-0103's changes to ADR-0034, ADR-0035 and ADR-0046
