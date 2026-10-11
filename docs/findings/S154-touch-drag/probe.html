@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S154 — touch drag probe</title>
+<style>
+  :root { color-scheme: dark; font: 14px -apple-system, system-ui, sans-serif; }
+  body { margin: 0; background: #16181c; color: #ddd; }
+  #bar { padding: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border-bottom: 1px solid #333; }
+  #bar label { display: flex; gap: 4px; align-items: center; }
+  button { font: inherit; padding: 6px 10px; }
+  #strip { display: flex; overflow-x: auto; gap: 8px; padding: 8px; height: 46vh; }
+  .col { flex: 0 0 70vw; max-width: 320px; display: flex; flex-direction: column; background: #22252b; border-radius: 8px; transition: box-shadow .15s; }
+  .head { padding: 14px 10px; background: #2d3139; border-radius: 8px 8px 0 0; font-weight: 600; }
+  body.nocallout .head { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  .head[data-armed] { background: #3a5a8a; }
+  .col[data-dragging] { box-shadow: 0 16px 40px rgba(0,0,0,.6); z-index: 2; position: relative; }
+  .body { overflow-y: auto; padding: 8px 10px; flex: 1; }
+  .body p { margin: 0 0 8px; }
+  #log { font: 12px ui-monospace, monospace; white-space: pre-wrap; padding: 8px; height: 30vh; overflow: auto; border-top: 1px solid #333; }
+  #steps { padding: 8px; font-size: 13px; line-height: 1.4; }
+</style>
+</head>
+<body class="nocallout">
+<div id="bar">
+  <label><input type="checkbox" id="nocallout" checked> callout/select off on headers</label>
+  <label><input type="checkbox" id="capture" checked> setPointerCapture</label>
+  <button type="button" id="copy">copy results</button>
+  <button type="button" id="clear">clear</button>
+</div>
+<div id="steps">
+  Do each, then <b>copy results</b> and paste them back:
+  <b>1</b> hold a header still ~½ s until it turns blue, then drag it sideways and down, past the screen edge, and let go.
+  <b>2</b> swipe a header quickly sideways (the strip should scroll).
+  <b>3</b> swipe a column's text up and down (it should scroll).
+  <b>4</b> untick “callout/select off”, then repeat 1: did a callout, a selection or a magnifier appear? Say so with the results.
+  <b>5</b> untick “setPointerCapture”, tick callout again, then repeat 1.
+</div>
+<div id="strip"></div>
+<div id="log"></div>
+<script>
+const HOLD_MS = 300, SLOP = 8
+const strip = document.getElementById("strip")
+const logEl = document.getElementById("log")
+const lines = []
+const log = s => { lines.push(s); logEl.textContent = lines.slice(-200).join("\n"); logEl.scrollTop = 1e9 }
+log(`UA ${navigator.userAgent}`)
+log(`PointerEvent ${"PointerEvent" in window}, maxTouchPoints ${navigator.maxTouchPoints}`)
+for (let i = 0; i < 6; i++) {
+  const c = document.createElement("div")
+  c.className = "col"
+  c.innerHTML = `<div class="head">✦ column ${i + 1}</div><div class="body">${Array.from({ length: 40 }, (_, j) => `<p>Line ${j + 1} of column ${i + 1}. The quick brown fox jumps over the lazy dog.</p>`).join("")}</div>`
+  strip.appendChild(c)
+}
+document.getElementById("nocallout").onchange = e => document.body.classList.toggle("nocallout", e.target.checked)
+document.getElementById("clear").onclick = () => { lines.length = 0; log("cleared") }
+document.getElementById("copy").onclick = async () => {
+  const text = lines.join("\n")
+  try { await navigator.clipboard.writeText(text); log("copied") }
+  catch { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); log("copied (fallback)") }
+}
+
+let g = null // the gesture in progress
+const scrollState = () => ({ strip: strip.scrollLeft, bodies: [...document.querySelectorAll(".body")].map(b => b.scrollTop) })
+const scrolled = (a, b) => a.strip !== b.strip || a.bodies.some((v, i) => v !== b.bodies[i])
+
+strip.addEventListener("pointerdown", e => {
+  const head = e.target.closest(".head")
+  if (!head || g) return
+  const col = head.closest(".col")
+  g = {
+    head, col, id: e.pointerId, type: e.pointerType, x: e.clientX, y: e.clientY,
+    t: performance.now(), phase: "pressed", pm: 0, pmDrag: 0, tm: 0, tmCancelable: 0, tmPrevented: 0,
+    cancel: false, lost: false, before: scrollState(), atArm: null, scrollsInDrag: 0, maxDist: 0,
+    capture: document.getElementById("capture").checked, callout: document.body.classList.contains("nocallout") ? "off" : "on",
+    contextmenu: 0, selectionAfter: "",
+  }
+  g.timer = setTimeout(() => {
+    if (!g || g.phase !== "pressed") return
+    g.phase = "armed"
+    g.atArm = scrollState()
+    head.dataset.armed = ""
+    if (g.capture) { try { head.setPointerCapture(g.id); g.captured = head.hasPointerCapture(g.id) } catch (err) { g.captureError = String(err) } }
+  }, HOLD_MS)
+})
+// Non-passive, so a drag can stop the scroll that would follow.
+document.addEventListener("touchmove", e => {
+  if (!g) return
+  g.tm++
+  if (e.cancelable) g.tmCancelable++
+  if (g.phase === "armed" || g.phase === "dragging") { e.preventDefault(); if (e.defaultPrevented) g.tmPrevented++ }
+}, { passive: false })
+document.addEventListener("pointermove", e => {
+  if (!g || e.pointerId !== g.id) return
+  g.pm++
+  const dx = e.clientX - g.x, dy = e.clientY - g.y, d = Math.hypot(dx, dy)
+  g.maxDist = Math.max(g.maxDist, d)
+  if (g.phase === "pressed" && d > SLOP) { g.phase = "swipe"; clearTimeout(g.timer) }
+  if (g.phase === "armed" && d > SLOP) { g.phase = "dragging"; g.col.dataset.dragging = "" }
+  if (g.phase === "dragging") { g.pmDrag++; g.col.style.transform = `translate(${dx}px, ${dy}px) scale(1.02)` }
+}, true)
+const onScroll = () => { if (g && (g.phase === "armed" || g.phase === "dragging")) g.scrollsInDrag++ }
+strip.addEventListener("scroll", onScroll, true)
+document.addEventListener("contextmenu", () => { if (g) g.contextmenu++ })
+document.addEventListener("lostpointercapture", e => { if (g && e.pointerId === g.id) g.lost = true }, true)
+const finish = (how) => e => {
+  if (!g || e.pointerId !== g.id) return
+  clearTimeout(g.timer)
+  if (how === "cancel") g.cancel = true
+  const after = scrollState()
+  const kind = g.phase === "dragging" || g.phase === "armed" ? "HOLD-DRAG" : g.phase === "swipe" ? "SWIPE" : "TAP"
+  const sel = String(getSelection() || "")
+  log([
+    `${kind} (${g.type}) callout ${g.callout}, capture ${!g.capture ? "off" : g.captured === undefined ? "not taken (no hold)" : g.captured ? "held" : "asked, not held"}${g.captureError ? " ERR " + g.captureError : ""}`,
+    `  ended by ${how}${g.cancel ? " (pointercancel)" : ""}, ${Math.round(performance.now() - g.t)} ms, moved up to ${Math.round(g.maxDist)} px`,
+    `  pointermove ${g.pm} (in drag ${g.pmDrag}), touchmove ${g.tm} (cancelable ${g.tmCancelable}, prevented ${g.tmPrevented})`,
+    `  scrolled: whole gesture ${scrolled(g.before, after)}, after the hold ${g.atArm ? scrolled(g.atArm, after) : "-"}, scroll events in drag ${g.scrollsInDrag}`,
+    `  lost capture ${g.lost}, contextmenu ${g.contextmenu}, selection "${sel.slice(0, 40)}"`,
+  ].join("\n"))
+  const before = g.before
+  setTimeout(() => log(`  …and 600 ms later, scrolled since the press: ${scrolled(before, scrollState())}`), 600)
+  delete g.head.dataset.armed
+  delete g.col.dataset.dragging
+  g.col.style.transform = ""
+  g = null
+}
+document.addEventListener("pointerup", finish("up"), true)
+document.addEventListener("pointercancel", finish("cancel"), true)
+</script>
+</body>
+</html>

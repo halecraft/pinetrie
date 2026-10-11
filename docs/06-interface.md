@@ -418,6 +418,12 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   above its own first message folded behind "↑ N earlier messages" when
   the thread it forks from is on no column of the canvas. A canvas with
   threads of several roots draws each root's tree on the rail.
+- **Every column's header is to end in ⋯ and ×, and the whole header to
+  be its handle** (ADR-0134, accepted, not yet built): × trashes any column
+  for everyone, into the trash of the place it left, and the task column
+  lists its canvas's trash for anyone to restore; a column dropped on a
+  task in the sidebar moves there, still running; one pointer engine drags
+  columns, cards and tasks. Until it is built, what follows holds.
 - **Only a thread not yet sent closes** (×), a branch or a new tab: its
   card goes to your trash, asked first when your message there holds text,
   which you keep in your inventory or discard with it, undone by the undo

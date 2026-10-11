@@ -1,0 +1,90 @@
+seeded 200 + 9×120 messages in 11120 ms
+page {"nodes":24563,"columns":10,"messages":1280,"strip":{"x":289,"y":0,"width":1631,"height":1038,"top":0,"right":1920,"bottom":1038,"left":289}}
+1 off 0 frames p50 16.7 p95 16.8 max 33.3 over20 1 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+1 off 1 frames p50 16.7 p95 16.8 max 33.4 over20 4 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+1 off 2 frames p50 16.7 p95 16.7 max 33.4 over20 2 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+1 efp 0 frames p50 16.7 p95 16.8 max 33.3 over20 2 over50 0 | work p50 0.8 p95 3.5 max 12.6 | gaps 6 offs 2 | slow frames after: {}
+1 efp 1 frames p50 16.7 p95 16.8 max 33.3 over20 3 over50 0 | work p50 0.7 p95 3.4 max 17 | gaps 6 offs 2 | slow frames after: {}
+1 efp 2 frames p50 16.7 p95 16.7 max 33.4 over20 2 over50 0 | work p50 0.7 p95 3.6 max 11.9 | gaps 6 offs 2 | slow frames after: {}
+1 cached 0 frames p50 16.7 p95 16.7 max 33.4 over20 2 over50 0 | work p50 0 p95 0.1 max 7.8 | gaps 6 offs 2 | slow frames after: {}
+1 cached 1 frames p50 16.7 p95 16.7 max 33.4 over20 2 over50 0 | work p50 0 p95 0.1 max 8.3 | gaps 6 offs 2 | slow frames after: {}
+1 cached 2 frames p50 16.7 p95 16.7 max 33.3 over20 1 over50 0 | work p50 0 p95 0.1 max 7.4 | gaps 6 offs 2 | slow frames after: {}
+1 efp+layers 0 frames p50 16.7 p95 16.8 max 33.4 over20 2 over50 0 | work p50 0 p95 0.1 max 0.1 | gaps 6 offs 2 | slow frames after: {}
+1 efp+layers 1 frames p50 16.7 p95 16.7 max 50 over20 1 over50 0 | work p50 0 p95 0.1 max 0.1 | gaps 6 offs 2 | slow frames after: {}
+1 efp+layers 2 frames p50 16.7 p95 16.8 max 33.4 over20 3 over50 0 | work p50 0 p95 0.1 max 0.2 | gaps 6 offs 2 | slow frames after: {}
+1 efp+layers+ghost 0 frames p50 16.7 p95 16.7 max 33.4 over20 2 over50 0 | work p50 0 p95 0.1 max 0.1 | gaps 6 offs 2 | slow frames after: {}
+1 efp+layers+ghost 1 frames p50 16.7 p95 16.7 max 49.9 over20 1 over50 0 | work p50 0 p95 0.1 max 0.2 | gaps 6 offs 2 | slow frames after: {}
+1 efp+layers+ghost 2 frames p50 16.7 p95 16.7 max 50 over20 1 over50 0 | work p50 0 p95 0.1 max 0.2 | gaps 6 offs 2 | slow frames after: {}
+4 off 0 frames p50 16.7 p95 16.7 max 49.9 over20 2 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+4 off 1 frames p50 16.7 p95 16.7 max 33.4 over20 3 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+4 off 2 frames p50 16.7 p95 16.8 max 33.4 over20 2 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+4 efp 0 frames p50 16.7 p95 16.8 max 83.3 over20 22 over50 2 | work p50 2.2 p95 4.7 max 25.4 | gaps 6 offs 2 | slow frames after: {}
+4 efp 1 frames p50 16.7 p95 16.8 max 83.3 over20 22 over50 1 | work p50 2.2 p95 4.2 max 25.5 | gaps 6 offs 2 | slow frames after: {}
+4 efp 2 frames p50 16.7 p95 16.8 max 83.2 over20 23 over50 1 | work p50 2.3 p95 4.1 max 25.3 | gaps 6 offs 2 | slow frames after: {}
+4 cached 0 frames p50 16.7 p95 16.8 max 83.4 over20 19 over50 1 | work p50 0 p95 0.2 max 22.3 | gaps 6 offs 2 | slow frames after: {}
+4 cached 1 frames p50 16.7 p95 16.8 max 66.6 over20 15 over50 1 | work p50 0 p95 0.2 max 23.4 | gaps 6 offs 2 | slow frames after: {}
+4 cached 2 frames p50 16.7 p95 16.8 max 100 over20 26 over50 2 | work p50 0 p95 0.4 max 22.8 | gaps 6 offs 2 | slow frames after: {}
+4 efp+layers 0 frames p50 16.7 p95 33.4 max 166.7 over20 180 over50 2 | work p50 0 p95 0.3 max 1.1 | gaps 6 offs 2 | slow frames after: {}
+4 efp+layers 1 frames p50 16.7 p95 33.4 max 150 over20 171 over50 4 | work p50 0 p95 0.1 max 0.9 | gaps 6 offs 2 | slow frames after: {}
+4 efp+layers 2 frames p50 16.7 p95 33.4 max 133.3 over20 149 over50 3 | work p50 0 p95 0.2 max 1 | gaps 6 offs 2 | slow frames after: {}
+4 efp+layers+ghost 0 frames p50 16.7 p95 16.8 max 166.6 over20 8 over50 2 | work p50 0 p95 0.3 max 7.3 | gaps 6 offs 2 | slow frames after: {}
+4 efp+layers+ghost 1 frames p50 16.7 p95 16.8 max 166.6 over20 6 over50 2 | work p50 0 p95 0.2 max 4.5 | gaps 6 offs 2 | slow frames after: {}
+4 efp+layers+ghost 2 frames p50 16.7 p95 16.8 max 133.4 over20 7 over50 2 | work p50 0 p95 0.1 max 1 | gaps 6 offs 2 | slow frames after: {}
+6 off 0 frames p50 16.7 p95 16.8 max 50 over20 3 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+6 off 1 frames p50 16.7 p95 16.8 max 50.1 over20 2 over50 1 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+6 off 2 frames p50 16.7 p95 16.7 max 50 over20 3 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+6 efp 0 frames p50 16.7 p95 33.4 max 116.7 over20 167 over50 8 | work p50 3.7 p95 7.8 max 42.1 | gaps 6 offs 2 | slow frames after: {}
+6 efp 1 frames p50 16.7 p95 50 max 116.6 over20 202 over50 22 | work p50 3.8 p95 10.8 max 41 | gaps 6 offs 2 | slow frames after: {}
+6 efp 2 frames p50 16.7 p95 50 max 183.4 over20 296 over50 22 | work p50 3.9 p95 11.8 max 57.5 | gaps 6 offs 2 | slow frames after: {}
+6 cached 0 frames p50 16.7 p95 33.4 max 149.9 over20 107 over50 8 | work p50 0 p95 1.1 max 42.8 | gaps 6 offs 2 | slow frames after: {}
+6 cached 1 frames p50 16.7 p95 49.9 max 166.8 over20 365 over50 21 | work p50 0 p95 1.3 max 41.1 | gaps 6 offs 2 | slow frames after: {}
+6 cached 2 frames p50 16.7 p95 49.9 max 166.7 over20 397 over50 20 | work p50 0 p95 1.3 max 47.3 | gaps 6 offs 2 | slow frames after: {}
+6 efp+layers 0 frames p50 33.2 p95 50 max 266.6 over20 546 over50 38 | work p50 0 p95 0.8 max 5.9 | gaps 6 offs 2 | slow frames after: {}
+6 efp+layers 1 frames p50 16.7 p95 50 max 250 over20 550 over50 43 | work p50 0 p95 0.7 max 6.4 | gaps 6 offs 2 | slow frames after: {}
+6 efp+layers 2 frames p50 33.2 p95 49.9 max 216.7 over20 534 over50 18 | work p50 0 p95 0.4 max 8.1 | gaps 6 offs 2 | slow frames after: {}
+6 efp+layers+ghost 0 frames p50 16.7 p95 33.4 max 199.9 over20 230 over50 6 | work p50 0 p95 0.1 max 5 | gaps 6 offs 2 | slow frames after: {}
+6 efp+layers+ghost 1 frames p50 16.7 p95 33.4 max 216.7 over20 232 over50 2 | work p50 0 p95 0.1 max 1.7 | gaps 6 offs 2 | slow frames after: {}
+6 efp+layers+ghost 2 frames p50 16.7 p95 33.4 max 216.6 over20 233 over50 5 | work p50 0 p95 0.4 max 6.3 | gaps 6 offs 2 | slow frames after: {}
+seeded 200 + 9×120 messages in 11187 ms
+page {"nodes":24563,"columns":10,"messages":1280,"strip":{"x":289,"y":0,"width":1631,"height":1038,"top":0,"right":1920,"bottom":1038,"left":289}}
+4 off 0 frames p50 16.7 p95 16.8 max 33.4 over20 4 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+4 off 1 frames p50 16.7 p95 16.7 max 116.7 over20 4 over50 1 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {'nothing': 1}
+4 off 2 frames p50 16.7 p95 16.8 max 33.3 over20 2 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+4 efp 0 frames p50 16.7 p95 16.8 max 66.6 over20 28 over50 2 | work p50 2.3 p95 4.3 max 27.3 | gaps 6 offs 2 | slow frames after: {'the press': 1, 'a gap change': 1}
+4 efp 1 frames p50 16.7 p95 16.8 max 66.7 over20 26 over50 1 | work p50 2.3 p95 4.5 max 27.3 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 efp 2 frames p50 16.7 p95 16.8 max 83.4 over20 27 over50 1 | work p50 2.2 p95 4.6 max 27.5 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 cached 0 frames p50 16.7 p95 16.8 max 66.7 over20 21 over50 1 | work p50 0 p95 0.4 max 24.2 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 cached 1 frames p50 16.7 p95 16.8 max 66.7 over20 19 over50 1 | work p50 0 p95 0.3 max 24.2 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 cached 2 frames p50 16.7 p95 16.8 max 83.4 over20 16 over50 1 | work p50 0 p95 0.3 max 24.6 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 efp+ghost 0 frames p50 49.9 p95 66.7 max 133.3 over20 616 over50 290 | work p50 0 p95 0.5 max 23.3 | gaps 6 offs 2 | slow frames after: {'the press': 4, 'nothing': 266, 'a gap change': 13, 'leaving the strip': 2, 'back on the strip': 5}
+4 efp+ghost 1 frames p50 50 p95 66.7 max 116.7 over20 615 over50 346 | work p50 0 p95 0.7 max 24.9 | gaps 6 offs 2 | slow frames after: {'the press': 4, 'nothing': 318, 'a gap change': 16, 'leaving the strip': 4, 'back on the strip': 4}
+4 efp+ghost 2 frames p50 49.9 p95 66.7 max 150.1 over20 614 over50 300 | work p50 0 p95 0.5 max 26.8 | gaps 6 offs 2 | slow frames after: {'the press': 3, 'nothing': 281, 'a gap change': 12, 'leaving the strip': 1, 'back on the strip': 3}
+4 efp+layers+ghost 0 frames p50 16.7 p95 16.8 max 133.4 over20 6 over50 1 | work p50 0 p95 0.1 max 1 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 efp+layers+ghost 1 frames p50 16.7 p95 16.7 max 133.3 over20 5 over50 2 | work p50 0 p95 0.1 max 1 | gaps 6 offs 2 | slow frames after: {'the press': 1, 'nothing': 1}
+4 efp+layers+ghost 2 frames p50 16.7 p95 16.8 max 150 over20 5 over50 2 | work p50 0 p95 0.1 max 6.8 | gaps 6 offs 2 | slow frames after: {'the press': 1, 'nothing': 1}
+6 off 0 frames p50 16.7 p95 16.8 max 66.6 over20 6 over50 1 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {'nothing': 1}
+6 off 1 frames p50 16.7 p95 16.7 max 50 over20 3 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+6 off 2 frames p50 16.7 p95 16.8 max 50.1 over20 3 over50 1 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {'nothing': 1}
+6 efp 0 frames p50 16.7 p95 33.4 max 116.6 over20 131 over50 10 | work p50 3.6 p95 7.4 max 45.2 | gaps 6 offs 2 | slow frames after: {'the press': 2, 'nothing': 4, 'a gap change': 4}
+6 efp 1 frames p50 16.7 p95 33.4 max 116.6 over20 147 over50 12 | work p50 3.5 p95 7.7 max 42.2 | gaps 6 offs 2 | slow frames after: {'the press': 2, 'nothing': 6, 'a gap change': 3, 'back on the strip': 1}
+6 efp 2 frames p50 16.7 p95 33.4 max 116.7 over20 119 over50 6 | work p50 3.5 p95 7.1 max 43.5 | gaps 6 offs 2 | slow frames after: {'the press': 1, 'a gap change': 3, 'nothing': 2}
+6 cached 0 frames p50 16.7 p95 33.3 max 116.7 over20 58 over50 4 | work p50 0 p95 0.8 max 36.2 | gaps 6 offs 2 | slow frames after: {'the press': 1, 'a gap change': 3}
+6 cached 1 frames p50 16.7 p95 33.3 max 116.7 over20 54 over50 6 | work p50 0 p95 0.8 max 35.9 | gaps 6 offs 2 | slow frames after: {'the press': 1, 'a gap change': 2, 'nothing': 3}
+6 cached 2 frames p50 16.7 p95 33.3 max 116.5 over20 56 over50 3 | work p50 0 p95 0.9 max 36.5 | gaps 6 offs 2 | slow frames after: {'the press': 1, 'nothing': 1, 'a gap change': 1}
+6 efp+ghost 0 frames p50 33.4 p95 99.9 max 183.3 over20 639 over50 590 | work p50 0 p95 0.3 max 35.9 | gaps 6 offs 2 | slow frames after: {'the press': 3, 'nothing': 568, 'a gap change': 12, 'leaving the strip': 3, 'back on the strip': 4}
+6 efp+ghost 1 frames p50 83.2 p95 83.5 max 183.3 over20 642 over50 587 | work p50 0 p95 0.7 max 35.3 | gaps 6 offs 2 | slow frames after: {'the press': 3, 'nothing': 564, 'a gap change': 13, 'leaving the strip': 3, 'back on the strip': 4}
+6 efp+ghost 2 frames p50 33.3 p95 83.4 max 166.7 over20 632 over50 592 | work p50 0 p95 0.6 max 34.4 | gaps 6 offs 2 | slow frames after: {'the press': 3, 'nothing': 569, 'a gap change': 13, 'leaving the strip': 3, 'back on the strip': 4}
+6 efp+layers+ghost 0 frames p50 16.7 p95 33.4 max 200.1 over20 240 over50 5 | work p50 0 p95 0.1 max 1.6 | gaps 6 offs 2 | slow frames after: {'the press': 1, 'nothing': 3, 'back on the strip': 1}
+6 efp+layers+ghost 1 frames p50 16.7 p95 33.4 max 216.7 over20 251 over50 2 | work p50 0 p95 0.2 max 1.6 | gaps 6 offs 2 | slow frames after: {'the press': 1, 'nothing': 1}
+6 efp+layers+ghost 2 frames p50 16.7 p95 33.4 max 233.3 over20 307 over50 5 | work p50 0 p95 0.7 max 6.3 | gaps 6 offs 2 | slow frames after: {'the press': 1, 'nothing': 3, 'a gap change': 1}
+seeded 200 + 9×120 messages in 11687 ms
+page {"nodes":24563,"columns":10,"messages":1280,"strip":{"x":289,"y":0,"width":1631,"height":1038,"top":0,"right":1920,"bottom":1038,"left":289}}
+4 off 0 frames p50 16.7 p95 16.8 max 50 over20 3 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+4 off 1 frames p50 16.7 p95 16.8 max 133.4 over20 4 over50 1 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {'nothing': 1}
+4 off 2 frames p50 16.7 p95 16.7 max 33.4 over20 2 over50 0 | work p50 0 p95 0 max 0 | gaps 0 offs 0 | slow frames after: {}
+4 efp 0 frames p50 16.7 p95 16.8 max 100 over20 36 over50 1 | work p50 2.3 p95 5.3 max 28 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 efp 1 frames p50 16.7 p95 33.3 max 66.7 over20 53 over50 1 | work p50 2.4 p95 5.9 max 28.1 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 efp 2 frames p50 16.7 p95 16.8 max 100 over20 41 over50 1 | work p50 2.4 p95 5.7 max 35.7 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 efp+flat 0 frames p50 16.7 p95 16.8 max 66.7 over20 9 over50 1 | work p50 0 p95 0.4 max 23.4 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 efp+flat 1 frames p50 16.7 p95 16.8 max 100 over20 6 over50 1 | work p50 0 p95 0.3 max 28 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+4 efp+flat 2 frames p50 16.7 p95 16.8 max 66.6 over20 8 over50 1 | work p50 0 p95 0.2 max 25.5 | gaps 6 offs 2 | slow frames after: {'the press': 1}

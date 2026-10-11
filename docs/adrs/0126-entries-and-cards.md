@@ -27,6 +27,9 @@
   - ADR-0132: Cmd+C copies to the clipboard and takes nothing; Cmd+X cuts;
     nothing is taken from the past; a reference put from your hand leaves it,
     as every card does.
+  - ADR-0134: any column closes, its card to the trash of the place it left,
+    which records that place; a task's trash is the task's, seen by anyone the
+    card was seen by there.
 
 **Context.**
 

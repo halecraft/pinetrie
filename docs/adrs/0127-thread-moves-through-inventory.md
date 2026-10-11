@@ -7,6 +7,8 @@
     inventory, and takes it; another task is reached through your inventory.
 - **Amended by:**
   - ADR-0132: a thread also reaches another task by a cut and a paste.
+  - ADR-0134: a thread dropped on a task in the sidebar moves to that task's
+    canvas and keeps running; Fold joins the column's ⋯.
 
 **Context.**
 

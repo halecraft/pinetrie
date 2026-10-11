@@ -22,6 +22,8 @@
     header.
   - ADR-0117: a fork row names a copy's source, or a parent thread in another
     task.
+  - ADR-0134: a column's header ends in ⋯ and × on every column; ⇲, ⠿ and ⇤
+    leave it, and the whole header drags.
 
 **Context.** A column's header was one row holding everything the column knew
 about itself: the grip, "from Ada: …" (or "thread", "new chat", "new · with
