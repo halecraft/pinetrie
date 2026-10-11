@@ -18,10 +18,13 @@ import {
   movesDocId,
   NO_CONTENT,
   type OfferFact,
+  type Paste,
   PERSON_HISTORY,
   type PlacedKind,
   REORDER_PLACES,
   type ReferenceCard,
+  type Replacing,
+  type ResolvedMove,
   rootIdFor,
   type Sha256,
   type TaskId,
@@ -35,6 +38,7 @@ import {
   textSourceOf,
   threadIdFor,
   type WorkflowStateId,
+  type WriterId,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -68,13 +72,12 @@ import {
   type Discards,
   NO_DISCARDS,
   ownsPlace,
-  planEditAsText,
-  planMakeReference,
   planMove,
   planMoveCommand,
   planMoveRequest,
   planMoves,
   planMoveTargets,
+  planPaste,
 } from "./moves.ts"
 import { nearestNoteColumn, notesNear, toNotes } from "./notes.ts"
 import { orderAfter, orderKeys } from "./order.ts"
@@ -936,14 +939,15 @@ describe("note columns (ADR-0116)", () => {
         NO_DISCARDS,
       ),
     ).toEqual({ kind: "refused", code: "no-place", now: null })
-    expect(historyOf([{ card: id, from: null, to }], [], NO_DISCARDS)).toEqual(
-      historyScope(TEST_TASK),
-    )
+    expect(
+      historyOf([{ card: id, from: null, to }], [], NO_DISCARDS, "move"),
+    ).toEqual(historyScope(TEST_TASK))
     expect(
       historyOf(
         [{ card: C1, from: null, to: { kind: "note", column: NOTES } }],
         [],
         NO_DISCARDS,
+        "move",
       ),
     ).toBeNull()
   })
@@ -2411,16 +2415,28 @@ describe("historyOf: the task a move enters the sender's history in (ADR-0066, A
       OTHER_TASK,
     ],
   ])("%s", (_, moves, cards, want) => {
-    expect(historyOf(moves, cards, { tasks, here: OTHER_TASK })).toEqual(
-      want === null ? null : historyScope(want),
-    )
+    expect(
+      historyOf(moves, cards, { tasks, here: OTHER_TASK }, "move"),
+    ).toEqual(want === null ? null : historyScope(want))
   })
 
   test("a discard from an inventory on no task: its sender's history outside any task (ADR-0126)", () => {
     const moves = [{ card: C1, from: inv, to: DISCARDED }]
-    expect(historyOf(moves, at(inv), { tasks, here: null })).toEqual(
+    expect(historyOf(moves, at(inv), { tasks, here: null }, "move")).toEqual(
       PERSON_HISTORY,
     )
+  })
+
+  test("a paste's creation enters the history of the task it lands in, or into a slot its sender's outside any task; a move's creation enters none (ADR-0132)", () => {
+    const made = (to: Move["to"]) => [{ card: C1, from: null, to }]
+    const notes = { kind: "notes", near: "thread", thread: T_OTHER } as const
+    expect(historyOf(made(notes), [], { tasks, here: null }, "paste")).toEqual(
+      historyScope(OTHER_TASK),
+    )
+    expect(historyOf(made(inv), [], { tasks, here: null }, "paste")).toEqual(
+      PERSON_HISTORY,
+    )
+    expect(historyOf(made(notes), [], { tasks, here: null }, "move")).toBeNull()
   })
 })
 
@@ -2583,45 +2599,54 @@ describe("references (ADR-0126)", () => {
     content: { address, quote },
   }
 
-  test("planMakeReference makes a reference where its move lands, through planMake; never on a canvas", () => {
-    expect(
-      planMakeReference(
-        [],
-        { card: REF, from: null, to: inv },
-        { address, quote },
-        ADA,
-      ),
-    ).toEqual({ kind: "write", record: reference })
-    expect(
-      planMakeReference(
-        [],
-        {
-          card: REF,
-          from: null,
-          to: { kind: "canvas", task: TEST_TASK, order: "a" },
-        },
-        { address, quote },
-        ADA,
-      ),
-    ).toMatchObject({ kind: "refused", code: "no-place" })
-    expect(
-      planMakeReference(
-        [reference],
-        { card: REF, from: null, to: inv },
-        { address, quote },
-        ADA,
-      ),
-    ).toMatchObject({ kind: "refused", code: "exists" })
-  })
-
-  test("planEditAsText: one move set, a text card in the reference's place with its origin, and the reference to the trash", () => {
-    const step = planEditAsText(
-      [reference],
-      { reference: REF, from: inv, card: NEW },
-      ADA,
+  const paste = (
+    cards: readonly CardRecord[],
+    pasted: Paste,
+    to: ResolvedMove["to"],
+    replacing: Replacing | null = null,
+    sender = ADA,
+  ) =>
+    planPaste(
+      cards,
+      pasted,
+      {
+        card: pasted.card,
+        from: pasted.kind === "uncut" ? DISCARDED : null,
+        to,
+      },
+      replacing,
+      sender,
       NO_DISCARDS,
     )
-    expect(step).toEqual({
+  const asReference: Paste = { kind: "reference", card: REF, address, quote }
+  const asText: Paste = { kind: "text", card: NEW, origin: address }
+  /** `n` text cards in Ada's inventory, beside whatever else is there. */
+  const filling = (n: number): readonly CardRecord[] =>
+    Array.from({ length: n }, (_, i) =>
+      card({
+        id: textCardId(
+          `01a0ffd2-0000-7000-8000-${String(i).padStart(12, "0")}`,
+        ),
+        place: inv,
+      }),
+    )
+
+  test("planPaste makes a reference where it lands, through planMake; never on a canvas, never twice (ADR-0132)", () => {
+    expect(paste([], asReference, inv)).toEqual({
+      kind: "steps",
+      steps: [{ kind: "write", record: reference }],
+    })
+    expect(
+      paste([], asReference, { kind: "canvas", task: TEST_TASK, order: "a" }),
+    ).toMatchObject({ kind: "refused", code: "no-place" })
+    expect(paste([reference], asReference, inv)).toMatchObject({
+      kind: "refused",
+      code: "exists",
+    })
+  })
+
+  test("planPaste makes a text card keeping its origin", () => {
+    expect(paste([], asText, inv)).toEqual({
       kind: "steps",
       steps: [
         {
@@ -2635,23 +2660,65 @@ describe("references (ADR-0126)", () => {
             content: { command: null, unsent: null, origin: address },
           },
         },
+      ],
+    })
+  })
+
+  test("an edit as text is a paste replacing its reference: the reference to the trash first, then the text card in its very place, in a full inventory too (ADR-0133)", () => {
+    const full = [reference, ...filling(INVENTORY_SLOTS - 1)]
+    const step = paste(full, asText, inv, { card: REF, from: inv })
+    expect(step).toMatchObject({
+      kind: "steps",
+      steps: [
         {
           kind: "write",
-          record: expect.objectContaining({
-            id: REF,
-            place: expect.objectContaining({ kind: "trash" }),
-          }),
+          record: { id: REF, place: { kind: "trash", holder: ADA } },
+        },
+        {
+          kind: "write",
+          record: { id: NEW, place: inv, content: { origin: address } },
         },
       ],
     })
     expect(
-      planEditAsText(
-        [reference],
-        { reference: REF, from: { kind: "inventory", holder: BEA }, card: NEW },
+      paste([reference], asText, inv, {
+        card: REF,
+        from: { kind: "inventory", holder: BEA },
+      }),
+    ).toMatchObject({ kind: "refused" })
+  })
+
+  test("a paste into a full inventory with nothing replaced is refused full", () => {
+    expect(paste(filling(INVENTORY_SLOTS), asReference, inv)).toMatchObject({
+      kind: "refused",
+      code: "full",
+    })
+  })
+
+  test("a cut card moves out of its cutter's own trash; one in someone else's, or in none, is gone; no move takes one out (ADR-0132)", () => {
+    const trashed = (holder: WriterId) =>
+      ({ ...reference, place: { kind: "trash", holder, task: null } }) as const
+    const uncut: Paste = { kind: "uncut", card: REF }
+    expect(paste([trashed(ADA)], uncut, inv)).toMatchObject({
+      kind: "steps",
+      steps: [{ kind: "write", record: { id: REF, place: inv, placer: ADA } }],
+    })
+    expect(paste([trashed(BEA)], uncut, inv)).toMatchObject({
+      kind: "refused",
+      code: "gone",
+    })
+    expect(paste([reference], uncut, inv)).toMatchObject({
+      kind: "refused",
+      code: "gone",
+    })
+    expect(
+      planMove(
+        [trashed(ADA)],
+        { card: REF, from: DISCARDED, to: inv },
         ADA,
         NO_DISCARDS,
       ),
-    ).toMatchObject({ kind: "refused" })
+    ).toMatchObject({ kind: "refused", code: "gone" })
   })
 
   test("a reference and a text card's origin round-trip through their stored form", () => {

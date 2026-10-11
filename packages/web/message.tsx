@@ -14,7 +14,6 @@ import {
   joinWords,
   type MessageAct,
   type MessageTools,
-  messageReference,
   NO_MEMORY,
   opens,
   pinnedMarkerWords,
@@ -27,20 +26,18 @@ import {
   rowView,
   runningFor,
   type ScreenMemory,
-  selectionReference,
   showsText,
   speakerWords,
-  TAKE_COPY,
-  TAKE_COPY_INTO_INVENTORY,
   taskPinnedMarkerWords,
   toolBody,
 } from "@pinetrie/interface"
 import { canvasLines } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
-import { newCardId, newReferenceCardId } from "@pinetrie/session"
+import { newCardId } from "@pinetrie/session"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
 import { COPIED, useCopy } from "./copy.ts"
+import { CopyIcon } from "./icons.tsx"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { MessageText } from "./message-text.tsx"
 import { useTrackColors } from "./palette-context.ts"
@@ -216,37 +213,6 @@ function Tools({
   return (
     <div className="tools">
       {tools.copy && <CopyButton node={node} />}
-      {tools.takeReference && (
-        <button
-          aria-label={TAKE_COPY_INTO_INVENTORY}
-          className="take-copy-into-inventory"
-          onClick={e => {
-            const msg = e.currentTarget.closest(".msg")
-            const selection = window.getSelection()
-            const range =
-              selection === null || selection.rangeCount === 0
-                ? null
-                : selection.getRangeAt(0)
-            // Your selection in the message when a range names it, else the
-            // message: the button is the message's own.
-            const inside =
-              range !== null &&
-              selection !== null &&
-              msg?.contains(range.commonAncestorContainer) === true
-            onAct({
-              kind: "takeReference",
-              card: newReferenceCardId(),
-              ...((inside
-                ? selectionReference(node, selection.toString())
-                : null) ?? messageReference(node, null)),
-            })
-          }}
-          title={TAKE_COPY_INTO_INVENTORY}
-          type="button"
-        >
-          {TAKE_COPY}
-        </button>
-      )}
       {tools.comment && (
         <button
           aria-label={COMMENT.title}
@@ -322,25 +288,6 @@ function CopyButton({ node }: { node: TranscriptMessage }) {
     >
       {copied ? "✓" : <CopyIcon />}
     </button>
-  )
-}
-
-/** Two overlapping sheets, 1em square, drawn in the text's colour. */
-function CopyIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height="1em"
-      stroke="currentColor"
-      strokeLinejoin="round"
-      strokeWidth="1.5"
-      viewBox="0 0 16 16"
-      width="1em"
-    >
-      <rect height="9" rx="1.5" width="9" x="5.5" y="5.5" />
-      <path d="M10.5 3V2.5A1.5 1.5 0 0 0 9 1H2.5A1.5 1.5 0 0 0 1 2.5V9a1.5 1.5 0 0 0 1.5 1.5H3" />
-    </svg>
   )
 }
 

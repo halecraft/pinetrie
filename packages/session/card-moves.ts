@@ -130,6 +130,13 @@ export type CardNotice = {
     }
   /** An undone swap whose slots no longer hold what it wrote. */
   | { readonly code: "slots-changed" }
+  /**
+   * A drop or a paste on a filled slot whose card may not be discarded, so
+   * nothing replaces it (ADR-0133): `card` names that card.
+   */
+  | { readonly code: "not-replaced" }
+  /** A thread's copy aimed at a filled slot: it lands only in an empty one. */
+  | { readonly code: "slot-taken" }
   /** Your discard, accepted. */
   | { readonly code: "discarded" }
 )

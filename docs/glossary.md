@@ -33,10 +33,18 @@ words they were written with.
 | **surface** | Where cards are put, which some content or a party has: a team's board, a task's canvas, a thread's dock, a note column's list, a person's inventory. A card is placed on one surface, and has the surfaces its content gives; a surface is data, never a view (ADR-0111, ADR-0126). | `CardPlace` | |
 | **content** | What a card holds, beside its identity and its place: a text card's command, a fact, nothing for a thread's card or a note column; later a task, a reference. Its kind decides the card's places, acts and renderings (ADR-0126). | `Card<K>`, `ContentOf`, `KINDS`, `textSourceOf` | the card's kind (as where it may be), `CardCarries` |
 | **fact card** | A fact on its way into a thread: a card of its own kind, only ever queued, until the thread's end consumes it (ADR-0080, ADR-0126). | `FactCard`, `FactCardId` (`x-`), `planFactCard` | a text card carrying a fact |
-| **reference** | A card holding an address and its quote, kept as a blob: a link, a quote, or whole, by where it is drawn. Edited as text, it becomes a text card that keeps its origin (ADR-0126). | `ReferenceCard` (`q-`), `planMakeReference`, `planEditAsText`, `messageReference`, `selectionReference` | taking a copy of a message as bare text |
+| **reference** | A card holding an address and its quote, kept as a blob: a link, a quote, or whole, by where it is drawn. What a paste of a message or a block makes on a surface; edited as text, it becomes a text card that keeps its origin, a paste replacing it (ADR-0126, ADR-0132). | `ReferenceCard` (`q-`), `planPaste`, `planEditAsText`, `messageReference` | taking a copy of a message as bare text; taking a reference from the past |
 | **origin** | Where a copy came from: an address a text card made from a reference keeps; a thread's copy keeps its fork (ADR-0126). | `ContentOf.text.origin`, `ThreadOrigin` | |
-| **in your hand** | Your inventory's selected slot: what the put key puts. A reference stays there when put; any other card leaves (ADR-0126). | `KINDS`' `put` | |
-| **put key** | Puts the card in your hand where focus is: a reference into a text box as a link, the card onto a surface (ADR-0126). | Ctrl+Shift+O, `keyAct`, `PutTarget` `text-box` | |
+| **clipboard** | The system clipboard, holding one copy: what copy and cut write and paste lands. pine·trie adds its own data beside the text, and owns nothing there (ADR-0132). | `clipboard.ts` (the page's), `CLIP_MIME` |  |
+| **copy** (to the clipboard) | Cmd+C on anything you can read, past or present: written to the clipboard, nothing moved or taken (ADR-0132). | `clipOfFocus`, `planCopy`, `Clip` | Cmd+C taking a reference into your inventory |
+| **cut** | Cmd+X on a card you can discard: a copy, then a discard, one undo step (ADR-0132). | `clipOfFocus`'s `cut`, `isDiscardable` | Cmd+X as a take into the inventory |
+| **paste** | Cmd+V: what the clipboard holds landed where focus is, a new thing keeping its origin; the first paste after a cut moves the cut card. A selection lands as text; an entry, a block or a card as a link in a text box, as a card on a surface (ADR-0132). | `readPaste`, `putLanding`, `planPut`, `planPaste`, `paste` (the command) |  |
+| **clipboard cell** | The inventory panel's cell beside the grid: the last thing copied in pine·trie, not a slot (ADR-0132). | `clipboardCellView`, `ClipboardCell` |  |
+| **keep** | Paste the clipboard cell into a free slot: how a message or a block reaches your inventory, as a reference (ADR-0132). | the `keep` intent | taking from the past (a message's take, a block's ❝) |
+| **carrier** | pine·trie's data on the clipboard beside the text: `application/x-pinetrie`, and `data-pinetrie` in `text/html`. It counts only when the pasted text is the text it was written with (ADR-0132). | `Carrier`, `CLIP_ATTRIBUTE` |  |
+| **replace** (a slot) | A drop or a paste aimed at a filled slot of your inventory: the new card takes the slot, and the one there goes to your trash, one undo step (ADR-0133). | `Landing`'s `replace`, `Replacing` | landing in another empty slot |
+| **in your hand** | Your inventory's selected slot: what the put key puts. Every card leaves it when put (ADR-0126, ADR-0132). | `selectedCard` | a reference staying in your hand |
+| **put key** | Puts the card in your hand in the column you were last in (ADR-0126, ADR-0132); never into a text box, which a paste types into. | Ctrl+Shift+O, `keyAct` | the put key's link in a text box |
 | **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `TextCard`, `TextCardId`, `CardPlace`, `CardFrame`, `cardFrame` | |
 | **thread card** | A thread, as a card: on a task's canvas, in someone's inventory or their trash, one place either way (ADR-0117, ADR-0124). A thread is a card from the moment its column opens, before its first entry (ADR-0126). | `ThreadCard`, `threadFace`, `planThreadOpen`, `unstartedThreads` | a root, as the board and the sidebar draw it; board item; a fresh column, a new tab's column |
 | **your message** | The text card in your composer at a thread's end, which only you see; at a thread not yet started too (ADR-0126). | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours); a fresh card |
@@ -156,10 +164,10 @@ word alone.)
   row, an SQL row. Never a kind of thing a person reads about.
 - **mark**: a task's title (ADR-0045). The pips that show your unsent
   text are a signal (ADR-0126).
-- **copy**: a thread's copy, a new thread at its end (ADR-0117); a copy
-  from the past, a card made from an entry, a block or a selection; and
-  Cmd+C, which makes that card and writes markdown to the system
-  clipboard (ADR-0126). Every copy keeps its origin.
+- **copy**: a thread's copy, a new thread at its end (ADR-0117); a copy to
+  the clipboard, Cmd+C, which moves and makes nothing (ADR-0132); and a
+  card a paste makes from what was copied. Every card made from a copy
+  keeps its origin.
 - **fact**: an entry the host wrote, and a fact card, the same fact before
   its thread's end consumes it.
 - **column**: a card drawn whole on a task's canvas, and each workflow state's

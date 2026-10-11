@@ -75,13 +75,12 @@ import {
   type OpenPlan,
   type OpenThread,
   planCopy,
-  planEditAsText,
   planLiftRoot,
-  planMakeReference,
   planMoveCommand,
   planMoveRequest,
   planMoveTargets,
   planOpenThread,
+  planPaste,
   planQueueCard,
   planReorder,
   planRootDelete,
@@ -346,7 +345,9 @@ export function createCardCommands(deps: CardCommandDeps) {
           }
         : planned.step
     const scope =
-      emptied.length > 0 ? PERSON_HISTORY : historyOf(moves, cards, discards)
+      emptied.length > 0
+        ? PERSON_HISTORY
+        : historyOf(moves, cards, discards, "move")
     // gather the history's stack: nothing writes the places while it loads,
     // on the keeper
     const gesture =
@@ -371,10 +372,12 @@ export function createCardCommands(deps: CardCommandDeps) {
   ): Promise<Settled> {
     // gather: the history's stack, loaded before the places are read
     // A queueing discards nothing: its history is the queue's task.
-    const scope = historyOf([queued], readPlaces(places), {
-      tasks,
-      here: null,
-    })
+    const scope = historyOf(
+      [queued],
+      readPlaces(places),
+      { tasks, here: null },
+      "move",
+    )
     const gesture =
       scope === null ? undefined : await deps.histories.gestureOf(writer, scope)
     // plan
@@ -529,7 +532,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       await deps.cards.hydrate([card])
       const text = deps.cards.textNow(card)
       const discards = { tasks, here: request.here }
-      const scope = historyOf([move], readPlaces(places), discards)
+      const scope = historyOf([move], readPlaces(places), discards, "move")
       const gesture =
         scope === null
           ? undefined
@@ -662,29 +665,42 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A thread copied (ADR-0117, ADR-0124), in one step of the keeper:
-     * planned (`planCopy`) from the source's record and tree, then the
-     * copy's record, its card and the canvas re-ranked for it, then its
-     * name. No entry is written: its first send branches at its fork.
+     * A paste (ADR-0132): the card it replaces discarded, then a card made
+     * from a copy where its target resolves to (a thread's nearest notes,
+     * made where its task has none; a margin checked against its entry's
+     * thread), or a cut card out of the sender's trash (`planPaste`). One
+     * step of the sender's history in the task it lands in, so the undo key
+     * takes it back. Queued on an idle thread, it is drained.
      */
-    /**
-     * A reference made where its move sends it (ADR-0126): the target
-     * resolved first (a thread's nearest notes, made where its task has
-     * none; a margin checked against its entry's thread), then made through
-     * `planMakeReference`. A creation, so it enters no history, as a text
-     * card's does not. Queued on an idle thread, it is drained.
-     */
-    async makeReference(
+    async paste(
       writer: WriterId,
-      made: Extract<Intent, { kind: "make-reference" }>,
+      pasted: Extract<Intent, { kind: "paste" }>,
+      tasks: TaskIndex,
     ): Promise<Settled> {
-      // gather
-      const entryThreads = await marginEntryThreads([made.move])
+      // gather: the history's stack, loaded before the places are read
+      const discards = { tasks, here: pasted.here }
+      const main = {
+        card: pasted.paste.card,
+        from: pasted.paste.kind === "uncut" ? DISCARDED : null,
+        to: pasted.to,
+      }
+      const moves = [
+        ...(pasted.replacing === null
+          ? []
+          : [{ ...pasted.replacing, to: DISCARDED }]),
+        main,
+      ]
+      const scope = historyOf(moves, readPlaces(places), discards, "paste")
+      const gesture =
+        scope === null
+          ? undefined
+          : await deps.histories.gestureOf(writer, scope)
+      const entryThreads = await marginEntryThreads([main])
       // plan
       const cards = readPlaces(places)
       const resolved = planMoveTargets({
         cards,
-        moves: [made.move],
+        moves: [main],
         sender: writer,
         newColumn,
         entryThreads,
@@ -692,51 +708,51 @@ export function createCardCommands(deps: CardCommandDeps) {
       if (resolved.kind === "refused") return unmoved(resolved)
       const [move] = resolved.moves
       if (move === undefined) return settled({ kind: "nothing" })
-      const step = planMakeReference(
+      const step = planPaste(
         afterSteps(cards, resolved.first),
+        pasted.paste,
         move,
-        { address: made.address, quote: made.quote },
+        pasted.replacing,
         writer,
+        discards,
       )
       if (step.kind === "refused") return unmoved(step)
-      const steps = [...resolved.first, step]
-      // execute: a reference queued on an idle thread is popped at once
+      const steps = [...resolved.first, ...step.steps]
+      // execute: a card queued on an idle thread is popped at once
       return carry(
         { kind: "steps", steps },
         lanesToDrain(cards, steps, running),
         { kind: "move", by: writer },
+        gesture,
       )
     },
 
     /**
-     * A reference edited as text (ADR-0126): the new text card and the
-     * reference's discard as one step of the sender's history in the task
-     * it is in (`planEditAsText`), so one undo takes back both.
+     * A thread copied (ADR-0117, ADR-0124), in one step of the keeper:
+     * planned (`planCopy`) from the source's record and tree, then the
+     * copy's record, its card and the canvas re-ranked for it, then its
+     * name. No entry is written: its first send branches at its fork. As a
+     * paste is (ADR-0132), it is one step of the copier's history in the
+     * task it lands in, or outside any task in an inventory, so the undo key
+     * takes it back; an undo leaves the copy's record, with no card and no
+     * entry.
      */
-    async editAsText(
+    async copyThread(
       writer: WriterId,
-      edit: Extract<Intent, { kind: "edit-as-text" }>,
+      copy: CopyThread,
       tasks: TaskIndex,
     ): Promise<Settled> {
       // gather: the history's stack, loaded before the places are read
-      const discards = { tasks, here: edit.here }
       const scope = historyOf(
-        [{ card: edit.reference, from: edit.from, to: DISCARDED }],
+        [copy.move],
         readPlaces(places),
-        discards,
+        { tasks, here: null },
+        "paste",
       )
       const gesture =
         scope === null
           ? undefined
           : await deps.histories.gestureOf(writer, scope)
-      // plan
-      const step = planEditAsText(readPlaces(places), edit, writer, discards)
-      // execute
-      return carry(step, [], { kind: "move", by: writer }, gesture)
-    },
-
-    async copyThread(writer: WriterId, copy: CopyThread): Promise<Settled> {
-      // gather
       const threads = readThreads(session)
       const root = threads.get(copy.source)?.root
       const index =
@@ -758,10 +774,12 @@ export function createCardCommands(deps: CardCommandDeps) {
       // execute: the record first, so a reader that finds the card finds
       // its thread's root
       await deps.records.writeValues(plan.records)
-      const done = await carry({ kind: "steps", steps: plan.steps }, [], {
-        kind: "move",
-        by: writer,
-      })
+      const done = await carry(
+        { kind: "steps", steps: plan.steps },
+        [],
+        { kind: "move", by: writer },
+        gesture,
+      )
       await deps.ensureNames()
       return done
     },

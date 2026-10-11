@@ -79,8 +79,6 @@ import {
   keyMove,
   type LiveWork,
   leftLine,
-  markdownOf,
-  messageReference,
   NEW_PIN,
   NEW_PIN_TITLE,
   newPinAt,
@@ -124,12 +122,7 @@ import {
 } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
 import type { AttentionStore } from "@pinetrie/session"
-import {
-  drawnPlace,
-  newCardId,
-  newReferenceCardId,
-  type SessionClient,
-} from "@pinetrie/session"
+import { drawnPlace, newCardId, type SessionClient } from "@pinetrie/session"
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
@@ -147,7 +140,6 @@ import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { Dock } from "./dock.tsx"
 import { Margin } from "./margin.tsx"
-import { blockOfProperty } from "./markdown.ts"
 import { MatchList } from "./match-list.tsx"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
@@ -155,7 +147,6 @@ import { MessageText } from "./message-text.tsx"
 import { useTrackColors } from "./palette-context.ts"
 import {
   askReviewTarget,
-  type BlockAddress,
   type PaneSubject,
   paneKey,
   paneView,
@@ -445,9 +436,9 @@ export function Column(p: ColumnProps) {
   /**
    * The column's messages as a grid one cell wide (ADR-0126), while focus is
    * in it and in no text box: `j` and `k` select, Enter opens the selected
-   * entry's margin, Escape shuts it, `c` comments, and Cmd+C with no text
-   * selected takes a reference to the focused table's bar's table, else to
-   * the selected entry. A selection is the page's copy event's (`App`).
+   * entry's margin, Escape shuts it, and `c` comments. Cmd+C copies the
+   * focused table's bar's table, else the selected entry: the page's copy
+   * event reads `data-block` and `data-selected` (`clipboard.ts`).
    */
   const onEntryKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (isTextBox(document.activeElement)) return
@@ -457,33 +448,6 @@ export function Column(p: ColumnProps) {
     const from = at < 0 ? ids.length - 1 : at
     const entry = ids[from]
     if (entry === undefined) return
-    const copying =
-      e.metaKey !== e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "c"
-    if (copying) {
-      if (!writable || window.getSelection()?.isCollapsed === false) return
-      const focused = document.activeElement
-      const blockEl =
-        focused instanceof HTMLElement
-          ? focused.closest<HTMLElement>("[data-block]")
-          : null
-      const block = blockOfProperty(blockEl?.dataset.block)
-      const owner = view.nodes.find(
-        n =>
-          n.id ===
-          blockEl?.closest<HTMLElement>(".msg[data-entry]")?.dataset.entry,
-      )
-      const node = at < 0 ? undefined : view.nodes[at]
-      const taken =
-        owner !== undefined && block !== null
-          ? messageReference(owner, block)
-          : node === undefined
-            ? null
-            : messageReference(node, null)
-      if (taken === null) return
-      e.preventDefault()
-      act({ kind: "takeReference", card: newReferenceCardId(), ...taken })
-      return
-    }
     const grid = { width: 1, rows: ids.length }
     const step = gridKeyAct(e, {
       grid,
@@ -808,21 +772,9 @@ export function Column(p: ColumnProps) {
     setPane(shown => togglePane(shown, subject)),
   )
   const closePane = useStable(() => setPane(null))
-  // A block taken from the past (ADR-0126): its markdown from the message
-  // this column draws, the same rule a reference's quote is kept by.
-  const takeBlock = useStable((address: BlockAddress) =>
-    act({
-      kind: "takeReference",
-      card: newReferenceCardId(),
-      address,
-      markdown: markdownOf(address, {
-        messageOf: entry => view.nodes.find(n => n.id === entry),
-      }),
-    }),
-  )
   const reach = useMemo(
-    () => ({ shown: pane, open: openPane, take: takeBlock }),
-    [pane, openPane, takeBlock],
+    () => ({ shown: pane, open: openPane }),
+    [pane, openPane],
   )
   const review = shows.strip.kind === "offer" ? shows.strip.review : null
   const paneShows =
@@ -1466,7 +1418,6 @@ export function Column(p: ColumnProps) {
             close={closePane}
             id={paneId}
             key={paneKey(pane)}
-            take={pane.kind === "block" ? () => takeBlock(pane.address) : null}
             track={p.track}
             view={paneShows}
           />

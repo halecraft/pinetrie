@@ -101,8 +101,7 @@ export function runsIn(command: Intent | QueuePop): readonly RunAt[] {
     case "move":
     case "queue-card":
     case "copy-thread":
-    case "make-reference":
-    case "edit-as-text":
+    case "paste":
     case "reorder":
     case "card-width":
     case "spin-off":

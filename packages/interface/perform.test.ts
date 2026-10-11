@@ -36,8 +36,7 @@ const ports = () => {
       cardText: vi.fn(
         () => ({ text: () => "  look at this  " }) as never,
       ) as AppPorts["session"]["cardText"],
-      makeReference: vi.fn(async (): Promise<MoveAnswer> => accepted),
-      editAsText: vi.fn(async (): Promise<Outcome> => answer),
+      paste: vi.fn(async (): Promise<MoveAnswer> => accepted),
       moveCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
       queueCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
       moveCards: vi.fn(async (): Promise<MoveAnswer> => accepted),
@@ -78,7 +77,7 @@ const ports = () => {
         height: null,
       },
     })),
-    clipboard: vi.fn(),
+    clipboardCell: vi.fn(),
     insertText: vi.fn(),
     page: vi.fn(),
     search: vi.fn(),
@@ -261,7 +260,7 @@ test("a keep is one move of every card, and closes its column only once accepted
   ] as const
   const actedAt = { kind: "column", key: "f" } as const
   const keep: Effect = {
-    kind: "keep",
+    kind: "moveCards",
     moves,
     actedAt,
     close: [close],
@@ -373,16 +372,70 @@ test("a comment queued as a reference keeps its text under a link to its entry, 
   const comment = textCardId("01a0ffd2-0000-7000-8000-0000000000d1")
   const card = cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000d2")
   const to = { kind: "queued", thread, seen: "" } as const
-  perform([{ kind: "queueComment", card, comment, entry, to, how }], p)
+  const address = { kind: "card", card: comment } as const
+  perform(
+    [
+      {
+        kind: "paste",
+        paste: {
+          kind: "reference",
+          card,
+          address,
+          quote: { kind: "comment", comment, entry },
+        },
+        to,
+        replacing: null,
+        how,
+        here: null,
+      },
+    ],
+    p,
+  )
   expect(p.uploadText).toHaveBeenCalledWith(
     `A comment on [a message](${addressUrl(entry)}):\n\nlook at this`,
   )
   await vi.waitFor(() =>
-    expect(p.session.makeReference).toHaveBeenCalledWith(
-      { card, to, address: { kind: "card", card: comment }, quote: SHA },
+    expect(p.session.paste).toHaveBeenCalledWith(
+      {
+        paste: { kind: "reference", card, address, quote: SHA },
+        to,
+        replacing: null,
+        here: null,
+        text: "",
+      },
       how,
     ),
   )
+})
+
+test("a pasted text card is sent with its text, to be written first; a kept quote is sent as it is (ADR-0132)", () => {
+  const p = ports()
+  const text = textCardId("01a0ffd2-0000-7000-8000-0000000000d3")
+  const to = { kind: "inventory", holder: ada } as const
+  perform(
+    [
+      {
+        kind: "paste",
+        paste: { kind: "text", card: text, origin: null, text: "hello" },
+        to,
+        replacing: null,
+        how,
+        here: null,
+      },
+    ],
+    p,
+  )
+  expect(p.session.paste).toHaveBeenCalledWith(
+    {
+      paste: { kind: "text", card: text, origin: null },
+      to,
+      replacing: null,
+      here: null,
+      text: "hello",
+    },
+    how,
+  )
+  expect(p.uploadText).not.toHaveBeenCalled()
 })
 
 test("a move flies only when its plan says so", () => {

@@ -26,28 +26,26 @@ import { type CommitOptions, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 import {
   type AcceptedAction,
-  type Address,
   type CardCommand,
   type CardId,
+  type CardPlace,
   type CardRecord,
   type ChatAt,
+  DISCARDED,
   type EntryId,
   type Intent,
   isTextCard,
   isTextCardId,
   keyOf,
   type MoveDirection,
-  makeCard,
+  type MoveTarget,
   type OfferAction,
-  type PlaceKey,
-  placeOfKind,
+  type Paste,
   type QueueHoldChange,
   type QueueMove,
-  type ReferenceCardId,
   type Reorder,
+  type Replacing,
   type RootId,
-  type Sha256,
-  type TargetOf,
   type TaskId,
   type TextCard,
   type TextCardId,
@@ -72,7 +70,7 @@ import {
   readPlacesRev,
   readRoots,
 } from "@pinetrie/reads"
-import { offerSeen } from "@pinetrie/rules"
+import { offerSeen, pastedCard } from "@pinetrie/rules"
 import {
   cardDocId,
   cardIdOfDoc,
@@ -248,28 +246,20 @@ export interface SessionClient {
    */
   createCard(card: NewCard, text: string, how?: MoveHow): Promise<MoveAnswer>
   /**
-   * Ask the host to make a reference where `to` is (ADR-0126): drawn there
-   * until the host answers, as a creation is. Into your inventory,
-   * `how.slot` is the slot it takes.
+   * Paste (ADR-0132): a text card's `text` written first, as a creation's
+   * is, then one request that discards the card it replaces (ADR-0133) and
+   * makes the pasted card where `to` is, or moves a cut card out of your
+   * trash there. Drawn there, and the replaced card gone, until the host
+   * answers. Into your inventory, `how.slot` is the slot it takes.
    */
-  /**
-   * Edit a reference as text (ADR-0126): `text` written into the new card
-   * `card` first, as a creation's is, then one request that makes the card
-   * where the reference is and trashes the reference.
-   */
-  editAsText(edit: {
-    readonly reference: ReferenceCardId
-    readonly from: PlaceKey
-    readonly card: TextCardId
-    readonly text: string
-    readonly here: TaskId | null
-  }): Promise<Outcome>
-  makeReference(
-    made: {
-      readonly card: ReferenceCardId
-      readonly to: TargetOf<"reference">
-      readonly address: Address
-      readonly quote: Sha256
+  paste(
+    pasted: {
+      readonly paste: Paste
+      readonly to: MoveTarget
+      readonly replacing: Replacing | null
+      readonly here: TaskId | null
+      /** A pasted text card's text; "" for any other paste. */
+      readonly text: string
     },
     how?: MoveHow,
   ): Promise<MoveAnswer>
@@ -673,41 +663,36 @@ export async function connectSession(
         void send({ kind: "set-command", card: card.id, command })
       return answer
     },
-    editAsText(edit) {
-      undo.gesture(() => {
-        texts.text(edit.card).text.insert(0, edit.text)
-      })
-      return send({
-        kind: "edit-as-text",
-        reference: edit.reference,
-        from: edit.from,
-        card: edit.card,
-        here: edit.here,
-      })
-    },
-    makeReference(made, how = OFF_PAGE) {
-      const move = { card: made.card, from: null, to: made.to }
-      const drawn = drawnPlace(made.to, me, readPlaces(places))
-      const place =
-        drawn === undefined ? undefined : placeOfKind("reference", drawn)
-      const draft =
-        place === undefined
-          ? null
-          : makeCard(
-              "reference",
-              made.card,
-              place,
-              { address: made.address, quote: made.quote },
-              me,
+    paste(pasted, how = OFF_PAGE) {
+      const { paste, to, replacing, here } = pasted
+      if (paste.kind === "text")
+        undo.gesture(() => {
+          texts.text(paste.card).text.insert(0, pasted.text)
+        })
+      const id = crypto.randomUUID()
+      const main: Pending =
+        paste.kind === "uncut"
+          ? pendingOf(id, { card: paste.card, from: DISCARDED, to }, how, null)
+          : pendingOf(
+              id,
+              { card: paste.card, from: null, to },
+              how,
+              pastedDraft(paste, drawnPlace(to, me, readPlaces(places)), me),
             )
+      const discard =
+        replacing === null
+          ? []
+          : [
+              pendingOf(
+                id,
+                { ...replacing, to: DISCARDED },
+                { actedAt: how.actedAt, slot: null },
+                null,
+              ),
+            ]
       return tracked(
-        {
-          kind: "make-reference",
-          move,
-          address: made.address,
-          quote: made.quote,
-        },
-        [pendingOf(crypto.randomUUID(), move, how, draft)],
+        { kind: "paste", paste, to, replacing, here },
+        [main, ...discard],
         null,
       ).then(r => r.answer)
     },
@@ -852,3 +837,13 @@ function within<T>(
   })
   return Promise.race([promise, late]).finally(() => clearTimeout(timer))
 }
+
+/** The card a paste draws until the host answers: the host's make (`pastedCard`), at its target as drawn. */
+const pastedDraft = (
+  paste: Paste,
+  drawn: CardPlace | undefined,
+  me: WriterId,
+): CardRecord | null =>
+  paste.kind === "uncut" || drawn === undefined
+    ? null
+    : (pastedCard(paste, drawn, me) ?? null)

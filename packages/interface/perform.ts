@@ -1,20 +1,14 @@
 // interface/perform — carry out the effects `planIntent` decided (`intent.ts`).
 // The shell: one port call per effect, and nothing decided here.
 
-import type {
-  Address,
-  CardId,
-  EntryId,
-  ReferenceCardId,
-  TargetOf,
-} from "@pinetrie/core"
+import type { CardId, EntryId, Paste, Sha256 } from "@pinetrie/core"
 import {
   AT_BOARD,
   type AttentionStore,
-  type MoveHow,
   type SessionClient,
 } from "@pinetrie/session"
 import { afterKeep } from "./card-intents.ts"
+import type { Clip } from "./clip.ts"
 import type { Effect } from "./effects.ts"
 import type { Identity } from "./identity.ts"
 import { afterTaskMove, type Intent } from "./intent.ts"
@@ -34,8 +28,7 @@ export interface AppPorts {
     | "offer"
     | "createCard"
     | "cardText"
-    | "makeReference"
-    | "editAsText"
+    | "paste"
     | "moveCard"
     | "queueCard"
     | "moveCards"
@@ -85,8 +78,8 @@ export interface AppPorts {
   readonly landed: (entry: EntryId) => void
   /** Keep markdown as a blob: a reference's quote (`uploadText`). */
   readonly uploadText: (markdown: string) => Promise<TextUpload>
-  /** Put markdown on the system clipboard. */
-  readonly clipboard: (text: string) => void
+  /** Show `clip` in the clipboard cell: the copy this tab just made (ADR-0132). */
+  readonly clipboardCell: (clip: Clip) => void
   /** Put text at the caret of the text box that has focus, as typed. */
   readonly insertText: (text: string) => void
 }
@@ -96,35 +89,64 @@ export function perform(effects: readonly Effect[], ports: AppPorts): void {
 }
 
 /**
- * A reference's quote, `markdown`, kept as a blob, then the reference made
- * where `made.to` is (ADR-0126). A quote that could not be kept makes
+ * A paste (ADR-0132): a reference's quote kept as a blob first when it is
+ * markdown (the past's, or a comment's under a link to its entry, read
+ * now), then the paste sent. A quote that could not be kept pastes
  * nothing, said where it was asked for.
  */
-function keepThenMake(
-  made: {
-    readonly card: ReferenceCardId
-    readonly address: Address
-    readonly to: TargetOf<"reference">
-    readonly how: MoveHow
-  },
-  markdown: string,
+function paste(
+  effect: Extract<Effect, { kind: "paste" }>,
   ports: AppPorts,
 ): void {
+  const send = (pasted: Paste, text: string) =>
+    void ports.session.paste(
+      {
+        paste: pasted,
+        to: effect.to,
+        replacing: effect.replacing,
+        here: effect.here,
+        text,
+      },
+      effect.how,
+    )
+  const { paste: card } = effect
+  if (card.kind !== "reference") {
+    send(
+      card.kind === "text"
+        ? { kind: "text", card: card.card, origin: card.origin }
+        : card,
+      card.kind === "text" ? card.text : "",
+    )
+    return
+  }
+  const asReference = (quote: Sha256) =>
+    send(
+      {
+        kind: "reference",
+        card: card.card,
+        address: card.address,
+        quote,
+      },
+      "",
+    )
+  const { quote } = card
+  if (quote.kind === "kept") {
+    asReference(quote.sha)
+    return
+  }
+  const markdown =
+    quote.kind === "markdown"
+      ? quote.text
+      : commentMarkdown(
+          quote.entry,
+          ports.session.cardText(quote.comment).text(),
+        )
   void ports.uploadText(markdown).then(upload => {
-    if (upload.ok)
-      void ports.session.makeReference(
-        {
-          card: made.card,
-          to: made.to,
-          address: made.address,
-          quote: upload.ref.sha256,
-        },
-        made.how,
-      )
+    if (upload.ok) asReference(upload.ref.sha256)
     else
       ports.session.refuse({
-        card: made.card,
-        actedAt: made.how.actedAt,
+        card: card.card,
+        actedAt: effect.how.actedAt,
         code: "no-place",
         by: null,
         fromQueue: false,
@@ -186,40 +208,11 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "createCard":
       void ports.session.createCard(effect.card, effect.text, effect.how)
       return
-    case "takeReference":
-      keepThenMake(effect, effect.markdown, ports)
+    case "paste":
+      paste(effect, ports)
       return
-    case "queueComment":
-      keepThenMake(
-        {
-          card: effect.card,
-          address: { kind: "card", card: effect.comment },
-          to: effect.to,
-          how: effect.how,
-        },
-        commentMarkdown(
-          effect.entry,
-          ports.session.cardText(effect.comment).text(),
-        ),
-        ports,
-      )
-      return
-    case "makeReference":
-      void ports.session.makeReference(
-        {
-          card: effect.card,
-          to: effect.to,
-          address: effect.address,
-          quote: effect.quote,
-        },
-        effect.how,
-      )
-      return
-    case "editAsText":
-      void ports.session.editAsText(effect)
-      return
-    case "copyText":
-      ports.clipboard(effect.text)
+    case "clipboardCell":
+      ports.clipboardCell(effect.clip)
       return
     case "insertText":
       ports.insertText(effect.text)
@@ -249,7 +242,7 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "swapSlots":
       ports.session.swapSlots(effect.a, effect.b)
       return
-    case "keep":
+    case "moveCards":
       for (const { move } of effect.moves) ports.fly(move.card)
       void ports.session
         .moveCards(effect.moves, effect.actedAt, effect.here)

@@ -52,7 +52,6 @@ import {
   NEW_PIN_PLACEHOLDER,
   type Pending,
   type Prefill,
-  pastedFiles,
   pinnedStatus,
   placeholderWords,
   planSend,
@@ -87,6 +86,7 @@ import {
   useState,
 } from "react"
 import { CardFrame } from "./card-frame.tsx"
+import { pastedImages } from "./clipboard.ts"
 import { Menu } from "./menu.tsx"
 import { useThreadStates } from "./thread-states.ts"
 import { useStable } from "./use-stable.ts"
@@ -632,7 +632,7 @@ export function CardEditor(p: {
           p.onTyping(shownBy(current.current))
         }}
         onPaste={e => {
-          const files = pastedFiles(e.clipboardData)
+          const files = pastedImages(e)
           if (files.length === 0) return
           e.preventDefault()
           const el = e.currentTarget

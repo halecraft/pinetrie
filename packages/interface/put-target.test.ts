@@ -11,6 +11,8 @@ import {
 import { describe, expect, test } from "vitest"
 import { composerPlace } from "./column-view.ts"
 import { BOUND } from "./columns.ts"
+import { NO_FOCUS } from "./fixtures.ts"
+import type { Focus } from "./focus.ts"
 import {
   composerPlacesStore,
   dropProps,
@@ -18,6 +20,7 @@ import {
   type PutTarget,
   placeOfTarget,
   targetOfElement,
+  targetOfFocus,
 } from "./put-target.ts"
 
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -160,4 +163,17 @@ test("composerPlace: your message at its thread, at its end once it has one, or 
   expect(
     composerPlace({ thread: LANE, mode: BOUND }, { kind: "root" }),
   ).toBeNull()
+})
+
+describe("targetOfFocus (ADR-0132)", () => {
+  const zone = { kind: "inventory", slot: 3 } as const
+  test("the text box that has focus, else the drop zone around focus, else the column last focused", () => {
+    const at = (over: Partial<Focus>) => targetOfFocus({ ...NO_FOCUS, ...over })
+    expect(at({ inText: true, zone, column: "k" })).toEqual({
+      kind: "text-box",
+    })
+    expect(at({ zone, column: "k" })).toEqual(zone)
+    expect(at({ column: "k" })).toEqual({ kind: "column", key: "k" })
+    expect(at({})).toBeNull()
+  })
 })

@@ -218,13 +218,6 @@ export const narrowStrip = (width: number, rem: number): boolean =>
 /** The line heading an ask's review. */
 export const ASK_REVIEW_LINE = "what this ask changed"
 
-/** A block's take into your inventory: a reference to it (ADR-0126). */
-export const TAKE_BLOCK = {
-  glyph: "❝",
-  label: "take a reference into your inventory",
-  title: "take a reference into your inventory, and copy it as markdown",
-} as const
-
 /** The image pane's link to the image alone. */
 export const OPEN_IN_TAB = "open in a new tab"
 

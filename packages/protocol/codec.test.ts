@@ -15,6 +15,7 @@ import {
   type MoveOf,
   type MoveTarget,
   type PlaceKey,
+  printAddress,
   rootIdFor,
   runId,
   type Sha256,
@@ -187,6 +188,11 @@ test("decode: an unknown kind is refused, not guessed", () => {
   assert.equal(refusalCode(decodeCommand({ kind: "fold" })), ERR.UNKNOWN_KIND)
   assert.equal(refusalCode(decodeCommand(null)), ERR.UNKNOWN_KIND)
 })
+
+const REFERENCE = cardIdOfKind(
+  "reference",
+  "01a0ffd2-0000-7000-8000-0000000000e1",
+)
 
 test("encodeIntent -> decodeCommand round-trips every intent", () => {
   const intents = [
@@ -416,6 +422,46 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         from: null,
         to: { kind: "canvas-at", task: TEST_TASK, after: TEST_THREAD },
       },
+    },
+    {
+      kind: "paste",
+      paste: {
+        kind: "reference",
+        card: REFERENCE,
+        address: { kind: "entry", thread: TEST_THREAD, entry: entryId("e-9") },
+        quote: "a".repeat(64) as Sha256,
+      },
+      to: { kind: "notes", near: "thread", thread: TEST_THREAD },
+      replacing: null,
+      here: null,
+    },
+    {
+      kind: "paste",
+      paste: { kind: "text", card: textCardId(cardIdFor("c7")), origin: null },
+      to: { kind: "inventory", holder: writerId("ada@example.com") },
+      replacing: {
+        card: REFERENCE,
+        from: { kind: "inventory", holder: writerId("ada@example.com") },
+      },
+      here: TEST_TASK,
+    },
+    {
+      kind: "paste",
+      paste: {
+        kind: "text",
+        card: textCardId(cardIdFor("c7")),
+        origin: { kind: "entry", thread: TEST_THREAD, entry: entryId("e-9") },
+      },
+      to: { kind: "canvas-at", task: TEST_TASK, after: null },
+      replacing: null,
+      here: null,
+    },
+    {
+      kind: "paste",
+      paste: { kind: "uncut", card: cardIdFor("c7") },
+      to: { kind: "notes", near: "task", task: TEST_TASK },
+      replacing: null,
+      here: null,
     },
     { kind: "undo-move", task: TEST_TASK, direction: "undo" },
     { kind: "undo-move", task: TEST_TASK, direction: "redo" },
@@ -726,6 +772,50 @@ test("decode: a move is typed by its card's kind, refused to or from a place tha
   // @ts-expect-error: a text card is never on a canvas
   const nor: MoveOf<"text"> = { card: cardIdFor("c1"), from: null, to: canvas }
   assert.ok(nor)
+})
+
+test("decode: a paste names its card's move, from nowhere or a trash, after at most a discard of the card it replaces (ADR-0132)", () => {
+  const ada = { kind: "inventory", holder: writerId("ada@x.io") } as const
+  const wire = (over: Record<string, string>) =>
+    decodeCommand({
+      kind: "paste",
+      mode: "reference",
+      cardId: REFERENCE,
+      text: printAddress({
+        kind: "entry",
+        thread: TEST_THREAD,
+        entry: entryId("e-9"),
+      }),
+      seen: "a".repeat(64),
+      moves: encodeMoves([{ card: REFERENCE, from: null, to: ada }]),
+      ...over,
+    })
+  expect(wire({})).toMatchObject({
+    kind: "paste",
+    paste: { kind: "reference" },
+    replacing: null,
+  })
+  expect(refusalCode(wire({ text: "nope" }))).toBe(ERR.UNKNOWN_TARGET)
+  expect(refusalCode(wire({ seen: "nope" }))).toBe(ERR.UNKNOWN_TARGET)
+  // A reference's paste on a text card's id.
+  const text = encodeMoves([
+    { card: textCardId(cardIdFor("c1")), from: null, to: ada },
+  ])
+  expect(refusalCode(wire({ moves: text }))).toBe(ERR.UNKNOWN_TARGET)
+  // A text card pasted from a place, not from nowhere.
+  const moved = encodeMoves([
+    { card: textCardId(cardIdFor("c1")), from: ada, to: ada },
+  ])
+  expect(refusalCode(wire({ mode: "text", text: "", moves: moved }))).toBe(
+    ERR.UNKNOWN_TARGET,
+  )
+  // What it replaces is discarded, and comes first.
+  const replaced = encodeMoves([
+    { card: textCardId(cardIdFor("c1")), from: ada, to: ada },
+    { card: REFERENCE, from: null, to: ada },
+  ])
+  expect(refusalCode(wire({ moves: replaced }))).toBe(ERR.UNKNOWN_TARGET)
+  expect(refusalCode(wire({ mode: "copy" }))).toBe(ERR.UNKNOWN_TARGET)
 })
 
 test("decode: a copy names its source, the end it forks at, and one new thread's card onto a canvas or into an inventory (ADR-0117)", () => {

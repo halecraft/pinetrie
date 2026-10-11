@@ -3174,22 +3174,13 @@ export const mutations: readonly Mutation[] = [
       "a put's link is found again in the text, with its label; one in code is text",
   },
   {
-    name: "a reference is made on a canvas",
+    name: "a replacement makes its card before the discard",
     file: "packages/rules/moves.ts",
-    from: "  if (place === undefined || !isReferenceCardId(card))",
-    to: "  if (!isReferenceCardId(card))",
+    from: "  const before = discard === null ? cards : afterStep(cards, discard)",
+    to: "  const before = cards",
     command: unit,
     expect:
-      "planMakeReference makes a reference where its move lands, through planMake; never on a canvas",
-  },
-  {
-    name: "a reference edited as text forgets where it came from",
-    file: "packages/rules/moves.ts",
-    from: "      { command: null, unsent: null, origin: now.content.address },",
-    to: "      { command: null, unsent: null, origin: null },",
-    command: unit,
-    expect:
-      "planEditAsText: one move set, a text card in the reference's place with its origin, and the reference to the trash",
+      "an edit as text is a paste replacing its reference: the reference to the trash first, then the text card in its very place, in a full inventory too (ADR-0133)",
   },
   {
     name: "a queued ask is no queued card",
@@ -3308,5 +3299,32 @@ export const mutations: readonly Mutation[] = [
     to: '      return !isWorkflowStateId(r.state) || r.order !== "-"',
     command: unit,
     expect: "a task card round-trips",
+  },
+  {
+    name: "a cut card comes out of anyone's trash",
+    file: "packages/rules/moves.ts",
+    from: "    now.place.holder !== sender",
+    to: "    false",
+    command: unit,
+    expect:
+      "a cut card moves out of its cutter's own trash; one in someone else's, or in none, is gone; no move takes one out (ADR-0132)",
+  },
+  {
+    name: "a paste enters no history",
+    file: "packages/rules/move-history.ts",
+    from: '      if (cause === "paste") return historyScope(taskOf(move.to))',
+    to: '      if (cause === "never") return historyScope(taskOf(move.to))',
+    command: unit,
+    expect:
+      "a paste's creation enters the history of the task it lands in, or into a slot its sender's outside any task; a move's creation enters none (ADR-0132)",
+  },
+  {
+    name: "a paste's first move may go anywhere",
+    file: "packages/protocol/codec.ts",
+    from: '        (replaced.from === null || replaced.to.kind !== "trash"))',
+    to: "        replaced.from === null)",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect:
+      "decode: a paste names its card's move, from nowhere or a trash, after at most a discard of the card it replaces (ADR-0132)",
   },
 ]

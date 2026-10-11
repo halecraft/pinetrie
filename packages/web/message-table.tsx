@@ -1,15 +1,10 @@
 // web/message-table — a table in a message's text, with its bar of
-// actions (ADR-0078): ❝ takes a reference to it into your inventory
-// (ADR-0126), and ⤢ opens it in the column's pane.
+// actions (ADR-0078): ⤢ opens it in the column's pane. Cmd+C with focus on
+// the bar copies the table (ADR-0132): the bar's wrap carries its block.
 
 import { type ComponentProps, useContext } from "react"
 import { blockOfProperty } from "./markdown.ts"
-import {
-  type PaneSubject,
-  samePane,
-  TAKE_BLOCK,
-  tableOpenWords,
-} from "./pane.ts"
+import { type PaneSubject, samePane, tableOpenWords } from "./pane.ts"
 import { MessageSource, PaneReach } from "./pane-context.ts"
 
 /**
@@ -45,26 +40,14 @@ export function MessageTable(
     mine === null ? "streaming" : shown ? "shown" : "closed",
   )
   return (
-    // Its block's number on the wrap too: Cmd+C with focus on its bar takes
-    // the table (the column's `onEntryKey`, ADR-0126).
+    // Its block's number on the wrap too: Cmd+C with focus on its bar copies
+    // the table (`focusFacts`, `clipboard.ts`, ADR-0132).
     <div
       className="table-wrap"
       data-block={props["data-block"]}
       data-shown={shown || undefined}
     >
       <div className="table-bar">
-        <button
-          aria-label={TAKE_BLOCK.label}
-          className="take-block"
-          disabled={mine === null}
-          onClick={() => {
-            if (mine?.kind === "block") reach.take(mine.address)
-          }}
-          title={TAKE_BLOCK.title}
-          type="button"
-        >
-          {TAKE_BLOCK.glyph}
-        </button>
         <button
           aria-label={words.label}
           aria-pressed={shown}

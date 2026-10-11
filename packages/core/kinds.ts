@@ -1,6 +1,6 @@
 // kinds — every kind of card, once (ADR-0126): its id's prefix, the places
-// it is ever in, whether it is reordered where it is, what a put does to
-// your hand, and where what it says is read. One row per kind, so a kind
+// it is ever in, whether it is reordered where it is, and where what it
+// says is read. One row per kind, so a kind
 // added to `CardKind` does not compile until each is said. Re-exported from
 // `index.ts`; `PLACES_OF`, `kindOfCard` and `textSourceOf` read it.
 
@@ -20,8 +20,6 @@ export interface KindSpec {
   readonly moves: boolean
   /** Whether it may be reordered among its neighbours where it is. */
   readonly reordered: boolean
-  /** What a put does to your hand: moves the card, or leaves it and makes another. */
-  readonly put: "moves" | "copies"
   /**
    * Where what it says is read (`textSourceOf`): its own text document, a
    * blob, the fact it holds, the ask it relays, or nowhere (it says
@@ -44,8 +42,7 @@ export interface KindSpec {
  * - a reference, holding an address and its quote: a note, a comment in
  *   an entry's margin, queued (its quote sent as its queuer's message), in
  *   an inventory, or discarded. The readers of pinned cards read no quote,
- *   so it is never pinned; a put leaves it in your hand and makes another
- *   where it lands;
+ *   so it is never pinned;
  * - a fact, only ever queued, until its thread's end consumes it: the
  *   host places it, no person moves it (a move is refused `no-place`), and
  *   nothing passes it in its queue (`planReorder`, refused `fact`);
@@ -74,7 +71,6 @@ export const KINDS = {
     ],
     moves: true,
     reordered: true,
-    put: "moves",
     text: "doc",
   },
   thread: {
@@ -82,7 +78,6 @@ export const KINDS = {
     places: ["canvas", "inventory", "trash"],
     moves: true,
     reordered: true,
-    put: "moves",
     text: "none",
   },
   task: {
@@ -90,7 +85,6 @@ export const KINDS = {
     places: ["board", "trash"],
     moves: false,
     reordered: false,
-    put: "moves",
     text: "none",
   },
   "note-column": {
@@ -98,7 +92,6 @@ export const KINDS = {
     places: ["canvas"],
     moves: true,
     reordered: true,
-    put: "moves",
     text: "none",
   },
   fact: {
@@ -106,7 +99,6 @@ export const KINDS = {
     places: ["queued"],
     moves: false,
     reordered: false,
-    put: "moves",
     text: "fact",
   },
   reference: {
@@ -114,7 +106,6 @@ export const KINDS = {
     places: ["note", "margin", "queued", "trash", "inventory"],
     moves: true,
     reordered: true,
-    put: "copies",
     text: "blob",
   },
   ask: {
@@ -122,7 +113,6 @@ export const KINDS = {
     places: ["queued"],
     moves: false,
     reordered: true,
-    put: "moves",
     text: "ask",
   },
   media: {
@@ -130,7 +120,6 @@ export const KINDS = {
     places: [],
     moves: false,
     reordered: false,
-    put: "moves",
     text: "none",
   },
   file: {
@@ -138,7 +127,6 @@ export const KINDS = {
     places: [],
     moves: false,
     reordered: false,
-    put: "moves",
     text: "none",
   },
 } as const satisfies Record<CardKind, KindSpec>

@@ -30,6 +30,7 @@ import {
 } from "@pinetrie/interface"
 import { type ReactNode, useRef, useState } from "react"
 import { CardHistory, MovedBack } from "./card-history.tsx"
+import { InventoryIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
 
 /** A tone's class; the inventory's is `held`, since `.inventory` is the panel's. */
@@ -77,7 +78,15 @@ export function CardFrame(p: {
           key,
           className: "move-to",
           data: { to: key },
-          label: w.label,
+          // Take has one icon wherever it is offered (ADR-0132).
+          label:
+            m.to === "inventory" ? (
+              <>
+                <InventoryIcon way="take" /> {w.label}
+              </>
+            ) : (
+              w.label
+            ),
           title: w.title,
           onChoose: () => p.onAct(m.act),
         }
@@ -108,6 +117,9 @@ export function CardFrame(p: {
       <div
         className="card-head"
         data-card={card?.id}
+        // The card itself takes focus here, outside its text box, so Cmd+C
+        // and Cmd+X copy and cut the card (ADR-0132); a click focuses it.
+        tabIndex={card === null ? undefined : 0}
         // A card you may discard is one you may move.
         draggable={card !== null && view.discards}
         onDragStart={e => {

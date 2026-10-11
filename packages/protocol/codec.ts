@@ -30,8 +30,8 @@ import {
   isReorderAt,
   isRootId,
   isSha256,
-  isTargetOf,
   isTaskId,
+  isTextCardId,
   isThreadId,
   isWorkflowStateId,
   keyFieldsFrom,
@@ -49,6 +49,7 @@ import {
   OFFER_ACTIONS,
   type OfferAction,
   type OfferSeen,
+  type Paste,
   type PlaceKey,
   type PlaceRefusal,
   type Position,
@@ -403,54 +404,32 @@ export function decodeCommand(
       move: { card: first.card, from: null, to: first.to },
     }
   }
-  if (kind === "make-reference") {
+  if (kind === "paste") {
     const moves = decodeMoves(text(wire?.moves))
     if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
-    const [first, ...more] = moves
-    const address = parseAddress(text(wire?.text))
-    const quote = text(wire?.seen)
+    // Its card's move last, after the discard of the card it replaces.
+    const main = moves.at(-1)
+    const replaced = moves.length === 2 ? moves[0] : undefined
     if (
-      first === undefined ||
-      more.length > 0 ||
-      first.from !== null ||
-      !isReferenceCardId(first.card) ||
-      !isTargetOf("reference", first.to)
+      main === undefined ||
+      moves.length > 2 ||
+      (replaced !== undefined &&
+        (replaced.from === null || replaced.to.kind !== "trash"))
     )
       return refused(
         ERR.UNKNOWN_TARGET,
-        "a reference is one new card, where a reference may be",
+        "a paste names its card's move, after a discard of the card it replaces",
       )
-    if (address === undefined)
-      return refused(ERR.UNKNOWN_TARGET, "a reference names an address")
-    if (!isSha256(quote))
-      return refused(ERR.UNKNOWN_TARGET, "a reference names its quote's blob")
-    return {
-      kind,
-      move: { card: first.card, from: null, to: first.to },
-      address,
-      quote,
-    }
-  }
-  if (kind === "edit-as-text") {
-    const reference = parseCardId(text(wire?.targetId))
-    const card = parseTextCardId(text(wire?.cardId))
-    const moves = decodeMoves(text(wire?.moves))
-    if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
-    const from = moves[0]?.from
     const here = hereOf(wire)
-    if (
-      reference === undefined ||
-      !isReferenceCardId(reference) ||
-      card === undefined ||
-      from === undefined ||
-      from === null ||
-      here === undefined
-    )
-      return refused(
-        ERR.UNKNOWN_TARGET,
-        "an edit as text names a reference where it is, and a new text card",
-      )
-    return { kind, reference, from, card, here }
+    if (here === undefined)
+      return refused(ERR.UNKNOWN_TARGET, "its sender's task is not a task")
+    const replacing =
+      replaced?.from == null
+        ? null
+        : { card: replaced.card, from: replaced.from }
+    const paste = pasteOfWire(text(wire?.mode), main, wire)
+    if (typeof paste === "string") return refused(ERR.UNKNOWN_TARGET, paste)
+    return { kind, paste, to: main.to, replacing, here }
   }
   if (kind === "undo-move") {
     // "" names the sender's history outside any task (ADR-0126).
@@ -788,6 +767,50 @@ export function decodeMoves(s: string): readonly TypedMove[] | string {
   return moves
 }
 
+/**
+ * A paste's card, by `mode`, from its one move and the wire, or why it is
+ * malformed: a text card or a reference made from nothing, a reference
+ * naming its address (`text`) and its quote's blob (`seen`), a text card
+ * its origin or none (`text`, `""`), a cut card out of a trash.
+ */
+function pasteOfWire(
+  mode: string,
+  move: TypedMove,
+  wire: WireCommand | null | undefined,
+): Paste | string {
+  switch (mode) {
+    case "text": {
+      const printed = text(wire?.text)
+      const origin = printed === "" ? null : parseAddress(printed)
+      if (
+        move.from !== null ||
+        !isTextCardId(move.card) ||
+        origin === undefined
+      )
+        return "a pasted text card is new, and names its origin or none"
+      return { kind: "text", card: move.card, origin }
+    }
+    case "reference": {
+      const address = parseAddress(text(wire?.text))
+      const quote = text(wire?.seen)
+      if (
+        move.from !== null ||
+        !isReferenceCardId(move.card) ||
+        address === undefined ||
+        !isSha256(quote)
+      )
+        return "a pasted reference is new, and names its address and its quote's blob"
+      return { kind: "reference", card: move.card, address, quote }
+    }
+    case "uncut":
+      return move.from?.kind === "trash"
+        ? { kind: "uncut", card: move.card }
+        : "a cut card is pasted out of a trash"
+    default:
+      return `unknown paste: ${mode}`
+  }
+}
+
 /** A reorder's place and neighbours -> the wire: `{ at, after, before }`. */
 export const encodeReorder = (r: Reorder): string =>
   JSON.stringify({
@@ -1021,22 +1044,28 @@ export function encodeIntent(id: string, intent: Intent): Command {
         parentId: intent.end,
         moves: encodeMoves([intent.move]),
       })
-    case "make-reference":
+    case "paste":
       return command({
         id,
-        kind: "make-reference",
-        moves: encodeMoves([intent.move]),
-        text: printAddress(intent.address),
-        seen: intent.quote,
-      })
-    case "edit-as-text":
-      return command({
-        id,
-        kind: "edit-as-text",
-        targetId: intent.reference,
-        cardId: intent.card,
+        kind: "paste",
+        mode: intent.paste.kind,
+        cardId: intent.paste.card,
+        text:
+          intent.paste.kind === "reference"
+            ? printAddress(intent.paste.address)
+            : intent.paste.kind === "text" && intent.paste.origin !== null
+              ? printAddress(intent.paste.origin)
+              : "",
+        seen: intent.paste.kind === "reference" ? intent.paste.quote : "",
         moves: encodeMoves([
-          { card: intent.reference, from: intent.from, to: DISCARDED },
+          ...(intent.replacing === null
+            ? []
+            : [{ ...intent.replacing, to: DISCARDED }]),
+          {
+            card: intent.paste.card,
+            from: intent.paste.kind === "uncut" ? DISCARDED : null,
+            to: intent.to,
+          },
         ]),
         here: intent.here ?? "",
       })

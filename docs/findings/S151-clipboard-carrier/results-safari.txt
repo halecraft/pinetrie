@@ -1,0 +1,48 @@
+Safari on macOS (version not recorded), probe.html served from
+`python3 -m http.server 8151`, run by hand by Duane, 2026-10-11, following
+the four steps. One page's log, as the page drew it (unescaped here from
+the HTML Duane copied). Every page's nonce was the default, n0, so which
+page a paste's data came from is read from the order of the steps.
+
+{"ev":"keydown","key":"meta","active":"BODY"}
+{"ev":"keydown","key":"alt","active":"BODY"}
+{"ev":"keydown","key":"control","active":"BODY"}
+{"ev":"keydown","key":"meta","active":"card"}
+{"ev":"keydown","key":"c","active":"card"}
+{"ev":"beforecopy","cancelled":false}
+{"ev":"beforecopy","cancelled":false}
+{"ev":"copy","active":"card","collapsed":true,"hasData":true,"set":{"text/plain":"ok","text/html":"ok","application/x-pinetrie":"ok"},"typesAfterSet":["text/plain","text/html","application/x-pinetrie"]}
+{"ev":"keydown","key":"x","active":"card"}
+{"ev":"beforecut","cancelled":false}
+{"ev":"beforecut","cancelled":false}
+{"ev":"cut","active":"card","collapsed":true,"hasData":true,"set":{"text/plain":"ok","text/html":"ok","application/x-pinetrie":"ok"},"typesAfterSet":["text/plain","text/html","application/x-pinetrie"]}
+{"ev":"keydown","key":"v","active":"card"}
+{"ev":"beforepaste","cancelled":false}
+{"ev":"beforepaste","cancelled":false}
+{"ev":"paste","active":"card","target":"card","types":["text/plain","text/html","application/x-pinetrie"],"data":{"text/plain":"CARD-TEXT n0","text/html":"<span data-pinetrie='{\"nonce\":\"n0\"}'>CARD-TEXT n0</span>","application/x-pinetrie":"{\"nonce\":\"n0\"}"},"files":0,"htmlCarrier":"{\"nonce\":\"n0\"}"}
+{"ev":"keydown","key":"meta","active":"card"}
+{"ev":"keydown","key":"v","active":"card"}
+{"ev":"beforepaste","cancelled":false}
+{"ev":"beforepaste","cancelled":false}
+{"ev":"paste","active":"card","target":"card","types":["text/html","text/plain"],"data":{"text/html":"<span data-pinetrie=\"{&quot;nonce&quot;:&quot;n0&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-size: medium; font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; text-decoration: none;\">CARD-TEXT n0</span>","text/plain":"CARD-TEXT n0","application/x-pinetrie":""},"files":0,"htmlCarrier":"{&quot;nonce&quot;:&quot;n0&quot;}"}
+{"ev":"keydown","key":"meta","active":"card"}
+{"ev":"keydown","key":"c","active":"card"}
+{"ev":"beforecopy","cancelled":false}
+{"ev":"beforecopy","cancelled":false}
+{"ev":"copy","active":"card","collapsed":true,"hasData":true,"set":{"text/plain":"ok","text/html":"ok","application/x-pinetrie":"ok"},"typesAfterSet":["text/plain","text/html","application/x-pinetrie"]}
+{"ev":"keydown","key":"meta","active":"card"}
+{"ev":"keydown","key":"meta","active":"card"}
+{"ev":"keydown","key":"v","active":"card"}
+{"ev":"beforepaste","cancelled":false}
+{"ev":"beforepaste","cancelled":false}
+{"ev":"paste","active":"card","target":"card","types":["text/plain","text/html"],"data":{"text/plain":"CARD-TEXT n0","text/html":"<span data-pinetrie=\"{&quot;nonce&quot;:&quot;n0&quot;}\" style=\"font-size: medium; font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; text-decoration: none; caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);\">CARD-TEXT n0</span>","application/x-pinetrie":""},"files":0,"htmlCarrier":"{&quot;nonce&quot;:&quot;n0&quot;}"}
+{"ev":"keydown","key":"control","active":"card"}
+{"ev":"keydown","key":"meta","active":"card"}
+{"ev":"keydown","key":"^","active":"card"}
+{"ev":"keydown","key":"meta","active":"BODY"}
+{"ev":"keydown","key":"c","active":"BODY"}
+{"ev":"copy","active":"BODY","collapsed":true,"hasData":true}
+{"ev":"keydown","key":"meta","active":"BODY"}
+{"ev":"keydown","key":"a","active":"BODY"}
+{"ev":"keydown","key":"c","active":"BODY"}
+{"ev":"copy","active":"BODY","collapsed":false,"hasData":true}

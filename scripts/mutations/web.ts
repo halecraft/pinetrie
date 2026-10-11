@@ -312,4 +312,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a link to an address is drawn as a chip naming it",
   },
+  {
+    name: "a button writes the clipboard itself",
+    file: "packages/web/copy.ts",
+    from: "    const written = writeTextByButton(text)",
+    to: "    const written = navigator.clipboard?.writeText(text) ?? null",
+    command: unit,
+    expect: "only clipboard.ts touches the clipboard (ADR-0132)",
+  },
 ]

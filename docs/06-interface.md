@@ -891,9 +891,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   written"). A table keeps its words whole, and one wider than the column
   scrolls sideways in it.
 - **A message's tools are one row** over its top right, shown on hover or
-  focus (ADR-0043): *copy* first, then *edit*, and `→` last, in the
-  right margin, since what it opens appears to the right. Copy puts the
-  message on the clipboard as markdown: its text as it was written, then
+  focus (ADR-0043): *copy* first, then *comment* and *edit*, and `→` last,
+  in the right margin, since what it opens appears to the right. Nothing is
+  taken from the past (ADR-0132): a message is copied, and kept from the
+  clipboard cell. Copy puts the message on the clipboard as markdown: its text as it was written, then
   each tool call it made, its tool's word and the command or path, and its
   whole output. It
   shows a check for two seconds; over plain http, which has no clipboard,
@@ -911,7 +912,9 @@ The rail is E; the column is T. Seeing both at once is the product.
 ### A card's frame (ADR-0111)
 
 - **Every text card is drawn in one frame**: a header, its box, and a
-  footer. The header is what you drag it by. Its icon says what kind of
+  footer. The header is what you drag it by, and what takes the card's
+  focus: a click there focuses the card itself, outside its box, so Cmd+C
+  and Cmd+X copy and cut it (ADR-0132). Its icon says what kind of
   card it is (✎ a text card), and it says where the card is (your message,
   note, queued, pinned, inventory), how it
   stands ("next", "held · 2nd in line", "not sent: …", "changed since the
@@ -1102,23 +1105,51 @@ The rail is E; the column is T. Seeing both at once is the product.
   Dropping a card on a slot that holds one swaps the two, and so do
   Alt+arrows.
 - **Take** moves a card into your inventory (a *take into the inventory*,
-  ADR-0083): Ctrl+Shift+I in its box, **Move to your inventory** in its ⋯,
-  or a drag of its header onto the panel. It lands in the selected slot if that is empty, else the first
-  empty one, and flies there; a take into the inventory while the panel is
-  closed shows it briefly. Full means full: the nineteenth card is refused
-  with "inventory full".
-- **Taking from the past** (ADR-0126): a message's **take**, a table's ❝,
-  or Cmd+C outside a text box, takes a *reference*, a card naming the
-  message, the table or your selection in it, with its quote, and puts its
-  markdown on the clipboard. The past never changes, so the reference is
-  the copy. Cmd+C on a selection copies what is selected: one across
-  formatting, which no range of the message's text names, is copied as
-  the browser copies it, and nothing is taken (ADR-0126). It shows as a chip; selected, its quote; opened, its quote and
-  thread, and **Edit as text**, which makes it a text card you can change,
-  in its place, one undo. Put with the put key, it stays in your hand and
-  a new one lands; in a text box, it is a link, which opens what it names.
-  The agent reads each linked message, table or quote under the message
-  that links it.
+  ADR-0083): Ctrl+Shift+I in its box or on its header, **Move to your
+  inventory** in its ⋯ (marked with the inventory's box and an arrow into
+  it, the take's one icon wherever it is offered), or a drag of its header
+  onto the panel. A take lands in the selected slot if that is empty, else
+  the first empty one, and flies there; a take into the inventory while the
+  panel is closed shows it briefly. With no empty slot it is refused with
+  "inventory full". **A drop or a paste aimed at a filled slot replaces its
+  card**, which goes to your trash in the same undo step (ADR-0133); a card
+  that may not be discarded there is not replaced ("not replaced: the card
+  in that slot can't be discarded"), and a thread's copy lands only in an
+  empty slot. Nothing nobody aimed at is discarded.
+- **Copy, cut and paste** are the system clipboard's (ADR-0132), and the
+  inventory holds only what you take:
+  - **Cmd+C** (Ctrl+C elsewhere) copies anything you can read: a selection
+    as its text; with nothing selected, a focused table's bar its table, a
+    message selected in its column (`j`/`k`, or a click) the message, a
+    focused card the card, the clipboard cell its copy. It moves nothing,
+    opens nothing, is never refused for room and is no undo step. In a
+    read-only column too.
+  - **Cmd+X** on a focused card you may discard cuts it: a copy, then a
+    discard to your trash, one undo step. On the past it does nothing.
+  - **Cmd+V** lands what the clipboard holds where focus is, one undo step:
+    in a text box, text as itself and a copied message, block or card as a
+    link to it; on a column, a note column or a slot, a selection or text
+    from another app as a text card keeping where it came from, a message
+    or a block as a reference, a card as a copy of it (a thread's copy at
+    its end as you copied it, a note column or a task as a reference to
+    it). The first paste after a cut moves the cut card itself out of your
+    trash. Cmd+Shift+V pastes the text alone, where the browser gives a
+    paste for it.
+  - A copy carries pine·trie's own data beside its text, so a paste in
+    another tab or browser still lands as a card; another app gets the
+    text, and a copy from another host lands as text.
+  - **The clipboard cell**, beside the grid on the side away from the
+    preview, shows what you last copied in this tab ("last copied here"): a
+    copy made in another app shows there once you paste it. It is no slot
+    and takes no drop; **keep** pastes it into a free slot. Keeping a
+    message or a block takes those two steps: copy, then keep.
+- **A reference** names a message, a table or a range of a message's
+  text, with its quote (ADR-0126). It shows as a chip; selected, its quote;
+  opened, its quote and thread, and **Edit as text**, which makes it a text
+  card you can change, in its place and slot, one undo (a paste replacing
+  it, so a full inventory takes it too). Put, it leaves your hand as any
+  card does. The agent reads each linked message, table or quote under the
+  message that links it.
 - **Comments** (ADR-0126): a message's **comment** opens its margin under
   it with a new note focused. Everyone on the task reads it; the agent does
   not. Shut, the message shows how many comments it has (💬 2); a press
@@ -1129,7 +1160,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   message does, with ↑ ↓, × and a ⋯ that moves it back to the notes or into
   your inventory. With a column's messages focused (a click on one), `j`
   and `k` select a message, Enter opens its comments, `c` comments on it,
-  Escape shuts them, and Cmd+C takes a reference to it.
+  Escape shuts them, and Cmd+C copies it.
 - **Put** moves the selected card to the notes of the column you were last
   in: Ctrl+Shift+O, the panel's **put** button, or a drag out
   of the panel onto a column: a note in the note column nearest its thread,
@@ -1145,7 +1176,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   column unfolded. If anyone moved the card since, it is refused, saying
   who, and nothing moves. Closing a branch is undone whole, its card and
   your message back; a new tab's task, closed empty, is gone for good.
-  Sends and copies are final. On no task, the undo key undoes your moves
+  Sends are final; a paste, **Copy to this task**, **Copy to your
+  inventory**, **Edit as text** and **Queue a reference** are each undone
+  whole, and a copy to the clipboard changes nothing to undo. On no task, the undo key undoes your moves
   outside any task: a discard from your inventory. An archived root's moves cannot be
   undone, and are forgotten 7 days after it was archived.
 - **Undo a swap** with the same keys while the panel has focus: this tab's
@@ -1169,6 +1202,10 @@ The rail is E; the column is T. Seeing both at once is the product.
 | a tab bar shared by everyone, with no close for yourself | the sidebar, yours on every device, with **×** (ADR-0030, ADR-0122) |
 | a new root by anyone appearing as a tab | the board shows it, and who is in it; you open it (ADR-0122) |
 | the Archive tab, and the header's people | the board: every root in a workflow state, Done the archive (ADR-0122) |
+| Cmd+C taking a reference into your inventory; a message's **take**; a table's or an image's ❝ | Cmd+C copies to the clipboard alone; keep, from the clipboard cell (ADR-0132) |
+| Cmd+X taking a card into your inventory | Cmd+X cuts it: a copy, then a discard (ADR-0132) |
+| a reference staying in your hand when put, and the put key in a text box | every card leaves your hand when put; Cmd+V types a link (ADR-0132) |
+| a drop on a filled slot landing in the first empty one | the drop replaces the slot's card (ADR-0133) |
 
 The last row mattered for `PLAN-2026-09-26-thread-lanes`: with no control moving
 a lane, the `navigate` command had no caller and was deleted with `prompt` and

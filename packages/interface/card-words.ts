@@ -124,6 +124,10 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
   if (notice.code === "discarded") return DISCARDED_NOTICE
   if (notice.code === "slots-changed")
     return "not undone: those slots have changed since"
+  if (notice.code === "not-replaced")
+    return "not replaced: the card in that slot can't be discarded"
+  if (notice.code === "slot-taken")
+    return "not pasted: a thread's copy lands only in an empty slot"
   const { by } = notice
   switch (notice.code) {
     case "gone":
@@ -160,10 +164,16 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
 
 /** The inventory panel's name, and its button in the footer. */
 export const INVENTORY = "inventory"
-/** A message's button that takes a copy of it into your inventory. */
-export const TAKE_COPY = "take"
-/** A message's button that takes a copy of it, or of your selection in it. */
-export const TAKE_COPY_INTO_INVENTORY = "take a copy into your inventory"
+/** Take into your inventory (ADR-0132): one name and one key wherever it is offered. */
+export const TAKE = "take into your inventory (Ctrl+Shift+I)"
+/** The clipboard cell's button: its copy into a free slot (ADR-0132). */
+export const KEEP = "keep"
+export const KEEP_TITLE =
+  "keep this in your inventory, in a free slot: a copy, as a paste makes"
+/** The clipboard cell's heading: what it shows, and that it knows no more (ADR-0132). */
+export const CLIPBOARD_CELL = "last copied here"
+export const CLIPBOARD_CELL_TITLE =
+  "what you last copied in this tab; a copy made in another app shows here once you paste it"
 /** The panel's button that puts the selected card in the column last focused. */
 export const PUT = "put"
 export const PUT_TITLE =

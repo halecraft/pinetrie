@@ -934,14 +934,16 @@ stored), and `searchOn` applies it only on the task it was opened on.
 - **`open` names no task in an intent** (`SearchAsk`): `searchActOn` gives it
   the task you are on, so `keyAct` needs none.
 - **Keys** (`page-keys.ts`): `/` outside a text box opens it, unless
-  `KeyFocus.search` is `"unavailable"`; Escape closes it when `"focused"`,
+  `Focus.search` is `"unavailable"`; Escape closes it when `"focused"`,
   checked before the text box's guard, so Escape in the field is this rule
   too.
 
 ## A message's tools (`message-tools.ts`, ADR-0043)
 
 `messageTools` decides which tools a message offers, and `Message` draws
-them in one row: *copy*, *take*, *comment*, *edit* or *new tab*, `→`.
+them in one row: *copy*, *comment*, *edit* or *new tab*, `→`. Nothing is
+taken from the past (ADR-0132): a copy goes to the clipboard, and *Copy,
+cut and paste* below is the rest.
 
 - **Copy is the message as markdown** (`copyText`, `copy-text.ts`): its
   text as stored, not as drawn (mentions, a `/command` and
@@ -952,35 +954,18 @@ them in one row: *copy*, *take*, *comment*, *edit* or *new tab*, `→`.
   result's images, a `write`'s content and an `edit`'s change are not in
   the view, so they are not copied. It only reads, so a column that can't
   be written offers it too, alone.
-- **Taking from the past is a reference** (ADR-0126): `messageReference`
-  takes the whole message, or the block named (a table's ❝, an image);
-  `selectionReference` takes a selection when its text is in the message's
+- **What the past copies as** (ADR-0126, ADR-0132): `messageReference`
+  names the whole message, or the block named (a table's bar, an image);
+  `selectionReference` names a selection when its text is in the message's
   text as written, a range of it, and is null otherwise: a selection across
-  formatting draws text that is not its markdown, and the whole message is
-  not what was selected. *Take a copy into your inventory* takes the
-  selection in the message when a range names it, else the message. Its
-  markdown is
+  formatting draws text that is not its markdown. Their markdown is
   `markdownOf`'s (an entry's is `copyText`, a block's and a range's their
-  slices, `pastMarkdown`), so the quote kept and the clipboard say the
-  same. `planTakeReference` plans the clipboard's write, and the take:
-  `perform` keeps the quote as a blob (`uploadText`), then asks the host to
-  make the reference (`makeReference`). A reference's put (`putReference`)
-  copies from your hand: a new reference with the same address and quote
-  is made where it lands, and into a text box (`PutTarget` `text-box`) it is
-  a link at the caret (`addressLink`, labelled by `addressWords`,
-  `address-words.ts`). *Edit as text* (`planEditAsText`) is
-  one request: its sender writes the quote into a new text card, and the
-  host makes it in the reference's place, its `origin` the address, and
-  trashes the reference, one step of history.
-- **Keys** (`page-keys.ts`): Cmd+X outside a text box takes as Ctrl+Shift+I
-  does; the put key in a text box puts a reference as a link. Cmd+C is
-  not a key here. On a selection outside a text box it is the page's `copy`
-  event: copied as the browser copies it, never prevented, and one inside
-  one message also plans `copySelection`, which takes it when a range names
-  it (its markdown then written over the browser's copy) and nothing
-  otherwise. With nothing selected it is the column's key (`onEntryKey`,
-  `packages/web`), which takes the focused table's bar's table
-  (`data-block` on its wrap), else the selected message.
+  slices, `pastMarkdown`), so what the clipboard says and a reference's
+  quote agree. `clipOfFocus` (`clip.ts`) reads them.
+- **Edit as text** (`planEditAsText`) is a paste (ADR-0132, ADR-0133): a
+  text card of the quote replacing the reference, in its very place and
+  slot, its `origin` the address, the reference to the trash first, so a
+  full inventory takes it too.
 - **The copied text is built on a press**, not by `messageTools`: every
   build of a column's list would otherwise join every call's output, and
   `sameMessageProps` would compare it. `MessageTools.copy` only says
@@ -1499,8 +1484,18 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
 - **A card an undo puts back in your inventory takes its old slot while the
   repair has not cleared it** (`steadiness`), else the first empty one: the
   host knows no slots.
-- **One landing rule** (`put-target.ts`). A put and a drop name a
-  `PutTarget`: a thread's column by key (a note in the note column nearest
+- **One landing rule** (`put-target.ts`, `card-intents.ts`). A put, a
+  drop and a paste name a `PutTarget`, and `planPut(source, target, how)`
+  lands a `PutSource` (a card where it is, or a `Clip`) there, moving it
+  or landing a copy. `putLanding` decides what that does as a value
+  (`Landing`: move, swap, a new text card or reference, a thread's copy,
+  an uncut, an insert into a text box, a replacement, or refused), which
+  the drag engine can draw before a drop; `planPut` only mints ids, words a
+  refusal and maps each case to its effect. Your inventory's target is
+  aimed (`slot: number`, a drop or a paste on a slot) or not (`null`, a
+  take, keep, Copy to your inventory): aimed and filled, the slot's card is
+  replaced, discarded first (ADR-0133); unaimed, the selected slot if empty,
+  else `firstEmpty`, else refused `full`. A target is: a thread's column by key (a note in the note column nearest
   its thread, `noteOf`), its composer (your message), a note column (a
   note at its end, ADR-0116), its pinned strip, a slot, a spot on a
   canvas (`canvas`: just after a folded column, or past the last, where
@@ -1518,14 +1513,15 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   `targetOfElement`, so a drop lands exactly where a put can. A column's pinned strip carries `data-put-pinned`: it
   lands where the column's composer would create a card, pinned (`pinnedOf`),
   an unstarted thread's too. A slot as the target swaps a card already in your
-  inventory, and takes any other into the inventory at that slot.
-- **Take into the inventory, put, keep, remove, select and undo are
-  intents** (`intent.ts`,
-  `card-intents.ts`), planned from `IntentState.cards` (`CardFacts`: the
-  drawn cards, the lanes, the drawn slots, the selection and the composer
-  places), carried out by `perform`. A keep sends one move of every card
-  (`moveCards`), which the host accepts or refuses whole, `full` among its
-  refusals, and closes the column once accepted (`afterKeep`).
+  inventory, and lands any other there, replacing what the slot holds.
+- **Take into the inventory, put, paste, keep (the clipboard cell's),
+  remove, select and undo are intents** (`intent.ts`, `card-intents.ts`),
+  planned from `IntentState.cards` (`CardFacts`: the drawn cards, the
+  lanes, the drawn slots, the selection and the composer places), carried
+  out by `perform`. Several moves sent as one (a closing branch's cards
+  kept in your inventory, a slot's replacement) are the `moveCards`
+  effect, which the host accepts or refuses whole, `full` among its
+  refusals; a closing branch's column closes once accepted (`afterKeep`).
 - **Drag** is HTML drag and drop, not the column drag's pointer events: it
   crosses elements and roots. A card's drag carries its id under
   `CARD_MIME`; its handle is its frame's header (`CardFrame`), or a slot. `App` listens on
@@ -1535,10 +1531,12 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   a card's drag never starts a column's.
 - **Keys** (`page-keys.ts`, `keyAct`): one table of the page's own keys,
   not only the inventory's, read by one `keydown` listener in `App` that
-  decides nothing. It holds the search's keys too (Search, above). Ctrl+Shift+I takes the
+  decides nothing, from one record of where focus is (`Focus`, `focus.ts`,
+  gathered by the page's `focusFacts`). It holds the search's keys too (Search, above). Ctrl+Shift+I takes the
   focused card into the inventory (`data-card` on the focused element, a box's included);
   Ctrl+Shift+O puts the selected one in the column whose element last held
-  focus; Cmd or Ctrl with Z, Shift+Z, or Ctrl+Y undo and redo a move, only
+  focus, never into a text box; Cmd+C, Cmd+X and Cmd+V are the page's
+  `copy`, `cut` and `paste` events, not keys here (*Copy, cut and paste*); Cmd or Ctrl with Z, Shift+Z, or Ctrl+Y undo and redo a move, only
   outside a text box, where the box's own text undo has them. A grid's
   keys are its own (`gridKeyAct`, *Card grids* below). Ctrl+Shift+L
   folds or unfolds the sidebar (ADR-0088), from anywhere, as I and O.
@@ -1560,9 +1558,65 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   preview's `.inventory .preview .card-normal[data-card]`, the open card's
   `.card-grid-open`, `.inventory .put`, `.inventory
   .discard-card`, `#bottom .inventory-toggle` (`.account-inventory` in the
-  account menu while the sidebar is folded), a message's
-  `.take-copy-into-inventory`, and an unstarted thread's column's `.close-keep`,
+  account menu while the sidebar is folded), the clipboard cell's
+  `.inventory .clipboard-cell` and its `.keep`, a card's focusable
+  `.card-head[data-card]`, and an unstarted thread's column's `.close-keep`,
   `.close-discard` and `.close-cancel`.
+
+## Copy, cut and paste (`clip.ts`, ADR-0132)
+
+The system clipboard is a tool, apart from the inventory: a copy moves
+nothing and opens nothing; a paste lands a copy where focus is. The page's
+`clipboard.ts` reads the events and the clipboard's data; everything it
+decides is here.
+
+- **A `Clip` is what was copied, holding its own text**: a selection or
+  another app's text (`text`, with its origin or none), the past (`past`, a
+  `Taken` of an entry or a block), or a card (`card`, its `CardClip` by
+  kind, and whether it was cut). `cardClip` builds a card's: a text
+  card's text (`textOf`), a reference's address and quote blob (its text
+  the quote if this tab has fetched it, `quoteOf`, else its link: the copy
+  cannot wait for a fetch), a thread's end as this tab holds it
+  (`threadAnchor`, `threadClip`), a note column's or a task's link. A
+  kind added to `CardClip` does not compile until `cardClip` and the
+  landing say.
+- **What a copy takes** is `clipOfFocus(focus, facts, cut)`, first match
+  wins: a text box, or a selection outside any message, is the browser's
+  own copy; a selection in a message is its text, its origin the range
+  `selectionReference` names, else the message; then a focused block
+  (`data-block`), the column's selected message (`data-selected`, only while
+  focus is in that column), a focused card, the clipboard cell. A cut takes
+  only a focused card `isDiscardable` says you may discard
+  (`discardable.ts`, the one test a discard, a cut and a replacement ask).
+- **The carrier** (S151): `planCopy` writes the text as `text/plain`, the
+  selection's own HTML or the text escaped in one element carrying
+  `data-pinetrie` as `text/html`, and the same JSON as
+  `application/x-pinetrie`. `readPaste` reads the custom type, then the
+  attribute (the page parses `text/html`: WebKit writes it again in its own
+  form), then the text; a carrier counts only when it decodes, was written
+  on this host (the page's origin) and names the text pasted, `\r\n` taken
+  as `\n`. Shift held at the paste's keydown (Cmd+Shift+V) makes it text.
+- **Where a paste lands** is `targetOfFocus`: the text box with focus, else
+  the drop zone around focus (`targetOfElement`), else the column last
+  focused. It lands by `planPut(…, "copy")`: in a text box, text as itself
+  and anything else as a link (`addressLink`, an `insert` typed by the
+  `insertText` port, so the box's own undo sees it); on a surface a
+  selection or text as a text card keeping its origin, the past as a
+  reference (its quote kept as a blob first), a text card as one with its
+  text and origin `{ kind: "card" }`, a reference as a reference with its
+  quote, a thread as its copy at its clip's end, a note column or a task as
+  a reference to it. A cut clip whose card is still in your trash is an
+  `uncut`: the card itself moves out.
+- **A paste is one request** (`paste`, `@pinetrie/rules`' `planPaste`):
+  the card it replaces discarded first, then the card made or moved, one
+  step of history. **Queue a reference** is a paste of a reference onto
+  its thread's queue, its quote the comment's under a link to its entry,
+  read as it is kept.
+- **The clipboard cell** is `clipboardCellView`: the last `Clip` this tab
+  copied (or pasted: a paste shows what the clipboard holds), its words,
+  "last copied here", and whether **keep** (a paste into an unaimed slot)
+  has a free slot. No page reads the clipboard before a paste, so it claims
+  no more.
 
 ## Card grids (`grid-view.ts`, `grid-keys.ts`, ADR-0048)
 

@@ -5,6 +5,8 @@
 - **Amends:**
   - ADR-0117: a column's ⋯ copies a thread beside itself or into your
     inventory, and takes it; another task is reached through your inventory.
+- **Amended by:**
+  - ADR-0132: a thread also reaches another task by a cut and a paste.
 
 **Context.**
 

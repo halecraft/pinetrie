@@ -51,8 +51,10 @@ export interface Minted {
   readonly task: TaskId
   readonly thread: ThreadId
   readonly noteColumn: NoteColumnId
-  /** A reference a put makes where it lands (ADR-0126). */
+  /** A reference a paste makes where it lands (ADR-0132). */
   readonly reference: ReferenceCardId
+  /** A text card a paste makes where it lands (ADR-0132). */
+  readonly text: TextCardId
 }
 
 export interface Column {

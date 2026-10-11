@@ -1052,9 +1052,9 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a reference's words are said to be a document",
     file: "packages/core/kinds.ts",
-    from: '    put: "copies",\n    text: "blob",',
-    to: '    put: "copies",\n    text: "doc",',
-    command: ["pnpm", "exec", "vitest", "run", "packages/core/kinds.test.ts"],
+    from: '    reordered: true,\n    text: "blob",',
+    to: '    reordered: true,\n    text: "doc",',
+    command: unit,
     expect:
       "a card's words are where its kind says (`KINDS`' text): textSourceOf agrees for every kind with records",
   },

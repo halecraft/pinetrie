@@ -4,7 +4,7 @@
 
 import type { EntryId, ThreadId } from "@pinetrie/core"
 import { createContext } from "react"
-import type { BlockAddress, PaneSubject } from "./pane.ts"
+import type { PaneSubject } from "./pane.ts"
 
 /**
  * The column's pane: what it shows, and `open`, which toggles a subject
@@ -14,8 +14,6 @@ import type { BlockAddress, PaneSubject } from "./pane.ts"
 export interface PaneReach {
   readonly shown: PaneSubject | null
   readonly open: (subject: PaneSubject) => void
-  /** Take a reference to a block into your inventory (ADR-0126); stable. */
-  readonly take: (address: BlockAddress) => void
 }
 
 export const PaneReach = createContext<PaneReach | null>(null)

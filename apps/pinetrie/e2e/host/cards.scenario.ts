@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import {
   type CardId,
+  DISCARDED,
   type EntryId,
   entryId,
   ROOT,
@@ -724,6 +725,67 @@ async function run(check: Checks["check"]): Promise<void> {
         onHost(wrapper.id) === undefined &&
         onHost(onCanvas)?.place.kind === "composing",
       `${drop.kind}; ${landed?.kind}, ${wrapper?.place.kind}; ${dropUndone.kind}, ${onHost(onCanvas)?.place.kind}`,
+    )
+    // A paste (ADR-0132): a text card pasted at the thread lands in its
+    // notes, one step of Ada's history in this task, which an undo takes
+    // away. A cut is a discard, then the paste of that very card out of
+    // her trash; an undo puts it back there.
+    const notesNear = {
+      kind: "notes",
+      near: "thread",
+      thread: threadHolding(ch, tipOf()),
+    } as const
+    const pastedCard = newCardId()
+    const pasted = await ada.paste(
+      {
+        paste: { kind: "text", card: pastedCard, origin: null },
+        to: notesNear,
+        replacing: null,
+        here,
+        text: "pasted here",
+      },
+      { actedAt: { kind: "inventory" }, slot: null },
+    )
+    const pastedLanded = onHost(pastedCard)?.place.kind === "note"
+    const pasteUndone = await ada.undoMoves(here, "undo")
+    await waitFor(() => onHost(pastedCard) === undefined, 5_000)
+    check(
+      "a pasted text card lands where it is pasted, one step of its paster's history: an undo takes it away",
+      pasted.kind === "accepted" &&
+        pastedLanded &&
+        pasteUndone.kind === "undone" &&
+        onHost(pastedCard) === undefined,
+      `${pasted.kind}, landed ${pastedLanded}; ${pasteUndone.kind}, ${onHost(pastedCard)?.place.kind}`,
+    )
+    const cutCard = newCard(ada, tipOf(), "cut, then pasted")
+    await waitFor(() => onHost(cutCard) !== undefined, 5_000)
+    await ada.moveCard(
+      { card: cutCard, from: drafting(tipOf()), to: DISCARDED },
+      { actedAt: { kind: "inventory" }, slot: null },
+      null,
+      here,
+    )
+    await waitFor(() => onHost(cutCard)?.place.kind === "trash", 5_000)
+    const uncut = await ada.paste(
+      {
+        paste: { kind: "uncut", card: cutCard },
+        to: notesNear,
+        replacing: null,
+        here,
+        text: "",
+      },
+      { actedAt: { kind: "inventory" }, slot: null },
+    )
+    const uncutLanded = onHost(cutCard)?.place.kind === "note"
+    const uncutUndone = await ada.undoMoves(here, "undo")
+    await waitFor(() => onHost(cutCard)?.place.kind === "trash", 5_000)
+    check(
+      "a cut card is pasted out of its cutter's trash, the same card, and an undo puts it back in the trash",
+      uncut.kind === "accepted" &&
+        uncutLanded &&
+        uncutUndone.kind === "undone" &&
+        onHost(cutCard)?.place.kind === "trash",
+      `${uncut.kind}, landed ${uncutLanded}; ${uncutUndone.kind}, ${onHost(cutCard)?.place.kind}`,
     )
     // Ada's last move in this root, to undo after a restart (section 6).
     const lastMove = newCard(ada, tipOf(), "moved before the restart")

@@ -1,7 +1,9 @@
 import { cardIdOfKind } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import { type KeyFocus, type KeyLike, keyAct } from "./page-keys.ts"
+import { NO_FOCUS } from "./fixtures.ts"
+import type { Focus } from "./focus.ts"
+import { type KeyLike, keyAct } from "./page-keys.ts"
 
 const C1 = cardIdFor("c1")
 const C2 = cardIdFor("c2")
@@ -13,45 +15,35 @@ const key = (k: string, over: Partial<KeyLike> = {}): KeyLike => ({
   altKey: false,
   ...over,
 })
-const focus = (over: Partial<KeyFocus> = {}): KeyFocus => ({
-  card: null,
-  inText: false,
-  inPanel: false,
+const focus = (over: Partial<Focus> = {}): Focus => ({
+  ...NO_FOCUS,
   selectedCard: C2,
   column: "k-1",
-  page: false,
   search: "closed",
   ...over,
 })
 const chord = { ctrlKey: true, shiftKey: true }
 
 describe("keyAct", () => {
-  test("Cmd+X outside a text box takes the focused card; in a box it is the box's own cut (ADR-0126)", () => {
-    const take = { kind: "takeIntoInventory", card: C1 }
-    expect(keyAct(key("x", { metaKey: true }), focus({ card: C1 }))).toEqual(
-      take,
-    )
-    expect(keyAct(key("x", { ctrlKey: true }), focus({ card: C1 }))).toEqual(
-      take,
-    )
-    expect(
-      keyAct(key("x", { metaKey: true }), focus({ card: C1, inText: true })),
-    ).toBeNull()
-    expect(keyAct(key("x", { metaKey: true }), focus())).toBeNull()
+  test("Cmd+C, Cmd+X and Cmd+V are no keys here: they are the page's copy, cut and paste events (ADR-0132)", () => {
+    for (const k of ["c", "x", "v"]) {
+      expect(keyAct(key(k, { metaKey: true }), focus({ card: C1 }))).toBeNull()
+      expect(keyAct(key(k, { ctrlKey: true }), focus({ card: C1 }))).toBeNull()
+    }
   })
 
-  test("the put key in a text box puts a reference there; any other card goes to the column (ADR-0126)", () => {
+  test("the put key in a text box puts the card in your hand in the column, whatever its kind: only a paste types into a box (ADR-0132)", () => {
     const REF = cardIdOfKind(
       "reference",
       "01a0ffd2-0000-7000-8000-0000000000e1",
     )
     expect(
       keyAct(key("O", chord), focus({ selectedCard: REF, inText: true })),
-    ).toEqual({ kind: "put", card: REF, target: { kind: "text-box" } })
-    expect(keyAct(key("O", chord), focus({ inText: true }))).toEqual({
+    ).toEqual({
       kind: "put",
-      card: C2,
+      source: { kind: "card", card: REF },
       target: { kind: "column", key: "k-1" },
+      how: "move",
     })
   })
 
@@ -72,8 +64,9 @@ describe("keyAct", () => {
     expect(keyAct(key("I", chord), focus())).toBeNull()
     expect(keyAct(key("O", chord), focus({ inText: true }))).toEqual({
       kind: "put",
-      card: C2,
+      source: { kind: "card", card: C2 },
       target: { kind: "column", key: "k-1" },
+      how: "move",
     })
     expect(keyAct(key("O", chord), focus({ column: null }))).toBeNull()
     expect(
@@ -119,7 +112,7 @@ test("while a page covers the stage only the list's fold acts (ADR-0098)", () =>
 describe("keyAct: search (ADR-0101)", () => {
   const open = { kind: "search", act: { kind: "open" } }
   const close = { kind: "search", act: { kind: "close" } }
-  test.each<[string, KeyLike, Partial<KeyFocus>, unknown]>([
+  test.each<[string, KeyLike, Partial<Focus>, unknown]>([
     ["/ opens it", key("/"), {}, open],
     ["/ in a box is text", key("/"), { inText: true }, null],
     [

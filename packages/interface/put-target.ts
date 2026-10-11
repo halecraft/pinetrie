@@ -1,4 +1,5 @@
-// interface/put-target — where a put or a drop lands (ADR-0048). Pure.
+// interface/put-target — where a put, a drop or a paste lands (ADR-0048,
+// ADR-0132). Pure.
 //
 // Every input makes the same moves: a drop names a target by the attribute
 // the drop code marks it with, and a put by key or button names the same
@@ -25,6 +26,7 @@ import {
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
+import type { Focus } from "./focus.ts"
 
 export type PutTarget =
   /**
@@ -51,15 +53,20 @@ export type PutTarget =
   | { readonly kind: "pinned"; readonly key: string }
   /** The cards pinned to a task, in its task column (ADR-0116). */
   | { readonly kind: "taskPinned"; readonly task: TaskId }
-  /** A slot of your inventory. */
-  | { readonly kind: "inventory"; readonly slot: number }
+  /**
+   * Your inventory: a slot aimed at (a drop on it, a paste on it), or, with
+   * null, none (a take, keep): the selected slot if empty, else the first
+   * empty one (ADR-0133).
+   */
+  | { readonly kind: "inventory"; readonly slot: number | null }
   /** A workflow state, on the board or the footer's strip: a new thread there (ADR-0111). */
   | { readonly kind: "state"; readonly state: WorkflowStateId }
   /** A place in the sidebar, before a task or at its end: a new thread there. */
   | { readonly kind: "sidebar"; readonly before: TaskId | null }
   /**
-   * The text box that has focus (ADR-0126): a reference put there is a link
-   * to its address at the caret. No other card is put into one.
+   * The text box that has focus (ADR-0132): a paste there types its text,
+   * or a link to what it names, at the caret. Nothing is put or dropped
+   * into one.
    */
   | { readonly kind: "text-box" }
 
@@ -103,7 +110,7 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
     case "taskPinned":
       return { [PUT_TASK_PINNED]: target.task }
     case "inventory":
-      return { [PUT_SLOT]: String(target.slot) }
+      return target.slot === null ? {} : { [PUT_SLOT]: String(target.slot) }
     case "notes":
       return { [PUT_NOTES]: target.column }
     case "canvas":
@@ -114,7 +121,7 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       return { [PUT_STATE]: target.state }
     case "sidebar":
       return { [PUT_SIDEBAR]: target.before ?? END }
-    // A text box is put into by the put key alone: no drop lands there.
+    // A text box is pasted into alone: no drop lands there.
     case "text-box":
       return {}
   }
@@ -154,6 +161,19 @@ export function targetOfElement(el: {
   const slot = el.getAttribute(PUT_SLOT)
   if (slot === null || !/^\d+$/.test(slot)) return null
   return { kind: "inventory", slot: Number(slot) }
+}
+
+/**
+ * Where a put or a paste lands, from where focus is (ADR-0132): the text
+ * box that has focus, else the drop zone around focus, else the column
+ * last focused; null with none of them.
+ */
+export function targetOfFocus(
+  focus: Pick<Focus, "inText" | "zone" | "column">,
+): PutTarget | null {
+  if (focus.inText) return { kind: "text-box" }
+  if (focus.zone !== null) return focus.zone
+  return focus.column === null ? null : { kind: "column", key: focus.column }
 }
 
 /** What a column publishes of its composer: where it makes your message, and the message there. */

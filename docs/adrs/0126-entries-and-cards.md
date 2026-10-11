@@ -24,6 +24,9 @@
 - **Amended by:**
   - ADR-0128: an ask card is a kind of card of its own, only ever queued,
     which a person may reorder and nobody moves.
+  - ADR-0132: Cmd+C copies to the clipboard and takes nothing; Cmd+X cuts;
+    nothing is taken from the past; a reference put from your hand leaves it,
+    as every card does.
 
 **Context.**
 

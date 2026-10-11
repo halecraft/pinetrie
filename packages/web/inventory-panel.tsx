@@ -16,11 +16,14 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import {
+  type ClipboardCellView,
   type Dock,
   type DrawnCard,
   INVENTORY,
   type Intent,
   inventoryView,
+  KEEP,
+  KEEP_TITLE,
   type NoteColumnView,
   noticeKey,
   noticeWords,
@@ -37,6 +40,7 @@ import type {
 } from "@pinetrie/session"
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import { CardGrid } from "./card-grid.tsx"
+import { CopyIcon, InventoryIcon } from "./icons.tsx"
 import { DrawCard, RenderingProvider } from "./renderings.tsx"
 import { useCardTexts } from "./use-card-texts.ts"
 
@@ -71,6 +75,8 @@ export function InventoryPanel(p: {
   notes: ReadonlyMap<NoteColumnId, NoteColumnView>
   /** Each thread's name, which a reference names. */
   threadNames: ReadonlyMap<ThreadId, ThreadName>
+  /** The clipboard cell: the last copy this tab made (ADR-0132), or none yet. */
+  cell: ClipboardCellView | null
 }) {
   const texts = useCardTexts(
     p.session,
@@ -154,8 +160,9 @@ export function InventoryPanel(p: {
               onMove={(card, slot) =>
                 p.onIntent({
                   kind: "put",
-                  card: card.id,
+                  source: { kind: "card", card: card.id },
                   target: { kind: "inventory", slot },
+                  how: "move",
                 })
               }
               onOpen={setOpen}
@@ -167,6 +174,13 @@ export function InventoryPanel(p: {
               targetOf={slot => ({ kind: "inventory", slot })}
               view={view.grid}
             />
+            {p.cell !== null && (
+              <ClipboardCell
+                cell={p.cell}
+                onKeep={() => p.onIntent({ kind: "keep" })}
+                side={PREVIEW_SIDE[p.dock] === "right" ? "left" : "right"}
+              />
+            )}
             {view.preview !== null && (
               <div
                 className="preview"
@@ -189,5 +203,45 @@ export function InventoryPanel(p: {
         ))}
       </div>
     </aside>
+  )
+}
+
+/**
+ * The clipboard cell (ADR-0132): beside the grid, on the side away from the
+ * preview, never a slot and no drop target. It is focusable, so Cmd+C on it
+ * copies its copy again; **keep** pastes it into a free slot.
+ */
+function ClipboardCell(p: {
+  cell: ClipboardCellView
+  onKeep: () => void
+  side: "left" | "right"
+}) {
+  const { cell } = p
+  return (
+    <section
+      aria-label={cell.words}
+      className="clipboard-cell"
+      data-side={p.side}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: focus here is what Cmd+C copies
+      tabIndex={0}
+      title={cell.title}
+    >
+      <div className="clipboard-cell-head">
+        <CopyIcon /> {cell.words}
+      </div>
+      <div className="clipboard-cell-face">
+        <span className="clipboard-cell-what">{cell.face.words}</span>
+        <span className="clipboard-cell-line">{cell.face.line}</span>
+      </div>
+      <button
+        className="keep"
+        disabled={!cell.keep}
+        onClick={p.onKeep}
+        title={KEEP_TITLE}
+        type="button"
+      >
+        <InventoryIcon way="take" /> {KEEP}
+      </button>
+    </section>
   )
 }

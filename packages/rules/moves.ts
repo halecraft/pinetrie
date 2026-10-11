@@ -8,12 +8,10 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
-  type ContentOf,
   DISCARDED,
   type EntryId,
   fitsPlace,
   isNoteColumnId,
-  isReferenceCardId,
   isTextCardId,
   KINDS,
   keyOf,
@@ -23,16 +21,17 @@ import {
   makeCard,
   NO_CONTENT,
   type NoteColumnId,
+  type Paste,
   type PlaceKey,
   placed,
   placeOfKind,
   type RankedCanvas,
+  type Replacing,
   type ResolvedMove,
   type ResolvedTarget,
   sameKey,
   seenAt,
   type TaskId,
-  type TextCardId,
   type ThreadId,
   type WriterId,
   wrapperKind,
@@ -204,78 +203,6 @@ export function planMake(
 }
 
 /**
- * A reference made by `sender` (ADR-0126), at the place a creation's move
- * resolves to, holding `content`: through `planMake`, as every card is.
- * Refused `no-place` for an id that is no reference's, or a place no
- * reference is in. A copy, so it enters no history. Pure.
- */
-export function planMakeReference(
-  cards: readonly CardRecord[],
-  move: ResolvedMove,
-  content: ContentOf["reference"],
-  sender: WriterId,
-): MakeStep {
-  const resolved = placeAt(move.to, cards, sender, undefined, NO_DISCARDS)
-  const place =
-    resolved === undefined ? undefined : placeOfKind("reference", resolved)
-  const { card } = move
-  if (place === undefined || !isReferenceCardId(card))
-    return { kind: "refused", code: "no-place", now: null }
-  return planMake(
-    cards,
-    makeCard("reference", card, place, content, sender),
-    sender,
-  )
-}
-
-/**
- * A reference edited as text (ADR-0126), one move set (`planMoves`'s
- * shape): a new text card, `card`, in the reference's place, its `origin`
- * the reference's address, made by `sender` through `planMake`; and the
- * reference to the trash (`DISCARDED`), as a discard. One gesture, one undo.
- * The new card's text, the quote, is its sender's to write, as a creation's
- * is. Refused as a discard of the reference would be, or a make of the card.
- * Pure.
- */
-export function planEditAsText(
-  cards: readonly CardRecord[],
-  edit: {
-    readonly reference: CardId
-    /** Where its sender saw it. */
-    readonly from: PlaceKey
-    readonly card: TextCardId
-  },
-  sender: WriterId,
-  discards: Discards,
-): MovesStep {
-  const now = cards.find(c => c.id === edit.reference)
-  if (now === undefined || now.kind !== "reference")
-    return { kind: "refused", code: "gone", now: null }
-  const place = placeOfKind("text", now.place)
-  if (place === undefined) return { kind: "refused", code: "no-place", now }
-  const made = planMake(
-    cards,
-    makeCard(
-      "text",
-      edit.card,
-      place,
-      { command: null, unsent: null, origin: now.content.address },
-      sender,
-    ),
-    sender,
-  )
-  if (made.kind === "refused") return made
-  const trashed = planMove(
-    afterStep(cards, made),
-    { card: now.id, from: edit.from, to: DISCARDED },
-    sender,
-    discards,
-  )
-  if (trashed.kind === "refused") return trashed
-  return { kind: "steps", steps: [made, trashed] }
-}
-
-/**
  * A card a person's move makes at `place`, of the kind its id says: a text
  * card with no command, or a note column on a canvas; undefined for any
  * other kind, or a place its kind is never in.
@@ -309,9 +236,10 @@ function madeAt(
  *   (`planMake`).
  * - A fact is the host's (ADR-0080): no person moves its kind (`KINDS`),
  *   so every move of it is refused `no-place`.
- * - To gone: a discard (ADR-0111), from any place the sender may move out
- *   of. A gone card moves only by an undo, which is no handoff: a move out
- *   of gone is refused `gone`.
+ * - To a trash: a discard (ADR-0111), from any place the sender may move
+ *   out of. A card in a trash moves only by an undo, which is no handoff,
+ *   or by its cutter's paste (`planUncut`): a move out of a trash is
+ *   refused `gone`.
  * - Into or out of an inventory: only its holder's, and into it only while
  *   it holds fewer than `INVENTORY_SLOTS` cards. A creation obeys both.
  * - To the queue: after the lane's last card, queued by the sender, and why
@@ -339,6 +267,39 @@ export function planMove(
   }
   if (now === undefined || now.place.kind === "trash")
     return { kind: "refused", code: "gone", now: null }
+  return handoff(cards, now, { ...move, from: move.from }, sender, discards)
+}
+
+/**
+ * A cut card moved out of its cutter's trash to `move.to` (ADR-0132): the
+ * first paste after a cut. Only the sender's own trash gives a card back
+ * this way; one in someone else's trash, or in none, is refused `gone`.
+ * Then it is a handoff as any move is. Pure.
+ */
+export function planUncut(
+  cards: readonly CardRecord[],
+  move: ResolvedMove,
+  sender: WriterId,
+  discards: Discards,
+): MoveStep {
+  const now = cards.find(c => c.id === move.card)
+  if (
+    now === undefined ||
+    now.place.kind !== "trash" ||
+    now.place.holder !== sender
+  )
+    return { kind: "refused", code: "gone", now: null }
+  return handoff(cards, now, { ...move, from: DISCARDED }, sender, discards)
+}
+
+/** `planMove`'s and `planUncut`'s checks once each has found the card where it may leave. */
+function handoff(
+  cards: readonly CardRecord[],
+  now: CardRecord,
+  move: ResolvedMove & { readonly from: PlaceKey },
+  sender: WriterId,
+  discards: Discards,
+): MoveStep {
   if (!seenAt(keyOf(now.place), move.from))
     return { kind: "refused", code: "moved", now }
   // A move to where the card is would requeue it last, under its sender's
@@ -362,6 +323,104 @@ export function planMove(
             content: { ...record.content, unsent: null },
           }
         : { ...record, placer: sender },
+  }
+}
+
+/**
+ * A paste (ADR-0132), as one step of its sender's history: the card it
+ * replaces discarded first (ADR-0133), so a replacement in a full inventory
+ * never meets `full`; then the card made where `move` sends it (a text
+ * card keeping its origin, or a reference), or the cut card moved out of
+ * the sender's trash (`planUncut`). A card made in the place of the one it
+ * replaces takes that very place (its rank in a note column or a queue): an
+ * edit as text keeps the reference's spot. Refused as the discard, the
+ * make or the move would be. Pure.
+ */
+export function planPaste(
+  cards: readonly CardRecord[],
+  paste: Paste,
+  move: ResolvedMove,
+  replacing: Replacing | null,
+  sender: WriterId,
+  discards: Discards,
+): MovesStep {
+  const old =
+    replacing === null ? undefined : cards.find(c => c.id === replacing.card)
+  const discard =
+    replacing === null
+      ? null
+      : planMove(
+          cards,
+          { card: replacing.card, from: replacing.from, to: DISCARDED },
+          sender,
+          discards,
+        )
+  if (discard?.kind === "refused") return discard
+  const before = discard === null ? cards : afterStep(cards, discard)
+  if (paste.kind === "uncut") {
+    const step = planUncut(
+      before,
+      { ...move, card: paste.card },
+      sender,
+      discards,
+    )
+    if (step.kind === "refused") return step
+    return {
+      kind: "steps",
+      steps: [...(discard === null ? [] : [discard]), step],
+    }
+  }
+  const place =
+    old !== undefined && sameKey(keyOf(old.place), move.to)
+      ? old.place
+      : placeAt(move.to, before, sender, undefined, discards)
+  const made =
+    place === undefined ? undefined : pastedCard(paste, place, sender)
+  if (made === undefined)
+    return { kind: "refused", code: "no-place", now: null }
+  const step = planMake(before, made, sender)
+  if (step.kind === "refused") return step
+  return {
+    kind: "steps",
+    steps: [...(discard === null ? [] : [discard]), step],
+  }
+}
+
+/**
+ * The card a paste makes at `place` (ADR-0132): the host's make, and the
+ * page's draw of it until the host answers. Undefined for a place its kind
+ * is never in. Pure.
+ */
+export function pastedCard(
+  paste: Exclude<Paste, { readonly kind: "uncut" }>,
+  place: CardPlace,
+  sender: WriterId,
+): CardRecord | undefined {
+  switch (paste.kind) {
+    case "text": {
+      const at = placeOfKind("text", place)
+      return at === undefined
+        ? undefined
+        : makeCard(
+            "text",
+            paste.card,
+            at,
+            { command: null, unsent: null, origin: paste.origin },
+            sender,
+          )
+    }
+    case "reference": {
+      const at = placeOfKind("reference", place)
+      return at === undefined
+        ? undefined
+        : makeCard(
+            "reference",
+            paste.card,
+            at,
+            { address: paste.address, quote: paste.quote },
+            sender,
+          )
+    }
   }
 }
 

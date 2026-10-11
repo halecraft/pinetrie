@@ -1333,9 +1333,8 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       const tops = row.map(b => b.top)
       check(
-        "a message's tools are one row: copy, take, comment, edit, →",
-        row.map(b => b.name).join(" ") ===
-          "copy take-copy-into-inventory comment edit branch" &&
+        "a message's tools are one row: copy, comment, edit, →",
+        row.map(b => b.name).join(" ") === "copy comment edit branch" &&
           Math.max(...tops) - Math.min(...tops) <= 1,
         `${JSON.stringify(row)}`,
       )
@@ -1418,58 +1417,88 @@ async function run(check: Checks["check"]): Promise<void> {
         selected.trim() === STILL,
         `"${selected}"`,
       )
-      // Cmd+C on a selection across formatting copies what you selected, as
-      // the browser does: no range names it, and the message is not what
-      // you selected (ADR-0126).
-      await page.evaluate(() => navigator.clipboard.writeText(""))
-      await page.locator(`${still} > .text > p`).evaluate(p => {
-        const selection = getSelection()
-        if (selection === null) return
-        selection.selectAllChildren(p)
-        document.execCommand("copy")
-        selection.removeAllRanges()
-      })
-      const highlighted = await page
-        .waitForFunction(
-          async () => (await navigator.clipboard.readText()) !== "",
-          undefined,
-          { timeout: 5_000 },
-        )
-        .then(
-          () => page.evaluate(() => navigator.clipboard.readText()),
-          () => "",
-        )
+      // Cmd+C on a selection copies what you selected, as text, across
+      // formatting or within plain text, and takes nothing into the
+      // inventory, which stays closed (ADR-0132).
+      const copySelection = async (end: number | null) => {
+        await page.evaluate(() => navigator.clipboard.writeText(""))
+        await page.locator(`${still} > .text > p`).evaluate((p, end) => {
+          const selection = getSelection()
+          const text = p.firstChild
+          if (selection === null || text === null) return
+          if (end === null) selection.selectAllChildren(p)
+          else selection.setBaseAndExtent(text, 0, text, end)
+          document.execCommand("copy")
+          selection.removeAllRanges()
+        }, end)
+        return page
+          .waitForFunction(
+            async () => (await navigator.clipboard.readText()) !== "",
+            undefined,
+            { timeout: 5_000 },
+          )
+          .then(
+            () => page.evaluate(() => navigator.clipboard.readText()),
+            () => "",
+          )
+      }
+      const across = await copySelection(null)
+      const plain = await copySelection("still".length)
+      const references = readPlaces(host.places).filter(
+        c => c.kind === "reference",
+      ).length
+      const shut = !(await page.locator(".inventory").isVisible())
       check(
-        "Cmd+C on a selection across formatting copies the text selected, not the message",
-        highlighted.trim() === STILL,
-        `"${highlighted}"`,
+        "Cmd+C on a selection in a message copies the text selected and takes nothing into the inventory",
+        across.trim() === STILL &&
+          plain === "still" &&
+          references === 0 &&
+          shut,
+        `across "${across}", plain "${plain}", ${references} references, inventory shut ${shut}`,
       )
-      // One within a run of plain text is a range of the message's text,
-      // taken as a quote too.
-      await page.locator(`${still} > .text > p`).evaluate(p => {
-        const selection = getSelection()
-        const text = p.firstChild
-        if (selection === null || text === null) return
-        selection.setBaseAndExtent(text, 0, text, "still".length)
-        document.execCommand("copy")
-        selection.removeAllRanges()
-      })
-      const quoted = await waitFor(
+      // Pasted on the thread's column, it lands in the thread's notes as a
+      // text card holding it, keeping the range it came from. With no note
+      // column on the task yet, one is made for it, beside the columns.
+      const columnsBeforePaste = await page.locator(".column").count()
+      await page.click(`${still} > .text`, { position: { x: 2, y: 2 } })
+      await page.keyboard.press("ControlOrMeta+v")
+      const pasted = await waitFor(
         () =>
           readPlaces(host.places).some(
             c =>
-              c.kind === "reference" &&
-              c.content.address.kind === "range" &&
-              c.content.address.from === 0 &&
-              c.content.address.to === "still".length,
+              c.kind === "text" &&
+              c.place.kind === "note" &&
+              c.content.origin?.kind === "range" &&
+              host.cardText(c.id) === "still",
           ),
         10_000,
       )
       check(
-        "Cmd+C on a selection a range names takes it as a quote",
-        quoted >= 0,
-        `taken in ${quoted} ms`,
+        "a selection pasted on a thread's column lands in its notes as a text card holding it, keeping where it came from",
+        pasted >= 0,
+        `pasted in ${pasted} ms`,
       )
+      // A paste is one step of your history: the undo key takes it back,
+      // so no note of yours is left to mark the task.
+      await page.keyboard.press("ControlOrMeta+z")
+      await waitFor(
+        () =>
+          !readPlaces(host.places).some(
+            c => c.kind === "text" && host.cardText(c.id) === "still",
+          ),
+        10_000,
+      )
+      // The column made for it goes with it: later checks count columns.
+      await page
+        .waitForFunction(
+          n => document.querySelectorAll(".column").length === n,
+          columnsBeforePaste,
+          { timeout: 10_000 },
+        )
+        .catch(() => {})
+      // A branch opens after the column you were last in: back to the
+      // agent's, as before the paste.
+      await page.click(`${person} > .text`, { position: { x: 2, y: 2 } })
       // Edit opens a branch at the message's parent, holding its text as sent,
       // with @agent in front: its thread's default person the agent, and a branch
       // asks only through a mention.
@@ -3900,6 +3929,36 @@ async function run(check: Checks["check"]): Promise<void> {
         "Alt+↑ in a note's box moves it up its note column, for everyone",
         raised >= 0,
         `jot ${orderOf("jot")}, one thought ${orderOf("one thought")}`,
+      )
+      // A card's header takes focus (ADR-0132): Cmd+X there cuts the note
+      // to your trash, and Cmd+V with another note's header focused moves
+      // that same card out of your trash, back into the note column.
+      const noteOf = (text: string) =>
+        readPlaces(host.places).find(
+          c => c.kind === "text" && host.cardText(c.id) === text,
+        )
+      const jot = noteOf("jot")?.id ?? ""
+      await page.click(`.card-head[data-card="${jot}"]`, {
+        position: { x: 4, y: 4 },
+      })
+      await page.keyboard.press("ControlOrMeta+x")
+      const cut = await waitFor(
+        () => noteOf("jot")?.place.kind === "trash",
+        10_000,
+      )
+      const neighbour = noteOf("one thought")?.id ?? ""
+      await page.click(`.card-head[data-card="${neighbour}"]`, {
+        position: { x: 4, y: 4 },
+      })
+      await page.keyboard.press("ControlOrMeta+v")
+      const back = await waitFor(
+        () => noteOf("jot")?.place.kind === "note",
+        10_000,
+      )
+      check(
+        "a note's header focused, Cmd+X cuts it to your trash, and Cmd+V on another note's header moves that same card back",
+        cut >= 0 && back >= 0,
+        `cut ${cut} ms, back ${back} ms`,
       )
       // Its title, renamed from its header, for everyone.
       const notesColumn = `.note-column:has(textarea[data-card="${noted}"])`

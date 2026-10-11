@@ -1,5 +1,7 @@
 // interface/message-tools — which tools a message offers, as a pure rule: copy,
-// edit (or new tab), and `→` (ADR-0021, ADR-0043). `Column`
+// comment, edit (or new tab), and `→` (ADR-0021, ADR-0043). Nothing is
+// taken from the past (ADR-0132): a message is copied, and kept from the
+// clipboard cell. `Column`
 // gathers the facts, and `Message` draws the result. Each tool but copy is the
 // `MessageAct` it sends, which reaches `App` as its column's intent
 // (`intent.ts`).
@@ -9,14 +11,13 @@ import {
   type BlockRef,
   type EntryId,
   parseMentions,
-  type ReferenceCardId,
   type TextCardId,
   THE_AGENT,
   type ThreadId,
   type ThreadLane,
   type TranscriptMessage,
 } from "@pinetrie/core"
-import type { Taken } from "./card-intents.ts"
+import type { Taken } from "./clip.ts"
 import type { Prefill } from "./columns.ts"
 import { markdownOf } from "./markdown-of.ts"
 
@@ -40,12 +41,6 @@ export interface MessageTools {
    * list would join every call's output.
    */
   readonly copy: boolean
-  /**
-   * Take a reference into your inventory (ADR-0126): what copy offers, where
-   * the column can be written. Built on a press too (`messageReference`,
-   * `selectionReference`).
-   */
-  readonly takeReference: boolean
   /** Comment on it: a note in its margin (ADR-0126), where the column can be written. */
   readonly comment: boolean
   /** Send it again: a sibling at its parent, or a root's first message in a new tab. */
@@ -73,15 +68,6 @@ export type MessageAct =
   /** Show an entry: a closed branch's first message. */
   | { readonly kind: "openAt"; readonly entry: EntryId }
   /**
-   * Take a reference to the message, a block of it or your selection in it
-   * into your inventory as a new card, `card` (ADR-0126: a reference to the
-   * past is the copy), its markdown on the clipboard too.
-   */
-  | ({
-      readonly kind: "takeReference"
-      readonly card: ReferenceCardId
-    } & Taken)
-  /**
    * Comment on the message `entry`, in `thread`: a new, empty note `card`
    * in its margin (ADR-0126).
    */
@@ -108,14 +94,12 @@ export function messageTools(
   if (!at.writable)
     return {
       copy,
-      takeReference: false,
       comment: false,
       edit: undefined,
       branch: undefined,
     }
   return {
     copy,
-    takeReference: copy,
     comment: true,
     edit: node.role === "chat" ? editOf(node, at.parentId) : undefined,
     // Below a conversation's last message, a branch would be the same as

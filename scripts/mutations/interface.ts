@@ -1073,8 +1073,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a read-only column offers no copy",
     file: "packages/interface/message-tools.ts",
-    from: "    return {\n      copy,\n      takeReference: false,",
-    to: "    return {\n      copy: false,\n      takeReference: false,",
+    from: "    return {\n      copy,\n      comment: false,",
+    to: "    return {\n      copy: false,\n      comment: false,",
     command: unit,
     expect: "a column that can't be written offers only copy",
   },
@@ -2100,8 +2100,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a drop on the composer leaves the message there",
     file: "packages/interface/card-intents.ts",
-    from: '  return [{ kind: "keep", moves: [into, back], actedAt, close: [], here: null }]',
-    to: '  return [{ kind: "keep", moves: [into], actedAt, close: [], here: null }]',
+    from: '    { kind: "moveCards", moves: [into, back], actedAt, close: [], here: null },',
+    to: '    { kind: "moveCards", moves: [into], actedAt, close: [], here: null },',
     command: unit,
     expect: "a message with text takes the note's place",
   },
@@ -2286,8 +2286,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a take into the inventory ignores the selection",
     file: "packages/interface/card-intents.ts",
-    from: "  return takeIntoInventoryAt(now, facts.selected, state)",
-    to: "  return takeIntoInventoryAt(now, 0, state)",
+    from: "  const slot = firstEmpty(slots, selected)",
+    to: "  const slot = firstEmpty(slots, 0)",
     command: unit,
     expect: "into the selected slot when it is empty, else the first empty",
   },
@@ -2319,8 +2319,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a slot is marked under another name",
     file: "packages/interface/put-target.ts",
-    from: "      return { [PUT_SLOT]: String(target.slot) }",
-    to: '      return { "data-slot": String(target.slot) }',
+    from: "      return target.slot === null ? {} : { [PUT_SLOT]: String(target.slot) }",
+    to: '      return target.slot === null ? {} : { "data-slot": String(target.slot) }',
     command: unit,
     expect: "a drop on",
   },
@@ -2373,15 +2373,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a selection across formatting, or of only space, takes nothing: never the whole message",
-  },
-  {
-    name: "Cmd+C on a selection no range names takes the whole message",
-    file: "packages/interface/intent.ts",
-    from: "        message === null ? null : selectionReference(message, intent.text)",
-    to: '        message === null ? null : (selectionReference(message, intent.text) ?? { address: { kind: "entry", thread: message.thread, entry: message.id }, markdown: message.text })',
-    command: unit,
-    expect:
-      "Cmd+C on a selection a range names takes it; on one none names, nothing, and the browser's copy stands (ADR-0126)",
   },
   {
     name: "a keep closes whatever its answers",
@@ -3537,8 +3528,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy lands first on the canvas, not after its source",
     file: "packages/interface/intent.ts",
-    from: '        : { kind: "canvas-at", task, after: source }\n',
-    to: '        : { kind: "canvas-at", task, after: null }\n',
+    from: '        : { kind: "canvas", task, after: source }\n',
+    to: '        : { kind: "canvas", task, after: null }\n',
     command: unit,
     expect:
       "copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas (ADR-0127)",
@@ -3546,8 +3537,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy here from no canvas is sent anyway",
     file: "packages/interface/intent.ts",
-    from: "  if (target === null) return []\n",
-    to: "",
+    from: "      : task === undefined\n        ? null\n",
+    to: '      : task === undefined\n        ? { kind: "inventory", slot: null }\n',
     command: unit,
     expect:
       "copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas (ADR-0127)",
@@ -3555,7 +3546,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread put from the inventory goes in a note column",
     file: "packages/interface/card-intents.ts",
-    from: '  if (cardFitsPlace(now, "canvas")) return putOnCanvas(now, target, state)\n',
+    from: '  if (now.kind === "thread" || now.kind === "note-column")\n    return putOnCanvas(now, target, state)\n',
     to: "",
     command: unit,
     expect:
@@ -3684,31 +3675,22 @@ export const mutations: readonly Mutation[] = [
       "a rail stub for a branch whose first run wrote a context entry above its prompt opens at its first message",
   },
   {
-    name: "a take from the past copies nothing",
-    file: "packages/interface/card-intents.ts",
-    from: '  const copied: Effect = { kind: "copyText", text: taken.markdown }',
-    to: '  const copied: Effect = { kind: "copyText", text: "" }',
+    name: "Cmd+X takes into the inventory again",
+    file: "packages/interface/page-keys.ts",
+    from: '  if (command && key === "z")',
+    to: '  if (command && key === "x" && focus.card !== null)\n    return { kind: "takeIntoInventory", card: focus.card }\n  if (command && key === "z")',
     command: unit,
     expect:
-      "a take from the past is a reference in your inventory, its markdown on the clipboard too (ADR-0126)",
+      "Cmd+C, Cmd+X and Cmd+V are no keys here: they are the page's copy, cut and paste events (ADR-0132)",
   },
   {
-    name: "Cmd+X cuts nothing",
+    name: "the put key does nothing in a text box",
     file: "packages/interface/page-keys.ts",
-    from: '  if (command && !event.shiftKey && key === "x")',
-    to: '  if (command && !event.shiftKey && key === "never")',
+    from: "    return focus.selectedCard === null || focus.column === null",
+    to: "    return focus.selectedCard === null || focus.column === null || focus.inText",
     command: unit,
     expect:
-      "Cmd+X outside a text box takes the focused card; in a box it is the box's own cut (ADR-0126)",
-  },
-  {
-    name: "the put key puts a reference in a text box to the column",
-    file: "packages/interface/page-keys.ts",
-    from: '    if (focus.inText && kindOfCard(focus.selectedCard) === "reference")',
-    to: "    if (false)",
-    command: unit,
-    expect:
-      "the put key in a text box puts a reference there; any other card goes to the column (ADR-0126)",
+      "the put key in a text box puts the card in your hand in the column, whatever its kind: only a paste types into a box (ADR-0132)",
   },
   {
     name: "search reads a link's address",
@@ -3730,8 +3712,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fact is taken into your inventory",
     file: "packages/interface/card-intents.ts",
-    from: '    !cardFitsPlace(now, "inventory") ||\n',
-    to: '    now.kind === "note-column" ||\n',
+    from: '    if (!cardFitsPlace(now, "inventory"))\n      return { kind: "refused", code: "no-place", card: now.id }',
+    to: '    if (now.kind === "note-column")\n      return { kind: "refused", code: "no-place", card: now.id }',
     command: unit,
     expect:
       "a card is taken into your inventory, or put in a slot, if its kind is ever in one (PLACES_OF)",
@@ -3826,9 +3808,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "only a text card is discarded",
-    file: "packages/interface/card-intents.ts",
-    from: '  if (now === undefined || !cardFitsPlace(now, "trash") || !isMovable(now))\n',
-    to: '  if (now === undefined || now.kind !== "text")\n',
+    file: "packages/interface/discardable.ts",
+    from: '  cardFitsPlace(card, "trash") &&\n  isMovable(card) &&',
+    to: '  card.kind === "text" &&',
     command: unit,
     expect:
       "goes back to its thread's notes from its ⋯, and to the trash from its ×",
@@ -3897,5 +3879,93 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a move on the board runs what follows it only once the host accepts it",
+  },
+  {
+    name: "a carrier on other text is believed",
+    file: "packages/interface/clip.ts",
+    from: "      newlines(carrier.text) === plain",
+    to: "      true",
+    command: unit,
+    expect:
+      "text from elsewhere: no carrier, a carrier on other text, from another host, malformed, or Shift held",
+  },
+  {
+    name: "a carrier from another host is believed",
+    file: "packages/interface/clip.ts",
+    from: "      carrier.host === host &&",
+    to: "      true &&",
+    command: unit,
+    expect:
+      "text from elsewhere: no carrier, a carrier on other text, from another host, malformed, or Shift held",
+  },
+  {
+    name: "a system clipboard's \\r\\n breaks the carrier",
+    file: "packages/interface/clip.ts",
+    from: 'const newlines = (s: string): string => s.replace(/\\r\\n?/g, "\\n")',
+    to: "const newlines = (s: string): string => s",
+    command: unit,
+    expect: "a system clipboard's \\r\\n still matches the carrier's \\n",
+  },
+  {
+    name: "a focused block is passed over for the selected message",
+    file: "packages/interface/clip.ts",
+    from: "  if (focus.block !== null) {",
+    to: "  if (false) {",
+    command: unit,
+    expect:
+      "a focused block beats the selected message, which beats a focused card",
+  },
+  {
+    name: "a cut takes the past",
+    file: "packages/interface/clip.ts",
+    from: "  if (cut) {",
+    to: "  if (false) {",
+    command: unit,
+    expect:
+      "a cut takes only a card you may discard; the past is left to the browser",
+  },
+  {
+    name: "a slot's card is replaced whether or not it may be discarded",
+    file: "packages/interface/card-intents.ts",
+    from: "  return isDiscardable(old, state.cards.me)",
+    to: "  return true",
+    command: unit,
+    expect:
+      "a slot holding a card you may not discard is not replaced; a thread's copy lands only in an empty one",
+  },
+  {
+    name: "a drop's replacement discards the slot's card last",
+    file: "packages/interface/card-intents.ts",
+    from: "            { move: moveOf(replacing, DISCARDED), slot: null },\n            { move: into, slot: landing.to.slot },",
+    to: "            { move: into, slot: landing.to.slot },\n            { move: moveOf(replacing, DISCARDED), slot: null },",
+    command: unit,
+    expect:
+      "a replaced slot's card goes to your trash first: a drop's move set, a paste's `replacing`",
+  },
+  {
+    name: "a cut card in your trash is pasted as a copy",
+    file: "packages/interface/card-intents.ts",
+    from: "        cut.place.holder === state.cards.me",
+    to: '        cut.place.holder === "nobody"',
+    command: unit,
+    expect:
+      "a cut card still in your trash comes out of it; anywhere else it lands as its copy",
+  },
+  {
+    name: "the past dropped with move is moved",
+    file: "packages/interface/card-intents.ts",
+    from: '  if (source.kind === "card") {',
+    to: '  if (source.kind === "card" || how === "move") {',
+    command: unit,
+    expect: "the past dropped with move is still a copy",
+  },
+  {
+    name: "an edit as text forgets where it came from",
+    file: "packages/interface/card-intents.ts",
+    from: "        origin: now.content.address,",
+    to: "        origin: null,",
+    command: unit,
+    expect:
+      "Edit as text is a paste of its quote replacing the reference, in its place and slot",
   },
 ]

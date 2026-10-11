@@ -36,7 +36,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         log: () => {},
       })
       const ppContext = await browser.newContext({ viewport: PANE_VIEWPORT })
-      // Taking from the past writes its markdown on the clipboard (ADR-0126).
+      // A copy writes the clipboard, which the checks read (ADR-0132).
       await ppContext.grantPermissions(["clipboard-read", "clipboard-write"])
       const pp = await ppContext.newPage()
       await asPerson(pp, "pia@browser.test", "Pia")
@@ -216,22 +216,6 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             pp.url() === url,
           `${JSON.stringify({ full, folded })}, ${pages.length} new pages`,
         )
-        // An image of a message is a block: the pane's ❝ takes a reference
-        // to it into Pia's inventory (ADR-0126).
-        const refSlot = ".inventory .slot:has(.reference-face)"
-        await pp.click("#bottom .inventory-toggle")
-        await pp.click(`${pane} .take-block`)
-        const imageTaken = await pp
-          .waitForSelector(refSlot, { timeout: 10_000 })
-          .then(
-            () => true,
-            () => false,
-          )
-        await pp.click("#bottom .inventory-toggle")
-        check(
-          "an image shown beside the thread is taken as a reference by its ❝",
-          imageTaken,
-        )
         await pp.click(`${pane} .pane-close`)
         // A person's table, long enough to scroll the pane.
         await waitFor(() => idleNow(imageHost))
@@ -324,42 +308,32 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             back,
           `${JSON.stringify(covers)}, focus back ${back}`,
         )
-        // Taking from the past (ADR-0126): the table's ❝ takes a reference to
-        // it into Pia's inventory and its markdown onto the clipboard; the
-        // slot shows a reference, and selected, the preview its quote, a
-        // table. The put key in her composer puts it there as a link, and
-        // the reference stays in her hand. Cmd+C on the table's bar takes
-        // another, by the column's key.
-        const take = `${col(0)} .msg[data-entry] .table-wrap .take-block`
-        // Open first: a take into a closed inventory shows it only briefly.
-        await pp.click("#bottom .inventory-toggle")
-        await pp.click(take)
-        const taken = await pp
-          .waitForFunction(
-            sel => document.querySelectorAll(sel).length === 2,
-            refSlot,
-            { timeout: 10_000 },
-          )
-          .then(
-            () => true,
-            () => false,
-          )
-        const copied = await pp
-          .evaluate(() => navigator.clipboard.readText())
-          .catch(() => "")
-        // The image's reference is in the selected slot: a click on the
-        // table's selects it, and the preview shows its quote.
-        await pp.locator(refSlot).nth(1).click()
-        const previewed = await pp
-          .waitForSelector(".inventory .preview .reference-quote table", {
-            timeout: 10_000,
-          })
-          .then(
-            () => true,
-            () => false,
-          )
-        await pp.click(box)
-        await pp.keyboard.press("Control+Shift+O")
+        // Copy, cut and paste (ADR-0132): Cmd+C with focus on the table's
+        // bar copies the table's markdown, with pine·trie's data beside it,
+        // and takes nothing into the inventory, which stays closed. Cmd+V in
+        // her composer pastes it there as a link to the table. The
+        // clipboard cell shows the copy, and keep pastes a reference to it
+        // into a slot, previewed as its quote.
+        const refSlot = ".inventory .slot:has(.reference-face)"
+        await pp.evaluate(() => navigator.clipboard.writeText(""))
+        await pp.focus(`${col(0)} .msg[data-entry] .table-wrap .table-open`)
+        await pp.keyboard.press("ControlOrMeta+c")
+        const readClipboard = () =>
+          pp.evaluate(() => navigator.clipboard.readText()).catch(() => "")
+        await waitFor(async () => (await readClipboard()) !== "", 5_000).catch(
+          () => 0,
+        )
+        const copied = await readClipboard()
+        const closed = !(await pp.locator(".inventory").isVisible())
+        const none = (await pp.locator(refSlot).count()) === 0
+        check(
+          "Cmd+C on a table's bar copies its markdown and takes nothing into the inventory, which stays closed",
+          copied.startsWith("| n | what |") && closed && none,
+          `copied ${JSON.stringify(copied.slice(0, 12))}, closed ${closed}, no reference ${none}`,
+        )
+        await pp.fill(box, "")
+        await pp.focus(box)
+        await pp.keyboard.press("ControlOrMeta+v")
         const linked = await pp
           .waitForFunction(
             sel =>
@@ -373,47 +347,40 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             () => true,
             () => false,
           )
-        const stays = (await pp.locator(refSlot).count()) === 2
         check(
-          "a table taken from a reply is a reference in the inventory, previewed as its quote, put in a composer as a link, and kept in the hand",
-          taken &&
-            previewed &&
-            linked &&
-            stays &&
-            copied.startsWith("| n | what |"),
-          `taken ${taken}, previewed ${previewed}, linked ${linked}, stays ${stays}, copied ${JSON.stringify(copied.slice(0, 12))}`,
+          "Cmd+V in a composer pastes a copied table as a link to it",
+          linked,
+          await pp.inputValue(box),
         )
         await pp.fill(box, "")
-        await pp.evaluate(() => navigator.clipboard.writeText(""))
-        // Its message selected, the column's Cmd+C would take the message:
-        // focus on the bar takes the table instead.
-        await pp.click(`${col(0)} .msg[data-entry]:has(.table-wrap) > .text`, {
-          position: { x: 2, y: 2 },
-        })
-        await pp.focus(take)
-        await pp.keyboard.press("ControlOrMeta+c")
-        const byKey = await pp
-          .waitForFunction(
-            sel => document.querySelectorAll(sel).length === 3,
-            refSlot,
-            { timeout: 10_000 },
-          )
+        await pp.click("#bottom .inventory-toggle")
+        const shown = await pp
+          .waitForSelector(".inventory .clipboard-cell", { timeout: 5_000 })
           .then(
             () => true,
             () => false,
           )
-        const copiedByKey = await pp
-          .evaluate(() => navigator.clipboard.readText())
-          .catch(() => "")
-        // The message is the table alone, so only the chip tells the
-        // table's reference from the message's.
-        const tables = await pp
-          .locator(`${refSlot} .reference-face-label`, { hasText: /^a table$/ })
-          .count()
+        if (shown) await pp.click(".inventory .clipboard-cell .keep")
+        const kept = await pp
+          .waitForSelector(refSlot, { timeout: 10_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        // Kept into the selected slot, it is previewed at once: a click on
+        // it would open it whole instead.
+        const previewed = await pp
+          .waitForSelector(".inventory .preview .reference-quote table", {
+            timeout: 10_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
         check(
-          "Cmd+C on a table's bar takes a reference to it, its markdown on the clipboard",
-          byKey && tables === 2 && copiedByKey.startsWith("| n | what |"),
-          `taken ${byKey}, tables ${tables}, copied ${JSON.stringify(copiedByKey.slice(0, 12))}`,
+          "the clipboard cell shows the last copy, and keep puts a reference to it in a slot, previewed as its quote",
+          shown && kept && previewed,
+          `cell ${shown}, kept ${kept}, previewed ${previewed}`,
         )
         await pp.click("#bottom .inventory-toggle")
         // Pia's picture (ADR-0098): chosen on her profile page, cropped to a

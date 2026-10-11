@@ -13,14 +13,12 @@ import {
   hasPlaceKind,
   type MarkTarget,
   type MoveDirection,
-  messageAt,
   moveOf,
   type NoteColumnId,
   noteOf,
   type OfferAction,
   type Position,
   type QueueHoldChange,
-  type TargetOf,
   type TaskId,
   type TextCardId,
   type ThreadId,
@@ -32,20 +30,17 @@ import {
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { isQueuedMessage } from "@pinetrie/rules"
-import {
-  AT_BOARD,
-  AT_INVENTORY,
-  firstEmpty,
-  IN_COLUMN,
-} from "@pinetrie/session"
+import { type ActedAt, AT_BOARD, IN_COLUMN } from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
 import { BOARD_SEARCH } from "./board-view.ts"
 import {
   afterUndo,
   cardOf,
-  full,
+  clipFacts,
   moveCard,
+  type PutHow,
+  type PutSource,
   planCloseUnstarted,
   planComment,
   planDiscard,
@@ -56,8 +51,6 @@ import {
   planPinToTask,
   planPut,
   planQueueReference,
-  planTakeIntoInventory,
-  planTakeReference,
   planToNote,
   planUndoMove,
   planUnpin,
@@ -67,6 +60,7 @@ import {
   slotOf,
   textCardOf,
 } from "./card-intents.ts"
+import { type Clip, threadClip } from "./clip.ts"
 import {
   type CardKey,
   type ColumnKey,
@@ -75,7 +69,6 @@ import {
   type Pending,
   type Prefill,
   type ReaderAction,
-  threadAnchor,
 } from "./columns.ts"
 import {
   changeViewOf,
@@ -96,7 +89,7 @@ import {
   type ViewChange,
 } from "./layout.ts"
 import { otherWidth } from "./list-width.ts"
-import { type MessageAct, selectionReference } from "./message-tools.ts"
+import type { MessageAct } from "./message-tools.ts"
 import type { PageName } from "./page.ts"
 import type { PutTarget } from "./put-target.ts"
 import { type SearchAsk, searchActOn } from "./search.ts"
@@ -359,32 +352,37 @@ export type Intent =
       readonly entry: EntryId
     }
   | { readonly kind: "signOut" }
-  /** Take `card` into your inventory: by key, wherever it is. */
+  /** Take `card` into your inventory, into a free slot: by key, wherever it is. */
   | { readonly kind: "takeIntoInventory"; readonly card: CardId }
-  /** Put `card` at `target`: a column's end, or a slot (a swap, or a take into the inventory there). */
-  | { readonly kind: "put"; readonly card: CardId; readonly target: PutTarget }
-  /** Discard a card in your inventory; the undo key brings it back (ADR-0111). */
-  | { readonly kind: "discard"; readonly card: CardId }
   /**
-   * Edit a reference as text (ADR-0126): a text card `card` in its place,
-   * its text the quote `text`, and the reference to the trash.
+   * Land `source` at `target` (`planPut`): a put by key or button, a drop,
+   * a slot's swap; `how` copies instead, as an Alt-drag does (ADR-0132).
+   */
+  | {
+      readonly kind: "put"
+      readonly source: PutSource
+      readonly target: PutTarget
+      readonly how: PutHow
+    }
+  /**
+   * Discard a card, said where `at` is: the undo key brings it back
+   * (ADR-0111). A cut is a copy, then this (ADR-0132).
+   */
+  | { readonly kind: "discard"; readonly card: CardId; readonly at: ActedAt }
+  /** The page copied `clip` to the clipboard: the clipboard cell shows it (ADR-0132). */
+  | { readonly kind: "copied"; readonly clip: Clip }
+  /** A paste of `clip` at `target`: a copy landed there (ADR-0132). */
+  | { readonly kind: "paste"; readonly clip: Clip; readonly target: PutTarget }
+  /** The clipboard cell's copy into a free slot of your inventory (ADR-0132). */
+  | { readonly kind: "keep" }
+  /**
+   * Edit a reference as text (ADR-0126): a paste of the quote `text` as the
+   * text card `card`, replacing the reference in its place (ADR-0132).
    */
   | {
       readonly kind: "editAsText"
       readonly reference: CardId
       readonly card: TextCardId
-      readonly text: string
-    }
-  /**
-   * Cmd+C on a selection in the message at `entry` (ADR-0126): a range of
-   * it taken into your inventory and its markdown on the clipboard when a
-   * range names `text` (`selectionReference`), else nothing, and the
-   * browser's copy stands.
-   */
-  | {
-      readonly kind: "copySelection"
-      /** The message's entry, as the page read it from `data-entry`. */
-      readonly entry: string
       readonly text: string
     }
   /** Select an inventory slot. */
@@ -507,7 +505,7 @@ function planOf(
         : []
     }
     case "copyThread":
-      return planCopyThread(intent.source, intent.to, minted.thread, state)
+      return planCopyThread(intent.source, intent.to, state, minted)
     // From the canvas its sender sees it on: the host refuses it moved since.
     case "cardWidth": {
       const task = state.tasks.index.taskOfCard.get(intent.card)
@@ -608,29 +606,33 @@ function planOf(
     case "signOut":
       return [{ kind: "forgetIdentity" }, { kind: "reload" }]
     case "takeIntoInventory":
-      return planTakeIntoInventory(intent.card, state)
+      return planTake(intent.card, state, minted)
     case "put":
-      return planPut(intent.card, intent.target, state, minted)
+      return planPut(intent.source, intent.target, intent.how, state, minted)
     case "editAsText":
       return planEditAsText(intent, state)
-    case "copySelection": {
-      // An id the page read is this tab's entry only if its index has it.
-      const entry = (Object.keys(state.index.entries) as EntryId[]).find(
-        id => id === intent.entry,
-      )
-      const message = entry === undefined ? null : messageAt(state.index, entry)
-      const taken =
-        message === null ? null : selectionReference(message, intent.text)
-      return taken === null
-        ? []
-        : planTakeReference(minted.reference, taken, state)
-    }
     case "discard":
-      return planDiscard(
-        intent.card,
-        { actedAt: AT_INVENTORY, slot: null },
+      return planDiscard(intent.card, { actedAt: intent.at, slot: null }, state)
+    case "copied":
+      return [{ kind: "clipboardCell", clip: intent.clip }]
+    case "paste":
+      return planPut(
+        { kind: "clip", clip: intent.clip },
+        intent.target,
+        "copy",
         state,
+        minted,
       )
+    case "keep":
+      return state.clips.cell === null
+        ? []
+        : planPut(
+            { kind: "clip", clip: state.clips.cell },
+            { kind: "inventory", slot: null },
+            "copy",
+            state,
+            minted,
+          )
     case "selectSlot":
       return [{ kind: "select", slot: intent.slot }]
     case "undoMove":
@@ -702,9 +704,7 @@ function planColumn(
     case "discard":
       return planDiscard(act.card, IN_COLUMN(key), state)
     case "takeIntoInventory":
-      return planTakeIntoInventory(act.card, state)
-    case "takeReference":
-      return planTakeReference(act.card, act, state)
+      return planTake(act.card, state, minted)
     case "density":
       return reading({ kind: "density", density: act.density })
     case "details":
@@ -770,9 +770,15 @@ function planColumn(
     case "comment":
       return planComment(act, state)
     case "queueReference":
-      return planQueueReference(act, minted.reference, IN_COLUMN(key))
+      return planQueueReference(act, minted.reference, IN_COLUMN(key), state)
     case "toMessage":
-      return planPut(act.card, { kind: "composer", key }, state, minted)
+      return planPut(
+        { kind: "card", card: act.card },
+        { kind: "composer", key },
+        "move",
+        state,
+        minted,
+      )
     case "spinOff":
       return planSpinOff(
         act.card,
@@ -896,44 +902,50 @@ function planAddNoteColumn(
   ]
 }
 
+/** Take `card` into a free slot of your inventory: a landing with no slot aimed at (ADR-0133). */
+const planTake = (
+  card: CardId,
+  state: IntentState,
+  minted: Minted,
+): readonly Effect[] =>
+  planPut(
+    { kind: "card", card },
+    { kind: "inventory", slot: null },
+    "move",
+    state,
+    minted,
+  )
+
 /**
- * A copy of `source` at its end as this tab holds it (ADR-0117), its id
- * `thread`: just after the source on its canvas, or into your inventory's
- * first empty slot. Nothing for a thread with no end here, or copied here
- * from no canvas; refused here, as the host would, into a full inventory.
+ * A copy of `source` at its end as this tab holds it (ADR-0117), as a
+ * paste of it lands (ADR-0132): just after the source on its canvas, or
+ * into a free slot of your inventory. Nothing for a thread with no card or
+ * no end here, or copied here from no canvas.
  */
 function planCopyThread(
   source: ThreadId,
   to: "here" | "inventory",
-  thread: ThreadId,
   state: IntentState,
+  minted: Minted,
 ): readonly Effect[] {
-  const end = threadAnchor(state.index, state.cards.lanes, source)
-  if (end === null) return []
-  if (to === "inventory" && firstEmpty(state.cards.slots, 0) === null)
-    return [
-      { kind: "showInventory", brief: true },
-      { kind: "refuse", refusal: full(thread) },
-    ]
+  const of = threadClip(source, clipFacts(state))
+  if (of === null) return []
   const task = state.tasks.index.taskOfCard.get(source)
-  const target: TargetOf<"thread"> | null =
+  const target: PutTarget | null =
     to === "inventory"
-      ? { kind: "inventory", holder: state.cards.me }
+      ? { kind: "inventory", slot: null }
       : task === undefined
         ? null
-        : { kind: "canvas-at", task, after: source }
-  if (target === null) return []
-  return [
-    {
-      kind: "request",
-      intent: {
-        kind: "copy-thread",
-        source,
-        end,
-        move: { card: thread, from: null, to: target },
-      },
-    },
-  ]
+        : { kind: "canvas", task, after: source }
+  return target === null
+    ? []
+    : planPut(
+        { kind: "clip", clip: { kind: "card", of, cut: false } },
+        target,
+        "copy",
+        state,
+        minted,
+      )
 }
 
 /**

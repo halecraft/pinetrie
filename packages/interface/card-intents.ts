@@ -1,19 +1,21 @@
-// interface/card-intents — what take into the inventory, put, keep, discard and
-// undo do (ADR-0048 step 4, ADR-0052, ADR-0059, ADR-0066), as effects. Pure:
-// `planIntent` calls these, and `perform` carries out what they return.
+// interface/card-intents — what take into the inventory, put, a paste, keep,
+// discard and undo do (ADR-0048 step 4, ADR-0052, ADR-0059, ADR-0066,
+// ADR-0132), as effects. Pure: `planIntent` calls these, and `perform`
+// carries out what they return.
 //
-// Every input makes the same moves: a key, a button and a drop each become
-// one of these intents. A take into the inventory lands in the selected
-// slot when it is empty, else the first empty one (`firstEmpty`); a put
-// lands at the place its target names (`placeOfTarget`): a note at a
+// Every input lands by one planner (`planPut`): a key, a button, a drop and
+// a paste each name a source and a target, and `putLanding` decides what
+// that does. A take, keep or a copy into your inventory lands in the
+// selected slot when it is empty, else the first empty one (`firstEmpty`);
+// a drop or a paste aimed at a filled slot replaces its card (ADR-0133); a
+// put lands at the place its target names (`placeOfTarget`): a note at a
 // column's end, or your message in its composer. Each move says where it
 // was made, so a refusal is said there. Which history a move enters is the
-// host's to decide (`historyOf`); an undo names only the root you are on.
+// host's to decide (`historyOf`); an undo names only the task you are on.
 
 import {
   type Address,
   type CanvasTarget,
-  type CardFittingPlace,
   type CardId,
   type CardRecord,
   cardFitsPlace,
@@ -25,6 +27,7 @@ import {
   KINDS,
   keyOf,
   type MoveDirection,
+  type MoveTarget,
   moveOf,
   type NoteColumnCard,
   type NoteColumnId,
@@ -35,10 +38,11 @@ import {
   parseTextCardId,
   pinnedOf,
   type QueueMove,
-  type ReferenceCard,
   type ReferenceCardId,
   type Reorder,
+  type Sha256,
   sameKey,
+  type TargetOf,
   type TaskId,
   type TextCard,
   type TextCardId,
@@ -64,7 +68,9 @@ import {
   type Slots,
 } from "@pinetrie/session"
 import { addressWords } from "./address-words.ts"
+import { type Clip, type ClipFacts, cardClip } from "./clip.ts"
 import type { Minted } from "./columns.ts"
+import { type Discardable, isDiscardable } from "./discardable.ts"
 import {
   type CardFacts,
   changeViewOf,
@@ -158,222 +164,474 @@ export const textCardOf = (
   return now?.kind === "text" ? now : undefined
 }
 
-/** Your inventory is full: said where a take into it was made. */
-export const full = (card: CardId): CardNotice => ({
-  card,
-  actedAt: AT_INVENTORY,
-  code: "full",
-  by: null,
-  fromQueue: false,
+/** What a put, a paste or a drop lands (ADR-0132): a card where it is, or a clip. */
+export type PutSource =
+  /** A card where it is: a take, a put, a drop, or an Alt-drag's copy of it. */
+  | { readonly kind: "card"; readonly card: CardId }
+  /** What was copied: a paste, keep, the column menu's copies. */
+  | { readonly kind: "clip"; readonly clip: Clip }
+
+/** Whether a landing moves its source or lands a copy of it. */
+export type PutHow = "move" | "copy"
+
+/**
+ * A reference's quote as a landing names it: a blob already kept (a
+ * reference's own), markdown to keep first (the past's), or a comment's
+ * text under a link to its entry, read as it is kept (`commentMarkdown`).
+ */
+export type Quote =
+  | { readonly kind: "kept"; readonly sha: Sha256 }
+  | { readonly kind: "markdown"; readonly text: string }
+  | {
+      readonly kind: "comment"
+      readonly comment: TextCardId
+      readonly entry: Address
+    }
+
+/** A landing that lands something: what a replacement may carry. */
+type Lands = Extract<
+  Landing,
+  { readonly kind: "move" | "text" | "reference" | "uncut" }
+>
+
+/**
+ * What a landing does (ADR-0132, ADR-0133), as a value: the drag engine
+ * draws it before a drop (a lift, a + badge, the slot's card leaving for
+ * the trash, grey when refused), and `planPut` carries it out, so the two
+ * cannot differ.
+ */
+export type Landing =
+  /** Nothing: a put where the card already is. */
+  | { readonly kind: "none" }
+  /** The card moves to `to`. */
+  | { readonly kind: "move"; readonly card: CardId; readonly to: PutTarget }
+  /** Two slots of your inventory swap. */
+  | { readonly kind: "swap"; readonly a: number; readonly b: number }
+  /** A new text card at `to`. */
+  | {
+      readonly kind: "text"
+      readonly text: string
+      readonly origin: Address | null
+      readonly to: PutTarget
+    }
+  /** A new reference at `to`. */
+  | {
+      readonly kind: "reference"
+      readonly address: Address
+      readonly quote: Quote
+      readonly to: PutTarget
+    }
+  /** A copy of a thread at its end `end`, at `to`. */
+  | {
+      readonly kind: "thread"
+      readonly source: ThreadId
+      readonly end: EntryId
+      readonly to: PutTarget
+    }
+  /** The card you cut, out of your trash to `to`. */
+  | { readonly kind: "uncut"; readonly card: CardId; readonly to: PutTarget }
+  /** Text typed into the text box that has focus: text, or a link. */
+  | { readonly kind: "insert"; readonly text: string }
+  /** `landing` into an aimed slot, its card `old` to your trash first (ADR-0133). */
+  | {
+      readonly kind: "replace"
+      readonly old: CardId
+      readonly landing: Lands
+    }
+  /** Refused here, as the host would refuse it, naming the card it is about. */
+  | {
+      readonly kind: "refused"
+      readonly code: "full" | "no-place" | "not-replaced" | "slot-taken"
+      readonly card: CardId | null
+    }
+
+/** What a copy of a card lands as: its kind's clip (`cardClip`), uncut. */
+const clipOfCard = (card: CardRecord, state: IntentState): Clip | null => {
+  const of = cardClip(card, clipFacts(state))
+  return of === null ? null : { kind: "card", of, cut: false }
+}
+
+/** `IntentState`'s facts as a copy reads them (`ClipFacts`). */
+export const clipFacts = (state: IntentState): ClipFacts => ({
+  me: state.cards.me,
+  cards: state.cards.cards,
+  index: state.index,
+  lanes: state.cards.lanes,
+  textOf: state.clips.textOf,
+  quoteOf: state.clips.quoteOf,
+  cell: state.clips.cell,
 })
 
-/** A card your hand may hold: a kind ever in an inventory (`PLACES_OF`). */
-type InHand = CardFittingPlace<"inventory">
-
-/** A handoff into your inventory, at `slot`. */
-const moveIntoInventorySlot = (
-  card: InHand,
-  slot: number,
-  me: CardFacts["me"],
-) =>
-  moveCard(
-    moveOf(card, { kind: "inventory", holder: me }),
-    {
-      actedAt: AT_INVENTORY,
-      slot,
-    },
-    true,
-  )
-
 /**
- * Take `card` into your inventory: the selected slot if it is empty, else
- * the first empty one. Full, it is refused here, as the host would.
+ * What landing `source` at `target` does (ADR-0132, ADR-0133). Pure.
+ *
+ * - **A move** of a card is a put or a drop, as ever: onto a canvas, a
+ *   column, a composer, a state or the sidebar (`planPut` keeps those
+ *   rules); a card in your inventory on another's slot swaps with it.
+ * - **A copy** of a clip lands by what it is and where: into a text box,
+ *   text as itself and anything else as a link; on a surface, text as a
+ *   text card keeping its origin, the past as a reference, a text card as
+ *   a text card with its text, a reference as a reference, a thread as its
+ *   copy, a note column or a task as a reference to it where one may be.
+ *   A cut card still in your trash is moved out of it instead.
+ * - **The past** only ever copies: a drop of it with `move` copies.
+ * - **A slot** (ADR-0133): aimed and empty, the card lands there; aimed and
+ *   filled, it replaces the card there, which must be one you may discard;
+ *   unaimed, the selected slot if empty, else the first empty one, else
+ *   refused `full`.
  */
-export function planTakeIntoInventory(
-  card: CardId,
+export function putLanding(
+  source: PutSource,
+  target: PutTarget,
+  how: PutHow,
   state: IntentState,
-): readonly Effect[] {
+): Landing {
   const facts = state.cards
-  const now = cardOf(facts, card)
-  if (
-    now === undefined ||
-    !cardFitsPlace(now, "inventory") ||
-    now.place.kind === "inventory"
-  )
-    return []
-  return takeIntoInventoryAt(now, facts.selected, state)
+  if (source.kind === "card") {
+    const now = cardOf(facts, source.card)
+    if (now === undefined) return { kind: "none" }
+    if (how === "copy") {
+      const clip = clipOfCard(now, state)
+      return clip === null
+        ? { kind: "refused", code: "no-place", card: now.id }
+        : putLanding({ kind: "clip", clip }, target, "copy", state)
+    }
+    if (target.kind === "text-box") return { kind: "none" }
+    if (target.kind !== "inventory")
+      return { kind: "move", card: now.id, to: target }
+    if (!cardFitsPlace(now, "inventory"))
+      return { kind: "refused", code: "no-place", card: now.id }
+    const from = slotOf(facts.slots, now.id)
+    if (from !== null && now.place.kind === "inventory") {
+      if (target.slot === null || from === target.slot) return { kind: "none" }
+      return { kind: "swap", a: from, b: target.slot }
+    }
+    return intoSlot(
+      { kind: "move", card: now.id, to: target },
+      target.slot,
+      state,
+    )
+  }
+  const lands = clipLanding(source.clip, target, state)
+  if (target.kind !== "inventory") return lands
+  switch (lands.kind) {
+    case "text":
+    case "reference":
+    case "uncut":
+      return intoSlot(lands, target.slot, state)
+    // A thread's copy has no card to discard first: it needs an empty slot.
+    case "thread": {
+      const at = slotFor(target.slot, state)
+      if (at.kind === "refused") return at
+      return at.taken === null
+        ? { ...lands, to: { kind: "inventory", slot: at.slot } }
+        : { kind: "refused", code: "slot-taken", card: at.taken }
+    }
+    default:
+      return lands
+  }
 }
 
-function takeIntoInventoryAt(
-  now: InHand,
-  start: number,
+/** Which slot a landing into your inventory takes: free, or the card it would replace. */
+function slotFor(
+  aimed: number | null,
   state: IntentState,
-): readonly Effect[] {
-  const slot = firstEmpty(state.cards.slots, start)
-  const show: Effect = { kind: "showInventory", brief: true }
-  if (slot === null) return [show, { kind: "refuse", refusal: full(now.id) }]
-  return [show, moveIntoInventorySlot(now, slot, state.cards.me)]
+):
+  | {
+      readonly kind: "slot"
+      readonly slot: number
+      readonly taken: CardId | null
+    }
+  | Extract<Landing, { readonly kind: "refused" }> {
+  const { slots, selected } = state.cards
+  if (aimed !== null)
+    return { kind: "slot", slot: aimed, taken: slots[String(aimed)] ?? null }
+  const slot = firstEmpty(slots, selected)
+  return slot === null
+    ? { kind: "refused", code: "full", card: null }
+    : { kind: "slot", slot, taken: null }
 }
 
-/**
- * Take a reference to the past into your inventory (ADR-0126): a card
- * naming `taken.address`, its quote `taken.markdown` (`markdownOf`) kept as
- * a blob, in the selected slot if it is empty, else the first empty one; and
- * the markdown on the system clipboard. A creation, so it enters no
- * history: discarding removes it. Full, it is refused here, as the host
- * would; the clipboard is written all the same.
- */
-export function planTakeReference(
-  card: ReferenceCardId,
-  taken: Taken,
+/** `lands` into your inventory at `aimed`, or at the first free slot for null (ADR-0133). */
+function intoSlot(
+  lands: Lands,
+  aimed: number | null,
   state: IntentState,
-): readonly Effect[] {
-  const facts = state.cards
-  const slot = firstEmpty(facts.slots, facts.selected)
-  const show: Effect = { kind: "showInventory", brief: true }
-  const copied: Effect = { kind: "copyText", text: taken.markdown }
-  if (slot === null)
-    return [copied, show, { kind: "refuse", refusal: full(card) }]
-  return [
-    copied,
-    show,
-    {
-      kind: "takeReference",
-      card,
-      address: taken.address,
-      markdown: taken.markdown,
-      to: { kind: "inventory", holder: facts.me },
-      how: { actedAt: AT_INVENTORY, slot },
-    },
-  ]
+): Landing {
+  const at = slotFor(aimed, state)
+  if (at.kind === "refused")
+    return { ...at, card: lands.kind === "move" ? lands.card : null }
+  const into = { ...lands, to: { kind: "inventory", slot: at.slot } } as const
+  if (at.taken === null) return into
+  const old = cardOf(state.cards, at.taken)
+  if (old === undefined) return into
+  return isDiscardable(old, state.cards.me)
+    ? { kind: "replace", old: old.id, landing: into }
+    : { kind: "refused", code: "not-replaced", card: old.id }
 }
 
-/**
- * Edit a reference as text (ADR-0126): one request, the new text card in
- * its place with the quote as its text and the reference to the trash, in
- * the history of the task it is in, else of the one you are on. Nothing for
- * a card that is no reference, or one not yours to move.
- */
-export function planEditAsText(
-  edit: {
-    readonly reference: CardId
-    readonly card: TextCardId
-    readonly text: string
-  },
-  state: IntentState,
-): readonly Effect[] {
-  const now = cardOf(state.cards, edit.reference)
-  if (now?.kind !== "reference") return []
-  if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)
-    return []
-  return [
-    {
-      kind: "editAsText",
-      reference: now.id,
-      from: keyOf(now.place),
-      card: edit.card,
-      text: edit.text,
-      here: taskOfTab(state),
-    },
-  ]
-}
-
-/** What taking from the past takes: an address, and its markdown (`markdownOf`). */
-export interface Taken {
-  readonly address: Address
-  readonly markdown: string
-}
-
-/**
- * A reference put where `target` is (ADR-0126). From your hand it stays
- * there, as a tool does in a game (`KINDS`' `put`): a new reference with the
- * same address and quote is made where it lands, `minted`. Into a text box,
- * that is a link to its address at the caret. From anywhere else it moves,
- * as a text card does; it never becomes your message, which is a text
- * card's. Pure.
- */
-function putReference(
-  now: ReferenceCard,
+/** What a copy of `clip` lands as at `target` (ADR-0132's table), before its slot. */
+function clipLanding(
+  clip: Clip,
   target: PutTarget,
   state: IntentState,
-  minted: Minted,
-): readonly Effect[] {
-  const facts = state.cards
-  const { address, quote } = now.content
+): Landing {
   if (target.kind === "text-box")
-    return [
-      {
-        kind: "insertText",
-        text: addressLink(address, addressWords(address)),
-      },
-    ]
-  const to =
-    target.kind === "canvas"
-      ? canvasSpot(target)
-      : placeOfTarget(target, facts.composers, facts.me)
-  // Only where a reference is ever (`KINDS`): a note, an inventory, or a
-  // note column made for it on a canvas (`WRAPS`).
-  if (to === null || !isTargetOf("reference", to)) return []
-  const how = { actedAt: actedAtOf(target), slot: null }
-  // What a put does to your hand is its kind's (`KINDS`' `put`).
-  const inHand = now.place.kind === "inventory" && now.place.holder === facts.me
-  if (!inHand || KINDS.reference.put !== "copies") {
-    if (
-      to.kind !== "notes" &&
-      to.kind !== "canvas-at" &&
-      sameKey(keyOf(now.place), to)
-    )
-      return []
-    return [moveCard(moveOf(now, to), how, true)]
+    return clip.kind === "text"
+      ? { kind: "insert", text: clip.text }
+      : { kind: "insert", text: linkOfClip(clip) }
+  switch (clip.kind) {
+    case "text":
+      return { kind: "text", text: clip.text, origin: clip.origin, to: target }
+    case "past":
+      return {
+        kind: "reference",
+        address: clip.taken.address,
+        quote: { kind: "markdown", text: clip.taken.markdown },
+        to: target,
+      }
+    case "card": {
+      const { of } = clip
+      const cut = cardOf(state.cards, of.card)
+      if (
+        clip.cut &&
+        cut !== undefined &&
+        cut.place.kind === "trash" &&
+        cut.place.holder === state.cards.me
+      )
+        return { kind: "uncut", card: of.card, to: target }
+      switch (of.kind) {
+        case "text":
+          return {
+            kind: "text",
+            text: of.text,
+            origin: { kind: "card", card: of.card },
+            to: target,
+          }
+        case "reference":
+          return {
+            kind: "reference",
+            address: of.address,
+            quote: { kind: "kept", sha: of.quote },
+            to: target,
+          }
+        case "thread":
+          return { kind: "thread", source: of.card, end: of.end, to: target }
+        case "note-column":
+        case "task":
+          return {
+            kind: "reference",
+            address: { kind: "card", card: of.card },
+            quote: { kind: "markdown", text: of.text },
+            to: target,
+          }
+      }
+    }
   }
-  return [
-    {
-      kind: "makeReference",
-      card: minted.reference,
-      address,
-      quote,
-      to,
-      how,
-    },
-  ]
 }
 
+/** A clip's link, as a text box takes it (`addressLink`). */
+const linkOfClip = (clip: Exclude<Clip, { readonly kind: "text" }>): string => {
+  const address: Address =
+    clip.kind === "past"
+      ? clip.taken.address
+      : clip.of.kind === "reference"
+        ? clip.of.address
+        : clip.of.kind === "thread"
+          ? { kind: "thread", thread: clip.of.card }
+          : { kind: "card", card: clip.of.card }
+  return addressLink(address, addressWords(address))
+}
+
+/** Your inventory is full, or a slot refused: said in the panel, where it was aimed. */
+const refusedAt = (
+  code: Extract<Landing, { kind: "refused" }>["code"],
+  card: CardId | null,
+): CardNotice =>
+  code === "not-replaced" || code === "slot-taken"
+    ? { card, actedAt: AT_INVENTORY, code }
+    : { card, actedAt: AT_INVENTORY, code, by: null, fromQueue: false }
+
 /**
- * Put `card` at `target`. A state or a place in the sidebar: a new thread
- * there (`planSpinOff`). A thread's column: a note in the note column
- * nearest it; a note column: a note at its end (ADR-0116). A spot on a
- * canvas: a text card in a note column made for it there (`WRAPS`,
- * ADR-0126). A composer: your message there (`putInMessage`). A slot: a card already
- * in your inventory swaps with what is there; any other card is taken into
- * the inventory, into that slot if it is empty.
+ * Land `source` at `target` (ADR-0132): what `putLanding` decides, carried
+ * out. A move of a card keeps every put's rules: a state or a place in the
+ * sidebar makes a new thread there (`planSpinOff`); a thread's column, a
+ * note in the note column nearest it; a note column, a note at its end
+ * (ADR-0116); a spot on a canvas, a text card in a note column made for it
+ * there (`WRAPS`, ADR-0126); a composer, your message there
+ * (`putInMessage`). A copy is one paste the host makes, or a thread's copy;
+ * into a text box, text typed at the caret. Anything landing in your
+ * inventory from outside shows the panel briefly. Pure.
  */
 export function planPut(
-  card: CardId,
+  source: PutSource,
+  target: PutTarget,
+  how: PutHow,
+  state: IntentState,
+  minted: Minted,
+): readonly Effect[] {
+  return effectsOfLanding(putLanding(source, target, how, state), state, minted)
+}
+
+/** The effects of `landing`; `replacing`, the slot's card a replacement discards first. */
+function effectsOfLanding(
+  landing: Landing,
+  state: IntentState,
+  minted: Minted,
+  replacing: Discardable | null = null,
+): readonly Effect[] {
+  const show: readonly Effect[] =
+    "to" in landing && landing.to.kind === "inventory"
+      ? [{ kind: "showInventory", brief: true }]
+      : []
+  switch (landing.kind) {
+    case "none":
+      return []
+    // A kind that never lands there is no refusal anyone needs to read.
+    case "refused":
+      return landing.code === "no-place"
+        ? []
+        : [
+            { kind: "showInventory", brief: true },
+            { kind: "refuse", refusal: refusedAt(landing.code, landing.card) },
+          ]
+    case "swap":
+      return [{ kind: "swapSlots", a: landing.a, b: landing.b }]
+    case "insert":
+      return [{ kind: "insertText", text: landing.text }]
+    case "replace": {
+      const old = cardOf(state.cards, landing.old)
+      return old === undefined || !isDiscardable(old, state.cards.me)
+        ? []
+        : effectsOfLanding(landing.landing, state, minted, old)
+    }
+    case "move": {
+      const now = cardOf(state.cards, landing.card)
+      if (now === undefined) return []
+      if (landing.to.kind !== "inventory")
+        return putCard(now, landing.to, state, minted)
+      if (!cardFitsPlace(now, "inventory")) return []
+      const into = moveOf(now, { kind: "inventory", holder: state.cards.me })
+      const how = { actedAt: AT_INVENTORY, slot: landing.to.slot }
+      if (replacing === null) return [...show, moveCard(into, how, true)]
+      // One move set, the slot's card to your trash first, so the host
+      // never finds your inventory full (ADR-0133).
+      return [
+        ...show,
+        {
+          kind: "moveCards",
+          moves: [
+            { move: moveOf(replacing, DISCARDED), slot: null },
+            { move: into, slot: landing.to.slot },
+          ],
+          actedAt: AT_INVENTORY,
+          close: [],
+          here: taskOfTab(state),
+        },
+      ]
+    }
+    case "text":
+    case "reference":
+    case "uncut": {
+      const to = pasteTarget(landing, state)
+      if (to === null) return []
+      const how = {
+        actedAt: actedAtOf(landing.to),
+        slot: landing.to.kind === "inventory" ? landing.to.slot : null,
+      }
+      return [
+        ...show,
+        {
+          kind: "paste",
+          paste:
+            landing.kind === "text"
+              ? {
+                  kind: "text",
+                  card: minted.text,
+                  origin: landing.origin,
+                  text: landing.text,
+                }
+              : landing.kind === "reference"
+                ? {
+                    kind: "reference",
+                    card: minted.reference,
+                    address: landing.address,
+                    quote: landing.quote,
+                  }
+                : { kind: "uncut", card: landing.card },
+          to,
+          replacing:
+            replacing === null
+              ? null
+              : { card: replacing.id, from: keyOf(replacing.place) },
+          how,
+          here: taskOfTab(state),
+        },
+      ]
+    }
+    case "thread": {
+      const spot = spotOnCanvas(landing.to, state)
+      const to: TargetOf<"thread"> | null =
+        landing.to.kind === "inventory"
+          ? { kind: "inventory", holder: state.cards.me }
+          : spot === null
+            ? null
+            : { kind: "canvas-at", ...spot }
+      if (to === null) return []
+      return [
+        ...show,
+        {
+          kind: "request",
+          intent: {
+            kind: "copy-thread",
+            source: landing.source,
+            end: landing.end,
+            move: { card: minted.thread, from: null, to },
+          },
+        },
+      ]
+    }
+  }
+}
+
+/**
+ * Where a paste goes, as the host takes it: a slot is your inventory; a
+ * spot on a canvas the target the host ranks; any other target the place it
+ * names (`placeOfTarget`), a thread's column its nearest notes. Null for a
+ * target no paste lands on (a state, the sidebar, a composer not drawn).
+ */
+function pasteTarget(
+  landing: Extract<Landing, { kind: "text" | "reference" | "uncut" }>,
+  state: IntentState,
+): MoveTarget | null {
+  const { to } = landing
+  if (to.kind === "canvas") return canvasSpot(to)
+  return placeOfTarget(to, state.cards.composers, state.cards.me)
+}
+
+/**
+ * A card put at `target`: a spin-off onto a state or the sidebar; a card
+ * that lives on a canvas onto one; a text card onto a spot on a canvas in a
+ * note column made for it; into a composer as your message; else to the
+ * place the target names. Nothing for a card no person moves, or for a
+ * note put on its own column, which a reorder moves.
+ */
+function putCard(
+  now: CardRecord,
   target: PutTarget,
   state: IntentState,
   minted: Minted,
 ): readonly Effect[] {
-  const facts = state.cards
-  const now = cardOf(facts, card)
-  if (now === undefined) return []
   if (target.kind === "state" || target.kind === "sidebar")
-    return planSpinOff(card, target, minted, state)
-  if (target.kind === "inventory") {
-    if (!cardFitsPlace(now, "inventory")) return []
-    // A reference in your hand moves within it: a put copies it elsewhere.
-    const from = slotOf(facts.slots, card)
-    if (from === null || now.place.kind !== "inventory")
-      return takeIntoInventoryAt(now, target.slot, state)
-    if (from === target.slot) return []
-    return [{ kind: "swapSlots", a: from, b: target.slot }]
-  }
+    return planSpinOff(now.id, target, minted, state)
   // A thread's card or a note column goes on a canvas (ADR-0117); a kind
-  // the host alone places is put nowhere; a reference copies from your hand.
+  // the host alone places is put nowhere.
   if (!isMovable(now)) return []
-  if (now.kind === "reference") return putReference(now, target, state, minted)
-  if (target.kind === "text-box") return []
-  if (cardFitsPlace(now, "canvas")) return putOnCanvas(now, target, state)
-  // A text card on a canvas lands in a note column made for it (`WRAPS`).
+  if (now.kind === "thread" || now.kind === "note-column")
+    return putOnCanvas(now, target, state)
+  if (now.kind !== "text" && now.kind !== "reference") return []
+  // A text card or a reference on a canvas lands in a note column made for
+  // it (`WRAPS`).
   if (target.kind === "canvas")
     return [
       moveCard(
@@ -382,19 +640,22 @@ export function planPut(
         true,
       ),
     ]
+  // Only a text card becomes your message.
   if (
+    now.kind === "text" &&
     (target.kind === "column" || target.kind === "composer") &&
     intoMessage(target)
   )
     return putInMessage(now, target.key, state)
-  const to = placeOfTarget(target, facts.composers, facts.me)
+  const to = placeOfTarget(target, state.cards.composers, state.cards.me)
   // A note put on its own column stays where it is: a reorder moves it there.
   if (to === null || (to.kind !== "notes" && sameKey(keyOf(now.place), to)))
     return []
-  // Where a refusal is said: the column the card was put on; a task's pins,
-  // its task column's.
-  const move = moveOf(now, to)
-  return [moveCard(move, { actedAt: actedAtOf(target), slot: null }, true)]
+  const how = { actedAt: actedAtOf(target), slot: null }
+  if (now.kind === "text") return [moveCard(moveOf(now, to), how, true)]
+  return isTargetOf("reference", to)
+    ? [moveCard(moveOf(now, to), how, true)]
+    : []
 }
 
 /**
@@ -442,23 +703,7 @@ function putOnCanvas(
   target: PutTarget,
   state: IntentState,
 ): readonly Effect[] {
-  const here = taskOfTab(state)
-  const spot: { task: TaskId; after: CardId | null } | null =
-    target.kind === "canvas"
-      ? { task: target.task, after: target.after }
-      : target.kind === "taskPinned"
-        ? { task: target.task, after: null }
-        : target.kind === "notes"
-          ? here === null
-            ? null
-            : { task: here, after: target.column }
-          : target.kind === "column" ||
-              target.kind === "composer" ||
-              target.kind === "pinned"
-            ? here === null
-              ? null
-              : { task: here, after: parseCardId(target.key) ?? null }
-            : null
+  const spot = spotOnCanvas(target, state)
   if (spot === null) return []
   if (now.place.kind === "canvas" && now.place.task === spot.task) return []
   return [
@@ -473,6 +718,34 @@ function putOnCanvas(
       unfolded: true,
     }),
   ]
+}
+
+/**
+ * The spot on a canvas `target` names for a card that lives on one: the
+ * spot itself; first on a task's pinned cards' column; just after a column
+ * or a note column on the task you are on. Null for any other target.
+ */
+function spotOnCanvas(
+  target: PutTarget,
+  state: IntentState,
+): { readonly task: TaskId; readonly after: CardId | null } | null {
+  const here = taskOfTab(state)
+  switch (target.kind) {
+    case "canvas":
+      return { task: target.task, after: target.after }
+    case "taskPinned":
+      return { task: target.task, after: null }
+    case "notes":
+      return here === null ? null : { task: here, after: target.column }
+    case "column":
+    case "composer":
+    case "pinned":
+      return here === null
+        ? null
+        : { task: here, after: parseCardId(target.key) ?? null }
+    default:
+      return null
+  }
 }
 
 /**
@@ -502,7 +775,7 @@ function putInMessage(
     const away = moveOf(message, DISCARDED)
     return [
       {
-        kind: "keep",
+        kind: "moveCards",
         moves: [into, { move: away, slot: null }],
         actedAt,
         close: [],
@@ -514,7 +787,9 @@ function putInMessage(
     move: moveOf(message, from),
     slot: now.place.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
   }
-  return [{ kind: "keep", moves: [into, back], actedAt, close: [], here: null }]
+  return [
+    { kind: "moveCards", moves: [into, back], actedAt, close: [], here: null },
+  ]
 }
 
 /** Your message `card` to the note column nearest its thread (ADR-0116). */
@@ -586,9 +861,50 @@ export function planComment(
 }
 
 /**
+ * Edit a reference as text (ADR-0126): a paste of its quote as a text card
+ * that replaces it (ADR-0132, ADR-0133), in its very place, keeping its
+ * address as its origin; one step of history, the reference to your trash
+ * first, so a full inventory takes it too. Nothing for a card that is no
+ * reference, or one you may not discard.
+ */
+export function planEditAsText(
+  edit: {
+    readonly reference: CardId
+    readonly card: TextCardId
+    readonly text: string
+  },
+  state: IntentState,
+): readonly Effect[] {
+  const facts = state.cards
+  const now = cardOf(facts, edit.reference)
+  if (now?.kind !== "reference" || !isDiscardable(now, facts.me)) return []
+  const from = keyOf(now.place)
+  return [
+    {
+      kind: "paste",
+      paste: {
+        kind: "text",
+        card: edit.card,
+        origin: now.content.address,
+        text: edit.text,
+      },
+      to: from,
+      replacing: { card: now.id, from },
+      how: {
+        actedAt: AT_INVENTORY,
+        slot:
+          now.place.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
+      },
+      here: taskOfTab(state),
+    },
+  ]
+}
+
+/**
  * A reference to a comment, `card`, queued on its thread as `reference`
- * (ADR-0126): its quote is the comment's text under a link to its entry
- * (`commentMarkdown`), read and kept as it is queued; the comment stays.
+ * (ADR-0126): a paste (ADR-0132), its quote the comment's text under a
+ * link to its entry (`commentMarkdown`), read and kept as it is queued;
+ * the comment stays.
  */
 export function planQueueReference(
   act: {
@@ -598,18 +914,28 @@ export function planQueueReference(
   },
   reference: ReferenceCardId,
   how: MoveHow,
+  state: IntentState,
 ): readonly Effect[] {
   const comment = parseTextCardId(act.card)
   return comment === undefined
     ? []
     : [
         {
-          kind: "queueComment",
-          card: reference,
-          comment,
-          entry: { kind: "entry", thread: act.thread, entry: act.entry },
+          kind: "paste",
+          paste: {
+            kind: "reference",
+            card: reference,
+            address: { kind: "card", card: comment },
+            quote: {
+              kind: "comment",
+              comment,
+              entry: { kind: "entry", thread: act.thread, entry: act.entry },
+            },
+          },
           to: { kind: "queued", thread: act.thread, seen: "" },
+          replacing: null,
           how,
+          here: taskOfTab(state),
         },
       ]
 }
@@ -692,13 +1018,7 @@ export function planDiscard(
   state: IntentState,
 ): readonly Effect[] {
   const now = cardOf(state.cards, card)
-  // A kind is discarded only where it may be in the trash (`PLACES_OF`),
-  // and only one a person moves: a task's card is the host's to trash.
-  if (now === undefined || !cardFitsPlace(now, "trash") || !isMovable(now))
-    return []
-  // Someone else's inventory is theirs to empty (ADR-0059).
-  if (now.place.kind === "inventory" && state.cards.me !== now.place.holder)
-    return []
+  if (now === undefined || !isDiscardable(now, state.cards.me)) return []
   return [moveCard(moveOf(now, DISCARDED), how, false, null, taskOfTab(state))]
 }
 
@@ -744,7 +1064,7 @@ export function planCloseUnstarted(
   const alone = (state.tasks.index.canvases.get(task) ?? []).length === 1
   return [
     {
-      kind: "keep",
+      kind: "moveCards",
       moves,
       actedAt: atColumn(thread),
       close: alone ? closeTaskEffects(task) : [],

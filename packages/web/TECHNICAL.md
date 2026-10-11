@@ -896,7 +896,8 @@ pipeline keeps the tree a pure function, testable without a DOM.
   from the same walk, so the table drawn and the table an address names
   cannot be counted differently (`blockAt`, `tableHeads` for a table's
   title). `drawTree` draws a tree; in a message, `<table>` is
-  `MessageTable`, with its bar (❝ takes a reference to it, ⤢ opens it),
+  `MessageTable`, with its bar (⤢ opens it; Cmd+C with focus there copies
+  the table, its wrap carrying its block),
   and `<img>` `BlobImage`.
 - **A link to an address is a chip** (`/a/<address>`, ADR-0126): a
   relative URL, so `safeUrl` keeps it, marked `data-address` and
@@ -1160,6 +1161,8 @@ board draws it (`boardView`), and an inventory never holds one
   its normal its first and last messages, its whole `ThreadPreviewView`.
   A note column's face is its title and count, its normal its title and
   first notes, its whole all of them.
+- **A reference's quote is fetched once per page** (`useQuote`), and kept
+  by its blob for a copy to read (`quoteOf`): a quote never changes.
 - **A row's components take their card and width alone**; what a surface
   gives them beyond that (the session, the reader, a thread's preview, the
   note columns, where a put lands) is `RenderingContext`, given by
@@ -1282,6 +1285,43 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   dialog makes the footer inert.
 - **The heading takes focus** when a page mounts (`tabIndex={-1}`): the
   menu item that opened it is gone.
+
+## The clipboard (`clipboard.ts`, `focus.ts`, ADR-0132)
+
+`clipboard.ts` is the one file that touches the clipboard
+(`clipboard-boundary.test.ts` keeps it so): the page's `copy`, `cut` and
+`paste` events, a pasted image's files (`pastedImages`, which the card
+editor and the picture field call), and a button's copy
+(`writeTextByButton`, `useCopy`'s). Each handler gathers where focus is
+(`focusFacts`, `focus.ts`, the one gather the keys read too) and what was
+pasted, asks the planners in `@pinetrie/interface` (`clipOfFocus`,
+`planCopy`, `readPaste`, `targetOfFocus`), and carries out what they say.
+What S151 measured, and these handlers rest on:
+
+- **`setData` counts only inside the event**, synchronously: a copy cannot
+  wait for anything, so a reference's quote is written only if this page
+  has already fetched it (`useQuote` keeps each, `quoteOf`), else its link.
+- **The events fire away from a text box**, on a focused element with
+  nothing selected, in Chromium, Firefox, WebKit and Safari, with no
+  workaround. So a card's header (`.card-head`), the clipboard cell and a
+  table's bar take focus, and a copy there writes the card, the cell's copy
+  or the table.
+- **`text/html` is the carrier that survives**: another origin, another
+  browser, the system clipboard. WebKit writes it again in its own form
+  (`data-pinetrie="{&quot;…}"`), so it is parsed (`DOMParser`), never
+  matched. `application/x-pinetrie` survives only within one browser, and
+  WebKit keeps it to one origin.
+- **A rich text box in Firefox carries `data-pinetrie` back** on text
+  someone changed: the carrier names its text, and counts only when the
+  pasted text is it.
+- **Nothing reads the clipboard before a paste** without a prompt or a
+  refusal, so the clipboard cell shows this tab's last copy, and a paste
+  that brings something else replaces it.
+- **The keydown comes before its paste**, so Shift held for Cmd+Shift+V is
+  known by then; WebKitGTK fires no paste for Ctrl+Shift+V at all.
+- **A pasted image is the box's own**: the card editor and the picture
+  field handle it on the element, first, and prevent the default; the
+  document's handler leaves an event already handled alone.
 
 ## Gotchas
 
@@ -1429,9 +1469,12 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
 - **`.column` must stay `#strip`'s direct child**: `use-column-drag.ts`
   queries `:scope > .column`. A column's `.column-body` is inside
   `.column-thread`.
-- **The clipboard needs a secure context.** An invite link over plain http
-  has no `navigator.clipboard`. There, or when the clipboard refuses,
-  `useCopy` (`copy.ts`) selects an element for the reader to copy: the
+- **A button's copy needs a secure context.** An invite link over plain
+  http has no `navigator.clipboard`, which only a button's copy uses
+  (`writeTextByButton`, `clipboard.ts`): Cmd+C, Cmd+X and Cmd+V are the
+  clipboard events, which work over plain http too. There, or when the
+  clipboard refuses, `useCopy` (`copy.ts`) selects an element for the
+  reader to copy: the
   bookmark its own text, a message its drawn text and tool rows. It tests for
   `navigator.clipboard?.writeText`, not `isSecureContext`: the browser
   suite hides the clipboard to check that path (S68), and can't make its

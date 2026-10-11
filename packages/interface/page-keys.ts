@@ -10,15 +10,14 @@
 // for itself; the panel's buttons and drag still work. Folding the sidebar is
 // Ctrl+Shift+L, the same way, beside the control at its foot. Undo and redo of a
 // move are Cmd or Ctrl with Z (Shift+Z, or Ctrl+Y, to redo), only outside a
-// text box, where they are the box's own text undo (ADR-0052). Cmd or Ctrl
-// with X outside a text box takes as Ctrl+Shift+I does, and the put key in a
-// text box puts a reference there as a link (ADR-0126). Cmd+C is not a key
-// here: on a selection it is the page's `copy` event's (`copySelection`),
-// and with none the column's (`onEntryKey`); Cmd+V is the browser's. `/`
-// opens a search outside a text box; Escape closes it from the search
-// itself, its field included.
+// text box, where they are the box's own text undo (ADR-0052). The put key
+// puts the card in your hand in the column you were last in, never into a
+// text box, which only a paste types into. Cmd+C, Cmd+X and Cmd+V are no
+// keys here: they are the page's `copy`, `cut` and `paste` events
+// (`clipboard.ts` in the page, ADR-0132). `/` opens a search outside a text
+// box; Escape closes it from the search itself, its field included.
 
-import { type CardId, kindOfCard } from "@pinetrie/core"
+import type { Focus } from "./focus.ts"
 import type { Intent } from "./intent.ts"
 
 /** The part of a `KeyboardEvent` read here. */
@@ -30,33 +29,8 @@ export interface KeyLike {
   readonly altKey: boolean
 }
 
-/** Where focus is when the key is pressed. */
-export interface KeyFocus {
-  /** The card whose box or heading has focus (`data-card`), if any. */
-  readonly card: CardId | null
-  /** Focus is in a text box: its undo keys are its own. */
-  readonly inText: boolean
-  /** Focus is in the inventory panel. */
-  readonly inPanel: boolean
-  /** The card in the inventory's selected slot, if any. */
-  readonly selectedCard: CardId | null
-  /** The column that last held focus, by key: where a put lands. */
-  readonly column: string | null
-  /**
-   * A page covers the stage (ADR-0098): no key but the list's fold acts,
-   * since a take, a put or an undo would act on columns no one can see.
-   */
-  readonly page: boolean
-  /**
-   * Where search stands: "unavailable" with no tree shown (a new tab, the
-   * board), "focused" while open with focus in the bar, a match list or
-   * nowhere.
-   */
-  readonly search: "unavailable" | "closed" | "open" | "focused"
-}
-
 /** The intent a key asks for, or null for a key that is not one of these. */
-export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
+export function keyAct(event: KeyLike, focus: Focus): Intent | null {
   const key = event.key.toLowerCase()
   const chord =
     event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey
@@ -71,34 +45,19 @@ export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
     return focus.card === null
       ? null
       : { kind: "takeIntoInventory", card: focus.card }
-  if (chord && key === "o") {
-    if (focus.selectedCard === null) return null
-    // The put key in a text box puts a reference there as a link
-    // (ADR-0126); any other card goes to the column, as ever.
-    if (focus.inText && kindOfCard(focus.selectedCard) === "reference")
-      return {
-        kind: "put",
-        card: focus.selectedCard,
-        target: { kind: "text-box" },
-      }
-    return focus.column === null
+  if (chord && key === "o")
+    return focus.selectedCard === null || focus.column === null
       ? null
       : {
           kind: "put",
-          card: focus.selectedCard,
+          source: { kind: "card", card: focus.selectedCard },
           target: { kind: "column", key: focus.column },
+          how: "move",
         }
-  }
   if (focus.inText || event.altKey) return null
   if (plain && event.key === "/" && focus.search !== "unavailable")
     return { kind: "search", act: { kind: "open" } }
   const command = event.metaKey !== event.ctrlKey
-  // Cmd+X outside a text box takes the focused card into your inventory
-  // (ADR-0126), as Ctrl+Shift+I does.
-  if (command && !event.shiftKey && key === "x")
-    return focus.card === null
-      ? null
-      : { kind: "takeIntoInventory", card: focus.card }
   if (command && key === "z")
     return {
       kind: "undoMove",

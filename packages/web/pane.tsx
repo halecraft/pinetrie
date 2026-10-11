@@ -16,7 +16,7 @@ import { createPortal } from "react-dom"
 import { BlobImage } from "./blob-image.tsx"
 import { drawTree } from "./message-text.tsx"
 import { useTrackColors } from "./palette-context.ts"
-import { OPEN_IN_TAB, type PaneView, paneLabel, TAKE_BLOCK } from "./pane.ts"
+import { OPEN_IN_TAB, type PaneView, paneLabel } from "./pane.ts"
 import { PaneHead } from "./pane-head.tsx"
 import { ReviewPane } from "./review-pane.tsx"
 import { useNarrow } from "./use-narrow.ts"
@@ -26,7 +26,6 @@ export function Pane({
   view,
   track,
   close,
-  take,
 }: {
   /** What the strip's review line controls. */
   id: string
@@ -35,8 +34,6 @@ export function Pane({
   track: number
   /** Stable (`useStable`). */
   close: () => void
-  /** Take a reference to what it shows (ADR-0126); null for none: a subject that is no block. */
-  take: (() => void) | null
 }) {
   const narrow = useNarrow()
   const shown =
@@ -60,7 +57,6 @@ export function Pane({
         close={close}
         narrow={narrow}
         src={view.src}
-        take={take}
         title={view.title}
       />
     )
@@ -209,15 +205,12 @@ function ImagePane({
   title,
   narrow,
   close,
-  take,
 }: {
   src: string
   alt: string
   title: string
   narrow: boolean
   close: () => void
-  /** An image of a message's text is a block: its ❝ takes a reference. */
-  take: (() => void) | null
 }) {
   const [zoom, setZoom] = useState(false)
   return (
@@ -225,22 +218,9 @@ function ImagePane({
       <PaneHead
         close={close}
         extra={
-          <>
-            {take !== null && (
-              <button
-                aria-label={TAKE_BLOCK.label}
-                className="take-block"
-                onClick={take}
-                title={TAKE_BLOCK.title}
-                type="button"
-              >
-                {TAKE_BLOCK.glyph}
-              </button>
-            )}
-            <a className="pane-link" href={src} rel="noopener" target="_blank">
-              {OPEN_IN_TAB}
-            </a>
-          </>
+          <a className="pane-link" href={src} rel="noopener" target="_blank">
+            {OPEN_IN_TAB}
+          </a>
         }
         narrow={narrow}
         title={title}

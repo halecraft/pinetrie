@@ -14,15 +14,14 @@ import type {
   LaneRecord,
   LaneView,
   MoveDirection,
+  MoveTarget,
   OfferAction,
-  PlaceKey,
-  QueuedKey,
   QueueHoldChange,
   QueueMove,
   ReferenceCardId,
   Reorder,
+  Replacing,
   Sha256,
-  TargetOf,
   TaskId,
   TextCard,
   TextCardId,
@@ -41,6 +40,8 @@ import type {
 } from "@pinetrie/session"
 import type { Raised } from "./attention.ts"
 import { heldByOthers } from "./canvas-columns.ts"
+import type { Quote } from "./card-intents.ts"
+import type { Clip } from "./clip.ts"
 import type { Identity } from "./identity.ts"
 import {
   type Here,
@@ -98,50 +99,22 @@ export type Effect =
       readonly how: MoveHow
     }
   /**
-   * Take a reference from the past (ADR-0126): its quote kept as a blob,
-   * then the reference made where `to` is.
+   * A paste (ADR-0132): a text card's text written first, a reference's
+   * quote kept first when it is markdown or a comment's, then one request
+   * that discards the card it replaces (ADR-0133) and makes the card, or
+   * moves a cut card out of your trash, where `to` sends it.
    */
   | {
-      readonly kind: "takeReference"
-      readonly card: ReferenceCardId
-      readonly address: Address
-      readonly markdown: string
-      readonly to: TargetOf<"reference">
+      readonly kind: "paste"
+      readonly paste: PastedCard
+      readonly to: MoveTarget
+      readonly replacing: Replacing | null
       readonly how: MoveHow
-    }
-  /**
-   * A reference to a comment queued on its thread (ADR-0126): its quote,
-   * the comment's text as it is now under a link to `entry`
-   * (`commentMarkdown`), kept as a blob, then the reference made there.
-   */
-  | {
-      readonly kind: "queueComment"
-      readonly card: ReferenceCardId
-      readonly comment: TextCardId
-      readonly entry: Address
-      readonly to: QueuedKey
-      readonly how: MoveHow
-    }
-  /** A reference made with a quote already kept: a put of one in your hand. */
-  | {
-      readonly kind: "makeReference"
-      readonly card: ReferenceCardId
-      readonly address: Address
-      readonly quote: Sha256
-      readonly to: TargetOf<"reference">
-      readonly how: MoveHow
-    }
-  /** A reference edited as text: its quote written into the new card first. */
-  | {
-      readonly kind: "editAsText"
-      readonly reference: ReferenceCardId
-      readonly from: PlaceKey
-      readonly card: TextCardId
-      readonly text: string
+      /** The task you are on: a discard's history from your inventory. */
       readonly here: TaskId | null
     }
-  /** Markdown on the system clipboard. */
-  | { readonly kind: "copyText"; readonly text: string }
+  /** What the clipboard cell shows: the copy this tab just made (ADR-0132). */
+  | { readonly kind: "clipboardCell"; readonly clip: Clip }
   /** Text at the caret of the text box that has focus. */
   | { readonly kind: "insertText"; readonly text: string }
   /** A move (ADR-0059): a take into the inventory, a put, an unqueue, a discard. */
@@ -177,12 +150,13 @@ export type Effect =
   | { readonly kind: "swapSlots"; readonly a: number; readonly b: number }
   /**
    * Moves sent as one, which the host accepts or refuses whole (ADR-0066):
-   * a keep into your inventory, or a card put in your composer and the
-   * message it displaces. `afterKeep` decides from its answer whether `close`
-   * runs.
+   * an unstarted branch's cards kept in your inventory as it closes, a card
+   * put in your composer and the message it displaces, or a slot's
+   * replacement (ADR-0133). `afterKeep` decides from its answer whether
+   * `close` runs.
    */
   | {
-      readonly kind: "keep"
+      readonly kind: "moveCards"
       /** At least one. */
       readonly moves: readonly [SlotMove, ...SlotMove[]]
       readonly actedAt: ActedAt
@@ -259,6 +233,35 @@ export interface IntentState {
   readonly page: PageName | null
   /** A search applies on the root you are on (`searchOn`, ADR-0101). */
   readonly searching: boolean
+  /** What a copy and a paste read (ADR-0132). */
+  readonly clips: ClipLookups
+}
+
+/** What a paste makes, as the page plans it (`Paste`, with what it writes first). */
+export type PastedCard =
+  | {
+      readonly kind: "text"
+      readonly card: TextCardId
+      readonly origin: Address | null
+      /** Written into the card before the host makes it (S96). */
+      readonly text: string
+    }
+  | {
+      readonly kind: "reference"
+      readonly card: ReferenceCardId
+      readonly address: Address
+      readonly quote: Quote
+    }
+  | { readonly kind: "uncut"; readonly card: CardId }
+
+/** What a copy reads beyond the cards (ADR-0132): texts, quotes, and the clipboard cell. */
+export interface ClipLookups {
+  /** A text card's text as this tab has it. */
+  readonly textOf: (card: TextCardId) => string
+  /** A reference's quote if this tab has fetched it. */
+  readonly quoteOf: (quote: Sha256) => string | null
+  /** The last copy this tab made. */
+  readonly cell: Clip | null
 }
 
 /** What the card intents decide from (ADR-0048 step 4). */

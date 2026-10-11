@@ -1,0 +1,1119 @@
+{
+  "port": 43095,
+  "versions": {
+    "chromium": "141.0.7390.37",
+    "firefox": "142.0.1",
+    "webkit": "26.0"
+  },
+  "sanity": {
+    "chromium": "ok",
+    "firefox": "ok",
+    "webkit": "ok"
+  },
+  "copy": {
+    "chromium": {
+      "copy": {
+        "ev": "copy",
+        "active": "card",
+        "collapsed": true,
+        "hasData": true,
+        "set": {
+          "text/plain": "ok",
+          "text/html": "ok",
+          "application/x-pinetrie": "ok"
+        },
+        "typesAfterSet": ["text/plain", "text/html", "application/x-pinetrie"]
+      },
+      "trick": null,
+      "x": {
+        "targets": [
+          "TIMESTAMP",
+          "TARGETS",
+          "SAVE_TARGETS",
+          "MULTIPLE",
+          "STRING",
+          "TEXT",
+          "UTF8_STRING",
+          "chromium/x-internal-source-rfh-token",
+          "chromium/x-source-url",
+          "chromium/x-web-custom-data",
+          "text/html",
+          "text/plain",
+          "text/plain;charset=utf-8"
+        ],
+        "read": {
+          "UTF8_STRING": "CARD-TEXT chromium-copy",
+          "chromium/x-internal-source-rfh-token": "\u0014\u0000\u0000\u0000\u0005\u0000\u0000\u0000Ћ_�\u0012I�V|7�ˎ���",
+          "chromium/x-source-url": "http://127.0.0.1:43095/",
+          "chromium/x-web-custom-data": "l\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0016\u0000\u0000\u0000a\u0000p\u0000p\u0000l\u0000i\u0000c\u0000a\u0000t\u0000i\u0000o\u0000n\u0000/\u0000x\u0000-\u0000p\u0000i\u0000n\u0000e\u0000t\u0000r\u0000i\u0000e\u0000\u0019\u0000\u0000\u0000{\u0000\"\u0000n\u0000o\u0000n\u0000c\u0000e\u0000\"\u0000:\u0000\"\u0000c\u0000h\u0000r\u0000o\u0000m\u0000i\u0000u\u0000m\u0000-\u0000c\u0000o\u0000p\u0000y\u0000\"\u0000}\u0000\u0000\u0000",
+          "text/html": "<span data-pinetrie='{\"nonce\":\"chromium-copy\"}'>CARD-TEXT chromium-copy</span>",
+          "text/plain": "CARD-TEXT chromium-copy",
+          "text/plain;charset=utf-8": "CARD-TEXT chromium-copy"
+        }
+      },
+      "pasted": {
+        "chromium/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html", "application/x-pinetrie"],
+            "data": {
+              "text/plain": "CARD-TEXT chromium-copy",
+              "text/html": "<span data-pinetrie='{\"nonce\":\"chromium-copy\"}'>CARD-TEXT chromium-copy</span>",
+              "application/x-pinetrie": "{\"nonce\":\"chromium-copy\"}"
+            },
+            "files": 0,
+            "htmlCarrier": "{\"nonce\":\"chromium-copy\"}"
+          },
+          "boxValue": "CARD-TEXT chromium-copy",
+          "boxTypes": ["text/plain", "text/html", "application/x-pinetrie"]
+        },
+        "chromium/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html", "application/x-pinetrie"],
+            "data": {
+              "text/plain": "CARD-TEXT chromium-copy",
+              "text/html": "<span data-pinetrie='{\"nonce\":\"chromium-copy\"}'>CARD-TEXT chromium-copy</span>",
+              "application/x-pinetrie": "{\"nonce\":\"chromium-copy\"}"
+            },
+            "files": 0,
+            "htmlCarrier": "{\"nonce\":\"chromium-copy\"}"
+          },
+          "boxValue": "CARD-TEXT chromium-copy",
+          "boxTypes": ["text/plain", "text/html", "application/x-pinetrie"]
+        },
+        "firefox/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<span data-pinetrie='{\"nonce\":\"chromium-copy\"}'>CARD-TEXT chromium-copy</span>",
+              "text/plain": "CARD-TEXT chromium-copy",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{\"nonce\":\"chromium-copy\"}"
+          },
+          "boxValue": "CARD-TEXT chromium-copy",
+          "boxTypes": ["text/html", "text/plain"]
+        },
+        "firefox/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<span data-pinetrie='{\"nonce\":\"chromium-copy\"}'>CARD-TEXT chromium-copy</span>",
+              "text/plain": "CARD-TEXT chromium-copy",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{\"nonce\":\"chromium-copy\"}"
+          },
+          "boxValue": "CARD-TEXT chromium-copy",
+          "boxTypes": ["text/html", "text/plain"]
+        },
+        "webkit/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;chromium-copy&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT chromium-copy</span>",
+              "text/plain": "CARD-TEXT chromium-copy",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;chromium-copy&quot;}"
+          },
+          "boxValue": "CARD-TEXT chromium-copy",
+          "boxTypes": ["text/html", "text/plain"]
+        },
+        "webkit/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;chromium-copy&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT chromium-copy</span>",
+              "text/plain": "CARD-TEXT chromium-copy",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;chromium-copy&quot;}"
+          },
+          "boxValue": "CARD-TEXT chromium-copy",
+          "boxTypes": ["text/html", "text/plain"]
+        }
+      },
+      "cut": {
+        "ev": "cut",
+        "active": "card",
+        "collapsed": true,
+        "hasData": true,
+        "set": {
+          "text/plain": "ok",
+          "text/html": "ok",
+          "application/x-pinetrie": "ok"
+        },
+        "typesAfterSet": ["text/plain", "text/html", "application/x-pinetrie"]
+      },
+      "cutTrick": null
+    },
+    "firefox": {
+      "copy": {
+        "ev": "copy",
+        "active": "card",
+        "collapsed": true,
+        "hasData": true,
+        "set": {
+          "text/plain": "ok",
+          "text/html": "ok",
+          "application/x-pinetrie": "ok"
+        },
+        "typesAfterSet": ["text/plain", "text/html", "application/x-pinetrie"]
+      },
+      "trick": null,
+      "x": {
+        "targets": [
+          "TIMESTAMP",
+          "TARGETS",
+          "MULTIPLE",
+          "SAVE_TARGETS",
+          "UTF8_STRING",
+          "COMPOUND_TEXT",
+          "TEXT",
+          "STRING",
+          "text/plain;charset=utf-8",
+          "text/plain;charset=ANSI_X3.4-1968",
+          "text/plain",
+          "text/html",
+          "application/x-moz-custom-clipdata"
+        ],
+        "read": {
+          "UTF8_STRING": "CARD-TEXT firefox-copy",
+          "text/plain;charset=utf-8": "CARD-TEXT firefox-copy",
+          "text/plain;charset=ANSI_X3.4-1968": "CARD-TEXT firefox-copy",
+          "text/plain": "CARD-TEXT firefox-copy",
+          "text/html": "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"><span data-pinetrie='{\"nonce\":\"firefox-copy\"}'>CARD-TEXT firefox-copy</span>",
+          "application/x-moz-custom-clipdata": "\u0000\u0000\u0000\u0001\u0000\u0000\u0000,a\u0000p\u0000p\u0000l\u0000i\u0000c\u0000a\u0000t\u0000i\u0000o\u0000n\u0000/\u0000x\u0000-\u0000p\u0000i\u0000n\u0000e\u0000t\u0000r\u0000i\u0000e\u0000\u0000\u0000\u00000{\u0000\"\u0000n\u0000o\u0000n\u0000c\u0000e\u0000\"\u0000:\u0000\"\u0000f\u0000i\u0000r\u0000e\u0000f\u0000o\u0000x\u0000-\u0000c\u0000o\u0000p\u0000y\u0000\"\u0000}\u0000\u0000\u0000\u0000\u0000"
+        }
+      },
+      "pasted": {
+        "chromium/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT firefox-copy",
+              "text/html": "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"><span data-pinetrie='{\"nonce\":\"firefox-copy\"}'>CARD-TEXT firefox-copy</span>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{\"nonce\":\"firefox-copy\"}"
+          },
+          "boxValue": "CARD-TEXT firefox-copy",
+          "boxTypes": ["text/plain", "text/html"]
+        },
+        "chromium/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT firefox-copy",
+              "text/html": "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"><span data-pinetrie='{\"nonce\":\"firefox-copy\"}'>CARD-TEXT firefox-copy</span>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{\"nonce\":\"firefox-copy\"}"
+          },
+          "boxValue": "CARD-TEXT firefox-copy",
+          "boxTypes": ["text/plain", "text/html"]
+        },
+        "firefox/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["application/x-pinetrie", "text/html", "text/plain"],
+            "data": {
+              "application/x-pinetrie": "{\"nonce\":\"firefox-copy\"}",
+              "text/html": "<span data-pinetrie='{\"nonce\":\"firefox-copy\"}'>CARD-TEXT firefox-copy</span>",
+              "text/plain": "CARD-TEXT firefox-copy"
+            },
+            "files": 0,
+            "htmlCarrier": "{\"nonce\":\"firefox-copy\"}"
+          },
+          "boxValue": "CARD-TEXT firefox-copy",
+          "boxTypes": ["application/x-pinetrie", "text/html", "text/plain"]
+        },
+        "firefox/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["application/x-pinetrie", "text/html", "text/plain"],
+            "data": {
+              "application/x-pinetrie": "{\"nonce\":\"firefox-copy\"}",
+              "text/html": "<span data-pinetrie='{\"nonce\":\"firefox-copy\"}'>CARD-TEXT firefox-copy</span>",
+              "text/plain": "CARD-TEXT firefox-copy"
+            },
+            "files": 0,
+            "htmlCarrier": "{\"nonce\":\"firefox-copy\"}"
+          },
+          "boxValue": "CARD-TEXT firefox-copy",
+          "boxTypes": ["application/x-pinetrie", "text/html", "text/plain"]
+        },
+        "webkit/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT firefox-copy",
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-copy&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT firefox-copy</span>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;firefox-copy&quot;}"
+          },
+          "boxValue": "CARD-TEXT firefox-copy",
+          "boxTypes": ["text/plain", "text/html"]
+        },
+        "webkit/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT firefox-copy",
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-copy&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT firefox-copy</span>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;firefox-copy&quot;}"
+          },
+          "boxValue": "CARD-TEXT firefox-copy",
+          "boxTypes": ["text/plain", "text/html"]
+        }
+      },
+      "cut": {
+        "ev": "cut",
+        "active": "card",
+        "collapsed": true,
+        "hasData": true,
+        "set": {
+          "text/plain": "ok",
+          "text/html": "ok",
+          "application/x-pinetrie": "ok"
+        },
+        "typesAfterSet": ["text/plain", "text/html", "application/x-pinetrie"]
+      },
+      "cutTrick": null
+    },
+    "webkit": {
+      "copy": {
+        "ev": "copy",
+        "active": "card",
+        "collapsed": true,
+        "hasData": true,
+        "set": {
+          "text/plain": "ok",
+          "text/html": "ok",
+          "application/x-pinetrie": "ok"
+        },
+        "typesAfterSet": ["text/plain", "text/html", "application/x-pinetrie"]
+      },
+      "trick": null,
+      "x": {
+        "targets": [
+          "SAVE_TARGETS",
+          "TIMESTAMP",
+          "TARGETS",
+          "text/html",
+          "org.webkitgtk.WebKit.custom-pasteboard-data",
+          "UTF8_STRING",
+          "COMPOUND_TEXT",
+          "TEXT",
+          "STRING",
+          "text/plain;charset=utf-8",
+          "text/plain;charset=ANSI_X3.4-1968",
+          "text/plain"
+        ],
+        "read": {
+          "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-copy&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-copy</span>",
+          "org.webkitgtk.WebKit.custom-pasteboard-data": "ERR Command failed: xclip -selection clipboard -o -t org.webkitgtk.WebKit.custom-pasteboard-data",
+          "UTF8_STRING": "CARD-TEXT webkit-copy",
+          "text/plain;charset=utf-8": "CARD-TEXT webkit-copy",
+          "text/plain;charset=ANSI_X3.4-1968": "ERR Command failed: xclip -selection clipboard -o -t text/plain;charset=ANSI_X3.4-1968",
+          "text/plain": "CARD-TEXT webkit-copy"
+        }
+      },
+      "pasted": {
+        "chromium/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT webkit-copy",
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-copy&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-copy</span>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-copy&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-copy",
+          "boxTypes": ["text/plain", "text/html"]
+        },
+        "chromium/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT webkit-copy",
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-copy&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-copy</span>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-copy&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-copy",
+          "boxTypes": ["text/plain", "text/html"]
+        },
+        "firefox/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-copy&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-copy</span>",
+              "text/plain": "CARD-TEXT webkit-copy",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-copy&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-copy",
+          "boxTypes": ["text/html", "text/plain"]
+        },
+        "firefox/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-copy&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-copy</span>",
+              "text/plain": "CARD-TEXT webkit-copy",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-copy&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-copy",
+          "boxTypes": ["text/html", "text/plain"]
+        },
+        "webkit/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html", "application/x-pinetrie"],
+            "data": {
+              "text/plain": "CARD-TEXT webkit-copy",
+              "text/html": "<span data-pinetrie='{\"nonce\":\"webkit-copy\"}'>CARD-TEXT webkit-copy</span>",
+              "application/x-pinetrie": "{\"nonce\":\"webkit-copy\"}"
+            },
+            "files": 0,
+            "htmlCarrier": "{\"nonce\":\"webkit-copy\"}"
+          },
+          "boxValue": "CARD-TEXT webkit-copy",
+          "boxTypes": ["text/plain", "text/html", "application/x-pinetrie"]
+        },
+        "webkit/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-copy&quot;}\" style=\"font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid; caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);\">CARD-TEXT webkit-copy</span>",
+              "text/plain": "CARD-TEXT webkit-copy",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-copy&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-copy",
+          "boxTypes": ["text/html", "text/plain"]
+        }
+      },
+      "cut": {
+        "ev": "cut",
+        "active": "card",
+        "collapsed": true,
+        "hasData": true,
+        "set": {
+          "text/plain": "ok",
+          "text/html": "ok",
+          "application/x-pinetrie": "ok"
+        },
+        "typesAfterSet": ["text/plain", "text/html", "application/x-pinetrie"]
+      },
+      "cutTrick": null
+    }
+  },
+  "external": {
+    "x": {
+      "targets": ["TARGETS", "UTF8_STRING"],
+      "read": {
+        "UTF8_STRING": "from another app"
+      }
+    },
+    "pasted": {
+      "chromium/a": {
+        "card": {
+          "ev": "paste",
+          "active": "card",
+          "target": "card",
+          "types": ["text/plain"],
+          "data": {
+            "text/plain": "from another app",
+            "text/html": "",
+            "application/x-pinetrie": ""
+          },
+          "files": 0,
+          "htmlCarrier": null
+        },
+        "boxValue": "from another app",
+        "boxTypes": ["text/plain"]
+      },
+      "chromium/b": {
+        "card": {
+          "ev": "paste",
+          "active": "card",
+          "target": "card",
+          "types": ["text/plain"],
+          "data": {
+            "text/plain": "from another app",
+            "text/html": "",
+            "application/x-pinetrie": ""
+          },
+          "files": 0,
+          "htmlCarrier": null
+        },
+        "boxValue": "from another app",
+        "boxTypes": ["text/plain"]
+      },
+      "firefox/a": {
+        "card": {
+          "ev": "paste",
+          "active": "card",
+          "target": "BODY",
+          "types": ["text/plain"],
+          "data": {
+            "text/plain": "from another app",
+            "text/html": "",
+            "application/x-pinetrie": ""
+          },
+          "files": 0,
+          "htmlCarrier": null
+        },
+        "boxValue": "from another app",
+        "boxTypes": ["text/plain"]
+      },
+      "firefox/b": {
+        "card": {
+          "ev": "paste",
+          "active": "card",
+          "target": "BODY",
+          "types": ["text/plain"],
+          "data": {
+            "text/plain": "from another app",
+            "text/html": "",
+            "application/x-pinetrie": ""
+          },
+          "files": 0,
+          "htmlCarrier": null
+        },
+        "boxValue": "from another app",
+        "boxTypes": ["text/plain"]
+      },
+      "webkit/a": {
+        "card": {
+          "ev": "paste",
+          "active": "card",
+          "target": "card",
+          "types": [],
+          "data": {
+            "text/plain": "from another app",
+            "text/html": "",
+            "application/x-pinetrie": ""
+          },
+          "files": 0,
+          "htmlCarrier": null
+        },
+        "boxValue": "from another app",
+        "boxTypes": []
+      },
+      "webkit/b": {
+        "card": {
+          "ev": "paste",
+          "active": "card",
+          "target": "card",
+          "types": [],
+          "data": {
+            "text/plain": "from another app",
+            "text/html": "",
+            "application/x-pinetrie": ""
+          },
+          "files": 0,
+          "htmlCarrier": null
+        },
+        "boxValue": "from another app",
+        "boxTypes": []
+      }
+    }
+  },
+  "asyncApi": {
+    "chromium": {
+      "write": "no write settled in 3.4s",
+      "x": {
+        "targets": ["TARGETS", "UTF8_STRING"],
+        "read": {
+          "UTF8_STRING": "from another app"
+        }
+      },
+      "pasted": {
+        "chromium/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain"],
+            "data": {
+              "text/plain": "from another app",
+              "text/html": "",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": null
+          },
+          "boxValue": "from another app",
+          "boxTypes": ["text/plain"]
+        },
+        "chromium/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain"],
+            "data": {
+              "text/plain": "from another app",
+              "text/html": "",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": null
+          },
+          "boxValue": "from another app",
+          "boxTypes": ["text/plain"]
+        },
+        "firefox/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["text/plain"],
+            "data": {
+              "text/plain": "from another app",
+              "text/html": "",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": null
+          },
+          "boxValue": "from another app",
+          "boxTypes": ["text/plain"]
+        },
+        "firefox/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["text/plain"],
+            "data": {
+              "text/plain": "from another app",
+              "text/html": "",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": null
+          },
+          "boxValue": "from another app",
+          "boxTypes": ["text/plain"]
+        },
+        "webkit/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": [],
+            "data": {
+              "text/plain": "from another app",
+              "text/html": "",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": null
+          },
+          "boxValue": "from another app",
+          "boxTypes": []
+        },
+        "webkit/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": [],
+            "data": {
+              "text/plain": "from another app",
+              "text/html": "",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": null
+          },
+          "boxValue": "from another app",
+          "boxTypes": []
+        }
+      }
+    },
+    "firefox": {
+      "write": {
+        "ev": "asyncWrite",
+        "result": {
+          "web-custom": "NotAllowedError: Type 'web application/x-pinetrie' not supported for write",
+          "plain+html": "ok"
+        },
+        "hasFocus": true
+      },
+      "x": {
+        "targets": [
+          "TIMESTAMP",
+          "TARGETS",
+          "MULTIPLE",
+          "SAVE_TARGETS",
+          "UTF8_STRING",
+          "COMPOUND_TEXT",
+          "TEXT",
+          "STRING",
+          "text/plain;charset=utf-8",
+          "text/plain;charset=ANSI_X3.4-1968",
+          "text/plain",
+          "text/html"
+        ],
+        "read": {
+          "UTF8_STRING": "CARD-TEXT firefox-async",
+          "text/plain;charset=utf-8": "CARD-TEXT firefox-async",
+          "text/plain;charset=ANSI_X3.4-1968": "CARD-TEXT firefox-async",
+          "text/plain": "CARD-TEXT firefox-async",
+          "text/html": "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"><html><head></head><body><span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-async&quot;}\">CARD-TEXT firefox-async</span></body></html>"
+        }
+      },
+      "pasted": {
+        "chromium/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT firefox-async",
+              "text/html": "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"><html><head></head><body><span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-async&quot;}\">CARD-TEXT firefox-async</span></body></html>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;firefox-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT firefox-async",
+          "boxTypes": ["text/plain", "text/html"]
+        },
+        "chromium/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT firefox-async",
+              "text/html": "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"><html><head></head><body><span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-async&quot;}\">CARD-TEXT firefox-async</span></body></html>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;firefox-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT firefox-async",
+          "boxTypes": ["text/plain", "text/html"]
+        },
+        "firefox/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<html><head></head><body><span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-async&quot;}\">CARD-TEXT firefox-async</span></body></html>",
+              "text/plain": "CARD-TEXT firefox-async",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;firefox-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT firefox-async",
+          "boxTypes": ["text/html", "text/plain"]
+        },
+        "firefox/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<html><head></head><body><span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-async&quot;}\">CARD-TEXT firefox-async</span></body></html>",
+              "text/plain": "CARD-TEXT firefox-async",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;firefox-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT firefox-async",
+          "boxTypes": ["text/html", "text/plain"]
+        },
+        "webkit/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT firefox-async",
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-async&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT firefox-async</span>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;firefox-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT firefox-async",
+          "boxTypes": ["text/plain", "text/html"]
+        },
+        "webkit/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT firefox-async",
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-async&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT firefox-async</span>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;firefox-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT firefox-async",
+          "boxTypes": ["text/plain", "text/html"]
+        }
+      }
+    },
+    "webkit": {
+      "write": {
+        "ev": "asyncWrite",
+        "result": {
+          "web-custom": "ok"
+        },
+        "hasFocus": true
+      },
+      "x": {
+        "targets": [
+          "SAVE_TARGETS",
+          "TIMESTAMP",
+          "TARGETS",
+          "text/html",
+          "org.webkitgtk.WebKit.custom-pasteboard-data",
+          "web application/x-pinetrie",
+          "UTF8_STRING",
+          "COMPOUND_TEXT",
+          "TEXT",
+          "STRING",
+          "text/plain;charset=utf-8",
+          "text/plain;charset=ANSI_X3.4-1968",
+          "text/plain"
+        ],
+        "read": {
+          "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-async&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-async</span>",
+          "org.webkitgtk.WebKit.custom-pasteboard-data": "ERR Command failed: xclip -selection clipboard -o -t org.webkitgtk.WebKit.custom-pasteboard-data",
+          "web application/x-pinetrie": "{\"nonce\":\"webkit-async\"}",
+          "UTF8_STRING": "CARD-TEXT webkit-async",
+          "text/plain;charset=utf-8": "CARD-TEXT webkit-async",
+          "text/plain;charset=ANSI_X3.4-1968": "ERR Command failed: xclip -selection clipboard -o -t text/plain;charset=ANSI_X3.4-1968",
+          "text/plain": "CARD-TEXT webkit-async"
+        }
+      },
+      "pasted": {
+        "chromium/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT webkit-async",
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-async&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-async</span>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-async",
+          "boxTypes": ["text/plain", "text/html"]
+        },
+        "chromium/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html"],
+            "data": {
+              "text/plain": "CARD-TEXT webkit-async",
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-async&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-async</span>",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-async",
+          "boxTypes": ["text/plain", "text/html"]
+        },
+        "firefox/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-async&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-async</span>",
+              "text/plain": "CARD-TEXT webkit-async",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-async",
+          "boxTypes": ["text/html", "text/plain"]
+        },
+        "firefox/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "BODY",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-async&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-async</span>",
+              "text/plain": "CARD-TEXT webkit-async",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-async",
+          "boxTypes": ["text/html", "text/plain"]
+        },
+        "webkit/a": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/plain", "text/html", "web application/x-pinetrie"],
+            "data": {
+              "text/plain": "CARD-TEXT webkit-async",
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-async&quot;}\" style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid;\">CARD-TEXT webkit-async</span>",
+              "web application/x-pinetrie": "",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-async",
+          "boxTypes": ["text/plain", "text/html", "web application/x-pinetrie"]
+        },
+        "webkit/b": {
+          "card": {
+            "ev": "paste",
+            "active": "card",
+            "target": "card",
+            "types": ["text/html", "text/plain"],
+            "data": {
+              "text/html": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-async&quot;}\" style=\"font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration-line: none; text-decoration-thickness: auto; text-decoration-style: solid; caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);\">CARD-TEXT webkit-async</span>",
+              "text/plain": "CARD-TEXT webkit-async",
+              "application/x-pinetrie": ""
+            },
+            "files": 0,
+            "htmlCarrier": "{&quot;nonce&quot;:&quot;webkit-async&quot;}"
+          },
+          "boxValue": "CARD-TEXT webkit-async",
+          "boxTypes": ["text/html", "text/plain"]
+        }
+      }
+    }
+  },
+  "reads": {
+    "chromium": {
+      "readText": "pending after 2.5s (a prompt?)",
+      "read": "pending after 2.5s (a prompt?)",
+      "fromKeydown": "pending after 2.5s (a prompt?)"
+    },
+    "firefox": {
+      "readText": {
+        "ev": "readText",
+        "why": "evaluate, no gesture",
+        "error": "NotAllowedError: Clipboard read operation is not allowed."
+      },
+      "read": {
+        "ev": "asyncRead",
+        "why": "evaluate, no gesture",
+        "error": "NotAllowedError: Clipboard read operation is not allowed."
+      },
+      "fromKeydown": {
+        "ev": "asyncRead",
+        "why": "keydown",
+        "error": "NotAllowedError: Clipboard read operation is not allowed."
+      }
+    },
+    "webkit": {
+      "readText": {
+        "ev": "readText",
+        "why": "evaluate, no gesture",
+        "error": "NotAllowedError: The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission."
+      },
+      "read": {
+        "ev": "asyncRead",
+        "why": "evaluate, no gesture",
+        "error": "NotAllowedError: The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission."
+      },
+      "fromKeydown": {
+        "ev": "asyncRead",
+        "why": "keydown",
+        "error": "NotAllowedError: The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission."
+      }
+    }
+  },
+  "roundTrip": {
+    "chromium": {
+      "richInnerHTML": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;chromium-trip&quot;}\">CARD-TEXT chromium-trip</span>",
+      "x": {
+        "targets": [
+          "TIMESTAMP",
+          "TARGETS",
+          "SAVE_TARGETS",
+          "MULTIPLE",
+          "STRING",
+          "TEXT",
+          "UTF8_STRING",
+          "chromium/x-internal-source-rfh-token",
+          "chromium/x-source-url",
+          "text/html",
+          "text/plain",
+          "text/plain;charset=utf-8"
+        ],
+        "read": {
+          "UTF8_STRING": "CARD-TEXT chromium-trip",
+          "chromium/x-internal-source-rfh-token": "\u0014\u0000\u0000\u0000\u0005\u0000\u0000\u0000Ћ_�\u0012I�V|7�ˎ���",
+          "chromium/x-source-url": "http://127.0.0.1:43095/",
+          "text/html": "<span style=\"color: rgb(0, 0, 0); font-family: system-ui; font-size: 14px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; display: inline !important; float: none;\">CARD-TEXT chromium-trip</span>",
+          "text/plain": "CARD-TEXT chromium-trip",
+          "text/plain;charset=utf-8": "CARD-TEXT chromium-trip"
+        }
+      }
+    },
+    "firefox": {
+      "richInnerHTML": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-trip&quot;}\">CARD-TEXT firefox-trip</span>",
+      "x": {
+        "targets": [
+          "TIMESTAMP",
+          "TARGETS",
+          "MULTIPLE",
+          "SAVE_TARGETS",
+          "text/html",
+          "text/_moz_htmlcontext",
+          "text/_moz_htmlinfo",
+          "UTF8_STRING",
+          "COMPOUND_TEXT",
+          "TEXT",
+          "STRING",
+          "text/plain;charset=utf-8",
+          "text/plain;charset=ANSI_X3.4-1968",
+          "text/plain",
+          "text/x-moz-url-priv"
+        ],
+        "read": {
+          "text/html": "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"><span data-pinetrie=\"{&quot;nonce&quot;:&quot;firefox-trip&quot;}\">CARD-TEXT firefox-trip</span>",
+          "text/_moz_htmlcontext": "<\u0000h\u0000t\u0000m\u0000l\u0000 \u0000l\u0000a\u0000n\u0000g\u0000=\u0000\"\u0000e\u0000n\u0000\"\u0000>\u0000<\u0000b\u0000o\u0000d\u0000y\u0000>\u0000<\u0000d\u0000i\u0000v\u0000 \u0000i\u0000d\u0000=\u0000\"\u0000r\u0000i\u0000c\u0000h\u0000\"\u0000 \u0000c\u0000o\u0000n\u0000t\u0000e\u0000n\u0000t\u0000e\u0000d\u0000i\u0000t\u0000a\u0000b\u0000l\u0000e\u0000=\u0000\"\u0000t\u0000r\u0000u\u0000e\u0000\"\u0000 \u0000s\u0000t\u0000y\u0000l\u0000e\u0000=\u0000\"\u0000b\u0000o\u0000r\u0000d\u0000e\u0000r\u0000:\u00001\u0000p\u0000x\u0000 \u0000d\u0000a\u0000s\u0000h\u0000e\u0000d\u0000 \u0000#\u00008\u00008\u00008\u0000;\u0000m\u0000i\u0000n\u0000-\u0000h\u0000e\u0000i\u0000g\u0000h\u0000t\u0000:\u00002\u0000e\u0000m\u0000;\u0000w\u0000i\u0000d\u0000t\u0000h\u0000:\u00002\u00004\u0000r\u0000e\u0000m\u0000\"\u0000>\u0000<\u0000/\u0000d\u0000i\u0000v\u0000>\u0000<\u0000/\u0000b\u0000o\u0000d\u0000y\u0000>\u0000<\u0000/\u0000h\u0000t\u0000m\u0000l\u0000>\u0000",
+          "text/_moz_htmlinfo": "0\u0000,\u00000\u0000",
+          "UTF8_STRING": "CARD-TEXT firefox-trip",
+          "text/plain;charset=utf-8": "CARD-TEXT firefox-trip",
+          "text/plain;charset=ANSI_X3.4-1968": "CARD-TEXT firefox-trip",
+          "text/plain": "CARD-TEXT firefox-trip",
+          "text/x-moz-url-priv": "h\u0000t\u0000t\u0000p\u0000:\u0000/\u0000/\u00001\u00002\u00007\u0000.\u00000\u0000.\u00000\u0000.\u00001\u0000:\u00004\u00003\u00000\u00009\u00005\u0000/\u0000"
+        }
+      }
+    },
+    "webkit": {
+      "richInnerHTML": "<span data-pinetrie=\"{&quot;nonce&quot;:&quot;webkit-trip&quot;}\">CARD-TEXT webkit-trip</span>",
+      "x": {
+        "targets": [
+          "SAVE_TARGETS",
+          "TIMESTAMP",
+          "TARGETS",
+          "text/html",
+          "org.webkitgtk.WebKit.custom-pasteboard-data",
+          "UTF8_STRING",
+          "COMPOUND_TEXT",
+          "TEXT",
+          "STRING",
+          "text/plain;charset=utf-8",
+          "text/plain;charset=ANSI_X3.4-1968",
+          "text/plain"
+        ],
+        "read": {
+          "text/html": "<span style=\"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); font-family: system-ui; font-size: 14px; font-style: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px; text-decoration: none; display: inline !important; float: none;\">CARD-TEXT webkit-trip</span>",
+          "org.webkitgtk.WebKit.custom-pasteboard-data": "ERR Command failed: xclip -selection clipboard -o -t org.webkitgtk.WebKit.custom-pasteboard-data",
+          "UTF8_STRING": "CARD-TEXT webkit-trip",
+          "text/plain;charset=utf-8": "CARD-TEXT webkit-trip",
+          "text/plain;charset=ANSI_X3.4-1968": "ERR Command failed: xclip -selection clipboard -o -t text/plain;charset=ANSI_X3.4-1968",
+          "text/plain": "CARD-TEXT webkit-trip"
+        }
+      }
+    }
+  }
+}

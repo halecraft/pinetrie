@@ -1,0 +1,194 @@
+<!doctype html>
+<!--
+  S151's probe page. Open it in a browser, or let run.mjs drive it. Every
+  clipboard event and API call is pushed onto window.log, and shown below.
+  Focus the card (click it or Tab to it) with nothing selected, and press
+  Cmd/Ctrl+C, Cmd/Ctrl+X or Cmd/Ctrl+V. The checkboxes turn on the
+  workarounds for an engine that fires no event away from a text box.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>S151 probe</title>
+    <style>
+      body { font: 14px system-ui; margin: 1rem; }
+      #card { border: 2px solid #888; padding: .5rem; width: 16rem; margin: .5rem 0; }
+      #card:focus { outline: 3px solid #36f; }
+      #sink { position: fixed; left: -9999px; top: 0; }
+      #catcher { position: fixed; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; }
+      pre { background: #f4f4f4; padding: .5rem; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <div id="card" tabindex="0">A card (focus me, select nothing)</div>
+    <p id="msg">Some message text you can select.</p>
+    <textarea id="box" rows="2" cols="40"></textarea>
+    <div id="rich" contenteditable="true" style="border:1px dashed #888;min-height:2em;width:24rem">a rich text box</div>
+    <span id="sink">CARD-TEXT</span>
+    <textarea id="catcher" aria-hidden="true" tabindex="-1"></textarea>
+    <p>
+      <label><input type="checkbox" id="selectionTrick" /> selection trick (Cmd+C/X)</label>
+      <label><input type="checkbox" id="catcherTrick" /> catcher trick (Cmd+V)</label>
+      <label><input type="checkbox" id="asyncKeys" /> async API on keydown</label>
+      <label><input type="checkbox" id="beforeTrick" /> before-events trick (beforecopy, beforecut, beforepaste cancelled on the card)</label>
+      <button id="asyncRead" type="button">navigator.clipboard.read()</button>
+    </p>
+    <pre id="out"></pre>
+    <script>
+      window.log = []
+      window.nonce = "n0"
+      const out = document.getElementById("out")
+      const card = document.getElementById("card")
+      const sink = document.getElementById("sink")
+      const catcher = document.getElementById("catcher")
+      const on = id => document.getElementById(id).checked
+      const record = entry => {
+        window.log.push(entry)
+        out.textContent += `${JSON.stringify(entry)}\n`
+      }
+      const where = () => {
+        const a = document.activeElement
+        return a?.id || a?.tagName || null
+      }
+      const payload = () => ({
+        plain: `CARD-TEXT ${window.nonce}`,
+        html:
+          `<span data-pinetrie='{"nonce":"${window.nonce}"}'>CARD-TEXT ${window.nonce}</span>`,
+        custom: JSON.stringify({ nonce: window.nonce }),
+      })
+      // Whether the copy came from the card: focus there, or the sink
+      // selected by the selection trick.
+      let fromCard = false
+      document.addEventListener(
+        "keydown",
+        e => {
+          const mod = e.metaKey || e.ctrlKey
+          if (!mod) return
+          const key = e.key.toLowerCase()
+          fromCard = where() === "card"
+          record({ ev: "keydown", key, active: where() })
+          if (!fromCard) return
+          if ((key === "c" || key === "x") && on("selectionTrick")) {
+            const range = document.createRange()
+            range.selectNodeContents(sink)
+            const sel = getSelection()
+            sel.removeAllRanges()
+            sel.addRange(range)
+          }
+          if (key === "v" && on("catcherTrick")) catcher.focus()
+          // The async API in place of the events: the key's own command is
+          // cancelled, so only the API writes or reads.
+          if ((key === "c" || key === "x") && on("asyncKeys")) {
+            e.preventDefault()
+            asyncWrite()
+          }
+          if (key === "v" && on("asyncKeys")) {
+            e.preventDefault()
+            asyncRead("keydown")
+          }
+        },
+        true,
+      )
+      // WebKit enables Copy, Cut and Paste with nothing selected, and on an
+      // element that is not editable, when a before-event is cancelled
+      // (Editor::canDHTMLCopy): the Edit menu's validation on macOS.
+      for (const type of ["beforecopy", "beforecut", "beforepaste"])
+        document.addEventListener(type, e => {
+          const card = where() === "card"
+          if (card && on("beforeTrick")) e.preventDefault()
+          if (card) record({ ev: type, cancelled: e.defaultPrevented })
+        })
+      for (const type of ["copy", "cut"])
+        document.addEventListener(type, e => {
+          const entry = {
+            ev: type,
+            active: where(),
+            collapsed: getSelection().isCollapsed,
+            hasData: e.clipboardData !== null,
+          }
+          if (fromCard && e.clipboardData) {
+            const p = payload()
+            const set = {}
+            for (const [t, v] of [
+              ["text/plain", p.plain],
+              ["text/html", p.html],
+              ["application/x-pinetrie", p.custom],
+            ])
+              try {
+                e.clipboardData.setData(t, v)
+                set[t] = "ok"
+              } catch (err) {
+                set[t] = String(err)
+              }
+            e.preventDefault()
+            entry.set = set
+            entry.typesAfterSet = [...e.clipboardData.types]
+            getSelection().removeAllRanges()
+            card.focus()
+          }
+          record(entry)
+        })
+      document.addEventListener("paste", e => {
+        const d = e.clipboardData
+        const entry = { ev: "paste", active: where(), target: e.target?.id || e.target?.tagName }
+        if (d) {
+          entry.types = [...d.types]
+          entry.data = {}
+          for (const t of new Set([...d.types, "text/plain", "text/html", "application/x-pinetrie"]))
+            if (t !== "Files") entry.data[t] = d.getData(t)
+          entry.files = d.files.length
+          const m = (entry.data["text/html"] || "").match(/data-pinetrie='([^']*)'|data-pinetrie="([^"]*)"/)
+          entry.htmlCarrier = m ? m[1] ?? m[2] : null
+        }
+        if (fromCard && e.target !== document.getElementById("box") && e.target !== document.getElementById("rich")) {
+          e.preventDefault()
+          card.focus()
+        }
+        record(entry)
+      })
+      async function asyncWrite() {
+        const p = payload()
+        const result = {}
+        for (const [name, types] of [
+          ["web-custom", { "text/plain": p.plain, "text/html": p.html, "web application/x-pinetrie": p.custom }],
+          ["plain+html", { "text/plain": p.plain, "text/html": p.html }],
+        ]) {
+          try {
+            const item = {}
+            for (const [t, v] of Object.entries(types)) item[t] = new Blob([v], { type: t.replace(/^web /, "") })
+            await navigator.clipboard.write([new ClipboardItem(item)])
+            result[name] = "ok"
+            break
+          } catch (err) {
+            result[name] = String(err)
+          }
+        }
+        record({ ev: "asyncWrite", result, hasFocus: document.hasFocus() })
+      }
+      async function asyncRead(why) {
+        try {
+          const items = await navigator.clipboard.read()
+          const got = []
+          for (const item of items) {
+            const one = {}
+            for (const t of item.types) one[t] = await (await item.getType(t)).text()
+            got.push(one)
+          }
+          record({ ev: "asyncRead", why, got })
+        } catch (err) {
+          record({ ev: "asyncRead", why, error: String(err) })
+        }
+      }
+      window.asyncRead = asyncRead
+      window.asyncWrite = asyncWrite
+      window.readTextNow = async why => {
+        try {
+          record({ ev: "readText", why, text: await navigator.clipboard.readText() })
+        } catch (err) {
+          record({ ev: "readText", why, error: String(err) })
+        }
+      }
+      document.getElementById("asyncRead").onclick = () => asyncRead("click")
+    </script>
+  </body>
+</html>

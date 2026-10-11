@@ -36,9 +36,10 @@ import {
   textFaceWords,
 } from "@pinetrie/interface"
 import { askLine, factLine } from "@pinetrie/rules"
-import { newCardId, type SessionClient } from "@pinetrie/session"
+import { AT_INVENTORY, newCardId, type SessionClient } from "@pinetrie/session"
 import { createContext, type ReactNode, useContext } from "react"
 import { BoundCardEditor } from "./card-editor.tsx"
+import { InventoryIcon } from "./icons.tsx"
 import { MessageText } from "./message-text.tsx"
 import { Initial } from "./presence.tsx"
 import { ThreadFaceView, ThreadPreviewView } from "./thread-preview.tsx"
@@ -100,14 +101,15 @@ function PutButton(p: { card: CardRecord; title: string }) {
         if (column !== null)
           onIntent({
             kind: "put",
-            card: p.card.id,
+            source: { kind: "card", card: p.card.id },
             target: { kind: "column", key: column },
+            how: "move",
           })
       }}
       title={p.title}
       type="button"
     >
-      {PUT}
+      <InventoryIcon way="put" /> {PUT}
     </button>
   )
 }
@@ -196,7 +198,9 @@ function TextWhole(p: { card: CardOf<"text">; width: CardWidth }) {
       catchUps={null}
       foot={<PutButton card={p.card} title={PUT_TITLE} />}
       key={p.card.id}
-      onDiscard={() => onIntent({ kind: "discard", card: p.card.id })}
+      onDiscard={() =>
+        onIntent({ kind: "discard", card: p.card.id, at: AT_INVENTORY })
+      }
       onTyping={() => {}}
       readOnly={false}
       reader={reader}
@@ -278,10 +282,23 @@ function NoteList(p: {
   )
 }
 
+/**
+ * Each quote this page has fetched, by its blob: a copy of a reference
+ * writes its quote as text (ADR-0132), and a copy cannot wait for a fetch.
+ * A quote never changes, so nothing here goes stale.
+ */
+const fetchedQuotes = new Map<Sha256, string>()
+
+/** A reference's quote if this page has fetched it (`useQuote`); null otherwise. */
+export const quoteOf = (quote: Sha256): string | null =>
+  fetchedQuotes.get(quote) ?? null
+
 /** A reference's quote, fetched from its blob: it never changes (ADR-0126). */
 function useQuote(quote: Sha256): string | null {
   const [loaded] = useFetched([blobUrl(quote)], r => r.text())
-  return loaded?.kind === "ready" ? loaded.value : null
+  if (loaded?.kind !== "ready") return null
+  fetchedQuotes.set(quote, loaded.value)
+  return loaded.value
 }
 
 /** A reference's face: a chip naming what it names, with its slot's key. */

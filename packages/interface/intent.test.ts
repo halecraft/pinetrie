@@ -31,7 +31,9 @@ import {
   NEW_NOTE_COLUMN,
   NEW_ROOT,
   NEW_TASK,
+  NEW_TEXT,
   NEW_THREAD,
+  NO_CLIPS,
   tasksFor,
   threadOfEntry,
   tree,
@@ -115,6 +117,7 @@ const at = (
   listWidth: "full",
   page: null,
   searching: false,
+  clips: NO_CLIPS,
 })
 /** A root shown: the root you are on, and in the sidebar, at its end if it was not. */
 const shown = (root: string, id: TaskId): Effect[] => [
@@ -169,6 +172,7 @@ const plan = (intent: Intent, state: IntentState = R1) =>
       "reference",
       "01a0ffd2-0000-7000-8000-0000000000e1",
     ),
+    text: NEW_TEXT,
   })
 /** The column keys these tests name: a branch's card's, a card's. */
 const UNSTARTED: ColumnKey = { kind: "card", card: F }
@@ -413,7 +417,7 @@ describe("planIntent", () => {
       plan({ kind: "closeUnstarted", card: F, keep: true }, state),
     ).toEqual([
       {
-        kind: "keep",
+        kind: "moveCards",
         moves: [
           {
             move: {
@@ -448,7 +452,7 @@ describe("planIntent", () => {
       plan({ kind: "closeUnstarted", card: F, keep: false }, onTab),
     ).toEqual([
       {
-        kind: "keep",
+        kind: "moveCards",
         moves: [
           {
             move: {
@@ -640,6 +644,7 @@ describe("planIntent", () => {
       expect(
         plan({ kind: "copyThread", source: TRUNK, to: "inventory" }),
       ).toMatchObject([
+        { kind: "showInventory", brief: true },
         {
           kind: "request",
           intent: { move: { to: { kind: "inventory", holder: ME } } },
@@ -683,7 +688,12 @@ describe("planIntent", () => {
         cards: [held],
       })
       const effects = plan(
-        { kind: "put", card: LINKED, target: { kind: "column", key: TRUNK } },
+        {
+          kind: "put",
+          source: { kind: "card", card: LINKED },
+          how: "move",
+          target: { kind: "column", key: TRUNK },
+        },
         state,
       )
       expect(effects[0]).toMatchObject({

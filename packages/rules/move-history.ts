@@ -28,29 +28,33 @@ import { taskOfTarget } from "./task.ts"
 
 /**
  * The history of the sender's moves `moves` enter, or null for none
- * (ADR-0066, ADR-0116, ADR-0126). A creation enters none (a composer's new
- * card, a copy) but a note column's, which enters its canvas's task.
- * Otherwise the task the card goes to, when it goes to one, else the task
- * it leaves, read from its record, since the host accepts a move only from
- * where the card is. So a take into the inventory is recorded where it
- * left, a put where it went, a drag across tasks where it went, and a
- * discard in the task it leaves (`discardHistory`), which the page does not
- * name (ADR-0066), or, leaving no task, in its sender's history outside any
- * task. Of several, the first that names a history names the step's. A
- * place at a thread, or a thread's nearest notes, is in its thread's task,
- * a spot on a canvas in its canvas's (`taskOfTarget`). Pure.
+ * (ADR-0066, ADR-0116, ADR-0126, ADR-0132). A creation enters one when its
+ * command's `cause` is a paste (a card pasted, a thread copied), or when it
+ * is a note column made for a note: the task it lands in, or with none the
+ * sender's history outside any task (a slot). A creation a move makes (a
+ * composer's new card, an empty note) enters none. Otherwise the task the
+ * card goes to, when it goes to one, else the task it leaves, read from its
+ * record, since the host accepts a move only from where the card is. So a
+ * take into the inventory is recorded where it left, a put where it went, a
+ * drag across tasks where it went, and a discard in the task it leaves
+ * (`discardHistory`), which the page does not name (ADR-0066), or, leaving
+ * no task, in its sender's history outside any task. Of several, the first
+ * that names a history names the step's: a paste's discard of the card it
+ * replaces, when there is one. A place at a thread, or a thread's nearest
+ * notes, is in its thread's task, a spot on a canvas in its canvas's
+ * (`taskOfTarget`). Pure.
  */
 export function historyOf(
   moves: readonly Move[],
   cards: readonly CardRecord[],
   discards: Discards,
+  cause: "move" | "paste",
 ): MoveHistoryScope | null {
   const taskOf = (to: CardPlace | MoveTarget) =>
     taskOfTarget(discards.tasks, to)
   for (const move of moves) {
-    // A note column made is in its task's history, so the undo key takes
-    // it back; a card made in a composer or a queue is in none.
     if (move.from === null) {
+      if (cause === "paste") return historyScope(taskOf(move.to))
       const task = isNoteColumnId(move.card) ? taskOf(move.to) : null
       return task === null ? null : historyScope(task)
     }

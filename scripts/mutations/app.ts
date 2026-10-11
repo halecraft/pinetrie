@@ -1023,7 +1023,7 @@ export const mutations: readonly Mutation[] = [
     to: "      .tools .branch { color: #9ecbff; position: relative; top: 1.1rem; }",
     suite: "browser",
     scenario: "page",
-    expect: "a message's tools are one row: copy, take, comment, edit, →",
+    expect: "a message's tools are one row: copy, comment, edit, →",
   },
   {
     name: "the row has no copy",
@@ -1032,7 +1032,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     suite: "browser",
     scenario: "page",
-    expect: "a message's tools are one row: copy, take, comment, edit, →",
+    expect: "a message's tools are one row: copy, comment, edit, →",
   },
   {
     name: "copy puts the drawn text on the clipboard",
@@ -1055,8 +1055,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "with no clipboard, copy does nothing",
     file: "packages/web/copy.ts",
-    from: "    if (clipboard?.writeText === undefined) return selectContents(fallback)",
-    to: "    if (clipboard?.writeText === undefined) return",
+    from: "    if (written === null) return selectContents(fallback)",
+    to: "    if (written === null) return",
     suite: "browser",
     scenario: "page",
     expect: "with no clipboard, copy selects the message's text",
@@ -2007,7 +2007,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a drop asks for nothing",
     file: "packages/web/app.tsx",
-    from: '      onIntent({ kind: "put", card, target })',
+    from: '      onIntent({\n        kind: "put",\n        source: { kind: "card", card },\n        target,\n        how: "move",\n      })\n',
     to: "",
     suite: "browser",
     scenario: "page",
@@ -2259,8 +2259,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the page gathers no search focus",
     file: "packages/web/app.tsx",
-    from: "        search: searchFocus(el, searchable, searchOpen),",
-    to: '        search: "closed",',
+    from: "      search: searchFocus(document.activeElement, searchable, searchOpen),",
+    to: '      search: "closed",',
     suite: "browser",
     scenario: "tools",
     expect:
@@ -2399,54 +2399,6 @@ export const mutations: readonly Mutation[] = [
     expect: "another window's card redraws the column and none of its messages",
   },
   {
-    name: "a table's take takes nothing",
-    file: "packages/web/message-table.tsx",
-    from: '            if (mine?.kind === "block") reach.take(mine.address)',
-    to: '            if (mine?.kind === "block") return',
-    suite: "browser",
-    scenario: "images",
-    expect:
-      "a table taken from a reply is a reference in the inventory, previewed as its quote, put in a composer as a link, and kept in the hand",
-  },
-  {
-    name: "Cmd+C on a table's bar takes its message",
-    file: "packages/web/column.tsx",
-    from: "          ? messageReference(owner, block)",
-    to: "          ? messageReference(owner, null)",
-    suite: "browser",
-    scenario: "images",
-    expect:
-      "Cmd+C on a table's bar takes a reference to it, its markdown on the clipboard",
-  },
-  {
-    name: "the page's copy takes nothing",
-    file: "packages/web/app.tsx",
-    from: '      if (entry !== undefined)\n        onIntent({ kind: "copySelection"',
-    to: '      if (entry === undefined)\n        onIntent({ kind: "copySelection"',
-    suite: "browser",
-    scenario: "page",
-    expect: "Cmd+C on a selection a range names takes it as a quote",
-  },
-  {
-    name: "the page's copy of a selection stops the browser's",
-    file: "packages/web/app.tsx",
-    from: "    const onCopy = () => {",
-    to: "    const onCopy = (e: ClipboardEvent) => {\n      e.preventDefault()",
-    suite: "browser",
-    scenario: "page",
-    expect:
-      "Cmd+C on a selection across formatting copies the text selected, not the message",
-  },
-  {
-    name: "an image's take takes nothing",
-    file: "packages/web/pane.tsx",
-    from: "                onClick={take}",
-    to: "                onClick={() => {}}",
-    suite: "browser",
-    scenario: "images",
-    expect: "an image shown beside the thread is taken as a reference by its ❝",
-  },
-  {
     name: "a gesture's first write is outside it",
     file: "apps/pinetrie/host/places.ts",
     from: "  else gesture(write)\n",
@@ -2495,5 +2447,84 @@ export const mutations: readonly Mutation[] = [
     scenario: "board",
     expect:
       "an unsent new tab closed is undone whole by its closer's undo key outside any task: its task and its thread back",
+  },
+  {
+    name: "a copy writes no text",
+    file: "packages/web/clipboard.ts",
+    from: '      data.setData("text/plain", write.plain)',
+    to: '      data.setData("text/plain", "")',
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "Cmd+C on a table's bar copies its markdown and takes nothing into the inventory, which stays closed",
+  },
+  {
+    name: "a paste reads none of pine·trie's data",
+    file: "packages/web/clipboard.ts",
+    from: '        custom: data.getData(CLIP_MIME),\n        attribute: carrierAttribute(data.getData("text/html")),',
+    to: '        custom: "",\n        attribute: null,',
+    suite: "browser",
+    scenario: "images",
+    expect: "Cmd+V in a composer pastes a copied table as a link to it",
+  },
+  {
+    name: "the panel draws no clipboard cell",
+    file: "packages/web/app.tsx",
+    from: "            cell={clipboardCellView(cell, slots)}",
+    to: "            cell={null}",
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "the clipboard cell shows the last copy, and keep puts a reference to it in a slot, previewed as its quote",
+  },
+  {
+    name: "a selection copies its whole message",
+    file: "packages/interface/clip.ts",
+    from: "    const range = selectionReference(message, selection.text)\n",
+    to: "    const range = selectionReference(message, selection.text)\n    if (range !== undefined) return past(messageReference(message, null))\n",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Cmd+C on a selection in a message copies the text selected and takes nothing into the inventory",
+  },
+  {
+    name: "the page reads no message around a selection",
+    file: "packages/web/focus.ts",
+    from: '    around?.closest<HTMLElement>(".msg[data-entry]")?.dataset.entry ?? null',
+    to: "    null",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a selection pasted on a thread's column lands in its notes as a text card holding it, keeping where it came from",
+  },
+  {
+    name: "a card's header takes no focus",
+    file: "packages/web/card-frame.tsx",
+    from: "        tabIndex={card === null ? undefined : 0}\n",
+    to: "",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a note's header focused, Cmd+X cuts it to your trash, and Cmd+V on another note's header moves that same card back",
+  },
+  {
+    name: "the host records no paste",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: '      const scope = historyOf(moves, readPlaces(places), discards, "paste")',
+    to: '      const scope = historyOf(moves, readPlaces(places), discards, "move")',
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a pasted text card lands where it is pasted, one step of its paster's history: an undo takes it away",
+  },
+  {
+    name: "a paste is no gesture of its history",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "      const gesture =\n        scope === null\n          ? undefined\n          : await deps.histories.gestureOf(writer, scope)\n      const entryThreads = await marginEntryThreads([main])",
+    to: "      const gesture = undefined\n      const entryThreads = await marginEntryThreads([main])",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a cut card is pasted out of its cutter's trash, the same card, and an undo puts it back in the trash",
   },
 ]

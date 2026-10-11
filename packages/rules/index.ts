@@ -306,12 +306,12 @@ export {
   type MovesStep,
   NO_DISCARDS,
   type PlaceStep,
-  planEditAsText,
+  pastedCard,
   planMake,
-  planMakeReference,
   planMoveCommand,
   planMoveRequest,
   planMoveTargets,
+  planPaste,
   rankOnCanvas,
 } from "./moves.ts"
 export {

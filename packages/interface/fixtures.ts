@@ -18,6 +18,7 @@ import {
   type ThreadRecord,
   type TreeIndex,
   taskIdFor,
+  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -27,6 +28,8 @@ import {
   taskCard,
   withThreads,
 } from "@pinetrie/core/fixtures"
+import type { ClipLookups } from "./effects.ts"
+import type { Focus } from "./focus.ts"
 
 export {
   entriesOf,
@@ -75,6 +78,35 @@ export const NEW_NOTE_COLUMN = cardIdOfKind(
   "note-column",
   "01a0ffd2-0000-7000-8000-0000000000cc",
 )
+
+/** A text card a paste made (ADR-0132), a bare uuidv7. */
+export const NEW_TEXT = textCardId("01a0ffd2-0000-7000-8000-0000000000dd")
+
+/**
+ * What a copy reads beyond the cards, for a test (ADR-0132): every text
+ * card holds "copied text", no quote is fetched, nothing is in the cell.
+ */
+export const NO_CLIPS: ClipLookups = {
+  textOf: () => "copied text",
+  quoteOf: () => null,
+  cell: null,
+}
+
+/** Focus nowhere: nothing selected, no card, no column, no box (`Focus`). */
+export const NO_FOCUS: Focus = {
+  card: null,
+  inText: false,
+  inPanel: false,
+  selectedCard: null,
+  column: null,
+  page: false,
+  search: "unavailable",
+  selection: null,
+  block: null,
+  selected: null,
+  cell: false,
+  zone: null,
+}
 
 /** The task a new tab's first send starts, in `parseNewTask`'s shape (ADR-0116). */
 export const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000bb")

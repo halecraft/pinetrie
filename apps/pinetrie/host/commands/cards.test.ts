@@ -2,6 +2,7 @@ import {
   type CardCommand,
   type CardId,
   cardIdOfKind,
+  DISCARDED,
   ERR,
   entryId,
   historyScope,
@@ -13,6 +14,7 @@ import {
   type Reorder,
   rootIdFor,
   runId,
+  type Sha256,
   type TaskId,
   type TextCard,
   type ThreadId,
@@ -186,6 +188,10 @@ function setUp() {
       r: Parameters<Raw["spinOff"]>[1],
       start: Parameters<Raw["spinOff"]>[2],
     ) => raw.spinOff(w, r, start, tasksNow(b)),
+    copyThread: (w: WriterId, c: CopyThread) =>
+      raw.copyThread(w, c, tasksNow(b)),
+    paste: (w: WriterId, p: Parameters<Raw["paste"]>[1]) =>
+      raw.paste(w, p, tasksNow(b)),
   }
   const undoes = (result: UndoResult, revert: () => void = () => {}) => {
     undoing = result
@@ -551,6 +557,51 @@ describe("a thread's card taken, put and moved (ADR-0117, ADR-0124)", () => {
   })
 })
 
+describe("a paste (ADR-0132)", () => {
+  const REF = cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1")
+  const reference = {
+    kind: "reference",
+    card: REF,
+    address: { kind: "entry", thread: LANE, entry: E1 },
+    quote: "a".repeat(64) as Sha256,
+  } as const
+
+  test("a reference pasted on a thread lands in its nearest notes, one step of the paster's history in its task", async () => {
+    const { b, commands, recorded } = setUp()
+    const done = await commands.paste(BEA, {
+      kind: "paste",
+      paste: reference,
+      to: { kind: "notes", near: "thread", thread: LANE },
+      replacing: null,
+      here: null,
+    })
+    expect(done.outcome).toEqual({ kind: "moved" })
+    expect(readPlaces(b.places).find(c => c.id === REF)?.place).toMatchObject({
+      kind: "note",
+      column: NOTES,
+    })
+    expect(recorded).toEqual([[BEA, TEST_TASK]])
+  })
+
+  test("a cut card, discarded, is pasted out of its cutter's trash into another place", async () => {
+    const { b, commands, put } = setUp()
+    put({ owner: BEA })
+    await commands.move(BEA, [{ card: C1, from: noteKey, to: DISCARDED }], null)
+    const done = await commands.paste(BEA, {
+      kind: "paste",
+      paste: { kind: "uncut", card: C1 },
+      to: { kind: "inventory", holder: BEA },
+      replacing: null,
+      here: null,
+    })
+    expect(done.outcome).toEqual({ kind: "moved" })
+    expect(readPlaces(b.places).find(c => c.id === C1)?.place).toEqual({
+      kind: "inventory",
+      holder: BEA,
+    })
+  })
+})
+
 describe("a thread copied (ADR-0117, ADR-0124)", () => {
   const COPY = threadIdFor("copy")
   const copy = (to: CopyThread["move"]["to"]): CopyThread => ({
@@ -575,6 +626,15 @@ describe("a thread copied (ADR-0117, ADR-0124)", () => {
       c => c.place.kind === "canvas" && c.place.task === TEST_TASK,
     )
     expect(canvas.map(c => c.id)).toEqual(expect.arrayContaining([LANE, COPY]))
+  })
+
+  test("a copy is one step of its copier's history, in the task it lands in or outside any task in an inventory (ADR-0132)", async () => {
+    const { commands, recorded } = setUp()
+    await commands.copyThread(
+      BEA,
+      copy({ kind: "canvas-at", task: TEST_TASK, after: LANE }),
+    )
+    expect(recorded).toEqual([[BEA, TEST_TASK]])
   })
 
   test("refused: an end not in its source; a thread someone else holds", async () => {

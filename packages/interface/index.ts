@@ -124,6 +124,7 @@ export {
   moveWords,
   type QueueOn,
 } from "./card-frame.ts"
+export { clipFacts } from "./card-intents.ts"
 export { cardKeyAct } from "./card-keys.ts"
 export {
   type EditorEvent,
@@ -146,7 +147,9 @@ export {
   historyItemWords,
   historyWords,
   INVENTORY,
+  KEEP,
   KEEP_IN_INVENTORY,
+  KEEP_TITLE,
   movedBackWords,
   NEW_PIN,
   NEW_PIN_PLACEHOLDER,
@@ -159,12 +162,26 @@ export {
   pinnedMarkerWords,
   retiredWords,
   sizeWords,
-  TAKE_COPY,
-  TAKE_COPY_INTO_INVENTORY,
+  TAKE,
   taskPinnedMarkerWords,
   traceWords,
   writtenWords,
 } from "./card-words.ts"
+export {
+  CLIP_ATTRIBUTE,
+  CLIP_MIME,
+  type Clip,
+  type ClipFacts,
+  clipOfFocus,
+  planCopy,
+  type Received,
+  readPaste,
+} from "./clip.ts"
+export {
+  type CellFace,
+  type ClipboardCellView,
+  clipboardCellView,
+} from "./clipboard-cell.ts"
 export type { Codec } from "./codec.ts"
 export {
   COLUMN_MENU_LABEL,
@@ -226,7 +243,7 @@ export {
 export { matchCommands } from "./commands.ts"
 export { copyText } from "./copy-text.ts"
 export { plural } from "./counts.ts"
-export type { Effect } from "./effects.ts"
+export type { Effect, IntentState } from "./effects.ts"
 export {
   cardOfFace,
   DETAIL_ON,
@@ -244,6 +261,7 @@ export {
   type TextFace,
   textFaceWords,
 } from "./face.ts"
+export type { Focus } from "./focus.ts"
 export {
   FOLD,
   type FoldedFace,
@@ -383,7 +401,7 @@ export {
   planLeave,
   profileWords,
 } from "./page.ts"
-export { type KeyFocus, keyAct } from "./page-keys.ts"
+export { keyAct } from "./page-keys.ts"
 export {
   type ColorSlot,
   rootSeed,
@@ -439,6 +457,7 @@ export {
   dropProps,
   type PutTarget,
   targetOfElement,
+  targetOfFocus,
 } from "./put-target.ts"
 export {
   compactRail,

@@ -46,23 +46,27 @@ import {
   boardView,
   branchColors,
   CARD_MIME,
+  type Clip,
   type Column as ColumnSpec,
   claimFocus,
+  clipboardCellView,
+  clipFacts,
   columnLandmarks,
   columnMatches,
   composerPlacesStore,
   type Dock,
   DROP_ZONE,
   type Effect,
+  type Focus,
   foldMemory,
   type HeldView,
   heldByOthers,
   type Identity,
   type Intent,
+  type IntentState,
   inboxCount,
   initialLayout,
   inventoryThreads,
-  type KeyFocus,
   keyAct,
   type Layout,
   type ListWidth,
@@ -154,6 +158,7 @@ import {
 import {
   heldBy,
   intentsOf,
+  newCardId,
   newNoteColumnId,
   newReferenceCardId,
   newRootId,
@@ -175,6 +180,8 @@ import {
 } from "react"
 import { Board, BoardStrip } from "./board.tsx"
 import { CardHistories } from "./card-history.tsx"
+import { useClipboard } from "./clipboard.ts"
+import { type FocusContext, focusFacts } from "./focus.ts"
 import { Footer } from "./footer.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
@@ -184,6 +191,7 @@ import { Pictures } from "./pictures-context.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { ProfilePage } from "./profile-page.tsx"
 import { EmptyRail, LiveRail } from "./rail.tsx"
+import { quoteOf } from "./renderings.tsx"
 import {
   NO_PREFS,
   type ReviewPrefs,
@@ -194,7 +202,6 @@ import { Sidebar } from "./sidebar.tsx"
 import { SignalMark } from "./signal-mark.tsx"
 import { Strip } from "./strip.tsx"
 import type { DeviceState, TabState } from "./tab-state.ts"
-import { isTextBox } from "./text-box.ts"
 import { ThreadStates } from "./thread-states.ts"
 import { useAttention } from "./use-attention.ts"
 import { useBlankQueued } from "./use-blank-queued.ts"
@@ -226,18 +233,15 @@ export interface AppStores {
 /** How long a card's drag held over a root in the sidebar opens it. */
 const ITEM_HOVER_MS = 600
 
-const cardOrNull = (id: string | undefined): CardId | null =>
-  id === undefined ? null : (parseCardId(id) ?? null)
-
 /**
- * Where search stands for the keys (`KeyFocus.search`): focused in the bar,
+ * Where search stands for the keys (`Focus.search`): focused in the bar,
  * a match list, or nowhere, which Escape closes from.
  */
 function searchFocus(
   el: Element | null,
   searchable: boolean,
   open: boolean,
-): KeyFocus["search"] {
+): Focus["search"] {
   if (!searchable) return "unavailable"
   if (!open) return "closed"
   return el === null ||
@@ -1303,6 +1307,17 @@ export function App({
   // The column whose element last held focus: where a put by key lands.
   const lastColumn = useRef<string | null>(null)
   const [lastColumnKey, setLastColumnKey] = useState<string | null>(null)
+  // The clipboard cell (ADR-0132): the last copy this tab made.
+  const [cell, setCell] = useState<Clip | null>(null)
+  /** What the page holds of focus beside the DOM, read at each key, copy and paste. */
+  const focusContext = useStable(
+    (): FocusContext => ({
+      selectedCard: slots[String(selected)] ?? null,
+      column: lastColumn.current,
+      page: page !== null,
+      search: searchFocus(document.activeElement, searchable, searchOpen),
+    }),
+  )
 
   // An opened fold draws in its own ask (`AskWork`): a render of `App`
   // runs `useReveal`'s wait once it has.
@@ -1349,9 +1364,7 @@ export function App({
     },
     landed,
     uploadText,
-    clipboard: text => {
-      void navigator.clipboard?.writeText(text).catch(() => {})
-    },
+    clipboardCell: setCell,
     // As typed: the box's own text undo and its binding see an insert.
     insertText: text => {
       const box = document.activeElement
@@ -1380,39 +1393,45 @@ export function App({
   }
   /** Carry out `effects`: the one way anything below acts. */
   const run = useStable((effects: readonly Effect[]) => perform(effects, ports))
+  /** What a plan reads: this render's layout and facts. */
+  const intentState = useStable(
+    (): IntentState => ({
+      layout,
+      index,
+      asks,
+      cards: {
+        cards,
+        lanes,
+        laneRecords: workFacts.lanes,
+        me: session.writer,
+        filled,
+        slots,
+        selected,
+        composers: composers.current(),
+      },
+      tasks,
+      listWidth,
+      page,
+      searching: searchOpen,
+      clips: {
+        textOf: card => session.cardText(card).text(),
+        quoteOf,
+        cell,
+      },
+    }),
+  )
   /** What a reader asked for, planned from this render's layout and facts. */
   const onIntent = useStable((intent: Intent) =>
     run(
-      planIntent(
-        intent,
-        {
-          layout,
-          index,
-          asks,
-          cards: {
-            cards,
-            lanes,
-            laneRecords: workFacts.lanes,
-            me: session.writer,
-            filled,
-            slots,
-            selected,
-            composers: composers.current(),
-          },
-          tasks,
-          listWidth,
-          page,
-          searching: searchOpen,
-        },
-        {
-          key: crypto.randomUUID(),
-          root: newRootId(),
-          task: newTaskId(),
-          thread: newThreadId(),
-          noteColumn: newNoteColumnId(),
-          reference: newReferenceCardId(),
-        },
-      ),
+      planIntent(intent, intentState(), {
+        key: crypto.randomUUID(),
+        root: newRootId(),
+        task: newTaskId(),
+        thread: newThreadId(),
+        noteColumn: newNoteColumnId(),
+        reference: newReferenceCardId(),
+        text: newCardId(),
+      }),
     ),
   )
   useEffect(() => {
@@ -1423,51 +1442,21 @@ export function App({
   // The keys (`keyAct`): decided there, from where focus is; nothing here.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement
-      const intent = keyAct(e, {
-        card:
-          el instanceof HTMLElement
-            ? cardOrNull(el.closest<HTMLElement>("[data-card]")?.dataset.card)
-            : null,
-        inText: isTextBox(el),
-        inPanel: el?.closest(".inventory") != null,
-        selectedCard: slots[String(selected)] ?? null,
-        column: lastColumn.current,
-        page: page !== null,
-        search: searchFocus(el, searchable, searchOpen),
-      })
+      const intent = keyAct(e, focusFacts(focusContext()))
       if (intent === null) return
       e.preventDefault()
       onIntent(intent)
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [onIntent, selected, slots, page, searchable, searchOpen])
-  // Cmd+C on a selection outside a text box (ADR-0126) is copied as the
-  // browser copies it, what you selected and nothing else; one inside one
-  // message that a range names is taken as a reference too, its markdown
-  // written over the browser's copy. With nothing selected, Cmd+C is the
-  // column's key (`onEntryKey`); in a text box, the box's own copy stands.
-  useEffect(() => {
-    const onCopy = () => {
-      if (isTextBox(document.activeElement)) return
-      const selection = window.getSelection()
-      if (
-        selection === null ||
-        selection.isCollapsed ||
-        selection.rangeCount === 0
-      )
-        return
-      const common = selection.getRangeAt(0).commonAncestorContainer
-      const around = common instanceof Element ? common : common.parentElement
-      const entry =
-        around?.closest<HTMLElement>(".msg[data-entry]")?.dataset.entry
-      if (entry !== undefined)
-        onIntent({ kind: "copySelection", entry, text: selection.toString() })
-    }
-    document.addEventListener("copy", onCopy)
-    return () => document.removeEventListener("copy", onCopy)
-  }, [onIntent])
+  }, [onIntent, focusContext])
+  // Copy, cut and paste (ADR-0132): decided in `@pinetrie/interface` from
+  // where focus is (`clipboard.ts`); nothing here.
+  useClipboard({
+    context: focusContext,
+    facts: () => clipFacts(intentState()),
+    onIntent,
+  })
   // A link to an address in text (ADR-0126): a past one opens its entry,
   // where its thread is; any other is followed by no page yet.
   useEffect(() => {
@@ -1561,7 +1550,12 @@ export function App({
       const card = parseCardId(e.dataTransfer?.getData(CARD_MIME) ?? "")
       if (target === null || card === undefined) return
       e.preventDefault()
-      onIntent({ kind: "put", card, target })
+      onIntent({
+        kind: "put",
+        source: { kind: "card", card },
+        target,
+        how: "move",
+      })
     }
     document.addEventListener("dragover", onOver)
     document.addEventListener("dragenter", onEnter)
@@ -1700,6 +1694,7 @@ export function App({
             notes={noteViews}
             threadNames={workFacts.names}
             threads={threadFaces}
+            cell={clipboardCellView(cell, slots)}
             reader={{ me: session.writer, nameOf }}
             notices={moves.notices.filter(r => r.actedAt.kind === "inventory")}
             selected={selected}

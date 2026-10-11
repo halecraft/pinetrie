@@ -18,14 +18,12 @@
 // several packages share (`paths.ts`, `errorText`), since every package that
 // uses one already depends on core.
 
-import type { Address } from "./address.ts"
 import type { CardCommand } from "./cards.ts"
 import {
   type AgentId,
   type CardId,
   type EntryId,
   type NoteColumnId,
-  type ReferenceCardId,
   type RootId,
   type TaskId,
   type TextCardId,
@@ -36,12 +34,14 @@ import {
 } from "./ids.ts"
 import type { Sha256 } from "./images.ts"
 import type { OfferLedger, OfferSeen, WorkChanges } from "./offers.ts"
+import type { Paste, Replacing } from "./paste.ts"
 import type {
   CanvasKey,
   CardWidth,
   Move,
   MoveDirection,
   MoveOf,
+  MoveTarget,
   PlaceKey,
   QueueHoldChange,
   QueueMove,
@@ -468,7 +468,8 @@ export type Intent =
    * Copy the thread `source` (ADR-0117, ADR-0124): a new thread, its id the
    * move's card, forked at `end`, the source's end as its copier saw it,
    * its card made where the move puts it: a spot on a canvas or the
-   * copier's inventory.
+   * copier's inventory. One step of the copier's history, as a paste is
+   * (ADR-0132).
    */
   | {
       readonly kind: "copy-thread"
@@ -477,28 +478,17 @@ export type Intent =
       readonly move: MoveOf<"thread"> & { readonly from: null }
     }
   /**
-   * Make a reference (ADR-0126): a card naming `address`, its quote's blob
-   * `quote`, made where `move` sends it (a creation, so it enters no
-   * history): your inventory as you take it from the past, or where a
-   * reference in your hand is put.
+   * Paste (ADR-0132): make a card from a copy, or move a cut card out of
+   * its sender's trash, where `to` sends it, after discarding the card it
+   * replaces (ADR-0133). One step of the sender's history, in the task it
+   * lands in; `here`, the task its sender is on, names a discard's from an
+   * inventory (ADR-0116).
    */
   | {
-      readonly kind: "make-reference"
-      readonly move: MoveOf<"reference"> & { readonly from: null }
-      readonly address: Address
-      readonly quote: Sha256
-    }
-  /**
-   * Edit a reference as text (ADR-0126): a new text card, `card`, in its
-   * place, its origin the reference's address, and the reference to the
-   * trash, as one step of the sender's history. Its sender writes the new
-   * card's text, the quote.
-   */
-  | {
-      readonly kind: "edit-as-text"
-      readonly reference: ReferenceCardId
-      readonly from: PlaceKey
-      readonly card: TextCardId
+      readonly kind: "paste"
+      readonly paste: Paste
+      readonly to: MoveTarget
+      readonly replacing: Replacing | null
       readonly here: TaskId | null
     }
   /**
@@ -1828,6 +1818,7 @@ export * from "./images.ts"
 export * from "./kinds.ts"
 export * from "./live.ts"
 export * from "./offers.ts"
+export * from "./paste.ts"
 export * from "./paths.ts"
 export * from "./places.ts"
 export * from "./roots.ts"

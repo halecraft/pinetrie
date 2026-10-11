@@ -6,6 +6,7 @@ import {
   type ColumnMenuSection,
   type Intent,
 } from "@pinetrie/interface"
+import { InventoryIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
 
 export function ColumnMenu(p: {
@@ -22,7 +23,15 @@ export function ColumnMenu(p: {
           key: item.key,
           className: `column-${item.key}`,
           title: item.title,
-          label: item.label,
+          // Take has one icon wherever it is offered (ADR-0132).
+          label:
+            item.intent.kind === "takeIntoInventory" ? (
+              <>
+                <InventoryIcon way="take" /> {item.label}
+              </>
+            ) : (
+              item.label
+            ),
           onChoose: () => p.onIntent(item.intent),
         })),
       }))}

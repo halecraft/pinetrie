@@ -910,6 +910,18 @@
       .inventory-grid-row { display: flex; gap: .75rem; align-items: flex-start; }
       .inventory-grid-row > .preview { flex: 0 0 min(28rem, 40vw); width: min(28rem, 40vw); }
       .inventory-grid-row > .preview[data-side="left"] { order: -1; }
+      /* The clipboard cell (ADR-0132): beside the grid, away from the preview;
+         never a slot. */
+      .clipboard-cell { flex: 0 0 9rem; width: 9rem; display: flex; flex-direction: column;
+        gap: .35rem; padding: .5rem; border: 1px dashed #3a4150; border-radius: 6px;
+        font-size: .75rem; color: #8b93a1; }
+      .clipboard-cell[data-side="left"] { order: -2; }
+      .clipboard-cell:focus { outline: 2px solid var(--you, #e3b341); outline-offset: 1px; }
+      .clipboard-cell-head { display: flex; gap: .3rem; align-items: center; }
+      .clipboard-cell-face { display: flex; flex-direction: column; gap: .15rem; color: #c9d1d9; min-width: 0; }
+      .clipboard-cell-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .clipboard-cell .keep { align-self: flex-start; display: inline-flex; gap: .3rem; align-items: center; }
+      .card-head:focus-visible { outline: 2px solid var(--tone, #8b93a1); outline-offset: -2px; }
       /* A card drawn normal: the card itself, bounded at a column's height. */
       .card-normal { display: flex; flex-direction: column; max-height: 18rem;
         background: #1b1e24; border: 1px solid #2c313a; border-radius: 6px; font-size: .8rem; }

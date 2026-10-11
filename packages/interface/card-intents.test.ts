@@ -5,6 +5,7 @@ import {
   DISCARDED,
   entryId,
   fitsPlace,
+  INVENTORY_SLOTS,
   indexAsks,
   KINDS,
   type PlacedKind,
@@ -19,16 +20,20 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Outcome } from "@pinetrie/protocol/codec"
+import { addressLink } from "@pinetrie/rules"
 import { LAST_ORDER } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
-import { afterKeep } from "./card-intents.ts"
+import { afterKeep, type Landing, planPut, putLanding } from "./card-intents.ts"
+import type { Clip } from "./clip.ts"
 import type { ColumnKey } from "./columns.ts"
 import type { CardFacts, IntentState } from "./effects.ts"
 import {
   NEW_NOTE_COLUMN,
   NEW_ROOT,
   NEW_TASK,
+  NEW_TEXT,
   NEW_THREAD,
+  NO_CLIPS,
   TEST_TASK,
   tasksFor,
   threadOfEntry,
@@ -41,7 +46,7 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
-import type { ComposerSpot } from "./put-target.ts"
+import type { ComposerSpot, PutTarget } from "./put-target.ts"
 import { afterSpinOff } from "./spin-off.ts"
 
 /** The thread `index` is: its first entry names it (`withThreads`). */
@@ -135,19 +140,18 @@ const state = (
   listWidth: "full",
   page: null,
   searching: false,
+  clips: NO_CLIPS,
 })
-const plan = (intent: Intent, s: IntentState) =>
-  planIntent(intent, s, {
-    key: "new-k",
-    root: NEW_ROOT,
-    task: NEW_TASK,
-    thread: NEW_THREAD,
-    noteColumn: NEW_NOTE_COLUMN,
-    reference: cardIdOfKind(
-      "reference",
-      "01a0ffd2-0000-7000-8000-0000000000e1",
-    ),
-  })
+const MINTED = {
+  key: "new-k",
+  root: NEW_ROOT,
+  task: NEW_TASK,
+  thread: NEW_THREAD,
+  noteColumn: NEW_NOTE_COLUMN,
+  reference: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1"),
+  text: NEW_TEXT,
+}
+const plan = (intent: Intent, s: IntentState) => planIntent(intent, s, MINTED)
 /** The trunk's column and the note column, as keys an intent names. */
 const TRUNK_COLUMN: ColumnKey = { kind: "card", card: threadOfEntry("1-r1") }
 const NOTES_COLUMN: ColumnKey = { kind: "card", card: NOTES }
@@ -198,43 +202,6 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
       },
     })
   })
-
-  test("a take from the past is a reference in your inventory, its markdown on the clipboard too (ADR-0126)", () => {
-    const address = { kind: "entry", thread: TEST_THREAD, entry: A } as const
-    const ref = cardIdOfKind(
-      "reference",
-      "01a0ffd2-0000-7000-8000-0000000000e2",
-    )
-    expect(
-      plan(
-        inColumn({
-          kind: "takeReference",
-          card: ref,
-          address,
-          markdown: "hello",
-        }),
-        state(),
-      ),
-    ).toEqual([
-      { kind: "copyText", text: "hello" },
-      { kind: "showInventory", brief: true },
-      {
-        kind: "takeReference",
-        card: ref,
-        address,
-        markdown: "hello",
-        to: inventory,
-        how: { actedAt: { kind: "inventory" }, slot: 0 },
-      },
-    ])
-  })
-
-  test("Cmd+C on a selection a range names takes it; on one none names, nothing, and the browser's copy stands (ADR-0126)", () => {
-    const copy = (text: string) =>
-      plan({ kind: "copySelection", entry: A, text }, state())
-    expect(copy("a")[0]).toEqual({ kind: "copyText", text: "a" })
-    expect(copy("2 a")).toEqual([])
-  })
 })
 
 /** A card of each kind with records, at the first of its places that is no inventory. */
@@ -272,13 +239,26 @@ describe("which kinds are taken and put (KINDS)", () => {
       const holds = fitsPlace(c.kind, "inventory")
       const take = plan({ kind: "takeIntoInventory", card: c.id }, s)
       const put = plan(
-        { kind: "put", card: c.id, target: { kind: "inventory", slot: 7 } },
+        {
+          kind: "put",
+          source: { kind: "card", card: c.id },
+          how: "move",
+          target: { kind: "inventory", slot: 7 },
+        },
         s,
       )
-      expect([c.kind, take.length > 0, put.length > 0]).toEqual([
+      // What the drag engine draws says so too (`putLanding`).
+      const landing = putLanding(
+        { kind: "card", card: c.id },
+        { kind: "inventory", slot: 7 },
+        "move",
+        s,
+      ).kind
+      expect([c.kind, take.length > 0, put.length > 0, landing]).toEqual([
         c.kind,
         holds,
         holds,
+        holds ? "move" : "refused",
       ])
     }
   })
@@ -289,7 +269,8 @@ describe("which kinds are taken and put (KINDS)", () => {
         plan(
           {
             kind: "put",
-            card: c.id,
+            source: { kind: "card", card: c.id },
+            how: "move",
             target: { kind: "column", key: threadKey },
           },
           state({ cards: [c] }),
@@ -399,12 +380,24 @@ describe("comments (ADR-0126)", () => {
       ),
     ).toEqual([
       {
-        kind: "queueComment",
-        card: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1"),
-        comment: card,
-        entry: { kind: "entry", thread: TEST_THREAD, entry: A },
+        kind: "paste",
+        paste: {
+          kind: "reference",
+          card: cardIdOfKind(
+            "reference",
+            "01a0ffd2-0000-7000-8000-0000000000e1",
+          ),
+          address: { kind: "card", card },
+          quote: {
+            kind: "comment",
+            comment: card,
+            entry: { kind: "entry", thread: TEST_THREAD, entry: A },
+          },
+        },
         to: { kind: "queued", thread: TEST_THREAD, seen: "" },
+        replacing: null,
         how: { actedAt: { kind: "column", key: TEST_THREAD }, slot: null },
+        here: TEST_TASK,
       },
     ])
   })
@@ -416,7 +409,12 @@ describe("put", () => {
     const move = { card: C1, from: inventory, to: toNote }
     expect(
       plan(
-        { kind: "put", card: C1, target: { kind: "column", key: threadKey } },
+        {
+          kind: "put",
+          source: { kind: "card", card: C1 },
+          how: "move",
+          target: { kind: "column", key: threadKey },
+        },
         s,
       ),
     ).toEqual([
@@ -438,7 +436,17 @@ describe("put", () => {
       after: TEST_THREAD,
     } as const
     const s = state({ cards: [card(C1, inventory)], slots: { "3": C1 } })
-    expect(plan({ kind: "put", card: C1, target }, s)).toEqual([
+    expect(
+      plan(
+        {
+          kind: "put",
+          source: { kind: "card", card: C1 },
+          how: "move",
+          target,
+        },
+        s,
+      ),
+    ).toEqual([
       {
         kind: "moveCard",
         move: {
@@ -461,13 +469,23 @@ describe("put", () => {
     })
     expect(
       plan(
-        { kind: "put", card: C1, target: { kind: "inventory", slot: 7 } },
+        {
+          kind: "put",
+          source: { kind: "card", card: C1 },
+          how: "move",
+          target: { kind: "inventory", slot: 7 },
+        },
         s,
       ),
     ).toEqual([{ kind: "swapSlots", a: 3, b: 7 }])
     expect(
       plan(
-        { kind: "put", card: C2, target: { kind: "inventory", slot: 7 } },
+        {
+          kind: "put",
+          source: { kind: "card", card: C2 },
+          how: "move",
+          target: { kind: "inventory", slot: 7 },
+        },
         s,
       )[1],
     ).toMatchObject({ kind: "moveCard", how: { slot: 7 } })
@@ -477,13 +495,23 @@ describe("put", () => {
     const s = state({ cards: [card(C1, note)] })
     expect(
       plan(
-        { kind: "put", card: C1, target: { kind: "column", key: "gone" } },
+        {
+          kind: "put",
+          source: { kind: "card", card: C1 },
+          how: "move",
+          target: { kind: "column", key: "gone" },
+        },
         s,
       ),
     ).toEqual([])
     expect(
       plan(
-        { kind: "put", card: C1, target: { kind: "notes", column: NOTES } },
+        {
+          kind: "put",
+          source: { kind: "card", card: C1 },
+          how: "move",
+          target: { kind: "notes", column: NOTES },
+        },
         s,
       ),
     ).toEqual([])
@@ -508,7 +536,8 @@ describe("your message (ADR-0113)", () => {
     })
   const toComposer = (key = threadKey): Intent => ({
     kind: "put",
-    card: C1,
+    source: { kind: "card", card: C1 },
+    how: "move",
     target: { kind: "composer", key },
   })
 
@@ -529,7 +558,7 @@ describe("your message (ADR-0113)", () => {
   test("a message with text takes the note's place, in one move of the two: one undo", () => {
     expect(plan(toComposer(), withMessage(true, [card(C1, note)]))).toEqual([
       {
-        kind: "keep",
+        kind: "moveCards",
         moves: [
           { move: { card: C1, from: noteKey, to: atEnd }, slot: null },
           { move: { card: MSG, from: atEnd, to: noteKey }, slot: null },
@@ -544,7 +573,7 @@ describe("your message (ADR-0113)", () => {
   test("a message with text goes to the slot a card from your inventory leaves", () => {
     const [keep] = plan(toComposer(), withMessage(true, [card(C1, inventory)]))
     expect(keep).toMatchObject({
-      kind: "keep",
+      kind: "moveCards",
       moves: [
         { move: { card: C1, to: atEnd }, slot: null },
         { move: { card: MSG, to: inventory }, slot: 3 },
@@ -555,7 +584,7 @@ describe("your message (ADR-0113)", () => {
   test("an empty message is discarded as the card takes its place", () => {
     const [keep] = plan(toComposer(), withMessage(false, [card(C1, note)]))
     expect(keep).toMatchObject({
-      kind: "keep",
+      kind: "moveCards",
       moves: [
         { move: { card: C1, to: atEnd } },
         { move: { card: MSG, to: { kind: "trash" } } },
@@ -588,7 +617,8 @@ describe("a note column (ADR-0116)", () => {
   )
   const into = (card: typeof C1, column = OTHER): Intent => ({
     kind: "put",
-    card,
+    source: { kind: "card", card },
+    how: "move",
     target: { kind: "notes", column },
   })
 
@@ -703,7 +733,8 @@ describe("pin and unpin (ADR-0048 step 5)", () => {
       plan(
         {
           kind: "put",
-          card: C1,
+          source: { kind: "card", card: C1 },
+          how: "move",
           target: { kind: "taskPinned", task: TEST_TASK },
         },
         state({ cards: [card(C1, inventory)], slots: { "3": C1 } }),
@@ -718,7 +749,12 @@ describe("pin and unpin (ADR-0048 step 5)", () => {
     const s = state({ cards: [card(C1, inventory)], slots: { "3": C1 } })
     expect(
       plan(
-        { kind: "put", card: C1, target: { kind: "pinned", key: threadKey } },
+        {
+          kind: "put",
+          source: { kind: "card", card: C1 },
+          how: "move",
+          target: { kind: "pinned", key: threadKey },
+        },
         s,
       )[0],
     ).toMatchObject({
@@ -941,7 +977,15 @@ describe("a card made a thread (ADR-0111)", () => {
     ],
   ] as const)("%s", (_, c, target, want) => {
     expect(
-      plan({ kind: "put", card: C1, target }, state({ cards: [c] })),
+      plan(
+        {
+          kind: "put",
+          source: { kind: "card", card: C1 },
+          how: "move",
+          target,
+        },
+        state({ cards: [c] }),
+      ),
     ).toEqual([
       {
         kind: "spinOff",
@@ -964,7 +1008,15 @@ describe("a card made a thread (ADR-0111)", () => {
     expect(
       plan(inColumn({ kind: "spinOff", card: C1, state: S1 }, TRUNK_COLUMN), s),
     ).toEqual(
-      plan({ kind: "put", card: C1, target: { kind: "state", state: S1 } }, s),
+      plan(
+        {
+          kind: "put",
+          source: { kind: "card", card: C1 },
+          how: "move",
+          target: { kind: "state", state: S1 },
+        },
+        s,
+      ),
     )
   })
 
@@ -972,7 +1024,12 @@ describe("a card made a thread (ADR-0111)", () => {
     const theirs = card(C1, { kind: "inventory", holder: writerId("bea@x.io") })
     expect(
       plan(
-        { kind: "put", card: C1, target: { kind: "state", state: S1 } },
+        {
+          kind: "put",
+          source: { kind: "card", card: C1 },
+          how: "move",
+          target: { kind: "state", state: S1 },
+        },
         state({ cards: [theirs] }),
       ),
     ).toEqual([])
@@ -1025,6 +1082,250 @@ describe("a new note (ADR-0116)", () => {
         },
         text: "",
         how: { actedAt: { kind: "column", key: NOTES }, slot: null },
+      },
+    ])
+  })
+})
+
+describe("landing a copy (ADR-0132, ADR-0133)", () => {
+  const entryAddress = { kind: "entry", thread: TEST_THREAD, entry: A } as const
+  const past: Clip = {
+    kind: "past",
+    taken: { address: entryAddress, markdown: "two" },
+  }
+  const selection: Clip = { kind: "text", text: "tw", origin: entryAddress }
+  const textCard: Clip = {
+    kind: "card",
+    of: { kind: "text", card: C1, text: "hi" },
+    cut: false,
+  }
+  const land = (
+    clip: Clip,
+    target: PutTarget,
+    s: IntentState = state(),
+  ): Landing => putLanding({ kind: "clip", clip }, target, "copy", s)
+  const column: PutTarget = { kind: "column", key: threadKey }
+
+  test("into a text box: text as itself, anything else as a link", () => {
+    expect(land(selection, { kind: "text-box" })).toEqual({
+      kind: "insert",
+      text: "tw",
+    })
+    expect(land(past, { kind: "text-box" })).toEqual({
+      kind: "insert",
+      text: addressLink(entryAddress, "a message"),
+    })
+  })
+
+  test("on a surface: the past as a reference, a selection as a text card keeping its origin, a text card as one with its text", () => {
+    expect(land(past, column)).toEqual({
+      kind: "reference",
+      address: entryAddress,
+      quote: { kind: "markdown", text: "two" },
+      to: column,
+    })
+    expect(land(selection, column)).toEqual({
+      kind: "text",
+      text: "tw",
+      origin: entryAddress,
+      to: column,
+    })
+    expect(land(textCard, column)).toMatchObject({
+      kind: "text",
+      text: "hi",
+      origin: { kind: "card", card: C1 },
+    })
+  })
+
+  test("an Alt-drag's copy of a card in place lands as a copy of its clip (`cardClip`), never a move", () => {
+    const s = state({ cards: [card(C1, atEnd)] })
+    expect(
+      putLanding({ kind: "card", card: C1 }, column, "copy", s),
+    ).toMatchObject({ kind: "text", text: "copied text" })
+  })
+
+  test("a cut card still in your trash comes out of it; anywhere else it lands as its copy", () => {
+    const cut: Clip = { ...textCard, cut: true }
+    const trashed = {
+      ...card(C1, atEnd),
+      place: { kind: "trash", holder: ADA, task: null },
+    } as const
+    expect(land(cut, column, state({ cards: [trashed] }))).toEqual({
+      kind: "uncut",
+      card: C1,
+      to: column,
+    })
+    expect(
+      land(cut, column, state({ cards: [card(C1, atEnd)] })),
+    ).toMatchObject({ kind: "text" })
+  })
+
+  test("a thread's copy lands just after its source; Copy to this task too", () => {
+    const thread: Clip = {
+      kind: "card",
+      of: { kind: "thread", card: TEST_THREAD, end: A, text: "" },
+      cut: false,
+    }
+    const effects = planPut(
+      { kind: "clip", clip: thread },
+      { kind: "canvas", task: TEST_TASK, after: TEST_THREAD },
+      "copy",
+      state(),
+      MINTED,
+    )
+    expect(effects).toMatchObject([
+      {
+        kind: "request",
+        intent: {
+          kind: "copy-thread",
+          source: TEST_THREAD,
+          end: A,
+          move: {
+            to: { kind: "canvas-at", task: TEST_TASK, after: TEST_THREAD },
+          },
+        },
+      },
+    ])
+  })
+
+  test("the past dropped with move is still a copy", () => {
+    expect(
+      putLanding({ kind: "clip", clip: past }, column, "move", state()),
+    ).toMatchObject({ kind: "reference" })
+  })
+
+  test("a slot: aimed and empty, there; aimed and filled, replaced; unaimed, the first free, else refused full", () => {
+    const filled = state({ cards: [card(C2, inventory)], slots: { "4": C2 } })
+    expect(land(past, { kind: "inventory", slot: 2 }, filled)).toMatchObject({
+      kind: "reference",
+      to: { kind: "inventory", slot: 2 },
+    })
+    expect(land(past, { kind: "inventory", slot: 4 }, filled)).toMatchObject({
+      kind: "replace",
+      old: C2,
+      landing: { kind: "reference", to: { kind: "inventory", slot: 4 } },
+    })
+    const full = state({
+      slots: Object.fromEntries(
+        Array.from({ length: INVENTORY_SLOTS }, (_, n) => [
+          String(n),
+          cardIdFor(`s${n}`),
+        ]),
+      ),
+    })
+    expect(land(past, { kind: "inventory", slot: null }, full)).toEqual({
+      kind: "refused",
+      code: "full",
+      card: null,
+    })
+  })
+
+  test("a replaced slot's card goes to your trash first: a drop's move set, a paste's `replacing`", () => {
+    const s = state({
+      cards: [card(C1, atEnd), card(C2, inventory)],
+      slots: { "4": C2 },
+    })
+    const target = { kind: "inventory", slot: 4 } as const
+    expect(
+      planPut({ kind: "card", card: C1 }, target, "move", s, MINTED),
+    ).toMatchObject([
+      { kind: "showInventory" },
+      {
+        kind: "moveCards",
+        moves: [
+          { move: { card: C2, to: DISCARDED } },
+          { move: { card: C1, to: inventory }, slot: 4 },
+        ],
+      },
+    ])
+    expect(
+      planPut({ kind: "clip", clip: past }, target, "copy", s, MINTED),
+    ).toMatchObject([
+      { kind: "showInventory" },
+      {
+        kind: "paste",
+        to: inventory,
+        replacing: { card: C2, from: inventory },
+        how: { slot: 4 },
+      },
+    ])
+  })
+
+  test("a slot holding a card you may not discard is not replaced; a thread's copy lands only in an empty one", () => {
+    const task = {
+      kind: "task",
+      id: TEST_TASK,
+      owner: ADA,
+      placer: ADA,
+      place: inventory,
+      content: {},
+    } as unknown as CardRecord
+    const s = state({ cards: [task], slots: { "4": TEST_TASK } })
+    expect(land(past, { kind: "inventory", slot: 4 }, s)).toEqual({
+      kind: "refused",
+      code: "not-replaced",
+      card: TEST_TASK,
+    })
+    const thread: Clip = {
+      kind: "card",
+      of: { kind: "thread", card: TEST_THREAD, end: A, text: "" },
+      cut: false,
+    }
+    const filled = state({ cards: [card(C2, inventory)], slots: { "4": C2 } })
+    expect(land(thread, { kind: "inventory", slot: 4 }, filled)).toEqual({
+      kind: "refused",
+      code: "slot-taken",
+      card: C2,
+    })
+  })
+
+  test("a card in your inventory dropped on another's slot swaps", () => {
+    const s = state({
+      cards: [card(C1, inventory), card(C2, inventory)],
+      slots: { "3": C1, "4": C2 },
+    })
+    expect(
+      putLanding(
+        { kind: "card", card: C1 },
+        { kind: "inventory", slot: 4 },
+        "move",
+        s,
+      ),
+    ).toEqual({ kind: "swap", a: 3, b: 4 })
+  })
+
+  test("Edit as text is a paste of its quote replacing the reference, in its place and slot", () => {
+    const ref = cardIdOfKind(
+      "reference",
+      "01a0ffd2-0000-7000-8000-0000000000e3",
+    )
+    const reference: CardRecord = {
+      kind: "reference",
+      id: ref,
+      owner: ADA,
+      placer: ADA,
+      place: inventory,
+      content: { address: entryAddress, quote: "a".repeat(64) as Sha256 },
+    }
+    const s = state({ cards: [reference], slots: { "6": ref } })
+    expect(
+      plan(
+        { kind: "editAsText", reference: ref, card: NEW_TEXT, text: "q" },
+        s,
+      ),
+    ).toEqual([
+      {
+        kind: "paste",
+        paste: {
+          kind: "text",
+          card: NEW_TEXT,
+          origin: entryAddress,
+          text: "q",
+        },
+        to: inventory,
+        replacing: { card: ref, from: inventory },
+        how: { actedAt: { kind: "inventory" }, slot: 6 },
+        here: TEST_TASK,
       },
     ])
   })

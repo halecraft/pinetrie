@@ -351,13 +351,21 @@ which are swept.
   (`queuedQuotes`, `wordsOf`'s `blob` reader) and sends it as its queuer's;
   one whose quote reads empty (its blob missing) is skipped, not sent
   (`planCarry`'s `skip`); a Stop holds the queue for it, and unqueue all
-  takes it back. A put from
-  your hand copies
-  it (`KINDS`' `put`). It is made by `planMakeReference`
-  (through `planMake`), the host's `make-reference`; a creation, so in no
-  history. *Edit as text* is `planEditAsText`: one move set, a new text card
-  in its place, its `origin` the address, and the reference to the trash,
-  undone whole. A text card's `origin` is stored printed ("" for none).
+  takes it back. A put moves it, as any card (ADR-0132). It is made by a
+  paste (`planPaste`, the host's `paste`, through `planMake`), in its
+  paster's history. *Edit as text* is a paste too: a `text` paste replacing
+  the reference, in its very place, its `origin` the address, the reference
+  to the trash first, undone whole. A text card's `origin` is stored
+  printed ("" for none).
+- **`planPaste`** (ADR-0132, ADR-0133) plans one paste as one step: the
+  card it replaces (`Replacing`: a slot's card, a reference edited as text)
+  discarded first, so a replacement into a full inventory never meets
+  `full`, then a new text card or reference made through `planMake` (in
+  the replaced card's very place when the target is its place), or a cut
+  card moved out of the sender's own trash (`planUncut`). "The replaced
+  card is discarded first" holds in two places: here, for a paste, and in
+  the client's `moveCards` set for a drop on a filled slot, which
+  `planMoves` plans in order.
 - **One rule makes every card** (`planMake`, `moves.ts`): it takes a card
   already made (`makeCard`, whose place type is its kind's, so a misplaced
   card does not compile) and refuses `exists`, then as any move into its
@@ -435,8 +443,10 @@ which are swept.
   its sender will be on: the new one for a drop in the sidebar, else the
   tab's. A queueing passes `NO_DISCARDS`, since its target is a queue. A
   card in a trash keeps its record and text, is drawn nowhere (every read
-  of a place names the kinds it draws), and moves only by an undo: a
-  handoff from a trash is refused `gone`. A thread's card in a trash is
+  of a place names the kinds it draws), and moves only by an undo or its
+  cutter's paste: `planMove` refuses a handoff from a trash `gone`, and
+  only `planUncut` takes one out, from the sender's own trash. Both share
+  `handoff`, the compare-and-set and every check after it. A thread's card in a trash is
   held as in an inventory (`holderOf`, `takenIn`): its run stops, and its
   queue waits. `planTrashSweep`
   (`card-history.ts`) deletes it once its newest history event is older
@@ -491,9 +501,12 @@ which are swept.
   each one a card ends queued on, when it is not running.
 - **Which history a move enters is `historyOf`'s** (ADR-0066), a
   `MoveHistoryScope` (core): a task's, or a person's outside any task.
-  None for a creation (a composer's new card, a copy) or a send, which is
-  no move, but a note column's, which enters its canvas's task, so the undo
-  key takes it back; else the task the card goes to, when it goes to one,
+  A creation enters one when its command's cause is a paste (a paste, a
+  thread's copy, ADR-0132) or it is a note column made for a note: the
+  task it lands in, or with none (a slot) its sender's history outside any
+  task, so the undo key takes it back. A creation a move makes (a
+  composer's new card, an empty note) and a send, which is no move, enter
+  none. Otherwise the task the card goes to, when it goes to one,
   else the task it leaves, read from its record, since a move is accepted
   only from there; a discard's is `discardHistory`'s task, or with none its
   sender's history outside any task (ADR-0126). A place is in a task by
@@ -560,9 +573,9 @@ which are swept.
   card moved in as its first note. Both are one `planMoveRequest` write, so
   one gesture: the mover's history in that task (`historyOf`) undoes both.
   The page draws the card where it was until the host writes the column,
-  as it does for a column `toNotes` would make. A reference copied from
-  your hand to a spot (`make-reference`) resolves the same way; a creation
-  enters no history, so its column is not undone with it.
+  as it does for a column `toNotes` would make. A reference or a text card
+  pasted on a spot (`paste`) resolves the same way, its column made in the
+  same step of its paster's history.
 - **A card the host could not send** (`planUnsent`) goes to the note column
   nearest its thread the same way, saying why. Where it has nowhere to go
   (its thread's holder's inventory full, or a thread with no card) it stays

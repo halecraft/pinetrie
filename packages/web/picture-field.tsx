@@ -12,6 +12,7 @@ import {
 } from "@pinetrie/interface"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { useContext, useRef, useState } from "react"
+import { pastedImages } from "./clipboard.ts"
 import { PictureCrop } from "./picture-crop.tsx"
 import { Pictures } from "./pictures-context.ts"
 import { Initial } from "./presence.tsx"
@@ -63,7 +64,7 @@ export function PictureField({
         void choose(picked)
       }}
       onPaste={e => {
-        const [picked] = pastedFiles(e.clipboardData)
+        const [picked] = pastedImages(e)
         if (picked === undefined) return
         e.preventDefault()
         void choose(picked)
