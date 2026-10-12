@@ -115,18 +115,30 @@ The spikes behind this decision:
     - its command and its image;
     - the content of each source file it read;
     - the files it looked for and did not find;
-    - `$HOME`'s configuration as a whole, since `$HOME` is on the lane's
-      disk.
+    - each file it read under `$HOME`, outside a cache. `$HOME` is on the
+      lane's disk.
 
     Those files are small (manifests, lockfiles, config), and their hashes
-    are cached while a file is unchanged.
+    are cached while a file's stamp is unchanged (S162).
+  - **A cache is a derived directory that runs only ever add files to,** or
+    one holding a `CACHEDIR.TAG`. Examples are pnpm's store, uv's and
+    cargo's caches. Tools address what is in them by content, and check it
+    themselves. A cache is never dropped for a key that broke, and travels
+    with its disk.
   - pine·trie never schedules a run. The agent, or you, run commands as a
     developer would.
-  - **When pine·trie makes a disk for a new state** (a fork, the base, a
-    catch up), it carries, by reflink, each derived output whose recipe's
-    key holds on that state, and leaves out the rest, for whoever works
-    there to make again. The base is accepted work's files plus the outputs
-    whose keys hold there.
+  - **A disk for a new state is always a copy of a disk that exists,** then
+    a subtraction:
+    - a fork clones its parent's snapshot;
+    - the base clones the previous base and checks out accepted work;
+    - a catch up merges in the lane itself.
+
+    pine·trie then deletes each derived output whose recipe's key no longer
+    holds on the new state, and leaves the rest: source, local files, caches
+    and outputs still good. Whoever works there makes again what was
+    deleted, as a developer would after a pull. A deleted package's
+    `node_modules` goes, because pine·trie knows every output it recorded,
+    and caches stay warm.
 - **What pine·trie knows about a project's files is a fact of a state.**
   - A fact is a pure function of some files, keyed by their content, and
     computed again on each new state where they changed. `pinetrie.json`,
@@ -195,6 +207,11 @@ The spikes behind this decision:
     never reaches accepted work.
 
 **Consequences.**
+- **Built in two steps:** first for jj projects, which are every project
+  pine·trie serves today; then for projects without a VCS, which need states
+  without commits, the path-by-path merge and conflicts as records. Until
+  that second step, a jj project's conflicts keep today's flow, with jj's
+  markers in the files.
 - **Projects:**
   - A project without jj or git works, from its first file.
   - Nothing is configured. `.gitignore` is the one file that says what a
@@ -214,7 +231,9 @@ The spikes behind this decision:
     as source, until the agent adds one in a visible edit.
 - **What goes:**
   - `lanes.install`, `installWhen` and `installCaches`;
-  - dependency layers built by pine·trie, and the in-lane re-install;
+  - dependency layers built by pine·trie, and the in-lane re-install. The
+    base is no longer built fresh: it is the previous base, with accepted
+    work checked out and stale outputs deleted;
   - reading `pinetrie.json` once at startup.
 - **Risks:**
   - The supervisor sits on every file call's path.
@@ -224,13 +243,45 @@ The spikes behind this decision:
   - io_uring's opens bypass seccomp. Whether Docker blocks them was not
     checked.
 - **Left open:**
-  - where an agent reads a conflict's three versions (a read-only path
-    outside the project, such as `/.pinetrie/conflicts/<path>/`);
   - states moving between machines. Between lane VMs, `btrfs send` (S146,
     S148) is where to start; the boundary with the Mac is a separate
     problem;
   - syncing your folder on the Mac with your thread (S149, S150, put
-    aside).
+    aside). The second step needs it (below).
+- **For the second step: projects without a VCS.** Its plan starts from
+  these points, which this decision leaves unsettled:
+  1. **Your folder on the Mac, a prerequisite needing a decision of its
+     own.**
+     - In a jj project, accepting work moves a bookmark in your repo.
+     - Without a VCS, your project is a plain folder, so accepting or
+       publishing writes files into it while you may be editing them.
+     - That is the folder sync S149 and S150 began and this work put
+       aside. It must be decided before the second step is planned.
+  2. **What accepted work, an offer and a WIP are without commits.** The
+     likely answer:
+     - accepted work is a line of snapshots;
+     - an offer is a lane's snapshot paired with the snapshot it started
+       from.
+  3. **The merge base.**
+     - A three-way merge needs a common ancestor, which jj finds from
+       commits.
+     - Without it, pine·trie records which snapshot each lane, fork and
+       catch up started from: a graph of states.
+     - It also keeps each snapshot that can still be a merge base. How
+       long, and which, is to be decided.
+  4. **Text against binary, and modes.**
+     - S160 called a file binary when it holds a NUL byte, and merged git's
+       two modes.
+     - Whether those rules hold for a project with no git is to be
+       decided.
+  5. **Conflict records:**
+     - where they are stored (the session store, presumably);
+     - how the page shows a conflict and its candidates;
+     - where an agent reads its three versions, such as a read-only
+       `/.pinetrie/conflicts/<path>/` outside the project.
+  6. **History.** A branch at a turn already works from snapshots. What
+     reads jj now for history (a turn's changed files, an offer's files,
+     the review page) must read snapshot diffs (S146) instead.
 
 **Alternatives rejected.**
 - **A content hash for every state, as a git tree id** (S156). Nothing needs
@@ -268,6 +319,12 @@ The spikes behind this decision:
   same job without either problem.
 - **Declared recipes and lockfile-only keys.** Every one measured missed
   inputs (S157).
+- **Building the base fresh each time,** as ADR-0131 did. It loses every
+  cache, so each change of a lockfile means a cold download. A copy of the
+  previous base, minus the outputs whose keys broke, leaves nothing stale,
+  because every output is recorded.
+- **Declaring caches** (`installCaches`). Tools only add to their caches, so
+  pine·trie can see which directories are caches.
 - **Splitting `pinetrie.json` by authority.** The direction of a change
   decides authority for every setting, with no section to remember.
 - **Following renames on every merge, as git does.** In 313 merges it
