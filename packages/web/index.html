@@ -347,7 +347,8 @@
         flex-direction: column; box-shadow: inset -1px 0 0 #23272e; }
       .folded-column .folded-head { flex: 0 0 var(--strip-head); height: var(--strip-head); align-items: center;
         justify-content: center; padding: 0; }
-      .folded-column[data-kind="note-column"] .folded-head { border-top-color: #6f7784; }
+      /* A note column's track is grey, folded or not: its head's top border. */
+      .note-column, .folded-column[data-kind="note-column"] { --track: #6f7784; }
       .folded-grip { color: #6f7784; font-size: .9rem; line-height: 1; }
       /* Its own background, isolated, is what a banner's black blends with
          (the `.thread-mark` rule). */
@@ -407,7 +408,6 @@
       /* ⇤ in the task column's head folds it; only you see your folds. */
       .task-column-head .fold { background: none; border: 0; padding: 0;
         color: #6f7784; cursor: pointer; font-size: .9rem; line-height: 1; }
-      .column-head .fold:hover, .note-column-head .fold:hover { color: #e6e6e6; }
       .avatars { display: inline-flex; gap: 2px; flex: 0 0 auto; }
       /* The circle. `.avatar` has no rule: it marks a person shown here, which
          the browser suite counts. */
@@ -798,11 +798,16 @@
       .note-column { flex: 0 0 20rem; width: 20rem; min-width: 0; display: flex;
         flex-direction: column; min-height: 0; border-right: 1px solid #23272e; }
       .note-column[data-width="2"] { flex-basis: 40rem; width: 40rem; }
-      .note-column-head { user-select: none; display: flex; align-items: center; gap: .5rem; padding: .4rem .75rem;
-        border-top: 4px solid #6f7784; font-size: .8rem; color: #aaa; }
-      .note-column-title { flex: 1; text-align: left; background: none; border: 0; padding: 0;
-        color: #ddd; font-weight: 600; cursor: text; }
-      .note-column-title:disabled { cursor: default; }
+      /* Its head is a `.column-head`, a thread's row: its mark in the square
+         a thread's takes, so the two names line up side by side. */
+      .note-column-mark { flex: 0 0 auto; width: 1.5rem; height: 1.5rem; display: inline-flex;
+        align-items: center; justify-content: center; font-size: .85rem; color: #8b93a1; }
+      .column-head .note-column-title { flex: 1; min-width: 0; text-align: left; font-size: .85rem;
+        font-weight: 600; color: #ddd; cursor: text; }
+      .column-head .note-column-title:disabled { cursor: default; }
+      /* Renamed, its field holds the row's height, the name where it was. */
+      .column-head .open-title-input { box-sizing: border-box; height: 1.5rem; margin: 0 0 0 calc(-.4rem - 1px);
+        padding: 0 .4rem; font-size: .85rem; font-weight: 600; }
       .note-count { font-size: .72rem; color: #8b93a1; }
       .note-column-notes { flex: 1; overflow-y: auto; padding: .4rem .75rem; }
       .note-column-notes .card-editor.note { margin-bottom: .3rem; }

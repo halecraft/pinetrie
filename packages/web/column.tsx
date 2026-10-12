@@ -50,7 +50,6 @@ import {
   type Column as ColumnSpec,
   type ColumnView,
   type ComposerPlacesStore,
-  columnMenu,
   columnView,
   composerPlace,
   crossTaskLinks,
@@ -93,7 +92,6 @@ import {
   startedWords,
   type ThreadDetails,
   type ThreadLink,
-  TRASH_COLUMN,
   threadLink,
   traceGroups,
   tracesAt,
@@ -129,7 +127,7 @@ import {
   useSyncExternalStore,
 } from "react"
 import { CardEditor } from "./card-editor.tsx"
-import { ColumnMenu } from "./column-menu.tsx"
+import { ColumnHeadEnd } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { Dock } from "./dock.tsx"
@@ -989,27 +987,13 @@ export function Column(p: ColumnProps) {
                 />
               )}
               {card !== null && (
-                <ColumnMenu
+                <ColumnHeadEnd
+                  card={card}
+                  columnKey={p.column.key}
                   onIntent={p.onIntent}
-                  sections={columnMenu({ card, width: p.width })}
+                  width={p.width}
+                  writable={writable}
                 />
-              )}
-              {card !== null && writable && (
-                <button
-                  aria-label={TRASH_COLUMN}
-                  className="close"
-                  onClick={() =>
-                    p.onIntent({
-                      kind: "discard",
-                      card,
-                      at: { kind: "column", key: p.column.key },
-                    })
-                  }
-                  title={TRASH_COLUMN}
-                  type="button"
-                >
-                  ×
-                </button>
               )}
             </div>
             <Origin onLink={openLink} onOpen={openAt} origin={shows.origin} />

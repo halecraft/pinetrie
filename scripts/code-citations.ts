@@ -11,7 +11,7 @@ export const CODE_CITATIONS: Readonly<Record<string, number>> = {
   "packages/interface": 657,
   "packages/lanes": 12,
   "packages/rules": 576,
-  "packages/web": 222,
+  "packages/web": 220,
   "scripts/mutations/app.ts": 12,
   "scripts/mutations/core.ts": 2,
   "scripts/mutations/docker.ts": 3,

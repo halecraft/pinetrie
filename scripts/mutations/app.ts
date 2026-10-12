@@ -183,9 +183,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column's × does nothing",
-    file: "packages/web/column.tsx",
-    from: '                    p.onIntent({\n                      kind: "discard",\n                      card,\n',
-    to: '                    void ({\n                      kind: "discard",\n                      card,\n',
+    file: "packages/web/column-menu.tsx",
+    from: '            p.onIntent({\n              kind: "discard",\n              card: p.card,\n',
+    to: '            void ({\n              kind: "discard",\n              card: p.card,\n',
     suite: "browser",
     scenario: "page",
     expect: "× on a branch's column takes it off the canvas",
@@ -2318,8 +2318,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note column's rename sends nothing",
     file: "packages/web/note-column.tsx",
-    from: '              p.onIntent({\n                kind: "rename",',
-    to: '              void ({\n                kind: "rename",',
+    from: '                p.onIntent({\n                  kind: "rename",',
+    to: '                void ({\n                  kind: "rename",',
     suite: "browser",
     scenario: "page",
     expect: "a note column is renamed from its header, for everyone",
@@ -2355,10 +2355,10 @@ export const mutations: readonly Mutation[] = [
       "a thread moved onto the canvas from another task's makes a canvas of two roots: its column, and its root's tree on the rail",
   },
   {
-    name: "a column's ⋯ acts on nothing",
-    file: "packages/web/column.tsx",
-    from: "                <ColumnMenu\n                  onIntent={p.onIntent}\n",
-    to: "                <ColumnMenu\n                  onIntent={() => {}}\n",
+    name: "a column's ⋯ copies nothing",
+    file: "packages/web/column-menu.tsx",
+    from: "          onChoose: () => p.onIntent(item.intent),\n",
+    to: '          onChoose: () => item.intent.kind === "copyThread" || p.onIntent(item.intent),\n',
     suite: "browser",
     scenario: "page",
     expect:

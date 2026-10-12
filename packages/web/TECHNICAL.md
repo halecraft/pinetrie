@@ -382,8 +382,13 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   `ThreadPreviewView` opened (`thread-preview.tsx`), whose **put** puts it
   on the canvas you are on.
 - **Every unfolded column's header ends in ⋯ and ×** (`.column-menu`,
-  `.close`), a note column's too: × is the `discard` intent of its card, and
-  Fold is the ⋯'s first item (`.column-fold`). A focused column moves with
+  `.close`), a note column's too, drawn by one component
+  (`column-menu.tsx`): × is the `discard` intent of its card, and
+  Fold is the ⋯'s first item (`.column-fold`). A note column's header is a
+  `.column-head` with a thread's `.head-row`, so it takes the same button
+  reset, row height and top border (its `--track` is grey), and its ▤ sits
+  in the square a thread's mark takes: a rule written for `.note-column-*`
+  alone would lose to `.column-head button`. A focused column moves with
   Alt+←/→ (`Focus.inColumn`), and is scrolled into view when it moves with
   focus inside it.
 - **The task column lists its canvas's trash** (`.task-trash`, a row per
