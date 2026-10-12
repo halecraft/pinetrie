@@ -72,7 +72,7 @@ itself (ADR-0095).
 | module | its one job |
 |---|---|
 | `thread-lanes.ts` | each thread's pi lane, held, and its handle (`ThreadLanes`) |
-| `tools.ts` | the tools registered, and which a lane's runs may call (`activeToolNames`, `toolsChanged`) |
+| `tools.ts` | the tools registered, and whether a stored lane's list differs from `TOOL_IDS` (`toolsChanged`) |
 | `search.ts` | the `grep` and `find` tools: rg and fd through the lane's `env` (ADR-0064) |
 | `lanes.ts` | where a lane's tools work (`toolContextOf`), and what it is told (`systemPromptFor`, `laneGuidelines`) |
 | `stream.ts` | pi's events as `StreamEvent`s (`streamEventOf`) |
@@ -84,7 +84,7 @@ itself (ADR-0095).
 | `inside.ts` | a facade's inside, reachable only in this package (`sealed`) |
 
 The decisions in them are pure and tested without a harness:
-`activeToolNames`, `toolsChanged`, `toolContextOf`, `streamEventOf`,
+`toolsChanged`, `toolContextOf`, `streamEventOf`,
 `expandCommand`, `skillOf`, and the search tools' `grepArgs`, `findArgs`,
 `searchOutcome` and `searchText`.
 
@@ -604,9 +604,9 @@ item 18, and in `lanes.test.ts` against the harness.
     renames one of its own fails there. The id is what the model calls; it
     never changes for people's words ("shell" for `bash` is interface's).
     The constants (`BASH_TOOL`, `GREP_TOOL`, `BANNER_TOOL`…) are core's.
-  - **The host's tools are active in every lane** (`activeToolNames`,
-    `tools.ts`): `ask_about_conflict`, `catch_up` and `split_offer`
-    (ADR-0080). A call that does not apply answers why: the tool list never
+  - **The host's tools are active in every lane** (`TOOL_IDS`, core):
+    `ask_about_conflict`, `catch_up` and `split_offer` (ADR-0080), and
+    `set_banner` (ADR-0143). A call that does not apply answers why: the tool list never
     names who may call it.
   - **`ask_about_conflict`** (`conflictTool`, `lanes.ts`; renamed from
     `ask_for_guidance` by ADR-0080) is taken while jj finds a conflict in the
@@ -614,11 +614,11 @@ item 18, and in `lanes.test.ts` against the harness.
     its result's `details` are `{ asked: true }`, which the page reads
     (`renderableMessage`, `conflictAskedAt`), never its text. Refused, it
     answers `NO_CONFLICTS`.
-  - **The list is set once, where a lane is held** (`existing()` in
-    `thread-lanes.ts`). A new lane takes the harness's seed. A restored lane
-    stored with another list (banners turned on or off since) is given the
-    current one with pi's `lane.setActiveTools`, which pi stores in the
-    lane's configuration.
+  - **The list is `TOOL_IDS`, the same in every run** (`agent.ts`), and set
+    once where a lane is held (`existing()` in `thread-lanes.ts`). A new
+    lane takes the harness's seed. A restored lane stored with another list
+    (by an agent with no tools, or under an older `TOOL_IDS`) is given the current one with
+    pi's `lane.setActiveTools`, which pi stores in the lane's configuration.
   - **The guidelines name nothing that changes**, the offer's bookmark among
     them: it changes when a thread is named. `lane.md` says how it is named.
   - **A change is logged.** A `before_payload` hook hashes each request
@@ -635,13 +635,14 @@ item 18, and in `lanes.test.ts` against the harness.
   pi's harness reads only the run's `toolExecution`, never a tool's
   `executionMode`, so `catch_up` cannot ask to run alone; the host refuses a
   call with a sibling instead.
-- **`set_banner`** (`banner.ts`, ADR-0050) is registered whenever the host
-  has tools, and active when `createAgent` is given `bannerAsks`. pi fails a
-  run whose stored list names a tool not registered, so every tool is
-  registered whatever the setting. A call while banners are off answers
-  that they are off. The tool reads its arguments (`parseBannerArgs`: an
-  image that names no pasted image is refused, not ignored) and hands the
-  ask to the host.
+- **`set_banner`** (`banner.ts`, ADR-0050, ADR-0143) is registered and
+  active whenever the host has tools: `bannerAsks` is part of
+  `CreateAgentOptions.tools`, so an agent with tools always has it. The host
+  answers each ask under the user config's icon source: a pasted image is
+  set under any, and a new drawing refused (`off`) unless the source is
+  `drawn`, which the tool's answer names. The tool reads its arguments
+  (`parseBannerArgs`: an image that names no pasted image is refused, not
+  ignored) and hands the ask to the host.
 - **pine·trie's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`

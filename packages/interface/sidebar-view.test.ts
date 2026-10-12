@@ -2,6 +2,7 @@ import {
   type BannerRecord,
   blobUrl,
   entryId,
+  type IconsRecord,
   type MarkRecord,
   type Sha256,
   type TaskId,
@@ -32,10 +33,11 @@ import {
   pageTitle,
   type SidebarViewInput,
   sidebarView,
-  taskSprites,
+  taskIcons,
 } from "./sidebar-view.ts"
 import type { UnsentSignals } from "./signals.ts"
 import { type ThreadCardFacts, threadCardHeads } from "./thread-card.ts"
+import { builtInIconUrl, type IconLookup, threadIcon } from "./thread-icon.ts"
 
 /** Each root's task, one a root: `K("r1")` holds root r1's threads. */
 const K = (root: string) => taskIdFor(root)
@@ -112,7 +114,7 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
       [K("r2"), DOING],
       [K("r3"), BACKLOG],
     ]),
-    sprites: new Map(),
+    icons: new Map(),
     shown: [K("r1"), K("r2"), K("r3")],
     ...over,
   }
@@ -124,7 +126,7 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
     marks: f.marks,
     archived: f.archived,
     arrivals: f.arrivals,
-    sprites: f.sprites,
+    icons: f.icons,
   }
 }
 const items = (over: Partial<Facts> = {}) => sidebarView(input(over)).items
@@ -330,17 +332,17 @@ describe("pageTitle", () => {
 })
 
 describe("icons", () => {
-  const SHA = "b".repeat(64) as Sha256
-  test("a task with a sprite draws it; one without, its initials on a colour its id seeds", () => {
+  const ICON = { kind: "built-in", url: builtInIconUrl("fox") } as const
+  test("a task with an icon draws it; one without, its initials on a colour its id seeds", () => {
     const [r1, r2, r3] = items({
-      sprites: new Map([[K("r2"), SHA]]),
+      icons: new Map([[K("r2"), ICON]]),
     })
     expect(r1?.icon).toEqual({
       kind: "initials",
       letters: "TN",
       slot: taskSlot(K("r1")),
     })
-    expect(r2?.icon).toEqual({ kind: "sprite", src: blobUrl(SHA) })
+    expect(r2?.icon).toEqual({ kind: "icon", icon: ICON })
     expect(r3?.icon).toEqual({
       kind: "initials",
       letters: "NT",
@@ -349,7 +351,7 @@ describe("icons", () => {
   })
 })
 
-describe("taskSprites", () => {
+describe("taskIcons", () => {
   const thread = (n: number) =>
     threadIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`)
   const banner = (t: ThreadId, c: string): [ThreadId, BannerRecord] => [
@@ -357,23 +359,54 @@ describe("taskSprites", () => {
     { lane: t, sha: c.repeat(64) as Sha256, at: 1 },
   ]
   const [early, late, other] = [thread(1), thread(2), thread(3)]
+  const lookup =
+    (
+      banners: ReadonlyMap<ThreadId, BannerRecord>,
+      names: ReadonlyMap<ThreadId, ThreadName> = new Map(),
+      icons: IconsRecord | null = null,
+    ): IconLookup =>
+    t =>
+      threadIcon({ thread: t, names, banners, icons })
+  const bannerIcon = (c: string) => ({
+    kind: "banner",
+    url: blobUrl(c.repeat(64) as Sha256),
+  })
 
-  test("a task takes the banner of its earliest thread with one, whatever its canvas order", () => {
-    const sprites = taskSprites(
+  test("a task takes the icon of its earliest thread with one, whatever its canvas order", () => {
+    const icons = taskIcons(
       new Map([
         [K("r1"), [late, early]],
         [K("r2"), [other]],
       ]),
-      new Map([banner(late, "2"), banner(early, "1")]),
+      lookup(new Map([banner(late, "2"), banner(early, "1")])),
     )
-    expect(sprites).toEqual(new Map([[K("r1"), "1".repeat(64)]]))
+    expect(icons).toEqual(new Map([[K("r1"), bannerIcon("1")]]))
   })
 
-  test("a thread with no banner gives way to a later one", () => {
-    const sprites = taskSprites(
+  test("a thread with no icon gives way to a later one", () => {
+    const icons = taskIcons(
       new Map([[K("r1"), [early, late]]]),
-      new Map([banner(late, "2"), banner(other, "3")]),
+      lookup(new Map([banner(late, "2"), banner(other, "3")])),
     )
-    expect(sprites).toEqual(new Map([[K("r1"), "2".repeat(64)]]))
+    expect(icons).toEqual(new Map([[K("r1"), bannerIcon("2")]]))
+  })
+
+  test("under built-in icons, the earliest named thread's noun icon; with no names, none", () => {
+    const names = new Map([[late, "amber-fox" as ThreadName]])
+    const builtIn = { source: "built-in" } as const
+    expect(
+      taskIcons(
+        new Map([[K("r1"), [late, early]]]),
+        lookup(new Map(), names, builtIn),
+      ),
+    ).toEqual(
+      new Map([[K("r1"), { kind: "built-in", url: builtInIconUrl("fox") }]]),
+    )
+    expect(
+      taskIcons(
+        new Map([[K("r1"), [early]]]),
+        lookup(new Map(), names, builtIn),
+      ),
+    ).toEqual(new Map())
   })
 })

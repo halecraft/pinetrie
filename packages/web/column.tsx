@@ -42,7 +42,6 @@ import {
   agentsRow,
   agentsWords,
   askLine,
-  bannerUrl,
   behind,
   branchesAt,
   type CatchUps,
@@ -65,7 +64,7 @@ import {
   earlierWords,
   type FoldMemory,
   gridKeyAct,
-  type HeadBanner,
+  type HeadIcon,
   type HeadIdentity,
   type HeadOrigin,
   headLane,
@@ -95,6 +94,7 @@ import {
   startedWords,
   type ThreadDetails,
   type ThreadLink,
+  threadIcon,
   threadLink,
   traceGroups,
   tracesAt,
@@ -591,16 +591,18 @@ export function Column(p: ColumnProps) {
   // decide, as it is typed.
   const [createsLane, setCreatesLane] = useState(false)
   const thread = p.column.thread
-  // The banner drawn as the column mounts shows at once; one arriving later,
+  // The icon drawn as the column mounts shows at once; one arriving later,
   // a new one, fades in. The composer reports `createsLane` only after the
-  // mount, so the banner of the lane its next send creates counts as there
+  // mount, so the icon of the lane its next send creates counts as there
   // already.
-  const [mountedBanner] = useState(() =>
-    bannerUrl(headLane(lane, true, thread), p.work.banners),
+  const [mountedIcon] = useState(
+    () =>
+      threadIcon({ thread: headLane(lane, true, thread), ...p.work })?.url ??
+      null,
   )
   // Whether the reader opened the thread's details here, since the column
   // mounted: they spin only then, and not when a reload or a tab switch
-  // mounts them open, as a banner there at mount does not fade.
+  // mounts them open, as an icon there at mount does not fade.
   const [openedHere, setOpenedHere] = useState(false)
   const working = workingWords(running, askLineOf(runningAsk))
   // The cards at this column's end: yours, which the composer
@@ -645,7 +647,7 @@ export function Column(p: ColumnProps) {
   const shows = columnView({
     acting:
       lane.kind === "lane" ? (acting.offers.get(lane.name) ?? null) : null,
-    mountedBanner,
+    mountedIcon,
     queued,
     index,
     asks: p.asks,
@@ -932,7 +934,6 @@ export function Column(p: ColumnProps) {
           >
             <div className="head-row">
               <Identity
-                banner={shows.banner}
                 detailsId={detailsId}
                 identity={shows.identity}
                 onToggle={open => {
@@ -1042,8 +1043,8 @@ export function Column(p: ColumnProps) {
               {shows.identity.kind === "agent" &&
                 shows.identity.details.open && (
                   <ThreadDetailsPanel
-                    banner={shows.banner}
                     details={shows.identity.details}
+                    icon={shows.identity.icon}
                     id={detailsId}
                     name={shows.identity.name}
                     onOpen={openAt}
@@ -1356,14 +1357,12 @@ function Reply({ doc, stream }: { doc: LiveDocHandle; stream: StreamRecord }) {
  */
 function Identity({
   identity,
-  banner,
   detailsId,
   onToggle,
   running,
   working,
 }: {
   identity: HeadIdentity
-  banner: HeadBanner | null
   /** The details' element id, for `aria-controls`. */
   detailsId: string
   onToggle: (open: boolean) => void
@@ -1374,7 +1373,7 @@ function Identity({
   if (identity.kind === "pending")
     return (
       <span className="agent-name pending">
-        <ThreadMark banner={null} folds running={running} working={working} />{" "}
+        <ThreadMark folds icon={null} running={running} working={working} />{" "}
         <span data-fold-name="">{identityWords(identity)}</span>
       </span>
     )
@@ -1389,7 +1388,12 @@ function Identity({
       title={detailsTitle(open)}
       type="button"
     >
-      <ThreadMark banner={banner} folds running={running} working={working} />{" "}
+      <ThreadMark
+        folds
+        icon={identity.icon}
+        running={running}
+        working={working}
+      />{" "}
       <span data-fold-name="">{identityWords(identity)}</span>
     </button>
   )
@@ -1406,8 +1410,8 @@ function Identity({
  * lane runs.
  */
 function ThreadDetailsPanel({
-  banner,
   details,
+  icon,
   id,
   name,
   onOpen,
@@ -1415,8 +1419,8 @@ function ThreadDetailsPanel({
   spinFirst,
   working,
 }: {
-  banner: HeadBanner | null
   details: ThreadDetails
+  icon: HeadIcon | null
   id: string
   name: string
   onOpen: (id: EntryId) => void
@@ -1433,12 +1437,12 @@ function ThreadDetailsPanel({
         aria-label="spin"
         className="thread-details-icon"
         // Each spin changes the animation's name, which restarts it without
-        // drawing the mark again: a new banner would fade in again.
+        // drawing the mark again: a new icon would fade in again.
         data-spin={spins === 0 ? undefined : spins % 2 === 1 ? "odd" : "even"}
         onClick={() => setSpins(n => n + 1)}
         type="button"
       >
-        <ThreadMark banner={banner} running={running} working={working} />
+        <ThreadMark icon={icon} running={running} working={working} />
       </button>
       <div className="thread-details-facts">
         <div className="thread-details-name">{name}</div>

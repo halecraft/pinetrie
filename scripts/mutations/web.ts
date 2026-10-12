@@ -7,6 +7,15 @@ const tabState = "packages/web/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a noun has no built-in icon",
+    file: "packages/core/thread-names.ts",
+    from: '  "fox",\n',
+    to: '  "foxglove",\n',
+    command: unit,
+    expect:
+      "every noun has its built-in icon where its URL names it, and nothing else is there",
+  },
+  {
     name: "a popover's box is as tall as the window",
     file: "packages/web/popover-place.ts",
     from: "        maxHeight: view.height - trigger.bottom - EDGE,\n",

@@ -29,6 +29,7 @@ import {
   COMMANDS,
   DIGEST,
   deleteRecord,
+  ICONS,
   LANE,
   MARK,
   NAME,
@@ -247,6 +248,7 @@ const SAMPLES: readonly Sample[] = [
     "lane",
   ),
   sample("commands", COMMANDS, { commands: [] }, null),
+  sample("icons", ICONS, { source: "built-in" }, null),
   sample("root", ROOT, rootRecord, "root"),
   sample(
     "card history",
@@ -401,6 +403,7 @@ test("each record lives where it is read: across roots in the session, by entry 
     budget: "session",
     project: "session",
     commands: "session",
+    icons: "session",
     root: "session",
     "card history": "session",
     trace: "session",

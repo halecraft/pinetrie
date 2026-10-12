@@ -39,10 +39,8 @@ import { askTool, catchUpTool, leaveTool, splitTool } from "./thread-tools.ts"
 export interface ToolsInput {
   readonly hooks: LaneHooks
   readonly blobs: Pick<BlobStore, "put"> | undefined
-  /** Where `set_banner` sends its asks; undefined while banners are off. */
-  readonly bannerAsks:
-    | ((lane: ThreadId, ask: BannerAsk) => Promise<BannerAnswer>)
-    | undefined
+  /** Where `set_banner` sends its asks: the host answers each. */
+  readonly bannerAsks: (lane: ThreadId, ask: BannerAsk) => Promise<BannerAnswer>
 }
 
 /**
@@ -155,23 +153,6 @@ export function assembleTools(input: ToolsInput): {
     registered: TOOL_IDS.map(id => TOOLS[id](input)),
     files: [...FILE_TOOLS],
   }
-}
-
-/**
- * What a lane's runs may call: every tool, in `TOOL_IDS`' order, but
- * `set_banner` only when banners are on. One list for every run, a
- * resolution's included, whatever kind of lane runs it: a tool that does not
- * apply answers why. A list that changed between runs would change every
- * request's prefix, and Anthropic then drops the lane's earlier thinking.
- * pi stores the list in a lane's configuration, and fails a run whose
- * list names a tool not registered, so `assembleTools` registers every tool
- * whatever the setting, and a lane stored with another list is given this
- * one when it is first held (`threadLanes`).
- */
-export function activeToolNames(input: {
-  readonly banners: boolean
-}): string[] {
-  return TOOL_IDS.filter(id => input.banners || id !== BANNER_TOOL)
 }
 
 /** Whether `next` names other tools than `active`, in any order. */

@@ -41,6 +41,7 @@ import { Menu, type MenuItem } from "./menu.tsx"
 import { Readers, type ReadersProps, RootStatus } from "./root-signals.tsx"
 import { SignalMark } from "./signal-mark.tsx"
 import { ThreadHead } from "./thread-card.tsx"
+import { ThreadIconImage } from "./thread-icon-image.tsx"
 import { TitleField } from "./title-field.tsx"
 
 /** Up and Down move focus between items. */
@@ -255,8 +256,8 @@ function FoldControl({
 /** An item's picture while the list is folded (`ItemIcon`). */
 function IconFace({ icon }: { icon: ItemIcon }) {
   switch (icon.kind) {
-    case "sprite":
-      return <img alt="" className="open-sprite" src={icon.src} />
+    case "icon":
+      return <ThreadIconImage className="open-sprite" icon={icon.icon} />
     case "initials":
       return (
         <span

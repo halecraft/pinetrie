@@ -20,6 +20,7 @@ import {
   type Spot,
   type StreamEvent,
   type ThreadId,
+  TOOL_IDS,
 } from "@pinetrie/core"
 import {
   type BannerAnswer,
@@ -50,7 +51,7 @@ import {
   type ThreadLanes,
   threadLanes,
 } from "./thread-lanes.ts"
-import { activeToolNames, assembleTools } from "./tools.ts"
+import { assembleTools } from "./tools.ts"
 
 const CTX = BACKGROUND_CONTEXT
 
@@ -83,6 +84,11 @@ export interface CreateAgentOptions {
     /** How a lane's tools reach its files: its container; null for a lane with no copy of its own. */
     readonly access: (lane: ThreadId) => LaneAccess | null
     readonly hooks: LaneHooks
+    /** Where `set_banner` sends its asks: the host answers each. */
+    readonly bannerAsks: (
+      lane: ThreadId,
+      ask: BannerAsk,
+    ) => Promise<BannerAnswer>
   } | null
   /**
    * Where images are kept. A chat's are read from it for every request;
@@ -90,14 +96,6 @@ export interface CreateAgentOptions {
    * the model as "no longer stored".
    */
   readonly blobs?: Pick<BlobStore, "get" | "put" | "ref">
-  /**
-   * Where `set_banner` sends its asks, when the user config enables banners.
-   * Without it, or without tools, there is no `set_banner`.
-   */
-  readonly bannerAsks?: (
-    lane: ThreadId,
-    ask: BannerAsk,
-  ) => Promise<BannerAnswer>
   readonly onStream?: (event: StreamEvent) => void
   /**
    * A lane's request starts otherwise than its last one did: its earlier
@@ -183,19 +181,16 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   const { setup, project } = setupInside.open(options.setup)
   const inside = scribeInside.open(options.scribe)
   const resolved = setup.model
-  // `set_banner` asks only while the agent has tools and banners are on.
-  const bannerAsks = tools === null ? undefined : options.bannerAsks
   const assembled =
     tools === null
       ? { registered: [], files: [] }
       : assembleTools({
           hooks: tools.hooks,
           blobs: options.blobs,
-          bannerAsks,
+          bannerAsks: tools.bannerAsks,
         })
   // An agent with no tools registers none, so its lanes may call none.
-  const activeTools =
-    tools === null ? [] : activeToolNames({ banners: bannerAsks !== undefined })
+  const activeTools: string[] = tools === null ? [] : [...TOOL_IDS]
   // No tools, or a call with no lane named: no access, and every call is
   // refused (`toolContextOf`).
   const accessFor = (lane: ThreadId | undefined): LaneAccess | null =>

@@ -76,7 +76,6 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "a running command's label shows once, in its row",
     'Stop ends a running command, shown as ✗ "Command aborted"',
     "typing /hel offers /fixture:skill:hello; Tab inserts it, and the sent message shows it",
-    "the column's header names the thread, its star shown with no banner",
     "an aligned column that runs past its end keeps its alignment as its thread grows",
   ],
   "lanes/main": [

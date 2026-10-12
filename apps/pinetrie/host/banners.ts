@@ -1,6 +1,7 @@
-// host/banners — each thread's column banner: made as the thread is named,
-// again at a run's end if that failed, or set when the person asks through
-// `set_banner`. `bannerDue` and `planAsk` decide; this carries them out.
+// host/banners — each thread's banner: drawn as the thread is named, and again
+// at a run's end if that failed, while the user config's icons are `drawn`;
+// or set when the person asks through `set_banner`. `bannerDue` and `planAsk`
+// decide; this carries them out.
 
 import {
   type BlobStore,
@@ -42,8 +43,10 @@ export function createBanners(deps: {
   readonly records: Pick<Records, "writeValues">
   /** The image model, and the banner's skill. */
   readonly piSetup: Pick<PiSetup, "canDrawBanners" | "drawBanner" | "skill">
+  /** Whether icons are drawn: the user config's `icons.source` is `drawn`. */
+  readonly draws: boolean
 }): Banners {
-  const { basics, keeper, blobs } = deps
+  const { basics, keeper, blobs, draws } = deps
   const { session: doc, log } = basics
   // Lanes whose banner is being made: a run's end does not start a second.
   const generating = new Set<ThreadId>()
@@ -111,12 +114,16 @@ export function createBanners(deps: {
   return {
     due: lane =>
       keeper.run(async () => {
-        const due = bannerDue(readBanners(doc).get(lane), generating.has(lane))
+        const due = bannerDue(
+          readBanners(doc).get(lane),
+          generating.has(lane),
+          draws,
+        )
         if (due) start(lane, null, false)
       }),
     request: (lane, ask) =>
       keeper.run(async () => {
-        const plan = planAsk(ask, sha => blobs.ref(sha) !== undefined)
+        const plan = planAsk(ask, sha => blobs.ref(sha) !== undefined, draws)
         if (plan.kind === "write") await write(lane, plan.sha)
         if (plan.kind === "generate") start(lane, plan.direction, true)
         return answerOf(plan)

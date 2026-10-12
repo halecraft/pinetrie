@@ -1,16 +1,21 @@
-// banner — the image in a thread's column header: whether a thread gets one,
-// what the image model is asked, the setting that turns it on, and its record.
+// banner — a thread's icon: the setting that chooses where icons come from
+// and its published record, whether a thread is due a drawn one, what the
+// image model is asked, and the record of a drawn or pasted one.
 
 import {
   type BannerRecord,
+  ICON_SOURCES,
+  type IconSource,
+  type IconsRecord,
   isSha256,
   type Sha256,
   type ThreadId,
   type ThreadName,
+  threadNameParts,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { type ModelRef, modelRef, recordOf } from "./config.ts"
-import { decodeAt, threadKey } from "./decode.ts"
+import { decodeAt, fixedKey, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const BannerRecordSchema = Type.Object({
@@ -32,26 +37,48 @@ export const BANNER: RecordSpec<BannerRecord, ThreadId, "session"> = {
 
 // ── the setting ───────────────────────────────────────────────────────────
 
-/** Banners' image model. */
-export type BannerConfig = ModelRef
+/** Where icons come from, and for `drawn`, the image model that draws them. */
+export type IconConfig =
+  | { readonly source: Exclude<IconSource, "drawn"> }
+  | { readonly source: "drawn"; readonly model: ModelRef }
 
 /**
  * Recraft V4.1 Flash: 0.7¢ an image and about 1.5 seconds, as OpenRouter
  * lists it. pi-ai 0.87.1 does not list it; `imageModelFor` describes it.
  */
-export const DEFAULT_BANNER: BannerConfig = {
+export const DEFAULT_ICON_MODEL: ModelRef = {
   provider: "openrouter",
   model: "recraft/recraft-v4.1-flash",
 }
 
 /**
- * The user config's `banner`: null unless `enabled` is `true`. `model` is
- * `provider/id` (`modelRef`). Total: a malformed model takes the default.
+ * The user config's `icons`: `source` is `built-in` unless it names
+ * `drawn` or `none`. A drawn `model` is `provider/id` (`modelRef`), and a
+ * missing or malformed one takes the default.
  */
-export function decodeBannerConfig(json: unknown): BannerConfig | null {
-  const banner = recordOf(recordOf(json)?.banner)
-  if (banner?.enabled !== true) return null
-  return modelRef(banner.model) ?? DEFAULT_BANNER
+export function decodeIconConfig(json: unknown): IconConfig {
+  const icons = recordOf(recordOf(json)?.icons)
+  const source = ICON_SOURCES.find(s => s === icons?.source) ?? "built-in"
+  return source === "drawn"
+    ? { source, model: modelRef(icons?.model) ?? DEFAULT_ICON_MODEL }
+    : { source }
+}
+
+/** The one `pinetrie.icons` value's key. */
+export const ICONS_KEY = "icons"
+
+const IconsRecordSchema = Type.Object({
+  source: Type.Union(ICON_SOURCES.map(s => Type.Literal(s))),
+})
+
+/** The host's icon source, at its one key, for the page to read. */
+export const ICONS: RecordSpec<IconsRecord, typeof ICONS_KEY, "session"> = {
+  namespace: "pinetrie.icons",
+  home: "session",
+  keyOf: () => ICONS_KEY,
+  encode: r => ({ source: r.source }),
+  decode: (contents, key) =>
+    decodeAt(IconsRecordSchema, contents, fixedKey(ICONS_KEY, key), r => r),
 }
 
 // ── the decision ──────────────────────────────────────────────────────────
@@ -68,35 +95,41 @@ export interface BannerAsk {
 }
 
 /**
- * Whether a thread, just named or at its run's end, is due a banner:
- * only when it has none and none is being made. So a new thread gets one as
- * it is named, enabling banners never makes one for every old thread, and a
- * failed one is tried again at the thread's next run's end.
+ * Whether a thread, just named or at its run's end, is due a drawn banner:
+ * only while the host draws, and when it has none and none is being made.
+ * So a new thread gets one as it is named, choosing `drawn` never makes one
+ * for every old thread, and a failed one is tried again at the thread's
+ * next run's end.
  */
 export const bannerDue = (
   banner: BannerRecord | undefined,
   generating: boolean,
-): boolean => banner === undefined && !generating
+  draws: boolean,
+): boolean => draws && banner === undefined && !generating
 
 type AskPlan =
   | { readonly kind: "generate"; readonly direction: string | null }
   /** Write the record: a pasted image. */
   | { readonly kind: "write"; readonly sha: Sha256 }
-  | { readonly kind: "refused"; readonly reason: "not_stored" }
+  | { readonly kind: "refused"; readonly reason: "not_stored" | "off" }
 
 /**
- * A pasted image is used when stored and refused otherwise; anything
- * else makes a new one, even while one is being made.
+ * A pasted image is used when stored and refused otherwise, whatever the
+ * source; anything else makes a new one while the host draws, even while
+ * one is being made, and is refused otherwise.
  */
 export const planAsk = (
   ask: BannerAsk,
   stored: (sha: Sha256) => boolean,
+  draws: boolean,
 ): AskPlan =>
-  ask.image === null
-    ? { kind: "generate", direction: ask.direction }
-    : stored(ask.image)
+  ask.image !== null
+    ? stored(ask.image)
       ? { kind: "write", sha: ask.image }
       : { kind: "refused", reason: "not_stored" }
+    : draws
+      ? { kind: "generate", direction: ask.direction }
+      : { kind: "refused", reason: "off" }
 
 /** What `set_banner` tells the agent: the host's answer to its ask. */
 export type BannerAnswer =
@@ -140,13 +173,11 @@ export function bannerPrompt(input: {
   readonly name: ThreadName
   readonly direction: string | null
 }): string {
-  const at = input.name.indexOf("-")
-  const adjective = at < 0 ? "" : input.name.slice(0, at)
-  const noun = input.name.slice(at + 1)
+  const parts = threadNameParts(input.name)
   const filled = input.template
     .trim()
-    .replaceAll("{adjective}", adjective)
-    .replaceAll("{noun}", noun)
+    .replaceAll("{adjective}", parts?.adjective ?? "")
+    .replaceAll("{noun}", parts?.noun ?? "")
   const direction = input.direction?.trim() ?? ""
   return direction === ""
     ? filled

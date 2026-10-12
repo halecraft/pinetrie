@@ -15,7 +15,7 @@ import {
 import { describe, expect, test } from "vitest"
 import { threadContext } from "./thread-context.ts"
 import { parseCatchUpArgs } from "./thread-tools.ts"
-import { activeToolNames, assembleTools, TOOLS, toolsChanged } from "./tools.ts"
+import { assembleTools, TOOLS, toolsChanged } from "./tools.ts"
 
 const unused = async (): Promise<never> => {
   throw new Error("not called")
@@ -31,7 +31,7 @@ const input = {
     leave: unused,
   },
   blobs: undefined,
-  bannerAsks: undefined,
+  bannerAsks: unused,
 }
 
 describe("TOOLS", () => {
@@ -88,27 +88,22 @@ describe("a write to the lane's pinetrie.json", () => {
   })
 })
 
-describe("activeToolNames", () => {
+describe("TOOL_IDS", () => {
   // The order is part of every request's prefix: pinned, not derived.
-  const always = [
-    "read",
-    "write",
-    "edit",
-    "bash",
-    "grep",
-    "find",
-    "ask_about_conflict",
-    "catch_up",
-    "split_offer",
-    "ask",
-    "leave",
-  ]
-  test("every tool always; set_banner with banners", () => {
-    expect(activeToolNames({ banners: false })).toEqual(always)
-    expect(activeToolNames({ banners: true })).toEqual([
-      ...always.slice(0, 9),
+  test("every tool, in its pinned order, every run", () => {
+    expect([...TOOL_IDS]).toEqual([
+      "read",
+      "write",
+      "edit",
+      "bash",
+      "grep",
+      "find",
+      "ask_about_conflict",
+      "catch_up",
+      "split_offer",
       BANNER_TOOL,
-      ...always.slice(9),
+      "ask",
+      "leave",
     ])
   })
 })

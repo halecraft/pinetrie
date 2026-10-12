@@ -12,6 +12,14 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a name's noun is not checked against the list",
+    file: "packages/core/thread-names.ts",
+    from: "    isNoun(noun)\n",
+    to: '    noun !== ""\n',
+    command: unit,
+    expect: "is no thread's name",
+  },
+  {
     name: "a path's tab is written as is",
     file: "packages/core/runs.ts",
     from: "  s.replace(/[\\\\\\t\\n]/g, c =>\n",

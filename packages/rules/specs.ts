@@ -4,7 +4,7 @@ import type { HostNamespace, Target, ValueWrite } from "@pinetrie/core"
 
 import { ACCEPTED } from "./accepted.ts"
 import { ACCESS } from "./access.ts"
-import { BANNER } from "./banner.ts"
+import { BANNER, ICONS } from "./banner.ts"
 import { BASE } from "./base.ts"
 import { WORKFLOW } from "./board.ts"
 import { BUDGET } from "./budget.ts"
@@ -39,6 +39,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   BUDGET,
   CARD_HISTORY,
   COMMANDS,
+  ICONS,
   DIGEST,
   FILES_LOST,
   LANE,

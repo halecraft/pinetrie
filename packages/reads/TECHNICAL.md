@@ -86,7 +86,9 @@ and every other reader returns the same map.
 A reader keeps its own name and return type, and shapes the map only where
 its readers want something else: `readSeats` and `readLandings` sort,
 `readNames` and `readParticipantNames` give the name alone, and the
-singletons (`readAccepted`, `readProject`, `readCommands`) take their one key.
+singletons (`readAccepted`, `readProject`, `readCommands`, `readIcons`) take
+their one key; `readIcons` is null before a host wrote it, which the page
+reads as no built-in icons.
 
 It declares core, schema and rules only (`workspace.test.ts`), so it runs
 in the host and in the browser alike: no pi, no transport.
@@ -111,6 +113,7 @@ The records it reads, and the decisions that made them:
 | `readFilesLost` | `pinetrie.files-lost` | ADR-0124 |
 | `readBudgets` | `pinetrie.budget` | ADR-0128 |
 | `readCommands` | `pinetrie.commands` | ADR-0036 |
+| `readIcons` | `pinetrie.icons` | ADR-0143 |
 
 The lanes' records and revisions (`readLaneRecords`, `readRevisions`,
 `readLandings`) are where lanes work (ADR-0032, ADR-0033); `worksOwn`

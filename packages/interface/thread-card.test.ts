@@ -102,7 +102,7 @@ describe("threadCardHead", () => {
       marks: new Map(),
       archived: new Set(),
       arrivals: { arrived: new Map(), done: new Map() },
-      sprites: new Map(),
+      icons: new Map(),
     })
     const board = boardView({
       workflow: WORKFLOW,

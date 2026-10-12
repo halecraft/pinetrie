@@ -11,8 +11,8 @@ import {
   bannerDue,
   bannerPrompt,
   bannerStillWanted,
-  DEFAULT_BANNER,
-  decodeBannerConfig,
+  DEFAULT_ICON_MODEL,
+  decodeIconConfig,
   planAsk,
   recordsOf,
   setRecord,
@@ -24,43 +24,58 @@ const B = "b".repeat(64) as Sha256
 const NAME = "vernal-crane" as ThreadName
 const banner: BannerRecord = { lane: LANE, sha: A, at: 1 }
 
-describe("decodeBannerConfig: banner, off unless enabled, total", () => {
-  test("off", () => {
-    expect(decodeBannerConfig(null)).toBeNull()
-    expect(decodeBannerConfig({})).toBeNull()
-    expect(decodeBannerConfig({ banner: { enabled: "yes" } })).toBeNull()
-    expect(decodeBannerConfig({ banner: { model: "x/y" } })).toBeNull()
+describe("decodeIconConfig: icons' source, built-in unless named, total", () => {
+  test.each<[string, unknown]>([
+    ["no config", null],
+    ["no icons", {}],
+    ["no source", { icons: {} }],
+    ["an unknown source", { icons: { source: "drawing" } }],
+    ["icons not an object", { icons: "drawn" }],
+    ["the old banner setting", { banner: { enabled: true } }],
+  ])("%s: built-in", (_, json) => {
+    expect(decodeIconConfig(json)).toEqual({ source: "built-in" })
   })
-  test("on, with the default model", () => {
-    expect(decodeBannerConfig({ banner: { enabled: true } })).toEqual(
-      DEFAULT_BANNER,
-    )
+  test("none", () => {
+    expect(decodeIconConfig({ icons: { source: "none" } })).toEqual({
+      source: "none",
+    })
   })
-  test("a model is split at its first slash", () => {
+  test("drawn, with the default model", () => {
+    expect(decodeIconConfig({ icons: { source: "drawn" } })).toEqual({
+      source: "drawn",
+      model: DEFAULT_ICON_MODEL,
+    })
+  })
+  test("a drawn model is split at its first slash", () => {
     expect(
-      decodeBannerConfig({
-        banner: {
-          enabled: true,
+      decodeIconConfig({
+        icons: {
+          source: "drawn",
           model: "openrouter/google/gemini-3.1-flash-image",
         },
       }),
     ).toEqual({
-      provider: "openrouter",
-      model: "google/gemini-3.1-flash-image",
+      source: "drawn",
+      model: {
+        provider: "openrouter",
+        model: "google/gemini-3.1-flash-image",
+      },
     })
   })
   test("a malformed model takes the default", () => {
     for (const model of ["no-slash", "/lead", "trail/", 3])
-      expect(decodeBannerConfig({ banner: { enabled: true, model } })).toEqual(
-        DEFAULT_BANNER,
-      )
+      expect(decodeIconConfig({ icons: { source: "drawn", model } })).toEqual({
+        source: "drawn",
+        model: DEFAULT_ICON_MODEL,
+      })
   })
 })
 
-test("bannerDue: only a thread with none, and none being made", () => {
-  expect(bannerDue(undefined, false)).toBe(true)
-  expect(bannerDue(banner, false)).toBe(false)
-  expect(bannerDue(undefined, true)).toBe(false)
+test("bannerDue: only while drawing, for a thread with none, and none being made", () => {
+  expect(bannerDue(undefined, false, true)).toBe(true)
+  expect(bannerDue(banner, false, true)).toBe(false)
+  expect(bannerDue(undefined, true, true)).toBe(false)
+  expect(bannerDue(undefined, false, false)).toBe(false)
 })
 
 describe("planAsk", () => {
@@ -70,24 +85,33 @@ describe("planAsk", () => {
     ...a,
   })
   const stored = (sha: Sha256) => sha === A
-  test("a pasted image is used when stored", () => {
-    expect(planAsk(ask({ image: A }), stored)).toEqual({
+  test.each([
+    true,
+    false,
+  ])("a pasted image is used when stored, drawing or not (%s)", draws => {
+    expect(planAsk(ask({ image: A }), stored, draws)).toEqual({
       kind: "write",
       sha: A,
     })
-    expect(planAsk(ask({ image: B }), stored)).toEqual({
+    expect(planAsk(ask({ image: B }), stored, draws)).toEqual({
       kind: "refused",
       reason: "not_stored",
     })
   })
-  test("words, or nothing, make a new one", () => {
-    expect(planAsk(ask({ direction: "at dusk" }), stored)).toEqual({
+  test("words, or nothing, make a new one while drawing", () => {
+    expect(planAsk(ask({ direction: "at dusk" }), stored, true)).toEqual({
       kind: "generate",
       direction: "at dusk",
     })
-    expect(planAsk(ask({}), stored)).toEqual({
+    expect(planAsk(ask({}), stored, true)).toEqual({
       kind: "generate",
       direction: null,
+    })
+  })
+  test("a new one is refused while not drawing", () => {
+    expect(planAsk(ask({ direction: "at dusk" }), stored, false)).toEqual({
+      kind: "refused",
+      reason: "off",
     })
   })
 })

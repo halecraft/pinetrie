@@ -24,6 +24,7 @@ import { tree } from "./fixtures.ts"
 import { foldedMark, foldedView, foldedWords } from "./folded-column-view.ts"
 import { gridView } from "./grid-view.ts"
 import { type ThreadFace, threadFace } from "./thread-face.ts"
+import { builtInIconUrl, threadIcon } from "./thread-icon.ts"
 
 const ADA = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
@@ -61,7 +62,7 @@ const threadFaceOfT: ThreadFace = threadFace({
   index: tree({ "1-r": null }),
   lanes: [],
   names: new Map([[T, "amber-fox" as never]]),
-  banners: new Map(),
+  iconFor: () => null,
 })
 const facts: FaceFacts = {
   tone: "inventory",
@@ -152,13 +153,39 @@ describe("faceOf", () => {
   })
 })
 
+test("a thread's face carries its icon, a conversation's with no lane included", () => {
+  const names = new Map([[T, "amber-fox" as never]])
+  const face = threadFace({
+    thread: T,
+    index: tree({ "1-r": null }),
+    lanes: [],
+    names,
+    iconFor: thread =>
+      threadIcon({
+        thread,
+        names,
+        banners: new Map(),
+        icons: { source: "built-in" },
+      }),
+  })
+  expect(face.icon).toEqual({
+    kind: "built-in",
+    url: builtInIconUrl("fox"),
+  })
+})
+
 describe("foldedMark", () => {
-  test("a thread's strip draws its banner, or ✦ without one; a note column's draws none", () => {
-    expect(foldedMark({ ...threadFaceOfT, sprite: "/blob/a" })).toEqual({
+  test("a thread's strip draws its icon, or ✦ without one; a note column's draws none", () => {
+    expect(
+      foldedMark({
+        ...threadFaceOfT,
+        icon: { kind: "banner", url: "/blob/a" },
+      }),
+    ).toEqual({
       kind: "thread",
-      banner: { url: "/blob/a", fade: false },
+      icon: { kind: "banner", url: "/blob/a", fade: false },
     })
-    expect(foldedMark(threadFaceOfT)).toEqual({ kind: "thread", banner: null })
+    expect(foldedMark(threadFaceOfT)).toEqual({ kind: "thread", icon: null })
     const folded = foldedView(
       { kind: "notes", card: N, folded: true, width: 1 },
       { threadFaceOf: () => threadFaceOfT, notes: facts.notes },

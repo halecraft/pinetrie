@@ -86,8 +86,10 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   but belongs to its call, never a message. A tool's image is a blob
   (ADR-0051), as a pasted one is, which a message holds by reference
   (ADR-0042); a reference card's quote is a blob too (ADR-0126).
-- `TOOL_IDS`' order is part of every request's prefix, and a changed prefix
-  drops a lane's earlier thinking (S85). The search tools run programs
+- `TOOL_IDS` is every lane's tool list, the same in every run, `set_banner`
+  included under any icon source (ADR-0143); its order is part of every
+  request's prefix, and a changed prefix drops a lane's earlier thinking
+  (S85). The search tools run programs
   carried into every lane (`RUNTIME_PROGRAMS`, ADR-0064).
 
 ## Records (`index.ts`)
@@ -96,8 +98,17 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   a record lives in the session's document or a root's (ADR-0063).
 - The board's workflow states and the archive (ADR-0122, ADR-0029); a
   task's title (ADR-0045, ADR-0116) and one a model gives (ADR-0074); a
-  person's picture (ADR-0098); a column's banner (ADR-0050); the commands a
-  pi skill or prompt makes (ADR-0036).
+  person's picture (ADR-0098); a column's banner (ADR-0050), and the host's
+  icon source, `IconsRecord` (ADR-0143); the commands a pi skill or prompt
+  makes (ADR-0036).
+- A thread's name splits into its two words in one place, `threadNameParts`
+  (`thread-names.ts`): a mention's handle, a drawn banner's prompt and a
+  built-in icon's noun all read it, and it is null for text that is not an
+  adjective and a noun from the lists. Its words are typed `Adjective` and
+  `Noun` (the lists are `as const`), so a built-in icon's URL
+  (`builtInIconUrl`, interface) can only be built for a noun on the list.
+- The icon sources are `ICON_SOURCES`; `IconSource`, the published record's
+  schema and the user config's decoder are all built from it.
 - A turn that changes files is a revision (ADR-0032), on a lane's own disk
   (ADR-0034), whose snapshots `RevisionRecord` names; every thread's agent
   works in a copy of its own (ADR-0102). A conflict is resolved by the agent

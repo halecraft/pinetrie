@@ -10,6 +10,7 @@ import {
 } from "@pinetrie/interface"
 import type { ReactNode } from "react"
 import { MessageText } from "./message-text.tsx"
+import { ThreadIconImage } from "./thread-icon-image.tsx"
 
 export function ThreadPreviewView(p: {
   preview: ThreadPreview
@@ -41,8 +42,8 @@ export function ThreadFaceView({ face }: { face: ThreadFace }) {
   return (
     <span className="thread-face" data-thread={face.thread}>
       <span className="thread-face-head">
-        {face.sprite !== null && (
-          <img alt="" className="thread-face-sprite" src={face.sprite} />
+        {face.icon !== null && (
+          <ThreadIconImage className="thread-face-sprite" icon={face.icon} />
         )}
         <span className="thread-face-name">{face.name ?? "a thread"}</span>
       </span>

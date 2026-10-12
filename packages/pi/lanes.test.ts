@@ -112,7 +112,9 @@ test("the prompt no longer tells the model to search with bash", () => {
       },
     },
     blobs: undefined,
-    bannerAsks: undefined,
+    bannerAsks: async () => {
+      throw new Error("unused")
+    },
   })
   const prompt = systemPromptFor(
     { contextFiles: [], skills: [] },
@@ -302,6 +304,9 @@ describe("lanes in a harness", () => {
       model: { kind: "scripted", script },
       project: root,
       tools: {
+        bannerAsks: async () => {
+          throw new Error("unused")
+        },
         access: lane => {
           const where = wheres.get(lane)
           if (where === undefined) throw new Error(`no access for ${lane}`)
@@ -557,6 +562,9 @@ describe("lanes in a harness", () => {
       model: { kind: "scripted", script },
       project: root,
       tools: {
+        bannerAsks: async () => {
+          throw new Error("unused")
+        },
         access: l => wheres.get(l) ?? where(root),
         hooks: {
           turnDone: async () => {},

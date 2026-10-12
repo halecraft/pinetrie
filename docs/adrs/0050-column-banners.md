@@ -6,6 +6,9 @@
 - **Amended by:**
   - ADR-0053: the banner is a square icon drawn from the thread's name alone,
     as the thread is named, with no crop.
+  - ADR-0143: the user config's `banner.enabled` is replaced by
+    `icons.source`, which names where icons come from: `built-in`, `drawn` or
+    `none`.
 
 **Context.** A tab can hold many columns, and each header shows the same
 things: a colour stripe, a two-word name (ADR-0039), avatars. Threads are

@@ -872,8 +872,18 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   running lane whose prompt is a relay from the stopped thread is stopped
   by the same person.
 
-## Banners (`banners.ts`, ADR-0050, ADR-0053)
+## Banners (`banners.ts`, ADR-0050, ADR-0053, ADR-0143)
 
+- **Banners are made under every icon source.** `createBanners` takes
+  `draws`, whether the user config's `icons.source` is `drawn`, and passes
+  it to both decisions: `bannerDue` draws nothing unless it draws, and
+  `planAsk` sets a pasted image under any source but refuses a new drawing
+  (`off`) unless it draws. The module holds no condition of its own, and
+  `set_banner` is the agent's in every run.
+- **The source is published at start**: `recover` writes the one
+  `pinetrie.icons` value beside `pinetrie.commands`, only when it changed,
+  before commands are taken, so the page never decides a thread's icon on a
+  stale source. The page shows a built-in icon only under `built-in`.
 - **A decision is one keeper step**: gather the lane's banner, whether one
   is being made and whether a blob is stored; `bannerDue` or `planAsk`;
   write a pasted image. A new image is a `keeper.track`ed task: the image takes seconds,
@@ -883,7 +893,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   `onNamed`): as a column about to create its lane asks for its name
   (ADR-0057), or as a lane is created. A conversation's thread is named and
   draws none. It is due again at each run's end, which draws only when it still has none: the
-  retry for a failed one. `recover` does not: turning banners on must not
+  retry for a failed one. `recover` does not: choosing `drawn` must not
   draw one for every thread that ever ran. Banners are made before
   `createNames`, whose `onNamed` asks them.
 - **Only the name goes out**: the prompt is the `column-banner` skill's

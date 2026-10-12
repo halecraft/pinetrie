@@ -277,12 +277,12 @@ export const mutations: readonly Mutation[] = [
     expect: "imageModelFor",
   },
   {
-    name: "banners can be drawn with banners off",
+    name: "banners can be drawn with no image model",
     file: "packages/pi/banner.ts",
     from: "      if (imageModel === undefined) return false",
     to: "      if (imageModel === undefined) return true",
     command: unit,
-    expect: "with banners off, nothing",
+    expect: "with no image model, nothing",
   },
   {
     name: "a drawn banner skips the upload's check",
@@ -293,10 +293,19 @@ export const mutations: readonly Mutation[] = [
     expect: "bytes that are not one are refused",
   },
   {
-    name: "set_banner is registered only while banners are on",
+    name: "a lane's runs may not call set_banner",
+    file: "packages/pi/agent.ts",
+    from: "  const activeTools: string[] = tools === null ? [] : [...TOOL_IDS]",
+    to: '  const activeTools: string[] = tools === null ? [] : TOOL_IDS.filter(id => id !== "set_banner")',
+    command: unit,
+    expect:
+      "a lane stored with another tool list is given the current one when it is first held",
+  },
+  {
+    name: "set_banner is not registered",
     file: "packages/pi/tools.ts",
     from: "    registered: TOOL_IDS.map(id => TOOLS[id](input)),",
-    to: "    registered: TOOL_IDS.filter(id => id !== BANNER_TOOL || input.bannerAsks !== undefined).map(id => TOOLS[id](input)),",
+    to: "    registered: TOOL_IDS.filter(id => id !== BANNER_TOOL).map(id => TOOLS[id](input)),",
     command: unit,
     expect: "every tool is registered, in the order the model is given them",
   },
@@ -469,20 +478,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a prefix of `a` is not one of `ab`",
   },
   {
-    name: "active tools forget the banner tool",
-    file: "packages/pi/tools.ts",
-    from: "  return TOOL_IDS.filter(id => input.banners || id !== BANNER_TOOL)",
-    to: "  return TOOL_IDS.filter(id => id !== BANNER_TOOL)",
-    command: unit,
-    expect: "every tool always; set_banner with banners",
-  },
-  {
     name: "ask_about_conflict is in a lane's tools only sometimes",
     file: "packages/core/tools.ts",
     from: "  CONFLICT_TOOL,\n",
     to: "",
     command: unit,
-    expect: "every tool always; set_banner with banners",
+    expect: "every tool, in its pinned order, every run",
   },
   {
     name: "the tools are registered in another order than the model's",
@@ -528,13 +529,13 @@ export const mutations: readonly Mutation[] = [
       "a run's last turn is recorded at its newest entry, however it ends: a Stop, or a model that fails",
   },
   {
-    name: "a lane stored before banners were on keeps its old tools",
+    name: "a lane stored with another tool list keeps it",
     file: "packages/pi/thread-lanes.ts",
     from: "    if (tools !== null && toolsChanged(await lane.getActiveTools(CTX), tools))",
     to: "    if (tools === undefined)",
     command: unit,
     expect:
-      "a lane stored before banners were on is given the tool when it is first held",
+      "a lane stored with another tool list is given the current one when it is first held",
   },
   {
     name: "a lane's first request counts as a change",

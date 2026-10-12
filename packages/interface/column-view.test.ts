@@ -38,6 +38,7 @@ import { projectColumns } from "./column-paths.ts"
 import {
   behindMark,
   type ColumnFacts,
+  type ColumnShows,
   columnView,
   identityWords,
   joinWords,
@@ -54,6 +55,7 @@ import {
   workingWords,
 } from "./column-view.ts"
 import { entry, indexOf, TEST_ROOT } from "./fixtures.ts"
+import { builtInIconUrl } from "./thread-icon.ts"
 import { threadLink } from "./thread-link.ts"
 
 const A = threadIdFor("a")
@@ -180,6 +182,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   offers: new Map(),
   names: new Map(),
   banners: new Map(),
+  icons: null,
   access: new Map(),
   accepted: null,
   bases: new Map(),
@@ -260,7 +263,7 @@ const facts = (
     createsLane: false,
     detailsOpen: false,
     thread: null,
-    mountedBanner: null,
+    mountedIcon: null,
     writable: true,
     nameOf: new Map([[ADA, "Ada"]]),
     queued: [],
@@ -277,6 +280,10 @@ const facts = (
   }
 }
 const OWNERS = revisions({ "3": A, "5": A, b1: B })
+/** The header's icon: a named agent's alone carries one. */
+const headIconOf = (shows: ColumnShows) =>
+  shows.identity.kind === "agent" ? shows.identity.icon : null
+
 const NAMES = new Map([
   [A, AMBER],
   [B, COPPER],
@@ -322,10 +329,9 @@ describe("columnView: the header", () => {
         behind: null,
         start: null,
       },
+      icon: { kind: "banner", url: `/blob/${sha}`, fade: true },
     })
-    expect(about({ createsLane: true }).banner?.url).toBe(`/blob/${sha}`)
     expect(about({ createsLane: false }).identity).toEqual({ kind: "none" })
-    expect(about({ createsLane: false }).banner).toBeNull()
     expect(
       columnView(facts(1, { createsLane: true, thread: B })).identity,
     ).toEqual({ kind: "pending" })
@@ -366,32 +372,60 @@ describe("columnView: the header", () => {
   ] as const)("the reserve step: %s", (_, over, step) => {
     expect(columnView(facts(1, over)).reserve).toEqual(step)
   })
-  test("the banner is the thread's at the column's end; a conversation has none", () => {
+  test("the header's icon is its named agent's; a pending or conversation header has none", () => {
     const sha = "a".repeat(64) as Sha256
     const banners = new Map([[B, { lane: B, sha, at: 1 }]])
+    const icon = (over: Partial<ColumnFacts>, w: Partial<WorkFacts>) =>
+      headIconOf(columnView(facts(1, { ...over, work: work(w) })))
+    const onB = { lane: onLane(laneView(B, "b2")) }
+    expect(icon(onB, { banners, names: NAMES })).toEqual({
+      kind: "banner",
+      url: `/blob/${sha}`,
+      fade: true,
+    })
+    expect(icon(onB, { banners })).toBeNull()
     expect(
-      columnView(
-        facts(1, { lane: onLane(laneView(B, "b2")), work: work({ banners }) }),
-      ).banner,
-    ).toEqual({ url: `/blob/${sha}`, fade: true })
-    expect(
-      columnView(
-        facts(1, { lane: onLane(laneView(A, "b2")), work: work({ banners }) }),
-      ).banner,
+      icon({ lane: onLane(laneView(A, "b2")) }, { banners, names: NAMES }),
     ).toBeNull()
-    expect(columnView(facts(1, { work: work({ banners }) })).banner).toBeNull()
+    expect(icon({}, { banners, names: NAMES })).toBeNull()
   })
-  test("a banner there as the column mounted shows at once; a new one fades in", () => {
+  test("under built-in icons, a named agent's header shows its noun's icon; a conversation's none", () => {
+    const icons = { source: "built-in" } as const
+    expect(
+      headIconOf(
+        columnView(
+          facts(1, {
+            lane: onLane(laneView(B, "b2")),
+            work: work({ names: NAMES, icons }),
+          }),
+        ),
+      ),
+    ).toEqual({
+      kind: "built-in",
+      url: builtInIconUrl("owl"),
+      fade: true,
+    })
+    expect(
+      headIconOf(
+        columnView(
+          facts(1, { thread: B, work: work({ names: NAMES, icons }) }),
+        ),
+      ),
+    ).toBeNull()
+  })
+  test("an icon there as the column mounted shows at once; a new one fades in", () => {
     const sha = "a".repeat(64) as Sha256
     const banners = new Map([[B, { lane: B, sha, at: 1 }]])
-    const shown = (mountedBanner: string | null) =>
-      columnView(
-        facts(1, {
-          lane: onLane(laneView(B, "b2")),
-          work: work({ banners }),
-          mountedBanner,
-        }),
-      ).banner?.fade
+    const shown = (mountedIcon: string | null) =>
+      headIconOf(
+        columnView(
+          facts(1, {
+            lane: onLane(laneView(B, "b2")),
+            work: work({ banners, names: NAMES }),
+            mountedIcon,
+          }),
+        ),
+      )?.fade
     expect(shown(`/blob/${sha}`)).toBe(false)
     expect(shown(null)).toBe(true)
     expect(shown("/blob/other")).toBe(true)
@@ -1076,6 +1110,7 @@ describe("identityWords", () => {
       {
         kind: "agent",
         name: "amber-fox" as ThreadName,
+        icon: null,
         details: {
           open: false,
           started: null,

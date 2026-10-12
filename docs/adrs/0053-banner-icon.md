@@ -11,6 +11,9 @@
     first send.
   - ADR-0073: the icon is also drawn magnified, in the thread's details, where
     it spins in as they are opened.
+  - ADR-0143: a thread's default icon is its noun's built-in 32×32 sprite,
+    shipped with the page; drawing one from the name is the `drawn` source,
+    and a built-in icon never shows before a drawn one.
 
 **Context.** ADR-0050's banners were wide images behind the header, briefed
 by the text model from the thread's messages and drawn at 8:1 after the

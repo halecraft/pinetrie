@@ -7,7 +7,7 @@
  * 256 adjectives and 256 nouns: lowercase, 3 to 7 letters, common, concrete,
  * neutral in any pairing, and no word in both, so a name reads one way.
  */
-export const ADJECTIVES: readonly string[] = [
+export const ADJECTIVES = [
   "able",
   "agile",
   "airy",
@@ -264,9 +264,9 @@ export const ADJECTIVES: readonly string[] = [
   "zealous",
   "zesty",
   "zippy",
-]
+] as const
 
-export const NOUNS: readonly string[] = [
+export const NOUNS = [
   "acorn",
   "alder",
   "anchor",
@@ -523,23 +523,39 @@ export const NOUNS: readonly string[] = [
   "zephyr",
   "cloud",
   "maple",
-]
+] as const
+
+/** One of the 256 adjectives a thread's name begins with. */
+export type Adjective = (typeof ADJECTIVES)[number]
+/** One of the 256 nouns a thread's name ends with: the key of its built-in icon. */
+export type Noun = (typeof NOUNS)[number]
 
 const ADJECTIVE_SET: ReadonlySet<string> = new Set(ADJECTIVES)
 const NOUN_SET: ReadonlySet<string> = new Set(NOUNS)
 
+const isAdjective = (word: string): word is Adjective => ADJECTIVE_SET.has(word)
+const isNoun = (word: string): word is Noun => NOUN_SET.has(word)
+
 /**
- * Whether `handle` is a name a thread could have: an adjective, `-`, a noun,
- * from the lists. A mention of one names that thread's agent, so no person may
- * take it.
+ * A thread's name as its two words, or null for text that is not exactly an
+ * adjective, `-` and a noun from the lists.
  */
-export function isThreadNameHandle(handle: string): boolean {
-  const [adjective, noun, ...rest] = handle.split("-")
-  return (
-    rest.length === 0 &&
+export function threadNameParts(
+  name: string,
+): { readonly adjective: Adjective; readonly noun: Noun } | null {
+  const [adjective, noun, ...rest] = name.split("-")
+  return rest.length === 0 &&
     adjective !== undefined &&
     noun !== undefined &&
-    ADJECTIVE_SET.has(adjective) &&
-    NOUN_SET.has(noun)
-  )
+    isAdjective(adjective) &&
+    isNoun(noun)
+    ? { adjective, noun }
+    : null
 }
+
+/**
+ * Whether `handle` is a name a thread could have. A mention of one names
+ * that thread's agent, so no person may take it.
+ */
+export const isThreadNameHandle = (handle: string): boolean =>
+  threadNameParts(handle) !== null

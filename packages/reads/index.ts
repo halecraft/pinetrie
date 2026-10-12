@@ -26,6 +26,7 @@ import {
   type EntryLike,
   entryId,
   firstLineOf,
+  type IconsRecord,
   indexTree,
   isTaskId,
   isThreadId,
@@ -83,6 +84,8 @@ import {
   FILES_LOST,
   type FilesLostRecord,
   type Home,
+  ICONS,
+  ICONS_KEY,
   LANE,
   MARK,
   NAME,
@@ -739,12 +742,12 @@ export const readNames = (
 ): ReadonlyMap<ThreadId, ThreadName> =>
   new Map([...readRecords(doc, NAME).values()].map(r => [r.lane, r.name]))
 
-/** Each thread's banner (`pinetrie.banner`), by lane. */
 /** Each lane's ssh identities and its owner's answers (`pinetrie.access`), by lane. */
 export const readAccess = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, AccessRecord> => readRecords(doc, ACCESS)
 
+/** Each thread's banner (`pinetrie.banner`), by lane. */
 export const readBanners = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, BannerRecord> => readRecords(doc, BANNER)
@@ -756,6 +759,10 @@ export const readThreadName = (doc: SessionDocHandle, lane: ThreadId): string =>
 /** What the host found where it runs (`pinetrie.project`); null with no tools. */
 export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>
   readRecords(doc, PROJECT).get(PROJECT_KEY) ?? null
+
+/** The host's icon source (`pinetrie.icons`); null before a host wrote it. */
+export const readIcons = (doc: SessionDocHandle): IconsRecord | null =>
+  readRecords(doc, ICONS).get(ICONS_KEY) ?? null
 
 /** The commands the host's pi loaded; none before a host wrote them. */
 export const readCommands = (

@@ -30,7 +30,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       writeFileSync(
         config,
-        JSON.stringify({ ...SUITE_CONFIG, banner: { enabled: true } }),
+        JSON.stringify({ ...SUITE_CONFIG, icons: { source: "drawn" } }),
       )
       const bannerHost = await startSuiteHost({
         model: { kind: "scripted", script: suiteModel() },
@@ -41,10 +41,22 @@ async function run(check: Checks["check"]): Promise<void> {
       await asPerson(bp, "bea@browser.test", "Bea")
       try {
         await bp.goto(bannerHost.httpUrl, { waitUntil: "domcontentloaded" })
+        // Under drawn icons a header never shows a built-in icon first: a
+        // watcher set before the thread exists notes any that appears.
+        await bp.evaluate(() => {
+          const seen = { builtIn: false }
+          Object.assign(window, { __iconsSeen: seen })
+          new MutationObserver(() => {
+            if (
+              document.querySelector('.column-head img[data-kind="built-in"]')
+            )
+              seen.builtIn = true
+          }).observe(document.body, { childList: true, subtree: true })
+        })
         // Drawn before the first message is typed.
         await bp.click("#sidebar .add-agent")
         const drawn = await bp
-          .waitForSelector(`${col(0)} .column-head .banner[data-loaded]`, {
+          .waitForSelector(`${col(0)} .column-head .thread-icon[data-loaded]`, {
             timeout: 30_000,
           })
           .then(
@@ -67,7 +79,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const header = await bp.evaluate(sel => {
           const head = document.querySelector(`${sel} .column-head`)
           const mark = head?.querySelector(".agent-name .thread-mark")
-          const img = mark?.querySelector("img.banner")
+          const img = mark?.querySelector("img.thread-icon")
           const star = mark?.querySelector(".thread-star")
           if (
             !(head instanceof HTMLElement) ||
@@ -90,6 +102,10 @@ async function run(check: Checks["check"]): Promise<void> {
           img.style.display = ""
           const style = getComputedStyle(img)
           return {
+            kind: img.dataset.kind,
+            builtInFirst: (
+              window as unknown as { __iconsSeen: { builtIn: boolean } }
+            ).__iconsSeen.builtIn,
             natural: img.naturalWidth,
             fit: style.objectFit,
             blend: style.mixBlendMode,
@@ -108,6 +124,8 @@ async function run(check: Checks["check"]): Promise<void> {
           drawn &&
             header !== null &&
             header.natural > 0 &&
+            header.kind === "banner" &&
+            !header.builtInFirst &&
             header.fit === "contain" &&
             header.blend === "lighten" &&
             header.opacity === "1" &&
@@ -131,7 +149,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await stepAway(bp)
         await stepBack(bp, root)
         const again = await bp
-          .waitForSelector(`${col(0)} .column-head .banner`, {
+          .waitForSelector(`${col(0)} .column-head .thread-icon`, {
             timeout: 15_000,
           })
           .then(img =>

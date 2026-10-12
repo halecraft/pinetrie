@@ -59,10 +59,7 @@
       "ms": 5,
       "ignored": 2,
       "agrees": false,
-      "ignoredButSource": [
-        "link-to-log",
-        "link-to-normal"
-      ],
+      "ignoredButSource": ["link-to-log", "link-to-normal"],
       "ignoredButSourceCount": 2,
       "sourceButNotIgnored": [
         "#hash.txt",
@@ -93,10 +90,7 @@
       "ms": 4,
       "ignored": 30,
       "agrees": false,
-      "ignoredButSource": [
-        "link-to-log",
-        "link-to-normal"
-      ],
+      "ignoredButSource": ["link-to-log", "link-to-normal"],
       "ignoredButSourceCount": 2,
       "sourceButNotIgnored": [],
       "sourceButNotIgnoredCount": 0
@@ -106,10 +100,7 @@
       "ms": 5,
       "ignored": 30,
       "agrees": false,
-      "ignoredButSource": [
-        "link-to-log",
-        "link-to-normal"
-      ],
+      "ignoredButSource": ["link-to-log", "link-to-normal"],
       "ignoredButSourceCount": 2,
       "sourceButNotIgnored": [],
       "sourceButNotIgnoredCount": 0

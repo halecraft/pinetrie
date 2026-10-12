@@ -15,8 +15,10 @@ import {
   projectRail,
   ROOT,
   type ThreadName,
+  threadNameParts,
 } from "@pinetrie/core"
 import {
+  builtInIconUrl,
   matchCountWords,
   rowSummary,
   rowView,
@@ -1485,20 +1487,46 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           `${col(0)} .column-head .agent-name`,
           "data-thread",
         )
-        const starShown = await tp
-          .locator(
-            `${col(0)} .column-head .agent-name .thread-mark .thread-star`,
+        // Under the default icon source, built-in: the name's noun's icon,
+        // loaded, unblended, over the star.
+        const icon = await tp
+          .waitForFunction(
+            sel => {
+              const img = document.querySelector(
+                `${sel} .column-head .agent-name .thread-mark img[data-kind="built-in"]`,
+              )
+              return img instanceof HTMLImageElement &&
+                img.complete &&
+                img.naturalWidth > 0
+                ? {
+                    src: img.getAttribute("src"),
+                    natural: img.naturalWidth,
+                    blend: getComputedStyle(img).mixBlendMode,
+                  }
+                : null
+            },
+            col(0),
+            { timeout: 10_000 },
           )
-          .evaluate(n => getComputedStyle(n).opacity === "1")
+          .then(
+            h => h.jsonValue(),
+            () => null,
+          )
+        const noun =
+          threadName === null ? undefined : threadNameParts(threadName)?.noun
         check(
-          "the column's header names the thread, its star shown with no banner",
+          "the column's header names the thread, its noun's built-in icon unblended in the star's square",
           threadName !== null &&
             [...readNames(toolHost.session).values()].includes(
               threadName as ThreadName,
             ) &&
             nameText === `✦ ${threadName}` &&
-            starShown,
-          `${nameText}`,
+            icon !== null &&
+            noun !== undefined &&
+            icon.src === builtInIconUrl(noun) &&
+            icon.natural === 32 &&
+            icon.blend === "normal",
+          `${nameText} ${JSON.stringify(icon)}`,
         )
         const longLane = Array.from({ length: 300 }, (_, i) => `line ${i}\n`)
         script.use([

@@ -17,7 +17,7 @@ import {
 import {
   type BannerAnswer,
   type BannerAsk,
-  DEFAULT_BANNER,
+  DEFAULT_ICON_MODEL,
   encodeChat,
 } from "@pinetrie/rules"
 import { type RootDocHandle, readEntries, rowMessage } from "@pinetrie/schema"
@@ -107,47 +107,54 @@ describe("banners in a harness", () => {
       Date.now(),
     )
 
-  /** pi over `doc`, with banners when `asks` is given. */
+  /**
+   * pi over `doc`: with tools unless `tools` is false, each ask recorded in
+   * `asks` and answered as `answer`; drawn with the default model when `draws`.
+   */
   const agentOver = (
     doc: RootDocHandle,
     script: ScriptedModel,
-    asks?: { lane: ThreadId; ask: BannerAsk }[],
+    o: {
+      readonly asks?: { lane: ThreadId; ask: BannerAsk }[]
+      readonly answer?: BannerAnswer
+      readonly draws?: boolean
+      readonly tools?: boolean
+    } = {},
   ) =>
     startPi(oneRoot(doc), {
       model: { kind: "scripted", script },
       project: root,
-      tools: {
-        access: () => null,
-        hooks: {
-          turnDone: async () => {},
-          askedAboutConflict: async () => false,
-          configWritten: async () => null,
-          catchUp: async () => {
-            throw new Error("no catch_up here")
-          },
-          askSplit: async () => {
-            throw new Error("no split_offer here")
-          },
-          ask: async () => {
-            throw new Error("unused")
-          },
-          leave: async () => {
-            throw new Error("unused")
-          },
-        },
-      },
-      ...(asks === undefined
-        ? {}
-        : {
-            banner: DEFAULT_BANNER,
-            bannerAsks: async (
-              lane: ThreadId,
-              ask: BannerAsk,
-            ): Promise<BannerAnswer> => {
-              asks.push({ lane, ask })
-              return { kind: "requested" }
+      tools:
+        o.tools === false
+          ? null
+          : {
+              access: () => null,
+              bannerAsks: async (
+                lane: ThreadId,
+                ask: BannerAsk,
+              ): Promise<BannerAnswer> => {
+                o.asks?.push({ lane, ask })
+                return o.answer ?? { kind: "requested" }
+              },
+              hooks: {
+                turnDone: async () => {},
+                askedAboutConflict: async () => false,
+                configWritten: async () => null,
+                catchUp: async () => {
+                  throw new Error("no catch_up here")
+                },
+                askSplit: async () => {
+                  throw new Error("no split_offer here")
+                },
+                ask: async () => {
+                  throw new Error("unused")
+                },
+                leave: async () => {
+                  throw new Error("unused")
+                },
+              },
             },
-          }),
+      ...(o.draws === true ? { banner: DEFAULT_ICON_MODEL } : {}),
     })
 
   const toolResults = (doc: RootDocHandle) =>
@@ -160,7 +167,7 @@ describe("banners in a harness", () => {
     const doc = newRootDoc()
     const script = scriptedModel()
     const asks: { lane: ThreadId; ask: BannerAsk }[] = []
-    const agent = await agentOver(doc, script, asks)
+    const agent = await agentOver(doc, script, { asks })
     const made = await agent.agent.createThreadLane(
       { root: ONE_ROOT, at: ROOT },
       threadIdFor(newId()),
@@ -181,10 +188,29 @@ describe("banners in a harness", () => {
     await agent.close()
   })
 
-  test("a lane stored before banners were on is given the tool when it is first held", async () => {
+  test("a drawing the host refuses tells the agent which setting draws", async () => {
     const doc = newRootDoc()
-    // pi stores a new lane's tools: then banners were off.
-    const before = await agentOver(doc, scriptedModel())
+    const script = scriptedModel()
+    const agent = await agentOver(doc, script, {
+      answer: { kind: "refused", reason: "off" },
+    })
+    const made = await agent.agent.createThreadLane(
+      { root: ONE_ROOT, at: ROOT },
+      threadIdFor(newId()),
+    )
+    if (made.kind !== "created") throw new Error("no lane")
+    script.use([{ tool: BANNER_TOOL, args: {} }, { text: "done" }])
+    await agent.agent.lane(made.lane).run(prompt("a banner, please"), [])
+    expect(toolResults(doc).join("\n")).toContain(
+      '"icons": { "source": "drawn" }',
+    )
+    await agent.close()
+  })
+
+  test("a lane stored with another tool list is given the current one when it is first held", async () => {
+    const doc = newRootDoc()
+    // An agent with no tools stores a lane that may call none.
+    const before = await agentOver(doc, scriptedModel(), { tools: false })
     const made = await before.agent.createThreadLane(
       { root: ONE_ROOT, at: ROOT },
       threadIdFor(newId()),
@@ -193,37 +219,15 @@ describe("banners in a harness", () => {
     await before.close()
     const script = scriptedModel()
     const asks: { lane: ThreadId; ask: BannerAsk }[] = []
-    const after = await agentOver(doc, script, asks)
+    const after = await agentOver(doc, script, { asks })
     script.use([{ tool: BANNER_TOOL, args: {} }, { text: "done" }])
     await after.agent.lane(made.lane).run(prompt("a banner, please"), [])
     expect(asks.map(a => a.lane)).toEqual([made.lane])
     await after.close()
   })
 
-  test("a lane stored while banners were on still runs once they are off, and asks for none", async () => {
-    const doc = newRootDoc()
-    const before = await agentOver(doc, scriptedModel(), [])
-    const made = await before.agent.createThreadLane(
-      { root: ONE_ROOT, at: ROOT },
-      threadIdFor(newId()),
-    )
-    if (made.kind !== "created") throw new Error("no lane")
-    await before.close()
-    const script = scriptedModel()
-    const after = await agentOver(doc, script)
-    script.use([{ tool: BANNER_TOOL, args: {} }, { text: "no banner" }])
-    const ran = await after.agent
-      .lane(made.lane)
-      .run(prompt("a banner, please"), [])
-    expect(ran).toEqual({ kind: "ok" })
-    expect(toolResults(doc).join("\n")).not.toContain(
-      "A new banner is being made",
-    )
-    await after.close()
-  })
-
-  test("a scripted model draws its fixed image; with banners off, nothing", async () => {
-    const on = await agentOver(newRootDoc(), scriptedModel(), [])
+  test("a scripted model draws its fixed image; with no image model, nothing", async () => {
+    const on = await agentOver(newRootDoc(), scriptedModel(), { draws: true })
     expect(await on.setup.canDrawBanners()).toBe(true)
     expect(await on.setup.drawBanner("a zebra")).toMatchObject({
       kind: "drawn",

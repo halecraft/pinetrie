@@ -28,9 +28,14 @@ export const ASK_TOOL = "ask"
 export const LEAVE_TOOL = "leave"
 
 /**
- * Every tool pine·trie registers, in the order the model is given them. The
- * order is part of every request's prefix, and a changed prefix drops a lane's
- * earlier thinking.
+ * Every tool pine·trie registers, in the order the model is given them, and
+ * what every lane's runs may call. One list for every run, a resolution's
+ * included, whatever kind of lane runs it: a tool that does not apply
+ * answers why. The list and its order are part of every request's prefix, and
+ * a changed prefix drops a lane's earlier thinking. pi stores the list in a
+ * lane's configuration and fails a run whose list names a tool not
+ * registered, so a lane stored with another list is given this one when it is
+ * first held (`threadLanes`, `@pinetrie/pi`).
  */
 export const TOOL_IDS = [
   READ_TOOL,

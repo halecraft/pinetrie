@@ -16,6 +16,7 @@ import { readPlaces, readPlacesRev } from "@pinetrie/reads"
 import {
   deleteRecord,
   encodeCard,
+  ICONS,
   PROJECT,
   pendingVerdict,
   SEAT,
@@ -59,6 +60,7 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
   roots: [ROOT_ID],
   ...ports(fakePi()),
   work: record<StartupDeps["work"]>({ project: null }).port,
+  icons: { source: "built-in" },
   ensureNames: async () => {},
   keeper: createKeeper(),
   start: () => runId("r-1"),
@@ -178,7 +180,7 @@ test("recover deletes the records of a type no spec declares, in the session and
   ])
 })
 
-test("recover writes the project record only when it changed, in one write", async () => {
+test("recover writes the project and icon records only when they changed, in one write", async () => {
   const project: ProjectRecord = { root: "/repo", owner: null }
   const run = async (b: ReturnType<typeof basics>) => {
     const agent = fakePi()
@@ -200,9 +202,11 @@ test("recover writes the project record only when it changed, in one write", asy
     )
   }
   const fresh = await run(basics())
-  expect(fresh.map(c => (c.args[0] as unknown[]).length)).toEqual([2])
+  expect(fresh.map(c => (c.args[0] as unknown[]).length)).toEqual([3])
+  expect(writesOf(fresh).map(w => w.namespace)).toContain("pinetrie.icons")
   const b = basics()
   putValue(b, setRecord(PROJECT, project))
+  putValue(b, setRecord(ICONS, { source: "built-in" }))
   const again = await run(b)
   expect(writesOf(again).map(w => w.namespace)).toEqual(["pinetrie.commands"])
 })

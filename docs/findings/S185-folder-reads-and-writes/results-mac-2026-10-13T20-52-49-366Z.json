@@ -45,24 +45,14 @@
       "incoming": "Foo.txt",
       "incomingLooksPresent": true,
       "checkedWriteRefused": true,
-      "renameAnywayLeaves": [
-        [
-          "foo.txt",
-          "forced"
-        ]
-      ]
+      "renameAnywayLeaves": [["foo.txt", "forced"]]
     },
     "unicode form": {
       "there": "café.txt",
       "incoming": "café.txt",
       "incomingLooksPresent": true,
       "checkedWriteRefused": true,
-      "renameAnywayLeaves": [
-        [
-          "café.txt",
-          "forced"
-        ]
-      ]
+      "renameAnywayLeaves": [["café.txt", "forced"]]
     }
   },
   "echo": {

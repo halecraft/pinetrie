@@ -2,15 +2,8 @@
 // to icons: `Sidebar` (`sidebar.tsx`) draws it, and each click sends the
 // intent it names.
 
-import type {
-  BannerRecord,
-  MarkRecord,
-  Sha256,
-  TaskId,
-  ThreadId,
-  ThreadName,
-} from "@pinetrie/core"
-import { blobUrl, PRODUCT_NAME } from "@pinetrie/core"
+import type { MarkRecord, TaskId, ThreadId, ThreadName } from "@pinetrie/core"
+import { PRODUCT_NAME } from "@pinetrie/core"
 import { threadNameOf } from "@pinetrie/rules"
 import type { Moments, Status } from "./attention.ts"
 import type { Intent } from "./intent.ts"
@@ -20,6 +13,7 @@ import { type ColorSlot, taskSlot } from "./palette.ts"
 import { initialsOf, NO_TEXT, type TaskSummary } from "./root-label.ts"
 import { newTabButton, type StartButton } from "./start-button.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
+import type { IconLookup, ThreadIcon } from "./thread-icon.ts"
 
 /** What a task's ⋯ in the sidebar offers. */
 export type ItemMenuItem =
@@ -37,12 +31,12 @@ export type ItemMenuItem =
   | ({ readonly kind: "moveTo" } & ThreadMove)
 
 /**
- * What an item draws while the sidebar is folded: the sprite of the
- * task's earliest thread with one (`taskSprites`), else its initials on a
- * colour seeded by its id.
+ * What an item draws while the sidebar is folded: the icon of the task's
+ * earliest thread with one (`taskIcons`), else its initials on a colour
+ * seeded by its id.
  */
 export type ItemIcon =
-  | { readonly kind: "sprite"; readonly src: string }
+  | { readonly kind: "icon"; readonly icon: ThreadIcon }
   | {
       readonly kind: "initials"
       readonly letters: string
@@ -105,8 +99,8 @@ export interface SidebarViewInput {
   readonly archived: ReadonlySet<TaskId>
   /** When each task's mark last arrived as you watched (`useAttention`). */
   readonly arrivals: Moments
-  /** Each task's sprite (`taskSprites`). */
-  readonly sprites: ReadonlyMap<TaskId, Sha256>
+  /** Each task's icon (`taskIcons`). */
+  readonly icons: ReadonlyMap<TaskId, ThreadIcon>
 }
 
 export function sidebarView(input: SidebarViewInput): SidebarView {
@@ -134,7 +128,7 @@ function itemView(
     task,
     head,
     label: head.label,
-    icon: iconOf(head, input),
+    icon: itemIcon(head, input),
     line: input.summaries.get(task)?.line ?? NO_TEXT,
     title: input.marks.get(task)?.title ?? null,
     status: head.status,
@@ -157,9 +151,9 @@ const noHead = (task: TaskId): ThreadCardHead => ({
   moves: [],
 })
 
-function iconOf(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
-  const sprite = input.sprites.get(head.task)
-  if (sprite !== undefined) return { kind: "sprite", src: blobUrl(sprite) }
+function itemIcon(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
+  const icon = input.icons.get(head.task)
+  if (icon !== undefined) return { kind: "icon", icon }
   return {
     kind: "initials",
     letters: initialsOf(head.label),
@@ -168,20 +162,22 @@ function iconOf(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
 }
 
 /**
- * Each task's sprite: the banner of its earliest thread that has one. A
+ * Each task's icon: that of its earliest thread with one (`threadIcon`). A
  * thread's id is `t-` and a uuidv7, so ids sort by creation.
  */
-export function taskSprites(
+export function taskIcons(
   threadsOf: ReadonlyMap<TaskId, readonly ThreadId[]>,
-  banners: ReadonlyMap<ThreadId, BannerRecord>,
-): ReadonlyMap<TaskId, Sha256> {
-  const sprites = new Map<TaskId, Sha256>()
-  for (const [task, threads] of threadsOf) {
-    const earliest = [...threads].sort().find(thread => banners.has(thread))
-    const banner = earliest === undefined ? undefined : banners.get(earliest)
-    if (banner !== undefined) sprites.set(task, banner.sha)
-  }
-  return sprites
+  iconFor: IconLookup,
+): ReadonlyMap<TaskId, ThreadIcon> {
+  const icons = new Map<TaskId, ThreadIcon>()
+  for (const [task, threads] of threadsOf)
+    for (const thread of [...threads].sort()) {
+      const icon = iconFor(thread)
+      if (icon === null) continue
+      icons.set(task, icon)
+      break
+    }
+  return icons
 }
 
 function menuOf(task: TaskId, head: ThreadCardHead): readonly ItemMenuItem[] {

@@ -21,7 +21,8 @@ describe("the word lists", () => {
     expect(new Set(ADJECTIVES).size).toBe(256)
     expect(new Set(NOUNS).size).toBe(256)
     for (const w of [...ADJECTIVES, ...NOUNS]) expect(w).toMatch(/^[a-z]{3,7}$/)
-    expect(ADJECTIVES.filter(w => NOUNS.includes(w))).toEqual([])
+    const nouns = new Set<string>(NOUNS)
+    expect(ADJECTIVES.filter(w => nouns.has(w))).toEqual([])
   })
 })
 

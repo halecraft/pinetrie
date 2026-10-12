@@ -13,7 +13,7 @@ import {
   type StoredImage,
   type ThreadId,
 } from "@pinetrie/core"
-import type { BannerAnswer, BannerAsk, BannerConfig } from "@pinetrie/rules"
+import type { BannerAnswer, BannerAsk, ModelRef } from "@pinetrie/rules"
 import { Type } from "typebox"
 import type { ImagesSetup } from "./config.ts"
 import { prepareImage } from "./images.ts"
@@ -73,21 +73,18 @@ export function bannerAnswerText(answer: BannerAnswer): string {
       return answer.reason === "not_stored"
         ? "That image is not stored: ask the person to paste it again."
         : answer.reason === "off"
-          ? "Banners are off: the person turns them on in ~/.config/pinetrie/config.json."
+          ? 'New banners are drawn only when "icons": { "source": "drawn" } is in ~/.config/pinetrie/config.json: paste an image to set one now.'
           : "This call has no thread to set a banner on."
   }
 }
 
 /**
  * The tool. `request` is the host's, and answers once the ask is planned,
- * not once an image is made; undefined when banners are off. It is
- * registered either way, since a lane's stored tool list may still name it
- * (`activeToolNames`, in `tools.ts`).
+ * not once an image is made: a drawing the icon source does not allow is
+ * the host's refusal.
  */
 export function bannerTool(
-  request:
-    | ((lane: ThreadId, ask: BannerAsk) => Promise<BannerAnswer>)
-    | undefined,
+  request: (lane: ThreadId, ask: BannerAsk) => Promise<BannerAnswer>,
 ) {
   return {
     name: BANNER_TOOL,
@@ -120,11 +117,9 @@ export function bannerTool(
       const text =
         "refused" in ask
           ? ask.refused
-          : request === undefined
-            ? bannerAnswerText({ kind: "refused", reason: "off" })
-            : lane === undefined
-              ? bannerAnswerText({ kind: "refused", reason: "no_thread" })
-              : bannerAnswerText(await request(lane, ask))
+          : lane === undefined
+            ? bannerAnswerText({ kind: "refused", reason: "no_thread" })
+            : bannerAnswerText(await request(lane, ask))
       return {
         content: [{ type: "text" as const, text }],
         details: undefined,
@@ -156,14 +151,14 @@ const DRAW_TIMEOUT_MS = 120_000
 
 export interface Banners {
   /**
-   * Whether a banner can be drawn: banners are enabled, their model is
-   * known, and there is a key for its provider. Asked first, so a host with
+   * Whether a banner can be drawn: an image model was given, pi knows it,
+   * and there is a key for its provider. Asked first, so a host with
    * no key spends nothing.
    */
   canDrawBanners(): Promise<boolean>
   /**
    * One square banner image from `prompt`, fitted as an upload is. Never
-   * rejects: a failure, banners being off or bytes that are not an image
+   * rejects: a failure, no image model or bytes that are not an image
    * included, is `failed` and why.
    */
   drawBanner(prompt: string): Promise<Drawn>
@@ -172,7 +167,7 @@ export interface Banners {
 /** Banners drawn with `config`'s image model; with no config, none is drawn. */
 export function banners(
   images: ImagesSetup,
-  config: BannerConfig | undefined,
+  config: ModelRef | undefined,
 ): Banners {
   const imageModel =
     config === undefined

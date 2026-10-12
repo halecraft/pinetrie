@@ -514,8 +514,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup does not compact",
     file: "apps/pinetrie/host/index.ts",
-    from: "    settle,\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n  })",
-    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n  })",
+    from: "    settle,\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n",
+    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n",
     suite: "host",
     scenario: "tools",
     expect: "a starting host compacts the session it opened",
@@ -1432,7 +1432,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new thread's banner waits for its run's end",
     file: "apps/pinetrie/host/index.ts",
-    from: '    onNamed: lane => {\n      banners?.due(lane).catch(failed(basics, "banner"))\n',
+    from: '    onNamed: lane => {\n      banners.due(lane).catch(failed(basics, "banner"))\n',
     to: "    onNamed: lane => {\n",
     suite: "host",
     scenario: "banners",
@@ -1441,23 +1441,53 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the agent is never given set_banner",
-    file: "apps/pinetrie/host/index.ts",
-    from: "    ...(banners === null ? {} : { bannerAsks: banners.request }),",
-    to: "    ...{},",
+    file: "packages/pi/agent.ts",
+    from: "  const activeTools: string[] = tools === null ? [] : [...TOOL_IDS]",
+    to: '  const activeTools: string[] = tools === null ? [] : TOOL_IDS.filter(id => id !== "set_banner")',
     suite: "host",
     scenario: "banners",
     expect:
       "set_banner sets a pasted image as the thread's banner, and tells the agent",
   },
   {
-    name: "a column's header draws no banner",
+    name: "a column's header draws no icon",
     file: "packages/web/column.tsx",
-    from: "                banner={shows.banner}\n                detailsId",
-    to: "                banner={null}\n                detailsId",
+    from: "        icon={identity.icon}\n",
+    to: "        icon={null}\n",
     suite: "browser",
     scenario: "banner",
     expect:
       "a new thread's banner takes the star's square before its name, its black blended away, and moves nothing as it arrives",
+  },
+  {
+    name: "a header draws no built-in icon",
+    file: "packages/interface/thread-icon.ts",
+    from: '  if (input.icons?.source !== "built-in") return null\n',
+    to: "  return null\n",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "the column's header names the thread, its noun's built-in icon unblended in the star's square",
+  },
+  {
+    name: "a drawn header shows the noun's icon until its banner arrives",
+    file: "packages/interface/thread-icon.ts",
+    from: '  if (input.icons?.source !== "built-in") return null\n',
+    to: '  if (input.icons?.source === "none") return null\n',
+    suite: "browser",
+    scenario: "banner",
+    expect:
+      "a new thread's banner takes the star's square before its name, its black blended away, and moves nothing as it arrives",
+  },
+  {
+    name: "a built-in icon is blended as a banner is",
+    file: "packages/web/index.html",
+    from: '      .thread-mark .thread-icon[data-kind="banner"] { mix-blend-mode: lighten; }',
+    to: "      .thread-mark .thread-icon { mix-blend-mode: lighten; }",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "the column's header names the thread, its noun's built-in icon unblended in the star's square",
   },
   {
     name: "the star shows under a banner",
@@ -1742,8 +1772,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the agent is given no tools",
     file: "packages/pi/agent.ts",
-    from: "    tools === null ? [] : activeToolNames({ banners: bannerAsks !== undefined })",
-    to: "    [] as string[]",
+    from: "  const activeTools: string[] = tools === null ? [] : [...TOOL_IDS]",
+    to: "  const activeTools: string[] = []",
     suite: "host",
     scenario: "tools",
     expect:

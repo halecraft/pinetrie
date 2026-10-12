@@ -206,11 +206,10 @@ export {
 } from "./column-paths.ts"
 export {
   AGENT_MARK,
-  bannerUrl,
   columnView,
   composerPlace,
   detailsTitle,
-  type HeadBanner,
+  type HeadIcon,
   type HeadIdentity,
   type HeadOrigin,
   headLane,
@@ -617,7 +616,7 @@ export {
   renameIntent,
   type SidebarView,
   sidebarView,
-  taskSprites,
+  taskIcons,
 } from "./sidebar-view.ts"
 export {
   elsewhereWords,
@@ -675,6 +674,12 @@ export {
   threadFace,
   threadPreview,
 } from "./thread-face.ts"
+export {
+  builtInIconUrl,
+  type IconLookup,
+  type ThreadIcon,
+  threadIcon,
+} from "./thread-icon.ts"
 export {
   type CrossTaskLink,
   crossTaskLinks,

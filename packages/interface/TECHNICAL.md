@@ -273,9 +273,9 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   `listWidth` port sets it and saves it. `App` writes it as `data-list` on
   the root element, and the CSS sets `--side` from that, so the body's
   grid, the footer's corner and the board follow. Folded, `Sidebar` draws
-  each item as `FoldedItem`: `sidebarView` decides its `ItemIcon` (a
-  sprite from `taskSprites`, the banner of the task's earliest thread with
-  one, else `initialsOf` its label on a slot seeded
+  each item as `FoldedItem`: `sidebarView` decides its `ItemIcon` (an icon
+  from `taskIcons`, that of the task's earliest thread with one, a built-in
+  one included (ADR-0143), else `initialsOf` its label on a slot seeded
   by its `TaskId` (`taskSlot`), which `Sidebar` draws in `slotColor`). The icon is the trigger of a `Menu` opened
   by `contextmenu` (`Popover`'s `opensOn`), whose click shows the root;
   the tooltip and the rename field are fixed to the window beside it, since
@@ -475,7 +475,7 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
 - **Folded, a column is its card's face** (`foldedView`, ADR-0126): the
   same `Face` a grid's cell draws for that card (`faceOf`), worded for a
   strip by `foldedWords` (its title, and a note column's count), headed by
-  `foldedMark` (a thread's banner or ✦, a note column's nothing), in its
+  `foldedMark` (a thread's icon or ✦, a note column's nothing), in its
   thread's colour (`threadTrack`, the track its column takes at the same
   end), in its place; `projectColumns` lays the paths out over the unfolded thread
   columns alone (`openColumns`), so folding the trunk shows it in the next
@@ -1258,18 +1258,35 @@ composer*).
     are still, as `mountedBanner` keeps a banner there at mount from fading.
   - **Toggling dispatches no `PLACED`**, unlike density: it changes the
     view's height, not the content's, and `useFollow` follows that.
-- **The banner (ADR-0050, ADR-0053) is the thread's at the column's end**
-  (`banner`): the lane's `pinetrie.banner`, none for a conversation. It takes
-  the star's place before the name (`ThreadMark`): a fixed 1.5rem square,
-  the head row's height, holding the star, with the image laid over it
-  absolutely, so its arrival moves nothing. The star stays in the text
-  (`✦ name`), hidden under an image. A new one fades in once loaded, the
-  star fading out; the one there as the column mounts shows at once, or
-  every tab switch would fade it in again: `Column` keeps the banner's URL
-  as it mounted (`bannerUrl`), and `columnView` decides `fade` from it.
+- **A thread's icon is one rule, `threadIcon`** (`thread-icon.ts`,
+  ADR-0143): its `pinetrie.banner` record (ADR-0050, ADR-0053) under any
+  icon source; else, while the host's `pinetrie.icons` says `built-in`, its
+  name's noun's sprite (`builtInIconUrl`), once it is named; else null, the
+  ✦. A missing `pinetrie.icons` is ✦ too: the page never guesses a source,
+  since under `drawn` a built-in icon shown first would be replaced seconds
+  later by the drawn one. The header, the details, the folded strip
+  (`foldedMark`), the card face (`threadFace`) and the folded list
+  (`taskIcons`) all ask it; `App` builds the one lookup (`IconLookup`) that
+  the faces and the list share. `ThreadIcon.kind` says how it is drawn: a
+  `banner` on black, blended off; a `built-in` sprite on a transparent
+  ground, unblended.
+- **The header's icon is its named agent's, by type**: `HeadIdentity`'s
+  `agent` case carries it, as it carries `details`, so a pending or absent
+  identity cannot have one. `identityOf` makes it from `headLane`'s lane
+  only once it has a name, so the icon and the name are one thread's.
+  Pending, the header shows ✦ alone, and a conversation's header
+  names no thread and draws no mark; a conversation's icon shows on its
+  face, its strip and in the list. It takes the star's place before the
+  name (`ThreadMark`): a fixed 1.5rem square, the head row's height, holding
+  the star, with the image laid over it absolutely, so its arrival moves
+  nothing. The star stays in the text (`✦ name`), hidden under an image. A
+  new one fades in once loaded, the star fading out; the one there as the
+  column mounts shows at once, or every tab switch would fade it in again:
+  `Column` keeps the icon's URL as it mounted (`mountedIcon`), and
+  `columnView` decides `fade` from it (`HeadIcon`).
   `isolation: isolate` makes the
-  header's own background what `mix-blend-mode: lighten` blends with: the
-  sprite's black ground becomes the header's colour. The mark's rules are
+  header's own background what `mix-blend-mode: lighten` blends with: a
+  banner's black ground becomes the header's colour. The mark's rules are
   `.thread-mark`'s, not the header's, since the details draw it too, with
   `isolation` of their own; only its pulse is scoped to where it is. The header has no `overflow: hidden`: on a flex item that
   removes its minimum height, and a tall column squeezed the header.
@@ -1278,14 +1295,14 @@ composer*).
   boolean, not the text lifted up: `Column` redraws only when it flips, not
   on every keystroke.
 - **A thread about to get its lane is named before the send** (ADR-0057).
-  `headLane` is the lane the header names and draws the banner of: the
+  `headLane` is the lane the header names and draws the icon of: the
   thread's, or, while `createsLane`, the one its next send creates, named by
   the thread's id. `columnView` decides the `reserve` step: `ask` the host to
   name it while it has no name, else `none`. `Column` carries it out in an
   effect keyed on the step. Asking again (a remount, StrictMode) is harmless:
   the host does nothing for an id it has named. A conversation's thread is
   named by the host as its first message is recorded (ADR-0117), with no
-  banner.
+  drawn banner.
 
 - **The agent can reply in several threads at once**: `readAgentActivity`
   returns every running lane. The rail pulses at each tip, and each column
@@ -1565,7 +1582,7 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   A click selects; Enter, or a click on the card already selected, opens it
   whole in place, which is the panel's state, so the preview can hide.
 - **A thread's card is drawn by its face** (`thread-face.ts`, ADR-0124):
-  `threadFace` (name, banner, first line, the first line of where it ended,
+  `threadFace` (name, icon, first line, the first line of where it ended,
   stopped, cards queued), a case of `Face`; opened, `threadPreview`, its
   path read only, a `ThreadPreview` that no composer, dock or queue takes.
 - **Two layers**: the host's records say which cards are in your

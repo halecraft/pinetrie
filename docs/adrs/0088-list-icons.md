@@ -8,6 +8,8 @@
 - **Amended by:**
   - ADR-0098: folded, your avatar carries the inbox's badge and opens the
     account menu, which holds the inbox and the inventory's toggle.
+  - ADR-0143: the folded list shows every task's icon, a built-in one
+    included, so initials are left for a task with no named thread.
 
 Uses ADR-0089's root colour.
 

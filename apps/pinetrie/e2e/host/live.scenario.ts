@@ -97,7 +97,7 @@ async function run(check: Checks["check"]): Promise<void> {
   )
   writeFileSync(
     bannerConfig,
-    JSON.stringify({ ...SUITE_CONFIG, banner: { enabled: true } }),
+    JSON.stringify({ ...SUITE_CONFIG, icons: { source: "drawn" } }),
   )
   const bannerLog: string[] = []
   const drawing = await startSuiteHost({

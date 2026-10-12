@@ -1363,6 +1363,19 @@ export interface BannerRecord {
   readonly at: number
 }
 
+/** Where threads' icons come from: the user config's `icons.source`. */
+export const ICON_SOURCES = ["built-in", "drawn", "none"] as const
+export type IconSource = (typeof ICON_SOURCES)[number]
+
+/**
+ * The host's icon source, published for the page as the one
+ * `pinetrie.icons` value: the page shows a built-in icon only under
+ * `built-in`, so it never shows one before a drawn one arrives.
+ */
+export interface IconsRecord {
+  readonly source: IconSource
+}
+
 /**
  * A lane's use of its owner's ssh identity: asked, and what the owner
  * answered. The host's to change: a request held while it is `waiting` is

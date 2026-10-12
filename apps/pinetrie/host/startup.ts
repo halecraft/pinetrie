@@ -1,6 +1,7 @@
 // host/startup — what a starting host does before it accepts a command.
 
 import {
+  type IconsRecord,
   isTextCard,
   type RootId,
   SESSION_TARGET,
@@ -9,6 +10,7 @@ import {
 import type { Keeper } from "@pinetrie/keeper"
 import type { Agent, PiSetup } from "@pinetrie/pi"
 import {
+  readIcons,
   readPlaces,
   readProject,
   readRecords,
@@ -22,6 +24,7 @@ import {
   COMMANDS,
   COMMANDS_KEY,
   deleteRecord,
+  ICONS,
   PROJECT,
   planAccessRecovery,
   planCardSweep,
@@ -64,6 +67,8 @@ export interface StartupDeps {
   /** The commands pi loaded, written as a record, and those it refused, logged. */
   readonly piSetup: Pick<PiSetup, "commands" | "refusedCommands">
   readonly work: Pick<LaneWork, "project">
+  /** Where icons come from, as the user config chose: published for the page. */
+  readonly icons: IconsRecord
   /** Name every lane that has none. */
   readonly ensureNames: () => Promise<void>
   readonly keeper: Keeper
@@ -81,7 +86,7 @@ export interface StartupDeps {
  * the stored lane names that are not a thread's, which no reader is given; name
  * every lane that has none; resume each lane a crash interrupted, in its own
  * directory (`planStartup`); write what the host found, the commands its pi
- * loaded and the verdicts whose request died with the last host, those that
+ * loaded, the icon source and the verdicts whose request died with the last host, those that
  * changed in one write; sweep what no one will type in again (`sweepTexts`);
  * and last, settle the lanes with cards queued, whose compaction then holds
  * every write above. Nothing else runs yet, so clearing the streams needs no
@@ -154,6 +159,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
       },
       readRecords(doc, COMMANDS).get(COMMANDS_KEY),
     ),
+    ...setIfChanged(ICONS, deps.icons, readIcons(doc) ?? undefined),
   ]
   if (changed.length > 0) await keeper.run(() => records.writeValues(changed))
   for (const r of piSetup.refusedCommands())

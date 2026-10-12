@@ -60,12 +60,14 @@ export {
   BANNER_ATTEMPTS,
   type BannerAnswer,
   type BannerAsk,
-  type BannerConfig,
   bannerDue,
   bannerPrompt,
   bannerStillWanted,
-  DEFAULT_BANNER,
-  decodeBannerConfig,
+  DEFAULT_ICON_MODEL,
+  decodeIconConfig,
+  ICONS,
+  ICONS_KEY,
+  type IconConfig,
   planAsk,
 } from "./banner.ts"
 export {

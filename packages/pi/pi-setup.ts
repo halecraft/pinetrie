@@ -5,11 +5,7 @@
 // from it.
 
 import path from "node:path"
-import {
-  type BannerConfig,
-  labelCommands,
-  type ModelRef,
-} from "@pinetrie/rules"
+import { labelCommands, type ModelRef } from "@pinetrie/rules"
 import { type Banners, banners } from "./banner.ts"
 import { type CommandFiles, commandFiles } from "./commands.ts"
 import {
@@ -68,8 +64,8 @@ export interface PiSetupOptions {
   readonly agentDir?: string
   /** The user config's `commands.names`: pi's `source` → a label. */
   readonly commandRenames?: Readonly<Record<string, string>>
-  /** Column banners' image model, when the user config enables them; without it `drawBanner` draws nothing. */
-  readonly banner?: BannerConfig
+  /** The image model banners are drawn with, when the user config's icons are `drawn`; without it `drawBanner` draws nothing. */
+  readonly banner?: ModelRef
   /** The user config's title model; null or absent for the run's. */
   readonly titleModel?: ModelRef | null
 }

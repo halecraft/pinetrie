@@ -8,7 +8,6 @@ import {
   ancestry,
   type BannerRecord,
   type BaseRecord,
-  blobUrl,
   type CanvasView,
   type CardRecord,
   type CommandSummary,
@@ -17,6 +16,7 @@ import {
   type DiffSpan,
   type EntryId,
   firstLine,
+  type IconsRecord,
   type LaneRecord,
   type LaneView,
   messageText,
@@ -68,6 +68,7 @@ import { ago, count } from "./counts.ts"
 import { speakerWords } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
 import type { Reader } from "./send.ts"
+import { type ThreadIcon, threadIcon } from "./thread-icon.ts"
 import { linkWords, type ThreadLink } from "./thread-link.ts"
 
 /** The agent's mark, wherever the agent or a lane of it is named. */
@@ -98,6 +99,8 @@ export interface WorkFacts {
   readonly offers: ReadonlyMap<ThreadId, OfferRecord>
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   readonly banners: ReadonlyMap<ThreadId, BannerRecord>
+  /** Where icons come from; null before a host published it. */
+  readonly icons: IconsRecord | null
   /** Each lane's ssh identities and its owner's answers. */
   readonly access: ReadonlyMap<ThreadId, AccessRecord>
   /** Accepted work, as the host last read it. */
@@ -177,6 +180,8 @@ export type HeadIdentity =
       readonly kind: "agent"
       readonly name: ThreadName
       readonly details: ThreadDetails
+      /** Its icon (`threadIcon`); only a named agent's header draws one. */
+      readonly icon: HeadIcon | null
     }
   /** A lane not named yet, or a next send that would create one. */
   | { readonly kind: "pending" }
@@ -201,15 +206,12 @@ export interface ThreadDetails {
   readonly start: EntryId | null
 }
 
-/** The thread's icon in a column's header. */
-export interface HeadBanner {
-  readonly url: string
-  /**
-   * A banner that arrives while the column is mounted fades in; the one there
-   * as it mounts shows at once, or every tab switch would fade it in again.
-   */
-  readonly fade: boolean
-}
+/**
+ * The thread's icon in a column's header. `fade`: an icon that arrives while
+ * the column is mounted fades in; the one there as it mounts shows at once,
+ * or every tab switch would fade it in again.
+ */
+export type HeadIcon = ThreadIcon & { readonly fade: boolean }
 
 /** Where a column forks: none for a root column, a new tab, or a column moved first. */
 export type HeadOrigin =
@@ -312,8 +314,8 @@ export interface ColumnFacts {
   readonly detailsOpen: boolean
   /** The column's thread; null for a column not yet settled on one. */
   readonly thread: ThreadId | null
-  /** The banner's URL as the column mounted (`bannerUrl`), or null. */
-  readonly mountedBanner: string | null
+  /** The header's icon's URL as the column mounted (`threadIcon` of `headLane`'s), or null. */
+  readonly mountedIcon: string | null
   readonly writable: boolean
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly lanes: readonly LaneView[]
@@ -327,8 +329,6 @@ export interface ColumnFacts {
 
 export interface ColumnShows {
   readonly identity: HeadIdentity
-  /** The banner of the thread at the column's end; none for a conversation. */
-  readonly banner: HeadBanner | null
   readonly origin: HeadOrigin
   /** Dividers, by the entry they sit above. */
   readonly joins: ReadonlyMap<EntryId, LaneJoin>
@@ -356,7 +356,7 @@ export type ReserveStep =
   | { readonly kind: "ask"; readonly lane: ThreadId }
 
 /**
- * The lane whose name and banner the header shows: the thread's, or the one
+ * The lane whose name and icon the header shows: the thread's, or the one
  * this column's next send creates, named by the thread's id.
  */
 export function headLane(
@@ -389,8 +389,8 @@ export function columnView(f: ColumnFacts): ColumnShows {
       f.createsLane,
       work.names,
       detailsOf(f, head, stretches, behind),
+      thread => shownHeadIcon(threadIcon({ thread, ...work }), f.mountedIcon),
     ),
-    banner: bannerOf(bannerUrl(head, work.banners), f.mountedBanner),
     origin: originOf(f, stretches),
     joins: joinsOf(view, stretches, work.names),
     strip: workStrip(f, parent),
@@ -430,8 +430,8 @@ export function behindMark(
 
 /**
  * Only where the next send creates the thread's lane: a conversation's thread
- * is named by the host as its first message is recorded, and draws no
- * banner. `createsLane` is the composer's report, a render behind, so a
+ * is named by the host as its first message is recorded, and is due no
+ * drawn banner. `createsLane` is the composer's report, a render behind, so a
  * column whose thread has just got its lane may still carry it.
  */
 function reserveStep(f: ColumnFacts): ReserveStep {
@@ -443,25 +443,18 @@ function reserveStep(f: ColumnFacts): ReserveStep {
   )
     return { kind: "none" }
   // A thread opened before its lane is named already, as a conversation's,
-  // with no banner: the reservation makes its banner due.
+  // with no banner: the reservation makes a drawn banner due, where the
+  // host draws.
   return f.work.names.has(f.thread) && f.work.banners.has(f.thread)
     ? { kind: "none" }
     : { kind: "ask", lane: f.thread }
 }
 
-/** The banner of the thread `headLane` gives, as a URL; null for none. */
-export function bannerUrl(
-  lane: ThreadId | null,
-  banners: ReadonlyMap<ThreadId, BannerRecord>,
-): string | null {
-  const banner = lane === null ? undefined : banners.get(lane)
-  return banner === undefined ? null : blobUrl(banner.sha)
-}
-
-const bannerOf = (
-  url: string | null,
+const shownHeadIcon = (
+  icon: ThreadIcon | null,
   mounted: string | null,
-): HeadBanner | null => (url === null ? null : { url, fade: url !== mounted })
+): HeadIcon | null =>
+  icon === null ? null : { ...icon, fade: icon.url !== mounted }
 
 /**
  * A thread's base in its header: the WIP it is on, or that the
@@ -497,17 +490,21 @@ export const START_WORDS = "where it started"
 export const detailsTitle = (open: boolean): string =>
   open ? "hide this thread's details" : "show this thread's details"
 
-/** `head` is `headLane`'s. Only a named agent carries `details`. */
+/**
+ * `head` is `headLane`'s. Only a named agent carries `details` and an icon:
+ * pending, the header shows ✦ alone, and a conversation's names no thread.
+ */
 function identityOf(
   head: ThreadId | null,
   createsLane: boolean,
   names: ReadonlyMap<ThreadId, ThreadName>,
   details: ThreadDetails,
+  iconOf: (thread: ThreadId) => HeadIcon | null,
 ): HeadIdentity {
   if (head === null) return createsLane ? { kind: "pending" } : { kind: "none" }
   const name = names.get(head)
   if (name === undefined) return { kind: "pending" }
-  return { kind: "agent", name, details }
+  return { kind: "agent", name, details, icon: iconOf(head) }
 }
 
 /**

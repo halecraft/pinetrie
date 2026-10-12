@@ -139,8 +139,10 @@
       .open-icon { position: relative; flex: 0 0 auto; display: inline-flex; width: 1.75rem;
         height: 1.75rem; }
       .open-sprite, .open-initials { width: 100%; height: 100%; border-radius: 6px; }
-      /* A sprite is drawn on black, which lighten takes out (ADR-0053). */
-      .open-sprite { object-fit: contain; mix-blend-mode: lighten; }
+      /* A banner is drawn on black, which lighten takes out; a built-in icon's
+         ground is transparent, and lighten would take out its dark outline. */
+      .open-sprite { object-fit: contain; }
+      .open-sprite[data-kind="banner"] { mix-blend-mode: lighten; }
       .open-initials { display: flex; align-items: center; justify-content: center; color: var(--page);
         font-size: .68rem; font-weight: 700; font-style: normal; line-height: 1; letter-spacing: .02em; }
       .open-root.archived .open-initials { opacity: .45; }
@@ -238,11 +240,13 @@
       /* The thread's base has new work it lacks (`behindMark`). */
       .column-head .thread-behind { color: #e8c07a; cursor: help; }
       /* The mark before a thread's name: a fixed square holding the star, and
-         the banner, a sprite on black, laid over it, so the name never moves
-         when one arrives. The same mark, larger, heads the thread's details,
-         and at the header's size, its folded strip.
-         `isolation` on what holds it makes that element's own background what
-         `lighten` blends with, so the sprite's black goes. A new banner fades
+         the thread's icon laid over it, so the name never moves when one
+         arrives. The same mark, larger, heads the thread's details, and at
+         the header's size, its folded strip.
+         A banner is a sprite on black: `isolation` on what holds it makes that
+         element's own background what `lighten` blends with, so the black
+         goes. A built-in icon has a transparent ground and is not blended,
+         since lighten would take out its dark outline. A new icon fades
          in once loaded, and the star out; the one there as the column mounts
          does not. The head row is the square's height, with or without one.
          That isolation would trap a menu opened in the header under the
@@ -256,10 +260,11 @@
         display: inline-flex; align-items: center; justify-content: center; }
       .thread-mark .thread-star { transition: opacity .6s ease-in; }
       .thread-mark .thread-star[data-gone] { opacity: 0; }
-      .thread-mark .banner { position: absolute; inset: 0; width: 100%; height: 100%;
-        object-fit: contain; pointer-events: none; mix-blend-mode: lighten; }
-      .thread-mark .banner[data-fade] { opacity: 0; transition: opacity .6s ease-in; }
-      .thread-mark .banner[data-fade][data-loaded] { opacity: 1; }
+      .thread-mark .thread-icon { position: absolute; inset: 0; width: 100%; height: 100%;
+        object-fit: contain; pointer-events: none; }
+      .thread-mark .thread-icon[data-kind="banner"] { mix-blend-mode: lighten; }
+      .thread-mark .thread-icon[data-fade] { opacity: 0; transition: opacity .6s ease-in; }
+      .thread-mark .thread-icon[data-fade][data-loaded] { opacity: 1; }
       /* A named thread's name opens and closes its details (ADR-0073). Its
          chevron is drawn here, so the name's text is the mark and the name. */
       .column-head button.agent-name::after { content: "▸"; display: inline-block;
@@ -283,6 +288,9 @@
       .thread-details-icon { flex: 0 0 auto; padding: 0; border: none; border-radius: 0;
         background: none; color: var(--track, #9ecbff); cursor: pointer; }
       .thread-details .thread-mark { width: 7rem; height: 7rem; font-size: 4rem; }
+      /* Magnified, a built-in icon's 32×32 pixels stay square: ×7 at 2× DPR.
+         Shrunk or scaled under ×2 elsewhere, it is smoothed. */
+      .thread-details .thread-mark .thread-icon[data-kind="built-in"] { image-rendering: pixelated; }
       /* Its pulse while the lane runs stays within the .75rem gap. */
       .thread-details .thread-mark.pulse { animation-name: pulse-mark-large; }
       @keyframes pulse-mark-large { 50% { transform: scale(1.08); } }
@@ -1002,13 +1010,14 @@
       .card-grid-open[data-side="left"] { left: 0; }
       .card-grid-open[data-side="right"] { right: 0; }
       .card-grid-open .card-frame { margin: 0; }
-      /* A thread's card in a slot (ADR-0124): its banner and name, its first
+      /* A thread's card in a slot (ADR-0124): its icon and name, its first
          line, where it ended, its status; opened, its path read only. */
       .thread-face { display: flex; flex-direction: column; gap: .1rem; height: 100%;
         border-top: 3px solid #a371f7; padding: .2rem .35rem; font-size: .72rem;
         overflow: hidden; }
       .thread-face-head { display: flex; align-items: center; gap: .3rem; }
-      .thread-face-sprite { width: 1.1rem; height: 1.1rem; image-rendering: pixelated; }
+      .thread-face-sprite { width: 1.1rem; height: 1.1rem; }
+      .thread-face-sprite[data-kind="banner"] { image-rendering: pixelated; }
       .thread-face-name { font-weight: 600; color: #d2a8ff; }
       .thread-face-first, .thread-face-last { color: #c9d1d9; white-space: nowrap;
         overflow: hidden; text-overflow: ellipsis; }

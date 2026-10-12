@@ -119,10 +119,11 @@ beside it (ADR-0081, turned sideways).
   its foot or Ctrl+Shift+L; **»** shows its titles again. Which you chose is
   this browser tab's, and a new tab starts from your latest. Until you
   choose, a window under 56rem shows icons. Nothing folds it by itself.
-  - **An item's icon** is the sprite of its root's earliest thread that has
-    one (ADR-0053), else two initials on the root's colour, the colour of
+  - **An item's icon** is the icon of its root's earliest thread that has
+    one (ADR-0143), else two initials on the root's colour, the colour of
     its trunk (ADR-0089): "Kanban outside click" is **KO**, "Sidebar" is
-    **SI**.
+    **SI**. Under built-in icons every named thread has one, so initials
+    show only for a root whose threads have no names yet.
   - **Its signals stay on it:** the blue ring round it while the agent
     works, the amber dot and the fading ✓ on its top-right corner, your
     dot on its bottom-right. Hovering or focusing it shows its label and
@@ -367,7 +368,13 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   (ADR-0040). Its first row names the agent working there, `✦ amber-fox` in
   the column's colour. While the composer's next send would start one, the
   agent to come is named already (ADR-0057), with `✦ new agent` only until its name arrives. A conversation
-  shows nothing there, since a message goes to people. Its second row, for a column
+  shows nothing there, since a message goes to people. Before the agent's name
+  is its icon (ADR-0143): its banner, drawn from its name (ADR-0053) or
+  pasted, under any icon
+  source; else its name's noun's built-in pixel sprite, when the user config's
+  `icons.source` is `built-in`, the default; else ✦. Under `drawn` a new
+  agent shows ✦ until its drawn banner fades in, and never a built-in icon
+  first. The same icon heads its folded strip and its card. Its second row, for a column
   that forks, names the fork, `↰ Ada: “Say exactly…”`, and clicking it brings
   the fork point into view. A copy names its source instead, "↰ copied from
   amber-fox · Fix the sync bug", and a thread whose parent thread is in
@@ -928,7 +935,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   else is written at the thread's end.
 - **A column says what its agent is doing** (ADR-0054), and none of it moves
   the column. While the agent works, the mark before the thread's name in the
-  header (its `✦`, or its banner, ADR-0053) pulses, titled with the ask it
+  header (its `✦`, or its icon, ADR-0143) pulses, titled with the ask it
   works on, "the agent is working on Ada: "Fix the rail…"" (ADR-0106). In
   outline, the running ask's own line pulses instead of accepted work below. A
   short line pulses at the
@@ -1157,7 +1164,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **A fixed 3 × 6 grid of cards**: each slot shows
   its card folded, its first three lines under its author's circle; the
   first nine are numbered 1–9. A thread's card takes one slot, drawn so it
-  is known at a glance (ADR-0124): its banner and name, its first line,
+  is known at a glance (ADR-0124): its icon and name, its first line,
   the first line of where it ended, and whether it stopped or has cards
   queued. Opened, it shows the thread's path read only, with no composer,
   queue or run, and **put** puts it on the canvas you are on, after the
@@ -1322,7 +1329,7 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
   its first line, under a title); and who is in a note column now, which
   needs a presence field of its own.
 - **Narrow screens**: the stacked sequence described above, with the sidebar
-  collapsed to each root's banner (ADR-0050, ADR-0053) and the footer to ▦,
+  collapsed to each root's icon (ADR-0088, ADR-0143) and the footer to ▦,
   what needs you and you (ADR-0122); built after the wide layout works. The
   column's pane is its first step (ADR-0078): over a narrow window it covers
   the page, and ← goes back to the thread. Below 56rem the sidebar narrows and

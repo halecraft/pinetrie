@@ -136,7 +136,7 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
       },
     ],
     names: new Map([[thread, "amber-fox" as ThreadName]]),
-    banners: new Map(),
+    iconFor: () => null,
   })
   expect(face).toMatchObject({ name: "amber-fox", queued: 2, stopped: false })
   expect(faceStatus(face)).toBe("2 cards queued")
@@ -191,7 +191,7 @@ test("a thread's face reads its first message, not the context entry its first r
     index,
     lanes: [],
     names: new Map(),
-    banners: new Map(),
+    iconFor: () => null,
   })
   expect([face.first, face.last]).toEqual(["an aside", "ok"])
 })

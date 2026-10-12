@@ -118,14 +118,15 @@ import {
   type ThreadLink,
   type TypedLast,
   taskColumnView,
+  taskIcons,
   taskRail,
-  taskSprites,
   taskStrip,
   tasksOf,
   taskWork,
   threadAnchor,
   threadCardHeads,
   threadFace,
+  threadIcon,
   threadLink,
   threadPreview,
   threadTrack,
@@ -1054,9 +1055,21 @@ export function App({
     settled,
   })
   const needsYou = inboxCount(attention.items, inbox.unseen)
-  const sprites = useMemo(
-    () => taskSprites(tasks.index.threadsOf, workFacts.banners),
-    [tasks, workFacts.banners],
+  // A thread's icon, one lookup for the sidebar and the faces alike, so
+  // they cannot disagree.
+  const iconFor = useCallback(
+    (thread: ThreadId) =>
+      threadIcon({
+        thread,
+        names: workFacts.names,
+        banners: workFacts.banners,
+        icons: workFacts.icons,
+      }),
+    [workFacts.names, workFacts.banners, workFacts.icons],
+  )
+  const taskIconsNow = useMemo(
+    () => taskIcons(tasks.index.threadsOf, iconFor),
+    [tasks, iconFor],
   )
   // Every task card's header, once per task: the board and the sidebar
   // draw the same one.
@@ -1160,7 +1173,7 @@ export function App({
           marks,
           archived: archivedTasks,
           arrivals: attention.arrivals,
-          sprites,
+          icons: taskIconsNow,
         })
   const title = pageTitle(needsYou, listView?.selected ?? null, page)
   // The board's search and "mine": never stored, so a filter outlives
@@ -1274,9 +1287,9 @@ export function App({
         index,
         lanes,
         names: workFacts.names,
-        banners: workFacts.banners,
+        iconFor,
       }),
-    [index, lanes, workFacts.names, workFacts.banners],
+    [index, lanes, workFacts.names, iconFor],
   )
   // Each thread you hold, as its slot draws it.
   const threadFaces = useMemo(

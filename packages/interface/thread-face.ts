@@ -1,11 +1,9 @@
 // interface/thread-face — a thread's card in your inventory: known at a glance,
-// as a game's inventory shows what it holds: its name and banner, its first
+// as a game's inventory shows what it holds: its name and icon, its first
 // line, the first line of where it ended, and its status. The whole path is its
 // preview's, when it is opened.
 
 import {
-  type BannerRecord,
-  blobUrl,
   type EntryId,
   firstLine,
   firstMessageOf,
@@ -19,6 +17,7 @@ import {
   type TreeIndex,
   threadEnd,
 } from "@pinetrie/core"
+import type { IconLookup, ThreadIcon } from "./thread-icon.ts"
 
 /** A thread's face in a slot. */
 export interface ThreadFace {
@@ -26,8 +25,8 @@ export interface ThreadFace {
   readonly thread: ThreadId
   /** Its two-word name; null before it has one. */
   readonly name: ThreadName | null
-  /** Its banner's image, null for none. */
-  readonly sprite: string | null
+  /** Its icon (`threadIcon`), null for none. */
+  readonly icon: ThreadIcon | null
   /** The first line of its first message; "" before it has one (a copy). */
   readonly first: string
   /** The first line of the message it ends at, when that is not its first. */
@@ -41,13 +40,13 @@ export interface ThreadFace {
 /** How long a face's lines are kept. */
 const LINE = 40
 
-/** `thread`'s face, from its tree and its asks, its lane, its name and banner. */
+/** `thread`'s face, from its tree and its asks, its lane, its name and icon. */
 export function threadFace(input: {
   readonly thread: ThreadId
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
   readonly names: ReadonlyMap<ThreadId, ThreadName>
-  readonly banners: ReadonlyMap<ThreadId, BannerRecord>
+  readonly iconFor: IconLookup
 }): ThreadFace {
   const { thread, index } = input
   // Its first message, not its first entry, which is often a context entry
@@ -60,12 +59,11 @@ export function threadFace(input: {
     id === undefined || id === null
       ? ""
       : firstLine(messageText(index.entries[id]?.message), LINE)
-  const banner = input.banners.get(thread)
   return {
     kind: "thread",
     thread,
     name: input.names.get(thread) ?? null,
-    sprite: banner === undefined ? null : blobUrl(banner.sha),
+    icon: input.iconFor(thread),
     first: line(firstId),
     last: end === null || end === firstId ? null : line(end),
     stopped: prompt !== null && indexAsks(index).stoppedBy.has(prompt),
@@ -78,7 +76,7 @@ export const bareThreadFace = (thread: ThreadId): ThreadFace => ({
   kind: "thread",
   thread,
   name: null,
-  sprite: null,
+  icon: null,
   first: "",
   last: null,
   stopped: false,

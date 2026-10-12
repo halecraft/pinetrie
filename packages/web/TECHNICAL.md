@@ -743,9 +743,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   (ADR-0054). `running` (`lane.running`, Stop's fact) is computed once in
   `Column`.
   - The mark before the thread's name (`.thread-mark`: the `✦`, or the
-    banner over it) pulses while it is true, titled by `workingWords`, which
-    names the running ask (`askWords`, ADR-0106). The square pulses, not
-    the star, which a banner hides.
+    thread's icon over it) pulses while it is true, titled by `workingWords`,
+    which names the running ask (`askWords`, ADR-0106). The square pulses,
+    not the star, which an icon hides.
   - A live row the work opened carries `data-revealed`, and
     `.tool.live[data-revealed]::after` draws a ring around it. A call
     shorter than `REVEAL_MS` is never revealed, so it shows none: the ring
@@ -1258,6 +1258,29 @@ stays in view; the strip scrolls past 30vh.
   exists, then publish while there is something to publish (ADR-0090).
   Whether a publish catches your files up or moves `main` alone is the
   host's `offers.catchUp` (ADR-0099, which amends ADR-0076).
+
+## Threads' icons (`thread-icon-image.tsx`, `public/noun-icons/`, ADR-0143)
+
+- **One image draws every icon**: `ThreadIconImage` sets `src`, an empty
+  `alt` and `data-kind` from a `ThreadIcon` (`@pinetrie/interface`), for
+  the mark (`ThreadMark`), the folded list's `.open-sprite` and a card's
+  `.thread-face-sprite`. The CSS in `index.html` draws by `data-kind`.
+- **Only a banner is blended.** A banner is drawn on black, which
+  `mix-blend-mode: lighten` takes out; a built-in icon has a transparent
+  ground, and lighten would take out its dark outline too. The rules are
+  `[data-kind="banner"]`'s.
+- **A built-in icon is pixelated only where magnified**: in the details,
+  7rem is ×7 its 32 pixels at 2× DPR. In the header (1.5rem, 48 device
+  pixels), the strip, a card and the folded list it is shrunk or scaled
+  under ×2, where nearest-neighbour would drop or double pixels unevenly, so
+  it is smoothed.
+- **The 256 icons are files named by noun**, `public/noun-icons/<noun>.png`,
+  which Vite serves at the page's root, behind the host's admission like
+  every other asset (`routes.ts`' `other`). Named by noun, not by index, so
+  reordering `NOUNS` cannot mismatch them. `noun-icons.test.ts` holds the
+  folder to exactly `builtInIconUrl` of every noun. They were cut from the
+  sheet in `docs/findings/S188-noun-icons/` (`noun-icons.png`, its order
+  `prompts.json`), where each noun's 64 candidates were chosen from.
 
 ## Renderings (`renderings.tsx`, ADR-0126)
 

@@ -27,7 +27,7 @@ export function FoldedStrip(p: {
       </span>
       {p.mark.kind === "thread" && (
         <ThreadMark
-          banner={p.mark.banner}
+          icon={p.mark.icon}
           folds
           running={false}
           working={undefined}

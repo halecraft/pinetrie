@@ -75,7 +75,8 @@ follow this list. A name only this package uses is imported from its module.
   the directory of roots, titles, who stopped a run and carrying on after
   it, an ask's digest, and how a thread's last run ended.
 - `names.ts`, `banner.ts`: a thread's name and its banner, each with its
-  record.
+  record; `banner.ts` also holds the icon source (`icons.source`) and its
+  published record.
 - `work.ts`: where lanes work (`pinetrie.lane`, `pinetrie.revision`,
   `pinetrie.project`).
 - `accepted.ts`: accepted work (`pinetrie.accepted`): its record, setup and
@@ -182,8 +183,9 @@ retired or rehomed record type leaves nothing behind.
   unchanged record on every check. The host writes only a changed record: a
   write compacted with no client connected moves the document's base past
   what a new client reports.
-- **The singletons** (`ACCEPTED`, `PROJECT`, `COMMANDS`, `WORKFLOW`) have one
-  fixed key (`ACCEPTED_KEY`, `PROJECT_KEY`, `COMMANDS_KEY`, `WORKFLOW_KEY`), and
+- **The singletons** (`ACCEPTED`, `PROJECT`, `COMMANDS`, `ICONS`, `WORKFLOW`)
+  have one fixed key (`ACCEPTED_KEY`, `PROJECT_KEY`, `COMMANDS_KEY`,
+  `ICONS_KEY`, `WORKFLOW_KEY`), and
   `decode` refuses any other.
 
 # Chat (`chat.ts`)
@@ -1149,7 +1151,7 @@ How a thread's last run ended, for the people who follow it.
 
 # The user config (`config.ts`)
 
-Every setting's decoder (`decodeBannerConfig`, `decodeDigestConfig`,
+Every setting's decoder (`decodeIconConfig`, `decodeDigestConfig`,
 `decodeTitleConfig`) reads through `recordOf`, and a model setting through
 `modelRef`: `provider/id`, split at its first `/`, since an OpenRouter id
 holds one. Each decoder is total: a missing or malformed setting takes its
@@ -1161,9 +1163,8 @@ A model's few words for a task, written as its mark (`MARK`, ADR-0116),
 so Rename edits it and every place a title shows reads it. Titling still
 reads a root's tree: Phase 2 holds one root a task.
 
-- **`decodeTitleConfig`**: on unless `enabled` is `false`, as digests are
-  (banners are off unless `true`); `model` is `modelRef`, or null for the
-  run's.
+- **`decodeTitleConfig`**: on unless `enabled` is `false`, as digests are;
+  `model` is `modelRef`, or null for the run's.
 - **`planTitling` is the decision and the request's lines.** Unasked (a
   lane just created, `trigger.kind` `lane`): only for the root's first lane
   (no other lane record names the root), with titles on, the task unmarked
@@ -1613,23 +1614,31 @@ commit-message request `request.ts` (`describeRequest`).
   it. The decoder accepts only `word-word`; `ThreadName` is branded in
   `@pinetrie/core`, and minted only here.
 
-# Banners (`banner.ts`, ADR-0050, ADR-0053)
+# Icons and banners (`banner.ts`, ADR-0050, ADR-0053, ADR-0143)
 
 | record | namespace | key | written |
 |---|---|---|---|
-| a thread's column banner: the image's hash (ADR-0050, ADR-0053) | `pinetrie.banner` | the lane | when a banner is made or set |
+| a thread's banner, drawn or pasted: the image's hash (ADR-0050, ADR-0053) | `pinetrie.banner` | the lane | when a banner is made or set |
+| where icons come from, for the page (ADR-0143) | `pinetrie.icons` | `icons` (`ICONS_KEY`) | at host start, when changed |
 
-- **`decodeBannerConfig`** reads the user config's `banner`: null unless
-  `enabled` is `true`. `model` is `provider/id`, split at its first `/`,
-  since OpenRouter's ids hold one. A malformed model takes `DEFAULT_BANNER`.
-- **Two decisions, with no outcome in common.** `bannerDue`: a thread just
-  named, or at its run's end, gets one only when it has none and none is
-  being made. `planAsk`, for `set_banner`: a pasted image is used when
-  stored, and anything else makes a new one.
+- **`decodeIconConfig`** reads the user config's `icons`: `source` is one
+  of `ICON_SOURCES` (core), and a missing, malformed or unknown one is
+  `built-in`; `IconsRecordSchema` takes the same list, so the config and
+  the published record cannot accept different sources. A drawn `model` is `provider/id`, split at its
+  first `/`, since OpenRouter's ids hold one; a missing or malformed one
+  takes `DEFAULT_ICON_MODEL`. The old `banner` key is not read.
+- **Both decisions take whether the host draws** (the source is `drawn`),
+  and have no outcome in common. `bannerDue`: a thread just named, or at its
+  run's end, gets a drawn one only while the host draws, and when it has
+  none and none is being made. `planAsk`, for `set_banner`: a pasted image
+  is used when stored, under any source; anything else makes a new one
+  while the host draws, and is refused `off` otherwise. The host's shell
+  holds no condition of its own.
 - **`bannerStillWanted`**: a due one gives way to any banner written
   meanwhile. One the person asked for is always written.
 - **`bannerPrompt`** fills the template's `{adjective}` and `{noun}` from
-  the thread's name and puts the person's direction after it. A record written when banners had a crop still decodes: its `focus`
+  the thread's name (`threadNameParts`, core) and puts the person's
+  direction after it. A record written when banners had a crop still decodes: its `focus`
   is ignored.
 
 # Pinned cards (`pinned.ts`, ADR-0048 step 5, S92)

@@ -61,9 +61,9 @@ import {
 } from "@pinetrie/reads"
 import {
   decodeAgentsConfig,
-  decodeBannerConfig,
   decodeCommandRenames,
   decodeDigestConfig,
+  decodeIconConfig,
   decodeTitleConfig,
   displayName,
   encodeFact,
@@ -279,7 +279,7 @@ export async function startHost({
   const toolsIn = project?.tools === true ? project.dir : null
 
   // The user config, read once: its shared directories, its renames for command
-  // packages and whether threads get banners. Missing or broken decodes as
+  // packages and where threads' icons come from. Missing or broken decodes as
   // empty, and the log says which.
   const userRead = await readConfigFile(userConfig)
   log(configLine(userConfig, userRead))
@@ -406,13 +406,14 @@ export async function startHost({
     for (const task of tasks) await histories.unloadTask(task)
   })
   const projectRoot = found?.project.root ?? project?.dir ?? null
-  const bannerConfig = decodeBannerConfig(userJson)
+  const iconConfig = decodeIconConfig(userJson)
+  const draws = iconConfig.source === "drawn"
   const titleConfig = decodeTitleConfig(userJson)
   const piSetup = await loadPiSetup({
     model,
     commandRenames: decodeCommandRenames(userJson),
     titleModel: titleConfig.model,
-    ...(bannerConfig === null ? {} : { banner: bannerConfig }),
+    ...(iconConfig.source === "drawn" ? { banner: iconConfig.model } : {}),
     ...(agentDir === undefined ? {} : { agentDir }),
     ...(projectRoot === null ? {} : { project: projectRoot }),
   })
@@ -420,9 +421,9 @@ export async function startHost({
     log(
       `[host] titles name ${titleConfig.model.provider}/${titleConfig.model.model}, which pi does not have: titles use the run's model`,
     )
-  if (bannerConfig !== null && !(await piSetup.canDrawBanners()))
+  if (iconConfig.source === "drawn" && !(await piSetup.canDrawBanners()))
     log(
-      `[host] banners are on, but ${bannerConfig.provider}/${bannerConfig.model} cannot be drawn: no key, or no such model`,
+      `[host] icons are drawn, but ${iconConfig.model.provider}/${iconConfig.model.model} cannot be drawn: no key, or no such model`,
     )
 
   const keeper: HostKeeper = createKeeper<HostKey>({
@@ -446,11 +447,16 @@ export async function startHost({
   // The directory follows the roots opened above as well as those opened
   // later (`onOpened`).
   startDirectory({ basics, keeper, records })
-  // Each thread's column banner, when the user config turns banners on.
-  const banners =
-    bannerConfig === null
-      ? null
-      : createBanners({ basics, keeper, blobs, records, piSetup })
+  // Each thread's banner: a pasted one under any icon source, a drawn one only
+  // under `drawn`.
+  const banners = createBanners({
+    basics,
+    keeper,
+    blobs,
+    records,
+    piSetup,
+    draws,
+  })
   // Each run's verdict, and each ask's digest unless the user config turns
   // digests off. What agents talking spend. Its drain and the relays are made
   // after the agent, whose hooks call them: bound late.
@@ -482,13 +488,13 @@ export async function startHost({
     records,
     piSetup,
   })
-  // Every thread's name. A thread's banner is drawn from its name, so it starts
+  // Every thread's name. A drawn banner is drawn from its name, so it starts
   // as the name is written.
   const names = createNames({
     basics,
     records,
     onNamed: lane => {
-      banners?.due(lane).catch(failed(basics, "banner"))
+      banners.due(lane).catch(failed(basics, "banner"))
     },
   })
   const provenance = createProvenance({ basics, presence, records })
@@ -525,6 +531,7 @@ export async function startHost({
         ? null
         : {
             access: work.access,
+            bannerAsks: banners.request,
             hooks: {
               ...work.hooks,
               askSplit,
@@ -545,7 +552,6 @@ export async function startHost({
       log(
         `[host] ${readThreadName(session, lane)}: the model's prompt or tools changed`,
       ),
-    ...(banners === null ? {} : { bannerAsks: banners.request }),
     onUsage: (lane, tokens) => budgets.onUsage(lane, tokens),
     mayRequest: lane => budgets.mayRequest(lane),
   })
@@ -700,7 +706,7 @@ export async function startHost({
   runs.onEnded((lane, prompt) => {
     void relays.ended(lane, prompt).catch(failed(basics, "an answer"))
     void settle([lane])
-    banners?.due(lane).catch(failed(basics, "banner"))
+    banners.due(lane).catch(failed(basics, "banner"))
     const root = docs.rootOfLane(lane)
     if (prompt !== null && root !== null)
       void digests.ended(root, lane, prompt, digestFailed(lane))
@@ -739,6 +745,7 @@ export async function startHost({
     cards: cardPort,
     provenance,
     ensureNames: names.ensure,
+    icons: { source: iconConfig.source },
   })
   await sweepHistories({ basics, store, histories, startup: true })
   await sweepHolds({ basics, records })

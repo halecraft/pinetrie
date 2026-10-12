@@ -5,7 +5,7 @@
 import type { NoteColumnId, ThreadId } from "@pinetrie/core"
 import type { CardColumn } from "./canvas-columns.ts"
 import type { ControlWords } from "./card-words.ts"
-import type { HeadBanner } from "./column-view.ts"
+import type { HeadIcon } from "./column-view.ts"
 import { type FaceOf, noteColumnFace } from "./face.ts"
 import { type NoteColumnView, noteCountWords } from "./note-column-view.ts"
 import type { ThreadFace } from "./thread-face.ts"
@@ -51,12 +51,12 @@ export const foldedWords = (face: FoldedFace): FoldedWords =>
       }
 
 /**
- * What heads a folded strip above its name: a thread's mark (its banner, or
- * ✦ with none), the same the column's header draws; or no mark at all. Every
+ * What heads a folded strip above its name: a thread's mark (its icon, or ✦
+ * with none), drawn as the column's header draws it; or no mark at all. Every
  * thread's strip has one, named or not, so its rows keep their heights.
  */
 export type FoldedMark =
-  | { readonly kind: "thread"; readonly banner: HeadBanner | null }
+  | { readonly kind: "thread"; readonly icon: HeadIcon | null }
   | { readonly kind: "none" }
 
 /** A strip with no mark: a note column's, the task column's. */
@@ -66,7 +66,7 @@ export const foldedMark = (face: FoldedFace): FoldedMark =>
   face.kind === "thread"
     ? {
         kind: "thread",
-        banner: face.sprite === null ? null : { url: face.sprite, fade: false },
+        icon: face.icon === null ? null : { ...face.icon, fade: false },
       }
     : NO_MARK
 

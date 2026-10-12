@@ -29,7 +29,7 @@ const DRAWN: Drawn = {
 type FakePi = Pick<PiSetup, "canDrawBanners" | "drawBanner" | "skill"> &
   Pick<Records, "writeValues">
 
-function setUp(pi: Partial<FakePi> = {}, named = true) {
+function setUp(pi: Partial<FakePi> = {}, named = true, drawing = true) {
   const b = basics()
   if (named)
     putValue(b, setRecord(NAME_RECORD, { lane: LANE, name: NAME, at: 1 }))
@@ -52,6 +52,7 @@ function setUp(pi: Partial<FakePi> = {}, named = true) {
     blobs,
     records: fake.port,
     piSetup: fake.port,
+    draws: drawing,
   })
   return { b, keeper, blobs, fake, banners }
 }
@@ -188,6 +189,27 @@ describe("set_banner", () => {
     expect(
       await banners.request(LANE, ask({ image: "f".repeat(64) as Sha256 })),
     ).toEqual({ kind: "refused", reason: "not_stored" })
+  })
+
+  test("with icons not drawn, a pasted image is still set, and nothing is drawn", async () => {
+    const { blobs, keeper, fake, banners, b } = setUp({}, true, false)
+    await banners.due(LANE)
+    expect(await banners.request(LANE, ask({ direction: "at dusk" }))).toEqual({
+      kind: "refused",
+      reason: "off",
+    })
+    await keeper.idle()
+    expect(draws(fake.calls)).toEqual([])
+    const pasted = blobs.put({
+      bytes: new Uint8Array([9]),
+      mimeType: "image/png",
+      width: 1,
+      height: 1,
+    }).sha256
+    expect(await banners.request(LANE, ask({ image: pasted }))).toEqual({
+      kind: "set",
+    })
+    expect(readBanners(b.session).get(LANE)?.sha).toBe(pasted)
   })
 
   test("words are answered at once, and the banner follows", async () => {

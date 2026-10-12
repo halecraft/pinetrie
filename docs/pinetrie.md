@@ -312,16 +312,34 @@ beside them naming their hosts (a relative `IdentityFile` means that
 folder); every lane uses them unasked. The host reads your `~/.ssh/config`
 for names, so `ssh pop` works in a lane.
 
-**A thread's column can have a banner** (ADR-0050, ADR-0053), when
-`~/.config/pinetrie/config.json` has `{ "banner": { "enabled": true } }` and
-pi has an OpenRouter key. A thread is named as its column first wants an
-agent, before its first message (ADR-0057), and its name then fills the
-`column-banner` skill, a prompt you can replace with your own, and Recraft
-V4.1 Flash draws a square pixel-art sprite of it. Only the name is sent. It is
-stored as a pasted image is, under a `pinetrie.banner` value keyed by the
-lane, and drawn in place of the ✦ before the thread's name. A failed one is tried
-again at the thread's next run's end. The agent's `set_banner` sets a
-pasted image, or a new one from your words.
+**Every thread has an icon** (ADR-0143), in place of the ✦ before its
+name: in its header, its details, its folded strip, its card and the folded
+list. Where it comes from is `icons.source` in
+`~/.config/pinetrie/config.json`:
+
+```json
+{ "icons": { "source": "built-in" } }
+{ "icons": { "source": "drawn", "model": "openrouter/recraft/recraft-v4.1-flash" } }
+{ "icons": { "source": "none" } }
+```
+
+- **`built-in`**, the default, also with no `icons` at all: the 32×32 pixel
+  sprite of the thread's name's noun, one of 256 shipped with the page
+  (`packages/web/public/noun-icons/`, made in S188 and S190). No key, no
+  request.
+- **`drawn`** (ADR-0050, ADR-0053): pi's OpenRouter key draws one from the
+  name. A thread is named as its column first wants an agent, before its
+  first message (ADR-0057), and its name then fills the `column-banner`
+  skill, a prompt you can replace with your own; `model` names the image
+  model, Recraft V4.1 Flash by default. Only the name is sent. The thread
+  shows ✦ until it arrives, and a failed one is tried again at the thread's
+  next run's end.
+- **`none`**: ✦ alone.
+
+A drawn or pasted image is stored as a pasted image is, under a
+`pinetrie.banner` value keyed by the lane, and wins under any source. The
+agent's `set_banner` sets a pasted image under any source, and a new one from
+your words only under `drawn`.
 
 **A column folds each ask's work** (ADR-0056). An ask is a message that
 started a run, with that run, read from the tree (`indexAsks`,

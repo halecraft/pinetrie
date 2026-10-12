@@ -972,10 +972,28 @@ export const mutations: readonly Mutation[] = [
     expect: "with no key, nothing is asked",
   },
   {
+    name: "the host's banners draw whatever the icon source",
+    file: "apps/pinetrie/host/banners.ts",
+    from: "        const plan = planAsk(ask, sha => blobs.ref(sha) !== undefined, draws)",
+    to: "        const plan = planAsk(ask, sha => blobs.ref(sha) !== undefined, true)",
+    command: unit,
+    expect:
+      "with icons not drawn, a pasted image is still set, and nothing is drawn",
+  },
+  {
+    name: "the icon source is not published",
+    file: "apps/pinetrie/host/startup.ts",
+    from: "    ...setIfChanged(ICONS, deps.icons, readIcons(doc) ?? undefined),\n",
+    to: "",
+    command: unit,
+    expect:
+      "recover writes the project and icon records only when they changed",
+  },
+  {
     name: "two runs' ends make two banners",
     file: "apps/pinetrie/host/banners.ts",
-    from: "bannerDue(readBanners(doc).get(lane), generating.has(lane))",
-    to: "bannerDue(readBanners(doc).get(lane), false)",
+    from: "          generating.has(lane),\n          draws,\n",
+    to: "          false,\n          draws,\n",
     command: unit,
     expect: "or one being made, gets no other",
   },
