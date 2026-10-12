@@ -1,5 +1,5 @@
-// host/offers/describe — an agent's commit message for a single offer
-// (ADR-0105): a one-shot model request outside the thread.
+// host/offers/describe — an agent's commit message for a single offer: a
+// one-shot model request outside the thread.
 
 import { projectTranscript, type ThreadId } from "@pinetrie/core"
 import { readTreeIndex } from "@pinetrie/reads"
@@ -21,13 +21,12 @@ import type { OfferDeps } from "./state.ts"
 const DESCRIBE_BUDGET = 24_000
 
 /**
- * Gathered by a pinned read, which writes nothing (S87): the offer, its diff
- * and your recent messages (`planDescribeAsk`, `gatherDescribe`). Asked
- * outside the owner (a model request takes seconds), and written as an
- * owner command, only while the offer is still the one asked about
- * (`planDescribeSettle`). One request per lane at a time (`describing`), so
- * two settles of one lane never meet. `force` asks again for an offer
- * already described. A failure is logged.
+ * Gathered by a pinned read, which writes nothing: the offer, its diff and your
+ * recent messages (`planDescribeAsk`, `gatherDescribe`). Asked outside the
+ * owner (a model request takes seconds), and written as an owner command, only
+ * while the offer is still the one asked about (`planDescribeSettle`). One
+ * request per lane at a time (`describing`), so two settles of one lane never
+ * meet. `force` asks again for an offer already described. A failure is logged.
  */
 export function describe(
   deps: Pick<OfferDeps, "owner" | "basics" | "docs" | "piSetup"> & {

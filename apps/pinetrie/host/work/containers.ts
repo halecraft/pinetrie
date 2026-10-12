@@ -1,5 +1,5 @@
-// host/work/containers — each lane's container: started before a run,
-// stopped after it (ADR-0034), and where its tools run.
+// host/work/containers — each lane's container: started before a run, stopped
+// after it, and where its tools run.
 
 import {
   errorText,
@@ -104,9 +104,9 @@ export function createContainers(deps: {
             planDisk({ spec, env: process.env, from: from.from }),
             handle.runners,
           )
-          // pre-rename: a snapshot of a lane made before the rename holds
-          // the old names. A volume needs no such step: the one-off
-          // migration renamed those (S114).
+          // pre-rename: a snapshot of a lane made before the rename holds the
+          // old names. A volume needs no such step: the one-off migration
+          // renamed those.
           await executeOrThrow(
             planOldNamesOnDisk(await oldNamesOnDisk(handle.runners.lane), lane),
             handle.runners,
@@ -119,7 +119,7 @@ export function createContainers(deps: {
     // Made just now, or read above: running unless it was stopped.
     await handle.start(decided === "start" ? "stopped" : "running")
     // A container made anew may run another image, whose dependencies the
-    // disk's do not match: the recipe's key says (ADR-0131).
+    // disk's do not match: the recipe's key says.
     if (decided === "create" || decided === "recreate")
       await deps.recipes.onQueue(lane, handle, registry.laneJjOf(lane), "all")
   }

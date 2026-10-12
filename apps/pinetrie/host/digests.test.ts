@@ -262,7 +262,7 @@ test("the scripted model's answer is a digest, so the suites have one", () => {
   expect(digestOf(SCRIPTED_DESCRIPTION)?.headline).toBe(SCRIPTED_DESCRIPTION)
 })
 
-// ── a run's verdict (ADR-0077) ────────────────────────────────────────────
+// ── a run's verdict ──────────────────────────────────────────────────────────
 
 /** Ada's ask `e-1` is stopping: its verdict is pending, as `runs.ts` writes it. */
 async function stopping(

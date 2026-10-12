@@ -1,15 +1,13 @@
 // host/queued-card-pop — popping a lane's queued cards, top first, to send
-// them (ADR-0048, ADR-0108, ADR-0083).
+// them.
 //
-// People queue and unqueue cards through handoffs (ADR-0059); the host pops
-// them, and only when the lane is not running, since a lane is never written
-// while it runs (S21), its queue is not held, and nobody is typing in the
-// top card (ADR-0048 step 7). A blank message is passed over, left where it
-// is (ADR-0113). Popping the next queued card is where the cards people
-// still edit meet the tree. What a popped card comes to is decided first
-// (`planCarry`): a fact appended, a catch-up then the card's text if it has
-// any, a split's run, or a message sent (ADR-0080); `carryOut` carries it
-// out.
+// People queue and unqueue cards through handoffs; the host pops them, and only
+// when the lane is not running, since a lane is never written while it runs,
+// its queue is not held, and nobody is typing in the top card. A blank message
+// is passed over, left where it is. Popping the next queued card is where the
+// cards people still edit meet the tree. What a popped card comes to is decided
+// first (`planCarry`): a fact appended, a catch-up then the card's text if it
+// has any, a split's run, or a message sent; `carryOut` carries it out.
 
 import { subscribe } from "@kyneta/schema"
 import {
@@ -80,7 +78,7 @@ export interface PoppedText {
   readonly text: string
 }
 
-/** A popped card sent as its queuer's message: a text card, or a reference's quote (ADR-0126). */
+/** A popped card sent as its queuer's message: a text card, or a reference's quote. */
 export interface PoppedMessage {
   readonly card: QueuedMessage
   readonly text: string
@@ -105,16 +103,15 @@ export type NextQueuedCardPop =
 /**
  * Pop a lane's next queued card: read that it is queued and on top, read its
  * text, and remove its record. Synchronous: an unqueue is a step on the same
- * keeper as the drain, so it runs before the pop or after it, never
- * between, and one after it is refused as gone. Idle when the lane runs or
- * nothing is queued; `held`, `typing` and `blank` as `planNextQueuedCardPop`
- * says (ADR-0048 step 7, ADR-0113). A card whose text the host does not yet
- * hold as its queuer had it is `behind`, and stays: Kyneta keeps no order
- * between documents, so its record can arrive before its text (S96). Such a
- * card is not blank, though its text reads empty so far: passing over it
- * would send the cards behind it first. `texts` must answer from texts
- * already loaded, and `quotes` holds each queued reference's quote, read
- * before (ADR-0126).
+ * keeper as the drain, so it runs before the pop or after it, never between,
+ * and one after it is refused as gone. Idle when the lane runs or nothing is
+ * queued; `held`, `typing` and `blank` as `planNextQueuedCardPop` says. A card
+ * whose text the host does not yet hold as its queuer had it is `behind`, and
+ * stays: Kyneta keeps no order between documents, so its record can arrive
+ * before its text. Such a card is not blank, though its text reads empty so
+ * far: passing over it would send the cards behind it first. `texts` must
+ * answer from texts already loaded, and `quotes` holds each queued reference's
+ * quote, read before.
  */
 export function popNextQueuedCard(
   places: PlacesDocHandle,
@@ -175,13 +172,13 @@ export interface QueuedCardPopDeps {
   /** Who is typing in which card (`typingIn`): the pop waits for them. */
   readonly presence: PresenceDocHandle
   readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds" | "destroy">
-  /** Where a fact is appended (ADR-0080). */
+  /** Where a fact is appended. */
   readonly agent: Pick<Agent, "lane">
   readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit">
   readonly start: Runs["start"]
   /** Send a popped card's text as its queuer's message, through `sendChat`. */
   readonly send: (popped: PoppedMessage) => Promise<Outcome>
-  /** Where a queued reference's quote is read (ADR-0126). */
+  /** Where a queued reference's quote is read. */
   readonly blobs: Pick<BlobStore, "get">
   /** The top card's text is behind: drain the lane again once the host holds it. */
   readonly behind: (card: QueuedText) => void
@@ -189,16 +186,16 @@ export interface QueuedCardPopDeps {
   readonly typing: (card: QueuedText) => void
   /** Only blank cards are queued: drain the lane again once `card` is written in. */
   readonly blank: (card: QueuedText) => void
-  /** Each card's history (ADR-0048 step 6). */
+  /** Each card's history. */
   readonly provenance: Pick<Provenance, "before" | "after">
-  /** Relay a popped ask card's ask (ADR-0128): "ran" when its run started. */
+  /** Relay a popped ask card's ask: "ran" when its run started. */
   readonly relay: (
     lane: ThreadId,
     relay: RelayDetails,
   ) => Promise<"ran" | "next">
   /**
-   * Append a fact to a thread with no lane, at its end: a conversation an
-   * agent was asked from (ADR-0128). False when it could not be.
+   * Append a fact to a thread with no lane, at its end: a conversation an agent
+   * was asked from. False when it could not be.
    */
   readonly appendLaneless: (
     thread: ThreadId,
@@ -207,15 +204,14 @@ export interface QueuedCardPopDeps {
 }
 
 /**
- * Pop a lane's queued cards in order until one starts a run or none is
- * left. Each card's text is loaded before the pop, so the pop reads it
- * whole. A popped card is spent once its message is written or running;
- * one that could not be sent goes back below the line, saying why
- * (`planUnsent`, S69 answer 5). A held queue ends the drain; a top card
- * whose text is behind, or that someone types in, ends it with a wait that
- * drains again; so does a queue of blank cards alone, until one is written
- * in. A run's end, startup, a move that queues a card on an idle
- * lane, and a release each drain again.
+ * Pop a lane's queued cards in order until one starts a run or none is left.
+ * Each card's text is loaded before the pop, so the pop reads it whole. A
+ * popped card is spent once its message is written or running; one that could
+ * not be sent goes back below the line, saying why (`planUnsent`). A held queue
+ * ends the drain; a top card whose text is behind, or that someone types in,
+ * ends it with a wait that drains again; so does a queue of blank cards alone,
+ * until one is written in. A run's end, startup, a move that queues a card on
+ * an idle lane, and a release each drain again.
  */
 export async function drain(
   deps: QueuedCardPopDeps,
@@ -269,7 +265,7 @@ export async function drain(
   }
 }
 
-/** The quote of each reference queued on `lane`, read from its blob (ADR-0126). */
+/** The quote of each reference queued on `lane`, read from its blob. */
 function queuedQuotes(
   blobs: Pick<BlobStore, "get">,
   cards: readonly CardRecord[],
@@ -323,9 +319,9 @@ async function carryOut(
 }
 
 /**
- * A fact the host queued (ADR-0080), appended to the thread: the lane is
- * idle, since the pop found it so. One that cannot be appended is logged
- * and dropped: nobody could send it from below the line.
+ * A fact the host queued, appended to the thread: the lane is idle, since the
+ * pop found it so. One that cannot be appended is logged and dropped: nobody
+ * could send it from below the line.
  */
 async function appendFact(
   deps: QueuedCardPopDeps,
@@ -352,8 +348,8 @@ async function appendFact(
 }
 
 /**
- * A card that catches the thread up (ADR-0108): the update, then the card's
- * text sent, or carried into the resolution run when the merge conflicts.
+ * A card that catches the thread up: the update, then the card's text sent, or
+ * carried into the resolution run when the merge conflicts.
  */
 async function catchUpThenSend(
   deps: QueuedCardPopDeps,
@@ -400,8 +396,8 @@ async function catchUpThenSend(
 }
 
 /**
- * A card that splits the offer (ADR-0080): the split's own run, the card's
- * text its intent; refused, the card goes back below the line, saying why.
+ * A card that splits the offer: the split's own run, the card's text its
+ * intent; refused, the card goes back below the line, saying why.
  */
 async function splitThen(
   deps: QueuedCardPopDeps,
@@ -499,10 +495,10 @@ async function unsent(
 }
 
 /**
- * The waits for a queued card's text to give up (`behind`): each awaited
- * card no longer queued. The pop removed it, someone unqueued it, took it
- * into an inventory or discarded it, or its lane went: it will not be
- * popped, so nothing is left to wait for. Pure.
+ * The waits for a queued card's text to give up (`behind`): each awaited card
+ * no longer queued. The pop removed it, someone unqueued it, took it into an
+ * inventory or discarded it, or its lane went: it will not be popped, so
+ * nothing is left to wait for.
  */
 export const givenUp = (
   awaited: Iterable<CardId>,
@@ -515,12 +511,11 @@ export const givenUp = (
 }
 
 /**
- * The drain's waits for its top card (ADR-0048 step 7, S96): once per card,
- * until `until` resolves, then drain its lane again. A wait is given up
- * when its card leaves the queue (`givenUp`), so no subscription outlives a
- * card the pop will never reach. The places are watched only while a wait
- * is out. A card already awaited is not awaited twice: the drain that
- * follows the first wait asks again if it must.
+ * The drain's waits for its top card: once per card, until `until` resolves,
+ * then drain its lane again. A wait is given up when its card leaves the queue
+ * (`givenUp`), so no subscription outlives a card the pop will never reach. The
+ * places are watched only while a wait is out. A card already awaited is not
+ * awaited twice: the drain that follows the first wait asks again if it must.
  */
 export function createWaits(deps: {
   readonly places: PlacesDocHandle
@@ -551,8 +546,8 @@ export function createWaits(deps: {
 }
 
 /**
- * Resolves once nobody is typing in `card` (`readTypingIn`), as soon as
- * their presence decays (S28), or when `signal` gives the wait up.
+ * Resolves once nobody is typing in `card` (`readTypingIn`), as soon as their
+ * presence decays, or when `signal` gives the wait up.
  */
 export function untilNotTyped(
   presence: PresenceDocHandle,

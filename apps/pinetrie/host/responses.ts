@@ -1,6 +1,6 @@
-// host/responses — every answer the host gives over HTTP itself, pure: an
-// image blob (ADR-0042), an upload's outcome, an offer's read (ADR-0047).
-// `http.ts` writes each one with `send`.
+// host/responses — every answer the host gives over HTTP itself, pure: an image
+// blob, an upload's outcome, an offer's read. `http.ts` writes each one with
+// `send`.
 
 import type { BlobRef, StoredBlob } from "@pinetrie/core"
 import type { OfferAnswer } from "@pinetrie/rules"

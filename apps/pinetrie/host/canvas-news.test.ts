@@ -22,7 +22,7 @@ const NOTES = cardIdOfKind(
   "01a0ffd2-0000-7000-8000-0000000000a1",
 )
 
-test("a card added to a task's canvas is told to its running threads, as a steer (ADR-0116)", async () => {
+test("a card added to a task's canvas is told to its running threads, as a steer", async () => {
   const b = basics()
   putLane(b, LANE, entryId("p-1"))
   putTask(b, LANE)

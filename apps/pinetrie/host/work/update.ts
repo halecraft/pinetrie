@@ -1,9 +1,8 @@
-// host/work/update — a thread's base, or the thread it branched from,
-// merged into its lane, when the host pops a queued card with a command
-// (ADR-0108, ADR-0104, ADR-0072) or its agent calls `catch_up`, and whether
-// its agent may ask about a conflict (ADR-0080). One step on the lane's
-// queue gathers, plans and merges; then `planSettle` decides what the thread
-// gets, and `applySettle` writes it.
+// host/work/update — a thread's base, or the thread it branched from, merged
+// into its lane, when the host pops a queued card with a command or its agent
+// calls `catch_up`, and whether its agent may ask about a conflict. One step on
+// the lane's queue gathers, plans and merges; then `planSettle` decides what
+// the thread gets, and `applySettle` writes it.
 
 import {
   type BaseMerge,
@@ -83,7 +82,7 @@ import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
 
-/** Why an update was refused, worded once (ADR-0104). */
+/** Why an update was refused, worded once. */
 function updateRefusal(code: UpdateRefusal): string {
   switch (code) {
     case ERR.NOT_SET_UP:
@@ -98,19 +97,18 @@ function updateRefusal(code: UpdateRefusal): string {
 }
 
 /**
- * Why a catch-up was refused before it merged: the smallest resolution
- * prompt for it would not fit what a run keeps when pi compacts (ADR-0084).
+ * Why a catch-up was refused before it merged: the smallest resolution prompt
+ * for it would not fit what a run keeps when pi compacts.
  */
 export function unfittableWords(tokens: number, budget: number): string {
   return `a resolution's prompt would need ${tokens} tokens, over the ${budget} a run keeps: shorten the card's text or the resolve-conflicts skill`
 }
 
 /**
- * What a catch-up may do once its base is known (ADR-0084): merge, with the
- * floor its resolution's prompt will fit, or refuse with the lane untouched,
- * when even the smallest prompt would not fit. Decided before the merge,
- * since a merge left without a prompt is one no later catch-up merges again.
- * Pure.
+ * What a catch-up may do once its base is known: merge, with the floor its
+ * resolution's prompt will fit, or refuse with the lane untouched, when even
+ * the smallest prompt would not fit. Decided before the merge, since a merge
+ * left without a prompt is one no later catch-up merges again.
  */
 export function planCatchUp(
   from: BaseMerge,
@@ -152,8 +150,8 @@ export function reasonOf(index: TreeIndex, description: string): string {
 }
 
 /**
- * What popping an update's card comes to (ADR-0108): the update written in
- * the thread, a resolution run's prompt, nothing new, or why not.
+ * What popping an update's card comes to: the update written in the thread, a
+ * resolution run's prompt, nothing new, or why not.
  */
 export type Prepared =
   | { readonly kind: "clean" }
@@ -164,9 +162,9 @@ export type Prepared =
 const refused = (reason: string): Prepared => ({ kind: "refused", reason })
 
 /**
- * What follows an update (ADR-0080): a run whatever it comes to, as after a
- * quiet catch-up before a person's message; or the card's text, whose send
- * may start no run, so the lane stops unless a resolution runs.
+ * What follows an update: a run whatever it comes to, as after a quiet catch-up
+ * before a person's message; or the card's text, whose send may start no run,
+ * so the lane stops unless a resolution runs.
  */
 export type UpdateFollows = "run" | "send"
 
@@ -218,12 +216,11 @@ const touching = (revisions: readonly TouchedRevision[], path: string) =>
   revisions.filter(r => r.paths.includes(path)).map(r => r.description)
 
 /**
- * What a merge comes to (ADR-0104, ADR-0033). Clean: the update, written in
- * the thread, and the merge fetched. Nothing: a mark naming accepted work, when
- * one was made, fetched. Conflicted: the resolution's prompt, within the
- * floor's budget, each file with why each side changed it, and the card's
- * text after; nothing is fetched: the resolution's turns fetch the lane as
- * they commit. Pure.
+ * What a merge comes to. Clean: the update, written in the thread, and the
+ * merge fetched. Nothing: a mark naming accepted work, when one was made,
+ * fetched. Conflicted: the resolution's prompt, within the floor's budget, each
+ * file with why each side changed it, and the card's text after; nothing is
+ * fetched: the resolution's turns fetch the lane as they commit.
  */
 export function planSettle(
   facts: SettleFacts,
@@ -324,16 +321,15 @@ export async function applySettle(
 export interface Updates {
   /**
    * Merge what `command` names into the lane `handle` names, whose handle the
-   * caller holds: the thread's base (ADR-0104),
-   * accepted work's commit or a fresh copy of its WIP; with `continue-on-accepted`,
-   * accepted work, moving the thread there; with `catch-up-with-parent`, the
-   * newest commit of the thread it branched from (ADR-0072).
-   * Clean: the update is appended to the thread, through `handle`. Conflicted: the land
-   * message for the resolution run, with `intent` (the card's text) after
-   * the conflicts. Nothing new: nothing to do, but a move to accepted work is
-   * fetched. Refused, with the lane untouched, when even the smallest
-   * resolution prompt would not fit (ADR-0084). The lane is stopped after,
-   * unless a run follows (`follows`).
+   * caller holds: the thread's base, accepted work's commit or a fresh copy of
+   * its WIP; with `continue-on-accepted`, accepted work, moving the thread
+   * there; with `catch-up-with-parent`, the newest commit of the thread it
+   * branched from. Clean: the update is appended to the thread, through
+   * `handle`. Conflicted: the land message for the resolution run, with
+   * `intent` (the card's text) after the conflicts. Nothing new: nothing to do,
+   * but a move to accepted work is fetched. Refused, with the lane untouched,
+   * when even the smallest resolution prompt would not fit. The lane is stopped
+   * after, unless a run follows (`follows`).
    */
   prepareUpdate(
     handle: Pick<ThreadLaneHandle, "name" | "append">,
@@ -343,17 +339,17 @@ export interface Updates {
     follows: UpdateFollows,
   ): Promise<Prepared>
   /**
-   * pi's hook: the lane's agent called `catch_up` (ADR-0080, S103). Merged
-   * during its run, on the lane's queue, with no start or stop of the lane,
-   * and nothing appended: the tool's answer is the update. Refused unless
-   * the call is the only one in its turn and there is something new.
+   * pi's hook: the lane's agent called `catch_up`. Merged during its run, on
+   * the lane's queue, with no start or stop of the lane, and nothing appended:
+   * the tool's answer is the update. Refused unless the call is the only one in
+   * its turn and there is something new.
    */
   catchUpInRun(lane: ThreadId, from: "base" | "parent"): Promise<ToolAnswer>
   /**
-   * pi's hook: the lane's agent asked about a conflict. Taken while jj finds
-   * a conflict in the lane's copy, in any run (ADR-0080, S104): read on the
-   * lane's queue, never from a revision record, which can be late. A lane
-   * with no copy of its own has nothing to ask about.
+   * pi's hook: the lane's agent asked about a conflict. Taken while jj finds a
+   * conflict in the lane's copy, in any run: read on the lane's queue, never
+   * from a revision record, which can be late. A lane with no copy of its own
+   * has nothing to ask about.
    */
   askedAboutConflict(lane: ThreadId): Promise<boolean>
 }
@@ -408,7 +404,7 @@ export function createUpdates(deps: {
 
   /** Anything edited in the lane since its last run, committed as a turn. */
   async function commitEdits(lane: ThreadId, jj: Runner): Promise<void> {
-    // The lane's own root's document (ADR-0063).
+    // The lane's own root's document.
     const doc = await docs.laneDoc(lane)
     const tip = doc === null ? null : readLaneTip(doc, lane)
     if (doc === null || tip === null) return
@@ -422,7 +418,7 @@ export function createUpdates(deps: {
 
   /**
    * The thread `lane` branched from, as its root's document says it now
-   * (`parentNow`), and whether its agent runs (ADR-0072).
+   * (`parentNow`), and whether its agent runs.
    */
   async function parentOf(
     lane: ThreadId,
@@ -473,8 +469,8 @@ export function createUpdates(deps: {
             readonly why: Exclude<ReturnType<typeof planCopyReady>, "ready">
           }
       > => {
-        // A merge lands at the lane's bookmark: a working copy off its line
-        // (a split's stack) would be left beside it (ADR-0080).
+        // A merge lands at the lane's bookmark: a working copy off its line (a
+        // split's stack) would be left beside it.
         const ready = planCopyReady(await copyFacts(jj, lane))
         if (ready !== "ready") return { kind: "copy", why: ready }
         const from =
@@ -522,7 +518,7 @@ export function createUpdates(deps: {
     }
   }
 
-  /** What a resolution's prompt must fit (ADR-0084), read before a merge. */
+  /** What a resolution's prompt must fit, read before a merge. */
   const resolutionOf = async (
     intent: string,
   ): Promise<Parameters<typeof planCatchUp>[1]> => ({

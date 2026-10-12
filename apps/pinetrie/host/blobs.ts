@@ -1,5 +1,5 @@
-// host/blobs — the host's blobs, kept by content (ADR-0042, ADR-0126):
-// images, and references' quotes as markdown.
+// host/blobs — the host's blobs, kept by content: images, and references'
+// quotes as markdown.
 //
 // Two stores with one contract (`blobs.test.ts`): a table in the session's
 // SQLite file, on the store's own connection, and a map for a host without a
@@ -94,8 +94,8 @@ function rowRef(row: Row | undefined): BlobRef | undefined {
 
 /**
  * Blobs in `pinetrie_blobs`, beside Kyneta's `kyneta_*` tables in the session's
- * file. `db` is the store's connection, which holds the file's lock (S47): a
- * second connection would be refused.
+ * file. `db` is the store's connection, which holds the file's lock: a second
+ * connection would be refused.
  */
 export function sqliteBlobs(
   db: DatabaseSync,
@@ -178,9 +178,9 @@ export type UploadHeaders =
 
 /**
  * Whether to read an upload's body at all, from its headers, so a refused
- * upload costs no read. Pure. The declared type decides only whether the
- * body is read: an image's bytes are judged after, by `prepareImage`, and
- * markdown is kept as it is (a reference's quote, ADR-0126).
+ * upload costs no read. The declared type decides only whether the body is
+ * read: an image's bytes are judged after, by `prepareImage`, and markdown is
+ * kept as it is (a reference's quote).
  */
 export function planUploadHeaders(headers: {
   readonly contentType: string | undefined

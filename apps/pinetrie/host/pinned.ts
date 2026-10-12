@@ -1,4 +1,4 @@
-// host/pinned — what a run reads of its thread's pinned cards (ADR-0048, S92).
+// host/pinned — what a run reads of its thread's pinned cards.
 //
 // Gather the thread's pinned cards and their texts, waiting a bounded time
 // for each as its sender had it; plan the cards entry against what the model

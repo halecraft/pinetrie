@@ -1,5 +1,5 @@
-// host/commands/mark — a task's or a note column's title (ADR-0045,
-// ADR-0116): gather, `planMark`, execute.
+// host/commands/mark — a task's or a note column's title: gather, `planMark`,
+// execute.
 
 import { type Intent, isNoteColumnId, type WriterId } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"

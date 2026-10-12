@@ -1,8 +1,7 @@
-// host/directory — the directory of roots (ADR-0063): each root's `pinetrie.root`
-// record, refreshed whenever its document's entries, pi's values (a lane's
-// tip) or the host's records (a mark) change, so
-// what the sidebar, the board, the inbox and the image sweep read of a
-// root follows it without any of them opening it.
+// host/directory — the directory of roots: each root's `pinetrie.root` record,
+// refreshed whenever its document's entries, pi's values (a lane's tip) or the
+// host's records (a mark) change, so what the sidebar, the board, the inbox and
+// the image sweep read of a root follows it without any of them opening it.
 //
 // The directory follows every root the documents hold (`onOpened`), those
 // opened before it started among them, and refreshes each as it starts to
@@ -26,11 +25,10 @@ import { type Basics, failed, type HostKeeper } from "./basics.ts"
 import type { Records } from "./records.ts"
 
 /**
- * The roots a starting host opens only to rebuild their directory record
- * (ADR-0063): named by a thread's record, with no record that decodes in
- * this build's shape (`ROOT` is derived, so its shape changes with no
- * migration), and not held already, which a held root's refresh covers.
- * In order, by id. Pure.
+ * The roots a starting host opens only to rebuild their directory record: named
+ * by a thread's record, with no record that decodes in this build's shape
+ * (`ROOT` is derived, so its shape changes with no migration), and not held
+ * already, which a held root's refresh covers. In order, by id.
  */
 export function planRebuild(input: {
   readonly named: Iterable<RootId>

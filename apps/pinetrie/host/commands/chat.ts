@@ -1,8 +1,7 @@
-// host/commands/chat — a human message, from a `chat` command or a queued
-// card the host popped: the one send path, so a busy lane, conflicts and who a
-// message is for are decided once. Who spends the card is the caller's:
-// the dispatcher for a `chat` command, the drain for a popped queued card
-// (ADR-0048).
+// host/commands/chat — a human message, from a `chat` command or a queued card
+// the host popped: the one send path, so a busy lane, conflicts and who a
+// message is for are decided once. Who spends the card is the caller's: the
+// dispatcher for a `chat` command, the drain for a popped queued card.
 
 import {
   agentCandidates,
@@ -77,25 +76,25 @@ export type Chat = Omit<Extract<Intent, { kind: "chat" }>, "kind" | "at"> & {
 export interface ChatDeps {
   readonly basics: Basics
   readonly agent: Pick<Agent, "createThreadLane" | "lane">
-  /** A message on a thread with no lane is written through the scribe (S21). */
+  /** A message on a thread with no lane is written through the scribe. */
   readonly scribe: Pick<Scribe, "appendToTree">
-  /** The commands pi loaded, which a `/` message names (ADR-0036). */
+  /** The commands pi loaded, which a `/` message names. */
   readonly piSetup: Pick<PiSetup, "commands" | "expand">
   readonly work: Pick<
     LaneWork,
     "project" | "checkBegin" | "prepareLane" | "prepareUpdate"
   >
   readonly blobs: Pick<BlobStore, "ref">
-  /** Who wrote in a card: its other writers are a message's contributors (ADR-0048). */
+  /** Who wrote in a card: its other writers are a message's contributors. */
   readonly cards: Pick<CardPort, "writers" | "blankQueued">
   readonly start: Runs["start"]
-  /** A new lane may title its root (ADR-0074). */
+  /** A new lane may title its root. */
   readonly titles: Pick<Titles, "laneStarted">
-  /** A thread's record, written with its first message (ADR-0117). */
+  /** A thread's record, written with its first message. */
   readonly records: Pick<Records, "writeValues">
-  /** Every thread is named once recorded (ADR-0117). */
+  /** Every thread is named once recorded. */
   readonly names: Pick<Names, "ensure">
-  /** A chat that asks or invites other threads' agents is relayed (ADR-0128). */
+  /** A chat that asks or invites other threads' agents is relayed. */
   readonly relays: Pick<Relays, "relayChat">
 }
 
@@ -104,18 +103,17 @@ export interface ChatContext {
   /** The root's documents the send was planned from. */
   readonly view: RootView
   readonly writer: WriterId
-  /** The WIP bookmark a new lane begins from; null for accepted work (ADR-0104). */
+  /** The WIP bookmark a new lane begins from; null for accepted work. */
   readonly base: string | null
   /** The thread's pinned cards as the sender had them: a run waits for them. */
   readonly pinned: readonly SentCard[]
   /**
-   * What a branch to a thread not yet opened writes before its first
-   * message (ADR-0116, ADR-0117, ADR-0126): the thread's opening
-   * (`planThreadOpen`), planned with the send; null for a send to a thread
-   * that is open already, or to its end.
+   * What a branch to a thread not yet opened writes before its first message:
+   * the thread's opening (`planThreadOpen`), planned with the send; null for a
+   * send to a thread that is open already, or to its end.
    */
   readonly start: Extract<ThreadOpen, { kind: "open" }> | null
-  /** The past its text links to, quoted for the model (ADR-0126). */
+  /** The past its text links to, quoted for the model. */
   readonly quotes: readonly LinkedQuote[]
 }
 
@@ -143,10 +141,10 @@ export async function sendChat(
   const { work, blobs, cards } = deps
   const { docs, session, live } = deps.basics
 
-  // A thread at the root starts a root (ADR-0063), under the id its tab
-  // minted, in a new task (ADR-0116): one the session already holds is
-  // another's, but for the task its thread was opened in, in that root
-  // (ADR-0126). A branch elsewhere goes in a task the session holds.
+  // A thread at the root starts a root, under the id its tab minted, in a new
+  // task: one the session already holds is another's, but for the task its
+  // thread was opened in, in that root. A branch elsewhere goes in a task the
+  // session holds.
   if (chat.at.kind === "branch") {
     const known = readTasks(deps.basics.places).has(chat.at.task)
     const opened = readThreads(session).get(chat.at.thread)?.root === chat.root
@@ -209,8 +207,8 @@ export async function sendChat(
       code: ERR.THREAD_TAKEN,
       message: "that thread has started already",
     }
-  // A recorded thread's first send is a branch where its record says it
-  // begins (ADR-0117): any other branch naming it is another's.
+  // A recorded thread's first send is a branch where its record says it begins:
+  // any other branch naming it is another's.
   const copied = readThreads(session).get(chat.at.thread)
   if (
     chat.at.kind === "branch" &&
@@ -222,9 +220,8 @@ export async function sendChat(
       code: ERR.THREAD_TAKEN,
       message: "that thread has started already",
     }
-  // A thread that works, or will work, in its own copy is sent paths as
-  // its lane sees them: your working copy's (ADR-0034), and a command's
-  // files (ADR-0036).
+  // A thread that works, or will work, in its own copy is sent paths as its
+  // lane sees them: your working copy's, and a command's files.
   const own = worksOwn(view.session, {
     lane: thread.lane,
     mode: planModeOf(chat.at),
@@ -241,7 +238,7 @@ export async function sendChat(
         : ((await deps.piSetup.expand(source, typed.args, own)) ?? {
             unreadable: typed.name,
           })
-  // gather: the store's refs of the images its text shows (ADR-0042)
+  // gather: the store's refs of the images its text shows
   const shas = pastedImages(chat.text)
   const refs = new Map(
     shas.flatMap(sha => {
@@ -250,8 +247,8 @@ export async function sendChat(
     }),
   )
 
-  // gather: the thread's base, for a lane with no work of its own to catch
-  // up quietly before it runs (ADR-0080)
+  // gather: the thread's base, for a lane with no work of its own to catch up
+  // quietly before it runs
   const lane = thread.lane.kind === "lane" ? thread.lane.name : null
   const bases = readBases(session)
 
@@ -353,8 +350,8 @@ export async function sendChat(
     start,
     quotes,
   })
-  // Other threads' agents it asks or invites are relayed to once the chat
-  // is written (ADR-0128), in a step of their own.
+  // Other threads' agents it asks or invites are relayed to once the chat is
+  // written, in a step of their own.
   const details = "details" in planned ? planned.details : null
   if (
     details !== null &&
@@ -366,11 +363,11 @@ export async function sendChat(
 }
 
 /**
- * A lane with no work of its own whose base has new work, caught up before
- * the chat runs on it (ADR-0080), as a card's catch-up is: the update, then
- * the chat planned again, after the update's entry; or, should the merge
- * conflict after all, the resolution run carrying the chat's text. The lane
- * is kept started: a run follows either way.
+ * A lane with no work of its own whose base has new work, caught up before the
+ * chat runs on it, as a card's catch-up is: the update, then the chat planned
+ * again, after the update's entry; or, should the merge conflict after all, the
+ * resolution run carrying the chat's text. The lane is kept started: a run
+ * follows either way.
  */
 async function catchUpFirst(
   deps: ChatDeps,
@@ -418,16 +415,15 @@ export async function executeChat(
   const { root } = view
   const message = (details: ChatDetails) =>
     encodeChat(details, now(), context.quotes)
-  // A thread opened by its first message: its record, its card on its
-  // task's canvas and a new task's record and board place first, so a
-  // reader that finds the message finds its thread's root and task
-  // (ADR-0117, ADR-0116).
+  // A thread opened by its first message: its record, its card on its task's
+  // canvas and a new task's record and board place first, so a reader that
+  // finds the message finds its thread's root and task.
   const { start } = context
   if (start !== null) {
     await deps.records.writeValues(start.records)
     applyPlaceSteps(deps.basics.places, start.steps)
-    // A conversation's thread is named once its record is (ADR-0117); a new
-    // lane's is named as its lane is made, which draws its banner.
+    // A conversation's thread is named once its record is; a new lane's is
+    // named as its lane is made, which draws its banner.
     if (planned.kind === "appendToTree") void deps.names.ensure()
   }
   switch (planned.kind) {

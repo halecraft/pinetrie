@@ -72,7 +72,7 @@ function behind(to = "l2") {
 
 const settle = () => new Promise(r => setTimeout(r, 0))
 
-describe("a thread's base news (ADR-0080)", () => {
+describe("a thread's base news", () => {
   test("a chat's run is told at its start", async () => {
     const { news } = behind()
     expect((await news.atStart(LANE))?.details).toMatchObject({

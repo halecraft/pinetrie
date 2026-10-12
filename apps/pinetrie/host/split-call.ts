@@ -1,10 +1,10 @@
-// host/split-call — `split_offer` (ADR-0080): a split card queued on the
-// agent's lane, in one step on the documents' keeper, as the strip's button
-// queues one. Its run's end pops it (`settle.ts`, `queued-card-pop.ts`): pi
-// calls the hook only during a run, and the tool awaits the step, so the
-// step is queued before the run's end queues its drain, which a keeper runs
-// after it (`packages/keeper/TECHNICAL.md`), even when a Stop ends the run
-// while the step waits.
+// host/split-call — `split_offer`: a split card queued on the agent's lane, in
+// one step on the documents' keeper, as the strip's button queues one. Its
+// run's end pops it (`settle.ts`, `queued-card-pop.ts`): pi calls the hook only
+// during a run, and the tool awaits the step, so the step is queued before the
+// run's end queues its drain, which a keeper runs after it
+// (`packages/keeper/TECHNICAL.md`), even when a Stop ends the run while the
+// step waits.
 
 import { type ThreadId, textCardId } from "@pinetrie/core"
 import {

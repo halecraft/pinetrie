@@ -62,29 +62,28 @@ export interface StartupDeps {
   /** The commands pi loaded, written as a record, and those it refused, logged. */
   readonly piSetup: Pick<PiSetup, "commands" | "refusedCommands">
   readonly work: Pick<LaneWork, "project">
-  /** Name every lane that has none (ADR-0039). */
+  /** Name every lane that has none. */
   readonly ensureNames: () => Promise<void>
   readonly keeper: Keeper
   readonly start: Runs["start"]
   readonly settle: (lanes: readonly ThreadId[]) => Promise<void>
   readonly cards: Pick<CardPort, "texts" | "stored" | "destroyDocs">
-  /** Each card's history and traces (ADR-0048 step 6), swept with the cards. */
+  /** Each card's history and traces, swept with the cards. */
   readonly provenance: Pick<Provenance, "before" | "sweep">
 }
 
 /**
- * In order: no stream survives a process, so clear them; give a new store
- * the default workflow (`planWorkflowSeed`); delete the records of a type
- * no spec declares, in the session and the roots opened
- * (`planUndeclaredSweep`, ADR-0100); log the stored lane
- * names that are not a thread's, which no reader is given; name every lane
- * that has none (ADR-0039); resume each lane a crash interrupted, in its own
- * directory (`planStartup`); write what the host found, the commands its
- * pi loaded and the verdicts whose request died with the last host, those
- * that changed in one write; sweep what no one will type in
- * again (`sweepTexts`); and last, settle the lanes with cards queued, whose
- * compaction then holds every write above. Nothing else runs yet, so
- * clearing the streams needs no keeper step.
+ * In order: no stream survives a process, so clear them; give a new store the
+ * default workflow (`planWorkflowSeed`); delete the records of a type no spec
+ * declares, in the session and the roots opened (`planUndeclaredSweep`); log
+ * the stored lane names that are not a thread's, which no reader is given; name
+ * every lane that has none; resume each lane a crash interrupted, in its own
+ * directory (`planStartup`); write what the host found, the commands its pi
+ * loaded and the verdicts whose request died with the last host, those that
+ * changed in one write; sweep what no one will type in again (`sweepTexts`);
+ * and last, settle the lanes with cards queued, whose compaction then holds
+ * every write above. Nothing else runs yet, so clearing the streams needs no
+ * keeper step.
  */
 export async function recover(deps: StartupDeps): Promise<void> {
   const { agent, records, piSetup, work, keeper, settle } = deps
@@ -157,10 +156,10 @@ export async function recover(deps: StartupDeps): Promise<void> {
 }
 
 /**
- * Delete what no one will type in again (ADR-0048): card records whose text
- * is empty and card documents with no record (`planCardSweep`); and seat
- * records no card's text names (`planSeatSweep`). Gather, plan, then execute; the stored lists and the
- * records are read with no await between them.
+ * Delete what no one will type in again: card records whose text is empty and
+ * card documents with no record (`planCardSweep`); and seat records no card's
+ * text names (`planSeatSweep`). Gather, plan, then execute; the stored lists
+ * and the records are read with no await between them.
  */
 async function sweepTexts(deps: StartupDeps): Promise<void> {
   const { cards } = deps
@@ -185,7 +184,7 @@ async function sweepTexts(deps: StartupDeps): Promise<void> {
     seats,
     texts.flatMap(t => t.clients),
   )
-  // execute: each record, then the texts (S64)
+  // execute: each record, then the texts
   applyPlaceSteps(
     places,
     swept.records.map(id => ({ kind: "remove", id })),

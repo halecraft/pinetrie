@@ -78,7 +78,7 @@ function setUp() {
   return { b, readTaskContext }
 }
 
-test("a run is told its task's canvas, its thread marked, and the cards pinned to the task, each as an entry of its own (ADR-0116)", async () => {
+test("a run is told its task's canvas, its thread marked, and the task's pinned cards", async () => {
   const { readTaskContext } = setUp()
   const [canvas, pinned] = await readTaskContext(LANE)
   const list = decodeCanvas(canvas)

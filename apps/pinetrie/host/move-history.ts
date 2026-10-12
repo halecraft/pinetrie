@@ -1,15 +1,15 @@
-// host/move-history — each person's history of moves, per task, and one
-// outside any task (ADR-0066, ADR-0116, ADR-0126).
+// host/move-history — each person's history of moves, per task, and one outside
+// any task.
 //
 // Kyneta undoes only the writes its own runtime made, and the host is the one
 // writer of the places document, so the stacks live here: one per writer and
 // task, `moves:<writer>:<task>`, and one per writer outside any task,
-// `moves:<writer>` (`MoveHistoryScope`), kept in the host's store, so a person's tabs
-// share it and it outlives a restart (S91). Every undo is whole or refused
-// (`whole: true`): without it, a step someone else's move broke would be
-// skipped and an older one undone out of sight (S82). A stack is made on its
-// first use, loaded from the store if it was kept, and unloaded when nobody
-// can use it.
+// `moves:<writer>` (`MoveHistoryScope`), kept in the host's store, so a
+// person's tabs share it and it outlives a restart. Every undo is whole or
+// refused (`whole: true`): without it, a step someone else's move broke would
+// be skipped and an older one undone out of sight. A stack is made on its first
+// use, loaded from the store if it was kept, and unloaded when nobody can use
+// it.
 
 import {
   createUndoStack,
@@ -33,8 +33,8 @@ export interface MoveHistories {
   /** One step of `writer`'s history in `scope`, its stack loaded first. */
   gestureOf(writer: WriterId, scope: MoveHistoryScope): Promise<Gesture>
   /**
-   * The step `step` would try first, without reverting it: its parts name
-   * the cards it moves (S139). Undefined for none.
+   * The step `step` would try first, without reverting it: its parts name the
+   * cards it moves. Undefined for none.
    */
   top(
     writer: WriterId,
@@ -53,7 +53,7 @@ export interface MoveHistories {
   unloadWriters(writers: readonly WriterId[]): Promise<void>
   /** Unload every stack in `task`: it was archived, or deleted. */
   unloadTask(task: TaskId): Promise<void>
-  /** Destroy these stack documents, loaded or not (S91). */
+  /** Destroy these stack documents, loaded or not. */
   retire(docIds: readonly string[]): Promise<void>
   dispose(): void
 }

@@ -1,7 +1,6 @@
 // host/commands/lane — the commands that act on one thread's lane: stop it,
-// carry it on after a Stop (ADR-0082), hold or release its queue (ADR-0048
-// step 7), or act on its offer (ADR-0105), which leaves a fact in the thread
-// (ADR-0080).
+// carry it on after a Stop, hold or release its queue, or act on its offer,
+// which leaves a fact in the thread.
 
 import {
   type AcceptedAction,
@@ -61,7 +60,7 @@ export interface LaneDeps {
   readonly keeper: Pick<HostKeeper, "run">
   /** Each card's history: a fact's card is the host's write. */
   readonly provenance: Pick<Provenance, "before" | "after">
-  /** Which queued cards are blank: they leave a lane idle (ADR-0113). */
+  /** Which queued cards are blank: they leave a lane idle. */
   readonly cards: Pick<CardPort, "blankQueued">
 }
 
@@ -74,8 +73,8 @@ interface LaneHere {
 }
 
 /**
- * The lane's root's document (ADR-0063), its tree and the lane's view; null
- * for a lane no root holds.
+ * The lane's root's document, its tree and the lane's view; null for a lane no
+ * root holds.
  */
 async function laneAt(
   deps: Pick<LaneDeps, "basics" | "cards">,
@@ -99,13 +98,12 @@ async function laneAt(
 }
 
 /**
- * Stop a thread's turn, queueing the fact of who stopped its ask first
- * (ADR-0106, ADR-0126), and holding its queue when a message card waits
- * there (ADR-0048 step 7): both are written before the run is stopped, so
- * they are there when the run's end drains the lane, which then appends the
- * fact and pops nothing else. A chat's run still waiting for its pinned
- * cards' text has not reached pi, whose abort would reach nothing: it is
- * cancelled instead. A take's stop is this one too, as the taker
+ * Stop a thread's turn, queueing the fact of who stopped its ask first, and
+ * holding its queue when a message card waits there: both are written before
+ * the run is stopped, so they are there when the run's end drains the lane,
+ * which then appends the fact and pops nothing else. A chat's run still waiting
+ * for its pinned cards' text has not reached pi, whose abort would reach
+ * nothing: it is cancelled instead. A take's stop is this one too, as the taker
  * (`onTaken`).
  */
 export async function handleStop(
@@ -145,7 +143,7 @@ export async function handleStop(
     }
     if (!deps.cancel(lane)) await agent.lane(lane).abort()
   }
-  // A run this thread asked for in another thread stops with it (ADR-0128).
+  // A run this thread asked for in another thread stops with it.
   for (const asked of askedFrom(deps.basics, lane))
     await handleStop(deps, asked, by)
   return { kind: "stopped" }
@@ -169,9 +167,9 @@ function askedFrom(
 }
 
 /**
- * Hold a thread's queue, or release it (ADR-0048 step 7), answering how the
- * queue is now: `held` or `released`, though it was already so. A release
- * asks for the lane's drain: nothing else would pop what waited.
+ * Hold a thread's queue, or release it, answering how the queue is now: `held`
+ * or `released`, though it was already so. A release asks for the lane's drain:
+ * nothing else would pop what waited.
  */
 export async function handleQueueHold(
   deps: Pick<LaneDeps, "basics" | "cards" | "drain" | "records">,
@@ -202,9 +200,9 @@ export async function handleQueueHold(
 }
 
 /**
- * Carry on a thread whose last ask was stopped (ADR-0082): a new run whose
- * prompt is the host's carry-on message, decided by `planCarryOn`. A step on
- * the documents' keeper, so a second press finds the lane busy.
+ * Carry on a thread whose last ask was stopped: a new run whose prompt is the
+ * host's carry-on message, decided by `planCarryOn`. A step on the documents'
+ * keeper, so a second press finds the lane busy.
  */
 export async function handleCarryOn(
   deps: Pick<LaneDeps, "basics" | "cards" | "start">,
@@ -240,8 +238,8 @@ const NO_REPO: Outcome = {
 }
 
 /**
- * An offer action (ADR-0105), the offer shell's, on your repo. A split is a
- * card's command, not an action (ADR-0080).
+ * An offer action, the offer shell's, on your repo. A split is a card's
+ * command, not an action.
  */
 export async function actOnOffer(
   deps: LaneDeps,
@@ -266,10 +264,10 @@ export async function actOnOffer(
 }
 
 /**
- * What a command on an offer did, queued as a card on its thread (ADR-0080)
- * and the lane's drain asked for: an idle lane pops it at once, a running
- * one when its run ends, in order with the cards already waiting. One step:
- * the card is written against the places as they are, with its history.
+ * What a command on an offer did, queued as a card on its thread and the lane's
+ * drain asked for: an idle lane pops it at once, a running one when its run
+ * ends, in order with the cards already waiting. One step: the card is written
+ * against the places as they are, with its history.
  */
 export async function recordFact(
   deps: Pick<LaneDeps, "basics" | "drain" | "provenance">,
@@ -306,8 +304,7 @@ export function offerRefusal(code: ErrCode): string {
 }
 
 /**
- * A setup or publish: set up accepted work (ADR-0104), or publish it
- * (ADR-0076, ADR-0090).
+ * A setup or publish: set up accepted work, or publish it.
  */
 export async function actOnAccepted(
   deps: Pick<LaneDeps, "work">,

@@ -97,7 +97,7 @@ test("sqlite blobs outlive their connection: a reopened file serves them", () =>
   expect(sqliteBlobs(openDatabase(file)).ref(RED_SHA)?.width).toBe(40)
 })
 
-test("markdown is kept as a blob too, with no size, and read back as itself (ADR-0126)", () => {
+test("markdown is kept as a blob too, with no size, and read back as itself", () => {
   for (const blobs of [memoryBlobs(), sqliteBlobs(openDatabase(":memory:"))]) {
     const ref = blobs.put(storedText("| a |\n|---|\n| 1 |"))
     expect(ref).toMatchObject({

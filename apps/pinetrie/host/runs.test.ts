@@ -58,7 +58,7 @@ describe("planRunEnd", () => {
     }
   })
 
-  test("a stack prompt adds splitEnded before endRun; a land prompt ends as any run (ADR-0080)", () => {
+  test("a stack prompt adds splitEnded before endRun; a land prompt ends as any run", () => {
     expect(planRunEnd("land")).toEqual(planRunEnd("chat"))
     expect(planRunEnd("stack")).toEqual([
       "splitEnded",
@@ -70,7 +70,7 @@ describe("planRunEnd", () => {
     expect(planRunEnd(undefined)).not.toContain("splitEnded")
   })
 
-  test("the verdict is pending before endRun, for every role (ADR-0077)", () => {
+  test("the verdict is pending before endRun, for every role", () => {
     for (const role of [undefined, "chat", "land", "stack"]) {
       const steps = planRunEnd(role)
       expect(steps.indexOf("verdictPending")).toBeGreaterThanOrEqual(0)
@@ -204,7 +204,7 @@ async function untilRun(lane: ReturnType<typeof fakeLane>): Promise<void> {
     await new Promise(resolve => setImmediate(resolve))
 }
 
-describe("a run's pinned cards (ADR-0048)", () => {
+describe("a run's pinned cards", () => {
   const pinned = encodePinned(
     {
       lane: LANE,
@@ -241,7 +241,7 @@ describe("a run's pinned cards (ADR-0048)", () => {
     )
   })
 
-  test("a chat's run is told its base's news first, then its task, before its cards entry, which stays the prompt's parent (ADR-0080, ADR-0116)", async () => {
+  test("a chat's run is told its base's news first, then its task, before its cards entry", async () => {
     const behind = encodeBehind(
       {
         from: { kind: "accepted" },

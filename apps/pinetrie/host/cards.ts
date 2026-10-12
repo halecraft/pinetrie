@@ -1,6 +1,5 @@
-// host/cards — where the host's shell opens card documents (ADR-0048), the
-// texts people type. `startHost` reads one more, for the suites
-// (`RunningHost.cardText`).
+// host/cards — where the host's shell opens card documents, the texts people
+// type. `startHost` reads one more, for the suites (`RunningHost.cardText`).
 //
 // Where a card is lives in the places document, which `places.ts` writes;
 // this port is about texts alone: who wrote in one, loading them for the
@@ -40,7 +39,7 @@ export interface CardPort {
   writers(id: TextCardId): Promise<readonly WriterId[]>
   /**
    * Destroy its text: it was sent or removed, and its record is gone first.
-   * Each client destroys its own copy once it has seen both (S64).
+   * Each client destroys its own copy once it has seen both.
    */
   destroy(id: TextCardId): Promise<void>
   /** Load these cards' texts, so `textNow` reads each whole. */

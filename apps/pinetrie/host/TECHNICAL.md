@@ -10,41 +10,41 @@ wires them.
 
 | module | owns |
 |---|---|
-| `server.ts`, `invocation.ts` | `pnpm host [folder]` (ADR-0086): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it), `refusalText` (a refusal's words); `server.ts` carries them out |
+| `server.ts`, `invocation.ts` | `pnpm host [folder]` (ADR-0086): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it), `refusalText` (a refusal's words); `server.ts` carries them out. A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm run host:react-dev` serves React's development build, for its warnings and render timeline (S59) |
 | `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the store, the user config, the agent's model and where it came from, the URL and invites |
 | `index.ts` | `startHost`: the store and the check of its schemas (`migrations/`), the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents and the records, then pi's scribe and setup, lane work and the agent, in that order (§ Startup), then the wiring below |
 | `basics.ts` | `Basics` (the session, `pinetrie:live`, the documents, the places, log, ids, clock) and how a failure is logged (`failed`, which words the error with core's `errorText`) |
-| `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`) |
+| `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`). A removed card's record goes before its text, which its caller destroys after: a client destroys its copy of a text only once it has seen both go (S64) |
 | `move-history.ts` | each person's history of moves per root (ADR-0066): `MoveHistories`, a shell over Kyneta's undo stacks |
 | `provenance.ts` | each card's history and the traces left where someone else moved your card (ADR-0048 step 6): `before` at a step's start, `after` its places write, `seen` and `sweep` |
 | `shutdown.ts` | the order a host stops in (`planShutdown`): the agent, then the scribe, among its steps |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`); a run asks base news what it is told first, and its lane's stop has base news forget what was steered |
-| `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
-| `canvas.ts` | what a run is told of its thread's task (ADR-0116): `readTaskContext`, the canvas list and the cards pinned to the task, each written only when it differs from the newest of its kind on the lane's path; `runs.ts` writes them between base news and the thread's pinned cards |
+| `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5, S92): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
+| `canvas.ts` | what a run is told of its thread's task (ADR-0116): `readTaskContext`, the canvas list and the cards pinned to the task, each written only when it differs from the newest of its kind on the lane's path, so an unchanged task keeps the prompt's cache (S92); `runs.ts` writes them between base news and the thread's pinned cards |
 | `canvas-news.ts` | a card added to a running thread's canvas or taken from it, steered into its lane as a fact line (`planCanvasFacts`), heard from `Provenance.onChanged`; never a queued fact card, which would wait for the run's end |
 | `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`), heard from lane work's `onBaseChanged`; `runEnded` forgets what was steered. Made after the agent, whose lanes it steers |
 | `split-call.ts` | `split_offer` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
 | `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
-| `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pinetrie:live`), deleting images nothing shows, retiring histories of moves (`sweepHistories`), and deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7) |
+| `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pinetrie:live`; § The session's documents), deleting images nothing shows (ADR-0042), retiring histories of moves (`sweepHistories`), and deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7) |
 | `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for, `onOpened`, which replays the roots already held to a listener that joins late, and `onReleasing`, whose listeners `unload` awaits, in order, before it lets a root go; `planLoads` |
 | `records.ts` | the host's writes of its records (ADR-0095): `createRecords`, whose `writeValues` writes each document's in one batch; every module that writes a record takes it |
 | `migrations/` | each stored document's schema, checked before anything opens it, and the migrations from a stored hash (§ The stored schemas, ADR-0096) |
 | `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the records, and the startup rebuild of records that do not decode (`planRebuild`) |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the queue's pops and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
-| `seats.ts` | each connected seat's person, written once as a `pinetrie.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
+| `seats.ts` | each connected seat's person (ADR-0037), written once as a `pinetrie.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
-| `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0122), `mark`, `lane` (stop, carry on, hold or release a queue, offer: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent, a paste, a thread's copy: ADR-0059, ADR-0066, ADR-0132); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
+| `control.ts` | the command Line of each client seat (ADR-0007), and who its writer is: the principal its connection named, an email, so no command field can claim to be someone else (ADR-0037). The host is no writer: writers are the connected clients, and own no lanes, which belong to threads (ADR-0120) |
+| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0122), `mark` (ADR-0045, ADR-0116), `lane` (stop, carry on, hold or release a queue, offer: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent, a paste, a thread's copy: ADR-0059, ADR-0066, ADR-0132); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
-| `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the blob store (images, and references' quotes as markdown, ADR-0126), the SQLite store |
-| `work/` | lane containers and disks (§ Lane work) |
-| `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers); accepted work's record and commands are `work/accepted.ts`'s |
+| `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47) |
+| `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034) |
+| `offers/` | each lane's offer in your repo (ADR-0105), on the owner of your repo (§ Offers), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands are `work/accepted.ts`'s |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
-| `digests.ts` | each ask's digest (ADR-0106), unless the user config turns them off (ADR-0071) |
+| `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the user config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024) |
 | `relays.ts` | another thread's agent asked, and its answer (ADR-0128): `ask` and `leave` (the tools' hooks), `relayChat` (a person's chat that asks or invites), `relayCard` (an ask card popped), `ended` (a relayed run's answer, then the round) |
 | `budgets.ts` | what agents talking spend (ADR-0128): the budget a run spends, read from its prompt (`promptBudget`), counted per request, written when it goes over and at a run's end, and the gate before each request |
 | `outside.ts` | `requestOutside`: a model request outside a keeper, its answer written in a step of its own |
@@ -198,6 +198,13 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   it runs after every refresh queued before it starts, and the records it
   compacts are current. A write after a compaction only lands in the next
   one's log.
+- **A compaction replaces a document's stored records with what it holds
+  now** (`compactAfter`), which also trims a `json` document's in-memory op
+  log (ADR-0023). The places are Yjs (ADR-0066): their storage is
+  compacted, and nothing in memory is trimmed (S90). A client's command
+  Line is stored too but not compacted: Kyneta cannot compact a replica of
+  a document another peer writes, which its pruning should do upstream
+  (S25). A card's text is Yjs, which Kyneta cannot compact live (S24).
 - **A command names its root and its task** (`Command.root`,
   `Command.task`, ADR-0063, ADR-0116): a chat writes in its root, and a
   chat at the root starts it, under the root and task ids the sender's tab
@@ -295,7 +302,10 @@ root holds or whose root is archived (ADR-0048 step 7). Both run again after
 each run's end, in `settle`'s sweep.
 
 `recover` runs, in order: the clear of `pinetrie:live` (`planClear`: no
-stream survives a process), a
+stream survives a process), a new store's default workflow
+(`planWorkflowSeed`), the deletion of the records of a type no spec
+declares, in the session and the roots opened (`planUndeclaredSweep`,
+ADR-0100, so a renamed record leaves nothing behind), a
 log of the stored lane names, in the roots opened, that fail `isThreadId`
 (`readStoredLanes`: no reader is given them, so the log is where one shows;
 it never throws, and nothing is deleted), `ensureNames` (ADR-0039),
@@ -374,7 +384,7 @@ any refresh they queued.
   - **On the Mac the host takes a lease** on a slot of the user's lane VM
     (`leaseVm`), starting the VM if need be, then removes every container
     labelled with its slot (`sweepSlot`): a host that died holding the slot
-    left them. The slot is filled once setup knows every directory a lane
+    left them (S130). The slot is filled once setup knows every directory a lane
     mounts (`Found.ready`, before the base's refresh, the first lane), and
     never replaced while the host runs: a changed grant or shared directory
     takes a restart, as ADR-0035 has it.
@@ -426,8 +436,8 @@ rejects `shutdown()`.
   written part of it. The seat's loop goes on to its next command.
 - **A command's id is its send's id.** The column that sent a chat finds its
   message by it (`TreeIndex.bySend`).
-- **The archive gate is in the dispatcher** (`refuseInArchive`), over
-  `readArchived` and `writesIn`: a task in the archive. Only the `chat`
+- **The archive gate is in the dispatcher** (`refuseInArchive`, ADR-0029),
+  over `readArchived` and `writesIn`: a task in the archive. Only the `chat`
   command and `sendPoppedQueuedCard` call `sendChat`, both behind the
   gate, so `sendChat` has no gate of its own.
 - **So is the held gate** (`refuseHeld`, ADR-0124): `runsIn` says where
@@ -585,7 +595,10 @@ rejects `shutdown()`.
   `connectSession` (`@pinetrie/session`) on every client, so a client's write to a document it
   may not write throws before it is made, rather than forking its copy
   (S28, S76). `hostPolicy` keeps what is the host's alone: which peers may
-  hold a document, and which writes it takes from presence and cards.
+  hold a document, and which writes it takes from presence and cards. A
+  card's text is created by a client, and accepted from anyone; without
+  `resolve` creating the documents clients make, one the host never opened
+  itself would be neither stored nor relayed (S58).
 
 ## Moves' history (`move-history.ts`, ADR-0066)
 
@@ -665,7 +678,7 @@ rejects `shutdown()`.
   the host failed: the pop has deleted its record, so nothing else would.
 - **Five things drain a lane:** a run's end (`settle`), startup
   (`recover`), a move that leaves a card queued on it while it is not
-  running (`queueDrain` in `index.ts`), a release of its queue, and the end
+  running (a lane is never written while it runs, S21), (`queueDrain` in `index.ts`), a release of its queue, and the end
   of a wait for its top card (below). All are the keeper's `once`
   (`drain:<lane>`): queued once until its step starts, the same step for
   all; a move while it runs queues one more, which finds what the running
@@ -830,7 +843,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   memory, for the asker's run to end, so its agent does not take it as
   something to answer. A restart drops what waited.
 - **A thread with no lane** is told its facts at its end through the
-  scribe (`appendLaneless`, the drain's), since only a lane appends.
+  scribe (`appendLaneless`, the drain's), since only a lane appends; a
+  person's message to one is written through the scribe too (S21).
 - **The budget is read from the run's prompt** (`promptBudget`): a
   relay's or an answer's names it, a person's message is its own, and only
   a run an agent started spends. Its count is kept in memory and written
@@ -905,9 +919,9 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 | module | owns |
 |---|---|
-| `setup.ts` | `Setup`, all of it or none: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once accepted work's names are read, before anything else reads your repo), the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the commands pi's setup loaded), and the base snapshot's refreshes. The project is found before it (`findProject`), since pi's setup loads from its root |
+| `setup.ts` | `Setup`, all of it or none: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once accepted work's names are read, before anything else reads your repo), the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, ADR-0036), and the base snapshot's refreshes. The project is found before it (`findProject`), since pi's setup loads from its root |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
-| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, `planOldNamesOnDisk`, `pre-rename:`; a container made anew checks its recipe, `recipe.ts`), `beforeRun`, `runEnded` |
+| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, `planOldNamesOnDisk`, `pre-rename:`, since a snapshot made before the rename holds the old names (S114); a container made anew checks its recipe, `recipe.ts`), `beforeRun`, `runEnded` |
 | `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
 | `turns.ts` | pi's `turnDone`: the turn's revision, its recipe and snapshot, its whole-disk diff (`classifyDisk`, ADR-0131), and its fetch; the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`), its fork (`forkFacts` waits for `pendingRecords`); a fork from a WIP whose recipe's inputs differ from accepted work's starts from a dependency layer of its own (`startSnapshot`, `Setup.depsLayerAt`) |
@@ -933,7 +947,9 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   base snapshot's keeper. Every read of your repo from lane work (an
   update's line and WIP, a new lane's begin and lockfile, the base
   snapshot's line, a split's stack) is a pinned read (`owner.read`), which
-  waits on no queue.
+  writes nothing (S87) and waits on no queue. A fetch's bundle needs the
+  lane running, about 30 ms (S43), so a container stopped since is started
+  for it, then stopped.
 - **A turn's end is its recipe, then its snapshot, then its diff**
   (`turns.ts`, ADR-0131). The commit is queued and awaited; the recipe (when
   an input the turn's commit changed has another key than the disk's
@@ -994,7 +1010,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 ## Offers (`offers/`)
 
 - **Every offer step runs on the owner of your repo** (`@pinetrie/repo`,
-  `packages/repo/TECHNICAL.md`, ADR-0065). An offer action, a `line`
+  `packages/repo/TECHNICAL.md`, ADR-0065), since a take once waited behind
+  every refresh queued before it (S89). An offer action, a `line`
   command, a split's span and its end, and moving lanes' refs are owner
   commands; a refresh is upkeep, `later("refresh:<lane>")`, and accepted work's
   record `later("line")`. So a command waits for at most the one step
@@ -1086,7 +1103,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   `@pinetrie/repo`'s. `setup` creates accepted work's bookmark at your `@-` and
   writes `immutable_heads()` and `revsets.log` to the repo's config, the
   text the publish button's setup showed (`planSetup`). A publish
-  (ADR-0090) is two rounds of gather, plan and execute in one command: the
+  (ADR-0076, ADR-0090) is two rounds of gather, plan and execute in one command: the
   catch-up (`planPublishCatchUp`, as you, only with `publish.catchUp` on
   and only when the working copy is behind), then the record read again, with
   the catch-up's operation from `SharedFacts.op`, decided by

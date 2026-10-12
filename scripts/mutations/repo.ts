@@ -673,7 +673,7 @@ export const mutations: readonly Mutation[] = [
     to: "    false\n",
     command: offersRefresh,
     expect:
-      "a catch-up that merged your acceptance of the lane's work leaves nothing to offer: an empty offer built before is withdrawn (S97)",
+      "a catch-up that merged your acceptance of the lane's work leaves nothing to offer",
   },
   {
     name: "a range jj refuses reads as a change",

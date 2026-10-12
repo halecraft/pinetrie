@@ -67,7 +67,7 @@ function rig(
   return { line: accepted, argv }
 }
 
-describe("a publish with publish.catchUp off moves main alone (ADR-0099)", () => {
+describe("a publish with publish.catchUp off moves main alone", () => {
   test("the working copy behind and your commits below @ stay where they are", async () => {
     const { line, argv } = rig(facts(), { catchUp: false })
     expect(await line.act("publish")).toBeNull()
@@ -75,7 +75,7 @@ describe("a publish with publish.catchUp off moves main alone (ADR-0099)", () =>
   })
 })
 
-describe("a publish with publish.catchUp on, in two rounds (ADR-0090)", () => {
+describe("a publish with publish.catchUp on, in two rounds", () => {
   test("the catch-up, then the move, from accepted work read after it", async () => {
     const { line, argv } = rig(facts({ behind: 0, ahead: 0, catchUp: null }))
     expect(await line.act("publish")).toBeNull()

@@ -31,7 +31,7 @@ const values = (writes: ReturnType<typeof planThreadOrigins>) =>
     writes.flatMap(w => (w.kind === "set" ? [[w.key, w.value]] : [])),
   )
 
-describe("0011-thread-origin: a thread's origin names its fork alone (ADR-0126)", () => {
+describe("0011-thread-origin: a thread's origin names its fork alone", () => {
   test("a root's first thread is a root; a branch forks at its first entry's parent; a copy at its fork", () => {
     expect(rootsToRead(stored)).toEqual([ROOT])
     const writes = planThreadOrigins({
@@ -62,7 +62,7 @@ describe("0011-thread-origin: a thread's origin names its fork alone (ADR-0126)"
     ).toEqual([])
   })
 
-  test("a thread a card was spun into is spun from it: its `spun` row names it (ADR-0126)", () => {
+  test("a thread a card was spun into is spun from it: its `spun` row names it", () => {
     const CARD = "01a0ffd2-0000-7000-8000-0000000000c1"
     const spun = spunFrom({ [CARD]: { kind: "spun", lane: ROOT_THREAD } })
     expect(

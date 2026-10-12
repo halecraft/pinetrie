@@ -119,7 +119,7 @@ function floorFor(from: BaseMerge, intent: string): Floor {
   return planned.floor
 }
 
-describe("planCatchUp: whether a catch-up may merge (ADR-0084)", () => {
+describe("planCatchUp: whether a catch-up may merge", () => {
   test("refused, before the merge, when even the smallest prompt would not fit; it names what can be shortened", () => {
     const planned = planCatchUp(acceptedFrom, {
       budget: budgetOf(50),
@@ -147,7 +147,7 @@ describe("planCatchUp: whether a catch-up may merge (ADR-0084)", () => {
   })
 })
 
-describe("planSettle: what a merge comes to (ADR-0104, ADR-0033)", () => {
+describe("planSettle: what a merge comes to", () => {
   const ctx = {
     lane: LANE,
     by: ADA,
@@ -258,7 +258,7 @@ describe("planSettle: what a merge comes to (ADR-0104, ADR-0033)", () => {
     expect(content.split("yours b").length).toBe(2)
     expect(content.endsWith("keep both sides")).toBe(true)
   })
-  test("from the thread it branched from: the update and the resolution name it (ADR-0072)", () => {
+  test("from the thread it branched from: the update and the resolution name it", () => {
     const parent = parentFrom
     const clean = planSettle(
       {
@@ -390,7 +390,7 @@ describe("withLaneStarted: the lane an update starts", () => {
       calls: ["start", "update"],
     })
   })
-  test("with a run to follow, the lane is never stopped, whatever the update comes to (ADR-0080)", async () => {
+  test("with a run to follow, the lane is never stopped, whatever the update comes to", async () => {
     for (const prepared of [
       { kind: "clean" },
       { kind: "nothing" },
@@ -413,7 +413,7 @@ describe("withLaneStarted: the lane an update starts", () => {
   })
 })
 
-describe("askedAboutConflict (ADR-0080)", () => {
+describe("askedAboutConflict", () => {
   /**
    * Updates whose lane jj answers with `conflicted` files, the lane its own
    * or not, its run prompted by `role`.
@@ -475,7 +475,7 @@ describe("askedAboutConflict (ADR-0080)", () => {
   })
 })
 
-describe("catchUpInRun (ADR-0080)", () => {
+describe("catchUpInRun", () => {
   /**
    * A lane of its own whose turn is `calls` calls of `catch_up`, its base
    * moved with files to bring, and a jj that answers `@`'s parents as
@@ -555,7 +555,7 @@ describe("catchUpInRun (ADR-0080)", () => {
             Parameters<typeof createUpdates>[0]["registry"]["handleOf"]
           >,
       }).port,
-      // The skill is read before the merge, for the floor (ADR-0084).
+      // The skill is read before the merge, for the floor.
       piSetup: record<Parameters<typeof createUpdates>[0]["piSetup"]>({
         skill: async () => null,
       }).port,

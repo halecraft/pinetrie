@@ -1,5 +1,5 @@
-// host/invocation — `pnpm host [folder]` (ADR-0086): which project a host
-// serves, where its session is kept, and the words for a refusal.
+// host/invocation — `pnpm host [folder]`: which project a host serves, where
+// its session is kept, and the words for a refusal.
 
 import path from "node:path"
 import { PRODUCT_NAME } from "@pinetrie/core"
@@ -20,10 +20,10 @@ export type Invocation =
   | { readonly kind: "refused"; readonly refusal: Refusal }
 
 /**
- * The folder the host serves: pinetrie's own repo without an argument, else
- * the one named, a relative one read from `base`. `args` is
+ * The folder the host serves: pinetrie's own repo without an argument, else the
+ * one named, a relative one read from `base`. `args` is
  * `process.argv.slice(2)`; `base` is `INIT_CWD`, else the working directory.
- * pnpm sets `INIT_CWD` to pinetrie's root, not the shell's directory (S108).
+ * pnpm sets `INIT_CWD` to pinetrie's root, not the shell's directory.
  */
 export function planInvocation(
   args: readonly string[],

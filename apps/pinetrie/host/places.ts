@@ -1,13 +1,13 @@
-// host/places — the one writer of the places document (ADR-0059).
+// host/places — the one writer of the places document.
 //
 // Every write to a card's place goes through `applyPlaceSteps`, which writes
 // its records in one batch, then raises `rev` in a batch of its own. A client
 // draws a move it sent until its copy of the document reaches the `rev` the
 // host answered with, so a write that skipped `rev` would leave a client
-// drawing a move over a record that has already changed. `rev` stays out of
-// the records' batch because that batch may be an undo step: a `rev` raised
-// inside it changes with every later write, so every whole undo of the step
-// would be refused (S82).
+// drawing a move over a record that has already changed. `rev` stays out of the
+// records' batch because that batch may be an undo step: a `rev` raised inside
+// it changes with every later write, so every whole undo of the step would be
+// refused.
 //
 // A caller then writes the cards' history and traces in the same step
 // (`provenance.ts`): they are session records, not fields here, for the same
@@ -21,11 +21,11 @@ import type { PlacesDocHandle } from "@pinetrie/schema"
 export type Gesture = <T>(write: () => T) => T
 
 /**
- * Carry out `steps` on the places document, inside `gesture` when one is
- * given, and return its `rev` after: raised once, or unchanged for no
- * steps. Synchronous, so a queued card's pop reads it and removes it with nothing
- * between. A removed card's text is its caller's to destroy, after this:
- * record first, then text (S64).
+ * Carry out `steps` on the places document, inside `gesture` when one is given,
+ * and return its `rev` after: raised once, or unchanged for no steps.
+ * Synchronous, so a queued card's pop reads it and removes it with nothing
+ * between. A removed card's text is its caller's to destroy, after this: record
+ * first, then text.
  */
 export function applyPlaceSteps(
   places: PlacesDocHandle,

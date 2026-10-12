@@ -1,8 +1,7 @@
-// host/work/runtime — the one place that picks the runtime lanes run on
-// (ADR-0130): gather the facts, plan (`planRuntime`), and build the
-// `LaneRuntime` lanes of their own get. On the Mac, Docker's is the lane VM's,
-// through a lease on a slot of it; on Linux, the host's own. Everything after
-// it takes the runtime as given.
+// host/work/runtime — the one place that picks the runtime lanes run on: gather
+// the facts, plan (`planRuntime`), and build the `LaneRuntime` lanes of their
+// own get. On the Mac, Docker's is the lane VM's, through a lease on a slot of
+// it; on Linux, the host's own. Everything after it takes the runtime as given.
 
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
@@ -243,7 +242,7 @@ async function vmFound(
     await first.close()
     return refusedWith(dockerWords(refusal))
   }
-  /** A slot's containers left by a host that died holding it (S130). */
+  /** A slot's containers left by a host that died holding it. */
   const sweep = async (lease: typeof first) => {
     const left = await sweepSlot(target, lease.slot)
     if (left.length > 0)

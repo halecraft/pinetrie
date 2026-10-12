@@ -45,7 +45,7 @@ function runningWithOffer() {
   return b
 }
 
-test("split_offer queues a split card by the person behind the run, once (ADR-0080)", async () => {
+test("split_offer queues a split card by the person behind the run, once", async () => {
   const b = runningWithOffer()
   const askSplit = createSplitCall({
     basics: b,
@@ -80,7 +80,7 @@ test("split_offer queues a split card by the person behind the run, once (ADR-00
   ])
 })
 
-test("a split asked as its run is stopped is popped by the run's end: its step comes before the end's drain (ADR-0080)", async () => {
+test("a split asked as its run is stopped is popped by the run's end", async () => {
   const b = runningWithOffer()
   const keeper = createKeeper<HostKey>()
   const askSplit = createSplitCall({

@@ -45,7 +45,7 @@ function setUp(
   over: { readonly enabled?: boolean; readonly reply?: string | null } = {},
 ) {
   const b = basics()
-  // L1's thread opened the task (ADR-0116).
+  // L1's thread opened the task.
   putTask(b, L1)
   const reply = deferred<string | null>()
   // The setup and the scribe in one record, so the order of their calls shows.

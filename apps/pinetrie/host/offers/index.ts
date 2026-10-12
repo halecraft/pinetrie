@@ -1,18 +1,17 @@
-// host/offers — each lane's offer in your repo (ADR-0105, ADR-0039), on the
-// owner of your repo (`@pinetrie/repo`, ADR-0065).
+// host/offers — each lane's offer in your repo, on the owner of your repo
+// (`@pinetrie/repo`).
 //
 // A refresh is upkeep, at most one queued per lane (`later("refresh:…")`):
-// gather (`gatherRefresh`), decide (`planRefresh`), translate
-// (`offerEffects`), and execute the steps, then write the `pinetrie.offer`
-// record, the page's cache, from the repo (`refresh.ts`). The host decides
-// nothing from a record (ADR-0104).
+// gather (`gatherRefresh`), decide (`planRefresh`), translate (`offerEffects`),
+// and execute the steps, then write the `pinetrie.offer` record, the page's
+// cache, from the repo (`refresh.ts`). The host decides nothing from a record.
 // What marks a lane: a move the owner observes (`planMarks`: the lane's ref
-// after a fetch, its offer bookmark, accepted work, a WIP, your `@`), a run's end,
-// and a root archived or restored (`moveLanes`); accepted work's record
-// (`work/accepted.ts`) is rewritten on the same moves. Commands (an offer action,
-// a split's span and end) are owner commands, ahead of every refresh
-// waiting. The reads a page asks for (`read`, ADR-0047) are pinned
-// reads, which wait on nothing.
+// after a fetch, its offer bookmark, accepted work, a WIP, your `@`), a run's
+// end, and a root archived or restored (`moveLanes`); accepted work's record
+// (`work/accepted.ts`) is rewritten on the same moves. Commands (an offer
+// action, a split's span and end) are owner commands, ahead of every refresh
+// waiting. The reads a page asks for (`read`) are pinned reads, which wait on
+// nothing.
 
 import type {
   CommitId,
@@ -54,8 +53,8 @@ import { createOfferDeps } from "./state.ts"
 export interface Offers {
   /**
    * Set lanes' history in your repo, or delete it with a null commit (a root
-   * archived or restored, ADR-0029), then refresh each lane's offer: an
-   * archived thread's is withdrawn, a restored one's built again.
+   * archived or restored), then refresh each lane's offer: an archived thread's
+   * is withdrawn, a restored one's built again.
    */
   moveLanes(
     updates: readonly {
@@ -66,9 +65,9 @@ export interface Offers {
   /** A run on `lane` ended: refresh its offer, then describe it if it is still a WIP. */
   runEnded(lane: ThreadId): void
   /**
-   * An offer action other than a split; an acceptance names its destination, null
-   * for the default, and what it was shown (ADR-0065). Carried out, it
-   * answers with its fact, which the thread is told (ADR-0080).
+   * An offer action other than a split; an acceptance names its destination,
+   * null for the default, and what it was shown. Carried out, it answers with
+   * its fact, which the thread is told.
    */
   act(
     lane: ThreadId,
@@ -97,17 +96,16 @@ export interface Offers {
     },
   ): Promise<string | null>
   /**
-   * A review or a diff a page asked for, of a commit an open offer holds now
-   * or a range one lane's turns recorded (ADR-0106):
-   * gathered, planned (`planOfferRead`), and read pinned to the head the
-   * owner last observed, waiting on no write.
+   * A review or a diff a page asked for, of a commit an open offer holds now or
+   * a range one lane's turns recorded: gathered, planned (`planOfferRead`), and
+   * read pinned to the head the owner last observed, waiting on no write.
    */
   read(ask: OfferAsk): Promise<OfferAnswer>
 }
 
 export function startOffers(input: {
   readonly owner: RepoOwner
-  /** Accepted work's names (ADR-0104). */
+  /** Accepted work's names. */
   readonly repoConfig: RepoConfig
   readonly basics: Basics
   readonly records: Pick<Records, "writeValues">
@@ -155,8 +153,7 @@ export function startOffers(input: {
     void acceptedWork.refresh().catch(failed(basics, "reading accepted work"))
   /**
    * Only `@` moved (jjui, an editor): one shared read rewrites each open
-   * record's `yourEdits` and accepted work's record, with no lane's jj
-   * (ADR-0065).
+   * record's `yourEdits` and accepted work's record, with no lane's jj.
    */
   const markShared = () =>
     void owner

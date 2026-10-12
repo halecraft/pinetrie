@@ -92,7 +92,7 @@ const stopFacts = (r: ReturnType<typeof running>) =>
       : [],
   )
 
-test("stopping a running lane queues the fact of who stopped its ask, then aborts its run (ADR-0126)", async () => {
+test("stopping a running lane queues the fact of who stopped its ask, then aborts its run", async () => {
   let queuedAtAbort = -1
   const r: ReturnType<typeof running> = running(() => {
     queuedAtAbort = stopFacts(r).length
@@ -139,7 +139,7 @@ test("a stop while a chat's run waits for its pinned cards cancels it there, and
   expect(methods(r.handle.calls)).toEqual([])
 })
 
-test("a stop with a message card queued holds the queue before the abort, and its fact goes before the card (ADR-0048 step 7)", async () => {
+test("a stop with a message card queued holds the queue before the abort", async () => {
   const r = running()
   r.b.places.cards.set(
     cardIdFor("c1"),
@@ -170,7 +170,7 @@ test("a stop with a message card queued holds the queue before the abort, and it
   expect(methods(r.handle.calls)).toEqual(["abort"])
 })
 
-test("a hold is written once, its release deleted and the lane drained, each answered with how the queue is now; an unknown lane is refused (ADR-0048 step 7)", async () => {
+test("a hold is written once, its release deleted and the lane drained, each answered with how the queue is now", async () => {
   const { b, lane } = running()
   const writes: unknown[] = []
   const drained: string[] = []
@@ -205,7 +205,7 @@ test("a hold is written once, its release deleted and the lane drained, each ans
   ).toBe("refused")
 })
 
-test("an offer's fact is queued as a card at the thread's end, after the cards there, and the lane's drain asked for (ADR-0080)", async () => {
+test("an offer's fact is queued as a card at the thread's end, and the lane's drain asked for", async () => {
   const b = basics()
   const lane = threadIdFor("0123456789abcdef")
   putLane(b, lane, entryId("e-2"))

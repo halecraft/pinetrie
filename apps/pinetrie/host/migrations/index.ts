@@ -1,12 +1,12 @@
 // host/migrations — a stored document's schema, checked before anything opens
-// it, and its data moved when the schema changed (ADR-0096).
+// it, and its data moved when the schema changed.
 //
 // A document opened under a changed schema keeps a dropped field's data only
-// until the next compaction (S120), and the host compacts at startup. So
-// `startHost` reads each stored document's schema hash first (`readStored`),
-// `planOpen` decides, and `migrate` runs what it planned before the first
-// `get`. One migration per file here; each is deleted once Duane's store has
-// passed it, and a store still on its hash is then refused.
+// until the next compaction, and the host compacts at startup. So `startHost`
+// reads each stored document's schema hash first (`readStored`), `planOpen`
+// decides, and `migrate` runs what it planned before the first `get`. One
+// migration per file here; each is deleted once Duane's store has passed it,
+// and a store still on its hash is then refused.
 
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
@@ -23,8 +23,8 @@ export interface MigrationRun {
   readonly docIds: readonly string[]
   /**
    * Wait for a document the migration has got (`exchange.get`) to load. A
-   * read-only open leaves its stored schema hash as it was (S120); a record
-   * that fails to load stops the migration before it writes.
+   * read-only open leaves its stored schema hash as it was; a record that fails
+   * to load stops the migration before it writes.
    */
   readonly hydrated: (docId: string) => Promise<void>
 }
@@ -44,13 +44,12 @@ export interface Migration {
 }
 
 /**
- * Every migration this build carries, oldest first: 0012-unstarted-threads
- * and 0013-task-cards (ADR-0126). A store opens through the one migration
- * from its stored hash, so 0012 moves 0013's data too.
- * 0001-live-row, 0002-records (ADR-0095), 0005-tasks' places and sidebars
- * (ADR-0116), 0008-entry-thread (ADR-0125) and 0010-reference-fields
- * (ADR-0126) ran on Duane's store and were deleted; restore one from the
- * revision that deleted it for a store still on its hash.
+ * Every migration this build carries, oldest first: 0012-unstarted-threads and
+ * 0013-task-cards. A store opens through the one migration from its stored
+ * hash, so 0012 moves 0013's data too. 0001-live-row, 0002-records, 0005-tasks'
+ * places and sidebars, 0008-entry-thread and 0010-reference-fields ran on
+ * Duane's store and were deleted; restore one from the revision that deleted it
+ * for a store still on its hash.
  */
 export const MIGRATIONS: readonly Migration[] = [unstartedThreads, taskCards]
 
@@ -73,10 +72,10 @@ export interface RecordMigration {
 
 /**
  * Every one-time record migration this build carries, oldest first:
- * 0009-card-content and 0011-thread-origin (ADR-0126), and 0014-trash-left
- * (a trashed card records the place it left). 0003-workflow-archive, 0004-threads
- * (ADR-0117), 0005-tasks' records, 0006-note-columns (ADR-0116) and
- * 0007-thread-origin (ADR-0117) ran on Duane's store and were deleted.
+ * 0009-card-content and 0011-thread-origin, and 0014-trash-left (a trashed card
+ * records the place it left). 0003-workflow-archive, 0004-threads, 0005-tasks'
+ * records, 0006-note-columns and 0007-thread-origin ran on Duane's store and
+ * were deleted.
  */
 export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   cardContent,
@@ -115,8 +114,8 @@ export type OpenPlan =
     }
 
 /**
- * Whether every stored document can open under this build's schemas, and
- * the migrations that get it there. Pure.
+ * Whether every stored document can open under this build's schemas, and the
+ * migrations that get it there.
  */
 export function planOpen(input: {
   readonly stored: ReadonlyMap<string, string>
@@ -178,8 +177,8 @@ const LOAD_FAILURE =
  * Run each planned migration on `exchange`, and each record migration that
  * finds its old shape: every read first, then, if every stored record loaded,
  * every write; then compact what they opened and let it go. A record that
- * failed to load stops this before anything is written, since compacting
- * would lose it for good (S120).
+ * failed to load stops this before anything is written, since compacting would
+ * lose it for good.
  *
  * `backup` copies a file store, naming the copy for the first migration that
  * moves data; it is called only when one does, after the reads, which change

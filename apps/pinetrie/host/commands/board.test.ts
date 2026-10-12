@@ -85,7 +85,7 @@ test("a task an agent of its threads works in is not archived, and nothing is wr
   expect(moves.calls).toEqual([])
 })
 
-test("an idle task moved to Done: its card's move written, then torn down and unloaded (ADR-0126)", async () => {
+test("an idle task moved to Done: its card's move written, then torn down and unloaded", async () => {
   const { moves, work, deps } = setUp()
   const out = await handleTaskMove(deps, ADA, toDone)
   expect(out.outcome).toEqual({ kind: "moved" })

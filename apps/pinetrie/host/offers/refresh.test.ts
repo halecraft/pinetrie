@@ -1,7 +1,7 @@
 // A refresh against real jj, as the host runs it: the owner, the gather,
-// `planRefresh` and its steps. Each history here is one your repo has held
-// (S97), and each must settle: refreshed until a round writes nothing, by
-// the second round.
+// `planRefresh` and its steps. Each history here is one your repo has held, and
+// each must settle: refreshed until a round writes nothing, by the second
+// round.
 
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -153,7 +153,7 @@ async function settles(dir: string, lane: ThreadId, name: ThreadName) {
   }
 }
 
-test("a catch-up that merged your acceptance of the lane's work leaves nothing to offer: an empty offer built before is withdrawn (S97)", async () => {
+test("a catch-up that merged your acceptance of the lane's work leaves nothing to offer", async () => {
   const you = await yourRepo("caught-up")
   const work = await you.commit(
     [you.base],
@@ -177,7 +177,8 @@ test("a catch-up that merged your acceptance of the lane's work leaves nothing t
     }),
   )
   await you.setTip(LANE, merged)
-  // The empty offer a host before S97 built from it, as the host's own.
+  // The empty offer an older host built from it, when it read jj's refusal as
+  // work, as the host's own.
   await run(
     "jj",
     [
@@ -215,7 +216,7 @@ test("a catch-up that merged your acceptance of the lane's work leaves nothing t
   })
 }, 60_000)
 
-test("an accepted-offer commit of the lane with no Pinetrie-Source builds nothing until the lane catches up past it; then only what is new (S97)", async () => {
+test("an accepted-offer commit with no Pinetrie-Source builds nothing until the lane catches up past it", async () => {
   const you = await yourRepo("untraced")
   const work = await you.commit(
     [you.base],
@@ -262,7 +263,7 @@ test("an accepted-offer commit of the lane with no Pinetrie-Source builds nothin
   })
 }, 60_000)
 
-test("work you landed yourself leaves the offer held: kept, with no files, and settled (S89)", async () => {
+test("work you landed yourself leaves the offer held: kept, with no files, and settled", async () => {
   const you = await yourRepo("held")
   const work = await you.commit(
     [you.base],

@@ -11,7 +11,7 @@ export type ShutdownStep =
   | "quiet"
   /** Every harness closes, which ends running runs. */
   | "agent"
-  /** Every pi session closes, after the harnesses over it: a later write is refused (ADR-0092). */
+  /** Every pi session closes, after the harnesses over it: a later write is refused. */
   | "scribe"
   /** Every lane's container stops. */
   | "work"
@@ -21,10 +21,10 @@ export type ShutdownStep =
 
 /**
  * A host's shutdown, in order. The queues close before `quiet`: a step that
- * started after it would write to a closing agent and document, and lose
- * its writes (S73). Closing the agent ends running runs, whose ends queue
- * steps; the closed queues refuse them. The scribe closes after the agent,
- * in a step of its own, so a failed agent close still closes the sessions.
+ * started after it would write to a closing agent and document, and lose its
+ * writes. Closing the agent ends running runs, whose ends queue steps; the
+ * closed queues refuse them. The scribe closes after the agent, in a step of
+ * its own, so a failed agent close still closes the sessions.
  */
 export const planShutdown = (): readonly ShutdownStep[] => [
   "intake",

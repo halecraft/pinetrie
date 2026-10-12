@@ -64,7 +64,7 @@ test("the records the host writes from your repo: only what changed, and only a 
   await records.write(OFFER)
   expect(scribe.calls).toHaveLength(2)
   expect(readBases(b.session).get(LANE)).toEqual(BASE)
-  // A base record that changed is announced, and one unchanged is not (ADR-0080).
+  // A base record that changed is announced, and one unchanged is not.
   expect(changed).toEqual([LANE])
   // An accepted offer's record is written whatever is there.
   await records.writeAcceptedOffer({ ...OFFER, acceptedAs: "kt" })

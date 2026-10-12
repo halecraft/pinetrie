@@ -48,7 +48,7 @@ test("acceptsWrite: presence is each client's; the session and the places are le
   expect(acceptsWrite("line:pinetrie.control:a→host")).toBeUndefined()
 })
 
-test("acceptsWrite: cards' texts are written by clients; an undo stack is refused (ADR-0048)", () => {
+test("acceptsWrite: cards' texts are written by clients; an undo stack is refused", () => {
   expect(acceptsWrite(CARD)).toBe(true)
   expect(acceptsWrite(UNDO)).toBe(false)
 })
@@ -59,7 +59,7 @@ test("resolveDoc: a card's text, a person's document by its kind, a known root, 
   expect(resolveDoc(INVENTORY, known)).toBe("inventory")
   expect(resolveDoc(ATTENTION, known)).toBe("attention")
   expect(resolveDoc(UNDO, known)).toBe("reject")
-  // Only the host makes roots; one the directory names it loads (ADR-0063).
+  // Only the host makes roots; one the directory names it loads.
   expect(resolveDoc(rootDocId(KNOWN), known)).toBe("root")
   expect(resolveDoc(rootDocId(rootIdFor("other")), known)).toBe("reject")
   for (const other of [
@@ -76,7 +76,7 @@ test("resolveDoc: a card's text, a person's document by its kind, a known root, 
     expect(resolveDoc(other, known)).toBeUndefined()
 })
 
-test("a command Line's documents are shared with, and taken from, its two ends only (ADR-0037)", () => {
+test("a command Line's documents are shared with, and taken from, its two ends only", () => {
   const policy = hostPolicy
   const line = "line:pinetrie.control:seat-a→seat-host"
   const peer = (peerId: string) =>
@@ -104,7 +104,7 @@ test("a tab's undo stack is shared with no one and taken from no one; places and
 test.each([
   ["an inventory", INVENTORY],
   ["an attention document", ATTENTION],
-])("%s is shared with its person only (ADR-0059, ADR-0077)", (_, doc) => {
+])("%s is shared with its person only", (_, doc) => {
   const policy = hostPolicy
   const peer = (principal: string) =>
     ({ peerId: `seat-${principal}`, principal, type: "user" }) as const
@@ -115,7 +115,7 @@ test.each([
   ]).toEqual([true, false, false])
 })
 
-test("a stack of moves is the host's: shared with no one, taken from no one, and rejected when a client announces one (ADR-0066)", () => {
+test("a stack of moves is the host's: shared with no one, taken from no one, refused from a client", () => {
   const MOVES = movesDocId(
     writerId("ada@x.io"),
     historyScope(taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")),
@@ -132,7 +132,7 @@ test("a stack of moves is the host's: shared with no one, taken from no one, and
   ]).toEqual([false, false, "reject"])
 })
 
-test("storedKind: each stored document's kind, by which its schema is checked at start (ADR-0096)", () => {
+test("storedKind: each stored document's kind, by which its schema is checked at start", () => {
   const OPEN = personDocId("open", writerId("ada@x.io"))
   const kinds = [
     [SESSION_DOC_ID, "session", SessionDoc],

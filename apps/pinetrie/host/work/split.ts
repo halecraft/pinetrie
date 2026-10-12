@@ -1,5 +1,5 @@
-// host/work/split — an offer split into a stack by a run on its lane
-// (ADR-0105): the run's prompt, and what its end does.
+// host/work/split — an offer split into a stack by a run on its lane: the run's
+// prompt, and what its end does.
 
 import {
   type CommitId,
@@ -56,7 +56,7 @@ export interface Splits {
   prepareSplit(
     lane: ThreadId,
     by: WriterId,
-    /** The split card's text: what the person asked of it (ADR-0080). */
+    /** The split card's text: what the person asked of it. */
     intent: string,
   ): Promise<StackMessage | { readonly refused: string }>
   /** A split's run ended: its stack, checked, becomes the offer, or why not. */

@@ -4,7 +4,7 @@ import path from "node:path"
 import { expect, test } from "vitest"
 import { isBusyError, openStore } from "./store.ts"
 
-test("a store owns its file: a second is refused until the first closes (S47)", async () => {
+test("a store owns its file: a second is refused until the first closes", async () => {
   const file = path.join(
     mkdtempSync(path.join(tmpdir(), "pinetrie-store-")),
     "s.db",

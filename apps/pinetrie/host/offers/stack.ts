@@ -1,6 +1,5 @@
-// host/offers/stack — a split's stack (ADR-0105): where it starts and ends,
-// and whether the stack a split's run made may replace the offer
-// (`planStackEnded`).
+// host/offers/stack — a split's stack: where it starts and ends, and whether
+// the stack a split's run made may replace the offer (`planStackEnded`).
 
 import type { CommitId, ThreadId } from "@pinetrie/core"
 import { gatherOffer, gatherPlace, gatherStack } from "@pinetrie/repo"

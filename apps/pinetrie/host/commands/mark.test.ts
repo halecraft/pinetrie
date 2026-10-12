@@ -12,7 +12,7 @@ import {
 } from "../fakes.ts"
 import { handleMark, type MarkDeps } from "./mark.ts"
 
-test("clearing a task's title removes its mark (ADR-0116)", async () => {
+test("clearing a task's title removes its mark", async () => {
   const b = basics()
   const ada = writerId("ada@example.com")
   putTask(b, threadIdFor("t"))
@@ -42,7 +42,7 @@ test("a task the session does not hold takes no title", async () => {
   expect(scribe.calls).toEqual([])
 })
 
-test("a note column on a canvas takes its title in its own record (ADR-0116)", async () => {
+test("a note column on a canvas takes its title in its own record", async () => {
   const b = basics()
   const ada = writerId("ada@example.com")
   putTask(b, threadIdFor("t"))

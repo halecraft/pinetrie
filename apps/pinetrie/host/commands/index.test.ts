@@ -46,9 +46,9 @@ const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
 /** The thread the test's root entry starts. */
 const THREAD = threadIdFor("root")
 
-/** The test's root in `state` on a board of Doing and Done (ADR-0122). */
+/** The test's root in `state` on a board of Doing and Done. */
 const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
-  // The task THREAD is in (ADR-0116), its card on the board.
+  // The task THREAD is in, its card on the board.
   putTask(b, THREAD, TASK_ID, undefined, state)
   putValue(
     b,
@@ -306,7 +306,7 @@ test("a popped queued card in an archived root is refused, and the agent is neve
   expect(pi.calls).toEqual([])
 })
 
-test("nothing runs in a thread in an inventory: a send, a branch at its entries, a carry-on, an offer's description, a popped card (ADR-0124)", async () => {
+test("nothing runs in a thread in an inventory", async () => {
   const { b, pi, commands, replies, sender, chat } = setUp()
   const taken = readPlaces(b.places).find(c => c.id === THREAD)
   if (taken?.kind !== "thread") throw new Error("no thread card")
@@ -383,7 +383,7 @@ test("a command that throws is answered failed, and logged", async () => {
   ])
 })
 
-test("a reservation is answered reserved, and refused for a lane pi holds (ADR-0057)", async () => {
+test("a reservation is answered reserved, and refused for a lane pi holds", async () => {
   const { commands, replies, sender } = setUp()
   const reserve = (id: string, lane: string) =>
     commands.handle(sender, ALICE, { id, kind: "reserve", lane } as never)

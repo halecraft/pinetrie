@@ -1,9 +1,9 @@
-// host/work/accepted — accepted work in your repo (ADR-0104, ADR-0090):
-// its record, read whenever the owner observes a move that changes it, and
-// setup and publish. Gather (the shared facts' `acceptedFacts`), decide
-// (`planAcceptedRecord`, `planAcceptedAction`, `planPublishFinish`), translate
-// (`setupProposal`, `planSetup` and the publish's steps) and execute, on
-// the owner: the record as upkeep (`later("accepted")`), a command as a command.
+// host/work/accepted — accepted work in your repo: its record, read whenever
+// the owner observes a move that changes it, and setup and publish. Gather (the
+// shared facts' `acceptedFacts`), decide (`planAcceptedRecord`,
+// `planAcceptedAction`, `planPublishFinish`), translate (`setupProposal`,
+// `planSetup` and the publish's steps) and execute, on the owner: the record as
+// upkeep (`later("accepted")`), a command as a command.
 
 import type {
   AcceptedAction,
@@ -55,7 +55,7 @@ export interface AcceptedWork {
 export function createAcceptedWork(deps: {
   readonly owner: Pick<RepoOwner, "later" | "command">
   readonly basics: Pick<Basics, "session">
-  /** Accepted work's names and `publish.catchUp` (ADR-0104, ADR-0099). */
+  /** Accepted work's names and `publish.catchUp`. */
   readonly repoConfig: RepoConfig
   readonly writeValues: (writes: readonly ValueWrite[]) => Promise<void>
 }): AcceptedWork {
@@ -75,9 +75,9 @@ export function createAcceptedWork(deps: {
   }
 
   /**
-   * A publish in two rounds (ADR-0090): the catch-up, then, from accepted work read
-   * again, the move or the catch-up reverted (`planPublishFinish`). A move jj
-   * refuses after a catch-up reverts it too, so nothing is left half done.
+   * A publish in two rounds: the catch-up, then, from accepted work read again,
+   * the move or the catch-up reverted (`planPublishFinish`). A move jj refuses
+   * after a catch-up reverts it too, so nothing is left half done.
    */
   async function publish(
     ops: RepoOps,

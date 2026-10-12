@@ -22,7 +22,7 @@ const record = (id: string) =>
     content: { command: null, unsent: null, origin: null },
   }) as const
 
-test("applyPlaceSteps: one rev per batch of writes and removals (ADR-0059)", () => {
+test("applyPlaceSteps: one rev per batch of writes and removals", () => {
   const places = newPlacesDoc()
   const [a, b] = [record(cardIdFor("c1")), record(cardIdFor("c2"))]
   expect(
@@ -38,7 +38,7 @@ test("applyPlaceSteps: one rev per batch of writes and removals (ADR-0059)", () 
   expect(applyPlaceSteps(places, [])).toBe(2)
 })
 
-test("applyPlaceSteps: inside a gesture, rev is raised outside it (S82)", () => {
+test("applyPlaceSteps: inside a gesture, rev is raised outside it", () => {
   const places = newPlacesDoc()
   const inside: number[] = []
   const gesture = <T>(write: () => T): T => {

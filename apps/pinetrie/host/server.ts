@@ -1,9 +1,9 @@
-// host/server — the entry point: `pnpm run host [folder]` serves the project
-// at that folder's root (ADR-0086), and without one, pinetrie's own repo. A
-// relative folder is read from `INIT_CWD`, which pnpm sets to pinetrie's root
-// (S108). `pnpm run host` sets NODE_ENV=production, so Vite serves React's
-// production build; `pnpm run host:react-dev` sets NODE_ENV=development, for
-// React's warnings, render timeline and Fast Refresh (S59).
+// host/server — the entry point: `pnpm run host [folder]` serves the project at
+// that folder's root, and without one, pinetrie's own repo. A relative folder
+// is read from `INIT_CWD`, which pnpm sets to pinetrie's root. `pnpm run host`
+// sets NODE_ENV=production, so Vite serves React's production build;
+// `pnpm run host:react-dev` sets NODE_ENV=development, for React's warnings,
+// render timeline and Fast Refresh.
 //
 //   PINETRIE_PORT      the port (default 7391; 0 = any free port)
 //   PINETRIE_BIND      the address (default 127.0.0.1: this machine only)
@@ -11,8 +11,8 @@
 //   PINETRIE_TOOLS=0   the agent has no tools. By default it reads, writes,
 //                    edits and runs commands: each thread's agent in its own
 //                    Linux container, on a disk cloned from where it branched,
-//                    with the project read-only at /mnt/host-working-copy
-//                    (ADR-0034, ADR-0102). Then the folder must be a jj repo,
+//                    with the project read-only at /mnt/host-working-copy.
+//                    Then the folder must be a jj repo,
 //                    and Docker must run lanes: the lane VM on the Mac
 //   PINETRIE_STORE     the SQLite file the session and pasted images are kept in
 //                    (default .pinetrie/pinetrie.db in the project's root)

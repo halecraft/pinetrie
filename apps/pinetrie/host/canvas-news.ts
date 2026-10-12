@@ -1,9 +1,9 @@
 // host/canvas-news — a running thread is told when a card is added to its
-// task's canvas or taken from it (ADR-0116), and when its own card moves to
-// another task (ADR-0124): a fact line steered after the
-// turn in flight, as base news is (`base-news.ts`, S103), never a queued
-// fact card, which the drain would pop only after the run. Reorders, widths
-// and titles wait for the next run's canvas list (`canvas.ts`).
+// task's canvas or taken from it, and when its own card moves to another task:
+// a fact line steered after the turn in flight, as base news is
+// (`base-news.ts`), never a queued fact card, which the drain would pop only
+// after the run. Reorders, widths and titles wait for the next run's canvas
+// list (`canvas.ts`).
 //
 // It hears each change to the places the host records (`Provenance`'s
 // `onChanged`), plans with `planCanvasFacts` (`@pinetrie/rules`), and steers

@@ -1,6 +1,6 @@
 // host/migrations/0009-card-content — a card is an identity, a place and
-// content (ADR-0126). Two changes to stored rows, whose fields stay, so the
-// schema's hash holds: a record migration, due while either is found.
+// content. Two changes to stored rows, whose fields stay, so the schema's hash
+// holds: a record migration, due while either is found.
 //
 // - Your message, a pinned card and a queued card name their thread alone:
 //   the `at` their rows kept is cleared, here and in the events of each

@@ -1,8 +1,8 @@
-// host/work/recipe — a lane's recipe run again when its inputs change
-// (ADR-0131): before a turn's snapshot and an update's, in one queued step
-// with it (`snapshotOnQueue`), and when a lane's container is made anew. Its
-// outputs are removed before it runs, so nothing it once wrote outlives the
-// inputs it was made from.
+// host/work/recipe — a lane's recipe run again when its inputs change: before a
+// turn's snapshot and an update's, in one queued step with it
+// (`snapshotOnQueue`), and when a lane's container is made anew. Its outputs
+// are removed before it runs, so nothing it once wrote outlives the inputs it
+// was made from.
 
 import type { SnapshotId, ThreadId } from "@pinetrie/core"
 import {

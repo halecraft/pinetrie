@@ -1,21 +1,20 @@
 // host/store — the session, kept on disk.
 //
 // Kyneta's exchange store (`@kyneta/sqlite-store`) over Node's built-in
-// `node:sqlite`, so there is no native dependency (S22). It holds every
-// document the host serves, one append-only record stream per document: the
-// session's records, `pinetrie:live`, the places, and one `RootDoc` per root,
-// which is that root's pi storage (ADR-0063). It is not a pi session file. A
-// document opens under a changed schema without complaint, and a dropped
-// field's data is deleted at the next compaction (S120). The host's images
-// are in the same file, in `pinetrie_blobs` (`blobs.ts`, ADR-0042), on the
-// same connection.
+// `node:sqlite`, so there is no native dependency. It holds every document the
+// host serves, one append-only record stream per document: the session's
+// records, `pinetrie:live`, the places, and one `RootDoc` per root, which is
+// that root's pi storage. It is not a pi session file. A document opens under a
+// changed schema without complaint, and a dropped field's data is deleted at
+// the next compaction. The host's images are in the same file, in
+// `pinetrie_blobs` (`blobs.ts`), on the same connection.
 //
-// The store owns its file (S47). Kyneta's SQLite store issues the same seat on
-// every open, so the host keeps its peer id across restarts; that is sound
-// only while nothing else writes the file. Kyneta's own adapters take the
-// file's lock when they wrap a connection, and so does this one: a second
-// process, or a second store in this one, is refused, and so is any reader.
-// The Runtime closes the store when the Exchange shuts down.
+// The store owns its file. Kyneta's SQLite store issues the same seat on every
+// open, so the host keeps its peer id across restarts; that is sound only while
+// nothing else writes the file. Kyneta's own adapters take the file's lock when
+// they wrap a connection, and so does this one: a second process, or a second
+// store in this one, is refused, and so is any reader. The Runtime closes the
+// store when the Exchange shuts down.
 
 import { existsSync, mkdirSync } from "node:fs"
 import path from "node:path"
@@ -29,8 +28,8 @@ import { sqliteBlobs } from "./blobs.ts"
 const BUSY_TIMEOUT_MS = 5_000
 
 /**
- * Whether `error` says another connection holds the file: `node:sqlite`
- * reports SQLite's `SQLITE_BUSY` (5) as `errcode` (S47). Pure.
+ * Whether `error` says another connection holds the file: `node:sqlite` reports
+ * SQLite's `SQLITE_BUSY` (5) as `errcode`.
  */
 export const isBusyError = (error: unknown): boolean =>
   typeof error === "object" &&
@@ -40,7 +39,7 @@ export const isBusyError = (error: unknown): boolean =>
 
 /**
  * The session's file, opened and locked: this connection is its only owner
- * until it closes (S47).
+ * until it closes.
  */
 export function openDatabase(
   file: string,

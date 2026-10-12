@@ -1,11 +1,10 @@
-// host/migrations/0013-task-cards — a task is a card on the board
-// (ADR-0126). The places' rows gain `state`, so the schema's hash moves,
-// and data moves with it: each task's record (`pinetrie.task`, who opened
-// it and when) and its board place (`pinetrie.board`, its state, its rank,
-// who moved it there and when) become its card, on the board in that state
-// at that rank, and its card's history: created by its opener in the first
-// open state, then moved by its placer into its state, when that is
-// another. Both records are deleted.
+// host/migrations/0013-task-cards — a task is a card on the board. The places'
+// rows gain `state`, so the schema's hash moves, and data moves with it: each
+// task's record (`pinetrie.task`, who opened it and when) and its board place
+// (`pinetrie.board`, its state, its rank, who moved it there and when) become
+// its card, on the board in that state at that rank, and its card's history:
+// created by its opener in the first open state, then moved by its placer into
+// its state, when that is another. Both records are deleted.
 //
 // 0012-unstarted-threads, from the hash before, plans with this too, so a
 // store there opens in one step. Delete this file once Duane's store has

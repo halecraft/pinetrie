@@ -19,7 +19,7 @@ const DIGESTED = (prompt: EntryId) => ({
   final: true,
 })
 
-test("writes sets and deletes, each in the document its target names (ADR-0063, ADR-0095)", async () => {
+test("writes sets and deletes, each in the document its target names", async () => {
   const b = basics()
   const records = createRecords(b.docs)
   const entry = entryId("e-1")

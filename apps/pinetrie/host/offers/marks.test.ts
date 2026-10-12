@@ -40,7 +40,7 @@ describe("planMarks: what a move the owner observed refreshes", () => {
     ).toEqual([D])
     expect(marks(moved({ all: true }), [D]).lanes).toEqual([A, B, D])
   })
-  test("the publish bookmark marks accepted work's record, and no lane (ADR-0076)", () => {
+  test("the publish bookmark marks accepted work's record, and no lane", () => {
     expect(marks(moved({ published: true }))).toEqual({
       accepted: true,
       shared: false,

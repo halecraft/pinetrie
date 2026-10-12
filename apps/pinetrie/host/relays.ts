@@ -1,4 +1,4 @@
-// host/relays — another thread's agent asked, and its answer (ADR-0128).
+// host/relays — another thread's agent asked, and its answer.
 //
 // An ask, a person's (`relayChat`) or an agent's (`ask`, its tool's hook),
 // is relayed into the asked thread: what it has not heard of the asking
@@ -88,9 +88,8 @@ const said = (text: string, isError = false): ToolAnswer => ({
 })
 
 /**
- * Every named thread on an open task's canvas (ADR-0128): whose agents a
- * message may name, wherever it is sent. `agentCandidates` leaves its own
- * thread out.
+ * Every named thread on an open task's canvas: whose agents a message may name,
+ * wherever it is sent. `agentCandidates` leaves its own thread out.
  */
 export function readReachableAgents(
   docs: Pick<Basics, "places" | "session">,
@@ -307,7 +306,7 @@ export function createRelays(deps: {
         return said("This call reached no thread.", true)
       if (target === null)
         return said(refusal({ kind: "unknown", name: to }), true)
-      // A person's message whose run asks sets its budget now (ADR-0128).
+      // A person's message whose run asks sets its budget now.
       const by = budget.by
       if (by === null) return said("This call reached no thread.", true)
       await budgets.ensure(budget.key, lane, by)
@@ -523,8 +522,8 @@ export function createRelays(deps: {
   }
 
   /**
-   * After every member a person's message asked has answered (ADR-0128):
-   * when it asked two or more, one request decides what comes next.
+   * After every member a person's message asked has answered: when it asked two
+   * or more, one request decides what comes next.
    */
   async function round(relay: RelayDetails): Promise<void> {
     if (reachNow(relay.from).kind !== "open") return

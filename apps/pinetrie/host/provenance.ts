@@ -1,10 +1,9 @@
-// host/provenance — each card's history and the traces left where someone
-// else moved your card (ADR-0048 step 6), written after every change to the
-// places, in the step that made it. `before` is read at the step's start;
-// `after` reads the places as the write left them, plans with
-// `planProvenance` (`@pinetrie/rules`) and writes the records in one call.
-// The records are the session's, never the places': a field there would
-// refuse each whole undo of a move (S82).
+// host/provenance — each card's history and the traces left where someone else
+// moved your card, written after every change to the places, in the step that
+// made it. `before` is read at the step's start; `after` reads the places as
+// the write left them, plans with `planProvenance` (`@pinetrie/rules`) and
+// writes the records in one call. The records are the session's, never the
+// places': a field there would refuse each whole undo of a move.
 
 import type {
   CardId,
@@ -56,16 +55,16 @@ export interface Provenance {
   /** Old traces, and histories whose card is gone (`planTraceSweep`). */
   sweep(): Promise<void>
   /**
-   * Call `listener` after each change `after` records, with the places
-   * before and after it and its cause: what tells a running thread its
-   * task's canvas changed (`canvas-news.ts`, ADR-0116). Never awaited.
+   * Call `listener` after each change `after` records, with the places before
+   * and after it and its cause: what tells a running thread its task's canvas
+   * changed (`canvas-news.ts`). Never awaited.
    */
   onChanged(listener: (change: PlacesChange) => void): void
   /**
    * Call `stop` after each change a person made that takes threads into an
-   * inventory (`takenIn`), with those threads and who made it: their runs
-   * stop with it, whatever wrote it (ADR-0124). Awaited in `after`, in the
-   * step that made the change.
+   * inventory (`takenIn`), with those threads and who made it: their runs stop
+   * with it, whatever wrote it. Awaited in `after`, in the step that made the
+   * change.
    */
   onTaken(
     stop: (threads: readonly ThreadId[], by: WriterId) => Promise<void>,

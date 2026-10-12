@@ -1,10 +1,9 @@
-// host/canvas — what a run is told of its thread's task (ADR-0116): the
-// task's canvas list, and the cards pinned to the task. Each is written only
-// when it differs from the newest of its kind on the lane's path
-// (`canvasInView`, `taskPinnedInView`), so an unchanged task keeps the
-// prompt's cache (S92). Gather the facts, plan with the rules
-// (`planCanvasRead`, `planTaskPinnedRead`), encode; `runs.ts` writes them
-// before the run's prompt.
+// host/canvas — what a run is told of its thread's task: the task's canvas
+// list, and the cards pinned to the task. Each is written only when it differs
+// from the newest of its kind on the lane's path (`canvasInView`,
+// `taskPinnedInView`), so an unchanged task keeps the prompt's cache. Gather
+// the facts, plan with the rules (`planCanvasRead`, `planTaskPinnedRead`),
+// encode; `runs.ts` writes them before the run's prompt.
 
 import {
   canvasInView,
@@ -49,8 +48,8 @@ import { tasksNow } from "./tasks.ts"
 export type TaskContext = readonly (CanvasMessage | TaskPinnedMessage)[]
 
 /**
- * The title a task is told by: its title, else its first thread's root's
- * first line. Pure.
+ * The title a task is told by: its title, else its first thread's root's first
+ * line.
  */
 export const taskTitle = (
   task: TaskId,

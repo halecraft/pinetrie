@@ -1,9 +1,9 @@
-// host/work/archive — what an archive or a restore does to its lanes
-// (ADR-0029), off the documents' keeper (ADR-0065): carries out
-// `planArchive`'s teardown, deciding nothing. Lanes forgotten and their
-// containers and disks removed; their refs in your repo moved by an owner
-// command, which marks each lane's offer (withdrawn, or built again); the
-// snapshots no one will branch from deleted in the background.
+// host/work/archive — what an archive or a restore does to its lanes, off the
+// documents' keeper: carries out `planArchive`'s teardown, deciding nothing.
+// Lanes forgotten and their containers and disks removed; their refs in your
+// repo moved by an owner command, which marks each lane's offer (withdrawn, or
+// built again); the snapshots no one will branch from deleted in the
+// background.
 
 import type { Keeper } from "@pinetrie/keeper"
 import { type LaneRuntime, removeLane } from "@pinetrie/lanes"

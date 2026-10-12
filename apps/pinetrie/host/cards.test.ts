@@ -53,7 +53,7 @@ test("an aborted whenHolds resolves, and a signal aborted first resolves at once
   expect(await settled(cards.whenHolds(id, seen, giveUp.signal))).toBe(true)
 })
 
-test("blankQueued: a queued card made empty is blank; one queued with text is not, before its text arrives or after (ADR-0113)", async () => {
+test("blankQueued: a queued card made empty is blank, and one queued with text is not", async () => {
   const { cards, id, seen, arrive } = setUp()
   const queuedAs = (card: string, s: string): TextCard => ({
     kind: "text",

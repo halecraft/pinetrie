@@ -1,5 +1,4 @@
-// host/work — lanes' containers and disks, as the host carries them out
-// (ADR-0032 to ADR-0034, ADR-0105).
+// host/work — lanes' containers and disks, as the host carries them out.
 //
 // The decisions are pure and live in `@pinetrie/core`, `@pinetrie/rules`,
 // `@pinetrie/lanes` and `@pinetrie/repo`; these modules gather what they need, call them, and
@@ -33,9 +32,8 @@ import { createTurns } from "./turns.ts"
 import { createUpdates, type Updates } from "./update.ts"
 
 /**
- * Your repo as lane work keeps it, all of it or none: its one writer
- * (ADR-0065), which shutdown closes, accepted work in it (ADR-0104), and each
- * lane's offer there (ADR-0105).
+ * Your repo as lane work keeps it, all of it or none: its one writer, which
+ * shutdown closes, accepted work in it, and each lane's offer there.
  */
 export interface YourRepo {
   readonly owner: RepoOwner
@@ -67,7 +65,7 @@ export type LaneWork = Pick<
      * records they write when they finish.
      */
     quiet(): Promise<void>
-    /** `listener` hears each lane whose base record changed (ADR-0080). */
+    /** `listener` hears each lane whose base record changed. */
     onBaseChanged(listener: (lane: ThreadId) => void): void
   }
 
@@ -81,9 +79,9 @@ export async function startLaneWork(input: {
   readonly basics: Basics
   /** What `findProject` found; null with no tools. */
   readonly found: Found | null
-  /** The user's config, as read at startup (ADR-0035): its file, for logs. */
+  /** The user's config, as read at startup: its file, for logs. */
   readonly userConfig: { readonly file: string; readonly json: unknown }
-  /** Where lane work writes its records (ADR-0062). */
+  /** Where lane work writes its records. */
   readonly records: Pick<Records, "writeValues">
   /** The person's pi setup: the commands' roots lanes are granted, the skills updates and splits ask for, and descriptions. */
   readonly piSetup: Pick<
@@ -124,19 +122,19 @@ export async function startLaneWork(input: {
   const { owner, runtime } = setup
   const registry = createRegistry({ session, runtime })
   const { repoConfig } = setup.lanes
-  /** Accepted work in your repo (ADR-0104). */
+  /** Accepted work in your repo. */
   const accepted = createAcceptedWork({
     owner,
     basics,
     repoConfig,
     writeValues: writes => input.records.writeValues(writes),
   })
-  // The base snapshot follows accepted work, however it moved: setup, an accept,
-  // a publish, or jj outside pine·trie (ADR-0090).
+  // The base snapshot follows accepted work, however it moved: setup, an
+  // accept, a publish, or jj outside pine·trie.
   owner.onMoved(moved => {
     if (moved.acceptedMoved) setup.refreshBaseSoon()
   })
-  /** Each lane's offer in your repo (ADR-0105). */
+  /** Each lane's offer in your repo. */
   const offers = startOffers({
     owner,
     repoConfig,

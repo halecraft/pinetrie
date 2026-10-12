@@ -4,10 +4,9 @@
 // the port must not be enough: whoever does gets the whole session, the
 // client's source and the command channel, and with tools, a shell. Off
 // loopback, an invite key is required: whoever has the link is a collaborator,
-// and nobody else gets anything. On loopback there is no key, so a request
-// must come from this machine's own names, and from a page of this host
-// (ADR-0042). It decides who gets in, not who is who: peer ids are chosen by
-// clients (ADR-0107).
+// and nobody else gets anything. On loopback there is no key, so a request must
+// come from this machine's own names, and from a page of this host. It decides
+// who gets in, not who is who: peer ids are chosen by clients.
 
 import { randomBytes, timingSafeEqual } from "node:crypto"
 
@@ -56,7 +55,7 @@ function cookieValue(
 }
 
 /**
- * Whether a request may reach the page, Vite, the blobs or the Exchange. Pure.
+ * Whether a request may reach the page, Vite, the blobs or the Exchange.
  *
  * First, where it comes from. A browser names the page that made a request in
  * `Origin`, and a page on another origin must not reach this one: a WebSocket

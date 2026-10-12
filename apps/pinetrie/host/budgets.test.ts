@@ -24,7 +24,7 @@ const relay = (asker: "person" | "agent") =>
     1,
   )
 
-describe("the budget a run spends is read from its prompt (ADR-0128)", () => {
+describe("the budget a run spends is read from its prompt", () => {
   test("an agent's ask spends its chain's budget; a person's ask names it, and spends nothing", () => {
     expect(promptBudget(entryId("p"), relay("agent"))).toEqual({
       key: budget,

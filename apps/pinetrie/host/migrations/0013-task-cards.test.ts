@@ -22,7 +22,7 @@ const [K1, K2, K3] = ["1", "2", "3"].map(n =>
   taskIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`),
 )
 
-describe("0013-task-cards (ADR-0126)", () => {
+describe("0013-task-cards", () => {
   const plan = planTaskCards({
     tasks: {
       [K1 ?? ""]: { by: ADA, createdAt: 1 },

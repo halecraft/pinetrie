@@ -47,7 +47,7 @@ function setUp() {
   return { b, keeper, records }
 }
 
-test("a root's record follows its document: a new entry refreshes it, once per burst (ADR-0063)", async () => {
+test("a root's record follows its document: a new entry refreshes it, once per burst", async () => {
   const { b, keeper, records } = setUp()
   // The refresh as the directory starts is over before the root changes.
   await keeper.idle()
@@ -137,7 +137,7 @@ test("five changes to one root before its refresh starts read and write it once"
   expect(writesOf(records.calls)).toHaveLength(written + 1)
 })
 
-test("the roots held when the directory starts are refreshed, and an unchanged record is not written again (ADR-0077)", async () => {
+test("the roots held when the directory starts are refreshed, and an unchanged record is not written again", async () => {
   const b = basics()
   const keeper = createKeeper<HostKey>()
   const records = record<Pick<Records, "writeValues">>({
@@ -156,7 +156,7 @@ test("the roots held when the directory starts are refreshed, and an unchanged r
   expect(records.calls.length).toBe(written)
 })
 
-test("planRebuild: a root a thread names, with no record that decodes, and held by no document (ADR-0063)", () => {
+test("planRebuild: a root a thread names, with no record that decodes, and held by no document", () => {
   const [a, b, c] = ["a", "b", "c"].map(rootIdFor) as [RootId, RootId, RootId]
   expect(
     planRebuild({

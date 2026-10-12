@@ -113,7 +113,7 @@ const plan = () =>
     newColumn: () => NOTES,
   })
 
-describe("0012-unstarted-threads (ADR-0126)", () => {
+describe("0012-unstarted-threads", () => {
   test("a fresh column becomes its thread opened, a new tab's task's card with it; your newest card is your message on its dock, the rest notes", () => {
     const { rows, records } = plan()
     const sets = records.flatMap(r =>

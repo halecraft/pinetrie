@@ -1,8 +1,7 @@
-// host/migrations/0012-unstarted-threads — a branch or a new tab is a
-// thread card from the moment it opens, and a discarded card is in its
-// discarder's trash (ADR-0126). The places' rows lose `root` (only a fresh
-// card's row named one) and gain an ask's `relay`, so the schema's hash
-// moves, and data moves with it:
+// host/migrations/0012-unstarted-threads — a branch or a new tab is a thread
+// card from the moment it opens, and a discarded card is in its discarder's
+// trash. The places' rows lose `root` (only a fresh card's row named one) and
+// gain an ask's `relay`, so the schema's hash moves, and data moves with it:
 //
 // - Each fresh column (`fresh` rows, by their column's key, the thread it
 //   minted) becomes its thread opened (`planThreadOpen`): its record, a new

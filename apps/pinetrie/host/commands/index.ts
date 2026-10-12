@@ -1,7 +1,7 @@
 // host/commands — one command from one writer: decoded, checked against the
-// archive, and routed to its module, in the place it runs
-// (`placeOfCommand`, ADR-0065): a step on the documents' keeper, straight
-// through to the owner of your repo, or a board move's three parts.
+// archive, and routed to its module, in the place it runs (`placeOfCommand`): a
+// step on the documents' keeper, straight through to the owner of your repo, or
+// a board move's three parts.
 
 import {
   ERR,
@@ -94,10 +94,10 @@ export interface CommandDeps {
 }
 
 /**
- * Where a command runs (ADR-0065). An offer action and a setup or publish act
- * on your repo only: they go straight to its owner, and hold no other
- * command. A move on the board is up to three parts (`handleTaskMove`).
- * Everything else is one step on the documents' keeper.
+ * Where a command runs. An offer action and a setup or publish act on your repo
+ * only: they go straight to its owner, and hold no other command. A move on the
+ * board is up to three parts (`handleTaskMove`). Everything else is one step on
+ * the documents' keeper.
  */
 export function placeOfCommand(intent: Intent): "documents" | "repo" | "board" {
   switch (intent.kind) {
@@ -144,7 +144,7 @@ export function createCommands(deps: CommandDeps): Commands {
     ensureNames: () => deps.names.ensure(),
   })
   // A change that takes a thread into an inventory stops its run, as the
-  // taker's own stop, whatever wrote it (ADR-0124).
+  // taker's own stop, whatever wrote it.
   deps.provenance.onTaken(async (threads, by) => {
     for (const lane of threads)
       if (readRunning(deps.basics.live, lane)) await handleStop(deps, lane, by)
@@ -332,12 +332,11 @@ export function createCommands(deps: CommandDeps): Commands {
 }
 
 /**
- * A command that would write in an archived task, or move a card out of
- * one, is refused, naming who archived it (ADR-0029, ADR-0122, ADR-0116).
- * `sendChat`'s only callers are this dispatcher and `sendPoppedQueuedCard`,
- * both behind it, so it needs no check of its own. `tasks` is the tasks the
- * command writes in (`writesIn`), so no root's document is opened to check.
- * Null when the command may go on.
+ * A command that would write in an archived task, or move a card out of one, is
+ * refused, naming who archived it. `sendChat`'s only callers are this
+ * dispatcher and `sendPoppedQueuedCard`, both behind it, so it needs no check
+ * of its own. `tasks` is the tasks the command writes in (`writesIn`), so no
+ * root's document is opened to check. Null when the command may go on.
  */
 /**
  * A command that would run, or write a message, in a thread someone holds

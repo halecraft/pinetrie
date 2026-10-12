@@ -2,9 +2,9 @@
 //
 // The one way a run starts. It announces its end and knows nothing of what
 // follows: `startHost` wires the drain and hot reload to `onEnded`, which is
-// what keeps the queue's pops and the commands out of this module. What a
-// run reads of its pinned cards is `readPinned`'s (`pinned.ts`); what it is
-// told of its base's new work, `baseNews`' (`base-news.ts`, ADR-0080).
+// what keeps the queue's pops and the commands out of this module. What a run
+// reads of its pinned cards is `readPinned`'s (`pinned.ts`); what it is told of
+// its base's new work, `baseNews`' (`base-news.ts`).
 
 import {
   type EntryId,
@@ -43,14 +43,13 @@ export type RunStart =
       readonly kind: "prompt"
       readonly message: PromptMessage
       /**
-       * The thread's pinned cards as the sender had them, which the run
-       * waits for (ADR-0048, S96): a chat's; none for a popped queued card,
-       * a landing or a stack.
+       * The thread's pinned cards as the sender had them, which the run waits
+       * for: a chat's; none for a popped queued card, a landing or a stack.
        */
       readonly pinnedSeen: readonly SentCard[]
       /**
-       * What an asked agent heard of the thread that asked (ADR-0128),
-       * written first, before its relayed ask; absent for every other run.
+       * What an asked agent heard of the thread that asked, written first,
+       * before its relayed ask; absent for every other run.
        */
       readonly heard?: HeardMessage | null
     }
@@ -63,7 +62,7 @@ export type ReadPinned = (
   signal: AbortSignal,
 ) => Promise<PinnedMessage | null>
 
-/** What a run on `lane` is told of its task first (`canvas.ts`, ADR-0116). */
+/** What a run on `lane` is told of its task first (`canvas.ts`). */
 export type ReadTaskContext = (lane: ThreadId) => Promise<TaskContext>
 
 export interface Runs {
@@ -99,11 +98,11 @@ export type RunEndStep =
 /**
  * A run's end, in order, from its prompt's role. A split checks its stack,
  * however it started. A resolution ends as any run does: its outcome is the
- * offer's conflicts and the agent's asks in the tree (ADR-0080, S104). The run's
- * verdict is pending before `endRun` (ADR-0077): written after, a reader
- * would see the lane stopped beside the last run's verdict. `endRun` comes
- * before `laneStopped` and `ended`: it closes the lane's streams (ADR-0044),
- * and what follows reads the lane as idle.
+ * offer's conflicts and the agent's asks in the tree. The run's verdict is
+ * pending before `endRun`: written after, a reader would see the lane stopped
+ * beside the last run's verdict. `endRun` comes before `laneStopped` and
+ * `ended`: it closes the lane's streams, and what follows reads the lane as
+ * idle.
  */
 export function planRunEnd(role: string | undefined): readonly RunEndStep[] {
   const outcome: readonly RunEndStep[] = role === "stack" ? ["splitEnded"] : []
@@ -236,8 +235,8 @@ export function createRuns(deps: {
             await handle.append(chat)
             return
           }
-          // A chat's run is told its base's new work first (ADR-0080); a
-          // resolution or a split has a prompt of its own.
+          // A chat's run is told its base's new work first; a resolution or a
+          // split has a prompt of its own.
           const behind =
             chat === null
               ? null
@@ -245,14 +244,14 @@ export function createRuns(deps: {
                   failed(basics, "the base's news")(error)
                   return null
                 })
-          // What the run is told of its task (ADR-0116), read after the
-          // pinned cards' wait, so it is as late as the run's start.
+          // What the run is told of its task, read after the pinned cards'
+          // wait, so it is as late as the run's start.
           const task = await readTaskContext(lane).catch(error => {
             failed(basics, "the task's context")(error)
             return []
           })
           // The cards entry stays the prompt's parent; what an asked agent
-          // heard goes first (ADR-0128).
+          // heard goes first.
           const before = [start.heard ?? null, behind, ...task, pinned].filter(
             m => m !== null,
           )

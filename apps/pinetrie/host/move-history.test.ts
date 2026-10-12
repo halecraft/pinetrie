@@ -24,7 +24,7 @@ const TEST_THREAD = threadIdFor("e")
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
-/** Two tasks, each with its own history (ADR-0116); their cards in one root. */
+/** Two tasks, each with its own history; their cards in one root. */
 const R1 = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const R2 = taskIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 const _ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -75,7 +75,7 @@ async function setUp() {
   return { store, exchange, histories, card, seed, move, placeOf, recordOf }
 }
 
-test("a move is one step of its writer's history in its task, and undoes whole after rev was raised (S82)", async () => {
+test("a move is one step of its writer's history in its task, and undoes whole after rev was raised", async () => {
   const { histories, card, seed, move, placeOf } = await setUp()
   const a = card("a", R1)
   seed(a)
@@ -112,7 +112,7 @@ test("another task's history, and another writer's, are untouched by an undo", a
   histories.dispose()
 })
 
-test("a person's history outside any task is a stack of its own: a task's undo leaves it, and its own undoes it (ADR-0126)", async () => {
+test("a person's history outside any task is a stack of its own, which a task's undo leaves", async () => {
   const { histories, card, seed, move, placeOf } = await setUp()
   const [a, b] = [card("a", R1), card("b", R1)]
   for (const x of [a, b]) seed(x)
@@ -142,7 +142,7 @@ test("an undo is refused, and nothing reverted, after someone else moved the car
   histories.dispose()
 })
 
-test("a stored history not loaded is retired by id, and a stack made on it again is empty (S91)", async () => {
+test("a stored history not loaded is retired by id, and a stack made on it again is empty", async () => {
   const { store, histories, card, seed, move } = await setUp()
   const a = card("a", R1)
   seed(a)

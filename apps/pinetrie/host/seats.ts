@@ -1,11 +1,11 @@
-// host/seats — which person each seat is, written down once (ADR-0048).
+// host/seats — which person each seat is, written down once.
 //
-// A text's operations carry their seat's `clientID`. Only the host knows
-// which person a seat is, and only while it is connected (ADR-0037), so it
-// writes a `pinetrie.seat` record per seat as the seat arrives. Anyone then
-// names a text's writers from its `clientID`s, after the seat has gone. A
-// person with no seat left can undo nothing, so their stacks of moves are
-// unloaded (ADR-0066); the next move loads one again (S91).
+// A text's operations carry their seat's `clientID`. Only the host knows which
+// person a seat is, and only while it is connected, so it writes a
+// `pinetrie.seat` record per seat as the seat arrives. Anyone then names a
+// text's writers from its `clientID`s, after the seat has gone. A person with
+// no seat left can undo nothing, so their stacks of moves are unloaded; the
+// next move loads one again.
 
 import type { Exchange } from "@kyneta/exchange"
 import type { WriterId } from "@pinetrie/core"
@@ -17,7 +17,7 @@ import type { Basics } from "./basics.ts"
 import type { MoveHistories } from "./move-history.ts"
 import type { Records } from "./records.ts"
 
-/** The writers with stacks of moves loaded and no seat connected. Pure. */
+/** The writers with stacks of moves loaded and no seat connected. */
 export const idleWriters = (
   loaded: readonly WriterId[],
   connected: readonly WriterId[],

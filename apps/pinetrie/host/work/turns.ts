@@ -1,6 +1,6 @@
-// host/work/turns — each turn of a lane of its own, recorded (ADR-0032): its
-// revision committed on the lane's queue, its disk snapshotted, its history
-// fetched into your repo.
+// host/work/turns — each turn of a lane of its own, recorded: its revision
+// committed on the lane's queue, its disk snapshotted, its history fetched into
+// your repo.
 
 import {
   type CommitId,
@@ -135,7 +135,7 @@ export function createTurns(deps: {
     )
   }
 
-  /** A revision, in the root its lane works in (ADR-0063). */
+  /** A revision, in the root its lane works in. */
   const writeRevision = async (record: RevisionRecord) => {
     const root = docs.rootOfLane(record.lane)
     if (root === null) throw new Error(`${record.lane} is in no root`)
@@ -156,8 +156,8 @@ export function createTurns(deps: {
         const entry = turnEntry(index, tip)
         const isPrompt = promptOf(index, entry) === entry
         const toolCalls = toolCallsOf(index.entries[entry]?.message).length > 0
-        // A `catch_up` in the turn moved the bookmark (ADR-0080): read from
-        // the tree, so a restart before this record changes nothing.
+        // A `catch_up` in the turn moved the bookmark: read from the tree, so a
+        // restart before this record changes nothing.
         const merged = turnMerged(index, tip)
         if (!registry.isOwn(lane)) {
           const revision = planTurnRecord({
@@ -199,8 +199,8 @@ export function createTurns(deps: {
             made.commit === null
               ? []
               : await changedPaths(jj, before, made.commit)
-          // The files conflicted in the commit its record names: its own,
-          // else the bookmark's, which a branch from it clones (ADR-0072).
+          // The files conflicted in the commit its record names: its own, else
+          // the bookmark's, which a branch from it clones.
           const named = made.commit ?? before
           const conflicts =
             made.conflicted && named !== null
@@ -237,7 +237,7 @@ export function createTurns(deps: {
           })
         // The recipe, if an input changed, then the snapshot: queued, so the
         // next tool call waits for both, and not awaited, so the next request
-        // does not (ADR-0131).
+        // does not.
         const ended = deps.recipes
           .snapshotOnQueue(
             lane,

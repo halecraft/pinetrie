@@ -1,10 +1,10 @@
 // host/offers/state — what the offer modules share, built once by
-// `startOffers`: what the documents say of a lane (`OfferDocs`), the
-// records the host writes (`OfferRecords`), and the owner of your repo
-// (`@pinetrie/repo`, ADR-0065). Every read of your repo is `@pinetrie/repo`'s
-// (`gatherOffer`, `gatherRefresh`, …), and every decision `@pinetrie/rules`': the
-// documents are read here only for what your repo cannot say, and a record
-// only to skip a write that changes nothing (ADR-0104).
+// `startOffers`: what the documents say of a lane (`OfferDocs`), the records
+// the host writes (`OfferRecords`), and the owner of your repo
+// (`@pinetrie/repo`). Every read of your repo is `@pinetrie/repo`'s
+// (`gatherOffer`, `gatherRefresh`, …), and every decision `@pinetrie/rules`':
+// the documents are read here only for what your repo cannot say, and a record
+// only to skip a write that changes nothing.
 
 import {
   type BaseRecord,
@@ -43,20 +43,20 @@ import { tasksNow } from "../tasks.ts"
 /** What the documents say of a lane, for what your repo cannot say. */
 export interface OfferDocs {
   nameOf(lane: ThreadId): ThreadName | undefined
-  /** Read from the archive record, never from the lane's tip being missing: a tip missing for one import (S78) must not withdraw a live offer. */
+  /** Read from the archive record, never from the lane's tip being missing: a tip missing for one import must not withdraw a live offer. */
   archived(lane: ThreadId): boolean
   /** A gather's input: the lane, its name, accepted work's names, and the last catch-up read, a memo `readCatchUp` keeps at the same tip and base commit. */
   input(lane: ThreadId): OfferInput
   /** The lane's tip entry, for `Pinetrie-Entry`; "" for none. */
   tipOf(lane: ThreadId): string
   /**
-   * An offer's line until an agent describes it: the thread's name and its
-   * own first message, the first prompt its lane ran (ADR-0039).
+   * An offer's line until an agent describes it: the thread's name and its own
+   * first message, the first prompt its lane ran.
    */
   wipLine(lane: ThreadId, name: ThreadName): string
 }
 
-/** The records the host writes from your repo, the page's cache (ADR-0104). */
+/** The records the host writes from your repo, the page's cache. */
 export interface OfferRecords {
   /** An offer's record, when it changed. */
   write(record: OfferRecord): Promise<void>
@@ -73,7 +73,7 @@ export interface OfferRecords {
 export interface OfferDeps {
   /** The one writer of your repo: commands, refreshes as upkeep, pinned reads. */
   readonly owner: RepoOwner
-  /** Accepted work's names (ADR-0104). */
+  /** Accepted work's names. */
   readonly repoConfig: RepoConfig
   readonly basics: Basics
   /** What a description asks of the model. */
@@ -149,7 +149,7 @@ export function createOfferDeps(input: {
       const writes = setIfChanged(BASE, next, readBases(doc).get(next.lane))
       if (writes.length === 0) return
       await writeValues(writes)
-      // Announced, so a running thread whose base now has news is told (ADR-0080).
+      // Announced, so a running thread whose base now has news is told.
       input.baseChanged(next.lane)
     },
   }

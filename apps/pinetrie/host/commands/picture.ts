@@ -1,7 +1,7 @@
-// host/commands/picture — a person's picture (ADR-0098): gather the blob's
-// reference, `planPicture`, execute. A picture larger than `PICTURE_MOST` is
-// fitted within it and kept as a blob of its own, which is what is set; the
-// original is left to the sweep, since nothing references it.
+// host/commands/picture — a person's picture: gather the blob's reference,
+// `planPicture`, execute. A picture larger than `PICTURE_MOST` is fitted within
+// it and kept as a blob of its own, which is what is set; the original is left
+// to the sweep, since nothing references it.
 
 import {
   type BlobStore,

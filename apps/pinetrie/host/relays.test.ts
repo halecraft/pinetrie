@@ -96,7 +96,7 @@ function setUp() {
   return { b, relays, opened }
 }
 
-describe("other threads' agents in reach (ADR-0128)", () => {
+describe("other threads' agents in reach", () => {
   test("every named thread on an open task, and none on an archived one", () => {
     const { b } = setUp()
     expect(readReachableAgents(b).map(t => t.name)).toEqual([

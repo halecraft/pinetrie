@@ -1,6 +1,6 @@
-// host/base-news — a thread is told when its base has new work (ADR-0080):
-// before a chat's run, in the run's own commit, and while it runs, by a
-// steer pi places after the turn in flight (S103 item 4).
+// host/base-news — a thread is told when its base has new work: before a chat's
+// run, in the run's own commit, and while it runs, by a steer pi places after
+// the turn in flight.
 //
 // `planBaseNews` (`@pinetrie/rules`) decides; this gathers and carries it out.
 // `told` is the one fact the tree cannot hold: a steer waits in pi's inbox,

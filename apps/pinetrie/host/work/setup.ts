@@ -57,8 +57,8 @@ const LANE_MEMORY = "4G"
 
 /**
  * The `@playwright/test` this app resolves, whose browser the default lane
- * image carries (ADR-0041). A dev dependency: the host runs from pinetrie's
- * repo, where `pnpm install` installs it.
+ * image carries. A dev dependency: the host runs from pinetrie's repo, where
+ * `pnpm install` installs it.
  */
 export const playwrightVersion = (): string =>
   (
@@ -77,7 +77,7 @@ export interface Ready {
   readonly identity: { readonly name: string; readonly email: string }
 }
 
-/** The lane configs and shared directories (ADR-0035), read at startup. */
+/** The lane configs and shared directories, read at startup. */
 export type PreparedLanes = Awaited<ReturnType<typeof prepareLanes>>
 
 /**
@@ -90,21 +90,21 @@ export interface Setup {
   readonly project: ProjectRecord
   /** The project's root. */
   readonly root: string
-  /** The one writer of your repo (ADR-0065). */
+  /** The one writer of your repo. */
   readonly owner: RepoOwner
   /** What lanes run on. */
   readonly runtime: LaneRuntime
   readonly lanes: PreparedLanes
   /**
-   * Whether lanes run pinetrie's default image, with its browser (ADR-0041) and
-   * python3 (ADR-0064): the project has no `pinetrie.Containerfile`.
+   * Whether lanes run pinetrie's default image, with its browser and python3:
+   * the project has no `pinetrie.Containerfile`.
    */
   readonly defaultImage: boolean
   /** The images, runtime and grants, made in the background. */
   readonly ready: Promise<Ready>
   /**
-   * The host paths every lane is granted, read-only: the roots of the
-   * commands pi loaded (ADR-0036).
+   * The host paths every lane is granted, read-only: the roots of the commands
+   * pi loaded.
    */
   readonly hostPaths: readonly string[]
   /** A lane's spec. The base lane gets no shared directories and no host paths. */
@@ -117,11 +117,11 @@ export interface Setup {
   refreshBaseSoon(): void
   /**
    * The base snapshot at accepted work's commit now, after the refreshes queued
-   * before: a fork from it waits for this, since accepted work may have been set
-   * up or moved since the last refresh (ADR-0104).
+   * before: a fork from it waits for this, since accepted work may have been
+   * set up or moved since the last refresh.
    */
   baseAtAccepted(): Promise<void>
-  /** The dependency layer's key at `rev` of the repo `jj` reads (ADR-0131). */
+  /** The dependency layer's key at `rev` of the repo `jj` reads. */
   keyAt(jj: Runner, rev: string, ready: Ready): Promise<string>
   /** The dependency layer `key` names, at `commits`: made if missing, after the base's builds queued before. */
   depsLayerAt(commits: readonly CommitId[], key: string): Promise<SnapshotId>
@@ -131,9 +131,9 @@ export async function startSetup(input: {
   readonly basics: Basics
   /** What `findProject` found; null with no tools. */
   readonly found: Found | null
-  /** The user's config, as read at startup (ADR-0035): its file, for logs. */
+  /** The user's config, as read at startup: its file, for logs. */
   readonly userConfig: { readonly file: string; readonly json: unknown }
-  /** The commands pi loaded, whose roots lanes are granted (ADR-0036). */
+  /** The commands pi loaded, whose roots lanes are granted. */
   readonly setup: Pick<PiSetup, "commands" | "agentDir">
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
@@ -157,8 +157,8 @@ export async function startSetup(input: {
     onError: failed(basics, "your repo"),
     onSlow: slow(basics, "your repo"),
   })
-  // pre-accepted: the owner's first command, before its first observation
-  // (ADR-0100). Delete with `renameAccepted`.
+  // pre-accepted: the owner's first command, before its first observation.
+  // Delete with `renameAccepted`.
   await owner
     .command(ops => renameAccepted(ops, lanes.repoConfig.acceptedBookmark))
     .then(
@@ -215,9 +215,9 @@ export async function startSetup(input: {
   }
 
   /**
-   * The base snapshot at accepted work's commit (ADR-0104): every lane starts
-   * from accepted work, or from a WIP's copy on it. Nothing to do before accepted work
-   * is set up.
+   * The base snapshot at accepted work's commit: every lane starts from
+   * accepted work, or from a WIP's copy on it. Nothing to do before accepted
+   * work is set up.
    */
   async function refreshBaseNow(r: Ready) {
     const acceptedBookmark = revsetName(lanes.repoConfig.acceptedBookmark)

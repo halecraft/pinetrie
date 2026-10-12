@@ -1,9 +1,9 @@
-// host/control — the command channel (ADR-0007): one Line per client seat.
+// host/control — the command channel: one Line per client seat.
 //
 // Identity comes from the TRANSPORT, never the message: `sender.peer` is the
-// client's seat, and the principal its connection named is who they are
-// (ADR-0037), so no command field can claim to be someone else. A principal
-// that is not an email names nobody, and every command from it is refused.
+// client's seat, and the principal its connection named is who they are, so no
+// command field can claim to be someone else. A principal that is not an email
+// names nobody, and every command from it is refused.
 
 import type { Exchange } from "@kyneta/exchange"
 import { type WriterId, writerOfPrincipal } from "@pinetrie/core"

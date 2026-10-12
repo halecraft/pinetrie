@@ -1,6 +1,6 @@
-// host/names — every thread's name (ADR-0039, ADR-0117): planned for each
-// thread or lane that has none, at start and for a new lane before its first
-// run, and for a thread a column opens before it has a message (ADR-0057).
+// host/names — every thread's name: planned for each thread or lane that has
+// none, at start and for a new lane before its first run, and for a thread a
+// column opens before it has a message.
 
 import type { NameRecord, ThreadId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
@@ -22,8 +22,8 @@ export interface Names {
    */
   ensure(): Promise<void>
   /**
-   * Name the thread a column is about to create a lane for (ADR-0057), and
-   * make its banner due, named already or not.
+   * Name the thread a column is about to create a lane for, and make its banner
+   * due, named already or not.
    */
   reserve(lane: ThreadId): Promise<ReservePlan["kind"]>
 }
@@ -48,9 +48,9 @@ export function createNames(deps: {
   return {
     ensure: () =>
       keeper.run(async () => {
-        // Every lane has a record from its creation (ADR-0063), in whichever
-        // root it works, and every thread from its first message (ADR-0117):
-        // a conversation thread is named too.
+        // Every lane has a record from its creation, in whichever root it
+        // works, and every thread from its first message: a conversation thread
+        // is named too.
         const lanes = readLaneRecords(session)
         const planned = planNames(
           [
@@ -79,8 +79,8 @@ export function createNames(deps: {
           now(),
         )
         if (plan.kind === "name") await write(plan.record, true)
-        // A thread opened before its lane (ADR-0126) was named as a
-        // conversation's, with no banner: its lane to come is due one.
+        // A thread opened before its lane was named as a conversation's, with
+        // no banner: its lane to come is due one.
         if (plan.kind === "known") deps.onNamed(lane)
         return plan.kind
       }),

@@ -127,7 +127,7 @@ describe("popNextQueuedCard", () => {
     expect(readPlaces(cards).map(c => c.id)).toEqual([cardIdFor("c2")])
   })
 
-  test("its removal raises the places document's rev, so a client whose unqueue it beat settles (ADR-0059)", () => {
+  test("its removal raises the places document's rev, so a client whose unqueue it beat settles", () => {
     const cards = newPlacesDoc()
     queue(cards, cardIdFor("c1"), "a")
     popNextQueuedCard(
@@ -185,7 +185,7 @@ describe("popNextQueuedCard", () => {
     ).toBe("idle")
   })
 
-  test("a top card whose text the host does not yet hold is behind, and stays: the next waits behind it (S96)", () => {
+  test("a top card whose text the host does not yet hold is behind, and stays: the next waits behind it", () => {
     const cards = newPlacesDoc()
     queue(cards, cardIdFor("c1"), "a")
     queue(cards, cardIdFor("c2"), "b")
@@ -317,7 +317,7 @@ function setUp(
 }
 
 describe("drain", () => {
-  test("a held queue pops no message; a card someone types in on top waits for them, and the cards behind it wait too (ADR-0048 step 7)", async () => {
+  test("a held queue pops no message, and a card someone types in on top waits for them", async () => {
     const { b, events, deps, presence } = setUp(
       {
         [cardIdFor("c1")]: "a",
@@ -342,7 +342,7 @@ describe("drain", () => {
     expect(textsIn(b.places)).toHaveLength(2)
   })
 
-  test("a blank message is passed over and stays queued; with only blank cards left, the drain waits for one to be written in (ADR-0113)", async () => {
+  test("a blank message is passed over and stays queued", async () => {
     const { b, events, deps } = setUp(
       {
         [cardIdFor("c1")]: " ",
@@ -424,7 +424,7 @@ describe("drain", () => {
     expect(textsIn(b.places).map(c => c.id)).toEqual([cardIdFor("c3")])
   })
 
-  test("a queued reference's quote, read from its blob, is sent as its queuer's message; its record goes, and nothing is destroyed (ADR-0126)", async () => {
+  test("a queued reference's quote, read from its blob, is sent as its queuer's message", async () => {
     const { b, events, deps, blobs } = setUp({ [cardIdFor("c2")]: "after" }, [])
     const quote = blobs.put(storedText("> the quote")).sha256
     const reference = cardIdOfKind(
@@ -455,7 +455,7 @@ describe("drain", () => {
     )
   })
 
-  test("a queued reference whose quote is not found is skipped, not sent empty; the card behind it is sent (ADR-0126)", async () => {
+  test("a queued reference whose quote is not found is skipped, not sent empty; the card behind it is sent", async () => {
     const { b, events, deps } = setUp({ [cardIdFor("c2")]: "after" }, [])
     const reference = cardIdOfKind(
       "reference",
@@ -488,7 +488,7 @@ describe("drain", () => {
     ).toBe(true)
   })
 
-  test("a card popped and sent leaves no history (ADR-0048 step 6)", async () => {
+  test("a card popped and sent leaves no history", async () => {
     const { b, deps } = setUp({ [cardIdFor("c1")]: "first" }, [])
     queue(b.places, cardIdFor("c1"), "a")
     putValue(
@@ -511,7 +511,7 @@ describe("drain", () => {
     expect(textsIn(b.places)).toHaveLength(1)
   })
 
-  test("pops nothing while its thread is in an inventory: its cards stay queued (ADR-0124)", async () => {
+  test("pops nothing while its thread is in an inventory: its cards stay queued", async () => {
     const { b, events, deps } = setUp({ [cardIdFor("c1")]: "first" }, [])
     queue(b.places, cardIdFor("c1"), "a")
     const card = readPlaces(b.places).find(c => c.id === LANE)
@@ -631,7 +631,7 @@ describe("drain", () => {
   })
 })
 
-describe("drain: bring up to date (ADR-0108)", () => {
+describe("drain: bring up to date", () => {
   const CMD = "bring-up-to-date" as const
 
   test("clean: the update, then the card's text as a message", async () => {
@@ -831,7 +831,7 @@ describe("the drain's waits for its top card", () => {
   })
 })
 
-describe("drain: a fact (ADR-0080)", () => {
+describe("drain: a fact", () => {
   test("a queued fact is appended as the fact, its card gone, and the drain goes on", async () => {
     const { b, events, deps, appended } = setUp(
       { [cardIdFor("c2")]: "next" },
@@ -876,7 +876,7 @@ describe("drain: a fact (ADR-0080)", () => {
   })
 })
 
-describe("drain: a split (ADR-0080)", () => {
+describe("drain: a split", () => {
   test("a split card starts the split's own run, its text the brief, and ends the drain", async () => {
     const { b, events, deps } = setUp(
       {

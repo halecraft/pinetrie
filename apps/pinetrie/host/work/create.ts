@@ -1,6 +1,6 @@
-// host/work/create — a new lane: where it works, its record and name, and,
-// for a lane of its own, its fork from where it branched, or from accepted work
-// or a WIP's copy where nothing is above (ADR-0032, ADR-0034, ADR-0104).
+// host/work/create — a new lane: where it works, its record and name, and, for
+// a lane of its own, its fork from where it branched, or from accepted work or
+// a WIP's copy where nothing is above.
 
 import {
   BASE_SNAPSHOT,
@@ -45,7 +45,7 @@ export async function forkFacts(ports: {
   readonly pendingRecords: Turns["pendingRecords"]
   readonly nearest: () => ReturnType<typeof nearestRevision>
   readonly begin: () => Promise<ForkBegin | ErrCode>
-  /** Whether a snapshot is still there: archiving deletes some (ADR-0124). */
+  /** Whether a snapshot is still there: archiving deletes some. */
   readonly exists: (snapshot: SnapshotId) => Promise<boolean>
 }): Promise<Parameters<typeof forkPoint>[0] | ErrCode> {
   await ports.pendingRecords()
@@ -61,16 +61,16 @@ export async function forkFacts(ports: {
 
 export interface NewLanes {
   /**
-   * Whether a new lane can begin at `at` from `base` (a WIP bookmark, null
-   * for accepted work), checked before the lane is made: null, or why not
-   * (ADR-0104). A lane with agent work above inherits it, and needs neither.
+   * Whether a new lane can begin at `at` from `base` (a WIP bookmark, null for
+   * accepted work), checked before the lane is made: null, or why not. A lane
+   * with agent work above inherits it, and needs neither.
    */
   checkBegin(
     view: RootView,
     at: Position,
     base: string | null,
   ): Promise<ErrCode | null>
-  /** Record a new lane in its root (ADR-0063), name it, and queue its fork. */
+  /** Record a new lane in its root, name it, and queue its fork. */
   prepareLane(
     view: RootView,
     lane: ThreadId,
@@ -122,10 +122,10 @@ export function createNewLanes(deps: {
   const { repoConfig } = setup.lanes
 
   /**
-   * Where a fork from a WIP's copy starts: the base disk holds accepted
-   * work's dependencies, so a WIP whose recipe's inputs differ from accepted
-   * work's starts from a dependency layer of its own (ADR-0131), made at
-   * its commit if missing. Any other fork starts where its point says.
+   * Where a fork from a WIP's copy starts: the base disk holds accepted work's
+   * dependencies, so a WIP whose recipe's inputs differ from accepted work's
+   * starts from a dependency layer of its own, made at its commit if missing.
+   * Any other fork starts where its point says.
    */
   async function startSnapshot(
     owner: RepoOwner,
@@ -187,7 +187,7 @@ export function createNewLanes(deps: {
               if (typeof facts === "string")
                 throw new Error(`the lane cannot begin: ${facts}`)
               const point = forkPoint(facts)
-              // Its fork row says it began from its base (ADR-0124).
+              // Its fork row says it began from its base.
               if (point.lost !== null)
                 await deps.records.writeValues([
                   setRecord(FILES_LOST, { lane, snapshot: point.lost }),

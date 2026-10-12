@@ -1,16 +1,15 @@
 // host/commands/board — move a task on the board, or change its workflow
-// states (ADR-0122, ADR-0116).
+// states.
 //
-// A move runs in up to three parts (ADR-0065). On the documents' keeper:
-// gather the workflow and the places, plan the task card's move
-// (`planBoardMove`); if it crosses the archive's edge, gather the documents
-// of the task's roots and plan the crossing (`planArchive`); then write the
-// card (`placeTask`), from which moment the archive gate refuses writes into
-// the archived task. Off the keeper:
-// the crossing's teardown (its lanes' containers, their refs in your repo
-// through the owner, snapshots). Then, on archiving, the roots nothing else
-// holds unloaded on the keeper again. The sender's reply comes after all of
-// it.
+// A move runs in up to three parts. On the documents' keeper: gather the
+// workflow and the places, plan the task card's move (`planBoardMove`); if it
+// crosses the archive's edge, gather the documents of the task's roots and plan
+// the crossing (`planArchive`); then write the card (`placeTask`), from which
+// moment the archive gate refuses writes into the archived task. Off the
+// keeper: the crossing's teardown (its lanes' containers, their refs in your
+// repo through the owner, snapshots). Then, on archiving, the roots nothing
+// else holds unloaded on the keeper again. The sender's reply comes after all
+// of it.
 
 import {
   type EntryId,
@@ -63,7 +62,7 @@ export interface BoardDeps {
   readonly records: Pick<Records, "writeValues">
   readonly work: Pick<LaneWork, "teardown" | "repo">
   readonly keeper: Pick<HostKeeper, "run" | "track">
-  /** Which queued cards are blank: they leave a lane idle (ADR-0113). */
+  /** Which queued cards are blank: they leave a lane idle. */
   readonly cards: Pick<CardPort, "blankQueued">
   /** The task's card written, with its history (`placeTask`). */
   readonly moves: Pick<CardCommands, "placeTask">
@@ -147,10 +146,10 @@ async function record(
 }
 
 /**
- * The documents of the task's roots (ADR-0063), opened if they are not, and
- * `planArchive` over them: the task's threads' lanes, its lanes of their
- * own with their tips, their revisions, and which of its roots another task
- * or an inventory still holds.
+ * The documents of the task's roots, opened if they are not, and `planArchive`
+ * over them: the task's threads' lanes, its lanes of their own with their tips,
+ * their revisions, and which of its roots another task or an inventory still
+ * holds.
  */
 async function planCrossing(
   deps: BoardDeps,

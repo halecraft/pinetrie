@@ -1,9 +1,8 @@
-// host/migrations/0011-thread-origin — a thread's origin names its fork
-// alone (ADR-0126): a root's first thread, or a fork at an entry, a branch
-// or a copy. A copy's source is the thread its fork entry is in (ADR-0125),
-// so it is no longer stored. Records' contents change and no schema's hash
-// does: a record migration, due while a stored origin is `started` or
-// `copy`.
+// host/migrations/0011-thread-origin — a thread's origin names its fork alone:
+// a root's first thread, or a fork at an entry, a branch or a copy. A copy's
+// source is the thread its fork entry is in, so it is no longer stored.
+// Records' contents change and no schema's hash does: a record migration, due
+// while a stored origin is `started` or `copy`.
 //
 // - `copy` at `fork` becomes a fork there, `how: "copy"`.
 // - `started` becomes a fork at its first entry's parent, `how: "branch"`;

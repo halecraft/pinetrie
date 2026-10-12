@@ -1,7 +1,6 @@
-// host/work/fetch — a lane's history into your repo (ADR-0105): bundled in
-// the lane, on its queue, then imported by the owner of your repo as the
-// lane's remote bookmark. The owner observes the import, which marks the
-// lane's offer.
+// host/work/fetch — a lane's history into your repo: bundled in the lane, on
+// its queue, then imported by the owner of your repo as the lane's remote
+// bookmark. The owner observes the import, which marks the lane's offer.
 
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -26,13 +25,13 @@ export interface Fetches {
   /**
    * Fetch the lane's bookmark into your repo, as its remote bookmark, or with
    * `stack` a split's stack. The bundle is made on the lane's queue, since it
-   * needs the lane running: about 30 ms (S43 item 8), and a container stopped
-   * since is started for it, then stopped. The owner of your repo imports it
-   * as a command, queued as the bundle is made: the lane's queue makes its
-   * bundles in order, and the owner runs its commands in the order they
-   * arrive, so a lane's imports keep their order. That matters: the fetch
-   * forces its ref, so an older bundle imported after a newer one would move
-   * it back. Resolves once imported.
+   * needs the lane running: about 30 ms, and a container stopped since is
+   * started for it, then stopped. The owner of your repo imports it as a
+   * command, queued as the bundle is made: the lane's queue makes its bundles
+   * in order, and the owner runs its commands in the order they arrive, so a
+   * lane's imports keep their order. That matters: the fetch forces its ref, so
+   * an older bundle imported after a newer one would move it back. Resolves
+   * once imported.
    */
   fetchLane(
     lane: ThreadId,

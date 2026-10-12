@@ -1,7 +1,6 @@
-// host/titles — a task's title from a model (ADR-0074, ADR-0116): unasked
-// as its root's first lane starts, or when a person asks (Auto-update
-// title).
-// `planTitling` and `titleStillWanted` decide; this carries them out.
+// host/titles — a task's title from a model: unasked as its root's first lane
+// starts, or when a person asks (Auto-update title). `planTitling` and
+// `titleStillWanted` decide; this carries them out.
 //
 // Both are called inside a command's step on the documents' keeper, so they
 // gather and plan there, and only the request goes outside it
@@ -123,7 +122,7 @@ export function createTitles(deps: {
         return title
       },
       settle: async title => {
-        // An archived task takes no writes (ADR-0029).
+        // An archived task takes no writes.
         if (archivedIn([task], readArchived(session, places)) !== null) return
         const marks = readMarks(session)
         if (!titleStillWanted(marks.get(task), by)) return

@@ -100,7 +100,7 @@ test("the image sweep keeps what a root's directory record shows, though no root
   expect(blobs.list().map(x => x.sha256)).toEqual([shown.sha256])
 })
 
-test("the blob sweep keeps a reference's quote, and deletes one no card holds (ADR-0126)", async () => {
+test("the blob sweep keeps a reference's quote, and deletes one no card holds", async () => {
   const b = basics()
   const blobs = memoryBlobs(() => 0)
   const kept = blobs.put(storedText("| a |"))

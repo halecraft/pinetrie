@@ -34,7 +34,7 @@ test("forkFacts reads nothing before every pending turn record is written", asyn
   expect(read).toEqual(["nearest", "begin"])
 })
 
-test("forkFacts asks whether the snapshot above is still there, and not of the base's (ADR-0124)", async () => {
+test("forkFacts asks whether the snapshot above is still there, and not of the base's", async () => {
   const asked: string[] = []
   const facts = (snapshot: SnapshotId | null) =>
     forkFacts({

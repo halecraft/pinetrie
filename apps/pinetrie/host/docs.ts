@@ -1,6 +1,6 @@
-// host/docs — the session's documents as the host holds them (ADR-0063): the
-// session's, `pinetrie:live`, the places, and a document per root, opened when
-// first asked for and let go when its root is archived.
+// host/docs — the session's documents as the host holds them: the session's,
+// `pinetrie:live`, the places, and a document per root, opened when first asked
+// for and let go when its root is archived.
 
 import type { Exchange } from "@kyneta/exchange"
 import {
@@ -41,8 +41,8 @@ export interface HostDocuments {
    */
   unload(root: RootId): Promise<void>
   /**
-   * Destroy a root's document, in memory and in the store, telling every
-   * peer; what holds it lets go first, as for `unload` (ADR-0111).
+   * Destroy a root's document, in memory and in the store, telling every peer;
+   * what holds it lets go first, as for `unload`.
    */
   destroy(root: RootId): Promise<void>
   /** The roots whose documents are held now. */
@@ -76,12 +76,12 @@ export const rootsOpenedWords = (counts: {
 }
 
 /**
- * The roots a starting host opens (ADR-0116): every root with a thread in a
- * task outside the archive, or in an inventory (`rootsHeld`), from the
- * threads' records, whatever the directory holds: a root whose directory
- * record is stale is opened all the same, and the directory rebuilds it. A
- * busy task cannot be archived (`planArchive`), so these hold every lane a
- * crash could have interrupted. In order, by id. Pure.
+ * The roots a starting host opens: every root with a thread in a task outside
+ * the archive, or in an inventory (`rootsHeld`), from the threads' records,
+ * whatever the directory holds: a root whose directory record is stale is
+ * opened all the same, and the directory rebuilds it. A busy task cannot be
+ * archived (`planArchive`), so these hold every lane a crash could have
+ * interrupted. In order, by id.
  */
 export const planLoads = (held: ReadonlySet<RootId>): readonly RootId[] =>
   [...held].sort()

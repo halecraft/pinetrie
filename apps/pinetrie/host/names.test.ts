@@ -41,7 +41,7 @@ test("two ensures called together write each lane's name once, and no two lanes 
   expect(named.sort()).toEqual([...lanes].sort())
 })
 
-test("a reservation is named on the same queue as new lanes, and starts its banner (ADR-0057)", async () => {
+test("a reservation is named on the same queue as new lanes, and starts its banner", async () => {
   const b = basics()
   const lane = threadIdFor("a")
   const reserved = threadIdFor("r")
@@ -79,7 +79,7 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
   expect(await names.reserve(other)).toBe("held")
 })
 
-test("a conversation thread is named as a lane is, and draws no banner: every thread has a name (ADR-0117)", async () => {
+test("a conversation thread is named as a lane is, and draws no banner: every thread has a name", async () => {
   const b = basics()
   const thread = threadIdFor("conversation")
   applyWrites(b, [
@@ -105,7 +105,7 @@ test("a conversation thread is named as a lane is, and draws no banner: every th
   expect(named).toEqual([])
 })
 
-test("a thread opened before its lane, named as a conversation's, makes its banner due once a column reserves its lane (ADR-0126)", async () => {
+test("a thread opened before its lane makes its banner due once a column reserves its lane", async () => {
   const b = basics()
   const thread = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f4")
   applyWrites(b, [

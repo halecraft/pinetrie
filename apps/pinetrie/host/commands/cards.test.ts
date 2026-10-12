@@ -76,7 +76,7 @@ const BEA = writerId("bea@x.io")
 const LANE = threadIdFor("0123456789abcdef")
 const E1 = entryId("e-1")
 const C1 = cardIdFor("c1")
-/** A note column on the lane's task's canvas (`putNoteColumn`, ADR-0116). */
+/** A note column on the lane's task's canvas (`putNoteColumn`). */
 const NOTES = cardIdOfKind(
   "note-column",
   "01a0ffd2-0000-7000-8000-0000000000a1",
@@ -114,7 +114,7 @@ function setUp() {
   const b = basics()
   writeEntry(b.root, threadRow(E1, null, LANE))
   writeLaneTip(b.root, LANE, E1)
-  // The lane's thread's card, on the task a move's history is in (ADR-0116).
+  // The lane's thread's card, on the task a move's history is in.
   putTask(b, LANE, TEST_TASK)
   putNoteColumn(b, NOTES, TEST_TASK)
   // Each card's text as the host holds it.
@@ -228,7 +228,7 @@ function setUp() {
   }
 }
 
-describe("moves on the documents' keeper: the next queued card's pop and an unqueue in either order (ADR-0059)", () => {
+describe("moves on the documents' keeper: the next queued card's pop and an unqueue in either order", () => {
   test("a queue on an idle lane asks for its drain, and answers with the rev of its write", async () => {
     const { b, drains, commands, put } = setUp()
     put()
@@ -304,7 +304,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     })
   })
 
-  test("the host names a discard's history: from your inventory, the task you are on, whatever task you are on when it leaves a thread (ADR-0116)", async () => {
+  test("the host names a discard's history: the task you are on, or the task of the thread it leaves", async () => {
     const elsewhere = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
     const gone = { kind: "trash" } as const
     const mine = { kind: "inventory", holder: ADA } as const
@@ -328,7 +328,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(atThread.recorded).toEqual([[ADA, TEST_TASK]])
   })
 
-  test("a new tab's thread to the trash before its first send leaves its task empty: the task's card goes to your trash in the same step, in your history outside any task (ADR-0126)", async () => {
+  test("an unsent new tab's thread trashed: the task's card goes to your trash in the same step", async () => {
     const { b, commands, recorded } = setUp()
     const TAB = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f7")
     const TAB_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000f8")
@@ -356,7 +356,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(recorded).toEqual([[ADA, "person"]])
   })
 
-  test("a task's card moved on the board: between states in your history outside any task, a reorder in none (ADR-0126)", async () => {
+  test("a task's card moved on the board: between states in your history outside any task, a reorder in none", async () => {
     const { b, raw, recorded } = setUp()
     const at = (state: string) => workflowStateIdFor(state)
     const card = readPlaces(b.places).find(c => c.id === TEST_TASK)
@@ -388,7 +388,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(recorded).toEqual([[ADA, "person"]])
   })
 
-  test("an undo or a redo that would move a task's card across the archive's edge is refused `archived`, nothing reverted (ADR-0126)", async () => {
+  test("an undo or a redo that would move a task's card across the archive's edge is refused `archived`, nothing reverted", async () => {
     const { b, commands, undoes } = setUp()
     const [doing, done] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
     putValue(
@@ -435,7 +435,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(reverted).toBe(false)
   })
 
-  test("a discard from your inventory on no task is in your history outside any task, and undone there (ADR-0126)", async () => {
+  test("a discard from your inventory on no task is in your history outside any task, and undone there", async () => {
     const gone = { kind: "trash" } as const
     const mine = { kind: "inventory", holder: ADA } as const
     const { b, commands, put, recorded, histories } = setUp()
@@ -471,7 +471,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
   })
 })
 
-describe("a thread's card taken, put and moved (ADR-0117, ADR-0124)", () => {
+describe("a thread's card taken, put and moved", () => {
   const OTHER_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
   const canvas = { kind: "canvas", task: TEST_TASK } as const
   const bea = { kind: "inventory", holder: BEA } as const
@@ -549,7 +549,7 @@ describe("a thread's card taken, put and moved (ADR-0117, ADR-0124)", () => {
   })
 })
 
-describe("a paste (ADR-0132)", () => {
+describe("a paste", () => {
   const REF = cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1")
   const reference = {
     kind: "reference",
@@ -594,7 +594,7 @@ describe("a paste (ADR-0132)", () => {
   })
 })
 
-describe("a thread copied (ADR-0117, ADR-0124)", () => {
+describe("a thread copied", () => {
   const COPY = threadIdFor("copy")
   const copy = (to: CopyThread["move"]["to"]): CopyThread => ({
     source: LANE,
@@ -620,7 +620,7 @@ describe("a thread copied (ADR-0117, ADR-0124)", () => {
     expect(canvas.map(c => c.id)).toEqual(expect.arrayContaining([LANE, COPY]))
   })
 
-  test("a copy is one step of its copier's history, in the task it lands in or outside any task in an inventory (ADR-0132)", async () => {
+  test("a copy is one step of its copier's history, in the task it lands in", async () => {
     const { commands, recorded } = setUp()
     await commands.copyThread(
       BEA,
@@ -658,7 +658,7 @@ describe("a thread copied (ADR-0117, ADR-0124)", () => {
   })
 })
 
-describe("queue-card (ADR-0113)", () => {
+describe("queue-card", () => {
   test("release: the card queued last and the hold gone in one step, then the lane drained", async () => {
     const { b, commands, put, drains, recorded } = setUp()
     put()
@@ -722,7 +722,7 @@ test("a card made in the queue is written there with its command, never in anoth
   expect(recorded).toEqual([])
 })
 
-describe("moves' history (ADR-0066)", () => {
+describe("moves' history", () => {
   const inventory = { kind: "inventory", holder: ADA } as const
 
   test("a take into the inventory is one step of the taker's history in the root it left; a creation is in none", async () => {
@@ -803,7 +803,7 @@ describe("moves' history (ADR-0066)", () => {
   })
 })
 
-describe("reorders and unqueue all (ADR-0048 step 7)", () => {
+describe("reorders and unqueue all", () => {
   const queuedAt = (order: string) => ({ ...queuedKey, order, by: BEA })
 
   test("a reorder writes only the card's order, in the sender's history of its root, with the rev; it drains nothing", async () => {
@@ -848,7 +848,7 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
     expect(queue).toEqual([cardIdFor("c2"), C1])
   })
 
-  test("a width writes only the card's width, in the sender's history of its task; the width it has, nothing (ADR-0116)", async () => {
+  test("a width writes only the card's width, in the sender's history of its task; the width it has, nothing", async () => {
     const { b, commands, recorded, drains } = setUp()
     const at = { kind: "canvas", task: TEST_TASK } as const
     const done = await commands.cardWidth(ADA, {
@@ -972,7 +972,7 @@ test("spend: the record goes, then its text; a card already gone answers the cur
   expect(cards.calls.map(c => c.method)).toEqual(["destroy", "destroy"])
 })
 
-describe("every command that moves a card records it (ADR-0048 step 6)", () => {
+describe("every command that moves a card records it", () => {
   const eventsOf = (b: ReturnType<typeof setUp>["b"]) =>
     (readCardHistories(b.session).get(C1)?.events ?? []).map(e => [
       e.kind,
@@ -1085,14 +1085,14 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
   })
 })
 
-describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
+describe("a card made a thread, and lifted back", () => {
   const THREAD = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
   const STARTS = threadIdFor("spun")
   /** The task the thread was spun into: a new one. */
   const SPUN_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000fe")
   const spun = { kind: "trash" } as const
   const spinMove = { card: C1, from: atEnd, to: spun }
-  /** The board a new task lands on (ADR-0126). */
+  /** The board a new task lands on. */
   const board = (b: ReturnType<typeof setUp>["b"]) =>
     putValue(
       b,
@@ -1129,7 +1129,7 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
       }),
     ])
     putTask(b, STARTS, SPUN_TASK, THREAD)
-    // Its record says it was spun from the card (ADR-0126).
+    // Its record says it was spun from the card.
     putValue(
       b,
       setRecord(THREAD_RECORD, {
@@ -1152,7 +1152,7 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
       )
   }
 
-  test("the thread is opened spun from the card in its new task, then started with the card's text, never asking the agent; the card goes to its sender's trash, in the history of the task it leaves (ADR-0126)", async () => {
+  test("the thread is started with the card's text, never asking the agent, and the card trashed", async () => {
     const { b, commands, put, texts, recorded } = setUp()
     board(b)
     put()

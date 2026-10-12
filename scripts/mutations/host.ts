@@ -11,7 +11,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a thread opened before its lane, named as a conversation's, makes its banner due once a column reserves its lane",
+      "a thread opened before its lane makes its banner due once a column reserves its lane",
   },
   {
     name: "a new tab's first send is refused for its own task",
@@ -108,7 +108,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "your commits conflicted by the catch-up: it is reverted",
   },
-  // ── a resolution's prompt fits (ADR-0084) ──
+  // ── a resolution's prompt fits ──
   {
     name: "an unfittable catch-up is merged anyway",
     file: "apps/pinetrie/host/work/update.ts",
@@ -118,7 +118,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "refused, before the merge, when even the smallest prompt would not fit",
   },
-  // ── card history and traces (ADR-0048 step 6) ──
+  // ── card history and traces ──
   {
     name: "traces seen delete someone else's trace",
     file: "apps/pinetrie/host/provenance.ts",
@@ -273,7 +273,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a root's record follows its document: a new entry refreshes it, once per burst (ADR-0063)",
+      "a root's record follows its document: a new entry refreshes it, once per burst",
   },
   {
     name: "a compaction runs as a command, before the refreshes waiting",
@@ -291,7 +291,7 @@ export const mutations: readonly Mutation[] = [
     to: "  }\n",
     command: unit,
     expect:
-      "the roots held when the directory starts are refreshed, and an unchanged record is not written again (ADR-0077)",
+      "the roots held when the directory starts are refreshed, and an unchanged record is not written again",
   },
   {
     name: "a late listener misses the roots already held",
@@ -662,7 +662,7 @@ export const mutations: readonly Mutation[] = [
     to: "  const outcome: readonly RunEndStep[] = []",
     command: unit,
     expect:
-      "a stack prompt adds splitEnded before endRun; a land prompt ends as any run (ADR-0080)",
+      "a stack prompt adds splitEnded before endRun; a land prompt ends as any run",
   },
   {
     name: "the drain goes on after a run starts",
@@ -1017,7 +1017,7 @@ export const mutations: readonly Mutation[] = [
     to: '    if (!deps.cancel(lane)) await agent.lane(lane).abort()\n    if (planned.fact.length > 0) {\n      const before = deps.provenance.before()\n      applyPlaceSteps(places, planned.fact)\n      await deps.provenance.after({ kind: "host" }, before)\n    }\n',
     command: unit,
     expect:
-      "stopping a running lane queues the fact of who stopped its ask, then aborts its run (ADR-0126)",
+      "stopping a running lane queues the fact of who stopped its ask, then aborts its run",
   },
   {
     name: "a late live digest overwrites the final one",
@@ -1188,7 +1188,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (prepared.kind !== "conflicted") ports.runEnded()',
     command: unit,
     expect:
-      "with a run to follow, the lane is never stopped, whatever the update comes to (ADR-0080)",
+      "with a run to follow, the lane is never stopped, whatever the update comes to",
   },
   {
     name: "a move to accepted work is not fetched",
@@ -1376,7 +1376,7 @@ export const mutations: readonly Mutation[] = [
     to: "  untraced: [],\n",
     command: unit,
     expect:
-      "an accepted-offer commit of the lane with no Pinetrie-Source builds nothing until the lane catches up past it; then only what is new (S97)",
+      "an accepted-offer commit with no Pinetrie-Source builds nothing until the lane catches up past it",
   },
   {
     name: "the base record leaves out what catching up changes",
@@ -1385,7 +1385,7 @@ export const mutations: readonly Mutation[] = [
     to: "  catchUp: null,\n",
     command: unit,
     expect:
-      "work you landed yourself leaves the offer held: kept, with no files, and settled (S89)",
+      "work you landed yourself leaves the offer held: kept, with no files, and settled",
   },
   {
     name: "a fetch is never imported",
@@ -1598,7 +1598,7 @@ export const mutations: readonly Mutation[] = [
   },
   // ── hot reload holds only what a direct lane edits ──
 
-  // ── the command line (ADR-0086) ──
+  // ── the command line ──
   {
     name: "a relative folder is read from the working directory",
     file: "apps/pinetrie/host/invocation.ts",
@@ -1654,7 +1654,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "agentReadyLine",
   },
-  // ── queue control (ADR-0048 step 7) ──
+  // ── queue control ──
   {
     name: "a held queue is popped",
     file: "apps/pinetrie/host/queued-card-pop.ts",
@@ -1670,7 +1670,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a stop with a message card queued holds the queue before the abort, and its fact goes before the card (ADR-0048 step 7)",
+      "a stop with a message card queued holds the queue before the abort",
   },
   {
     name: "a release drains nothing",
@@ -1736,7 +1736,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "planShutdown closes intake",
   },
-  // ── the stored schemas, checked at start (ADR-0096) ──
+  // ── the stored schemas, checked at start ──
   {
     name: "a stored hash with no migration from it opens anyway",
     file: "apps/pinetrie/host/migrations/index.ts",
@@ -1801,7 +1801,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "recover gives a new store the default workflow first",
   },
-  // ── a person's picture (commands/picture.ts, ADR-0098) ──
+  // ── a person's picture (commands/picture.ts) ──
   {
     name: "a fitted picture records the original",
     file: "apps/pinetrie/host/commands/picture.ts",
@@ -1907,7 +1907,7 @@ export const mutations: readonly Mutation[] = [
     to: "    begun === null || begun.starts === null\n",
     command: unit,
     expect:
-      "a copy's first send is a branch at its fork, appended in the copy's thread, and its record and card stay as made (ADR-0117)",
+      "a copy's first send is a branch at its fork, appended in the copy's thread",
   },
   {
     name: "a branch names a copy anywhere",
@@ -1916,7 +1916,7 @@ export const mutations: readonly Mutation[] = [
     to: "    true\n",
     command: unit,
     expect:
-      "a copy's first send is a branch at its fork, appended in the copy's thread, and its record and card stay as made (ADR-0117)",
+      "a copy's first send is a branch at its fork, appended in the copy's thread",
   },
   {
     name: "the dispatcher lets a command run in a held thread",
@@ -1924,8 +1924,7 @@ export const mutations: readonly Mutation[] = [
     from: "    const held = await refuseHeld(deps.basics, intent)\n    if (held !== null) return settled(held)\n",
     to: "",
     command: unit,
-    expect:
-      "nothing runs in a thread in an inventory: a send, a branch at its entries, a carry-on, an offer's description, a popped card (ADR-0124)",
+    expect: "nothing runs in a thread in an inventory",
   },
   {
     name: "the drain pops a held thread's card",
@@ -1934,7 +1933,7 @@ export const mutations: readonly Mutation[] = [
     to: "        away:\n          false &&\n          heldIn(",
     command: unit,
     expect:
-      "pops nothing while its thread is in an inventory: its cards stay queued (ADR-0124)",
+      "pops nothing while its thread is in an inventory: its cards stay queued",
   },
   {
     name: "a take stops no run",
@@ -1986,7 +1985,7 @@ export const mutations: readonly Mutation[] = [
     to: "    referenced: new Set([...readReferencedBlobs(doc, texts)]),",
     command: unit,
     expect:
-      "the blob sweep keeps a reference's quote, and deletes one no card holds (ADR-0126)",
+      "the blob sweep keeps a reference's quote, and deletes one no card holds",
   },
   {
     name: "the drain reads no queued quote",
@@ -1995,7 +1994,7 @@ export const mutations: readonly Mutation[] = [
     to: '    blob: () => "",\n',
     command: unit,
     expect:
-      "a queued reference's quote, read from its blob, is sent as its queuer's message; its record goes, and nothing is destroyed (ADR-0126)",
+      "a queued reference's quote, read from its blob, is sent as its queuer's message",
   },
   {
     name: "a skipped reference ends the drain",
@@ -2004,7 +2003,7 @@ export const mutations: readonly Mutation[] = [
     to: '    case "skip":\n      return "ran"\n      deps.basics.log(\n',
     command: unit,
     expect:
-      "a queued reference whose quote is not found is skipped, not sent empty; the card behind it is sent (ADR-0126)",
+      "a queued reference whose quote is not found is skipped, not sent empty; the card behind it is sent",
   },
   {
     name: "a move on the board is in no history",

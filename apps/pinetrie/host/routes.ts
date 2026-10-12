@@ -1,7 +1,7 @@
 // host/routes — what the host does with a request or an upgrade, pure:
 // admission first (admission.ts), then which requests it answers itself, an
-// image blob (ADR-0042) or a read of an offer (ADR-0047). Everything else is
-// Vite's. `http.ts` carries each plan out.
+// image blob or a read of an offer. Everything else is Vite's. `http.ts`
+// carries each plan out.
 
 import { isSha256, type Sha256 } from "@pinetrie/core"
 import { type OfferAsk, parseOfferPath } from "@pinetrie/rules"

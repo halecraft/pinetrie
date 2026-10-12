@@ -12,15 +12,15 @@ import type {
 import type { HostDocuments } from "./docs.ts"
 
 export interface Basics {
-  /** The session's records, the directory of roots among them (ADR-0063). */
+  /** The session's records, the directory of roots among them. */
   readonly session: SessionDocHandle
-  /** What is streaming now (ADR-0063): which lanes run, and their streams. */
+  /** What is streaming now: which lanes run, and their streams. */
   readonly live: LiveDocHandle
   /** Every document, each root's among them (`docs.ts`). */
   readonly docs: HostDocuments
   /**
-   * Where every card is (ADR-0059): what is queued for each lane. Written
-   * only through `applyPlaceSteps` (`places.ts`).
+   * Where every card is: what is queued for each lane. Written only through
+   * `applyPlaceSteps` (`places.ts`).
    */
   readonly places: PlacesDocHandle
   readonly log: (message: string) => void

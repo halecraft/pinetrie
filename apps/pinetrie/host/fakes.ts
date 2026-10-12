@@ -159,7 +159,7 @@ export const row = (
   payload: { message },
 })
 
-/** A stored chat in `thread` (ADR-0125), as a person's message is written. */
+/** A stored chat in `thread`, as a person's message is written. */
 export const threadRow = (
   id: string,
   parentId: string | null,
@@ -286,16 +286,16 @@ export type FakeBasics = Basics & {
 }
 
 /**
- * The test's root's directory record, read from its document as the host
- * writes it: what the archive gate and the tabs find a root by (ADR-0063).
+ * The test's root's directory record, read from its document as the host writes
+ * it: what the archive gate and the tabs find a root by.
  */
 export function writeDirectory(b: WriteDocs): void {
   putValue(b, setRecord(ROOT, readRootRecord(ROOT_ID, b.root)))
 }
 
 /**
- * A lane as the host creates one (ADR-0063): its record, naming the test's
- * root, and its tip there, as pi writes it.
+ * A lane as the host creates one: its record, naming the test's root, and its
+ * tip there, as pi writes it.
  */
 export function putLane(
   b: WriteDocs,
@@ -351,12 +351,12 @@ export const NO_BLANK_CARDS = {
   blankQueued: async () => new Set<CardId>(),
 } as const
 
-/** The task the test's root's threads are in (ADR-0116), unless it makes another. */
+/** The task the test's root's threads are in, unless it makes another. */
 export const TASK_ID: TaskId = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 /**
- * A note column on `task`'s canvas, after its last card (ADR-0116): where a
- * test's notes are.
+ * A note column on `task`'s canvas, after its last card: where a test's notes
+ * are.
  */
 export function putNoteColumn(
   b: Pick<FakeBasics, "places">,
@@ -425,8 +425,8 @@ function taskCardStep(
 
 /**
  * `task`'s card on the board in `state`, put there by `by` at `at`, as its
- * card's history says (ADR-0126): how a test archives a task. A card
- * already there is not written again.
+ * card's history says: how a test archives a task. A card already there is not
+ * written again.
  */
 export function placeTask(
   b: WriteDocs & Pick<FakeBasics, "places">,

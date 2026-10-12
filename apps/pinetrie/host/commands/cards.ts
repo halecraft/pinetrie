@@ -1,7 +1,6 @@
-// host/commands/cards — the commands that move cards (ADR-0059): a move, a
-// reorder and unqueue all (ADR-0048 step 7), an undo of moves (ADR-0066), a
-// card's command, a busy chat's card queued, a sent card spent, a card made
-// a thread and lifted back (ADR-0111), and traces seen (ADR-0048 step 6).
+// host/commands/cards — the commands that move cards: a move, a reorder and
+// unqueue all, an undo of moves, a card's command, a busy chat's card queued, a
+// sent card spent, a card made a thread and lifted back, and traces seen.
 //
 // Each runs inside one step of the documents' keeper, as every command does, so
 // it is ordered with a queued card's pop and with every other move: gather the places,
@@ -106,8 +105,8 @@ import { tasksNow } from "../tasks.ts"
 import { type Chat, spendsCard } from "./chat.ts"
 
 /**
- * A command's outcome, and the places document's `rev` after its step when
- * the step wrote it or refused a move (ADR-0059).
+ * A command's outcome, and the places document's `rev` after its step when the
+ * step wrote it or refused a move.
  */
 export interface Settled {
   readonly outcome: Outcome
@@ -134,11 +133,11 @@ export interface CardCommandDeps {
     MoveHistories,
     "gestureOf" | "step" | "top" | "unloadTask"
   >
-  /** Each card's history, and traces (ADR-0048 step 6). */
+  /** Each card's history, and traces. */
   readonly provenance: Pick<Provenance, "before" | "after" | "seen">
-  /** A queue's hold, written with a card queued (ADR-0113). */
+  /** A queue's hold, written with a card queued. */
   readonly records: Pick<Records, "writeValues">
-  /** Name every recorded thread that has none: a copy is named as it is made (ADR-0117). */
+  /** Name every recorded thread that has none: a copy is named as it is made. */
   readonly ensureNames: () => Promise<void>
 }
 
@@ -176,11 +175,10 @@ export function createCardCommands(deps: CardCommandDeps) {
     )
 
   /**
-   * Carry out steps, as one step of a history of moves when `gesture` is
-   * given: writes, and removals whose texts then go (record first, S64),
-   * the cards' history and traces `cause` calls for (none for a command,
-   * which moves no card), and the drains. A refusal says where the card is
-   * now and who put it there.
+   * Carry out steps, as one step of a history of moves when `gesture` is given:
+   * writes, and removals whose texts then go (record first), the cards' history
+   * and traces `cause` calls for (none for a command, which moves no card), and
+   * the drains. A refusal says where the card is now and who put it there.
    */
   async function carry(
     step: MovesStep | MoveStep | ReorderStep,
@@ -202,9 +200,9 @@ export function createCardCommands(deps: CardCommandDeps) {
   }
 
   /**
-   * The thread of each entry whose margin a move sends a card to (ADR-0126),
-   * from its root's index, so `planMoveTargets` can refuse a margin that
-   * names another thread. An entry not found is left out.
+   * The thread of each entry whose margin a move sends a card to, from its
+   * root's index, so `planMoveTargets` can refuse a margin that names another
+   * thread. An entry not found is left out.
    */
   async function marginEntryThreads(
     moves: readonly Move[],
@@ -222,10 +220,9 @@ export function createCardCommands(deps: CardCommandDeps) {
   }
 
   /**
-   * What an undo of a step does to the threads its cards were spun into
-   * (S139): `lifting`, the cards its step moves, read before it is tried,
-   * and each thread whose record says it was spun from one of them, as its
-   * tree is now.
+   * What an undo of a step does to the threads its cards were spun into:
+   * `lifting`, the cards its step moves, read before it is tried, and each
+   * thread whose record says it was spun from one of them, as its tree is now.
    */
   async function liftOf(
     lifting: readonly CardId[],
@@ -274,7 +271,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     await deps.records.writeValues(plan.values)
     if (plan.cards.length > 0) {
       applyPlaceSteps(places, plan.cards)
-      // Each record first, then its text (S64).
+      // Each record first, then its text.
       const gone = plan.cards.flatMap(s =>
         s.kind === "remove" && isTextCardId(s.id) ? [s.id] : [],
       )
@@ -296,9 +293,9 @@ export function createCardCommands(deps: CardCommandDeps) {
   }
 
   /**
-   * Handoffs, whole or refused: applied when every card is where its
-   * sender saw it. Recorded as one step of the sender's history of moves
-   * in the root `historyOf` names, when it names one (ADR-0066).
+   * Handoffs, whole or refused: applied when every card is where its sender saw
+   * it. Recorded as one step of the sender's history of moves in the root
+   * `historyOf` names, when it names one.
    */
   async function move(
     writer: WriterId,
@@ -356,11 +353,11 @@ export function createCardCommands(deps: CardCommandDeps) {
   }
 
   /**
-   * A card queued, and its queue's hold changed with it (ADR-0113), in one
-   * step: planned whole (`planQueueCard`), then the hold written, then the
-   * move carried as any move is, so the drain it asks for finds the hold as
-   * planned. Recorded in the sender's history as a move is; the hold is not,
-   * so an undo puts the card back and leaves the queue held or released.
+   * A card queued, and its queue's hold changed with it, in one step: planned
+   * whole (`planQueueCard`), then the hold written, then the move carried as
+   * any move is, so the drain it asks for finds the hold as planned. Recorded
+   * in the sender's history as a move is; the hold is not, so an undo puts the
+   * card back and leaves the queue held or released.
    */
   async function queueCard(
     writer: WriterId,
@@ -400,9 +397,9 @@ export function createCardCommands(deps: CardCommandDeps) {
     queueCard,
 
     /**
-     * A queued or pinned card moved among its neighbours (ADR-0048 step 7),
-     * as one step of the sender's history of moves in its task, so the
-     * page can undo it. It changes no lane's turn, so it drains nothing.
+     * A queued or pinned card moved among its neighbours, as one step of the
+     * sender's history of moves in its task, so the page can undo it. It
+     * changes no lane's turn, so it drains nothing.
      */
     async reorder(
       writer: WriterId,
@@ -422,9 +419,9 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A card drawn one column wide or two on its canvas (ADR-0116), as one
-     * step of the sender's history of moves in its task, as a reorder is.
-     * The width it has already writes nothing.
+     * A card drawn one column wide or two on its canvas, as one step of the
+     * sender's history of moves in its task, as a reorder is. The width it has
+     * already writes nothing.
      */
     async cardWidth(
       writer: WriterId,
@@ -461,8 +458,8 @@ export function createCardCommands(deps: CardCommandDeps) {
 
     /**
      * Undo or redo the sender's newest move in `scope`, a task's history or
-     * theirs outside any task, whole or refused (ADR-0066). Kyneta writes
-     * the revert, then `rev` is raised apart from it (S82).
+     * theirs outside any task, whole or refused. Kyneta writes the revert, then
+     * `rev` is raised apart from it.
      */
     async undoMove(
       writer: WriterId,
@@ -508,13 +505,12 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A text card made a thread (ADR-0111, ADR-0126), in one step of the
-     * keeper: planned (`planSpinOff`), then the thread's records (its own,
-     * spun from the card, and its new task's), its first message, the
-     * card's text, sent by `start`, then its card on its task's canvas and
-     * the card's move to the trash, in its history's step. A send
-     * that took nothing deletes the records again. The answer is the
-     * thread's start, its first message's id among it.
+     * A text card made a thread, in one step of the keeper: planned
+     * (`planSpinOff`), then the thread's records (its own, spun from the card,
+     * and its new task's), its first message, the card's text, sent by `start`,
+     * then its card on its task's canvas and the card's move to the trash, in
+     * its history's step. A send that took nothing deletes the records again.
+     * The answer is the thread's start, its first message's id among it.
      */
     async spinOff(
       writer: WriterId,
@@ -608,9 +604,9 @@ export function createCardCommands(deps: CardCommandDeps) {
 
     /**
      * A task's card moved on the board (`planBoardMove`'s writes): between
-     * states, one step of its sender's history outside any task (ADR-0126);
-     * within one, a reorder, in none. Its card's history and traces are
-     * written as any move's.
+     * states, one step of its sender's history outside any task; within one, a
+     * reorder, in none. Its card's history and traces are written as any
+     * move's.
      */
     async placeTask(
       writer: WriterId,
@@ -629,11 +625,11 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A thread opened as its column opens (ADR-0126), in one step of the
-     * keeper: planned (`planOpenThread`) from its root's tree for a branch,
-     * then its record (and a new tab's task's), its card on its task's
-     * canvas and the canvas re-ranked for it, then its name. No entry is
-     * written: its first send is a branch at its fork, or a new root.
+     * A thread opened as its column opens, in one step of the keeper: planned
+     * (`planOpenThread`) from its root's tree for a branch, then its record
+     * (and a new tab's task's), its card on its task's canvas and the canvas
+     * re-ranked for it, then its name. No entry is written: its first send is a
+     * branch at its fork, or a new root.
      */
     async openThread(writer: WriterId, open: OpenThread): Promise<Settled> {
       // gather: a branch's root's tree; a new root has none yet
@@ -669,12 +665,12 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A paste (ADR-0132): the card it replaces discarded, then a card made
-     * from a copy where its target resolves to (a thread's nearest notes,
-     * made where its task has none; a margin checked against its entry's
-     * thread), or a cut card out of a trash by its cutter (`planPaste`). One
-     * step of the sender's history in the task it lands in, so the undo key
-     * takes it back. Queued on an idle thread, it is drained.
+     * A paste: the card it replaces discarded, then a card made from a copy
+     * where its target resolves to (a thread's nearest notes, made where its
+     * task has none; a margin checked against its entry's thread), or a cut
+     * card out of a trash by its cutter (`planPaste`). One step of the sender's
+     * history in the task it lands in, so the undo key takes it back. Queued on
+     * an idle thread, it is drained.
      */
     async paste(
       writer: WriterId,
@@ -731,14 +727,13 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A thread copied (ADR-0117, ADR-0124), in one step of the keeper:
-     * planned (`planCopy`) from the source's record and tree, then the
-     * copy's record, its card and the canvas re-ranked for it, then its
-     * name. No entry is written: its first send branches at its fork. As a
-     * paste is (ADR-0132), it is one step of the copier's history in the
-     * task it lands in, or outside any task in an inventory, so the undo key
-     * takes it back; an undo leaves the copy's record, with no card and no
-     * entry.
+     * A thread copied, in one step of the keeper: planned (`planCopy`) from the
+     * source's record and tree, then the copy's record, its card and the canvas
+     * re-ranked for it, then its name. No entry is written: its first send
+     * branches at its fork. As a paste is, it is one step of the copier's
+     * history in the task it lands in, or outside any task in an inventory, so
+     * the undo key takes it back; an undo leaves the copy's record, with no
+     * card and no entry.
      */
     async copyThread(
       writer: WriterId,
@@ -787,12 +782,12 @@ export function createCardCommands(deps: CardCommandDeps) {
       return done
     },
 
-    /** Set a card's command, or clear it (ADR-0108). */
+    /** Set a card's command, or clear it. */
     setCommand(card: CardId, command: CardCommand | null): Promise<Settled> {
       return carry(planSetCommand(readPlaces(places), card, command), [], null)
     },
 
-    /** A sent card's record goes, then its text (S64). Its `rev` after. */
+    /** A sent card's record goes, then its text. Its `rev` after. */
     async spend(
       writer: WriterId,
       card: TextCardId,
@@ -815,8 +810,8 @@ export function createCardCommands(deps: CardCommandDeps) {
 
     /**
      * A chat from a card that found its lane busy: the card is queued behind
-     * the others in this step, so no other send gets between (ADR-0059).
-     * Null when it cannot be: the chat's `busy` answer stands.
+     * the others in this step, so no other send gets between. Null when it
+     * cannot be: the chat's `busy` answer stands.
      */
     async queueBusy(
       writer: WriterId,
@@ -858,7 +853,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       return settled({ kind: "queued" }, rev)
     },
 
-    /** Delete the traces the sender has seen (ADR-0048). */
+    /** Delete the traces the sender has seen. */
     async tracesSeen(
       writer: WriterId,
       ids: readonly string[],

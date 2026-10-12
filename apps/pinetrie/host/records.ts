@@ -1,7 +1,6 @@
-// host/records — the host's writes of its own records (ADR-0062, ADR-0095):
-// each document's writes in one batch, in the document their target names.
-// Every module that writes a record takes this port, so a test asserts what
-// was written, not how.
+// host/records — the host's writes of its own records: each document's writes
+// in one batch, in the document their target names. Every module that writes a
+// record takes this port, so a test asserts what was written, not how.
 
 import type { ValueWrite } from "@pinetrie/core"
 import { byTarget } from "@pinetrie/rules"

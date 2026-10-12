@@ -54,7 +54,7 @@ const histories = {
   },
 }
 
-describe("0009-card-content (ADR-0126)", () => {
+describe("0009-card-content", () => {
   const plan = planCardContent({
     rows: stored,
     histories,

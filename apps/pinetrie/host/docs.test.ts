@@ -5,7 +5,7 @@ import { newSessionDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { hostDocuments, planLoads, rootsOpenedWords } from "./docs.ts"
 
-test("planLoads: every root something still holds a thread of, whatever the directory holds (ADR-0063, ADR-0116)", () => {
+test("planLoads: every root something still holds a thread of, whatever the directory holds", () => {
   expect(planLoads(new Set([rootIdFor("c"), rootIdFor("a")]))).toEqual([
     rootIdFor("a"),
     rootIdFor("c"),

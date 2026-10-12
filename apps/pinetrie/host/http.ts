@@ -73,9 +73,9 @@ export async function startHttp(input: {
   })
 
   const httpServer = http.createServer()
-  // Vite's HMR listener sits on this stand-in, which never binds, so an
-  // upgrade reaches it only through the `"vite"` route below, admitted.
-  // Without one, Vite opens port 24678 and its client connects there (S112).
+  // Vite's HMR listener sits on this stand-in, which never binds, so an upgrade
+  // reaches it only through the `"vite"` route below, admitted. Without one,
+  // Vite opens port 24678 and its client connects there.
   const viteUpgrades = http.createServer()
 
   // Vite serves the client: index.html, module transforms, wasm, HMR. One
@@ -175,8 +175,8 @@ export async function startHttp(input: {
       return
     }
     const bytes = Buffer.concat(chunks)
-    // A reference's quote is kept as it is (ADR-0126); an image is judged
-    // and fitted first.
+    // A reference's quote is kept as it is; an image is judged and fitted
+    // first.
     const prepared =
       headers.mime === TEXT_MIME
         ? ({ ok: true, image: storedText(bytes.toString("utf8")) } as const)
@@ -257,11 +257,11 @@ export async function startHttp(input: {
     wsUrl: `ws://${local}:${actualPort}/ws`,
     invites,
     async close() {
-      // `close` stops accepting at once, but calls back only when every
-      // socket has ended, upgraded ones too, which `closeAllConnections`
-      // does not reach (S98). Accepting stops before Vite closes: a page
-      // retries Vite's socket, and once Vite's listener is gone that
-      // upgrade would be left open.
+      // `close` stops accepting at once, but calls back only when every socket
+      // has ended, upgraded ones too, which `closeAllConnections` does not
+      // reach. Accepting stops before Vite closes: a page retries Vite's
+      // socket, and once Vite's listener is gone that upgrade would be left
+      // open.
       const closed = new Promise<void>(resolve => {
         httpServer.close(() => resolve())
       })

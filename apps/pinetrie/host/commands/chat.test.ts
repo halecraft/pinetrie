@@ -55,7 +55,7 @@ import {
   spendsCard,
 } from "./chat.ts"
 
-/** A new tab's task: in no store yet (ADR-0116). */
+/** A new tab's task: in no store yet. */
 const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
 
 const ALICE = writerId("alice@example.com")
@@ -161,7 +161,7 @@ describe("executeChat", () => {
     expect(seen).toEqual([pinned, pinned])
   })
 
-  test("createAndRun from a base that cannot begin refuses, and never creates the lane (ADR-0104)", async () => {
+  test("createAndRun from a base that cannot begin refuses, and never creates the lane", async () => {
     const { pi, started, deps, context } = setUp(ERR.BAD_BASE)
     const out = await executeChat(
       deps,
@@ -205,7 +205,7 @@ describe("sendChat", () => {
   ) {
     const b = basics()
     writeEntry(b.root, threadRow(E1, null, LANE))
-    // The thread's task, which a branch from it is put in (ADR-0116).
+    // The thread's task, which a branch from it is put in.
     putTask(b, LANE)
     if (project !== null) putValue(b, setRecord(PROJECT, project))
     const cards = record<ChatDeps["cards"]>({
@@ -267,7 +267,7 @@ describe("sendChat", () => {
     expect([pi.calls, started]).toEqual([[], []])
   })
 
-  test("a new tab's first send, its thread and task opened as it opened, writes its entry alone; a root's thread in a task in use is refused (ADR-0126)", async () => {
+  test("a new tab's first send, its thread and task opened as it opened, writes its entry alone", async () => {
     const { b, pi, records, deps } = setUp()
     putTask(b, NEW, NEW_TASK)
     const first = {
@@ -306,7 +306,7 @@ describe("sendChat", () => {
     expect(seen).toEqual([pinned])
   })
 
-  test("a new lane is named by its thread's id (ADR-0117)", async () => {
+  test("a new lane is named by its thread's id", async () => {
     const { pi, deps } = setUp()
     await sendChat(deps, ALICE, "s-1", chat("do it", true))
     await sendChat(deps, ALICE, "s-2", {
@@ -318,7 +318,7 @@ describe("sendChat", () => {
     ).toEqual([LANE, NEW])
   })
 
-  test("each message is appended in its thread (ADR-0125); a branch's record is written with its first, then named", async () => {
+  test("each message is appended in its thread; a branch's record is written with its first, then named", async () => {
     const { pi, records, names, deps } = setUp()
     await sendChat(deps, ALICE, "s-1", {
       ...chat("aside"),
@@ -343,7 +343,7 @@ describe("sendChat", () => {
     expect(names.calls.map(c => c.method)).toEqual(["ensure"])
   })
 
-  test("a thread's start is planned with its send and written before it: its card on its task's canvas, and a new task's card on the board (ADR-0116, ADR-0126)", async () => {
+  test("a thread's start, its card and a new task's card, is written before its send", async () => {
     const { b, records, deps } = setUp()
     const doing = workflowStateIdFor("d")
     putValue(
@@ -381,7 +381,7 @@ describe("sendChat", () => {
     expect(pi.calls.filter(c => c.method === "appendToTree")).toEqual([])
   })
 
-  test("a copy's first send is a branch at its fork, appended in the copy's thread, and its record and card stay as made (ADR-0117)", async () => {
+  test("a copy's first send is a branch at its fork, appended in the copy's thread", async () => {
     const { b, pi, records, deps } = setUp()
     const COPY = threadIdFor("copy")
     putValue(
@@ -437,7 +437,7 @@ describe("sendChat", () => {
     )
   })
 
-  describe("a lane with no work of its own is caught up before its run (ADR-0080)", () => {
+  describe("a lane with no work of its own is caught up before its run", () => {
     /** A lane at E1 whose base, accepted work, moved to L2 bringing a file, its work `work`. */
     const behindLane = (
       b: ReturnType<typeof basics>,
@@ -564,7 +564,7 @@ describe("sendChat", () => {
     expect(out).toEqual({ kind: "conflict", by: BEA })
   })
 
-  test("a message sent from a card carries its other writers, and spends nothing itself (ADR-0048)", async () => {
+  test("a message sent from a card carries its other writers, and spends nothing itself", async () => {
     const { pi, cards, deps } = setUp()
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("from the card"),

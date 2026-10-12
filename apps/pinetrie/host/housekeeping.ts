@@ -1,8 +1,7 @@
-// host/housekeeping — what the host does between runs besides draining:
-// compact the session (ADR-0023), delete images nothing shows (ADR-0042),
-// retire histories of moves no one will undo again (ADR-0066), and delete
-// holds on queues nobody can use (ADR-0048 step 7), and delete trashed
-// cards no one brought back in a week, a deleted thread's lane with it.
+// host/housekeeping — what the host does between runs besides draining: compact
+// the session, delete images nothing shows, retire histories of moves no one
+// will undo again, and delete holds on queues nobody can use, and delete
+// trashed cards no one brought back in a week, a deleted thread's lane with it.
 
 import type { Exchange, Store } from "@kyneta/exchange"
 import {
@@ -50,9 +49,9 @@ import type { Records } from "./records.ts"
 import type { LaneWork } from "./work/index.ts"
 
 /**
- * The documents a compaction replaces with what they hold now: `roots`',
- * whose lanes ran, and the session's, the places and `pinetrie:live`, which
- * every run writes (ADR-0063). Pure.
+ * The documents a compaction replaces with what they hold now: `roots`', whose
+ * lanes ran, and the session's, the places and `pinetrie:live`, which every run
+ * writes.
  */
 export const planCompaction = (
   roots: ReadonlySet<RootId>,
@@ -64,16 +63,13 @@ export const planCompaction = (
 ]
 
 /**
- * Replace the store's records with each document `planCompaction` names as
- * it stands, which also trims each `json` one's in-memory op log (ADR-0023,
- * ADR-0059, ADR-0063). The places are Yjs (ADR-0066): their storage is
- * compacted, and nothing in memory is trimmed (S90). The host writes them
- * all alone. Only those: each
- * client's
- * command Line is stored too, but half of it is the client's to write, and
- * Kyneta cannot compact a replica of a document another peer writes. Its
- * pruning should compact it; that is upstream (S25 addendum). A card's text
- * is Yjs, which Kyneta cannot compact live (S24).
+ * Replace the store's records with each document `planCompaction` names as it
+ * stands, which also trims each `json` one's in-memory op log. The places are
+ * Yjs: their storage is compacted, and nothing in memory is trimmed. The host
+ * writes them all alone. Only those: each client's command Line is stored too,
+ * but half of it is the client's to write, and Kyneta cannot compact a replica
+ * of a document another peer writes. Its pruning should compact it; that is
+ * upstream. A card's text is Yjs, which Kyneta cannot compact live.
  */
 export async function compactAfter(
   exchange: Exchange,
@@ -83,11 +79,11 @@ export async function compactAfter(
 }
 
 /**
- * Delete the blobs nothing shows or quotes any more: gather every card's
- * text (`CardPort.texts` of the cards `places` holds) and every
- * reference's quote (`textSourceOf`, ADR-0126), then the store's list and
- * the session's references (`readReferencedBlobs`: roots' images, banners
- * and people's pictures) with no await between them, `planSweep`, delete.
+ * Delete the blobs nothing shows or quotes any more: gather every card's text
+ * (`CardPort.texts` of the cards `places` holds) and every reference's quote
+ * (`textSourceOf`), then the store's list and the session's references
+ * (`readReferencedBlobs`: roots' images, banners and people's pictures) with no
+ * await between them, `planSweep`, delete.
  */
 export async function sweepBlobs(input: {
   readonly basics: Pick<Basics, "session" | "places" | "log" | "now">
@@ -101,7 +97,7 @@ export async function sweepBlobs(input: {
   const cards = readPlaces(input.basics.places)
   const ids = cards.filter(isTextCard).map(c => c.id)
   const texts = (await input.texts(ids)).map(t => t.text)
-  // A reference's quote is a blob its card holds (ADR-0126).
+  // A reference's quote is a blob its card holds.
   const quotes = cards.flatMap(c => {
     const source = textSourceOf(c)
     return source.kind === "blob" ? [source.sha] : []
@@ -118,10 +114,10 @@ export async function sweepBlobs(input: {
 }
 
 /**
- * Retire the histories of moves no one will undo again (ADR-0066): gather
- * the stored `moves:` documents, the directory and the archive, plan
- * (`planHistorySweep`), then destroy each. `startup` adds those of a root the
- * directory does not name, which only a starting host can know are dead.
+ * Retire the histories of moves no one will undo again: gather the stored
+ * `moves:` documents, the directory and the archive, plan (`planHistorySweep`),
+ * then destroy each. `startup` adds those of a root the directory does not
+ * name, which only a starting host can know are dead.
  */
 export async function sweepHistories(input: {
   readonly basics: Pick<Basics, "session" | "places" | "log" | "now">
@@ -149,10 +145,10 @@ export async function sweepHistories(input: {
 }
 
 /**
- * Delete the holds on queues nobody can use (ADR-0048 step 7): gather the
- * holds, each lane's root and the roots in the archive (ADR-0122), plan (`planHoldSweep`), then
- * delete them in one write. Archiving is refused while cards are queued, so
- * a hold swept holds nothing.
+ * Delete the holds on queues nobody can use: gather the holds, each lane's root
+ * and the roots in the archive, plan (`planHoldSweep`), then delete them in one
+ * write. Archiving is refused while cards are queued, so a hold swept holds
+ * nothing.
  */
 export async function sweepHolds(input: {
   readonly basics: Pick<Basics, "session" | "log" | "places">
@@ -184,14 +180,13 @@ export async function sweepHolds(input: {
 }
 
 /**
- * Delete the trashed cards past their deadline, and every card on a surface
- * one owns (`planTrashSweep`): gather the places, the cards' histories and,
- * for the threads among them, their lanes of their own with their roots'
- * revisions and trees; plan; then delete each record, then its text (S64),
- * then the deleted threads' lanes, as an archive's teardown removes them
- * (`planLanesGone`). Their messages stay in their roots. The histories left
- * with no card go with the provenance's own sweep, which the caller runs
- * after.
+ * Delete the trashed cards past their deadline, and every card on a surface one
+ * owns (`planTrashSweep`): gather the places, the cards' histories and, for the
+ * threads among them, their lanes of their own with their roots' revisions and
+ * trees; plan; then delete each record, then its text, then the deleted
+ * threads' lanes, as an archive's teardown removes them (`planLanesGone`).
+ * Their messages stay in their roots. The histories left with no card go with
+ * the provenance's own sweep, which the caller runs after.
  */
 export async function sweepTrash(input: {
   readonly basics: Pick<Basics, "session" | "places" | "docs" | "log" | "now">

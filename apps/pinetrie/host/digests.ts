@@ -1,10 +1,9 @@
-// host/digests — each long ask's digest (ADR-0106, ADR-0075), and each run's
-// verdict (ADR-0077). A digest is asked as its run goes, while someone reads
-// it, at most once a `DIGEST_EVERY`, unless the user config turns digests
-// off (ADR-0071). At a run's end one request asks for the verdict and the
-// final digest together, digests on or off. `planDigest`, `planRunEnded`,
-// `digestToWrite` and `runEndedToWrite` decide, and `digestOf` and
-// `endReplyOf` read the reply; this carries them out, outside the queue
+// host/digests — each long ask's digest, and each run's verdict. A digest is
+// asked as its run goes, while someone reads it, at most once a `DIGEST_EVERY`,
+// unless the user config turns digests off. At a run's end one request asks for
+// the verdict and the final digest together, digests on or off. `planDigest`,
+// `planRunEnded`, `digestToWrite` and `runEndedToWrite` decide, and `digestOf`
+// and `endReplyOf` read the reply; this carries them out, outside the queue
 // (`requestOutside`).
 //
 // Each event names an entry, and the ask is `promptOf` that entry. An entry
@@ -83,7 +82,7 @@ export interface Digests {
 export function createDigests(deps: {
   readonly basics: Pick<Basics, "session" | "docs" | "places" | "log" | "now">
   readonly keeper: Keeper
-  /** Who is reading which thread (ADR-0024): a live digest waits for a reader. */
+  /** Who is reading which thread: a live digest waits for a reader. */
   readonly presence: PresenceDocHandle
   readonly records: Pick<Records, "writeValues">
   /** The model a digest is asked of, and its skill. */
@@ -92,7 +91,7 @@ export function createDigests(deps: {
   readonly enabled: boolean
   /**
    * Tokens a request for `ask`'s run spent: its budget counts them, when
-   * another thread's agent asked for the run (ADR-0128).
+   * another thread's agent asked for the run.
    */
   readonly spent?: (ask: EntryId, tokens: number) => void
 }): Digests {

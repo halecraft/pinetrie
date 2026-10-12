@@ -1,10 +1,10 @@
-// host/budgets — what agents talking spend (ADR-0128). The budget a run
-// spends is read from its prompt, never kept beside it: a relay's or an
-// answer's names it, and a person's message is its own. A run spends from
-// it only when an agent started it: an agent's ask, or an answer that woke
-// its asker. Its count is kept here while runs go on, and written to the
-// budget's record when it crosses the limit and at each run's end, so a
-// session write is not made for every model request.
+// host/budgets — what agents talking spend. The budget a run spends is read
+// from its prompt, never kept beside it: a relay's or an answer's names it, and
+// a person's message is its own. A run spends from it only when an agent
+// started it: an agent's ask, or an answer that woke its asker. Its count is
+// kept here while runs go on, and written to the budget's record when it
+// crosses the limit and at each run's end, so a session write is not made for
+// every model request.
 
 import {
   cardIdOfKind,
@@ -49,9 +49,8 @@ export interface RunBudget {
 }
 
 /**
- * The budget a prompt names (ADR-0128), read from it: a relay's or an
- * answer's, else the prompt's own (a person's message, or a carry-on). Pure
- * over the stored message.
+ * The budget a prompt names, read from it: a relay's or an answer's, else the
+ * prompt's own (a person's message, or a carry-on).
  */
 export function promptBudget(prompt: EntryId, message: unknown): RunBudget {
   const relay = decodeRelay(message)
@@ -150,9 +149,9 @@ export function createBudgets(deps: {
   }
 
   /**
-   * Queue the stop's fact for a run the budget stopped (ADR-0128): its
-   * stopper the budget's person, and no queue held. pi aborts the run
-   * itself, before its next request (`mayRequest`).
+   * Queue the stop's fact for a run the budget stopped: its stopper the
+   * budget's person, and no queue held. pi aborts the run itself, before its
+   * next request (`mayRequest`).
    */
   function stopNow(lane: ThreadId, over: BudgetRecord): void {
     const doc = docs.docOfLane(lane)
@@ -226,8 +225,8 @@ export function createBudgets(deps: {
       if (budget === null || !budget.spends) return true
       const r = record(budget.key)
       if (mayRequest(r) || r === undefined) return true
-      // The run is stopped before this request: its stop is named now,
-      // while the lane still runs, so its end appends it (ADR-0128).
+      // The run is stopped before this request: its stop is named now, while
+      // the lane still runs, so its end appends it.
       stopNow(lane, r)
       return false
     },

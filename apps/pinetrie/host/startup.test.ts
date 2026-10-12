@@ -141,7 +141,7 @@ test("recover logs a stored lane whose name is not a thread's, and only such a l
   ])
 })
 
-test("recover deletes the records of a type no spec declares, in the session and each root opened, and says so (ADR-0100)", async () => {
+test("recover deletes the records of a type no spec declares, in the session and each root opened", async () => {
   const b = basics()
   putValue(b, {
     kind: "set",
@@ -207,7 +207,7 @@ test("recover writes the project record only when it changed, in one write", asy
   expect(writesOf(again).map(w => w.namespace)).toEqual(["pinetrie.commands"])
 })
 
-test("recover writes unclassified over a verdict a stopped host left pending (ADR-0077)", async () => {
+test("recover writes unclassified over a verdict a stopped host left pending", async () => {
   const LANE = threadIdFor("0123456789abcdef")
   const b = basics()
   const pending = pendingVerdict(LANE, entryId("p-1"), entryId("w-1"))
@@ -221,7 +221,7 @@ test("recover writes unclassified over a verdict a stopped host left pending (AD
   ])
 })
 
-test("recover sweeps empty cards, texts no record names, and seats no text names (ADR-0048)", async () => {
+test("recover sweeps empty cards, texts no record names, and seats no text names", async () => {
   const placesDoc = newPlacesDoc()
   const b = basics(undefined, placesDoc)
   const card = (id: string) =>
@@ -285,7 +285,7 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
   ).toEqual([[deleteRecord(SEAT, "p-22"), deleteRecord(SEAT, "p-33")]])
 })
 
-test("recover gives a new store the default workflow first, before it names lanes (ADR-0122)", async () => {
+test("recover gives a new store the default workflow first, before it names lanes", async () => {
   const events: string[] = []
   await recover(
     deps({

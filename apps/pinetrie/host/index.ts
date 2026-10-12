@@ -163,37 +163,36 @@ export interface StartHostOptions {
   /** No default: a suite that forgot one must not spend the person's models. */
   readonly model: ModelChoice
   /**
-   * The project (ADR-0086): where pi's settings and `AGENTS.md` load from,
-   * and, with `tools`, where the agent reads, writes and runs commands, each
-   * lane in its own container, on its own disk (ADR-0034, ADR-0102). Absent
-   * or null: no project, and no tools. With tools, a folder with no jj repo,
-   * or a runtime that cannot run lanes, refuses the start (`HostRefused`).
+   * The project: where pi's settings and `AGENTS.md` load from, and, with
+   * `tools`, where the agent reads, writes and runs commands, each lane in its
+   * own container, on its own disk. Absent or null: no project, and no tools.
+   * With tools, a folder with no jj repo, or a runtime that cannot run lanes,
+   * refuses the start (`HostRefused`).
    */
   readonly project?: { readonly dir: string; readonly tools: boolean } | null
   /**
-   * The user's lane config (ADR-0035), by default
-   * `$XDG_CONFIG_HOME/pinetrie/config.json`. A suite passes its own file rather
-   * than move `XDG_CONFIG_HOME`, which git and jj read too.
+   * The user's lane config, by default `$XDG_CONFIG_HOME/pinetrie/config.json`.
+   * A suite passes its own file rather than move `XDG_CONFIG_HOME`, which git
+   * and jj read too.
    */
   readonly userConfig?: string
   /**
-   * pi's agent directory, by default pi's own. With a scripted or named
-   * model, skills and prompts load only from one given here: a suite's
-   * fixture (ADR-0036).
+   * pi's agent directory, by default pi's own. With a scripted or named model,
+   * skills and prompts load only from one given here: a suite's fixture.
    */
   readonly agentDir?: string
   /**
    * Where the session is kept: a SQLite file; a Kyneta store a caller made, as
-   * a suite does to read it while the host runs; or, absent or null, a store
-   * in memory. Shutting the host down closes the store, whoever made it.
-   * Every host has a store: Kyneta compacts only a document with one, and
-   * compaction is also what trims the session's in-memory op log (ADR-0023).
+   * a suite does to read it while the host runs; or, absent or null, a store in
+   * memory. Shutting the host down closes the store, whoever made it. Every
+   * host has a store: Kyneta compacts only a document with one, and compaction
+   * is also what trims the session's in-memory op log.
    */
   readonly store?: string | Store | null
   /**
-   * The images (ADR-0042), for a caller that gives a `Store` it made: pass
-   * the `blobs` `openStore` gave with it, so a restart keeps them. A store
-   * given as a file keeps its own; otherwise they are held in memory.
+   * The images, for a caller that gives a `Store` it made: pass the `blobs`
+   * `openStore` gave with it, so a restart keeps them. A store given as a file
+   * keeps its own; otherwise they are held in memory.
    */
   readonly blobs?: BlobStore
   /**
@@ -220,13 +219,13 @@ export interface RunningHost {
   readonly live: LiveDocHandle
   readonly presence: PresenceDocHandle
   /**
-   * Where every card is, as the host holds it (ADR-0059): for the suites to
-   * read. Only `applyPlaceSteps` writes it.
+   * Where every card is, as the host holds it: for the suites to read. Only
+   * `applyPlaceSteps` writes it.
    */
   readonly places: PlacesDocHandle
   /** A card's text as the host holds it: for the suites. */
   cardText(id: CardId): string
-  /** The host's records (ADR-0095): for a suite to write one as the host would. */
+  /** The host's records: for a suite to write one as the host would. */
   readonly records: Records
   /** The invite key, or null on loopback. */
   readonly key: string | null
@@ -264,14 +263,14 @@ export async function startHost({
   const key = isLoopback(bind) ? null : (givenKey ?? newKey())
   const toolsIn = project?.tools === true ? project.dir : null
 
-  // The user config, read once: its shared directories (ADR-0035), its
-  // renames for command packages (ADR-0036) and whether threads get banners.
-  // Missing or broken decodes as empty, and the log says which.
+  // The user config, read once: its shared directories, its renames for command
+  // packages and whether threads get banners. Missing or broken decodes as
+  // empty, and the log says which.
   const userRead = await readConfigFile(userConfig)
   log(configLine(userConfig, userRead))
   const userJson = configJson(userRead)
-  // The project, before anything opens, so a refusal leaves nothing to
-  // close, and before pi's setup, which loads from its root (ADR-0086).
+  // The project, before anything opens, so a refusal leaves nothing to close,
+  // and before pi's setup, which loads from its root.
   const found = await findProject({
     dir: toolsIn,
     // A port of 0 is chosen when the host listens, after this.
@@ -297,18 +296,17 @@ export async function startHost({
   for await (const id of store.listDocIds(lineDocPrefix(CONTROL_TOPIC)))
     await store.delete(id)
   // Each stored document's schema, checked before anything opens one: opened
-  // under a changed schema, a dropped field's data goes at the next
-  // compaction (S120, ADR-0096).
+  // under a changed schema, a dropped field's data goes at the next compaction.
   const stored = await readStored(store)
   const openPlan = planStoredOpen(stored)
   if (openPlan.kind === "refuse") {
     await store.close()
     throw new Error(refusalLine(openPlan))
   }
-  // Clients find the host by its principal and address their Lines to the
-  // seat Kyneta issues it (ADR-0037). The host has no WRITER identity:
-  // writers are the connected clients, named by their principals, and they
-  // own no lanes; lanes belong to threads (ADR-0120).
+  // Clients find the host by its principal and address their Lines to the seat
+  // Kyneta issues it. The host has no WRITER identity: writers are the
+  // connected clients, named by their principals, and they own no lanes; lanes
+  // belong to threads.
   const exchange = new Exchange({
     principal: HOST_PRINCIPAL,
     type: "service",
@@ -317,10 +315,9 @@ export async function startHost({
     // A client does not reconnect: a closed channel is a seat that has left,
     // so there is nothing to wait for before its Line goes.
     departureTimeout: 0,
-    // Cards' texts and a person's documents are created by clients
-    // (ADR-0048, ADR-0059, ADR-0077): without this, a document the host never
-    // opened itself would be neither stored nor relayed (S58). The host never
-    // writes a person's document.
+    // Cards' texts and a person's documents are created by clients: without
+    // this, a document the host never opened itself would be neither stored nor
+    // relayed. The host never writes a person's document.
     resolve: docId => {
       const kind = resolveDoc(docId, root => readRoots(session).has(root))
       if (kind === "reject") return Reject()
@@ -336,29 +333,29 @@ export async function startHost({
     backup: opened.backup,
     log,
   })
-  // The session's records, the directory of roots among them (ADR-0063).
-  // Each root's document is opened through `docs`, below.
+  // The session's records, the directory of roots among them. Each root's
+  // document is opened through `docs`, below.
   const session = exchange.get(SESSION_DOC_ID, SessionDoc)
   // The host is every document's authority: no peer is upstream of it. So
-  // Kyneta loads a root it let go again when a client asks for it (S86).
+  // Kyneta loads a root it let go again when a client asks for it.
   exchange.register({ name: "pinetrie.authority", authority: "self" })
   // Clients may write presence and cards' texts (host/policy.ts); only the
   // host the session and the places, and only its person an inventory
   // (`writersPolicy`, registered on every client too).
   exchange.register(hostPolicy)
   exchange.register(writersPolicy)
-  // Held here so the host relays it between clients (ADR-0024).
+  // Held here so the host relays it between clients.
   const presence = exchange.get(PRESENCE_DOC_ID, presenceDoc(presenceDecay))
-  // Where every card is, which only the host writes (ADR-0059).
+  // Where every card is, which only the host writes.
   const places: PlacesDocHandle = exchange.get(PLACES_DOC_ID, PlacesDoc)
-  // What is streaming now (ADR-0063), which only the host writes.
+  // What is streaming now, which only the host writes.
   const live: LiveDocHandle = exchange.get(LIVE_DOC_ID, LiveDoc)
   // A stored session loads asynchronously; pi must see it before it starts.
   // Only storage is awaited: the host is the authority, with no peer upstream.
   await whenHydrated(session)
   await whenHydrated(places)
   await whenHydrated(live)
-  // Each person's history of moves, per root (ADR-0066).
+  // Each person's history of moves, per root.
   const histories = createMoveHistories(exchange)
   const docs = hostDocuments({ exchange, session, live, places })
   const basics: Basics = {
@@ -371,16 +368,15 @@ export async function startHost({
     now,
   }
 
-  // The host writes its own records (ADR-0095); every module that writes one
-  // takes this.
+  // The host writes its own records; every module that writes one takes this.
   const records = createRecords(docs)
 
-  // --- pi: the scribe and the person's pi setup (ADR-0092) -----------------
+  // --- pi: the scribe and the person's pi setup -----------------------------
   // A thread's appends go through the scribe, which holds each root's one pi
   // session; the agent, made last, builds its harnesses over them.
   const scribe = createScribe({ documents: docs, replicaId: newId(), blobs })
-  // Before a root's document goes, what holds it lets go: the scribe closes
-  // the agent's harness over it, then its session (ADR-0063).
+  // Before a root's document goes, what holds it lets go: the scribe closes the
+  // agent's harness over it, then its session.
   docs.onReleasing(root => scribe.release(root))
   // So do the stacks of moves of the tasks holding its threads.
   docs.onReleasing(async root => {
@@ -433,9 +429,8 @@ export async function startHost({
     bannerConfig === null
       ? null
       : createBanners({ basics, keeper, blobs, records, piSetup })
-  // Each run's verdict (ADR-0077), and each ask's digest unless the user
-  // config turns digests off (ADR-0071).
-  // What agents talking spend (ADR-0128). Its drain and the relays are made
+  // Each run's verdict, and each ask's digest unless the user config turns
+  // digests off. What agents talking spend. Its drain and the relays are made
   // after the agent, whose hooks call them: bound late.
   let queueDrainLate: (lane: ThreadId) => void = () => {}
   const budgets = createBudgets({
@@ -456,8 +451,8 @@ export async function startHost({
   })
   const digestFailed = (lane: ThreadId) =>
     failed(basics, "summarizing its ask", lane)
-  // Each root's title, unasked as its first lane starts unless the user
-  // config turns that off, or when a person asks (ADR-0074).
+  // Each root's title, unasked as its first lane starts unless the user config
+  // turns that off, or when a person asks.
   const titles = createTitles({
     basics,
     keeper,
@@ -465,8 +460,8 @@ export async function startHost({
     records,
     piSetup,
   })
-  // Every thread's name (ADR-0039, ADR-0057). A thread's banner is drawn
-  // from its name, so it starts as the name is written.
+  // Every thread's name. A thread's banner is drawn from its name, so it starts
+  // as the name is written.
   const names = createNames({
     basics,
     records,
@@ -475,11 +470,11 @@ export async function startHost({
     },
   })
   const provenance = createProvenance({ basics, presence, records })
-  // `split_offer`: a split card queued on the agent's lane (ADR-0080), which
-  // its run's end pops.
+  // `split_offer`: a split card queued on the agent's lane, which its run's end
+  // pops.
   const askSplit = createSplitCall({ basics, keeper, provenance })
 
-  // --- where lanes work (ADR-0032, ADR-0034) --------------------------------
+  // --- where lanes work -----------------------------------------------------
   const work = await startLaneWork({
     basics,
     found,
@@ -539,12 +534,11 @@ export async function startHost({
   )
 
   // --- the shell -----------------------------------------------------------
-  // What each thread is told of its base's new work (ADR-0080): lane work's
-  // refreshes announce a changed base, and a running lane is steered.
+  // What each thread is told of its base's new work: lane work's refreshes
+  // announce a changed base, and a running lane is steered.
   const baseNews = createBaseNews({ basics, agent, keeper })
   work.onBaseChanged(lane => baseNews.baseChanged(lane))
-  // A card added to or taken from a task, told to its running threads
-  // (ADR-0116).
+  // A card added to or taken from a task, told to its running threads.
   const canvasNews = createCanvasNews({ basics, agent, keeper })
   provenance.onChanged(change => canvasNews.changed(change))
   // Commands are received only from `startControl`, after `recover`.
@@ -598,8 +592,8 @@ export async function startHost({
     keeper,
     relays,
   })
-  // The drain's waits for its top card: its text (S96), someone's typing in
-  // it to stop (ADR-0048 step 7), or a blank card to be written in (ADR-0113).
+  // The drain's waits for its top card: its text, someone's typing in it to
+  // stop, or a blank card to be written in.
   const wait = createWaits({ places, drain: lane => queueDrain(lane) })
   const behind = (card: QueuedText) =>
     wait(card, signal => cardPort.whenHolds(card.id, card.place.seen, signal))
@@ -687,11 +681,11 @@ export async function startHost({
     if (prompt !== null && root !== null)
       void digests.ended(root, lane, prompt, digestFailed(lane))
   })
-  // A card queued on a lane that is not running is popped at once (ADR-0059):
-  // the move that queued it asks for a drain. A lane's drain is the keeper's
-  // `once`: queued once until its step starts, and a move while it runs
-  // queues one more, which finds what that one missed. It keeps its place
-  // among the commands, so a late message still goes after the queued cards.
+  // A card queued on a lane that is not running is popped at once: the move
+  // that queued it asks for a drain. A lane's drain is the keeper's `once`:
+  // queued once until its step starts, and a move while it runs queues one
+  // more, which finds what that one missed. It keeps its place among the
+  // commands, so a late message still goes after the queued cards.
   const queueDrain = (lane: ThreadId) => {
     if (readRunning(live, lane)) return
     void keeper.once(`drain:${lane}`, () => drain(lane))
@@ -765,7 +759,7 @@ export async function startHost({
           // Every session, the session document's too: a later write is refused.
           return scribe.close()
         case "work":
-          // A container runs only while its lane runs (ADR-0034).
+          // A container runs only while its lane runs.
           return work.close()
         case "exchange":
           histories.dispose()
