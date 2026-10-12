@@ -61,8 +61,9 @@ whole header in one layout, so a hand edit to a generated field is lost:
 them, and while any header does not parse, names an Area that is not a
 living doc, names a record that does not exist, or is in force with no Area
 that cites it. It also fails when a tracked file cites a `docs/adrs/` or
-`docs/findings/` path that does not exist, and when code cites a superseded
-ADR (`scripts/record.test.ts`).
+`docs/findings/` path that does not exist, and when the decision ids left
+in code differ from `scripts/code-citations.ts`, a count that only shrinks:
+code names no decision (ADR-0135, `scripts/record.test.ts`).
 
 **Never deleted; archived.** An ADR is in force while it is Proposed or
 Accepted. A Superseded or Rejected one moves to `docs/adrs/archive/`: the
@@ -70,13 +71,10 @@ rejected reasoning is the valuable part, so it stays, but search skips it
 (`/.ignore`) unless you name the folder. jj sees the move as a delete and an
 add, so an archived ADR's history before the move is under its old path.
 
-**Amendments.** An ADR in force has at most three amendments, counting
-those by other ADRs and those made in place. Past that, write a
-restatement: a new ADR whose body opens "Restates ADR-NNNN as amended by …;
-decides nothing new", states the decision as it stands, and supersedes the
-head, with every amending ADR whose whole decision it states. Point the
-head's citations in living docs and code at the restatement. ADRs over the
-limit now are listed in `scripts/unconsolidated.ts`, which only shrinks.
+**Amendments.** The record is a log (ADR-0135). An ADR is amended as often
+as decisions need, by newer ADRs or in place, and its back links show each.
+Supersede an ADR only when its decision is overturned, never to gather its
+amendments into one text: the living docs say what holds now.
 
 **Numbering.** Take the next number free both on the trunk, counting
 `archive/`, and in the plans in flight, which may have written theirs

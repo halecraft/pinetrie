@@ -23,9 +23,6 @@ import {
 import path from "node:path"
 import { ADRS, FINDINGS, type RecordFile, readRecord } from "./numbering.ts"
 
-/** An ADR in force may be amended this many times; past it, it is restated. */
-export const AMENDMENT_LIMIT = 3
-
 /** Living docs say what is true now. Every `TECHNICAL.md` is one too. */
 export const LIVING_DOCS: readonly string[] = [
   "AGENTS.md",
@@ -464,20 +461,6 @@ export function planRecord(records: readonly Parsed[]): RecordPlan {
   return { writes, moves }
 }
 
-/** Each ADR in force amended more than `AMENDMENT_LIMIT` times, in place or not. */
-export function overLimit(records: readonly Parsed[]): readonly number[] {
-  const derived = derive(records)
-  return records
-    .flatMap(r => {
-      const d = derived.get(r.file.path)
-      if (r.header.kind !== "adr" || d === undefined || !inForce(d.status))
-        return []
-      const count = d.amendedBy.length + r.header.revised.length
-      return count > AMENDMENT_LIMIT ? [r.header.id] : []
-    })
-    .toSorted((a, b) => a - b)
-}
-
 // ── Citations, and the gaps ─────────────────────────────────────────────
 
 /**
@@ -494,12 +477,21 @@ export function citations(text: string): Citations {
   return { paths: [...new Set(paths)], adrIds: [...new Set(adrIds)] }
 }
 
+/** A decision's id: an ADR's, a spike's or a plan's, which code does not name. */
+const DECISION = /\bADR-\d{4}\b|\bS\d{1,3}\b|\bPLAN-\d{4}-\d{2}-\d{2}\b/g
+
+/** How many times `text` names a decision by its id. */
+export const decisionCitations = (text: string): number =>
+  text.match(DECISION)?.length ?? 0
+
 export interface RecordInput {
   readonly files: readonly RecordFile[]
   /** Each living doc's citations, by path. */
   readonly living: ReadonlyMap<string, Citations>
   /** Every other tracked text file's citations, by path. */
   readonly cited: ReadonlyMap<string, Citations>
+  /** Each code file's count of decision ids (`decisionCitations`), by path. */
+  readonly inCode: ReadonlyMap<string, number>
   /** The record's files and folders, repo-relative, without a trailing `/`. */
   readonly paths: ReadonlySet<string>
 }
@@ -522,10 +514,6 @@ export interface RecordGaps {
   readonly missingPaths: readonly {
     readonly file: string
     readonly cited: string
-  }[]
-  readonly codeCitesSuperseded: readonly {
-    readonly file: string
-    readonly adr: string
   }[]
 }
 
@@ -553,14 +541,6 @@ export function recordGaps(input: RecordInput): RecordGaps {
       ? [{ path: r.file.path, header: r.header }]
       : []
   })
-  const superseded = new Set(
-    records.flatMap(r =>
-      r.header.kind === "adr" &&
-      derived.get(r.file.path)?.status === "Superseded"
-        ? [r.header.id]
-        : [],
-    ),
-  )
   const dangling = records.flatMap(r => {
     const h = r.header
     if (h.kind !== "adr") return []
@@ -576,13 +556,6 @@ export function recordGaps(input: RecordInput): RecordGaps {
       c.paths.filter(p => !input.paths.has(p)).map(cited => ({ file, cited })),
     )
     .toSorted((a, b) => a.file.localeCompare(b.file))
-  const codeCitesSuperseded = [...input.cited]
-    .filter(([file]) => /\.tsx?$/.test(file))
-    .flatMap(([file, c]) =>
-      c.adrIds
-        .filter(id => superseded.has(id))
-        .map(id => ({ file, adr: adrId(id) })),
-    )
   return {
     unparsed,
     noArea: adrsInForce
@@ -605,7 +578,6 @@ export function recordGaps(input: RecordInput): RecordGaps {
       )
       .map(a => a.path),
     missingPaths,
-    codeCitesSuperseded,
   }
 }
 
@@ -688,6 +660,13 @@ export const parseAll = (files: readonly RecordFile[]): Parsed[] =>
 const CITING = ["**/*.md", "**/*.ts", "**/*.tsx", "**/*.mjs"]
 /** Files whose record paths and ids are fixtures, not citations. */
 const FIXTURES = ["scripts/record.test.ts"]
+/** Code whose spike ids are fixtures of the numbering, not citations. */
+const NUMBERING = ["scripts/numbering.ts", "scripts/numbering.test.ts"]
+const CODE = ["**/*.ts", "**/*.tsx", "**/*.mjs"]
+
+/** Every decision id in code, summed (`decisionCitations`). */
+export const citationsInCode = (input: Pick<RecordInput, "inCode">): number =>
+  [...input.inCode.values()].reduce((sum, n) => sum + n, 0)
 const UNTRACKED = [
   "**/node_modules/**",
   ".plans/**",
@@ -701,8 +680,8 @@ const UNTRACKED = [
 /** Everything `recordGaps` reads, from the repository at `root`. */
 export function gatherInput(root: string): RecordInput {
   const files = readRecord(root)
-  const read = (p: string) =>
-    citations(readFileSync(path.join(root, p), "utf8"))
+  const text = (p: string) => readFileSync(path.join(root, p), "utf8")
+  const read = (p: string) => citations(text(p))
   const technical = globSync("{packages,apps}/**/TECHNICAL.md", {
     cwd: root,
     exclude: UNTRACKED,
@@ -721,7 +700,15 @@ export function gatherInput(root: string): RecordInput {
     cwd: root,
   }).map(p => p.replace(/\/$/, ""))
   const paths = new Set([...files.map(f => f.path), ...folders])
-  return { files, living, cited, paths }
+  const inCode = new Map(
+    globSync(CODE, {
+      cwd: root,
+      exclude: [...UNTRACKED, ...FIXTURES, ...NUMBERING, "docs/**"],
+    })
+      .toSorted()
+      .map(p => [p, decisionCitations(text(p))] as const),
+  )
+  return { files, living, cited, inCode, paths }
 }
 
 /** Writes, then moves; a spike's folder of sources moves with its file. */

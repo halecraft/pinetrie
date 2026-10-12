@@ -41,6 +41,20 @@ spent spikes: history, which search skips unless you name the folder.
   own value, and one stored in an older shape stops decoding
   (`packages/rules/TECHNICAL.md`, "History messages").
 - No non-null assertions (`!`).
+- Comments carry what the code cannot: a constraint (an ordering, a caller's
+  obligation, a failure mode, a limit) or a reason a reader would otherwise
+  undo. Not a restatement of the name and type below, not the module's
+  story (its `TECHNICAL.md` holds that), not "Pure." (`/skill:comments`).
+- Code names no decision (ADR-0135): no ADR, spike or plan id in a
+  comment, a test title or a mutation list. Where a reader needs the
+  reason, say it in a sentence; the module's `TECHNICAL.md` cites the
+  decisions it rests on. The ids still in code are counted in
+  `scripts/code-citations.ts`, which only shrinks: remove a file's when
+  you change it for its own reasons, and lower the count.
+- A test's title states one behaviour, briefly.
+- A `TECHNICAL.md` states rules, invariants and gotchas, and names the
+  module they live in; a function's name in its prose goes stale on the
+  next rename.
 - Functional core, imperative shell: gather, then plan (pure, returning values),
   then execute. Decisions are values, and tests exercise them without I/O.
 - Precise types inside; awkward representations only at the edges (wire,
@@ -62,7 +76,8 @@ spent spikes: history, which search skips unless you name the folder.
   or spike you add or change is followed by `pnpm run record`, which writes
   every back link and moves what is spent to the archive
   (`docs/adrs/README.md`). Whoever resolves a landing that adds one runs it
-  too.
+  too. ADRs are a log: amend one as often as decisions need, and supersede
+  it only when its decision is overturned.
 
 ## Gates
 

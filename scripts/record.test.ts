@@ -1,11 +1,13 @@
 import path from "node:path"
 import { describe, expect, test } from "vitest"
+import { CODE_CITATIONS } from "./code-citations.ts"
 import { type RecordFile, readRecord } from "./numbering.ts"
 import {
   type Citations,
   citations,
+  citationsInCode,
+  decisionCitations,
   gatherInput,
-  overLimit,
   type Parsed,
   parseAll,
   parseHeader,
@@ -14,7 +16,6 @@ import {
   recordGaps,
   renderIndex,
 } from "./record.ts"
-import { UNCONSOLIDATED } from "./unconsolidated.ts"
 
 // Fixtures use numbers from 9000, which no real record holds.
 
@@ -232,39 +233,6 @@ describe("planRecord", () => {
   })
 })
 
-describe("overLimit", () => {
-  const amending = (target: number, from: number) =>
-    adr(from, accepted(`\n- **Amends:**\n  - ADR-${target}: a change.`))
-  const revisions = (n: number) =>
-    `\n- **Revised:**\n${Array.from({ length: n }, () => "  - 2026-10-07: in place.").join("\n")}`
-
-  test("more than 3 amendments are over, counting those made in place", () => {
-    expect(
-      overLimit(
-        parsed([
-          adr(9001, accepted()),
-          ...[9101, 9102, 9103, 9104].map(n => amending(9001, n)),
-          adr(9002, accepted()),
-          ...[9201, 9202, 9203].map(n => amending(9002, n)),
-          adr(9003, accepted(revisions(2))),
-          ...[9301, 9302].map(n => amending(9003, n)),
-        ]),
-      ),
-    ).toEqual([9001, 9003])
-  })
-
-  test("a superseded ADR is never over", () => {
-    expect(
-      overLimit(
-        parsed([
-          adr(9001, accepted(revisions(4))),
-          adr(9002, accepted("\n- **Supersedes:**\n  - ADR-9001: gone.")),
-        ]),
-      ),
-    ).toEqual([])
-  })
-})
-
 describe("citations", () => {
   test("record paths, and ADR ids of four digits", () => {
     expect(
@@ -278,12 +246,29 @@ describe("citations", () => {
   })
 })
 
+describe("decisionCitations", () => {
+  test("counts ADR, spike and plan ids, each time it meets one", () => {
+    expect(
+      decisionCitations(
+        "ADR-0126 and ADR-0126 again; S96, S7; PLAN-2026-10-11-clipboard.",
+      ),
+    ).toBe(5)
+  })
+
+  test("not a longer word, nor an id of the wrong length", () => {
+    expect(
+      decisionCitations("ADR-01241, S1234, MS96, PLAN-26-10-11, SS7"),
+    ).toBe(0)
+  })
+})
+
 describe("recordGaps", () => {
   const none: Citations = { paths: [], adrIds: [] }
   const input = (over: Partial<RecordInput>): RecordInput => ({
     files: [adr(9001, accepted())],
     living: new Map([["docs/06-interface.md", { paths: [], adrIds: [9001] }]]),
     cited: new Map(),
+    inCode: new Map(),
     paths: new Set(["docs/adrs/9001-x.md"]),
     ...over,
   })
@@ -340,24 +325,6 @@ describe("recordGaps", () => {
       { file: "a.ts", cited: "docs/adrs/9002-gone.md" },
     ])
   })
-
-  test("code that cites a superseded ADR is listed; Markdown that does is not", () => {
-    const files = [
-      adr(9001, accepted()),
-      adr(9002, accepted("\n- **Supersedes:**\n  - ADR-9001: gone.")),
-    ]
-    const living = new Map([
-      ["docs/06-interface.md", { paths: [], adrIds: [9001, 9002] }],
-    ])
-    const cited = new Map([
-      ["a.ts", { paths: [], adrIds: [9001] }],
-      ["b.md", { paths: [], adrIds: [9001] }],
-      ["c.tsx", { paths: [], adrIds: [9002] }],
-    ])
-    expect(
-      recordGaps(input({ files, living, cited })).codeCitesSuperseded,
-    ).toEqual([{ file: "a.ts", adr: "ADR-9001" }])
-  })
 })
 
 test("renderIndex lists an ADR in force under each of its areas, and the archive apart", () => {
@@ -396,11 +363,10 @@ describe("the repository's record", () => {
       dangling: [],
       uncitedInArea: [],
       missingPaths: [],
-      codeCitesSuperseded: [],
     })
   })
 
-  test("the ADRs over the amendment limit are exactly UNCONSOLIDATED", () => {
-    expect(overLimit(records)).toEqual(UNCONSOLIDATED)
+  test("code names exactly CODE_CITATIONS decision ids, a count that only shrinks", () => {
+    expect(citationsInCode(gatherInput(root))).toBe(CODE_CITATIONS)
   })
 })
