@@ -1,5 +1,5 @@
 // web/use-card-texts — the texts of several cards, for their faces: your
-// inventory's and a notes board's (ADR-0113).
+// inventory's and a notes board's.
 
 import { subscribe } from "@kyneta/schema"
 import type { TextCardId } from "@pinetrie/core"

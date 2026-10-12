@@ -183,7 +183,6 @@ export interface ColumnProps {
   forks: ReadonlyMap<EntryId, readonly number[]>
   /** Ids any column of this tab shows: a branch leaving here that is shown needs no button. */
   shown: ReadonlySet<string>
-  /** Display names by writer. */
   nameOf: ReadonlyMap<WriterId, string>
   /** Everyone who can be mentioned (`readParticipants`). */
   participants: readonly string[]
@@ -198,7 +197,6 @@ export interface ColumnProps {
   colorOf: (writer: WriterId) => string
   /** This window is typing in this column, in the card its box shows. */
   onTyping: (card: CardId | null) => void
-  /** Every card's record. */
   cards: readonly CardRecord[]
   /** The queued cards that are blank messages (`useBlankQueued`): they do not wait. */
   blank: ReadonlySet<CardId>

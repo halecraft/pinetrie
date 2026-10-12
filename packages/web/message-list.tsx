@@ -1,6 +1,6 @@
 // web/message-list — a column's messages, memoised as a whole
 // (`message-list-props.ts`): the part of a column that grows with its thread.
-// Each ask's work is drawn together, folded or open (`AskWork`, ADR-0106).
+// Each ask's work is drawn together, folded or open (`AskWork`).
 
 import { ancestry, type EntryId } from "@pinetrie/core"
 import {
@@ -37,8 +37,7 @@ function MessageListView(p: MessageListProps) {
     const node = i === undefined ? undefined : view.nodes[i]
     if (i === undefined || node === undefined) return null
     const comments = p.margins.get(node.id) ?? 0
-    // Its margin (ADR-0126): open under it, else its face while it holds
-    // comments.
+    // Its margin: open under it, else its face while it holds comments.
     const margin =
       p.openMargin === node.id ? (
         p.marginSlot

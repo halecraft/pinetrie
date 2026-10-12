@@ -1,7 +1,7 @@
-// web/use-page — the page over the stage (ADR-0098), kept in the URL's
-// hash so the browser's Back leaves it and a reload stays on it. What the
-// hash names and how to leave are `page.ts`'s (`@pinetrie/interface`); this
-// reads `location` and moves `history`.
+// web/use-page — the page over the stage, kept in the URL's hash so the
+// browser's Back leaves it and a reload stays on it. What the hash names and
+// how to leave are `page.ts`'s (`@pinetrie/interface`); this reads `location`
+// and moves `history`.
 //
 // `pushState` and `replaceState` fire no event, so `goTo` tells the
 // subscribers itself. Back fires `popstate`, and a hash typed in the address

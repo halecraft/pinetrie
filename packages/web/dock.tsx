@@ -1,12 +1,11 @@
-// web/dock — a column's foot (ADR-0113): the queue's header, which says what
-// happens next and holds the one control for it, the queued cards, "+ add to
-// queue", the line, and what the column puts below it (your message, the
-// notes line). CSS keeps it to a third of the column, scrolling within, its
-// header in view.
+// web/dock — a column's foot: the queue's header, which says what happens next
+// and holds the one control for it, the queued cards, "+ add to queue", the
+// line, and what the column puts below it (your message, the notes line). CSS
+// keeps it to a third of the column, scrolling within, its header in view.
 //
 // It reads presence (who types in which card) itself, so a keystroke anywhere
-// redraws the dock, not the column (S59); which queued cards are blank is
-// `App`'s, one set for every reader.
+// redraws the dock, not the column; which queued cards are blank is `App`'s,
+// one set for every reader.
 
 import { useSelector } from "@kyneta/react"
 import type {
@@ -44,10 +43,10 @@ import { Menu } from "./menu.tsx"
 import { RENDERINGS } from "./renderings.tsx"
 
 /**
- * A reference queued to tell the agent (ADR-0126), framed as a queued
- * message is: who queued it, its place in line, ↑ and ↓, its ⋯ (back to
- * the notes, into your inventory: the moves its kind may make, `cardFrame`)
- * and ×. Its body is its quote, read only.
+ * A reference queued to tell the agent, framed as a queued message is: who
+ * queued it, its place in line, ↑ and ↓, its ⋯ (back to the notes, into your
+ * inventory: the moves its kind may make, `cardFrame`) and ×. Its body is its
+ * quote, read only.
  */
 function QueuedReference(p: {
   card: Extract<QueuedCard, { kind: "reference" }>
@@ -193,12 +192,11 @@ export function Dock(p: {
         <div className="queue-cards">
           {queued.map(c =>
             c.kind === "fact" ? (
-              // The host's fact, waiting for the run's end: a dock draws
-              // its cards normal (`DETAIL_ON`), and nobody edits or moves
-              // it (ADR-0080).
+              // The host's fact, waiting for the run's end: a dock draws its
+              // cards normal (`DETAIL_ON`), and nobody edits or moves it.
               <RENDERINGS.fact.Normal card={c} key={c.id} width={1} />
             ) : c.kind === "ask" ? (
-              // An ask from another thread, the host's (ADR-0128).
+              // An ask from another thread, the host's.
               <RENDERINGS.ask.Normal card={c} key={c.id} width={1} />
             ) : (
               <div

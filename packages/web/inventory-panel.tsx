@@ -1,12 +1,10 @@
-// web/inventory-panel — your inventory (ADR-0048 step 4): a panel that
-// floats over the columns, docked left, centre or right by this device's
-// choice, holding a fixed 3 × 6 grid of slots (`CardGrid`, ADR-0113). The
-// selected card is previewed beside the grid, normal, one column wide and
-// read only, on the side away from the panel's dock edge; Enter opens it
-// whole and editable in place, and the preview hides while it is open
-// (ADR-0126). What it draws is `inventoryView`, each card by its kind's row
-// of `RENDERINGS`; every click and drop here is an intent, planned like any
-// other.
+// web/inventory-panel — your inventory: a panel that floats over the columns,
+// docked left, centre or right by this device's choice, holding a fixed 3 × 6
+// grid of slots (`CardGrid`). The selected card is previewed beside the grid,
+// normal, one column wide and read only, on the side away from the panel's dock
+// edge; Enter opens it whole and editable in place, and the preview hides while
+// it is open. What it draws is `inventoryView`, each card by its kind's row of
+// `RENDERINGS`; every click and drop here is an intent, planned like any other.
 
 import {
   isTextCard,
@@ -68,14 +66,14 @@ export function InventoryPanel(p: {
   onIntent: (intent: Intent) => void
   /** Each change opens the selected slot's card (`openSelected`). */
   openRequest: number
-  /** Each held thread's face, and its preview when opened (ADR-0124). */
+  /** Each held thread's face, and its preview when opened. */
   threads: ReadonlyMap<ThreadId, ThreadFace>
   previewOf: (thread: ThreadId) => ThreadPreview
   /** Each note column, as its column draws it. */
   notes: ReadonlyMap<NoteColumnId, NoteColumnView>
   /** Each thread's name, which a reference names. */
   threadNames: ReadonlyMap<ThreadId, ThreadName>
-  /** The clipboard cell: the last copy this tab made (ADR-0132), or none yet. */
+  /** The clipboard cell: the last copy this tab made, or none yet. */
   cell: ClipboardCellView | null
 }) {
   const texts = useCardTexts(
@@ -121,7 +119,7 @@ export function InventoryPanel(p: {
       className="inventory"
       data-dock={p.dock}
       ref={frame}
-      // Your colour: a card in your inventory is drawn in it (`--you`, ADR-0111).
+      // Your colour: a card in your inventory is drawn in it (`--you`).
       style={
         {
           "--you": p.colorOf(p.reader.me),
@@ -207,9 +205,9 @@ export function InventoryPanel(p: {
 }
 
 /**
- * The clipboard cell (ADR-0132): beside the grid, on the side away from the
- * preview, never a slot and no drop target. It is focusable, so Cmd+C on it
- * copies its copy again; **keep** pastes it into a free slot.
+ * The clipboard cell: beside the grid, on the side away from the preview, never
+ * a slot and no drop target. It is focusable, so Cmd+C on it copies its copy
+ * again; **keep** pastes it into a free slot.
  */
 function ClipboardCell(p: {
   cell: ClipboardCellView

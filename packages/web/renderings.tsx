@@ -1,12 +1,11 @@
 // web/renderings — how each kind of card is drawn at each level of detail
-// (ADR-0126, *Renderings*): its face (a grid's cell), normal (the card
-// itself, bounded: the inventory's preview) and whole (opened). One row per
-// kind, declared with `satisfies`, so a kind added later does not compile
-// until it draws all three. A card on a canvas is drawn whole by its column
-// (`Strip`'s switch, total by kind too); a folded one by its face
-// (`FoldedColumn`). What each draws is the interface's values (`faceOf`,
-// `cardFrame`, `threadPreview`); what a row needs beyond its card comes from
-// the surface drawing it (`RenderingContext`).
+// (*Renderings*): its face (a grid's cell), normal (the card itself, bounded:
+// the inventory's preview) and whole (opened). One row per kind, declared with
+// `satisfies`, so a kind added later does not compile until it draws all three.
+// A card on a canvas is drawn whole by its column (`Strip`'s switch, total by
+// kind too); a folded one by its face (`FoldedColumn`). What each draws is the
+// interface's values (`faceOf`, `cardFrame`, `threadPreview`); what a row needs
+// beyond its card comes from the surface drawing it (`RenderingContext`).
 
 import {
   blobUrl,
@@ -51,7 +50,7 @@ export interface RenderingContext {
   readonly session: SessionClient
   readonly reader: Reader
   readonly colorOf: (writer: WriterId) => string
-  /** A thread's path, read only (ADR-0124). */
+  /** A thread's path, read only. */
   readonly previewOf: (thread: ThreadId) => ThreadPreview
   /** Each note column, as its column draws it. */
   readonly notes: ReadonlyMap<NoteColumnId, NoteColumnView>
@@ -79,7 +78,6 @@ const useRendering = (): RenderingContext => {
   return context
 }
 
-/** A card of `K`. */
 type CardOf<K extends DrawnKind> = Extract<CardRecord, { readonly kind: K }>
 
 /** How a kind is drawn at each level. */
@@ -119,10 +117,10 @@ const PUT_THREAD_TITLE =
   "put this thread on the canvas you are on, after the column you were in"
 
 /**
- * A text card folded (ADR-0113): a strip in its place's colour, its kind's
- * icon, its owner's circle, its command's chip, its first three lines, and
- * its slot's key in your inventory. Not an `Avatar`: the browser suite
- * counts people by `.avatar`.
+ * A text card folded: a strip in its place's colour, its kind's icon, its
+ * owner's circle, its command's chip, its first three lines, and its slot's key
+ * in your inventory. Not an `Avatar`: the browser suite counts people by
+ * `.avatar`.
  */
 function TextFaceView({ face }: { face: FaceOf<"text"> }) {
   const { reader, colorOf } = useRendering()
@@ -232,7 +230,7 @@ function ThreadNormal(p: { card: CardOf<"thread">; width: CardWidth }) {
   )
 }
 
-/** A thread's card opened: its path, read only, with its put (ADR-0124). */
+/** A thread's card opened: its path, read only, with its put. */
 function ThreadWhole(p: { card: CardOf<"thread">; width: CardWidth }) {
   const { previewOf } = useRendering()
   return (
@@ -283,9 +281,9 @@ function NoteList(p: {
 }
 
 /**
- * Each quote this page has fetched, by its blob: a copy of a reference
- * writes its quote as text (ADR-0132), and a copy cannot wait for a fetch.
- * A quote never changes, so nothing here goes stale.
+ * Each quote this page has fetched, by its blob: a copy of a reference writes
+ * its quote as text, and a copy cannot wait for a fetch. A quote never changes,
+ * so nothing here goes stale.
  */
 const fetchedQuotes = new Map<Sha256, string>()
 
@@ -293,7 +291,7 @@ const fetchedQuotes = new Map<Sha256, string>()
 export const quoteOf = (quote: Sha256): string | null =>
   fetchedQuotes.get(quote) ?? null
 
-/** A reference's quote, fetched from its blob: it never changes (ADR-0126). */
+/** A reference's quote, fetched from its blob: it never changes. */
 function useQuote(quote: Sha256): string | null {
   const [loaded] = useFetched([blobUrl(quote)], r => r.text())
   if (loaded?.kind !== "ready") return null
@@ -331,7 +329,7 @@ function ReferenceNormal(p: { card: CardOf<"reference">; width: CardWidth }) {
 
 /**
  * A reference opened: its quote with the thread it is from, read only, and
- * *Edit as text*, which makes it a text card you can change (ADR-0126).
+ * *Edit as text*, which makes it a text card you can change.
  */
 function ReferenceWhole(p: { card: CardOf<"reference">; width: CardWidth }) {
   const { onIntent, threadNames } = useRendering()
@@ -385,8 +383,8 @@ function FactFaceView({ face }: { face: FaceOf<"fact"> }) {
 }
 
 /**
- * A fact, normal and whole alike (ADR-0080): its one line, the host's,
- * waiting for its thread's end. Nobody edits or moves it.
+ * A fact, normal and whole alike: its one line, the host's, waiting for its
+ * thread's end. Nobody edits or moves it.
  */
 function FactLine(p: { card: CardOf<"fact">; width: CardWidth }) {
   return (
@@ -409,8 +407,8 @@ function AskFaceView({ face }: { face: FaceOf<"ask"> }) {
 }
 
 /**
- * An ask from another thread, normal and whole alike (ADR-0128): its one
- * line, the host's, waiting for its thread's end. Nobody edits or moves it.
+ * An ask from another thread, normal and whole alike: its one line, the host's,
+ * waiting for its thread's end. Nobody edits or moves it.
  */
 function AskLine(p: { card: CardOf<"ask">; width: CardWidth }) {
   return (

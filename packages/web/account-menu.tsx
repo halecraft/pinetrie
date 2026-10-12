@@ -1,10 +1,9 @@
-// web/account-menu — you, at the footer's left (ADR-0098): your avatar and
-// name, opening a menu headed by who you are, your email included. It offers
-// your profile page and signing in as someone else (ADR-0037). While your
-// list is folded, the corner holds your avatar alone, carrying the inbox's
-// badge, and the menu holds the inbox and the inventory too: choosing the
-// inbox shows its sections in the same box, after a back item. What the menu
-// holds is `accountView`'s.
+// web/account-menu — you, at the footer's left: your avatar and name, opening a
+// menu headed by who you are, your email included. It offers your profile page
+// and signing in as someone else. While your list is folded, the corner holds
+// your avatar alone, carrying the inbox's badge, and the menu holds the inbox
+// and the inventory too: choosing the inbox shows its sections in the same box,
+// after a back item. What the menu holds is `accountView`'s.
 
 import type { WriterId } from "@pinetrie/core"
 import {

@@ -29,18 +29,17 @@ export interface Follow {
 }
 
 /**
- * Keep `scroller` at its end while the reader is there (`follow.ts`).
- * `content` is the element whose height grows; a ResizeObserver watches it and
- * the scroller's viewport, and follows in the frame the layout changed.
- * While `hold.holding`, a shrink is taken up by `hold.floor`, an element
- * after `content` inside the scroller.
- * It starts with ↓ new below showing when `seen.unseen` (read at mount
- * only), and tells `seen.leave` whether it was showing, and the tip it was
- * released from: on unmount, and when the page is hidden, since
- * most context switches leave the browser, not the tab (ADR-0106).
- * The first placement keeps it only short of the end: nothing clears it
- * before then, since a scroller's first resize comes after `alignOnOpen`.
- * `tip` is the column's tip now, which a release keeps (`releasedTip`).
+ * Keep `scroller` at its end while the reader is there (`follow.ts`). `content`
+ * is the element whose height grows; a ResizeObserver watches it and the
+ * scroller's viewport, and follows in the frame the layout changed. While
+ * `hold.holding`, a shrink is taken up by `hold.floor`, an element after
+ * `content` inside the scroller. It starts with ↓ new below showing when
+ * `seen.unseen` (read at mount only), and tells `seen.leave` whether it was
+ * showing, and the tip it was released from: on unmount, and when the page is
+ * hidden, since most context switches leave the browser, not the tab. The first
+ * placement keeps it only short of the end: nothing clears it before then,
+ * since a scroller's first resize comes after `alignOnOpen`. `tip` is the
+ * column's tip now, which a release keeps (`releasedTip`).
  */
 export function useFollow(
   scroller: RefObject<HTMLElement | null>,

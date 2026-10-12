@@ -53,7 +53,7 @@ function MessageView(p: MessageProps) {
     node.role,
     node.compelled === true ? "asked" : "",
   ].filter(c => c !== "")
-  // What its tables and images name it by, in the column's pane (ADR-0078).
+  // What its tables and images name it by, in the column's pane.
   const source = useMemo<MessageSource>(
     () => ({ kind: "entry", thread: node.thread, entry: node.id }),
     [node.thread, node.id],
@@ -113,8 +113,8 @@ function MessageView(p: MessageProps) {
       <div className={classes.join(" ")} data-entry={node.id}>
         <span className="role">{speaker}</span>
         {p.crossTaskLink !== undefined && (
-          // Another task's thread it came from (ADR-0128), opened as a
-          // fork row's link is; held elsewhere, it opens nothing.
+          // Another task's thread it came from, opened as a fork row's link is;
+          // held elsewhere, it opens nothing.
           <button
             className="cross-task-link"
             disabled={!opens(p.crossTaskLink.link)}
@@ -292,16 +292,15 @@ function CopyButton({ node }: { node: TranscriptMessage }) {
 }
 
 /**
- * One tool call: its tool's word as a tag and its status at its top right,
- * what it touched, what it returned, and a toggle (ADR-0114, ADR-0123).
- * `rowView` decides how much it draws: the summary shows the command's first lines and
- * the output's last, and the reader's toggle shows both whole. The result is
- * its own entry in the tree, paired here by `projectSpine`; with none yet, the
- * call is still running or was cut off, and its live output is drawn in the
- * same element the result replaces it in. A result's images are drawn in
- * place of its text (`toolBody`), which keeps to their `title`. What it
- * decided is kept in `rows` by the call's id, so a row mounted again starts
- * where it was left.
+ * One tool call: its tool's word as a tag and its status at its top right, what
+ * it touched, what it returned, and a toggle. `rowView` decides how much it
+ * draws: the summary shows the command's first lines and the output's last, and
+ * the reader's toggle shows both whole. The result is its own entry in the
+ * tree, paired here by `projectSpine`; with none yet, the call is still running
+ * or was cut off, and its live output is drawn in the same element the result
+ * replaces it in. A result's images are drawn in place of its text
+ * (`toolBody`), which keeps to their `title`. What it decided is kept in `rows`
+ * by the call's id, so a row mounted again starts where it was left.
  */
 function ToolRow({
   call,
@@ -334,8 +333,8 @@ function ToolRow({
     toolBody(call.result),
     open,
   )
-  // Set once and never unset: it rings a call that lasts (ADR-0054). A
-  // result within REVEAL_MS clears the timer: the row was never ringed.
+  // Set once and never unset: it rings a call that lasts. A result within
+  // REVEAL_MS clears the timer: the row was never ringed.
   useEffect(() => {
     if (live === undefined || revealed) return
     const t = setTimeout(

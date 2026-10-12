@@ -10,7 +10,6 @@ export const CODE_CITATIONS: Readonly<Record<string, number>> = {
   "packages/core": 11,
   "packages/interface": 9,
   "packages/lanes": 12,
-  "packages/web": 219,
   "scripts/mutations/core.ts": 2,
   "scripts/mutations/docker.ts": 3,
   "scripts/mutations/host.ts": 21,
@@ -19,5 +18,4 @@ export const CODE_CITATIONS: Readonly<Record<string, number>> = {
   "scripts/mutations/rules.ts": 17,
   "scripts/mutations/scripts.ts": 2,
   "scripts/mutations/session.ts": 2,
-  "scripts/mutations/web.ts": 9,
 }

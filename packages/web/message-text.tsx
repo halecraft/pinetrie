@@ -35,7 +35,7 @@ export function MessageText({
   mode: TextMode
   /** Beside `text`, which the browser suite looks for. */
   className?: string
-  /** The message's images (ADR-0042); none for streaming text. */
+  /** The message's images; none for streaming text. */
   images?: readonly ImageRef[] | undefined
 }) {
   const lookup = useMemo(() => imageLookup(images), [images])

@@ -1,8 +1,8 @@
-// web/icons — the page's drawn icons (ADR-0098), in the text's colour, so a
-// control's rest, hover and pressed colours are its CSS alone: the footer
-// corner's inbox and inventory, copy (two sheets) wherever a copy is
-// offered, and the inventory's box with an arrow into it (take) or out of it
-// (put), the same wherever take and put are offered (ADR-0132).
+// web/icons — the page's drawn icons, in the text's colour, so a control's
+// rest, hover and pressed colours are its CSS alone: the footer corner's inbox
+// and inventory, copy (two sheets) wherever a copy is offered, and the
+// inventory's box with an arrow into it (take) or out of it (put), the same
+// wherever take and put are offered.
 
 const ICON = {
   fill: "none",

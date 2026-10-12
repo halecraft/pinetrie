@@ -1,7 +1,6 @@
-// web/profile-page — your profile (ADR-0098): your picture
-// (`picture-field.tsx`), your name, the handle it gives you, and your email.
-// A page of its own, opened from the menu your avatar opens
-// (`account-menu.tsx`).
+// web/profile-page — your profile: your picture (`picture-field.tsx`), your
+// name, the handle it gives you, and your email. A page of its own, opened from
+// the menu your avatar opens (`account-menu.tsx`).
 //
 // A rename is sent on Enter or save, never on blur: a click on "← back" or
 // the sidebar would blur the field and send a name you were still typing.

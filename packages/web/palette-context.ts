@@ -1,7 +1,7 @@
-// web/palette-context — the seed of the root you are on (ADR-0089), for
-// everything drawn in a track's colour: the rail, a column, its fork dots,
-// the narrow pane's dialog. `App` provides it; it changes only with the root,
-// which remounts the columns anyway.
+// web/palette-context — the seed of the root you are on, for everything drawn
+// in a track's colour: the rail, a column, its fork dots, the narrow pane's
+// dialog. `App` provides it; it changes only with the root, which remounts the
+// columns anyway.
 
 import { trackSlot } from "@pinetrie/interface"
 import { type CSSProperties, createContext, useContext, useMemo } from "react"

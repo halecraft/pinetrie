@@ -1,5 +1,4 @@
-// web/markdown — message text as the tree `MessageText` draws
-// (docs/findings/S27-markdown-rendering.md).
+// web/markdown — message text as the tree `MessageText` draws.
 
 import {
   addressOfUrl,
@@ -64,11 +63,10 @@ export const imageLookup = (
 
 /**
  * The tree to draw for a message's text. A `/blob/` image found in `images`
- * gets its stored size, so its box is laid out before it loads: alignment
- * and following measure a message once (ADR-0042). Each block (a table, a
- * code block, an image, a paragraph) carries its number (`data-block`,
- * `markBlocks`), so the column's pane and an address can name it
- * (ADR-0078, ADR-0126).
+ * gets its stored size, so its box is laid out before it loads: alignment and
+ * following measure a message once. Each block (a table, a code block, an
+ * image, a paragraph) carries its number (`data-block`, `markBlocks`), so the
+ * column's pane and an address can name it.
  */
 export function messageTree(
   source: string,
@@ -196,8 +194,8 @@ export function safeUrl(url: string): string {
 }
 
 /**
- * A link to an address (ADR-0126), `/a/<address>`, drawn as a chip: marked
- * with what it names (`data-address`), which the page's click opens.
+ * A link to an address, `/a/<address>`, drawn as a chip: marked with what it
+ * names (`data-address`), which the page's click opens.
  */
 function markAddress(a: Element): void {
   const href = a.properties.href

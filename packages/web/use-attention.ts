@@ -1,8 +1,7 @@
-// web/use-attention — what needs you, and where (ADR-0077): the shell
-// over `attention.ts`. It reads your attention document, decides each
-// thread's status and so each task's (ADR-0116), and keeps what changed as
-// you watched long enough for its mark to move (`moving`). The decisions
-// are `attention.ts`'s.
+// web/use-attention — what needs you, and where: the shell over `attention.ts`.
+// It reads your attention document, decides each thread's status and so each
+// task's, and keeps what changed as you watched long enough for its mark to
+// move (`moving`). The decisions are `attention.ts`'s.
 
 import {
   isBusy,
@@ -63,7 +62,7 @@ export function useAttention(input: {
   readonly running: readonly { readonly lane: ThreadId }[]
   /** The held roots' lanes, with their queues. */
   readonly lanes: readonly LaneView[]
-  /** The archived tasks (ADR-0116): their threads raise nothing. */
+  /** The archived tasks: their threads raise nothing. */
   readonly archived: ReadonlySet<TaskId>
   /** Each thread's task: a task's status is its threads'. */
   readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>

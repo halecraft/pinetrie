@@ -1,8 +1,7 @@
-// web/use-blank-queued — the queued cards that are blank messages, as this
-// page holds their texts (`blankQueued`, ADR-0113). A lane with only blank
-// cards queued is not waiting, as the host decides it. It changes only when
-// a card becomes blank or stops being blank, so typing in a queued card
-// redraws nothing that reads it.
+// web/use-blank-queued — the queued cards that are blank messages, as this page
+// holds their texts (`blankQueued`). A lane with only blank cards queued is not
+// waiting, as the host decides it. It changes only when a card becomes blank or
+// stops being blank, so typing in a queued card redraws nothing that reads it.
 
 import { subscribe } from "@kyneta/schema"
 import { type CardId, type CardRecord, isTextCard } from "@pinetrie/core"

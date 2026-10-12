@@ -1,10 +1,10 @@
-// web/presence — how people are drawn, you included (ADR-0024).
+// web/presence — how people are drawn, you included.
 //
 // A person's colour is kept apart from the branch palette (`palette.ts`): a
 // ring or an avatar must never read as a track. The first few people in a
-// session get colours far from each other and from the tracks (S110); the
-// rest, a hue from their writer id. A person's circle shows their picture
-// when they have set one (ADR-0098), over their initial in their colour.
+// session get colours far from each other and from the tracks; the rest, a hue
+// from their writer id. A person's circle shows their picture when they have
+// set one, over their initial in their colour.
 
 import {
   blobUrl,
@@ -19,9 +19,9 @@ import { useContext, useState } from "react"
 import { Pictures } from "./pictures-context.ts"
 
 /**
- * The first people's colours: magenta, white and yellow, far apart, and
- * lighter or more saturated than any track (S110). A ring also has a dark gap
- * between it and the dot (`Rail`), so it reads against a track of any colour.
+ * The first people's colours: magenta, white and yellow, far apart, and lighter
+ * or more saturated than any track. A ring also has a dark gap between it and
+ * the dot (`Rail`), so it reads against a track of any colour.
  */
 const FIRST = ["#ff4fd8", "#ffffff", "#ffe030"]
 
@@ -33,7 +33,7 @@ const hashed = (writer: WriterId): string =>
  * Writers in the order they joined: by their first message in the session
  * (`writersOf`), then those who have only named themselves, by id. Every
  * window reads the same document, so every window gives each person the same
- * colour. Pure.
+ * colour.
  */
 export function writerOrder(
   index: TreeIndex,
@@ -47,7 +47,7 @@ export function writerOrder(
   return [...wrote, ...rest]
 }
 
-/** Each writer's colour: one of `FIRST` by `order`, else from their id. Pure. */
+/** Each writer's colour: one of `FIRST` by `order`, else from their id. */
 export function presenceColors(
   order: readonly WriterId[],
 ): (writer: WriterId) => string {

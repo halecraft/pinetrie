@@ -2,7 +2,7 @@ import type { DrawnKind } from "@pinetrie/interface"
 import { expect, test } from "vitest"
 import { RENDERINGS, type Renderings } from "./renderings.tsx"
 
-test("every drawn kind draws a face, normal and whole: a row missing one does not compile (ADR-0126)", () => {
+test("every drawn kind draws a face, normal and whole: a row missing one does not compile", () => {
   const { Face, Normal } = RENDERINGS.text
   const rows = {
     ...RENDERINGS,

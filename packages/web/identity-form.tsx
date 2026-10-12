@@ -1,4 +1,4 @@
-// web/identity-form — who you are, asked once per device (ADR-0037).
+// web/identity-form — who you are, asked once per device.
 //
 // Drawn before anything connects: a person is their email, the principal the
 // Exchange names, so there is nothing to connect as until it is known. The

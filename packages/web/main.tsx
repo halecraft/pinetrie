@@ -24,9 +24,9 @@ import { deviceState, tabState } from "./tab-state.ts"
 
 const stores: AppStores = {
   /**
-   * The tab you are on and each root's columns: this browser tab's, or on a
-   * new one the device's latest (ADR-0027). The key predates tabs; the
-   * layout's version tells an older one apart.
+   * The tab you are on and each root's columns: this browser tab's, or on a new
+   * one the device's latest. The key predates tabs; the layout's version tells
+   * an older one apart.
    */
   layout: tabState({
     key: `pinetrie-columns:${SESSION_DOC_ID}`,
@@ -38,9 +38,9 @@ const stores: AppStores = {
     device: localStorage,
   }),
   /**
-   * Who this device says it is (ADR-0037), shared by its tabs. Another tab
-   * clearing it, or storing another email, reloads this one too (below); a
-   * new name for the same email reloads nothing.
+   * Who this device says it is, shared by its tabs. Another tab clearing it, or
+   * storing another email, reloads this one too (below); a new name for the
+   * same email reloads nothing.
    */
   identity: deviceState<Identity>({
     key: IDENTITY_KEY,
@@ -48,7 +48,7 @@ const stores: AppStores = {
     device: localStorage,
     events: window,
   }),
-  /** Where the inventory panel is docked (ADR-0048): the device's, not the session's. */
+  /** Where the inventory panel is docked: the device's, not the session's. */
   dock: deviceState<Dock>({
     key: DOCK_KEY,
     codec: dockCodec,
@@ -56,8 +56,8 @@ const stores: AppStores = {
     events: window,
   }),
   /**
-   * The sidebar full or folded to icons (ADR-0088): this browser tab's choice,
-   * or on a new one the device's latest.
+   * The sidebar full or folded to icons: this browser tab's choice, or on a new
+   * one the device's latest.
    */
   list: tabState({
     key: LIST_KEY,
@@ -65,7 +65,7 @@ const stores: AppStores = {
     tab: sessionStorage,
     device: localStorage,
   }),
-  /** How you read a review: wrapped, its file list folded (ADR-0087). */
+  /** How you read a review: wrapped, its file list folded. */
   review: deviceState({
     key: REVIEW_PREFS_KEY,
     codec: reviewPrefsCodec,
@@ -83,8 +83,8 @@ const root = document.getElementById("root")
 if (root === null) throw new Error("client/main: missing #root in the page")
 
 // Who you are: your email, asked once per device and shared by its tabs, so a
-// reload, another tab and another device with the same email are one person
-// (ADR-0037). Kyneta gives each tab its own seat.
+// reload, another tab and another device with the same email are one person.
+// Kyneta gives each tab its own seat.
 const identity =
   stores.identity.load() ?? stores.identity.save(await askIdentity(root))
 stores.identity.subscribe(next => {

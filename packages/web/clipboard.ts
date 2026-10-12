@@ -1,12 +1,12 @@
-// web/clipboard — the one file that touches the clipboard (ADR-0132): the
-// page's `copy`, `cut` and `paste` events, a pasted image's files, and a
-// button's copy. Each handler gathers (focus, the selection, what was
-// pasted), asks a pure planner in `@pinetrie/interface` (`clipOfFocus`,
-// `planCopy`, `readPaste`, `targetOfFocus`), and carries out what it says.
-// It decides nothing. `clipboard-boundary.test.ts` keeps every other file
-// off `clipboardData` and `navigator.clipboard`.
+// web/clipboard — the one file that touches the clipboard: the page's `copy`,
+// `cut` and `paste` events, a pasted image's files, and a button's copy. Each
+// handler gathers (focus, the selection, what was pasted), asks a pure planner
+// in `@pinetrie/interface` (`clipOfFocus`, `planCopy`, `readPaste`,
+// `targetOfFocus`), and carries out what it says. It decides nothing.
+// `clipboard-boundary.test.ts` keeps every other file off `clipboardData` and
+// `navigator.clipboard`.
 //
-// S151 measured what this rests on: the events fire on a focused element
+// What this rests on: the events fire on a focused element
 // that is no text box, with nothing selected, in Chromium, Firefox, WebKit
 // and Safari, with no workaround; `setData` counts only inside the event;
 // WebKit writes `text/html` again in its own form, so the attribute is read
@@ -44,8 +44,8 @@ export function useClipboard(p: {
   const onIntent = useStable(p.onIntent)
   useEffect(() => {
     const host = window.location.origin
-    // Whether the next paste is Cmd+Shift+V's, text alone: its keydown
-    // comes first (S151).
+    // Whether the next paste is Cmd+Shift+V's, text alone: its keydown comes
+    // first.
     let plainOnly = false
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "v") plainOnly = e.shiftKey

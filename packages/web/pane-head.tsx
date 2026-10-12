@@ -1,6 +1,6 @@
-// web/pane-head — the head of a column's pane (ADR-0078), whatever it
-// shows: a line, a title, anything else the subject offers, and the close
-// control, which over a narrow screen goes back to the thread.
+// web/pane-head — the head of a column's pane, whatever it shows: a line, a
+// title, anything else the subject offers, and the close control, which over a
+// narrow screen goes back to the thread.
 
 import { type ReactNode, useLayoutEffect, useRef } from "react"
 import { paneCloseWords } from "./pane.ts"

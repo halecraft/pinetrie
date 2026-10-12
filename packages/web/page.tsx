@@ -1,7 +1,7 @@
-// web/page — the frame of a page over the stage (ADR-0098): a back
-// button and the page's title, then its body in a column of readable width.
-// `App` draws it in the stage's grid cell, over the stage, which stays
-// laid out and inert beneath it (`packages/web/TECHNICAL.md`, "Pages").
+// web/page — the frame of a page over the stage: a back button and the page's
+// title, then its body in a column of readable width. `App` draws it in the
+// stage's grid cell, over the stage, which stays laid out and inert beneath it
+// (`packages/web/TECHNICAL.md`, "Pages").
 
 import { type PageName, pageWords } from "@pinetrie/interface"
 import { type ReactNode, useLayoutEffect, useRef } from "react"

@@ -1,23 +1,22 @@
-// web/board — the board (ADR-0122): everyone's roots, each in its
-// workflow state. Its strip sits in the footer and says each state's name,
-// count, the people reading in its roots, its highest mark, and how many of
-// its roots the agent works in and have work ready to accept (ADR-0091),
-// counts that ask nothing of you; ▦ opens the board over the columns, moving
-// none of them, and ▦, Escape or a click outside it closes it. While the
-// board is open, the strip holds the board's search and "mine" in the
-// states' place, and each column's head says what the state's button did
-// (ADR-0115).
+// web/board — the board: everyone's roots, each in its workflow state. Its
+// strip sits in the footer and says each state's name, count, the people
+// reading in its roots, its highest mark, and how many of its roots the agent
+// works in and have work ready to accept, counts that ask nothing of you; ▦
+// opens the board over the columns, moving none of them, and ▦, Escape or a
+// click outside it closes it. While the board is open, the strip holds the
+// board's search and "mine" in the states' place, and each column's head says
+// what the state's button did.
 //
 // Opened, each open state is a column: drag an item to another column, or
-// within one, or use its ⋯'s Move to ▸, to move it for everyone. To the
-// archive it is archived (ADR-0029). An item with a thread whose work
-// is ready to accept carries ⇡, for everyone. Selecting an item opens it in your
-// list; dragged onto the sidebar, it opens there. A state's name is edited in
-// place, and its ⋯ moves or removes it, or adds one beside it. The
-// archive, marked ✓, shows its count and its most recent roots. The search and
-// "mine" filter every state in place (ADR-0109); a banner at the board's foot
-// names the filter, `/` focuses the search, and Escape clears the filter
-// before it closes the board. What it shows is `boardView`'s.
+// within one, or use its ⋯'s Move to ▸, to move it for everyone. To the archive
+// it is archived. An item with a thread whose work is ready to accept carries
+// ⇡, for everyone. Selecting an item opens it in your list; dragged onto the
+// sidebar, it opens there. A state's name is edited in place, and its ⋯ moves
+// or removes it, or adds one beside it. The archive, marked ✓, shows its count
+// and its most recent roots. The search and "mine" filter every state in place;
+// a banner at the board's foot names the filter, `/` focuses the search, and
+// Escape clears the filter before it closes the board. What it shows is
+// `boardView`'s.
 
 import type { EntryId, TaskId, WorkflowStateId, WriterId } from "@pinetrie/core"
 import {
@@ -64,9 +63,9 @@ import { ThreadHead } from "./thread-card.tsx"
 
 /**
  * The strip: ▦, then, while the board is closed, each state's name, count,
- * readers, mark, ◌ and ⇡ (ADR-0091); while it is open, the board's search
- * and "mine" in their place (ADR-0115). ▦ carries ⌕ while a filter is on
- * and the board is closed, so a filter kept across closing is not missed.
+ * readers, mark, ◌ and ⇡; while it is open, the board's search and "mine" in
+ * their place. ▦ carries ⌕ while a filter is on and the board is closed, so a
+ * filter kept across closing is not missed.
  */
 export function BoardStrip({
   view,
@@ -253,7 +252,7 @@ function StripStateButton({
       data-state={state.id}
       onClick={onOpen}
       type="button"
-      // A card dropped on an open state becomes a thread there (ADR-0111).
+      // A card dropped on an open state becomes a thread there.
       {...(state.archive ? {} : dropProps({ kind: "state", state: state.id }))}
     >
       <span className="strip-name">{state.name}</span>{" "}
@@ -324,7 +323,7 @@ export function Board({
   /** A thread as a row of a reader's menu, which opens it. */
   thread: (end: EntryId, task: TaskId) => MenuItem | null
   pip: React.ReactNode
-  /** Your refused moves on the board, said above its states (ADR-0126). */
+  /** Your refused moves on the board, said above its states. */
   notices: readonly CardNotice[]
   reader: Reader
 }) {

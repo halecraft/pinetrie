@@ -81,7 +81,6 @@ export interface DeviceState<T> {
   load(): T | undefined
   /** Write `value` over what is stored, and return it. */
   save(value: T): T
-  /** Remove the stored value. */
   clear(): void
   /**
    * Call `listener` when another tab writes the key: with its value, or with
@@ -103,7 +102,7 @@ const isStorageEvent = (e: Event): e is Event & StorageEventLike =>
 /**
  * A value kept per device, shared by its tabs; the latest save wins. What a
  * person has dealt with, which two tabs could mark at once, is not kept here
- * but in their attention document (ADR-0077), which merges.
+ * but in their attention document, which merges.
  */
 export function deviceState<T>({
   key,

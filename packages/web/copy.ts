@@ -11,9 +11,8 @@ export const COPIED = "copied"
  * clipboard exists only in a secure context, which an invite link over plain
  * http is not: there, or when the clipboard refuses, a press selects
  * `fallback`, from the start of its first element to the end of its last, for
- * the reader to copy. The test is for `writeText`,
- * not `isSecureContext`, since the browser suite can hide the one (S68) but
- * not the other.
+ * the reader to copy. The test is for `writeText`, not `isSecureContext`, since
+ * the browser suite can hide the one but not the other.
  */
 export function useCopy(): {
   readonly copied: boolean

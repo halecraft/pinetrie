@@ -1,9 +1,9 @@
-// web/card-frame — the frame every text card is drawn in (ADR-0111): a
-// header that is its drag handle and its signals (its kind's icon, its place, state,
-// who put it there, a command's chip, ⋯ and ×), its body, and a footer of
-// ↑ ↓ and its one primary action. What it shows is `cardFrame`'s value, in
-// `cardFrameWords`'s words; the frame's colour is the place's, the icon the
-// kind's (ADR-0126). A card's face is `RENDERINGS`'s (`renderings.tsx`).
+// web/card-frame — the frame every text card is drawn in: a header that is its
+// drag handle and its signals (its kind's icon, its place, state, who put it
+// there, a command's chip, ⋯ and ×), its body, and a footer of ↑ ↓ and its one
+// primary action. What it shows is `cardFrame`'s value, in `cardFrameWords`'s
+// words; the frame's colour is the place's, the icon the kind's. A card's face
+// is `RENDERINGS`'s (`renderings.tsx`).
 //
 // The body is the caller's, and keeps its elements while the card comes
 // into being: the composer's box must stay one element for its whole life
@@ -76,7 +76,7 @@ export function CardFrame(p: {
           key,
           className: "move-to",
           data: { to: key },
-          // Take has one icon wherever it is offered (ADR-0132).
+          // Take has one icon wherever it is offered.
           label:
             m.to === "inventory" ? (
               <>
@@ -207,7 +207,7 @@ export function CardFrame(p: {
   )
 }
 
-/** A card's ×: discards it, and the undo key outside a box brings it back (ADR-0111). */
+/** A card's ×: discards it, and the undo key outside a box brings it back. */
 export function DiscardButton(p: { onDiscard: () => void }) {
   return (
     <button

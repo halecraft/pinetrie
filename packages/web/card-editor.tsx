@@ -1,9 +1,8 @@
-// web/card-editor — one card's editor (ADR-0048), in its frame
-// (`card-frame.tsx`, ADR-0111): your message in the composer and the box
-// "+ pin" opens, each a `CardEditor`; each note at a thread's end
-// (`NoteCardEditor`), each queued card above the line (`QueuedCardEditor`),
-// each pinned card and the card selected in your inventory, all a
-// `BoundCardEditor`.
+// web/card-editor — one card's editor, in its frame (`card-frame.tsx`): your
+// message in the composer and the box "+ pin" opens, each a `CardEditor`; each
+// note at a thread's end (`NoteCardEditor`), each queued card above the line
+// (`QueuedCardEditor`), each pinned card and the card selected in your
+// inventory, all a `BoundCardEditor`.
 //
 // One uncontrolled textarea for the editor's whole life. Until there is
 // something worth keeping it is local; the input that makes it worth keeping
@@ -92,9 +91,9 @@ import { useThreadStates } from "./thread-states.ts"
 import { useStable } from "./use-stable.ts"
 
 /**
- * Bind a box to a card's text, its undo reaching only that card's steps
- * (ADR-0052), and tell `onText` the text now and at every change, others'
- * edits included. Returns the unbinding.
+ * Bind a box to a card's text, its undo reaching only that card's steps, and
+ * tell `onText` the text now and at every change, others' edits included.
+ * Returns the unbinding.
  */
 function bindText(
   session: SessionClient,
@@ -114,26 +113,26 @@ function bindText(
 
 /** What a lane this editor's send creates would start from. */
 export interface Where {
-  /** Accepted work, for the bases a new lane may start from (ADR-0104). */
+  /** Accepted work, for the bases a new lane may start from. */
   readonly accepted: AcceptedRecord | null
-  /** Files conflicted in the commit a new lane here would be cloned from (ADR-0072). */
+  /** Files conflicted in the commit a new lane here would be cloned from. */
   readonly forkConflicts: number
 }
 
 /**
- * Before sending, the button says what the message will do: who it is for,
- * and whether it will wait. `planSend` decides as the host will, over the
- * column's thread and its lane (ADR-0021, ADR-0117), and `sendButton` words it. When the send
- * starts a thread and there is a WIP, a line beside it says what the thread
- * starts from, and changes it (`StartLine`).
+ * Before sending, the button says what the message will do: who it is for, and
+ * whether it will wait. `planSend` decides as the host will, over the column's
+ * thread and its lane, and `sendButton` words it. When the send starts a thread
+ * and there is a WIP, a line beside it says what the thread starts from, and
+ * changes it (`StartLine`).
  *
- * A reply carries the end its sender saw. If another writer's compelled
- * message got there first, or the lane became busy, the host writes nothing
- * and says so (`conflict`), and the sender chooses: queue, or branch here.
- * Either way, and after a refusal, the card is still there: nothing is put
- * back, because nothing was taken away. A send to a busy lane, or of a card
- * with a command, queues the card instead: this client asks the host to, and
- * the host pops it in turn (ADR-0108, ADR-0059).
+ * A reply carries the end its sender saw. If another writer's compelled message
+ * got there first, or the lane became busy, the host writes nothing and says so
+ * (`conflict`), and the sender chooses: queue, or branch here. Either way, and
+ * after a refusal, the card is still there: nothing is put back, because
+ * nothing was taken away. A send to a busy lane, or of a card with a command,
+ * queues the card instead: this client asks the host to, and the host pops it
+ * in turn.
  *
  * A box whose `place` is pinned is the one "+ pin" opens: it makes a pinned
  * card at the first keystroke worth keeping and goes on editing it, the same
@@ -151,17 +150,17 @@ export function CardEditor(p: {
   /** The thread's lane (`laneOf`): whether the agent is busy there. */
   lane: ThreadLane
   /**
-   * What every send from this column carries: its thread, whether it is a
-   * Start Agent column, and a new tab's root (ADR-0117).
+   * What every send from this column carries: its thread, whether it is a Start
+   * Agent column, and a new tab's root.
    */
   how: ColumnHow
   /** A unstarted column: its first message starts the thread (`branch`). */
   unstarted: boolean
-  /** The commands the host's pi loaded, for completion (ADR-0036). */
+  /** The commands the host's pi loaded, for completion. */
   commands: readonly CommandSummary[]
   /** Everyone who can be mentioned, as shown. */
   participants: readonly string[]
-  /** Other threads' agents a mention may reach (ADR-0128). */
+  /** Other threads' agents a mention may reach. */
   agents: readonly AgentCandidate[]
   /** Who is sending, and everyone's names. */
   reader: Reader
@@ -223,7 +222,7 @@ export function CardEditor(p: {
     text: string
     line: string
   } | null>(null)
-  /** The WIP a new lane of its own starts from; null for accepted work (ADR-0104). */
+  /** The WIP a new lane of its own starts from; null for accepted work. */
   const [base, setBase] = useState<string | null>(null)
   const command = card === undefined ? null : commandOf(card)
   const plan = planSend({
@@ -354,9 +353,9 @@ export function CardEditor(p: {
   )
 
   /**
-   * Queue the card on this column's lane, from its end, releasing a held
-   * queue when the plan says so (ADR-0113). False when there is no card or
-   * no lane to queue on: nothing was queued.
+   * Queue the card on this column's lane, from its end, releasing a held queue
+   * when the plan says so. False when there is no card or no lane to queue on:
+   * nothing was queued.
    */
   const queueHere = (from: TextCardId | null): boolean => {
     if (from === null || p.lane.kind !== "lane" || p.at.kind !== "entry")
@@ -710,13 +709,13 @@ export function BoundCardEditor(p: {
   /** Told the card's text each time it changes. */
   onText?: (text: string) => void
   /**
-   * A queued or pinned card's list as drawn, which Alt+↑/↓ in its box move
-   * it in (ADR-0048 step 7); null for a card with no place in line.
+   * A queued or pinned card's list as drawn, which Alt+↑/↓ in its box move it
+   * in; null for a card with no place in line.
    */
   among: readonly CardRecord[] | null
   /** A move from its ⋯, a ↑ or ↓, or a key in its box; absent where it has none. */
   onAct?: (act: ColumnAct) => void
-  /** Discards the card (ADR-0111): its × and Ctrl+Shift+Backspace. */
+  /** Discards the card: its × and Ctrl+Shift+Backspace. */
   onDiscard: () => void
   /** Every seat the host has seen, to name who wrote in a note; empty for none. */
   seats?: readonly SeatRecord[]
@@ -789,11 +788,10 @@ const keyOfBox = (e: KeyboardEvent<HTMLTextAreaElement>) => ({
 })
 
 /**
- * A note in a note column (ADR-0116): its text, which anyone in the task
- * may edit, and whose it is, with ↑ and ↓ that move it in its column (as
- * Alt+↑/↓ in its box do). It has no send: Enter is a new line, and its ⋯
- * takes it into your inventory or makes it a thread; a drag takes it
- * anywhere else.
+ * A note in a note column: its text, which anyone in the task may edit, and
+ * whose it is, with ↑ and ↓ that move it in its column (as Alt+↑/↓ in its box
+ * do). It has no send: Enter is a new line, and its ⋯ takes it into your
+ * inventory or makes it a thread; a drag takes it anywhere else.
  */
 export function NoteCardEditor(p: {
   session: SessionClient
@@ -835,15 +833,14 @@ export function NoteCardEditor(p: {
 }
 
 /**
- * A queued card above the line (ADR-0048): its text, which anyone here may
- * edit until the host pops it, who queued it and its place in line, its
- * command, and ↑ and ↓ that move it in line (as Alt+↑/↓ in its box do). Its
- * other moves are its ⋯'s; the queue's controls send it.
+ * A queued card above the line: its text, which anyone here may edit until the
+ * host pops it, who queued it and its place in line, its command, and ↑ and ↓
+ * that move it in line (as Alt+↑/↓ in its box do). Its other moves are its ⋯'s;
+ * the queue's controls send it.
  */
 export function QueuedCardEditor(p: {
   session: SessionClient
   card: QueuedText
-  /** Its queue is held. */
   held: boolean
   reader: Reader
   readOnly: ReadOnly | null
@@ -882,11 +879,11 @@ export function QueuedCardEditor(p: {
 }
 
 /**
- * A pinned card at the top of its column (ADR-0048): its text, which anyone
- * here may edit, who pinned it, its size, how it stands against what the
- * agent last read (`inView`), and ↑ and ↓ that move it among the thread's
- * pinned cards (as Alt+↑/↓ in its box do). It has no send: Enter is a new
- * line. Its other moves are its ⋯'s.
+ * A pinned card at the top of its column: its text, which anyone here may edit,
+ * who pinned it, its size, how it stands against what the agent last read
+ * (`inView`), and ↑ and ↓ that move it among the thread's pinned cards (as
+ * Alt+↑/↓ in its box do). It has no send: Enter is a new line. Its other moves
+ * are its ⋯'s.
  */
 export function PinnedCardEditor(p: {
   session: SessionClient
@@ -934,9 +931,9 @@ export function PinnedCardEditor(p: {
 }
 
 /**
- * The line under the box that says what a new thread starts from, opening
- * the menu of bases: accepted work or a WIP (ADR-0104). With no WIP there is
- * no choice, and no line; a fork from a conflicted commit says so.
+ * The line under the box that says what a new thread starts from, opening the
+ * menu of bases: accepted work or a WIP. With no WIP there is no choice, and no
+ * line; a fork from a conflicted commit says so.
  */
 function StartLine(p: {
   accepted: AcceptedRecord | null

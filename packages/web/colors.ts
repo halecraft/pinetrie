@@ -1,15 +1,14 @@
-// web/colors — the page's colour for each palette slot (ADR-0089, S110).
-// Which slot a track takes is `palette.ts`'s, the same in any client.
+// web/colors — the page's colour for each palette slot. Which slot a track
+// takes is `palette.ts`'s, the same in any client.
 
 import type { ColorSlot } from "@pinetrie/interface"
 
 /**
- * Twelve colours, one per slot, at OKLCH lightness 0.72 and chroma 0.14, in
- * hue order, so a slot's neighbours are its nearest colours. S110 chose
- * them: about 0.06 apart in OKLab at the closest, 0.08 or more from
- * people's first colours, the attention amber and the review's lines, and
- * 6.8:1 or more on `--page`. `index.html` has a hover rule pair per slot
- * (`colors.test.ts`).
+ * Twelve colours, one per slot, at OKLCH lightness 0.72 and chroma 0.14, in hue
+ * order, so a slot's neighbours are its nearest colours. They are about 0.06
+ * apart in OKLab at the closest, 0.08 or more from people's first colours, the
+ * attention amber and the review's lines, and 6.8:1 or more on `--page`.
+ * `index.html` has a hover rule pair per slot (`colors.test.ts`).
  */
 export const PALETTE: readonly string[] = [
   "#eb8656",

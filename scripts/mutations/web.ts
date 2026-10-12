@@ -239,7 +239,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "index.html sizes the pane and the thread by pane.ts's numbers",
   },
-  // ── track colours (ADR-0089, S110) ──
+  // ── track colours ──
   {
     name: "a track colour is the attention amber",
     file: "packages/web/colors.ts",
@@ -265,7 +265,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a later person's colour comes from their id",
   },
-  // ── the sidebar folded to icons (ADR-0088) ──
+  // ── the sidebar folded to icons ──
   {
     name: "a stored wrap is dropped",
     file: "packages/web/review-prefs.ts",
@@ -290,11 +290,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "tableOpenWords(shown)",
   },
-  // ── your inventory (ADR-0048 step 4) ──
-  // ── attention (ADR-0077) ──
-  // ── the publish button (ADR-0076, ADR-0090) ──
-  // ── queue control (ADR-0048 step 7) ──
-  // ── the sidebar and the board (ADR-0122) ──
+  // ── the sidebar and the board ──
   {
     name: "blocks of a kind are all numbered 0",
     file: "packages/rules/blocks.ts",

@@ -1,8 +1,7 @@
-// web/signal-mark — a signal's mark (ADR-0126): every signal, the unsent
-// pip in your colour (ADR-0048, step 2) on a tab, a rail dot or ▦, and a
-// status's (ADR-0077) before a task's label. One element, so the browser
-// suite finds every mark by `.signal[data-signal]`, and `signalWords` words
-// each.
+// web/signal-mark — a signal's mark: every signal, the unsent pip in your
+// colour on a tab, a rail dot or ▦, and a status's before a task's label. One
+// element, so the browser suite finds every mark by `.signal[data-signal]`, and
+// `signalWords` words each.
 
 import { moving, type Signal, signalWords } from "@pinetrie/interface"
 

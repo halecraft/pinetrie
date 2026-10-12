@@ -110,7 +110,7 @@ describe("streaming", () => {
   })
 })
 
-describe("images (ADR-0042)", () => {
+describe("images", () => {
   const SHA = "c".repeat(64) as Sha256
   const images = new Map([
     [
@@ -146,7 +146,7 @@ describe("images (ADR-0042)", () => {
   })
 })
 
-describe("tables (ADR-0078)", () => {
+describe("tables", () => {
   const TWO = [
     "| State | When |",
     "|---|---|",
@@ -173,7 +173,7 @@ describe("tables (ADR-0078)", () => {
     expect(blockAt(tree, { kind: "table", n: 2 })).toBeNull()
   })
 
-  test("blocksOf numbers tables as the drawn tree does, and a table's slice is its source (ADR-0126)", () => {
+  test("blocksOf numbers tables as the drawn tree does, and a table's slice is its source", () => {
     const tables = blocksOf(TWO).filter(b => b.ref.kind === "table")
     expect(tables.map(b => b.ref.n)).toEqual(
       elements(committed(TWO), "table").map(t =>
@@ -206,7 +206,7 @@ describe("tables (ADR-0078)", () => {
   })
 })
 
-test("a link to an address is drawn as a chip naming it; any other link is a link (ADR-0126)", () => {
+test("a link to an address is drawn as a chip naming it; any other link is a link", () => {
   const tree = messageTree(
     "[the table](/a/b/t-1/e1/table-0) and [docs](https://x.test)",
     "committed",

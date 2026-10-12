@@ -1,4 +1,4 @@
-// web/popover-place — where a popover's box goes (`popover.tsx`). Pure.
+// web/popover-place — where a popover's box goes (`popover.tsx`).
 
 /** Where an open box goes, and how tall it may be. */
 export type Placement = (

@@ -33,8 +33,8 @@ export interface PopoverApi {
 }
 
 /**
- * What else the trigger carries, when it is more than a menu's button: a
- * folded list's icon (ADR-0088) shows its root on a click and is dragged.
+ * What else the trigger carries, when it is more than a menu's button: a folded
+ * list's icon shows its root on a click and is dragged.
  */
 export type TriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   readonly [data: `data-${string}`]: string | undefined

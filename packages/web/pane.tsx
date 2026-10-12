@@ -1,7 +1,6 @@
-// web/pane — a column's pane (ADR-0078): beside the thread, or over a
-// narrow screen as a modal dialog. It draws a `PaneView`, which `paneView`
-// decided, and owns what every view needs: Escape, focus, and coming into
-// view.
+// web/pane — a column's pane: beside the thread, or over a narrow screen as a
+// modal dialog. It draws a `PaneView`, which `paneView` decided, and owns what
+// every view needs: Escape, focus, and coming into view.
 
 import type { Element } from "hast"
 import {
@@ -120,10 +119,10 @@ function WideFrame({ id, label, close, children }: FrameProps) {
 
 /**
  * Over the page, in the top layer, which covers every stacking context and
- * makes the page behind inert. Escape closes a modal dialog itself, and
- * closing gives focus back to what had it (S66). Unmounted while open (its
- * subject gone, or ← pressed), it is closed first, so focus still returns.
- * In `body`: the column's `--track` does not reach it, so it sets its own.
+ * makes the page behind inert. Escape closes a modal dialog itself, and closing
+ * gives focus back to what had it. Unmounted while open (its subject gone, or ←
+ * pressed), it is closed first, so focus still returns. In `body`: the column's
+ * `--track` does not reach it, so it sets its own.
  */
 function NarrowFrame({
   id,

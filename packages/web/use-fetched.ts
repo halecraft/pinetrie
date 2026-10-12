@@ -1,6 +1,6 @@
-// web/use-fetched — fetch a list of URLs whose answers never change
-// (ADR-0047): a review's URL names a commit, so the URL is the whole cache
-// key, and the browser's HTTP cache answers one seen before.
+// web/use-fetched — fetch a list of URLs whose answers never change: a review's
+// URL names a commit, so the URL is the whole cache key, and the browser's HTTP
+// cache answers one seen before.
 
 import { errorText } from "@pinetrie/core"
 import type { Loaded } from "@pinetrie/interface"

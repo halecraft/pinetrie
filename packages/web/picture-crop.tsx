@@ -1,7 +1,7 @@
-// web/picture-crop — cropping a chosen image to your picture (ADR-0098): a
-// round preview you drag, and a zoom. Where the square is, and how a drag or
-// the zoom moves it, is `picture-crop.ts`'s (`@pinetrie/interface`); this
-// draws it and, on "use this picture", renders the square at `PICTURE_SIZE`.
+// web/picture-crop — cropping a chosen image to your picture: a round preview
+// you drag, and a zoom. Where the square is, and how a drag or the zoom moves
+// it, is `picture-crop.ts`'s (`@pinetrie/interface`); this draws it and, on
+// "use this picture", renders the square at `PICTURE_SIZE`.
 
 import {
   type Crop,

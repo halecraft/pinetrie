@@ -1,7 +1,6 @@
-// web/search-bar — the search of the root you are on (ADR-0101): the 🔍 at
-// the rail's top, and the bar it opens across the workspace's top. Every key
-// is `keyAct`'s, Escape in the field included; what is typed is a search
-// act, kept in `App`.
+// web/search-bar — the search of the root you are on: the 🔍 at the rail's top,
+// and the bar it opens across the workspace's top. Every key is `keyAct`'s,
+// Escape in the field included; what is typed is a search act, kept in `App`.
 
 import {
   type Intent,

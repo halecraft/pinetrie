@@ -1,7 +1,7 @@
-// web/thread-preview — a thread in your inventory, opened (ADR-0124): its
-// path read only, each message with who wrote it. It takes a
-// `ThreadPreview`, which no composer, dock or queue takes, so nothing here
-// sends. To work in it, put it on a canvas.
+// web/thread-preview — a thread in your inventory, opened: its path read only,
+// each message with who wrote it. It takes a `ThreadPreview`, which no
+// composer, dock or queue takes, so nothing here sends. To work in it, put it
+// on a canvas.
 
 import {
   faceStatus,
@@ -35,7 +35,7 @@ export function ThreadPreviewView(p: {
   )
 }
 
-/** A thread's card in a slot (ADR-0124): known at a glance. */
+/** A thread's card in a slot: known at a glance. */
 export function ThreadFaceView({ face }: { face: ThreadFace }) {
   const status = faceStatus(face)
   return (

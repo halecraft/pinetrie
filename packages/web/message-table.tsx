@@ -1,6 +1,6 @@
-// web/message-table — a table in a message's text, with its bar of
-// actions (ADR-0078): ⤢ opens it in the column's pane. Cmd+C with focus on
-// the bar copies the table (ADR-0132): the bar's wrap carries its block.
+// web/message-table — a table in a message's text, with its bar of actions: ⤢
+// opens it in the column's pane. Cmd+C with focus on the bar copies the table:
+// the bar's wrap carries its block.
 
 import { type ComponentProps, useContext } from "react"
 import { blockOfProperty } from "./markdown.ts"
@@ -41,7 +41,7 @@ export function MessageTable(
   )
   return (
     // Its block's number on the wrap too: Cmd+C with focus on its bar copies
-    // the table (`focusFacts`, `clipboard.ts`, ADR-0132).
+    // the table (`focusFacts`, `clipboard.ts`).
     <div
       className="table-wrap"
       data-block={props["data-block"]}

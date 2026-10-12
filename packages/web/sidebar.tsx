@@ -1,14 +1,12 @@
-// web/sidebar — the sidebar, down the left edge: the roots you have open,
-// in your order, then ＋ (ADR-0030, ADR-0122); full, or folded
-// to an icon per item (ADR-0088, `FoldedItem`).
+// web/sidebar — the sidebar, down the left edge: the roots you have open, in
+// your order, then ＋; full, or folded to an icon per item (`FoldedItem`).
 //
 // The sidebar is yours, on every device: × closes a root for you and writes
-// nothing shared. Drag an item to reorder; a root dragged here from the
-// board opens there. In its ⋯, Rename titles a root for everyone (ADR-0045),
-// and Move to ▸ moves it on the board for everyone: to the archive, it
-// is archived. A root someone else
-// starts is not added here. An item holding an unsent card of yours carries a
-// pip (ADR-0048, `unsentSignals`), and before its label, its status (ADR-0077).
+// nothing shared. Drag an item to reorder; a root dragged here from the board
+// opens there. In its ⋯, Rename titles a root for everyone, and Move to ▸ moves
+// it on the board for everyone: to the archive, it is archived. A root someone
+// else starts is not added here. An item holding an unsent card of yours
+// carries a pip (`unsentSignals`), and before its label, its status.
 
 import type { TaskId, ThreadId, TreeIndex, WriterId } from "@pinetrie/core"
 import {
@@ -71,7 +69,7 @@ export function Sidebar({
 }: {
   /** What the list shows and offers (`sidebarView`). */
   view: SidebarView
-  /** Full, or folded to icons (ADR-0088). */
+  /** Full, or folded to icons. */
   width: ListWidth
   onIntent: (intent: Intent) => void
   /** Whose presence an item shows: others reading in its task. */
@@ -272,11 +270,11 @@ function IconFace({ icon }: { icon: ItemIcon }) {
 }
 
 /**
- * An item of the folded list (ADR-0088): its icon, carrying its status and
- * pip, and a menu a right-click, Shift+F10 or the Menu key opens, which
- * holds ⋯'s items and Close. Hover and focus show its label and who reads
- * there; a rename's field opens beside it. The tooltip and the field are
- * fixed to the window, since the list scrolls and would clip them.
+ * An item of the folded list: its icon, carrying its status and pip, and a menu
+ * a right-click, Shift+F10 or the Menu key opens, which holds ⋯'s items and
+ * Close. Hover and focus show its label and who reads there; a rename's field
+ * opens beside it. The tooltip and the field are fixed to the window, since the
+ * list scrolls and would clip them.
  */
 function FoldedItem({
   item,

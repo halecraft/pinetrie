@@ -1,7 +1,6 @@
-// web/inventory-toggle — opens and closes your inventory's panel
-// (ADR-0048), as an icon in the footer's corner beside your inbox
-// (ADR-0098). While the sidebar is folded, the account menu toggles it instead
-// (`account-menu.tsx`).
+// web/inventory-toggle — opens and closes your inventory's panel, as an icon in
+// the footer's corner beside your inbox. While the sidebar is folded, the
+// account menu toggles it instead (`account-menu.tsx`).
 
 import { inventoryWords } from "@pinetrie/interface"
 import { InventoryIcon } from "./icons.tsx"

@@ -33,7 +33,6 @@ export interface MessageProps {
   live: LiveDocHandle
   /** Each tool row's state, by call id, across unmounts. */
   rows: ScreenMemory<RowMemory>
-  /** Current display names, by writer. */
   nameOf: ReadonlyMap<WriterId, string>
   /** Which tools it offers (`messageTools`). */
   tools: MessageTools
@@ -41,7 +40,7 @@ export interface MessageProps {
   onAct: (act: MessageAct) => void
   /** A lane starts here: a divider above the message names it. */
   join: LaneJoin | undefined
-  /** Another task's thread it came from, and where that is (ADR-0128). */
+  /** Another task's thread it came from, and where that is. */
   crossTaskLink: CrossTaskLink | undefined
   /** Open `crossTaskLink`'s thread, as a fork row's link opens. */
   onLink: (link: ThreadLink, at: EntryId) => void

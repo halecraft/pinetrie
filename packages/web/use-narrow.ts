@@ -1,6 +1,6 @@
-// web/use-narrow — whether the strip is too narrow for the pane beside
-// the thread (`narrowStrip`, ADR-0087). `App` measures the strip and
-// provides the answer; a pane reads it.
+// web/use-narrow — whether the strip is too narrow for the pane beside the
+// thread (`narrowStrip`). `App` measures the strip and provides the answer; a
+// pane reads it.
 
 import {
   createContext,

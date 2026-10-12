@@ -1,7 +1,7 @@
-// web/picture-field — your picture on your profile page (ADR-0098): your
-// circle, large, with "upload a picture" and, when you have one, "remove".
-// An image chosen, dropped or pasted on the field is cropped first
-// (`picture-crop.tsx`); nothing is uploaded before "use this picture".
+// web/picture-field — your picture on your profile page: your circle, large,
+// with "upload a picture" and, when you have one, "remove". An image chosen,
+// dropped or pasted on the field is cropped first (`picture-crop.tsx`); nothing
+// is uploaded before "use this picture".
 
 import type { Sha256, WriterId } from "@pinetrie/core"
 import {

@@ -1,15 +1,15 @@
-// web/use-reveal — bring a picked message into view, and keep it there;
-// and outline where leaving a search landed (ADR-0101).
+// web/use-reveal — bring a picked message into view, and keep it there; and
+// outline where leaving a search landed.
 
 import { type RefObject, useCallback, useLayoutEffect, useRef } from "react"
 import { PLACED } from "./use-follow.ts"
 
 /**
- * Centre `.msg[data-entry=id]` in its column unless it is already in view,
- * then tell the column it was placed. Without `PLACED`, a column that has just
+ * Centre `.msg[data-entry=id]` in its column unless it is already in view, then
+ * tell the column it was placed. Without `PLACED`, a column that has just
  * opened is still following: scrolled down from 0, it has not moved up, so it
- * would jump to its end on its next resize (S33). False when the message is
- * not drawn.
+ * would jump to its end on its next resize. False when the message is not
+ * drawn.
  */
 function show(container: HTMLElement, id: string): boolean {
   const message = container.querySelector(`.msg[data-entry="${id}"]`)
@@ -28,8 +28,8 @@ function show(container: HTMLElement, id: string): boolean {
 }
 
 /**
- * Scroll a queued card into view in its column's dock (ADR-0113), which
- * scrolls apart from the thread. False when the card is not drawn.
+ * Scroll a queued card into view in its column's dock, which scrolls apart from
+ * the thread. False when the card is not drawn.
  */
 function showCard(container: HTMLElement, card: string): boolean {
   const frame = container.querySelector(`.dock [data-queued="${card}"]`)
@@ -40,10 +40,9 @@ function showCard(container: HTMLElement, card: string): boolean {
 
 /**
  * Bring entry `id` into view in `container`: now, if it is drawn, or once it
- * is. Picking a message a column already draws changes no state, so no
- * render follows (S33); a message in a column that is opening, or in another
- * root, is drawn by the render the pick causes. A newer pick replaces
- * one still waiting.
+ * is. Picking a message a column already draws changes no state, so no render
+ * follows; a message in a column that is opening, or in another root, is drawn
+ * by the render the pick causes. A newer pick replaces one still waiting.
  *
  * With `afterRender`, it waits for the render a pick causes even when the
  * message is drawn: a fold opening above it moves it (an ask's last word is
@@ -89,9 +88,9 @@ function land(container: HTMLElement, id: string): boolean {
 }
 
 /**
- * Outline entry `id` in `container` briefly, where leaving a search landed
- * (ADR-0101): now, if it is drawn, or once it is, as `useReveal` waits. CSS
- * draws and fades the outline (`.msg[data-landed]`).
+ * Outline entry `id` in `container` briefly, where leaving a search landed:
+ * now, if it is drawn, or once it is, as `useReveal` waits. CSS draws and fades
+ * the outline (`.msg[data-landed]`).
  */
 export function useLanding(
   container: RefObject<HTMLElement | null>,

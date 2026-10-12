@@ -1,7 +1,7 @@
-// web/match-list — a column's matches while a search applies (ADR-0101),
-// laid over its thread: `columnMatches`' rows, drawn as they come. A row
-// shows its message with `openAt`, whose plan leaves the search
-// (`leavingSearch`, `packages/interface/intent.ts`).
+// web/match-list — a column's matches while a search applies, laid over its
+// thread: `columnMatches`' rows, drawn as they come. A row shows its message
+// with `openAt`, whose plan leaves the search (`leavingSearch`,
+// `packages/interface/intent.ts`).
 
 import type { EntryId } from "@pinetrie/core"
 import type { ColumnMatches } from "@pinetrie/interface"

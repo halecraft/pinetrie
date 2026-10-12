@@ -1,13 +1,13 @@
-// web/card-grid — your inventory's slots (ADR-0048), drawn from a
-// `GridView` as index cards, empty cells dashed. Every cell is a drop
-// target; a card's cell starts its drag. Its keys are `gridKeyAct`'s: arrows
-// and `hjkl` move the selection, Alt+arrows move the selected card, Enter
-// opens it, as a click on the selected card does. Each cell draws its card's face (`DrawFace`). The open card is
+// web/card-grid — your inventory's slots, drawn from a `GridView` as index
+// cards, empty cells dashed. Every cell is a drop target; a card's cell starts
+// its drag. Its keys are `gridKeyAct`'s: arrows and `hjkl` move the selection,
+// Alt+arrows move the selected card, Enter opens it, as a click on the selected
+// card does. Each cell draws its card's face (`DrawFace`). The open card is
 // drawn whole and editable in place, over its neighbours, by the caller
 // (`renderOpen`); Escape folds it. Whether it is open is the caller's too, so
 // the caller can hide what it draws beside the grid while it is. What a
-// selection, a move or a drop does is the caller's: an intent, planned like
-// any other.
+// selection, a move or a drop does is the caller's: an intent, planned like any
+// other.
 
 import type { CardRecord } from "@pinetrie/core"
 import {
@@ -107,8 +107,8 @@ export function CardGrid(p: {
             {...(cell.card === null
               ? {}
               : dragProps({ kind: "card", card: cell.card.id }))}
-            // A click selects, and the panel previews the card; a click on
-            // the card already selected opens it, as Enter does (ADR-0126).
+            // A click selects, and the panel previews the card; a click on the
+            // card already selected opens it, as Enter does.
             onClick={() => {
               const again = cell.selected && cell.card !== null
               select(cell.index)

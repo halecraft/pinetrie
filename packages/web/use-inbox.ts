@@ -1,6 +1,6 @@
-// web/use-inbox — the inbox's imperative shell: what you have seen, kept
-// in your attention document, on every device of yours (ADR-0030,
-// ADR-0077). The decisions are `inbox.ts`'s.
+// web/use-inbox — the inbox's imperative shell: what you have seen, kept in
+// your attention document, on every device of yours. The decisions are
+// `inbox.ts`'s.
 
 import {
   type Inbox,

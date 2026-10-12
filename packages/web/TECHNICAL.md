@@ -387,7 +387,9 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   at its fork's row (`.rail-stub`).
 - **A thread in your inventory** is a `ThreadFaceView` in its slot and a
   `ThreadPreviewView` opened (`thread-preview.tsx`), whose **put** puts it
-  on the canvas you are on.
+  on the canvas you are on. A thread taken into an inventory stops, and its
+  holder sees it there read only (ADR-0124): a mention of it opens nowhere
+  while someone else holds it (`inbox-menu.tsx`).
 - **Every unfolded column's header ends in ⋯ and ×** (`.column-menu`,
   `.close`), a note column's too, drawn by one component
   (`column-menu.tsx`): × is the `discard` intent of its card, and
@@ -780,7 +782,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   wip/x ▾"), and opens `baseChoices` (`send.ts`): accepted work, then each
   WIP with how far it is behind accepted work. With no WIP there is no
   choice, and no line; a fork from a conflicted commit says so there
-  (`forkWords`). The base is each editor's state until sent, and is sent
+  (`forkWords`, ADR-0072). The base is each editor's state until sent, and is sent
   with the chat. Every thread's agent works in a lane of its own: there is
   no place to choose. The words are `.start-words`: `Menu` passes no
   attributes to its trigger, so they sit on a span inside it.
@@ -1093,6 +1095,10 @@ the session sends moves and draws them until its copy holds them
   is set from the `input` event and, while bound, from a subscription to the
   card's document, which catches others' edits. No hook depends on whether a
   card exists.
+- **Who a message is for** is decided as the host will (`planSend`): the
+  column's thread's lane gives its mode, and a mention picks the addressee
+  (ADR-0021), another thread's agent among them (ADR-0128). The box
+  completes the commands the host's pi loaded (ADR-0036).
 - **Sending.** The editor sends the text it shows, with the card's id, and is
   read-only until the host answers; `sendButton` disables the button while it
   waits. Spent (`appended`, `started`, `queued`),
@@ -1233,6 +1239,20 @@ stays in view; the strip scrolls past 30vh.
   thread lifted back into its card loses its columns, and a page on it
   moves to the sidebar's last root.
 
+## The sidebar, the board and the footer (ADR-0122)
+
+- **The sidebar is yours** (`sidebar.tsx`): × closes a root for you alone,
+  while its ⋯'s Rename titles the root for everyone, as its mark (ADR-0045),
+  and Move to ▸ the archive archives it for everyone (ADR-0029).
+- **The board's search and "mine" filter every state in place**
+  (ADR-0109), and sit in the footer's strip while the board is open; ▦
+  carries ⌕ while a filter is on and the board is closed, so a kept filter
+  is not missed (ADR-0115, `board.tsx`).
+- **The publish button** (`footer.tsx`) says set up before accepted work
+  exists, then publish while there is something to publish (ADR-0090).
+  Whether a publish catches your files up or moves `main` alone is the
+  host's `offers.catchUp` (ADR-0099, which amends ADR-0076).
+
 ## Renderings (`renderings.tsx`, ADR-0126)
 
 Every kind of card is drawn at three levels of detail, and `RENDERINGS`
@@ -1339,6 +1359,8 @@ the email is the only thing pine·trie chooses.
 - **Sign in as someone else**, in the account menu, clears the stored
   identity and reloads. Every tab subscribes to it, and reloads when another
   clears it or stores another email, so no tab goes on as the old person.
+- **Presence is ephemeral, written by each client for its open columns**
+  (ADR-0024), each naming the root it is in (ADR-0063, `use-presence.ts`).
 - **Presence is per seat** (`presence-seat.ts`, `@pinetrie/session`), so
   your tabs never overwrite or clear each other's; `core/presence.ts` shows
   each person once, and never you.

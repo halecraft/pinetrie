@@ -1,7 +1,7 @@
-// web/review-prefs — how you read a review (ADR-0087): long lines
-// wrapped or not, and the file list folded or not. Your reader's settings,
-// kept per device and the same in every column's review; what the pane shows
-// is never kept (ADR-0078). `App` provides them; `ReviewPane` reads them.
+// web/review-prefs — how you read a review: long lines wrapped or not, and the
+// file list folded or not. Your reader's settings, kept per device and the same
+// in every column's review; what the pane shows is never kept. `App` provides
+// them; `ReviewPane` reads them.
 
 import type { Codec } from "@pinetrie/interface"
 import { createContext } from "react"

@@ -1,6 +1,6 @@
-// web/thread-states — the board's open states, where a note or your message
-// can start a thread from its ⋯ (ADR-0111). `App` provides them from the
-// workflow; a card's editor reads them for its Move to ▸ items.
+// web/thread-states — the board's open states, where a note or your message can
+// start a thread from its ⋯. `App` provides them from the workflow; a card's
+// editor reads them for its Move to ▸ items.
 
 import type { WorkflowState } from "@pinetrie/core"
 import { createContext, useContext } from "react"

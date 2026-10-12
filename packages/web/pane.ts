@@ -1,6 +1,6 @@
-// web/pane — what a column's pane shows (ADR-0078), as values: the subject
-// a column holds, what it draws from the column's facts, and the pane's words.
-// Pure; `pane.tsx` draws it.
+// web/pane — what a column's pane shows, as values: the subject a column holds,
+// what it draws from the column's facts, and the pane's words; `pane.tsx` draws
+// it.
 
 import {
   type Address,
@@ -18,15 +18,15 @@ import type { ReviewTarget } from "@pinetrie/interface"
 import type { Element, Root } from "hast"
 import { blockAt, imageLookup, messageTree, tableHeads } from "./markdown.ts"
 
-/** A block of a message, by its address (ADR-0126). */
+/** A block of a message, by its address. */
 export type BlockAddress = Extract<Address, { readonly kind: "block" }>
 
 /**
- * What a column's pane shows: a name, never data, so the pane can tell when
- * its subject is gone. Kept while the column is mounted, never stored. A
- * table or an image of a message's text is a block, named by its address
- * (ADR-0126); an image that is no block of a message (a tool's result, or
- * one in a reply still streaming, which has no entry yet) by its blob.
+ * What a column's pane shows: a name, never data, so the pane can tell when its
+ * subject is gone. Kept while the column is mounted, never stored. A table or
+ * an image of a message's text is a block, named by its address; an image that
+ * is no block of a message (a tool's result, or one in a reply still streaming,
+ * which has no entry yet) by its blob.
  */
 export type PaneSubject =
   | { readonly kind: "offer" }
@@ -56,7 +56,6 @@ export function paneKey(subject: PaneSubject): string {
   }
 }
 
-/** Whether two subjects name the same thing. */
 export const samePane = (a: PaneSubject, b: PaneSubject): boolean =>
   paneKey(a) === paneKey(b)
 
@@ -66,7 +65,6 @@ export const togglePane = (
   next: PaneSubject,
 ): PaneSubject | null => (shown !== null && samePane(shown, next) ? null : next)
 
-/** What the pane draws. */
 export type PaneView =
   | {
       readonly kind: "review"
@@ -169,9 +167,9 @@ function treeOf(node: SpineNode): Root {
 }
 
 /**
- * An ask's files as a review (ADR-0106): the range from its prompt's commit
- * to its last turn's, titled with its line. Null when it changed nothing, or
- * its lane recorded no revision.
+ * An ask's files as a review: the range from its prompt's commit to its last
+ * turn's, titled with its line. Null when it changed nothing, or its lane
+ * recorded no revision.
  */
 export function askReviewTarget(
   index: TreeIndex,
@@ -193,10 +191,10 @@ export function askReviewTarget(
 }
 
 /**
- * `.column-thread`'s width, and `.pane`'s narrowest and widest, in rem.
- * `.pane` is `clamp(40rem, 100cqw - 28rem - 1px, 64rem)`, with `#strip` its
- * container (ADR-0087, S109): it fills what the strip has beside the thread.
- * `pane.test.ts` holds `index.html` to these.
+ * `.column-thread`'s width, and `.pane`'s narrowest and widest, in rem. `.pane`
+ * is `clamp(40rem, 100cqw - 28rem - 1px, 64rem)`, with `#strip` its container:
+ * it fills what the strip has beside the thread. `pane.test.ts` holds
+ * `index.html` to these.
  */
 export const THREAD_REM = 28
 export const PANE_MIN_REM = 40

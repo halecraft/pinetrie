@@ -1,6 +1,6 @@
-// web/pane-context — how what a message draws reaches its column's pane
-// (ADR-0078), with no prop through the memoised list and messages: a context
-// change redraws only the components that read it.
+// web/pane-context — how what a message draws reaches its column's pane, with
+// no prop through the memoised list and messages: a context change redraws only
+// the components that read it.
 
 import type { EntryId, ThreadId } from "@pinetrie/core"
 import { createContext } from "react"

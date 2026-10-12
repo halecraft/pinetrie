@@ -1,10 +1,9 @@
-// web/root-signals — what a root shows wherever it is drawn: in the sidebar
-// and on the board (ADR-0077, ADR-0122). Its status before its label, a
-// signal's mark (ADR-0126: a still ring while its agent works or cards wait
-// for it, never behind a held queue; an amber dot when something needs you,
-// a dim one when something is worth a read, a ✓ that fades), and the others
-// reading in it. Each reads presence itself, so a presence write redraws it
-// and not the list or the board (S59).
+// web/root-signals — what a root shows wherever it is drawn: in the sidebar and
+// on the board. Its status before its label, a signal's mark (a still ring
+// while its agent works or cards wait for it, never behind a held queue; an
+// amber dot when something needs you, a dim one when something is worth a read,
+// a ✓ that fades), and the others reading in it. Each reads presence itself, so
+// a presence write redraws it and not the list or the board.
 
 import type {
   EntryId,
@@ -35,9 +34,9 @@ import { SignalMark } from "./signal-mark.tsx"
 import { useReadingAt, useReadingTasks } from "./use-presence.ts"
 
 /**
- * A root's status, before its label (ADR-0077): a still ring while its
- * agent works, its level's mark when something is raised, a ✓ that fades
- * when a run you follow ended with nothing to do (`statusSignal`).
+ * A root's status, before its label: a still ring while its agent works, its
+ * level's mark when something is raised, a ✓ that fades when a run you follow
+ * ended with nothing to do (`statusSignal`).
  */
 export function RootStatus({
   status,

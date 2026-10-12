@@ -1,11 +1,11 @@
-// web/pinned-strip — a thread's pinned cards, at the top of its column
-// (ADR-0048 step 5): what the thread is for, which the agent reads on every
-// run. Drawn under the column's header, outside its scrolling body, so it
-// stays in view. Empty, it is a drop zone that pins the first card, shown
-// only while a card is dragged (`data-card-drag`): an empty strip that took
-// room would move where a column shown again puts its reader. So "+ pin" is
-// in the column's header until the strip has a card (`newPinAt`), and in the
-// strip after; the box it opens is drawn last in the strip.
+// web/pinned-strip — a thread's pinned cards, at the top of its column: what
+// the thread is for, which the agent reads on every run. Drawn under the
+// column's header, outside its scrolling body, so it stays in view. Empty, it
+// is a drop zone that pins the first card, shown only while a card is dragged
+// (`data-card-drag`): an empty strip that took room would move where a column
+// shown again puts its reader. So "+ pin" is in the column's header until the
+// strip has a card (`newPinAt`), and in the strip after; the box it opens is
+// drawn last in the strip.
 
 import type { CardId, PinnedView, TextCard } from "@pinetrie/core"
 import {

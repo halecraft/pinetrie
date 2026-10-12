@@ -1,10 +1,9 @@
-// web/card-history — a card's history, and who moved it back below the
-// line (ADR-0048 step 6). Every card's frame draws them (`card-frame.tsx`):
-// the history in its body while its ⋯'s History is open, who moved it back
-// in its header. What they read comes by context from `App`, which reads it
-// once (`readCardHistories`), as a message's pane facts do
-// (`pane-context.ts`): a prop through every editor would be one more for
-// each to pass on.
+// web/card-history — a card's history, and who moved it back below the line.
+// Every card's frame draws them (`card-frame.tsx`): the history in its body
+// while its ⋯'s History is open, who moved it back in its header. What they
+// read comes by context from `App`, which reads it once (`readCardHistories`),
+// as a message's pane facts do (`pane-context.ts`): a prop through every editor
+// would be one more for each to pass on.
 
 import type {
   CardHistoryRecord,

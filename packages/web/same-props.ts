@@ -1,6 +1,6 @@
 // web/same-props — `React.memo`'s rule from a table of how each prop is
 // compared, pure: `Message`'s (`message-props.ts`) and the review's
-// (`review-pane.tsx`) (S54).
+// (`review-pane.tsx`).
 
 import { sameData } from "@pinetrie/interface"
 

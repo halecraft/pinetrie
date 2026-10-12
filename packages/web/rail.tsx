@@ -1,12 +1,11 @@
-// web/rail — one root's tree, beside its columns (ADR-0029).
+// web/rail — one root's tree, beside its columns.
 //
 // A dot per message, a capsule per stretch of uneventful messages, and a line
-// per parent link, drawn from `compactRail`. A long ask is a dot and a
-// capsule of its own (ADR-0106). The rail is E (everything in this
-// root); the lit column is T (what the agent reads). A track's colour comes
-// from the palette, seeded by the root (`useTrackColors`, ADR-0089), and the
-// column headers and fork dots take the same, so a branch looks the same
-// everywhere.
+// per parent link, drawn from `compactRail`. A long ask is a dot and a capsule
+// of its own. The rail is E (everything in this root); the lit column is T
+// (what the agent reads). A track's colour comes from the palette, seeded by
+// the root (`useTrackColors`), and the column headers and fork dots take the
+// same, so a branch looks the same everywhere.
 
 import type {
   AgentRun,
@@ -100,19 +99,19 @@ export function Rail({
   /** Others reading each thread end, with their names and colours: a ring there. */
   here: ReadonlyMap<EntryId, readonly { name: string; color: string }[]>
   /**
-   * Thread ends holding an unsent card of yours (`UnsentSignals.ends`), with your
-   * colour: each dot there carries a pip (ADR-0048).
+   * Thread ends holding an unsent card of yours (`UnsentSignals.ends`), with
+   * your colour: each dot there carries a pip.
    */
   yours: { readonly ends: ReadonlySet<EntryId>; readonly color: string }
   /** A writer's name, for a capsule's label. */
   nameOf: (writer: WriterId) => string
-  /** Each mounted column's view, outlined (ADR-0058); none, no outlines. */
+  /** Each mounted column's view, outlined; none, no outlines. */
   viewports?: ViewportStore
-  /** What a search finds here (ADR-0101): the rest is dimmed. Null while not searching. */
+  /** What a search finds here: the rest is dimmed. Null while not searching. */
   matches: SearchResult | null
   /**
-   * Each fork to a thread on no column of this canvas (ADR-0117), worded:
-   * a press follows its link, which a thread someone else holds does not.
+   * Each fork to a thread on no column of this canvas, worded: a press follows
+   * its link, which a thread someone else holds does not.
    */
   stubs?: readonly DrawnStub[]
   onLink?: (link: ThreadLink, at: EntryId) => void
@@ -242,15 +241,14 @@ const tickBox = (t: Tick): { top: number; height: number } => {
 }
 
 /**
- * What each column shows, on the rail in its colour (`railView`, ADR-0058):
- * an outline around the whole dots and capsules in its view, under them, and
- * a tick across a capsule where the view's top or bottom falls in it, over
- * it. It reads the
- * columns' views itself, so a scroll redraws these alone. The rail follows
- * the view's own extent, not its outline: a capsule outlined whole can be
- * far taller than what is in view. The rail follows the column moved last: it
- * scrolls when that column's outline leaves its view (`railScroll`), unless
- * the reader has just scrolled the rail.
+ * What each column shows, on the rail in its colour (`railView`): an outline
+ * around the whole dots and capsules in its view, under them, and a tick across
+ * a capsule where the view's top or bottom falls in it, over it. It reads the
+ * columns' views itself, so a scroll redraws these alone. The rail follows the
+ * view's own extent, not its outline: a capsule outlined whole can be far
+ * taller than what is in view. The rail follows the column moved last: it
+ * scrolls when that column's outline leaves its view (`railScroll`), unless the
+ * reader has just scrolled the rail.
  */
 function RailViewport({
   itemOf,

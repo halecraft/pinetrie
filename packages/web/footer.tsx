@@ -1,15 +1,13 @@
-// web/footer — the page's one row of chrome, along its bottom (ADR-0122).
-// It splits where the sidebar's edge does. Below the sidebar, what is yours
-// (ADR-0098): you, whose avatar and name open the account menu
-// (`account-menu.tsx`), then your inbox (`inbox-view.ts`, ADR-0091) and your
-// inventory as icons; while the sidebar is folded, your avatar alone, carrying
-// the inbox's badge, and both are in its menu. To the right, what is
-// everyone's: the board's strip (`board.tsx`), which counts where the agent
-// works and what is ready to accept, then "syncing…" while the document is
-// pending and the publish button (ADR-0090). The inbox carries the page's
-// only badge. Nothing here opens a root until you choose, and nothing closes
-// a menu you opened: an open menu keeps a section whose rows have gone, and
-// says so.
+// web/footer — the page's one row of chrome, along its bottom. It splits where
+// the sidebar's edge does. Below the sidebar, what is yours: you, whose avatar
+// and name open the account menu (`account-menu.tsx`), then your inbox
+// (`inbox-view.ts`) and your inventory as icons; while the sidebar is folded,
+// your avatar alone, carrying the inbox's badge, and both are in its menu. To
+// the right, what is everyone's: the board's strip (`board.tsx`), which counts
+// where the agent works and what is ready to accept, then "syncing…" while the
+// document is pending and the publish button. The inbox carries the page's only
+// badge. Nothing here opens a root until you choose, and nothing closes a menu
+// you opened: an open menu keeps a section whose rows have gone, and says so.
 
 import type { AcceptedRecord, WriterId } from "@pinetrie/core"
 import {
@@ -51,7 +49,7 @@ export function Footer({
   colorOf: (writer: WriterId) => string
   /** What your inbox draws from: in the corner, or folded, in the account menu. */
   inbox: InboxMenuProps
-  /** Accepted work (ADR-0104), as the host last read it. */
+  /** Accepted work, as the host last read it. */
   accepted: AcceptedRecord | null
   /** Where the account menu's choices go. */
   onIntent: (intent: Intent) => void
@@ -59,9 +57,8 @@ export function Footer({
   inventory: InventoryToggleProps
   me: Me
   /**
-   * The sidebar is folded to icons (ADR-0088): the corner, as narrow, holds
-   * only your avatar, and your inbox and inventory are in its menu
-   * (ADR-0098).
+   * The sidebar is folded to icons: the corner, as narrow, holds only your
+   * avatar, and your inbox and inventory are in its menu.
    */
   folded: boolean
 }) {
@@ -94,10 +91,9 @@ export function Footer({
 }
 
 /**
- * The publish button (ADR-0090, ADR-0099): set up before accepted work exists;
- * then publish, only while there is something to publish. A
- * refusal or failure of your last command here is a toast until you dismiss
- * it or send another.
+ * The publish button: set up before accepted work exists; then publish, only
+ * while there is something to publish. A refusal or failure of your last
+ * command here is a toast until you dismiss it or send another.
  */
 function PublishButton({
   accepted: line,

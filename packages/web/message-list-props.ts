@@ -1,6 +1,6 @@
-// web/message-list-props — what a column's message list is drawn from, and
-// how each prop is compared: `React.memo`'s rule for `MessageList`
-// (`sameProps`), kept pure (S59).
+// web/message-list-props — what a column's message list is drawn from, and how
+// each prop is compared: `React.memo`'s rule for `MessageList` (`sameProps`),
+// kept pure.
 
 import type {
   AskIndex,
@@ -35,7 +35,7 @@ export interface MessageListProps {
   writable: boolean
   /** Where a lane starts on this path (`columnView`). */
   joins: ReadonlyMap<EntryId, LaneJoin>
-  /** Where each row from another thread's task is (`crossTaskLinks`, ADR-0128). */
+  /** Where each row from another thread's task is (`crossTaskLinks`). */
   crossTaskLinks: ReadonlyMap<EntryId, CrossTaskLink>
   /** Open a row's other thread, as a fork row's link opens (`Origin`). */
   onLink: (link: ThreadLink, at: EntryId) => void
@@ -72,7 +72,7 @@ export interface MessageListProps {
   leftBefore: EntryId | null
   /** Each ask's model-written digest, by its prompt. */
   digests: ReadonlyMap<EntryId, DigestRecord>
-  /** How many comments each entry's margin holds (`marginCounts`, ADR-0126). */
+  /** How many comments each entry's margin holds (`marginCounts`). */
   margins: ReadonlyMap<EntryId, number>
   /** The entry whose margin is open, drawn as `marginSlot` under it; null for none. */
   openMargin: EntryId | null
@@ -83,9 +83,9 @@ export interface MessageListProps {
 }
 
 /**
- * How each prop is compared. Building the list costs about 35 µs per message
- * in React's development build, memoised or not (S59), so the list is skipped
- * whenever its column renders for a reason that leaves it alone.
+ * How each prop is compared. Building the list costs about 35 µs per message in
+ * React's development build, memoised or not, so the list is skipped whenever
+ * its column renders for a reason that leaves it alone.
  *
  * `view` is compared by identity: `App` keeps it while `index` and the
  * columns are the same, and comparing a long thread's nodes by

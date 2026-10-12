@@ -1,7 +1,7 @@
-// web/thread-card — a thread card's header (ADR-0111): its mark, its label,
-// ⇡ for work ready to accept, and your pip. The board's cards and the
-// sidebar's items draw it from the same value (`ThreadCardHead`), so a root
-// reads the same in both. Neutral: never in the thread's colour.
+// web/thread-card — a thread card's header: its mark, its label, ⇡ for work
+// ready to accept, and your pip. The board's cards and the sidebar's items draw
+// it from the same value (`ThreadCardHead`), so a root reads the same in both.
+// Neutral: never in the thread's colour.
 
 import type { WriterId } from "@pinetrie/core"
 import { readyWords, type ThreadCardHead } from "@pinetrie/interface"

@@ -1,6 +1,6 @@
-// web/blob-image — an image the host keeps (ADR-0042), as a message's
-// markdown or a tool's result draws it. A click opens it in the column's pane
-// (ADR-0078); a Cmd- or Ctrl-click opens it in a new tab.
+// web/blob-image — an image the host keeps, as a message's markdown or a tool's
+// result draws it. A click opens it in the column's pane; a Cmd- or Ctrl-click
+// opens it in a new tab.
 
 import { blobOfUrl, blobUrl, type ImageRef } from "@pinetrie/core"
 import { type ComponentProps, type CSSProperties, useContext } from "react"
@@ -22,8 +22,8 @@ export function BlobImage(
   const sha = typeof src === "string" ? blobOfUrl(src) : null
   if (typeof src !== "string" || sha === null || reach === null)
     return <img {...props} alt={alt ?? ""} />
-  // A block of a committed message is named by its address (ADR-0126); an
-  // image of a tool's result, or of a reply still streaming, by its blob.
+  // A block of a committed message is named by its address; an image of a
+  // tool's result, or of a reply still streaming, by its blob.
   const block = blockOfProperty(props["data-block"])
   const mine: PaneSubject =
     block !== null && source?.kind === "entry"

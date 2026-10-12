@@ -1,7 +1,7 @@
-// web/inbox-menu — your inbox's menu (ADR-0091): in the footer's corner as
-// an icon with its badge, and, while the sidebar is folded, inside the account
-// menu (`account-menu.tsx`, ADR-0098). One hook builds its sections for both.
-// A thread's row (`threadRow`) is here too: the board's readers' menus use it.
+// web/inbox-menu — your inbox's menu: in the footer's corner as an icon with
+// its badge, and, while the sidebar is folded, inside the account menu
+// (`account-menu.tsx`). One hook builds its sections for both. A thread's row
+// (`threadRow`) is here too: the board's readers' menus use it.
 
 import {
   type EntryId,
@@ -36,10 +36,10 @@ import { nameFor } from "./presence.tsx"
 import type { InboxSeen } from "./use-inbox.ts"
 
 /**
- * A thread as a menu row: its lane's name when it has one, where its link
- * leads (its task's label, or who has it), and the start of the message at
- * `end`; choosing it follows the link (`onOpen`), which a thread someone
- * else holds does not let it (ADR-0124).
+ * A thread as a menu row: its lane's name when it has one, where its link leads
+ * (its task's label, or who has it), and the start of the message at `end`;
+ * choosing it follows the link (`onOpen`), which a thread someone else holds
+ * does not let it.
  */
 export function threadRow(input: {
   readonly index: TreeIndex
@@ -74,7 +74,6 @@ export function threadRow(input: {
 /** A thread's menu row, as `threadRow` builds it. */
 export type ThreadRow = ReturnType<typeof threadRow>
 
-/** What your inbox draws from. */
 export interface InboxMenuProps {
   readonly attention: readonly Item[]
   readonly count: number
@@ -91,11 +90,11 @@ export interface InboxMenuProps {
 }
 
 /**
- * Your inbox's menu (ADR-0091): what the threads you follow raise for you,
- * then mentions of you. What goes in which section is `inboxView`'s; this
- * turns them into rows. Both the corner's inbox and, while the sidebar is
- * folded, the account menu draw it, so its rows, "not needed", the filter
- * and "mark all seen" are one code path.
+ * Your inbox's menu: what the threads you follow raise for you, then mentions
+ * of you. What goes in which section is `inboxView`'s; this turns them into
+ * rows. Both the corner's inbox and, while the sidebar is folded, the account
+ * menu draw it, so its rows, "not needed", the filter and "mark all seen" are
+ * one code path.
  */
 export function useInboxMenu({
   attention,
@@ -194,8 +193,8 @@ export function useInboxMenu({
       ),
       onChoose: () => {
         inbox.markSeen(m.id)
-        // A mention opens in the task its thread is in (ADR-0116), or not
-        // at all where someone else holds it (ADR-0124).
+        // A mention opens in the task its thread is in, or not at all where
+        // someone else holds it.
         onOpen(m.id, link)
       },
     }
@@ -223,9 +222,8 @@ export function useInboxMenu({
 }
 
 /**
- * Your inbox in the corner (ADR-0091, ADR-0098): an icon, its badge counting
- * what needs you; nothing here animates, and it is drawn even with nothing in
- * it.
+ * Your inbox in the corner: an icon, its badge counting what needs you; nothing
+ * here animates, and it is drawn even with nothing in it.
  */
 export function InboxMenu(props: InboxMenuProps) {
   const { view, words, sections, onToggle } = useInboxMenu(props)

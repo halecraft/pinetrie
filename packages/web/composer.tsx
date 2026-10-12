@@ -1,5 +1,5 @@
-// web/composer — one per column, at its foot: your message's editor
-// (ADR-0113), which only you see, and who else is writing here.
+// web/composer — one per column, at its foot: your message's editor, which only
+// you see, and who else is writing here.
 
 import type {
   AgentCandidate,
@@ -28,12 +28,11 @@ import { nameFor } from "./presence.tsx"
 import { useTypingAt } from "./use-presence.ts"
 
 /**
- * The column's foot. What you type here is your message at this thread's
- * end, or at it before it starts: created with the first keystroke worth
- * keeping, and kept across tab switches, reloads and restarts (ADR-0048,
- * ADR-0113). Sending it spends it; a conflict or a refusal leaves it; a busy
- * thread, or a command, queues it above the line. A card dropped here
- * becomes your message (`planPut`).
+ * The column's foot. What you type here is your message at this thread's end,
+ * or at it before it starts: created with the first keystroke worth keeping,
+ * and kept across tab switches, reloads and restarts. Sending it spends it; a
+ * conflict or a refusal leaves it; a busy thread, or a command, queues it above
+ * the line. A card dropped here becomes your message (`planPut`).
  */
 export function Composer(p: {
   session: SessionClient
@@ -47,7 +46,7 @@ export function Composer(p: {
   unstarted: boolean
   commands: readonly CommandSummary[]
   participants: readonly string[]
-  /** Other threads' agents a mention may reach (ADR-0128). */
+  /** Other threads' agents a mention may reach. */
   agents: readonly AgentCandidate[]
   reader: Reader
   prefill: Prefill | undefined

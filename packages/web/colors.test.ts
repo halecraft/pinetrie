@@ -14,7 +14,7 @@ test("a fresh branch is grey", () => {
   expect(slotColor("pending")).toBe(PENDING_COLOR)
 })
 
-// sRGB to OKLab, for S110's bounds.
+// sRGB to OKLab, for the palette's bounds.
 const linear = (c: number) =>
   c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
 const rgb = (hex: string) =>
@@ -45,7 +45,7 @@ const contrast = (a: string, b: string) => {
   return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05)
 }
 
-describe("PALETTE (S110)", () => {
+describe("PALETTE", () => {
   const page = /--page: (#[0-9a-f]{6})/.exec(html)?.[1] ?? ""
   /** People's first colours, the attention amber, the review's lines. */
   const reserved = [

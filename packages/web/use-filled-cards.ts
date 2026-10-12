@@ -1,4 +1,4 @@
-// web/use-filled-cards — which of your cards hold text (ADR-0048, step 2).
+// web/use-filled-cards — which of your cards hold text.
 //
 // A card's record outlives its text, so the marks read each card's text. A
 // subscription of its own, not `useSelector`: Kyneta's `useTracked` renders

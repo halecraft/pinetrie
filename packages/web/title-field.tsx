@@ -1,6 +1,5 @@
-// web/title-field — the field a title is edited in (ADR-0045): a root's,
-// in the sidebar, and a note column's (ADR-0116). `planTitle` decides what
-// a save sends.
+// web/title-field — the field a title is edited in: a root's, in the sidebar,
+// and a note column's. `planTitle` decides what a save sends.
 
 import { MAX_TITLE } from "@pinetrie/core"
 import { planTitle, renameKey } from "@pinetrie/interface"

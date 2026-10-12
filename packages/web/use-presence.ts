@@ -1,7 +1,7 @@
-// web/use-presence — each part of the screen that shows who else is here
-// reads the one presence field it shows (ADR-0024). `useSelector` re-renders
-// its reader on every write to that field, the page's own refresh included,
-// so only small components call these: never `App`, never a `Column` (S59).
+// web/use-presence — each part of the screen that shows who else is here reads
+// the one presence field it shows. `useSelector` re-renders its reader on every
+// write to that field, the page's own refresh included, so only small
+// components call these: never `App`, never a `Column`.
 
 import { useSelector } from "@kyneta/react"
 import type { EntryId, TaskId, TreeIndex, WriterId } from "@pinetrie/core"
@@ -19,7 +19,7 @@ export function useReadingAt(
   return useMemo(() => readingAt(reading, me), [reading, me])
 }
 
-/** The task each thread end being read was reported on (ADR-0063, ADR-0116). */
+/** The task each thread end being read was reported on. */
 export function useReadingTasks(
   presence: PresenceDocHandle,
 ): ReadonlyMap<EntryId, TaskId> {
