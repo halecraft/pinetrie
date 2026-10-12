@@ -1,0 +1,20 @@
+{
+  "opsSeenUnderTheMount": {
+    "open": 11,
+    "capture-close": 8,
+    "capture-dup": 4,
+    "capture-open": 4,
+    "rename": 2,
+    "unlink": 1,
+    "mkdir": 1
+  },
+  "renameSeen": true,
+  "unlinkSeen": true,
+  "relativePathResolved": true,
+  "lastCaptureEqualsDisk": {
+    "n.txt": true,
+    "c.bin": true,
+    "late.txt": true,
+    "sub/r.txt": true
+  }
+}

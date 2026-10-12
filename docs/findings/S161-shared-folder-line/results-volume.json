@@ -1,0 +1,19 @@
+{
+  "files": 481,
+  "MB": 1809.17,
+  "medianKB": 13.4,
+  "largestMB": 321.86,
+  "changedInLastHour": 58,
+  "changedInLastDay": 68,
+  "changedInLastWeek": 351,
+  "topFolders": {
+    "(top level)": 186,
+    "disk-model-probes": 54,
+    "account-corner-shots": 18,
+    "s126-direct-boot": 16,
+    "s128-launcher": 16,
+    "board-layout-shots": 13,
+    "board-build-shots": 10,
+    "lane-runtime-mac": 9
+  }
+}

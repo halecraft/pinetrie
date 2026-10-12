@@ -3,7 +3,7 @@
 - **Status:** Proposed (2026-10-11)
 - **Area:** `packages/lanes/TECHNICAL.md`, `docs/the-jujutsu-repo.md`,
   `docs/01-architecture.md`
-- **Evidence:** S146, S148, S155, S156, S157, S158, S159, S160
+- **Evidence:** S146, S148, S155, S156, S157, S158, S159, S160, S161
 - **Amends:**
   - ADR-0131: a recipe is any recorded run of a command that made derived
     files, learned rather than declared (`lanes.install`, `installWhen` and
@@ -12,6 +12,9 @@
   - ADR-0130: a change to `pinetrie.json` that widens what a lane may do or
     share takes effect only from accepted work; a lane's own copy can only
     narrow it.
+  - ADR-0035: a shared directory keeps a history: a single line of states,
+    each write attributed to the tool call that made it, and a write based on
+    an old version shown as concurrent. It is still live, and never branched.
 
 **Context.** pine·trie names a state by a jj commit, and lets jj's ignore
 rules decide which files are part of it. Four problems follow:
@@ -121,8 +124,8 @@ Six spikes measured what a model built on the disk itself would rest on:
   - A fact is a pure function of some paths, keyed by their blob ids, and
     computed again on each new state. Examples: the class map, the lane
     config, and whether a recipe's key holds.
-  - No change pine·trie acts on reaches it except as a state. Shared
-    directories stay outside every state (ADR-0035).
+  - No change pine·trie acts on reaches it except as a state. A shared
+    directory's states are its own line (below), never a thread's.
   - **Authority follows the direction of a change.** A lane can always
     narrow what it may do or share. Only accepted work widens it:
     - grants;
@@ -131,6 +134,26 @@ Six spikes measured what a model built on the disk itself would rest on:
 
     The check's reply tells the agent which applies, and an offer's review
     lists the widenings it would make.
+- **A shared directory is a single line of states, outside every thread's
+  state** (S161).
+  - **Its paths come out of every thread's state by where they are
+    mounted, never by ignore rules.** The state's walk, the turn's diff
+    and the codec's exclude file all skip it. A commit that tracks a
+    shared path is reported at import, as a local one is.
+  - **A lane's write goes on the line** as its tool call's capture, taken
+    when the file is released (`close`, `dup3`, `exit_group`, `execve`),
+    with the version the writer read when it opened the file.
+  - **A write whose version read is not the line's head is shown as
+    concurrent,** not silently lost.
+  - **A write from the Mac goes on the line from the host's watcher** and
+    a hash. It carries no version read, so it cannot be checked for
+    concurrency.
+  - **A turn's record names the shared states it read and wrote.**
+  - **No fact that grants authority reads a shared path.** A recipe that
+    read one is carried only if the shared content it read is still the
+    line's head when the new disk is made.
+  - **The line is never branched.** Branching at a turn shows the shared
+    directory as it was, but the directory itself stays live.
 - **jj is a codec, used only by projects that have it.**
   - pine·trie writes each turn's commit itself: the blobs that changed,
     the trees above them, and the commit. jj imports it. The commit's tree
@@ -180,6 +203,12 @@ Six spikes measured what a model built on the disk itself would rest on:
   - reading `pinetrie.json` once at startup.
 - **Grants:** a grant in a lane's `pinetrie.json` that widens takes effect
   only when its offer is accepted.
+- **Shared directories:**
+  - A branch can show `.plans` as it was at its turn.
+  - Two lanes writing one plan see a conflict instead of losing a write.
+  - Opening a shared file costs about 3 ms on virtiofs, plus up to 2.7 ms
+    to capture it. That was measured on a busy VM, so it is an upper bound
+    (S161).
 - **Risks:**
   - The supervisor sits on every file call's path.
   - setuid programs cannot gain privilege inside a tool call
@@ -190,6 +219,10 @@ Six spikes measured what a model built on the disk itself would rest on:
 - **Left open:**
   - how a file of a gigabyte reaches a git remote, as one blob or a
     pointer;
+  - large binaries in a shared directory (1.8 GB in `.plans`, files up to
+    322 MB): chunked as S156 would chunk them, or kept off the line;
+  - the last version written by a process killed by a signal, which is
+    captured only when its tool call ends;
   - syncing your folder on the Mac with your thread (S149, S150, put
     aside);
   - the chunking threshold's exact value.

@@ -1,0 +1,7 @@
+{
+  "plain, /etc/hostname": "stat 1502 ns, open+close 3027 ns",
+  "plain, shared file": "stat 1108 ns, open+close 2993693 ns",
+  "opens only, /etc/hostname": "stat 1474 ns, open+close 421103 ns",
+  "capture mode, /etc/hostname": "stat 1734 ns, open+close 490329 ns",
+  "capture mode, shared file": "stat 5503 ns, open+close 5732791 ns"
+}

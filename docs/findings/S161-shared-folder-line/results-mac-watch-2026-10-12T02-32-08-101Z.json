@@ -1,0 +1,23 @@
+{
+  "root": "/Users/duane/halecraft/pinetrie/.plans",
+  "minutes": 15.04,
+  "platform": "darwin 25.6.0",
+  "events": 23,
+  "errors": [],
+  "changedFiles": 21,
+  "changedByThisScriptOnTheMac": 20,
+  "changedByOthers": 1,
+  "missedByEvents": [],
+  "missedCount": 0,
+  "missedOnTheMacCount": 0,
+  "bursts": 22,
+  "burstMs": {
+    "median": 0,
+    "p90": 0
+  },
+  "gapMs": {
+    "min": 1407,
+    "median": 18483
+  },
+  "changedOthersSample": ["2026-10-11-decision-ids.md"]
+}

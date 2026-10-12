@@ -1,0 +1,10 @@
+{
+  "stats": {
+    "rounds": 100,
+    "a write overwrote another it never read (truth)": 20,
+    "flagged concurrent by the line": 20,
+    "truth and line agree": 100,
+    "each capture holds its own writer's content": 100
+  },
+  "mismatches": []
+}

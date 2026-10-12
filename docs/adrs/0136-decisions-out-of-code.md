@@ -1,4 +1,6 @@
-# ADR-0135 — Code names no decision, a unit mutation lives beside its test, and ADRs are a log with no amendment limit
+# ADR-0136 — Code names no decision, a unit mutation lives beside its test, and ADRs are a log with no amendment limit
+
+Numbered 0135 until 2026-10-11, when two files held that number.
 
 - **Status:** Accepted (Duane, 2026-10-11)
 - **Area:** `AGENTS.md`

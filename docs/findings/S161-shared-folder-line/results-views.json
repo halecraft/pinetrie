@@ -1,0 +1,13 @@
+{
+  "devSame": true,
+  "lagsMs": {
+    "median": 0.536,
+    "max": 0.924,
+    "neverSeen": 0
+  },
+  "newFileLagsMs": {
+    "median": 0.523,
+    "max": 0.724,
+    "neverSeen": 0
+  }
+}

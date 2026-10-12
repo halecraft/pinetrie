@@ -45,7 +45,7 @@ spent spikes: history, which search skips unless you name the folder.
   obligation, a failure mode, a limit) or a reason a reader would otherwise
   undo. Not a restatement of the name and type below, not the module's
   story (its `TECHNICAL.md` holds that), not "Pure." (`/skill:comments`).
-- Code names no decision (ADR-0135): no ADR, spike or plan id in a
+- Code names no decision (ADR-0136): no ADR, spike or plan id in a
   comment, a test title or a mutation list. Where a reader needs the
   reason, say it in a sentence; the module's `TECHNICAL.md` cites the
   decisions it rests on. The ids still in code are counted by area in
