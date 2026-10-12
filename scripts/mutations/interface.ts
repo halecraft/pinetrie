@@ -405,7 +405,8 @@ export const mutations: readonly Mutation[] = [
     from: "    ...input.layout.open,\n",
     to: "",
     command: unit,
-    expect: "the sidebar's roots and the one you are on, and no other",
+    expect:
+      "the roots of the sidebar's tasks and the one you are on, and no other",
   },
 
   {
@@ -624,7 +625,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const kept = list.filter(t => !archived.has(t) || t === here)",
     to: "  const kept = list",
     command: unit,
-    expect: "archived roots leave the sidebar as drawn",
+    expect: "archived tasks leave the sidebar as drawn",
   },
 
   {
@@ -741,7 +742,7 @@ export const mutations: readonly Mutation[] = [
     from: "      return { ...state, active: afterClosing(state, here) }",
     to: "      return { ...state, active: afterClosing(state, here), roots: withRoot(state.roots, action.root, []) }",
     command: unit,
-    expect: "a root that leaves the sidebar keeps its columns",
+    expect: "a task that leaves the sidebar keeps your view of it",
   },
   {
     name: "prune falls back to an archived task",
@@ -757,7 +758,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const next = items[at + 1] ?? items[at - 1]",
     to: "  const next = items[at]",
     command: unit,
-    expect: "closing the root you are on shows its neighbour below",
+    expect: "closing the task you are on shows its neighbour below",
   },
   {
     name: "every root anyone starts is in the sidebar",
@@ -815,7 +816,7 @@ export const mutations: readonly Mutation[] = [
     from: "      if (!at.includes(writer)) at.push(writer)",
     to: "      at.push(writer)",
     command: unit,
-    expect: "readersByRoot turns people around",
+    expect: "readersByTask turns people around",
   },
   {
     name: "joining always renames you to the stored name",
@@ -1308,8 +1309,7 @@ export const mutations: readonly Mutation[] = [
     from: "      search.words.every(w => label.includes(w))",
     to: '      search.words.every(w => "".includes(w))',
     command: unit,
-    expect:
-      "it keeps, in every state and in place, the roots whose label holds every word",
+    expect: "it keeps the tasks whose label holds every word",
   },
   {
     name: "the board's search keeps a root with any one word",
@@ -1317,8 +1317,7 @@ export const mutations: readonly Mutation[] = [
     from: "      search.words.every(w => label.includes(w))",
     to: "      search.words.some(w => label.includes(w))",
     command: unit,
-    expect:
-      "it keeps, in every state and in place, the roots whose label holds every word",
+    expect: "it keeps the tasks whose label holds every word",
   },
   {
     name: "a state added right of a column lands left of it",
@@ -1326,8 +1325,7 @@ export const mutations: readonly Mutation[] = [
     from: "      addBefore: { left: state.id, right: next?.state.id ?? null },",
     to: "      addBefore: { left: state.id, right: state.id },",
     command: unit,
-    expect:
-      "a column moves left or right one place; one holding a root, or the only open one, says why it cannot be removed",
+    expect: "a column moves one place either way",
   },
   {
     name: "a state added is always added last",
@@ -1344,8 +1342,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const keeps = search === null ? null : boardFilter(search, input.me)",
     to: "  const keeps = null",
     command: unit,
-    expect:
-      "it keeps, in every state and in place, the roots whose label holds every word",
+    expect: "it keeps the tasks whose label holds every word",
   },
   {
     name: "mine keeps everyone's roots",
@@ -1353,7 +1350,7 @@ export const mutations: readonly Mutation[] = [
     from: "      (!search.mine || root.writers.includes(me)) &&",
     to: "      true &&",
     command: unit,
-    expect: "mine keeps the roots you wrote in, in every state",
+    expect: "mine keeps the tasks you wrote in, in every state",
   },
   {
     name: "a blank query is a filter",
@@ -1465,7 +1462,7 @@ export const mutations: readonly Mutation[] = [
     from: `  return \`Filtered by \${quoted(search)}\${search.mine ? " and mine" : ""}: \${of}\``,
     to: `  return \`Filtered by \${quoted(search)}: \${of}\``,
     command: unit,
-    expect: 'Filtered by "parser" and mine: 14 of 140 roots',
+    expect: 'Filtered by "parser" and mine: 14 of 140 tasks',
   },
   {
     name: "the board's own open arms the search's focus",
@@ -1668,7 +1665,7 @@ export const mutations: readonly Mutation[] = [
     from: "  [...tasks].filter(t => !layout.open.includes(t) && !archived.has(t))",
     to: "  [...tasks].filter(t => !archived.has(t))",
     command: unit,
-    expect: "your message marks its root and its thread's end",
+    expect: "your message marks its task and its thread's end",
   },
   {
     name: "railKeep drops your cards' ends",
@@ -1843,7 +1840,7 @@ export const mutations: readonly Mutation[] = [
     from: "          archived === undefined\n            ? null",
     to: "          true\n            ? null",
     command: unit,
-    expect: "an archived root is read-only, with Restore",
+    expect: "an archived task is read-only, with Restore",
   },
 
   {
@@ -1996,7 +1993,7 @@ export const mutations: readonly Mutation[] = [
     from: '    ? (input.prefill?.text ?? "")',
     to: '    ? ""',
     command: unit,
-    expect: "startText: a fresh column's prefill",
+    expect: "startText: an unstarted thread's prefill",
   },
   {
     name: "the editor binds before it creates the card, so the first run of typing is lost",
@@ -2288,7 +2285,7 @@ export const mutations: readonly Mutation[] = [
     from: "        : `not moved: ${who(by, reader)} moved it first`",
     to: '        : "not moved: someone moved it first"',
     command: unit,
-    expect: "refusalWords, moved by Bea first",
+    expect: "noticeWords, moved by Bea first",
   },
   {
     name: "every slot is labelled",
@@ -2329,7 +2326,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (target.kind === "inventory") return { kind: "inventory", holder: me }',
     to: '  if (target.kind === "inventory") return null',
     command: unit,
-    expect: "a column lands as a note at its end, its composer as your message",
+    expect: "a slot as your inventory",
   },
   {
     name: "a slot is marked under another name",
@@ -2411,7 +2408,7 @@ export const mutations: readonly Mutation[] = [
     from: '  return [...showTask(task), { kind: "openWhenHeld", entry }]',
     to: "  return []",
     command: unit,
-    expect: "openIn: an entry this tab holds opens as openAt does",
+    expect: "openLink: an entry this tab holds opens as openAt does",
   },
   {
     name: "the header lists no offer in a root not held",
@@ -2448,12 +2445,12 @@ export const mutations: readonly Mutation[] = [
     expect: "with the inventory panel focused: this tab's swaps",
   },
   {
-    name: "an undone keep reveals its column once per card",
+    name: "an undo reveals each card's place, though two share it",
     file: "packages/interface/card-intents.ts",
     from: "        if (place !== null && !places.some(p => sameKey(p.place, place)))",
     to: "        if (place !== null)",
     command: unit,
-    expect: "once for a keep's cards",
+    expect: "two cards back in one place: it is shown once, as for one card",
   },
 
   {
@@ -2875,7 +2872,7 @@ export const mutations: readonly Mutation[] = [
     from: "  return here === null || kept.includes(here) ? kept : [...kept, here]",
     to: "  return kept",
     command: unit,
-    expect: "and the root you are on wherever it lacks it",
+    expect: "and the task you are on wherever it lacks it",
   },
   {
     name: "the strip counts the archive as open",
@@ -2891,7 +2888,7 @@ export const mutations: readonly Mutation[] = [
     from: '      return s === undefined || s.kind === "working" ? null : s.kind',
     to: '      return s === undefined ? null : s.kind === "working" ? "needsYou" : s.kind',
     command: unit,
-    expect: "markOf: the highest level among the roots it covers",
+    expect: "markOf: the highest level among the tasks it covers",
   },
   {
     name: "a drop moves a task before itself",
@@ -3431,7 +3428,8 @@ export const mutations: readonly Mutation[] = [
     from: '    case "unfold":\n      return [\n        ...fold,\n        { kind: "reveal", entry: id },',
     to: '    case "unfold":\n      return [\n        ...fold,',
     command: unit,
-    expect: "an entry no unfolded column shows unfolds its thread's, revealed",
+    expect:
+      "an entry no unfolded column shows unfolds its thread's, unmoving, revealed",
   },
   {
     name: "the tab's rail draws every tree",

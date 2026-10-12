@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
 import { SCENARIO_SUFFIX } from "../apps/pinetrie/e2e/scenario.ts"
-import { type Mutation, SUITES } from "./mutate.ts"
+import { loadMutationLists, SUITES } from "./mutate.ts"
 import { callsCheck, labelsIn, proofGaps } from "./proofs.ts"
 import { UNPROVEN } from "./unproven.ts"
 
@@ -21,12 +21,7 @@ const dir = path.join(import.meta.dirname, "mutations")
 const root = path.join(import.meta.dirname, "..")
 
 describe("mutation lists", async () => {
-  for (const file of readdirSync(dir)
-    .filter(f => f.endsWith(".ts"))
-    .sort()) {
-    const { mutations } = (await import(path.join(dir, file))) as {
-      mutations: readonly Mutation[]
-    }
+  for (const { file, mutations } of await loadMutationLists(dir)) {
     test(`${file}: every anchor occurs exactly once`, () => {
       const drifted = mutations
         .filter(m => {
@@ -61,20 +56,7 @@ describe("every suite check is proven, and every suite mutation names one", asyn
       nonLiteral += found.nonLiteral
     } else if (!FRAMEWORK.includes(rel) && callsCheck(source)) stray.push(rel)
   }
-  const mutations = (
-    await Promise.all(
-      readdirSync(dir)
-        .filter(f => f.endsWith(".ts"))
-        .map(
-          async f =>
-            (
-              (await import(path.join(dir, f))) as {
-                mutations: readonly Mutation[]
-              }
-            ).mutations,
-        ),
-    )
-  ).flat()
+  const mutations = (await loadMutationLists(dir)).flatMap(l => l.mutations)
   const gaps = proofGaps({
     labels,
     mutations,

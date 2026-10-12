@@ -1,10 +1,12 @@
 // scripts/proofs — "a check without a proof it can fail is not yet a check",
-// as a rule between the suites' checks and their mutations. Pure: the
-// labels and mutations come in, and what breaks the rule comes out.
+// as a rule between the checks and their mutations. Pure: the labels, tests
+// and mutations come in, and what breaks the rule comes out.
 //
 // Every check label in a scenario (`apps/pinetrie/e2e/<suite>/<name>.scenario.ts`)
 // is the `expect` of a suite mutation that names that scenario, and every
-// suite mutation's `expect` is a label in the scenario it names.
+// suite mutation's `expect` is a label in the scenario it names. A unit
+// mutation's `expect` is in the full name of a test its command runs: a test
+// renamed or deleted leaves it naming nothing, and its kill reads ELSEWHERE.
 
 import type { Mutation, SuiteMutation } from "./mutate.ts"
 
@@ -92,3 +94,52 @@ export function labelsIn(source: string): {
 /** Whether a source calls `check(`, as only a scenario may. */
 export const callsCheck = (source: string): boolean =>
   (source.match(CALL) ?? []).length > 0
+
+/** A test as Vitest lists it: its file from the repository's root, and its full name (`describe > … > title`). */
+export interface ListedTest {
+  readonly file: string
+  readonly name: string
+}
+
+/**
+ * The file filters a Vitest command runs, as Vitest reads them: each a part
+ * of a test file's path, none for every file. Null for a command that is not
+ * `vitest run`.
+ */
+export function vitestFilters(
+  command: readonly string[],
+): readonly string[] | null {
+  const run = command.indexOf("run")
+  if (!command.includes("vitest") || run < 0) return null
+  return command.slice(run + 1).filter(arg => !arg.startsWith("-"))
+}
+
+/**
+ * Unit mutations whose `expect` is in the full name of no test their
+ * command runs. A failing test prints as `file > describe > title`, and
+ * `pnpm mutate` looks for the `expect` there.
+ */
+export function unitExpectGaps(
+  mutations: readonly Mutation[],
+  tests: readonly ListedTest[],
+): readonly { readonly mutation: string; readonly why: string }[] {
+  return mutations.flatMap(m => {
+    if ("suite" in m || m.expect === undefined) return []
+    const filters = vitestFilters(m.command)
+    if (filters === null) return []
+    const expect = m.expect
+    const named = tests.some(
+      t =>
+        (filters.length === 0 || filters.some(f => t.file.includes(f))) &&
+        `${t.file} > ${t.name}`.includes(expect),
+    )
+    return named
+      ? []
+      : [
+          {
+            mutation: m.name,
+            why: `no test its command runs (${filters.join(" ") || "every test"}) is named "${expect}"`,
+          },
+        ]
+  })
+}

@@ -84,8 +84,6 @@ export async function countLayers(root: string): Promise<LayerCounts> {
  * An entry only shrinks, and is deleted at zero.
  */
 export const FIXED_WAITS: Readonly<Record<string, number>> = {
-  // A socket nothing answers: silence, timed out, is the outcome checked.
-  "apps/pinetrie/e2e/host/admission.scenario.ts": 1,
   // A write and a deletion of one key in one millisecond tie on other peers
   // (Kyneta: `docs/pinetrie.md`, "Open, non-blocking").
   "apps/pinetrie/e2e/host/presence.scenario.ts": 1,

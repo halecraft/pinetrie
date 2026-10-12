@@ -895,7 +895,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (crossing === "archive" && busy !== undefined)',
     to: '  if (crossing === "restore" && busy !== undefined)',
     command: unit,
-    expect: "refuses while the agent works in the root",
+    expect: "refuses while an agent of its threads works",
   },
   {
     name: "archivedIn finds no root",
@@ -903,7 +903,7 @@ export const mutations: readonly Mutation[] = [
     from: "    if (found !== undefined) return found",
     to: "    if (found !== undefined) return null",
     command: unit,
-    expect: "a written root that is archived refuses, by who archived it",
+    expect: "a written task that is archived refuses, by who archived it",
   },
   {
     name: "every root on the board is archived",
@@ -1627,7 +1627,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (false)",
     command: unit,
     expect:
-      "a discard from your own inventory is gone in the task you are on, or none; from someone else's refused",
+      "a discard from your own inventory records that it left it; from someone else's, refused",
   },
   {
     name: "an inventory holds a nineteenth card",
@@ -2458,7 +2458,7 @@ export const mutations: readonly Mutation[] = [
     from: "      if (held > 0)",
     to: "      if (held < 0)",
     command: unit,
-    expect: "refuses removing a state that holds a root",
+    expect: "refuses removing a state that holds a task",
   },
   {
     name: "the archive can be removed",

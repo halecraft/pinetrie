@@ -112,7 +112,10 @@ after the suite itself passes:
 one `pnpm mutate` call per name (it takes one name substring, or none for the
 whole list; a substring that names no mutation exits 2), one after another. While writing,
 `npx vitest run scripts/mutations.test.ts` checks that every anchor still
-matches, in seconds. A run you interrupt leaves its mutant in the file: check
+matches, in seconds, and `pnpm run proofs:unit` (a step of `verify`) that
+every unit mutation's `expect` still names a test its command runs: a
+test renamed or deleted under it would leave its kill reading ELSEWHERE.
+Rename a test, and move its mutations' `expect` with it. A run you interrupt leaves its mutant in the file: check
 the file and put the line back.
 
 ## Plans

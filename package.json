@@ -20,9 +20,10 @@
     "e2e:lanes": "pnpm --filter @pinetrie/app run e2e:lanes",
     "vm:build": "pnpm --filter @pinetrie/app run vm:build",
     "build": "pnpm --filter @pinetrie/web run build",
-    "verify": "pnpm run lint && pnpm run typecheck && pnpm test && pnpm run conformance && pnpm run e2e && pnpm run e2e:lanes",
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm test && pnpm run proofs:unit && pnpm run conformance && pnpm run e2e && pnpm run e2e:lanes",
     "verify:all": "pnpm run verify && pnpm run e2e:live && pnpm run e2e:browser",
     "mutate": "node scripts/mutate.ts",
+    "proofs:unit": "node scripts/unit-proofs.ts",
     "record": "node scripts/record.ts"
   },
   "devDependencies": {

@@ -28,7 +28,7 @@
 // is already caught by a faster command, as a unit test.
 
 import { spawn } from "node:child_process"
-import { readFileSync, writeFileSync } from "node:fs"
+import { readdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import process from "node:process"
 import { pathToFileURL } from "node:url"
@@ -228,21 +228,50 @@ export function choose(
     : `no mutation's name contains "${only}"`
 }
 
-const apply = (root: string, m: Mutation): Promise<Verdict> =>
+/** A mutant's verdict, and the checks that failed with it in place. */
+/** Every mutation list in `dir` (`scripts/mutations`), by file name, in name order. */
+export async function loadMutationLists(
+  dir: string,
+): Promise<
+  readonly { readonly file: string; readonly mutations: readonly Mutation[] }[]
+> {
+  const files = readdirSync(dir)
+    .filter(f => f.endsWith(".ts"))
+    .sort()
+  return Promise.all(
+    files.map(async file => ({
+      file,
+      mutations: (
+        (await import(pathToFileURL(path.join(dir, file)).href)) as {
+          mutations: readonly Mutation[]
+        }
+      ).mutations,
+    })),
+  )
+}
+
+const apply = (
+  root: string,
+  m: Mutation,
+): Promise<{
+  readonly verdict: Verdict
+  readonly failing: readonly string[]
+}> =>
   withMutant(root, m, async () => {
     const [cmd, ...args] = commandOf(m)
-    if (cmd === undefined) return "BROKEN" as const
-    return judge(
-      await run(
-        cmd,
-        args,
-        root,
-        m.timeoutMs ?? 900_000,
-        mutantEnv(process.env, m),
-      ),
-      m.expect,
+    if (cmd === undefined) return { verdict: "BROKEN" as const, failing: [] }
+    const ran = await run(
+      cmd,
+      args,
+      root,
+      m.timeoutMs ?? 900_000,
+      mutantEnv(process.env, m),
     )
-  })
+    return {
+      verdict: judge(ran, m.expect),
+      failing: [...new Set(failingChecks(ran.output).map(l => l.trim()))],
+    }
+  }).then(r => (r === "ANCHOR" ? { verdict: r, failing: [] } : r))
 
 /** The checks `against` fails with the mutant in place, each once, trimmed. */
 const probe = (
@@ -291,8 +320,12 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   }
   let bad = 0
   for (const m of chosen) {
-    const verdict = await apply(root, m)
+    const { verdict, failing } = await apply(root, m)
     console.log(`  ${verdict.padEnd(9)} ${m.name}`)
+    // Caught by another check: the expect has drifted from the test that
+    // catches it, which is one of these.
+    if (verdict === "ELSEWHERE")
+      for (const line of failing.slice(0, 5)) console.log(`      ${line}`)
     if (verdict !== "KILLED") bad += 1
   }
   console.log(`\n=== mutations: ${chosen.length - bad} killed, ${bad} not ===`)

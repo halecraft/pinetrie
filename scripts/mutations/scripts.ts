@@ -37,6 +37,15 @@ const scenarios = [
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a unit mutation's expect may name a test its command does not run",
+    file: "scripts/proofs.ts",
+    from: "        (filters.length === 0 || filters.some(f => t.file.includes(f))) &&\n",
+    to: "",
+    command: proofs,
+    expect:
+      "an expect named only outside the command's files, or nowhere, is a gap",
+  },
+  {
     name: "a fixed wait in Playwright is not counted",
     file: "scripts/budget.ts",
     from: "  /waitForTimeout\\(|\\bsleep\\(|",

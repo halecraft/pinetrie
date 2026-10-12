@@ -219,7 +219,7 @@ export const mutations: readonly Mutation[] = [
     from: "    n <= MAX_VM_SLOTS",
     to: "    n <= 32",
     command: unit("packages/lanes"),
-    expect: "another runtime, or more than 20 slots, refused with why",
+    expect: "more than 20 slots, refused with why",
   },
   {
     name: "a host in a nested lane keeps its lanes in the state directory",

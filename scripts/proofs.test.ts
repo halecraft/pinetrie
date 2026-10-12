@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 import type { Mutation } from "./mutate.ts"
-import { labelsIn, proofGaps } from "./proofs.ts"
+import { labelsIn, proofGaps, unitExpectGaps, vitestFilters } from "./proofs.ts"
 
 const suite = (scenario: string, expect: string, name = expect): Mutation => ({
   name,
@@ -87,5 +87,77 @@ describe("labelsIn", () => {
       labels: ["a plain one", 'say "BROWSER-OK"'],
       nonLiteral: 2,
     })
+  })
+})
+
+describe("unitExpectGaps", () => {
+  const unit = (expect: string, command: string[]): Mutation => ({
+    name: expect,
+    file: "f",
+    from: "a",
+    to: "b",
+    command,
+    expect,
+  })
+  const run = (...filters: string[]) => [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    ...filters,
+  ]
+  const tests = [
+    {
+      file: "packages/core/tree.test.ts",
+      name: "threads > a race, in a branch",
+    },
+    { file: "packages/rules/card.test.ts", name: "a card round-trips" },
+  ]
+
+  test("an expect in a test's full name, its describe's or its file's, in the command's files, names it", () => {
+    expect(
+      unitExpectGaps(
+        [
+          unit("in a branch", run("packages/core")),
+          unit("threads > a race", run("packages/core")),
+          unit("tree.test.ts > threads", run()),
+        ],
+        tests,
+      ),
+    ).toEqual([])
+  })
+
+  test("an expect named only outside the command's files, or nowhere, is a gap", () => {
+    expect(
+      unitExpectGaps(
+        [
+          unit("a card round-trips", run("packages/core")),
+          unit("a renamed test", run("packages/rules")),
+        ],
+        tests,
+      ).map(g => g.mutation),
+    ).toEqual(["a card round-trips", "a renamed test"])
+  })
+
+  test("a suite's mutation, a command other than vitest's, or no expect: not judged here", () => {
+    expect(
+      unitExpectGaps(
+        [
+          suite("s", "no such test"),
+          unit("no such test", ["pnpm", "exec", "biome", "lint", "x.ts"]),
+          { name: "x", file: "f", from: "a", to: "b", command: run() },
+        ],
+        tests,
+      ),
+    ).toEqual([])
+  })
+
+  test("vitestFilters: the paths after run, none for every file; null for any other command", () => {
+    expect(vitestFilters(run("a.test.ts", "b/", "--bail"))).toEqual([
+      "a.test.ts",
+      "b/",
+    ])
+    expect(vitestFilters(run())).toEqual([])
+    expect(vitestFilters(["pnpm", "exec", "biome", "lint"])).toBeNull()
   })
 })

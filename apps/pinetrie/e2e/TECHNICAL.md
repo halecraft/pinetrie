@@ -120,6 +120,11 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
   `expect` is a check in the scenario it names** (`scripts/proofs.ts`,
   enforced by `scripts/mutations.test.ts`). A check no mutation proves yet is
   listed in `scripts/unproven.ts`, a list that only shrinks.
+- **A unit mutation's `expect` is in the full name of a test its command
+  runs** (`unitExpectGaps`, `scripts/proofs.ts`), checked against
+  `vitest list` by `pnpm run proofs:unit`, a step of `pnpm run verify`.
+  Its collection takes seconds, so it is not a unit test. A test renamed
+  without its mutations once left 33 of them naming nothing.
 - **A check stays only while it proves what a unit test cannot:** the
   stack's (pi, Kyneta, the store, a restart, a websocket, `startHost`'s
   wiring), or the browser's (focus and the caret, geometry, CSS, scrolling,
@@ -173,8 +178,10 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
     wait for.
   - **The fixed waits left are listed** in `FIXED_WAITS`
     (`scripts/budget.ts`), each with its reason, and `budget.test.ts`
-    fails when a scenario holds more, or fewer. A wait there is one whose
-    length is the rule it checks, a socket's silence, or a Kyneta bug.
+    fails when a scenario holds more, or fewer. What is left there is a
+    process whose death a check reads, or a Kyneta bug. A deadline on a wait
+    for a state is no fixed wait: bound it with `waitFor`, not a
+    `setTimeout`.
 - **A browser check stays only while it proves what only a browser shows:**
   focus and the caret, geometry, CSS, scrolling, render counts, a real
   Kyneta round trip, the device's storage. A rule decided in a pure

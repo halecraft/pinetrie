@@ -28,8 +28,7 @@ export const mutations: readonly Mutation[] = [
     from: '    relay: ask ? (row.fact ?? "") : "",\n',
     to: '    relay: "",\n',
     command: unit,
-    expect:
-      "a spun card is in its spinner's trash; an ask's relay is in `relay`",
+    expect: "an ask's relay is in `relay`",
   },
   {
     name: "a fresh column's oldest card becomes its message",
@@ -643,8 +642,7 @@ export const mutations: readonly Mutation[] = [
     from: "  if (docId === PRESENCE_DOC_ID) return true",
     to: "  if (docId === PRESENCE_DOC_ID) return false",
     command: unit,
-    expect:
-      "acceptsWrite: the session and the places are the host's; presence is each client's",
+    expect: "acceptsWrite: presence is each client's",
   },
   {
     name: "the host shares every command Line with every client",
@@ -734,7 +732,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (crossed.kind === "refused") return done(crossed)\n',
     to: '  if (crossed.kind === "refused") {\n    await deps.agent.writeValues(writes)\n    return done(crossed)\n  }\n',
     command: unit,
-    expect: "a root the agent works in is not archived",
+    expect: "a task an agent of its threads works in is not archived",
   },
   {
     name: "stop does nothing",
@@ -742,7 +740,8 @@ export const mutations: readonly Mutation[] = [
     from: "    if (!deps.cancel(lane)) await agent.lane(lane).abort()\n",
     to: "",
     command: unit,
-    expect: "stopping a running lane records who stopped its ask, then aborts",
+    expect:
+      "stopping a running lane queues the fact of who stopped its ask, then aborts its run",
   },
   {
     name: "a planned title is never written",
@@ -1454,8 +1453,7 @@ export const mutations: readonly Mutation[] = [
     from: '          purpose: "title",\n',
     to: "",
     command: unit,
-    expect:
-      "a new root's first lane: titled by the agent once the run writes its prompt",
+    expect: "a new root's first lane: its task titled by the agent",
   },
   {
     name: "a new lane never titles its root",

@@ -505,7 +505,7 @@ export const mutations: readonly Mutation[] = [
     from: "export const PATH_LINE = 'json(path) ++ \"\\\\n\"'",
     to: "export const PATH_LINE = 'json(display_diff_path) ++ \"\\\\n\"'",
     command: unit,
-    expect: "a path with a space and an accent",
+    expect: "changedPaths: each path as it is named",
   },
   {
     name: "a WIP's copy fetches the lane's own copy too",

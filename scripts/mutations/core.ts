@@ -353,7 +353,7 @@ export const mutations: readonly Mutation[] = [
     from: "  for (const id of ancestry(index, end).path) {\n    if (id === at) break",
     to: "  for (const id of Object.keys(index.entries)) {\n    if (id === at) continue",
     command: unit,
-    expect: "in a sibling fork, not",
+    expect: "in a branch, not",
   },
   {
     name: "every handle is a person",

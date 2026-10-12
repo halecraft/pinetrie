@@ -5,7 +5,7 @@
 
 import { scriptedModel } from "@pinetrie/pi"
 import type { Checks } from "../checks.ts"
-import { withHost } from "../harness.ts"
+import { waitFor, withHost } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 export const scenario: Scenario = {
@@ -37,24 +37,22 @@ async function run(check: Checks["check"]): Promise<void> {
           (await status(`${open.httpUrl}app.tsx`)) === 403 &&
           wsRefused,
       )
-      // A socket nothing answers neither opens nor fails: the timeout is
-      // that outcome.
-      const hmrOpens = await new Promise<boolean>(resolve => {
-        const ws = new WebSocket(
-          `${open.httpUrl.replace("http", "ws")}?key=k3y`,
-          "vite-hmr",
-        )
-        const timer = setTimeout(() => resolve(false), 5000)
-        ws.onopen = () => {
-          clearTimeout(timer)
-          ws.close()
-          resolve(true)
-        }
-        ws.onerror = () => {
-          clearTimeout(timer)
-          resolve(false)
-        }
-      })
+      // An upgrade routed to nothing neither opens nor fails, so the wait
+      // for either is bounded: past it, the socket has not opened.
+      let answered: "open" | "error" | null = null
+      const hmr = new WebSocket(
+        `${open.httpUrl.replace("http", "ws")}?key=k3y`,
+        "vite-hmr",
+      )
+      hmr.onopen = () => {
+        answered = "open"
+      }
+      hmr.onerror = () => {
+        answered = "error"
+      }
+      await waitFor(() => answered !== null, 5_000)
+      hmr.close()
+      const hmrOpens = answered === "open"
       check(
         "with the key, Vite's HMR socket opens on the host's port",
         hmrOpens,
