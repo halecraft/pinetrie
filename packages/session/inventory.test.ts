@@ -39,7 +39,7 @@ describe("firstEmpty", () => {
   })
 })
 
-describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
+describe("settleSlots and planSlots: the repair", () => {
   test("an unslotted held card goes in the first empty slot, in id order", () => {
     const slots = slotsOf({ "0": cardIdFor("cb") })
     expect(settleSlots([C, A, B], slots, NO_INTENTS)).toEqual({
@@ -111,7 +111,7 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
     })
   })
 
-  test("a card not yet steady is neither placed nor has its slot cleared; a duplicate, or a slot that is no slot, is settled at once", () => {
+  test("a card not yet steady is neither placed nor has its slot cleared; a duplicate is settled at once", () => {
     const unsteady = (card: string) =>
       card !== cardIdFor("cb") && card !== cardIdFor("c103")
     // B newly held and unslotted: not placed yet. A gone card's slot: kept.

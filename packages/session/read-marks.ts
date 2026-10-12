@@ -1,15 +1,15 @@
-// session/read-marks — when a tab writes how far you have read a thread
-// (ADR-0077), decided. A column at its thread's end reports each new end;
-// writing every one would grow your attention document by about 10 bytes a
-// time, for good (S101), so a lane's mark is written at most once a
-// `READ_EVERY`, and at once when you leave. A mark only moves forward, and
-// nothing is written before the host's copy has arrived: a mark written
-// earlier can win over a further one written on another device (S101).
-// `attention-doc.ts` carries it out. Pure.
+// session/read-marks — when a tab writes how far you have read a thread. A
+// mark only moves forward, and nothing is written before the host's copy has
+// arrived: a mark written earlier can win over a further one written on
+// another device. `attention-doc.ts` carries it out.
 
 import type { EntryId, ThreadId } from "@pinetrie/core"
 
-/** The least time between two writes of one lane's mark. */
+/**
+ * The least time between two writes of one lane's mark: a column reports
+ * each new end, and each write stays in your attention document, about 10
+ * bytes, for good.
+ */
 export const READ_EVERY = 5_000
 
 /** What `readStep` remembers between calls. */

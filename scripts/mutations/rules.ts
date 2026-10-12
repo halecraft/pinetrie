@@ -3325,7 +3325,7 @@ export const mutations: readonly Mutation[] = [
     to: "        replaced.from === null)",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
-      "decode: a paste names its card's move, from nowhere or a trash, after at most a discard of the card it replaces (ADR-0132)",
+      "decode: a paste names its card's move, after at most a discard of the card it replaces",
   },
   // ── a trash that records where the card was ──
   {

@@ -1,8 +1,5 @@
-// session/presence-seat — what this seat says about where it is (ADR-0024,
-// ADR-0037). Runs in a browser and in Node alike: it touches only the
-// Exchange.
-//
-// A person may be here from several seats, so each writes under its own key
+// session/presence-seat — what this seat says about where it is. A person
+// may be here from several seats, so each writes under its own key
 // (`seatKey`), and one leaving takes only its own entries with it.
 
 import type { Exchange } from "@kyneta/exchange"
@@ -29,7 +26,7 @@ export interface PresenceSeat {
   clearReading(columnKey: string): void
   /**
    * This seat is typing at `end`, in `card` when it is one already: the host
-   * pops no card someone is typing in (ADR-0048 step 7). Silence decays
+   * pops no card someone is typing in. Silence decays
    * both.
    */
   setTyping(end: string, card: CardId | null): void

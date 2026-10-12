@@ -1,17 +1,5 @@
 // session/connect — connect to a host and expose what the page and the e2e
 // suites read and send.
-//
-// Runs unmodified in a browser and in Node, because the only
-// environment-specific value is the WebSocket constructor. No pi, no React.
-//
-// `connectSession` connects, then wires its parts to each other: the roots
-// held (`root-docs.ts`), the cards' texts (`card-texts.ts`), this tab's moves
-// over the host's records (`localStep`), your inventory's slots
-// (`inventory-slots.ts`), what you have dealt with (`attention-doc.ts`),
-// this seat's presence (`presence-seat.ts`), and the requests to the host
-// (`host-line.ts`). Each part's decisions are pure
-// functions: `planHold` (`root-hold.ts`), `localStep`, `repairStep`,
-// `planChatRequest` (`chat.ts`).
 
 import {
   createUndoStack,
@@ -146,8 +134,8 @@ export interface ConnectOptions {
   readonly presenceDecay?: PresenceDecay
   readonly WebSocket: WebSocketCtor
   /**
-   * Who this client is: a person's email, the principal its Exchange names
-   * (ADR-0037). Kyneta issues the seat.
+   * Who this client is: a person's email, the principal its Exchange names.
+   * Kyneta issues the seat.
    */
   readonly principal: string
 }
@@ -163,30 +151,30 @@ export interface SessionClient {
    * than opening a second one, and so Node callers read the same document.
    */
   readonly exchange: Exchange
-  /** The session's records, the directory of roots among them (ADR-0063). */
+  /** The session's records, the directory of roots among them. */
   readonly session: SessionDocHandle
-  /** What is streaming now (ADR-0063): which lanes run, and their streams. */
+  /** What is streaming now: which lanes run, and their streams. */
   readonly live: LiveDocHandle
   /**
-   * The roots' documents this client holds (ADR-0063): those it was asked to
+   * The roots' documents this client holds: those it was asked to
    * hold (`holdRoots`), and a root it has just started, until then.
    */
   readonly roots: Readable<ReadonlyMap<RootId, RootDocHandle>>
   /**
    * Hold exactly `roots`' documents, and a root this client just started:
    * opened if new, and every other let go (`destroy`), which leaves the
-   * host's copy (S86).
+   * host's copy.
    */
   holdRoots(roots: ReadonlySet<RootId>): void
   /** The root a held document has `entry` in, or undefined. */
   rootOf(entry: EntryId): RootId | undefined
   /**
-   * Who is here (ADR-0024). Write it only through `setReading`,
+   * Who is here. Write it only through `setReading`,
    * `clearReading` and `setTyping`, which write under this seat's key.
    */
   readonly presence: PresenceDocHandle
   /**
-   * Every card's record (ADR-0059): the host's, with this tab's moves the
+   * Every card's record: the host's, with this tab's moves the
    * copy does not yet hold drawn over them (`withPending`). The places
    * document itself is never exposed, and a write to it throws
    * (`writersPolicy`). Move a card only through `createCard` and `moveCard`,
@@ -195,15 +183,15 @@ export interface SessionClient {
   readonly cards: Readable<readonly CardRecord[]>
   /**
    * Once this client's copy of the places has settled: what a task holds
-   * is there (ADR-0116), so the roots of the sidebar's tasks can be held.
+   * is there, so the roots of the sidebar's tasks can be held.
    */
   placesSettled(): Promise<void>
   /**
    * This tab's undo stack, narrowed to one card: undo and redo take only the
-   * steps that wrote its text, its creation among them (ADR-0052). The stack
+   * steps that wrote its text, its creation among them. The stack
    * itself is not exposed: its own `undo()` takes the tab's last step,
    * wherever that is. It is in memory, so it lasts until the tab reloads or
-   * closes (ADR-0048). Each undo and redo says what it did (`Undone`).
+   * closes. Each undo and redo says what it did (`Undone`).
    */
   undoFor(id: TextCardId): CardUndo
   /**
@@ -240,14 +228,14 @@ export interface SessionClient {
   cardText(id: TextCardId): TextDocHandle
   /**
    * Create a card holding `text`: its text in one undo step, so undoing past
-   * the first keystroke empties it, and a request that the host place it
-   * (ADR-0059), then one for its command when it has one. Into your
+   * the first keystroke empties it, and a request that the host place it,
+   * then one for its command when it has one. Into your
    * inventory, `how.slot` is the slot it takes.
    */
   createCard(card: NewCard, text: string, how?: MoveHow): Promise<MoveAnswer>
   /**
-   * Paste (ADR-0132): a text card's `text` written first, as a creation's
-   * is, then one request that discards the card it replaces (ADR-0133) and
+   * Paste: a text card's `text` written first, as a creation's
+   * is, then one request that discards the card it replaces and
    * makes the pasted card where `to` is, or moves a cut card out of your
    * trash there. Drawn there, and the replaced card gone, until the host
    * answers. Into your inventory, `how.slot` is the slot it takes.
@@ -264,14 +252,14 @@ export interface SessionClient {
     how?: MoveHow,
   ): Promise<MoveAnswer>
   /**
-   * Ask the host to move a card (ADR-0059), as the page planned it: a take
+   * Ask the host to move a card, as the page planned it: a take
    * into the inventory, a put, an unqueue, or a discard (to gone); a queue is
    * `queueCard`. Into your inventory with `how.slot`, the slot is written once the host
    * accepts, before the answer is recorded, so the repair never sees the
    * card held without its slot. `queuedBy`, for an unqueue, is who queued
    * the card: if the host popped it first, the refusal says it was sent, as
    * theirs. `here`, the task this tab is on, names the history of a
-   * discard from your inventory (ADR-0116). Resolves with the host's answer.
+   * discard from your inventory. Resolves with the host's answer.
    */
   moveCard(
     move: TypedMove,
@@ -280,8 +268,8 @@ export interface SessionClient {
     here?: TaskId | null,
   ): Promise<MoveAnswer>
   /**
-   * Ask the host to queue a card (ADR-0113): `move` into a queue, sent with
-   * its text's version as this client has it then (S96), and what it does to
+   * Ask the host to queue a card: `move` into a queue, sent with
+   * its text's version as this client has it then, and what it does to
    * that queue's hold, which the host decides with the move in one step.
    * A move with no `from` makes the card in the queue, empty, carrying
    * `command`: it never passes through another place. Drawn queued at once;
@@ -295,13 +283,13 @@ export interface SessionClient {
   ): Promise<MoveAnswer>
   /**
    * Ask the host to move a queued or pinned card among its neighbours, as
-   * the page saw them (ADR-0048 step 7), drawn there at once. Resolves with
+   * the page saw them, drawn there at once. Resolves with
    * the host's answer; a refusal is kept where you acted.
    */
   reorderCard(reorder: Reorder, how?: MoveHow): Promise<MoveAnswer>
   /**
    * Hand several cards at once, as one move the host accepts or refuses
-   * whole (a keep, ADR-0066), each with the slot it takes; `here`, as
+   * whole (a keep), each with the slot it takes; `here`, as
    * `moveCard`'s.
    */
   moveCards(
@@ -311,8 +299,7 @@ export interface SessionClient {
   ): Promise<MoveAnswer>
   /**
    * Undo or redo your newest move in `task`, or outside any task for none:
-   * the host's history of your moves there, from any of your tabs
-   * (ADR-0066, ADR-0126).
+   * the host's history of your moves there, from any of your tabs.
    */
   undoMoves(task: TaskId | null, direction: MoveDirection): Promise<Outcome>
   /**
@@ -322,7 +309,7 @@ export interface SessionClient {
   swapSlots(a: number, b: number): void
   /**
    * Undo or redo this tab's newest swap, whole or refused: refused, said at
-   * the inventory, when the slots it wrote have changed since (S90).
+   * the inventory, when the slots it wrote have changed since.
    */
   undoSwap(direction: MoveDirection): Promise<void>
   /** Keep a refusal: one made before anything was sent, or an undo's. */
@@ -339,14 +326,14 @@ export interface SessionClient {
    */
   readonly slots: Readable<Slots>
   /**
-   * What you have dealt with, on every device of yours (ADR-0077): how far
+   * What you have dealt with, on every device of yours: how far
    * you have read each thread, what you marked "not needed", the mentions
    * you have seen.
    */
   readonly attention: AttentionStore
   /**
    * The sidebar: the roots you have open, in your order, on every device of
-   * yours (ADR-0122). A root moved to the archive leaves it, but the one
+   * yours. A root moved to the archive leaves it, but the one
    * the page reports it shows (`here`).
    */
   readonly openThreads: OpenThreads
@@ -360,7 +347,7 @@ export interface SessionClient {
     action: OfferAction,
     to?: string | null,
   ): Promise<Outcome>
-  /** Set up accepted work, or publish it (ADR-0104, ADR-0090). Tracked in `acting`. */
+  /** Set up accepted work, or publish it. Tracked in `acting`. */
   actOnAccepted(action: AcceptedAction): Promise<Outcome>
   /** Your offer, setup and publish commands out now, or refused or failed (`acting.ts`). */
   readonly acting: Readable<ActingState>
@@ -433,7 +420,7 @@ export async function connectSession(
   const session = exchange.get(SESSION_DOC_ID, SessionDoc)
   const live = exchange.get(LIVE_DOC_ID, LiveDoc)
   const roots = rootDocs(exchange)
-  // Never written here: `cards` is how the page reads it (ADR-0059).
+  // Never written here: `cards` is how the page reads it.
   const places = exchange.get(PLACES_DOC_ID, PlacesDoc)
   const texts = cardTexts(
     exchange,
@@ -457,7 +444,7 @@ export async function connectSession(
     intents: () => intentsOf(local.current().moves),
   })
   // Before the directory arrives, a start would leave out every root not yet
-  // read, and their verdicts and mentions would count as new (S29).
+  // read, and their verdicts and mentions would count as new.
   const attention = attentionStore(exchange, me, host.peerId, () =>
     sync(session).readyFor(p => p.peerId === host.peerId)
       ? startOf(readRoots(session).values())
@@ -481,7 +468,7 @@ export async function connectSession(
     scope: id => cardIdOfDoc(id) !== undefined,
   })
   // This tab's swaps in your inventory, on the same document under their
-  // own key: a text's undo never takes a swap (S90). The repair writes
+  // own key: a text's undo never takes a swap. The repair writes
   // outside it, so an undo refuses a swap whose slots it changed.
   const swaps = await createUndoStack({
     exchange,
@@ -553,7 +540,7 @@ export async function connectSession(
 
   /**
    * A card's text version as this client has it now: what a queued card's
-   * pop, and a run's pinned cards, wait for the host to hold (S96). It opens
+   * pop, and a run's pinned cards, wait for the host to hold. It opens
    * a card's document this client does not hold yet, so it is called while
    * gathering, never from a plan.
    */
@@ -633,7 +620,7 @@ export async function connectSession(
           ? line.request(plan.intent, plan.id)
           : tracked(plan.intent, [plan.pending], null)
       return sent.then(({ outcome }) => {
-        // A task you start is in the sidebar (ADR-0122, ADR-0116).
+        // A task you start is in the sidebar.
         if (at.kind === "branch" && startsRoot(at, outcome))
           open.ensure(at.task)
         return outcome
@@ -775,7 +762,7 @@ export async function connectSession(
     },
     offer(lane, action, to = null) {
       // An acceptance names the offer this tab shows now: its record, as the strip
-      // drew it (ADR-0065).
+      // drew it.
       const seen =
         action === "accept" ? offerSeen(readOffers(session).get(lane)) : null
       return sendActing(acting, { kind: "offer", lane, action, to }, () =>

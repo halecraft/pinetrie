@@ -1,6 +1,5 @@
 // session/host-line — requests to the host, each answered by the reply that
-// carries its id. Runs in a browser and in Node alike: it is given the
-// Line's two ends, and touches nothing else.
+// carries its id.
 
 import type { Intent } from "@pinetrie/core"
 import {

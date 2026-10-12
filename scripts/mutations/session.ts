@@ -389,7 +389,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const gone = [...keys.keys()].filter(r => archived.has(r) && r !== here)",
     to: "  const gone = [...keys.keys()].filter(r => archived.has(r))",
     command: unit,
-    expect: "planOpenRepair: archived roots leave, but the one you are on",
+    expect: "planOpenRepair: archived tasks leave, but the one you are on",
   },
   {
     name: "a refused send at the root opens a root in the sidebar",

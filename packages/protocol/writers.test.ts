@@ -44,14 +44,14 @@ test.each(
 
 test.each(
   PERSON_DOC_KINDS,
-)("a person's %s document is held by that person only (ADR-0077)", kind => {
+)("a person's %s document is held by that person only", kind => {
   const doc = personDocId(kind, ADA)
   expect(holdsPersonDoc(doc, "Ada@X.io")).toBe(true)
   expect(holdsPersonDoc(doc, "bea@x.io")).toBe(false)
   expect(holdsPersonDoc("card:c-1", "ada@x.io")).toBeUndefined()
 })
 
-test("mayWrite: the session, the places, now, every root and every stack of moves are the host's; a person's document its person's, relayed by the host", () => {
+test("mayWrite: the host's documents are the host's; a person's is theirs, relayed by the host", () => {
   for (const doc of [
     SESSION_DOC_ID,
     PLACES_DOC_ID,

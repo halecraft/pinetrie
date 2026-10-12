@@ -1,8 +1,5 @@
-// session — one client's connection to a host: the documents it syncs and
-// the requests it sends, deciding nothing about what the page draws. It runs
-// unchanged in a browser and in Node, and declares no React. This lists
-// every name another package imports; a name only this package and its
-// tests use is not exported here.
+// session — one client's connection to a host. This lists every name another
+// package imports; a name only this package and its tests use is not here.
 
 export type { AcceptedActing, OfferActing, Unsuccessful } from "./acting.ts"
 export type { AttentionStore, SeenMentions } from "./attention-doc.ts"

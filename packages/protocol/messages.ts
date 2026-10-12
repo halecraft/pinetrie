@@ -1,22 +1,18 @@
-// protocol/messages — the host<->client contract, as plain values.
-//
-// ZERO imports. Not pi, not Kyneta, not Node. This file is the contract both
-// sides agree on; binding it to a transport happens in protocol/line.ts.
+// protocol/messages — the host<->client contract, as plain values. It
+// imports nothing, not pi, Kyneta or Node; `line.ts` binds it to a Line.
 
-/** Line topic for the command channel (ADR-0007: commands over a Line). */
 export const CONTROL_TOPIC = "pinetrie.control"
 
-/** Document ids replicated host -> client (ADR-0007: state over documents). */
 export const SESSION_DOC_ID = "pinetrie:session"
-/** Who is here, and what each person reads and types: ephemeral, never stored (ADR-0024). */
+/** Who is here, and what each person reads and types: ephemeral, never stored. */
 export const PRESENCE_DOC_ID = "pinetrie:presence"
 /**
- * Where every card is (ADR-0059): written only by the host, through handoffs.
- * Yjs (ADR-0066), under a new id so a store's `json` places never meet the
- * new schema under one id.
+ * Where every card is: written only by the host, through handoffs. Yjs,
+ * under an id of its own so a store's older `json` places never meet the
+ * Yjs schema under one id.
  */
 export const PLACES_DOC_ID = "pinetrie:card-places"
-/** What is streaming now (ADR-0063): written only by the host, and compacted at every run's end. */
+/** What is streaming now: written only by the host, and compacted at every run's end. */
 export const LIVE_DOC_ID = "pinetrie:live"
 
 /**
@@ -37,74 +33,75 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     sender's column, at `parentId` (`""`: the root). See `ChatAt` in
  *     @pinetrie/core;
  *     `asksAgent` marks a Start Agent column; `cardId` names the card its text
- *     was sent from, which the host spends once it is sent (ADR-0048), and
+ *     was sent from, which the host spends once it is sent, and
  *     `pinned` the versions of the thread's pinned cards its run waits for.
  *     It runs the agent only when the agent is its addressee (`address`).
  *   - `name` sets the sender's display name to `text`.
  *   - `picture` sets the sender's picture to the blob whose SHA-256 is
- *     `text`, or removes it with `""` (ADR-0098).
+ *     `text`, or removes it with `""`.
  *   - `stop` ends the running turn of the thread whose lane is `lane`.
  *   - `carry-on` starts a new turn on that thread after a stop, its prompt
- *     the host's carry-on message (ADR-0082).
+ *     the host's carry-on message.
  *   - `queue-hold` holds that thread's queue (`mode` `hold`) or releases
- *     it (`release`), ADR-0048 step 7.
+ *     it (`release`).
  *   - `unqueue-all` takes every message card queued on that thread back
  *     below the line.
- *   - `move-task` moves the task `task`'s card on the board (ADR-0122,
- *     ADR-0126): `text` is JSON `{ from, to, before }`, the state its
+ *   - `move-task` moves the task `task`'s card on the board: `text` is JSON `{ from, to, before }`, the state its
  *     sender saw it in, the state it goes to, and the task it goes before
  *     there, or null for the end. Answered `moved`, or `unmoved` as a
  *     card's move is.
- *   - `workflow` changes the board's states (ADR-0122): `mode` names the
+ *   - `workflow` changes the board's states: `mode` names the
  *     action (`add`, `rename`, `move`, `remove`), `targetId` the state (`""`
  *     to add), `text` its name, and `parentId` the state it goes before
  *     (`""` for after every open state).
  *   - `mark` titles the task `task`, or the note column `cardId`, with
- *     `text` (ADR-0045, ADR-0116); `""` clears its title.
- *   - `retitle` asks a model for the root `root`'s title (ADR-0074).
+ *     `text`; `""` clears its title.
+ *   - `retitle` asks a model for the root `root`'s title.
  *   - `offer` acts on that lane's offer in your repo; `mode` names the
  *     action: `accept`, `split`, `squash`, `describe` or `refresh`. An
  *     acceptance names its destination bookmark in `targetId`, `""` for the default,
  *     and what it was shown in `seen`.
- *   - `line` sets up accepted work (`mode` `setup`) or lands your
- *     work on it (`land`), ADR-0104.
+ *   - `setup` sets up accepted work; `publish` publishes your work on it.
  *   - `reserve` asks the host to name the thread whose lane will be `lane`,
- *     a new id the sender's column made, before the lane exists (ADR-0057).
- *   - `move` hands cards from place to place (ADR-0059): `moves` lists
+ *     a new id the sender's column made, before the lane exists.
+ *   - `move` hands cards from place to place: `moves` lists
  *     each card, where its sender saw it and where it goes, each an encoded
  *     key or null: no `from` creates the card, and no `to` removes it.
  *     The list is accepted whole or refused (a keep's several cards).
  *   - `queue-card` moves one card into a queue, as `move` does, and
  *     changes that queue's hold (`mode`: `keep`, `hold-if-idle` or
- *     `release`) in the same step (ADR-0113). A card it creates carries the
+ *     `release`) in the same step. A card it creates carries the
  *     command `targetId`.
- *   - `spin-off` makes a card a thread (ADR-0111): `moves` is its one move,
+ *   - `spin-off` makes a card a thread: `moves` is its one move,
  *     to gone, spun into the new root it names; `state` is the workflow
  *     state the root lands in, `""` for the first open state.
  *   - `reorder` moves the card `cardId` among its neighbours in its queue,
  *     among the pinned cards, in its note column or on its canvas: `moves`
  *     is `{ at, after, before }`, the key of where it is and the cards it
- *     goes after and before, `""` for none (ADR-0048 step 7, ADR-0116).
+ *     goes after and before, `""` for none.
  *   - `card-width` draws the card `cardId` on the canvas of the task
  *     `task`, where its sender saw it, one column wide (`mode` `1`) or two
- *     (`2`), ADR-0116.
+ *     (`2`).
+ *   - `open-thread` starts the thread `lane`, a new id, at `parentId` in the
+ *     root `root` and the task `task`, new ones its tab minted at the root;
+ *     `state` as for `spin-off`.
  *   - `copy-thread` copies the thread `lane` at its end `parentId` as its
- *     sender saw it (ADR-0117): `moves` is the copy's one move, its new
+ *     sender saw it: `moves` is the copy's one move, its new
  *     thread's card from nowhere onto a canvas spot or into the sender's
  *     inventory.
  *   - `paste` makes a card from a copy, or moves a cut one out of a trash
- *     by its cutter (ADR-0132): `mode` is `text`, `reference` or `uncut`;
+ *     by its cutter: `mode` is `text`, `reference` or `uncut`;
  *     `moves` ends with the card's move (from nowhere, or from a trash),
- *     after the discard of the card it replaces, if any (ADR-0133); `text`
+ *     after the discard of the card it replaces, if any; `text`
  *     is a reference's address, or a text card's origin (`""` for none),
  *     printed (`printAddress`); `seen` a reference's quote's blob; `here`
  *     the sender's task.
  *   - `undo-move` undoes (`mode` `undo`) or redoes (`redo`) the sender's
- *     newest move in the root `root` (ADR-0066).
+ *     newest move in the root `root`.
  *   - `set-command` sets the card `cardId`'s command to `mode`, or
- *     clears it with `""` (ADR-0108).
+ *     clears it with `""`.
  *   - `traces-seen` names the sender's traces they have seen, a JSON list
- *     of ids in `text`; the host deletes them (ADR-0048).
+ *     of ids in `text`; the host deletes them.
  */
 export const COMMAND_KINDS = [
   "chat",
@@ -137,13 +134,9 @@ export const COMMAND_KINDS = [
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
 /**
- * The wire shapes.
- *
- * ADR-0013 is enforced structurally here: neither type has a `seq` field, and
- * because they are exact interfaces rather than open records, adding one is a
- * compile error at every call site rather than something a reviewer has to
- * notice. `seq` is a replica-local arrival index; entry `id` is the durable
- * identifier.
+ * Neither wire shape has a `seq` field: `seq` is a replica-local arrival
+ * index, and an entry's `id` is what names it across replicas. As exact
+ * interfaces, adding one is a compile error at every call site.
  */
 export interface Command {
   readonly id: string
@@ -156,20 +149,20 @@ export interface Command {
    */
   readonly parentId: string
   /**
-   * `chat`: the root it writes in (ADR-0063); for a chat at the root, a new
+   * `chat`: the root it writes in; for a chat at the root, a new
    * root's id the sender's tab minted. `""` otherwise.
    */
   readonly root: string
   /**
    * `chat` and `spin-off`: the task a thread it starts goes in, for a new
-   * root a new task's id the sender's tab minted (ADR-0116); `move-task`,
+   * root a new task's id the sender's tab minted; `move-task`,
    * `mark`, `retitle` and `undo-move`: the task it acts on; `card-width`:
    * the task whose canvas its sender saw the card on. `""` otherwise.
    */
   readonly task: string
   /**
    * `move` and `spin-off`: the task its sender is on, which names a
-   * discard's history for a card in an inventory (ADR-0116). `""` for none.
+   * discard's history for a card in an inventory. `""` for none.
    */
   readonly here: string
   /**
@@ -179,7 +172,7 @@ export interface Command {
    */
   readonly mode: string
   /**
-   * `chat`: its thread (ADR-0117), which names its lane too; `stop`,
+   * `chat`: its thread, which names its lane too; `stop`,
    * `carry-on`, `unqueue-all`, `queue-hold`, `reserve`: the thread whose lane
    * it acts on.
    */
@@ -194,14 +187,14 @@ export interface Command {
    */
   readonly targetId: string
   /**
-   * `chat`: the card its text was sent from, or `""` (ADR-0048);
+   * `chat`: the card its text was sent from, or `""`;
    * `set-command`, `reorder`, `card-width`: the card.
    */
   readonly cardId: string
   /**
-   * `chat`: the card's text version as the sender had it (S96), or `""`.
-   * `offer` `accept`: what the acceptance was shown (`OfferSeen`,
-   * ADR-0065), as JSON; an acceptance without it is refused.
+   * `chat`: the card's text version as the sender had it, which the host
+   * waits for, since the text can reach it after the card's record; or `""`.
+   * `offer` `accept`: what the acceptance was shown (`OfferSeen`), as JSON; an acceptance without it is refused.
    */
   readonly seen: string
   /**
@@ -213,17 +206,17 @@ export interface Command {
   /**
    * `chat`: a JSON list of `{ card, seen }`, each card pinned at the
    * sender's thread end with its text version as the sender had it, which
-   * the run waits for (ADR-0048, S96); `""` otherwise.
+   * the run waits for; `""` otherwise.
    */
   readonly pinned: string
   /**
-   * `chat`: the WIP bookmark a lane it creates starts from, or `""` for the
-   * line (ADR-0104).
+   * `chat`: the WIP bookmark a lane it creates starts from, or `""` for
+   * accepted work.
    */
   readonly base: string
   /**
    * `chat` and `spin-off`: the workflow state a task it starts lands in,
-   * or `""` for the first open state (ADR-0122).
+   * or `""` for the first open state.
    */
   readonly state: string
 }
@@ -283,7 +276,7 @@ export interface Reply {
   readonly cards: string
   /**
    * The places document's `rev` after the command's step, when the step
-   * wrote it or refused a move; 0 otherwise (ADR-0059). A client draws its
+   * wrote it or refused a move; 0 otherwise. A client draws its
    * move until its copy reaches it.
    */
   readonly rev: number

@@ -6,9 +6,9 @@
 // encodes them back on the way out, so no `""`, no `?? ""` and no `.trim()` of
 // an id reaches decision logic.
 //
-// It owns every SHAPE rule. `planCommand` in @pinetrie/core owns only state
-// policy (ready, busy). Keeping all shape rules here means the order in which
-// a malformed command is refused is decided in exactly one function.
+// It owns every shape rule, so the order in which a malformed command is
+// refused is decided in one function; what the host's state allows is
+// `@pinetrie/rules`'.
 
 import {
   atEntry,
@@ -93,20 +93,19 @@ export type Outcome =
    * A chat sent from a card is queued instead (`queued`).
    */
   | { readonly kind: "busy" }
-  /** The lane was busy, so the host queued the chat's card behind the others (ADR-0059). */
+  /** The lane was busy, so the host queued the chat's card behind the others. */
   | { readonly kind: "queued" }
-  /** A move of cards, or a command on a card, was carried out (ADR-0059). */
+  /** A move of cards, or a command on a card, was carried out. */
   | { readonly kind: "moved" }
-  /** A thread's queue is held now, whoever held it first (ADR-0048 step 7). */
+  /** A thread's queue is held now, whoever held it first. */
   | { readonly kind: "held" }
-  /** A thread's queue is released now (ADR-0048 step 7). */
   | { readonly kind: "released" }
-  /** An undo or redo of moves moved these cards, each to the place it is now (ADR-0066). */
+  /** An undo or redo of moves moved these cards, each to the place it is now. */
   | { readonly kind: "undone"; readonly cards: readonly MovedCard[] }
   /** An undo or redo found nothing to do. */
   | { readonly kind: "nothing" }
   /**
-   * A move the host refused (ADR-0059): why, where the card is now (null
+   * A move the host refused: why, where the card is now (null
    * when it is gone), and who put it there.
    */
   | {
@@ -122,24 +121,24 @@ export type Outcome =
    */
   | { readonly kind: "conflict"; readonly by: WriterId | null }
   | { readonly kind: "named" }
-  /** The sender's picture is set, or removed (ADR-0098). */
+  /** The sender's picture is set, or removed. */
   | { readonly kind: "pictured" }
   | { readonly kind: "stopped" }
-  /** The workflow's states changed, or already were as asked (ADR-0122). */
+  /** The workflow's states changed, or already were as asked. */
   | { readonly kind: "workflow-changed" }
-  /** An entry's title is set or cleared (ADR-0045); also when it already was. */
+  /** A task's or a note column's title is set or cleared; also when it already was. */
   | { readonly kind: "marked" }
-  /** A model is asked for a root's title, which arrives as its mark (ADR-0074). */
+  /** A model is asked for a root's title, which arrives as its mark. */
   | { readonly kind: "retitling" }
-  /** The lane's offer is accepted into accepted work or a WIP now (ADR-0104). */
+  /** The lane's offer is accepted into accepted work or a WIP. */
   | { readonly kind: "accepted" }
   /** An offer action was carried out (squash, describe, refresh). */
   | { readonly kind: "offered" }
-  /** A thread is named before its lane exists, or already was (ADR-0057). */
+  /** A thread is named before its lane exists, or already was. */
   | { readonly kind: "reserved" }
-  /** Traces the sender has seen are gone (ADR-0048). */
+  /** Traces the sender has seen are gone. */
   | { readonly kind: "seen" }
-  /** Accepted work was set up, or published (ADR-0104, ADR-0090). */
+  /** Accepted work was set up, or published. */
   | { readonly kind: "accepted-moved" }
   | Refusal
   /**
@@ -181,7 +180,6 @@ export function decodeCommand(
   wire: WireCommand | null | undefined,
 ): Intent | Refusal {
   const kind = wire?.kind
-  // "" is the root. Only the codec knows that.
   const at = positionFromWire(text(wire?.parentId))
 
   if (kind === "name") {
@@ -284,7 +282,7 @@ export function decodeCommand(
   if (kind === "move") {
     const moves = decodeMoves(text(wire?.moves))
     if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
-    // One way into a queue, which decides its hold too (ADR-0113).
+    // `queue-card` is the one way into a queue, since it decides the hold too.
     if (moves.some(m => m.to.kind === "queued"))
       return refused(ERR.UNKNOWN_TARGET, "a card is queued by queue-card")
     const here = hereOf(wire)
@@ -432,7 +430,7 @@ export function decodeCommand(
     return { kind, paste, to: main.to, replacing, here }
   }
   if (kind === "undo-move") {
-    // "" names the sender's history outside any task (ADR-0126).
+    // "" names the sender's history outside any task.
     const task = text(wire?.task)
     if (task !== "" && !isTaskId(task))
       return refused(ERR.UNKNOWN_TARGET, `not a task: ${task}`)
@@ -574,7 +572,7 @@ export function decodeCommand(
 /**
  * Where a chat goes, from its mode and position: a reply at the end of the
  * thread it saw there; a branch at its fork, its card in the task named,
- * which at the root is a new one its tab minted (ADR-0116). Undefined for a
+ * which at the root is a new one its tab minted. Undefined for a
  * branch with no task. A reply at the root was refused before this.
  */
 function chatAtFromWire(
@@ -631,7 +629,6 @@ function offerSeenFromWire(wire: string): OfferSeen | null {
   return { ledger: { source: commitId(source), start: commits }, conflicted }
 }
 
-/** A chat's card on the wire, with its text's version: `""` is none. */
 /** The card a chat is sent from: null for none; undefined for an id that is no text card's. */
 const cardFromWire = (
   id: string,
@@ -648,7 +645,6 @@ const pinnedToWire = (pinned: readonly SentCard[]): string =>
     ? ""
     : JSON.stringify(pinned.map(p => ({ card: p.id, seen: p.seen })))
 
-/** The wire -> a chat's pinned cards; undefined for anything malformed. */
 /** The most traces one `traces-seen` names: a column's worth, and more. */
 export const MAX_TRACES_SEEN = 100
 
@@ -1104,7 +1100,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
 
 /**
  * Outcome -> the flat wire reply. `rev` is the places document's after the
- * command's step, when the step wrote it or refused a move (ADR-0059).
+ * command's step, when the step wrote it or refused a move.
  */
 export function encodeOutcome(
   id: string,

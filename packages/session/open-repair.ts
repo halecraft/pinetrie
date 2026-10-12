@@ -1,5 +1,5 @@
-// session/open-repair — what the sidebar's document should say (ADR-0122).
-// Pure: `open-threads.ts` writes what these decide.
+// session/open-repair — what the sidebar's document should say;
+// `open-threads.ts` writes it.
 
 import type { TaskId } from "@pinetrie/core"
 import { keyAfter, orderBetween, orderKeys } from "@pinetrie/rules"
@@ -61,7 +61,7 @@ export function placeInList(
 /**
  * The repair: archived tasks leave the sidebar, but the one you are on, which
  * leaves once you switch away. A restore then brings a task back only for
- * whoever restores it (ADR-0030). Nothing when nothing differs.
+ * whoever restores it. Nothing when nothing differs.
  */
 export function planOpenRepair(
   keys: ReadonlyMap<TaskId, string>,

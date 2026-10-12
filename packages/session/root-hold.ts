@@ -1,6 +1,5 @@
 // session/root-hold — what holding the roots asked for changes: which roots'
-// documents to open and which to let go (ADR-0063, S86). Pure; `root-docs.ts`
-// carries it out.
+// documents to open and which to let go; `root-docs.ts` carries it out.
 
 import type { RootId } from "@pinetrie/core"
 

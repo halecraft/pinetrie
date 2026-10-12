@@ -4,10 +4,10 @@
 // Kyneta judges `canWrite` against a peer's own identity for its local writes,
 // and against the sender of every offer. So one declaration refuses a client's
 // write to the places before anything is applied, rather than letting the
-// write diverge that client's copy for good (S28, S76), and refuses the same
+// write diverge that client's copy for good, and refuses the same
 // operations arriving from anyone else. It judges the sender, not the author:
 // the host relays an inventory between its person's tabs, so the host is one
-// of its writers, though it never writes one (ADR-0059).
+// of its writers, though it never writes one.
 
 import type { Policy } from "@kyneta/exchange"
 import {
@@ -25,8 +25,7 @@ import {
 
 /**
  * Whether only the host writes `docId`: the session, the places, what is
- * streaming, every root's document, and its stacks of people's moves
- * (ADR-0023, ADR-0059, ADR-0063, ADR-0066).
+ * streaming, every root's document, and its stacks of people's moves.
  */
 export const isHostDoc = (docId: string): boolean =>
   docId === SESSION_DOC_ID ||
@@ -36,8 +35,8 @@ export const isHostDoc = (docId: string): boolean =>
   docId.startsWith(MOVES_DOC_PREFIX)
 
 /**
- * A person's own documents (ADR-0059, ADR-0077, ADR-0122): their inventory,
- * what they have dealt with, and the roots they have open. Only that person's tabs
+ * A person's own documents: their inventory, what they have dealt with, and
+ * the roots they have open. Only that person's tabs
  * write one, and the host stores it and shares it with that person only.
  * Each kind is its own document, since each is written at its own rate and
  * keeps its own history.
@@ -70,7 +69,7 @@ export function ownerOfPersonDoc(
 
 /**
  * Whether the peer whose principal is `principal` is the person whose
- * document `docId` is; undefined for any other document. Pure.
+ * document `docId` is; undefined for any other document.
  */
 export function holdsPersonDoc(
   docId: string,
@@ -86,7 +85,7 @@ export function holdsPersonDoc(
  * Whether the peer whose principal is `principal` may write `docId`;
  * undefined leaves it to the other policies. The session, the places and
  * `pinetrie:live` are the host's (`isHostDoc`); a person's document is that
- * person's, relayed by the host. Pure.
+ * person's, relayed by the host.
  */
 export function mayWrite(
   docId: string,

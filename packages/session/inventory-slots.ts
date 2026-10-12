@@ -1,12 +1,7 @@
 // session/inventory-slots — your inventory document's slots, repaired from
-// the host's record (ADR-0059, S76, S79). Runs in a browser and in Node
-// alike: it touches only the Exchange and the clock.
-//
-// The slots are written by this person's tabs only, and repaired on every
-// change, but only once the host's copy has reached this one: repaired
-// before then, an empty copy would fill slots that the stored layout already
-// names, and the merge would move cards. `repairStep` (`inventory.ts`)
-// decides each repair, and when to look again.
+// the host's record on every change once the host's copy has reached this
+// one: an empty copy repaired earlier would fill slots the stored layout
+// already names, and the merge would move cards.
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"

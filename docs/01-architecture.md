@@ -117,7 +117,7 @@ packages/     libraries; their boundaries are enforced by resolution
   core/          @pinetrie/core         declares NOTHING; pure decisions and types
   schema/        @pinetrie/schema       Kyneta only; the document shape (TECHNICAL.md)
   pi/            @pinetrie/pi           THE pi boundary (TECHNICAL.md)
-  protocol/      @pinetrie/protocol     the wire contract and its codec
+  protocol/      @pinetrie/protocol     the wire contract and its codec (TECHNICAL.md)
   rules/         @pinetrie/rules        each stored shape and the pure rules about it (TECHNICAL.md)
   reads/         @pinetrie/reads        document reads shared by the host and the client
   channel/       @pinetrie/channel      declares NOTHING; a held JSON-lines channel to a server process (TECHNICAL.md)

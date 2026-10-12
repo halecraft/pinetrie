@@ -1,8 +1,6 @@
-// session/attention-doc — what you have dealt with (ADR-0077), in your own
-// attention document: how far you have read each thread, what you marked
-// "not needed", and the mentions you have seen. Every write waits for the
-// host's copy (`PersonDoc.ready`, S101); read marks are timed by
-// `readStep`. Runs in a browser and in Node alike.
+// session/attention-doc — what you have dealt with, in your own attention
+// document: how far you have read each thread, what you marked "not needed",
+// and the mentions you have seen. Every write waits for `PersonDoc.ready`.
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
@@ -13,11 +11,11 @@ import { personDoc } from "./person-doc.ts"
 import { NO_READS, type ReadMemory, readStep } from "./read-marks.ts"
 import type { Readable } from "./store.ts"
 
-/** Lower than every entry id (uuidv7, S9): where a person starts in an empty session. */
+/** Lower than every entry id (a uuidv7): where a person starts in an empty session. */
 export const EARLIEST = "0"
 
 /**
- * Where a person with nothing stored starts (ADR-0077): the newest entry in
+ * Where a person with nothing stored starts: the newest entry in
  * the directory, so everything so far is before them and they start with no
  * backlog; `EARLIEST` when the directory is empty.
  */

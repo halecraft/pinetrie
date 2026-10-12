@@ -1,10 +1,6 @@
-// session/root-docs — the roots' documents this client holds (ADR-0063, S86).
-// Runs in a browser and in Node alike: it touches only the Exchange.
-//
-// Kyneta takes in every announced document whose schema a client knows, and
-// every root's is the session's, so a `canShare` policy declines each root
-// this client does not hold. `planHold` (`root-hold.ts`) decides what to
-// open and let go of; this module carries it out.
+// session/root-docs — the roots' documents this client holds, and a
+// `canShare` policy that declines every other: Kyneta takes in every
+// announced document whose schema a client knows, and every root's is one.
 
 import type { Exchange } from "@kyneta/exchange"
 import {
@@ -38,7 +34,7 @@ export interface RootDocs {
   /**
    * The root a write at `at` goes to: its entry's, or, at the root, one this
    * client starts and holds until the page asks for it too: `minting`, the
-   * root a new tab minted as it opened (ADR-0066), or, for a send at the
+   * root a new tab minted as it opened, or, for a send at the
    * root that names none (a script's), one minted here.
    */
   rootFor(at: ChatAt, minting?: RootId): RootId | undefined

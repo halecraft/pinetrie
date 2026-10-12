@@ -1,10 +1,9 @@
-// protocol/line — binds the message contract to a Kyneta Line.
-//
-// Imports Kyneta's PUBLIC schema/Line API only. No pi. No Kyneta internals.
+// protocol/line — binds the message contract to a Kyneta Line, through
+// Kyneta's public schema and Line API only.
 //
 // A client opens its Line with `sender()` and `claimReceiver()`, addressed to
 // the host's seat, which Kyneta issues and the client finds by the host's
-// principal (`whenPeer`, ADR-0037). The host accepts Lines with
+// principal (`whenPeer`). The host accepts Lines with
 // `Line.listen(exchange)` and `.onReceive`, which names the client's seat.
 
 import { Line } from "@kyneta/exchange"
@@ -19,18 +18,10 @@ const Command = Schema.struct({
   id: Schema.string(),
   kind: Schema.string(...COMMAND_KINDS),
   text: Schema.string(),
-  /** Where the sender was reading, or "" for the root (schemas are total). */
   parentId: Schema.string(),
-  /** A chat's root, or "" for other kinds (ADR-0063). */
   root: Schema.string(),
-  /**
-   * A branch's or a spin-off's task, or the task a move on the board, a
-   * mark, a retitle or an undo of moves acts on; "" for other kinds (ADR-0116).
-   */
   task: Schema.string(),
-  /** A move's or a spin-off's sender's task, or "" (ADR-0116). */
   here: Schema.string(),
-  /** A chat's mode, or "" for other kinds. */
   mode: Schema.string(),
   lane: Schema.string(),
   asksAgent: Schema.boolean(),
@@ -40,7 +31,6 @@ const Command = Schema.struct({
   seen: Schema.string(),
   moves: Schema.string(),
   pinned: Schema.string(),
-  /** A chat's workflow state for a root it starts, or "" (ADR-0122). */
   state: Schema.string(),
 })
 

@@ -1,14 +1,6 @@
-// session/inventory — your inventory's slots (ADR-0048 step 4, ADR-0059). Pure.
-//
-// The host says which cards are in your inventory; your inventory document
-// says which slot holds each. Your tabs write that document at once, so each
-// repairs it from the host's record, writing only what differs (S76). One
-// rule, `settleSlots`, says what the slots should be: the repair writes it,
-// the page's panel draws it (`inventoryView`, `@pinetrie/interface`), and a take
-// into the inventory lands by the same `firstEmpty`, so what is drawn and
-// what is written cannot differ. A take into the inventory this tab has in
-// flight is an intent: drawn in the slot it chose, and left alone by the
-// repair until the host answers and the take writes its own slot.
+// session/inventory — which slot of your inventory holds each card the host
+// says you hold: one rule (`settleSlots`) that the page draws and the repair
+// writes, so what is drawn and what is written cannot differ.
 
 import {
   type CardId,
@@ -93,7 +85,7 @@ export function settleSlots(
 }
 
 /**
- * The repair (ADR-0059, S76): the writes that bring `slots` to
+ * The repair: the writes that bring `slots` to
  * `settleSlots`. An intent's slot, and a slot holding an intent's card, are
  * left alone: the take into the inventory writes them itself once the host
  * accepts it. Nothing to do gives no writes, so two tabs never write back

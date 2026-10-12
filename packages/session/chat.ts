@@ -1,5 +1,5 @@
 // session/chat — a chat as this client asks the host for it: how it is sent
-// (`ChatHow`), and what sending it does (`planChatRequest`). Pure.
+// (`ChatHow`), and what sending it does (`planChatRequest`).
 
 import {
   type ChatAt,
@@ -28,18 +28,18 @@ export interface ChatHow {
   readonly card?: TextCardId
   /**
    * The cards pinned at the column's thread end: the run waits for each as
-   * this client has it (ADR-0048).
+   * this client has it.
    */
   readonly pinned?: readonly TextCardId[]
   /** The column it is sent from, where a refusal of its card's move is said. */
   readonly column?: string
-  /** The root a new tab minted as it opened: where its first send starts (ADR-0066). */
+  /** The root a new tab minted as it opened: where its first send starts. */
   readonly root?: RootId
-  /** The WIP bookmark a lane this send creates starts from; absent, accepted work (ADR-0104). */
+  /** The WIP bookmark a lane this send creates starts from; absent, accepted work. */
   readonly base?: string
   /**
    * The workflow state a root this send starts lands in; absent, the first
-   * open state (ADR-0122).
+   * open state.
    */
   readonly state?: WorkflowStateId
 }
@@ -99,7 +99,7 @@ export interface ChatRequestPlan {
 /**
  * A chat as this client sends it, from what the session gathered: the root
  * it is written in, the card it is sent from as drawn, and each card's text
- * version as this client has it, which the host waits for (S96). It never
+ * version as this client has it, which the host waits for. It never
  * refuses: the gather has already minted and held a root for a send at the
  * root (`RootDocs.rootFor`), so a refusal added here must move that minting
  * after the plan.
@@ -140,7 +140,7 @@ export function planChatRequest(input: {
 
 /**
  * Whether a send's answer started a root: a thread at the root written, as
- * a conversation or a run (ADR-0122). The session then puts the root in your
+ * a conversation or a run. The session then puts the root in your
  * list, so a root you start is yours.
  */
 export const startsRoot = (at: ChatAt, outcome: Outcome): boolean =>

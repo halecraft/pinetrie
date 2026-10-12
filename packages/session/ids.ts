@@ -1,5 +1,5 @@
 // session/ids — ids this client mints: uuidv7, so they sort oldest first and
-// no two writers mint one key (ADR-0016).
+// no two writers mint one key.
 
 import {
   cardIdOfKind,
@@ -30,29 +30,29 @@ export const newCardId = (): TextCardId => textCardId(newUuidv7())
 
 /**
  * A new note column's id, minted by the page that makes the column with a
- * move (ADR-0116). `parseCardId` accepts only this shape.
+ * move. `parseCardId` accepts only this shape.
  */
 export const newNoteColumnId = (): NoteColumnId =>
   cardIdOfKind("note-column", newUuidv7())
 
-/** A new reference card's id (ADR-0126): minted by the page that takes or puts it. */
+/** A new reference card's id: minted by the page that takes or puts it. */
 export const newReferenceCardId = (): ReferenceCardId =>
   cardIdOfKind("reference", newUuidv7())
 
 /**
  * A new thread's lane id, reserved by a column before the lane exists
- * (ADR-0057). The host accepts only this shape (`parseNewThread`).
+ * The host accepts only this shape (`parseNewThread`).
  */
 export const newThreadId = (): ThreadId => threadIdFor(newUuidv7())
 
 /**
  * A new root's id, minted by the tab whose first message starts it
- * (ADR-0063). The host accepts only this shape (`parseNewRoot`).
+ * The host accepts only this shape (`parseNewRoot`).
  */
 export const newRootId = (): RootId => rootIdFor(newUuidv7())
 
 /**
  * A new task's id, minted by the tab that opens it, as it mints a root's
- * (ADR-0116). The host accepts only this shape (`parseNewTask`).
+ * The host accepts only this shape (`parseNewTask`).
  */
 export const newTaskId = (): TaskId => taskIdFor(newUuidv7())

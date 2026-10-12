@@ -7,7 +7,8 @@ import { attentionStore, EARLIEST, startOf } from "./attention-doc.ts"
 const ME = writerId("ada@x.io")
 const LANE = threadIdFor("a")
 
-test("before the host's copy arrives, your attention document is not written: an early write could undo another device's (S101)", () => {
+test("before the host's copy arrives, your attention document is not written", () => {
+  // An early write could undo another device's.
   const exchange = new Exchange({ principal: "ada@x.io" })
   const store = attentionStore(exchange, ME, "seat-host", () => "0")
   store.read(LANE, entryId("e-1"))

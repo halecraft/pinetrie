@@ -81,7 +81,7 @@ const accepted = (id: string, rev: number): MovesEvent => ({
 const changed = (rev: number): MovesEvent => ({ kind: "changed", rev })
 const placeOf = (records: readonly CardRecord[]) => records[0]?.place.kind
 
-describe("the tab's moves (ADR-0059)", () => {
+describe("the tab's moves", () => {
   const host = [card()]
 
   test("sent: a creation, a move and a move out are drawn at once", () => {
@@ -117,7 +117,7 @@ describe("the tab's moves (ADR-0059)", () => {
     expect(s.pending).toEqual([])
   })
 
-  test("overtaken: accepted, then the queued card's pop removes it before the copy catches up; nothing stays drawn", () => {
+  test("overtaken: an accepted move whose card the pop removes leaves nothing drawn", () => {
     const s = run([sent(queueIt), accepted("m-1", 4)])
     // The copy goes from atEnd straight to gone, at rev 5.
     const after = movesStep(s, changed(5))
@@ -141,7 +141,7 @@ describe("the tab's moves (ADR-0059)", () => {
     expect(s.notices).toEqual([refusal])
   })
 
-  test("an accepted discard is kept as a notice where you made it, until your next move there; drawn gone until then", () => {
+  test("an accepted discard is a notice where you made it until your next move there, drawn gone until then", () => {
     const gone = { kind: "trash", why: { kind: "discarded" } } as const
     const discard = {
       ...sentAs,
@@ -205,7 +205,7 @@ describe("the tab's moves (ADR-0059)", () => {
     expect(queuedDraft(queueIt.move, ME, "split")).toBeNull()
   })
 
-  test("a reorder is drawn where the host would put it, its queuer kept, until the copy reaches its rev (ADR-0048 step 7)", () => {
+  test("a reorder is drawn where the host would put it, its queuer kept, until the copy reaches its rev", () => {
     const key = (n: number) => n.toString(36).padStart(10, "0")
     const q = (id: string, n: number) =>
       card({
@@ -245,7 +245,7 @@ describe("the tab's moves (ADR-0059)", () => {
 describe("answerOf", () => {
   const context = { card: C1, actedAt: COLUMN, queuedBy: null }
 
-  test("a send: written, running or queued is accepted at the reply's rev; busy and the rest are dropped unworded", () => {
+  test("a send: written, running or queued is accepted at the reply's rev; the rest dropped unworded", () => {
     for (const outcome of [
       { kind: "appended", id: entryId("e-2") },
       { kind: "queued" },
@@ -304,7 +304,7 @@ describe("answerOf", () => {
   })
 })
 
-describe("a command of several moves: a keep (ADR-0066)", () => {
+describe("a command of several moves: a keep", () => {
   const C2 = cardIdFor("c2")
   const inventory = { kind: "inventory", holder: ME } as const
   const keeping = (card: typeof C1, slot: number): Pending => ({
@@ -451,7 +451,7 @@ describe("records, moves and cards, in one step", () => {
   })
 })
 
-describe("drawnPlace (ADR-0116)", () => {
+describe("drawnPlace", () => {
   const task = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
   const thread: CardRecord = {
     kind: "thread",
@@ -473,7 +473,7 @@ describe("drawnPlace (ADR-0116)", () => {
     place: { kind: "canvas", task, order: "0000000200", width: 1 },
     content: NO_CONTENT,
   }
-  test("a thread's nearest notes are drawn in the column the host would choose; nowhere while the host would make one", () => {
+  test("a thread's nearest notes are drawn in the column the host would choose, or nowhere yet", () => {
     const to = { kind: "notes", near: "thread", thread: LANE } as const
     expect(drawnPlace(to, ME, [thread, notes])).toEqual({
       kind: "note",

@@ -1,8 +1,5 @@
-// session/open-threads — the sidebar: the tasks you have open, in your order
-// (ADR-0122), in your own document, the same on every device of yours.
-// Every write waits for the host's copy (`PersonDoc.ready`, S101), and the
-// list is repaired on every change: a task moved to the archive leaves
-// it (`planOpenRepair`). Runs in a browser and in Node alike.
+// session/open-threads — the sidebar: the tasks you have open, in your
+// order, in your own document. Every write waits for `PersonDoc.ready`.
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"

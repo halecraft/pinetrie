@@ -1,20 +1,6 @@
 // session/card-moves — the moves this tab sent, drawn until its copy of the
-// places document holds them (ADR-0059). Pure.
-//
-// The host writes every place and answers each move. The answer travels on
-// the command Line and the change to `places` travels apart from it, so
-// either can reach this tab first. A move the host accepted is therefore
-// drawn until the copy's `rev` reaches the one the answer carried: a copy at
-// that `rev` holds the move and everything before it, whatever happened to
-// the card since. Dropped at the answer alone, the card would jump back for
-// a moment; dropped when the card looks moved, a move overtaken before the
-// copy caught up (popped from its queue, or moved back) would never show, and would be drawn
-// for good. A send is a move of its card too: out of the composer. So is a
-// reorder (ADR-0048 step 7), drawn as the host's own rule would write it.
-//
-// The history of moves is the host's (ADR-0066), not kept here. The slot a
-// take into the inventory chose is an intent until the take is answered
-// (`intentsOf`): the repair leaves it alone (`inventory.ts`).
+// places document reaches the `rev` the host's answer carried. The answer and
+// the change to the places reach the tab in either order.
 
 import {
   type CardCommand,
@@ -37,7 +23,7 @@ import type { Intents } from "./inventory.ts"
 
 /**
  * Where you were looking when you acted: a column, by key, the inventory,
- * or the board (a task's card moved there, ADR-0126). A refusal is drawn
+ * or the board (a task's card moved there). A refusal is drawn
  * there (`CardNotice`).
  */
 export type ActedAt =
@@ -111,7 +97,7 @@ export type Pending =
 /**
  * Something of yours to say where you acted, kept until your next move
  * there: a move or an undo the host refused, an undone swap whose slots
- * changed since, or a discard the undo key can bring back (ADR-0111).
+ * changed since, or a discard the undo key can bring back.
  */
 export type CardNotice = {
   /** The card it was about; null when no one card is named. */
@@ -132,7 +118,7 @@ export type CardNotice = {
   | { readonly code: "slots-changed" }
   /**
    * A drop or a paste on a filled slot whose card may not be discarded, so
-   * nothing replaces it (ADR-0133): `card` names that card.
+   * nothing replaces it: `card` names that card.
    */
   | { readonly code: "not-replaced" }
   /** A thread's copy aimed at a filled slot: it lands only in an empty one. */
@@ -319,8 +305,8 @@ export function slotOnAccept(
 
 /**
  * `move` with its queue's text version as this client has it: the host pops
- * a queued card only once it holds that much (S96). Any other move is
- * returned as it is.
+ * a queued card only once it holds that much, since a card's text can reach
+ * it after its record. Any other move is returned as it is.
  */
 export const stampSeen = (move: QueueMove, seen: string): QueueMove => ({
   ...move,

@@ -1,8 +1,7 @@
-// session/person-doc — one of your own documents (ADR-0059, ADR-0077): your
-// inventory or your attention, written only by your tabs and relayed by the
-// host to you alone. A write made before the host's copy has arrived can
-// win over a later one from another of your devices (S101), so a writer
-// asks `ready()` first. Runs in a browser and in Node alike.
+// session/person-doc — one of your own documents, written only by your tabs
+// and relayed by the host to you alone. A write made before the host's copy
+// has arrived can win over a later one from another of your devices, so a
+// writer asks `ready()` first.
 
 import { sync } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"

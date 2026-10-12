@@ -64,7 +64,12 @@ it.
   written, only once the host's copy has reached this one (`personDoc`'s
   `ready`, S101).
 - **The host is found by principal** (`HOST_PRINCIPAL`, `whenPeer`), since
-  its seat is Kyneta's to issue: a Line is addressed by seat.
+  its seat is Kyneta's to issue: a Line is addressed by seat. A client's
+  principal is its person's email, and each tab is a seat (ADR-0037).
+- **Every id this client mints is a uuidv7** (`ids.ts`), so ids sort
+  oldest first and no two writers mint one key (ADR-0016, S9). The host
+  accepts a new thread's, root's or task's id only in that shape (ADR-0057,
+  ADR-0063, ADR-0116).
 - **A closed line answers at once** (`HostLine.close`). When the host
   leaves, or the client closes, every request waiting is answered
   `failed`, and every later one at once, with nothing sent: a client does
@@ -172,10 +177,16 @@ session or someone else's inventory throws before it is made.
   (`ActedAt`: a column's key, the inventory, or the board, ADR-0126), and
   its notice is drawn there. A move on the board asks for no card's move:
   it says it acted there (`acted`), and the refusal said there before goes.
+- **A paste is a creation** (`paste`, ADR-0132): a text card's text is
+  written first, then one request discards the card on the filled slot it
+  replaces, if any, and makes the pasted card, or moves a cut card out of
+  your trash. A card that may not be discarded is not replaced, and says so
+  (`not-replaced`, ADR-0133).
 - **A send is pending as a send** (`sendPendingOf`): its card is drawn
   nowhere until the copy holds what the host did with it. A move always
   names where the card goes.
-- **An undo of moves waits for the copy** (`whenRev`): the session sends
+- **An undo of moves waits for the copy** (`whenRev`): the history of
+  moves is the host's (ADR-0066), not kept here. The session sends
   `undo-move` and resolves once its copy of the places reaches the reply's
   `rev`.
 - **The store** is `snapshotStore` (`store.ts`): a new value tells its
@@ -205,7 +216,7 @@ session or someone else's inventory throws before it is made.
   (`CardPlace` `inventory`, `heldBy`); your inventory document
   (`inventory:<you>`, `InventoryDoc`) says which slot holds each. The
   session opens it and repairs it on every change (`repairStep`:
-  `steadiness`, then `planSlots`).
+  `steadiness`, then `planSlots`), since your tabs write it at once (S76).
 - **`settleSlots` is the one slot rule**: the page's panel draws it
   (`inventoryView`, `@pinetrie/interface`), the repair writes towards it, and a
   take into the inventory lands by the same `firstEmpty`: the selected slot if empty, else the
@@ -277,8 +288,8 @@ the two merge (S101), so a writer asks `ready()` first.
 `SessionClient.offer` and `.line` go through `sendActing`, which marks the
 command `sent` in the `acting` store at once and records the answer when it
 comes; `nextActing` decides. A refusal or failure stays until your next
-command on that lane (or accepted work); an answer that carried it out clears
-it, since the record then says how things stand. An acceptance names the offer
+command on that lane (or accepted work, ADR-0104); an answer that carried
+it out clears it, since the record then says how things stand. An acceptance names the offer
 this tab's record shows as it sends (`offerSeen`, ADR-0065). A split is
 no offer command: it is a card's command, queued (ADR-0080).
 A refusal keeps its code (`Unsuccessful.code`). A setup or publish's

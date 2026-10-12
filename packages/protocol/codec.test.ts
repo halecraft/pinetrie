@@ -1,8 +1,4 @@
-// The protocol codec: the one place wire sentinels are understood.
-//
-// It owns every SHAPE rule. These cases moved here from planCommand's tests
-// when the rules did, and keep their meaning: in particular, empty text is
-// still reported ahead of a missing parent.
+// The codec's shape rules. Empty text is reported ahead of a missing parent.
 
 import assert from "node:assert/strict"
 import {
@@ -90,7 +86,7 @@ test('decode: parentId "" is the root, where only a branch starts a thread', () 
   )
 })
 
-test("decode: a reply continues the thread it names, from the end its sender saw (ADR-0117)", () => {
+test("decode: a reply continues the thread it names, from the end its sender saw", () => {
   const reply = decodeCommand({
     kind: "chat",
     text: "hi",
@@ -106,7 +102,7 @@ test("decode: a reply continues the thread it names, from the end its sender saw
   })
 })
 
-test("decode: a chat names its root (ADR-0063): a new one, minted, at the root; one it is in, at an entry", () => {
+test("decode: a chat names its root: a new one, minted, at the root; one it is in, at an entry", () => {
   const at = (parentId: string, root: string) =>
     decodeCommand({
       kind: "chat",
@@ -123,7 +119,7 @@ test("decode: a chat names its root (ADR-0063): a new one, minted, at the root; 
   assert.equal(refusalCode(at("e-1", "")), ERR.UNKNOWN_TARGET)
 })
 
-test("decode: queue is the host's own mode, never a client's (ADR-0048)", () => {
+test("decode: queue is the host's own mode, never a client's", () => {
   assert.equal(
     refusalCode(
       decodeCommand({
@@ -137,7 +133,7 @@ test("decode: queue is the host's own mode, never a client's (ADR-0048)", () => 
   )
 })
 
-test("decode: the update command is gone (ADR-0108): an unknown kind", () => {
+test("decode: an update command is an unknown kind", () => {
   assert.equal(
     refusalCode(decodeCommand({ kind: "update", lane: "lane:abc" })),
     ERR.UNKNOWN_KIND,
@@ -525,7 +521,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
   }
 })
 
-test("a picture names a stored image's hash, or none (ADR-0098); anything else is refused", () => {
+test("a picture names a stored image's hash, or none; anything else is refused", () => {
   const picture = (text: string) =>
     decodeCommand(command({ id: "c", kind: "picture", text }))
   assert.deepEqual(picture(""), { kind: "picture", sha256: null })
@@ -654,7 +650,7 @@ test("a reply carries the places document's rev when its step wrote it; none is 
   assert.equal(revOfReply(encodeOutcome("c", { kind: "named" })), null)
 })
 
-test("a note's key carries its column, and a thread's nearest notes its thread (ADR-0116)", () => {
+test("a note's key carries its column, and a thread's nearest notes its thread", () => {
   const note = {
     kind: "note",
     column: cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1"),
@@ -676,7 +672,7 @@ test("a note's key carries its column, and a thread's nearest notes its thread (
   assert.equal(decodeKey('{"kind":"notes","lane":"t-x"}'), undefined)
 })
 
-test("a move's target may be a spot on a canvas, after a card or first, and no place (ADR-0116)", () => {
+test("a move's target may be a spot on a canvas, after a card or first, and no place", () => {
   const made = cardIdOfKind(
     "note-column",
     "01a0ffd2-0000-7000-8000-0000000000a1",
@@ -726,7 +722,7 @@ test("a move's target may be back where a trashed card was, or a new task; neith
   assert.equal(decodeKey('{"kind":"back"}'), undefined)
 })
 
-test("decode: a move is typed by its card's kind, refused to or from a place that kind is never in (ADR-0117); a spot on a canvas for a kind WRAPS (ADR-0126)", () => {
+test("decode: a move is refused to or from a place its card's kind is never in", () => {
   const canvas = { kind: "canvas", task: TEST_TASK } as const
   const inventory = {
     kind: "inventory",
@@ -760,7 +756,7 @@ test("decode: a move is typed by its card's kind, refused to or from a place tha
     "string",
   )
   // A text card never onto a canvas by its key; at a spot there, the host
-  // makes it a note column (`WRAPS`, ADR-0126). A fact, at neither.
+  // makes it a note column (`WRAPS`). A fact, at neither.
   assert.equal(decoded(cardIdFor("c1"), inventory, queued), "object")
   assert.equal(decoded(cardIdFor("c1"), inventory, canvas), "string")
   const spot = { ...canvas, kind: "canvas-at", after: null } as const
@@ -791,7 +787,7 @@ test("decode: a move is typed by its card's kind, refused to or from a place tha
   assert.ok(nor)
 })
 
-test("decode: a paste names its card's move, from nowhere or a trash, after at most a discard of the card it replaces (ADR-0132)", () => {
+test("decode: a paste names its card's move, after at most a discard of the card it replaces", () => {
   const ada = { kind: "inventory", holder: writerId("ada@x.io") } as const
   const wire = (over: Record<string, string>) =>
     decodeCommand({
@@ -835,7 +831,7 @@ test("decode: a paste names its card's move, from nowhere or a trash, after at m
   expect(refusalCode(wire({ mode: "copy" }))).toBe(ERR.UNKNOWN_TARGET)
 })
 
-test("decode: a copy names its source, the end it forks at, and one new thread's card onto a canvas or into an inventory (ADR-0117)", () => {
+test("decode: a copy names its source, the end it forks at, and its new thread's card's one move", () => {
   const wire = (over: Record<string, string>) =>
     decodeCommand({
       kind: "copy-thread",
@@ -871,7 +867,7 @@ test("decode: a copy names its source, the end it forks at, and one new thread's
   expect(refusalCode(wire({ moves: moved }))).toBe(ERR.UNKNOWN_TARGET)
 })
 
-test("decode: a mark names a task or a note column, never both or neither (ADR-0116)", () => {
+test("decode: a mark names a task or a note column, never both or neither", () => {
   const N = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1")
   assert.equal(
     refusalCode(decodeCommand({ kind: "mark", task: TEST_TASK, cardId: N })),
@@ -904,7 +900,7 @@ test('decodeKey: "" is none; anything malformed is undefined', () => {
   assert.equal(decodeKey('{"kind":"fresh","column":"k"}'), undefined)
 })
 
-test("decode: a move needs its cards, each with a place, and its sender's task a task or none; set-command a known command; an undo a root and a direction", () => {
+test("decode: a malformed move, command, width or undo of moves is refused", () => {
   const unstarted = { kind: "composing", thread: NEW_THREAD } as const
   for (const wire of [
     { kind: "move", moves: encodeMoves([]) },
@@ -956,7 +952,7 @@ test("decode: a move needs its cards, each with a place, and its sender's task a
     { kind: "card-width", cardId: cardIdFor("c1"), task: TEST_TASK, mode: "3" },
     { kind: "undo-move", task: "r-x", mode: "undo" },
     { kind: "undo-move", root: TEST_ROOT, mode: "sideways" },
-    // Accepted work command is gone: setup and publish are commands of their own (ADR-0100).
+    // `line` is no kind: setup and publish are commands of their own.
     { kind: "line", mode: "publish" },
   ])
     assert.equal(decodeCommand(wire).kind, "refused")
@@ -982,7 +978,7 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
   assert.equal(out.kind === "refused" ? out.code : "", ERR.UNKNOWN_KIND)
 })
 
-test("decode: a spin-off names one move to the trash, a new root and its thread, a new task, and a known state or none (ADR-0111, ADR-0126)", () => {
+test("decode: a spin-off names its move to the trash, a new root, thread and task, and a state or none", () => {
   const trash = { kind: "discarded" }
   const from = { kind: "inventory", holder: "ada@example.com" }
   const moves = (to: unknown) =>
@@ -1006,7 +1002,7 @@ test("decode: a spin-off names one move to the trash, a new root and its thread,
     assert.equal(decodeCommand(wire).kind, "refused")
 })
 
-test("decode: a thread opened names a new thread, a branch's root and task or a new tab's new ones, and a known state or none (ADR-0126)", () => {
+test("decode: a thread opened names a new thread, its root and task, and a state or none", () => {
   const branch = encodeIntent("c", {
     kind: "open-thread",
     thread: NEW_THREAD,
@@ -1042,7 +1038,7 @@ test("decode: a thread opened names a new thread, a branch's root and task or a 
     assert.equal(decodeCommand(wire).kind, "refused")
 })
 
-test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", () => {
+test("decode: a malformed reorder or queue hold is refused", () => {
   const queued = {
     kind: "queued",
     lane: threadIdFor("abc"),
@@ -1051,7 +1047,7 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
   const moves = JSON.stringify([
     { card: cardIdFor("c1"), from: null, to: queued },
   ])
-  // One way into a queue (ADR-0113): `move` refuses it, `queue-card` takes
+  // One way into a queue: `move` refuses it, `queue-card` takes
   // one move into a queue and a known hold change.
   assert.equal(decodeCommand({ kind: "move", moves }).kind, "refused")
   assert.equal(
@@ -1162,7 +1158,7 @@ test("decode: stop and carry-on must name a thread's lane", () => {
     )
 })
 
-test("decode: notes on messages are gone (ADR-0048): a note command is an unknown kind", () => {
+test("decode: a note command is an unknown kind", () => {
   for (const mode of ["open", "done", "reopen"])
     assert.equal(
       refusalCode(decodeCommand({ kind: "note", mode, parentId: "e-1" })),
@@ -1251,7 +1247,7 @@ test("a chat's workflow state must be one", () => {
   assert.equal(refusalCode(chat("")), "not refused: chat")
 })
 
-test("a mark names its task; its title is trimmed, blank clears, and a line break or 81 characters is refused", () => {
+test("a mark names its task; its title is trimmed, one line, at most 80 characters, blank clears", () => {
   assert.deepEqual(
     decodeCommand({ kind: "mark", task: TEST_TASK, text: "  Tab names " }),
     { kind: "mark", of: { kind: "task", task: TEST_TASK }, title: "Tab names" },
@@ -1283,7 +1279,7 @@ test("a retitle names its task; anything else is refused", () => {
   })
 })
 
-test("decode: a branch's thread, and a reserved one, is a new thread's id, t- and a uuidv7 (ADR-0057, ADR-0117)", () => {
+test("decode: a branch's thread, and a reserved one, is a new thread's id, t- and a uuidv7", () => {
   const chat = (lane: string) =>
     decodeCommand({
       kind: "chat",
@@ -1309,7 +1305,8 @@ test("decode: a branch's thread, and a reserved one, is a new thread's id, t- an
   }
 })
 
-test("the Line carries every field of a command, and no other: a field the wire's schema lacked would be dropped on the way", () => {
+test("the Line carries every field of a command, and no other", () => {
+  // A field the Line's schema lacks would be dropped on the way.
   assert.deepEqual(
     Object.keys(Command.fields).sort(),
     Object.keys(EMPTY_COMMAND).sort(),

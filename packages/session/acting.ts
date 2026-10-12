@@ -1,9 +1,5 @@
-// session/acting — your offer and setup and publish commands while they are out, and what
-// the host answered. An entry is `sent` from the click to the reply,
-// then the refusal or failure, until your next command there. An answer that
-// carried the command out clears the entry: the record then says how things
-// stand. `nextActing` decides, and `sendActing` is the one shell around it,
-// over the session's store.
+// session/acting — your offer, setup and publish commands while they are
+// out, and what the host answered; `nextActing` decides.
 
 import type {
   AcceptedAction,
@@ -40,7 +36,7 @@ export type Acting<A> =
 
 /** An offer command of yours on a lane. */
 export type OfferActing = Acting<OfferAction>
-/** A setup or publish of yours: setting up, or publishing (ADR-0104, ADR-0090). */
+/** A setup or publish of yours: setting up, or publishing. */
 export type AcceptedActing = Acting<AcceptedAction>
 
 export type ActingEvent<A> =
@@ -56,7 +52,7 @@ export type ActingEvent<A> =
       readonly outcome: Outcome
     }
 
-/** Pure: what is said of your last command on one thing. */
+/** What is said of your last command on one thing. */
 export function nextActing<A>(
   prev: Acting<A> | null,
   event: ActingEvent<A>,
@@ -96,7 +92,7 @@ type ActingOn =
     }
   | { readonly kind: "accepted"; readonly event: ActingEvent<AcceptedAction> }
 
-/** Pure: the state after one event. */
+/** The state after one event. */
 function actingStep(state: ActingState, on: ActingOn): ActingState {
   if (on.kind === "accepted")
     return { ...state, accepted: nextActing(state.accepted, on.event) }
