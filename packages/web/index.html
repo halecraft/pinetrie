@@ -116,14 +116,15 @@
       .menu button:disabled { color: #777; cursor: default; }
       .menu .why { font-size: .75rem; }
       /* ＋: a split button, dashed, at the foot of the sidebar and of each
-         board column. */
+         board column, and past a canvas's last column. */
       .add-root { position: relative; display: inline-flex; flex: 0 0 auto; align-self: flex-start;
         margin-left: .2rem; }
-      .add-root button { padding: .3rem .6rem; background: none; color: #aab4c3;
+      /* Its own two buttons: its menu's items are a menu's. */
+      .add-root > button, .add-root .add-menu { padding: .3rem .6rem; background: none; color: #aab4c3;
         border: 1px dashed #3a3f48; border-radius: 0; }
       .add-root .add-agent { border-radius: 6px 0 0 6px; }
       .add-root .add-menu { border-radius: 0 6px 6px 0; border-left: 0; }
-      .add-root button:hover { color: #e6e6e6; background: #1b1e24; }
+      .add-root > button:hover, .add-root .add-menu:hover { color: #e6e6e6; background: #1b1e24; }
       /* The control at the list's foot that folds it, or shows its titles. */
       .list-fold { margin-top: auto; align-self: flex-start; padding: .2rem .55rem; background: none;
         color: #6f7784; font-size: .9rem; }
@@ -322,7 +323,9 @@
       [data-dragging][data-drag-card], [data-dragging][data-drag-task] { cursor: grabbing; }
       /* Past the last column: a drop there is a spot on the canvas (ADR-0126),
          marked while a card is dragged. */
-      #strip > .canvas-end { flex: 0 0 4rem; }
+      #strip > .canvas-end { flex: 0 0 4rem; display: flex; justify-content: center;
+        align-items: flex-start; padding-top: .5rem; }
+      #strip > .canvas-end > .add-root { align-self: flex-start; }
       body[data-card-drag] #strip > .canvas-end { box-shadow: inset 2px 0 0 #555; }
       /* A column folded to a strip in its place on the canvas: its head a drag
          handle, the rest a button that unfolds it, holding ⇥, a thread's mark,
@@ -403,9 +406,6 @@
       .trash-restore:hover:not(:disabled) { color: #e6e6e6; }
       .task-told-line, .canvas-read-line { font-size: .72rem; color: #aaa; padding-left: .6rem;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .add-note-column { align-self: flex-start; background: none; border: 0; padding: 0;
-        font-size: .72rem; color: #8b93a1; cursor: pointer; }
-      .add-note-column:hover { color: #ddd; }
       .avatars { display: inline-flex; gap: 2px; flex: 0 0 auto; }
       /* The circle. `.avatar` has no rule: it marks a person shown here, which
          the browser suite counts. */

@@ -829,10 +829,16 @@ width, so a card has one place by construction.
   dropped, `rankOnCanvas`; or in an inventory), and for a task the session
   does not hold (`TaskOpening`, a new tab's) the task's card, made by the
   host with its opener its owner, at the end of its state (`boardEnd`);
-  refused `no-place` before the board has states. The one planner for a branch or a new tab
-  as its column opens (`planOpenThread`, `open.ts`: refused `taken` for an
-  id in use, `unknown` for a branch's entry its root lacks or a task the
-  session lacks), a copy (`planCopy`) and a spin-off (`planSpinOff`). A
+  refused `no-place` before the board has states. The one planner for a
+  thread as its column opens (`planOpenThread`, `open.ts`), by its
+  `ThreadStart`: a branch, a new tab's new root in a new task, or a new
+  root in a task the session holds, placed as a drop after its `after`
+  would be (`spot`, ADR-0138); refused `taken` for an id in use or a new
+  tab's task the session holds, `unknown` for a branch's entry its root
+  lacks or a task the session should hold and lacks. A branch's root's
+  tree is planned from only as part of its start (`GatheredStart`), so
+  nothing else gathers one. Also a copy (`planCopy`) and a spin-off
+  (`planSpinOff`). A
   first send to a thread opened writes only its entry; a branch's first
   send that names no thread opened yet (a script's) opens it with the send
   (`sendChat`), as its column would have, and `executeChat` writes that
@@ -840,7 +846,7 @@ width, so a card has one place by construction.
 - **`unstartedThreads`**: each thread opened and not yet started, and where
   its column ends: no entry of it in the tree, and either its fork in the
   tree (its root held here), or its root one the directory does not name
-  yet (a new tab's). The page draws its card's column from it.
+  yet (a new tab's, or a new root's in a task already held). The page draws its card's column from it.
 - **`rootsHeld`**: the roots with a thread on the canvas of a task outside
   the archive, or in an inventory: what a starting host loads, and what
   archiving keeps. A root the directory does not name has no document

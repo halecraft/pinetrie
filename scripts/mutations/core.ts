@@ -439,6 +439,15 @@ export const mutations: readonly Mutation[] = [
     expect: "encodeIntent -> decodeCommand round-trips every intent",
   },
   {
+    name: "a thread opened as a new root may name a root in use",
+    file: "packages/protocol/codec.ts",
+    from: '    const root = start.kind === "branch" ? rootText : parseNewRoot(rootText)\n',
+    to: '    const root = start.kind !== "new-task" ? rootText : parseNewRoot(rootText)\n',
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect:
+      "decode: a thread opened names a new thread, its root, its task and how it starts",
+  },
+  {
     name: "a reply may start at the root",
     file: "packages/protocol/codec.ts",
     from: '    if (at.kind === "root" && mode !== "branch") {',

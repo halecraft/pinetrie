@@ -17,7 +17,6 @@ import {
   type ColumnAct,
   dropProps,
   dropsWords,
-  FIRST_NOTE_COLUMN,
   FOLD_TASK,
   type Intent,
   NO_MARK,
@@ -225,16 +224,6 @@ export function TaskColumn(p: {
         <div className="task-here">
           <ReaderMenus {...p.readers} task={view.task} thread={p.thread} />
         </div>
-        {!view.readOnly && (
-          <button
-            className={FIRST_NOTE_COLUMN.className}
-            onClick={() => p.onIntent({ kind: "addNoteColumn", after: null })}
-            title={FIRST_NOTE_COLUMN.title}
-            type="button"
-          >
-            {FIRST_NOTE_COLUMN.label}
-          </button>
-        )}
       </div>
     </section>
   )

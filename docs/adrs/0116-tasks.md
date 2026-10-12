@@ -26,6 +26,7 @@
     card dropped on a canvas lands in a note column made for it.
   - ADR-0137: a folded strip shows its thread's mark, and its name at the
     header's size and colour, in its thread's colour.
+  - ADR-0138: the task column no longer has **+ note column**.
 
 **Context.**
 

@@ -30,6 +30,8 @@
   - ADR-0134: any column closes, its card to the trash of the place it left,
     which records that place; a task's trash is the task's, seen by anyone the
     card was seen by there.
+  - ADR-0138: `open-thread` also opens a new root's first thread in a task the
+    session holds, its card where a drop on the canvas would land.
 
 **Context.**
 

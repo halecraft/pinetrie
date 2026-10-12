@@ -283,6 +283,18 @@ export const planModeOf = (at: SendAt): PlanMode =>
   at.kind === "queue" ? "queue" : modeOf(at)
 
 /**
+ * How an opened thread starts. A branch at `at` in its root, its card just
+ * after the thread `at` is in. A new tab's: a new root's first thread in a
+ * new task, which lands in `state` (the first open state for null). A new
+ * root's first thread in a task the session holds, its card just after
+ * `after` (first for null; at the end when `after` has left the canvas).
+ */
+export type ThreadStart =
+  | { readonly kind: "branch"; readonly at: EntryId }
+  | { readonly kind: "new-task"; readonly state: WorkflowStateId | null }
+  | { readonly kind: "new-root"; readonly after: CardId | null }
+
+/**
  * A command whose SHAPE is already known to be valid. The protocol codec
  * produces it; it owns every shape rule, so this type cannot express a
  * malformed command. What it then does is decided by `planChat` and the
@@ -429,18 +441,14 @@ export type Intent =
     }
   /**
    * Open a thread before its first entry, as its column opens: its record, and
-   * its card on `task`'s canvas. A branch at `at` in `root`, just after the
-   * thread `at` is in; or, with `at` null, a new tab's: a new root's first
-   * thread in a new task, which lands in `state` (the first open state for
-   * null).
+   * its card on `task`'s canvas, as `start` says.
    */
   | {
       readonly kind: "open-thread"
       readonly thread: ThreadId
       readonly root: RootId
-      readonly at: EntryId | null
       readonly task: TaskId
-      readonly state: WorkflowStateId | null
+      readonly start: ThreadStart
     }
   /**
    * Copy the thread `source`: a new thread, its id the move's card, forked at

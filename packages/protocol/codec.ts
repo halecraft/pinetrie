@@ -74,6 +74,7 @@ import {
   type SentCard,
   type TaskId,
   type ThreadId,
+  type ThreadStart,
   type TypedMove,
   targetOfFields,
   typedMove,
@@ -353,27 +354,19 @@ export function decodeCommand(
   if (kind === "open-thread") {
     const thread = parseNewThread(text(wire?.lane))
     if (thread === undefined) return notNewLane(text(wire?.lane))
-    // A new tab's thread starts a new root in a new task; a branch is in
-    // the root and the task its column is on.
+    const start = threadStartOfWire(wire, at)
+    if (start.kind === "refused") return start
+    // A branch is in the root and the task its column is on; a new root's
+    // id is minted by its tab, and so is a new tab's task.
     const rootText = text(wire?.root)
-    const root = at.kind === "root" ? parseNewRoot(rootText) : rootText
+    const root = start.kind === "branch" ? rootText : parseNewRoot(rootText)
     if (root === undefined || !isRootId(root))
       return refused(ERR.UNKNOWN_TARGET, `not a root: ${rootText}`)
     const taskText = text(wire?.task)
-    const task = at.kind === "root" ? parseNewTask(taskText) : taskText
+    const task = start.kind === "new-task" ? parseNewTask(taskText) : taskText
     if (task === undefined || !isTaskId(task))
       return refused(ERR.UNKNOWN_TARGET, `not a task: ${taskText}`)
-    const state = text(wire?.state)
-    if (state !== "" && !isWorkflowStateId(state))
-      return refused(ERR.UNKNOWN_STATE, `not a workflow state: ${state}`)
-    return {
-      kind,
-      thread,
-      root,
-      at: at.kind === "entry" ? at.id : null,
-      task,
-      state: state === "" ? null : state,
-    }
+    return { kind, thread, root, task, start }
   }
   if (kind === "copy-thread") {
     const source = text(wire?.lane)
@@ -596,6 +589,52 @@ function chatAtFromWire(
 
 const notNewLane = (lane: string): Refusal =>
   refused(ERR.UNKNOWN_TARGET, `not a new thread's lane: ${lane}`)
+
+/**
+ * An opened thread's start on the wire: its kind in `mode`, a branch's
+ * entry in `parentId`, a new tab's workflow state in `state` ("" for the
+ * first open one), a new root's card it goes after in `cardId` ("" for
+ * first).
+ */
+const threadStartWire = (start: ThreadStart) => {
+  switch (start.kind) {
+    case "branch":
+      return { mode: start.kind, parentId: start.at }
+    case "new-task":
+      return { mode: start.kind, state: start.state ?? "" }
+    case "new-root":
+      return { mode: start.kind, cardId: start.after ?? "" }
+  }
+}
+
+function threadStartOfWire(
+  wire: WireCommand | null | undefined,
+  at: Position,
+): ThreadStart | Refusal {
+  const mode = text(wire?.mode)
+  switch (mode) {
+    case "branch":
+      return at.kind === "entry"
+        ? { kind: mode, at: at.id }
+        : refused(ERR.UNKNOWN_TARGET, "a branch names the entry it forks at")
+    case "new-task": {
+      const state = text(wire?.state)
+      if (state !== "" && !isWorkflowStateId(state))
+        return refused(ERR.UNKNOWN_STATE, `not a workflow state: ${state}`)
+      return { kind: mode, state: state === "" ? null : state }
+    }
+    case "new-root": {
+      const afterText = text(wire?.cardId)
+      if (afterText === "") return { kind: mode, after: null }
+      const after = parseCardId(afterText)
+      return after === undefined
+        ? refused(ERR.UNKNOWN_TARGET, `not a card: ${afterText}`)
+        : { kind: mode, after }
+    }
+    default:
+      return refused(ERR.UNKNOWN_KIND, `unknown thread start: ${mode}`)
+  }
+}
 
 /** What an acceptance was shown, as the wire carries it in `seen`: JSON. */
 export const offerSeenToWire = (seen: OfferSeen | null): string =>
@@ -1030,9 +1069,8 @@ export function encodeIntent(id: string, intent: Intent): Command {
         kind: "open-thread",
         lane: intent.thread,
         root: intent.root,
-        parentId: intent.at ?? "",
         task: intent.task,
-        state: intent.state ?? "",
+        ...threadStartWire(intent.start),
       })
     case "copy-thread":
       return command({

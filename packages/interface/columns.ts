@@ -58,7 +58,7 @@ export interface Column {
   /**
    * Where the column's path ends: its thread's end (`threadEnd`), or an
    * unstarted thread's fork. Null only for an unstarted new root's thread: a
-   * new tab's.
+   * new tab's, or one ＋ made past a canvas's last column.
    */
   readonly anchor: EntryId | null
   /**

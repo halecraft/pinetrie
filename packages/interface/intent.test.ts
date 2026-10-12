@@ -320,27 +320,21 @@ describe("planIntent", () => {
     })
   })
 
-  test("＋ opens a new tab: its task and its thread written now, shown and in the sidebar, its column unfolded, taking focus (ADR-0126)", () => {
+  test("＋ opens a new tab: its task and its thread written now, shown and in the sidebar, its column unfolded, taking focus", () => {
     expect(
       plan({ kind: "newTab", asksAgent: true, state: workflowStateIdFor("d") }),
     ).toEqual([
+      { kind: "armFocus", key: NEW_THREAD },
       {
         kind: "request",
         intent: {
           kind: "open-thread",
           thread: NEW_THREAD,
           root: NEW_ROOT,
-          at: null,
           task: NEW_TASK,
-          state: workflowStateIdFor("d"),
+          start: { kind: "new-task", state: workflowStateIdFor("d") },
         },
       },
-      {
-        kind: "layout",
-        moves: false,
-        action: { kind: "show", here: { kind: "task", task: NEW_TASK } },
-      },
-      { kind: "list", act: { kind: "ensure", task: NEW_TASK } },
       {
         kind: "layout",
         moves: false,
@@ -351,11 +345,16 @@ describe("planIntent", () => {
           change: { kind: "opened", card: NEW_THREAD, asksAgent: true },
         },
       },
-      { kind: "armFocus", key: NEW_THREAD },
+      {
+        kind: "layout",
+        moves: false,
+        action: { kind: "show", here: { kind: "task", task: NEW_TASK } },
+      },
+      { kind: "list", act: { kind: "ensure", task: NEW_TASK } },
     ])
   })
 
-  test("a branch is opened on the host, just after its thread, its column unfolded with what it starts with, taking focus (ADR-0126)", () => {
+  test("a branch is opened on the host, just after its thread, its column unfolded with what it starts with, taking focus", () => {
     const at2 = entryId("2-a")
     expect(
       plan(
@@ -375,9 +374,8 @@ describe("planIntent", () => {
           kind: "open-thread",
           thread: NEW_THREAD,
           root: TEST_ROOT,
-          at: at2,
           task: R1_ID,
-          state: null,
+          start: { kind: "branch", at: at2 },
         },
       },
       onR1({
@@ -494,8 +492,11 @@ describe("planIntent", () => {
     )
   })
 
-  test("a note column is made just after a card, or first, on the task you are on, and unfolded; off a task, nothing (ADR-0116)", () => {
-    expect(plan({ kind: "addNoteColumn", after: C })).toEqual([
+  test("a note column is made at its spot on the canvas, and unfolded", () => {
+    const at = { kind: "canvas", task: R1_ID, after: C } as const
+    expect(
+      plan({ kind: "addColumn", make: { kind: "note-column" }, at }),
+    ).toEqual([
       {
         kind: "moveCard",
         move: {
@@ -510,10 +511,36 @@ describe("planIntent", () => {
       },
       onR1({ kind: "fold", card: NEW_NOTE_COLUMN, unfolded: true }),
     ])
-    expect(plan({ kind: "addNoteColumn", after: null })[0]).toMatchObject({
+    expect(
+      plan({
+        kind: "addColumn",
+        make: { kind: "note-column" },
+        at: { ...at, after: null },
+      })[0],
+    ).toMatchObject({
       move: { to: { kind: "canvas-at", task: R1_ID, after: null } },
     })
-    expect(plan({ kind: "addNoteColumn", after: C }, at(onNothing))).toEqual([])
+  })
+
+  test("a thread column is a new root opened at its spot on the canvas, asking the agent as it was made to, taking focus", () => {
+    const at = { kind: "canvas", task: R1_ID, after: C } as const
+    const made = (asksAgent: boolean) =>
+      plan({ kind: "addColumn", make: { kind: "thread", asksAgent }, at })
+    expect(made(true)).toEqual([
+      { kind: "armFocus", key: NEW_THREAD },
+      {
+        kind: "request",
+        intent: {
+          kind: "open-thread",
+          thread: NEW_THREAD,
+          root: NEW_ROOT,
+          task: R1_ID,
+          start: { kind: "new-root", after: C },
+        },
+      },
+      onR1({ kind: "opened", card: NEW_THREAD, asksAgent: true }),
+    ])
+    expect(made(false)[2]).toEqual(onR1({ kind: "opened", card: NEW_THREAD }))
   })
 
   test("a width is asked of the host, from the canvas the card is on; a card on none, nothing (ADR-0116)", () => {

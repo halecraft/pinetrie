@@ -1065,8 +1065,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new tab drops its prefill",
     file: "packages/interface/intent.ts",
-    from: "          ...(intent.prefill === undefined ? {} : { prefill: intent.prefill }),\n",
-    to: "",
+    from: "              : { prefill: intent.prefill }),\n",
+    to: "              : {}),\n",
     command: unit,
     expect: "a new tab from a first message's edit starts with its text",
   },
@@ -1769,14 +1769,6 @@ export const mutations: readonly Mutation[] = [
     expect:
       "× on a root closes it for you: it leaves the sidebar, and nothing shared is written",
   },
-  {
-    name: "a first message's new tab starts empty",
-    file: "packages/interface/intent.ts",
-    from: "          ...(intent.prefill === undefined ? {} : { prefill: intent.prefill }),",
-    to: "",
-    command: unit,
-    expect: "a new tab from a first message's edit starts with its text",
-  },
 
   {
     name: "Not you? reloads without forgetting who you are",
@@ -1856,11 +1848,35 @@ export const mutations: readonly Mutation[] = [
 
   {
     name: "＋'s default starts a conversation",
-    file: "packages/interface/sidebar-view.ts",
-    from: '      agent: { kind: "newTab", asksAgent: true },',
-    to: '      agent: { kind: "newTab", asksAgent: false },',
+    file: "packages/interface/start-button.ts",
+    from: "    main: tab(main),\n",
+    to: "    main: tab({ ...main, asksAgent: false }),\n",
     command: unit,
     expect: "＋'s main action starts agent work",
+  },
+  {
+    name: "＋ past the last column offers no note column",
+    file: "packages/interface/start-button.ts",
+    from: '  "note-column": [{ kind: "note-column" }],\n} as const satisfies NewColumnTable\n',
+    to: "} as const satisfies NewColumnTable\n",
+    command: unit,
+    expect: "＋ past the last column makes an agent thread",
+  },
+  {
+    name: "a thread column never asks the agent",
+    file: "packages/interface/intent.ts",
+    from: "        make.asksAgent ? { asksAgent: true } : {},\n",
+    to: "        {},\n",
+    command: unit,
+    expect: "a thread column is a new root opened at its spot on the canvas",
+  },
+  {
+    name: "a thread column opens first on the canvas",
+    file: "packages/interface/intent.ts",
+    from: '        { kind: "new-root", after },\n',
+    to: '        { kind: "new-root", after: null },\n',
+    command: unit,
+    expect: "a thread column is a new root opened at its spot on the canvas",
   },
   {
     name: "a task's ⋯ shows only on the task you are on",
@@ -3405,8 +3421,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a branch's column is keyed apart from its thread",
     file: "packages/interface/intent.ts",
-    from: "  return opened(thread, [",
-    to: '  return opened("k", [',
+    from: '    { kind: "armFocus", key: thread },\n',
+    to: '    { kind: "armFocus", key: "k" },\n',
     command: unit,
     expect: "a branch is opened on the host, just after its thread",
   },
@@ -3453,10 +3469,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note column made is left folded",
     file: "packages/interface/intent.ts",
-    from: '    changeViewOf(state, task, { kind: "fold", card: column, unfolded: true }),\n',
-    to: "",
+    from: "          unfolded: true,\n",
+    to: "          unfolded: false,\n",
     command: unit,
-    expect: "a note column is made just after a card, or first",
+    expect: "a note column is made at its spot on the canvas, and unfolded",
   },
   {
     name: "a pin to the task off a thread's task goes nowhere",

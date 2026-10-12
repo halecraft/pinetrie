@@ -76,6 +76,9 @@ export type PutTarget =
    */
   | { readonly kind: "text-box" }
 
+/** A spot on a task's canvas: where a drop past a column, or a column ＋ makes, lands. */
+export type CanvasPut = Extract<PutTarget, { readonly kind: "canvas" }>
+
 /** The attribute a column's drop zone carries: its key. */
 const PUT_COLUMN = "data-put-column"
 /** The attribute a column's composer carries: its column's key. */

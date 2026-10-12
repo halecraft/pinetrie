@@ -2538,6 +2538,35 @@ export const mutations: readonly Mutation[] = [
       "a thread's card trashed by one writer is restored by another, back on its canvas at its rank",
   },
   {
+    name: "the host opens a new root's thread as a new tab's",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "          : open.start\n",
+    to: '          : { kind: "new-task", state: null }\n',
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a new root's thread opens in a task the session holds, just after the card it was made after, and its first send starts that root there",
+  },
+  {
+    name: "＋ past the last column shows on a read-only task",
+    file: "packages/web/strip.tsx",
+    from: '      {endDrop !== null && (\n        <div className="canvas-end">\n',
+    to: '      {p.taskColumn !== null && (\n        <div className="canvas-end">\n',
+    suite: "browser",
+    scenario: "page",
+    expect: "an archived task's canvas offers no ＋ to make a column",
+  },
+  {
+    name: "＋ past the last column makes its column first",
+    file: "packages/web/strip.tsx",
+    from: "            add={newColumnButton(endDrop)}\n",
+    to: "            add={newColumnButton({ ...endDrop, after: null })}\n",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "＋ past the last column makes a conversation at the canvas's end: a new root's thread in this task, its box focused",
+  },
+  {
     name: "a new tab's emptied task stays on the board",
     file: "apps/pinetrie/host/commands/cards.ts",
     from: "              ...planTasksTrashed(cards, emptied, writer),\n",

@@ -37,7 +37,7 @@ import {
   readTyping,
   readWorkflow,
 } from "@pinetrie/reads"
-import { indexTasks, titleOf } from "@pinetrie/rules"
+import { canvasOf, indexTasks, titleOf } from "@pinetrie/rules"
 import { COPIED } from "@pinetrie/web/copy"
 import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Page } from "@playwright/test"
@@ -1451,6 +1451,57 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check("× on a branch's column takes it off the canvas", asideClosed)
+      // ＋ past the last column: its ▾'s conversation makes a column at the
+      // canvas's end, a new root's thread in this task, ready to type in.
+      await page.focus("#strip > .canvas-end .add-menu")
+      await page.keyboard.press("ArrowDown")
+      await page
+        .waitForFunction(
+          () => document.activeElement?.classList.contains("add-conversation"),
+          undefined,
+          { timeout: 5_000 },
+        )
+        .catch(() => null)
+      await page.keyboard.press("Enter")
+      const madeCol = col(before + 2)
+      await page.waitForSelector(`${madeCol} .composer`, { timeout: 15_000 })
+      const made = (await page.getAttribute(madeCol, "data-card")) ?? ""
+      const agentCard = (await page.getAttribute(agentCol, "data-card")) ?? ""
+      await waitFor(
+        () => readPlaces(host.places).some(c => c.id === made),
+        5_000,
+      )
+      const agentPlace = readPlaces(host.places).find(
+        c => c.id === agentCard,
+      )?.place
+      const madeLast =
+        agentPlace?.kind === "canvas" &&
+        canvasOf(readPlaces(host.places), agentPlace.task).at(-1)?.id === made
+      const recordOf = (card: string) =>
+        [...readThreads(host.session).values()].find(r => r.thread === card)
+      const madeRecord = recordOf(made)
+      const agentRecord = recordOf(agentCard)
+      const madeLabel = await label(before + 2)
+      const madeCaret = await caretIn(before + 2)
+      check(
+        "＋ past the last column makes a conversation at the canvas's end: a new root's thread in this task, its box focused",
+        madeLast &&
+          madeRecord?.origin.kind === "root" &&
+          agentRecord !== undefined &&
+          madeRecord.root !== agentRecord.root &&
+          madeLabel === TO_NOBODY &&
+          madeCaret === 0,
+        `last ${madeLast}; ${JSON.stringify(madeRecord?.origin)}; "${madeLabel}", caret ${madeCaret}`,
+      )
+      // Taken off again: what follows counts the two columns it made.
+      await page.click(`${madeCol} .close`)
+      await page
+        .waitForFunction(
+          () => document.querySelectorAll(".column").length === 2,
+          undefined,
+          { timeout: 15_000 },
+        )
+        .catch(() => null)
 
       // ── a message's tools: one row; edit is a sibling; a first message's new tab
       // (ADR-0043). A person's message in agent work has all three tools.
@@ -2562,6 +2613,11 @@ async function run(check: Checks["check"]): Promise<void> {
             copyStays === 1 &&
             leftTb,
           `"${banner}", its typed text kept, no tools that write, and copy (${tools}, ${copyStays})`,
+        )
+        check(
+          "an archived task's canvas offers no ＋ to make a column",
+          (await page.$("#strip .column")) !== null &&
+            (await page.$("#strip > .canvas-end")) === null,
         )
         await page.click(`${col(0)} .read-only-action`)
         await page

@@ -50,12 +50,6 @@ export function columnMenu(input: {
           : "draw it two columns wide, for everyone",
         intent: { kind: "cardWidth", card: input.card, width: wide ? 1 : 2 },
       },
-      {
-        key: "note-column",
-        label: "Add a note column here",
-        title: "a new note column just after this one, for everyone",
-        intent: { kind: "addNoteColumn", after: input.card },
-      },
     ],
   }
   if (!isThreadId(input.card)) return [yours, canvas]
@@ -89,13 +83,6 @@ export function columnMenu(input: {
     },
   ]
 }
-
-/** The task column's own way to make a note column: first on the canvas. */
-export const FIRST_NOTE_COLUMN = {
-  label: "+ note column",
-  title: "a new note column first on the canvas, for everyone",
-  className: "add-note-column",
-} as const
 
 /** The ⋯'s own name, for a screen reader. */
 export const COLUMN_MENU_LABEL = "more for this column"

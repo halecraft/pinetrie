@@ -21,16 +21,18 @@ import {
   readPlaces,
   readQueueHolds,
   readReading,
+  readRoots,
   readSeats,
   readThreads,
   readTraces,
   readTypingIn,
 } from "@pinetrie/reads"
-import { HELD_WORDS, yourCard } from "@pinetrie/rules"
+import { canvasOf, HELD_WORDS, yourCard } from "@pinetrie/rules"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pinetrie/schema"
 import {
   LAST_ORDER,
   newCardId,
+  newRootId,
   newThreadId,
   type SessionClient,
 } from "@pinetrie/session"
@@ -726,6 +728,36 @@ async function run(check: Checks["check"]): Promise<void> {
         onHost(wrapper.id) === undefined &&
         onHost(onCanvas)?.place.kind === "composing",
       `${drop.kind}; ${landed?.kind}, ${wrapper?.place.kind}; ${dropUndone.kind}, ${onHost(onCanvas)?.place.kind}`,
+    )
+    // ＋ past the last column: a new root's first thread opened in this
+    // task, its card just after the card it was made after; its first send
+    // starts that root here.
+    const main = threadHolding(ch, tipOf())
+    const fresh = newThreadId()
+    const freshRoot = newRootId()
+    const freshOpened = await ada.request({
+      kind: "open-thread",
+      thread: fresh,
+      root: freshRoot,
+      task: here,
+      start: { kind: "new-root", after: main },
+    })
+    await waitFor(() => onHost(fresh) !== undefined, 5_000)
+    const canvasNow = canvasOf(readPlaces(ch.places), here).map(c => c.id)
+    const freshFirst = await ada.chat("a fresh start", at(null), {
+      mode: "branch",
+      thread: fresh,
+      task: here,
+      root: freshRoot,
+    })
+    check(
+      "a new root's thread opens in a task the session holds, just after the card it was made after, and its first send starts that root there",
+      freshOpened.kind === "moved" &&
+        canvasNow.indexOf(fresh) === canvasNow.indexOf(main) + 1 &&
+        freshFirst.kind === "appended" &&
+        readRoots(ch.session).has(freshRoot) &&
+        readThreads(ch.session).get(fresh)?.root === freshRoot,
+      `${freshOpened.kind}; ${canvasNow.indexOf(main)} ${canvasNow.indexOf(fresh)}; ${freshFirst.kind}`,
     )
     // A paste (ADR-0132): a text card pasted at the thread lands in its
     // notes, one step of Ada's history in this task, which an undo takes

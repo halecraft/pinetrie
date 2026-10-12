@@ -363,7 +363,12 @@ export {
   offerSeen,
   offerView,
 } from "./offer-view.ts"
-export { type OpenPlan, type OpenThread, planOpenThread } from "./open.ts"
+export {
+  type GatheredStart,
+  type OpenPlan,
+  type OpenThread,
+  planOpenThread,
+} from "./open.ts"
 export {
   keyAfter,
   orderAfter,

@@ -348,8 +348,14 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   nothing does.
 - **The task column comes first**, folded the same way: the task's title,
   which anyone renames there, **Move to ▸** among the board's states, who is
-  reading, the cards pinned to the task, the canvas list its agents are
-  told, and **+ note column**.
+  reading, the cards pinned to the task, and the canvas list its agents
+  are told.
+- **＋ past the last column makes a column** (ADR-0138), for everyone, on a
+  task you may change, and nowhere else: **＋** an agent thread, its **▾** a
+  conversation or a note column. It lands where a drop there would, at the
+  canvas's end; a thread made there starts a new root, with no history of
+  its own, unfolded for you and ready to type in. On a read-only task it is
+  not drawn.
 - **A thread's column is one path**, from its root to its thread's end,
   read top to bottom. Its composer sends at its last message.
 - **Opening a branch adds a column after the thread it forks from**, starting
@@ -399,8 +405,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **Every unfolded column's header ends in ⋯ and ×** (ADR-0134), threads,
   sent or not, and note columns alike. Its ⋯ holds **Fold** first, yours
   alone, then what changes the canvas for everyone: its width, one or two
-  columns wide, and a note column after it; a thread's adds its copies and
-  its take. A folded strip has neither: unfold it first.
+  columns wide; a thread's adds its copies and its take. A folded strip has neither: unfold it first.
 - **Columns are reordered by dragging their headers, for everyone**: the
   canvas's order is shared, and a drag moves a card on it. Whichever column
   is first shows its whole path, so moving a branch to the far left makes it
@@ -831,8 +836,10 @@ The rail is E; the column is T. Seeing both at once is the product.
 
 - **At the root, two ways to start**, because there is no context yet: a person
   declares a purpose. Both are on ＋, at the foot of the sidebar and on each
-  board column. **＋ agent** opens a new tab whose column asks the agent
-  unless a message names someone, so its first message creates the lane.
+  board column, and past a canvas's last column, where they make a column
+  of the task you are on instead (ADR-0138). **＋ agent** opens a new tab
+  whose column asks the agent unless a message names someone, so its first
+  message creates the lane.
   **Conversation**, in its menu, opens a new tab whose column is a
   conversation.
 - **A new tab is a task from the moment it opens** (ADR-0126): its thread,
@@ -989,8 +996,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   queued card moves; **+ add a note** makes an empty one at its end, the
   cursor in it; one left empty is swept when the host next starts. It sits
   on the canvas in its place, folded until you open it, and moves and
-  folds as a thread's column does. **+ note column** in the task column
-  adds one first on the canvas, and a column's ⋯ adds one after it.
+  folds as a thread's column does. ＋ past the last column makes an empty
+  one there.
 - **A card leaving a thread's queue or pinned strip goes to the note column
   nearest the thread**, in the task's order, the one after it on a tie;
   with none, a note column titled "Notes" is made just after the thread.

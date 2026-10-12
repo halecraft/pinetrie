@@ -15,6 +15,7 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import {
+  type CanvasPut,
   type CardColumn,
   type ColumnMatches,
   type Column as ColumnSpec,
@@ -26,7 +27,7 @@ import {
   heldWords,
   type Intent,
   type NoteColumnView,
-  type PutTarget,
+  newColumnButton,
   type Reader,
   type ReadOnly,
   type Stage,
@@ -38,6 +39,7 @@ import {
 import type { CanvasCard } from "@pinetrie/rules"
 import type { ReactElement, RefObject } from "react"
 import { useMemo } from "react"
+import { AddButton } from "./add-button.tsx"
 import { Column, type ColumnProps } from "./column.tsx"
 import { FoldedColumn } from "./folded-column.tsx"
 import type { MenuItem } from "./menu.tsx"
@@ -150,8 +152,8 @@ export function Strip(p: {
   }
   // A drop where no column takes one is a spot on the canvas:
   // just after a folded column, or past the last, where `.canvas-end`
-  // leaves room for it.
-  const canvasDrop = (after: CardId | null): PutTarget | null =>
+  // leaves room for it. Past the last is where ＋ makes a column too.
+  const canvasDrop = (after: CardId | null): CanvasPut | null =>
     stage.kind === "task" && readOnly === null
       ? { kind: "canvas", task: stage.task, after }
       : null
@@ -224,7 +226,15 @@ export function Strip(p: {
         />
       )}
       {p.strip !== null && stripCards(p.strip).map(cardColumn)}
-      {endDrop !== null && <div aria-hidden="true" className="canvas-end" />}
+      {endDrop !== null && (
+        <div className="canvas-end">
+          <AddButton
+            add={newColumnButton(endDrop)}
+            folded
+            onIntent={p.onIntent}
+          />
+        </div>
+      )}
     </div>
   )
 }

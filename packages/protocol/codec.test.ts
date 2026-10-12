@@ -1002,38 +1002,70 @@ test("decode: a spin-off names its move to the trash, a new root, thread and tas
     assert.equal(decodeCommand(wire).kind, "refused")
 })
 
-test("decode: a thread opened names a new thread, its root and task, and a state or none", () => {
+test("decode: a thread opened names a new thread, its root, its task and how it starts", () => {
   const branch = encodeIntent("c", {
     kind: "open-thread",
     thread: NEW_THREAD,
     root: TEST_ROOT,
-    at: entryId("e-1"),
     task: TEST_TASK,
-    state: null,
+    start: { kind: "branch", at: entryId("e-1") },
   })
   assert.deepEqual(decodeCommand(branch), {
     kind: "open-thread",
     thread: NEW_THREAD,
     root: TEST_ROOT,
-    at: "e-1",
     task: TEST_TASK,
-    state: null,
+    start: { kind: "branch", at: "e-1" },
   })
+  const newRoot = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
   const tab = encodeIntent("c", {
     kind: "open-thread",
     thread: NEW_THREAD,
-    root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
-    at: null,
+    root: newRoot,
     task: NEW_TASK,
-    state: null,
+    start: { kind: "new-task", state: null },
   })
-  assert.equal(decodeCommand(tab).kind, "open-thread")
+  assert.deepEqual(decodeCommand(tab), {
+    kind: "open-thread",
+    thread: NEW_THREAD,
+    root: newRoot,
+    task: NEW_TASK,
+    start: { kind: "new-task", state: null },
+  })
+  const after = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
+  const column = encodeIntent("c", {
+    kind: "open-thread",
+    thread: NEW_THREAD,
+    root: newRoot,
+    task: TEST_TASK,
+    start: { kind: "new-root", after },
+  })
+  assert.deepEqual(decodeCommand(column), {
+    kind: "open-thread",
+    thread: NEW_THREAD,
+    root: newRoot,
+    task: TEST_TASK,
+    start: { kind: "new-root", after },
+  })
+  assert.deepEqual(decodeCommand({ ...column, cardId: "" }), {
+    kind: "open-thread",
+    thread: NEW_THREAD,
+    root: newRoot,
+    task: TEST_TASK,
+    start: { kind: "new-root", after: null },
+  })
   for (const wire of [
     { ...branch, lane: "t-not-new" },
     { ...branch, task: "r-x" },
+    { ...branch, parentId: "" },
+    { ...branch, mode: "" },
     { ...tab, root: "r-x" },
     { ...tab, task: "k-x" },
     { ...tab, state: "not a state" },
+    // A new root's id is minted by its tab, in a task the session holds.
+    { ...column, root: TEST_ROOT },
+    { ...column, task: "r-x" },
+    { ...column, cardId: "not a card" },
   ])
     assert.equal(decodeCommand(wire).kind, "refused")
 })

@@ -193,7 +193,6 @@ export {
   type ColumnMenuItem,
   type ColumnMenuSection,
   columnMenu,
-  FIRST_NOTE_COLUMN,
 } from "./column-menu.ts"
 export {
   branchColors,
@@ -488,6 +487,7 @@ export {
   publishWords,
 } from "./publish-view.ts"
 export {
+  type CanvasPut,
   type ComposerPlacesStore,
   composerPlacesStore,
   DROP_ZONE,
@@ -622,6 +622,13 @@ export {
   unsentSignals,
   withFilled,
 } from "./signals.ts"
+export {
+  type NewColumn,
+  newColumnButton,
+  newTabButton,
+  type StartButton,
+  type StartItem,
+} from "./start-button.ts"
 export {
   boardStateWords,
   canvasTrash,

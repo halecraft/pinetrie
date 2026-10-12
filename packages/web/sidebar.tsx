@@ -37,6 +37,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { AddButton } from "./add-button.tsx"
 import { slotColor } from "./colors.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Readers, type ReadersProps, RootStatus } from "./root-signals.tsx"
@@ -457,55 +458,4 @@ function menuItem(
       }
     }
   }
-}
-
-/**
- * ＋: a split button. Agent work is the usual start at the root, so it is
- * the main action; a conversation is in its menu. A board column has its
- * own, which lands the root in that state.
- */
-export function AddButton({
-  add,
-  folded = false,
-  onIntent,
-}: {
-  add: SidebarView["add"]
-  /** In a folded list (ADR-0088): ＋ alone, its ▾ under it. */
-  folded?: boolean
-  onIntent: (intent: Intent) => void
-}) {
-  return (
-    <span className={folded ? "add-root folded" : "add-root"}>
-      <button
-        aria-label={folded ? "new agent thread" : undefined}
-        className="add-agent"
-        onClick={() => onIntent(add.agent)}
-        title="a new thread where the agent answers every message that names no one"
-        type="button"
-      >
-        {folded ? "＋" : "＋ agent"}
-      </button>
-      <Menu
-        className="add-more"
-        sections={[
-          {
-            key: "add",
-            items: [
-              {
-                key: "conversation",
-                className: "add-conversation",
-                title:
-                  "a new conversation: the agent answers only when @agent is mentioned",
-                label: "conversation",
-                onChoose: () => onIntent(add.conversation),
-              },
-            ],
-          },
-        ]}
-        label="other ways to start"
-        trigger="▾"
-        triggerClassName="add-menu"
-      />
-    </span>
-  )
 }

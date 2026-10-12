@@ -293,10 +293,11 @@ describe("sidebarView", () => {
 })
 
 test("＋'s main action starts agent work; its menu, a conversation", () => {
-  expect(sidebarView(input()).add).toEqual({
-    agent: { kind: "newTab", asksAgent: true },
-    conversation: { kind: "newTab", asksAgent: false },
-  })
+  const { add } = sidebarView(input())
+  expect([add.main, ...add.more].map(i => i.intent)).toEqual([
+    { kind: "newTab", asksAgent: true },
+    { kind: "newTab", asksAgent: false },
+  ])
 })
 
 test("selected is the item you are on, and each item has its own key", () => {

@@ -443,8 +443,9 @@ rejects `shutdown()`.
   writes no record or card for it.
 - **A thread is opened before its first send** (ADR-0126, `open-thread`
   below), so its first send writes only its entry; a branch at the root in
-  a task the session holds is refused unless that task's thread is the one
-  it opened. A branch naming a thread no column opened (a script's) is
+  a task the session holds is refused unless its thread was opened there,
+  in that root: a new tab's, or a new root's made past a canvas's last
+  column (ADR-0138). A branch naming a thread no column opened (a script's) is
   opened with its send (ADR-0116, ADR-0117): `planChat`'s decision names
   the thread it writes in (`thread`), and for a branch what its card needs
   (`starts`), and `sendChat`, after its last await, plans its opening
@@ -550,7 +551,8 @@ rejects `shutdown()`.
   new task's; a chat that took nothing deletes the records again. The
   answer is the chat's: `appended`, with the first message's id.
 - **`open-thread` opens a thread before its first entry** (ADR-0126,
-  `openThread`), in one keeper step: a branch's root's tree loaded,
+  `openThread`), in one keeper step: a branch's root's tree loaded (a new
+  root has none: a new tab's, or one in a task the session holds, ADR-0138),
   `planOpenThread`, then its record, its card and the canvas re-ranked for
   it (and a new tab's task's card on the board), then its name
   (`names.ensure`). No entry is written. A move that takes a new tab's only

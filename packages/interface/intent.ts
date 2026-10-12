@@ -19,9 +19,11 @@ import {
   type OfferAction,
   type Position,
   type QueueHoldChange,
+  type RootId,
   type TaskId,
   type TextCardId,
   type ThreadId,
+  type ThreadStart,
   type TraceRecord,
   threadAt,
   type WorkflowEdit,
@@ -41,6 +43,7 @@ import type { Raised } from "./attention.ts"
 import { BOARD_SEARCH } from "./board-view.ts"
 import {
   afterUndo,
+  canvasSpot,
   cardOf,
   clipFacts,
   moveCard,
@@ -97,9 +100,10 @@ import {
 import { otherWidth } from "./list-width.ts"
 import type { MessageAct } from "./message-tools.ts"
 import type { PageName } from "./page.ts"
-import type { PutTarget } from "./put-target.ts"
+import type { CanvasPut, PutTarget } from "./put-target.ts"
 import { type SearchAsk, searchActOn } from "./search.ts"
 import { planSpinOff } from "./spin-off.ts"
+import type { NewColumn } from "./start-button.ts"
 import { openOf, type ThreadLink } from "./thread-link.ts"
 
 /**
@@ -249,11 +253,12 @@ export type Intent =
     }
   /** Unfold the task column of the task you are on, or fold it. */
   | { readonly kind: "foldTask"; readonly unfolded: boolean }
-  /**
-   * Make a note column on the canvas of the task you are on, just after the
-   * card `after`, or first with null.
-   */
-  | { readonly kind: "addNoteColumn"; readonly after: CardId | null }
+  /** Make a column, as `make` says, at a spot on a task's canvas. */
+  | {
+      readonly kind: "addColumn"
+      readonly make: NewColumn
+      readonly at: CanvasPut
+    }
   /**
    * Copy the thread `source` at its end as you see it: its new
    * card just after the source on the source's canvas, or into your
@@ -494,12 +499,8 @@ function planOf(
           ]
         : []
     }
-    case "addNoteColumn": {
-      const active = state.layout.active
-      return active?.kind === "task"
-        ? planAddNoteColumn(active.task, intent.after, minted.noteColumn, state)
-        : []
-    }
+    case "addColumn":
+      return planAddColumn(intent.make, intent.at, state, minted)
     case "copyThread":
       return planCopyThread(intent.source, intent.to, state, minted)
     // From the canvas its sender sees it on: the host refuses it moved since.
@@ -522,27 +523,21 @@ function planOf(
     case "show":
       return show(intent.here)
     case "newTab":
-      // Its column is keyed by the thread it minted, as its card is.
       return [
-        {
-          kind: "request",
-          intent: {
-            kind: "open-thread",
-            thread: minted.thread,
-            root: minted.root,
-            at: null,
-            task: minted.task,
-            state: intent.state ?? null,
+        ...openThreadColumn(
+          minted.task,
+          minted.thread,
+          minted.root,
+          { kind: "new-task", state: intent.state ?? null },
+          {
+            ...(intent.prefill === undefined
+              ? {}
+              : { prefill: intent.prefill }),
+            ...(intent.asksAgent ? { asksAgent: true } : {}),
           },
-        },
+          state,
+        ),
         ...show({ kind: "task", task: minted.task }),
-        changeViewOf(state, minted.task, {
-          kind: "opened",
-          card: minted.thread,
-          ...(intent.prefill === undefined ? {} : { prefill: intent.prefill }),
-          ...(intent.asksAgent ? { asksAgent: true } : {}),
-        }),
-        { kind: "armFocus", key: minted.thread },
       ]
     case "close":
       return intent.here.kind === "task" ? closeTask(intent.here.task) : []
@@ -886,24 +881,44 @@ export function planColumnMove(
 }
 
 /**
- * A note column made on `task`'s canvas just after `after`: a
- * move with no `from` to that spot, so the host ranks it there and the undo
- * key takes it back; unfolded, so you see what you made.
+ * A column made at `at`, both kinds ranked there by the host as a drop
+ * there is. A note column: a move with no `from`, so the undo key takes it
+ * back; unfolded, so you see what you made. A thread: a new root's, opened
+ * with its column, taking focus.
  */
-function planAddNoteColumn(
-  task: TaskId,
-  after: CardId | null,
-  column: NoteColumnId,
+function planAddColumn(
+  make: NewColumn,
+  at: CanvasPut,
   state: IntentState,
+  minted: Minted,
 ): readonly Effect[] {
-  return [
-    moveCard(
-      { card: column, from: null, to: { kind: "canvas-at", task, after } },
-      IN_COLUMN(column),
-      false,
-    ),
-    changeViewOf(state, task, { kind: "fold", card: column, unfolded: true }),
-  ]
+  const { task, after } = at
+  switch (make.kind) {
+    case "note-column": {
+      const column = minted.noteColumn
+      return [
+        moveCard(
+          { card: column, from: null, to: canvasSpot(at) },
+          IN_COLUMN(column),
+          false,
+        ),
+        changeViewOf(state, task, {
+          kind: "fold",
+          card: column,
+          unfolded: true,
+        }),
+      ]
+    }
+    case "thread":
+      return openThreadColumn(
+        task,
+        minted.thread,
+        minted.root,
+        { kind: "new-root", after },
+        make.asksAgent ? { asksAgent: true } : {},
+        state,
+      )
+  }
 }
 
 /** Take `card` into a free slot of your inventory: a landing with no slot aimed at. */
@@ -961,7 +976,7 @@ function planCopyThread(
 function planOpenBranch(
   thread: ThreadId,
   at: EntryId,
-  starts: { readonly pending?: Pending; readonly prefill?: Prefill },
+  starts: ColumnStarts,
   state: IntentState,
 ): readonly Effect[] {
   const active = state.layout.active
@@ -969,29 +984,44 @@ function planOpenBranch(
   const root =
     parent === null ? undefined : state.tasks.index.rootOfThread.get(parent)
   if (active?.kind !== "task" || root === undefined) return []
-  return opened(thread, [
-    {
-      kind: "request",
-      intent: {
-        kind: "open-thread",
-        thread,
-        root,
-        at,
-        task: active.task,
-        state: null,
-      },
-    },
-    changeViewOf(state, active.task, {
-      kind: "opened",
-      card: thread,
-      ...starts,
-    }),
-  ])
+  return openThreadColumn(
+    active.task,
+    thread,
+    root,
+    { kind: "branch", at },
+    starts,
+    state,
+  )
 }
 
-/** A column opened with `key` takes focus; nothing opened, nothing armed. */
-const opened = (key: string, effects: readonly Effect[]): readonly Effect[] =>
-  effects.length === 0 ? [] : [{ kind: "armFocus", key }, ...effects]
+/** What a thread's column starts with, until its first send. */
+type ColumnStarts = Omit<
+  Extract<ViewChange, { kind: "opened" }>,
+  "kind" | "card"
+>
+
+/**
+ * The thread `thread` of `root` opened on `task`'s canvas as `start` says,
+ * written now, and its column, keyed by the thread as its card is, unfolded
+ * with what it starts with and taking focus once.
+ */
+function openThreadColumn(
+  task: TaskId,
+  thread: ThreadId,
+  root: RootId,
+  start: ThreadStart,
+  starts: ColumnStarts,
+  state: IntentState,
+): readonly Effect[] {
+  return [
+    { kind: "armFocus", key: thread },
+    {
+      kind: "request",
+      intent: { kind: "open-thread", thread, root, task, start },
+    },
+    changeViewOf(state, task, { kind: "opened", card: thread, ...starts }),
+  ]
+}
 
 const closeTask = closeTaskEffects
 

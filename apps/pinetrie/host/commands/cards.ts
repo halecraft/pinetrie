@@ -66,6 +66,7 @@ import {
   cardsOfParts,
   crossesArchive,
   emptiedTasks,
+  type GatheredStart,
   historyOf,
   type LiftPlan,
   lanesToDrain,
@@ -635,18 +636,23 @@ export function createCardCommands(deps: CardCommandDeps) {
      * written: its first send is a branch at its fork, or a new root.
      */
     async openThread(writer: WriterId, open: OpenThread): Promise<Settled> {
-      // gather
-      const index =
-        open.at === null ? null : readTreeIndex(await docs.root(open.root))
+      // gather: a branch's root's tree; a new root has none yet
+      const start: GatheredStart =
+        open.start.kind === "branch"
+          ? {
+              ...open.start,
+              index: readTreeIndex(await docs.root(open.root)),
+            }
+          : open.start
       // plan
       const plan = planOpenThread({
         open,
+        start,
         sender: writer,
         cards: readPlaces(places),
         threads: readThreads(session),
         roots: new Set(readRoots(session).keys()),
         tasks: readTasks(places),
-        index,
         workflow: readWorkflow(session),
         now: deps.basics.now(),
       })

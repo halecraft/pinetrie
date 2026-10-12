@@ -82,9 +82,11 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *   - `card-width` draws the card `cardId` on the canvas of the task
  *     `task`, where its sender saw it, one column wide (`mode` `1`) or two
  *     (`2`).
- *   - `open-thread` starts the thread `lane`, a new id, at `parentId` in the
- *     root `root` and the task `task`, new ones its tab minted at the root;
- *     `state` as for `spin-off`.
+ *   - `open-thread` starts the thread `lane`, a new id, in the root `root`
+ *     and the task `task`, as `mode` says: `branch` at `parentId`;
+ *     `new-task`, a new tab's, a new root and task its tab minted, `state`
+ *     as for `spin-off`; `new-root`, a new root its tab minted in a task the
+ *     session holds, its card just after `cardId` (`""` for first).
  *   - `copy-thread` copies the thread `lane` at its end `parentId` as its
  *     sender saw it: `moves` is the copy's one move, its new
  *     thread's card from nowhere onto a canvas spot or into the sender's

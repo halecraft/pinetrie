@@ -164,7 +164,7 @@ describe("boardView", () => {
     const view = boardView(input({ cardRoots: new Set([E(1)]) }))
     const doing = view.open[1]
     expect(doing?.items.map(t => t.pip)).toEqual([false, true])
-    expect(doing?.add.agent).toEqual({
+    expect(doing?.add.main.intent).toEqual({
       kind: "newTab",
       asksAgent: true,
       state: DOING,

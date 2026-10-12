@@ -72,7 +72,12 @@ import {
   planOpenAt,
 } from "./effects.ts"
 import type { MessageAct } from "./message-tools.ts"
-import { intoMessage, type PutTarget, placeOfTarget } from "./put-target.ts"
+import {
+  type CanvasPut,
+  intoMessage,
+  type PutTarget,
+  placeOfTarget,
+} from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
 import { newTaskEffects, planSpinOff } from "./spin-off.ts"
 
@@ -698,9 +703,7 @@ const actedAtOf = (target: PutTarget): ActedAt => {
 }
 
 /** A spot on a canvas a put names, as the target the host ranks (`canvas-at`). */
-const canvasSpot = (
-  target: Extract<PutTarget, { kind: "canvas" }>,
-): CanvasTarget => ({
+export const canvasSpot = (target: CanvasPut): CanvasTarget => ({
   kind: "canvas-at",
   task: target.task,
   after: target.after,

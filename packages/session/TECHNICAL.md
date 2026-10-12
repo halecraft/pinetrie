@@ -279,7 +279,9 @@ the two merge (S101), so a writer asks `ready()` first.
   restores it (ADR-0030). It writes nothing when nothing differs.
 - **A task you start is in the sidebar**: `chat` ensures it once its
   answer says the send that started it was written (`startsRoot`:
-  `appended` or `started`). A refused or failed send writes nothing.
+  `appended` or `started`). A refused or failed send writes nothing. A
+  root started in a task you are on (＋ past its last column) ensures that
+  task too, which is in your sidebar already: nothing changes.
 - **`placeInList` renumbers** when `orderBetween` finds no room between a
   task's neighbours, as the board does.
 

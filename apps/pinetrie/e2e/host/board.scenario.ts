@@ -152,9 +152,8 @@ async function run(check: Checks["check"]): Promise<void> {
         kind: "open-thread",
         thread: tab,
         root: newRootId(),
-        at: null,
         task: tabTask,
-        state: null,
+        start: { kind: "new-task", state: null },
       })
       const shut = await ada.moveCard(
         { card: tab, from: { kind: "canvas", task: tabTask }, to: DISCARDED },

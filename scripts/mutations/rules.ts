@@ -27,10 +27,26 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a branch opens at an entry in no root it holds",
     file: "packages/rules/open.ts",
-    from: "  if (parent === null || !input.tasks.has(open.task))\n",
-    to: "  if (!input.tasks.has(open.task))\n",
+    from: '      if (parent === null || !held) return { kind: "refused", why: "unknown" }\n',
+    to: '      if (!held) return { kind: "refused", why: "unknown" }\n',
     command: unit,
     expect: "refused: its entry is in no root it holds",
+  },
+  {
+    name: "a new root opens in a task the session does not hold",
+    file: "packages/rules/open.ts",
+    from: '      if (!held) return { kind: "refused", why: "unknown" }\n',
+    to: "",
+    command: unit,
+    expect: "refused: a new root's task is not the session's",
+  },
+  {
+    name: "a new root's card goes first on its canvas",
+    file: "packages/rules/open.ts",
+    from: '            to: { kind: "canvas-at", task: open.task, after: start.after },\n',
+    to: '            to: { kind: "canvas-at", task: open.task, after: null },\n',
+    command: unit,
+    expect: "a new root in a task the session holds",
   },
   {
     name: "a started new root is drawn not yet started",

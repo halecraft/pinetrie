@@ -16,6 +16,7 @@ import type { Intent } from "./intent.ts"
 import type { KeyLike } from "./page-keys.ts"
 import { NO_TEXT, type TaskSummary } from "./root-label.ts"
 import { stepsIn } from "./root-target.ts"
+import { newTabButton, type StartButton } from "./start-button.ts"
 import type { ThreadCardHead } from "./thread-card.ts"
 
 /**
@@ -65,8 +66,8 @@ export interface BoardColumnView {
   readonly mark: Level | null
   /** Over the roots the search keeps, as its cards show them. */
   readonly signals: StateSignals
-  /** ＋ here: a new root that lands in this state. */
-  readonly add: { readonly agent: Intent; readonly conversation: Intent }
+  /** ＋ here: a new tab whose task lands in this state. */
+  readonly add: StartButton
   /** One place left or right among the open states; null at an end. */
   readonly left: Intent | null
   readonly right: Intent | null
@@ -254,10 +255,7 @@ export function boardView(input: BoardViewInput): BoardView {
       count,
       mark,
       signals: stateSignals(cards.map(t => t.task)),
-      add: {
-        agent: { kind: "newTab", asksAgent: true, state: state.id },
-        conversation: { kind: "newTab", asksAgent: false, state: state.id },
-      },
+      add: newTabButton(state.id),
       left: previous === undefined ? null : before(previous.state.id),
       right: next === undefined ? null : before(afterNext?.state.id ?? null),
       addBefore: { left: state.id, right: next?.state.id ?? null },

@@ -1,4 +1,5 @@
 import {
+  type CardId,
   entryId,
   indexTree,
   livePlaceOf,
@@ -38,29 +39,27 @@ const WORKFLOW = {
   open: [{ id: STATE, name: "Doing" }],
   archive: { id: workflowStateIdFor("x"), name: "Done" },
 }
+const BRANCH = { kind: "branch", at: entryId("b"), index } as const
 const plan = (
   open: Partial<Parameters<typeof planOpenThread>[0]["open"]> = {},
   over: Partial<Parameters<typeof planOpenThread>[0]> = {},
 ) =>
   planOpenThread({
-    open: {
-      thread: NEW,
-      root: ROOT,
-      at: entryId("b"),
-      task: TASK,
-      state: null,
-      ...open,
-    },
+    open: { thread: NEW, root: ROOT, task: TASK, ...open },
+    start: BRANCH,
     sender: ADA,
     cards: [onCanvas],
     threads: new Map([[R, record(R)]]),
     roots: new Set([ROOT]),
     tasks: new Set([TASK]),
-    index,
     workflow: WORKFLOW,
     now: 7,
     ...over,
   })
+const newTab = (state: typeof STATE | null = null) =>
+  ({ start: { kind: "new-task", state } }) as const
+const newRoot = (after: CardId | null) =>
+  ({ start: { kind: "new-root", after } }) as const
 
 describe("planOpenThread", () => {
   test("a branch: its record forks at its entry, its card just after the thread it forks from, and no task is written", () => {
@@ -90,10 +89,7 @@ describe("planOpenThread", () => {
   })
 
   test("a new tab: a new root's first thread, in a new task whose card ends its state", () => {
-    const opened = plan(
-      { root: NEW_ROOT, at: null, task: NEW_TASK, state: STATE },
-      { index: null },
-    )
+    const opened = plan({ root: NEW_ROOT, task: NEW_TASK }, newTab(STATE))
     expect(
       opened.kind === "open" && opened.records.map(r => r.namespace),
     ).toEqual(["pinetrie.thread"])
@@ -115,26 +111,47 @@ describe("planOpenThread", () => {
 
   test("a new tab before the board has states is refused", () => {
     expect(
-      plan(
-        { root: NEW_ROOT, at: null, task: NEW_TASK },
-        { index: null, workflow: null },
-      ),
+      plan({ root: NEW_ROOT, task: NEW_TASK }, { ...newTab(), workflow: null }),
     ).toEqual({ kind: "refused", why: "no-place" })
+  })
+
+  test("a new root in a task the session holds: its card where a drop after `after` lands, and no task is written", () => {
+    const ranked = (after: CardId | null) => {
+      const opened = plan({ root: NEW_ROOT }, newRoot(after))
+      if (opened.kind !== "open") throw new Error(opened.why)
+      expect(opened.records).toMatchObject([
+        { value: { root: NEW_ROOT, origin: { kind: "root" } } },
+      ])
+      expect(opened.steps).toHaveLength(1)
+      const [made] = opened.steps
+      if (made?.kind !== "write" || made.record.place.kind !== "canvas")
+        throw new Error("not made on a canvas")
+      expect(made.record.place.task).toBe(TASK)
+      return made.record.place.order
+    }
+    const existing =
+      onCanvas.place.kind === "canvas" ? onCanvas.place.order : ""
+    expect(ranked(R) > existing).toBe(true)
+    expect(ranked(null) < existing).toBe(true)
+    // A card that has left the canvas: at its end.
+    expect(ranked(threadIdFor("gone")) > existing).toBe(true)
   })
 
   test.each([
     ["its id names a recorded thread", plan({ thread: R }), "taken"],
-    ["its entry is in no root it holds", plan({ at: entryId("x") }), "unknown"],
-    ["its task is not the session's", plan({ task: NEW_TASK }), "unknown"],
     [
-      "a new tab's root is in use",
-      plan({ at: null, task: NEW_TASK }, { index: null }),
-      "taken",
+      "its entry is in no root it holds",
+      plan({}, { start: { ...BRANCH, at: entryId("x") } }),
+      "unknown",
     ],
+    ["its task is not the session's", plan({ task: NEW_TASK }), "unknown"],
+    ["a new tab's root is in use", plan({ task: NEW_TASK }, newTab()), "taken"],
+    ["a new tab's task is in use", plan({ root: NEW_ROOT }, newTab()), "taken"],
+    ["a new root is in use", plan({}, newRoot(null)), "taken"],
     [
-      "a new tab's task is in use",
-      plan({ root: NEW_ROOT, at: null }, { index: null }),
-      "taken",
+      "a new root's task is not the session's",
+      plan({ root: NEW_ROOT, task: NEW_TASK }, newRoot(null)),
+      "unknown",
     ],
   ] as const)("refused: %s", (_, planned, why) => {
     expect(planned).toEqual({ kind: "refused", why })

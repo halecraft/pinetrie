@@ -366,12 +366,19 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   (`drawnAt`), which the suite's `col(n)` selects by; `position`, its index
   on the canvas, is what Alt+arrows move by.
 - **A column's ⋯** (`column-menu.tsx`, `columnMenu`) is its card's, for
-  everyone: its width, one column or two (`cardWidth`), and a note column
-  after it; a thread's adds a section of Copy to this task, Copy to your
-  inventory and Move to your inventory, and no task (ADR-0127).
-  `columnMenu` returns the sections, and each item's class is
-  `column-<key>` (`.column-copy`, `.column-copy-inventory`,
-  `.column-take`). The task column's **+ note column** puts one first.
+  everyone: its width, one column or two (`cardWidth`); a thread's adds a
+  section of Copy to this task, Copy to your inventory and Move to your
+  inventory, and no task (ADR-0127). `columnMenu` returns the sections,
+  and each item's class is `column-<key>` (`.column-copy`,
+  `.column-copy-inventory`, `.column-take`). Neither it nor the task
+  column makes a column: ＋ past the last column does (ADR-0138).
+- **Every ＋ is one split button** (`AddButton`, `add-button.tsx`): it
+  draws a `StartButton`, its main item and a `Menu` of the rest, with no
+  words of its own; each button's class is `add-<key>`. The sidebar's and
+  a board column's start a new tab; the strip's, in `.canvas-end` while
+  the canvas takes a drop there (so never on a read-only task), is drawn
+  folded, ＋ over its ▾, and makes a column of the task
+  (`newColumnButton`).
 - **A copy's fork row and a parent elsewhere's** (`Origin`, kind `source`)
   follow a `ThreadLink`; one held by someone else is disabled. A column
   whose path above its thread is folded (`ColumnView.above`) draws
@@ -1500,7 +1507,8 @@ What S151 measured, and these handlers rest on:
   `.open-close` after it, its `⋯` (`.open-menu`) holds `.rename-root`,
   `.retitle-root` and `.move-to` (`.closes` for
   the archive), a root being renamed is `.open-title-input`, and ＋'s
-  buttons are `.add-agent`, `.add-menu` and `.add-conversation`; a new tab
+  buttons are `.add-agent`, `.add-menu` and `.add-conversation` (past the
+  last column, `#strip > .canvas-end`'s, with `.add-note-column`); a new tab
   is a task's `.open-root` (ADR-0126). Folded, an item's `.open-root` holds
   `.open-icon` (`.open-sprite` or `.open-initials`), its
   menu ends in `.open-close-item`, its tooltip is `.open-tip` and its

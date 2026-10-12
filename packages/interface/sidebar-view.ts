@@ -18,6 +18,7 @@ import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
 import { type PageName, pageWords } from "./page.ts"
 import { type ColorSlot, taskSlot } from "./palette.ts"
 import { initialsOf, NO_TEXT, type TaskSummary } from "./root-label.ts"
+import { newTabButton, type StartButton } from "./start-button.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 
 /** What a task's ⋯ in the sidebar offers. */
@@ -88,8 +89,8 @@ export interface SidebarView {
   readonly items: readonly ItemView[]
   /** The item you are on, or null when the list lacks it. */
   readonly selected: ItemView | null
-  /** ＋: agent work, its main action, and a conversation. */
-  readonly add: { readonly agent: Intent; readonly conversation: Intent }
+  /** ＋: a new tab, agent work its main action. */
+  readonly add: StartButton
 }
 
 export interface SidebarViewInput {
@@ -114,10 +115,7 @@ export function sidebarView(input: SidebarViewInput): SidebarView {
   return {
     items,
     selected: items.find(t => t.selected) ?? null,
-    add: {
-      agent: { kind: "newTab", asksAgent: true },
-      conversation: { kind: "newTab", asksAgent: false },
-    },
+    add: newTabButton(null),
   }
 }
 

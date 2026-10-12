@@ -140,7 +140,9 @@ can only be proven in a browser, minutes per check; a rule in a pure
 function is proven by a unit test in a second.
 
 - **A component draws a view.** It branches only on a view's `kind` or its
-  flags, and draws the view's strings. It compares no document fact, builds
+  flags, and draws the view's strings. Every ＋ draws a `StartButton`
+  (`start-button.ts`), whose items one function words (`startWords`), so
+  the sidebar's, a board column's and the canvas's say a thing alike. It compares no document fact, builds
   no label, and chooses nothing that is offered. The views are `appView`
   (`app-view.ts`), `sidebarView`, `boardView`, `columnView`, `messageTools`, `railItems`,
   `rowSummary` and `rowView`, `callStatus`, `editorState` and `startText`,
@@ -299,8 +301,8 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   the rule that a key's parts are its colons.
 - **A new tab is a task opened with its thread** (ADR-0126): ＋ mints a
   root, a task and a thread (`planIntent`'s `Minted`), asks the host to open
-  them (`open-thread`, a new root's first thread, in the workflow state of
-  the board column it was opened from, if any), shows the task (in the
+  them (`open-thread` starting `new-task`, a new root's first thread, in the
+  workflow state of the board column it was opened from, if any), shows the task (in the
   sidebar from then), and unfolds the thread's card with what it starts
   with (`opened`: a prefill, Start Agent). Its column appears as the host
   writes its card; its first send starts its root (`ChatHow.root`, the
@@ -443,10 +445,26 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   it (its placer) and the days until the sweep (`trashDeadline`, the
   sweep's own). Its **restore** is `planRestore`, a move to `BACK`.
 - **A branch is a card from the moment it opens** (ADR-0126): `→` asks the
-  host to open its thread (`open-thread`, `planOpenBranch`), whose card
-  lands just after the thread its fork is in (`branchAfter`,
-  `@pinetrie/rules`), and unfolds it with what it starts with (`opened`).
-  Its column appears as the card arrives.
+  host to open its thread (`open-thread` starting `branch`,
+  `planOpenBranch`), whose card lands just after the thread its fork is in
+  (`branchAfter`, `@pinetrie/rules`), and unfolds it with what it starts
+  with (`opened`). Its column appears as the card arrives.
+- **Every thread's column opens one way** (`openThreadColumn`, `intent.ts`):
+  the `open-thread` request, its `opened` view change and `armFocus` on its
+  thread, for a new tab, a branch and ＋ past the last column alike.
+- **＋ past the last column makes a column** (`newColumnButton`,
+  `start-button.ts`, ADR-0138): one `addColumn` intent per item, carrying
+  what it makes (`NewColumn`) and the spot it lands at (`CanvasPut`), the
+  same value as the strip's drop past its last column, so the button exists
+  exactly when that drop does, and its plan reads the task from the spot,
+  not the layout. A note column is a move with no `from` to `canvas-at`; a
+  thread is `open-thread` starting `new-root` just after the same card,
+  which the host ranks as that drop. Both land by one rule.
+- **What ＋ makes is complete by construction** (`NEW_COLUMNS`,
+  `start-button.ts`): `NewColumn` is built over `CanvasKind`
+  (`@pinetrie/rules`), and the table `satisfies` `NewColumnTable`: every
+  kind a canvas holds at least once, each entry under its own kind. A new
+  kind of canvas card does not compile until ＋ makes it.
 - **Folded, a column is its card's face** (`foldedView`, ADR-0126): the
   same `Face` a grid's cell draws for that card (`faceOf`), worded for a
   strip by `foldedWords` (its title, and a note column's count), headed by
@@ -547,7 +565,8 @@ density?, details?, mode }`, `mode` `bound` or `unstarted`
   message; from then it follows its thread.
 - **Every column's path ends at its anchor** in `projectColumns`: a
   thread's end (`threadAnchor`), or an unstarted thread's fork.
-- **A null anchor** belongs only to an unstarted new root's thread: a new tab's.
+- **A null anchor** belongs only to an unstarted new root's thread: a new
+  tab's, or one ＋ made past a canvas's last column.
 - **An unstarted thread's column can carry a `Prefill`**, which its
   composer starts with, and a `pending` first message it sends as it opens
   ("branch here" after a conflict), both from your `CardView` (`opened`),
@@ -578,7 +597,8 @@ density?, details?, mode }`, `mode` `bound` or `unstarted`
   message, a branch would be the same as replying. At an agent thread's end
   it is "open a branch here", as on every message; its `@agent ` deleted, it
   steps back down to a conversation (ADR-0021).
-- **`asksAgent`** is a new tab from **＋ agent** (ADR-0021's Start Agent): a
+- **`asksAgent`** is a thread from **＋ agent**, a new tab or a column past
+  the canvas's last (ADR-0021's Start Agent): a
   message with no mention asks the agent, as if `@agent` were written, until
   the thread has a lane of its own. Only the composer reads it; the header
   shows what the composer will do (`onCreatesLane`, below).
@@ -1724,10 +1744,9 @@ gone.
   each with its title (its `NOTE_COLUMN` record, else `NEW_NOTES_TITLE`)
   and its notes in order (`notesIn`).
 - **Where one is drawn is its card's rank on the canvas** (`canvasColumns`).
-  "Add a note column here" in a column's `⋯` makes one just after it, and
-  the task column's "+ note column" one first: a move with no `from` to a
-  spot on the canvas (`canvas-at`), which the host ranks; it opens
-  unfolded.
+  ＋ past the last column makes one there, and nothing else makes an empty
+  one (ADR-0138): a move with no `from` to a spot on the canvas
+  (`canvas-at`), which the host ranks; it opens unfolded.
 - **A note's acts are a column's**, keyed by its note column's card (a
   `column` intent with a `card` key), so a refusal is said there: ↑ and ↓
   reorder it among the column's notes (`reorderOf`, a `note` key), and its

@@ -11,6 +11,8 @@
     card was seen by there.
   - ADR-0127: a thread dropped on a task in the sidebar moves to that task's
     canvas and keeps running; Fold joins the column's ⋯.
+- **Amended by:**
+  - ADR-0138: a column's ⋯ no longer adds a note column after it.
 
 **Context.**
 
