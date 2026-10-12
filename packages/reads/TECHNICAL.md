@@ -91,6 +91,33 @@ singletons (`readAccepted`, `readProject`, `readCommands`) take their one key.
 It declares core, schema and rules only (`workspace.test.ts`), so it runs
 in the host and in the browser alike: no pi, no transport.
 
+The records it reads, and the decisions that made them:
+
+| reader | record | decision |
+|---|---|---|
+| `readRoots`, `readRootRecord` | `pinetrie.root` | ADR-0063; each thread's writers on its path, ADR-0077 |
+| `readThreads` | `pinetrie.thread` | ADR-0117 |
+| `readNames` | `pinetrie.name` | ADR-0039 |
+| `readMarks` | `pinetrie.mark` | ADR-0045, ADR-0116 |
+| `readNoteColumns` | `pinetrie.note-column` | ADR-0116 |
+| `readWorkflow`, `readArchived` | `pinetrie.workflow` | ADR-0122; the archive, ADR-0029 |
+| `readVerdicts` | `pinetrie.verdict` | ADR-0077 |
+| `readDigests` | `pinetrie.digest` | ADR-0106 |
+| `readCardHistories`, `readTraces` | `pinetrie.card-history`, `pinetrie.trace` | ADR-0048 step 6 |
+| `readQueueHolds` | `pinetrie.queue-hold` | ADR-0048 step 7 |
+| `readParticipantPictures` | `pinetrie.picture` | ADR-0098 |
+| `readOffers` | `pinetrie.offer` | ADR-0105 |
+| `readAccepted`, `readBases` | `pinetrie.accepted`, `pinetrie.base` | ADR-0104 |
+| `readFilesLost` | `pinetrie.files-lost` | ADR-0124 |
+| `readBudgets` | `pinetrie.budget` | ADR-0128 |
+| `readCommands` | `pinetrie.commands` | ADR-0036 |
+
+The lanes' records and revisions (`readLaneRecords`, `readRevisions`,
+`readLandings`) are where lanes work (ADR-0032, ADR-0033); `worksOwn`
+decides whether a send's paths are written as its lane sees them (ADR-0034,
+ADR-0036, ADR-0102). A renderable entry is the stored row's typed columns
+with pi's message lifted out of `payload` (ADR-0015).
+
 A read caches only by an object Kyneta keeps while its content is unchanged
 (S54): a hit returns what reading again would, and the cache holds nothing
 Kyneta has let go.
@@ -142,8 +169,8 @@ Kyneta has let go.
   its map the same way, and so do `readParticipantNames` and `readParticipantPictures`,
   which every message's speaker and every circle compare by identity.
 - **`readReferencedBlobs` is what the sweep keeps**: each root's images
-  from its directory record, every card's text, every banner and every
-  person's picture (ADR-0098). An image left out of it is deleted after the
+  from its directory record, every card's text, every banner (ADR-0050)
+  and every person's picture (ADR-0098). An image left out of it is deleted after the
   grace period.
 - **Build a `Record<EntryId, …>` from each entry's own `id`.** `Object.entries`
   and `Object.keys` give back `string`, which cannot index it (TS7053), so
@@ -159,9 +186,10 @@ Kyneta has let go.
   builds each thread's first entry and end (`TreeIndex.firstOf`, `endOf`).
   A row whose thread fails `isThreadId` is left out, as `readStoredLanes`
   sets aside a malformed lane name: none should exist, since every commit
-  names its thread and a store from before is refused until migrated.
+  names its thread and a store from before is refused until migrated
+  (ADR-0096).
 - **A compaction entry carries the pinned cards its retained tail holds**
-  (`carried`, ADR-0048 step 5): the tail's newest cards entry, read from the
+  (`carried`, ADR-0048 step 5, S92): the tail's newest cards entry, read from the
   row's payload (`rowRetainedTail`, `@pinetrie/schema`). pi stores the tail on
   the compaction itself, and the model reads it after the summary, so
   `pinnedInView` stops there.

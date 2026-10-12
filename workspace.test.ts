@@ -3,8 +3,8 @@
 // time. That holds only if the manifests say the right things. This file
 // checks the manifests, and the one resolution property everything rests on.
 //
-// It replaced scripts/check-boundaries.ts, a regex scanner that failed silently
-// three times. Nothing here reads source text.
+// Nothing here reads source text: a regex scanner of imports failed silently
+// three times.
 
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
@@ -46,7 +46,7 @@ test("the root declares tooling only, so nothing runtime leaks to packages", () 
   assert.deepEqual(Object.keys(root.devDependencies ?? {}).sort(), ROOT_TOOLING)
 })
 
-test("only the pi adapter and the conformance suite declare pi (ADR-0003)", () => {
+test("only the pi adapter and the conformance suite declare pi", () => {
   const declaring = WORKSPACE.filter(dir =>
     allDeps(read(dir)).some(d => d.startsWith("@earendil-works/")),
   ).sort()
@@ -67,7 +67,7 @@ test("the protocol declares only Kyneta and core", () => {
 test("rules declares only TypeBox, core, and the markdown parser the client's remark wraps", () => {
   // Which images a message shows is read from its markdown on the host, by
   // the parser under the client's remark-parse and remark-gfm, at the same
-  // versions, so both read one tree and the bundle holds one copy (ADR-0042).
+  // versions, so both read one tree and the bundle holds one copy.
   assert.deepEqual(deps(read("packages/rules")).sort(), [
     "@pinetrie/core",
     "mdast-util-from-markdown",
@@ -105,7 +105,7 @@ test("session declares only Kyneta's exchange and WebSocket transport, core, pro
 })
 
 test("interface declares only core, protocol, reads, rules, schema, session, shell and TypeBox: no React, no DOM", () => {
-  // What any client shows and does (ADR-0093): a TTY must be able to take
+  // What any client shows and does: a TTY must be able to take
   // it without a browser. `packages/interface/tsconfig.json` checks the DOM.
   assert.deepEqual(deps(read("packages/interface")).sort(), [
     "@pinetrie/core",
@@ -123,7 +123,7 @@ test("shell declares only unbash: shell source as structure, nothing of pine·tr
   assert.deepEqual(allDeps(read("packages/shell")), ["unbash"])
 })
 
-test("only interface declares shell: which call reads as shell is its decision (ADR-0114)", () => {
+test("only interface declares shell: which call reads as shell is its decision", () => {
   const declaring = WORKSPACE.filter(dir =>
     allDeps(read(dir)).includes("@pinetrie/shell"),
   ).sort()
@@ -141,10 +141,10 @@ test("lanes declares only core: it runs jj and git in a lane, on a runtime it is
   assert.deepEqual(deps(read("packages/lanes")), ["@pinetrie/core"])
 })
 
-/** The packages that run lanes, and the VM Docker runs in on the Mac (ADR-0130). */
+/** The packages that run lanes, and the VM Docker runs in on the Mac. */
 const RUNTIMES = ["@pinetrie/docker", "@pinetrie/vm"]
 
-/** What a runtime may declare: core, lanes when it runs lanes, and lanehost with its channel for the disks (ADR-0129). */
+/** What a runtime may declare: core, lanes when it runs lanes, and lanehost with its channel for the disks. */
 const RUNTIME_MAY = [
   "@pinetrie/channel",
   "@pinetrie/core",

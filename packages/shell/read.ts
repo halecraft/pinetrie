@@ -14,7 +14,7 @@ export interface ShellRead {
   readonly laidOut: readonly ShellSpan[] | undefined
 }
 
-/** A command as a reader sees it, laid out to `width` columns. Pure. */
+/** A command as a reader sees it, laid out to `width` columns. */
 export function readShell(source: string, width: number): ShellRead {
   const parsed = parse(source)
   if ((parsed.errors?.length ?? 0) > 0)

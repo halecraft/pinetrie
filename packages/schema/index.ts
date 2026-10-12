@@ -1,8 +1,5 @@
 // schema — each document's Kyneta shape, and the reads and writes at the
-// storage edge (ADR-0095). It makes no decisions: those are
-// `@pinetrie/rules`'. It imports no pi, which let S7, S8 and S12 test
-// convergence with no harness; `pi-layout.ts` says how pi's data is laid out
-// in a root's document.
+// storage edge. It makes no decisions, and imports no pi.
 
 export * from "./attention.ts"
 export * from "./inventory.ts"

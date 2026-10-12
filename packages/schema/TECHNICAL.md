@@ -3,7 +3,7 @@
 Each document's Kyneta shape, and the reads and writes at the storage edge
 (ADR-0095). It makes no decisions: what a stream event does, how a run
 ends, what a record says, are `@pinetrie/rules`', over types in
-`@pinetrie/core`. It imports Kyneta and core, never pi. That pi-free property
+`@pinetrie/core`. It imports Kyneta and core, never pi (ADR-0003). That pi-free property
 is what let spikes S7, S8 and S12 test convergence with no harness in the
 picture, and it is worth protecting.
 
@@ -133,6 +133,8 @@ were no users. Recorded precisely so it does not blur S17's finding that
 `streams` (a record per stream: lane, `reply` or `tool`, call, `under`) and
 `streamText` (a `Schema.text()` per stream) replaced `pendingText`, which held
 one text per run. Keys are fresh uuidv7s (ADR-0016), written only by the host.
+A stream's text is written as edits, never as a whole value, which would
+cost O(n²) and store every snapshot (ADR-0014, S22).
 
 - A reply stream opens on its message's first text, recording the lane's tip
   as `under`. It is the lane's current reply while the tip is still there
@@ -230,6 +232,11 @@ document.
   it to real documents' `clientID`s. The host writes a record of each seat
   as it connects, so a card's writers are named from the records after
   they have gone.
+- **A queued card names the text version its queuer had** (`textVersion`,
+  in the card's `seen`), and the host takes it only once its copy of the
+  text holds that much (`textHolds`): Kyneta keeps no order between
+  documents, so a card's record can arrive before the text typed just
+  before it (S96).
 - **A deletion moves its writer's clock.** Kyneta's Yjs substrate ticks a
   `kyneta.clock` text after a transaction that only deleted, and a Kyneta
   delete carries its author's tick, so a deletion is attributed like an
@@ -275,7 +282,10 @@ would refuse each whole undo of a move (S82).
   `order` and its width (`"1"` or `"2"`): a thread's card on its task's
   canvas: a thread not yet started's too (ADR-0126).
 - **A pinned row carries `lane` and `order`**, as a queued one does, and
-  no `by` or `seen`.
+  no `by` or `seen`. A card's place among others is a rank in its own
+  `order`, not a place in a list (S69).
+- **A card's command is in `command`** (ADR-0108), and the fact a card
+  carries is JSON in `fact` (ADR-0080).
 - **A comment is stored as `margin`** (ADR-0126): its entry in `at`, the
   entry's thread in `lane`, its rank in `order`. Fields the row already
   had, so the schema's hash held.
@@ -486,7 +496,8 @@ value as pi does, for tests and fixtures; in the host, only pi writes it.
 ## Lane names, tips and runs are branded here
 
 The lane and run functions take and give `ThreadId`, `EntryId` and `RunId`
-(`@pinetrie/core`), so a `begin` cannot take its lane and run swapped. The readers mint them: `readLaneTip` an `EntryId`, `readActiveRun` a
+(`@pinetrie/core`), so a `begin` cannot take its lane and run swapped. A
+lane's name is its thread's id (ADR-0120). The readers mint them: `readLaneTip` an `EntryId`, `readActiveRun` a
 `RunId`, and `readStoredLanes` the lane names.
 
 - **`readStoredLanes` sets aside a stored name that fails `isThreadId`**, in

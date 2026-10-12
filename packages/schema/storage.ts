@@ -1,5 +1,5 @@
-// schema/storage — a root's document and the session's (ADR-0063,
-// ADR-0095): their schemas, and the host's records in them, read and written.
+// schema/storage — a root's document and the session's: their schemas, and
+// the host's records in them, read and written.
 
 import {
   type BoundSchema,
@@ -12,18 +12,18 @@ import type { ValueWrite } from "@pinetrie/core"
 import { StoredEntryRowSchema } from "./pi-layout.ts"
 
 /**
- * The host's records (ADR-0095): a record's namespace, then its key, then its
+ * The host's records: a record's namespace, then its key, then its
  * contents, which its `RecordSpec` (`@pinetrie/rules`) decodes. A
  * namespace's first write creates its child record; the host is every
- * document's only writer (ADR-0023), so no two replicas create one at once
- * (S18).
+ * document's only writer, so no two replicas create one at once, which
+ * would lose one's contents.
  */
 const RecordsField = Schema.record(Schema.record(Schema.any()))
 
 /**
- * A root's document (ADR-0063): pi's storage, and the host's records keyed by
- * its entries. Authoritative JSON (`json.bind`, ADR-0023): the host is its
- * only writer, and compacts it between runs.
+ * A root's document: pi's storage, and the host's records keyed by its
+ * entries. Authoritative JSON: the host is its only writer, and compacts it
+ * between runs.
  *
  * `entries` is keyed by entry id, so a retried write replaces the same row.
  * `usageRows`, `values` and `lists` are pi's bookkeeping, typed `any`.
@@ -41,10 +41,7 @@ export const RootDoc = json.bind(
   }),
 )
 
-/**
- * The session's document (ADR-0063, ADR-0095): the host's records read
- * across roots, the directory among them.
- */
+/** The session's document: the host's records read across roots, the directory among them. */
 export const SessionDoc = json.bind(Schema.struct({ records: RecordsField }))
 
 /** A root's document, as the Exchange gives it. */
@@ -62,7 +59,7 @@ const NO_RECORDS: Readonly<Record<string, unknown>> = Object.freeze({})
 
 /**
  * Every record in `namespace`, by its key, as stored: the same object while
- * nothing in the namespace changes, whatever else is written (S120), so a
+ * nothing in the namespace changes, whatever else is written, so a
  * reader can cache by it. An empty namespace is one shared empty object.
  */
 export const readNamespace = (

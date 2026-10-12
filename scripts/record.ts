@@ -50,7 +50,7 @@ export interface Link {
 /** An amendment made in place, without an ADR of its own. */
 export interface Revision {
   readonly date: string
-  /** What it rests on (`S135, S136`), or null. */
+  /** The spikes it rests on, as its parenthesis names them, or null. */
   readonly evidence: string | null
   readonly line: string
 }

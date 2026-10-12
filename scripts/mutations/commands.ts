@@ -1,4 +1,4 @@
-// Mutations for commands (ADR-0036). Run: pnpm mutate scripts/mutations/commands.ts
+// Mutations for commands. Run: pnpm mutate scripts/mutations/commands.ts
 import type { Mutation } from "../mutate.ts"
 
 const vitest = (path: string) => ["pnpm", "exec", "vitest", "run", path]

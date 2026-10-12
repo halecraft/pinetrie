@@ -1,6 +1,5 @@
-// schema/live — what is streaming now, `pinetrie:live` (ADR-0014, ADR-0063):
-// its schema, the stream row's codec, its one writer and its readers. What a
-// stream event does is planned in `@pinetrie/rules` (`packages/rules/live.ts`).
+// schema/live — what is streaming now, `pinetrie:live`: its schema, the
+// stream row's codec, its one writer and its readers.
 
 import { batch, createDoc, json, Schema } from "@kyneta/schema"
 import {
@@ -18,13 +17,13 @@ import {
 } from "@pinetrie/core"
 
 /**
- * What is streaming now (ADR-0063), written only by the host. No restarted
+ * What is streaming now, written only by the host. No restarted
  * host needs it, since a starting host clears it, so it is a document of its
  * own: compacting it rewrites only what is running.
  *
- * `streams` holds one row per stream, keyed by a fresh uuidv7 (ADR-0016), and
- * `streamText` its text, written as edits (ADR-0014): a whole-value string
- * costs O(n^2) and stores every snapshot (S22). `activeRuns` maps a lane to
+ * `streams` holds one row per stream, keyed by a fresh uuidv7, and
+ * `streamText` its text, written as edits: a whole-value string costs
+ * O(n^2) and stores every snapshot. `activeRuns` maps a lane to
  * the run it is streaming; a lane with no key is idle.
  */
 export const LiveDoc = json.bind(
@@ -134,7 +133,7 @@ export const readActiveLanes = (live: LiveDocHandle): readonly ThreadId[] =>
 
 /**
  * Every stream's record, or only `lane`'s, in id order, without reading any
- * text: a `useTracked` over it does not re-run on a delta (S55).
+ * text: a `useTracked` over it does not re-run on a delta.
  */
 export function readStreamRecords(
   live: LiveDocHandle,

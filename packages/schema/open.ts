@@ -1,9 +1,5 @@
-// schema/open — the tasks a person has open, in their order (ADR-0122,
-// ADR-0116): a
-// Yjs document per person, written only by that person's tabs, so the list is
-// the same on every device of theirs. The host stores and relays it, shared
-// with its person only (host/policy.ts), and never writes it; its id and who
-// may write it are the protocol's (`personDocId`, `@pinetrie/protocol/writers`).
+// schema/open — the tasks a person has open, in their order: a Yjs document
+// per person, written only by that person's tabs.
 //
 // A task maps to an order key, not a place in a list: two devices reordering
 // at once merge per task, and a list could hold a task twice.

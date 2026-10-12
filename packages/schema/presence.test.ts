@@ -1,6 +1,5 @@
-// The presence document's shape, pinned before anything is built on it
-// (PLAN-2026-09-27-presence, Phase 0). What decay and disconnects do across
-// peers was measured through Exchanges; see the plan's implementation notes.
+// The presence document's shape. What decay and disconnects do across peers
+// was measured through Exchanges (`TECHNICAL.md`, "Presence").
 import { batch, createDoc, SUBSTRATE } from "@kyneta/schema"
 import { describe, expect, test } from "vitest"
 import {
@@ -31,7 +30,7 @@ describe("presence: flat records of decaying strings", () => {
     })
     expect(doc.typing()).toEqual({ "w-ada@x.io:s1": "e2" })
   })
-  test("every key's writer is before its first colon (ADR-0037)", () => {
+  test("every key's writer is before its first colon", () => {
     const me = seatKey("w-ada@x.io", "s1")
     expect([writerOfKey(me), writerOfKey(readingKey(me, "c1"))]).toEqual([
       "w-ada@x.io",

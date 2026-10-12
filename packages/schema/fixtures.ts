@@ -25,7 +25,7 @@ export const newSessionDoc = (): SessionDocHandle => createDoc(SessionDoc)
 
 /**
  * Write one entry row, as pi's storage does. The caller supplies `id`: a
- * same-key write replaces the row, and entry ids are unique (ADR-0009).
+ * same-key write replaces the row, and entry ids are unique.
  */
 export function writeEntry(doc: RootDocHandle, row: StoredEntryRow): void {
   doc.entries.set(row.id, row)

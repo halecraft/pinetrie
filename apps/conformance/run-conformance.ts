@@ -1,8 +1,8 @@
-// SPIKE S2 runner: runs pi's own Storage conformance suite against an
-// implementation, prints a per-case pass/fail table and a failure taxonomy.
+// Runs pi's own Storage conformance suite against a storage, and prints a
+// per-case pass/fail table and a failure taxonomy.
 //
-//   node run-conformance.mjs kyneta   (default)
-//   node run-conformance.mjs memory   (control / baseline)
+//   node run-conformance.ts kyneta   (default)
+//   node run-conformance.ts memory   (control / baseline)
 
 const { createRequire } = await import("node:module")
 const require_ = createRequire(import.meta.url)
@@ -30,8 +30,8 @@ if (target === "memory") {
   const { KynetaStorage } = await import("@pinetrie/pi")
   const { threadIdFor } = await import("@pinetrie/core")
   factory = async () => {
-    // pi's suite commits entries outside any thread; pine·trie's never do
-    // (ADR-0125), so only this storage is given a thread to fall back to.
+    // pi's suite commits entries outside any thread; pine·trie's never do,
+    // so only this storage is given a thread to fall back to.
     const storage = new KynetaStorage({
       fallbackThread: threadIdFor("c0f0a0ce"),
     })

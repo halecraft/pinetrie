@@ -95,10 +95,10 @@ export const mutations: readonly Mutation[] = [
     expect: "readLanes: a lane's queued cards are what waits",
   },
   {
-    name: "a lane's notes count as waiting",
+    name: "a card at a lane's end counts as waiting",
     file: "packages/reads/index.ts",
-    from: "    const queue = queuedOn(cards, name)",
-    to: '    const queue = cards.filter(c => c.place.kind !== "fresh") as ReturnType<typeof queuedOn>',
+    from: "    const queue = queuedOn(cards, name).filter(c => !blank.has(c.id))",
+    to: '    const queue = cards.filter(c => "thread" in c.place && c.place.thread === name && !blank.has(c.id)) as ReturnType<typeof queuedOn>',
     command: unit,
     expect: "readLanes: a lane's queued cards are what waits",
   },

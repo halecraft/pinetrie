@@ -1,4 +1,4 @@
-// The directory of roots (ADR-0063): what is read of a root's document for
+// The directory of roots: what is read of a root's document for
 // its record, and the tree of several held roots at once.
 
 import {
@@ -112,7 +112,7 @@ describe("readRootRecord", () => {
     })
   })
 
-  test("each thread's writers are those on its path, in order of first message (ADR-0077)", () => {
+  test("each thread's writers are those on its path, in order of first message", () => {
     // e1 (Bea) ─ e2 (agent) ─ e3 (Ada) ─ e4 (agent)   lane A
     //                     └─ e5 (Cy)                    lane B
     const doc = rootWith(
@@ -135,7 +135,7 @@ describe("readRootRecord", () => {
     })
   })
 
-  test("a mention names the thread it is in, which the inbox opens it in (ADR-0116)", () => {
+  test("a mention names the thread it is in, which the inbox opens it in", () => {
     const [t, u] = [threadIdFor("t"), threadIdFor("u")]
     const doc = rootWith(
       row("e1", null, chat("plan"), t),
@@ -167,7 +167,7 @@ test("readReferencedBlobs: every root's images from its record, without its docu
   expect([...readReferencedBlobs(session, [])]).toEqual([SHA])
 })
 
-test("readReferencedBlobs: a person's picture is kept from the sweep (ADR-0098)", () => {
+test("readReferencedBlobs: a person's picture is kept from the sweep", () => {
   const session = newSessionDoc()
   put(session, "pinetrie.picture", ADA, SHA)
   expect([...readReferencedBlobs(session, [])]).toEqual([SHA])

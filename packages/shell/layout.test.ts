@@ -5,7 +5,7 @@ import { layoutOf, sameProgram } from "./layout.ts"
 const WIDTH = 56
 const laidOut = (source: string) => layoutOf(source, parse(source), WIDTH)?.text
 
-/** The commands of S138, and the shapes a chain breaks around. */
+/** Agents' one-line commands, and the shapes a chain breaks around. */
 const CASES: readonly (readonly [string, string])[] = [
   [
     "mkdir -p /tmp/wc && cd /tmp/wc && (git init -q 2>/dev/null; git -c user.email=a@b -c user.name=a commit -q --allow-empty -m init) && ls -la /tmp/wc && git log --oneline | head -3",

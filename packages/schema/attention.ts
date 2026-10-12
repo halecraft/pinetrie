@@ -1,14 +1,11 @@
-// schema/attention — what a person has dealt with (ADR-0077): how far they
-// have read each thread, the verdicts and offers they marked "not needed",
-// and the mentions they have seen. A Yjs document per person, written only
-// by that person's tabs, so it is the same on every device of theirs. The host
-// stores and relays it, shared with its person only (host/policy.ts), and
-// never writes it; its id and who may write it are the protocol's
-// (`personDocId`, `@pinetrie/protocol/writers`).
+// schema/attention — what a person has dealt with: how far they have read
+// each thread, the verdicts and offers they marked "not needed", and the
+// mentions they have seen. A Yjs document per person, written only by that
+// person's tabs.
 //
 // It is a document of its own, not a part of the inventory's: read marks are
 // written whenever a column reaches its thread's end, slots only when a card
-// moves, and each keeps its own history (S101).
+// moves, and each keeps its own history.
 
 import {
   type BoundSchema,

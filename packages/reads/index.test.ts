@@ -50,7 +50,7 @@ test("readTreeIndex keeps the index, and each unchanged entry, until entries cha
   expect(after.childrenOf.get(entryId("e2"))).toEqual(["e3"])
 })
 
-test("each entry is in the thread its row names; a row whose thread is no thread's id is left out (ADR-0125)", () => {
+test("each entry is in the thread its row names; a row whose thread is no thread's id is left out", () => {
   const doc = newRootDoc()
   writeEntry(doc, row("e1", null))
   writeEntry(doc, { ...row("e2", "e1"), thread: "" })
@@ -159,7 +159,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     heldBy: null,
   })
   // A blank queued card does not wait: the drain passes over it, so a queue
-  // of blank cards alone leaves its lane idle (ADR-0113).
+  // of blank cards alone leaves its lane idle.
   expect(
     readLanes(
       view,
@@ -178,7 +178,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
       new Set([cardIdFor("c1"), cardIdFor("c2")]),
     ).find(l => l.name === lane),
   ).toMatchObject({ waiting: 0, askedBy: null, lastWaiting: null })
-  // A held queue names who holds it (ADR-0048 step 7).
+  // A held queue names who holds it.
   const holds = new Map([[lane, { lane, by: writerId("cy@x.io"), at: 1 }]])
   expect(
     readLanes(view, readTreeIndex(doc), [], holds, new Set())[0]?.heldBy,

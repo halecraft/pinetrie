@@ -9,7 +9,7 @@ import {
   readTypingIn,
 } from "./index.ts"
 
-test("each presence read names each seat's person, a person with two seats twice (ADR-0037)", () => {
+test("each presence read names each seat's person, a person with two seats twice", () => {
   const ada = writerId("ada@x.io")
   const [one, two] = [seatKey(ada, "s1"), seatKey(ada, "s2")]
   const doc = newPresenceDoc()
@@ -48,7 +48,7 @@ test("a presence read keeps its array while its entries are the same, and not af
   expect(moved).toEqual([[writerId("ada@x.io"), "e2"]])
 })
 
-test("each followed end's task, as its column reported it; one that is no task's left out; the same map while unchanged (ADR-0063, ADR-0116)", () => {
+test("each followed end's task, as its column reported it, kept while unchanged", () => {
   const ada = seatKey(writerId("ada@x.io"), "s1")
   const doc = newPresenceDoc()
   const [k1, k9] = [taskIdFor("1"), taskIdFor("9")]
@@ -66,7 +66,7 @@ test("each followed end's task, as its column reported it; one that is no task's
   expect([...readReadingTasks(doc)]).toEqual([["e1", k9]])
 })
 
-test("the cards someone is typing in, from any seat, without decayed ones; the same set while unchanged (ADR-0048 step 7)", () => {
+test("the cards someone is typing in, from any seat, without decayed ones; the same set while unchanged", () => {
   const ada = writerId("ada@x.io")
   const doc = newPresenceDoc()
   doc.typingIn.set(seatKey(ada, "s1"), cardIdFor("c1"))

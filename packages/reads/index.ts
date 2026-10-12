@@ -1,18 +1,8 @@
 // reads — what the session's documents say, read once, for the host and the
-// client alike.
+// client alike, so a promise the page makes is decided from the facts the
+// host decides from.
 //
-// Each read takes the documents it reads (ADR-0063): a root's (`RootDocHandle`:
-// its entries, pi's values for its lanes, the records keyed by its entries),
-// the session's (`SessionDocHandle`: the records read across roots), or
-// `pinetrie:live`. A read of several takes a `RootView`.
-//
-// The composer promises "send" or "queue" from the same facts the host then
-// decides from. If the two read those facts separately, the promise holds only
-// while two copies stay in step, which is the drift this project keeps
-// meeting. So both read here. `packages/interface/projection.ts` gathers these
-// for the page; a stream's text is `readStreams`, in `@pinetrie/schema`.
-//
-// Pure reads of a document handle: no subscription and no pi. The only caches
+// Reads of a document handle: no subscription and no pi. The only caches
 // are keyed by objects Kyneta keeps while their content is unchanged, so a hit
 // returns what reading again would.
 
@@ -137,12 +127,12 @@ import {
 
 /**
  * Each stored row's entry, decoded once. Kyneta returns the same frozen row
- * object for as long as the entry is unchanged (S54), so a row is its own
+ * object for as long as the entry is unchanged, so a row is its own
  * cache key and a hit is always current.
  */
 const entryOfRow = new WeakMap<StoredEntryRow, EntryLike>()
 
-/** The tree index of each `entries` record, which Kyneta keeps while no entry changes (S54). */
+/** The tree index of each `entries` record, which Kyneta keeps while no entry changes. */
 const indexOfEntries = new WeakMap<
   Readonly<Record<string, StoredEntryRow>>,
   TreeIndex
@@ -150,8 +140,7 @@ const indexOfEntries = new WeakMap<
 
 /**
  * The context entries a compaction's retained tail carries: the newest of
- * each kind, which pi's compaction hook puts there (ADR-0048, ADR-0116,
- * S92); undefined for none.
+ * each kind, which pi's compaction hook puts there; undefined for none.
  */
 function carriedBy(row: StoredEntryRow): ContextInView | undefined {
   const carried = contextOf(rowRetainedTail(row))
@@ -160,8 +149,8 @@ function carriedBy(row: StoredEntryRow): ContextInView | undefined {
 
 /**
  * A row's entry, or null for one whose thread is no thread's id. None is:
- * every commit names its thread (ADR-0125), and a store from before the
- * column is refused at startup (ADR-0096). Left out, as a malformed lane
+ * every commit names its thread, and a store from before the column is
+ * refused at startup. Left out, as a malformed lane
  * name is (`readStoredLanes`), rather than read into some thread.
  */
 function renderableEntry(row: StoredEntryRow): EntryLike | null {
@@ -195,7 +184,7 @@ function renderableEntries(
 }
 
 /**
- * Stored rows -> the shape the projections read (ADR-0015). `message` is pi's
+ * Stored rows -> the shape the projections read. `message` is pi's
  * variant data, lifted by `rowMessage`; a human's chat is decoded here, by
  * `renderableMessage`, into role `chat` with its author and writer. An
  * unchanged row gives the same entry, frozen.
@@ -226,7 +215,7 @@ let heldIndex: {
 
 /**
  * The tree of every root in `docs`, one index over all their entries: what a
- * page reads of the roots its tabs hold (ADR-0063). The same index while no
+ * page reads of the roots its tabs hold. The same index while no
  * root's entries change, as `readTreeIndex` gives one root's.
  */
 export function readHeldIndex(docs: readonly RootDocHandle[]): TreeIndex {
@@ -259,7 +248,7 @@ export const readRunning = (live: LiveDocHandle, lane: ThreadId): boolean =>
   readActiveRun(live, lane) !== undefined
 
 /**
- * A root's documents, for a read of several (ADR-0063): the root's own, for
+ * A root's documents, for a read of several: the root's own, for
  * its lanes and their tips; the session's, for the lanes' records; and
  * `pinetrie:live`, for which of them run.
  */
@@ -299,7 +288,7 @@ export function readPromptMessage(
 }
 
 /**
- * The person behind a lane's latest run (ADR-0080): its prompt's author, a
+ * The person behind a lane's latest run: its prompt's author, a
  * chat's or a land or stack message's `by` (`promptAuthor`); else whoever
  * started the lane. Null for a lane with neither.
  */
@@ -318,7 +307,7 @@ export function readRunAuthor(
 
 /**
  * Who asked the run that wrote `tip`: the writer of its prompt
- * (`promptOf`, ADR-0106), when a person's message started it.
+ * (`promptOf`), when a person's message started it.
  */
 function askerOf(index: TreeIndex, tip: EntryId | null): WriterId | undefined {
   const prompt = promptOf(index, tip)
@@ -327,14 +316,14 @@ function askerOf(index: TreeIndex, tip: EntryId | null): WriterId | undefined {
 }
 
 /**
- * Every thread lane: its tip, whether it runs, how many cards wait for it
- * (ADR-0048), who holds it (for a conflict's "by"): the writer of the ask
+ * Every thread lane: its tip, whether it runs, how many cards wait for it,
+ * who holds it (for a conflict's "by"): the writer of the ask
  * it is answering (`askerOf`), or who queued its first card; who queued
- * its last card, whom a card queued now follows; and who holds its queue
- * (ADR-0048 step 7). `cards` is every card's record (`readPlaces`), `holds`
+ * its last card, whom a card queued now follows; and who holds its queue.
+ * `cards` is every card's record (`readPlaces`), `holds`
  * the session's held queues (`readQueueHolds`). A blank queued message
  * (`blank`, `blankQueued`) does not wait: the drain passes over it, so a
- * queue of blank cards alone leaves its lane idle (ADR-0113).
+ * queue of blank cards alone leaves its lane idle.
  */
 export function readLanes(
   view: Pick<RootView, "doc" | "live">,
@@ -373,7 +362,7 @@ export function readAgentActivity(
   )
 }
 
-/** The document a record's home names (ADR-0063). */
+/** The document a record's home names. */
 export type HomeDoc<H extends Home> = H extends "root"
   ? RootDocHandle
   : SessionDocHandle
@@ -385,10 +374,10 @@ const decoded = new WeakMap<
 >()
 
 /**
- * Every record `spec` describes, by its address (ADR-0062), from the
+ * Every record `spec` describes, by its address, from the
  * document its home names. Each named reader below is this, for one record.
  * The same map while its namespace is unchanged: the stored namespace keeps
- * its identity across writes to others (S120), so a write decodes only its
+ * its identity across writes to others, so a write decodes only its
  * own namespace's records again.
  */
 export function readRecords<R, K extends string, H extends Home>(
@@ -406,7 +395,7 @@ export function readRecords<R, K extends string, H extends Home>(
   return records
 }
 
-/** Every root's directory record (`pinetrie.root`, ADR-0063), by its id. */
+/** Every root's directory record (`pinetrie.root`), by its id. */
 export const readRoots = (
   doc: SessionDocHandle,
 ): ReadonlyMap<RootId, RootRecord> => readRecords(doc, ROOT)
@@ -425,7 +414,7 @@ export function readRunningLanes(
  * `read`, returning its last result for a document (its first argument)
  * while a new one is `same`. Kyneta gives a record a new identity on every write, the same
  * value written again included, and a memo or `React.memo` keyed on a read
- * skips only while the read keeps its identity (S59).
+ * skips only while the read keeps its identity.
  */
 function keptWhileSame<D extends object, T, R extends readonly unknown[] = []>(
   read: (doc: D, ...rest: R) => T,
@@ -448,8 +437,7 @@ const sameMap = <K, V>(a: ReadonlyMap<K, V>, b: ReadonlyMap<K, V>): boolean =>
 /**
  * Each writer's display name (`pinetrie.participant`). The same map while the
  * names are the same: every message compares it by identity, and the
- * session's other records, the directory's among them, change far more often
- * (ADR-0063).
+ * session's other records, the directory's among them, change far more often.
  */
 export const readParticipantNames = keptWhileSame(
   (doc: SessionDocHandle): ReadonlyMap<WriterId, string> =>
@@ -460,7 +448,7 @@ export const readParticipantNames = keptWhileSame(
 )
 
 /**
- * Each writer's picture (`pinetrie.picture`, ADR-0098). The same map while
+ * Each writer's picture (`pinetrie.picture`). The same map while
  * the pictures are the same, as `readParticipantNames`: every circle on the
  * page reads it.
  */
@@ -476,7 +464,7 @@ export const readParticipantPictures = keptWhileSame(
  * Every participant's display name, guests included: the list a mention
  * resolves against (`address`), and the names the screen shows. A writer is
  * found in `index`, else in any root's directory record, so one who wrote
- * only in a root not loaded still counts (ADR-0063).
+ * only in a root not loaded still counts.
  */
 export const readParticipants = (
   doc: SessionDocHandle,
@@ -484,7 +472,7 @@ export const readParticipants = (
 ): readonly string[] =>
   participantsIn(readParticipantNames(doc), index, readRoots(doc))
 
-/** `readParticipants` over what a reader already holds. Pure. */
+/** `readParticipants` over what a reader already holds. */
 export function participantsIn(
   names: ReadonlyMap<WriterId, string>,
   index: TreeIndex,
@@ -499,7 +487,7 @@ export function participantsIn(
 
 /**
  * One field of the presence document: an entry per key, as its writer and
- * value. A person here from two seats (ADR-0037) appears twice.
+ * value. A person here from two seats appears twice.
  */
 export type PresenceEntries = readonly (readonly [WriterId, EntryId])[]
 
@@ -533,9 +521,8 @@ const presenceField = (
 /** One entry per open column: its writer, and the thread end it follows. */
 export const readReading = presenceField(doc => doc.reading())
 /**
- * Each followed thread end's task (ADR-0116), from the column that reports
- * it: what a window that does not hold the thread's root names it by
- * (ADR-0063). Kept while unchanged, as `presenceField`'s reads are.
+ * Each followed thread end's task, from the column that reports it: what a
+ * window that does not hold the thread's root names it by. Kept while unchanged, as `presenceField`'s reads are.
  */
 export const readReadingTasks = keptWhileSame(
   (doc: PresenceDocHandle): ReadonlyMap<EntryId, TaskId> => {
@@ -556,7 +543,7 @@ export const readTyping = presenceField(doc => doc.typing())
 
 /**
  * The cards someone is typing in now (`typingIn`), from any seat: the host
- * pops none of them (ADR-0048 step 7). Kept while the same cards.
+ * pops none of them. Kept while the same cards.
  */
 export const readTypingIn = keptWhileSame(
   (doc: PresenceDocHandle): ReadonlySet<CardId> =>
@@ -580,20 +567,20 @@ const sameHolds = (
     return o !== undefined && o.by === h.by && o.at === h.at
   })
 
-/**
- * Each held queue (`pinetrie.queue-hold`, ADR-0048 step 7), by lane. The same
- * map while the holds are, since every session write wakes it.
- */
-/** Every thread's record (ADR-0117), by its id. */
+/** Every thread's record, by its id. */
 export const readThreads = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, ThreadRecord> => readRecords(doc, THREAD)
 
-/** Each lane whose fork's files were not kept (`pinetrie.files-lost`, ADR-0124). */
+/** Each lane whose fork's files were not kept (`pinetrie.files-lost`). */
 export const readFilesLost = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, FilesLostRecord> => readRecords(doc, FILES_LOST)
 
+/**
+ * Each held queue (`pinetrie.queue-hold`), by lane. The same map while the
+ * holds are, since every session write wakes it.
+ */
 export const readQueueHolds = keptWhileSame(
   (doc: SessionDocHandle): ReadonlyMap<ThreadId, QueueHold> =>
     readRecords(doc, QUEUE_HOLD),
@@ -606,7 +593,7 @@ export const readSeats = (doc: SessionDocHandle): readonly SeatRecord[] =>
 
 // Each stored card row as last decoded. Kyneta gives an unchanged `json`
 // row the same object across writes, so an unchanged card keeps its record
-// object, and a change to one card redraws only what shows it (S54).
+// object, and a change to one card redraws only what shows it.
 const decodedRows = new WeakMap<object, CardRecord | null>()
 
 const decodeRow = (id: string, row: object): CardRecord | null => {
@@ -618,7 +605,7 @@ const decodeRow = (id: string, row: object): CardRecord | null => {
 }
 
 /**
- * Every card's record (ADR-0059), oldest first (ids are uuidv7), from the
+ * Every card's record, oldest first (ids are uuidv7), from the
  * places document. A card that does not decode is left out.
  */
 export function readPlaces(places: PlacesDocHandle): readonly CardRecord[] {
@@ -630,19 +617,19 @@ export function readPlaces(places: PlacesDocHandle): readonly CardRecord[] {
     })
 }
 
-/** The places document's `rev`: raised with every write (ADR-0059). */
+/** The places document's `rev`: raised with every write. */
 export const readPlacesRev = (places: PlacesDocHandle): number => places.rev()
 
-/** The session's workflow (`pinetrie.workflow`, ADR-0122), or null before a host wrote it. */
+/** The session's workflow (`pinetrie.workflow`), or null before a host wrote it. */
 export const readWorkflow = (doc: SessionDocHandle): Workflow | null =>
   readRecords(doc, WORKFLOW).get(WORKFLOW_KEY) ?? null
 
-/** Every task the session holds: each one whose card is on the board (ADR-0126). */
+/** Every task the session holds: each one whose card is on the board. */
 export const readTasks = (places: PlacesDocHandle): ReadonlySet<TaskId> =>
   boardTasks(readPlaces(places))
 
 /**
- * The tasks in the archive, archived (ADR-0029, ADR-0122), by id, from the
+ * The tasks in the archive, archived, by id, from the
  * board's cards and their histories (`archivedOf`); none before a host
  * wrote the workflow. The same map while the same tasks are archived by the
  * same writers at the same times: every write to the session's values
@@ -666,37 +653,37 @@ export const readArchived = keptWhileSame(
     }),
 )
 
-/** Every task's title (`pinetrie.mark`, ADR-0045, ADR-0116), by task. */
+/** Every task's title (`pinetrie.mark`), by task. */
 export const readMarks = (
   doc: SessionDocHandle,
 ): ReadonlyMap<TaskId, MarkRecord> => readRecords(doc, MARK)
 
-/** Each titled note column's title (`pinetrie.note-column`, ADR-0116), by id. */
+/** Each titled note column's title (`pinetrie.note-column`), by id. */
 export const readNoteColumns = (
   doc: SessionDocHandle,
 ): ReadonlyMap<NoteColumnId, NoteColumnRecord> => readRecords(doc, NOTE_COLUMN)
 
-/** Each ask's digest (`pinetrie.digest`, ADR-0106), by its prompt. */
+/** Each ask's digest (`pinetrie.digest`), by its prompt. */
 export const readDigests = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, DigestRecord> => readRecords(doc, DIGEST)
 
-/** Each thread's last run's verdict (`pinetrie.verdict`, ADR-0077), by lane. */
-/** Every card's history (`pinetrie.card-history`, ADR-0048 step 6), by card. */
+/** Every card's history (`pinetrie.card-history`), by card. */
 export const readCardHistories = (
   doc: SessionDocHandle,
 ): ReadonlyMap<CardId, CardHistoryRecord> => readRecords(doc, CARD_HISTORY)
 
-/** Every trace (`pinetrie.trace`, ADR-0048), by id. */
+/** Every trace (`pinetrie.trace`), by id. */
 export const readTraces = (
   doc: SessionDocHandle,
 ): ReadonlyMap<string, TraceRecord> => readRecords(doc, TRACE)
 
+/** Each thread's last run's verdict (`pinetrie.verdict`), by lane. */
 export const readVerdicts = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, VerdictRecord> => readRecords(doc, VERDICT)
 
-// ── where lanes work (ADR-0032, ADR-0033) ─────────────────────────────────
+// ── where lanes work ──────────────────────────────────────────────────────
 
 /** Every lane's record (`pinetrie.lane`): where it works, by lane. */
 export const readLaneRecords = (
@@ -718,26 +705,26 @@ export const readLaneSnapshots = (
     .sort((a, b) => (a.entry < b.entry ? 1 : -1))
     .flatMap(r => (r.snapshot === null ? [] : [r.snapshot]))
 
-/** Each lane's offer in your repo (ADR-0105), by lane. */
+/** Each lane's offer in your repo, by lane. */
 export const readOffers = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, OfferRecord> => readRecords(doc, OFFER)
 
-/** Accepted work as the host last read it (ADR-0104); null before it wrote one. */
+/** Accepted work as the host last read it; null before it wrote one. */
 export const readAccepted = (doc: SessionDocHandle): AcceptedRecord | null =>
   readRecords(doc, ACCEPTED).get(ACCEPTED_KEY) ?? null
 
-/** Each lane's base as its history says it (ADR-0104), by lane. */
+/** Each lane's base as its history says it, by lane. */
 export const readBases = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, BaseRecord> => readRecords(doc, BASE)
 
-/** Each lane's name (`pinetrie.name`, ADR-0039), by lane. */
-/** Each budget for agents talking, by the message that set it (ADR-0128). */
+/** Each budget for agents talking, by the message that set it. */
 export const readBudgets = (
   doc: SessionDocHandle,
 ): ReadonlyMap<EntryId, BudgetRecord> => readRecords(doc, BUDGET)
 
+/** Each lane's name (`pinetrie.name`), by lane. */
 export const readNames = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, ThreadName> =>
@@ -756,7 +743,7 @@ export const readThreadName = (doc: SessionDocHandle, lane: ThreadId): string =>
 export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>
   readRecords(doc, PROJECT).get(PROJECT_KEY) ?? null
 
-/** The commands the host's pi loaded (ADR-0036); none before a host wrote them. */
+/** The commands the host's pi loaded; none before a host wrote them. */
 export const readCommands = (
   doc: SessionDocHandle,
 ): readonly CommandSummary[] =>
@@ -765,9 +752,8 @@ export const readCommands = (
 /**
  * Whether a send's thread works, or will work, in its own copy: its lane is
  * one of its own, or the send would create a lane on a host with tools,
- * whose new lanes all have their own (ADR-0102). Paths to your working copy,
- * and to granted host paths, are then written as the lane sees them
- * (ADR-0034, ADR-0036).
+ * whose new lanes all have their own. Paths to your working copy, and to
+ * granted host paths, are then written as the lane sees them.
  */
 export function worksOwn(
   session: SessionDocHandle,
@@ -781,14 +767,14 @@ export function worksOwn(
   return readProject(session) !== null
 }
 
-// --- blobs (ADR-0042) ---------------------------------------------------------
+// --- blobs --------------------------------------------------------------------
 
 /**
- * Every blob something still shows: each chat's images, each tool result's
- * (ADR-0051), each `/blob/` image in the texts people type, every card's
- * (ADR-0048), queued ones among them, and each thread's banner (ADR-0050).
- * A card holds what a composer has typed, pasted images included, so the
- * caller passes every text, not only those it has loaded. Pure.
+ * Every blob something still shows: each chat's images, each tool result's,
+ * each `/blob/` image in the texts people type, every card's, queued ones
+ * among them, and each thread's banner. A card holds what a composer has
+ * typed, pasted images included, so the caller passes every text, not only
+ * those it has loaded.
  */
 export function referencedBlobs(facts: {
   readonly messages: Iterable<unknown>
@@ -811,7 +797,7 @@ export function referencedBlobs(facts: {
 /**
  * Every image something still shows (`referencedBlobs`): each root's, from
  * its directory record, so no root is opened to sweep; every card's text;
- * every banner; and every person's picture (ADR-0098).
+ * every banner; and every person's picture.
  */
 export const readReferencedBlobs = (
   session: SessionDocHandle,
@@ -832,10 +818,10 @@ export const readReferencedBlobs = (
 }
 
 /**
- * A root's directory record, read from its document (ADR-0063): its first
+ * A root's directory record, read from its document: its first
  * message and that message's first line, its messages, newest
- * entry and writers (`summarizeRoots`), each thread's writers on its path
- * (ADR-0077), its chats that name someone, and every image it shows. What
+ * entry and writers (`summarizeRoots`), each thread's writers on its path,
+ * its chats that name someone, and every image it shows. What
  * the host writes as `pinetrie.root`.
  */
 export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
@@ -879,7 +865,7 @@ export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
 /**
  * The blobs to delete: those nothing shows and nobody has stored or touched
  * within `grace`. The grace covers an image pasted and not yet sent, which
- * only a composer holds. Pure.
+ * only a composer holds.
  */
 export function planSweep(input: {
   readonly stored: readonly {

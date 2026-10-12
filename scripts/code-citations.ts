@@ -5,21 +5,16 @@
 // An entry only shrinks, and is deleted at zero.
 
 export const CODE_CITATIONS: Readonly<Record<string, number>> = {
-  "apps/conformance": 2,
   "apps/pinetrie/e2e": 253,
   "apps/pinetrie/host": 567,
   "packages/core": 517,
   "packages/interface": 778,
   "packages/lanes": 12,
   "packages/protocol": 100,
-  "packages/reads": 74,
   "packages/rules": 576,
-  "packages/schema": 77,
   "packages/session": 97,
-  "packages/shell": 2,
   "packages/web": 362,
   "scripts/mutations/app.ts": 12,
-  "scripts/mutations/commands.ts": 1,
   "scripts/mutations/core.ts": 10,
   "scripts/mutations/docker.ts": 3,
   "scripts/mutations/host.ts": 21,
@@ -30,6 +25,4 @@ export const CODE_CITATIONS: Readonly<Record<string, number>> = {
   "scripts/mutations/scripts.ts": 2,
   "scripts/mutations/session.ts": 2,
   "scripts/mutations/web.ts": 9,
-  "scripts/record.ts": 2,
-  "workspace.test.ts": 6,
 }

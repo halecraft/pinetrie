@@ -1,12 +1,8 @@
-// schema/inventory — which slot of your inventory holds which card
-// (ADR-0059): a Yjs document per person, written only by that person's tabs.
+// schema/inventory — which slot of your inventory holds which card: a Yjs
+// document per person, written only by that person's tabs.
 //
-// The host's places document says whose inventory a card is in; this says
-// where in the grid it sits. Only your own tabs arrange it, and they may do
-// so at once, so it merges; each tab then repairs it from the host's record
-// (`planSlots` in @pinetrie/session). The host stores and relays it, shared with
-// its person only (host/policy.ts), and never writes it; its id and who may
-// write it are the protocol's (`@pinetrie/protocol/writers`).
+// Your tabs may arrange it at once, so it merges; each tab then repairs it
+// from the host's record (`planSlots` in @pinetrie/session).
 
 import {
   type BoundSchema,

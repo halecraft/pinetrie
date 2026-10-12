@@ -1,6 +1,6 @@
 // schema/pi-layout — how pi's data is laid out in a root's document: the
 // entry row, pi's values at their physical keys, a lane's tip, and the
-// payload fields pine·trie reads. This package imports no pi (ADR-0003);
+// payload fields pine·trie reads. This package imports no pi;
 // `KynetaStorage` (`packages/pi/storage.ts`) writes pi's values with
 // `physicalKey` and `StoredValueRecord` from here.
 
@@ -14,13 +14,13 @@ import {
 import type { RootDocHandle } from "./storage.ts"
 
 /**
- * One entry as a root's document holds it (ADR-0015): six typed columns, the
+ * One entry as a root's document holds it: six typed columns, the
  * fields pine·trie reads, and pi's own fields sealed in `payload`, which never
  * repeats a column (`toStoredRow`, `packages/pi/stored-row.ts`). `type` is any
  * string, so a new pi entry type needs no schema change. `thread` is the
- * thread whose commit wrote the entry (ADR-0125), never empty once written.
+ * thread whose commit wrote the entry, never empty once written.
  * `.json()` stores the row as one leaf, since an entry is written once and
- * never edited (ADR-0004, ADR-0009). `TECHNICAL.md`, "The entry row", has the
+ * never edited. `TECHNICAL.md`, "The entry row", has the
  * reasons.
  */
 export const StoredEntryRowSchema = Schema.struct.json({
@@ -45,8 +45,8 @@ export const readEntries = (
  *
  * pi addresses a value by a (namespace, key) pair. Folding the pair into one
  * record key is ours: `values` is a flat record, so each address is one leaf
- * register, with no child container for two replicas to create at once (S18,
- * ADR-0016). NUL is the separator pi's own in-memory storage uses; it cannot
+ * register, with no child container for two replicas to create at once.
+ * NUL is the separator pi's own in-memory storage uses; it cannot
  * appear in a namespace, and it sorts first, so one namespace's keys are
  * adjacent.
  *
@@ -76,16 +76,16 @@ export interface StoredValueRecord {
   readonly value: unknown
   /**
    * A token unique to the write. A changed `wid` tells a replica that a newer
-   * write won the register (ADR-0013). Absent on a record written outside
+   * write won the register. Absent on a record written outside
    * `KynetaStorage`, as `writeLaneTip` (`@pinetrie/schema/fixtures`) writes
    * one.
    */
   readonly wid?: string
-  /** A checkpoint's shell: its text is in `checkpointText` under the same key (S22). */
+  /** A checkpoint's shell: its text is in `checkpointText` under the same key. */
   readonly sealed?: true
 }
 
-/** pi's namespace for lane tips, keyed by lane name (a thread's, ADR-0120). */
+/** pi's namespace for lane tips, keyed by lane name (a thread's id). */
 export const LANE_TIP = "pi.branch.tip"
 
 /** A stored value's own record of its address and contents. */
@@ -148,7 +148,7 @@ export const readLaneNames = (doc: RootDocHandle): readonly ThreadId[] =>
 /**
  * Every one of pi's values in `namespace`, in no specified order, read from
  * each value's own `namespace` and `key` properties, never by parsing the
- * physical key (ADR-0016).
+ * physical key.
  */
 function readValues(
   doc: RootDocHandle,
@@ -165,7 +165,7 @@ function readValues(
 
 /**
  * Whether the root holds entry `id`, and if so its message, lifted out of its
- * sealed `payload` (ADR-0015); the message is undefined for an entry that
+ * sealed `payload`; the message is undefined for an entry that
  * carries none.
  */
 export function readEntryMessage(
@@ -178,13 +178,13 @@ export function readEntryMessage(
     : { present: true, message: rowMessage(row) }
 }
 
-/** A row's message, lifted out of its sealed `payload`. Pure; no lookup. */
+/** A row's message, lifted out of its sealed `payload`. */
 export const rowMessage = (row: StoredEntryRow): unknown =>
   (row.payload as { message?: unknown } | null)?.message
 
 /**
  * A compaction row's retained tail: the messages pi keeps after its summary,
- * stored on the compaction itself. Empty for any other row. Pure.
+ * stored on the compaction itself. Empty for any other row.
  */
 export function rowRetainedTail(row: StoredEntryRow): readonly unknown[] {
   const tail = (row.payload as { retainedTail?: unknown } | null)?.retainedTail

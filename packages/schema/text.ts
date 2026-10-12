@@ -1,15 +1,8 @@
-// schema/text — the text people type together: one Yjs document per card
-// (ADR-0048), and who wrote in it.
-//
-// Typed text is the one thing people edit together, so it is a CRDT
-// (ADR-0023); a card's record is in the places document (`places.ts`). Kyneta gives each peer's
-// Yjs `clientID` from its seat (`yjsClientId`), so the operations in a text
-// say which seat wrote them, and the seat's principal says who that is
-// (ADR-0037). The host writes that down once per seat (`pinetrie.seat`), so
-// anyone can name a text's writers after they have gone.
+// schema/text — the text people type together: one Yjs document per card,
+// and who wrote in it.
 //
 // A text's document is never compacted: Kyneta cannot compact a live Yjs
-// document (S24). A spent card's is destroyed instead.
+// document. A spent card's is destroyed instead.
 
 import {
   type BoundSchema,
@@ -50,7 +43,7 @@ export const seatOf = (
 /**
  * The `clientID`s that wrote in a text, every one that ever did, deletions
  * included. Kyneta writes a structural seed under `clientID` 0 before anyone
- * types (S58), which is nobody's and left out.
+ * types, which is nobody's and left out.
  */
 export const textClients = (doc: TextDocHandle): number[] => {
   const clients: ReadonlyMap<number, unknown> = (
@@ -63,7 +56,7 @@ export const textClients = (doc: TextDocHandle): number[] => {
  * The text's version, serialized: what a client writes on a card it queues,
  * so the host takes the card only once it holds that much of the text.
  * Kyneta keeps no order between documents, so a card's record can reach the
- * host before the text typed just before it (S96).
+ * host before the text typed just before it.
  */
 export const textVersion = (doc: TextDocHandle): string =>
   version(doc).serialize()
