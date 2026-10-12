@@ -1,8 +1,8 @@
-// e2e/lanes/recipe — derived state is rebuilt from its key, never carried
-// (ADR-0131): a package deleted from accepted work, or in a lane, leaves no
-// output of its own behind, and a turn's record names the ignored files it
-// wrote. The project's recipe is offline: it writes `out-<p>/marker` for
-// each package `pkgs.txt` lists.
+// e2e/lanes/recipe — derived state is rebuilt from its key, never carried: a
+// package deleted from accepted work, or in a lane, leaves no output of its own
+// behind, and a turn's record names the ignored files it wrote. The project's
+// recipe is offline: it writes `out-<p>/marker` for each package `pkgs.txt`
+// lists.
 
 import { rmSync, writeFileSync } from "node:fs"
 import path from "node:path"

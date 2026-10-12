@@ -1,4 +1,4 @@
-// e2e/lanes — lanes of their own, in real containers (ADR-0034, ADR-0130):
+// e2e/lanes — lanes of their own, in real containers:
 // the scenarios in `lanes/`.
 //
 //   pnpm run e2e:lanes    needs the suites' Docker (the Mac's lane VM; on

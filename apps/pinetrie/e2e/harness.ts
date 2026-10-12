@@ -87,7 +87,7 @@ export type ScenarioHow = ChatHow & {
   readonly thread?: ThreadId
   /**
    * The task a thread it starts goes in; else a new one at the root, or the
-   * task of the thread its entry is in (ADR-0116).
+   * task of the thread its entry is in.
    */
   readonly task?: TaskId
 }
@@ -128,7 +128,7 @@ export const archivedFor = (
       )
 }
 
-/** How the two starts send at the root (ADR-0021), and a branch's. */
+/** How the two starts send at the root, and a branch's. */
 export const START_AGENT = { mode: "branch", asksAgent: true } as const
 export const START_CHAT = { mode: "branch" } as const
 export const BRANCH = { mode: "branch" } as const
@@ -182,7 +182,7 @@ export function suiteClock(): SuiteClock {
   }
 }
 
-/** No card is queued on any lane (ADR-0048): nothing waits to be popped. */
+/** No card is queued on any lane: nothing waits to be popped. */
 export const noQueued = (host: Pick<RunningHost, "places">): boolean =>
   readPlaces(host.places).every(c => c.place.kind !== "queued")
 
@@ -196,8 +196,8 @@ export const idleNow = (host: Pick<RunningHost, "live" | "places">): boolean =>
 
 /**
  * A project for a host with tools: a jj repo, colocated with git, with
- * `files` committed. A lane starts from your committed work (`@-`,
- * ADR-0032), so what its agent should see must be committed. The path is the
+ * `files` committed. A lane starts from your committed work (`@-`), so what
+ * its agent should see must be committed. The path is the
  * real one (on macOS a temporary directory is behind a symlink), as jj names
  * it.
  */
@@ -222,7 +222,7 @@ export function committedProject(
 
 /**
  * A person joining `host` over its WebSocket, as `<name>@<scenario>.test`:
- * one domain per scenario, so no two scenarios share a person (ADR-0037).
+ * one domain per scenario, so no two scenarios share a person.
  */
 export const join = async (
   host: { readonly wsUrl: string },
@@ -315,7 +315,7 @@ export type ScenarioClient = Omit<SessionClient, "chat"> & {
 /**
  * A WebSocket that sends every frame naming `docId` `ms` late, in order:
  * a client whose writes to that document reach the host after the commands
- * it sends behind them, as Kyneta allows (S96). A frame names a document by
+ * it sends behind them, as Kyneta allows. A frame names a document by
  * its id's bytes, so this needs no reading of Kyneta's wire.
  */
 export const lateFor = (docId: string, ms: number): typeof WebSocket => {
@@ -338,8 +338,8 @@ export const lateFor = (docId: string, ms: number): typeof WebSocket => {
 }
 
 /**
- * Set up accepted work at your `@-`, as the footer's set up button does
- * (ADR-0104): a new thread with no history of its own starts there. Waits for
+ * Set up accepted work at your `@-`, as the footer's set up button does:
+ * a new thread with no history of its own starts there. Waits for
  * the host's line record; does nothing when accepted work is set up already.
  */
 export async function setUpAccepted(
@@ -359,8 +359,8 @@ const SUITE_REPLY =
   "A scripted reply, streamed in pieces, so a suite sees it grow and then end."
 
 /**
- * The suites' own model: scripted, so a run spends nothing and needs no key
- * (ADR-0041). At 400 tokens per second a reply's pieces arrive over tens of
+ * The suites' own model: scripted, so a run spends nothing and needs no key.
+ * At 400 tokens per second a reply's pieces arrive over tens of
  * milliseconds, so a streaming check sees it grow. A check that needs a run
  * in progress holds it (`ScriptedModel.hold`).
  */
@@ -369,7 +369,7 @@ export const suiteModel = () =>
 
 /**
  * The suites' user config: titles off, so a tab keeps its first line and no
- * request is made that a scenario did not ask for (ADR-0074). A scenario
+ * request is made that a scenario did not ask for. A scenario
  * that writes a config of its own spreads this into it.
  */
 export const SUITE_CONFIG = {
@@ -420,7 +420,7 @@ export async function withHost<T>(
 }
 
 /**
- * What a scenario reads of a host or a client (ADR-0063): the session's
+ * What a scenario reads of a host or a client: the session's
  * documents, and the roots it holds now, read as one.
  */
 export interface Held {
@@ -493,7 +493,7 @@ function drawnCard(
 
 /**
  * Move the task holding the thread `entry` is in to the archive, or out of
- * it to the first open one, as the board does (ADR-0122): archive or
+ * it to the first open one, as the board does: archive or
  * restore it. The state it is in is read from `client`'s copy of the board.
  */
 export function moveTaskTo(
@@ -521,7 +521,7 @@ export function moveTaskTo(
 
 /**
  * Queue `id` on `lane` from where it is, as a column's queue does, with its
- * text's version as `client` has it (S96). Throws for any card but a text
+ * text's version as `client` has it. Throws for any card but a text
  * card.
  */
 export function queueCard(
@@ -555,7 +555,7 @@ export function unqueueCard(
 /**
  * A client that holds every root the directory names, as it changes: a
  * scenario's session reads and writes in any root, as a page holds the roots
- * of its tabs (ADR-0063).
+ * of its tabs.
  */
 export function holdEvery(client: Omit<SessionClient, "chat">): () => void {
   const follow = () =>
@@ -588,7 +588,7 @@ export const entryMessageIn = (
 
 /**
  * The root whose document holds `entry` on the host: where a card at that
- * entry goes (ADR-0063). Throws when no root it holds has the entry, or when
+ * entry goes. Throws when no root it holds has the entry, or when
  * there is no entry (a lane with no tip yet).
  */
 export function rootHolding(
@@ -606,7 +606,7 @@ export function rootHolding(
   return root
 }
 
-/** The thread `entry` is in, as the host holds the tree (ADR-0117). */
+/** The thread `entry` is in, as the host holds the tree. */
 export function threadHolding(
   host: Parameters<typeof treeOf>[0],
   entry: EntryId | null,
@@ -616,7 +616,7 @@ export function threadHolding(
   return thread
 }
 
-/** The task the thread `entry` is in holds, as the host reads it (ADR-0116). */
+/** The task the thread `entry` is in holds, as the host reads it. */
 export function taskHolding(
   host: Parameters<typeof treeOf>[0] & Pick<RunningHost, "places">,
   entry: EntryId | null,
@@ -682,7 +682,7 @@ export async function composeAt(
   const { entry } = place
   if (entry === null) throw new Error("no entry to compose a card at")
   await waitForRootHolding(client, entry)
-  // A lane is named by its thread (ADR-0117); with none, the entry's thread.
+  // A lane is named by its thread; with none, the entry's thread.
   const thread = place.lane ?? threadAt(treeOf(client), entry)
   if (thread === null) throw new Error("no thread to compose a card in")
   const id = newCardId()

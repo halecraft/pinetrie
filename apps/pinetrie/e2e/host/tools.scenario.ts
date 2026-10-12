@@ -1,4 +1,4 @@
-// e2e/host/tools — the agent reads, writes, edits and runs, visibly (ADR-0107).
+// e2e/host/tools — the agent reads, writes, edits and runs, visibly.
 
 import { randomBytes } from "node:crypto"
 import { existsSync, mkdtempSync } from "node:fs"
@@ -114,7 +114,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     await u.chat("make new.txt", at(lane?.tip ?? null), { thread: lane?.name })
     await tidle()
     // In its lane's own copy: the project is the person's working copy,
-    // which no lane writes (ADR-0034).
+    // which no lane writes.
     const inItsLane = lane === undefined ? "" : inLane(lane.name, "cat new.txt")
     check(
       "the agent wrote a file, then edited it, in its lane, leaving the project as it was",
@@ -173,7 +173,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         result.includes(lastLive.slice(-300)),
       `${toolTexts.length} updates), matching its result`,
     )
-    // The run's end compacted its root's document (ADR-0023, ADR-0063): the
+    // The run's end compacted its root's document: the
     // store holds the document as it stands, not the run's edits. Whole-value
     // streams are guarded by `planStream`'s unit test, since compaction would
     // hide them here.
@@ -237,7 +237,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     )
     if (l5 !== undefined) await u.request({ kind: "stop", lane: l5.name })
     await u.request({ kind: "stop", lane: threadIdFor("no-such-lane") })
-    // Who stopped it is a fact in its thread (ADR-0106, ADR-0126): pi's
+    // Who stopped it is a fact in its thread: pi's
     // entries say only that the run was aborted. The run's end appends it,
     // the thread's last entry, and the asks name the stopper from it.
     // Stopping it again, idle, queues nothing.
@@ -260,7 +260,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       `${fact?.role ?? "none"} by ${fact?.stopped?.by ?? "none"}, ${stopFacts().length} stop fact(s)`,
     )
 
-    // Resume (ADR-0082): a new run whose prompt is the host's carry-on
+    // Resume: a new run whose prompt is the host's carry-on
     // message, which the model reads. Held, so a second press finds it busy.
     script.use([{ reply: context => context.at(-1) ?? "" }])
     const carrying = script.hold("asked you to carry on")

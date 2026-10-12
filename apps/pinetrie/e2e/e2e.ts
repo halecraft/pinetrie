@@ -11,7 +11,7 @@
 //                       does (`scripts/mutate.ts`)
 //
 // Every scenario but `live` runs on a scripted model, so its steps are
-// repeatable, cost nothing and need no key (ADR-0041). None uses the person's
+// repeatable, cost nothing and need no key. None uses the person's
 // pi setup. One whose agent has tools runs its lanes on the suites' Docker,
 // as `e2e:lanes` does, and is skipped where it cannot run (`lanes: true`).
 

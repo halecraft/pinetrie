@@ -1,4 +1,4 @@
-// e2e/host/presence — who is here, per open column, decaying (ADR-0024).
+// e2e/host/presence — who is here, per open column, decaying.
 
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"

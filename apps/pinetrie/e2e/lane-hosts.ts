@@ -1,5 +1,5 @@
 // e2e/lane-hosts — hosts whose agents have tools, each thread's agent in a
-// lane of its own on the suites' runtime (ADR-0102): why that runtime cannot
+// lane of its own on the suites' runtime: why that runtime cannot
 // run here (`runtimeProblem`), a host with tools (`LaneHosts`), a host of a
 // scenario's own with accepted work set up (`sectionHost`), a lane's shell,
 // and removing a host's lanes. The scenario runner gives `LaneHosts` only to
@@ -130,8 +130,8 @@ const startLaneHost = (options: StartHostOptions): Promise<RunningHost> =>
 
 /**
  * A host of its own for a section: a project (`files`, or an existing `dir`),
- * its own scripted model unless given one, a user, and accepted work set up
- * (ADR-0104), so its root lanes start there. Reads by message text. `close`
+ * its own scripted model unless given one, a user, and accepted work set up,
+ * so its root lanes start there. Reads by message text. `close`
  * removes its lanes; `keep` leaves the project, for a host to restart over.
  */
 async function sectionHost(input: SectionInput) {

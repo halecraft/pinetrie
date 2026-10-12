@@ -66,7 +66,7 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
     expect: "asks the container's state only when the caller does not know it",
   },
-  // ── the lanes suite, proven in a lane (ADR-0130) ──
+  // ── the lanes suite, proven in a lane ──
   {
     name: "a base is the base before it, checked out again",
     file: "packages/lanes/base.ts",
@@ -566,7 +566,7 @@ export const mutations: readonly Mutation[] = [
     scenario: "images",
     expect: "the default image has python3",
   },
-  // ── a project's folder (ADR-0086) ──
+  // ── a project's folder ──
   {
     name: "a home directory can be a project",
     file: "packages/lanes/plan.ts",

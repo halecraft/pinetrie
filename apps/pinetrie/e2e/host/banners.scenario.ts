@@ -1,4 +1,4 @@
-// e2e/host/banners — an image behind each thread's column header (ADR-0050, ADR-0053).
+// e2e/host/banners — an image behind each thread's column header.
 
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"

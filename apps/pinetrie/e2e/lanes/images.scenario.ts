@@ -97,8 +97,8 @@ async function imagesSection(
     await bare.close()
   }
 
-  // pinetrie's default image carries the browser its Playwright drives
-  // (ADR-0041). The check is an agent's command, so it sees the image's
+  // pinetrie's default image carries the browser its Playwright drives.
+  // The check is an agent's command, so it sees the image's
   // environment as an agent does.
   const pinetrie = await lanes.sectionHost({
     files: { "notes.txt": "the secret word is MANGO\n" },

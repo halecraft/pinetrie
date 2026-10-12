@@ -83,7 +83,7 @@ export async function chooseFromMenu(
 }
 
 /**
- * Choose `item` in the ⋯ of the card framed by `frame` (ADR-0111). A column
+ * Choose `item` in the ⋯ of the card framed by `frame`. A column
  * that scrolls as its cards change closes a menu it holds (`popover.tsx`),
  * so the menu is opened again until the item is chosen. Whether it was.
  */
@@ -103,11 +103,11 @@ export async function chooseOnCard(
 }
 
 /**
- * Open `card` in the note column that holds it (ADR-0116): its box focused,
+ * Open `card` in the note column that holds it: its box focused,
  * so the note unfolds. The selector of its frame, which may not be there.
  */
 export async function openNote(p: Page, card: string): Promise<string> {
-  // A note column you have not opened is folded (ADR-0116): unfold each.
+  // A note column you have not opened is folded: unfold each.
   const textarea = `.note-column textarea[data-card="${card}"]`
   await p
     .waitForFunction(
@@ -142,7 +142,7 @@ export const storedName = (p: Page) =>
   }, IDENTITY_KEY)
 
 /**
- * Open your profile page from the menu your avatar opens (ADR-0098), and
+ * Open your profile page from the menu your avatar opens, and
  * whether a person could see it: `elementFromPoint` at its centre, as
  * `seeInMenu` checks a menu.
  */
@@ -195,7 +195,7 @@ interface ColumnFrame {
 /**
  * Sample column `c` on every animation frame and every change of its size, in
  * the page, until the returned function stops it and hands back what it saw:
- * a slow render's frames are each seen, as a person sees them (S35). The
+ * a slow render's frames are each seen, as a person sees them. The
  * column must be mounted already, so this observer runs after its own.
  */
 /** Wait for the next frame. */
@@ -258,7 +258,7 @@ export async function recordFrames(
  * The component renders the page recorded since the last call, and clears
  * them. React's development build, which the host's Vite serves, measures
  * every render whose props its diff finds changed on its "Components ⚛"
- * track, with the diff as [label, value] pairs (S54): a label is a
+ * track, with the diff as [label, value] pairs: a label is a
  * two-character mark, an indent, then the prop's name. A render whose props
  * are new objects with the same data is not measured, so a message list also
  * marks each of its commits (`markCommit`), counted here with no props. Both
@@ -309,8 +309,8 @@ export async function waitForQuiet(p: Page): Promise<void> {
 }
 
 /**
- * Chromium's headless shell. In a lane it comes with the lane's image
- * (ADR-0041); on the Mac, install it once:
+ * Chromium's headless shell. In a lane it comes with the lane's image;
+ * on the Mac, install it once:
  *
  *     pnpm --filter @pinetrie/app exec playwright install chromium-headless-shell
  */
@@ -337,7 +337,7 @@ export const asPerson = (p: Page, email: string, name: string) =>
   ] as const)
 /**
  * A page that opens a column's pane: wide enough for your full list, the
- * rail, the thread and the pane's 40rem beside it (ADR-0087). At the
+ * rail, the thread and the pane's 40rem beside it. At the
  * default 1280, the pane covers the page.
  */
 export const PANE_VIEWPORT = { width: 1440, height: 720 }
@@ -365,7 +365,7 @@ export const col = (n: number) => `.column[data-position="${n}"]`
 export const msg = (text: string) =>
   `.msg:has(> .text > p:only-child:text-is(${JSON.stringify(text)}))`
 /**
- * Read column `n` raw (ADR-0106): every message and tool row, which the
+ * Read column `n` raw: every message and tool row, which the
  * checks written before densities look at once a run has ended. A column
  * opens in story, folding each ask's work; the choice is kept with it. Its
  * control appears with its first message.
@@ -392,14 +392,14 @@ export const connected = (p: Page, timeout = 20_000) =>
     undefined,
     { timeout },
   )
-/** A task in the sidebar (ADR-0122, ADR-0116). */
+/** A task in the sidebar. */
 export const itemSel = (task: string) =>
   `#sidebar .open-root[data-task="${task}"]`
 /** A task on the board: inside `#board`. */
 export const boardSel = (task: string) => `.thread-card[data-task="${task}"]`
 /**
  * Step away from the root you are on, so its columns unmount: to a new tab,
- * a task of its own holding one thread not yet started (ADR-0126), which
+ * a task of its own holding one thread not yet started, which
  * `stepBack` closes again. The sidebar has nothing else to step to that
  * every scenario holds.
  */
@@ -427,7 +427,7 @@ export async function openBoard(p: Page): Promise<void> {
 /** The messages the rail on `p` accounts for: dots, and each stretch's count. */
 export const railCount = (p: Page) => p.evaluate(RAIL_MESSAGES)
 /**
- * Open task `r` from the board (ADR-0122): select its item, which shows it
+ * Open task `r` from the board: select its item, which shows it
  * and puts it in the sidebar, and wait until you are on it. An archived task
  * is found in the archive's rows, by its label's search.
  */

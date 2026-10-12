@@ -1,5 +1,5 @@
 // e2e/lanes/catch-up — the agent catches its thread up in the middle of its
-// run (ADR-0080, S103), and an acceptance leaves a fact in the thread.
+// run, and an acceptance leaves a fact in the thread.
 
 import { writeFileSync } from "node:fs"
 import path from "node:path"
@@ -47,7 +47,7 @@ async function catchUpSection(
   const project = committedProject("pinetrie-catch-up-", {
     "a.txt": "a\n",
     ".gitignore": "node_modules/\n.vite/\n",
-    // A publish here accepts your commit (ADR-0099).
+    // A publish here accepts your commit.
     "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
   })
   const script = scriptedModel()
@@ -104,7 +104,7 @@ async function catchUpSection(
     if (lane === undefined) throw new Error("no lane")
 
     // Accepted work moves on: your commit, published, which accepts it and
-    // moves main (ADR-0090).
+    // moves main.
     jj(project, "bookmark", "create", "main", "-r", "pinetrie-accepted")
     writeFileSync(path.join(project, "landed.txt"), "landed\n")
     jj(project, "commit", "-m", "you land landed.txt")
@@ -121,7 +121,7 @@ async function catchUpSection(
     await wu.chat("@agent catch up", at(laneTip(lane)), { thread: lane })
     await idle()
     const results = toolResults(lane)
-    // The turn that called it records the merge (S103 item 3): a branch
+    // The turn that called it records the merge: a branch
     // there starts with the merged file.
     const index = tree()
     const call = ancestry(index, laneTip(lane)).path.find(id => {
@@ -156,7 +156,7 @@ async function catchUpSection(
       `${JSON.stringify({ results, recorded, branched: toolResults(branched) })}`,
     )
 
-    // An acceptance leaves a fact in the thread (ADR-0080).
+    // An acceptance leaves a fact in the thread.
     const accepted = await wu.offer(lane, "accept", "pinetrie-accepted")
     const fact = await waitFor(() => {
       const now = tree()

@@ -1,5 +1,5 @@
-// e2e/browser/banner — a thread's banner in its column's header (ADR-0050,
-// ADR-0053), drawn before its first message (ADR-0057).
+// e2e/browser/banner — a thread's banner in its column's header, drawn
+// before its first message.
 
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -41,7 +41,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await asPerson(bp, "bea@browser.test", "Bea")
       try {
         await bp.goto(bannerHost.httpUrl, { waitUntil: "domcontentloaded" })
-        // Drawn before the first message is typed (ADR-0057).
+        // Drawn before the first message is typed.
         await bp.click("#sidebar .add-agent")
         const drawn = await bp
           .waitForSelector(`${col(0)} .column-head .banner[data-loaded]`, {
@@ -147,7 +147,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
 
         // The other scenarios close their pages first. An open page holds
-        // Vite's HMR socket, which kept the host's server from closing (S98).
+        // Vite's HMR socket, which kept the host's server from closing.
         const end: { outcome: string | null } = { outcome: null }
         void bannerHost.shutdown().then(
           () => {

@@ -1,4 +1,4 @@
-// e2e/host/titles — a root titled by a model (ADR-0074): unasked as its first
+// e2e/host/titles — a root titled by a model: unasked as its first
 // lane starts, and again when a person asks (Auto-update title).
 
 import { mkdtempSync, writeFileSync } from "node:fs"
@@ -49,7 +49,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     userConfig,
   })
   const record = () => [...readRoots(th.session).values()][0]
-  // The root's task's title (ADR-0116): the one task the scenario opens.
+  // The root's task's title: the one task the scenario opens.
   const title = () => [...readMarks(th.session).values()][0]?.title ?? null
 
   // 1. The first message to the agent titles its root while the run goes.

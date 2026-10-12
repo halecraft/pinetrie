@@ -1,5 +1,4 @@
-// e2e/lanes/shared — directories every lane and you see, never branched
-// (ADR-0035).
+// e2e/lanes/shared — directories every lane and you see, never branched.
 
 import {
   existsSync,
@@ -26,7 +25,7 @@ export const scenario: Scenario = {
   run: ({ check }, { lanes }) => sharedSection(check, lanes),
 }
 
-// ── shared: directories every lane and you see, never branched (ADR-0035) ──
+// ── shared: directories every lane and you see, never branched ──
 async function sharedSection(
   check: Checks["check"],
   lanes: LaneHosts,

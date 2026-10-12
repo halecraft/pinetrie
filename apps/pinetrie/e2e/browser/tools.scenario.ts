@@ -2,7 +2,7 @@
 // where the agent will work, the column's height while it works, commands,
 // widths, the thread's name and offer, the review, markdown, following, the
 // header's work, and the rail's capsules; first, each ask's work folded
-// and opened from the rail (ADR-0106), on a host of its own.
+// and opened from the rail, on a host of its own.
 
 import { execFileSync } from "node:child_process"
 import { existsSync, rmSync } from "node:fs"
@@ -89,7 +89,7 @@ async function inThreadLane(page: Page, script: string): Promise<void> {
 async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   const browser = await launchBrowser()
   try {
-    // ── asks: each ask's work folds, and the rail opens it (ADR-0106) ─────
+    // ── asks: each ask's work folds, and the rail opens it ────────────────
     // The column is read in story, as a new one opens. A column is read raw
     // in the blocks below (`readRaw`).
     {
@@ -198,7 +198,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         await say("read them once more")
         // The held command, live: every read before it is drawn, so the
         // scroll below lands inside the ask's work, as a lane's start can
-        // hold the reads back (ADR-0102).
+        // hold the reads back.
         await ap.waitForSelector(heldLive, { timeout: 15_000 })
         const second = askId("read them once more")
         const work2 = `${col(0)} .ask-work[data-ask-of="${second}"]`
@@ -355,7 +355,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         )
         await bo.close()
 
-        // 6. A search (ADR-0101): each column shows only its own matches over
+        // 6. A search: each column shows only its own matches over
         // its thread, the rail lights them, and Escape puts every column back
         // where it was, since the thread stayed under the matches.
         const texts = [
@@ -478,7 +478,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             () => true,
             () => false,
           )
-        // The root's document arrives after the stored layout is drawn (ADR-0063).
+        // The root's document arrives after the stored layout is drawn.
         await ap
           .waitForSelector(`${col(0)} .ask-line`, { timeout: 15_000 })
           .catch(() => null)
@@ -514,14 +514,14 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       const toolHost = await lanes.startHost({
         model: { kind: "scripted", script },
         project: { dir: work, tools: true },
-        // A fixture pi directory, for commands (ADR-0036).
+        // A fixture pi directory, for commands.
         agentDir: path.join(
           import.meta.dirname,
           "../../../../packages/pi/fixtures/pi-agent",
         ),
         log: () => {},
       })
-      // A new thread of its own starts at accepted work (ADR-0104).
+      // A new thread of its own starts at accepted work.
       {
         const owner = await join(toolHost, "owner", "tools")
         await setUpAccepted(toolHost.session, owner)
@@ -543,7 +543,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             () => true,
             () => false,
           )
-        // ── what a new thread starts from, said before sending (ADR-0104) ───
+        // ── what a new thread starts from, said before sending ──────────────
         // With no WIP there is nothing to choose, and no line. A WIP above
         // accepted work offers one; it goes again before the thread starts.
         const startLine = `${col(0)} .start-line`
@@ -678,7 +678,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           )
         check("a running command's output shows live in its column", live)
         // The live output's last five lines, then the result's in their place:
-        // pi's result is the live text, so the row keeps its height (S142).
+        // pi's result is the live text, so the row keeps its height.
         await inThreadLane(tp, gateFeed(ticking, ticks(3, 6)))
         await tp
           .waitForFunction(
@@ -728,7 +728,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // A row's summary is its command's first five lines and its output's
         // last five, its toggle saying what they leave out; the toggle shows
         // both whole, then folds them. A short command hides nothing, and has
-        // no toggle (ADR-0123).
+        // no toggle.
         {
           const LONG = [
             "seq 1 300 | sed 's/^/line /'",
@@ -857,7 +857,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         }
 
         // A tab shown again mounts its columns anew: each row starts as it was
-        // left (ADR-0123), so a running one is ringed from its first frame and
+        // left, so a running one is ringed from its first frame and
         // a finished one keeps its reader's choice.
         {
           // Held until the tab has been left and shown again.
@@ -989,7 +989,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // While the lane runs, its header's mark pulses and a line at the
         // column's end says more is coming. It takes no height, and stays the
         // content's last child with a card queued: the queue is in the dock,
-        // below the thread (ADR-0113).
+        // below the thread.
         {
           const thinking = script.hold("think a while")
           script.use([{ text: "thought" }, { text: "after the thought" }])
@@ -1058,7 +1058,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             "the header's mark pulses while the agent works, and stops when it ends",
             pulsing &&
               starShows?.animation === "pulse-mark" &&
-              // It names the ask it works on (ADR-0106).
+              // It names the ask it works on.
               starShows.title?.startsWith(`${workingWords(true, null)} on `) ===
                 true &&
               ended.pulsing === 0,
@@ -1229,7 +1229,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         }
 
         // A shell row's tag is its tool's word, with its status at its top
-        // right (ADR-0114), and a long one-line chain is laid out, a step a
+        // right, and a long one-line chain is laid out, a step a
         // line, each step's command marked. Seven steps are more than a
         // summary shows: its detail shows them all.
         {
@@ -1297,7 +1297,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           )
         }
 
-        // ── a following column never gets shorter while its agent works (S35) ─
+        // ── a following column never gets shorter while its agent works ───────
         // At 20× CPU throttle every render is painted, as in a long session, so
         // a render that disagrees with the document would be seen here.
         {
@@ -1426,7 +1426,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         )
         await toolIdle()
 
-        // ── commands: found as you type, sent in full (ADR-0036) ─────────────
+        // ── commands: found as you type, sent in full ────────────────────────
         await tp.fill(`${col(0)} .composer .input`, "/hel")
         const commandOffered = await appears(
           `${col(0)} .command-menu [data-command="fixture:skill:hello"]`,
@@ -1445,7 +1445,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           `${inserted}`,
         )
 
-        // ── a column keeps its width, whatever its content (S37) ─────────────
+        // ── a column keeps its width, whatever its content ───────────────────
         script.use([
           {
             text: `\`\`\`\n${"x".repeat(150)}\n\`\`\``,
@@ -1477,7 +1477,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         )
 
         // ── the thread's name in its header, and its offer at its foot ──────
-        // (ADR-0105, ADR-0039, ADR-0040). The name is as the host stored it.
+        // The name is as the host stored it.
         const nameText = await tp.textContent(
           `${col(0)} .column-head .agent-name`,
         )
@@ -1523,7 +1523,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             .textContent(`${col(0)} .work .offer-bookmark`)
             .catch(() => "")) ?? ""
 
-        // ── the review, beside the thread (ADR-0047) ─────────────────────────
+        // ── the review, beside the thread ────────────────────────────────────
         {
           // Once described: describing rewrites the offer's commit, and the review
           // would read the new one mid-check.
@@ -1559,7 +1559,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             opened && threadWidth && rows === 2 && diffShown,
             `opened ${opened}, thread 28rem ${threadWidth}, rows ${rows}, diff ${diffShown}`,
           )
-          // What only typing changes redraws no part of the review (S54).
+          // What only typing changes redraws no part of the review.
           await appears(`${section("long-lane.txt")}[data-state="shown"]`)
           await componentRenders(tp)
           await tp.click(`${col(0)} .composer .input`)
@@ -1625,7 +1625,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             .catch(() => {})
           const closed = await appears(`${col(0)}:not(:has(.review))`, 5_000)
           if (acceptShown) await tp.click(`${col(0)} .work .offer-accept`)
-          // The acceptance moves accepted work forward to the offer (ADR-0104).
+          // The acceptance moves accepted work forward to the offer.
           const onAccepted = () => {
             try {
               return execFileSync(
@@ -1905,7 +1905,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await aligner.close()
         }
 
-        // ── the agent's work, on the board (ADR-0091) ───────────────────────
+        // ── the agent's work, on the board ──────────────────────────────────
         // Another writer starts agent work at the root: no tab opens, the
         // strip counts it, the board rings its root though this tab does not
         // hold it, choosing the item opens it, and that root cannot be
@@ -1933,7 +1933,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await starter.close()
         }
 
-        // ── the rail draws a long loop as one capsule (ADR-0031) ─────────────
+        // ── the rail draws a long loop as one capsule ────────────────────────
         await tp.keyboard.press("Escape")
         await tp.click("#sidebar .add-agent")
         script.use([
@@ -1976,7 +1976,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             capsule.count >= 30 &&
             capsule.span === 1 + String(capsule.count).length &&
             capsule.height > 8 &&
-            // Its first line counts; a digest, on by default (ADR-0071),
+            // Its first line counts; a digest, on by default,
             // follows on the next.
             (capsule.label.split("\n")[0] ?? "").endsWith("· 1 failed") &&
             capsule.fill === "agent" &&
@@ -1988,7 +1988,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // there. Its fork point is out of view in the column that shows it, so
         // aligning the new column to it alone would not show the message. The
         // aside is one message, so the preview below opens on a short path and
-        // its pick scrolls down, which does not stop a column following (S33).
+        // its pick scrolls down, which does not stop a column following.
         const railer = await join(toolHost, "railer", "browser")
         try {
           const say3 = (n: string) => `${n}.\nIts second line.\nIts third line.`
@@ -2000,7 +2000,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           ) => {
             let tip = from
             for (let k = 1; k <= n; k++) {
-              // A branch starts a thread of its own (ADR-0117); the rest
+              // A branch starts a thread of its own; the rest
               // continue it.
               const r = await railer.chat(
                 say3(`${name} ${k}`),
@@ -2017,7 +2017,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           })
           // The trunk is the first thread, which the task's first column
           // follows; the branches at its end are threads of their own, each
-          // on a track of its own (ADR-0125), the older, Later, first.
+          // on a track of its own, the older, Later, first.
           const trunk =
             start.kind === "appended"
               ? await chain(start.id, "Trunk", 20, false)
@@ -2028,7 +2028,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             trunk === null ? null : await chain(trunk, "Aside", 1, true)
           const railRoot =
             start.kind === "appended" ? start.id : entryId("none")
-          // Another writer's root is not in the sidebar (ADR-0030): open it from the board.
+          // Another writer's root is not in the sidebar: open it from the board.
           await openFromBoard(tp, taskHolding(toolHost, railRoot))
           await tp.waitForSelector(
             `${col(0)} .msg[data-entry="${aside === null ? "none" : (trunk ?? "none")}"]`,

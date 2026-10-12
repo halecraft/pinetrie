@@ -16,7 +16,7 @@ import { composeAt, queueCard } from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 
 /**
- * Bring a thread up to date (ADR-0108), as its button and a send do: a card
+ * Bring a thread up to date, as its button and a send do: a card
  * at the lane's tip with the command and `text`, queued. On an idle lane the
  * host pops it at once.
  */
@@ -30,7 +30,7 @@ export const bringUpToDate = (
 /**
  * A card with `command` and `text`, made at the thread's end once the
  * session holds it (`composeAt`), then queued: a command button makes its
- * card in the queue, empty (ADR-0113); this one carries text, which a card
+ * card in the queue, empty; this one carries text, which a card
  * made in the queue cannot.
  */
 export async function queueCommand(

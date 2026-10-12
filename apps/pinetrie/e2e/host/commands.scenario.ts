@@ -1,4 +1,4 @@
-// e2e/host/commands — your pi skills and prompts, /package:name (ADR-0036).
+// e2e/host/commands — your pi skills and prompts, /package:name.
 
 import path from "node:path"
 import { ROOT } from "@pinetrie/core"
@@ -60,7 +60,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       START_CHAT,
     )
     await cidle()
-    // As the lane reads it, under /mnt/host (ADR-0036).
+    // As the lane reads it, under /mnt/host.
     const hello = `/mnt/host${path.join(fixtures, "fixture-pkg", "skills", "hello")}`
     const typed = Object.values(entriesOf(ch))
       .map(

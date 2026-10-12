@@ -1,6 +1,6 @@
-// e2e/browser/images — an image pasted into the composer (ADR-0042), opened
-// in the column's pane, as a table is (ADR-0078), and a tool's image, drawn
-// in its row, which opens capped (ADR-0051).
+// e2e/browser/images — an image pasted into the composer, opened in the
+// column's pane, as a table is, and a tool's image, drawn in its row, which
+// opens capped.
 
 import { writerId } from "@pinetrie/core"
 import { UPLOADING } from "@pinetrie/interface"
@@ -37,7 +37,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         log: () => {},
       })
       const ppContext = await browser.newContext({ viewport: PANE_VIEWPORT })
-      // A copy writes the clipboard, which the checks read (ADR-0132).
+      // A copy writes the clipboard, which the checks read.
       await ppContext.grantPermissions(["clipboard-read", "clipboard-write"])
       const pp = await ppContext.newPage()
       await asPerson(pp, "pia@browser.test", "Pia")
@@ -146,7 +146,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         )
         await qp.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
         // A window with nothing in its list opens on the board, where the
-        // other window's reader avatar leads to its thread (ADR-0122).
+        // other window's reader avatar leads to its thread.
         await qp
           .waitForSelector("#board .reader-trigger", { timeout: 20_000 })
           .catch(() => null)
@@ -157,7 +157,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           JSON.stringify(theirs) === JSON.stringify([40, "40"]),
           `${JSON.stringify(theirs)}`,
         )
-        // A click opens it in the column's pane, beside the thread (ADR-0078).
+        // A click opens it in the column's pane, beside the thread.
         const pages: Page[] = []
         pp.context().on("page", p => pages.push(p))
         const url = pp.url()
@@ -197,7 +197,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             timeout: 5_000,
           })
           .then(measure, () => null)
-        // Folded to icons (ADR-0088), the strip widens and the pane with it.
+        // Folded to icons, the strip widens and the pane with it.
         await pp.click("#sidebar .list-fold")
         const folded = await pp
           .waitForFunction(
@@ -309,7 +309,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             back,
           `${JSON.stringify(covers)}, focus back ${back}`,
         )
-        // Copy, cut and paste (ADR-0132): Cmd+C with focus on the table's
+        // Copy, cut and paste: Cmd+C with focus on the table's
         // bar copies the table's markdown, with pine·trie's data beside it,
         // and takes nothing into the inventory, which stays closed. Cmd+V in
         // her composer pastes it there as a link to the table. The
@@ -384,7 +384,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           `cell ${shown}, kept ${kept}, previewed ${previewed}`,
         )
         await pp.click("#bottom .inventory-toggle")
-        // Pia's picture (ADR-0098): chosen on her profile page, cropped to a
+        // Pia's picture: chosen on her profile page, cropped to a
         // square in the browser and sent at 256, then drawn in her circle in
         // Quinn's window, where she reads the thread he has open.
         await openProfile(pp)
@@ -441,7 +441,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         model: { kind: "scripted", script },
       })
       const imageHost = section.host
-      // It may use the clipboard, for copy's check (S68).
+      // It may use the clipboard, for copy's check.
       const ip = await (
         await browser.newContext({
           permissions: ["clipboard-read", "clipboard-write"],

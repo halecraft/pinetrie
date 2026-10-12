@@ -1,4 +1,4 @@
-// e2e/host/cards — what you type, kept on its thread (ADR-0048).
+// e2e/host/cards — what you type, kept on its thread.
 
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -96,7 +96,7 @@ async function run(check: Checks["check"]): Promise<void> {
         thread: threadHolding(ch, end),
       }) as const
     /**
-     * Pinned at `end` (ADR-0048): shared, as your message is not. Its order
+     * Pinned at `end`: shared, as your message is not. Its order
      * is the host's to give, as a queued card's is.
      */
     const pinnedIn = (end: EntryId | null) =>
@@ -166,11 +166,11 @@ async function run(check: Checks["check"]): Promise<void> {
     await cIdle()
     await ch.quiet()
 
-    // 2b. Undo in a card reaches only that card (ADR-0052): A's undo passes
+    // 2b. Undo in a card reaches only that card: A's undo passes
     // over B's newer creation. A sent card's copy is destroyed once the host
-    // lets go of it (S64), so its steps no longer stand. Undoing past a card's
-    // creation empties it and keeps its record, which only the host writes
-    // (ADR-0059), so redo brings its text back.
+    // lets go of it, so its steps no longer stand. Undoing past a card's
+    // creation empties it and keeps its record, which only the host writes,
+    // so redo brings its text back.
     const kept = newCard(ada, tipOf(), "kept")
     ada.undoFor(kept).typing(() => ada.cardText(kept).text.insert(4, " more"))
     const spentCard = newCard(ada, tipOf(), "@Bea spent")
@@ -222,7 +222,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await waitFor(() => ch.cardText(c2) === "@agent me too", 5_000)
     await ada.chat("@agent me too", at(busyEnd), { card: c2 })
 
-    // 4. The busy lane's queue (ADR-0048, ADR-0059). Bea sends Ada's card
+    // 4. The busy lane's queue. Bea sends Ada's card
     // there: the host queues it in the same step, as Bea's. Ada edits it while
     // it waits; Ada queues another and unqueues it.
     const lane = (laneNamesOf(ch)[0] ?? "") as ThreadId
@@ -279,7 +279,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 4b. A card queued on an idle thread is popped at once. It is queued as
     // soon as it is made, as the bring-up-to-date button's card can be: its
-    // record can reach the host before its text (S96), and the pop waits.
+    // record can reach the host before its text, and the pop waits.
     const idleEnd = tipOf()
     const c6 = newCard(ada, idleEnd, "@Bea while it is quiet")
     void queueCard(ada, c6, lane)
@@ -301,7 +301,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 4c. An unqueue sent right behind a queue on an idle thread: the queue's
     // step queued the drain, so the pop is on the documents' keeper first, and
-    // the unqueue is refused as gone (ADR-0059). Ada's client says it was sent.
+    // the unqueue is refused as gone. Ada's client says it was sent.
     const quickEnd = tipOf()
     const c7 = newCard(ada, quickEnd, "@Bea too quick")
     await waitFor(() => ch.cardText(c7) === "@Bea too quick", 5_000)
@@ -324,8 +324,8 @@ async function run(check: Checks["check"]): Promise<void> {
       `${told}; sent ${sent7}`,
     )
 
-    // 4d. The top queued card waits while someone types in it (ADR-0048
-    // step 7): Ada types in her card as she queues it on the idle thread.
+    // 4d. The top queued card waits while someone types in it: Ada
+    // types in her card as she queues it on the idle thread.
     // The host hears her typing through presence, waits, and pops it once
     // her typing decays.
     const typeEnd = tipOf()
@@ -354,7 +354,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     await ch.quiet()
 
-    // 4e. Pinned cards (ADR-0048 step 5, S92): a card pinned at the thread's
+    // 4e. Pinned cards: a card pinned at the thread's
     // end is read by the agent's next run, in a cards entry pi writes with
     // the run's prompt, before it.
     const pinEnd = tipOf()
@@ -404,7 +404,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
 
     // 4f. A pinned card's text typed just before a send reaches that run:
-    // Kyneta keeps no order between documents (S96), so the run waits for
+    // Kyneta keeps no order between documents, so the run waits for
     // the text as its sender had it (`seen`). A second session of Ada's
     // sends her writes to the card's document 300 ms late (`lateFor`): her
     // card is made, pinned and sent at once, and the commands arrive first.
@@ -447,7 +447,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await adaLate.close()
     await ch.quiet()
 
-    // 4g. Traces (ADR-0048 step 6): Bea takes a card Ada pinned while Ada
+    // 4g. Traces: Bea takes a card Ada pinned while Ada
     // has no column open at its thread, which leaves Ada a trace naming Bea;
     // she takes another while Ada reads that thread, which leaves none. The
     // host learns what Ada reads from presence alone.
@@ -509,10 +509,10 @@ async function run(check: Checks["check"]): Promise<void> {
       await bea.moveCard({ card, from: beas, to: drafting(traceEnd) }, byBea)
     await ch.quiet()
 
-    // 4d. A client cannot write the places document: only the host writes it
-    // (ADR-0059), and every peer declares so (`writersPolicy`), so the write
+    // 4d. A client cannot write the places document: only the host writes it,
+    // and every peer declares so (`writersPolicy`), so the write
     // throws before it is made. A throwaway session tries it: had it been
-    // made, the writer's copy would keep its own value for good (S76).
+    // made, the writer's copy would keep its own value for good.
     const mallory = await join(ch, "mallory", "cards")
     const forged = newCardId()
     const placesRefused = refusedWrite(() =>
@@ -546,7 +546,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     await mallory.close()
 
-    // 4e. Your inventory (ADR-0059): a take into it reaches your other
+    // 4e. Your inventory: a take into it reaches your other
     // session's inventory and nobody else's; nobody else moves a card out of
     // it; and it holds 18 cards. Each move is a client's request over the wire.
     const ada2 = await join(ch, "ada", "cards")
@@ -597,11 +597,11 @@ async function run(check: Checks["check"]): Promise<void> {
       JSON.stringify(stolen),
     )
 
-    // 4f. Moves' history (ADR-0066): one per person and root, on the host.
+    // 4f. Moves' history: one per person and root, on the host.
     // Ada's second session undoes, in this root, the take into the inventory
     // her first session made here; her take in another root stays. An undo after Bea moved the
     // card is refused, naming Bea. A keep of three cards is one move.
-    // A history is a task's (ADR-0116).
+    // A history is a task's.
     const here = taskHolding(ch, tipOf())
     const other = await ada.chat("a root of its own", ROOT, { mode: "branch" })
     const otherEnd = other.kind === "appended" ? other.id : null
@@ -703,7 +703,7 @@ async function run(check: Checks["check"]): Promise<void> {
       `${refusedWhole.kind}, ${noneMoved}, ${keptAll.kind}, ${allKept}; ${keepUndone.kind}`,
     )
     // A text card dropped on the canvas lands in a note column made for it
-    // there (ADR-0126); one undo takes back both.
+    // there; one undo takes back both.
     const onCanvas = newCard(ada, tipOf(), "dropped on the canvas")
     await waitFor(() => onHost(onCanvas) !== undefined, 5_000)
     const drop = await ada.moveCard(
@@ -759,7 +759,7 @@ async function run(check: Checks["check"]): Promise<void> {
         readThreads(ch.session).get(fresh)?.root === freshRoot,
       `${freshOpened.kind}; ${canvasNow.indexOf(main)} ${canvasNow.indexOf(fresh)}; ${freshFirst.kind}`,
     )
-    // A paste (ADR-0132): a text card pasted at the thread lands in its
+    // A paste: a text card pasted at the thread lands in its
     // notes, one step of Ada's history in this task, which an undo takes
     // away. A cut is a discard, then the paste of that very card out of
     // her trash; an undo puts it back there.
@@ -931,7 +931,7 @@ async function run(check: Checks["check"]): Promise<void> {
         readSeats(ch.session).some(s => s.writer === zed.writer),
       5_000,
     )
-    // A held queue (ADR-0048 step 7): Bea holds it, and her send to the idle
+    // A held queue: Bea holds it, and her send to the idle
     // thread waits in it, across the restart.
     await bea.request({ kind: "queue-hold", lane, held: true })
     const c9 = newCard(bea, tipOf(), "@Ada after the restart")
@@ -957,7 +957,7 @@ async function run(check: Checks["check"]): Promise<void> {
       onHost(empty) === undefined,
     )
     // Ada's history in that root was kept in the store: her undo undoes her
-    // last move there (ADR-0066, S91).
+    // last move there.
     const adaAgain = await join(ch, "ada", "cards")
     const afterRestart = await adaAgain.undoMoves(here, "undo")
     check(
@@ -988,7 +988,7 @@ async function run(check: Checks["check"]): Promise<void> {
       heldSend.kind === "queued" && heldAcross && released >= 0,
       `${heldSend.kind}; held ${heldAcross}; popped after ${released} ms`,
     )
-    // 7. A thread's card taken into an inventory (ADR-0117, ADR-0124):
+    // 7. A thread's card taken into an inventory:
     // nothing is sent in it there; a copy of it forks at its end, where it
     // was dropped; put back on a canvas, it takes a send again.
     const tipNow = tipIn(ch, lane)
@@ -1064,7 +1064,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     await eve.close()
     await ch.shutdown()
-    // Read the store once the host has let it go: it owns its file (S47).
+    // Read the store once the host has let it go: it owns its file.
     const stored: string[] = []
     const closed = openStore(dbFile)
     for await (const d of closed.store.listDocIds("card:")) stored.push(d)

@@ -1,4 +1,4 @@
-// e2e/host/images — pasted, kept by content, read by the model (ADR-0042).
+// e2e/host/images — pasted, kept by content, read by the model.
 
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -134,7 +134,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await recordsHold(stored.opened.store, base64Slice)
 
     // 7. Deleting what nothing shows, after the grace; a card's image stays,
-    // across a restart (ADR-0048).
+    // across a restart.
     const blue = await upload(BLUE_PNG)
     const yellow = await upload(YELLOW_PNG)
     const draftedText = `next: ![yellow](/blob/${yellow.sha256})`

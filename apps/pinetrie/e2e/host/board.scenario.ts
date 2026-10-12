@@ -1,10 +1,9 @@
-// e2e/host/board — moving a root on the board (ADR-0122), archiving it in
-// the archive (ADR-0029), and titling one (ADR-0045), through the
-// command Line. What each decides is unit-tested (`@pinetrie/rules`'
-// `board.test.ts`, `archive.test.ts` and `mark.test.ts`, the host's
-// `commands/*.test.ts`); this proves the dispatcher routes each command to
-// it, a new root lands where its chat says, and the records reach another
-// client.
+// e2e/host/board — moving a root on the board, archiving it in the archive, and
+// titling one, through the command Line. What each decides is unit-tested
+// (`@pinetrie/rules`' `board.test.ts`, `archive.test.ts` and `mark.test.ts`,
+// the host's `commands/*.test.ts`); this proves the dispatcher routes each
+// command to it, a new root lands where its chat says, and the records reach
+// another client.
 
 import { DISCARDED, entryId, ROOT, type TaskId } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
@@ -50,7 +49,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await ada.chat("first root", ROOT, { ...START_CHAT, state: doing.id }),
       )
       const r2 = appended(await ada.chat("second root", ROOT, START_CHAT))
-      // Each root's task, which its first message opened (ADR-0116).
+      // Each root's task, which its first message opened.
       const idOf = (entry: string): TaskId | "" => {
         try {
           return taskHolding(host, entryId(entry))
@@ -126,7 +125,7 @@ async function run(check: Checks["check"]): Promise<void> {
           mark.by === bea.writer,
         titled.kind,
       )
-      // A task is a card (ADR-0126): a move on the board is its mover's,
+      // A task is a card: a move on the board is its mover's,
       // undone by their undo key outside any task.
       const forward = await ada.request({
         kind: "move-task",

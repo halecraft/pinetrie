@@ -1,6 +1,6 @@
 // e2e/lanes/main — one host with a scripted model over a throwaway project,
 // whose threads' agents each work in a Linux container on a disk cloned from
-// where they branched (ADR-0034).
+// where they branched.
 
 import {
   chmodSync,
@@ -152,7 +152,7 @@ async function mainSection(
       readProject(wh.session)?.root === project,
       `${JSON.stringify(readProject(wh.session))}`,
     )
-    // Threads start at accepted work (ADR-0104): set it up at the
+    // Threads start at accepted work: set it up at the
     // project's commit, as the footer's set up button does.
     await setUpAccepted(wh.session, wu)
 
@@ -240,7 +240,7 @@ async function mainSection(
     // ── revisions: in the document, and in your repo by bundle ─────────────
     // Lane one's first run committed who.txt; its prompt and that message each
     // have a record with a snapshot, and your repo holds its history as a
-    // remote bookmark (ADR-0105).
+    // remote bookmark.
     const ofOne = [...rootRecordsOf(wh, readRevisions).values()].filter(
       r => r.lane === one?.name,
     )
@@ -393,7 +393,7 @@ async function mainSection(
       `${rewrite.split("\n")[0] ?? ""}`,
     )
     // The lane's config names a commit only its own repo has: any other repo
-    // it reached would fail every jj command (S50).
+    // it reached would fail every jj command.
     const scratch =
       deeper === undefined
         ? "no fork"
@@ -407,7 +407,7 @@ async function mainSection(
       `${scratch.trim().split("\n").at(-1) ?? ""}`,
     )
 
-    // ── An agent's own commit is the turn's revision (S56) ──────────────────────
+    // ── An agent's own commit is the turn's revision ────────────────────────────
     script.use([
       {
         tool: "bash",
@@ -499,7 +499,7 @@ async function mainSection(
       await wu.request({ kind: "stop", lane: atOnce.name })
     await idle()
 
-    // ── 6. Offers: the thread's work as one commit you accept (ADR-0105) ─
+    // ── 6. Offers: the thread's work as one commit you accept ────────────
     const offerOf = () =>
       two === undefined ? undefined : readOffers(wh.session).get(two.name)
     const defaultLog = () =>
@@ -535,7 +535,7 @@ async function mainSection(
       `${JSON.stringify({ files: offerOf()?.files, described: offerOf()?.described, log: defaultLog().split("\n").slice(0, 4) })}`,
     )
     // Every lane has a name, two words, and no two alike; the offer's
-    // bookmark and its message's trailer carry it (ADR-0039).
+    // bookmark and its message's trailer carry it.
     const names = readNames(wh.session)
     const twoName = two === undefined ? undefined : names.get(two.name)
     const offerBookmarkOf = (lane: ThreadId | undefined) =>
@@ -590,7 +590,7 @@ async function mainSection(
         .filter((l, i, all) => l !== all[i - 1])
     // You change the same line, commit, publish it, and keep editing: the
     // offer is rebuilt on accepted work and shows the conflict before you
-    // accept it (ADR-0104, ADR-0090). Publishing needs a main to move: it is
+    // accept it. Publishing needs a main to move: it is
     // set at the project's first commit.
     jj(
       project,
@@ -616,8 +616,8 @@ async function mainSection(
     // You reword accepted work's commit under the offer, which is immutable
     // until you say otherwise: jj rebases the offer, not the host, whose next
     // trigger plans `none` and writes nothing to your repo. The record's
-    // `commits` names the offer as it is now, which is what a review reads
-    // (ADR-0047). The first line stays, for the acceptance below.
+    // `commits` names the offer as it is now, which is what a review reads.
+    // The first line stays, for the acceptance below.
     // Publishing moved every open offer: their writes are done first.
     await wh.quiet()
     const commitsBefore = JSON.stringify(offerOf()?.commits)
@@ -666,9 +666,9 @@ async function mainSection(
         offerOf()?.edited === false,
       `${JSON.stringify({ before: commitsBefore, commits: offerOf()?.commits, now: offerNow(), by: newestBy(), edited: offerOf()?.edited })}`,
     )
-    // The record is the page's cache (ADR-0104): lost, the next trigger, a
+    // The record is the page's cache: lost, the next trigger, a
     // jj operation of yours that the offers depend on (a WIP bookmark, so
-    // everything is refreshed, ADR-0065), writes it again from the repo, and
+    // everything is refreshed), writes it again from the repo, and
     // the offer is the same commit, not built anew.
     const lostAt = offerNow()
     if (two !== undefined)
@@ -733,7 +733,7 @@ async function mainSection(
     const landPrompt = stored.present
       ? (stored.message as { content?: unknown }).content
       : undefined
-    // A resolution ends as any run (ADR-0080): no ask about a conflict.
+    // A resolution ends as any run: no ask about a conflict.
     const askedAt =
       two === undefined ? null : conflictAskedAt(tree(), laneTip(two.name))
     check(
@@ -763,7 +763,7 @@ async function mainSection(
       `${JSON.stringify(history)}`,
     )
     // Accept: accepted work moves forward to the offer, which stays one commit on
-    // your landed one; your working copy is untouched (ADR-0104).
+    // your landed one; your working copy is untouched.
     const atBefore = jj(
       project,
       "log",
@@ -825,7 +825,7 @@ async function mainSection(
     // A clean update: a fact in the thread, then the card's text, sent. Your
     // work goes in accepted work first: a publish catches it up with what you
     // accepted, as you, after accepted work's record previews it, then accepts it
-    // and moves main (ADR-0090).
+    // and moves main.
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     jj(project, "commit", "-m", "you add yours.txt")
     const previewed = await waitFor(
@@ -936,7 +936,7 @@ async function mainSection(
       },
       { text: "split" },
     ])
-    // A split is a card's command, queued as the button queues it (ADR-0080).
+    // A split is a card's command, queued as the button queues it.
     const split =
       lane2 === undefined
         ? null
@@ -958,12 +958,12 @@ async function mainSection(
     )
 
     // A new root thread starts at accepted work: what you landed, not what you
-    // committed and have not landed, nor your working copy (ADR-0104).
+    // committed and have not landed, nor your working copy.
     writeFileSync(path.join(project, "unlanded.txt"), "not landed\n")
     const aheadBefore = readAccepted(wh.session)?.yours.ahead ?? 0
     jj(project, "commit", "-m", "you add unlanded.txt")
     // The host has seen your commit (its line record counts it), so its
-    // reads, pinned to the head it observed, have it too (ADR-0065).
+    // reads, pinned to the head it observed, have it too.
     await waitFor(
       () => (readAccepted(wh.session)?.yours.ahead ?? 0) > aheadBefore,
       10_000,
@@ -1001,8 +1001,7 @@ async function mainSection(
 
     // A branch's offer holds its parent's work you lack, with its own.
     // Accepting the parent's shrinks it to its own, in place; accepting a
-    // branch that holds all of its parent's withdraws the parent's
-    // (ADR-0039).
+    // branch that holds all of its parent's withdraws the parent's.
     const offerFor = (lane: ThreadId | undefined) =>
       lane === undefined ? undefined : readOffers(wh.session).get(lane)
     const filesOf = (lane: ThreadId | undefined) =>

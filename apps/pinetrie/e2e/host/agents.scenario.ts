@@ -1,7 +1,6 @@
 // e2e/host/agents — another task's thread's agent invited, asked by this
 // thread's agent, and its answer waking the asker; then its task archived,
-// which refuses the next ask; then a budget spent, which wakes nobody
-// (ADR-0128).
+// which refuses the next ask; then a budget spent, which wakes nobody.
 
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -59,7 +58,7 @@ function configWith(budget: number): string {
 
 /**
  * Two agent threads, A and B, each started at the root, so each is a task
- * of its own (ADR-0128): every check below crosses tasks and root
+ * of its own: every check below crosses tasks and root
  * documents. B's name.
  */
 async function twoThreads(section: SectionHost) {

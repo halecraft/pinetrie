@@ -1,5 +1,4 @@
-// e2e/lanes/commands — your pi skills' files, readable in a lane at /mnt/host
-// (ADR-0036).
+// e2e/lanes/commands — your pi skills' files, readable in a lane at /mnt/host.
 
 import path from "node:path"
 import { atEntry, entryId, ROOT } from "@pinetrie/core"
@@ -13,7 +12,7 @@ export const scenario: Scenario = {
   run: ({ check }, { lanes }) => commandsSection(check, lanes),
 }
 
-// ── commands: skill files at /mnt/host in a lane (ADR-0036) ─────────────────
+// ── commands: skill files at /mnt/host in a lane ────────────────────────────
 async function commandsSection(
   check: Checks["check"],
   lanes: LaneHosts,
@@ -53,9 +52,9 @@ async function commandsSection(
         `/mnt/host${path.join(fixtures, "fixture-pkg", "skills", "explain")}/SKILL.md`,
       ),
     )
-    // What the lane is told about itself (ADR-0121), in a real container.
-    // It names no bookmark, which changes when the thread is named: S85, and
-    // `packages/pi/lanes.test.ts`.
+    // What the lane is told about itself, in a real container.
+    // It names no bookmark, which changes when the thread is named
+    // (`packages/pi/lanes.test.ts`).
     const lane = h.laneWith("read it")?.name
     check(
       "a lane of its own is told it is in a lane, and of its browser",

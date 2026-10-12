@@ -1,4 +1,4 @@
-// e2e/host/tool-images — a tool's image: kept by content, a reference in the session (ADR-0051).
+// e2e/host/tool-images — a tool's image: kept by content, a reference in the session.
 
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -66,10 +66,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const tu = section.user
 
     // pi's pending entries, as each change of the document leaves them: a
-    // compaction after the run rewrites the history they were in (S93).
+    // compaction after the run rewrites the history they were in.
     const pendings: string[] = []
     // Each root's document, followed as the host opens it: a run is in
-    // its root's (ADR-0063), which a start makes, and starting a run is a
+    // its root's, which a start makes, and starting a run is a
     // change to what streams, which comes first.
     const watching = new Map<object, () => void>()
     const watchRoots = () => {
@@ -113,7 +113,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     )
 
     // 2. No bytes in the session: not in the entry, nor in pi's pending entry,
-    // which a delete leaves in the history until a compaction (S93).
+    // which a delete leaves in the history until a compaction.
     unwatch()
     await th.quiet()
     const base64Slice = RED_PNG.toString("base64").slice(20, 70)

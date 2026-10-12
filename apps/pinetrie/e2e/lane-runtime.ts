@@ -1,6 +1,6 @@
-// e2e/lane-runtime — the suites' runtime, Docker (ADR-0130): its CLI, and a
+// e2e/lane-runtime — the suites' runtime, Docker: its CLI, and a
 // lane's container and disks read and removed through lanehost, as the host
-// does (ADR-0129). The lane VM's Docker on the Mac, the host's on Linux, and
+// does. The lane VM's Docker on the Mac, the host's on Linux, and
 // a nested lane's rootless one inside a lane.
 
 import { execFileSync } from "node:child_process"

@@ -36,7 +36,7 @@ export type Scenario =
 
 /**
  * Why a scenario cannot run here, or null: the runtime's reason first, for
- * one that runs lanes, then its own `needs`. Pure.
+ * one that runs lanes, then its own `needs`.
  */
 export function scenarioProblem(input: {
   readonly lanes: boolean
@@ -52,7 +52,7 @@ export const SCENARIO_SUFFIX = ".scenario.ts"
 
 /**
  * Which scenario names to run: all, or those `named` (`PINETRIE_SCENARIO`, a
- * comma-separated list) names, in name order. Pure.
+ * comma-separated list) names, in name order.
  */
 export function chooseScenarios(
   all: readonly string[],
@@ -78,7 +78,7 @@ export type SuitePlan =
 
 /**
  * What a suite does: the chosen scenarios, each run, or skipped for the
- * reason its `needs` gave (`problems`, by name; absent or null runs it). Pure.
+ * reason its `needs` gave (`problems`, by name; absent or null runs it).
  */
 export function planSuite(
   all: readonly string[],

@@ -1,6 +1,6 @@
 // e2e/host/live — a real model's words (`pnpm run e2e:live`). Every other
 // scenario runs on a scripted model, so its steps are repeatable, cost nothing
-// and need no key (ADR-0041).
+// and need no key.
 
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -60,7 +60,7 @@ async function run(check: Checks["check"]): Promise<void> {
     "the model's reply contains the requested token",
     last?.role === "assistant" && last.text.includes("PINETRIE-OK"),
   )
-  // A pasted image reaches a real model (ADR-0042): it says what it shows.
+  // A pasted image reaches a real model: it says what it shows.
   const uploaded = await fetch(`${live.httpUrl}blob`, {
     method: "POST",
     headers: { "content-type": "image/png" },
@@ -90,7 +90,7 @@ async function run(check: Checks["check"]): Promise<void> {
   await live.shutdown()
 
   // A banner drawn by the real image model: a square icon, as the request's
-  // `aspect_ratio` of 1:1 asks (ADR-0053).
+  // `aspect_ratio` of 1:1 asks.
   const bannerConfig = path.join(
     mkdtempSync(path.join(tmpdir(), "pinetrie-live-banner-")),
     "config.json",

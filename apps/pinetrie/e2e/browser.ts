@@ -1,6 +1,6 @@
 // e2e/browser — a real browser against a real host: the scenarios in
 // `browser/`. Each launches Chromium's headless shell and starts its own
-// host. In a lane Chromium comes with the lane's image (ADR-0041); on the
+// host. In a lane Chromium comes with the lane's image; on the
 // Mac, install it once:
 //
 //     pnpm --filter @pinetrie/app exec playwright install chromium-headless-shell

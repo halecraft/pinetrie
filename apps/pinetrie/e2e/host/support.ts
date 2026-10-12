@@ -32,7 +32,7 @@ export const runOf = (o: Outcome) => (o.kind === "started" ? o.runId : "")
  * A document's records in a Kyneta store, their payloads' size, and how many
  * hold the whole document (a compaction's), read
  * through the store itself: it owns its SQLite file, so no second connection
- * may read it (S47). The store also holds each client's command Line, which
+ * may read it. The store also holds each client's command Line, which
  * the host does not compact (see `settle`), so callers count one document.
  */
 export const storedRecords = async (
@@ -81,7 +81,7 @@ export const LATE_LOAD_MS = 300
  * `store`, with `docId`'s first load taking `ms` longer. Only the first
  * `loadAll` of `docId` waits, which is the exchange's hydration: the startup
  * reads every document's `currentMeta` before the exchange opens
- * (`readStored`, ADR-0096), and a compaction's `loadAll` comes after the
+ * (`readStored`), and a compaction's `loadAll` comes after the
  * hydration. A proxy, so everything else, its seat included, is the store's
  * own.
  */

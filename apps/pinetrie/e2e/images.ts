@@ -1,4 +1,4 @@
-// e2e/images — small PNGs the suites paste and upload (ADR-0042). Each is a
+// e2e/images — small PNGs the suites paste and upload. Each is a
 // solid colour, so a real model can say which one it was shown.
 
 import { deflateSync } from "node:zlib"

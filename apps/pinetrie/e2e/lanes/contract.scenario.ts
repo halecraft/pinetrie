@@ -1,10 +1,9 @@
-// e2e/lanes/contract — what the Docker runtime must hold that no unit test
-// can show (ADR-0130): snapshots under writes, the working copy read-only on
-// the Mac's side, a half-close through the launcher, no vsock from a lane,
-// two hosts' slots apart, and what a lane's start and a snapshot cost. On the
-// Mac it runs a VM of its own, from this checkout's launcher and the built
-// image, so a change to the launcher is what runs, and the person's hosts
-// are untouched.
+// e2e/lanes/contract — what the Docker runtime must hold that no unit test can
+// show: snapshots under writes, the working copy read-only on the Mac's side, a
+// half-close through the launcher, no vsock from a lane, two hosts' slots
+// apart, and what a lane's start and a snapshot cost. On the Mac it runs a VM
+// of its own, from this checkout's launcher and the built image, so a change to
+// the launcher is what runs, and the person's hosts are untouched.
 
 import { execFile, spawn } from "node:child_process"
 import {
@@ -109,7 +108,7 @@ const median = (xs: readonly number[]) =>
 
 /**
  * A server on the Mac's loopback, answering `mac <name>`, in a process of its
- * own: this one blocks while a lane connects (S136). Its port, and how to stop
+ * own: this one blocks while a lane connects. Its port, and how to stop
  * it.
  */
 async function loopbackServer(
@@ -224,7 +223,7 @@ async function dockerContract(
     )
 
     // Lanehost's server runs from pine·trie's install on the lane runtime,
-    // which a host copies out of the default image (ADR-0129).
+    // which a host copies out of the default image.
     const { runtimeFrom } = await prepareImages(
       runtime,
       projA,
@@ -251,7 +250,7 @@ async function dockerContract(
     for (const image of [NODE_IMAGE, PYTHON_IMAGE, ALPINE_IMAGE])
       await runtime.runInImage(image, ["true"])
 
-    // ── lanehost's privileged role (ADR-0129): the host's grant made it ──
+    // ── lanehost's privileged role: the host's grant made it ──
     const privileged = quietCli([
       "ps",
       "--filter",
@@ -352,7 +351,7 @@ async function dockerContract(
       `${holding.length} of ${SNAPSHOTS}`,
     )
 
-    // ── a diff between two snapshots (ADR-0129) ──
+    // ── a diff between two snapshots ──
     await exec(writerLane, "echo gone > /workspace/gone.txt")
     const diffFrom = snapshotId(`contract-${process.pid}-before`)
     const diffTo = snapshotId(`contract-${process.pid}-after`)
@@ -426,7 +425,7 @@ async function dockerContract(
       vsock.stdout.trim().split("\n").at(-1) ?? "",
     )
 
-    // ── the fence (S136): the Mac's loopback and gvproxy's API ──
+    // ── the fence: the Mac's loopback and gvproxy's API ──
     /** What a lane got from `url`: the server's answer, or wget's error. */
     const fetchFrom = async (name: ThreadId, url: string) =>
       (
