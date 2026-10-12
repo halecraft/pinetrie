@@ -264,7 +264,7 @@ describe("machineConfig: the VM's slots, a bad value refused", () => {
   })
 })
 
-describe("repoConfig: the project's values win, and a bad one falls back (ADR-0100)", () => {
+describe("repoConfig: the project's values win, and a bad one falls back", () => {
   const none = {
     acceptedBookmark: null,
     wipPrefix: null,
@@ -335,8 +335,8 @@ describe("repoConfig: the project's values win, and a bad one falls back (ADR-01
     const r = repoConfig({ ...none, offers: true }, { ...none, offers: true })
     expect(r.repoConfig).toEqual(DEFAULT_REPO)
     expect(r.refused).toEqual([
-      "your config: offers is no longer read; use accepted.bookmark, wip.prefix, publish.bookmark and publish.catchUp (ADR-0100)",
-      "pinetrie.json: offers is no longer read; use accepted.bookmark, wip.prefix, publish.bookmark and publish.catchUp (ADR-0100)",
+      "your config: offers is no longer read; use accepted.bookmark, wip.prefix, publish.bookmark and publish.catchUp",
+      "pinetrie.json: offers is no longer read; use accepted.bookmark, wip.prefix, publish.bookmark and publish.catchUp",
     ])
   })
   test("isBookmarkName: git's rules", () => {
@@ -596,7 +596,7 @@ test("planForkSetup: a base with several parents is committed once, so the bookm
   ])
 })
 
-test("planForkSetup: on accepted work, an empty commit naming it; its id read for the config (ADR-0104)", () => {
+test("planForkSetup: on accepted work, an empty commit naming it; its id read for the config", () => {
   const steps = argvs(
     planForkSetup(LANE, {
       kind: "accepted",
@@ -612,7 +612,7 @@ test("planForkSetup: on accepted work, an empty commit naming it; its id read fo
   )
 })
 
-test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's own commits (ADR-0104)", () => {
+test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's own commits", () => {
   const W = commitId("w1")
   const steps = argvs(
     planForkSetup(LANE, {
@@ -629,11 +629,11 @@ test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's o
     `lane: jj commit -m ${baseMessage("copy of wip/x", { kind: "wip", bookmark: "wip/x", commit: W })}`,
   ])
   expect(steps.some(s => s.includes("jj new w1"))).toBe(false)
-  // No fork installs: a WIP's dependencies are a layer of its own (ADR-0131).
+  // No fork installs: a WIP's dependencies are a layer of its own.
   expect(steps.join("\n")).not.toContain("pnpm")
 })
 
-describe("planJoins: the accepted-offer commits a lane holds, joined before it catches up (S102)", () => {
+describe("planJoins: the accepted-offer commits a lane holds, joined before it catches up", () => {
   const T1 = commitId("t1")
   const T2 = commitId("t2")
   const S1 = commitId("s1")
@@ -644,7 +644,7 @@ describe("planJoins: the accepted-offer commits a lane holds, joined before it c
       planJoins([{ acceptedOfferCommit: T1, sources: [X] }], new Set([S1])),
     ).toEqual([])
   })
-  test("a squash naming one source held and one not is joined, with the held one alone (S77 item 6)", () => {
+  test("a squash naming one source held and one not is joined, with the held one alone", () => {
     expect(
       planJoins(
         [{ acceptedOfferCommit: T1, sources: [S1, X] }],
@@ -673,7 +673,7 @@ describe("planJoins: the accepted-offer commits a lane holds, joined before it c
   })
 })
 
-describe("planMerge: an update's steps (ADR-0104)", () => {
+describe("planMerge: an update's steps", () => {
   const W = commitId("w1")
   const COPY = commitId("copy1")
   test("accepted work's merge names its base, and lists what came in since the lane", () => {
@@ -715,7 +715,7 @@ describe("planMerge: an update's steps (ADR-0104)", () => {
       came: { from: C2, to: W },
     })
   })
-  test("the thread it branched from is merged as a commit, named, with no Pinetrie-Base (ADR-0072)", () => {
+  test("the thread it branched from is merged as a commit, named, with no Pinetrie-Base", () => {
     expect(
       planMerge({
         kind: "parent",
@@ -817,7 +817,7 @@ test("planBundle: the lane's bookmark, excluding what your repo has", () => {
   })
 })
 
-describe("the base: a dependency layer and a checkout (ADR-0131)", () => {
+describe("the base: a dependency layer and a checkout", () => {
   const recipe: Recipe = {
     command: "pnpm install --frozen-lockfile",
     inputs: ["pnpm-lock.yaml"],
@@ -1107,7 +1107,7 @@ test("imageRefusal: git 2.41 or later, named when missing or old", () => {
   expect(imageRefusal("")).toContain("has no git")
 })
 
-describe("planTurnCommit: the turn's revision (S56)", () => {
+describe("planTurnCommit: the turn's revision", () => {
   const C3 = commitId("c3")
   const at = {
     atEmpty: true,
@@ -1184,7 +1184,7 @@ describe("pre-rename: planOldNamesOnDisk, for a disk cloned from a snapshot take
   })
 })
 
-test("the base's scratch lane is no thread's: nothing that takes a thread takes it (ADR-0117)", () => {
+test("the base's scratch lane is no thread's: nothing that takes a thread takes it", () => {
   // @ts-expect-error: a bookmark, a remote and a stack are a thread's lane's
   const bookmark = bookmarkName(BASE_LANE)
   expect([laneContainer(BASE_LANE), bookmark]).toEqual([
@@ -1193,7 +1193,7 @@ test("the base's scratch lane is no thread's: nothing that takes a thread takes 
   ])
 })
 
-describe("a lane's recipe, run again when its inputs change (ADR-0131)", () => {
+describe("a lane's recipe, run again when its inputs change", () => {
   const recipe: Recipe = {
     command: "pnpm install --frozen-lockfile",
     inputs: ["pnpm-lock.yaml"],

@@ -1,13 +1,13 @@
-// lanes/runtime — pinetrie's lane runtime: Node, and static programs for any
-// image (S44, ADR-0064).
+// lanes/runtime — pine·trie's lane runtime: Node, and static programs for any
+// image.
 //
-// The helper is pinetrie's, so it must run on any project's image, with or
-// without Node, on musl as well as glibc. After building pinetrie's default
+// The helper is pine·trie's, so it must run on any project's image, with or
+// without Node, on musl as well as glibc. After building pine·trie's default
 // image, the host copies out of it:
 // - `node/`: the `node` binary, the shared libraries `ldd` lists for it
 //   (`node/lib/`), and glibc's dynamic loader. The helper is started through
 //   that loader with those libraries, so the image's own libc and Node are
-//   never used. Its `process.execPath` is then the loader (S44 item 2).
+//   never used. Its `process.execPath` is then the loader.
 // - `bin/`: each of core's `RUNTIME_PROGRAMS`, a static musl build that runs
 //   on any Linux. Debian's own builds of rg and fd link glibc, so the default
 //   image downloads release builds instead.

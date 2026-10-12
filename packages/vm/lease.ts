@@ -1,4 +1,4 @@
-// vm/lease — a host's lease on the lane VM (ADR-0130). To a host the VM is a
+// vm/lease — a host's lease on the lane VM. To a host the VM is a
 // Docker socket and a slot of shared directories: it gathers what decides
 // whether to start or join the VM (`planVm`), starts the launcher when need
 // be, takes a slot, and waits for Docker to answer.
@@ -194,7 +194,7 @@ async function leaseOnce(input: LeaseInput): Promise<{
       input.log("[vm] building the lane VM's launcher")
       await buildLauncher(launcher.binary)
     }
-    // The VM's network (S136): fetched and checked once, then kept.
+    // The VM's network stack: fetched and checked once, then kept.
     const gvproxy = await ensureGvproxy(stateDir, await readGvproxyPin())
     const out = openSync(path.join(stateDir, "launcher.log"), "a")
     started = Date.now()

@@ -1,6 +1,5 @@
-// lanes/runtime-port — what a runtime does for lanes (ADR-0130). Planners
-// return values (`ContainerShape`, `DiskOp`); a runtime turns them into
-// commands. The host picks the runtime and hands it in.
+// lanes/runtime-port — what a runtime does for lanes. Planners return
+// values (`ContainerShape`, `DiskOp`); a runtime turns them into commands. The host picks the runtime and hands it in.
 
 import type { DiskDiff, SnapshotId } from "@pinetrie/core"
 import type { ContainerShape, ImagePlan, LaneOwner } from "./plan.ts"

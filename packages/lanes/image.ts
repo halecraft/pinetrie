@@ -1,9 +1,9 @@
-// lanes/image — the image a lane runs (ADR-0034, ADR-0041).
+// lanes/image — the image a lane runs.
 //
-// pinetrie's default image is built from `image/Containerfile`; a project's
+// pine·trie's default image is built from `image/Containerfile`; a project's
 // own `pinetrie.Containerfile` at its root replaces it for the project's lanes.
 // Either is built once per change of its content and build arguments: the
-// host's jj version for both, and the app's Playwright version for pinetrie's
+// host's jj version for both, and the app's Playwright version for pine·trie's
 // (`planImages`). The runtime builds and runs them.
 
 import { readFile } from "node:fs/promises"
@@ -19,8 +19,8 @@ const DEFAULT_CONTAINERFILE = path.join(
 )
 /**
  * A project's own image, when this file exists: its lanes then run it instead
- * of pinetrie's default image, which carries the browser (ADR-0041) and
- * python3 (ADR-0064).
+ * of pine·trie's default image, which carries the browser and
+ * python3.
  */
 export const projectContainerfile = (root: string): string =>
   path.join(root, "pinetrie.Containerfile")
@@ -46,10 +46,10 @@ async function ensureImage(
 }
 
 /**
- * The images a project's lanes need: pinetrie's default, always, since the lane
+ * The images a project's lanes need: pine·trie's default, always, since the lane
  * runtime comes from it; and the project's own when it has a
  * `pinetrie.Containerfile`. `playwrightVersion` is the app's
- * `@playwright/test`, whose browser pinetrie's image carries. Returns the tag
+ * `@playwright/test`, whose browser pine·trie's image carries. Returns the tag
  * lanes run.
  */
 export async function prepareImages(

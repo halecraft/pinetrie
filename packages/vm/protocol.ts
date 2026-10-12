@@ -1,5 +1,5 @@
 // vm/protocol — the lease's messages on the launcher's control.sock, one JSON
-// object a line (ADR-0130). The launcher's side is `launcher/launcher.swift`.
+// object a line. The launcher's side is `launcher/launcher.swift`.
 
 /** A directory of a host's slot: the name it has under `/mnt/host-shares/<slot>/`. */
 export interface ShareEntry {
@@ -23,7 +23,7 @@ export type ToLauncher =
 export type LauncherRefusal =
   /** Every slot is taken. */
   | { readonly reason: "full"; readonly slots: number }
-  /** The slot was filled already: a slot is filled once (S130). */
+  /** The slot was filled already: a slot is filled once. */
   | { readonly reason: "filled" }
   /** A fill before a lease, or a second lease on one connection. */
   | { readonly reason: "unleased" }

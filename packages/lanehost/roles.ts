@@ -1,5 +1,5 @@
-// lanehost/roles — which process serves which module, and with what grant
-// (ADR-0129). A role is one process of the server, in a container of its
+// lanehost/roles — which process serves which module, and with what grant.
+// A role is one process of the server, in a container of its
 // own, holding one grant. A capability lanehost needs is a module, and a row
 // here, never another kind of container.
 
@@ -30,7 +30,7 @@ export interface RoleSpec {
 }
 
 export const ROLES: Readonly<Record<Role, RoleSpec>> = {
-  /** The disks: subvolumes made, snapshotted and deleted without privilege (S125, S148). */
+  /** The disks: subvolumes made, snapshotted and deleted without privilege. */
   disks: {
     lanesDir: "rw",
     caps: { keep: "default" },
@@ -63,14 +63,14 @@ export function moduleOf(call: LanehostCall): Module {
 
 /** What decides which role serves a module. */
 export interface RoleFacts {
-  /** Docker runs rootless (a nested lane): no capability reaches the host's namespace (S148). */
+  /** Docker runs rootless (a nested lane): no capability reaches the host's namespace. */
   readonly rootless: boolean
 }
 
 /**
  * Which role serves each module. A diff is `btrfs send`'s, in the
  * privileged role, where its `SYS_ADMIN` reaches the host's user namespace;
- * under rootless Docker it cannot (S148), and the diff is a walk of both
+ * under rootless Docker it cannot, and the diff is a walk of both
  * trees, which needs no capability, in the disks role.
  */
 export function planRoles(facts: RoleFacts): ReadonlyMap<Module, Role> {

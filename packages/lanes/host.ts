@@ -1,5 +1,5 @@
 // lanes/host — what the host finds at startup, gathered, then planned by
-// `planProjectDir` and `planShared` (ADR-0034, ADR-0035, ADR-0086). What a
+// `planProjectDir` and `planShared`. What a
 // runtime finds is the runtime's own.
 //
 // These are the one exception to "only `@pinetrie/repo` runs jj on your repo":
@@ -10,7 +10,7 @@
 //
 // Only jj can say where a jj repo is: a secondary workspace's `.jj/repo` is a
 // file, and from a jj workspace nested in another repo, git names the outer
-// one (S36 item 17). So jj is asked first, git only when jj finds nothing, and
+// one. So jj is asked first, git only when jj finds nothing, and
 // no code looks for `.jj` or `.git` itself.
 
 import {
@@ -78,7 +78,7 @@ export async function prepareProjectDir(dir: string): Promise<ProjectDir> {
 /**
  * Add `lines` to your repo's exclude file, found with
  * `git rev-parse --git-path info/exclude`, so what they name changes no
- * tracked file. False when the repo has no git directory beside it (S108).
+ * tracked file. False when the repo has no git directory beside it.
  */
 async function excludeInYours(
   root: string,
@@ -132,7 +132,7 @@ export const userConfigFile = (
  * directories, add unignored ones to your repo's exclude file, and write the
  * lanes' ignore file (`laneIgnores`) in `pinetrieDir`'s `laneGit`. jj, not git's
  * index, says what is tracked: in a colocated repo the index can lag. Ignore
- * rules are git's, and jj applies them, the global file included (S45).
+ * rules are git's, and jj applies them, the global file included.
  */
 export async function prepareShared(
   root: string,

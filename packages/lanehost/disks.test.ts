@@ -1,7 +1,6 @@
 // The disks module against real btrfs, without privilege: a pine·trie lane's
 // `/workspace` is on the VM's btrfs, mounted with `user_subvol_rm_allowed`,
-// as the disks role's lanes directory is (S148). Elsewhere it skips, saying
-// why.
+// as the disks role's lanes directory is. Elsewhere it skips, saying why.
 
 import { readFileSync } from "node:fs"
 import {
@@ -150,7 +149,7 @@ describe.skipIf(!onBtrfs)(
         ),
       ).toBe(false)
     })
-    test("the walk's diff of S148's turn, between two snapshots, is what send's stream says", async () => {
+    test("the walk's diff of the recorded turn, between two snapshots, is what send's stream says", async () => {
       const lane = disks.lane("turn")
       await disk({
         kind: "disk",

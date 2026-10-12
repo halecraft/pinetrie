@@ -1,7 +1,7 @@
 // lanehost/diff — what differs between two read-only snapshots of a disk:
 // by `btrfs send --no-data` where the role holds `SYS_ADMIN` in the host's
-// user namespace, about 2 ms for a turn's change (S146); by walking both
-// trees under rootless Docker, where it cannot (S148). `planRoles` decides
+// user namespace, about 2 ms for a turn's change; by walking both trees
+// under rootless Docker, where it cannot. `planRoles` decides
 // which, once, from the machine's facts.
 
 import { runCommand } from "@pinetrie/channel"
@@ -27,7 +27,6 @@ export async function diffBySend(from: string, to: string): Promise<DiskDiff> {
   return { changes: foldSendStream(readSendStream(ran.stdout)) }
 }
 
-/** The diff by walking both trees. */
 export async function diffByWalk(from: string, to: string): Promise<DiskDiff> {
   const [before, after] = await Promise.all([walkTree(from), walkTree(to)])
   return { changes: compareTrees(before, after) }

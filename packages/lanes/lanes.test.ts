@@ -111,7 +111,7 @@ test("helperCommand: the runtime's exec of the helper on the lane runtime's Node
   ])
 })
 
-test("changedPaths: a path with a space and an accent comes back as it is named (S70), and a conflicted commit's paths are its files (S99)", async () => {
+test("changedPaths: each path as it is named, a conflicted commit's included", async () => {
   const dir = await realpath(
     await mkdtemp(path.join(tmpdir(), "pinetrie-paths-")),
   )
@@ -160,7 +160,7 @@ test("changedPaths: a path with a space and an accent comes back as it is named 
   }
 })
 
-test("copyFacts (S103, ADR-0080): the copy on its bookmark, on the merge whose turn commits nothing of its own, on the agent's own commit, and on a split's stack", async () => {
+test("copyFacts: on its bookmark, after a merge, on the agent's own commit, on a split's stack", async () => {
   const dir = await realpath(
     await mkdtemp(path.join(tmpdir(), "pinetrie-copy-")),
   )
@@ -194,7 +194,7 @@ test("copyFacts (S103, ADR-0080): the copy on its bookmark, on the merge whose t
       descends: false,
     })
     // The merge as `mergeUpdate` makes it: the bookmark moves to it, and the
-    // next turn has no commit of its own to record (S103 item 3).
+    // next turn has no commit of its own to record.
     await jj(["new", (await bookmarkOf(jj, lane)) ?? "", line, "-m", "merge"])
     const merge = await commitToBookmark(jj, lane, "merge")
     expect(
@@ -234,7 +234,7 @@ test("copyFacts (S103, ADR-0080): the copy on its bookmark, on the merge whose t
   }
 })
 
-test("prepareProjectDir (ADR-0086, S108): a repo's root with .pinetrie/ excluded once; a non-colocated repo refused; a plain folder untouched", async () => {
+test("prepareProjectDir: .pinetrie/ excluded once; a non-colocated repo refused; a plain folder untouched", async () => {
   const dir = await realpath(
     await mkdtemp(path.join(tmpdir(), "pinetrie-dir-")),
   )

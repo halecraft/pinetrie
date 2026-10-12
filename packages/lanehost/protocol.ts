@@ -1,5 +1,5 @@
-// lanehost/protocol — the calls the host makes to lanehost, and their results
-// (ADR-0129). Every call names its project by key and its disks by name,
+// lanehost/protocol — the calls the host makes to lanehost, and their
+// results. Every call names its project by key and its disks by name,
 // never by path: the server builds each path itself (`layout.ts`).
 
 import type { DiskDiff } from "@pinetrie/core"

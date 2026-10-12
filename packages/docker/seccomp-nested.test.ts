@@ -31,7 +31,7 @@ test("the default, minus the three clone rules, plus exactly the listed calls", 
   expect(allows[0]?.args).toBeUndefined()
 })
 
-test("socket's rules are the default's: AF_VSOCK stays refused (S128)", () => {
+test("socket's rules are the default's: AF_VSOCK stays refused", () => {
   const socket = (p: Profile) =>
     p.syscalls.filter(r => r.names.includes("socket"))
   expect(socket(nested)).toEqual(socket(base))

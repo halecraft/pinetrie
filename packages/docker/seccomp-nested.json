@@ -1184,7 +1184,7 @@
         "setdomainname"
       ],
       "action": "SCMP_ACT_ALLOW",
-      "comment": "pine·trie: a lane that runs lanes makes user namespaces and mounts in them (S125)"
+      "comment": "pine·trie: a lane that runs lanes makes user namespaces and mounts in them"
     }
   ]
 }

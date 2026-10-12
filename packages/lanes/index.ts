@@ -1,7 +1,6 @@
 // lanes — what a lane is and what runs in it: its container's shape, its
-// mounts and grants, jj and git in it, forks, turns and bundles (ADR-0032 to
-// ADR-0034). It runs on whichever `LaneRuntime` the host hands in, and
-// implements none (ADR-0130). Your repo is `@pinetrie/repo`'s, which builds
+// mounts and grants, jj and git in it, forks, turns and bundles. It runs on
+// whichever `LaneRuntime` the host hands in, and implements none. Your repo is `@pinetrie/repo`'s, which builds
 // on this package: what a lane also runs, through a runner it is given, is
 // here.
 

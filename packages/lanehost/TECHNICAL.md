@@ -130,7 +130,8 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
 ## The client (`client.ts`)
 
 - **One channel per role, opened at its first call** (`open`, the
-  runtime's). A channel that ends is opened again at the next call; a
+  runtime's): a message on a held channel, not a `docker exec` per call
+  (S147). A channel that ends is opened again at the next call; a
   failed open is tried again then too. `reset` closes them all.
 - **Each call is one line in the host's log:** its role, its kind, its time
   and whether it failed.

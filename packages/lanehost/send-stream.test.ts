@@ -1,4 +1,4 @@
-// The streams are S148's, recorded on the lane VM (btrfs-progs 6.17.1): a
+// The streams were recorded on the lane VM (btrfs-progs 6.17.1): a
 // pair with no change, a pair with each kind of change, and a whole
 // subvolume with no parent.
 

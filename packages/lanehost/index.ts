@@ -1,5 +1,5 @@
 // @pinetrie/lanehost — everything the host asks of the machine its lanes'
-// disks are on, outside a lane (ADR-0129, TECHNICAL.md). The host imports its
+// disks are on, outside a lane. The host imports its
 // client and its layout; the server runs in a role's container.
 
 import path from "node:path"

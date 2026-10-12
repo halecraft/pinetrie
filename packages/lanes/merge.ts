@@ -1,11 +1,11 @@
-// lanes/merge — a thread's base merged into its lane (ADR-0033, ADR-0104).
+// lanes/merge — a thread's base merged into its lane.
 //
 // The lane merges accepted work's commit, or a fresh copy of its WIP (`planMerge`),
 // into itself, in its own repo: jj records conflicts in the merge rather than
-// failing (S36 item 11), and the agent resolves them there, never in your
+// failing, and the agent resolves them there, never in your
 // repo. An accepted-offer commit on accepted work is a copy of a lane's work, so
-// each one the lane holds a source of is first joined to it (`planJoins`,
-// S102): merged as history says, the lane's own work would come in twice.
+// each one the lane holds a source of is first joined to it (`planJoins`):
+// merged as history says, the lane's own work would come in twice.
 // The merge is committed at once, so it is a revision even when it merged
 // cleanly: an empty merge would stay the working copy, which every
 // snapshot rewrites. The lane's work comes back to you as its offer, never by
@@ -77,7 +77,7 @@ async function commitOn(
  * What `planJoins` decides from: the accepted-offer commits in `from`'s history the lane at
  * `ours` lacks, oldest first, each with the sources its message names; and
  * which of those sources the lane holds. A source is read with `present()`:
- * one may never have reached the lane (S102).
+ * one may never have reached the lane.
  */
 async function acceptedOfferCommitsAbove(
   jj: Runner,
@@ -153,8 +153,8 @@ async function joinAcceptedOfferCommits(
  * Merge `from` (accepted work's commit, a WIP's copy, or the parent's newest) into
  * the lane at its bookmark, described `message`, and commit the merge. `jj`
  * is the lane's, and must already hold `from`. Each accepted-offer commit in `from`'s history
- * that names a source the lane holds is first joined to it (`planJoins`,
- * S102), and the merge is one commit on the lane, the last join if any,
+ * that names a source the lane holds is first joined to it (`planJoins`),
+ * and the merge is one commit on the lane, the last join if any,
  * and `from`.
  * Returns the lane's revision before the merge (`ours`), the merge, or null
  * when `from` is already in the lane (nothing to merge), and the
@@ -186,7 +186,7 @@ export async function mergeBase(
 /**
  * An empty commit on the lane's bookmark, described `message`: a thread
  * moved to accepted work when accepted work has nothing the lane lacks still needs its
- * newest `Pinetrie-Base` to say so (ADR-0104). Returns it.
+ * newest `Pinetrie-Base` to say so. Returns it.
  */
 async function markBase(
   jj: Runner,
@@ -197,7 +197,7 @@ async function markBase(
 }
 
 /**
- * A lane's base as its history says it (ADR-0104): the newest commit in
+ * A lane's base as its history says it: the newest commit in
  * `::rev` whose message carries a base trailer, read with `jj` (the lane's,
  * or your repo's on the lane's tip). Its value names accepted work, or a WIP
  * by its bookmark (`baseOf`, by `wipPrefix`), and the commit it pointed at;
@@ -234,7 +234,7 @@ export async function newestBase(
 
 /**
  * Of a merge's `conflicted` files, those its two sides hold alike: not among
- * the files that `differ` between them. Pure.
+ * the files that `differ` between them.
  */
 export const heldAlike = (
   conflicted: readonly string[],
@@ -299,7 +299,7 @@ export interface TouchedRevision {
 /**
  * The revisions in `range` that touched any of `files`, oldest first, each
  * with the ones of `files` it touched: one `jj log`, a JSON object per line,
- * as `REVISION_READ` (`revisions.ts`). Its paths are from the repo's root (S83).
+ * as `REVISION_READ` (`revisions.ts`). Its paths are from the repo's root.
  */
 export async function revisionsIn(
   jj: Runner,
@@ -366,7 +366,7 @@ export type Merged =
  * `range` without the accepted-offer commits an update joined: each is the
  * lane's own work, as a copy, so it did not come in. Only those commits go: accepted work's
  * commits under them did come in, which `(<ours> | <join>)..<to>` would also
- * drop (S102 item 9).
+ * drop.
  */
 const withoutAcceptedOfferCommits = (
   range: string,
@@ -375,7 +375,7 @@ const withoutAcceptedOfferCommits = (
   joined.length === 0 ? range : `(${range}) ~ (${joined.join(" | ")})`
 
 /**
- * An update in a lane, after its edits are committed (ADR-0104): `plan`'s
+ * An update in a lane, after its edits are committed: `plan`'s
  * steps, the accepted-offer commits it holds joined and the merge (`mergeBase`), a mark when
  * the plan asks and nothing merged, then what the merge left. The caller
  * runs it on the lane's queue.
@@ -405,7 +405,7 @@ export async function mergeUpdate(
   let conflicted = await conflictsIn(jj)
   // A file both sides hold alike is merged whatever the base says: jj keeps
   // a conflict when the base is itself conflicted, as when a branch and the
-  // thread it was cloned from resolved the same conflict alike (S99).
+  // thread it was cloned from resolved the same conflict alike.
   const alike = heldAlike(conflicted, await changedPaths(jj, ours, from))
   if (alike.length > 0) {
     await restoreInto(jj, from, merge, alike)

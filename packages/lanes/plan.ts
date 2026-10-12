@@ -1,7 +1,6 @@
-// lanes/plan — every decision about a lane's container and disk, as values
-// (ADR-0034).
+// lanes/plan — every decision about a lane's container and disk, as values.
 //
-// Each function here is pure. What runs is a list of `Step`s, carried out by
+// What runs is a list of `Step`s, carried out by
 // `execute.ts`: commands in the lane, and `RuntimeOp`s a runtime turns into
 // its own commands (`runtime-port.ts`). What is gathered is gathered by
 // `host.ts` and the host. So each rule below is tested without a runtime, jj
@@ -34,19 +33,19 @@ import {
 } from "@pinetrie/core"
 import type { LaneRuntime, RuntimeOp } from "./runtime-port.ts"
 
-/** pinetrie's own install, read-only: the helper's code and pi's. */
+/** pine·trie's own install, read-only: the helper's code and pi's. */
 export const PINETRIE_MOUNT = "/pinetrie"
 /**
- * pinetrie's lane runtime, read-only: Node and its libraries (S44), and in
+ * pine·trie's lane runtime, read-only: Node and its libraries, and in
  * `bin/` the static programs core's `RUNTIME_PROGRAMS` lists.
  */
 export const RUNTIME_MOUNT = "/pinetrie-runtime"
 /** The runtime's programs, as a lane sees them: on its `PATH`, last. */
 export const RUNTIME_BIN = `${RUNTIME_MOUNT}/bin`
-/** The lane's own jj config, on its disk so that forks inherit it (S42 item 4). */
+/** The lane's own jj config, on its disk so that forks inherit it. */
 export const LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pinetrie-lane`
 export const LANE_JJ_CONFIG = `${LANE_CONFIG_DIR}/jj.toml`
-/** The branch a commit fetched by id is put on, so jj sees it (S44 item 7). */
+/** The branch a commit fetched by id is put on, so jj sees it. */
 export const FETCHED_REF = "refs/heads/pinetrie/fetched"
 /** The directory the host keeps in a project's root (`pinetrieDir`). */
 export const PROJECT_DIR = ".pinetrie"
@@ -64,7 +63,7 @@ export const bookmarkRevset = (name: string): string =>
 /**
  * A lane's history in your repo: a remote bookmark, `tip@pinetrie-<lane>`,
  * which jj keeps out of your default log and immutable with its builtin
- * config, ancestors included (S48 items 11 and 19). No git remote is added.
+ * config, ancestors included. No git remote is added.
  */
 export const LANE_REMOTE_PREFIX = "pinetrie-"
 const laneRemote = (lane: ThreadId): string => `${LANE_REMOTE_PREFIX}${lane}`
@@ -74,7 +73,7 @@ export const laneTipRef = (lane: ThreadId): string =>
 export const laneTipName = (lane: ThreadId): string => `tip@${laneRemote(lane)}`
 
 /**
- * A split's stack (ADR-0105): the bookmark its run leaves in the lane's own
+ * A split's stack: the bookmark its run leaves in the lane's own
  * repo, and the remote bookmark it arrives as in yours.
  */
 export const stackBookmark = (lane: ThreadId): string =>
@@ -86,8 +85,8 @@ export const laneStackName = (lane: ThreadId): string =>
   `stack@${laneRemote(lane)}`
 
 /**
- * A lane's offer in your repo (ADR-0105). Not under `pinetrie/`, whose
- * bookmarks were immutable when offers began (S48 item 14).
+ * A lane's offer in your repo. Not under `pinetrie/`, whose bookmarks were
+ * immutable when offers began.
  */
 export const OFFER_PREFIX = "pinetrie-offer/"
 export const offerBookmark = (name: ThreadName): string =>
@@ -105,19 +104,19 @@ export const BASE_LANE = "base-scratch" as BaseLane
 
 /**
  * What a lane's container, disk and snapshots are named by: a thread, whose
- * id names its lane (ADR-0117), or the base's scratch lane.
+ * id names its lane, or the base's scratch lane.
  */
 export type LaneOwner = ThreadId | BaseLane
 
 /** A lane's container's name. */
 export const laneContainer = (lane: LaneOwner): string => `pinetrie-${lane}`
 
-/** What a project lets cross a lane's boundary (ADR-0034), from `pinetrie.json`. */
+/** What a project lets cross a lane's boundary, from `pinetrie.json`. */
 export interface LaneGrants {
   readonly ssh: boolean
-  /** Lanes of their own inside each lane: rootless Docker (ADR-0130). */
+  /** Lanes of their own inside each lane: rootless Docker. */
   readonly nested: boolean
-  /** Ports of the Mac's loopback a lane may reach, through the lane VM (S136). */
+  /** Ports of the Mac's loopback a lane may reach, through the lane VM. */
   readonly hostPorts: readonly number[]
   /** Environment variable names passed from the host. */
   readonly env: readonly string[]
@@ -142,7 +141,7 @@ export const NO_GRANTS: LaneGrants = {
 
 /**
  * How a disk's dependencies are made: what the base's dependency layer runs,
- * and a lane runs again when its inputs change (ADR-0131).
+ * and a lane runs again when its inputs change.
  */
 export interface Recipe {
   /** A shell command, run in `/workspace`. */
@@ -176,8 +175,8 @@ export interface LaneSpec<L extends LaneOwner = ThreadId> {
  * - pinetrie's own install at `/pinetrie` and its runtime at `/pinetrie-runtime`,
  *   and the directory of the lane's ignore file at `/pinetrie-git`, read-only;
  * - links' and grants' mounts, read-only where they say;
- * - shared directories, read-write at their place in `/workspace` (ADR-0035);
- * - granted host paths, read-only at `/mnt/host` and their path (ADR-0036).
+ * - shared directories, read-write at their place in `/workspace`;
+ * - granted host paths, read-only at `/mnt/host` and their path.
  */
 export function planMounts(parts: {
   readonly hostWorkingCopy: string
@@ -211,7 +210,7 @@ export function planMounts(parts: {
 }
 
 /**
- * Which host paths a lane is granted, read-only (ADR-0036): the roots a
+ * Which host paths a lane is granted, read-only: the roots a
  * command's files live in. Nested roots collapse into the outermost. A root
  * that is, or contains, your home directory, `/` or pi's agent directory
  * (which holds `auth.json`) is refused, as is one Docker cannot mount.
@@ -249,7 +248,7 @@ export function planHostMounts(input: {
   return { mounts, refused }
 }
 
-/** A directory of your working copy, shared read-write into every lane (ADR-0035). */
+/** A directory of your working copy, shared read-write into every lane. */
 export interface SharedDir {
   /** Relative to the project's root, normalized, e.g. ".plans". */
   readonly path: string
@@ -279,7 +278,7 @@ export interface ContainerShape {
   readonly env: Readonly<Record<string, string>>
   /** Your ssh agent, forwarded. */
   readonly ssh: boolean
-  /** Lanes of its own inside it: rootless Docker (ADR-0130). */
+  /** Lanes of its own inside it: rootless Docker. */
   readonly nested: boolean
   /** Ports of the Mac's loopback it may reach (`LaneGrants.hostPorts`). */
   readonly hostPorts: readonly number[]
@@ -288,8 +287,8 @@ export interface ContainerShape {
 /**
  * A lane's container. It mounts what `planMounts` listed: nothing of your
  * home directory unless a grant or a skill's root names it, so credentials
- * stay out of reach (S43 item 7). Only variables a grant names are copied
- * from `env`, first, so pinetrie's own come after them.
+ * stay out of reach. Only variables a grant names are copied
+ * from `env`, first, so pine·trie's own come after them.
  */
 export function planShape(
   spec: LaneSpec<LaneOwner>,
@@ -315,8 +314,8 @@ export function planShape(
       ["JJ_CONFIG", LANE_JJ_CONFIG],
       // Every repo in the lane ignores what the ignore file lists, from the
       // container's first moment: git's own variables, which jj reads too
-      // (S45 item 7). An exclude line written by a step would come too late
-      // for a jj command that ran first (S45 item 4).
+      // An exclude line written by a step would come too late for a jj
+      // command that ran first.
       ["GIT_CONFIG_COUNT", "1"],
       ["GIT_CONFIG_KEY_0", "core.excludesFile"],
       ["GIT_CONFIG_VALUE_0", `${IGNORE_MOUNT}/${IGNORE_FILE}`],
@@ -343,10 +342,6 @@ export const specHashOf = (
 ): string => specHash(runtime.runSpec(shape))
 
 /**
- * The lane's ignore file: what no repo in a lane may track. pinetrie's own
- * config, the file system's own directory, and each shared directory.
- */
-/**
  * Git's system config in every lane. It trusts your working copy, which
  * every lane fetches from: in a nested lane its owner is outside the lane's
  * user namespace, and git refuses a repository another user owns ("dubious
@@ -356,6 +351,11 @@ export const specHashOf = (
 export const laneGitConfig = (): string =>
   `[safe]\n\tdirectory = ${HOST_WORKING_COPY}\n\tdirectory = ${HOST_WORKING_COPY}/.git\n`
 
+/**
+ * The lane's ignore file: what no repo in a lane may track. pine·trie's own
+ * config, the file system's own directory, each shared directory and each of
+ * the recipe's caches.
+ */
 export const laneIgnores = (
   shared: readonly string[],
   caches: readonly string[] = [],
@@ -410,7 +410,7 @@ export interface WrittenMachine {
 const NO_MACHINE: WrittenMachine = { slots: null }
 
 /**
- * The `accepted`, `wip` and `publish` keys' values (ADR-0100), as written:
+ * The `accepted`, `wip` and `publish` keys' values, as written:
  * null where absent. `offers` says the config still has the key they
  * replaced, which is not read.
  */
@@ -469,7 +469,7 @@ export function decodeLaneConfig(
         inputs: ["pnpm-lock.yaml"],
         // pnpm keeps its store on the disk it installs on, at the root of
         // its file system, and refuses a `node_modules` made with another
-        // store (S148): the store stays there, carried by reflink.
+        // store: the store stays there, carried by reflink.
         caches: [".pnpm-store"],
       }
     : null
@@ -548,7 +548,7 @@ export function decodeLaneConfig(
 
 /** The slots a lane VM boots with when the user config names none. */
 export const DEFAULT_VM_SLOTS = 16
-/** A VM boots with 20 share devices alongside its others, and not 24 (S131). */
+/** A VM boots with 20 share devices alongside its others, and not 24. */
 export const MAX_VM_SLOTS = 20
 
 /** This machine's lane settings, from the user's config; each bad value refused, naming why. */
@@ -583,10 +583,9 @@ export function machineConfig(user: WrittenMachine): {
 }
 
 /**
- * How pine·trie uses your repo (ADR-0100): accepted work's bookmark, the WIP
- * bookmarks' prefix (ADR-0104), the bookmark publishing moves to accepted
- * work (ADR-0076), and whether a publish catches the working copy up and accepts
- * your commits first (ADR-0099).
+ * How pine·trie uses your repo: accepted work's bookmark, the WIP bookmarks'
+ * prefix, the bookmark publishing moves to accepted work, and whether a
+ * publish catches the working copy up and accepts your commits first.
  */
 export interface RepoConfig {
   readonly acceptedBookmark: string
@@ -643,7 +642,7 @@ export function repoConfig(
     ...(project.offers ? ["pinetrie.json"] : []),
   ].map(
     file =>
-      `${file}: offers is no longer read; use accepted.bookmark, wip.prefix, publish.bookmark and publish.catchUp (ADR-0100)`,
+      `${file}: offers is no longer read; use accepted.bookmark, wip.prefix, publish.bookmark and publish.catchUp`,
   )
   const pick = (
     key: keyof typeof KEYS,
@@ -675,7 +674,7 @@ export function repoConfig(
   }
 }
 
-/** Where a shared directory may never be: repos, pinetrie's own, dependencies. */
+/** Where a shared directory may never be: repos, pine·trie's own, dependencies. */
 const NEVER_SHARED = [".git", ".jj", PROJECT_DIR, "node_modules"]
 
 /**
@@ -750,7 +749,7 @@ export const EXCLUDE_LINE = `/${PROJECT_DIR}/`
 
 /**
  * What the host keeps in a project, all under `.pinetrie/` at its root, which
- * `EXCLUDE_LINE` keeps out of the project's repo (ADR-0086).
+ * `EXCLUDE_LINE` keeps out of the project's repo.
  */
 export function pinetrieDir(root: string): {
   readonly dir: string
@@ -799,7 +798,7 @@ export interface Link {
  * project's that holds it is mounted where it resolves from `/workspace`: the
  * whole directory, since a linked package resolves its own dependencies
  * through the `node_modules` of its repo. pinetrie's `link:` dependencies on
- * Kyneta resolve this way (S39 item 5).
+ * Kyneta resolve this way.
  */
 export function planLinks(root: string, links: readonly Link[]): Mount[] {
   const found = new Map<string, string>()
@@ -828,11 +827,11 @@ export function planLinks(root: string, links: readonly Link[]): Mount[] {
 /**
  * A fork's whole jj config: in the repo at `repo`, everything at or above its
  * fork point is immutable, so the lane cannot rewrite a commit its parent or
- * your repo holds (S42 item 4). A parent's fork point is an ancestor of its
+ * your repo holds. A parent's fork point is an ancestor of its
  * child's, so nothing needs reading from the lane first.
  *
  * Scoped to `repo` because `JJ_CONFIG` reaches every jj command in the lane,
- * and jj rejects the whole config in a repo that lacks the commit (S50).
+ * and jj rejects the whole config in a repo that lacks the commit.
  * `repo` is a plain path, written into TOML unescaped.
  */
 export const forkConfig = (
@@ -865,7 +864,7 @@ const laneShell = (script: string): LaneStep => inLane("sh", "-c", script)
 /**
  * Fetch `commits` from `from` (your working copy, at `/mnt/host-working-copy`) when the disk
  * lacks any of them. The fetch puts each on a branch, which is what makes jj
- * see it (S44 item 7), and jj imports it at once: a jj command with
+ * see it, and jj imports it at once: a jj command with
  * `--ignore-working-copy` imports nothing. A commit a fork's disk already
  * holds needs no fetch.
  */
@@ -897,10 +896,10 @@ export const planAcceptedStart = (commit: CommitId): LaneStep[] => [
 ]
 
 /**
- * The lane steps that make a copy of a WIP (ADR-0104): a commit on `on`
+ * The lane steps that make a copy of a WIP: a commit on `on`
  * with the WIP's files and a change id of its own, left as `@-`. Never the
  * WIP's own commits: the lane's tip, immutable in your repo, would make them
- * immutable (S48 item 11). Fetches nothing: the lane must hold both commits.
+ * immutable. Fetches nothing: the lane must hold both commits.
  */
 export const planWipCopy = (
   wip: { readonly bookmark: string; readonly commit: CommitId },
@@ -929,7 +928,7 @@ export interface MergePlan {
   readonly steps: readonly LaneStep[]
   /** The commit to merge, or the copy the steps leave as `@-`. */
   readonly source: CommitId | "copy"
-  /** Accepted work's names the base (`Pinetrie-Base`); a WIP's copy names its own; a parent's none (ADR-0072). */
+  /** Accepted work's names the base (`Pinetrie-Base`); a WIP's copy names its own; a parent's none. */
   readonly message: string
   /** With nothing to merge, a commit still names accepted work (`BaseMerge`). */
   readonly mark: boolean
@@ -941,10 +940,10 @@ export interface MergePlan {
 }
 
 /**
- * An update's steps (ADR-0104). A WIP's copy fetches only the WIP's commit:
+ * An update's steps. A WIP's copy fetches only the WIP's commit:
  * the copy's parent is the lane's own. The thread it branched from is merged
  * as accepted work's commit is, with no `Pinetrie-Base`: it is no base, and what
- * the lane holds of it is its history (ADR-0072).
+ * the lane holds of it is its history.
  */
 export function planMerge(from: BaseMerge): MergePlan {
   if (from.kind === "accepted")
@@ -981,10 +980,10 @@ export interface AcceptedOfferCommitAbove {
   readonly sources: readonly CommitId[]
 }
 
-/** An accepted-offer commit to join to the sources the lane holds, before an update's merge (S102). */
+/** An accepted-offer commit to join to the sources the lane holds, before an update's merge. */
 export interface Join {
   readonly acceptedOfferCommit: CommitId
-  /** Of its sources, those in the lane's history: a squash may name others (S77 item 6). */
+  /** Of its sources, those in the lane's history: a squash may name others. */
   readonly sources: readonly CommitId[]
   /**
    * The join's message. It carries no trailer: the host finds bases and
@@ -996,13 +995,12 @@ export interface Join {
 
 /**
  * The accepted-offer commits an update joins to their sources before it
- * merges (S102, ADR-0079), oldest first as they come: each that names a
+ * merges, oldest first as they come: each that names a
  * source the lane holds. An accepted-offer commit is a copy of the lane's
  * work on accepted work, and the join says so in history, so the merge does not
  * bring that work in twice. One naming a source the lane lacks too, a
  * squash's, is joined all the same: the rest of it is accepted work's. Each join
  * is made on the one before, so a later one's base holds the earlier ones.
- * Pure.
  */
 export function planJoins(
   accepted: readonly AcceptedOfferCommitAbove[],
@@ -1024,14 +1022,13 @@ export function planJoins(
 
 /**
  * The lane steps that make a disk a fork: a change of its own, before any
- * other jj command runs there (S42 item 2), the lane's bookmark at its base, and
+ * other jj command runs there, the lane's bookmark at its base, and
  * inherited history made immutable. Without it, the fork's first turn reuses
  * its parent's change id, and your repo sees a divergent change. A base with
  * several parents is committed once, empty, so the bookmark names one commit.
  * A lane starting on accepted work or a WIP's copy is based on the commit that
- * names it (ADR-0104). Its dependencies are its disk's: a WIP whose recipe's
- * inputs differ from accepted work's forks from a dependency layer of its
- * own (ADR-0131).
+ * names it. Its dependencies are its disk's: a WIP whose recipe's inputs
+ * differ from accepted work's forks from a dependency layer of its own.
  */
 export function planForkSetup(lane: ThreadId, start: ForkStart): LaneStep[] {
   const base: LaneStep[] =
@@ -1124,7 +1121,7 @@ export interface OldNamesOnDisk {
 
 /**
  * pre-rename: the steps that give a disk cloned from a snapshot taken before
- * the rename the names the host reads now. Pure; empty when nothing is old.
+ * the rename the names the host reads now; empty when nothing is old.
  * The config folder moves first, so the jj steps after it run under the
  * lane's own config: jj ignores a `JJ_CONFIG` naming no file. Bookmarks of
  * other lanes, a fork's inherited ones, are never read and are left alone.
@@ -1189,8 +1186,8 @@ export const planFork = (input: {
 /**
  * A git bundle of `bookmark` in the lane, written to the host file `to`,
  * excluding what your repo already has: a bundle naming only the bookmark
- * carries the whole history, 1.1 MB against 8 KB for one commit on pinetrie's
- * repo (S43 item 8). Your repo imports it with `@pinetrie/repo`'s `planImport`.
+ * carries the whole history, 1.1 MB against 8 KB for one commit on pine·trie's
+ * repo. Your repo imports it with `@pinetrie/repo`'s `planImport`.
  */
 export const planBundle = (input: {
   readonly bookmark: string
@@ -1218,7 +1215,7 @@ export type TurnCommit =
 /**
  * A turn whose `@` has changes commits them. With `@` empty, a single parent
  * that descends from the lane's bookmark is a commit the agent made in the
- * turn, and is the turn's revision (S56): otherwise the offer would lack it,
+ * turn, and is the turn's revision: otherwise the offer would lack it,
  * and a branch's `jj new` would put the bookmark's files back. A parent on
  * another line, such as a stack's, or a merge, is left alone.
  */
@@ -1242,7 +1239,7 @@ export function planTurnCommit(facts: {
 
 /**
  * A turn's snapshot: `sync`, so what the tools wrote is on the disk (without
- * it, unflushed files clone empty, S41), then the snapshot.
+ * it, unflushed files clone empty), then the snapshot.
  */
 export const planSnapshot = (input: {
   readonly lane: LaneOwner
@@ -1263,7 +1260,7 @@ export const BASE_FORMAT = 2
  * inputs (`inputsHash`), the lane image it ran in, and `BASE_FORMAT`. With
  * no recipe, a layer is a checkout alone, keyed by the image. Two
  * disks with one key have the same dependencies, so a layer is built once
- * per key and never carries anything an older one held (ADR-0131).
+ * per key and never carries anything an older one held.
  */
 export function depsKey(input: {
   /** Null with none: the layer is a checkout alone. */
@@ -1467,14 +1464,14 @@ export function planRecipeRecord(input: {
 /**
  * A base's checkout of accepted work's commits (`yours`), by id. On a fresh
  * disk, `git init` and `jj git init --colocate` first, not `jj git clone`: a
- * fresh volume holds `lost+found`, which `jj git clone` refuses (S44 item 6).
+ * fresh volume holds `lost+found`, which `jj git clone` refuses.
  *
  * On a disk restored from a dependency layer made at other commits, the
  * fetched ref moves sideways when your `@-` was rewritten rather than built
  * on: the import abandons the commit it named, and rebases the working-copy
  * commit, a child of it, with `--ignore-working-copy`. The working copy is
  * then stale, and `jj new` refuses until `jj workspace update-stale`, which
- * does nothing when it is not (S74).
+ * does nothing when it is not.
  */
 export function planBaseCheckout(input: {
   readonly yours: readonly CommitId[]
@@ -1550,7 +1547,7 @@ export type ProjectDirRefusal =
   | { readonly kind: "missing"; readonly dir: string }
   /** Your home directory or `/`. */
   | { readonly kind: "unsafe"; readonly root: string }
-  /** A jj repo with no git directory beside it to exclude `.pinetrie/` in (S108). */
+  /** A jj repo with no git directory beside it to exclude `.pinetrie/` in. */
   | { readonly kind: "unexcludable"; readonly root: string }
 
 /** A project's root and the repo there, or why the folder cannot be one. */
@@ -1663,7 +1660,7 @@ export function planStartFrom(input: {
     : { kind: "snapshot", from: input.newest }
 }
 
-/** The oldest git a lane's image may have: jj's fetch needs 2.41 (S42 item 7). */
+/** The oldest git a lane's image may have: jj's fetch needs 2.41. */
 const MIN_GIT: readonly [number, number] = [2, 41]
 
 /**
@@ -1695,7 +1692,7 @@ export interface Containerfile {
 }
 
 /**
- * The images a project's lanes need (ADR-0034, ADR-0041). pinetrie's is built
+ * The images a project's lanes need. pine·trie's is built
  * with the host's jj version and the app's Playwright version, so its jj and
  * its browser match what drives them. A project's own image gets the jj
  * version only. Each is tagged by a hash of its Containerfile and build

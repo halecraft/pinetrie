@@ -1,7 +1,6 @@
 // lanehost/disks — a project's disks as btrfs subvolumes, on a filesystem
-// mounted with `user_subvol_rm_allowed`, so none of it needs a capability
-// (S122, S125, S148). Each operation is planned as `DiskStep`s, pure, then
-// carried out by `executeDiskSteps`. Snapshots are read-only, as `btrfs send`
+// mounted with `user_subvol_rm_allowed`, so none of it needs a capability.
+// Each operation is planned as `DiskStep`s, then carried out by `executeDiskSteps`. Snapshots are read-only, as `btrfs send`
 // needs: a restore is a writable snapshot of one, and a delete makes one
 // writable first.
 
@@ -34,7 +33,7 @@ export type DiskStep =
   /** Make the directory a path is in. */
   | { readonly kind: "parent"; readonly path: string }
   | { readonly kind: "create"; readonly path: string }
-  /** A snapshot of `from` at `to`: read-only, as `btrfs send` needs (S146), or a writable restore. */
+  /** A snapshot of `from` at `to`: read-only, as `btrfs send` needs, or a writable restore. */
   | {
       readonly kind: "snapshot"
       readonly from: string
@@ -43,7 +42,7 @@ export type DiskStep =
     }
   /**
    * Delete what is at `path`, if anything: a subvolume by btrfs, made
-   * writable first (a read-only one is refused otherwise, S148); anything
+   * writable first (a read-only one is refused otherwise); anything
    * else, or a subvolume btrfs refuses, by `rm -rf`. An inner Docker makes
    * subvolumes inside a nested lane's disk, and `rmdir` of an empty
    * subvolume is a delete with `user_subvol_rm_allowed`.
@@ -159,7 +158,7 @@ export function planNestedDisk(
   ]
 }
 
-/** A subvolume's root is inode 256 (S125): `btrfs subvolume show` needs a capability. */
+/** A subvolume's root is inode 256: `btrfs subvolume show` needs a capability. */
 export async function isSubvolume(at: string): Promise<boolean> {
   try {
     return (await stat(at)).ino === 256
@@ -189,7 +188,7 @@ const exists = (at: string) =>
 async function drop(at: string): Promise<void> {
   if (!(await exists(at))) return
   if (await isSubvolume(at)) {
-    // A read-only subvolume is deleted only once it is writable again (S148).
+    // A read-only subvolume is deleted only once it is writable again.
     await runCommand(["btrfs", "property", "set", at, "ro", "false"], {
       cwd: "/",
       bytes: false,

@@ -592,7 +592,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return true\n",
     command: unit,
     expect:
-      "prepareProjectDir (ADR-0086, S108): a repo's root with .pinetrie/ excluded once; a non-colocated repo refused; a plain folder untouched",
+      "prepareProjectDir: .pinetrie/ excluded once; a non-colocated repo refused; a plain folder untouched",
   },
   {
     name: "a broken config file reads as missing",

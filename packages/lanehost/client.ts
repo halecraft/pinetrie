@@ -1,6 +1,6 @@
 // lanehost/client — the host's side of lanehost: one held channel per role,
 // opened on its first call, each call sent to the role that serves its
-// module (S147: a message instead of a `docker exec` per call). How a role's
+// module: a message, instead of a `docker exec` per call. How a role's
 // channel is opened is the runtime's (`open`): lanehost knows nothing of
 // Docker.
 

@@ -1,5 +1,5 @@
 // docker/api — Docker's HTTP API over the target's socket: a call costs about
-// 0.2 ms, where the CLI's own start costs 11–13 ms (S147). The CLI stays for
+// 0.2 ms, where the CLI's own start costs 11–13 ms. The CLI stays for
 // what streams or builds: `buildx build`, `exec -i` and `runInImage`.
 
 import { readFile } from "node:fs/promises"
@@ -9,7 +9,6 @@ import { SPEC_LABEL } from "@pinetrie/lanes"
 import type { ContainerSpec, Listed } from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
 
-/** A response: its status, and its body as text. */
 export interface Answered {
   readonly status: number
   readonly body: string
@@ -252,7 +251,6 @@ export async function listLabelled(
   }
 }
 
-/** Whether an image is here. */
 export const imageExists = async (
   target: Pick<DockerTarget, "socket">,
   tag: string,
@@ -276,7 +274,6 @@ export async function imageEnv(
   return found.Config?.Env ?? null
 }
 
-/** Whether a network is here. */
 export const networkExists = async (
   target: Pick<DockerTarget, "socket">,
   name: string,

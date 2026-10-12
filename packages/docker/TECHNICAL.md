@@ -138,6 +138,9 @@ never reaches the VM's Docker or the launcher's ports.
   `seccomp-nested.test.ts` checks the one follows from the other.
 - **runc's `NoNewKeyring`** is the inner Docker's default runtime: Docker's
   profile refuses `keyctl`, which runc's session keyring needs (S125).
+- **A nested lane's own host knows its Docker is rootless** from
+  `docker info`'s `SecurityOptions` (`dockerRootless`, S148): no
+  capability it grants reaches the host's user namespace.
 - **Inner lanes have no limits of their own,** and cannot be privileged
   (S125): the outer lane's limits hold for all of them.
 - **A host in a nested lane** gets `docker-host` from `planRuntime`, its

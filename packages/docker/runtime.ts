@@ -1,6 +1,5 @@
-// docker/runtime — Docker as a `LaneRuntime` (ADR-0130): the facts, plan,
-// API and CLI modules composed, and lanehost's roles for the disks
-// (ADR-0129). One code path for the Mac, through the launcher's
+// docker/runtime — Docker as a `LaneRuntime`: the facts, plan, API and CLI
+// modules composed, and lanehost's roles for the disks. One code path for the Mac, through the launcher's
 // socket and the host's slot, and for Linux, inside a lane or not.
 
 import { createHash } from "node:crypto"

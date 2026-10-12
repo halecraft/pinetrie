@@ -1,5 +1,5 @@
 // lanehost/grants — one project's `lanes.hostPorts` in the lane VM's
-// firewall (S136), from the privileged role on the VM's own network with
+// firewall, from the privileged role on the VM's own network with
 // `NET_ADMIN`: the host, which holds Docker's socket, may; a lane never can.
 // Gathered (the rules jumping to the project's chain now), planned as one
 // `iptables-restore` input, and applied all at once, so the chain is never

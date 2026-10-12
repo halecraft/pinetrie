@@ -61,7 +61,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   of your repo (`jjIn`, git from its root) are the one exception to "only
   `@pinetrie/repo` runs jj on your repo": they only read, at startup, before
   the owner of your repo starts. Its one write there is a file, the exclude
-  file. `prepareProjectDir` adds `/.pinetrie/` to it, once from `server.ts`
+  file, which a non-colocated jj repo lacks: such a folder is refused
+  (S108). `prepareProjectDir` adds `/.pinetrie/` to it, once from `server.ts`
   before the store opens and again in `prepareContainerHost`, which then writes
   nothing (ADR-0086); `prepareShared` adds shared directories.
 - `planProjectDir` (`plan.ts`) decides a project's root from `RootFacts`,

@@ -1,4 +1,4 @@
-// vm/gvproxy — the lane VM's network stack (S136): gvisor-tap-vsock's
+// vm/gvproxy — the lane VM's network stack: gvisor-tap-vsock's
 // gvproxy, at the release `launcher/gvproxy.json` pins, fetched once into
 // `<state dir>/bin/` and checked against its SHA-256 before it is used.
 

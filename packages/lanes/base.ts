@@ -1,5 +1,5 @@
 // lanes/base — the base snapshot: accepted work's commits on a dependency
-// layer (ADR-0034, ADR-0104, ADR-0131).
+// layer.
 //
 // Root lanes fork from it as other lanes fork from a turn's snapshot. A
 // dependency layer (`deps-<key>`) is a disk on which the project's recipe ran

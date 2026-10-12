@@ -1,8 +1,7 @@
 // lanehost/send-stream — btrfs's send stream (`btrfs send --no-data -p`,
-// version 1) read as the paths that differ between two snapshots (S146,
-// S148). Pure: bytes in, `DiskChange`s out. Command and attribute numbers are
-// the kernel's (`fs/btrfs/send.h`), checked against the streams S148
-// recorded.
+// version 1) read as the paths that differ between two snapshots. Command
+// and attribute numbers are the kernel's (`fs/btrfs/send.h`), checked against
+// recorded streams (`fixtures/`).
 //
 // The stream names a deleted path only through a rename: a deleted
 // directory is first renamed to an orphan name (`o<ino>-<gen>-<idx>`), its

@@ -1,7 +1,7 @@
-// docker/seccomp-nested — the seccomp profile of a lane that runs lanes
-// (S125): Docker's default, with the namespace and mount calls a user
-// namespace needs allowed. `socket`'s rules are the default's, so AF_VSOCK
-// stays refused (S128).
+// docker/seccomp-nested — the seccomp profile of a lane that runs lanes:
+// Docker's default, with the namespace and mount calls a user namespace
+// needs allowed. `socket`'s rules are the default's, so AF_VSOCK stays
+// refused.
 //
 //   node packages/docker/seccomp-nested.ts          rewrite seccomp-nested.json
 //   node packages/docker/seccomp-nested.ts --fetch  fetch the default at UPSTREAM first
@@ -68,7 +68,7 @@ export function nestedProfile(base: Profile): Profile {
         names: [...NESTED_CALLS],
         action: "SCMP_ACT_ALLOW",
         comment:
-          "pine·trie: a lane that runs lanes makes user namespaces and mounts in them (S125)",
+          "pine·trie: a lane that runs lanes makes user namespaces and mounts in them",
       },
     ],
   }

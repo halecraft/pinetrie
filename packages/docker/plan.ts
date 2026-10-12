@@ -1,9 +1,9 @@
-// docker/plan — Docker as a lane runtime: every decision, pure (ADR-0130).
+// docker/plan — Docker as a lane runtime: every decision.
 //
 // Each lane's disk is a btrfs subvolume on Docker's machine, under the
 // project's own directory there (`projectDisks`, lanehost's layout), so a
 // project's disks are deleted with it. Lanehost's roles, each a container,
-// do everything to the disks (ADR-0129).
+// do everything to the disks.
 
 import { createHash } from "node:crypto"
 import { WORKSPACE_ROOT } from "@pinetrie/core"
@@ -94,8 +94,8 @@ const bind = (m: Mount, pathOf: (p: string) => string): BindMount => ({
 
 /**
  * A lane's shape as a container, without its spec label. Never privileged,
- * never a capability, never a Docker socket (ADR-0130): a lane with the VM's
- * socket reads every lane's disk (S125). A nested lane gets the narrow
+ * never a capability, never a Docker socket: a lane with the VM's socket
+ * reads every lane's disk. A nested lane gets the narrow
  * seccomp profile, unconfined system paths, `/dev/net/tun` and its inner
  * lanes' subvolume, and keeps setuid, which rootless Docker's `newuidmap`
  * needs; every other lane runs with `no-new-privileges`.
@@ -248,7 +248,6 @@ export function renderHelper(
   }
 }
 
-/** A spec with its spec label. */
 export const labelled = (spec: ContainerSpec, hash: string): ContainerSpec => ({
   ...spec,
   labels: { ...spec.labels, [SPEC_LABEL]: hash },
@@ -367,7 +366,7 @@ export interface Listed {
 /**
  * Before a slot is filled: every container labelled with it. They belong to
  * a host that died holding the slot, and filling it would cut their mounts
- * or show them the new host's directories (S130).
+ * or show them the new host's directories.
  */
 export const planSlotSweep = (
   slot: number,

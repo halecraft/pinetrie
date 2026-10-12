@@ -1,7 +1,7 @@
 // lanehost/walk — what differs between two snapshots, from each tree's
-// `lstat`s: the diff where `btrfs send` cannot run, under rootless Docker
-// (S148). It reads every entry of both, about 80 ms each for a lane of
-// 44,566 entries (S146), whatever changed.
+// `lstat`s: the diff where `btrfs send` cannot run, under rootless Docker.
+// It reads every entry of both, about 80 ms each for a lane of 44,566
+// entries, whatever changed.
 
 import { lstat, readdir } from "node:fs/promises"
 import path from "node:path"

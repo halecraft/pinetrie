@@ -1,11 +1,10 @@
-// lanes/revisions — a turn's files, committed (ADR-0032).
+// lanes/revisions — a turn's files, committed.
 //
 // After a message's tool calls, and at a run's first request, the host
 // commits whatever changed in the lane's repo: one revision per turn that
 // changed tracked files, described with the message's first line and
-// trailers naming the entry and lane (ADR-0033 reads them back). A commit the
-// agent made itself in the turn is the turn's revision instead, without
-// trailers (S56). The lane's bookmark moves to it.
+// trailers naming the entry and lane. A commit the agent made itself in the
+// turn is the turn's revision instead, without trailers. The lane's bookmark moves to it.
 
 import {
   type CommitId,
@@ -90,7 +89,7 @@ export interface TurnCommitted {
  * (`planTurnCommit`). Move the lane's bookmark to it and return it; null when
  * the turn has none. `bookmark` is the lane's bookmark as the caller read it.
  * The one `jj log` also says whether the turn's commit, or the bookmark when
- * there is none, is conflicted (ADR-0072).
+ * there is none, is conflicted.
  */
 export async function commitTurn(
   jj: Runner,
@@ -155,7 +154,7 @@ export async function commitTurn(
 }
 
 /**
- * Where the lane's working copy sits against its bookmark (ADR-0080), after
+ * Where the lane's working copy sits against its bookmark, after
  * a snapshot: `@`'s parents, the bookmark, and whether the one parent
  * descends from it, asked only when it is not the bookmark itself.
  */
@@ -250,15 +249,14 @@ export async function titlesOf(jj: Runner, revset: string): Promise<string[]> {
 /**
  * A diff entry's path, from the repo's root, as one JSON string a line:
  * `--name-only` prints paths from the process's directory, and `json()`
- * quotes a path with any character in it (S70).
+ * quotes a path with any character in it.
  */
 export const PATH_LINE = 'json(path) ++ "\\n"'
 
 /**
  * The paths changed from `from` to `to`, from the repo's root; those `to`
- * changed when there is no `from` (ADR-0106). Read with jj, not git: git
- * reads a conflicted commit as every side's whole tree under
- * `.jjconflict-*` (S99).
+ * changed when there is no `from`. Read with jj, not git: git reads a
+ * conflicted commit as every side's whole tree under `.jjconflict-*`.
  */
 export async function changedPaths(
   jj: Runner,
@@ -290,7 +288,7 @@ export async function conflictedFilesAt(
 
 /**
  * A revision's description and per-file stats, printed as the JSON of
- * `RevisionReview` (`@pinetrie/core`): `json()` quotes every string (S57). A
+ * `RevisionReview` (`@pinetrie/core`): `json()` quotes every string. A
  * change to it bumps `OFFER_WIRE` (`@pinetrie/rules`).
  */
 export const REVISION_READ =

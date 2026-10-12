@@ -1,7 +1,6 @@
 // vm/build — building the lane VM's image (`image/build.sh`) in a Linux
-// container the caller runs (ADR-0130). The build needs no mount: its sources
-// go in as arguments, and the three files come out as a tar on stdout, so it
-// runs the same in any Docker: the VM's own, or one on this machine.
+// container the caller runs. The build needs no mount: its sources go in as
+// arguments, and the three files come out as a tar on stdout, so it runs the same in any Docker: the VM's own, or one on this machine.
 
 import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"

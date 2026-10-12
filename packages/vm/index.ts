@@ -1,4 +1,4 @@
-// vm — a Linux machine on the Mac for lanes' Docker (ADR-0130): its image,
+// vm — a Linux machine on the Mac for lanes' Docker: its image,
 // the launcher that runs it, and a host's lease on a slot of it. It knows
 // nothing of lanes.
 

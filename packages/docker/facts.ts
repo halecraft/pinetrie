@@ -40,7 +40,6 @@ export async function gatherDockerHost(
   }
 }
 
-/** Whether a path on the host exists. */
 export const hostPathExists = (p: string): Promise<boolean> =>
   stat(p).then(
     () => true,
@@ -49,7 +48,7 @@ export const hostPathExists = (p: string): Promise<boolean> =>
 
 /**
  * Whether Docker runs rootless, as a nested lane's does: it says so in
- * `SecurityOptions` (S148), and no capability it grants reaches the host's
+ * `SecurityOptions`, and no capability it grants reaches the host's
  * user namespace, so `btrfs send` cannot run under it.
  */
 export const dockerRootless = async (

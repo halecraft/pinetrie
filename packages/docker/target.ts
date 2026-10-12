@@ -1,5 +1,5 @@
 // docker/target — where Docker is, and where a host path is on Docker's
-// machine (ADR-0130). The Mac and Linux differ only in this value.
+// machine. The Mac and Linux differ only in this value.
 
 export interface DockerTarget {
   /** Docker's socket on the host. */

@@ -3,23 +3,23 @@
 // A `Runner` runs one argument list and reports how it ended; the caller
 // decides where. On the host, every command goes through `execFile`, never a
 // shell string. In a lane, the runner comes from `packages/pi`'s helper
-// channel (`laneRunner`), so this package never imports pi (ADR-0003).
+// channel (`laneRunner`), so this package never imports pi.
 //
 // A non-zero exit is a result, never a throw: callers decide from `ok` and
 // `code`, never from printed text, which jj does not promise to keep stable.
 // Output meant for a program always comes from a `-T` template.
 //
-// jj rules (S36 items 24 and 28):
+// jj rules:
 // - Every jj command passes `-R <root>`: one run from the wrong directory acts
 //   on whatever repo surrounds it. `-R` must name a workspace root exactly.
 // - Never pipe jj into something that closes early: jj exits 3 on a broken
 //   pipe. `execFile` reads everything.
 // - An editor would hang a shell with no terminal, so every jj runs with
-//   `JJ_EDITOR=false` (`NO_EDITOR`): a command that wants one fails at once
-//   (S36 item 21). A lane's container sets the same variables.
+//   `JJ_EDITOR=false` (`NO_EDITOR`): a command that wants one fails at once.
+//   A lane's container sets the same variables.
 //
 // Every host command here runs with `PINETRIE_GIT=1`. A git shim that refuses
-// git writes in a jj repo when an agent is driving lets pinetrie's own calls
+// git writes in a jj repo when an agent is driving lets pine·trie's own calls
 // through by it: the host must fetch lanes' bundles into your repo. The
 // agent's own commands run through pi's environment, never through `run`,
 // so they never carry it.

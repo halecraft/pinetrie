@@ -1,5 +1,4 @@
-// lanes/lane — a lane's container, the one way into it, and its queue
-// (ADR-0034).
+// lanes/lane — a lane's container, the one way into it, and its queue.
 //
 // A container runs only while its lane runs. The disk keeps everything, so a
 // container is disposable: one made from another spec is recreated on the
@@ -12,7 +11,7 @@
 // can never overlap the next turn's writes, by construction.
 //
 // The channel into a lane is `packages/pi`'s (`openChannel`), which this
-// package cannot import (ADR-0003): the host passes an `OpenLink` that opens
+// package cannot import: the host passes an `OpenLink` that opens
 // one and wraps it as runners.
 
 import path from "node:path"
@@ -28,7 +27,7 @@ export const PINETRIE_INSTALL = path.resolve(import.meta.dirname, "../..")
 /** The helper's own path, inside every lane. */
 export const HELPER = `${PINETRIE_MOUNT}/packages/pi/lane-helper.ts`
 
-/** The note a lane's agent is pointed at, inside every lane (ADR-0121). */
+/** The note a lane's agent is pointed at, inside every lane. */
 export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane.md`
 
 /** The command that opens a lane's channel: the helper on the runtime's Node. */
