@@ -7,6 +7,7 @@ import { type ImageRef, messageText, ROOT } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { readBanners, readPlaces } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
+import { BLOB_GRACE_MS } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   at,
@@ -14,14 +15,14 @@ import {
   lanesOf,
   START_AGENT,
   SUITE_CONFIG,
+  suiteClock,
   treeOf,
   waitFor,
 } from "../harness.ts"
 import { RED_PNG } from "../images.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
-
-import { idOfIn, sleep } from "./support.ts"
+import { idOfIn } from "./support.ts"
 
 export const scenario: Scenario = {
   lanes: true,
@@ -30,7 +31,8 @@ export const scenario: Scenario = {
 
 async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   // Turned on by the user config. A scripted model draws a fixed image; the
-  // grace is short, so the sweep's handling of banners shows.
+  // host's clock is moved past the grace, so the sweep's handling of banners
+  // shows.
   {
     const userConfig = path.join(
       mkdtempSync(path.join(tmpdir(), "pinetrie-banner-config-")),
@@ -41,7 +43,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       JSON.stringify({ ...SUITE_CONFIG, banner: { enabled: true } }),
     )
     const script = scriptedModel({ answer: { text: "noted" } })
-    const GRACE_MS = 1_000
+    const clock = suiteClock()
     const {
       host: bh,
       user: bu,
@@ -51,14 +53,14 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       files: { "a.txt": "a\n" },
       model: { kind: "scripted", script },
       userConfig,
-      blobGraceMs: GRACE_MS,
+      now: clock.now,
     })
     await bu.request({ kind: "name", name: "Bea" })
     const blobAt = (sha: string) => fetch(`${bh.httpUrl}blob/${sha}`)
 
     // 1. A new thread's banner is made as it is named, while its first run is
     //    still going.
-    const planning = script.pause("plan the parser")
+    const planning = script.hold("plan the parser")
     await bu.chat("@agent plan the parser", ROOT, START_AGENT)
     await waitFor(() => planning.reached, 10_000)
     const bannerOfFirst = () => {
@@ -69,7 +71,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     }
     const madeEarly =
       (await waitFor(() => bannerOfFirst() !== undefined, 10_000)) >= 0
-    planning.resume()
+    planning.finish()
     await bidle()
     const [lane] = lanesOf(bh, treeOf(bh), readPlaces(bh.places)).map(
       l => l.name,
@@ -84,7 +86,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     )
 
     // 2. The sweep keeps a banner nothing else shows.
-    await sleep(GRACE_MS + 200)
+    clock.advance(BLOB_GRACE_MS + 1)
     const reply = idOfIn(bh, "noted")
     await bu.chat("@agent and the lexer", at(reply), { mode: "reply" })
     await bidle()
@@ -119,7 +121,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       "set_banner sets a pasted image as the thread's banner, and tells the agent",
       now?.sha === red.sha256 && toolSaid.includes("The banner is set."),
     )
-    await sleep(GRACE_MS + 200)
+    clock.advance(BLOB_GRACE_MS + 1)
     await bu.chat("@agent thanks", at(idOfIn(bh, "set it")), {
       mode: "reply",
     })

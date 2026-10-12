@@ -1263,7 +1263,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
+      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; one not yet ringed does neither",
   },
   {
     name: "a revealed row is never marked revealed",
@@ -1273,7 +1273,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
+      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; one not yet ringed does neither",
   },
   {
     name: "a running row's ring reaches past the row into the gutter",
@@ -1283,7 +1283,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
+      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; one not yet ringed does neither",
   },
   {
     name: "a running command's time never moves",
@@ -1293,7 +1293,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a running command the work opened shows how long it has run, counting up; a fast one never shows it",
+      "a running command the work opened shows how long it has run, counting up; one not yet ringed never shows it",
   },
   {
     name: "a fast command shows its time",
@@ -1303,7 +1303,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a running command the work opened shows how long it has run, counting up; a fast one never shows it",
+      "a running command the work opened shows how long it has run, counting up; one not yet ringed never shows it",
   },
   {
     name: "a tool row stops short of the right gutter",
@@ -1313,7 +1313,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
+      "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; one not yet ringed does neither",
   },
   {
     name: "a result's text is never drawn",
@@ -1713,12 +1713,22 @@ export const mutations: readonly Mutation[] = [
   {
     name: "images are kept in memory, not the store's file",
     file: "apps/pinetrie/host/store.ts",
-    from: "  return { store, blobs: sqliteBlobs(db), backup }",
-    to: '  return { store, blobs: sqliteBlobs(new DatabaseSync(":memory:")), backup }',
+    from: "  return { store, blobs: sqliteBlobs(db, options.now), backup }",
+    to: '  return { store, blobs: sqliteBlobs(new DatabaseSync(":memory:"), options.now), backup }',
     suite: "host",
     scenario: "images",
     expect:
       "after a restart on the same file, an image is still served, and still reaches the model",
+  },
+  {
+    name: "the host keeps the real clock, whatever it is given",
+    file: "apps/pinetrie/host/index.ts",
+    from: "    newId,\n    now,\n  }\n",
+    to: "    newId,\n    now: Date.now,\n  }\n",
+    suite: "host",
+    scenario: "images",
+    expect:
+      "after the grace, the sweep deletes an image nothing shows, and keeps one a card shows",
   },
   {
     name: "the agent is given no tools",

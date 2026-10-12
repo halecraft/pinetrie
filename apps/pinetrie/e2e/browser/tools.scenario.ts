@@ -10,6 +10,7 @@ import path from "node:path"
 import {
   atEntry,
   entryId,
+  isThreadId,
   messageText,
   projectRail,
   ROOT,
@@ -22,14 +23,22 @@ import {
   toolWord,
   workingWords,
 } from "@pinetrie/interface"
-import { scriptedModel } from "@pinetrie/pi"
+import { type Held, scriptedModel } from "@pinetrie/pi"
 import {
   readLaneRecords,
   readNames,
   readOffers,
   readPlaces,
 } from "@pinetrie/reads"
+import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
+import {
+  type Gate,
+  gateClose,
+  gateCommand,
+  gateFeed,
+  newGate,
+} from "../gate.ts"
 import {
   committedProject,
   idleNow,
@@ -40,7 +49,7 @@ import {
   treeOf,
   waitFor,
 } from "../harness.ts"
-import type { LaneHosts } from "../lane-hosts.ts"
+import { inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
 import { removeLane } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -53,6 +62,7 @@ import {
   launchBrowser,
   msg,
   OWN_MENU,
+  oneFrame,
   openBoard,
   openFromBoard,
   PANE_VIEWPORT,
@@ -68,6 +78,12 @@ import {
 export const scenario: Scenario = {
   lanes: true,
   run: ({ check }, { lanes }) => run(check, lanes),
+}
+
+/** Run a gate's script in the lane of the thread `page` draws first. */
+async function inThreadLane(page: Page, script: string): Promise<void> {
+  const card = await page.getAttribute(col(0), "data-card")
+  if (card !== null && isThreadId(card)) inLaneQuiet(card, script)
 }
 
 async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
@@ -101,16 +117,24 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             )?.id ?? ""
           )
         }
-        /** Eight reads, a command that waits, then a reply: a run long enough to watch. */
-        const longRun = (reply: string) =>
+        /**
+         * Eight reads, a command held until its gate is closed, then a reply:
+         * a run that lasts until the step ends it.
+         */
+        const longRun = (reply: string): Gate => {
+          const held = newGate("long-run")
           script.use([
             ...Array.from({ length: 8 }, () => ({
               tool: "read" as const,
               args: { path: "notes.txt" },
             })),
-            { tool: "bash", args: { command: "sleep 2; echo waited" } },
+            { tool: "bash", args: { command: gateCommand(held) } },
             { text: reply },
           ])
+          return held
+        }
+        /** The held command of a long run, live: every read before it is drawn. */
+        const heldLive = `${col(0)} .tool.live:has-text("pinetrie-gate")`
         const bodyOf = `${col(0)} .column-body`
         /** The column's scroll: how far from its end, and its content's height. */
         const scroll = () =>
@@ -139,13 +163,14 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
 
         // 1. Running, the ask is open; at its end it folds above the view, and
         // the column stays at its end with the last word in view.
-        longRun("Read it eight times.")
+        const firstRun = longRun("Read it eight times.")
         await say("read the notes, slowly")
-        await ap.waitForSelector(`${col(0)} .tool.live`, { timeout: 15_000 })
+        await ap.waitForSelector(heldLive, { timeout: 15_000 })
         const first = askId("read the notes, slowly")
         const work1 = `${col(0)} .ask-work[data-ask-of="${first}"]`
         const openWhileRunning = (await ap.$(`${work1}[data-open]`)) !== null
         const running = await scroll()
+        await inThreadLane(ap, gateClose(firstRun))
         await idle()
         const ended = await ap
           .waitForSelector(`${work1}:not([data-open])`, { timeout: 10_000 })
@@ -169,14 +194,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // 2. Scrolled up into a running ask's work, it stays open under the
         // reader after its run ends, and folds when they come back down. The
         // bar names the ask whose message is above, and takes no room.
-        longRun("Read it again.")
+        const secondRun = longRun("Read it again.")
         await say("read them once more")
-        // The command that waits, live: every read before it is drawn, so
-        // the scroll below lands inside the ask's work, as a lane's start
-        // can hold the reads back (ADR-0102).
-        await ap.waitForSelector(`${col(0)} .tool.live:has-text("sleep")`, {
-          timeout: 15_000,
-        })
+        // The held command, live: every read before it is drawn, so the
+        // scroll below lands inside the ask's work, as a lane's start can
+        // hold the reads back (ADR-0102).
+        await ap.waitForSelector(heldLive, { timeout: 15_000 })
         const second = askId("read them once more")
         const work2 = `${col(0)} .ask-work[data-ask-of="${second}"]`
         await ap.$eval(
@@ -206,6 +229,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           bar.includes('Asa: "read them once more"') && slot === 0,
           `${JSON.stringify({ bar, slot })}`,
         )
+        await inThreadLane(ap, gateClose(secondRun))
         await idle()
         await twoFrames(ap)
         const stayed = (await ap.$(`${work2}[data-open]`)) !== null
@@ -620,17 +644,25 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         await say("quick")
         await toolIdle()
 
+        // Eight ticks, each four lines after it, fed as the steps read them.
+        const ticking = newGate("tick")
+        const ticks = (from: number, to: number) =>
+          Array.from({ length: to - from + 1 }, (_, k) => [
+            `tick ${from + k}`,
+            "1",
+            "2",
+            "3",
+            "4",
+          ]).flat()
         script.use([
-          {
-            tool: "bash",
-            args: {
-              command:
-                "for i in 1 2 3 4 5 6 7 8; do echo tick $i; seq 1 4; sleep 0.25; done",
-            },
-          },
+          { tool: "bash", args: { command: gateCommand(ticking) } },
           { text: "ticked" },
         ])
         await say("tick")
+        await tp
+          .waitForSelector(`${col(0)} .tool.live`, { timeout: 15_000 })
+          .catch(() => null)
+        await inThreadLane(tp, gateFeed(ticking, ticks(1, 2)))
         const live = await tp
           .waitForFunction(
             c =>
@@ -647,6 +679,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         check("a running command's output shows live in its column", live)
         // The live output's last five lines, then the result's in their place:
         // pi's result is the live text, so the row keeps its height (S142).
+        await inThreadLane(tp, gateFeed(ticking, ticks(3, 6)))
         await tp
           .waitForFunction(
             c =>
@@ -660,6 +693,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         const liveHeight = await tp
           .$eval(`${col(0)} .tool.live`, r => r.getBoundingClientRect().height)
           .catch(() => 0)
+        await inThreadLane(tp, gateFeed(ticking, ticks(7, 8)))
+        await inThreadLane(tp, gateClose(ticking))
         await toolIdle()
         const ticked = tp.locator(`${col(0)} .tool[data-tool="bash"]`).last()
         await ticked
@@ -773,16 +808,22 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // output is two lines past its summary's, so the floor needs less
         // than its cap (FLOOR_MAX).
         {
+          const stepping = newGate("step")
           script.use([
-            {
-              tool: "bash",
-              args: {
-                command: "printf 'step %s\\n' a b c d e f g; sleep 3",
-              },
-            },
+            { tool: "bash", args: { command: gateCommand(stepping) } },
             { text: "stepped" },
           ])
           await say("step through")
+          await tp
+            .waitForSelector(`${col(0)} .tool.live`, { timeout: 15_000 })
+            .catch(() => null)
+          await inThreadLane(
+            tp,
+            gateFeed(
+              stepping,
+              ["a", "b", "c", "d", "e", "f", "g"].map(s => `step ${s}`),
+            ),
+          )
           const toggle = `${col(0)} .tool.live .tool-more`
           const opened = await appears(toggle, 10_000)
           const column = () =>
@@ -802,6 +843,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const detail = await tp
             .$eval(`${col(0)} .tool.live`, r => r.hasAttribute("data-open"))
             .catch(() => null)
+          await inThreadLane(tp, gateClose(stepping))
           await toolIdle()
           check(
             "a row its reader folds while its agent works leaves the column at its end, no shorter",
@@ -818,22 +860,19 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // left (ADR-0123), so a running one is ringed from its first frame and
         // a finished one keeps its reader's choice.
         {
+          // Held until the tab has been left and shown again.
+          const running = newGate("again")
           script.use([
-            {
-              tool: "bash",
-              args: {
-                command:
-                  "for i in $(seq 1 25); do echo again $i; sleep 0.2; done",
-              },
-            },
+            { tool: "bash", args: { command: gateCommand(running) } },
             { text: "again done" },
           ])
+          // Each gated row is known by its gate's label, in its command.
           const ticked = tp
             .locator(`${col(0)} .tool[data-tool="bash"]`)
-            .filter({ hasText: "seq 1 4" })
+            .filter({ hasText: "pinetrie-gate-tick" })
           const stepped = tp
             .locator(`${col(0)} .tool[data-tool="bash"]`)
-            .filter({ hasText: "step %s" })
+            .filter({ hasText: "pinetrie-gate-step" })
           // The reader opens the tick command's detail. The floor check
           // above folded the step command's.
           await ticked.locator(".tool-more").click()
@@ -857,7 +896,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               }
               w.__rows = []
               const state = (row: Element, how: string) =>
-                `${how}:${row.textContent?.includes("echo again") ? "again" : "other"}:${row.classList.contains("live") ? "live" : "done"}:${row.hasAttribute("data-open") ? "detail" : "summary"}:${row.hasAttribute("data-revealed") ? "revealed" : "-"}`
+                `${how}:${row.textContent?.includes("pinetrie-gate-again") ? "again" : "other"}:${row.classList.contains("live") ? "live" : "done"}:${row.hasAttribute("data-open") ? "detail" : "summary"}:${row.hasAttribute("data-revealed") ? "revealed" : "-"}`
               w.__rowsWatch = new MutationObserver(records => {
                 for (const r of records) {
                   if (
@@ -902,21 +941,29 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               l => getComputedStyle(l).visibility,
             )
             .catch(() => "none")
-          await tp.waitForTimeout(1_000)
-          const running = await recorded()
+          // Nothing unsets a ring, so the again row's first record is the
+          // claim: read once it is drawn.
+          await tp
+            .waitForSelector(
+              `${col(0)} .tool.live:has-text("pinetrie-gate-again")`,
+              { timeout: 15_000 },
+            )
+            .catch(() => null)
+          const mounted = await recorded()
           const sizeOf = async (row: typeof ticked) =>
             (await row.count()) === 1
               ? (await row.getAttribute("data-open")) === null
                 ? "summary"
                 : "detail"
               : "missing"
+          await inThreadLane(tp, gateClose(running))
           await toolIdle()
           await away()
           await twoFrames(tp)
           const done = await recorded()
           const again = tp
             .locator(`${col(0)} .tool[data-tool="bash"]`)
-            .filter({ hasText: "echo again" })
+            .filter({ hasText: "pinetrie-gate-again" })
           const after = {
             again: await sizeOf(again),
             ticked: await sizeOf(ticked),
@@ -928,14 +975,14 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           check(
             "a tab shown again draws each tool row as it was left: a running one ringed from its first frame, the line hidden, and its reader's choice of detail or summary kept",
             opened &&
-              running.filter(r => r.includes(":again:")).join() ===
+              mounted.filter(r => r.includes(":again:")).join() ===
                 "added:again:live:summary:revealed" &&
               line === "hidden" &&
               done.every(r => r.startsWith("added:")) &&
               after.again === "summary" &&
               after.ticked === "detail" &&
               after.stepped === "summary",
-            `${JSON.stringify({ running, line, done, after })}`,
+            `${JSON.stringify({ mounted, line, done, after })}`,
           )
         }
 
@@ -944,7 +991,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // content's last child with a card queued: the queue is in the dock,
         // below the thread (ADR-0113).
         {
-          const thinking = script.pause("think a while")
+          const thinking = script.hold("think a while")
           script.use([{ text: "thought" }, { text: "after the thought" }])
           await say("think a while")
           const star = `${col(0)} .column-head .agent-name .thread-mark`
@@ -1000,7 +1047,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           )
           await twoFrames(tp)
           const above = await lineShows()
-          thinking.resume()
+          thinking.finish()
           await toolIdle()
           await twoFrames(tp)
           const ended = {
@@ -1035,17 +1082,61 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         }
 
         // A command the work opened is outlined while it runs, shows how long
-        // it has run, and the line hides; one that ends within half a second
-        // does none of it. The fast one sleeps, so it is live for frames the
-        // sampler sees: an `echo` alone gets its result between two.
+        // it has run, and the line hides. Until it has run `REVEAL_MS` it does
+        // none of it: its row's first frame, recorded as it is added, is what
+        // a call that ends sooner shows for its whole life.
         {
+          await tp.evaluate(c => {
+            const w = window as unknown as {
+              __firstFrame: {
+                line: boolean
+                lineVisible: boolean
+                outlined: boolean
+                timed: boolean
+              } | null
+              __firstWatch: MutationObserver
+            }
+            w.__firstFrame = null
+            w.__firstWatch = new MutationObserver(() => {
+              const row = document.querySelector(`${c} .tool.live`)
+              if (w.__firstFrame !== null || row === null) return
+              const line = document.querySelector(`${c} .working-line`)
+              w.__firstFrame = {
+                line: line !== null,
+                lineVisible:
+                  line !== null &&
+                  getComputedStyle(line).visibility === "visible",
+                outlined: getComputedStyle(row, "::after").content !== "none",
+                timed: row.querySelector(".tool-elapsed") !== null,
+              }
+              w.__firstWatch.disconnect()
+            })
+            w.__firstWatch.observe(document.body, {
+              subtree: true,
+              childList: true,
+            })
+          }, col(0))
+          const held = newGate("ring")
           script.use([
-            { tool: "bash", args: { command: "sleep 3" } },
-            { text: "slept" },
+            { tool: "bash", args: { command: gateCommand(held) } },
+            { text: "held" },
           ])
-          await say("sleep on it")
+          await say("hold on to it")
           const revealed = `${col(0)} .tool.live[data-revealed]`
           const outlined = await appears(revealed, 10_000)
+          const first = await tp.evaluate(
+            () =>
+              (
+                window as unknown as {
+                  __firstFrame: {
+                    line: boolean
+                    lineVisible: boolean
+                    outlined: boolean
+                    timed: boolean
+                  } | null
+                }
+              ).__firstFrame,
+          )
           await twoFrames(tp)
           const slow = await tp
             .$eval(
@@ -1098,70 +1189,18 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               col(0),
             )
             .catch(() => null)
-          // How long it has run, read twice a little over a second apart.
+          // How long it has run, then again once it has counted on.
           const elapsedNow = () =>
             tp
               .$eval(`${revealed} .tool-head .tool-elapsed`, e => e.textContent)
               .catch(() => null)
           const firstTime = await elapsedNow()
-          await tp.waitForTimeout(1_100)
+          await waitFor(async () => (await elapsedNow()) !== firstTime, 3_000)
           const laterTime = await elapsedNow()
+          await inThreadLane(tp, gateClose(held))
           await toolIdle()
-          await tp.evaluate(c => {
-            const w = window as unknown as {
-              __frames: {
-                line: number
-                hidden: number
-                live: number
-                outlined: number
-                timed: number
-              }
-              __sampling: boolean
-            }
-            w.__frames = { line: 0, hidden: 0, live: 0, outlined: 0, timed: 0 }
-            w.__sampling = true
-            const sample = () => {
-              if (!w.__sampling) return
-              const line = document.querySelector(`${c} .working-line`)
-              if (line !== null) {
-                w.__frames.line++
-                if (getComputedStyle(line).visibility !== "visible")
-                  w.__frames.hidden++
-              }
-              for (const row of document.querySelectorAll(`${c} .tool.live`)) {
-                w.__frames.live++
-                if (getComputedStyle(row, "::after").content !== "none")
-                  w.__frames.outlined++
-                if (row.querySelector(".tool-elapsed") !== null)
-                  w.__frames.timed++
-              }
-              requestAnimationFrame(sample)
-            }
-            requestAnimationFrame(sample)
-          }, col(0))
-          script.use([
-            { tool: "bash", args: { command: "sleep 0.2; echo briefly" } },
-            { text: "brief" },
-          ])
-          await say("briefly")
-          await toolIdle()
-          await twoFrames(tp)
-          const fast = await tp.evaluate(() => {
-            const w = window as unknown as {
-              __frames: {
-                line: number
-                hidden: number
-                live: number
-                outlined: number
-                timed: number
-              }
-              __sampling: boolean
-            }
-            w.__sampling = false
-            return w.__frames
-          })
           check(
-            "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
+            "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; one not yet ringed does neither",
             outlined &&
               slow?.outline === "solid" &&
               slow.colour !== "rgba(0, 0, 0, 0)" &&
@@ -1171,22 +1210,21 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               slow.row !== null &&
               Math.abs(slow.row.left - slow.row.right) <= 1 &&
               new Set(slow.insets).size === 1 &&
-              fast.line > 0 &&
-              fast.live > 0 &&
-              fast.hidden === 0 &&
-              fast.outlined === 0,
-            `${JSON.stringify({ slow, fast })}`,
+              first?.line === true &&
+              first.lineVisible &&
+              !first.outlined,
+            `${JSON.stringify({ slow, first })}`,
           )
           const seconds = (t: string | null) =>
             t === null ? Number.NaN : Number.parseInt(t, 10)
           check(
-            "a running command the work opened shows how long it has run, counting up; a fast one never shows it",
+            "a running command the work opened shows how long it has run, counting up; one not yet ringed never shows it",
             /^\d+s$/.test(firstTime ?? "") &&
               /^\d+s$/.test(laterTime ?? "") &&
               seconds(laterTime) > seconds(firstTime) &&
-              fast.live > 0 &&
-              fast.timed === 0,
-            `${JSON.stringify({ firstTime, laterTime, timed: fast.timed })}`,
+              first !== null &&
+              !first.timed,
+            `${JSON.stringify({ firstTime, laterTime, first })}`,
           )
         }
 
@@ -1267,8 +1305,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await tp.$eval(bodyOf, b => {
             b.scrollTop = b.scrollHeight
           })
-          const COMMAND =
-            "for s in a b c d e f; do echo step $s; sleep 0.1; done"
+          // Six steps, each fed once the one before it is drawn.
+          const stepping = newGate("tests")
+          const COMMAND = gateCommand(stepping)
           script.use([
             {
               text: "Now the tests for this, which take a moment.",
@@ -1281,6 +1320,23 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const stop = await recordFrames(tp, col(0))
           await cdp.send("Emulation.setCPUThrottlingRate", { rate: 20 })
           await say("run the tests")
+          await tp
+            .waitForSelector(`${col(0)} .tool.live`, { timeout: 30_000 })
+            .catch(() => null)
+          for (const step of ["a", "b", "c", "d", "e", "f"]) {
+            await inThreadLane(tp, gateFeed(stepping, [`step ${step}`]))
+            await tp
+              .waitForFunction(
+                ([c, line]) =>
+                  document
+                    .querySelector(`${c} .tool.live .tool-output`)
+                    ?.textContent?.includes(line) === true,
+                [col(0), `step ${step}`] as const,
+                { timeout: 30_000 },
+              )
+              .catch(() => null)
+          }
+          await inThreadLane(tp, gateClose(stepping))
           await toolIdle()
           await tp.waitForSelector(`${col(0)} .stop`, {
             state: "detached",
@@ -1345,15 +1401,15 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           )
         }
 
+        // A command that never ends on its own: only Stop ends it.
         script.use([
-          { tool: "bash", args: { command: "sleep 5" } },
+          { tool: "bash", args: { command: gateCommand(newGate("held")) } },
           { text: "after" },
         ])
-        await say("sleep")
+        await say("hold it")
         // As a person does: stop the command once it is seen running.
         await appears(`${col(0)} .tool.live`)
         const stopShown = await appears(`${col(0)} .stop`)
-        const t0 = Date.now()
         if (stopShown) await tp.click(`${col(0)} .stop`)
         const failed = `${col(0)} .tool[data-tool="bash"][data-status="error"]`
         const ended = await appears(failed, 10_000)
@@ -1364,7 +1420,6 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           'Stop ends a running command, shown as ✗ "Command aborted"',
           stopShown &&
             ended &&
-            Date.now() - t0 < 4_000 &&
             (await tp.textContent(`${failed} .tool-status`)) === "✗" &&
             why?.includes("aborted") === true,
           `${why?.slice(-16) ?? "none"}`,
@@ -1667,8 +1722,6 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         const body = (n: number) => `${col(n)} .column-body`
         const gapOf = (n: number) =>
           tp.$eval(body(n), b => b.scrollHeight - b.scrollTop - b.clientHeight)
-        const frame = () =>
-          tp.evaluate(() => new Promise(r => requestAnimationFrame(r)))
         /**
          * Turn the wheel over column 0 by `dy`, and wait until its scroll has
          * moved and holds across a frame: the scroll lands frames after the
@@ -1682,7 +1735,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await tp.mouse.wheel(0, dy)
           let last = from
           await waitFor(async () => {
-            await frame()
+            await oneFrame(tp)
             const now = await top()
             const settled = now !== from && now === last
             last = now
@@ -1696,14 +1749,34 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               s => s.getBoundingClientRect().height,
             )
             .catch(() => 0)
-        /** The column's gap to its end, sampled while its reply is written. */
-        const sampleWhileStreaming = async () => {
+        /** Column 0's reply holds what `held` has released, whitespace aside. */
+        const releasedDrawn = (held: Held) =>
+          tp
+            .waitForFunction(
+              ([c, tail]) =>
+                (document.querySelector(`${c} .streaming`)?.textContent ?? "")
+                  .replace(/\s+/g, "")
+                  .endsWith(tail),
+              [col(0), held.released.replace(/\s+/g, "").slice(-12)] as const,
+              { timeout: 10_000 },
+            )
+            .catch(() => null)
+        /**
+         * Release `held` a delta at a time, until `enough` or its end, and
+         * after each is drawn and a frame has passed, take column 0's gap to
+         * its end.
+         */
+        const stepReply = async (
+          held: Held,
+          enough: () => Promise<boolean> = async () => false,
+        ) => {
           const gaps: number[] = []
           let tallest = 0
-          while ((await tp.$(`${col(0)} .streaming`)) !== null) {
+          while (!(await enough()) && (await held.next())) {
+            await releasedDrawn(held)
+            await oneFrame(tp)
             tallest = Math.max(tallest, await streamHeight())
             gaps.push(Math.round(await gapOf(0)))
-            await new Promise(r => setTimeout(r, 100))
           }
           return { gaps, tallest }
         }
@@ -1712,10 +1785,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           (_, i) => `Line ${i + 1} of a long reply.`,
         ).join("\n\n")
 
+        const firstLong = script.hold("a long one")
         script.use([{ text: LONG }])
         await say("a long one")
-        await appears(`${col(0)} .streaming`)
-        const followed = await sampleWhileStreaming()
+        await waitFor(() => firstLong.reached, 10_000)
+        const followed = await stepReply(firstLong)
         await toolIdle()
         check(
           "a column at its end follows a reply as it is written",
@@ -1725,47 +1799,32 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           `gaps ${followed.gaps.join(" ")}; reply ${Math.round(followed.tallest)}px`,
         )
 
+        // Held between deltas, so nothing grows under the wheel.
+        const secondLong = script.hold("another long one")
         script.use([{ text: LONG }])
         await say("another long one")
-        await tp
-          .waitForFunction(
-            c =>
-              (document
-                .querySelector(`${c} .streaming`)
-                ?.getBoundingClientRect().height ?? 0) > 100,
-            col(0),
-            { timeout: 20_000 },
-          )
-          .catch(() => null)
+        await waitFor(() => secondLong.reached, 10_000)
+        await stepReply(secondLong, async () => (await streamHeight()) > 100)
         await wheelColumn(-10)
         const heldAt = await tp.$eval(body(0), b => b.scrollTop)
         const grownFrom = await streamHeight()
-        await tp
-          .waitForFunction(
-            ([c, h]) =>
-              (document
-                .querySelector(`${c} .streaming`)
-                ?.getBoundingClientRect().height ?? 0) >
-              h + 200,
-            [col(0), grownFrom] as const,
-            { timeout: 20_000 },
-          )
-          .catch(() => null)
+        await stepReply(
+          secondLong,
+          async () => (await streamHeight()) > grownFrom + 200,
+        )
         const heldTo = await tp.$eval(body(0), b => b.scrollTop)
         const offered = await appears(`${col(0)} .jump-latest`, 2_000)
         if (offered) await tp.click(`${col(0)} .jump-latest`)
-        await frame()
+        await oneFrame(tp)
         const jumped = await gapOf(0)
         const gone = (await tp.locator(`${col(0)} .jump-latest`).count()) === 0
-        const after = await sampleWhileStreaming()
+        const after = await stepReply(secondLong)
         await toolIdle()
         check(
           "a small scroll up holds the column still while the reply is written, and ↓ new below is the way back",
           Math.abs(heldTo - heldAt) <= 1 &&
             offered &&
-            // While the reply streams, a paragraph can land between the jump
-            // and this read, as in the samples.
-            jumped < 80 &&
+            jumped <= 2 &&
             gone &&
             after.gaps.every(g => g < 80),
           `held ${Math.round(heldAt)}→${Math.round(heldTo)}, offered ${offered}, gap after ${Math.round(jumped)}, then ${after.gaps.join(" ")}`,
@@ -1777,7 +1836,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         await say("back to the end")
         await toolIdle()
         await appears(`${col(0)} ${msg("back to the end")}`)
-        await frame()
+        await oneFrame(tp)
         const back = await gapOf(0)
         check(
           "your own send brings the column back to its end",
@@ -1813,8 +1872,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await tp.evaluate(() => document.fonts.ready)
           await tp.click(`${fork} .open-branch`)
           await tp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
-          await frame()
-          await frame()
+          await oneFrame(tp)
+          await oneFrame(tp)
           const level = async () => {
             const a = await tp.$eval(
               `${col(1)} .msg`,
@@ -1834,7 +1893,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               { state: "attached", timeout: 15_000 },
             )
             .catch(() => null)
-          await frame()
+          await oneFrame(tp)
           const grown = await level()
           const short = await gapOf(1)
           check(
@@ -2007,8 +2066,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             const size = tp.viewportSize()
             if (size !== null)
               await tp.setViewportSize({ ...size, height: size.height - 40 })
-            await frame()
-            await frame()
+            await oneFrame(tp)
+            await oneFrame(tp)
             if (size !== null) await tp.setViewportSize(size)
           }
           // The fork point, the trunk's last message, goes below the view.
@@ -2032,7 +2091,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await tp.waitForSelector(`#strip .msg[data-entry="${target}"]`, {
             timeout: 15_000,
           })
-          await frame()
+          await oneFrame(tp)
           const shownAtOnce = await inView()
           await nudge()
           const kept = await inView()
@@ -2055,7 +2114,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const members = at < 0 ? [] : rows.slice(at, at + count)
           const three = members[Math.floor(0.75 * members.length)]?.id ?? "none"
           await clickRun(".rail", 0.75)
-          await frame()
+          await oneFrame(tp)
           const deepShown = await inView("#strip", three)
           const firstGone = !(await inView())
           check(

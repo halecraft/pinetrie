@@ -157,8 +157,10 @@ async function mainSection(
     await setUpAccepted(wh.session, wu)
 
     // ── 1. Two lanes at once: the same file, the same port, their own ──────
+    // The fetch is tried until the server listens: a refused fetch exits
+    // non-zero, and each try is a node start, so a hundred are a few seconds.
     const serve =
-      "node -e \"require('http').createServer((q, s) => s.end(require('os').hostname())).listen(5173)\" > /dev/null 2>&1 & sleep 0.5; hostname > who.txt; node -e \"fetch('http://127.0.0.1:5173').then(r => r.text()).then(t => console.log('served ' + t))\""
+      "node -e \"require('http').createServer((q, s) => s.end(require('os').hostname())).listen(5173)\" > /dev/null 2>&1 & hostname > who.txt; for i in $(seq 1 100); do node -e \"fetch('http://127.0.0.1:5173').then(r => r.text()).then(t => console.log('served ' + t))\" 2>/dev/null && break; done"
     script.use([
       { tool: "bash", args: { command: serve } },
       { tool: "bash", args: { command: serve } },

@@ -6,6 +6,9 @@
 import { createHash } from "node:crypto"
 import {
   type AssistantMessage,
+  type AssistantMessageEvent,
+  type AssistantMessageEventStream,
+  createAssistantMessageEventStream,
   createImagesProvider,
   type FauxProviderHandle,
   type FauxResponseFactory,
@@ -37,21 +40,31 @@ export type ScriptStep =
       readonly text?: string
     }
 
-export interface Paused {
-  /** Whether the paused request has arrived: its run has started. Poll it with a timeout. */
+/** A reply held from its first event: nothing of it streams until released. */
+export interface Held {
+  /** Whether the held request has arrived: its run has started. Poll it with a timeout. */
   readonly reached: boolean
-  resume(): void
+  /** The reply's text released so far. */
+  readonly released: string
+  /**
+   * Release the reply's events up to and including its next text delta,
+   * once the provider has made it. False when the reply ended first.
+   */
+  next(): Promise<boolean>
+  /** Release the rest of the reply, as it comes. */
+  finish(): void
 }
 
 export interface ScriptedModel {
   /** The replies the model gives next, one per model turn, in order; after them, `answer`. */
   use(steps: readonly ScriptStep[]): void
   /**
-   * Pause the reply to the next request whose last user message includes
-   * `prompt`: its run is in progress, with nothing streamed, until resumed.
-   * The request still takes its reply when it arrives, in arrival order.
+   * Hold the reply to the next request whose last user message includes
+   * `prompt`: its run is in progress, with nothing streamed, until released
+   * a step at a time or whole. The run's abort releases it. The request
+   * still takes its reply when it arrives, in arrival order.
    */
-  pause(prompt: string): Paused
+  hold(prompt: string): Held
 }
 
 // The faux handles stay in this module: `config.ts` reaches them through here.
@@ -79,8 +92,8 @@ function describeStep(describe: ScriptStep, asked: string): ScriptStep {
 
 /**
  * `tokensPerSecond` sets how fast replies stream: fast by default. A check
- * that must see a reply while it is being written uses a slow one; a check
- * that must see a run in progress pauses it instead.
+ * that must see a reply while it is being written, or a run in progress,
+ * holds it (`hold`).
  */
 export function scriptedModel(
   options: {
@@ -112,41 +125,28 @@ export function scriptedModel(
   })
   const describe = options.describe ?? { text: SCRIPTED_DESCRIPTION }
   let queue: readonly ScriptStep[] = []
-  const pauses: {
-    readonly prompt: string
-    reached: boolean
-    readonly resumed: PromiseWithResolvers<void>
-  }[] = []
-  const run = perRequest(faux, async (context, signal) => {
-    const [next, ...rest] = queue
-    queue = rest
-    const step = next ?? options.answer ?? null
-    const prompt = lastUserText(context)
-    const at = pauses.findIndex(p => prompt.includes(p.prompt))
-    const [paused] = at < 0 ? [] : pauses.splice(at, 1)
-    if (paused !== undefined) {
-      paused.reached = true
-      await Promise.race([paused.resumed.promise, aborted(signal)])
-    }
-    return step
-  })
+  const holds: Hold[] = []
+  const run = perRequest(
+    faux,
+    () => {
+      const [next, ...rest] = queue
+      queue = rest
+      return next ?? options.answer ?? null
+    },
+    context => {
+      const prompt = lastUserText(context)
+      const at = holds.findIndex(h => prompt.includes(h.prompt))
+      return at < 0 ? undefined : holds.splice(at, 1)[0]
+    },
+  )
   const model: ScriptedModel = {
     use(steps) {
       queue = steps
     },
-    pause(prompt) {
-      const paused = {
-        prompt,
-        reached: false,
-        resumed: Promise.withResolvers<void>(),
-      }
-      pauses.push(paused)
-      return {
-        get reached() {
-          return paused.reached
-        },
-        resume: () => paused.resumed.resolve(),
-      }
+    hold(prompt) {
+      const hold = newHold(prompt)
+      holds.push(hold)
+      return hold.held
     },
   }
   handles.set(model, {
@@ -159,27 +159,36 @@ export function scriptedModel(
 }
 
 /** The step a request is answered with; null answers with an error. */
-type Choose = (
-  context: TranscriptContext,
-  signal: AbortSignal | undefined,
-) => ScriptStep | null | Promise<ScriptStep | null>
+type Choose = (context: TranscriptContext) => ScriptStep | null
+
+/** A request's hold, taken from those waiting as the request arrives. */
+type TakeHold = (context: TranscriptContext) => Hold | undefined
 
 /**
- * `faux`, answering each request with `choose`'s step. Faux takes a response
- * off its queue when a request arrives but runs a factory a microtask later,
- * so a factory that queued itself again would leave the queue empty for a
- * second request in the same tick. Each request queues its own,
- * just before faux takes it.
+ * `faux`, answering each request with `choose`'s step, and holding its
+ * stream when `takeHold` gives a hold. Faux takes a response off its queue
+ * when a request arrives but runs a factory a microtask later, so a factory
+ * that queued itself again would leave the queue empty for a second request
+ * in the same tick. Each request queues its own, just before faux takes it.
  */
 function perRequest(
   faux: FauxProviderHandle,
   choose: Choose,
+  takeHold: TakeHold = () => undefined,
 ): FauxProviderHandle {
-  const dispatch: FauxResponseFactory = async (context, options) => {
-    const step = await choose(context, options?.signal)
+  const dispatch: FauxResponseFactory = context => {
+    const step = choose(context)
     return step === null ? NO_REPLY : render(step, context)
   }
   const base = faux.provider
+  const held = (
+    context: TranscriptContext,
+    signal: AbortSignal | undefined,
+    stream: AssistantMessageEventStream,
+  ) => {
+    const hold = takeHold(context)
+    return hold === undefined ? stream : holdStream(stream, hold, signal)
+  }
   const provider: Provider = {
     id: base.id,
     name: base.name,
@@ -187,15 +196,145 @@ function perRequest(
     getModels: () => base.getModels(),
     stream: (model, context, streamOptions) => {
       faux.appendResponses([dispatch])
-      return base.stream(model, context, streamOptions)
+      return held(
+        context,
+        streamOptions?.signal,
+        base.stream(model, context, streamOptions),
+      )
     },
     streamSimple: (model, context, streamOptions) => {
       faux.appendResponses([dispatch])
-      return base.streamSimple(model, context, streamOptions)
+      return held(
+        context,
+        streamOptions?.signal,
+        base.streamSimple(model, context, streamOptions),
+      )
     },
   }
   return { ...faux, provider }
 }
+
+/** A hold as `perRequest` drives it, and as the suite sees it (`held`). */
+interface Hold {
+  readonly prompt: string
+  readonly held: Held
+  /** The request has arrived. */
+  reach(): void
+  /** Settles once `event` may go on: at once when released, else at a release. */
+  turn(event: AssistantMessageEvent): Promise<void>
+  /** `event` has gone on. */
+  sent(event: AssistantMessageEvent): void
+  /** The reply has no more events. */
+  ended(): void
+}
+
+function newHold(prompt: string): Hold {
+  let reached = false
+  let released = ""
+  // Text deltas released and not yet sent: each takes the events before it.
+  let allowed = 0
+  let finished = false
+  let over = false
+  let wake = () => {}
+  let answer: ((more: boolean) => void) | null = null
+  const answered = (more: boolean) => {
+    answer?.(more)
+    answer = null
+  }
+  return {
+    prompt,
+    held: {
+      get reached() {
+        return reached
+      },
+      get released() {
+        return released
+      },
+      next() {
+        if (over) return Promise.resolve(false)
+        allowed++
+        const more = new Promise<boolean>(resolve => {
+          answer = resolve
+        })
+        wake()
+        return more
+      },
+      finish() {
+        finished = true
+        wake()
+      },
+    },
+    reach() {
+      reached = true
+    },
+    async turn() {
+      while (!finished && allowed === 0)
+        await new Promise<void>(resolve => {
+          wake = resolve
+        })
+    },
+    sent(event) {
+      if (event.type !== "text_delta") return
+      released += event.delta
+      if (finished) return
+      allowed--
+      answered(true)
+    },
+    ended() {
+      over = true
+      answered(false)
+    },
+  }
+}
+
+/**
+ * `inner`'s events, each forwarded only when `hold` lets it go. Faux may
+ * have made the whole reply before the run aborts, so an abort ends the
+ * reply here, as faux ends one it sees aborted: at the last event forwarded.
+ */
+function holdStream(
+  inner: AssistantMessageEventStream,
+  hold: Hold,
+  signal: AbortSignal | undefined,
+): AssistantMessageEventStream {
+  const outer = createAssistantMessageEventStream()
+  hold.reach()
+  let cut = false
+  void aborted(signal).then(() => {
+    cut = true
+    hold.held.finish()
+  })
+  void (async () => {
+    let partial: AssistantMessage | undefined
+    for await (const event of inner) {
+      await hold.turn(event)
+      partial ??= partialOf(event)
+      if (cut) {
+        if (partial !== undefined) {
+          const error: AssistantMessage = {
+            ...partial,
+            stopReason: "aborted",
+            errorMessage: "Request was aborted",
+          }
+          outer.push({ type: "error", reason: "aborted", error })
+        }
+        break
+      }
+      outer.push(event)
+      hold.sent(event)
+      partial = partialOf(event) ?? partial
+    }
+    hold.ended()
+    outer.end()
+  })()
+  return outer
+}
+
+/** The message as far as `event` has it. */
+const partialOf = (
+  event: AssistantMessageEvent,
+): AssistantMessage | undefined =>
+  "partial" in event ? event.partial : undefined
 
 const NO_REPLY = fauxAssistantMessage("", {
   stopReason: "error",

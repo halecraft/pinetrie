@@ -20,7 +20,6 @@ import {
   identityCodec,
   promptParent,
   queueWords,
-  RAIL_HOLD_MS,
   readerHeading,
 } from "@pinetrie/interface"
 import { SCRIPTED_DESCRIPTION } from "@pinetrie/pi"
@@ -951,7 +950,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.fill(`${col(0)} .composer .input`, "@agent after Bea")
       await label(0)
       // Her reply is paused, so her run shows for as long as the checks look.
-      const beasTurn = script.pause("Bea's turn")
+      const beasTurn = script.hold("Bea's turn")
       await other.chat("@agent Bea's turn", atEntry(entryId(await tipOf0())))
       // The send button once it says `words`: its label and its title.
       const queueButton = (words: ButtonWords) =>
@@ -1182,7 +1181,7 @@ async function run(check: Checks["check"]): Promise<void> {
           beaLane !== undefined && !readQueueHolds(host.session).has(beaLane),
         15_000,
       )
-      beasTurn.resume()
+      beasTurn.finish()
       await waitFor(() => idleNow(host))
       const asked = [
         "@agent Bea's turn",
@@ -1223,7 +1222,7 @@ async function run(check: Checks["check"]): Promise<void> {
         Object.values(entriesOf(host)).find(e =>
           JSON.stringify(e).includes("just a note"),
         )?.id ?? ""
-      const pulse = script.pause("say exactly: PULSE")
+      const pulse = script.hold("say exactly: PULSE")
       await other.chat(
         "@agent say exactly: PULSE",
         atEntry(entryId(forAdaId)),
@@ -1240,7 +1239,7 @@ async function run(check: Checks["check"]): Promise<void> {
         pulsing !== null,
       )
       // A pulsing dot scales forever, and Playwright clicks only a still element.
-      pulse.resume()
+      pulse.finish()
       if (pulsing !== null)
         await page.click(`.rail-dot[data-entry="${pulsing}"]`)
       check(
@@ -1251,7 +1250,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // While the agent works, the strip counts its root and the thread's
       // item shows a still ring: nothing in the footer, and nothing in your
       // list, animates.
-      const held = script.pause("say exactly: HELD")
+      const held = script.hold("say exactly: HELD")
       await other.chat("@agent say exactly: HELD", atEntry(entryId(forAdaId)), {
         mode: "branch",
       })
@@ -1288,7 +1287,7 @@ async function run(check: Checks["check"]): Promise<void> {
             ? "no working mark on the tab"
             : animated.join(", "),
       )
-      held.resume()
+      held.finish()
       await idle()
       await other.close()
 
@@ -2956,10 +2955,6 @@ async function run(check: Checks["check"]): Promise<void> {
                 .locator(`${col(0)} .msg[data-entry]`)
                 .last()
                 .getAttribute("data-entry")) ?? ""
-            // Away from the rail, which holds still under the pointer and
-            // for its hold after: time is the state it waits on.
-            await lp.mouse.move(600, 10)
-            await lp.waitForTimeout(RAIL_HOLD_MS + 100)
             const scrollTo = (to: "top" | "end" | "middle") =>
               lp.$eval(
                 body0,

@@ -53,11 +53,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   const title = () => [...readMarks(th.session).values()][0]?.title ?? null
 
   // 1. The first message to the agent titles its root while the run goes.
-  const planning = script.pause("plan the parser")
+  const planning = script.hold("plan the parser")
   await tu.chat("@agent plan the parser", ROOT, START_AGENT)
   await waitFor(() => planning.reached, 10_000)
   const early = (await waitFor(() => title() === "Parser plan", 10_000)) >= 0
-  planning.resume()
+  planning.finish()
   await idle()
   check(
     "a new root's first lane titles it from its first message, before its run ends",

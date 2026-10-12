@@ -148,8 +148,8 @@ import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
 import { findProject } from "./work/runtime.ts"
 
-/** How long an unreferenced image is kept (ADR-0042). */
-const BLOB_GRACE_MS = 24 * 60 * 60 * 1000
+/** How long an image nothing shows is kept, from its upload or last touch: for one pasted and not yet sent. */
+export const BLOB_GRACE_MS = 24 * 60 * 60 * 1000
 
 export interface StartHostOptions {
   readonly port?: number
@@ -197,10 +197,12 @@ export interface StartHostOptions {
    */
   readonly blobs?: BlobStore
   /**
-   * How long an image nothing shows is kept, from its upload or last touch:
-   * a day by default, for one pasted and not yet sent. A suite shortens it.
+   * Where the host reads the time: its own (`Basics.now`) and the blobs it
+   * opens or keeps in memory. `blobs` given here keep their own clock, which
+   * must be this one: a store behind the host's clock makes every blob it
+   * stamps look old to the sweep.
    */
-  readonly blobGraceMs?: number
+  readonly now?: () => number
   /** How long presence lasts without a refresh; a suite shortens it. */
   readonly presenceDecay?: PresenceDecay
   readonly log?: (message: string) => void
@@ -255,7 +257,7 @@ export async function startHost({
   agentDir,
   store: storeFile = null,
   blobs: givenBlobs,
-  blobGraceMs = BLOB_GRACE_MS,
+  now = Date.now,
   presenceDecay = PRESENCE_DECAY,
   log = console.log,
 }: StartHostOptions): Promise<RunningHost> {
@@ -283,10 +285,10 @@ export async function startHost({
   const serverTransport = new WebsocketServerTransport()
   const opened =
     typeof storeFile === "string"
-      ? openStore(storeFile)
+      ? openStore(storeFile, { now })
       : {
           store: storeFile ?? createInMemoryStore(),
-          blobs: givenBlobs ?? memoryBlobs(),
+          blobs: givenBlobs ?? memoryBlobs(now),
           backup: null,
         }
   const { store, blobs } = opened
@@ -366,7 +368,7 @@ export async function startHost({
     places,
     log,
     newId,
-    now: Date.now,
+    now,
   }
 
   // The host writes its own records (ADR-0095); every module that writes one
@@ -665,7 +667,7 @@ export async function startHost({
       await sweepBlobs({
         basics,
         blobs,
-        grace: blobGraceMs,
+        grace: BLOB_GRACE_MS,
         texts: cardPort.texts,
       })
       await sweepHistories({ basics, store, histories, startup: false })

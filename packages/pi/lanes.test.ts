@@ -600,7 +600,7 @@ describe("lanes in a harness", () => {
     }
     // A Stop while the model's reply is held.
     const held = await newLane(where(dir))
-    const paused = script.pause("held")
+    const paused = script.hold("held")
     const holding = agent.lane(held).run(prompt("held"), [])
     await until(() => paused.reached)
     await agent.lane(held).abort()

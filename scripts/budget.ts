@@ -9,6 +9,9 @@
 // against its own host, which holds many checks, as one `test()` holds many
 // `expect()`s. `pnpm run conformance` is pi's own Storage suite, run against
 // ours: its tests are pi's, so they count in no layer.
+//
+// A scenario's fixed waits are its other cost: each is paid in full on every
+// run, and guesses when a state comes. `FIXED_WAITS` lists the few left.
 
 import { globSync, readFileSync } from "node:fs"
 import path from "node:path"
@@ -73,4 +76,69 @@ export async function countLayers(root: string): Promise<LayerCounts> {
       scenarioNames(path.join(e2e, "lanes")).length,
     browser: scenarioNames(path.join(e2e, "browser")).length,
   }
+}
+
+/**
+ * The fixed waits each scenario still holds, by path from the repository's
+ * root: waits for time, not for a state. A scenario not listed holds none.
+ * An entry only shrinks, and is deleted at zero.
+ */
+export const FIXED_WAITS: Readonly<Record<string, number>> = {
+  // A socket nothing answers: silence, timed out, is the outcome checked.
+  "apps/pinetrie/e2e/host/admission.scenario.ts": 1,
+  // A write and a deletion of one key in one millisecond tie on other peers
+  // (Kyneta: `docs/pinetrie.md`, "Open, non-blocking").
+  "apps/pinetrie/e2e/host/presence.scenario.ts": 1,
+  // A drag held over a sidebar item for halves of `ITEM_HOVER_MS`: the
+  // hold's length is the rule checked.
+  "apps/pinetrie/e2e/browser/page.scenario.ts": 2,
+  // The foreground `sleep`s a tool's timeout and Stop kill, and the
+  // process list searched for one: their death is checked, not waited out.
+  "apps/pinetrie/e2e/lanes/main.scenario.ts": 3,
+}
+
+/**
+ * `waitForTimeout(`, `sleep(`, `setTimeout(`, and a shell `sleep N` that
+ * is not sent to the background (`sleep N &`).
+ */
+const FIXED_WAIT =
+  /waitForTimeout\(|\bsleep\(|\bsetTimeout\(|\bsleep \d+(?:\.\d+)?(?![\d.])(?!\s*&(?!&))/g
+
+/** The fixed waits in a scenario's source. */
+export const fixedWaitsIn = (source: string): number =>
+  (source.match(FIXED_WAIT) ?? []).length
+
+/** What breaks `allowed`, worded; empty when nothing does. */
+export function fixedWaitBreaches(
+  counts: Readonly<Record<string, number>>,
+  allowed: Readonly<Record<string, number>> = FIXED_WAITS,
+): readonly string[] {
+  const files = [...new Set([...Object.keys(counts), ...Object.keys(allowed)])]
+  return files.sort().flatMap(file => {
+    const has = counts[file] ?? 0
+    const may = allowed[file] ?? 0
+    if (has > may)
+      return [
+        `${file} holds ${has} fixed waits, FIXED_WAITS allows ${may}: wait for a state instead`,
+      ]
+    if (has < may)
+      return [
+        `${file} holds ${has} fixed waits: lower its FIXED_WAITS entry from ${may}`,
+      ]
+    return []
+  })
+}
+
+/** Each scenario's fixed waits, by path from `root`. */
+export function countFixedWaits(root: string): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const suite of ["host", "lanes", "browser"]) {
+    const dir = path.join("apps/pinetrie/e2e", suite)
+    for (const name of scenarioNames(path.join(root, dir))) {
+      const file = path.join(dir, `${name}.scenario.ts`)
+      const n = fixedWaitsIn(readFileSync(path.join(root, file), "utf8"))
+      if (n > 0) counts[file] = n
+    }
+  }
+  return counts
 }

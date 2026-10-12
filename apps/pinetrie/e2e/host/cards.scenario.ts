@@ -3,6 +3,7 @@
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { whenSettled } from "@kyneta/exchange"
 import {
   BACK,
   type CardId,
@@ -56,7 +57,7 @@ import {
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
-import { LATE_LOAD_MS, sleep, slowToLoad } from "./support.ts"
+import { LATE_LOAD_MS, slowToLoad } from "./support.ts"
 
 export const scenario: Scenario = {
   run: ({ check }) => run(check),
@@ -213,7 +214,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 3. A compelled send to a busy lane is a conflict, and the card stays.
     script.use([{ text: "A long answer." }, { text: "later" }])
-    const longOne = script.pause("@agent a long one")
+    const longOne = script.hold("@agent a long one")
     await bea.chat("@agent a long one", at(tipOf()), { mode: "reply" })
     await waitFor(() => longOne.reached, 10_000)
     const busyEnd = tipOf()
@@ -247,7 +248,7 @@ async function run(check: Checks["check"]): Promise<void> {
         ch.cardText(c3) === "@Ada the plan is ready",
       5_000,
     )
-    longOne.resume()
+    longOne.finish()
     await cIdle()
     await ch.quiet()
     const index3 = treeOf(ch)
@@ -538,8 +539,6 @@ async function run(check: Checks["check"]): Promise<void> {
         origin: "",
       }),
     )
-    await sleep(500)
-    await ch.quiet()
     check(
       "a client cannot write the places: its write is refused before it is made, and the host's copy is unchanged",
       placesRefused && onHost(forged) === undefined,
@@ -569,8 +568,9 @@ async function run(check: Checks["check"]): Promise<void> {
       InventoryDoc,
     )
     const beaRefused = refusedWrite(() => beaView.slots.set("7", "planted"))
-    await sleep(500)
-    await ch.quiet()
+    // Settled once the host has answered for Bea's copy: had it shared Ada's
+    // inventory, her slots would be in it by then.
+    await whenSettled(beaView)
     const hidden =
       beaRefused &&
       Object.keys(beaView.slots()).length === 0 &&

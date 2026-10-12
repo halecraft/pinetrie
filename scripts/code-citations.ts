@@ -6,7 +6,7 @@
 
 export const CODE_CITATIONS: Readonly<Record<string, number>> = {
   "apps/pinetrie/e2e": 184,
-  "apps/pinetrie/host": 567,
+  "apps/pinetrie/host": 566,
   "packages/core": 11,
   "packages/interface": 9,
   "packages/lanes": 12,

@@ -1,6 +1,6 @@
 // e2e/host/support — what the host scenarios share: a run's id, the store's
-// records, a store that loads one document late, and a message found by its
-// text. Positions and starts are `harness.ts`'s.
+// records, a store on a suite's clock, a store that loads one document late,
+// and a message found by its text. Positions and starts are `harness.ts`'s.
 
 import type { Store } from "@kyneta/exchange"
 import { type EntryId, projectTranscript } from "@pinetrie/core"
@@ -8,10 +8,25 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import { CONTROL_TOPIC, SESSION_DOC_ID } from "@pinetrie/protocol/messages"
 import type { RootDocHandle } from "@pinetrie/schema"
 import { lineDocPrefix } from "../../host/lines.ts"
-import { treeOf } from "../harness.ts"
+import { openStore } from "../../host/store.ts"
+import { type SuiteClock, treeOf } from "../harness.ts"
 
 export const sleep = (ms: number): Promise<void> =>
   new Promise(r => setTimeout(r, ms))
+/**
+ * A store on `file`, and the `startHost` options that use it, on one clock.
+ * The blobs stamp each image with the clock the host's sweep reads: a store
+ * left on the real clock, behind a host moved ahead, makes every image it
+ * stamps look a day old, and the sweep deletes it.
+ */
+export function clockedStore(file: string, clock: SuiteClock) {
+  const opened = openStore(file, { now: clock.now })
+  return {
+    opened,
+    options: { store: opened.store, blobs: opened.blobs, now: clock.now },
+  } as const
+}
+
 export const runOf = (o: Outcome) => (o.kind === "started" ? o.runId : "")
 /**
  * A document's records in a Kyneta store, their payloads' size, and how many

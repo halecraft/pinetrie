@@ -1,7 +1,7 @@
 // e2e/harness — what the end-to-end suites share besides their checks
-// (checks.ts) and scenarios (scenario.ts): waiting, throwaway projects,
-// joining a host, a host with no tools for a body (`withHost`), positions
-// and starts, and their model. A host whose agent has tools, and so lanes,
+// (checks.ts) and scenarios (scenario.ts): waiting, a host's clock,
+// throwaway projects, joining a host, a host with no tools for a body
+// (`withHost`), positions and starts, and their model. A host whose agent has tools, and so lanes,
 // is `lane-hosts.ts`'s.
 //
 // Deliberately not in core/: core is pure domain logic and imports nothing.
@@ -160,6 +160,26 @@ export async function waitFor(
     await new Promise(resolve => setTimeout(resolve, 10))
   }
   return -1
+}
+
+/**
+ * A host's clock that a suite moves (`startHost`'s `now`): the real clock
+ * plus an offset only `advance` adds to, so it never stands still and never
+ * goes back.
+ */
+export interface SuiteClock {
+  readonly now: () => number
+  advance(ms: number): void
+}
+
+export function suiteClock(): SuiteClock {
+  let offset = 0
+  return {
+    now: () => Date.now() + offset,
+    advance: ms => {
+      offset += ms
+    },
+  }
 }
 
 /** No card is queued on any lane (ADR-0048): nothing waits to be popped. */
@@ -342,7 +362,7 @@ const SUITE_REPLY =
  * The suites' own model: scripted, so a run spends nothing and needs no key
  * (ADR-0041). At 400 tokens per second a reply's pieces arrive over tens of
  * milliseconds, so a streaming check sees it grow. A check that needs a run
- * in progress pauses it (`ScriptedModel.pause`).
+ * in progress holds it (`ScriptedModel.hold`).
  */
 export const suiteModel = () =>
   scriptedModel({ tokensPerSecond: 400, answer: { text: SUITE_REPLY } })

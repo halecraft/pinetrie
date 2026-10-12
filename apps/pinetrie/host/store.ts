@@ -72,7 +72,11 @@ export function openDatabase(
  */
 export function openStore(
   file: string,
-  options: { readonly busyTimeoutMs?: number } = {},
+  options: {
+    readonly busyTimeoutMs?: number
+    /** The blobs' clock, which stamps each one as it is stored or touched. */
+    readonly now?: () => number
+  } = {},
 ): {
   readonly store: Store
   readonly blobs: BlobStore
@@ -102,5 +106,5 @@ export function openStore(
     db.prepare("VACUUM INTO ?").run(to)
     return to
   }
-  return { store, blobs: sqliteBlobs(db), backup }
+  return { store, blobs: sqliteBlobs(db, options.now), backup }
 }

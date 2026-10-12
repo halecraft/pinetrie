@@ -198,6 +198,9 @@ interface ColumnFrame {
  * a slow render's frames are each seen, as a person sees them (S35). The
  * column must be mounted already, so this observer runs after its own.
  */
+/** Wait for the next frame. */
+export const oneFrame = (p: Page) =>
+  p.evaluate(() => new Promise(r => requestAnimationFrame(r)))
 /** Wait two frames: a change's layout, its ResizeObserver callbacks and its paint have run. */
 export const twoFrames = (p: Page) =>
   p.evaluate(

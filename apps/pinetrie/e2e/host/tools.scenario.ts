@@ -1,5 +1,6 @@
 // e2e/host/tools — the agent reads, writes, edits and runs, visibly (ADR-0107).
 
+import { randomBytes } from "node:crypto"
 import { existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -20,6 +21,7 @@ import { readStreams } from "@pinetrie/schema"
 import { beginRun } from "@pinetrie/schema/fixtures"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
+import { gateClose, gateCommand, gateFeed, newGate } from "../gate.ts"
 import {
   at,
   committedProject,
@@ -35,14 +37,13 @@ import {
   treeOf,
   waitFor,
 } from "../harness.ts"
-import { cleanUp, inLane, type LaneHosts } from "../lane-hosts.ts"
+import { cleanUp, inLane, inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
   idOfIn,
   LATE_LOAD_MS,
   rootBytes,
-  sleep,
   slowToLoad,
   storedLines,
   storedRecords,
@@ -122,29 +123,36 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     )
 
     // 3. A long command streams live, as edits, and leaves no stream behind.
-    const lines = 400
-    const printed = Array.from(
-      { length: lines },
-      (_, k) => `line ${k + 1} `.length + 201,
-    ).reduce((a, b) => a + b, 0)
+    // Its 400 lines are fed in batches, each streamed before the next.
+    const fed = Array.from(
+      { length: 400 },
+      (_, k) => `line ${k + 1} ${randomBytes(150).toString("base64")}`,
+    )
+    const printed = fed.reduce((a, l) => a + l.length + 1, 0)
+    const long = newGate("long")
     script.use([
-      {
-        tool: "bash",
-        args: {
-          command: `for i in $(seq 1 ${lines}); do echo "line $i $(head -c 150 /dev/urandom | base64 | tr -d '\\n')"; sleep 0.005; done`,
-        },
-      },
+      { tool: "bash", args: { command: gateCommand(long) } },
       { text: "ran it" },
     ])
     watched.length = 0
     const l3 = tlane()
     await u.chat("run it", at(l3?.tip ?? null), { thread: l3?.name })
-    await tidle()
     const liveTexts = () =>
       watched
         .flat()
         .filter(s => s.kind === "tool")
         .map(s => s.text)
+    if (l3 !== undefined)
+      for (let at = 0; at < fed.length; at += 80) {
+        const batch = fed.slice(at, at + 80)
+        inLaneQuiet(l3.name, gateFeed(long, batch))
+        await waitFor(
+          () => (liveTexts().at(-1) ?? "").includes(batch.at(-1) ?? ""),
+          10_000,
+        )
+      }
+    if (l3 !== undefined) inLaneQuiet(l3.name, gateClose(long))
+    await tidle()
     const resultText = () =>
       projectSpine(ttree(), tlane()?.tip ?? null)
         .spine.flatMap(n => n.toolCalls ?? [])
@@ -197,12 +205,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // answered busy, and nothing is written.
     const bob = await join(th, "bob", "tools")
     await bob.request({ kind: "name", name: "Bob" })
+    // A command that never ends on its own: only the stop ends it.
     script.use([
-      { tool: "bash", args: { command: "sleep 5; echo late" } },
+      { tool: "bash", args: { command: gateCommand(newGate("held")) } },
       { text: "after" },
     ])
     const l5 = tlane()
-    const t0 = Date.now()
     await u.chat("sleep", at(l5?.tip ?? null), { thread: l5?.name })
     await waitFor(
       () => readStreams(th.live).some(s => s.kind === "tool"),
@@ -224,8 +232,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       waiting.kind === "busy" &&
         stopped?.kind === "stopped" &&
         aborted?.result?.isError === true &&
-        aborted.result.text.includes("aborted") &&
-        Date.now() - t0 < 4_000,
+        aborted.result.text.includes("aborted"),
       `${aborted?.result?.text.slice(-20) ?? "none"}`,
     )
     if (l5 !== undefined) await u.request({ kind: "stop", lane: l5.name })
@@ -256,7 +263,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // Resume (ADR-0082): a new run whose prompt is the host's carry-on
     // message, which the model reads. Held, so a second press finds it busy.
     script.use([{ reply: context => context.at(-1) ?? "" }])
-    const carrying = script.pause("asked you to carry on")
+    const carrying = script.hold("asked you to carry on")
     const carried =
       l5 === undefined
         ? undefined
@@ -266,7 +273,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       l5 === undefined
         ? undefined
         : await bob.request({ kind: "carry-on", lane: l5.name })
-    carrying.resume()
+    carrying.finish()
     await tidle()
     const [prompt, reply] = projectSpine(
       ttree(),
@@ -380,7 +387,6 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     await tidle()
     unwatch()
     await u2.close()
-    await sleep(100)
     // The host's Exchange closes its stores when it shuts down, this one too.
     await th.shutdown()
     cleanUp(th.session, work)

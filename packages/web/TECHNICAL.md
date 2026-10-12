@@ -698,9 +698,10 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     stream) while the call has a stream and no result. The result replaces
     it in the same `.tool-output`.
 - **A stream goes when its entry arrives,** which a fast model can do between
-  two renders, so a check that must see one uses a slow scripted model. A
-  check that must see a run in progress, not its reply, pauses the reply
-  (`ScriptedModel.pause`).
+  two renders, so a check that must see one uses a slow scripted model, or
+  holds the reply and releases it a delta at a time (`ScriptedModel.hold`).
+  A check that must see a run in progress, not its reply, holds the reply
+  and releases none of it.
 - **Live work is drawn in its committed form's box.** A streaming reply is a
   `.msg.assistant.streaming`, and its mark is a 2px bar in the gutter, drawn
   by a border image outside the box, which takes no width: text wraps as its
@@ -747,7 +748,10 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     the star, which a banner hides.
   - A live row the work opened carries `data-revealed`, and
     `.tool.live[data-revealed]::after` draws a ring around it. A call
-    shorter than `REVEAL_MS` is never revealed, so it shows none. The ring
+    shorter than `REVEAL_MS` is never revealed, so it shows none: the ring
+    is drawn only on a live row, so once the call ends none can show. The
+    browser suite reads that state at a held call's first frame, as its
+    row is added. The ring
     is a positioned pseudo-element 4px outside the row, taking no layout.
     The row itself reaches 1rem into the column's right gutter (1.75rem,
     against .75rem on the left: `.tool`'s negative right margin), so the

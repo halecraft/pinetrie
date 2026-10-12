@@ -1,4 +1,4 @@
-// The scripted model: its queue, its standing answer, and paused replies.
+// The scripted model: its queue, its standing answer, and held replies.
 
 import path from "node:path"
 import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pinetrie/rules"
@@ -25,6 +25,22 @@ async function asker(script: ScriptedModel) {
       },
       signal === undefined ? {} : { signal },
     )
+}
+
+/** A request's stream, and every event it has given so far. */
+async function streamer(script: ScriptedModel) {
+  const setup = await loadModelSetup({ kind: "scripted", script }, { cwd })
+  return (prompt: string) => {
+    const stream = setup.models.streamSimple(setup.model, {
+      systemPrompt: "answer",
+      messages: [{ role: "user", content: prompt, timestamp: 0 }],
+    })
+    const events: string[] = []
+    const ended = (async () => {
+      for await (const event of stream) events.push(event.type)
+    })()
+    return { events, ended, result: stream.result() }
+  }
 }
 
 const textOf = (m: Awaited<ReturnType<Awaited<ReturnType<typeof asker>>>>) =>
@@ -64,38 +80,84 @@ test("queued steps come first, then the answer; with no answer, an error reply",
   expect((await askBare("b")).stopReason).toBe("error")
 })
 
-test("a paused reply waits until resumed, and others pass it", async () => {
+test("a held reply waits until finished, and others pass it", async () => {
   const script = scriptedModel({ answer: ANSWER })
   const ask = await asker(script)
-  const paused = script.pause("wait")
+  const hold = script.hold("wait")
   const held = ask("please wait here")
-  await vi.waitFor(() => expect(paused.reached).toBe(true))
+  await vi.waitFor(() => expect(hold.reached).toBe(true))
   expect(textOf(await ask("go"))).toBe("the answer")
   expect(await settled(held)).toBe(false)
-  paused.resume()
+  hold.finish()
   expect(textOf(await held)).toBe("the answer")
 })
 
-test("a pause matches one request", async () => {
+test("a hold matches one request", async () => {
   const script = scriptedModel({ answer: ANSWER })
   const ask = await asker(script)
-  const paused = script.pause("wait")
+  const hold = script.hold("wait")
   const first = ask("wait")
-  await vi.waitFor(() => expect(paused.reached).toBe(true))
+  await vi.waitFor(() => expect(hold.reached).toBe(true))
   expect(textOf(await ask("wait again"))).toBe("the answer")
-  paused.resume()
+  hold.finish()
   await first
 })
 
-test("a paused request whose run aborts ends, aborted, with no resume", async () => {
+test("a held request whose run aborts ends, aborted, with no release", async () => {
   const script = scriptedModel({ answer: ANSWER })
   const ask = await asker(script)
-  const paused = script.pause("wait")
+  const hold = script.hold("wait")
   const abort = new AbortController()
   const held = ask("wait", abort.signal)
-  await vi.waitFor(() => expect(paused.reached).toBe(true))
+  await vi.waitFor(() => expect(hold.reached).toBe(true))
   abort.abort()
   expect((await held).stopReason).toBe("aborted")
+})
+
+test("a held reply streams nothing, its start included, until released", async () => {
+  const script = scriptedModel({ answer: ANSWER })
+  const hold = script.hold("wait")
+  const held = (await streamer(script))("wait")
+  await vi.waitFor(() => expect(hold.reached).toBe(true))
+  expect(await settled(held.result)).toBe(false)
+  expect(held.events).toEqual([])
+  hold.finish()
+  await held.ended
+})
+
+/** Long enough for faux to stream it in several deltas, of 3 to 6 tokens each. */
+const LONG = Array.from({ length: 40 }, (_, k) => `word${k}`).join(" ")
+
+test("a held reply is released a text delta at a time, in order, until none are left", async () => {
+  const script = scriptedModel({ answer: { text: LONG } })
+  const hold = script.hold("step")
+  const held = (await streamer(script))("step")
+  const steps: string[] = []
+  while (await hold.next()) {
+    steps.push(hold.released)
+    await vi.waitFor(() =>
+      expect(held.events.filter(e => e === "text_delta")).toHaveLength(
+        steps.length,
+      ),
+    )
+  }
+  await held.ended
+  expect(steps.length).toBeGreaterThan(2)
+  expect(
+    steps.every((t, i) => i === 0 || t.startsWith(steps[i - 1] ?? "")),
+  ).toBe(true)
+  expect(textOf(await held.result)).toBe(LONG)
+  expect(hold.released).toBe(LONG)
+})
+
+test("finish releases the rest of a reply stepped part way", async () => {
+  const script = scriptedModel({ answer: { text: LONG } })
+  const hold = script.hold("step")
+  const held = (await streamer(script))("step")
+  expect(await hold.next()).toBe(true)
+  hold.finish()
+  await held.ended
+  expect(textOf(await held.result)).toBe(LONG)
 })
 
 test("a scripted tool step's call carries its arguments", async () => {

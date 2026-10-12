@@ -7,7 +7,7 @@ import { subscribe } from "@kyneta/schema"
 import { projectSpine, ROOT } from "@pinetrie/core"
 import { scriptedModel, sha256Of } from "@pinetrie/pi"
 import { readPlaces } from "@pinetrie/reads"
-import { openStore } from "../../host/store.ts"
+import { BLOB_GRACE_MS } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   at,
@@ -16,6 +16,7 @@ import {
   idleNow,
   lanesOf,
   START_AGENT,
+  suiteClock,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -23,7 +24,7 @@ import { RED_PNG } from "../images.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { recordsHold, sleep } from "./support.ts"
+import { clockedStore, recordsHold } from "./support.ts"
 
 export const scenario: Scenario = {
   lanes: true,
@@ -40,15 +41,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       "pinetrie.db",
     )
     const script = scriptedModel()
-    let opened = openStore(dbFile)
-    const GRACE_MS = 1_500
+    const clock = suiteClock()
+    let stored = clockedStore(dbFile, clock)
     const start = () =>
       lanes.sectionHost({
         dir: work,
         model: { kind: "scripted", script },
-        store: opened.store,
-        blobs: opened.blobs,
-        blobGraceMs: GRACE_MS,
+        ...stored.options,
       })
     let section = await start()
     let th = section.host
@@ -118,15 +117,15 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     unwatch()
     await th.quiet()
     const base64Slice = RED_PNG.toString("base64").slice(20, 70)
-    await recordsHold(opened.store, base64Slice)
+    await recordsHold(stored.opened.store, base64Slice)
 
     // 3. After a restart on the same file and the grace, the sweep keeps it,
     // and it still reaches the model.
     await section.close(true)
-    opened = openStore(dbFile)
+    stored = clockedStore(dbFile, clock)
     section = await start()
     th = section.host
-    await sleep(GRACE_MS + 200)
+    clock.advance(BLOB_GRACE_MS + 1)
     const tv = section.user
     script.use([{ text: "still red" }])
     const tip = lanesOf(th, treeOf(th), readPlaces(th.places))[0]

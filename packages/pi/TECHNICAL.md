@@ -373,10 +373,16 @@ never cuts the newest, so a prompt within it is kept whole (S106).
 - **`scripted`:** pi-ai's faux provider (`scripted.ts`), for repeatable suites.
   - A reply is the next step `use` queued, else the standing `answer`, else
     an error reply. A request takes its step when it arrives.
-  - `pause(prompt)` holds the reply to the next request whose last user
-    message includes `prompt`, until `resume()` or the run's abort. Its
-    `reached` resolves when that request arrives, so a check sees the run in
-    progress for as long as it needs.
+  - `hold(prompt)` holds the reply to the next request whose last user
+    message includes `prompt`, from its first event (`start` included), so
+    its run is in progress with nothing streamed (ADR-0139). `next()`
+    releases its events up to and including its next text delta, and says
+    whether there was one; `finish()` releases the rest. Its `reached` turns
+    true when the request arrives.
+  - A held reply is a second stream around faux's (`holdStream`). Faux may
+    have made the whole reply before the run aborts, so an abort ends the
+    held stream itself, as faux ends one it sees aborted: an `error` of
+    reason `aborted`, at the last partial forwarded.
   - A second faux provider answers commit-message requests (`describe`, by
     default `SCRIPTED_DESCRIPTION`), so a describe request never takes a
     reply from the run's script (S48 item 22). `ModelSetup.describeModel` is

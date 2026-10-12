@@ -328,7 +328,10 @@ async function dockerContract(
         runners,
       )
       promised.push([id, count])
-      await new Promise(r => setTimeout(r, 20 + Math.random() * 80))
+      // The next snapshot lands a random number of records later, so each
+      // falls somewhere new in the write.
+      const later = count + 10 * (1 + Math.floor(Math.random() * 50))
+      await waitFor(() => written() >= later, 10_000)
     }
     writeFileSync(path.join(probe, "stop"), "")
     await writing

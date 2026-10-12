@@ -5,6 +5,10 @@
 - **Evidence:** S52
 - **Amends:**
   - ADR-0034: the default image, and what a lane reaches on the host.
+- **Amended by:**
+  - ADR-0139: a check that needs a run in progress holds its reply
+    (`ScriptedModel.hold`), which can also release it a text delta at a time;
+    `pause` is gone.
 
 **Context.** Agents in lanes run the gates, and two of them could not pass
 there. `e2e:browser` drove Chromium through a `playwright run-server` on the

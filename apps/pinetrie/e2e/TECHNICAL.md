@@ -10,16 +10,19 @@ The end-to-end suites, each a directory of scenarios:
 
 They share `checks.ts` (recording a check, and stopping at one),
 `scenario.ts` (choosing, skipping and running scenarios), `harness.ts`
-(waiting, `idleNow`, throwaway projects, joining a host through `@pinetrie/session`'s
+(waiting, `idleNow`, a host's clock a suite moves, `suiteClock`, throwaway
+projects, joining a host through `@pinetrie/session`'s
 `connectSession`, a host with no tools and `withHost`, positions and
-starts, the scripted model), `lane-hosts.ts` (why the
+starts, the scripted model), `gate.ts` (a tool command a scenario holds
+and feeds), `lane-hosts.ts` (why the
 suites' runtime cannot run here, `runtimeProblem`; hosts with tools,
 `LaneHosts`; a section's host with accepted work set up, `sectionHost`; a
 lane's shell, `inLane`; `cleanUp`) and `lane-runtime.ts` (the suites'
 runtime's CLI, and a lane's container and disks read and removed through
 lanehost's one-shot command in the project's `disks` role container, as
 the host does: ADR-0129). A suite's own helpers are beside its scenarios:
-`host/support.ts`, `lanes/support.ts`, `browser/page.ts`.
+`host/support.ts` (among them `clockedStore`), `lanes/support.ts`,
+`browser/page.ts`.
 
 ## Scenarios
 
@@ -121,10 +124,22 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
 - **A wait costs once per run, and once more per mutant whose check comes
   after it in its scenario.** S65 measures where the time went before the
   suites were scenarios; S94, after.
-- **A wait must be able to end early.** A fixed `sleep`, or a `waitFor`
-  whose condition cannot hold, costs its whole length every run. A negative
-  check, which shows that nothing arrives, has to wait: wait as briefly as
-  the rule it checks allows.
+- **A wait must be able to end early: a scenario waits for a state, never
+  for time** (ADR-0139). A fixed `sleep`, or a `waitFor` whose condition
+  cannot hold, costs its whole length every run, and guesses.
+  - **What stood in for time has a seam.** A host's clock is `startHost`'s
+    `now`, which a scenario moves (`suiteClock`, `advance`). A tool
+    command the page must watch runs behind a gate. A reply is held
+    (`ScriptedModel.hold`) and released a delta at a time.
+  - **A negative check waits on a barrier.** A read of what a client must
+    not receive waits for its copy to settle (`whenSettled`, from
+    `@kyneta/exchange`): the host has answered for it by then. A write the
+    client refused (`refusedWrite`) was never sent, so there is nothing to
+    wait for.
+  - **The fixed waits left are listed** in `FIXED_WAITS`
+    (`scripts/budget.ts`), each with its reason, and `budget.test.ts`
+    fails when a scenario holds more, or fewer. A wait there is one whose
+    length is the rule it checks, a socket's silence, or a Kyneta bug.
 - **A browser check stays only while it proves what only a browser shows:**
   focus and the caret, geometry, CSS, scrolling, render counts, a real
   Kyneta round trip, the device's storage. A rule decided in a pure
@@ -168,6 +183,23 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   `Intent`s.
 
 ## Gotchas
+
+- **A gate is a FIFO in the lane's `/tmp`** (`gate.ts`). Its command
+  (`gateCommand`) makes the FIFO, holds it open for reading and writing so a
+  feed never blocks, and prints each line it reads until `gateClose`'s end
+  line. A gate is a value with a FIFO of its own (`newGate`), so no feed
+  meets a stale one; `gateFeed` waits in the lane for the FIFO, and is run
+  with `inLaneQuiet`. Each feed is a `docker exec`: feed together the lines
+  a step does not read between. A gated row is found by its gate's label,
+  which its command shows (`pinetrie-gate-<label>`). Stop kills a gate's
+  command as it kills any.
+- **A suite's clock and its blob store's are one** (`clockedStore`,
+  `host/support.ts`). A store left on the real clock behind a host moved
+  ahead stamps every blob a day old, and the sweep deletes it, a fresh
+  paste included.
+- **Playwright's `page.clock` is never installed.** It replaces
+  `requestAnimationFrame`, `performance` and `Event.timeStamp` as well as
+  the timers, and the browser checks read geometry in real frames (S168).
 
 - **An idle wait checks the queue as well as the runs** (`idleNow`): a
   card queued while a run goes is popped only when it ends, so "no run" alone

@@ -275,6 +275,13 @@ until the next compaction (S120), and the host compacts at startup. So
   HTML.
 - **The sweep keeps a reference's quote** (`sweepBlobs`): every card's
   words that are a blob (`textSourceOf`) count as referenced.
+- **The sweep reads the host's clock, and so do the blobs** (ADR-0139):
+  `startHost`'s `now` is `Basics.now`, and the clock of the blobs it opens
+  (`openStore`'s `now`) or keeps in memory. A caller that passes its own
+  `blobs` must give them the same clock: a store behind the host's stamps
+  each blob as old, and the next sweep deletes it, though nothing has had
+  its `BLOB_GRACE_MS`. A suite moves the clock instead of waiting out the
+  grace (`suiteClock`, `clockedStore`).
 - **A message's links are quoted for the model** (`linkedQuotes`,
   `withQuotes`): `sendChat` gathers each past referent its text links to
   from the root it is in, and the chat's content quotes it under the text,

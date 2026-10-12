@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { type ImageRef, ROOT, type ThreadId } from "@pinetrie/core"
 import { scriptedModel, sha256Of } from "@pinetrie/pi"
-import { openStore } from "../../host/store.ts"
+import { BLOB_GRACE_MS } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   at,
@@ -16,12 +16,13 @@ import {
   queueCard,
   START_AGENT,
   startSuiteHost,
+  suiteClock,
   waitFor,
 } from "../harness.ts"
 import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { idOfIn, recordsHold, sleep } from "./support.ts"
+import { clockedStore, idOfIn, recordsHold } from "./support.ts"
 
 export const scenario: Scenario = {
   run: ({ check }) => run(check),
@@ -34,14 +35,12 @@ async function run(check: Checks["check"]): Promise<void> {
       "pinetrie.db",
     )
     const script = scriptedModel()
-    let opened = openStore(dbFile)
-    const GRACE_MS = 1_500
+    const clock = suiteClock()
+    let stored = clockedStore(dbFile, clock)
     const start = () =>
       startSuiteHost({
         model: { kind: "scripted", script },
-        store: opened.store,
-        blobs: opened.blobs,
-        blobGraceMs: GRACE_MS,
+        ...stored.options,
         log: () => {},
       })
     let ih = await start()
@@ -104,7 +103,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // 4. A card queued for its lane carries its images when it is popped.
     const green = await upload(GREEN_PNG)
     const replyId = idOfIn(ih, "a red one")
-    const paused = script.pause("hold on")
+    const paused = script.hold("hold on")
     script.use([{ text: "held" }, { text: "a green one" }])
     await iu.chat("@agent hold on", at(replyId), {
       mode: "reply",
@@ -120,7 +119,7 @@ async function run(check: Checks["check"]): Promise<void> {
     if (lane !== undefined) void queueCard(iu, queued, lane)
     await waitFor(() => ih.cardText(queued) === queuedText, 5_000)
 
-    paused.resume()
+    paused.finish()
     await iidle()
 
     // 5. An image the host does not store refuses the send.
@@ -132,11 +131,11 @@ async function run(check: Checks["check"]): Promise<void> {
     // 6. No image bytes in the session's records, compacted.
     await ih.quiet()
     const base64Slice = RED_PNG.toString("base64").slice(20, 70)
-    await recordsHold(opened.store, base64Slice)
+    await recordsHold(stored.opened.store, base64Slice)
 
     // 7. Deleting what nothing shows, after the grace; a card's image stays,
     // across a restart (ADR-0048).
-    await upload(BLUE_PNG)
+    const blue = await upload(BLUE_PNG)
     const yellow = await upload(YELLOW_PNG)
     const draftedText = `next: ![yellow](/blob/${yellow.sha256})`
     const drafted = await composeAt(
@@ -146,11 +145,10 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     await waitFor(() => ih.cardText(drafted) === draftedText, 5_000)
     await iu.close()
-    await sleep(100)
     await ih.shutdown()
-    opened = openStore(dbFile)
+    stored = clockedStore(dbFile, clock)
     ih = await start()
-    await sleep(GRACE_MS + 200)
+    clock.advance(BLOB_GRACE_MS + 1)
     const iv = await join(ih, "ivy", "images")
     script.use([{ text: "swept" }])
     await iv.chat("@agent anything", at(idOfIn(ih, "a green one")), {
@@ -158,6 +156,14 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     await iidle()
     await ih.quiet()
+    // The run's end swept, on the host's clock, a day past both uploads.
+    const blueAfter = (await blobAt(blue.sha256)).status
+    const yellowAfter = (await blobAt(yellow.sha256)).status
+    check(
+      "after the grace, the sweep deletes an image nothing shows, and keeps one a card shows",
+      blueAfter === 404 && yellowAfter === 200,
+      `blue ${blueAfter}, yellow ${yellowAfter}`,
+    )
     let seenAfter: readonly string[] = []
     script.use([
       {
@@ -177,7 +183,6 @@ async function run(check: Checks["check"]): Promise<void> {
         seenAfter.includes(`Ivy: ${asked}[image image/png ${red.sha256}]`),
     )
     await iv.close()
-    await sleep(100)
     await ih.shutdown()
   }
 }

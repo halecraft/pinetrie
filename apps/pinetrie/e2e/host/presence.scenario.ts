@@ -81,14 +81,12 @@ async function run(check: Checks["check"]): Promise<void> {
         d.records.set("forged", { forged: "bea is the host" }),
       ),
     )
-    await sleep(500)
     check(
       "a client cannot write the session: its write is refused before it is made, and the host's copy is unchanged",
       refused && ph.session.records.get("forged") === undefined,
       `refused ${refused}`,
     )
     await bea.close()
-    await sleep(100)
     await ph.shutdown()
   }
 }

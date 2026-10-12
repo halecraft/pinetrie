@@ -710,7 +710,6 @@ export {
   type Box,
   keepSpot,
   placeAt,
-  RAIL_HOLD_MS,
   railScroll,
   type Span,
   type Spot,

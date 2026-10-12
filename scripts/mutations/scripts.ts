@@ -26,6 +26,7 @@ const proofs = [
 ]
 const numbering = ["pnpm", "exec", "vitest", "run", "scripts/numbering.test.ts"]
 const record = ["pnpm", "exec", "vitest", "run", "scripts/record.test.ts"]
+const gate = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/e2e/gate.test.ts"]
 const scenarios = [
   "pnpm",
   "exec",
@@ -35,6 +36,23 @@ const scenarios = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a fixed wait in Playwright is not counted",
+    file: "scripts/budget.ts",
+    from: "  /waitForTimeout\\(|\\bsleep\\(|",
+    to: "  /\\bsleep\\(|",
+    command: proofs,
+    expect: "each scenario holds exactly the fixed waits FIXED_WAITS allows it",
+  },
+  {
+    name: "a gate's line is fed unquoted",
+    file: "apps/pinetrie/e2e/gate.ts",
+    from: '  ["\'", line.replaceAll("\'", "\'\\\\\'\'"), "\'"].join("")',
+    to: "  line",
+    command: gate,
+    expect:
+      "a gate prints only what it is fed, each line as written, and ends when closed",
+  },
   {
     name: "a client names an entry's root without waiting for its copy to have it",
     file: "apps/pinetrie/e2e/harness.ts",

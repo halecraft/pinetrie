@@ -368,7 +368,9 @@ context.**
   such deletions lost; 3 ms apart, 0 of 20. One peer's later operation should
   beat its own earlier one. In pine·trie it needs a column refreshed and closed in
   the same millisecond, and leaves only an empty key readers skip. To file
-  upstream.
+  upstream. The host suite's `presence` scenario sleeps 20 ms before such a
+  deletion; that wait is listed in `FIXED_WAITS` (`scripts/budget.ts`)
+  until Kyneta orders a peer's own operations.
 
 - ~~**Kyneta's store repeats bytes when commits overlap**~~ — fixed in Kyneta
   (locally, unreleased), verified from pine·trie: 0 overlapping records, where one
