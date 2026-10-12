@@ -1,10 +1,11 @@
 // web/use-drag — the one drag engine: every drag that starts in the page,
 // a column's, a card's, a slot's, a task's, by the pointer. It decides
 // nothing (`drag.ts` in `@pinetrie/interface` does): each frame it gathers
-// the pointer and the element under it, asks `dragVerdict` and `drawPlan`,
-// and applies the plan to `style` and `dataset`; a drop sends
-// `dropIntents`. A drag writes to the DOM, never to React state: a render of
-// `App` per pointer move would redraw every column.
+// what the source is over and the element it read that from, asks
+// `dragVerdict` and `drawPlan`, and applies the plan to `style` and
+// `dataset`, the target's mark and what a hold opens included; a drop
+// sends `dropIntents`. A drag writes to the DOM, never to React state: a
+// render of `App` per pointer move would redraw every column.
 //
 // What the first frame needs is measured at the press, before the drag
 // threshold, so the one long frame of a drag falls before anything is seen
@@ -13,13 +14,14 @@
 import { isTaskId, type TaskId, type WorkflowStateId } from "@pinetrie/core"
 import {
   type Armed,
+  type CardOver,
   DRAG_HANDLE,
   DRAG_START,
   DROP_ZONE,
+  type DragAt,
   type DragFrom,
-  type DragOver,
   type DragSource,
-  type DragVerdict,
+  type DropMark,
   dragVerdict,
   drawPlan,
   dropIntents,
@@ -40,6 +42,7 @@ import {
   rootTargetOfElement,
   sidebarSpotAt,
   sourceOfElement,
+  type TaskOver,
   targetOfElement,
 } from "@pinetrie/interface"
 import { type RefObject, useEffect } from "react"
@@ -151,30 +154,28 @@ export function useDrag(input: {
     let speed = 0
     let alt = false
     let frame = 0
-    let over: DragOver = { kind: "none" }
-    let verdict: DragVerdict = { kind: "nothing" }
+    // The element marked, and its mark, as `mark` last wrote them.
     let marked: HTMLElement | null = null
+    let markedAs: DropMark | null = null
     let hover: { readonly key: string; readonly timer: number } | null = null
     let hovered: HTMLElement | null = null
     let swallowClick = false
 
     const how = (): PutHow => (alt ? "copy" : "move")
 
-    const mark = (el: HTMLElement | null, value: string | null) => {
-      if (marked !== null && marked !== el) {
-        delete marked.dataset.dragVerdict
-        delete marked.dataset.rootDrop
-      }
+    const unmark = (el: HTMLElement) => {
+      delete el.dataset.dragVerdict
+      delete el.dataset.rootDrop
+    }
+    const mark = (el: HTMLElement | null, value: DropMark | null) => {
+      if (el === marked && value === markedAs) return
+      if (marked !== null && marked !== el) unmark(marked)
       marked = el
-      if (el === null || value === null) {
-        if (el !== null) {
-          delete el.dataset.dragVerdict
-          delete el.dataset.rootDrop
-        }
-        return
-      }
-      if (press?.source.kind === "task") el.dataset.rootDrop = ""
-      else el.dataset.dragVerdict = value
+      markedAs = value
+      if (el === null) return
+      unmark(el)
+      if (value === "root") el.dataset.rootDrop = ""
+      else if (value !== null) el.dataset.dragVerdict = value
     }
 
     const setHover = (at: HoverOver, el: HTMLElement | null) => {
@@ -198,26 +199,26 @@ export function useDrag(input: {
       }
     }
 
-    /** What is under the pointer now, read from the page. */
-    const gather = (p: Press): { over: DragOver; el: HTMLElement | null } => {
+    /** What the source is over now, and the element it was read from. */
+    const gather = (p: Press): { at: DragAt; el: HTMLElement | null } => {
       const under = document.elementFromPoint(x, y)
-      const row = under?.closest<HTMLElement>(".open-root[data-task]") ?? null
-      const rowTask = taskOf(row?.dataset.task)
-      const board = under?.closest<HTMLElement>(".board-toggle") ?? null
-      setHover(
-        board !== null
-          ? { kind: "board" }
-          : rowTask !== null
-            ? { kind: "task", task: rowTask }
-            : { kind: "none" },
-        board ?? row,
-      )
       if (p.source.kind === "task") {
         const lands = rootLanding(under, y)
-        return lands === null
-          ? { over: { kind: "none" }, el: null }
-          : { over: { kind: "root", target: lands.target }, el: lands.el }
+        const over: TaskOver =
+          lands === null
+            ? { kind: "none" }
+            : { kind: "root", target: lands.target }
+        return { at: { ...p.source, over }, el: lands?.el ?? null }
       }
+      const seen = cardOver(p, under)
+      return { at: { ...p.source, over: seen.over }, el: seen.el }
+    }
+
+    /** What a card's drag is over: the strip, ▦, or a drop zone. */
+    const cardOver = (
+      p: Press,
+      under: Element | null,
+    ): { over: CardOver; el: HTMLElement | null } => {
       const { strip } = p
       if (p.armed.column && strip !== null && p.armed.strip !== null) {
         const box = p.armed.strip
@@ -234,6 +235,8 @@ export function useDrag(input: {
           }
         }
       }
+      const board = under?.closest<HTMLElement>(".board-toggle") ?? null
+      if (board !== null) return { over: { kind: "board" }, el: board }
       const zone = under?.closest<HTMLElement>(DROP_ZONE) ?? null
       const target = zone === null ? null : targetOfElement(zone)
       if (zone === null || target === null)
@@ -261,9 +264,8 @@ export function useDrag(input: {
       const p = press
       if (p === null || !begun) return
       const seen = gather(p)
-      over = seen.over
-      verdict = dragVerdict(p.source, p.from, over, how(), read())
-      const plan = drawPlan(p.armed, { x, y }, speed, over, verdict, how())
+      const verdict = dragVerdict(seen.at, p.from, how(), read())
+      const plan = drawPlan(p.armed, { x, y }, speed, seen.at, verdict, how())
       speed *= 0.6
       // Only what changed is written: a style written again, the same,
       // still costs the page a style pass over what it touches.
@@ -295,13 +297,14 @@ export function useDrag(input: {
       const lean = `${Math.round(plan.lean * 2) / 2}deg`
       if (p.handle.style.getPropertyValue("--lean") !== lean)
         p.handle.style.setProperty("--lean", lean)
-      if (
-        seen.el !== marked ||
-        (seen.el?.dataset.dragVerdict ?? null) !== plan.mark
-      )
-        mark(seen.el, plan.mark)
+      mark(seen.el, plan.mark)
+      setHover(plan.opens, seen.el)
       // The strip scrolls near its edges while a column is over it.
-      if (p.strip !== null && over.kind === "strip" && p.armed.strip !== null) {
+      if (
+        p.strip !== null &&
+        seen.at.over.kind === "strip" &&
+        p.armed.strip !== null
+      ) {
         const by = edgeScroll(x, p.armed.strip.left, p.armed.strip.right)
         if (by !== 0) p.strip.scrollLeft += by
       }
@@ -379,8 +382,8 @@ export function useDrag(input: {
       if (p === null || e.pointerId !== p.pointer) return
       if (!begun) return finish(false)
       const seen = gather(p)
-      const final = dragVerdict(p.source, p.from, seen.over, how(), read())
-      const intents = dropIntents(p.source, seen.over, final, how())
+      const final = dragVerdict(seen.at, p.from, how(), read())
+      const intents = dropIntents(seen.at, final, how())
       finish(intents.length > 0)
       for (const intent of intents) send(intent)
     }

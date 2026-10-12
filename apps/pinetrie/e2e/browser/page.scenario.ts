@@ -16,6 +16,7 @@ import {
 } from "@pinetrie/core"
 import {
   type ButtonWords,
+  ITEM_HOVER_MS,
   identityCodec,
   promptParent,
   queueWords,
@@ -98,7 +99,7 @@ async function run(check: Checks["check"]): Promise<void> {
       log: (m: string) => console.log("    [host]", m),
     })
     console.log(`  host              : ${host.httpUrl}\n`)
-    /** The task the thread `root` starts is in: what the sidebar and the board name it by (ADR-0116). */
+    /** The task the thread `root` starts is in: what the sidebar and the board name it by. */
     // Read while the host holds the root, and kept: an archived task's
     // root is let go.
     const tasksOf = new Map<string, string>()
@@ -115,7 +116,7 @@ async function run(check: Checks["check"]): Promise<void> {
     }
     /**
      * The page's message count, on ▦, reaches the host's directory's: it has
-     * every root's record, held or not (ADR-0063, ADR-0122).
+     * every root's record, held or not.
      */
     const countIsHosts = (p: Page) =>
       waitFor(async () => {
@@ -129,13 +130,13 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // An explicit context: a page from `browser.newPage()` owns its context, and
     // Playwright refuses a second tab in it, which the column checks open. It may
-    // use the clipboard, so a check can read what copy wrote (S68).
+    // use the clipboard, so a check can read what copy wrote.
     const page = await (
       await browser.newContext({
         permissions: ["clipboard-read", "clipboard-write"],
       })
     ).newPage()
-    /** The main page's person: the email it gives the form below (ADR-0037). */
+    /** The main page's person: the email it gives the form below. */
     const ME = writerId("ada@browser.test")
     /**
      * Make `p` a person before it loads: what the identity form would have
@@ -158,7 +159,7 @@ async function run(check: Checks["check"]): Promise<void> {
       })
 
       // A first visit asks who you are, and connects nothing until it knows: your
-      // email is the principal, your name the session's label for you (ADR-0037).
+      // email is the principal, your name the session's label for you.
       await page.waitForSelector("#identity", { timeout: 20_000 })
       await page.fill('#identity input[name="email"]', "ada")
       await page.fill('#identity input[name="name"]', "Ada")
@@ -186,7 +187,7 @@ async function run(check: Checks["check"]): Promise<void> {
         "page loaded, wasm instantiated, client connected to the host",
         true,
       )
-      // The render checks count React's development-build measures (S54), and
+      // The render checks count React's development-build measures, and
       // against the production build every count is 0 and passes: refuse it.
       const devReact = await page
         .waitForFunction(
@@ -218,7 +219,7 @@ async function run(check: Checks["check"]): Promise<void> {
         errors.length === 0,
         `${errors[0] === undefined ? "" : ` — ${errors[0].slice(0, 90)}`}`,
       )
-      // The session is plain JSON (ADR-0023): the page loads no Loro and no wasm.
+      // The session is plain JSON: the page loads no Loro and no wasm.
       // In development Vite pre-bundles loro-crdt with its wasm inside a JS module,
       // so a check for `.wasm` files alone would pass with Loro loaded.
       const heavy = await page.evaluate(() =>
@@ -326,7 +327,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       }
       // The board opens over the columns, from the footer's edge, and moves
-      // none of them (ADR-0122). A click on a column above it closes it.
+      // none of them. A click on a column above it closes it.
       {
         const rects = () =>
           page.$$eval(".column", cs =>
@@ -375,7 +376,7 @@ async function run(check: Checks["check"]): Promise<void> {
           `${before.join("|")} → ${during.join("|")}; closed: ${closed}`,
         )
       }
-      // Its thread is named before anything is typed (ADR-0057).
+      // Its thread is named before anything is typed.
       const nameBefore = await page
         .waitForSelector(`${col(0)} .column-head .agent-name[data-thread]`, {
           timeout: 15_000,
@@ -455,7 +456,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
       // ── mentions pick the addressee, and the button says so ────────────────
       // The thread has a lane now, so a message naming no one asks the agent; one
-      // naming only a person is for them (ADR-0021).
+      // naming only a person is for them.
       await page.fill(`${col(0)} .composer .input`, FOR_ADA)
       await page.click(`${col(0)} .composer .send`)
       await shows(FOR_ADA)
@@ -657,7 +658,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `${caret}`,
       )
       // Its header says a new agent starts, for as long as its composer asks one:
-      // `new agent`, then its name once reserved (ADR-0057).
+      // `new agent`, then its name once reserved.
       {
         const agentName = `${col(1)} .column-head .agent-name`
         const appears = (present: boolean) =>
@@ -1044,7 +1045,7 @@ async function run(check: Checks["check"]): Promise<void> {
         queuedHere >= 0 && drawn,
         `${queuedHere} ms`,
       )
-      // The dock (ADR-0113): grown past a third of the column, by a tall
+      // The dock: grown past a third of the column, by a tall
       // message, it scrolls within, its queue header still in view.
       const dockHolds = await page.$eval(col(0), c => {
         const dock = c.querySelector<HTMLElement>(".dock")
@@ -1080,7 +1081,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await queueButton(queueWords({ kind: "afterYours", ahead: 2 })),
         `"${await label(0)}"`,
       )
-      // ── the queue's own controls (ADR-0048 step 7) ────────────────────────
+      // ── the queue's own controls ────────────────────────
       // Alt+↑ in your queued card moves it above Bea's; its box keeps the
       // focus and the caret, though the list was drawn again.
       const yourBox = `${col(0)} .card-editor.queued textarea[data-card="${yours?.id ?? ""}"]`
@@ -1249,7 +1250,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await idle()
       // While the agent works, the strip counts its root and the thread's
       // item shows a still ring: nothing in the footer, and nothing in your
-      // list, animates (ADR-0069, ADR-0077, ADR-0091).
+      // list, animates.
       const held = script.pause("say exactly: HELD")
       await other.chat("@agent say exactly: HELD", atEntry(entryId(forAdaId)), {
         mode: "branch",
@@ -1291,7 +1292,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await idle()
       await other.close()
 
-      // ── a page over the stage (ADR-0098): the browser's Back leaves it,
+      // ── a page over the stage: the browser's Back leaves it,
       // and the columns under it kept their place. ──
       const body = `${col(0)} .column-body`
       const scrolled = await page
@@ -1324,7 +1325,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // ── your profile: a rename shows, and the name each message was sent ──
-      // under stays; this device keeps the name you go by (ADR-0037).
+      // under stays; this device keeps the name you go by.
       const profileSeen = await openProfile(page)
       const profile = '.page[data-page="profile"]'
       const nameField = `${profile} input[name="name"]`
@@ -1503,8 +1504,8 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         .catch(() => null)
 
-      // ── a message's tools: one row; edit is a sibling; a first message's new tab
-      // (ADR-0043). A person's message in agent work has all three tools.
+      // ── a message's tools: one row; edit is a sibling; a first message's new tab.
+      // A person's message in agent work has all three tools.
       const person = `${agentCol} ${msg("say exactly: DOWN-TWO")}`
       await page.hover(person)
       const row = await page.$$eval(`${person} > .tools > button`, bs =>
@@ -1520,7 +1521,7 @@ async function run(check: Checks["check"]): Promise<void> {
           Math.max(...tops) - Math.min(...tops) <= 1,
         `${JSON.stringify(row)}`,
       )
-      // ── a comment (ADR-0126): a note in the message's margin, which opens
+      // ── a comment: a note in the message's margin, which opens
       // under it with its box focused; shut, the message shows its count.
       await page.click(`${person} > .tools > .comment`)
       const commentBox = `${agentCol} .margin textarea`
@@ -1576,7 +1577,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `"${copied}", "${copiedTitle}"`,
       )
       // Without a clipboard, as over plain http, copy selects the drawn text for
-      // you to copy (S68: hiding it stands in for an insecure context).
+      // you to copy (hiding it stands in for an insecure context).
       await page.evaluate(() => {
         getSelection()?.removeAllRanges()
         Object.defineProperty(navigator, "clipboard", {
@@ -1601,7 +1602,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       // Cmd+C on a selection copies what you selected, as text, across
       // formatting or within plain text, and takes nothing into the
-      // inventory, which stays closed (ADR-0132).
+      // inventory, which stays closed.
       const copySelection = async (end: number | null) => {
         await page.evaluate(() => navigator.clipboard.writeText(""))
         await page.locator(`${still} > .text > p`).evaluate((p, end) => {
@@ -1687,7 +1688,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const askedId = entryId(
         (await page.getAttribute(person, "data-entry")) ?? "",
       )
-      // Past the context its run wrote above it: a canvas list (ADR-0116).
+      // Past the context its run wrote above it: a canvas list.
       const parentId = promptParent(treeOf(host), askedId) ?? ""
       await page.hover(person)
       await page.click(`${person} > .tools > .edit`)
@@ -1731,7 +1732,71 @@ async function run(check: Checks["check"]): Promise<void> {
         undefined,
         { timeout: 15_000 },
       )
-      // The sidebar is your own document (ADR-0122): another device of yours,
+      // A task dragged over another in the sidebar only reorders. Held over
+      // the other's middle past the hold that opens a task for a card's drag,
+      // it shows no ring and opens nothing; released past that middle, it
+      // lands on the other side. The other is never the task you are on, so
+      // opening it would show.
+      {
+        const order = await page.$$eval("#sidebar .open-root", ts =>
+          ts.map(t => t.getAttribute("data-task") ?? ""),
+        )
+        const current = () =>
+          page
+            .$eval('#sidebar .open-root[aria-current="true"]', n =>
+              n.getAttribute("data-task"),
+            )
+            .catch(() => null)
+        const here = await current()
+        // From the first to below the second, or from the second to above
+        // the first: either way the first two swap.
+        const down = here === order[0]
+        const rows = page.locator("#sidebar .open-root")
+        const from = await rows.nth(down ? 0 : 1).boundingBox()
+        const over = await rows.nth(down ? 1 : 0).boundingBox()
+        let ringed = true
+        let stayed = false
+        if (from !== null && over !== null) {
+          const x = over.x + over.width / 3
+          await page.mouse.move(
+            from.x + from.width / 3,
+            from.y + from.height / 2,
+          )
+          await page.mouse.down()
+          await page.mouse.move(x, over.y + over.height / 2, { steps: 8 })
+          // The ring fills while the hold lasts and clears as it opens.
+          await page.waitForTimeout(ITEM_HOVER_MS / 2)
+          ringed = (await page.$("[data-hover-open]")) !== null
+          await page.waitForTimeout(ITEM_HOVER_MS / 2 + 150)
+          stayed = (await current()) === here
+          await page.mouse.move(
+            x,
+            down ? over.y + over.height - 2 : over.y + 2,
+            { steps: 4 },
+          )
+          await page.mouse.up()
+        }
+        const swapped = [order[1], order[0], ...order.slice(2)].join()
+        const after = await page
+          .waitForFunction(
+            o =>
+              [...document.querySelectorAll("#sidebar .open-root")]
+                .map(n => n.getAttribute("data-task"))
+                .join() === o,
+            swapped,
+            { timeout: 10_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "a task dragged over another's middle in the sidebar opens nothing, and drops above or below it",
+          order.length >= 2 && !ringed && stayed && after,
+          `ringed ${ringed}, stayed ${stayed}, swapped ${after}`,
+        )
+      }
+      // The sidebar is your own document: another device of yours,
       // a browser context of its own, has it, in your order. A reload reads
       // it the same way.
       {
@@ -1771,7 +1836,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const first = `${agentCol} ${msg("say exactly: DOWN-ONE")}`
       await page.hover(first)
       await page.click(`${first} > .tools > .edit-new-tab`)
-      // A new tab is a task of its own from the start (ADR-0126).
+      // A new tab is a task of its own from the start.
       await page.waitForSelector(`${col(0)}[data-card] .composer`, {
         timeout: 15_000,
       })
@@ -1784,7 +1849,7 @@ async function run(check: Checks["check"]): Promise<void> {
         { timeout: 15_000 },
       )
 
-      // ── the sidebar, the board and the inbox (ADR-0030, ADR-0122) ───────────
+      // ── the sidebar, the board and the inbox ───────────
       const downRoot = treeOf(host).roots.at(-1) ?? ""
       const selectedRoot = (p: Page) =>
         p
@@ -1806,7 +1871,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         .catch(() => null)
 
-      // 2. A root someone else starts is not added to the sidebar (ADR-0030).
+      // 2. A root someone else starts is not added to the sidebar.
       const api = await join(host, "tabs", "browser")
       await api.request({ kind: "name", name: "Bea" })
       const third = await api.chat("a third thread", ROOT, { mode: "branch" })
@@ -1832,7 +1897,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `${hiddenAtRest}, ${shownOnHover}`,
       )
 
-      // Renders (S54, S59). Your typing writes only presence once your card
+      // Renders. Your typing writes only presence once your card
       // exists, and `App` reads none, so it redraws nothing outside the
       // composer. Typed for over a second: `typing` is written at most once a
       // second. A render is named by the function that rendered: a message's is
@@ -1893,7 +1958,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // A message in a thread this tab does not show redraws none of its
       // messages. It is in a root of the sidebar, which this tab holds, so the
       // tree changes and every column's list draws again: only the messages'
-      // own memo keeps them (S59).
+      // own memo keeps them.
       await componentRenders(page)
       await api.chat("meanwhile, elsewhere", atEntry(entryId(downRoot)), {
         mode: "branch",
@@ -2078,7 +2143,7 @@ async function run(check: Checks["check"]): Promise<void> {
           onThird && moved,
         )
 
-        // 4b. Rename (ADR-0045): a title is the root's label for everyone, the
+        // 4b. Rename: a title is the root's label for everyone, the
         // board shows it, Escape keeps the old one, and clearing it brings
         // back the first line. The page is on the third root.
         const tabLabel = (p: Page, r: string) =>
@@ -2142,7 +2207,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         await rename("", "Enter")
 
-        // 4c. Auto-update title (ADR-0074): the model's title arrives as the
+        // 4c. Auto-update title: the model's title arrives as the
         // label. The suites' scripted model answers every request outside a
         // thread with `SCRIPTED_DESCRIPTION`.
         const auto = titleOf(SCRIPTED_DESCRIPTION) ?? ""
@@ -2156,7 +2221,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         await rename("", "Enter")
 
-        // 4d. The board (ADR-0122): a root dragged to another state moves
+        // 4d. The board: a root dragged to another state moves
         // there for everyone, and the other window's board shows it.
         {
           const workflow = readWorkflow(host.session)
@@ -2190,7 +2255,7 @@ async function run(check: Checks["check"]): Promise<void> {
           await tb.click("#bottom .board-toggle")
         }
 
-        // 4e. The board's search (ADR-0115): opened with ▦, its field in the
+        // 4e. The board's search: opened with ▦, its field in the
         // footer takes focus, and a filter shows a banner at the board's
         // foot without moving the field. A word no label holds hides every
         // root, so the board shrinks as far as it can. Clear lifts the
@@ -2340,7 +2405,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
-        // The corner at 11.5rem (ADR-0098): your name gives way, so it, your
+        // The corner at 11.5rem: your name gives way, so it, your
         // inbox with a two-digit badge and your inventory sit side by side.
         const viewport = page.viewportSize()
         const wasFolded = (await page.$(':root[data-list="icons"]')) !== null
@@ -2473,7 +2538,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         await page.keyboard.press("Escape")
         // Seen is kept per device: across a reload, and a mention made meanwhile counts.
-        // The reload keeps the root you were on and its columns (ADR-0027).
+        // The reload keeps the root you were on and its columns.
         await page.click(itemSel(taskOf(firstRoot)))
         const keysOf = () =>
           page.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key")))
@@ -2525,7 +2590,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const sibling = await page.context().newPage()
         try {
           await sibling.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
-          // A second tab of the device is the same person (ADR-0037), so its
+          // A second tab of the device is the same person, so its
           // mentions are the page's.
           await sibling.waitForSelector("#bottom .inbox-badge", {
             timeout: 20_000,
@@ -2555,7 +2620,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
         // 7. Moved to Done, a root is archived and leaves every list: the
         // window that moved it closes it, and the page someone else is on
-        // reads it (ADR-0122).
+        // reads it.
         await page.click(itemSel(taskOf(thirdRoot)))
         await page.waitForSelector(`${col(0)} .composer .send`, {
           timeout: 15_000,
@@ -2881,8 +2946,8 @@ async function run(check: Checks["check"]): Promise<void> {
               `${before} before, arrived ${arrived}, offered ${offered}, gap after ${Math.round(gap)}px; ${kinds.join(",")}; ${where.join(" ")}`,
             )
           }
-          // Where a column was left, and the rail's outline of what it shows
-          // (ADR-0058). Column 0 is long: 30 messages and more.
+          // Where a column was left, and the rail's outline of what it shows.
+          // Column 0 is long: 30 messages and more.
           {
             const body0 = `${col(0)} .column-body`
             const key0 = (await lp.getAttribute(col(0), "data-key")) ?? ""
@@ -2946,7 +3011,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
             // The rail, shorter than column 0's path, keeps the column's view
             // in view. Column 0 ends on the late aside, one row under the
-            // fork, beside the trunk's continuation (ADR-0068): its path is
+            // fork, beside the trunk's continuation: its path is
             // about 100 px of the rail, its view at its end about 40 px, from
             // inside the trunk's capsule. The rail is taller than that and
             // its margins.
@@ -3145,7 +3210,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // ── a second window joins and asks ──────────────────────────────────────
-      // Alone, nobody else is shown anywhere (ADR-0024).
+      // Alone, nobody else is shown anywhere.
       await page.evaluate(() => ({
         avatars: [...document.querySelectorAll(".avatar")].map(
           a =>
@@ -3224,7 +3289,7 @@ async function run(check: Checks["check"]): Promise<void> {
           avatar,
         )
         // Its typing makes a card, new in `cards`, so the column redraws; its
-        // message list does not (S59). What earlier steps set going (a
+        // message list does not. What earlier steps set going (a
         // thread's name, a title, a run's end and the facts its drain
         // appends) lands first, so the renders counted are the card's alone.
         await idle()
@@ -3265,7 +3330,7 @@ async function run(check: Checks["check"]): Promise<void> {
             n.getAttribute("data-task"),
           )
           .catch(() => null)
-        // Its first root's newest message (ADR-0116).
+        // Its first root's newest message.
         const threads = readThreads(host.session)
         const shownRoot = [...threads.values()].find(
           t =>
@@ -3281,7 +3346,7 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForSelector(`.msg[data-entry="${newest}"]`, { timeout: 15_000 })
           .catch(() => null)
 
-        // Cards (ADR-0048, ADR-0113): what you type is your message on its
+        // Cards: what you type is your message on its
         // thread, which only you see, kept across tab switches; a note is
         // shown to everyone at that end.
         const box = `${col(0)} .composer .input`
@@ -3377,7 +3442,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.click(itemSel(here))
         // Undo is the card's (Kyneta's stack): your typing, never the other's.
         // A word typed after a space starts a step, so Cmd+Z takes back "more",
-        // a run of four keystrokes, which redo puts back in order (S64).
+        // a run of four keystrokes, which redo puts back in order.
         await page.focus(box)
         await page.keyboard.press("End")
         await page.keyboard.type(" and more")
@@ -3391,7 +3456,7 @@ async function run(check: Checks["check"]): Promise<void> {
           `${await boxValue(page, box)}`,
         )
         // Cmd+Z in the other root's box undoes its card, though this root's
-        // typing is newer (ADR-0052).
+        // typing is newer.
         await page.click(itemSel(taskOf(downRoot)))
         await page.focus(box)
         await page.keyboard.press("ControlOrMeta+z")
@@ -3449,7 +3514,7 @@ async function run(check: Checks["check"]): Promise<void> {
           `${readPlaces(host.places).length} cards, ${cardsAfterSend} before`,
         )
         // Undo past a card's creation empties the box and keeps the card,
-        // whose record only the host writes (ADR-0059); Cmd+Shift+Z in the
+        // whose record only the host writes; Cmd+Shift+Z in the
         // same box brings its text back.
         await page.keyboard.type("x")
         await waitFor(
@@ -3515,7 +3580,7 @@ async function run(check: Checks["check"]): Promise<void> {
           "× on a new branch that holds text trashes its card at once, asking nothing",
           closed && shown() === cardsBefore - 1,
         )
-        // Marks (ADR-0048, step 2): a pip where a card of yours holds text.
+        // Marks: a pip where a card of yours holds text.
         const pipIn = (p: typeof page, sel: string) =>
           p
             .waitForSelector(`${sel} .signal[data-signal="unsent"]`, {
@@ -3572,7 +3637,7 @@ async function run(check: Checks["check"]): Promise<void> {
           unmarked && readPlaces(host.places).length === records,
           `${unmarked}; ${readPlaces(host.places).length} records, ${records} before`,
         )
-        // A root you closed is marked on ▦ and on its thread card (ADR-0122).
+        // A root you closed is marked on ▦ and on its thread card.
         await page.keyboard.type("back tomorrow")
         await pipIn(page, itemSel(here))
         const columnsHere = await page.locator(".column").count()
@@ -3636,7 +3701,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await second.close().catch(() => {})
       }
 
-      // Your inventory (ADR-0048 step 4), in the DOWN thread's tab: its agent
+      // Your inventory, in the DOWN thread's tab: its agent
       // thread and the conversation below it.
       await page.click(itemSel(taskOf(downRoot)))
       await page.waitForFunction(
@@ -3705,7 +3770,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `slot ${inSlot}, line ${firstLine}, emptied ${boxEmptied}, ${placeOf(parked)?.kind}`,
       )
       // Swap: dropped on an empty slot, the card moves there; with the panel
-      // focused, the undo key swaps it back (ADR-0066, this tab's own stack).
+      // focused, the undo key swaps it back (this tab's own stack).
       const inventorySlot =
         (await page.getAttribute(slotOf(parked), "data-slot")) ?? ""
       const emptySlot = inventorySlot === "9" ? "10" : "9"
@@ -3738,7 +3803,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `${await boxText(putNote)}; ${placeOf(parked)?.kind}`,
       )
       // Undo, outside a box: the put is undone, and the card is back in its
-      // slot. The host records a move as it applies it (ADR-0066), so the key
+      // slot. The host records a move as it applies it, so the key
       // can follow at once.
       await page.evaluate(() =>
         (document.activeElement as HTMLElement | null)?.blur(),
@@ -3769,7 +3834,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       await page.keyboard.press("ControlOrMeta+z")
       // Dropped on the canvas past its last column, a text card lands in a
-      // note column made for it there (ADR-0126); the undo key takes back
+      // note column made for it there; the undo key takes back
       // both.
       await waitFor(() => placeOf(parked)?.kind === "inventory", 5_000)
       await page.dragAndDrop(slotOf(parked), "#strip > .canvas-end")
@@ -3806,7 +3871,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `${wrapped}, ${wrapPlace?.kind}; undone ${unwrapped} ms, ${placeOf(parked)?.kind}`,
       )
       // Discarded with its ×, and back in its slot with the undo key: a
-      // discard is a move the host's history holds (ADR-0111).
+      // discard is a move the host's history holds.
       await page.click(slotOf(parked))
       await page.keyboard.press("Enter")
       await page.click(".inventory .discard-card")
@@ -3826,7 +3891,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       // Dropped on a state in the footer's strip, a card becomes a thread
       // there, its first message the card's text; the undo key lifts it back
-      // into the card while it holds that message alone (ADR-0111).
+      // into the card while it holds that message alone.
       const stateEl = "#bottom .strip-state[data-put-state]"
       const target = await page
         .getAttribute(stateEl, "data-put-state")
@@ -3864,10 +3929,10 @@ async function run(check: Checks["check"]): Promise<void> {
         spun >= 0 && landed === target && lifted >= 0,
         `spun ${spun} ms into ${thread} in ${landed}, not ${target}; lifted ${lifted} ms, ${placeOf(parked)?.kind}`,
       )
-      // Selected, a card is previewed beside the grid, read only (ADR-0126);
+      // Selected, a card is previewed beside the grid, read only;
       // Enter opens it whole in place, over its neighbours, its box
       // focusable, and the preview hides; Escape there folds it, and focus
-      // is back on its slot (ADR-0113). An empty slot first, since a click on
+      // is back on its slot. An empty slot first, since a click on
       // the card already selected opens it.
       await page.click(slotAt(emptySlot))
       await page.click(slotOf(parked))
@@ -4008,7 +4073,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.click(`${branch} .close`)
       await columnsAre(columnsBefore)
 
-      // Pinned cards (ADR-0048 step 5), in the DOWN thread's agent column:
+      // Pinned cards, in the DOWN thread's agent column:
       // pin moves the composer's card to the strip at the column's top, above
       // its scrolling messages, and the composer is empty again.
       const composerBox = `${col(0)} .composer .input`
@@ -4081,7 +4146,7 @@ async function run(check: Checks["check"]): Promise<void> {
         readMarked,
       )
 
-      // Notes (ADR-0116): your message's ⋯ moves it to the note column
+      // Notes: your message's ⋯ moves it to the note column
       // nearest its thread.
       // The inventory, left open in the middle of the screen, would cover it.
       if ((await page.locator(".inventory").count()) > 0)
@@ -4146,7 +4211,7 @@ async function run(check: Checks["check"]): Promise<void> {
         raised >= 0,
         `jot ${orderOf("jot")}, one thought ${orderOf("one thought")}`,
       )
-      // A card's header takes focus (ADR-0132): Cmd+X there cuts the note
+      // A card's header takes focus: Cmd+X there cuts the note
       // to your trash, and Cmd+V with another note's header focused moves
       // that same card out of your trash, back into the note column.
       const noteOf = (text: string) =>
@@ -4207,7 +4272,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `${columnRenamed} ms; ${[...readNoteColumns(host.session).values()].map(r => r.title).join()}; shown ${shownTitle}`,
       )
 
-      // "+ pin" (ADR-0048), in the conversation below, which has no pinned
+      // "+ pin", in the conversation below, which has no pinned
       // card: the header offers it, and the box it opens in the strip makes a
       // pinned card. Enter there is a new line; Escape closes the box, the
       // card stays pinned, and "+ pin" moves into the strip.
@@ -4247,7 +4312,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `focused ${pinFocused}, lines ${twoLines}, drawn ${drawnPinned}, ${placeOf(newPinned)?.kind}, moved ${pinMoved}`,
       )
 
-      // A trace (ADR-0048 step 6): Ada pins her card in the conversation
+      // A trace: Ada pins her card in the conversation
       // below, and someone else pins it on the thread above while she is on
       // a new tab, which reports no column. Back on her tab, a trace says so
       // where the card was, leads to it, and the card's history names who
@@ -4334,11 +4399,11 @@ async function run(check: Checks["check"]): Promise<void> {
         `trace ${drawnTrace} (${traceText}), leads ${leads}, history ${historyNames}${historyOpened ? "" : ": not opened"}`,
       )
 
-      // What a new tab of this device opens is the layout last saved (ADR-0027).
+      // What a new tab of this device opens is the layout last saved.
       const columnKeys = (p: typeof page) =>
         p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))
       const openKeys = await columnKeys(page)
-      // What you type is kept across a reload too (ADR-0048).
+      // What you type is kept across a reload too.
       await page.fill(`${col(0)} .composer .input`, "survives a reload")
       await waitFor(() => false, 300)
 
@@ -4429,7 +4494,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await newTab.close().catch(() => {})
       }
 
-      // ── threads as cards (ADR-0117, ADR-0124) ───────────────────────────────
+      // ── threads as cards ───────────────────────────────
       // A thread of another root, moved onto the canvas you are on: the
       // canvas holds two roots, and the rail draws each one's tree.
       const here = taskHolding(host, entryId(downRoot))

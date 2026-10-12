@@ -16,7 +16,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "an ask of a member whose task was archived says why, and its root stays unloaded",
   },
-  // ── agents talking (ADR-0128), the host suite's agents scenario ──
+  // ── agents talking, the host suite's agents scenario ──
   {
     name: "a chat stores none of the agents it invites",
     file: "packages/rules/chat.ts",
@@ -65,7 +65,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a spent budget: the answer wakes nobody, and the asking thread is told it was spent",
   },
-  // ── the lanes suite, proven in a lane (ADR-0130) ──
+  // ── the lanes suite, proven in a lane ──
   {
     name: "a new lane forks from the root, not where it branched",
     file: "apps/pinetrie/host/work/create.ts",
@@ -219,7 +219,7 @@ export const mutations: readonly Mutation[] = [
     scenario: "catch-up",
     expect: "an acceptance leaves a fact the thread shows",
   },
-  // ── card history and traces (ADR-0048 step 6) ──
+  // ── card history and traces ──
   {
     name: "the host reads no presence for traces",
     file: "apps/pinetrie/host/provenance.ts",
@@ -764,7 +764,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "the strip's working count and the thread's item are still while the agent works",
   },
-  // ── the board and the sidebar (ADR-0122) ──
+  // ── the board and the sidebar ──
   {
     name: "the board opens in the flow, before the columns",
     file: "packages/web/index.html",
@@ -784,6 +784,16 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "the board opens over the columns, moves none of them, and a click outside closes it",
+  },
+  {
+    name: "a task's drag lands nowhere in the sidebar",
+    file: "packages/web/use-drag.ts",
+    from: "        const lands = rootLanding(under, y)",
+    to: '        const lands = under?.closest("#sidebar") ? null : rootLanding(under, y)',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a task dragged over another's middle in the sidebar opens nothing, and drops above or below it",
   },
   {
     name: "a root's drag lands nowhere",
@@ -886,7 +896,7 @@ export const mutations: readonly Mutation[] = [
       "after a reload, what was seen stays seen, and a mention made meanwhile counts",
   },
 
-  // ── your profile (packages/web/profile-page.tsx, ADR-0037, ADR-0098) ──
+  // ── your profile (packages/web/profile-page.tsx) ──
   {
     name: "the handle hint is never shown",
     file: "packages/web/name-input.tsx",
@@ -925,7 +935,7 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect: "another window shows on its root's thread card, and you never do",
   },
-  // ── a person's picture (packages/web/presence.tsx, ADR-0098) ──
+  // ── a person's picture (packages/web/presence.tsx) ──
   {
     name: "a circle never draws its person's picture",
     file: "packages/web/presence.tsx",
@@ -946,7 +956,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a picture set on the profile page shows on your avatar in another person's window",
   },
-  // ── a page over the stage (packages/web/use-page.ts, ADR-0098) ──
+  // ── a page over the stage (packages/web/use-page.ts) ──
   {
     name: "opening a page replaces the stage's history entry",
     file: "packages/web/use-page.ts",
@@ -1015,7 +1025,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "hovering a branch's header outlines its fork dot in the branch's colour",
   },
-  // ── a message's tools (ADR-0043) ──
+  // ── a message's tools ──
   {
     name: "→ sits a line below the other tools",
     file: "packages/web/index.html",
@@ -1142,7 +1152,7 @@ export const mutations: readonly Mutation[] = [
       "with your own message last in line, it says it will queue after yours",
   },
   {
-    // S35: a column's anchor a render behind its thread's tip. A card
+    // A column's anchor a render behind its thread's tip. A card
     // column's anchor is derived as the strip is drawn (`canvasColumns`), so
     // the strip reading the tree a frame late is what brings it back.
     name: "the strip reads the tree a frame behind the document",
@@ -1945,7 +1955,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a client cannot write the places: its write is refused before it is made, and the host's copy is unchanged",
   },
-  // ── your inventory (ADR-0048 step 4) ──
+  // ── your inventory ──
   {
     name: "every inventory is shared with every peer",
     file: "apps/pinetrie/host/policy.ts",
@@ -2215,7 +2225,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "after a run, the marker of the pinned cards it read is drawn above its prompt",
   },
-  // ── queue control (ADR-0048 step 7) ──
+  // ── queue control ──
   {
     name: "the drain is never woken once typing stops",
     file: "apps/pinetrie/host/index.ts",

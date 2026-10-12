@@ -249,10 +249,11 @@ export { copyText } from "./copy-text.ts"
 export { plural } from "./counts.ts"
 export {
   type Armed,
+  type CardOver,
   DRAG_HANDLE,
   DRAG_START,
+  type DragAt,
   type DragFrom,
-  type DragOver,
   type DragSource,
   type DragVerdict,
   type DrawPlan,
@@ -269,6 +270,7 @@ export {
   type Point,
   sidebarSpotAt,
   sourceOfElement,
+  type TaskOver,
 } from "./drag.ts"
 export type { Effect, IntentState } from "./effects.ts"
 export {

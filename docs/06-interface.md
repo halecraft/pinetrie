@@ -66,7 +66,8 @@ beside it (ADR-0081, turned sideways).
   Every column there shares the root.
 - **The sidebar is yours, on every device of yours**: your own document, which
   only your tabs write. Top to bottom is your order. Opening a root adds it at
-  the bottom; drag an item to reorder. **×** closes a root for you and
+  the bottom; drag an item to reorder: dragged over another, it goes above
+  or below it, never into it, and opens nothing. **×** closes a root for you and
   writes nothing shared; opening it again brings its columns back. A root
   you start joins the sidebar; a root someone else starts does not, and
   reaches you through the board or your inbox.
@@ -430,7 +431,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   Dragged onto a task in the sidebar, a column moves to the end of that
   task's canvas, for everyone, and a running thread keeps running; you stay
   where you are. Dragged between two tasks there, it makes a new task
-  holding it, placed there in your sidebar (ADR-0134). Taken
+  holding it, placed there in your sidebar (ADR-0134). Held over the
+  middle of a task there, a column or a card opens that task; held
+  between tasks, nothing opens (ADR-0134). Taken
   into an inventory, its run stops at once, the taker's own stop ("Bea
   stopped it"); nothing is sent in it there, nor branched from its entries
   ("put it on a canvas first"), and its queue waits, held. Put on a canvas

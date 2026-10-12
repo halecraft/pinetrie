@@ -44,7 +44,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a row from another task's thread says where it is; from this task, nothing (ADR-0128)",
+      "a row from another task's thread says where it is; from this task, nothing",
   },
   {
     name: "a send to a held idle queue keeps the hold",
@@ -634,7 +634,7 @@ export const mutations: readonly Mutation[] = [
     to: '        set(c, "prefill", undefined),\n',
     command: unit,
     expect:
-      "a thread you opened is unfolded with what it starts with, until its first send spends it; reader settings stay (ADR-0126)",
+      "a thread you opened is unfolded with what it starts with, until its first send spends it; reader settings stay",
   },
   {
     name: "a pending message is stored",
@@ -2161,7 +2161,7 @@ export const mutations: readonly Mutation[] = [
     to: "      grid.card === null",
     command: unit,
     expect:
-      "previews the selected card, normal and one column wide; an empty slot or an open card, none (ADR-0126)",
+      "previews the selected card, normal and one column wide; an empty slot or an open card, none",
   },
   {
     name: "a queued card cannot be pinned from its ⋯",
@@ -2959,7 +2959,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a WIP gone without landing offers no acceptance, and continuing from the project",
   },
-  // ── pages and the account menu (ADR-0098) ──
+  // ── pages and the account menu ──
   {
     name: "a new tab opens under the page",
     file: "packages/interface/layout.ts",
@@ -3326,7 +3326,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "visibleSpan: a top in a gap is past the message above it",
   },
-  // ── the canvas (ADR-0116) ──────────────────────────────────────────────
+  // ── the canvas ──────────────────────────────────────────────
   {
     name: "a thread with no entry yet ignores its lane",
     file: "packages/interface/columns.ts",
@@ -3524,7 +3524,7 @@ export const mutations: readonly Mutation[] = [
     to: "        ? reach.by !== null\n",
     command: unit,
     expect:
-      "a link opens a thread's task, your own held thread's preview, and nothing for someone else's (ADR-0117, ADR-0124)",
+      "a link opens a thread's task, your own held thread's preview, and nothing for someone else's",
   },
   {
     name: "a link to your own held thread opens nothing",
@@ -3533,7 +3533,7 @@ export const mutations: readonly Mutation[] = [
     to: '      return slot === slot\n        ? []\n        : [\n            { kind: "showInventory", brief: false },',
     command: unit,
     expect:
-      "openLink: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing (ADR-0124)",
+      "openLink: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing",
   },
   {
     name: "a copy lands first on the canvas, not after its source",
@@ -3542,7 +3542,7 @@ export const mutations: readonly Mutation[] = [
     to: '        : { kind: "canvas", task, after: null }\n',
     command: unit,
     expect:
-      "copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas (ADR-0127)",
+      "copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas",
   },
   {
     name: "a copy here from no canvas is sent anyway",
@@ -3551,7 +3551,7 @@ export const mutations: readonly Mutation[] = [
     to: '      : task === undefined\n        ? { kind: "inventory", slot: null }\n',
     command: unit,
     expect:
-      "copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas (ADR-0127)",
+      "copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas",
   },
   {
     name: "a thread put from the inventory goes in a note column",
@@ -3560,7 +3560,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "put: a thread's card from your inventory lands on the canvas you are on, just after the column it was put on, unfolded (ADR-0117)",
+      "put: a thread's card from your inventory lands on the canvas you are on, just after the column it was put on, unfolded",
   },
   {
     name: "a tab holds no root of a thread in your inventory",
@@ -3586,7 +3586,7 @@ export const mutations: readonly Mutation[] = [
     to: "      cut < 0 && foldAbove === undefined\n",
     command: unit,
     expect:
-      "a column whose parent thread is on no column folds its path above its own first entry; one a column to its left shares does not (ADR-0117)",
+      "a column whose parent thread is on no column folds its path above its first message",
   },
   {
     name: "a thread with its parent elsewhere is drawn whole",
@@ -3649,7 +3649,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a task's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub",
   },
-  // ── a thread's first entry is not always a message (ADR-0125) ──
+  // ── a thread's first entry is not always a message ──
   {
     name: "a column folds above its thread's first entry, by id",
     file: "packages/interface/column-paths.ts",
@@ -3683,7 +3683,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (command && key === "x" && focus.card !== null)\n    return { kind: "takeIntoInventory", card: focus.card }\n  if (command && key === "z")',
     command: unit,
     expect:
-      "Cmd+C, Cmd+X and Cmd+V are no keys here: they are the page's copy, cut and paste events (ADR-0132)",
+      "Cmd+C, Cmd+X and Cmd+V are no keys here: they are the page's copy, cut and paste events",
   },
   {
     name: "the put key does nothing in a text box",
@@ -3692,7 +3692,7 @@ export const mutations: readonly Mutation[] = [
     to: "    return focus.selectedCard === null || focus.column === null || focus.inText",
     command: unit,
     expect:
-      "the put key in a text box puts the card in your hand in the column, whatever its kind: only a paste types into a box (ADR-0132)",
+      "the put key in a text box puts the card in your hand in the column, whatever its kind: only a paste types into a box",
   },
   {
     name: "search reads a link's address",
@@ -3778,7 +3778,7 @@ export const mutations: readonly Mutation[] = [
     to: '"a message"',
     command: unit,
     expect:
-      "a comment queued as a reference keeps its text under a link to its entry, then makes the reference in the queue (ADR-0126)",
+      "a comment queued as a reference keeps its text under a link to its entry, then makes the reference in the queue",
   },
   {
     name: "every grid's cell takes a comment",
@@ -3982,8 +3982,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column off the strip is drawn whole",
     file: "packages/interface/drag.ts",
-    from: "    return { dragged: null, face: pointer, shifts: still, mark, lean }",
-    to: "    return { dragged: pointer, face: null, shifts: still, mark, lean }",
+    from: "    return { dragged: null, face: pointer, shifts: still, mark, lean, opens }",
+    to: "    return { dragged: pointer, face: null, shifts: still, mark, lean, opens }",
     command: unit,
     expect:
       "drawPlan: a column only translates, along the strip; off it, its face is drawn instead",
@@ -3991,8 +3991,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused landing is dropped anyway",
     file: "packages/interface/drag.ts",
-    from: '        verdict.landing.kind !== "refused"',
-    to: "        true",
+    from: '      return source.kind === "card" && verdict.landing.kind !== "refused"',
+    to: '      return source.kind === "card"',
     command: unit,
     expect:
       "a drop sends what a key or a menu would: moveColumn, put or the task's drop, nothing else",
@@ -4005,6 +4005,32 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a sidebar row: between rows in its top and bottom quarters, onto its task in between",
+  },
+  {
+    name: "a task's drag opens the task it would go before",
+    file: "packages/interface/drag.ts",
+    from: '  if (at.kind === "task") return NO_HOVER',
+    to: '  if (at.kind === "task") return at.over.kind === "root" && at.over.target.before !== null ? { kind: "task", task: at.over.target.before } : NO_HOVER',
+    command: unit,
+    expect: "a task's drag opens nothing, over a place among tasks or none",
+  },
+  {
+    name: "a card opens a sidebar task from between rows",
+    file: "packages/interface/drag.ts",
+    from: '        ? { kind: "task", task: over.target.task }\n        : NO_HOVER',
+    to: '        ? { kind: "task", task: over.target.task }\n        : over.target.kind === "sidebar" && over.target.before !== null\n          ? { kind: "task", task: over.target.before }\n          : NO_HOVER',
+    command: unit,
+    expect:
+      "a card's drag opens a sidebar task from its middle and ▦ the board; between tasks, nothing",
+  },
+  {
+    name: "a task's landing is marked as a card's move",
+    file: "packages/interface/drag.ts",
+    from: '    case "root":\n      return "root"',
+    to: '    case "root":\n      return "move"',
+    command: unit,
+    expect:
+      "a task's landing is marked as a root drop; a card's as its move or copy",
   },
   {
     name: "Alt+arrows move a column from a text box",

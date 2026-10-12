@@ -25,14 +25,14 @@ const focus = (over: Partial<Focus> = {}): Focus => ({
 const chord = { ctrlKey: true, shiftKey: true }
 
 describe("keyAct", () => {
-  test("Cmd+C, Cmd+X and Cmd+V are no keys here: they are the page's copy, cut and paste events (ADR-0132)", () => {
+  test("Cmd+C, Cmd+X and Cmd+V are no keys here: they are the page's copy, cut and paste events", () => {
     for (const k of ["c", "x", "v"]) {
       expect(keyAct(key(k, { metaKey: true }), focus({ card: C1 }))).toBeNull()
       expect(keyAct(key(k, { ctrlKey: true }), focus({ card: C1 }))).toBeNull()
     }
   })
 
-  test("the put key in a text box puts the card in your hand in the column, whatever its kind: only a paste types into a box (ADR-0132)", () => {
+  test("the put key in a text box puts the card in your hand in the column, whatever its kind: only a paste types into a box", () => {
     const REF = cardIdOfKind(
       "reference",
       "01a0ffd2-0000-7000-8000-0000000000e1",

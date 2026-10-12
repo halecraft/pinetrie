@@ -229,8 +229,6 @@ export interface AppStores {
   readonly list: TabState<ListWidth>
 }
 
-/** How long a card's drag held over a root in the sidebar opens it. */
-
 /**
  * Where search stands for the keys (`Focus.search`): focused in the bar,
  * a match list, or nowhere, which Escape closes from.

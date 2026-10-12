@@ -86,7 +86,6 @@
         left: 0; right: 0; top: calc(-.05rem - 1.5px); height: 3px; border-radius: 2px;
         background: #8ab4f8; pointer-events: none; }
       .open-end[data-root-drop] { box-shadow: inset 0 3px 0 #8ab4f8; }
-      .sidebar-item[data-root-dragging] { opacity: .4; }
       /* A root's status, before its label (ADR-0077), in the sidebar and on the
          board. Working is a still ring: it needs nothing from you, so it does
          not move. What needs you is a filled amber dot, the colour of the
@@ -1213,7 +1212,6 @@
       .board-column[data-root-drop] > .board-cards:empty::after { top: calc(50% - 1.5px); bottom: auto; }
       .board-archive[data-root-drop] { outline: 2px solid #8ab4f8; outline-offset: .3rem;
         border-radius: 4px; }
-      .thread-card[data-root-dragging] { opacity: .4; border-style: dashed; }
       .board-open { display: flex; gap: .35rem; align-items: center; padding: 0; background: none;
         color: #e6e6e6; text-align: left; line-height: 1.25; }
       .board-label { flex: 1; min-width: 0; }

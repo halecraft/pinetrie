@@ -20,10 +20,14 @@ import type { PutTarget } from "./put-target.ts"
 import { landing, neighbourShifts } from "./reorder.ts"
 import { planRootDrop, type RootDrag, type RootTarget } from "./root-target.ts"
 
-/** What a drag carries: a card (a column's, a frame's, a slot's), or a task. */
-export type DragSource =
-  | { readonly kind: "card"; readonly card: CardId }
-  | { readonly kind: "task"; readonly drag: RootDrag }
+/** A card dragged: a column's, a frame's, a slot's. */
+export type CardSource = { readonly kind: "card"; readonly card: CardId }
+
+/** A task dragged: a board card, a sidebar row. */
+export type TaskSource = { readonly kind: "task"; readonly drag: RootDrag }
+
+/** What a drag carries. */
+export type DragSource = CardSource | TaskSource
 
 const DRAG_CARD = "data-drag-card"
 const DRAG_TASK = "data-drag-task"
@@ -70,19 +74,39 @@ export const NOT_A_HANDLE =
 /** How far, in px, a press moves before it is a drag rather than a click. */
 export const DRAG_START = 5
 
-/** What is under the pointer, as the engine read it. */
-export type DragOver =
+/** What a card's drag can be over, as the engine read it. */
+export type CardOver =
   /** The strip, between its columns: `gap` is `gapAt`'s. */
   | { readonly kind: "strip"; readonly gap: number }
   | { readonly kind: "put"; readonly target: PutTarget }
+  /** ▦, which opens the board when held over; nothing lands on it. */
+  | { readonly kind: "board" }
+  | { readonly kind: "none" }
+
+/** What a task's drag can be over: a place among tasks, or nothing. */
+export type TaskOver =
   | { readonly kind: "root"; readonly target: RootTarget }
   | { readonly kind: "none" }
+
+/**
+ * A drag this frame: its source, and what that source is over. A task's
+ * drag cannot be over a card's drop zone, nor a card's over a task's place,
+ * so no planner can mistake one for the other. It is a `DragSource` too.
+ */
+export type DragAt =
+  | (CardSource & { readonly over: CardOver })
+  | (TaskSource & { readonly over: TaskOver })
 
 /** What a drop there would do. */
 export type DragVerdict =
   /** A column moved along the strip, to `to`; null where it already is. */
   | { readonly kind: "reorder"; readonly to: number | null }
-  | { readonly kind: "land"; readonly landing: Landing }
+  /** A card landing on `target`, as `landing` says. */
+  | {
+      readonly kind: "land"
+      readonly target: PutTarget
+      readonly landing: Landing
+    }
   | { readonly kind: "root"; readonly intent: Intent }
   | { readonly kind: "nothing" }
 
@@ -98,46 +122,50 @@ export interface DragFrom {
 
 const NOTHING: DragVerdict = { kind: "nothing" }
 
-/** What dropping `source` over `over` would do, `how` its Alt. */
+/** What dropping `at` where it is would do, `how` its Alt. */
 export function dragVerdict(
-  source: DragSource,
+  at: DragAt,
   from: DragFrom,
-  over: DragOver,
   how: PutHow,
   state: IntentState,
 ): DragVerdict {
-  if (source.kind === "task") {
-    if (over.kind !== "root" || from.archive === null) return NOTHING
-    const intent = planRootDrop(
-      source.drag,
-      over.target,
-      from.archive,
-      from.home,
-    )
+  if (at.kind === "task") {
+    const { over } = at
+    if (over.kind === "none" || from.archive === null) return NOTHING
+    const intent = planRootDrop(at.drag, over.target, from.archive, from.home)
     return intent === null ? NOTHING : { kind: "root", intent }
   }
-  if (over.kind === "strip")
-    return from.column === null
-      ? NOTHING
-      : { kind: "reorder", to: landing(from.column, over.gap) }
-  if (over.kind !== "put") return NOTHING
-  const lands = putLanding(
-    { kind: "card", card: source.card },
-    over.target,
-    how,
-    state,
-  )
-  return lands.kind === "none" ? NOTHING : { kind: "land", landing: lands }
+  const { over } = at
+  switch (over.kind) {
+    case "strip":
+      return from.column === null
+        ? NOTHING
+        : { kind: "reorder", to: landing(from.column, over.gap) }
+    case "put": {
+      const lands = putLanding(
+        { kind: "card", card: at.card },
+        over.target,
+        how,
+        state,
+      )
+      return lands.kind === "none"
+        ? NOTHING
+        : { kind: "land", target: over.target, landing: lands }
+    }
+    case "board":
+    case "none":
+      return NOTHING
+  }
 }
 
 /**
  * The intents a drop sends: the ones a key or a menu would. A reorder is
  * `moveColumn`, a landing a `put`, a task's drop its own; each runs its
- * own planner, so a drop does what the put key or Move up does.
+ * own planner, so a drop does what the put key or Move up does. The
+ * verdict holds all a drop needs besides its source.
  */
 export function dropIntents(
   source: DragSource,
-  over: DragOver,
   verdict: DragVerdict,
   how: PutHow,
 ): readonly Intent[] {
@@ -153,14 +181,12 @@ export function dropIntents(
             },
           ]
     case "land":
-      return source.kind === "card" &&
-        over.kind === "put" &&
-        verdict.landing.kind !== "refused"
+      return source.kind === "card" && verdict.landing.kind !== "refused"
         ? [
             {
               kind: "put",
               source: { kind: "card", card: source.card },
-              target: over.target,
+              target: verdict.target,
               how,
             },
           ]
@@ -172,14 +198,37 @@ export function dropIntents(
   }
 }
 
-/** How long a drag held over a task in the sidebar, or ▦, waits before opening it. */
+/** How long a card's drag held onto a task in the sidebar, or over ▦, waits before opening it. */
 export const ITEM_HOVER_MS = 600
 
-/** What a drag is held over that opens after `ITEM_HOVER_MS`. */
+/** What a card's drag is held over that opens after `ITEM_HOVER_MS`. */
 export type HoverOver =
   | { readonly kind: "task"; readonly task: TaskId }
   | { readonly kind: "board" }
   | { readonly kind: "none" }
+
+const NO_HOVER: HoverOver = { kind: "none" }
+
+/**
+ * What holding the drag where it is opens: the sidebar task a card is onto
+ * (a row's middle, `sidebarSpotAt`), or the board from ▦. A task's drag
+ * lands only between tasks, never onto one, so it opens nothing.
+ */
+function heldOpens(at: DragAt): HoverOver {
+  if (at.kind === "task") return NO_HOVER
+  const { over } = at
+  switch (over.kind) {
+    case "put":
+      return over.target.kind === "task"
+        ? { kind: "task", task: over.target.task }
+        : NO_HOVER
+    case "board":
+      return { kind: "board" }
+    case "strip":
+    case "none":
+      return NO_HOVER
+  }
+}
 
 /** What being held over `over` opens: a task in the sidebar, or the board. */
 export function hoverOpens(over: HoverOver): Intent | null {
@@ -194,10 +243,10 @@ export function hoverOpens(over: HoverOver): Intent | null {
 }
 
 /**
- * A row of the sidebar the pointer is over: onto its task in the middle
- * half, between it and the one above in its top quarter, and between it
- * and the one below in its bottom quarter. Only a card's drag reads it; a
- * task's drag reorders among the rows.
+ * A row of the sidebar the pointer is over, for a card's drag: onto its
+ * task in the middle half, between it and the one above in its top
+ * quarter, and between it and the one below in its bottom quarter. A
+ * task's drag has no put target (`TaskOver`), so it never reads one.
  */
 export function sidebarSpotAt(
   y: number,
@@ -234,8 +283,11 @@ export interface Armed {
   readonly widths: readonly number[]
 }
 
-/** How a verdict is marked on its target. */
-export type DropMark = "move" | "copy" | "replace" | "refused"
+/**
+ * How a verdict is marked on its target: a task's landing as `root`
+ * (`data-root-drop`), any other as what it would do (`data-drag-verdict`).
+ */
+export type DropMark = "root" | "move" | "copy" | "replace" | "refused"
 
 /** What one frame draws: applied by the engine to `style` and `dataset`, nothing else. */
 export interface DrawPlan {
@@ -248,6 +300,8 @@ export interface DrawPlan {
   readonly mark: DropMark | null
   /** The handle's lean, in degrees, from the pointer's speed. */
   readonly lean: number
+  /** What holding here opens, ringed on the target until it does (`heldOpens`). */
+  readonly opens: HoverOver
 }
 
 /** How a verdict is marked: what it would do there. */
@@ -256,7 +310,7 @@ export function dropMark(verdict: DragVerdict, how: PutHow): DropMark | null {
     case "reorder":
       return null
     case "root":
-      return "move"
+      return "root"
     case "nothing":
       return null
     case "land":
@@ -278,18 +332,20 @@ const MAX_LEAN = 3
  * pointer is over it, and leaves it as its card face; anything else moves
  * whole. The dragged element only ever translates: a scaled, rotated or
  * shadowed column costs frames on a slow machine, and the lift is drawn on
- * its handle instead.
+ * its handle instead. The target's mark and what a hold there opens are
+ * drawn from the same values.
  */
 export function drawPlan(
   armed: Armed,
   pointer: Point,
   speed: number,
-  over: DragOver,
+  at: DragAt,
   verdict: DragVerdict,
   how: PutHow,
 ): DrawPlan {
   const lean = Math.max(-MAX_LEAN, Math.min(MAX_LEAN, speed * LEAN_PER_PX))
   const mark = dropMark(verdict, how)
+  const opens = heldOpens(at)
   const still = armed.widths.map(() => 0)
   const { strip } = armed
   if (!armed.column || strip === null)
@@ -299,6 +355,7 @@ export function drawPlan(
       shifts: still,
       mark,
       lean,
+      opens,
     }
   const onStrip =
     pointer.x >= strip.left &&
@@ -306,15 +363,16 @@ export function drawPlan(
     pointer.y >= strip.top &&
     pointer.y <= strip.bottom
   if (!onStrip)
-    return { dragged: null, face: pointer, shifts: still, mark, lean }
+    return { dragged: null, face: pointer, shifts: still, mark, lean, opens }
   return {
     dragged: { x: pointer.x - armed.start.x, y: 0 },
     face: null,
     shifts:
-      over.kind === "strip" && armed.from !== null
-        ? neighbourShifts(armed.from, over.gap, armed.widths)
+      at.over.kind === "strip" && armed.from !== null
+        ? neighbourShifts(armed.from, at.over.gap, armed.widths)
         : still,
     mark,
     lean,
+    opens,
   }
 }

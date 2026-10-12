@@ -32,7 +32,7 @@ const at = (place: CardRecord["place"]): CardRecord[] => [
 ]
 const E = entryId("e-1")
 
-test("a link opens a thread's task, your own held thread's preview, and nothing for someone else's (ADR-0117, ADR-0124)", () => {
+test("a link opens a thread's task, your own held thread's preview, and nothing for someone else's", () => {
   const open = threadLink(
     T,
     at({ kind: "canvas", task: TASK, order: "1", width: 1 }),
@@ -80,7 +80,7 @@ test("a link is made only by threadLink", () => {
   expect(forged.kind).toBe("open")
 })
 
-test("a row from another task's thread says where it is; from this task, nothing (ADR-0128)", () => {
+test("a row from another task's thread says where it is; from this task, nothing", () => {
   const canvas = at({ kind: "canvas", task: TASK, order: "1", width: 1 })
   const nodes = [
     { id: entryId("a"), role: "answer", from: T },

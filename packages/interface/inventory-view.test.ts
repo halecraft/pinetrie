@@ -90,7 +90,7 @@ describe("inventoryView", () => {
     ])
   })
 
-  test("previews the selected card, normal and one column wide; an empty slot or an open card, none (ADR-0126)", () => {
+  test("previews the selected card, normal and one column wide; an empty slot or an open card, none", () => {
     const view = (selected: number, open: boolean) =>
       inventoryView({
         held: [record(A)],

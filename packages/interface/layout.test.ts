@@ -177,7 +177,7 @@ describe("layoutReducer", () => {
     })
   })
 
-  test("a thread you opened is unfolded with what it starts with, until its first send spends it; reader settings stay (ADR-0126)", () => {
+  test("a thread you opened is unfolded with what it starts with, until its first send spends it; reader settings stay", () => {
     const T = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
     const pending = { text: "@agent separately?" }
     const prefill = { text: "@agent ", blank: true }

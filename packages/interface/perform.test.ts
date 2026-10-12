@@ -366,7 +366,7 @@ test("a spin-off into the sidebar places and shows its thread only once the host
   )
 })
 
-test("a comment queued as a reference keeps its text under a link to its entry, then makes the reference in the queue (ADR-0126)", async () => {
+test("a comment queued as a reference keeps its text under a link to its entry, then makes the reference in the queue", async () => {
   const p = ports()
   const thread = threadIdFor("1-r1")
   const entry = { kind: "entry", thread, entry: entryId("e-1") } as const

@@ -636,7 +636,7 @@ describe("planIntent", () => {
       ).toBe(false)
     })
 
-    test("copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas (ADR-0127)", () => {
+    test("copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas", () => {
       expect(plan({ kind: "copyThread", source: TRUNK, to: "here" })).toEqual([
         {
           kind: "request",
@@ -685,7 +685,7 @@ describe("planIntent", () => {
       ).toEqual([])
     })
 
-    test("put: a thread's card from your inventory lands on the canvas you are on, just after the column it was put on, unfolded (ADR-0117)", () => {
+    test("put: a thread's card from your inventory lands on the canvas you are on, just after the column it was put on, unfolded", () => {
       const held: CardRecord = {
         kind: "thread",
         id: LINKED,
@@ -738,7 +738,7 @@ describe("planIntent", () => {
       ])
     })
 
-    test("openLink: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing (ADR-0124)", () => {
+    test("openLink: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing", () => {
       const mine = threadLink(LINKED, [inventoryOf(ME)], ME)
       const slots = { "4": LINKED }
       expect(

@@ -497,7 +497,12 @@ a board card, a sidebar row. Each handle carries `dragProps` (`data-drag-card`
 or `data-drag-task`), and the engine finds its source with
 `sourceOfElement`. It decides nothing: `drag.ts` in `@pinetrie/interface`
 does (`dragVerdict` over `putLanding` and `planRootDrop`, `drawPlan`,
-`dropIntents`, `hoverOpens`).
+`dropIntents`, `hoverOpens`). It gathers by source (`DragAt`): a task's
+drag reads only the root zones, a card's the strip, ▦ and the drop
+zones. It marks a target with the attribute the plan's mark names, and
+rings and opens what the plan's `opens` names, on the element the target
+was read from. It reads the source itself only to arm what moves and to
+set `data-card-drag`.
 
 - **What the first frame needs is armed at the press**, before the 5 px
   threshold (`DRAG_START`): the strip's box, the columns' widths and
@@ -513,13 +518,17 @@ does (`dragVerdict` over `putLanding` and `planRootDrop`, `drawPlan`,
 - **A style is written only when it changes** (`write`). Writing every
   transform each frame, the same as the last, brought the 95th percentile
   frame to 33 ms at 4× throttling; written on change, it is the
-  baseline's.
+  baseline's. The engine keeps the element it marked and the mark it
+  wrote, and writes again only when either changes. When it read the mark
+  back from `data-drag-verdict` instead, a task's mark (`data-root-drop`)
+  never matched, and was written every frame.
 - **A drag writes to the DOM, never to React state**: a transform,
   `data-dragging` on what moves, `data-reordering` on the strip,
   `data-card-drag` on the body (an empty pinned strip shows, and drop zones
   are outlined), `data-drag-verdict` on the target (`move`, `copy`,
-  `replace`, `refused`), `data-hover-open` on a sidebar task or ▦ while its
-  ring fills. It reads the intent state from a function each frame, never
+  `replace`, `refused`) or `data-root-drop` for a task's landing,
+  `data-hover-open` on the target's own element (a sidebar row a card is
+  onto, ▦) while its ring fills. It reads the intent state from a function each frame, never
   rebuilt for it. The order changes once, on the drop: a reorder's
   `moveColumn`, a landing's `put`, a task's own drop, the intents a key or
   a menu would send.
@@ -1146,9 +1155,10 @@ stays in view; the strip scrolls past 30vh.
   column does for the composer's. `newPinAt` puts "+ pin" in the header
   while the thread has no pinned card, in the strip after, and nowhere while
   the box is open.
-- **The empty strip shows only while a card is dragged.** `App` sets
-  `data-card-drag` on the body from a card's `dragenter` to its `dragend`
-  or drop, and the CSS shows `.pinned-strip[data-empty]` then. An empty strip
+- **The empty strip shows only while a card is dragged.** The drag engine
+  (`use-drag.ts`) sets `data-card-drag` on the body from a card drag's
+  start past the threshold to its drop or cancel, and the CSS shows
+  `.pinned-strip[data-empty]` then. An empty strip
   that always took room moved where a column shown again puts its reader.
 - **A send carries the pinned cards' versions.** `Column` puts the strip's
   card ids in `how.pinned`, and the session sends each with its version as
@@ -1215,7 +1225,7 @@ stays in view; the strip scrolls past 30vh.
   the footer strip's open states carry `data-put-state`, the sidebar's
   items and its end `data-put-sidebar`, beside the root's own marks; while
   a card is dragged (`body[data-card-drag]`) they are outlined. A card held
-  over ▦ for `ITEM_HOVER_MS` opens the board (`App`'s card drag).
+  over ▦ for `ITEM_HOVER_MS` opens the board (the drag plan's `opens`).
 - **The open states reach a card's ⋯ through a context** (`ThreadStates`,
   `thread-states.ts`), which `App` provides from the workflow: the
   composer's and a note's editors read it for their Move to a new thread.

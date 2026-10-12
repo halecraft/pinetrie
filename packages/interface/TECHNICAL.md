@@ -1634,27 +1634,45 @@ values; the engine gathers and applies.
 
 - **A source is a card or a task** (`DragSource`). A column is its card on
   a canvas, drawn whole: no source of its own. Only over the strip does a
-  card's drag reorder (`DragOver` `strip`, `landing` over `gapAt`);
+  card's drag reorder (`CardOver` `strip`, `landing` over `gapAt`);
   anywhere else it lands as any card does (`putLanding`), so a column on a
   slot is a take, onto a sidebar task a move to that canvas's end, between
   tasks a `new-task`. A task's drag lands only on a root zone
   (`planRootDrop`).
+- **A drag is its source paired with what that kind can be over**
+  (`DragAt`): a card over the strip, a drop zone or ▦ (`CardOver`), a task
+  over a place among tasks (`TaskOver`). A task's drag cannot be over a
+  card's drop zone, nor a card's over a root zone, and every planner
+  switches on the source first. `DragAt` is the source with `over` added,
+  not `{ source, over }`: TypeScript narrows a union only by a top-level
+  discriminant.
 - **What a drop would do is the same function each frame and on the
   drop** (`dragVerdict`), so what is drawn is what happens. Alt is read
   each frame as `how: "copy"`.
 - **A drop sends the intents a key or a menu would** (`dropIntents`):
   `moveColumn`, `put` with its source, target and how, or the root drop's
-  own; each runs its own planner. A refused landing sends nothing.
+  own; each runs its own planner. A refused landing sends nothing. A
+  landing's verdict carries its target, so a drop reads only the source
+  and the verdict.
 - **What a frame draws is a value** (`drawPlan`): the dragged element's
   translate (never a scale, a rotation or a shadow, S153), the card face's
   position off the strip, each column's shift (`neighbourShifts`), the
-  target's mark (`dropMark`), and the handle's lean. S153's drawing
-  conditions are its unit tests.
+  target's mark (`dropMark`), the handle's lean, and what a hold there
+  opens (`opens`). S153's drawing conditions are its unit tests. A mark
+  names its attribute too: `root` for a task's landing
+  (`data-root-drop`), any other for `data-drag-verdict`.
 - **A sidebar row splits in quarters** (`sidebarSpotAt`): its top and
-  bottom are between rows, its middle onto its task. A task's drag
-  ignores it and reorders among the rows (`landingIn`).
-- **Held over a task in the sidebar or ▦** for `ITEM_HOVER_MS`, a drag
-  opens it (`hoverOpens`).
+  bottom are between rows, its middle onto its task. Only a card's drag
+  reads it: a task's has no put target (`TaskOver`), and reorders among
+  the rows (`landingIn`).
+- **What a hold opens is decided from the target** (`heldOpens`), after
+  `ITEM_HOVER_MS`: a card onto a sidebar task (its row's middle half)
+  opens that task, a card over ▦ opens the board, and a task's drag opens
+  nothing (ADR-0134). Only what a card could be dropped onto opens, so the
+  ring never fills where the drop would make a new task. When the shell
+  decided this from the row under the pointer, for every source, a task
+  dragged over another in the sidebar filled the ring and opened it, and
+  looked like a drop *into* that task.
 
 ## Copy, cut and paste (`clip.ts`, ADR-0132)
 

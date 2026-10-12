@@ -3,15 +3,21 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import {
   type Armed,
+  type CardOver,
+  type CardSource,
+  type DragAt,
   type DragFrom,
   type DragSource,
   dragProps,
   dragVerdict,
   drawPlan,
   dropIntents,
+  dropMark,
   hoverOpens,
   sidebarSpotAt,
   sourceOfElement,
+  type TaskOver,
+  type TaskSource,
 } from "./drag.ts"
 import type { IntentState } from "./effects.ts"
 import { neighbourShifts } from "./reorder.ts"
@@ -21,8 +27,10 @@ const K = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const NEXT = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
 const ARCHIVE = workflowStateIdFor("x")
 const DOING = workflowStateIdFor("d")
-const card: DragSource = { kind: "card", card: T }
-const task: DragSource = { kind: "task", drag: { task: K, state: DOING } }
+const card: CardSource = { kind: "card", card: T }
+const task: TaskSource = { kind: "task", drag: { task: K, state: DOING } }
+const cardAt = (over: CardOver): DragAt => ({ ...card, over })
+const taskAt = (over: TaskOver): DragAt => ({ ...task, over })
 const from: DragFrom = { column: 1, home: null, archive: ARCHIVE }
 /** A drag's verdict never reads the state for these: a task's, or one over the strip. */
 const NO_STATE = {} as IntentState
@@ -45,22 +53,15 @@ test("a handle's source round-trips through its attributes; an element with none
 
 test("a column over the strip reorders, over its own gap moves nothing; a task lands by its own drop", () => {
   expect(
-    dragVerdict(card, from, { kind: "strip", gap: 3 }, "move", NO_STATE),
-  ).toEqual({
-    kind: "reorder",
-    to: 2,
-  })
+    dragVerdict(cardAt({ kind: "strip", gap: 3 }), from, "move", NO_STATE),
+  ).toEqual({ kind: "reorder", to: 2 })
   expect(
-    dragVerdict(card, from, { kind: "strip", gap: 1 }, "move", NO_STATE),
-  ).toEqual({
-    kind: "reorder",
-    to: null,
-  })
+    dragVerdict(cardAt({ kind: "strip", gap: 1 }), from, "move", NO_STATE),
+  ).toEqual({ kind: "reorder", to: null })
   expect(
     dragVerdict(
-      task,
+      taskAt({ kind: "root", target: { kind: "list", before: NEXT } }),
       from,
-      { kind: "root", target: { kind: "list", before: NEXT } },
       "move",
       NO_STATE,
     ),
@@ -68,63 +69,38 @@ test("a column over the strip reorders, over its own gap moves nothing; a task l
     kind: "root",
     intent: { kind: "moveInList", task: K, before: NEXT },
   })
-  // A task over a card's drop zone, or a card over a task's, does nothing.
-  expect(
-    dragVerdict(
-      task,
-      from,
-      { kind: "put", target: { kind: "inventory", slot: 0 } },
-      "move",
-      NO_STATE,
-    ),
-  ).toEqual({ kind: "nothing" })
-  expect(
-    dragVerdict(
-      card,
-      from,
-      { kind: "root", target: { kind: "list", before: null } },
-      "move",
-      NO_STATE,
-    ),
-  ).toEqual({ kind: "nothing" })
 })
 
 test("a drop sends what a key or a menu would: moveColumn, put or the task's drop, nothing else", () => {
+  expect(dropIntents(card, { kind: "reorder", to: 2 }, "move")).toEqual([
+    { kind: "moveColumn", column: { kind: "card", card: T }, to: 2 },
+  ])
+  const target = { kind: "task", task: K } as const
   expect(
     dropIntents(
       card,
-      { kind: "strip", gap: 3 },
-      { kind: "reorder", to: 2 },
-      "move",
-    ),
-  ).toEqual([{ kind: "moveColumn", column: { kind: "card", card: T }, to: 2 }])
-  const over = { kind: "put", target: { kind: "task", task: K } } as const
-  expect(
-    dropIntents(
-      card,
-      over,
-      { kind: "land", landing: { kind: "move", card: T, to: over.target } },
+      {
+        kind: "land",
+        target,
+        landing: { kind: "move", card: T, to: target },
+      },
       "copy",
     ),
   ).toEqual([
-    {
-      kind: "put",
-      source: { kind: "card", card: T },
-      target: over.target,
-      how: "copy",
-    },
+    { kind: "put", source: { kind: "card", card: T }, target, how: "copy" },
   ])
   expect(
     dropIntents(
       card,
-      over,
-      { kind: "land", landing: { kind: "refused", code: "no-place", card: T } },
+      {
+        kind: "land",
+        target,
+        landing: { kind: "refused", code: "no-place", card: T },
+      },
       "move",
     ),
   ).toEqual([])
-  expect(
-    dropIntents(card, over, { kind: "reorder", to: null }, "move"),
-  ).toEqual([])
+  expect(dropIntents(card, { kind: "reorder", to: null }, "move")).toEqual([])
 })
 
 test("held over a sidebar task it opens that task, over ▦ the board", () => {
@@ -162,20 +138,29 @@ test("neighbours slide by the dragged column's width to open its gap, and the re
   expect(neighbourShifts(1, 1, [100, 100, 100])).toEqual([0, 0, 0])
 })
 
+/** A column's drag, armed at its press: the strip's box, three columns. */
+const armed: Armed = {
+  start: { x: 100, y: 10 },
+  column: true,
+  strip: { left: 0, right: 1000, top: 0, bottom: 600 },
+  from: 1,
+  widths: [300, 300, 300],
+}
+/** A drag of anything but a column, armed at its press. */
+const whole: Armed = {
+  ...armed,
+  column: false,
+  strip: null,
+  from: null,
+  widths: [],
+}
+
 test("drawPlan: a column only translates, along the strip; off it, its face is drawn instead", () => {
-  const armed: Armed = {
-    start: { x: 100, y: 10 },
-    column: true,
-    strip: { left: 0, right: 1000, top: 0, bottom: 600 },
-    from: 1,
-    widths: [300, 300, 300],
-  }
-  const over = { kind: "strip", gap: 3 } as const
   const on = drawPlan(
     armed,
     { x: 700, y: 40 },
     0,
-    over,
+    cardAt({ kind: "strip", gap: 3 }),
     { kind: "reorder", to: 2 },
     "move",
   )
@@ -185,12 +170,13 @@ test("drawPlan: a column only translates, along the strip; off it, its face is d
     shifts: [0, 0, -300],
     mark: null,
     lean: 0,
+    opens: { kind: "none" },
   })
   const off = drawPlan(
     armed,
     { x: 1200, y: 40 },
     100,
-    { kind: "none" },
+    cardAt({ kind: "none" }),
     { kind: "nothing" },
     "move",
   )
@@ -200,13 +186,15 @@ test("drawPlan: a column only translates, along the strip; off it, its face is d
     3,
   ])
   // Anything else moves whole, marked by what a drop there would do.
-  const whole = drawPlan(
-    { ...armed, column: false, strip: null, from: null, widths: [] },
+  const slot = { kind: "inventory", slot: 0 } as const
+  const moved = drawPlan(
+    whole,
     { x: 130, y: 50 },
     0,
-    { kind: "put", target: { kind: "inventory", slot: 0 } },
+    cardAt({ kind: "put", target: slot }),
     {
       kind: "land",
+      target: slot,
       landing: {
         kind: "replace",
         old: T,
@@ -215,9 +203,46 @@ test("drawPlan: a column only translates, along the strip; off it, its face is d
     },
     "move",
   )
-  expect([whole.dragged, whole.face, whole.mark]).toEqual([
+  expect([moved.dragged, moved.face, moved.mark]).toEqual([
     { x: 30, y: 40 },
     null,
     "replace",
   ])
+})
+
+/** What a hold opens for `at`, drawn as a drag of anything but a column. */
+const opensFor = (at: DragAt) =>
+  drawPlan(whole, { x: 0, y: 0 }, 0, at, { kind: "nothing" }, "move").opens
+
+test("a task's drag opens nothing, over a place among tasks or none", () => {
+  expect(
+    opensFor(taskAt({ kind: "root", target: { kind: "list", before: NEXT } })),
+  ).toEqual({ kind: "none" })
+  expect(opensFor(taskAt({ kind: "none" }))).toEqual({ kind: "none" })
+})
+
+test("a card's drag opens a sidebar task from its middle and ▦ the board; between tasks, nothing", () => {
+  expect(
+    opensFor(cardAt({ kind: "put", target: { kind: "task", task: K } })),
+  ).toEqual({ kind: "task", task: K })
+  expect(
+    opensFor(cardAt({ kind: "put", target: { kind: "sidebar", before: K } })),
+  ).toEqual({ kind: "none" })
+  expect(opensFor(cardAt({ kind: "board" }))).toEqual({ kind: "board" })
+  expect(opensFor(cardAt({ kind: "strip", gap: 0 }))).toEqual({
+    kind: "none",
+  })
+})
+
+test("a task's landing is marked as a root drop; a card's as its move or copy", () => {
+  const intent = { kind: "moveInList", task: K, before: NEXT } as const
+  expect(dropMark({ kind: "root", intent }, "move")).toBe("root")
+  const target = { kind: "column", key: "k" } as const
+  const land = {
+    kind: "land",
+    target,
+    landing: { kind: "move", card: T, to: target },
+  } as const
+  expect(dropMark(land, "move")).toBe("move")
+  expect(dropMark(land, "copy")).toBe("copy")
 })
