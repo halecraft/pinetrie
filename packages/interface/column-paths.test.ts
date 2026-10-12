@@ -8,7 +8,13 @@ import {
   threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { branchColors, PENDING_TRACK, projectColumns } from "./column-paths.ts"
+import {
+  branchColors,
+  PENDING_TRACK,
+  projectColumns,
+  threadTrack,
+  trackIndex,
+} from "./column-paths.ts"
 import { entriesOf, entry, fromParents, threadOfEntry } from "./fixtures.ts"
 
 /**
@@ -185,7 +191,7 @@ describe("a branch whose first entry is a context entry no column draws (ADR-012
 
 describe("branchColors", () => {
   const i = indexTree(forks)
-  const rail = projectRail(i, entryId("1-t1"))
+  const rail = trackIndex(projectRail(i, entryId("1-t1")))
   test("a column's colour is its last message's track; its fork dot matches", () => {
     const cols = projectColumns(i, [
       { anchor: entryId("3-t3") },
@@ -205,5 +211,21 @@ describe("branchColors", () => {
       { anchor: entryId("2-t2") },
     ])
     expect(branchColors(rail, cols).track).toEqual([0, PENDING_TRACK])
+  })
+  test("a folded strip ending where a column ends takes its colour", () => {
+    const cols = projectColumns(i, [
+      { anchor: entryId("3-t3") },
+      { anchor: entryId("7-b2") },
+    ])
+    const strips = [
+      threadTrack(rail, entryId("3-t3")),
+      threadTrack(rail, entryId("7-b2")),
+    ]
+    expect(strips).toEqual([0, 2])
+    expect(strips).toEqual(branchColors(rail, cols).track)
+  })
+  test("a strip whose end is not on the rail, or has none, is pending", () => {
+    expect(threadTrack(rail, entryId("nowhere"))).toBe(PENDING_TRACK)
+    expect(threadTrack(rail, null)).toBe(PENDING_TRACK)
   })
 })

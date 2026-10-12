@@ -1,0 +1,19 @@
+page {"nodes":21447,"columns":8,"messages":1200}
+{"label":"run0","rate":4,"act":"baseline","shown":{"n":13,"p50":17,"p95":26,"max":26,"over20":2,"over50":0},"raf":{"n":16,"p50":17,"p95":17,"max":17,"over20":0,"over50":0}}
+{"label":"run0","rate":4,"act":"fold","shown":{"n":13,"p50":17,"p95":20,"max":20,"over20":1,"over50":0},"raf":{"n":17,"p50":17,"p95":67,"max":67,"over20":1,"over50":1}}
+{"label":"run0","rate":4,"act":"unfold","commit":1076,"shown":{"n":15,"p50":16,"p95":25,"max":25,"over20":2,"over50":0},"raf":{"n":16,"p50":17,"p95":133,"max":133,"over20":4,"over50":1}}
+{"label":"run1","rate":4,"act":"baseline","shown":{"n":12,"p50":17,"p95":25,"max":25,"over20":2,"over50":0},"raf":{"n":16,"p50":17,"p95":17,"max":17,"over20":0,"over50":0}}
+{"label":"run1","rate":4,"act":"fold","shown":{"n":13,"p50":17,"p95":20,"max":20,"over20":0,"over50":0},"raf":{"n":17,"p50":17,"p95":67,"max":67,"over20":1,"over50":1}}
+{"label":"run1","rate":4,"act":"unfold","commit":946,"shown":{"n":14,"p50":16,"p95":32,"max":32,"over20":2,"over50":0},"raf":{"n":14,"p50":17,"p95":100,"max":100,"over20":4,"over50":1}}
+{"label":"run2","rate":4,"act":"baseline","shown":{"n":13,"p50":17,"p95":26,"max":26,"over20":1,"over50":0},"raf":{"n":16,"p50":17,"p95":17,"max":17,"over20":0,"over50":0}}
+{"label":"run2","rate":4,"act":"fold","shown":{"n":13,"p50":16,"p95":19,"max":19,"over20":0,"over50":0},"raf":{"n":18,"p50":17,"p95":50,"max":50,"over20":1,"over50":0}}
+{"label":"run2","rate":4,"act":"unfold","commit":1022,"shown":{"n":14,"p50":17,"p95":20,"max":20,"over20":0,"over50":0},"raf":{"n":15,"p50":17,"p95":133,"max":133,"over20":3,"over50":1}}
+{"label":"run0","rate":6,"act":"baseline","shown":{"n":14,"p50":17,"p95":32,"max":32,"over20":1,"over50":0},"raf":{"n":17,"p50":17,"p95":33,"max":33,"over20":1,"over50":0}}
+{"label":"run0","rate":6,"act":"fold","shown":{"n":14,"p50":20,"p95":26,"max":26,"over20":5,"over50":0},"raf":{"n":11,"p50":33,"p95":117,"max":117,"over20":6,"over50":1}}
+{"label":"run0","rate":6,"act":"unfold","commit":1819,"shown":{"n":14,"p50":18,"p95":72,"max":72,"over20":6,"over50":1},"raf":{"n":10,"p50":33,"p95":183,"max":183,"over20":8,"over50":2}}
+{"label":"run1","rate":6,"act":"baseline","shown":{"n":13,"p50":16,"p95":30,"max":30,"over20":1,"over50":0},"raf":{"n":15,"p50":17,"p95":33,"max":33,"over20":2,"over50":0}}
+{"label":"run1","rate":6,"act":"fold","shown":{"n":15,"p50":16,"p95":32,"max":32,"over20":5,"over50":0},"raf":{"n":12,"p50":33,"p95":117,"max":117,"over20":8,"over50":1}}
+{"label":"run1","rate":6,"act":"unfold","commit":1917,"shown":{"n":14,"p50":17,"p95":26,"max":26,"over20":6,"over50":0},"raf":{"n":9,"p50":33,"p95":217,"max":217,"over20":7,"over50":2}}
+{"label":"run2","rate":6,"act":"baseline","shown":{"n":13,"p50":17,"p95":28,"max":28,"over20":1,"over50":0},"raf":{"n":16,"p50":17,"p95":33,"max":33,"over20":1,"over50":0}}
+{"label":"run2","rate":6,"act":"fold","shown":{"n":14,"p50":17,"p95":28,"max":28,"over20":2,"over50":0},"raf":{"n":11,"p50":33,"p95":117,"max":117,"over20":7,"over50":1}}
+{"label":"run2","rate":6,"act":"unfold","commit":1634,"shown":{"n":14,"p50":17,"p95":31,"max":31,"over20":1,"over50":0},"raf":{"n":8,"p50":33,"p95":183,"max":183,"over20":6,"over50":2}}

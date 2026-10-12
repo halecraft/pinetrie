@@ -1,7 +1,7 @@
-// web/folded-column — a column folded to a narrow strip with its title, in its
-// place on the canvas (ADR-0116): its card's face (ADR-0126), worded for a
-// strip (`foldedWords`). Pressing it unfolds it. Its head is a drag handle,
-// as an unfolded column's is (`use-drag.ts`): folds are yours, the order
+// web/folded-column — a card's column folded to a strip in its place on the
+// canvas: its card's face, worded for a strip (`foldedWords`), in its
+// thread's colour, drawn by `FoldedStrip`. Its head is a drag handle, as an
+// unfolded column's is (`use-drag.ts`): folds are yours, the order
 // everyone's. It has no ⋯ and no ×: a column is unfolded to act on it.
 
 import {
@@ -9,14 +9,19 @@ import {
   dragProps,
   dropProps,
   type FoldedFace,
+  foldedMark,
   foldedWords,
   type Intent,
   type PutTarget,
   UNFOLD,
 } from "@pinetrie/interface"
+import { FoldedStrip } from "./folded-strip.tsx"
+import { useTrackColors } from "./palette-context.ts"
 
 export function FoldedColumn(p: {
   face: FoldedFace
+  /** Its colour track: its thread's, as its column would take; a note column's is none. */
+  track: number | null
   /** Where a drop on it lands: a spot on its canvas just after it; null where none does. */
   drop: PutTarget | null
   onIntent: (intent: Intent) => void
@@ -24,16 +29,19 @@ export function FoldedColumn(p: {
   const { face } = p
   const card = cardOfFace(face)
   const words = foldedWords(face)
+  const colors = useTrackColors()
   return (
     <section
       {...(p.drop === null ? {} : dropProps(p.drop))}
       className="folded-column"
       data-card={card}
       data-kind={face.kind}
+      style={p.track === null ? undefined : colors.style(p.track)}
     >
       {/* The handle a drag starts from; the strip below unfolds. */}
       <header
         className="column-head folded-head"
+        data-color={p.track === null ? undefined : colors.slot(p.track)}
         data-column-head=""
         {...dragProps({ kind: "card", card })}
       >
@@ -41,21 +49,13 @@ export function FoldedColumn(p: {
           ⠿
         </span>
       </header>
-      <button
-        aria-label={`${UNFOLD.title}: ${words.title}`}
-        className="folded-title"
-        onClick={() => p.onIntent({ kind: "fold", card, unfolded: true })}
-        title={UNFOLD.title}
-        type="button"
-      >
-        <span aria-hidden="true" className={UNFOLD.className}>
-          {UNFOLD.label}
-        </span>
-        <span className="folded-name">{words.title}</span>
-        {words.detail !== null && (
-          <span className="folded-detail">{words.detail}</span>
-        )}
-      </button>
+      <FoldedStrip
+        detail={words.detail}
+        mark={foldedMark(face)}
+        name={words.title}
+        onUnfold={() => p.onIntent({ kind: "fold", card, unfolded: true })}
+        unfold={UNFOLD}
+      />
     </section>
   )
 }

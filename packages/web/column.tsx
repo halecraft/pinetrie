@@ -36,7 +36,6 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import {
-  AGENT_MARK,
   agentsRow,
   agentsWords,
   askLine,
@@ -152,6 +151,7 @@ import { MessageSource, PaneReach, STREAMING } from "./pane-context.ts"
 import { PinnedStrip } from "./pinned-strip.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { isTextBox } from "./text-box.ts"
+import { ThreadMark } from "./thread-mark.tsx"
 import { useAskBar } from "./use-ask-bar.ts"
 import { PLACED, useFollow } from "./use-follow.ts"
 import { useSeenBy } from "./use-presence.ts"
@@ -162,10 +162,10 @@ export interface ColumnProps {
   session: SessionClient
   /** The column as drawn: its thread, and whether it has started. */
   column: ColumnSpec
-  /** The task it is on (ADR-0116); null before it is known. */
+  /** The task it is on; null before it is known. */
   task: TaskId | null
   /**
-   * Which column it is (ADR-0116): its thread's card on the canvas, which
+   * Which column it is: its thread's card on the canvas, which
    * folds and moves, and, its thread not yet started, closes.
    */
   columnKey: ColumnKey
@@ -173,9 +173,9 @@ export interface ColumnProps {
   position: number
   /** Its place among the columns drawn whole, as `data-position` says it. */
   drawnAt: number
-  /** How many columns wide its card is drawn (ADR-0116); 1 with no card. */
+  /** How many columns wide its card is drawn; 1 with no card. */
   width: CardWidth
-  /** A task's label: what a fork row names a source's task by (ADR-0117). */
+  /** A task's label: what a fork row names a source's task by. */
   labelOf: (task: TaskId) => string
   view: ColumnView
   index: TreeIndex
@@ -189,18 +189,18 @@ export interface ColumnProps {
   nameOf: ReadonlyMap<WriterId, string>
   /** Everyone who can be mentioned (`readParticipants`). */
   participants: readonly string[]
-  /** Every named thread on an open task's canvas, whose agents a mention may reach (ADR-0128). */
+  /** Every named thread on an open task's canvas, whose agents a mention may reach. */
   inReach: readonly {
     readonly thread: ThreadId
     readonly name: ThreadName
   }[]
-  /** The tasks in the archive: a member there is away (ADR-0128). */
+  /** The tasks in the archive: a member there is away. */
   archived: ReadonlyMap<TaskId, ArchivedTask>
   /** Each person's colour (`presenceColors`). */
   colorOf: (writer: WriterId) => string
   /** This window is typing in this column, in the card its box shows. */
   onTyping: (card: CardId | null) => void
-  /** Every card's record (ADR-0048). */
+  /** Every card's record. */
   cards: readonly CardRecord[]
   /** The queued cards that are blank messages (`useBlankQueued`): they do not wait. */
   blank: ReadonlySet<CardId>
@@ -211,7 +211,7 @@ export interface ColumnProps {
   /** The streams to draw, from the same moment as `index` (`liveWork`). */
   live: LiveWork
   lanes: readonly LaneView[]
-  /** Where lanes work, the files at each entry, and each lane's offer (ADR-0032). */
+  /** Where lanes work, the files at each entry, and each lane's offer. */
   work: WorkFacts
   /** The ids on this column's path, which the app has already computed. */
   path: ReadonlySet<EntryId>
@@ -220,7 +220,7 @@ export interface ColumnProps {
    * `{ kind: "column", key, act }`, a message's among them.
    */
   onIntent: (intent: Intent) => void
-  /** Nothing may be written here (ADR-0029): no composer, no tools that write. */
+  /** Nothing may be written here: no composer, no tools that write. */
   readOnly: ReadOnly | null
   /**
    * Whether the column keyed `key` was just opened, so its composer takes
@@ -240,26 +240,25 @@ export interface ColumnProps {
   landmarks: readonly EntryId[]
   /** Each ask's fold, as the reader chose it, across unmounts. */
   folds: FoldMemory
-  /** Each ask's model-written digest, by its prompt (ADR-0106). */
+  /** Each ask's model-written digest, by its prompt. */
   digests: ReadonlyMap<EntryId, DigestRecord>
   /**
-   * How far you have read each thread, on every device of yours (ADR-0106,
-   * ADR-0077).
+   * How far you have read each thread, on every device of yours.
    */
   attention: AttentionStore
-  /** Every mounted column's view, which the rail outlines (ADR-0058). */
+  /** Every mounted column's view, which the rail outlines. */
   viewports: ViewportStore
-  /** Where columns were left, by message (ADR-0058). */
+  /** Where columns were left, by message. */
   spots: SpotStore
   /**
-   * Every trace, by id (ADR-0048): the column draws its reader's own at its
+   * Every trace, by id: the column draws its reader's own at its
    * thread's end.
    */
   traces: ReadonlyMap<string, TraceRecord>
   /** Each column's composer, which a put on the column reads (`put-target.ts`). */
   composers: ComposerPlacesStore
   /**
-   * This column's matches while a search applies (ADR-0101), laid over its
+   * This column's matches while a search applies, laid over its
    * thread; null while not searching.
    */
   matches: ColumnMatches | null
@@ -272,7 +271,7 @@ const textPlaceOf = (place: CardPlace | undefined): TextPlace | undefined =>
 export function Column(p: ColumnProps) {
   const { index } = p
   // The path above the column's own thread, folded when the thread it forks
-  // from is on no column of this canvas (ADR-0117): unfolded, it is drawn
+  // from is on no column of this canvas: unfolded, it is drawn
   // as the rest of the path is.
   const [aboveOpen, setAboveOpen] = useState(false)
   const view = useMemo(
@@ -307,8 +306,8 @@ export function Column(p: ColumnProps) {
       spacer.current.style.height = "0px"
   }, [view.forkFrom])
 
-  // A thread not yet started (ADR-0126): its next send is a branch at its
-  // anchor, its thread's first message (ADR-0117).
+  // A thread not yet started: its next send is a branch at its
+  // anchor, its thread's first message.
   const unstarted = branchesAt(p.column)
   const opening = unstartedOf(p.column)
   // A card's column folds and moves; an unstarted one closes too.
@@ -340,7 +339,7 @@ export function Column(p: ColumnProps) {
     p.onIntent({ kind: "openLink", link, entry: at }),
   )
 
-  // Margins (ADR-0126): the comments beside each entry, one open at a time,
+  // Margins: the comments beside each entry, one open at a time,
   // and the entry the keys select.
   const [openMargin, setOpenMargin] = useState<EntryId | null>(null)
   const [commenting, setCommenting] = useState<CardId | null>(null)
@@ -419,7 +418,7 @@ export function Column(p: ColumnProps) {
       ?.scrollIntoView({ block: "nearest" })
   }, [selected])
   /**
-   * The column's messages as a grid one cell wide (ADR-0126), while focus is
+   * The column's messages as a grid one cell wide, while focus is
    * in it and in no text box: `j` and `k` select, Enter opens the selected
    * entry's margin, Escape shuts it, and `c` comments. Cmd+C copies the
    * focused table's bar's table, else the selected entry: the page's copy
@@ -483,7 +482,7 @@ export function Column(p: ColumnProps) {
   )
   // Where you last left the thread, on any device: read as the column
   // mounts and when the page shows again, so the line stays where it was
-  // while you read below it (ADR-0106, ADR-0077).
+  // while you read below it.
   const leftLane = p.column.thread
   const readLeft = useStable(() =>
     p.attention.attention.current().read.get(leftLane),
@@ -540,7 +539,7 @@ export function Column(p: ColumnProps) {
       )
     },
   )
-  // While they do, the column does not get shorter at its end (S35).
+  // While they do, the column does not get shorter at its end.
   const end = useFollow(
     body,
     content,
@@ -549,8 +548,8 @@ export function Column(p: ColumnProps) {
     view.tipId,
   )
   // Watching its end, in a page you can see, you have read the thread to it:
-  // a run you watch end raises nothing (ADR-0077). Covered by a search, it
-  // is not watched (ADR-0101). `readStep` decides when the mark is written.
+  // a run you watch end raises nothing. Covered by a search, it
+  // is not watched. `readStep` decides when the mark is written.
   const attention = p.attention
   const covered = p.matches !== null
   useEffect(() => {
@@ -566,7 +565,7 @@ export function Column(p: ColumnProps) {
     ? { kind: "none" }
     : laneOf(p.lanes, p.column.thread)
   const running = lane.kind === "lane" && lane.running
-  // The ask this column's lane is answering (ADR-0106).
+  // The ask this column's lane is answering.
   const runningAsk =
     lane.kind === "lane" && lane.running ? promptOf(index, lane.tip) : null
   const density = p.column.density ?? "story"
@@ -574,13 +573,13 @@ export function Column(p: ColumnProps) {
   const askLineOf = (ask: EntryId | null): string | null =>
     askLine(index, ask, nameFn)
   // Which ask the work at the top belongs to, while its message is out of
-  // sight (ADR-0106). Outline draws each ask's line under its message.
+  // sight. Outline draws each ask's line under its message.
   const atTop = useAskBar(body, density !== "outline")
   // The cards queued for this thread's lane, above the line, in the order the
-  // host pops them (ADR-0048).
+  // host pops them.
   const queued = lane.kind === "lane" ? queuedOn(p.cards, lane.name) : []
   // What you did here that was refused: an unqueue the host had popped the
-  // card before (S69), a move someone else made first (ADR-0059), a put the
+  // card before, a move someone else made first, a put the
   // host would not accept, or a keep without room.
   const refused = useSyncExternalStore(
     p.session.moves.subscribe,
@@ -602,10 +601,10 @@ export function Column(p: ColumnProps) {
   )
   // Whether the reader opened the thread's details here, since the column
   // mounted: they spin only then, and not when a reload or a tab switch
-  // mounts them open (ADR-0073), as a banner there at mount does not fade.
+  // mounts them open, as a banner there at mount does not fade.
   const [openedHere, setOpenedHere] = useState(false)
   const working = workingWords(running, askLineOf(runningAsk))
-  // The cards at this column's end (ADR-0048): yours, which the composer
+  // The cards at this column's end: yours, which the composer
   // edits, and everyone else's, drawn above it. A thread's cards are found
   // by where its thread ends now; an unstarted one's by its thread.
   const threadEnd = at.kind === "entry" ? at.id : null
@@ -624,7 +623,7 @@ export function Column(p: ColumnProps) {
           p.cards,
           index,
         )
-  // The thread's pinned cards (ADR-0048 step 5), and what the agent reads of
+  // The thread's pinned cards, and what the agent reads of
   // them now, from the walk the host plans a run's cards from. A unstarted
   // column has no thread, so none.
   const pinned =
@@ -662,8 +661,8 @@ export function Column(p: ColumnProps) {
     work: p.work,
     origins,
   })
-  // What a card's command catches up with: the thread's base (ADR-0104),
-  // or the thread it branched from (ADR-0072). One object while what it
+  // What a card's command catches up with: the thread's base,
+  // or the thread it branched from. One object while what it
   // says is the same: the composer is memoised.
   const baseRecord =
     lane.kind === "lane" ? (p.work.bases.get(lane.name) ?? null) : null
@@ -679,7 +678,7 @@ export function Column(p: ColumnProps) {
     }),
     [baseRecord, parentLane, parentName],
   )
-  // The thread is named before its first send (ADR-0057). The step changes
+  // The thread is named before its first send. The step changes
   // with the person's typing (`createsLane`) and as the name arrives, so the
   // effect runs once per step, not once per render.
   const carryOut = useStable((step: ReserveStep) => {
@@ -699,7 +698,7 @@ export function Column(p: ColumnProps) {
     ...(opening?.root === undefined ? {} : { root: opening.root }),
     ...(pinned.length === 0 ? {} : { pinned: pinned.map(c => c.id) }),
   }
-  // This thread's members and its budget, in its header (ADR-0128).
+  // This thread's members and its budget, in its header.
   const agentsHere = useMemo(
     () => threadMembers(p.index, view.tipId),
     [p.index, view.tipId],
@@ -731,7 +730,7 @@ export function Column(p: ColumnProps) {
       p.work.budgets,
     ],
   )
-  // Where each row from another task's thread is (ADR-0128).
+  // Where each row from another task's thread is.
   const crossTasks = useMemo(
     () =>
       crossTaskLinks(view.nodes, {
@@ -742,12 +741,12 @@ export function Column(p: ColumnProps) {
       }),
     [view.nodes, p.cards, p.session.writer, p.nameOf, p.task, p.labelOf],
   )
-  // Other threads' agents a message here may name (ADR-0128).
+  // Other threads' agents a message here may name.
   const agents = useMemo(
     () => agentCandidates(p.inReach, thread, agentsHere),
     [p.inReach, thread, agentsHere],
   )
-  // The column's pane (ADR-0078): what you opened beside the thread, kept
+  // The column's pane: what you opened beside the thread, kept
   // only while the column is mounted. One subject at a time, named, so
   // `paneView` can tell when it is gone: the offer's review after an
   // acceptance or a withdrawal, a table or an image whose message this column no longer
@@ -785,9 +784,9 @@ export function Column(p: ColumnProps) {
   const paneId = `pane-${p.column.key}`
   const toggleReview = useStable(() => openPane({ kind: "offer" }))
   // Catching up and splitting are a card with the command and no text,
-  // made in the queue (ADR-0108, ADR-0061, ADR-0080, ADR-0113): the host
+  // made in the queue: the host
   // pops it when the lane is free. An acceptance names its destination: the default,
-  // or accepted work (ADR-0104).
+  // or accepted work.
   const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
     if (button === "accept" || button === "accept-into-accepted") {
@@ -863,7 +862,7 @@ export function Column(p: ColumnProps) {
   const putColumn = writable && place !== undefined ? key : null
   const pinKey = writable && place !== undefined ? pinnedOf(place) : null
   const putPinned = pinKey === null ? null : key
-  // "+ pin" opens a box that makes a pinned card (ADR-0048). While it is
+  // "+ pin" opens a box that makes a pinned card. While it is
   // open, the strip leaves out the card it shows, as the column leaves out
   // the composer's. It closes when focus leaves it.
   const [pinning, setPinning] = useState(false)
@@ -879,7 +878,7 @@ export function Column(p: ColumnProps) {
     setPinning(true)
   }
   // Your traces where your cards were at this thread's end, when someone
-  // else moved them while you were away (ADR-0048). Drawn in a page you can
+  // else moved them while you were away. Drawn in a page you can
   // see, a trace is seen: the host deletes it, and this column keeps drawing
   // what it drew until it unmounts (`keptTraces`). Not in a column that
   // cannot be written: an archived root's is a glance, not a return.
@@ -915,6 +914,7 @@ export function Column(p: ColumnProps) {
       className="column"
       ref={section}
       data-card={card ?? undefined}
+      data-kind="thread"
       data-density={density}
       data-width={p.width}
       data-key={p.column.key}
@@ -1015,7 +1015,7 @@ export function Column(p: ColumnProps) {
             <Origin onLink={openLink} onOpen={openAt} origin={shows.origin} />
             {agentsLine !== null && (
               // Other threads' agents in this thread, and what agents
-              // talking from it spent (ADR-0128).
+              // talking from it spent.
               <div className="agents-row">{agentsWords(agentsLine)}</div>
             )}
             {view.above.length > 0 && (
@@ -1028,7 +1028,7 @@ export function Column(p: ColumnProps) {
                 {earlierWords(view.above.length)}
               </button>
             )}
-            {/* The work strip, a row of the header (ADR-0113). */}
+            {/* The work strip, a row of the header. */}
             <WorkStripView
               act={actOnOffer}
               review={{
@@ -1040,7 +1040,7 @@ export function Column(p: ColumnProps) {
             />
           </header>
           {/* Under a search, the thread stays as it is, covered and inert,
-          with its matches laid over it (ADR-0101, S126): leaving needs no
+          with its matches laid over it: leaving needs no
           restoring. Positioned, this is the messages' offsetParent, and the
           body's, so their offsets from the body hold. */}
           <div className="column-below">
@@ -1355,62 +1355,8 @@ function Reply({ doc, stream }: { doc: LiveDocHandle; stream: StreamRecord }) {
 }
 
 /**
- * The mark before a thread's name: one fixed square, so the name never
- * moves. It holds the star, and the thread's banner over it when there is
- * one; the star stays in the text either way. The square pulses while the
- * lane runs, banner and all: under a banner the star is hidden.
- */
-function ThreadMark({
-  banner,
-  running,
-  working,
-}: {
-  banner: HeadBanner | null
-  running: boolean
-  /** Its title while the lane runs (`workingWords`). */
-  working: string | undefined
-}) {
-  return (
-    <span
-      className={running ? "thread-mark pulse" : "thread-mark"}
-      title={working}
-    >
-      {banner === null ? (
-        <span className="thread-star">{AGENT_MARK}</span>
-      ) : (
-        <BannerImage fade={banner.fade} key={banner.url} url={banner.url} />
-      )}
-    </span>
-  )
-}
-
-/**
- * A banner over the star. A new one fades in once loaded, the star fading
- * out under it; one there as the column mounts shows at once, with no star.
- * Keyed by its URL, so each new banner fades in.
- */
-function BannerImage({ url, fade }: { url: string; fade: boolean }) {
-  const [loaded, setLoaded] = useState(false)
-  return (
-    <>
-      <span className="thread-star" data-gone={loaded || !fade || undefined}>
-        {AGENT_MARK}
-      </span>
-      <img
-        alt=""
-        className="banner"
-        data-fade={fade || undefined}
-        data-loaded={loaded || undefined}
-        onLoad={() => setLoaded(true)}
-        src={url}
-      />
-    </>
-  )
-}
-
-/**
  * Who works in the column: its lane's name, which opens or closes the
- * thread's details (ADR-0073); a lane about to start; or nothing, in a
+ * thread's details; a lane about to start; or nothing, in a
  * conversation. Its mark pulses while the lane runs. The name's chevron is
  * CSS, so its text is the mark and the name alone.
  */
@@ -1434,8 +1380,8 @@ function Identity({
   if (identity.kind === "pending")
     return (
       <span className="agent-name pending">
-        <ThreadMark banner={null} running={running} working={working} />{" "}
-        {identityWords(identity)}
+        <ThreadMark banner={null} folds running={running} working={working} />{" "}
+        <span data-fold-name="">{identityWords(identity)}</span>
       </span>
     )
   const { open } = identity.details
@@ -1449,14 +1395,14 @@ function Identity({
       title={detailsTitle(open)}
       type="button"
     >
-      <ThreadMark banner={banner} running={running} working={working} />{" "}
-      {identityWords(identity)}
+      <ThreadMark banner={banner} folds running={running} working={working} />{" "}
+      <span data-fold-name="">{identityWords(identity)}</span>
     </button>
   )
 }
 
 /**
- * A named thread's details, under its header (ADR-0073): its mark
+ * A named thread's details, under its header: its mark
  * magnified, its name, who started it, what it works on
  * now, whether its base has moved on, and where its lane started on this
  * path. The mark is `ThreadMark` itself, scaled by CSS. It spins as the
@@ -1530,7 +1476,7 @@ function ThreadDetailsPanel({
 /**
  * Where the column forks, leading back to it: the message it forks from;
  * or a copy's source, or a parent thread in another task, by its link,
- * which opens nothing where someone else holds it (ADR-0117, ADR-0124).
+ * which opens nothing where someone else holds it.
  */
 function Origin({
   origin,
@@ -1590,9 +1536,9 @@ function Bookmark({ name }: { name: string }) {
 }
 
 /**
- * What became of the column's files, at its foot (ADR-0040): the lane's offer
- * in your repo (ADR-0105). An
- * offer's line opens its review (ADR-0047); its bookmark, copied, finds it in
+ * What became of the column's files, at its foot: the lane's offer
+ * in your repo. An
+ * offer's line opens its review; its bookmark, copied, finds it in
  * jj or jjui.
  */
 function WorkStripView({
@@ -1678,7 +1624,7 @@ function WorkStripView({
 }
 
 /**
- * How much of each ask the column draws (ADR-0106): outline, story or raw.
+ * How much of each ask the column draws: outline, story or raw.
  * The reader's choice, kept with the column, never written.
  */
 function DensityControl({

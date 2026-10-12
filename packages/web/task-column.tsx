@@ -1,9 +1,9 @@
-// web/task-column — the task column (ADR-0116): the task's own place on its
-// canvas, drawn before every card and outside the order, so nothing moves it.
-// Its title is renamed in place, its state changed from its Move to ▸, the
-// same intents the sidebar and the board send; who is here is the board's
-// readers. Folded, it is a strip with its title. What it says is
-// `taskColumnView`'s.
+// web/task-column — the task column: the task's own place on its canvas,
+// drawn before every card and outside the order, so nothing moves it. Its
+// title is renamed in place, its state changed from its Move to ▸, the same
+// intents the sidebar and the board send; who is here is the board's
+// readers. Folded, it is a `FoldedStrip` with its title, and no mark. What it
+// says is `taskColumnView`'s.
 
 import type {
   CardId,
@@ -20,6 +20,7 @@ import {
   FIRST_NOTE_COLUMN,
   FOLD_TASK,
   type Intent,
+  NO_MARK,
   pinnedCountWords,
   RENAME_TASK_TITLE,
   RESTORE_WORDS,
@@ -38,6 +39,7 @@ import { TASK_BUSY_REASON } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { useState } from "react"
 import { PinnedCardEditor } from "./card-editor.tsx"
+import { FoldedStrip } from "./folded-strip.tsx"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { ReaderMenus, type ReadersProps } from "./root-signals.tsx"
 import { TitleField } from "./title-field.tsx"
@@ -72,26 +74,18 @@ export function TaskColumn(p: {
       column: { kind: "task", task: view.task },
       act: a,
     })
-  if (view.folded) {
-    const pins = pinnedCountWords(p.pins.length)
+  if (view.folded)
     return (
       <section className="task-column folded-column" data-task={view.task}>
-        <button
-          aria-label={`${UNFOLD_TASK.title}: ${view.label}`}
-          className="folded-title"
-          onClick={() => fold(true)}
-          title={UNFOLD_TASK.title}
-          type="button"
-        >
-          <span aria-hidden="true" className={UNFOLD_TASK.className}>
-            {UNFOLD_TASK.label}
-          </span>
-          <span className="folded-name">{view.label}</span>
-          {pins !== null && <span className="folded-detail">{pins}</span>}
-        </button>
+        <FoldedStrip
+          detail={pinnedCountWords(p.pins.length)}
+          mark={NO_MARK}
+          name={view.label}
+          onUnfold={() => fold(true)}
+          unfold={UNFOLD_TASK}
+        />
       </section>
     )
-  }
   return (
     <section className="task-column" data-task={view.task}>
       <header className="task-column-head">
@@ -111,7 +105,7 @@ export function TaskColumn(p: {
             title={RENAME_TASK_TITLE}
             type="button"
           >
-            {view.label}
+            <span data-fold-name="">{view.label}</span>
           </button>
         )}
         <button

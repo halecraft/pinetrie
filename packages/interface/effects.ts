@@ -57,12 +57,21 @@ import type { SearchAct } from "./search.ts"
 import type { Tasks } from "./tasks.ts"
 
 export type Effect =
-  | { readonly kind: "layout"; readonly action: LayoutAction }
+  | {
+      readonly kind: "layout"
+      readonly action: LayoutAction
+      /**
+       * Whether a column moves into its fold or out of it as the action
+       * lands (`ports.foldColumn`): only for a fold the reader asked for,
+       * never one a navigation makes.
+       */
+      readonly moves: boolean
+    }
   /** Show the sidebar at `width`, and keep that choice for this tab. */
   | { readonly kind: "listWidth"; readonly width: ListWidth }
-  /** Show a page over the stage, or, with null, the stage (ADR-0098). */
+  /** Show a page over the stage, or, with null, the stage. */
   | { readonly kind: "page"; readonly to: PageName | null }
-  /** Open, type in, clear or close the search of the root you are on (ADR-0101). */
+  /** Open, type in, clear or close the search of the root you are on. */
   | { readonly kind: "search"; readonly act: SearchAct }
   /** Mark what `lane` raised "not needed", in your attention document. */
   | {
@@ -72,10 +81,10 @@ export type Effect =
     }
   /** Ask the host for something that moves no card (`HostRequest`). */
   | { readonly kind: "request"; readonly intent: HostRequest }
-  /** Change the sidebar, in your own document (`openThreads`, ADR-0122). */
+  /** Change the sidebar, in your own document (`openThreads`). */
   | { readonly kind: "list"; readonly act: ListAct }
   /**
-   * Make a card a thread (ADR-0111); `afterSpinOff` decides from its
+   * Make a card a thread; `afterSpinOff` decides from its
    * answer what follows: for the sidebar, the new task placed and shown.
    */
   | {
@@ -99,9 +108,9 @@ export type Effect =
       readonly how: MoveHow
     }
   /**
-   * A paste (ADR-0132): a text card's text written first, a reference's
+   * A paste: a text card's text written first, a reference's
    * quote kept first when it is markdown or a comment's, then one request
-   * that discards the card it replaces (ADR-0133) and makes the card, or
+   * that discards the card it replaces and makes the card, or
    * moves a cut card out of your trash, where `to` sends it.
    */
   | {
@@ -113,11 +122,11 @@ export type Effect =
       /** The task you are on: a discard's history from your inventory. */
       readonly here: TaskId | null
     }
-  /** What the clipboard cell shows: the copy this tab just made (ADR-0132). */
+  /** What the clipboard cell shows: the copy this tab just made. */
   | { readonly kind: "clipboardCell"; readonly clip: Clip }
   /** Text at the caret of the text box that has focus. */
   | { readonly kind: "insertText"; readonly text: string }
-  /** A move (ADR-0059): a take into the inventory, a put, an unqueue, a discard. */
+  /** A move: a take into the inventory, a put, an unqueue, a discard. */
   | {
       readonly kind: "moveCard"
       readonly move: TypedMove
@@ -126,11 +135,11 @@ export type Effect =
       readonly queuedBy: WriterId | null
       /** Whether the card animates to where it lands (`ports.fly`). */
       readonly fly: boolean
-      /** The task you are on, for a discard: its history, from your inventory (ADR-0116). */
+      /** The task you are on, for a discard: its history, from your inventory. */
       readonly here: TaskId | null
     }
   /**
-   * A card queued, and its queue's hold changed with it (ADR-0113). A move
+   * A card queued, and its queue's hold changed with it. A move
    * with no `from` makes the card there, carrying `command`.
    */
   | {
@@ -140,7 +149,7 @@ export type Effect =
       readonly command: CardCommand | null
       readonly how: MoveHow
     }
-  /** A reorder (ADR-0048 step 7), drawn at once, as a move is. */
+  /** A reorder, drawn at once, as a move is. */
   | {
       readonly kind: "reorderCard"
       readonly reorder: Reorder
@@ -149,10 +158,10 @@ export type Effect =
   /** Swap two slots of your inventory, as one step of this tab's swaps. */
   | { readonly kind: "swapSlots"; readonly a: number; readonly b: number }
   /**
-   * Moves sent as one, which the host accepts or refuses whole (ADR-0066):
+   * Moves sent as one, which the host accepts or refuses whole:
    * an unstarted branch's cards kept in your inventory as it closes, a card
    * put in your composer and the message it displaces, or a slot's
-   * replacement (ADR-0133). `afterKeep` decides from its answer whether
+   * replacement. `afterKeep` decides from its answer whether
    * `close` runs.
    */
   | {
@@ -166,7 +175,7 @@ export type Effect =
     }
   /**
    * Undo or redo your newest move in `task`, or outside any task for none,
-   * on the host (ADR-0066, ADR-0126).
+   * on the host.
    */
   | {
       readonly kind: "undoMoves"
@@ -180,7 +189,7 @@ export type Effect =
   /** Open the inventory; `brief`: only for the flight of a take into it, if it was closed. */
   | { readonly kind: "showInventory"; readonly brief: boolean }
   | { readonly kind: "select"; readonly slot: number }
-  /** Open the selected slot's card in your inventory: a thread's read-only preview (ADR-0124). */
+  /** Open the selected slot's card in your inventory: a thread's read-only preview. */
   | { readonly kind: "openSelected" }
   /** An offer action, which the session tracks (`acting`). */
   | {
@@ -195,9 +204,9 @@ export type Effect =
   | { readonly kind: "reveal"; readonly entry: EntryId }
   /** Outline entry `entry` briefly, once drawn: where leaving a search landed. */
   | { readonly kind: "landed"; readonly entry: EntryId }
-  /** Scroll a queued card into view in its column's dock (ADR-0113). */
+  /** Scroll a queued card into view in its column's dock. */
   | { readonly kind: "revealCard"; readonly card: CardId }
-  /** Open ask `ask`'s fold, so what is revealed in it is drawn (ADR-0106). */
+  /** Open ask `ask`'s fold, so what is revealed in it is drawn. */
   | { readonly kind: "openFold"; readonly ask: EntryId }
   /** The column keyed `key` takes focus when it mounts (`claimFocus`). */
   | { readonly kind: "armFocus"; readonly key: string }
@@ -205,7 +214,7 @@ export type Effect =
   | { readonly kind: "forgetIdentity" }
   | { readonly kind: "reload" }
 
-/** A change to the sidebar, by task: your document's key (ADR-0122, ADR-0116). */
+/** A change to the sidebar, by task: your document's key. */
 export type ListAct =
   /** At its end, unless it is in the sidebar already. */
   | { readonly kind: "ensure"; readonly task: TaskId }
@@ -223,17 +232,17 @@ export interface IntentState {
   readonly asks: AskIndex
   readonly cards: CardFacts
   /**
-   * Every task (ADR-0116): an entry opens in the task its thread is in, and
+   * Every task: an entry opens in the task its thread is in, and
    * a task's columns are its canvas's.
    */
   readonly tasks: Tasks
   /** What the sidebar shows now (`shownWidth`). */
   readonly listWidth: ListWidth
-  /** The page over the stage, if any (ADR-0098). */
+  /** The page over the stage, if any. */
   readonly page: PageName | null
-  /** A search applies on the root you are on (`searchOn`, ADR-0101). */
+  /** A search applies on the root you are on (`searchOn`). */
   readonly searching: boolean
-  /** What a copy and a paste read (ADR-0132). */
+  /** What a copy and a paste read. */
   readonly clips: ClipLookups
 }
 
@@ -243,7 +252,7 @@ export type PastedCard =
       readonly kind: "text"
       readonly card: TextCardId
       readonly origin: Address | null
-      /** Written into the card before the host makes it (S96). */
+      /** Written into the card before the host makes it. */
       readonly text: string
     }
   | {
@@ -254,7 +263,7 @@ export type PastedCard =
     }
   | { readonly kind: "uncut"; readonly card: CardId }
 
-/** What a copy reads beyond the cards (ADR-0132): texts, quotes, and the clipboard cell. */
+/** What a copy reads beyond the cards: texts, quotes, and the clipboard cell. */
 export interface ClipLookups {
   /** A text card's text as this tab has it. */
   readonly textOf: (card: TextCardId) => string
@@ -264,7 +273,7 @@ export interface ClipLookups {
   readonly cell: Clip | null
 }
 
-/** What the card intents decide from (ADR-0048 step 4). */
+/** What the card intents decide from. */
 export interface CardFacts {
   /** Every card as drawn. */
   readonly cards: readonly CardRecord[]
@@ -286,6 +295,7 @@ export interface CardFacts {
 export const layout = (action: LayoutAction): Effect => ({
   kind: "layout",
   action,
+  moves: false,
 })
 export const list = (act: ListAct): Effect => ({ kind: "list", act })
 
@@ -305,27 +315,44 @@ export function show(here: Here): readonly Effect[] {
 export const showTask = (task: TaskId): readonly Effect[] =>
   show({ kind: "task", task })
 
-/**
- * A change to your view of `task` (`ViewChange`), as an effect: a view made
- * by it starts from the task's canvas (`defaultView`).
- */
+/** A change to your view of `task`: a view made by it starts from the task's canvas (`defaultView`). */
+const viewAction = (
+  state: Pick<IntentState, "tasks">,
+  task: TaskId,
+  change: ViewChange,
+): LayoutAction => ({
+  kind: "view",
+  task,
+  first: state.tasks.index.canvases.get(task)?.[0]?.id ?? null,
+  change,
+})
+
+/** A change to your view of `task` (`ViewChange`), as an effect. */
 export const changeViewOf = (
   state: Pick<IntentState, "tasks">,
   task: TaskId,
   change: ViewChange,
-): Effect =>
-  layout({
-    kind: "view",
-    task,
-    first: state.tasks.index.canvases.get(task)?.[0]?.id ?? null,
-    change,
-  })
+): Effect => layout(viewAction(state, task, change))
+
+/**
+ * A fold or unfold of a column of `task` that the reader asked for: as
+ * `changeViewOf`, and the column moves as it folds.
+ */
+export const foldViewOf = (
+  state: Pick<IntentState, "tasks">,
+  task: TaskId,
+  change: Extract<ViewChange, { kind: "fold" | "foldTask" }>,
+): Effect => ({
+  kind: "layout",
+  action: viewAction(state, task, change),
+  moves: true,
+})
 
 /**
  * Show entry `id` (`planOpen`): in view in the column that shows it, or in
  * its thread's column, unfolded. An entry of an ask's work opens the ask's
- * fold first, whatever the column's density, so it is drawn to be revealed
- * (ADR-0106): forks, branch starts and people's messages are never in one.
+ * fold first, whatever the column's density, so it is drawn to be revealed:
+ * forks, branch starts and people's messages are never in one.
  */
 export function planOpenAt(id: EntryId, state: IntentState): readonly Effect[] {
   const plan = planOpen(

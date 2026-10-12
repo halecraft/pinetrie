@@ -4034,4 +4034,83 @@ export const mutations: readonly Mutation[] = [
     // typecheck clean, any error is the mutant's.
     command: ["pnpm", "exec", "tsc", "--noEmit", "-p", "packages/interface"],
   },
+  // ── a fold in motion (fold-motion.ts, effects, perform) ──
+  {
+    name: "a fold's turn lands the name on the strip's other edge",
+    file: "packages/interface/fold-motion.ts",
+    from: "          dx: left + (geometry.width + line) / 2 - name.left,\n",
+    to: "          dx: left + (geometry.width - line) / 2 - name.left,\n",
+    command: unit,
+    expect: "a fold turns the name onto where its strip draws it",
+  },
+  {
+    name: "a fold's edge runs through the turning name",
+    file: "packages/interface/fold-motion.ts",
+    from: "      inset: Math.max(0, Math.min(narrowing * fold, limit)),\n",
+    to: "      inset: Math.max(0, narrowing * fold),\n",
+    command: unit,
+    expect: "the edge stays clear of a long name all the way through its turn",
+  },
+  {
+    name: "a fold leaves out the scroll's clamp",
+    file: "packages/interface/fold-motion.ts",
+    from: "  const clamp = scene.unfolding\n",
+    to: "  const clamp = true\n",
+    command: unit,
+    expect:
+      "a fold that shrinks the scroll below where it stands moves every column by the clamp",
+  },
+  {
+    name: "a fold moves under reduced motion",
+    file: "packages/interface/fold-motion.ts",
+    from: "  if (scene.reducedMotion || scene.dragging) return null\n",
+    to: "  if (scene.dragging) return null\n",
+    command: unit,
+    expect:
+      "nothing moves under reduced motion, during a drag, out of view, or already narrow",
+  },
+  {
+    name: "the task column's fold names a card",
+    file: "packages/interface/fold-motion.ts",
+    from: '        column: { kind: "task", task: action.task },\n',
+    to: '        column: { kind: "card", card: action.task as never },\n',
+    command: unit,
+    expect:
+      "a card's fold or the task column's, with which way; nothing for another action",
+  },
+  {
+    name: "a fold that moves lands without its motion",
+    file: "packages/interface/perform.ts",
+    from: "      const motion = effect.moves ? foldOf(effect.action) : null\n",
+    to: "      const motion = null\n",
+    command: unit,
+    expect:
+      "a fold that moves goes through the fold's port, whose commit lands it; one that does not lands at once",
+  },
+  {
+    name: "a fold you ask for does not move",
+    file: "packages/interface/intent.ts",
+    from: "            foldViewOf(\n",
+    to: "            changeViewOf(\n",
+    command: unit,
+    expect:
+      "a fold you ask for is your view of the task you are on, and moves; off a task, nothing",
+  },
+  {
+    name: "a folded strip's colour ignores the rail",
+    file: "packages/interface/column-paths.ts",
+    from: "  end === null ? PENDING_TRACK : (tracks.get(end) ?? PENDING_TRACK)\n",
+    to: "  PENDING_TRACK\n",
+    command: unit,
+    expect: "a folded strip ending where a column ends takes its colour",
+  },
+  {
+    name: "a thread's strip draws ✦ over its banner",
+    file: "packages/interface/folded-column-view.ts",
+    from: "        banner: face.sprite === null ? null : { url: face.sprite, fade: false },\n",
+    to: "        banner: null,\n",
+    command: unit,
+    expect:
+      "a thread's strip draws its banner, or ✦ without one; a note column's draws none",
+  },
 ]

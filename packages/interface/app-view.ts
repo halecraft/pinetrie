@@ -3,7 +3,7 @@
 // `appView` decides; it does not project. The projections (`projectColumns`,
 // `pathIds`, `branchColors`, `unsentSignals`) stay in `App`'s own `useMemo`s and
 // their results come in: one tree rebuilt each render would give every
-// memoised child new props (S54, S59).
+// memoised child new props.
 
 import {
   type ArchivedTask,
@@ -36,7 +36,7 @@ import type { Reader } from "./send.ts"
 import { linkWords, type ThreadLink } from "./thread-link.ts"
 
 /**
- * A column nothing may be written in (ADR-0029): its composer stays mounted,
+ * A column nothing may be written in: its composer stays mounted,
  * disabled, so what was typed survives, and shows `label` and `action` in
  * place of its buttons. `action` is null when nothing can restore it (no
  * workflow yet).
@@ -55,7 +55,7 @@ export interface ColumnSlot {
 export type Stage =
   /** Before the first `prune`: nothing is chosen yet. */
   | { readonly kind: "connecting" }
-  /** No task: the board, and ＋ (ADR-0122). */
+  /** No task: the board, and ＋. */
   | { readonly kind: "nothing" }
   | {
       readonly kind: "task"
@@ -69,9 +69,9 @@ export interface AppViewInput {
   readonly active: Here | null
   /** The task's thread columns drawn whole (`openColumns`). */
   readonly columns: readonly Column[]
-  /** `branchColors(rail, views).track`, memoised by `App`. */
+  /** `branchColors(tracks, views).track`, memoised by `App`. */
   readonly tracks: readonly number[]
-  /** The tasks in the archive (ADR-0122). */
+  /** The tasks in the archive. */
   readonly archived: ReadonlyMap<TaskId, ArchivedTask>
   readonly workflow: Workflow | null
   readonly nameOf: ReadonlyMap<WriterId, string>
@@ -82,7 +82,7 @@ export interface AppViewInput {
   readonly laneRoots: ReadonlyMap<ThreadId, EntryId>
 }
 
-/** Every lane's root entry: its `LaneRecord`'s root, through `rootEntries` (ADR-0063). */
+/** Every lane's root entry: its `LaneRecord`'s root, through `rootEntries`. */
 export const laneRootsOf = (
   records: ReadonlyMap<ThreadId, LaneRecord>,
   rootEntries: ReadonlyMap<RootId, EntryId>,
@@ -96,8 +96,8 @@ export const laneRootsOf = (
 
 /**
  * The agent's work in each thread, held by this tab or not: each held
- * lane's that is busy (`laneWork`), and every lane running in the session
- * (ADR-0063, ADR-0091), running winning. What refuses a task's move to the
+ * lane's that is busy (`laneWork`), and every lane running in the session,
+ * running winning. What refuses a task's move to the
  * archive, and, but for `held`, what rings it in the sidebar and on the
  * board (`threadStatus`).
  */
@@ -115,7 +115,7 @@ export function threadWork(input: {
 }
 
 /**
- * Each task's work (ADR-0116): the most among its threads', running over
+ * Each task's work: the most among its threads', running over
  * waiting over held. A thread in no task counts for none.
  */
 export function taskWork(
@@ -137,7 +137,7 @@ export function taskWork(
 const WORK_ORDER: readonly RootWork[] = ["held", "waiting", "running"]
 
 /**
- * An open offer (`offerStatus`), for your inbox and the board's ⇡ (ADR-0091):
+ * An open offer (`offerStatus`), for your inbox and the board's ⇡:
  * its lane, its root entry, and where it opens: its lane's tip, or its root
  * entry in a root this tab does not hold.
  */
@@ -147,7 +147,7 @@ export interface OpenOffer {
   readonly end: EntryId
   /**
    * The lane tip it holds (`ledger.source`): "not needed" holds until new
-   * work moves it (ADR-0077). Null for an offer whose message carries none.
+   * work moves it. Null for an offer whose message carries none.
    */
   readonly source: string | null
 }
@@ -191,7 +191,7 @@ function stageOf(input: AppViewInput): Stage {
  * The offers with work to add (`offerStatus`'s `open`; not one accepted, nor
  * one accepted work already holds), each in a root with an entry. A lane this
  * tab holds opens at its tip, and one with none yet is left out; any other
- * lane opens at its root entry (ADR-0063).
+ * lane opens at its root entry.
  */
 const openOffers = (input: AppViewInput): readonly OpenOffer[] =>
   [...input.offers.values()].flatMap(o => {
@@ -205,7 +205,7 @@ const openOffers = (input: AppViewInput): readonly OpenOffer[] =>
       : [{ lane: o.lane, root, end: held.tip, source }]
   })
 
-/** A fork on the rail to a thread on no column of this canvas (ADR-0117). */
+/** A fork on the rail to a thread on no column of this canvas. */
 export interface RailStub {
   /** The row it forks from. */
   readonly from: EntryId
@@ -226,7 +226,7 @@ export interface TaskRail {
 export const NO_RAIL: TaskRail = { rows: [], stubs: [] }
 
 /**
- * The rail of the task you are on, a forest (ADR-0116, ADR-0117): one tree
+ * The rail of the task you are on, a forest: one tree
  * for each root a thread of the task is in, in canvas order, each cut to
  * the paths that lead to its threads' ends (`ends`); each fork from those
  * paths to a thread elsewhere a stub naming where it is (`linkOf`). Each
@@ -259,7 +259,7 @@ export function taskRail(input: {
     for (const row of projectRail(index, entry)) {
       if (!keep.has(row.id)) continue
       rows.push({ ...row, track: row.track + shift })
-      // A child in another thread starts it (ADR-0125); its stub opens at
+      // A child in another thread starts it; its stub opens at
       // the thread's first message, which is often below a context entry.
       const own = index.entries[row.id]?.thread
       for (const child of index.childrenOf.get(row.id) ?? []) {
@@ -298,7 +298,7 @@ const shiftOf = (seed: number, own: number): number =>
   (((STRIDE * (own - seed)) % SLOTS) + SLOTS) % SLOTS
 
 /**
- * What an archived task's column says and offers (ADR-0122): who moved it to
+ * What an archived task's column says and offers: who moved it to
  * the archive, and Restore, which moves it to the first open state.
  */
 export function readOnlyWords(

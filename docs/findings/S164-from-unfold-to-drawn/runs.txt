@@ -1,0 +1,20 @@
+S164 runs, 2026-10-11, Chromium headless shell 141, 1920×1080, the host's
+Vite dev server (React's development build, as `pnpm host` serves it).
+Four columns of 150 messages; ms from the click.
+
+mode mount, rate 1:
+  unfold  sync=false micro=true commit≈248  drawn 240–252  long task 249–260  messages 150 at once, 150 later
+  fold    sync=false micro=true commit≈23   drawn 24–26    no long task
+mode mount, rate 4:
+  unfold  commit 861–1039  drawn 871–1050  long task 883–1067
+  fold    commit 89–133    drawn 98–153    long task 102–160
+
+mode compositor (a 300 px element turned over 600 ms by the Web Animations
+API, the unfold pressed after it; screencast frame times, ms):
+  rate 1, pressed two frames after animate(): commit done by 263;
+    frames at 9 43 57 71 89 105 122 139 155 173 189 206 222 239 257 272 ...
+    every frame a new picture (sha1 differs) through the commit.
+  rate 4, pressed two frames after: commit done by 1139;
+    frames every 16–18 ms from 12 to 638, each a new picture.
+  rate 4, pressed in the same task as animate(): commit done by 944;
+    no frame at all from −50 to 900.

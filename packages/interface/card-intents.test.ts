@@ -856,11 +856,13 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
     ).toEqual([
       {
         kind: "layout",
+        moves: false,
         action: { kind: "show", here: { kind: "task", task: TEST_TASK } },
       },
       { kind: "list", act: { kind: "ensure", task: TEST_TASK } },
       {
         kind: "layout",
+        moves: false,
         action: {
           kind: "view",
           task: TEST_TASK,
@@ -904,7 +906,9 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
           },
         ],
       }),
-    ).toEqual([{ kind: "layout", action: { kind: "board", open: true } }])
+    ).toEqual([
+      { kind: "layout", moves: false, action: { kind: "board", open: true } },
+    ])
   })
 
   test("nothing to undo: nothing", () => {
@@ -1050,6 +1054,7 @@ describe("a card made a thread (ADR-0111)", () => {
       },
       {
         kind: "layout",
+        moves: false,
         action: { kind: "show", here: { kind: "task", task: NEW_TASK } },
       },
     ])

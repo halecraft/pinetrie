@@ -1,0 +1,26 @@
+S167 runs, 2026-10-11, Chromium headless shell 141, 1920×1080, the probe in this folder.
+Glyph centres of the header's name turned 90° clockwise about its element box's
+top-left, translated by (strip name's right − header name's left, strip name's
+top − header name's top), against the strip name's glyph centres. px.
+
+thread, sizes as now (header .85rem 13.6px, strip .8rem 12.8px)
+  element boxes h 66.8×21.1, v 21.1×? (strip name smaller)
+  advance per glyph: header 6.07, strip 5.72
+  box formula: mean dx −1.50 dy 1.84, max dx 1.50 dy 3.74
+  corrected by the mean: max dy 1.91 (the two lengths differ)
+
+thread, strip name at the header's size (.folded-name { font-size: .85rem })
+  element boxes h 66.78×21.08, v 21.06×66.78
+  advance per glyph: 6.07 both
+  box formula: mean 0.00/0.00, max 0.00/0.00; glyph sizes equal (0.00)
+
+task column, sizes as now (title 14.4px, strip 12.8px)
+  element boxes h 51.7×22.3, v 19.8×46.0; advance 5.75 vs 5.11
+  box formula: max dx 2.00 dy 5.48; corrected: max dy 2.73
+
+task column, strip name at the title's size (14.4px)
+  element boxes h 51.73×22.31, v 22.33×51.73
+  box formula: max 0.00/0.00
+
+Overlay shots: thread-same-size.png (the turned copy, red, covers the strip's
+name exactly), thread-sizes-now.png (it does not: the sizes differ).

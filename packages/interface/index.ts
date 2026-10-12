@@ -1,5 +1,5 @@
 // @pinetrie/interface — what a person sees and can do, decided, for any
-// client (ADR-0093). It exports by name only what another package imports;
+// client. It exports by name only what another package imports;
 // a name only this package and its tests use is imported from its module.
 
 export {
@@ -144,6 +144,7 @@ export {
 export {
   type CatchUps,
   CLEAR_COMMAND,
+  type ControlWords,
   canvasMarkerWords,
   DISCARD_CARD,
   DISCARD_CARD_TITLE,
@@ -199,6 +200,8 @@ export {
   type ColumnView,
   earlierWords,
   projectColumns,
+  threadTrack,
+  trackIndex,
 } from "./column-paths.ts"
 export {
   AGENT_MARK,
@@ -288,10 +291,20 @@ export {
 } from "./face.ts"
 export type { Focus } from "./focus.ts"
 export {
+  type ColumnMotion,
+  type FoldMotion,
+  type FoldScene,
+  planFoldMotion,
+  type Rect,
+} from "./fold-motion.ts"
+export {
   FOLD,
   type FoldedFace,
+  type FoldedMark,
+  foldedMark,
   foldedView,
   foldedWords,
+  NO_MARK,
   UNFOLD,
   UNNAMED_THREAD,
 } from "./folded-column-view.ts"

@@ -2,15 +2,15 @@
 //
 // The screen is the sidebar down the left, the root you are on beside it, a
 // rail beside a strip of columns, and the footer along the bottom: you, the
-// board's strip, what needs you and publish (docs/06-interface.md,
-// ADR-0122). The rail draws the root's tree; each column is one path, read on
-// its own scroll; the board opens over them, and a search's bar above them
-// (ADR-0101). What is drawn is a read of the
+// board's strip, what needs you and publish (docs/06-interface.md).
+// The rail draws the root's tree; each column is one path, read on
+// its own scroll; the board opens over them, and a search's bar above them.
+// What is drawn is a read of the
 // document, through `@pinetrie/reads` and `projection.ts`. The sidebar is your
 // own document, on every device (`openThreads`). Which root you are on, each
 // root's columns and whether the board is open are this window's own view
 // state: a reducer (`layout.ts`), kept in this browser tab's storage and
-// never in the document (ADR-0027). A search is view state too, never kept.
+// never in the document. A search is view state too, never kept.
 //
 // `App` gathers, `appView` (`app-view.ts`) decides what is shown, and a click
 // comes back as an `Intent`, which `planIntent` (`intent.ts`) plans and
@@ -19,7 +19,7 @@
 // The renderer before React rebuilt the transcript with `innerHTML` on every
 // change, which destroyed focus and selection on every keystroke. React gives
 // stable node identity, which `useText` needs to keep a card's textarea
-// bound while everyone types (ADR-0048).
+// bound while everyone types.
 
 import { whenSettled } from "@kyneta/exchange"
 import { useDocStatus, useSelector } from "@kyneta/react"
@@ -128,7 +128,9 @@ import {
   threadFace,
   threadLink,
   threadPreview,
+  threadTrack,
   threadWork,
+  trackIndex,
   typingDue,
   unsentSignals,
   unstartedOf,
@@ -205,6 +207,7 @@ import { useBlankQueued } from "./use-blank-queued.ts"
 import { useDrag } from "./use-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
 import { FLIGHT_MS, useFlight } from "./use-flight.ts"
+import { useFoldMotion } from "./use-fold-motion.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { NarrowContext, useStripNarrow } from "./use-narrow.ts"
@@ -218,11 +221,11 @@ import { useStable } from "./use-stable.ts"
 export interface AppStores {
   readonly layout: TabState<Layout>
   readonly identity: DeviceState<Identity>
-  /** Where the inventory panel is docked, on this device (ADR-0048). */
+  /** Where the inventory panel is docked, on this device. */
   readonly dock: DeviceState<Dock>
-  /** How you read a review, on this device (ADR-0087). */
+  /** How you read a review, on this device. */
   readonly review: DeviceState<ReviewPrefs>
-  /** The sidebar full or folded to icons, chosen in this tab (ADR-0088). */
+  /** The sidebar full or folded to icons, chosen in this tab. */
   readonly list: TabState<ListWidth>
 }
 
@@ -375,9 +378,9 @@ export function App({
 }) {
   const doc = session.session
   const status = useDocStatus(doc)
-  // The page over the stage, from the URL's hash (ADR-0098).
+  // The page over the stage, from the URL's hash.
   const page = usePage()
-  // The roots this tab holds (ADR-0063): the roots of the sidebar and the one
+  // The roots this tab holds: the roots of the sidebar and the one
   // you are on, set by the effect below. Every read of the tree reads them
   // as one.
   const roots = useSyncExternalStore(
@@ -392,7 +395,7 @@ export function App({
     }),
     [session, roots],
   )
-  // The directory of every root (ADR-0063): what the sidebar, the board and
+  // The directory of every root: what the sidebar, the board and
   // the inbox read of a root without holding it.
   const directory = useSelector(doc, readRoots)
   // Every read is `useSelector` over a named read, never an inline
@@ -416,16 +419,16 @@ export function App({
     histories,
     traces,
   } = useSelector(heldView, readSessionFacts)
-  // Every card's record (ADR-0059): the host's places, with this tab's moves
+  // Every card's record: the host's places, with this tab's moves
   // drawn over them until its copy holds them. An unchanged card keeps its
   // record object (`readPlaces`).
   const cards = useSyncExternalStore(
     session.cards.subscribe,
     session.cards.current,
   )
-  // Each lane, with its queue from the cards (ADR-0048): read again on every
+  // Each lane, with its queue from the cards: read again on every
   // change to the session, as a run's start or end is one, and to the
-  // cards; a blank queued card does not wait (ADR-0113).
+  // cards; a blank queued card does not wait.
   const blank = useBlankQueued(session, cards)
   const lanes = useSelector(
     heldView,
@@ -439,10 +442,10 @@ export function App({
   const nameOf = useSelector(doc, readParticipantNames)
   const pictures = useSelector(doc, readParticipantPictures)
 
-  // Every task (ADR-0116): its card on the board, its threads, from the
+  // Every task: its card on the board, its threads, from the
   // places, and their roots.
   const tasks = useMemo(() => tasksOf({ cards, threads }), [cards, threads])
-  // The tasks in the archive (ADR-0122), from the board's cards and their
+  // The tasks in the archive, from the board's cards and their
   // histories, the same map while it reads the same.
   const archived = useSameData(
     useMemo(
@@ -460,8 +463,8 @@ export function App({
     [workFacts, forkOf],
   )
   // Each task with a message, for the board, and each task's label: its
-  // title, else its first card's (ADR-0045). Which tasks are in the sidebar
-  // is yours (`openThreads`, ADR-0122).
+  // title, else its first card's. Which tasks are in the sidebar
+  // is yours (`openThreads`).
   const summaries = useMemo(
     () => summariesOf(tasks, directory),
     [tasks, directory],
@@ -482,12 +485,12 @@ export function App({
     () => messageCount(directory, new Set(roots.keys())),
     [directory, roots],
   )
-  // Each root's root entry, held or not (ADR-0063): where a lane running in
+  // Each root's root entry, held or not: where a lane running in
   // a root this tab does not hold rings it, and where its offer's ⇡ goes.
   const rootEntries = useMemo(() => rootEntriesOf(directory), [directory])
-  // The tasks in the archive (ADR-0122).
+  // The tasks in the archive.
   const archivedTasks = useMemo(() => new Set(archived.keys()), [archived])
-  // The sidebar (ADR-0122): your own document; a task the session does not
+  // The sidebar: your own document; a task the session does not
   // hold yet is left out until it does.
   const listIds = useSyncExternalStore(
     session.openThreads.tasks.subscribe,
@@ -497,7 +500,7 @@ export function App({
     () => listIds.filter(task => tasks.byId.has(task)),
     [listIds, tasks],
   )
-  // The board (ADR-0122): each task's state.
+  // The board: each task's state.
   const board = useMemo(
     () => (workflow === null ? null : boardOf(workflow, cards)),
     [workflow, cards],
@@ -509,7 +512,7 @@ export function App({
     [workFacts.lanes, rootEntries],
   )
   // The agent's work in every thread, held or not, and so in every task:
-  // one map for the sidebar, the board and each task's ring (ADR-0091).
+  // one map for the sidebar, the board and each task's ring.
   const work = useMemo(() => threadWork({ lanes, running }), [lanes, running])
   const workOfTask = useMemo(
     () => taskWork(work, taskOfThread),
@@ -526,17 +529,17 @@ export function App({
   )
   // Drawn from this render's facts, never `stored`: an effect runs a render
   // after the facts it reads, and a slow render painted new entries under an
-  // old anchor (S35). A layout change is resolved in the same render too, so
+  // old anchor. A layout change is resolved in the same render too, so
   // a column opened at a lane's tip is bound at once. The effect below stores
   // it, so an action reduces from it: React runs pending effects before it
   // handles the next event.
-  // Each thread opened and not yet started (ADR-0126): its column ends at
+  // Each thread opened and not yet started: its column ends at
   // its fork, or a new tab's at its root.
   const unstarted = useMemo(
     () => unstartedThreads(threads, index, new Set(directory.keys())),
     [threads, index, directory],
   )
-  // Each thread someone else holds (ADR-0124): a branch not yet sent from
+  // Each thread someone else holds: a branch not yet sent from
   // one is drawn without its entries.
   const holders = useMemo(
     () => heldByOthers(cards, session.writer),
@@ -586,11 +589,9 @@ export function App({
   )
   // Restored anchors the document lacks are dropped once, when it has
   // settled, and the tab to show is chosen then: before, missing means not
-  // yet arrived. `"populated"` comes with the first data, so it cannot tell
-  // (S29).
+  // yet arrived. `"populated"` comes with the first data, so it cannot tell.
   // The roots of the sidebar's tasks and the stored task you were on are
-  // held, and settled, first: their anchors are in no index before
-  // (ADR-0063).
+  // held, and settled, first: their anchors are in no index before then.
   const [settled, setSettled] = useState(false)
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, with the stored layout of that render
   useEffect(() => {
@@ -648,8 +649,8 @@ export function App({
         known: new Set(tasks.byId.keys()),
       })
   }, [settled])
-  // A task the session stops holding (a thread lifted back into its card,
-  // ADR-0111) is pruned as at settle: its columns go, and a page on it
+  // A task the session stops holding (a thread lifted back into its card)
+  // is pruned as at settle: its columns go, and a page on it
   // moves to the sidebar's last task.
   const known = useRef<ReadonlySet<TaskId> | null>(null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: on the tasks changing, with the facts of that render
@@ -673,7 +674,7 @@ export function App({
   }, [settled, tasks])
 
   const active = layout.active
-  // The task's strip (ADR-0116): its task column, then every card on its
+  // The task's strip: its task column, then every card on its
   // canvas, in its order, folded or not, and your branches not yet sent.
   const strip: StripView | null = useMemo(
     () =>
@@ -691,7 +692,7 @@ export function App({
   // The task's thread columns drawn whole. Every projection below is keyed
   // on this one, so it keeps its identity while its data does: the strip is
   // rebuilt on every card's change, and another window's card redraws no
-  // message list (S59).
+  // message list.
   const columns: readonly ColumnSpec[] = useSameData(
     useMemo(
       () => (strip !== null ? openColumns(stripCards(strip)) : []),
@@ -723,20 +724,20 @@ export function App({
       ),
     [index, columns],
   )
-  // The cards pinned to the task you are on (ADR-0116).
+  // The cards pinned to the task you are on.
   const taskPins = useMemo(
     () =>
       active?.kind === "task" ? taskPinnedOf(cards, active.task) : NO_PINS,
     [active, cards],
   )
-  // The task's canvas, and its note columns (ADR-0116).
+  // The task's canvas, and its note columns.
   const canvas = useMemo(
     () =>
       active?.kind === "task" ? (canvases.get(active.task) ?? NO_CANVAS) : [],
     [active, canvases],
   )
   // Every named thread on an open task's canvas, whose agents a mention may
-  // reach (ADR-0128), as the host builds them.
+  // reach, as the host builds them.
   const inReach = useMemo(
     () =>
       reachableAgents({
@@ -771,9 +772,9 @@ export function App({
     [hereTask, tasks, rootEntries],
   )
   useEffect(() => session.openThreads.here(hereTask), [session, hereTask])
-  // The root whose colours the stage draws in (ADR-0089): the task you are
+  // The root whose colours the stage draws in: the task you are
   // on's first root, or the root its first thread will start, which its
-  // record names (ADR-0126).
+  // record names.
   const seedRoot =
     hereTask === null
       ? null
@@ -783,8 +784,8 @@ export function App({
           .find(r => r !== undefined) ??
         null)
   const seed = seedRoot === null ? 0 : rootSeed(seedRoot)
-  // Where each thread on the canvas ends, which the rail cuts its trees to
-  // (ADR-0117): its end, its lane's tip before its first entry, a copy's fork.
+  // Where each thread on the canvas ends, which the rail cuts its trees to:
+  // its end, its lane's tip before its first entry, a copy's fork.
   const threadEnds = useMemo(
     () =>
       new Map(
@@ -832,7 +833,7 @@ export function App({
     [index, nameOf],
   )
   const colorOf = useMemo(() => presenceColors(order), [order])
-  // Where your unsent cards are (ADR-0048, step 2): your cards that hold
+  // Where your unsent cards are (step 2): your cards that hold
   // text, read from their texts, since a record outlives its text.
   const mine = useMemo(
     () => ownCards(session.writer, cards),
@@ -857,7 +858,7 @@ export function App({
   )
   // Each column's end, for the rail: one array while the views are the same.
   const ends = useMemo(() => views.map(v => v.tipId), [views])
-  // What no fold hides in this tab's columns: the rail's landmarks (ADR-0106).
+  // What no fold hides in this tab's columns: the rail's landmarks.
   const landmarks = useMemo(
     () =>
       columnLandmarks(rail, {
@@ -869,12 +870,12 @@ export function App({
   )
 
   // `App` writes presence and reads none: a read here would render every
-  // column on each write, the refresh and others' typing included (S59).
+  // column on each write, the refresh and others' typing included.
   // Each part that shows presence reads it (`use-presence.ts`).
   //
-  // Each column of the task you are on reports its thread end (ADR-0024,
-  // ADR-0029; `planReading`), and its task, so a window that does not hold
-  // the thread's root can name it (ADR-0063, ADR-0116). While the page is
+  // Each column of the task you are on reports its thread end
+  // (`planReading`), and its task, so a window that does not hold
+  // the thread's root can name it. While the page is
   // visible the entries are refreshed, so they outlive their decay.
   const reported = useRef(new Map<string, string | null>())
   const reportedTask = useRef<TaskId | null>(null)
@@ -908,16 +909,22 @@ export function App({
     lastTyped.current = { at: now, card }
     session.setTyping(end, card)
   }
-  const colors = useMemo(() => branchColors(rail, views), [rail, views])
+  const tracks = useMemo(() => trackIndex(rail), [rail])
+  const colors = useMemo(() => branchColors(tracks, views), [tracks, views])
+  // A folded thread's colour: the track its column would take, at its end.
+  const threadTrackOf = useCallback(
+    (thread: ThreadId) => threadTrack(tracks, threadEnds.get(thread) ?? null),
+    [tracks, threadEnds],
+  )
   // Kept while its data is: the rail is rebuilt on every card's change, and
-  // a message list compares its forks by identity (S59).
+  // a message list compares its forks by identity.
   const forks = useSameData(colors.forks)
   const paths = useMemo(
     () => views.map(v => pathIds(index, v.tipId)),
     [index, views],
   )
   const shown = useMemo(() => new Set(paths.flatMap(p => [...p])), [paths])
-  // The search of the task you are on (ADR-0101), never stored. Its corpus,
+  // The search of the task you are on, never stored. Its corpus,
   // result and matches are built only while it applies, and from the
   // deferred query, so typing stays quick on a long task.
   const [searchState, setSearch] = useState<SearchState | null>(null)
@@ -1028,8 +1035,8 @@ export function App({
     items: mentions,
     shown,
   })
-  // What needs you, and where (ADR-0077): each root's status, your inbox's
-  // rows, and its count, which the page's title shows too (ADR-0091).
+  // What needs you, and where: each root's status, your inbox's
+  // rows, and its count, which the page's title shows too.
   const attention = useAttention({
     me: session.writer,
     attention: session.attention,
@@ -1050,7 +1057,7 @@ export function App({
     [tasks, workFacts.banners],
   )
   // Every task card's header, once per task: the board and the sidebar
-  // draw the same one (ADR-0111).
+  // draw the same one.
   const heads = useMemo(
     () =>
       threadCardHeads(new Set([...summaries.keys(), ...layout.open]), {
@@ -1074,7 +1081,7 @@ export function App({
       workOfTask,
     ],
   )
-  // The task column (ADR-0116), from what the sidebar and the board read.
+  // The task column, from what the sidebar and the board read.
   const taskColumn = useMemo(
     () =>
       strip === null
@@ -1112,7 +1119,7 @@ export function App({
     ],
   )
   // The canvas list the task's agents are told, read from no thread, and
-  // what the agent of its first column last read of its pins (ADR-0116).
+  // what the agent of its first column last read of its pins.
   const told = useMemo(
     () =>
       strip === null
@@ -1197,7 +1204,7 @@ export function App({
   // measured at its top, and a fork point far down it would need a spacer
   // taller than the screen.
   //
-  // A column shown again with a spot (where it was left, ADR-0058) goes back
+  // A column shown again with a spot (where it was left) goes back
   // there instead.
   const [spots] = useState(() => spotStore())
   const aligned = useRef(new Set<string>())
@@ -1219,7 +1226,7 @@ export function App({
         alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)
     }
   }, [columns, views, spots])
-  // Every mounted column's view, which the rail outlines (ADR-0058).
+  // Every mounted column's view, which the rail outlines.
   const [viewports] = useState(() => viewportStore())
 
   // What each column knew of its end when it was unmounted (`SeenEnd`), so a
@@ -1229,10 +1236,10 @@ export function App({
   // column, placed at its end, and that clears ↓ new below.
   const [seenEnds] = useState(() => screenMemory<SeenEnd>())
   // What each tool row decided, by its call's id, so a tab shown again draws
-  // its rows as they were left (ADR-0123). Never pruned: a call id is not
+  // its rows as they were left. Never pruned: a call id is not
   // reused.
   const [rows] = useState(() => screenMemory<RowMemory>())
-  // Each ask's fold as its reader chose it (ADR-0106), kept as rows are.
+  // Each ask's fold as its reader chose it, kept as rows are.
   const [folds] = useState(() => foldMemory())
 
   // After the alignment above: a picked message the alignment left out of
@@ -1241,7 +1248,7 @@ export function App({
   const revealCard = useRevealCard(stripEl)
   const landed = useLanding(stripEl)
 
-  // Your inventory (ADR-0048 step 4): this tab's moves and your slots, the
+  // Your inventory: this tab's moves and your slots, the
   // panel's selection, whether it is open (never stored), and its dock
   // (this device's).
   const moves = useSyncExternalStore(
@@ -1257,7 +1264,7 @@ export function App({
     [cards, session.writer],
   )
   const intents = useMemo(() => intentsOf(moves), [moves])
-  // A thread's face (ADR-0126): its slot's, and its column's when folded.
+  // A thread's face: its slot's, and its column's when folded.
   const threadFaceOf = useCallback(
     (thread: ThreadId) =>
       threadFace({
@@ -1269,7 +1276,7 @@ export function App({
       }),
     [index, lanes, workFacts.names, workFacts.banners],
   )
-  // Each thread you hold, as its slot draws it (ADR-0124).
+  // Each thread you hold, as its slot draws it.
   const threadFaces = useMemo(
     () =>
       new Map(
@@ -1289,7 +1296,7 @@ export function App({
     [held, storedSlots, intents],
   )
   const [selected, setSelected] = useState(0)
-  // Each request to open the selected slot's card: a thread's preview (ADR-0124).
+  // Each request to open the selected slot's card: a thread's preview.
   const [openSlot, setOpenSlot] = useState(0)
   const [inventoryOpen, setInventoryOpen] = useState(false)
   const openNow = useRef(false)
@@ -1317,12 +1324,13 @@ export function App({
     [reviewPrefs, saveReviewPrefs],
   )
   const fly = useFlight()
+  const foldColumn = useFoldMotion(stripEl)
   // Each column's composer place (`composerPlace`), which a put lands in.
   const [composers] = useState(() => composerPlacesStore())
   // The column whose element last held focus: where a put by key lands.
   const lastColumn = useRef<string | null>(null)
   const [lastColumnKey, setLastColumnKey] = useState<string | null>(null)
-  // The clipboard cell (ADR-0132): the last copy this tab made.
+  // The clipboard cell: the last copy this tab made.
   const [cell, setCell] = useState<Clip | null>(null)
   /** What the page holds of focus beside the DOM, read at each key, copy and paste. */
   const focusContext = useStable(
@@ -1338,7 +1346,7 @@ export function App({
   // runs `useReveal`'s wait once it has.
   const [, setOpened] = useState(0)
   const foldOpened = useRef(false)
-  // An entry to show once this tab holds its root (`openIn`, ADR-0063).
+  // An entry to show once this tab holds its root (`openIn`).
   const [whenHeld, setWhenHeld] = useState<EntryId | null>(null)
   const ports: AppPorts = {
     dispatch,
@@ -1404,6 +1412,7 @@ export function App({
       openSelected: () => setOpenSlot(n => n + 1),
     },
     fly,
+    foldColumn,
     intent: intent => onIntent(intent),
   }
   /** Carry out `effects`: the one way anything below acts. */
@@ -1465,14 +1474,14 @@ export function App({
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
   }, [onIntent, focusContext])
-  // Copy, cut and paste (ADR-0132): decided in `@pinetrie/interface` from
+  // Copy, cut and paste: decided in `@pinetrie/interface` from
   // where focus is (`clipboard.ts`); nothing here.
   useClipboard({
     context: focusContext,
     facts: () => clipFacts(intentState()),
     onIntent,
   })
-  // A link to an address in text (ADR-0126): a past one opens its entry,
+  // A link to an address in text: a past one opens its entry,
   // where its thread is; any other is followed by no page yet.
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -1515,7 +1524,7 @@ export function App({
     state: stateOf.get(task) ?? null,
   })
   const openAt = (entry: EntryId) => onIntent({ kind: "openAt", entry })
-  /** Follow `link` to `entry` (ADR-0124): a held thread's opens nothing. */
+  /** Follow `link` to `entry`: a held thread's opens nothing. */
   const openLink = (entry: EntryId, link: ThreadLink) =>
     onIntent({ kind: "openLink", link, entry })
 
@@ -1575,7 +1584,7 @@ export function App({
   const readers = { session, index, taskOfThread, order, nameOf, colorOf }
   const pip = <SignalMark color={colorOf(session.writer)} signal="unsent" />
   const reader = { me: session.writer, nameOf }
-  /** Where a link to `thread` leads, as you follow it (ADR-0124). */
+  /** Where a link to `thread` leads, as you follow it. */
   const linkOf = (thread: ThreadId) => threadLink(thread, cards, session.writer)
   const thread = threadRow({ index, labelOf, reader, onOpen: openLink })
   /**
@@ -1633,8 +1642,8 @@ export function App({
             slots={slots}
           />
         )}
-        {/* Under a page the stage stays mounted and laid out, only inert
-          (ADR-0098). Remounted, its columns would lose their scroll; with
+        {/* Under a page the stage stays mounted and laid out, only inert.
+          Remounted, its columns would lose their scroll; with
           `display: none`, `useStripNarrow` would measure the strip at 0 and
           turn an open pane into a modal dialog over the page. */}
         <main
@@ -1642,7 +1651,7 @@ export function App({
           id="stage"
           inert={page !== null}
         >
-          {/* What the stage's columns draw by (ADR-0087, ADR-0089): the
+          {/* What the stage's columns draw by: the
             root's colours, whether the pane covers the page, how you read a
             review. Each changes rarely, and only its readers redraw. */}
           <TrackSeed value={seed}>
@@ -1677,7 +1686,7 @@ export function App({
                             </div>
                           )}
                           {/* A task whose threads have no message yet, a new
-                            tab's (ADR-0126), draws a hollow dot where its
+                            tab's, draws a hollow dot where its
                             first message will be. */}
                           {rail.length > 0 ? (
                             <LiveRail
@@ -1709,6 +1718,7 @@ export function App({
                           canvas={canvas}
                           noteViews={noteViews}
                           threadFaceOf={threadFaceOf}
+                          threadTrackOf={threadTrackOf}
                           onIntent={onIntent}
                           projected={projected}
                           reader={historyFacts.reader}

@@ -343,10 +343,25 @@ them, your branches not yet sent. Its first column is a `TaskColumn` by its
 type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
 
 - **A folded column is a `.folded-column`** (`folded-column.tsx`), never a
-  `.column`: a narrow strip with its title, `data-card`, and `data-kind`
-  (`thread` or `notes`), which a click unfolds. So `.column` counts whole
-  thread columns, and the browser suite counts with it. The folded task
-  column is a `.task-column.folded-column`.
+  `.column`: a strip with `data-card` and `data-kind` (`thread` or
+  `note-column`, as the wide `Column` and `NoteColumn` carry too), which a
+  click unfolds. So `.column` counts whole thread columns, and the browser
+  suite counts with it. The folded task column is a
+  `.task-column.folded-column`. Both draw one `FoldedStrip`
+  (`folded-strip.tsx`): ⇥, the mark `foldedMark` decides, the name on its
+  side, the detail.
+- **A strip is its header turned on its side** (ADR-0137): a thread's
+  mark and its name at the header's size, in its thread's colour
+  (`threadTrackOf`, the `threadTrack` its column takes at the same end).
+  Every row above the name has a fixed height, and their sums are the
+  registered properties `--strip-mark-top` and `--strip-name-top` (with
+  `--strip-width` and `--strip-name-max`), one rule per `data-kind` and one
+  for `.task-column`. The strip is laid out by them, and a fold reads them
+  from the wide column before its strip exists: a change to a strip's rows
+  that does not change them moves the strip away from where a fold lands
+  its name. Registered (`@property`, `<length>`), they compute to px; an
+  unregistered `calc()` would read back as its text. The divider is a
+  shadow, not a border, so the name centres in the strip's whole width.
 - **`data-position` is a column's index among whole thread columns**
   (`drawnAt`), which the suite's `col(n)` selects by; `position`, its index
   on the canvas, is what Alt+arrows move by.
@@ -373,6 +388,44 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   focus inside it.
 - **The task column lists its canvas's trash** (`.task-trash`, a row per
   column, `.trash-row[data-card]`, its `.trash-restore`).
+
+## Folding in motion (`use-fold-motion.ts`, `motion.ts`, ADR-0137, S164–S167)
+
+A fold you ask for moves (`layout` effect's `moves`, the `foldColumn`
+port): the name turns onto the strip's, the mark moves to the strip's, the
+rest fades, and one right edge closes in. What moves where is
+`planFoldMotion`'s (`packages/interface/TECHNICAL.md`, "A fold in
+motion"); `use-fold-motion.ts` measures and plays it.
+
+- **A fold animates the live column, then lands; it lets go only once its
+  strip is drawn.** Its animations hold their end (`fill: "forwards"`)
+  until `whenDrawn` sees the strip, which runs after React's commit and
+  before the paint, and are cancelled there. Cancelled before the commit,
+  the old layout shows for a frame (S165): the fold is dispatched from an
+  animation's end, outside any event, so React renders it in a later task.
+- **An unfold lands first, then animates** the column its commit draws,
+  from where its strip was, before its first paint. Its render (S164: a
+  quarter second for 150 messages here) comes before the motion.
+- **The clip and every column after it follow one edge** (`FoldFrame`'s
+  `inset`). The column after is drawn above the folding one: an edge of
+  its own would cover the turning name the clip keeps clear.
+- **The names that turn are `[data-fold-name]` line boxes** at
+  `line-height: 1.5`: `inline-block`, so their box is a line box, and a
+  number, since `normal` reads back as no length. The header's mark and
+  the strip's are `[data-fold-mark]` (`ThreadMark`'s `folds`).
+- **Everything beside the path from a kept element up to the column
+  fades**, and the generated content of what is on it (the name's ▸). A
+  column whose header draws no name at its first commit (a thread not yet
+  started, whose composer reports its new lane after the mount) unfolds
+  without a turn.
+- **The folding column is `inert`** while it moves, so nothing in it takes
+  a click on its way out.
+- **What is moving is the page's animations with id `FOLD_ANIMATION`.**
+  `settleFolds()` finishes them, which lands a fold in flight: before every
+  fold, and at a drag's press (`use-drag.ts`), so the drag measures columns
+  where they end. No module keeps a flag.
+- **Reduced motion** (`reducedMotion()`) stops folds, flights and a drag's
+  springs alike.
 
 ## A column's view (`viewport.ts`, `use-viewport.ts`, ADR-0058)
 
@@ -1341,6 +1394,11 @@ What S151 measured, and these handlers rest on:
 
 ## Gotchas
 
+- **A fold reaches the layout about 200 ms after its click**, once its
+  column has moved into its strip: a check that reads the layout after a
+  fold waits for `.folded-column`, and one that folds twice waits between.
+  An unfold lands at once and moves for 200 ms after: a check that measures
+  columns waits for no animation with id `fold` to be left.
 - **Kyneta's detach puts back the `readOnly` a box had when it was bound**
   (`attach`, `@kyneta/react`). React sets `readOnly` only when its prop
   changes, so a composer bound while its column was read-only stayed so

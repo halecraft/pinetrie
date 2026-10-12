@@ -1,0 +1,11 @@
+S166 runs at rate 1, 2026-10-11 (page: 21,447 elements, 8 columns, 1,200 messages).
+Intervals between frames, ms: "shown" from the screencast, "raf" the main thread's.
+run0 baseline shown p50 17 p95 19 max 19 | raf p95 17
+run0 fold     shown p50 17 p95 18 max 18 | raf p95 17
+run0 unfold   commit 203, shown p50 17 p95 18 max 18 | raf p95 33 (1 over 20)
+run1 baseline shown p95 18 max 18 | raf p95 33 (1 over 20)
+run1 fold     shown p95 17 max 17 | raf p95 33 (1 over 20)
+run1 unfold   commit 211, shown p95 17 max 17 | raf p95 17
+run2 baseline shown p95 20 max 20 | raf p95 17
+run2 fold     shown p95 20 max 20 | raf p95 33 (1 over 20)
+run2 unfold   commit 188, shown p95 18 max 18 | raf p95 17

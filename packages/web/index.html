@@ -239,7 +239,8 @@
       .column-head .thread-behind { color: #e8c07a; cursor: help; }
       /* The mark before a thread's name: a fixed square holding the star, and
          the banner, a sprite on black, laid over it, so the name never moves
-         when one arrives. The same mark, larger, heads the thread's details.
+         when one arrives. The same mark, larger, heads the thread's details,
+         and at the header's size, its folded strip.
          `isolation` on what holds it makes that element's own background what
          `lighten` blends with, so the sprite's black goes. A new banner fades
          in once loaded, and the star out; the one there as the column mounts
@@ -323,23 +324,56 @@
          marked while a card is dragged. */
       #strip > .canvas-end { flex: 0 0 4rem; }
       body[data-card-drag] #strip > .canvas-end { box-shadow: inset 2px 0 0 #555; }
-      /* A column folded to a strip with its title, in its place on the canvas
-         (ADR-0116): its head a drag handle, the rest a button that unfolds it. */
-      .folded-column { flex: 0 0 2.2rem; width: 2.2rem; min-height: 0; display: flex; flex-direction: column;
-        border-right: 1px solid #23272e; }
-      .folded-column .folded-head { align-items: center; padding: .4rem 0; border-top-color: #6f7784; }
+      /* A column folded to a strip in its place on the canvas: its head a drag
+         handle, the rest a button that unfolds it, holding ⇥, a thread's mark,
+         its name on its side and its detail. The strip is its header turned
+         on its side: the name at the header's size and colour, so a fold's
+         turn lands on it exactly (`use-fold-motion.ts`). Every row above the
+         name has a fixed height, summed in the registered properties below,
+         which the strip is laid out by and which a fold reads from the live
+         column before its strip exists. Its divider is a shadow, not a
+         border, so the name centres in the strip's whole width. */
+      @property --strip-width { syntax: "<length>"; inherits: true; initial-value: 0px; }
+      @property --strip-mark-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
+      @property --strip-name-top { syntax: "<length>"; inherits: true; initial-value: 0px; }
+      @property --strip-name-max { syntax: "<length>"; inherits: true; initial-value: 0px; }
+      #strip { --strip-width: 2.2rem; --strip-head: 2rem; --strip-pad: .5rem; --strip-unfold: 1rem;
+        --strip-gap: .4rem; --strip-mark: 1.5rem; --strip-name-max: 60vh;
+        --strip-mark-top: calc(var(--strip-head) + var(--strip-pad) + var(--strip-unfold) + var(--strip-gap));
+        --strip-name-top: calc(var(--strip-mark-top) + var(--strip-mark) + var(--strip-gap)); }
+      /* A note column's strip has no mark; the task column's (below), no head either. */
+      #strip [data-kind="note-column"] { --strip-name-top: var(--strip-mark-top); }
+      .folded-column { flex: 0 0 var(--strip-width); width: var(--strip-width); min-height: 0; display: flex;
+        flex-direction: column; box-shadow: inset -1px 0 0 #23272e; }
+      .folded-column .folded-head { flex: 0 0 var(--strip-head); height: var(--strip-head); align-items: center;
+        justify-content: center; padding: 0; }
+      .folded-column[data-kind="note-column"] .folded-head { border-top-color: #6f7784; }
       .folded-grip { color: #6f7784; font-size: .9rem; line-height: 1; }
-      .folded-title { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .4rem;
-        padding: .5rem 0; background: none; border: 0; color: #aaa; cursor: pointer; }
+      /* Its own background, isolated, is what a banner's black blends with
+         (the `.thread-mark` rule). */
+      .folded-title { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--strip-gap);
+        padding: var(--strip-pad) 0; border: 0; border-radius: 0; color: #aaa; cursor: pointer;
+        isolation: isolate; background: var(--strip-paper, var(--page)); }
       .folded-title:hover, .folded-title:focus-visible { color: #e6e6e6; background: #1b1e23; }
+      .folded-title > .unfold { flex: 0 0 var(--strip-unfold); height: var(--strip-unfold);
+        line-height: var(--strip-unfold); }
+      .folded-title > .thread-mark { flex: 0 0 var(--strip-mark); height: var(--strip-mark); }
       .folded-name, .folded-detail { writing-mode: vertical-rl; white-space: nowrap; overflow: hidden;
-        text-overflow: ellipsis; max-height: 60vh; }
-      .folded-name { font-size: .8rem; font-weight: 600; }
+        text-overflow: ellipsis; max-height: var(--strip-name-max); }
+      .folded-name { font-weight: 600; }
+      .folded-column[data-kind="thread"] .folded-name,
+      .folded-column[data-kind="thread"] .folded-title > .thread-mark { font-size: .85rem; color: var(--track, #9ecbff); }
+      .folded-column[data-kind="note-column"] .folded-name { font-size: .8rem; color: #ddd; }
+      .task-column.folded-column .folded-name { font-size: .9rem; color: #e6e6e6; }
       .folded-detail { font-size: .7rem; color: #8b93a1; }
-      /* The task column (ADR-0116): first on the canvas, outside its order. */
+      /* The name a fold turns: a line box of a line height a fold can read
+         (`normal` reads as no length), as tall as the strip's name is wide. */
+      [data-fold-name] { display: inline-block; line-height: 1.5; }
+      /* The task column: first on the canvas, outside its order. */
       .task-column { flex: 0 0 18rem; width: 18rem; min-width: 0; display: flex; flex-direction: column;
-        min-height: 0; border-right: 1px solid #23272e; background: #15171b; }
-      .task-column.folded-column { flex: 0 0 2.2rem; width: 2.2rem; }
+        min-height: 0; border-right: 1px solid #23272e; background: #15171b; --strip-paper: #15171b;
+        --strip-name-top: calc(var(--strip-pad) + var(--strip-unfold) + var(--strip-gap)); }
+      .task-column.folded-column { flex: 0 0 var(--strip-width); width: var(--strip-width); border-right: 0; }
       .task-column-head { display: flex; align-items: center; gap: .5rem; padding: .4rem .75rem;
         border-top: 4px solid #8ab4f8; font-size: .8rem; color: #aaa; }
       .task-column-title { flex: 1; text-align: left; background: none; border: 0; padding: 0;

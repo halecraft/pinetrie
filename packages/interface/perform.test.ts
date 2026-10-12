@@ -59,6 +59,7 @@ const ports = () => {
     inventory: { show: vi.fn(), select: vi.fn(), openSelected: vi.fn() },
     attention: { dismiss: vi.fn(), dismissOffer: vi.fn() },
     fly: vi.fn(),
+    foldColumn: vi.fn(),
     intent: vi.fn(),
     reveal: vi.fn(),
     revealCard: vi.fn(),
@@ -112,7 +113,7 @@ interface Row {
 
 test.each<Row>([
   {
-    effect: { kind: "layout", action: show },
+    effect: { kind: "layout", moves: false, action: show },
     port: p => p.dispatch,
     args: [show],
   },
@@ -253,7 +254,7 @@ test.each<Row>([
 })
 
 test("a keep is one move of every card, and closes its column only once accepted", async () => {
-  const close = { kind: "layout", action: show } as const
+  const close = { kind: "layout", moves: false, action: show } as const
   const moves = [
     { move, slot: 1 },
     { move: { ...move, card: textCardId("d") }, slot: 2 },
@@ -306,7 +307,7 @@ test("a move on the board runs what follows it only once the host accepts it, th
   const effect: Effect = {
     kind: "moveTask",
     move: request,
-    moved: [{ kind: "layout", action: closed }],
+    moved: [{ kind: "layout", moves: false, action: closed }],
   }
   const p = ports()
   p.session.request.mockImplementationOnce(async () => ({ kind: "moved" }))
@@ -446,6 +447,29 @@ test("a move flies only when its plan says so", () => {
   )
   expect(p.fly).not.toHaveBeenCalled()
   expect(p.session.moveCard).toHaveBeenCalledOnce()
+})
+
+test("a fold that moves goes through the fold's port, whose commit lands it; one that does not lands at once", () => {
+  const task = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+  const card = cardIdFor("c1")
+  const action = {
+    kind: "view",
+    task,
+    first: null,
+    change: { kind: "fold", card, unfolded: false },
+  } as const
+  const p = ports()
+  perform([{ kind: "layout", moves: true, action }], p)
+  expect(p.dispatch).not.toHaveBeenCalled()
+  expect(p.foldColumn).toHaveBeenCalledOnce()
+  const [motion, commit] = p.foldColumn.mock.calls[0] ?? []
+  expect(motion).toEqual({ column: { kind: "card", card }, unfolded: false })
+  commit()
+  expect(p.dispatch).toHaveBeenCalledWith(action)
+  const q = ports()
+  perform([{ kind: "layout", moves: false, action }], q)
+  expect(q.foldColumn).not.toHaveBeenCalled()
+  expect(q.dispatch).toHaveBeenCalledWith(action)
 })
 
 test("not needed marks a verdict by its ask, an offer by its source, and an offer with none not at all (ADR-0077)", () => {

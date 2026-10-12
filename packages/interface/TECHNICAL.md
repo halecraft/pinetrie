@@ -171,7 +171,10 @@ function is proven by a unit test in a second.
   and no case. What the session tracks keeps a method of its own: a chat
   and a move (`moves`), an offer action and a line action (`acting`), and a
   mark, whose root it finds. Whether a move animates is the plan's too
-  (`moveCard`'s `fly`).
+  (`moveCard`'s `fly`), and whether a fold moves (the `layout` effect's
+  `moves`, set by `foldViewOf` for the `fold` and `foldTask` intents
+  alone): `perform` hands a moving fold to the `foldColumn` port with the
+  dispatch as its commit, which the port calls once.
 - **`appView` decides; it does not project.** The projections
   (`projectColumns`, `pathIds`, `branchColors`, `unsentSignals`) stay in `App`'s
   own `useMemo`s, and their results come in. One tree rebuilt each render
@@ -446,8 +449,10 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   Its column appears as the card arrives.
 - **Folded, a column is its card's face** (`foldedView`, ADR-0126): the
   same `Face` a grid's cell draws for that card (`faceOf`), worded for a
-  strip by `foldedWords` (its title, and a note column's count), in its
-  place; `projectColumns` lays the paths out over the unfolded thread
+  strip by `foldedWords` (its title, and a note column's count), headed by
+  `foldedMark` (a thread's banner or ✦, a note column's nothing), in its
+  thread's colour (`threadTrack`, the track its column takes at the same
+  end), in its place; `projectColumns` lays the paths out over the unfolded thread
   columns alone (`openColumns`), so folding the trunk shows it in the next
   unfolded column. Going to a card unfolds it: `planOpen`'s `unfold`, a
   reveal of a note or a canvas place (`revealOf`), your new branch, a note
@@ -488,6 +493,39 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   `canvasColumns` from `holders` (`heldByOthers`): its `UnstartedMode.held`
   names that thread and who; `projectColumns` leaves the thread's entries
   out (`hide`), and the strip draws the column read only, "Bea has it".
+
+## A fold in motion (`fold-motion.ts`, ADR-0137)
+
+`planFoldMotion` decides how a column moves into its strip or out of it,
+from boxes the page measured where the column is wide (`FoldScene`) and
+the strip's geometry its CSS declares; the page plays it
+(`packages/web/TECHNICAL.md`, "Folding in motion"). A fold and an unfold
+take the same scene and differ only in which way their frames run.
+
+- **The strip is predicted, both ways**: at the wide column's left and
+  top, its name centred across `geometry.width` at `nameTop`, a line high
+  and the wide name long, its mark centred at `markTop`. An unfold's strip
+  lies where the column now starts, so it needs no measuring either. The
+  browser suite's check of the turn proves the prediction is where the CSS
+  draws the strip.
+- **The turn** (S167): the wide name turned 90° clockwise about its own
+  top-left, then moved so its right edge meets the strip name's and its
+  top its top. At the same font size every glyph lands exactly. A name
+  that wraps (its height not `line`), outgrows `nameMax` or is missing does
+  not turn: it fades with the rest.
+- **One edge, sampled** (`FoldFrame`): eased out over 8 samples, played
+  linearly between, the column's right edge and every column after it.
+  At each sample the edge stays `CLEAR` px right of the turning name and
+  the mark, where an edge eased alone would cut a long name mid-turn.
+- **The clamp**: folding can shrink the strip's scroll below where it
+  stands; the browser then clamps it and every column moves right. Every
+  column moves by it as the fold goes, so the commit's jump is part of
+  the motion.
+- **Nothing moves** under reduced motion, during a drag, for a column out
+  of the strip's view, or one already no wider than its strip.
+- **`foldOf` reads the motion from the action**: a `view` action's `fold`
+  or `foldTask` names its column and which way. The effect carries only
+  `moves`, so nothing says it twice.
 
 ## The column model (`columns.ts`)
 

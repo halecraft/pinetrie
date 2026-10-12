@@ -123,6 +123,7 @@ const at = (
 const shown = (root: string, id: TaskId): Effect[] => [
   {
     kind: "layout",
+    moves: false,
     action: { kind: "show", here: { kind: "task", task: TASK_OF(root) } },
   },
   { kind: "list", act: { kind: "ensure", task: id } },
@@ -185,6 +186,7 @@ const column = (
 const onR1 = (change: object): Effect =>
   ({
     kind: "layout",
+    moves: false,
     action: { kind: "view", task: R1_ID, first: TRUNK, change },
   }) as Effect
 
@@ -194,7 +196,11 @@ describe("planIntent", () => {
       plan({ kind: "close", here: { kind: "task", task: TASK_OF("1-r1") } }),
     ).toEqual([
       { kind: "list", act: { kind: "close", task: R1_ID } },
-      { kind: "layout", action: { kind: "closeTask", task: TASK_OF("1-r1") } },
+      {
+        kind: "layout",
+        moves: false,
+        action: { kind: "closeTask", task: TASK_OF("1-r1") },
+      },
     ])
   })
 
@@ -207,7 +213,11 @@ describe("planIntent", () => {
       plan({ kind: "show", here: { kind: "task", task: TASK_OF("5-r2") } }),
     ).toEqual(shown("5-r2", R2_ID))
     expect(plan({ kind: "show", here: { kind: "nothing" } })).toEqual([
-      { kind: "layout", action: { kind: "show", here: { kind: "nothing" } } },
+      {
+        kind: "layout",
+        moves: false,
+        action: { kind: "show", here: { kind: "nothing" } },
+      },
     ])
     expect(
       plan({
@@ -247,6 +257,7 @@ describe("planIntent", () => {
           { kind: "list", act: { kind: "close", task: R1_ID } },
           {
             kind: "layout",
+            moves: false,
             action: { kind: "closeTask", task: TASK_OF("1-r1") },
           },
         ],
@@ -265,17 +276,17 @@ describe("planIntent", () => {
       { kind: "request", intent: { kind: "workflow", edit } },
     ])
     expect(plan({ kind: "board", open: true, focus: false })).toEqual([
-      { kind: "layout", action: { kind: "board", open: true } },
+      { kind: "layout", moves: false, action: { kind: "board", open: true } },
     ])
     expect(plan({ kind: "board", open: false })).toEqual([
-      { kind: "layout", action: { kind: "board", open: false } },
+      { kind: "layout", moves: false, action: { kind: "board", open: false } },
     ])
   })
 
   test("a person's open of the board arms its search's focus first; the board's own open arms nothing", () => {
     expect(plan({ kind: "board", open: true, focus: true })).toEqual([
       { kind: "armFocus", key: BOARD_SEARCH },
-      { kind: "layout", action: { kind: "board", open: true } },
+      { kind: "layout", moves: false, action: { kind: "board", open: true } },
     ])
   })
 
@@ -294,6 +305,7 @@ describe("planIntent", () => {
       plan(column({ kind: "newTab", prefill, asksAgent: true })),
     ).toContainEqual({
       kind: "layout",
+      moves: false,
       action: {
         kind: "view",
         task: NEW_TASK,
@@ -325,11 +337,13 @@ describe("planIntent", () => {
       },
       {
         kind: "layout",
+        moves: false,
         action: { kind: "show", here: { kind: "task", task: NEW_TASK } },
       },
       { kind: "list", act: { kind: "ensure", task: NEW_TASK } },
       {
         kind: "layout",
+        moves: false,
         action: {
           kind: "view",
           task: NEW_TASK,
@@ -431,7 +445,11 @@ describe("planIntent", () => {
         actedAt: column,
         close: [
           { kind: "list", act: { kind: "close", task: NEW_TASK } },
-          { kind: "layout", action: { kind: "closeTask", task: NEW_TASK } },
+          {
+            kind: "layout",
+            moves: false,
+            action: { kind: "closeTask", task: NEW_TASK },
+          },
         ],
         here: NEW_TASK,
       },
@@ -460,15 +478,16 @@ describe("planIntent", () => {
     expect(plan(column(act, CARD_C), at(onNothing))).toEqual([])
   })
 
-  test("a fold is your view of the task you are on; off a task, nothing (ADR-0116)", () => {
+  test("a fold you ask for is your view of the task you are on, and moves; off a task, nothing", () => {
+    const moving = (change: object) => ({ ...onR1(change), moves: true })
     expect(plan({ kind: "fold", card: C, unfolded: true })).toEqual([
-      onR1({ kind: "fold", card: C, unfolded: true }),
+      moving({ kind: "fold", card: C, unfolded: true }),
     ])
     expect(
       plan({ kind: "fold", card: C, unfolded: false }, at(onNothing)),
     ).toEqual([])
     expect(plan({ kind: "foldTask", unfolded: true })).toEqual([
-      onR1({ kind: "foldTask", unfolded: true }),
+      moving({ kind: "foldTask", unfolded: true }),
     ])
     expect(plan({ kind: "foldTask", unfolded: true }, at(onNothing))).toEqual(
       [],
@@ -555,7 +574,7 @@ describe("planIntent", () => {
       ])
     })
 
-    test("an entry no unfolded column shows unfolds its thread's, revealed, which takes no focus", () => {
+    test("an entry no unfolded column shows unfolds its thread's, unmoving, revealed, which takes no focus", () => {
       // 4-c is a branch at 2-a: its card's column is folded.
       const effects = plan({ kind: "openAt", entry: entryId("4-c") })
       expect(effects[0]).toEqual({ kind: "reveal", entry: "4-c" })
@@ -944,7 +963,11 @@ describe("planIntent", () => {
 
 test("afterTaskMove: what follows a move runs only once the host accepts it; a refusal of its card's move is said on the board (ADR-0126)", () => {
   const moved: Effect[] = [
-    { kind: "layout", action: { kind: "closeTask", task: TASK_OF("1-r1") } },
+    {
+      kind: "layout",
+      moves: false,
+      action: { kind: "closeTask", task: TASK_OF("1-r1") },
+    },
   ]
   expect(afterTaskMove({ kind: "moved" }, moved)).toBe(moved)
   expect(

@@ -1,7 +1,7 @@
-// web/strip — the columns of the task you are on (ADR-0116): the task
+// web/strip — the columns of the task you are on: the task
 // column first, then each card of the canvas in its order, folded to a
 // strip or drawn whole (a thread's column, a note column), a branch not yet
-// sent among them (ADR-0126). What is drawn is decided in `@pinetrie/interface` (`taskStrip`);
+// sent among them. What is drawn is decided in `@pinetrie/interface` (`taskStrip`);
 // this draws it. A column's header is its drag handle (`use-drag.ts`).
 
 import type {
@@ -71,9 +71,9 @@ interface Projected {
   readonly view: ColumnView
   readonly path: ReadonlySet<EntryId>
   readonly track: number
-  /** Who holds the thread a branch not yet sent forks in, when someone else does (ADR-0124). */
+  /** Who holds the thread a branch not yet sent forks in, when someone else does. */
   readonly heldBy: WriterId | null
-  /** Its matches while a search applies (ADR-0101), else null. */
+  /** Its matches while a search applies, else null. */
   readonly matches: ColumnMatches | null
 }
 
@@ -94,8 +94,10 @@ export function Strip(p: {
   /** The canvas list the task's agents are told, its lines. */
   told: readonly string[]
   noteViews: ReadonlyMap<NoteColumnId, NoteColumnView>
-  /** A thread's face, which its column draws when folded (ADR-0126). */
+  /** A thread's face, which its column draws when folded. */
   threadFaceOf: (thread: ThreadId) => ThreadFace
+  /** A folded thread's colour track: the one its column takes. */
+  threadTrackOf: (thread: ThreadId) => number
   shared: SharedColumnProps
   reader: Reader
   readers: ReadersProps
@@ -146,7 +148,7 @@ export function Strip(p: {
       />
     )
   }
-  // A drop where no column takes one is a spot on the canvas (ADR-0126):
+  // A drop where no column takes one is a spot on the canvas:
   // just after a folded column, or past the last, where `.canvas-end`
   // leaves room for it.
   const canvasDrop = (after: CardId | null): PutTarget | null =>
@@ -168,6 +170,9 @@ export function Strip(p: {
           drop={canvasDrop(cardOfFace(folded))}
           face={folded}
           key={cardOfFace(folded)}
+          track={
+            folded.kind === "thread" ? p.threadTrackOf(folded.thread) : null
+          }
           onIntent={p.onIntent}
         />
       )

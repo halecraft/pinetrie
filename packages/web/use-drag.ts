@@ -43,11 +43,11 @@ import {
   targetOfElement,
 } from "@pinetrie/interface"
 import { type RefObject, useEffect } from "react"
+import { reducedMotion, settleFolds } from "./motion.ts"
 import { useStable } from "./use-stable.ts"
 
 /** How long a cancelled drag springs back, in ms: none with reduced motion. */
-const settleMs = (): number =>
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 160
+const settleMs = (): number => (reducedMotion() ? 0 : 160)
 
 /** What a task is dragged from: a board card or a row of the sidebar. */
 const ROOT_ITEM = ".thread-card, .sidebar-item"
@@ -433,6 +433,9 @@ export function useDrag(input: {
       source: DragSource,
       e: PointerEvent,
     ): Press => {
+      // A fold still moving lands first: its columns are measured where
+      // they end, not on their way there.
+      settleFolds()
       const strip = stripRef.current
       const column =
         source.kind === "card"

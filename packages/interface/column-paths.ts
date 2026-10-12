@@ -18,14 +18,14 @@ export interface ColumnSpec {
    */
   readonly anchor: EntryId | null
   /**
-   * Its own thread, when its parent thread is on no column of the canvas
-   * (ADR-0117): its path above that thread's first message folds, behind
+   * Its own thread, when its parent thread is on no column of the canvas:
+   * its path above that thread's first message folds, behind
    * its fork row, unless a column to its left shows some of it.
    */
   readonly foldAbove?: ThreadId
   /**
    * A thread someone else holds, whose entries a branch not yet sent from it
-   * leaves out, its column saying who has it in their place (ADR-0124).
+   * leaves out, its column saying who has it in their place.
    */
   readonly hide?: ThreadId
 }
@@ -91,24 +91,33 @@ export interface BranchColors {
   readonly forks: ReadonlyMap<EntryId, readonly number[]>
 }
 
+/** Each rail entry's track, built once per rail: what `threadTrack` and `branchColors` read. */
+export type TrackIndex = ReadonlyMap<EntryId, number>
+
+export const trackIndex = (rail: readonly RailRow[]): TrackIndex =>
+  new Map(rail.map(r => [r.id, r.track]))
+
+/**
+ * The track of a path ending at `end`: the colour of a column or a folded
+ * strip ending there, so the two never disagree.
+ */
+export const threadTrack = (tracks: TrackIndex, end: EntryId | null): number =>
+  end === null ? PENDING_TRACK : (tracks.get(end) ?? PENDING_TRACK)
+
 /**
  * Each column's colour, and the dots it puts where it forks. Colour, not drawn
  * lines, links a branch to its parent, so sibling branches never cross. A
  * column takes the track of its last message, which is where its path ends in
- * the rail; the client maps a track to a colour by the track and its root
- * (ADR-0089), so the rail, the column's header and its fork dot agree.
+ * the rail; the client maps a track to a colour by the track and its root,
+ * so the rail, the column's header and its fork dot agree.
  */
 export function branchColors(
-  rail: readonly RailRow[],
+  tracks: TrackIndex,
   columns: readonly ColumnView[],
 ): BranchColors {
-  const trackOf = new Map(rail.map(r => [r.id, r.track]))
-  const track = columns.map(c => {
-    const last = c.nodes.at(-1)?.id
-    return last === undefined
-      ? PENDING_TRACK
-      : (trackOf.get(last) ?? PENDING_TRACK)
-  })
+  const track = columns.map(c =>
+    threadTrack(tracks, c.nodes.at(-1)?.id ?? null),
+  )
   const forks = new Map<EntryId, number[]>()
   for (const [i, c] of columns.entries()) {
     if (c.forkFrom === null) continue

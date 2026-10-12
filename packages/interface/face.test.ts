@@ -21,7 +21,7 @@ import {
   textFaceWords,
 } from "./face.ts"
 import { tree } from "./fixtures.ts"
-import { foldedView, foldedWords } from "./folded-column-view.ts"
+import { foldedMark, foldedView, foldedWords } from "./folded-column-view.ts"
 import { gridView } from "./grid-view.ts"
 import { type ThreadFace, threadFace } from "./thread-face.ts"
 
@@ -148,6 +148,23 @@ describe("faceOf (ADR-0126)", () => {
     expect(folded === null ? null : foldedWords(folded)).toEqual({
       title: "Ideas",
       detail: "2 notes",
+    })
+  })
+})
+
+describe("foldedMark", () => {
+  test("a thread's strip draws its banner, or ✦ without one; a note column's draws none", () => {
+    expect(foldedMark({ ...threadFaceOfT, sprite: "/blob/a" })).toEqual({
+      kind: "thread",
+      banner: { url: "/blob/a", fade: false },
+    })
+    expect(foldedMark(threadFaceOfT)).toEqual({ kind: "thread", banner: null })
+    const folded = foldedView(
+      { kind: "notes", card: N, folded: true, width: 1 },
+      { threadFaceOf: () => threadFaceOfT, notes: facts.notes },
+    )
+    expect(folded === null ? null : foldedMark(folded)).toEqual({
+      kind: "none",
     })
   })
 })

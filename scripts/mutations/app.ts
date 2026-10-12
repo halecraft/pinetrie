@@ -1442,7 +1442,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the star shows under a banner",
-    file: "packages/web/column.tsx",
+    file: "packages/web/thread-mark.tsx",
     from: '      <span className="thread-star" data-gone={loaded || !fade || undefined}>',
     to: '      <span className="thread-star">',
     suite: "browser",
@@ -2546,5 +2546,14 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "an unsent new tab closed with × takes its task away, and its thread's card to the trash, asking nothing",
+  },
+  {
+    name: "a strip's mark row is taller than the geometry a fold reads",
+    file: "packages/web/index.html",
+    from: "      .folded-title > .thread-mark { flex: 0 0 var(--strip-mark); height: var(--strip-mark); }\n",
+    to: "      .folded-title > .thread-mark { flex: 0 0 calc(var(--strip-mark) + 4px); height: calc(var(--strip-mark) + 4px); }\n",
+    suite: "browser",
+    scenario: "page",
+    expect: "a fold turns the column's name onto its strip's, in its colour",
   },
 ]

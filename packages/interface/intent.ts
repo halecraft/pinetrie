@@ -79,6 +79,7 @@ import {
   changeViewOf,
   closeTaskEffects,
   type Effect,
+  foldViewOf,
   type IntentState,
   layout,
   list,
@@ -109,13 +110,13 @@ import { openOf, type ThreadLink } from "./thread-link.ts"
  */
 export type ColumnAct =
   | MessageAct
-  /** Discard a card here; the undo key brings it back (ADR-0111). */
+  /** Discard a card here; the undo key brings it back. */
   | { readonly kind: "discard"; readonly card: CardId }
-  /** Take a card in this column into your inventory (ADR-0048). */
+  /** Take a card in this column into your inventory. */
   | { readonly kind: "takeIntoInventory"; readonly card: CardId }
-  /** Read the column at `density` (ADR-0106). */
+  /** Read the column at `density`. */
   | { readonly kind: "density"; readonly density: Density }
-  /** Open or close the thread's details under the header (ADR-0073). */
+  /** Open or close the thread's details under the header. */
   | { readonly kind: "details"; readonly open: boolean }
   /** After a conflict: a thread opened at `at`, whose column sends `pending` there. */
   | {
@@ -124,8 +125,8 @@ export type ColumnAct =
       readonly pending: Pending
     }
   /**
-   * Queue a card on the column's lane, from where it was (ADR-0048), and
-   * change that queue's hold with it (ADR-0113).
+   * Queue a card on the column's lane, from where it was, and
+   * change that queue's hold with it.
    */
   | {
       readonly kind: "queue"
@@ -134,20 +135,20 @@ export type ColumnAct =
       readonly at: Position
       readonly hold: QueueHoldChange
     }
-  /** Pin a card below the line at the top of its thread's column (ADR-0048). */
+  /** Pin a card below the line at the top of its thread's column. */
   | { readonly kind: "pin"; readonly card: CardId }
   /**
    * Unpin a card: a note in the note column nearest its thread, or, pinned
-   * to the task, nearest the task column (ADR-0116).
+   * to the task, nearest the task column.
    */
   | { readonly kind: "unpin"; readonly card: CardId }
-  /** Pin a card to the task its column is in: every thread reads it (ADR-0116). */
+  /** Pin a card to the task its column is in: every thread reads it. */
   | { readonly kind: "pinToTask"; readonly card: CardId }
-  /** Your message to the note column nearest its thread (ADR-0116). */
+  /** Your message to the note column nearest its thread. */
   | { readonly kind: "toNote"; readonly card: CardId }
   /**
    * A reference to the comment `card` on `entry`, queued on `thread`: the
-   * agent reads it; the comment stays (ADR-0126).
+   * agent reads it; the comment stays.
    */
   | {
       readonly kind: "queueReference"
@@ -155,7 +156,7 @@ export type ColumnAct =
       readonly entry: EntryId
       readonly thread: ThreadId
     }
-  /** A new, empty note at the end of note column `column` (ADR-0116). */
+  /** A new, empty note at the end of note column `column`. */
   | {
       readonly kind: "newNote"
       readonly card: TextCardId
@@ -163,7 +164,7 @@ export type ColumnAct =
     }
   /** A card into this column's composer, as your message (`planPut`). */
   | { readonly kind: "toMessage"; readonly card: CardId }
-  /** A card made a new thread in `state` on the board (ADR-0111). */
+  /** A card made a new thread in `state` on the board. */
   | {
       readonly kind: "spinOff"
       readonly card: CardId
@@ -178,7 +179,7 @@ export type ColumnAct =
     }
   /**
    * Move a queued or pinned card one place up (-1) or down (1) among
-   * `among`, its list as drawn, by id (ADR-0048 step 7).
+   * `among`, its list as drawn, by id.
    */
   | {
       readonly kind: "reorder"
@@ -186,7 +187,7 @@ export type ColumnAct =
       readonly among: readonly CardId[]
       readonly step: -1 | 1
     }
-  /** Hold the thread's queue, or release it (ADR-0048 step 7). */
+  /** Hold the thread's queue, or release it. */
   | {
       readonly kind: "holdQueue"
       readonly lane: ThreadId
@@ -194,16 +195,16 @@ export type ColumnAct =
     }
   /** Take every message card queued on the thread back below the line. */
   | { readonly kind: "unqueueAll"; readonly lane: ThreadId }
-  /** Set a card's command, or clear it with null (ADR-0108). */
+  /** Set a card's command, or clear it with null. */
   | {
       readonly kind: "setCommand"
       readonly card: CardId
       readonly command: CardCommand | null
     }
   /**
-   * A card made in `lane`'s queue, with no text, never drawn anywhere first
-   * (ADR-0113). A command button's (catching up, continuing on accepted
-   * work, splitting the offer: ADR-0104, ADR-0061, ADR-0080) carries its
+   * A card made in `lane`'s queue, with no text, never drawn anywhere first.
+   * A command button's (catching up, continuing on accepted
+   * work, splitting the offer) carries its
    * `command` and keeps the hold, so the host carries the command out when
    * the lane is free; "+ add to queue"'s has none and holds an idle queue
    * (`hold-if-idle`), so it waits while you type. Your message is left as
@@ -217,7 +218,7 @@ export type ColumnAct =
       readonly command: CardCommand | null
       readonly hold: Extract<QueueHoldChange, "keep" | "hold-if-idle">
     }
-  /** Act on the lane's offer in your repo; an acceptance names its destination (ADR-0104). */
+  /** Act on the lane's offer in your repo; an acceptance names its destination. */
   | {
       readonly kind: "offer"
       readonly lane: ThreadId
@@ -232,7 +233,7 @@ export type Intent =
       readonly column: ColumnKey
       readonly act: ColumnAct
     }
-  /** Move a card's column to index `to` on its canvas, for everyone (ADR-0116). */
+  /** Move a card's column to index `to` on its canvas, for everyone. */
   | {
       readonly kind: "moveColumn"
       readonly column: CardKey
@@ -240,7 +241,7 @@ export type Intent =
     }
   /** A thread you opened sent its first message: what it started with is spent. */
   | { readonly kind: "sentFirst"; readonly card: ThreadId }
-  /** Unfold a column of the task you are on, or fold it (ADR-0116). */
+  /** Unfold a column of the task you are on, or fold it. */
   | {
       readonly kind: "fold"
       readonly card: CardId
@@ -250,20 +251,20 @@ export type Intent =
   | { readonly kind: "foldTask"; readonly unfolded: boolean }
   /**
    * Make a note column on the canvas of the task you are on, just after the
-   * card `after`, or first with null (ADR-0116).
+   * card `after`, or first with null.
    */
   | { readonly kind: "addNoteColumn"; readonly after: CardId | null }
   /**
-   * Copy the thread `source` at its end as you see it (ADR-0117): its new
+   * Copy the thread `source` at its end as you see it: its new
    * card just after the source on the source's canvas, or into your
-   * inventory (ADR-0127).
+   * inventory.
    */
   | {
       readonly kind: "copyThread"
       readonly source: ThreadId
       readonly to: "here" | "inventory"
     }
-  /** Draw a card's column one column wide or two, for everyone (ADR-0116). */
+  /** Draw a card's column one column wide or two, for everyone. */
   | {
       readonly kind: "cardWidth"
       readonly card: CardId
@@ -272,26 +273,26 @@ export type Intent =
   /** Show a task, opening it in the sidebar, or nothing. */
   | { readonly kind: "show"; readonly here: Here }
   /**
-   * Open a new tab (ADR-0126): a new task, its new root's first thread not
+   * Open a new tab: a new task, its new root's first thread not
    * yet started on its canvas, shown and in the sidebar.
    */
   | {
       readonly kind: "newTab"
       readonly asksAgent: boolean
       readonly prefill?: Prefill
-      /** The workflow state its task lands in: the board column it came from (ADR-0122). */
+      /** The workflow state its task lands in: the board column it came from. */
       readonly state?: WorkflowStateId
     }
   /** Close a task of the sidebar for you: nothing shared is written. */
   | { readonly kind: "close"; readonly here: Here }
-  /** Move a task of the sidebar before `before`, or to its end (ADR-0122). */
+  /** Move a task of the sidebar before `before`, or to its end. */
   | {
       readonly kind: "moveInList"
       readonly task: TaskId
       readonly before: TaskId | null
     }
   /**
-   * Move a task on the board (ADR-0122). Into the archive it is archived,
+   * Move a task on the board. Into the archive it is archived,
    * and closed for you once the host accepts; out of it, restored.
    */
   | {
@@ -303,7 +304,7 @@ export type Intent =
       /** `to` is the archive. */
       readonly closes: boolean
     }
-  /** Change the board's workflow states (ADR-0122). */
+  /** Change the board's workflow states. */
   | { readonly kind: "editWorkflow"; readonly edit: WorkflowEdit }
   /** Close the board. */
   | { readonly kind: "board"; readonly open: false }
@@ -313,21 +314,21 @@ export type Intent =
    * itself, with nothing to show (`pruneLayout`), sends no intent.
    */
   | { readonly kind: "board"; readonly open: true; readonly focus: boolean }
-  /** Fold the sidebar to icons, or unfold it (ADR-0088). */
+  /** Fold the sidebar to icons, or unfold it. */
   | { readonly kind: "foldList" }
-  /** Show a page over the stage, or, with null, the stage (ADR-0098). */
+  /** Show a page over the stage, or, with null, the stage. */
   | { readonly kind: "page"; readonly to: PageName | null }
-  /** Open, type in, clear or close the search of the task you are on (ADR-0101). */
+  /** Open, type in, clear or close the search of the task you are on. */
   | { readonly kind: "search"; readonly act: SearchAsk }
-  /** Title a task or a note column, or clear its title with null (ADR-0116). */
+  /** Title a task or a note column, or clear its title with null. */
   | {
       readonly kind: "rename"
       readonly of: MarkTarget
       readonly title: string | null
     }
-  /** Ask a model for the task's title (ADR-0074). */
+  /** Ask a model for the task's title. */
   | { readonly kind: "retitle"; readonly task: TaskId }
-  /** What `lane` raised for you is not needed (ADR-0077): it clears on every device. */
+  /** What `lane` raised for you is not needed: it clears on every device. */
   | {
       readonly kind: "notNeeded"
       readonly lane: ThreadId
@@ -336,8 +337,8 @@ export type Intent =
   /** Show entry `entry`, wherever it is (`planOpen`). */
   | { readonly kind: "openAt"; readonly entry: EntryId }
   /**
-   * Follow a link to entry `entry` of its thread (ADR-0117, ADR-0124): in
-   * its task, whose root this tab may not hold (ADR-0063); in your
+   * Follow a link to entry `entry` of its thread: in
+   * its task, whose root this tab may not hold; in your
    * inventory, its preview; held by someone else, nothing. What the inbox,
    * a mention, a fork row and a rail's stub open.
    */
@@ -351,7 +352,7 @@ export type Intent =
   | { readonly kind: "takeIntoInventory"; readonly card: CardId }
   /**
    * Land `source` at `target` (`planPut`): a put by key or button, a drop,
-   * a slot's swap; `how` copies instead, as an Alt-drag does (ADR-0132).
+   * a slot's swap; `how` copies instead, as an Alt-drag does.
    */
   | {
       readonly kind: "put"
@@ -360,21 +361,21 @@ export type Intent =
       readonly how: PutHow
     }
   /**
-   * Discard a card, said where `at` is: the undo key brings it back
-   * (ADR-0111). A cut is a copy, then this (ADR-0132).
+   * Discard a card, said where `at` is: the undo key brings it back.
+   * A cut is a copy, then this.
    */
   | { readonly kind: "discard"; readonly card: CardId; readonly at: ActedAt }
   /** Bring a trashed card back to where it was, for anyone who may. */
   | { readonly kind: "restore"; readonly card: CardId; readonly at: ActedAt }
-  /** The page copied `clip` to the clipboard: the clipboard cell shows it (ADR-0132). */
+  /** The page copied `clip` to the clipboard: the clipboard cell shows it. */
   | { readonly kind: "copied"; readonly clip: Clip }
-  /** A paste of `clip` at `target`: a copy landed there (ADR-0132). */
+  /** A paste of `clip` at `target`: a copy landed there. */
   | { readonly kind: "paste"; readonly clip: Clip; readonly target: PutTarget }
-  /** The clipboard cell's copy into a free slot of your inventory (ADR-0132). */
+  /** The clipboard cell's copy into a free slot of your inventory. */
   | { readonly kind: "keep" }
   /**
-   * Edit a reference as text (ADR-0126): a paste of the quote `text` as the
-   * text card `card`, replacing the reference in its place (ADR-0132).
+   * Edit a reference as text: a paste of the quote `text` as the
+   * text card `card`, replacing the reference in its place.
    */
   | {
       readonly kind: "editAsText"
@@ -386,7 +387,7 @@ export type Intent =
   | { readonly kind: "selectSlot"; readonly slot: number }
   /**
    * Undo or redo your newest move in the task you are on, or, with the
-   * inventory panel focused, your newest swap (ADR-0066).
+   * inventory panel focused, your newest swap.
    */
   | {
       readonly kind: "undoMove"
@@ -415,8 +416,8 @@ export function planIntent(
 }
 
 /**
- * `effects`, after closing the search when they show something it covers
- * (ADR-0101): a message revealed, a column opened or unfolded, or another
+ * `effects`, after closing the search when they show something it covers:
+ * a message revealed, a column opened or unfolded, or another
  * task, a new tab or the board. A message revealed is outlined last, so
  * leaving shows where it landed.
  */
@@ -483,7 +484,7 @@ function planOf(
       const active = state.layout.active
       return active?.kind === "task"
         ? [
-            changeViewOf(
+            foldViewOf(
               state,
               active.task,
               intent.kind === "fold"
@@ -841,7 +842,7 @@ export function planOpenLink(
 }
 
 /**
- * Show `entry`, in task `task` (ADR-0063). One this tab holds opens as
+ * Show `entry`, in task `task`. One this tab holds opens as
  * `planOpenAt`. Else the task is shown, which holds its roots, archived or
  * not, and the entry is shown once it has arrived.
  */
@@ -856,8 +857,8 @@ function planOpenIn(
 
 /**
  * A column moved to index `to` of its task's canvas, for everyone: a reorder
- * of its card among the canvas's cards as drawn (ADR-0116), which the host
- * orders and the undo key takes back (ADR-0066). Nothing for a card on no
+ * of its card among the canvas's cards as drawn, which the host
+ * orders and the undo key takes back. Nothing for a card on no
  * canvas of `task`, or one already at `to`.
  */
 export function planColumnMove(
@@ -885,7 +886,7 @@ export function planColumnMove(
 }
 
 /**
- * A note column made on `task`'s canvas just after `after` (ADR-0116): a
+ * A note column made on `task`'s canvas just after `after`: a
  * move with no `from` to that spot, so the host ranks it there and the undo
  * key takes it back; unfolded, so you see what you made.
  */
@@ -905,7 +906,7 @@ function planAddNoteColumn(
   ]
 }
 
-/** Take `card` into a free slot of your inventory: a landing with no slot aimed at (ADR-0133). */
+/** Take `card` into a free slot of your inventory: a landing with no slot aimed at. */
 const planTake = (
   card: CardId,
   state: IntentState,
@@ -920,8 +921,8 @@ const planTake = (
   )
 
 /**
- * A copy of `source` at its end as this tab holds it (ADR-0117), as a
- * paste of it lands (ADR-0132): just after the source on its canvas, or
+ * A copy of `source` at its end as this tab holds it, as a
+ * paste of it lands: just after the source on its canvas, or
  * into a free slot of your inventory. Nothing for a thread with no card or
  * no end here, or copied here from no canvas.
  */
@@ -952,7 +953,7 @@ function planCopyThread(
 }
 
 /**
- * A branch at `at` opened on the task you are on (ADR-0126): its thread
+ * A branch at `at` opened on the task you are on: its thread
  * `thread` written now, its card just after the thread `at` is in, and its
  * column unfolded with what it starts with, taking focus. Nothing off a
  * task, or for an entry in no root this tab holds.
@@ -995,10 +996,10 @@ const opened = (key: string, effects: readonly Effect[]): readonly Effect[] =>
 const closeTask = closeTaskEffects
 
 /**
- * After a move on the board is answered (ADR-0122): `moved` runs only once
+ * After a move on the board is answered: `moved` runs only once
  * the host accepts. A task you move into the archive leaves the sidebar,
  * the one you are on too; only a task someone else archives stays while you
- * are on it (`resolveLayout`). A refusal of its card's move (ADR-0126) is
+ * are on it (`resolveLayout`). A refusal of its card's move is
  * said on the board, naming who moved it first; any other changes nothing.
  */
 export function afterTaskMove(

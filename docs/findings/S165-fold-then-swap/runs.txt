@@ -1,0 +1,17 @@
+S165 runs, 2026-10-11, Chromium headless shell 141, 1920×1080, mode swap of
+docs/findings/S164-from-unfold-to-drawn/probe.ts, four columns of 150 messages.
+Each frame: ms since the animation started : x of the red marker on the next
+column / green pixels of the marker in the folding column's body (400 = shown).
+The fold animation: 200 ms; the strip lands with the marker at 363–364.
+
+rate 1
+cancel-click  12:777/400 24:722/400 42:670/16 58:621/0 75:575/0 91:533/0 107:494/0 124:459/0 140:428/0 157:402/0 173:382/0 190:369/0 207:364/0 227:363/0
+held-click    11:777/400 27:722/400 43:670/16 60:621/0 77:575/0 93:533/0 110:494/0 126:459/0 142:428/0 159:402/0 176:382/0 193:369/0 209:364/0 227:363/0
+cancel-call   39:777/400 49:722/400 56:670/16 71:621/0 86:575/0 103:533/0 120:494/0 137:459/0 152:428/0 168:402/0 185:382/0 203:369/0 219:364/0 238:777/400 253:363/0
+held-call     11:777/400 19:722/400 33:670/16 50:621/0 68:575/0 83:533/0 100:494/0 116:459/0 132:428/0 149:402/0 166:382/0 188:369/0 203:364/0 230:363/0
+
+rate 4
+cancel-click  ... 198:369/0 215:364/0 250:364/0 290:363/0             (committed by ~260)
+held-click    ... 194:369/0 211:364/0 247:364/0 289:363/0             committed 267
+cancel-call   ... 175:382/0 192:369/0 216:777/400 295:363/0           the old layout for a frame
+held-call     ... 196:369/0 213:364/0 229:364/0 315:363/0             committed 286

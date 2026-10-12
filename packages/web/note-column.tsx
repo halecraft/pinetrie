@@ -1,4 +1,4 @@
-// web/note-column — a note column on a task's canvas (ADR-0116): its title,
+// web/note-column — a note column on a task's canvas: its title,
 // which anyone renames, and its notes, one under another, each folded to its
 // first line and opened while it holds the focus. ↑ and ↓ on a note, or
 // Alt+↑/↓ in its box, move it in the column, as a queued card moves in its
@@ -31,7 +31,7 @@ import { TitleField } from "./title-field.tsx"
 export function NoteColumn(p: {
   session: SessionClient
   view: NoteColumnView
-  /** How many columns wide its card is drawn (ADR-0116). */
+  /** How many columns wide its card is drawn. */
   width: CardWidth
   reader: Reader
   readOnly: ReadOnly | null
@@ -72,6 +72,7 @@ export function NoteColumn(p: {
     <section
       className="note-column"
       data-card={column}
+      data-kind="note-column"
       data-column={column}
       data-width={p.width}
       {...(p.readOnly === null ? dropProps({ kind: "notes", column }) : {})}
@@ -103,7 +104,7 @@ export function NoteColumn(p: {
             title="rename this note column"
             type="button"
           >
-            {view.title}
+            <span data-fold-name="">{view.title}</span>
           </button>
         )}
         <span className="note-count">{noteCountWords(view.notes.length)}</span>

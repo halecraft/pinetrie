@@ -24,6 +24,8 @@
   - ADR-0126: a task is a card, placed on the board, whose surface is its
     canvas; a column is how a card on a canvas is drawn, not a card; a text
     card dropped on a canvas lands in a note column made for it.
+  - ADR-0137: a folded strip shows its thread's mark, and its name at the
+    header's size and colour, in its thread's colour.
 
 **Context.**
 

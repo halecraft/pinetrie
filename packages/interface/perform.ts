@@ -10,6 +10,7 @@ import {
 import { afterKeep } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
 import type { Effect } from "./effects.ts"
+import { type ColumnMotion, foldOf } from "./fold-motion.ts"
 import type { Identity } from "./identity.ts"
 import { afterTaskMove, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
@@ -40,7 +41,7 @@ export interface AppPorts {
     | "acted"
     | "openThreads"
   >
-  /** Your attention document: what "not needed" marks (ADR-0077). */
+  /** Your attention document: what "not needed" marks. */
   readonly attention: Pick<AttentionStore, "dismiss" | "dismissOffer">
   /** The inventory panel: opened (briefly, for the flight of a take into it), and its selection. */
   readonly inventory: {
@@ -51,6 +52,12 @@ export interface AppPorts {
   }
   /** Measure a card's box before it moves, so it flies to where it lands. */
   readonly fly: (card: CardId) => void
+  /**
+   * Move a column into its fold or out of it, calling `commit`, which lands
+   * the fold, exactly once: before the motion for an unfold, after it for a
+   * fold, at once when nothing moves.
+   */
+  readonly foldColumn: (motion: ColumnMotion, commit: () => void) => void
   /** Plan and carry out an intent afresh, after something it waited for. */
   readonly intent: (intent: Intent) => void
   /** Show an entry once this tab holds it (`openAt`). */
@@ -68,17 +75,17 @@ export interface AppPorts {
     readonly clear: () => void
   }
   readonly reload: () => void
-  /** Show the sidebar at a width, and keep the choice for this tab (ADR-0088). */
+  /** Show the sidebar at a width, and keep the choice for this tab. */
   readonly listWidth: (width: ListWidth) => void
-  /** Show a page over the stage, or, with null, the stage (ADR-0098). */
+  /** Show a page over the stage, or, with null, the stage. */
   readonly page: (to: PageName | null) => void
-  /** Carry a search act out on the tab's search (`searchReducer`, ADR-0101). */
+  /** Carry a search act out on the tab's search (`searchReducer`). */
   readonly search: (act: SearchAct) => void
   /** Outline a message briefly once it is drawn (`useReveal`). */
   readonly landed: (entry: EntryId) => void
   /** Keep markdown as a blob: a reference's quote (`uploadText`). */
   readonly uploadText: (markdown: string) => Promise<TextUpload>
-  /** Show `clip` in the clipboard cell: the copy this tab just made (ADR-0132). */
+  /** Show `clip` in the clipboard cell: the copy this tab just made. */
   readonly clipboardCell: (clip: Clip) => void
   /** Put text at the caret of the text box that has focus, as typed. */
   readonly insertText: (text: string) => void
@@ -89,7 +96,7 @@ export function perform(effects: readonly Effect[], ports: AppPorts): void {
 }
 
 /**
- * A paste (ADR-0132): a reference's quote kept as a blob first when it is
+ * A paste: a reference's quote kept as a blob first when it is
  * markdown (the past's, or a comment's under a link to its entry, read
  * now), then the paste sent. A quote that could not be kept pastes
  * nothing, said where it was asked for.
@@ -156,9 +163,12 @@ function paste(
 
 function performOne(effect: Effect, ports: AppPorts): void {
   switch (effect.kind) {
-    case "layout":
-      ports.dispatch(effect.action)
+    case "layout": {
+      const motion = effect.moves ? foldOf(effect.action) : null
+      if (motion === null) ports.dispatch(effect.action)
+      else ports.foldColumn(motion, () => ports.dispatch(effect.action))
       return
+    }
     case "listWidth":
       ports.listWidth(effect.width)
       return

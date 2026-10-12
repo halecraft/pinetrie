@@ -701,6 +701,97 @@ async function run(check: Checks["check"]): Promise<void> {
         }),
       )
 
+      // ── folding a column: its name turns into its strip ───────────────────
+      // The trunk's, whose agent has a name (a chat has none to turn). Each
+      // frame until the strip is drawn, the header name's box; then the
+      // strip's name. The last frame of the fold is where the strip draws its
+      // name, to within a pixel, in the column's colour.
+      {
+        const card = (await page.getAttribute(col(0), "data-card")) ?? ""
+        const turn = page.evaluate(
+          ([sel, card]) =>
+            new Promise<{
+              first: number[] | null
+              last: number[] | null
+              strip: number[] | null
+              frames: number
+              colour: string | null
+              stripColour: string | null
+            } | null>(resolve => {
+              const box = (e: Element | null) => {
+                const r = e?.getBoundingClientRect()
+                return r === undefined
+                  ? null
+                  : [r.left, r.top, r.width, r.height]
+              }
+              let first: number[] | null = null
+              let last: number[] | null = null
+              let colour: string | null = null
+              let frames = 0
+              const tick = () => {
+                frames++
+                const strip = document.querySelector(
+                  `.folded-column[data-card="${card}"] [data-fold-name]`,
+                )
+                if (strip !== null) {
+                  resolve({
+                    first,
+                    last,
+                    strip: box(strip),
+                    frames,
+                    colour,
+                    stripColour: getComputedStyle(strip).color,
+                  })
+                  return
+                }
+                const name = document.querySelector(`${sel} [data-fold-name]`)
+                if (name !== null) {
+                  last = box(name)
+                  first ??= last
+                  colour ??= getComputedStyle(name).color
+                }
+                if (frames < 600) requestAnimationFrame(tick)
+                else resolve(null)
+              }
+              requestAnimationFrame(tick)
+            }),
+          [col(0), card] as const,
+        )
+        await chooseFromMenu(page, `${col(0)} .column-menu`, ".column-fold")
+        const t = await turn
+        const off =
+          t?.last == null || t.strip === null
+            ? Infinity
+            : Math.max(
+                ...t.last.map((v, i) => Math.abs(v - (t.strip?.[i] ?? 0))),
+              )
+        check(
+          "a fold turns the column's name onto its strip's, in its colour",
+          t !== null &&
+            t.first !== null &&
+            (t.first[2] ?? 0) > (t.first[3] ?? 0) &&
+            off <= 1 &&
+            t.colour !== null &&
+            t.colour === t.stripColour,
+          JSON.stringify({ ...t, off }),
+        )
+        await page
+          .click(`.folded-column[data-card="${card}"] .folded-title`, {
+            timeout: 15_000,
+          })
+          .catch(() => {})
+        // Moved back, before the columns are dragged and measured.
+        await page
+          .waitForFunction(
+            c =>
+              document.querySelector(`.column[data-card="${c}"]`) !== null &&
+              document.getAnimations().every(a => a.id !== "fold"),
+            card,
+            { timeout: 15_000 },
+          )
+          .catch(() => {})
+      }
+
       // ── moving a column: drag its header, or Alt+arrows ───────────────────
       const keys = () =>
         page.$$eval(".column", ns => ns.map(n => n.getAttribute("data-key")))
@@ -1112,7 +1203,17 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // ── the agent in a thread no column shows: the rail pulses ──────────────
+      // A fold lands once its column has moved into its strip: the second
+      // waits for the first.
+      const whole = await page.$$eval(".column", cs => cs.length)
       await chooseFromMenu(page, `${col(1)} .column-menu`, ".column-fold")
+      await page
+        .waitForFunction(
+          n => document.querySelectorAll(".column").length === n,
+          whole - 1,
+          { timeout: 15_000 },
+        )
+        .catch(() => {})
       await chooseFromMenu(page, `${col(1)} .column-menu`, ".column-fold")
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 1,

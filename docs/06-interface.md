@@ -337,9 +337,15 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A task opens on its canvas**: every card on it, as columns, in an order
   everyone shares. A thread card's column is its thread's path; a note
   column's is its notes. Each is **folded** for you until you open it: a
-  narrow strip in its place with its title, which a click unfolds. Folding
-  (**Fold**, first in a column's ⋯) is yours alone, and moves nothing for
-  anyone else.
+  narrow strip in its place, which a click unfolds. Folding (**Fold**,
+  first in a column's ⋯) is yours alone, and moves nothing for anyone
+  else.
+- **A strip is its column's header turned on its side** (ADR-0137): a
+  thread's mark, then its name at the header's size, in its colour. Folding
+  turns the name 90° into the strip, its mark moving with it, while the
+  rest of the column fades and the columns after it close up; unfolding
+  turns it back. Only a fold you ask for moves; under reduced motion,
+  nothing does.
 - **The task column comes first**, folded the same way: the task's title,
   which anyone renames there, **Move to ▸** among the board's states, who is
   reading, the cards pinned to the task, the canvas list its agents are
