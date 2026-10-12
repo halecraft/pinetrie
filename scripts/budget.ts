@@ -89,9 +89,6 @@ export const FIXED_WAITS: Readonly<Record<string, number>> = {
   // A write and a deletion of one key in one millisecond tie on other peers
   // (Kyneta: `docs/pinetrie.md`, "Open, non-blocking").
   "apps/pinetrie/e2e/host/presence.scenario.ts": 1,
-  // A drag held over a sidebar item for halves of `ITEM_HOVER_MS`: the
-  // hold's length is the rule checked.
-  "apps/pinetrie/e2e/browser/page.scenario.ts": 2,
   // The foreground `sleep`s a tool's timeout and Stop kill, and the
   // process list searched for one: their death is checked, not waited out.
   "apps/pinetrie/e2e/lanes/main.scenario.ts": 3,

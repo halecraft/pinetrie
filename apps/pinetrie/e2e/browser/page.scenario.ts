@@ -16,7 +16,6 @@ import {
 } from "@pinetrie/core"
 import {
   type ButtonWords,
-  ITEM_HOVER_MS,
   identityCodec,
   promptParent,
   queueWords,
@@ -1763,10 +1762,12 @@ async function run(check: Checks["check"]): Promise<void> {
           )
           await page.mouse.down()
           await page.mouse.move(x, over.y + over.height / 2, { steps: 8 })
-          // The ring fills while the hold lasts and clears as it opens.
-          await page.waitForTimeout(ITEM_HOVER_MS / 2)
+          // A hold that will open anything rings its target in the same move,
+          // and only the ring's timer opens it: no ring now, nothing opens
+          // later. That a task's drag opens nothing is `drawPlan`'s, proven
+          // by its unit test.
+          await twoFrames(page)
           ringed = (await page.$("[data-hover-open]")) !== null
-          await page.waitForTimeout(ITEM_HOVER_MS / 2 + 150)
           stayed = (await current()) === here
           await page.mouse.move(
             x,
