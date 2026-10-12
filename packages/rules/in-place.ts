@@ -1,6 +1,5 @@
-// in-place — a card's actions in place, which change no key and so leave
-// no trace and no history: a reorder among its siblings (ADR-0048 step 7,
-// ADR-0116), its width on a canvas, and its command.
+// in-place — a card's actions in place, which change no key and so leave no
+// trace and no history: a reorder, its width on a canvas, and its command.
 
 import {
   type CanvasKey,
@@ -24,10 +23,10 @@ import { orderBetween, respace } from "./order.ts"
 import { isPinned, queuedOn, taskPinnedOf } from "./queue.ts"
 import { canvasOf } from "./task.ts"
 
-// ── reorders (ADR-0048 step 7) ─────────────────────────────────────────────
+// ── reorders ─────────────────────────────────────────────
 
 /**
- * How a reorder works in one kind of place (ADR-0048 step 7, ADR-0116).
+ * How a reorder works in one kind of place.
  * `siblings` are the cards a card there moves among, in order, itself
  * included; `adjacent`, whether its two neighbours must still be next to
  * each other there; `passesFacts`, whether it may pass a fact.
@@ -52,10 +51,10 @@ interface ReorderRule<K extends ReorderAt["kind"]> {
  *   the session's (`placeAt`). A thread's pinned cards are found through
  *   the tree, which this does not read, so other threads' may sit between
  *   two pinned neighbours: they need not be adjacent here.
- * - A task's pinned cards (ADR-0116): its own, the neighbours next to each
+ * - A task's pinned cards: its own, the neighbours next to each
  *   other.
  * - A note column: its notes, the neighbours next to each other.
- * - An entry's margin (ADR-0126): its comments, the neighbours next to each
+ * - An entry's margin: its comments, the neighbours next to each
  *   other.
  * - A canvas: its task's cards (`canvasOf`), the neighbours next to each
  *   other.
@@ -134,10 +133,10 @@ const staysPut = (card: CardRecord): boolean => !KINDS[card.kind].reordered
 
 /**
  * A reorder: a queued or pinned card, a note, or a card on a canvas, moved
- * among its neighbours, as its sender saw them (ADR-0048, *Physics* 5,
- * ADR-0116), by its place's rule (`REORDERS`). Only its order changes: its
- * placer, its queuer, its text's version, why it was not sent and its width
- * stay, so nobody's trace or history changes with it. Refused:
+ * among its neighbours, as its sender saw them, by its place's rule
+ * (`REORDERS`). Only its order changes: its placer, its queuer, its text's
+ * version, why it was not sent and its width stay, so nobody's trace or history
+ * changes with it. Refused:
  * - `gone`: no card;
  * - `fact`: a card of a kind `KINDS` does not reorder (a fact), or one
  *   that would pass one where its rule forbids it;
@@ -147,7 +146,7 @@ const staysPut = (card: CardRecord): boolean => !KINDS[card.kind].reordered
  *   each other.
  *
  * With no room between the neighbours, the crowded siblings around it are
- * given new keys in the same step (`respace`). Pure.
+ * given new keys in the same step (`respace`).
  */
 export function planReorder(
   cards: readonly CardRecord[],
@@ -212,12 +211,12 @@ export function planReorder(
 }
 
 /**
- * A card's width on its canvas (ADR-0116): one column or two, from where its
+ * A card's width on its canvas: one column or two, from where its
  * sender saw it (`at`), a compare-and-set as a reorder is. Only its width
  * changes: its rank and its placer stay, so nobody's trace or history of
  * the card changes with it. Refused `gone` with no card, and `moved` once
  * it is not on the canvas its sender saw. Null when it has that width
- * already: nothing to write. Pure.
+ * already: nothing to write.
  */
 export function planWidth(
   cards: readonly CardRecord[],
@@ -240,7 +239,7 @@ export function planWidth(
 
 /**
  * Set a text card's command, or clear it: its place and placer kept;
- * refused `no-place` for any other kind, which has none. Pure.
+ * refused `no-place` for any other kind, which has none.
  */
 export function planSetCommand(
   cards: readonly CardRecord[],

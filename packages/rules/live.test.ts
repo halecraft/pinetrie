@@ -96,7 +96,7 @@ describe("planStream: replies and tools are streams of edits", () => {
     ])
   })
 
-  test("a message's end changes nothing: its reply stays until its entry moves the tip, and the next text opens a new one", () => {
+  test("a message's end leaves its reply until its entry moves the tip; the next text opens a new one", () => {
     const seen = drive([
       { kind: "text", lane: L, delta: "First." },
       { commit: "a1" },

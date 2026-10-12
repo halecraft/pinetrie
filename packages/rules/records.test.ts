@@ -323,14 +323,14 @@ describe.each(SAMPLES)("%s", (_, spec, record, keyField) => {
   })
 })
 
-test("an offer record with no ledger reads back with none, and so does one written before the field (ADR-0065)", () => {
+test("an offer record with no ledger reads back with none, and so does one written before the field", () => {
   const stored = OFFER.encode(offer) as Record<string, unknown>
   expect(OFFER.decode(stored, L)).toEqual(offer)
   const { ledger: _, ...before } = stored
   expect(OFFER.decode(before, L)).toEqual(offer)
 })
 
-test("an offer record written before ADR-0100 reads its `integratedAs` as `acceptedAs`; one written since keeps its own, null too", () => {
+test("an offer record written before the rename reads its `integratedAs` as `acceptedAs`", () => {
   const stored = OFFER.encode(offer) as Record<string, unknown>
   const { acceptedAs: _, ...rest } = stored
   expect(OFFER.decode({ ...rest, integratedAs: "ktop" }, L)).toEqual({
@@ -342,7 +342,7 @@ test("an offer record written before ADR-0100 reads its `integratedAs` as `accep
   expect("integratedAs" in stored).toBe(false)
 })
 
-test("a root record in an older shape does not decode: it is derived, and the directory rebuilds it (ADR-0063, ADR-0116)", () => {
+test("a root record in an older shape does not decode: it is derived, and the directory rebuilds it", () => {
   const stored = ROOT.encode(rootRecord) as Record<string, unknown>
   const { threads: _, ...noThreads } = stored
   expect(ROOT.decode(noThreads, TEST_ROOT)).toBeUndefined()
@@ -367,7 +367,7 @@ test("a record keyed by lane does not read at an address that is no lane", () =>
   expect(recordsOf(OFFER, [{ ...write, key: "main" }]).size).toBe(0)
 })
 
-test("each record lives where it is read (ADR-0063): across roots in the session, by entry in its root", () => {
+test("each record lives where it is read: across roots in the session, by entry in its root", () => {
   const homes = Object.fromEntries(
     SAMPLES.map(([name, spec]) => [name, spec.home]),
   )
@@ -417,7 +417,7 @@ test("deleteRecord names the spec's namespace and the key", () => {
   })
 })
 
-test("planUndeclaredSweep deletes a record stored outside its spec's home: a root's mark, from before tasks (ADR-0116)", () => {
+test("planUndeclaredSweep deletes a record stored outside its spec's home: a root's mark, from before tasks", () => {
   const root = rootIdFor("r-1")
   expect(
     planUndeclaredSweep([
@@ -468,7 +468,7 @@ describe("every spec, and writes by document", () => {
     expect(new Set(namespaces).size).toBe(namespaces.length)
   })
 
-  test("planUndeclaredSweep deletes every record of a namespace no spec declares, where it is (ADR-0100)", () => {
+  test("planUndeclaredSweep deletes every record of a namespace no spec declares, where it is", () => {
     const root = rootIdFor("r-1")
     const writes = planUndeclaredSweep([
       {

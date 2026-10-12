@@ -1,6 +1,5 @@
-// moves — a card's handoffs between places (ADR-0059): whether the host
-// accepts a move, where a target resolves to, and the steps a command's
-// moves make.
+// moves — a card's handoffs between places: whether the host accepts a move,
+// where a target resolves to, and the steps a command's moves make.
 
 import {
   type CanvasKey,
@@ -46,7 +45,7 @@ import { inventoryFull, isPinned, queuedOn, taskPinnedOf } from "./queue.ts"
 import { rankAfter, rankOfDrop } from "./rank.ts"
 import { canvasOf, planTaskOpening } from "./task.ts"
 
-// ── handoffs (ADR-0059) ───────────────────────────────────────────────────
+// ── handoffs ───────────────────────────────────────────────────
 
 /** A write to the places document, as the host's one writer carries it out. */
 export type PlaceStep =
@@ -125,7 +124,7 @@ function placeAt(
 
 /**
  * Whether `sender` may move a card into or out of `key`: every place but
- * someone else's inventory (ADR-0059). Pure.
+ * someone else's inventory.
  */
 export const ownsPlace = (key: PlaceKey, sender: WriterId): boolean =>
   key.kind !== "inventory" || key.holder === sender
@@ -151,14 +150,14 @@ function refuseInto(
 
 /**
  * Whether the host writes `card`, made (`makeCard`): the one rule every card
- * is made by, a person's or the host's (ADR-0126). Refused `exists` for an
+ * is made by, a person's or the host's. Refused `exists` for an
  * id in use, else as any move into its place is (`refuseInto`: a kind no
  * person moves, someone else's inventory, a full one); the host makes the
  * kinds no person moves, so its own make is refused only for a full
  * inventory. Its place fits its kind by its type, so a misplaced card never
  * reaches this. `planMove`'s creations, a copy's card (`planCopy`), a
  * thread's card, a note column made for a note, a fact's card and a
- * split's card all go through it, so their refusals cannot drift. Pure.
+ * split's card all go through it, so their refusals cannot drift.
  */
 export function planMake(
   cards: readonly CardRecord[],
@@ -207,11 +206,11 @@ function madeAt(
  * only if the card is still where its sender saw it; someone else's reorder
  * since does not count as moving it (`sameKey`). A move to where the card is
  * already is refused `moved`: `planReorder` changes a place in line. Every
- * accepted move names its sender as the card's placer. Pure.
+ * accepted move names its sender as the card's placer.
  *
  * - No `from`: the card is created, its sender its owner, with no command
  *   (`planMake`).
- * - A fact is the host's (ADR-0080): no person moves its kind (`KINDS`),
+ * - A fact is the host's: no person moves its kind (`KINDS`),
  *   so every move of it is refused `no-place`.
  * - To a trash: a discard, from any place the sender may move out of; the
  *   card records the place it left. A card in a trash moves only by an
@@ -269,7 +268,7 @@ export const RESTORE: FromTrash = { kind: "restore" }
  * `left-gone` when what that place is on (a task, a note column, a thread)
  * is itself trashed or has no record, `left-taken` for your message's
  * place where you have written a newer one, and `not-yours` for someone
- * else's message. Then it is a handoff as any move is. Pure.
+ * else's message. Then it is a handoff as any move is.
  */
 export function planFromTrash(
   cards: readonly CardRecord[],
@@ -374,14 +373,14 @@ function handoff(
 }
 
 /**
- * A paste (ADR-0132), as one step of its sender's history: the card it
- * replaces discarded first (ADR-0133), so a replacement in a full inventory
+ * A paste, as one step of its sender's history: the card it
+ * replaces discarded first, so a replacement in a full inventory
  * never meets `full`; then the card made where `move` sends it (a text
  * card keeping its origin, or a reference), or the cut card moved out of
  * a trash by its cutter (`planFromTrash`). A card made in the place of the one it
  * replaces takes that very place (its rank in a note column or a queue): an
  * edit as text keeps the reference's spot. Refused as the discard, the
- * make or the move would be. Pure.
+ * make or the move would be.
  */
 export function planPaste(
   cards: readonly CardRecord[],
@@ -430,9 +429,9 @@ export function planPaste(
 }
 
 /**
- * The card a paste makes at `place` (ADR-0132): the host's make, and the
+ * The card a paste makes at `place`: the host's make, and the
  * page's draw of it until the host answers. Undefined for a place its kind
- * is never in. Pure.
+ * is never in.
  */
 export function pastedCard(
   paste: Exclude<Paste, { readonly kind: "uncut" }>,
@@ -469,7 +468,7 @@ export function pastedCard(
 
 /**
  * Moves with a target that is no place yet, resolved to places before any is
- * planned (ADR-0116), each against the cards as the ones before it left
+ * planned, each against the cards as the ones before it left
  * them, so a column made for the first takes the rest:
  *
  * - a thread's nearest notes (`notes`, `noteOf`), through `toNotes`, a note
@@ -482,13 +481,11 @@ export function pastedCard(
  *   (`WRAPS`): a text card or a reference as the first note of a note
  *   column made at that rank, written first.
  *
- * A move into an entry's margin (ADR-0126) is refused `no-place` unless the
+ * A move into an entry's margin is refused `no-place` unless the
  * margin names the thread its entry is in (`entryThreads`): a margin's task
  * is read from its thread, so one naming another would put a comment in
  * the wrong task. A move onto the board is refused `no-place`: only the
  * board's own move places a task's card.
- *
- * Pure.
  */
 export function planMoveTargets(input: {
   readonly cards: readonly CardRecord[]
@@ -630,9 +627,9 @@ export function planMoveTargets(input: {
 }
 
 /**
- * Where `card` lands on a canvas (ADR-0116): just after a drop's `after`,
+ * Where `card` lands on a canvas: just after a drop's `after`,
  * at the end when that card is no longer there or for a canvas's key alone,
- * with the cards given new ranks to make room, written first. Pure.
+ * with the cards given new ranks to make room, written first.
  */
 export function rankOnCanvas(
   cards: readonly CardRecord[],
@@ -655,7 +652,7 @@ export function rankOnCanvas(
 /**
  * Moves as a person sends them: each target that is no place yet resolved
  * first (`planMoveTargets`), what that writes written before the moves, then
- * planned whole (`planMoveCommand`). Pure.
+ * planned whole (`planMoveCommand`).
  */
 export function planMoveRequest(
   cards: readonly CardRecord[],
@@ -696,7 +693,7 @@ export type MovesStep =
   | { readonly kind: "steps"; readonly steps: readonly PlaceStep[] }
   | Extract<MoveStep, { kind: "refused" }>
 
-/** `cards` as `steps` leave them, in order. Pure. */
+/** `cards` as `steps` leave them, in order. */
 export const afterSteps = (
   cards: readonly CardRecord[],
   steps: readonly PlaceStep[],
@@ -712,9 +709,9 @@ const afterStep = (
     : [...cards.filter(c => c.id !== step.record.id), step.record]
 
 /**
- * Several moves as one (a keep's cards, ADR-0066): each planned against the
+ * Several moves as one (a keep's cards): each planned against the
  * cards as the ones before it left them, and accepted whole, or refused by
- * the first that is, naming its card. Pure.
+ * the first that is, naming its card.
  */
 export function planMoves(
   cards: readonly CardRecord[],
@@ -745,7 +742,7 @@ export interface MoveCommand {
 /** A command that moves nothing. */
 const REFUSED = (step: MovesStep): MoveCommand => ({ step, drain: [] })
 
-/** Moves and what follows them (`MoveCommand`). Pure. */
+/** Moves and what follows them (`MoveCommand`). */
 export function planMoveCommand(
   cards: readonly CardRecord[],
   moves: readonly ResolvedMove[],
@@ -761,7 +758,6 @@ export function planMoveCommand(
  * The lanes `steps` leave to drain, those not running: each a step leaves
  * a card queued on (a move's, or a reference made there), and each thread
  * put on a canvas from an inventory or a trash, whose queue waited there.
- * Pure.
  */
 export function lanesToDrain(
   cards: readonly CardRecord[],

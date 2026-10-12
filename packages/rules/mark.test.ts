@@ -47,7 +47,7 @@ const plan = (
   })
 
 describe("the records", () => {
-  test("a task's title round-trips at its task, in the session; a value with no title, or a key that is no task, is dropped", () => {
+  test("a task's title round-trips at its task; a malformed one is dropped", () => {
     const r = mark("Tab names")
     expect(MARK.home).toBe("session")
     expect(MARK.decode(MARK.encode(r), r.task)).toEqual(r)
@@ -60,7 +60,7 @@ describe("the records", () => {
       ]).get(K1),
     ).toEqual(r)
   })
-  test("a note column's title round-trips at its column, in the session; a key that is no note column is dropped (ADR-0116)", () => {
+  test("a note column's title round-trips at its column, in the session; a key that is no note column is dropped", () => {
     const r = titled("Ideas")
     expect(NOTE_COLUMN.home).toBe("session")
     expect(NOTE_COLUMN.decode(NOTE_COLUMN.encode(r), r.column)).toEqual(r)
@@ -112,7 +112,7 @@ describe("planMark", () => {
       }),
     ).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })
   })
-  test("titles a note column in its own record, and clears it there (ADR-0116)", () => {
+  test("titles a note column in its own record, and clears it there", () => {
     const of = { kind: "note-column", column: N1 } as const
     expect(plan({ of, title: "Ideas" })).toEqual({
       kind: "writes",

@@ -50,7 +50,7 @@ test("offerSeen: what an acceptance was shown is the record's ledger and whether
   expect(offerSeen(undefined)).toEqual({ ledger: null, conflicted: false })
 })
 
-describe("offerView: the work strip's states (ADR-0105)", () => {
+describe("offerView: the work strip's states", () => {
   const MOVE = {
     base: { kind: "accepted" },
     bookmark: "pinetrie-accepted",
@@ -98,7 +98,7 @@ describe("offerView: the work strip's states (ADR-0105)", () => {
       ["accept", "split"],
       ["describe", "update"],
     ])
-    // Only a clean offer lands on accepted work (ADR-0104): no acceptance on a thread on accepted work.
+    // Only a clean offer lands on accepted work: no acceptance on a thread on accepted work.
     expect(at(view({ ...offer, conflicts: ["a.txt"] }))).toEqual([
       "conflicts",
       ["update"],
@@ -173,7 +173,7 @@ describe("offerView: the work strip's states (ADR-0105)", () => {
       [],
     ])
   })
-  test("offerStatus: one decoding of a record, which every reader shares (ADR-0067)", () => {
+  test("offerStatus: one decoding of a record, which every reader shares", () => {
     expect(offerStatus(undefined)).toEqual({ kind: "none" })
     expect(offerStatus({ ...offer, acceptedAs: "zz" })).toEqual({
       kind: "accepted",
@@ -203,7 +203,7 @@ describe("offerView: the work strip's states (ADR-0105)", () => {
     // Running, nothing to catch up with is offered at all.
     expect(at(view(offer, "turn", null, behind))).toEqual(["running", [], []])
   })
-  test("catching up that would change nothing is listed, but quiet; one not yet read is not (S97)", () => {
+  test("catching up that would change nothing is listed, but quiet; one not yet read is not", () => {
     const quiet = (catchUp: CatchUpNow) =>
       view(offer, "idle", null, { catchUp }).quiet
     expect(quiet({ kind: "current" })).toEqual(["update"])
@@ -226,13 +226,13 @@ describe("offerView: the work strip's states (ADR-0105)", () => {
     })
     expect([gone.menu, gone.quiet]).toEqual([["continue"], []])
   })
-  test("an untraced thread's offer you edited can be accepted, never rebuilt (S97)", () => {
+  test("an untraced thread's offer you edited can be accepted, never rebuilt", () => {
     const edited = view({ ...offer, edited: true }, "idle", null, {
       untraced: true,
     })
     expect(at(edited)).toEqual(["edited", ["accept", "update"], []])
   })
-  test("an untraced thread offers nothing, and catching up beside it, never quiet (S97)", () => {
+  test("an untraced thread offers nothing, and catching up beside it, never quiet", () => {
     const untraced = view(undefined, "idle", null, { untraced: true })
     expect([...at(untraced), untraced.quiet, untraced.facts.untraced]).toEqual([
       "nothing",
@@ -254,13 +254,13 @@ describe("offerView: the work strip's states (ADR-0105)", () => {
         .activity,
     ).toBe("turn")
   })
-  test("a split queued is not a catch-up: the offer stays ready, its split button quiet (ADR-0080)", () => {
+  test("a split queued is not a catch-up: the offer stays ready, its split button quiet", () => {
     const queued = view(offer, "idle", null, { queued: ["split"] })
     expect([queued.state, queued.facts.activity]).toEqual(["ready", "idle"])
     expect(queued.quiet).toContain("split")
     expect(view(offer, "idle", null).quiet).not.toContain("split")
   })
-  test("catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)", () => {
+  test("catchUpOf: from the commit a lane last caught up with to the base's now", () => {
     const moved = (...args: Parameters<typeof catchUpOf>) =>
       catchUpOf(...args).kind !== "current"
     const L1 = commitId("l1")
@@ -352,14 +352,14 @@ describe("offerView: the work strip's states (ADR-0105)", () => {
       kind: "unknown",
     })
   })
-  test("an ask about a conflict counts only when newer than the offer (ADR-0080)", () => {
+  test("an ask about a conflict counts only when newer than the offer", () => {
     expect(view(offer, "idle", 20).state).toBe("needs_you")
     expect(view(offer, "idle", 5).state).toBe("ready")
     expect(view(offer, "idle", null).state).toBe("ready")
   })
 })
 
-describe("a conflict that came with the copy, and the thread it branched from (ADR-0072)", () => {
+describe("a conflict that came with the copy, and the thread it branched from", () => {
   const P = threadIdFor("p")
   const parent = (over: Partial<ParentNow> = {}): ParentNow => ({
     kind: "parent",

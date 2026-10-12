@@ -62,7 +62,7 @@ const plan = (
     ...over,
   })
 
-describe("planOpenThread (ADR-0126)", () => {
+describe("planOpenThread", () => {
   test("a branch: its record forks at its entry, its card just after the thread it forks from, and no task is written", () => {
     const opened = plan()
     expect(opened.kind).toBe("open")
@@ -89,7 +89,7 @@ describe("planOpenThread (ADR-0126)", () => {
     })
   })
 
-  test("a new tab: a new root's first thread, in a new task whose card is made at the end of its state, its opener its owner", () => {
+  test("a new tab: a new root's first thread, in a new task whose card ends its state", () => {
     const opened = plan(
       { root: NEW_ROOT, at: null, task: NEW_TASK, state: STATE },
       { index: null },
@@ -141,8 +141,8 @@ describe("planOpenThread (ADR-0126)", () => {
   })
 })
 
-describe("unstartedThreads (ADR-0126)", () => {
-  test("a thread with no entry: a branch at its fork when its fork is held here, a new root's while the directory names no root of it", () => {
+describe("unstartedThreads", () => {
+  test("a thread with no entry: a branch at its fork when its fork is held here", () => {
     const threads = new Map<typeof R, ThreadRecord>([
       [R, record(R)],
       [
@@ -176,14 +176,14 @@ describe("unstartedThreads (ADR-0126)", () => {
   })
 })
 
-describe("closing a new tab before its first send (ADR-0126)", () => {
+describe("closing a new tab before its first send", () => {
   const tab = threadCardOf({ thread: NEW, task: NEW_TASK, by: ADA, cards: [] })
   const trashed = {
     ...tab,
     place: { kind: "trash", left: livePlaceOf(tab.place) },
   } as const
   const threads = new Map([[NEW, record(NEW, NEW_ROOT)]])
-  test("its thread to the trash leaves its task empty: the task's card goes to the closer's trash, remembering the task", () => {
+  test("its thread trashed, the empty task's card goes to the closer's trash, remembering the task", () => {
     expect(
       emptiedTasks({
         before: [tab],
@@ -239,7 +239,7 @@ describe("closing a new tab before its first send (ADR-0126)", () => {
   })
 })
 
-test("rootsHeld: a root with a thread on an open canvas or in an inventory; never one the directory does not name yet, an unstarted new tab's (ADR-0126)", () => {
+test("rootsHeld: a root with a thread on an open canvas or in an inventory", () => {
   const tab = threadCardOf({ thread: NEW, task: NEW_TASK, by: ADA, cards: [] })
   const threads = new Map([
     [R, record(R)],

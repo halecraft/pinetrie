@@ -1,11 +1,5 @@
-// behind — a thread's base has new work (ADR-0080): what the thread is told,
-// and when it is caught up instead.
-//
-// A history message (`history.ts`): `content` is what the model reads,
-// `details` the `BehindView` the column words as one line. It is written
-// before a run's prompt, in the commit that admits the run, as a cards entry
-// is (S92), or steered into a running thread (S103 item 4). `planBaseNews` is the one decision: a lane with work of its
-// own is told, one with none is caught up before its run, never both.
+// behind — a thread's base has new work: what the thread is told, and when it
+// is caught up instead.
 
 import {
   type AcceptedRecord,
@@ -80,7 +74,7 @@ export const encodeBehind = (
   timestamp: number,
 ): BehindMessage => BEHIND.encode(view, behindContent(view), timestamp)
 
-/** What a base with new work comes to for a thread (ADR-0080). */
+/** What a base with new work comes to for a thread. */
 export type BaseNews =
   | { readonly kind: "nothing" }
   /** The lane's work changes no file: catch it up before its run, quietly. */
@@ -93,7 +87,7 @@ export type BaseNews =
  * lane's base record and accepted work's (`catchUpOf`), its offer, the base
  * commits it last heard of or merged (`baseKnown`), and the one the host
  * told it while it runs (`told`). Only a lane of its own has a base. `unknown`
- * work never acts (ADR-0067), nor a gone base. Pure.
+ * work never acts, nor a gone base.
  */
 export function planBaseNews(input: {
   readonly own: boolean

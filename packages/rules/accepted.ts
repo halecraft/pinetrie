@@ -1,11 +1,5 @@
-// accepted — accepted work (ADR-0104, ADR-0076, ADR-0090): its record
-// (`pinetrie.accepted`), from what the host read (`planAcceptedRecord`),
-// whether a setup or publish may run (`acceptedActionState`) and why not
-// (`acceptedRefusal`), what a publish would do (`publishWork`), the command
-// (`planAcceptedAction`) and a publish's second round (`planPublishFinish`).
-// A setup or publish's steps are `@pinetrie/repo`'s (`planSetup`,
-// `planPublishCatchUp`, `planPublishMove`, `planCatchUpUndo`). A thread's
-// base on accepted work is `base.ts`'s.
+// accepted — accepted work: its record, whether a setup or publish may run,
+// and what a publish does. A thread's base on accepted work is `base.ts`'s.
 
 import {
   type AcceptedAction,
@@ -119,10 +113,10 @@ export const ACCEPTED: RecordSpec<
 }
 
 /**
- * Accepted work's record, the page's cache, from what the host read of it
- * (ADR-0104): what setting it up would write to your repo's config
+ * Accepted work's record, the page's cache, from what the host read of it:
+ * what setting it up would write to your repo's config
  * (`proposed`, `setupProposal`), and whether a publish catches the working copy up
- * (`publish.catchUp`, ADR-0099).
+ * (`publish.catchUp`).
  */
 export function planAcceptedRecord(input: {
   readonly facts: AcceptedFacts
@@ -161,7 +155,7 @@ const refused = (code: ErrCode): AcceptedActionState => ({
   code,
 })
 
-/** What a publish would do (ADR-0090): what the button counts and its title says. */
+/** What a publish would do: what the button counts and its title says. */
 export interface PublishWork {
   /** Line commits the publish bookmark lacks. */
   readonly acceptedCommits: number
@@ -193,8 +187,8 @@ export const nothingToPublish = (work: PublishWork): boolean =>
 /**
  * Whether `action` may run on accepted work as `record` has it: the one rule the
  * host's `planAcceptedAction` and the page's button both read. Anyone admitted
- * may set up or publish (ADR-0099). A publish is refused before its first
- * step for whatever can be checked then (ADR-0090): with `publish.catchUp` on,
+ * may set up or publish. A publish is refused before its first
+ * step for whatever can be checked then: with `publish.catchUp` on,
  * the working copy's conflicts and the catch-up's preview among them.
  */
 export function acceptedActionState(
@@ -250,13 +244,13 @@ export function planAcceptedAction(
 }
 
 /**
- * A publish's second round (ADR-0090), from accepted work's record as read again
+ * A publish's second round, from accepted work's record as read again
  * after the catch-up (`after`), and the operation the catch-up wrote. Without
  * a catch-up there is nothing to undo, and every check ran before the first
  * step. After one, the catch-up's operation is reverted when your commits are
  * now conflicted, which the preview of `@` alone cannot show, or the publish
  * bookmark moved meanwhile. Whether your commits move with accepted work is read
- * from `after`. Pure.
+ * from `after`.
  */
 export function planPublishFinish(input: {
   readonly decision: PublishDecision

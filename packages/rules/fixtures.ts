@@ -1,6 +1,5 @@
-// rules/fixtures — test support: a thread's card as its opening makes it
-// (`planThreadOpen`). Rules' tests use it, and other packages' tests as
-// `@pinetrie/rules/fixtures`; production code never imports it.
+// rules/fixtures — test support: a thread's card as its opening makes it.
+// Production code never imports it.
 
 import {
   type CardRecord,

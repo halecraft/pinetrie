@@ -1,17 +1,4 @@
-// chat — a human message in the conversation tree.
-//
-// A chat message is a pi `CustomMessage` (`role: "custom"`), not a custom
-// entry (S19). pi's default conversion sends it to the model as a `user`
-// message with its `content`, so `content` carries the speaker ("Alice: …")
-// and needs no projector. A message that compels the agent IS the agent's
-// prompt, so its thread's lane runs it; one that compels nobody is appended
-// with no run (ADR-0120). Who a message is for comes from its mentions, then
-// from whether its thread has a lane (`address`, ADR-0021).
-//
-// `details` holds the structured fields, which readers decode here and never
-// parse back out of `content`. Its images are references: the model is given
-// their bytes after `content`, by `withChatImages` (ADR-0042), and `content`
-// itself stays text.
+// chat — a human message in the conversation tree, and who it is for.
 
 import {
   type AgentCandidate,
@@ -92,7 +79,7 @@ const DetailsSchema = Type.Object({
   sendId: Type.String(),
   /** The other people who wrote in the card it was sent from (`WriterId`s). */
   contributors: Type.Optional(Type.Array(Type.String())),
-  /** The command it ran, and what the model read for it (ADR-0036). */
+  /** The command it ran, and what the model read for it. */
   command: Type.Optional(
     Type.Object({
       name: Type.String({ minLength: 1 }),
@@ -102,11 +89,11 @@ const DetailsSchema = Type.Object({
       expanded: Type.String(),
     }),
   ),
-  /** The images its text shows, by reference (ADR-0042). */
+  /** The images its text shows, by reference. */
   images: Type.Optional(Type.Array(ImageRefSchema)),
-  /** Other threads' agents it asks, members already (ADR-0128). */
+  /** Other threads' agents it asks, members already. */
   asks: Type.Optional(Type.Array(ThreadIdSchema)),
-  /** Other threads' agents it invites: they become members (ADR-0128). */
+  /** Other threads' agents it invites: they become members. */
   invites: Type.Optional(Type.Array(ThreadIdSchema)),
 })
 
@@ -118,7 +105,7 @@ const ChatSchema = Type.Object({
 
 /**
  * A chat's structured fields. `author` is who sent it; a card others wrote
- * in too (ADR-0048) also names them, in `contributors`, so it reads "Ada,
+ * in too also names them, in `contributors`, so it reads "Ada,
  * with Bea". The model reads only the sender's name.
  */
 export interface ChatDetails {
@@ -129,16 +116,16 @@ export interface ChatDetails {
   readonly sendId: string
   /** Absent when the sender wrote it alone. */
   readonly contributors?: readonly WriterId[]
-  /** The command it ran (ADR-0036); `text` stays as typed. */
+  /** The command it ran; `text` stays as typed. */
   readonly command?: CommandRef
   /**
-   * The `/blob/` images its text shows, in order (ADR-0042): the model reads
+   * The `/blob/` images its text shows, in order: the model reads
    * their bytes after `content`. Absent when it shows none.
    */
   readonly images?: readonly ImageRef[]
-  /** Other threads' agents it asks (ADR-0128); absent when none. */
+  /** Other threads' agents it asks; absent when none. */
   readonly asks?: readonly ThreadId[]
-  /** Other threads' agents it invites (ADR-0128); absent when none. */
+  /** Other threads' agents it invites; absent when none. */
   readonly invites?: readonly ThreadId[]
 }
 
@@ -153,9 +140,9 @@ export interface ChatMessage {
 }
 
 /**
- * What a run can start with: a compelled chat, a land message (ADR-0033), a
- * stack message (ADR-0105), a carry-on message (ADR-0082), or an ask relayed
- * from another thread, or an answer that wakes its asker (ADR-0128).
+ * What a run can start with: a compelled chat, a land message, a
+ * stack message, a carry-on message, or an ask relayed
+ * from another thread, or an answer that wakes its asker.
  */
 export type PromptMessage =
   | ChatMessage
@@ -176,7 +163,7 @@ export const attributed = (d: ChatDetails): string =>
 
 /**
  * A chat as stored: what the model reads is its attributed text, then each
- * past referent it links to quoted under it (`withQuotes`, ADR-0126),
+ * past referent it links to quoted under it (`withQuotes`),
  * frozen as it was sent, as the past never changes.
  */
 export const encodeChat = (
@@ -212,7 +199,7 @@ export function chatImageShas(messages: readonly unknown[]): Sha256[] {
  * `messages` as the model reads them: each chat with images carries them
  * after its text, as image parts, in the order its text shows them, their
  * base64 from `blobs`. A blob `blobs` lacks is named as text in its place.
- * Every other message is returned as it is. Pure.
+ * Every other message is returned as it is.
  */
 export function withChatImages<M>(
   messages: readonly M[],
@@ -279,7 +266,7 @@ export const decodeChat = (message: unknown): ChatDetails | undefined =>
   decodeWith(ChatSchema, message, ({ details }) => detailsFromStored(details))
 
 /**
- * What a tool result of the host's tools says as a fact (ADR-0080), from its
+ * What a tool result of the host's tools says as a fact, from its
  * `details`, never its text: an `ask_about_conflict` the host took, or the
  * commits a `catch_up` merged. Undefined for any other message.
  */
@@ -314,15 +301,14 @@ function toolResultFacts(
 /**
  * A stored message -> what the projections render. A chat becomes role `chat`
  * with its author; a land, update, stack or carry-on message becomes role
- * `land`, `update`, `stack` or `carry-on` with its one line (ADR-0033,
- * ADR-0105, ADR-0082), as a fact becomes role `fact` and a base's news role
- * `behind` (ADR-0080); a cards entry becomes role `pinned` with the cards it
- * read (ADR-0048), a task's cards entry role `task-pinned`, and a canvas
- * entry role `canvas` with the list it told (ADR-0116); an ask relayed from
- * another thread, an answer and what an asked agent heard become roles
- * `relay`, `answer` and `heard` with their details (ADR-0128); a host tool's
- * result keeps its role and gains what it says as a fact (`asked`, `merged`,
- * ADR-0080); anything else passes through unchanged for `core` to judge.
+ * `land`, `update`, `stack` or `carry-on` with its one line, as a fact becomes
+ * role `fact` and a base's news role `behind`; a cards entry becomes role
+ * `pinned` with the cards it read, a task's cards entry role `task-pinned`, and
+ * a canvas entry role `canvas` with the list it told; an ask relayed from
+ * another thread, an answer and what an asked agent heard become roles `relay`,
+ * `answer` and `heard` with their details; a host tool's result keeps its role
+ * and gains what it says as a fact (`asked`, `merged`); anything else passes
+ * through unchanged for `core` to judge.
  */
 export function renderableMessage(message: unknown): AgentMessageLike {
   const land = decodeLand(message)
@@ -405,9 +391,9 @@ export function renderableMessage(message: unknown): AgentMessageLike {
 }
 
 /**
- * The person behind a run (ADR-0080), from its prompt as stored: a chat's
+ * The person behind a run, from its prompt as stored: a chat's
  * author, a land or stack message's `by`, or for an ask relayed from another
- * thread and an answer, the person behind the chain (ADR-0128). Null for
+ * thread and an answer, the person behind the chain. Null for
  * anything else.
  */
 export function promptAuthor(message: unknown): WriterId | null {
@@ -426,14 +412,14 @@ export function promptAuthor(message: unknown): WriterId | null {
  * After a run ends: a compelled message pi refused to run is still a person's
  * message, so it is appended, with no reply, rather than lost. A run pi
  * admitted, whatever became of the model's call, is done: its prompt is in
- * the tree. Pure.
+ * the tree.
  */
 export const settleRun = (
   ran: { readonly kind: "ok" } | { readonly kind: "refused" },
 ): "done" | "keep" => (ran.kind === "refused" ? "keep" : "done")
 
 /**
- * What a send that starts a thread needs for its card (ADR-0116, ADR-0117):
+ * What a send that starts a thread needs for its card:
  * the task its card goes on, and the board state a new task lands in, null
  * for the first open one. The thread is the decision's own.
  */
@@ -480,13 +466,13 @@ export type ChatDecision =
     }
   /**
    * The thread's lane is idle and the agent is compelled, but its work
-   * changes no file and its base has new work (ADR-0080): catch it up, then
+   * changes no file and its base has new work: catch it up, then
    * plan the chat again.
    */
   | { readonly kind: "catch-up-first"; readonly thread: ThreadId }
   /**
    * The lane runs, or has cards queued: nothing is written, and the sender's
-   * client queues its card behind them (ADR-0048).
+   * client queues its card behind them.
    */
   | { readonly kind: "busy" }
   /** Another writer wrote at the slot first. Nothing is written; the sender chooses. */
@@ -497,7 +483,7 @@ export type ChatDecision =
 /**
  * Whether a message with no mention asks the agent: in a thread with a lane,
  * or from a Start Agent column. A branch is a new thread, with no lane of its
- * own yet, so only a Start Agent column makes it ask (ADR-0021). A branch from
+ * own yet, so only a Start Agent column makes it ask. A branch from
  * agent work asks through the `@agent ` its composer starts with.
  */
 export const agentByDefault = (send: {
@@ -508,8 +494,8 @@ export const agentByDefault = (send: {
   (send.mode !== "branch" && send.lane.kind === "lane") || send.asksAgent
 
 /**
- * Who a chat is for, as the host decides it and the composer foresees it
- * (ADR-0021, ADR-0036): its mentions, else the thread's default (the agent
+ * Who a chat is for, as the host decides it and the composer foresees it:
+ * its mentions, else the thread's default (the agent
  * where the thread has a lane or the column is a Start Agent column). A
  * command is for the agent, as `@agent` is, whoever else it names. The people
  * it names are kept either way: the composer shows them.
@@ -517,12 +503,11 @@ export const agentByDefault = (send: {
 export function addressChat(input: {
   readonly mentions: readonly Mention[]
   readonly participants: readonly string[]
-  /** Other threads' agents on open tasks' canvases (ADR-0128). */
+  /** Other threads' agents on open tasks' canvases. */
   readonly agents: readonly AgentCandidate[]
   readonly mode: PlanMode
   readonly lane: ThreadLane
   readonly asksAgent: boolean
-  /** The text is a command. */
   readonly command: boolean
 }): Recipients {
   const to = address({
@@ -537,15 +522,15 @@ export function addressChat(input: {
 }
 
 /**
- * Where a message into a thread goes, by its lane's state (ADR-0120,
- * ADR-0128): the one table a person's chat (`planChat`), a relayed ask and
- * an answer (`relay.ts`) are all planned with.
+ * Where a message into a thread goes, by its lane's state: the one table a
+ * person's chat (`planChat`), a relayed ask and an answer (`relay.ts`) are all
+ * planned with.
  *
  * - No lane: appended with no lane, or, compelled, the lane is created and
  *   runs. A compelled `reply` another writer raced is a conflict.
  * - A lane that runs, or has cards queued (`sendWaits`), is busy; in `queue`
- *   mode (the host's own send) only a run is. A busy lane is never written
- *   (S21): the message waits as a card, or, for a message that `steers`
+ *   mode (the host's own send) only a run is. A busy lane is never written:
+ *   the message waits as a card, or, for a message that `steers`
  *   (an answer), is steered into the run at its next boundary.
  * - An idle lane appends, or, compelled, runs. A compelled `reply` that
  *   finds it raced or busy is a conflict, so its sender chooses.
@@ -564,7 +549,7 @@ export function planDelivery(input: {
   readonly compelled: boolean
   readonly mode: PlanMode
   readonly race: { readonly by: WriterId } | null
-  /** It may enter a running lane by a steer: only an answer (ADR-0128). */
+  /** It may enter a running lane by a steer: only an answer. */
   readonly steers: boolean
 }): Delivery {
   const { lane, compelled, mode, race } = input
@@ -585,7 +570,7 @@ export function planDelivery(input: {
 }
 
 /**
- * Decide what a human message does. Pure; the host gathers every input inside
+ * Decide what a human message does. The host gathers every input inside
  * one serial step, so each decision names exactly where to write.
  *
  * - Who it is for is `addressChat`, which the composer runs too.
@@ -593,25 +578,24 @@ export function planDelivery(input: {
  *   plain, it is appended there with no lane; compelled, it creates the
  *   thread's lane there. What its card needs comes with it (`starts`).
  * - Every decision that writes names the thread it writes in (`thread`):
- *   each entry is that thread's (ADR-0125).
+ *   each entry is that thread's.
  * - A thread lane that is running, or has cards queued, is busy: a message
  *   is not written, and its card is queued behind them, since a lane is never
- *   written while it runs (S21).
+ *   written while it runs.
  * - A compelled `end` send that another writer raced, or that finds the lane
  *   busy, is a conflict: the sender chooses to queue or to branch. Plain chat
  *   never conflicts.
  * - `queue` is the host popping a queued card: it is the queue's turn, so
  *   only a run makes the lane busy.
- * - A lane is always named by its thread's id (ADR-0117): no other name is
+ * - A lane is always named by its thread's id: no other name is
  *   ever chosen.
  * - A run on a lane whose work changes no file, and whose base has new work,
- *   catches the lane up first (`catch-up-first`, ADR-0080), once per send.
+ *   catches the lane up first (`catch-up-first`), once per send.
  */
 export function planChat(input: {
   readonly author: WriterId
   readonly authorName: string
   readonly text: string
-  /** Where it goes. */
   readonly at: SendAt
   /** The thread, from `threadOfSend`. */
   readonly thread: {
@@ -622,10 +606,9 @@ export function planChat(input: {
   readonly mentions: readonly Mention[]
   /** Every participant's display name (`participants`). */
   readonly participants: readonly string[]
-  /** Other threads' agents on open tasks' canvases (ADR-0128). */
+  /** Other threads' agents on open tasks' canvases. */
   readonly agents: readonly AgentCandidate[]
   readonly asksAgent: boolean
-  /** The command's id. */
   readonly sendId: string
   /** The other people who wrote in its card; empty for a message written alone. */
   readonly contributors: readonly WriterId[]
@@ -634,11 +617,11 @@ export function planChat(input: {
   /**
    * Your working copy's root when the thread works, or will work, in its own
    * copy: paths under it are stored as the lane sees them, under `/mnt/host-working-copy`, so
-   * people and the model read the same text (ADR-0034). Null otherwise.
+   * people and the model read the same text. Null otherwise.
    */
   readonly hostWorkingCopy: string | null
   /**
-   * The command its first word names, expanded (ADR-0036); `unknown` when it
+   * The command its first word names, expanded; `unknown` when it
    * has the form of one and names none; `unreadable` when its file could not
    * be read; null when it is not one.
    */
@@ -648,7 +631,7 @@ export function planChat(input: {
     | { readonly unreadable: string }
     | null
   /**
-   * What the thread's base has for it (`planBaseNews`, ADR-0080), and whether
+   * What the thread's base has for it (`planBaseNews`), and whether
    * this send has already caught it up: `pinetrie.base` is rewritten only at
    * the next refresh, so it still says the base has news.
    */

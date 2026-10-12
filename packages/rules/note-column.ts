@@ -1,11 +1,4 @@
-// note-column — a note column's title (ADR-0116).
-//
-// A note column is a card on a task's canvas holding notes in one order
-// (`notesIn`, `nearestNoteColumn`, `card.ts`). Its card says who made it,
-// and its id when; its title is a host-written `pinetrie.note-column` value
-// in the session, keyed by the column's id, set with `mark` as a task's
-// title is (`planMark`). The last write wins, and clearing deletes it:
-// untitled, a column reads `NEW_NOTES_TITLE`.
+// note-column — a note column's title.
 
 import type { NoteColumnId, NoteColumnRecord, WriterId } from "@pinetrie/core"
 import { Type } from "typebox"

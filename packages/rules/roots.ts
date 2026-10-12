@@ -1,10 +1,5 @@
-// roots — the directory of roots (ADR-0063): what the sidebar, the board and
-// your inbox read of a root without opening its document.
-//
-// The record is a host-written `pinetrie.root` value in the session, keyed by
-// the root's id. The host refreshes it whenever the root's document changes
-// (`readRootRecord`, in `@pinetrie/reads`), so it lags a running turn by one
-// step of the host's queue.
+// roots — the directory of roots: what the sidebar, the board and your inbox
+// read of a root without opening its document.
 
 import {
   type EntryId,

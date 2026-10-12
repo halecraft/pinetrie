@@ -1,17 +1,4 @@
-// records — the host's records, one `RecordSpec` each (ADR-0062).
-//
-// A record is a pi value at an address, `(namespace, key)`. The address
-// holds the record's key, and the stored contents never repeat it: a spec's
-// `encode` leaves the key out, and its `decode` checks the address and puts
-// it back. So a write and a read cannot disagree on a key, and the host and
-// the client read records whole. A value written before this kept its key in
-// its contents too; `decode` sets the key after the contents, so the address
-// wins over that copy.
-//
-// A record lives in one document, its `home` (ADR-0063): the session's, for
-// what is read across roots, or a root's, for what is keyed by its entries.
-// The home is in the spec's type, so a root-homed write cannot be built
-// without its root, and a session-homed one cannot be given one.
+// records — the host's records, one `RecordSpec` each.
 
 import {
   type HostNamespace,
@@ -21,7 +8,7 @@ import {
   type ValueWrite,
 } from "@pinetrie/core"
 
-/** Which document a record lives in (ADR-0063). */
+/** Which document a record lives in. */
 export type Home = "session" | "root"
 
 export interface RecordSpec<R, K extends string, H extends Home = Home> {
@@ -49,7 +36,7 @@ type DeleteWrite = Extract<ValueWrite, { kind: "delete" }>
 
 /**
  * Writes grouped by the document they go to, in the order each target first
- * appears. Pure.
+ * appears.
  */
 export function byTarget(
   writes: readonly ValueWrite[],
@@ -126,7 +113,7 @@ export function recordsOf<R, K extends string>(
   return out
 }
 
-/** A namespace as stored (`records[namespace]`, ADR-0095) -> its records. */
+/** A namespace as stored (`records[namespace]`) -> its records. */
 export const recordsIn = <R, K extends string>(
   spec: RecordSpec<R, K>,
   namespace: Readonly<Record<string, unknown>>,

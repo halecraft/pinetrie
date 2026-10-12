@@ -1,11 +1,5 @@
-// archive — what crossing the archive's edge does (ADR-0029, ADR-0122,
-// ADR-0116), and the gate that keeps an archived task read-only.
-//
-// A task is archived while its board place is in the archive (`board.ts`).
-// Moving it there or out writes only its place: entries are immutable
-// (ADR-0004), so a task is hidden and its threads made read-only, never
-// removed. What follows the place is planned here: the busy check, the
-// teardown off the documents' keeper (ADR-0065), and the roots to unload.
+// archive — what crossing the archive's edge does, and the gate that keeps an
+// archived task read-only.
 
 import {
   type ArchivedTask,
@@ -39,7 +33,7 @@ export type Crossing = "archive" | "restore"
 
 /**
  * What archiving or restoring does off the documents' keeper, after the task's
- * place is written (ADR-0065): lanes to forget and remove (their containers
+ * place is written: lanes to forget and remove (their containers
  * and disks), their refs in your repo moved (null deletes, on archiving), and
  * snapshots to delete. Empty on a host without lanes of their own.
  */
@@ -73,13 +67,12 @@ export const TASK_BUSY_REASON = {
  * Decide what crossing the archive's edge does for a task. A task an agent
  * of its threads works in, or where cards are queued, is not archived:
  * stopping the run or holding the queue would do work nobody asked for, so
- * the person chooses (ADR-0029). Restoring is never busy. Archiving lets go
+ * the person chooses. Restoring is never busy. Archiving lets go
  * of the roots no task outside the archive, and no inventory, still holds a
  * thread of (`stillHeld`).
  */
 export function planArchive(input: {
   readonly crossing: Crossing
-  /** The task's threads. */
   readonly threads: readonly ThreadId[]
   readonly lanes: readonly LaneView[]
   /**
@@ -148,7 +141,7 @@ function planTeardown(
  * each forgotten, its ref deleted (which withdraws its offer), and every
  * snapshot of it but its newest and the one nearest each thread's end in
  * `trees`, whatever task that thread is in (`planRetention`), so a copy
- * from the archive finds its files. Pure.
+ * from the archive finds its files.
  */
 export function planLanesGone(
   lanes: readonly ThreadId[],
@@ -168,14 +161,14 @@ export function planLanesGone(
 }
 
 /**
- * The tasks a command writes in (ADR-0063, ADR-0116), none for a name, a
+ * The tasks a command writes in, none for a name, a
  * picture, a stop, a move on the board or a change to its states, a
  * reservation, a card's command, or traces seen. A send at a thread's end
  * writes in the thread's task, a branch in the task it lands in; an offer,
  * a carry-on and a queue's hold in their lane's thread's; a card's move in
  * the task each card leaves as well as the one it goes to, so nothing moves
  * out of an archived task; an undo of moves, a mark and a retitle in their
- * own (ADR-0066, ADR-0074).
+ * own.
  */
 export function writesIn(
   intent: Intent,

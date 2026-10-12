@@ -1,7 +1,5 @@
-// rules/links — links to addresses in text (ADR-0126): `[label](/a/<address>)`,
-// a relative URL `safeUrl` keeps, as it keeps `/blob/`. What the agent reads
-// of a message quotes each linked referent under it, gathered by the host.
-// Pure; read from the tree the client draws (`parseMarkdown`).
+// rules/links — links to addresses in text: `[label](/a/<address>)`, a
+// relative URL `safeUrl` keeps, as it keeps `/blob/`.
 
 import {
   type Address,
@@ -79,7 +77,7 @@ export interface LinkedQuote {
  * Each past referent `text` links to, with its markdown from the message
  * it is in (`messageText`; undefined for an entry this host does not
  * hold), in link order. A link to a thread or a card is followed by no
- * quote: neither is a part of the past. Pure.
+ * quote: neither is a part of the past.
  */
 export const linkedQuotes = (
   text: string,
@@ -103,7 +101,7 @@ const quoted = (markdown: string): string =>
  * What the model reads of a message with links: its content, then each
  * linked referent's markdown quoted under it, named by its link's label.
  * `quotes` are the referents found, in link order; those not found are left
- * out. Pure.
+ * out.
  */
 export function withQuotes(
   content: string,

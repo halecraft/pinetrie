@@ -1,7 +1,5 @@
-// config — reading the user config (`~/.config/pinetrie/config.json`): the
-// helpers its settings' decoders share (`decodeBannerConfig`,
-// `decodeDigestConfig`, `decodeTitleConfig`). Each decoder is total: a
-// missing or malformed setting takes its default.
+// config — reading the user config (`~/.config/pinetrie/config.json`). Each
+// decoder is total: a missing or malformed setting takes its default.
 
 /** A model as pi names it: its provider and its id there. */
 export interface ModelRef {

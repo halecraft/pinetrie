@@ -30,7 +30,7 @@ import {
   publishWork,
 } from "./index.ts"
 
-describe("accepted work (ADR-0104)", () => {
+describe("accepted work", () => {
   const facts = {
     commit: null,
     heads: "trunk()",
@@ -90,11 +90,11 @@ describe("accepted work (ADR-0104)", () => {
       planAcceptedAction("setup", record({ commit: commitId("c1") })).kind,
     ).toBe("refused")
   })
-  test("land and follow are no setup or publish command (ADR-0090)", () => {
+  test("land and follow are no setup or publish command", () => {
     expect(ACCEPTED_ACTIONS).toEqual(["setup", "publish"])
   })
 
-  describe("publish (ADR-0076, ADR-0090)", () => {
+  describe("publish", () => {
     const main = commitId("m1")
     const yours = (
       over: Partial<AcceptedRecord["yours"]> = {},
@@ -327,7 +327,7 @@ describe("accepted work (ADR-0104)", () => {
   })
 })
 
-describe("planBegin: accepted work, or a WIP's copy (ADR-0104)", () => {
+describe("planBegin: accepted work, or a WIP's copy", () => {
   const L = commitId("l1")
   const wip = { commit: commitId("w1"), under: commitId("l0") }
   const begin = (
@@ -361,7 +361,7 @@ describe("planBegin: accepted work, or a WIP's copy (ADR-0104)", () => {
   })
 })
 
-describe("parentNow and planParentUpdate: the thread a lane branched from (ADR-0072)", () => {
+describe("parentNow and planParentUpdate: the thread a lane branched from", () => {
   const P = threadIdFor("p")
   const L = threadIdFor("l")
   const C = (n: number) => commitId(`c${n}`)
@@ -473,7 +473,7 @@ describe("parentNow and planParentUpdate: the thread a lane branched from (ADR-0
   })
 })
 
-describe("planUpdateFrom: always the base the thread follows (ADR-0104)", () => {
+describe("planUpdateFrom: always the base the thread follows", () => {
   const L = commitId("l1")
   const W = commitId("w1")
   const COPY = commitId("c1")

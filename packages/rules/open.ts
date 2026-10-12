@@ -1,8 +1,5 @@
-// open — a thread opened as its column opens (ADR-0126): a branch at an
-// entry, or a new tab's new root in a new task. Its record and its card are
-// written now, so it is on its task's canvas, can be asked and can be
-// closed, before it holds an entry; its first send writes only that entry.
-// Pure.
+// open — a thread opened as its column opens: a branch at an entry, or a new
+// tab's new root in a new task.
 
 import {
   type CardRecord,
@@ -35,12 +32,12 @@ export type OpenPlan =
     }
 
 /**
- * A thread opened by `sender` (ADR-0126). A branch at `at`, in a task the
+ * A thread opened by `sender`. A branch at `at`, in a task the
  * session holds, its card just after the thread `at` is in on that task's
  * canvas (`planThreadOpen`); or, with `at` null, a new tab's: a new root's
  * first thread in a new task, which lands on the board in `state`. Refused
  * unless its id is new, and a branch's entry is in its root (`index`), or a
- * new tab's root and task are new. Pure.
+ * new tab's root and task are new.
  */
 export function planOpenThread(input: {
   readonly open: OpenThread

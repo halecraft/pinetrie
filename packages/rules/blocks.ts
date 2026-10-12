@@ -1,9 +1,5 @@
-// rules/blocks — the blocks of a message's text, numbered once (ADR-0126):
-// each table, code block, image and paragraph, the `n`th of its kind in
-// document order. One walk over the mdast tree the page draws
-// (`parseMarkdown`), so the block the page draws and the block an address
-// names cannot be counted differently: `markBlocks` labels a tree the page
-// draws, and `blocksOf` gives each block's source range.
+// rules/blocks — the blocks of a message's text, numbered once, so the block
+// the page draws and the block an address names cannot be counted differently.
 
 import type { BlockKind, BlockRef } from "@pinetrie/core"
 import { parseMarkdown } from "./markdown.ts"
@@ -74,7 +70,7 @@ export interface Block {
   readonly to: number
 }
 
-/** The blocks of `text`, as `markBlocks` numbers them. Pure. */
+/** The blocks of `text`, as `markBlocks` numbers them. */
 export function blocksOf(text: string): readonly Block[] {
   const tree = parseMarkdown(text) as BlockNode
   return numberBlocks(tree).flatMap(({ node, ref }) => {

@@ -1,13 +1,6 @@
 // history — the host's own messages in a thread's history: pi
-// `CustomMessage`s whose `content` is what the model reads and whose
-// `details` are what pinetrie reads back (ADR-0033, ADR-0080, ADR-0105).
-//
-// History is stored in the thread's documents and never rewritten. Its
-// `details` are the code's own values, as the code has them now: a message
-// stored before its shape changed does not decode, and the column leaves it
-// out (core's `renderableMessage` drops a `custom` message), while the model
-// still reads its `content`. Each kind is one `historyMessage` spec, listed
-// in `MESSAGE_SPECS` (`history-specs.ts`).
+// `CustomMessage`s whose `content` the model reads and whose `details`
+// pine·trie reads back.
 
 import { type Static, type TSchema, Type } from "typebox"
 import { Value } from "typebox/value"

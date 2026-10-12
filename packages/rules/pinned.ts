@@ -1,12 +1,4 @@
-// pinned — the pinned cards a run reads (ADR-0048, S92).
-//
-// A cards entry is a history message (`history.ts`): `content` is what the
-// model reads, `details` what pinetrie reads back. The host plans one
-// when a run starts and the thread's pinned cards differ from those the model
-// last read on the path (`pinnedInView`, in @pinetrie/core), and pi writes it
-// with the run's prompt, in the commit that admits the run. It restates every
-// card pinned now, and names each card unpinned since, so the newest entry is
-// all that holds.
+// pinned — the pinned cards a run reads.
 
 import {
   type CardId,
@@ -28,7 +20,7 @@ export const PINNED_TYPE = "pinetrie.pinned"
 
 /**
  * The line every agent thread's `<rules>` holds for pinned cards, a
- * thread's and a task's (ADR-0116). Constant, so the system prompt stays the
+ * thread's and a task's. Constant, so the system prompt stays the
  * same between runs and an edited card keeps the cache.
  */
 export const PINNED_RULE =
@@ -139,7 +131,7 @@ export const RETIRED_LINE = 80
  * The one comparison of the cards pinned now with those the model last read
  * (`pinnedInView`): the host plans a run's cards entry from it, and the
  * column shows each card's status from it. By id, then text, so a card
- * swapped for another with the same text is unread. Pure.
+ * swapped for another with the same text is unread.
  */
 export function pinnedDiff(
   inView: Pick<PinnedView, "cards"> | null,
@@ -178,7 +170,7 @@ export function pinnedDiff(
  * The cards a run on `lane` reads, or null when the model already reads
  * them as they are: every card read, none retired, and the same order. A
  * branch's first run needs no rule of its own: its path holds its parent's
- * cards and its thread none, so they are all retired. Pure.
+ * cards and its thread none, so they are all retired.
  */
 export function planPinnedRead(input: {
   readonly inView: PinnedView | null
@@ -199,7 +191,7 @@ export function planPinnedRead(input: {
  * A thread's pinned cards as a run reads them, in order: each with its words
  * (`wordsOf`) and owner. A card with no text yet is left out: the model would read an
  * empty card. The host reads a run's cards with it, and the column each
- * card's status, so the two agree on which cards count. Pure.
+ * card's status, so the two agree on which cards count.
  */
 export const pinnedReads = (
   pinned: readonly CardRecord[],

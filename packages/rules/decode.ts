@@ -1,8 +1,6 @@
-// Decoding for every shape pinetrie stores inside pi.
-//
-// Stored values are `Schema.any()` in the document and may come from any
-// replica, so decoding is total: a malformed value is dropped, never thrown.
-// One bad value must not break every client's render.
+// decode — decoding for every shape pine·trie stores inside pi. Stored values
+// may come from any replica, so decoding is total: a malformed value is
+// dropped, never thrown, and cannot break every client's render.
 
 import {
   type CardId,
@@ -40,7 +38,7 @@ export function decodeWith<S extends TSchema, T>(
 }
 
 /**
- * `decodeWith` for a record's contents at its address (ADR-0062). `key` is
+ * `decodeWith` for a record's contents at its address. `key` is
  * the address as one of the key readers below gives it, or undefined when
  * the address is malformed, and then so is the record.
  */

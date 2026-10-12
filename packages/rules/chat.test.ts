@@ -45,7 +45,7 @@ import {
   withChatImages,
 } from "./index.ts"
 
-/** A resolution's floor with room to spare (ADR-0084). */
+/** A resolution's floor with room to spare. */
 function floor(): Floor {
   const found = resolutionFloor({
     budget: { tokens: 10_000, estimate: c => Math.ceil(c.length / 4) },
@@ -170,7 +170,7 @@ describe("addressChat: who a chat is for, host and composer alike", () => {
   })
 })
 
-describe("planChat: a command (ADR-0036)", () => {
+describe("planChat: a command", () => {
   const command = {
     name: "duane:skill:plan",
     kind: "skill" as const,
@@ -252,7 +252,7 @@ describe("planChat: plain messages never conflict", () => {
       kind: "busy",
     })
   })
-  test("an idle lane whose queue is held: busy, so the message waits in the queue (ADR-0048 step 7)", () => {
+  test("an idle lane whose queue is held: busy, so the message waits in the queue", () => {
     expect(plan({ mentions: TO_BO, lane: lane({ heldBy: BO }) })).toEqual({
       kind: "busy",
     })
@@ -280,13 +280,13 @@ describe("planChat: a compelled message", () => {
       at: atEntry(E2),
     })
   })
-  test("a new lane is named by its thread's id: the thread a send continues, or the one a branch starts (ADR-0117)", () => {
+  test("a new lane is named by its thread's id: the thread a send continues, or the one a branch starts", () => {
     const laneOf = (d: ReturnType<typeof plan>) =>
       d.kind === "createAndRun" ? d.thread : d.kind
     expect(laneOf(plan({ mentions: ASK }))).toBe(LANE)
     expect(laneOf(plan({ mode: "branch", mentions: ASK }))).toBe(NEW)
   })
-  test("every decision that writes names its thread once: the one a send continues, or the one a branch starts (ADR-0125)", () => {
+  test("every decision that writes names its thread once: the one a send continues, or the one a branch starts", () => {
     const threadOf = (d: ReturnType<typeof plan>) =>
       "thread" in d ? d.thread : d.kind
     expect(threadOf(plan({ mode: "branch" }))).toBe(NEW)
@@ -299,7 +299,7 @@ describe("planChat: a compelled message", () => {
       "starts" in (plan({ mode: "branch" }) as { details: object }).details,
     ).toBe(false)
   })
-  test("a branch's decision carries its card's task and board state, in one value; no other does (ADR-0116)", () => {
+  test("a branch's decision carries its card's task and board state, in one value; no other does", () => {
     const startsOf = (d: ReturnType<typeof plan>) =>
       d.kind === "appendToTree" || d.kind === "createAndRun" ? d.starts : d.kind
     const state = "s-doing" as WorkflowStateId
@@ -566,7 +566,7 @@ describe("settling and starting up", () => {
     })
     expect(plan).toMatchObject({ resume: [LANE1], drain: [LANE2] })
   })
-  test("planStartup: a pending verdict is unclassified, unless its lane is resumed (ADR-0077)", () => {
+  test("planStartup: a pending verdict is unclassified, unless its lane is resumed", () => {
     const pending = (lane: typeof LANE1) =>
       pendingVerdict(lane, entryId(`p-${lane}`), entryId(`w-${lane}`))
     const said = {
@@ -584,7 +584,7 @@ describe("settling and starting up", () => {
   })
 })
 
-describe("a host tool's result as a fact (ADR-0080)", () => {
+describe("a host tool's result as a fact", () => {
   const result = (toolName: string, details: unknown, text = "Asked.") => ({
     role: "toolResult",
     toolCallId: cardIdFor("c1"),
@@ -617,7 +617,7 @@ describe("a host tool's result as a fact (ADR-0080)", () => {
   })
 })
 
-describe("promptAuthor (ADR-0080)", () => {
+describe("promptAuthor", () => {
   const ADA = writerId("ada@example.com")
   test("a chat's author, a land or stack message's by; none for anything else", () => {
     expect(
@@ -663,7 +663,7 @@ describe("promptAuthor (ADR-0080)", () => {
   })
 })
 
-describe("planChat: a lane with no work of its own catches up first (ADR-0080)", () => {
+describe("planChat: a lane with no work of its own catches up first", () => {
   const ask = { mentions: ASK, text: "@agent please", lane: lane() }
   test("a run on a lane whose news is catch-up catches it up first, once per send", () => {
     expect(plan({ ...ask, news: "catch-up" })).toEqual({

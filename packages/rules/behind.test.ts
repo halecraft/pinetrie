@@ -62,7 +62,7 @@ const VIEW: BehindView = {
   conflicts: ["a.ts"],
 }
 
-describe("planBaseNews (ADR-0080)", () => {
+describe("planBaseNews", () => {
   const news = (
     over: Partial<Parameters<typeof planBaseNews>[0]> = {},
   ): ReturnType<typeof planBaseNews> =>

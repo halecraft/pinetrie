@@ -70,11 +70,11 @@ describe("records: one spec each, total decoders", () => {
     const { snapshot: _, ...old } = revision
     expect(REVISION.decode(old, "e1")).toEqual({ ...old, snapshot: null })
   })
-  test("a record from before conflicts were recorded decodes with none (ADR-0072)", () => {
+  test("a record from before conflicts were recorded decodes with none", () => {
     const { conflicts: _, ...old } = revision
     expect(REVISION.decode(old, "e1")).toEqual({ ...old, conflicts: [] })
   })
-  test("a project record from before ADR-0102 reads as its root alone, and is rewritten at start", () => {
+  test("a project record from when a lane could work directly reads as its root alone, and is rewritten at start", () => {
     expect(
       PROJECT.decode(
         { kind: "lanes", root: "/p", rootDefault: "own" },
@@ -82,7 +82,7 @@ describe("records: one spec each, total decoders", () => {
       ),
     ).toEqual({ root: "/p" })
   })
-  test("a lane's copy of its own is stored as its work, as records before ADR-0102 hold it", () => {
+  test("a lane's copy of its own is stored as its work, as records from when a lane could work directly hold it", () => {
     expect(LANE_RECORD.encode(lane)).toMatchObject({ work: { kind: "own" } })
     expect(LANE_RECORD.encode({ ...lane, ownCopy: false })).toMatchObject({
       work: null,
@@ -120,7 +120,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
     conflicts: ["x.txt"],
     merged: false,
   }
-  test("a turn whose catch_up merged names the bookmark it moved, with no paths; its own commit wins (ADR-0080)", () => {
+  test("a turn whose catch_up merged names the bookmark it moved, with no paths; its own commit wins", () => {
     expect(
       planTurnRecord({
         ...base,
@@ -254,7 +254,7 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
       lost: null,
     })
   })
-  test("from a turn whose snapshot is gone: the base snapshot and where agent work begins, its snapshot named lost (ADR-0124)", () => {
+  test("from a turn whose snapshot is gone: the base snapshot and where agent work begins, its snapshot named lost", () => {
     expect(
       forkPoint({
         above: { lane: LANE, commit: C2, commitLane: LANE, snapshot: S },
@@ -276,7 +276,7 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
       lost: null,
     })
   })
-  test("from nothing: the base snapshot, and where agent work begins (ADR-0104)", () => {
+  test("from nothing: the base snapshot, and where agent work begins", () => {
     expect(
       forkPoint({
         above: { lane: null, commit: null, commitLane: null, snapshot: null },
@@ -317,7 +317,7 @@ describe("planRetention: which snapshots go", () => {
       ["01-a", "02-a", "04-b"],
     )
   })
-  test("an archived root keeps the snapshots it is asked to keep (ADR-0124)", () => {
+  test("an archived root keeps the snapshots it is asked to keep", () => {
     expect(
       planRetention({
         records,
@@ -362,7 +362,7 @@ describe("showHostWorkingCopy: whole path prefixes only", () => {
   })
 })
 
-describe("classifyDisk: what each path a turn's whole-disk diff names is (ADR-0131)", () => {
+describe("classifyDisk: what each path a turn's whole-disk diff names is", () => {
   const change = (
     path: string,
     change: "added" | "changed" | "deleted" = "added",

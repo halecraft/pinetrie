@@ -91,7 +91,7 @@ describe("planNames", () => {
   })
 })
 
-describe("planReserve (ADR-0057)", () => {
+describe("planReserve", () => {
   const named = new Map([[A, "amber-fox" as ThreadName]])
   test("an id already named is known, and one pi holds is refused", () => {
     expect(planReserve(A, new Set(), named, 5)).toEqual({ kind: "known" })

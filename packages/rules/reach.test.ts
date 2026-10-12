@@ -39,7 +39,7 @@ const names = new Map([
   [elk, "jolly-elk" as ThreadName],
 ])
 
-describe("where a thread is (ADR-0128)", () => {
+describe("where a thread is", () => {
   test("open, archived with its record, held by whom, or gone", () => {
     const at = (t: typeof fox) => threadReach(t, { cards: all, archived })
     expect(at(fox)).toEqual({ kind: "open", task: open })

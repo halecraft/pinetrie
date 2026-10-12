@@ -17,7 +17,7 @@ const ref = (width: number, height: number): ImageRef => ({
   height,
 })
 
-describe("a person's picture (ADR-0098)", () => {
+describe("a person's picture", () => {
   test("its record holds a blob's hash, and nothing else reads as one", () => {
     expect(PICTURE.decode(SHA, ADA)).toEqual({ writer: ADA, sha256: SHA })
     for (const bad of ["C".repeat(64), "c".repeat(63), 7, null])

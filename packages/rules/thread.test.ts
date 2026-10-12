@@ -11,7 +11,7 @@ const stored = (origin: unknown) => ({
   origin,
 })
 
-describe("a thread's record (ADR-0117, ADR-0126)", () => {
+describe("a thread's record", () => {
   test("a root's first thread and a fork, a branch's or a copy's, read back", () => {
     expect(THREAD.decode(stored({ kind: "root" }), KEY)?.origin).toEqual({
       kind: "root",

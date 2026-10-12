@@ -1,11 +1,4 @@
 // participant — who is in a session, what each is called, and their picture.
-//
-// A session is its participants (ADR-0021). A name is a label, never an
-// identity: a `pinetrie.participant` value is a name, keyed by writer id.
-// Everyone who has written is a participant, named or not, so everyone shown
-// on screen can be mentioned. A `pinetrie.picture` value is the blob a
-// person's circle shows (ADR-0098), kept apart from the name, so setting one
-// never rewrites the other.
 
 import {
   ERR,
@@ -42,7 +35,7 @@ export const PARTICIPANT: RecordSpec<ParticipantRecord, WriterId, "session"> = {
 
 /**
  * A writer's name for display: the one they set, or the part of their email
- * before the `@`, so a speaker is never blank (ADR-0037).
+ * before the `@`, so a speaker is never blank.
  */
 export const displayName = (
   writer: WriterId,
@@ -92,8 +85,8 @@ export type PicturePlan =
   | { readonly kind: "refuse"; readonly refusal: Refusal }
 
 /**
- * What a `picture` command does (ADR-0098), from the blob store's reference
- * for its SHA-256, read without the bytes. Pure.
+ * What a `picture` command does, from the blob store's reference
+ * for its SHA-256, read without the bytes.
  */
 export function planPicture(
   sha256: Sha256 | null,

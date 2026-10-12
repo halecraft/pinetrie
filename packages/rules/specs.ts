@@ -1,6 +1,4 @@
-// specs — every host record's spec (ADR-0062), in one list: what a check
-// over every record reads, as a migration's verification does (ADR-0096),
-// and what a starting host keeps of the records it finds (ADR-0100).
+// specs — every host record's spec, in one list.
 
 import type { HostNamespace, Target, ValueWrite } from "@pinetrie/core"
 
@@ -71,10 +69,10 @@ export interface StoredRecords {
 }
 
 /**
- * Deletes for every record whose namespace no spec declares (ADR-0100), or
+ * Deletes for every record whose namespace no spec declares, or
  * that is stored outside its spec's home: a renamed, retired or rehomed
  * record type (a mark, once a root's, now a task's in the session)
- * leaves nothing behind once a host starts. Pure.
+ * leaves nothing behind once a host starts.
  */
 export const planUndeclaredSweep = (
   stored: readonly StoredRecords[],

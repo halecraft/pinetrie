@@ -1,10 +1,4 @@
-// mark — a task's title (ADR-0045, ADR-0116), and the one plan for titling
-// a task or a note column (`planMark`).
-//
-// The record is a host-written `pinetrie.mark` value in the session, keyed by
-// the task's id. The last write wins, since nobody types a title together
-// (ADR-0023), and clearing a title deletes its record. A note column's title
-// is its own record (`NOTE_COLUMN`).
+// mark — a task's title, and the one plan for titling a task or a note column.
 
 import {
   type AgentId,
@@ -59,7 +53,7 @@ type MarkPlan =
   | { readonly kind: "writes"; readonly writes: readonly ValueWrite[] }
 
 /**
- * Decide a mark (ADR-0045, ADR-0116): set a task's or a note column's
+ * Decide a mark: set a task's or a note column's
  * title, or clear it with null. Each title is in its own record: a task's in
  * `MARK`, a note column's in `NOTE_COLUMN`, which only a person sets.
  */

@@ -1,17 +1,4 @@
-// board — the team's workflow and each task's card on the board (ADR-0122,
-// ADR-0116, ADR-0126).
-//
-// The workflow is one host-written singleton: the open states in order, then
-// the archive, which is always there and always last. A task is a card
-// (`KINDS.task`), its id its `TaskId`, placed on the board in a state at a
-// rank there: the places document is the one record of where it is, and its
-// card's history says who moved it there and when. A task in the archive is
-// archived (ADR-0029); `archive.ts` decides what crossing that state's edge
-// does.
-//
-// The board is total: a task's card in a state the workflow no longer holds
-// is read at the end of the first open state, so a stale place never hides
-// a task.
+// board — the team's workflow and each task's card on the board.
 
 import {
   type ArchivedTask,
@@ -87,9 +74,9 @@ export const defaultWorkflow = (newId: () => string): Workflow => ({
 })
 
 /**
- * A store with no workflow gets the default one: a new store's first start
- * (ADR-0122). Nothing else writes the first workflow, and no task is
- * opened before there is one (`planThreadOpen`). Pure.
+ * A store with no workflow gets the default one: a new store's first start.
+ * Nothing else writes the first workflow, and no task is
+ * opened before there is one (`planThreadOpen`).
  */
 export const planWorkflowSeed = (
   workflow: Workflow | null,
@@ -117,8 +104,8 @@ export const isBoardCard = (c: CardRecord): c is BoardCard =>
   hasPlaceKind(c, "board")
 
 /**
- * The tasks on the board: each task whose card is there, not in a trash
- * (ADR-0126). The set of tasks the session holds. Pure.
+ * The tasks on the board: each task whose card is there, not in a trash.
+ * The set of tasks the session holds.
  */
 export const boardTasks = (cards: readonly CardRecord[]): ReadonlySet<TaskId> =>
   new Set(cards.filter(isBoardCard).map(c => c.id))
@@ -164,7 +151,6 @@ function columnsOf(
 /**
  * Every task's card on the board, in its state by rank, then by id; one in
  * a state the workflow lacks after them at the end of the first open state.
- * Pure.
  */
 export function boardOf(
   workflow: Workflow,
@@ -186,10 +172,10 @@ export function boardOf(
 }
 
 /**
- * The tasks in the archive: archived (ADR-0029), by whom and when: the
+ * The tasks in the archive: archived, by whom and when: the
  * newest event of its card's history that put it in the archive, which a
  * history always keeps (`HISTORY_EVENTS`); its placer at 0 for a card with
- * none. Pure.
+ * none.
  */
 export function archivedOf(
   workflow: Workflow,
@@ -249,7 +235,7 @@ export type BoardMove =
     }
 
 /**
- * Decide a move of a task's card on the board (ADR-0122, ADR-0126). The
+ * Decide a move of a task's card on the board. The
  * sender names the state it saw the task in; if the task has left it, the
  * move is refused `moved`, the card as it is saying who moved it where.
  * `before` is the task it goes before in `to`, null (or a task no longer
@@ -257,7 +243,7 @@ export type BoardMove =
  * changes, its placer stays. Between states its sender is its placer. A
  * card with no room between its neighbours renumbers the fewest of them
  * (`rankAfter`). Refused `gone` for a task with no card on the board, and
- * `no-place` for a state the workflow lacks. Pure.
+ * `no-place` for a state the workflow lacks.
  */
 export function planBoardMove(input: {
   readonly task: TaskId
@@ -301,7 +287,7 @@ export function planBoardMove(input: {
 
 /**
  * A new task's place on the board: the end of `state`, or of the first open
- * state for none or one that is no open state. Pure.
+ * state for none or one that is no open state.
  */
 export function boardEnd(
   workflow: Workflow,
@@ -326,7 +312,7 @@ export type WorkflowPlan =
 /**
  * Decide a change to the workflow. Names are trimmed and may repeat. The
  * archive is renamed, never moved or removed; a state holding a task is
- * not removed, nor the only open state. Pure.
+ * not removed, nor the only open state.
  */
 export function planWorkflowEdit(
   workflow: Workflow,

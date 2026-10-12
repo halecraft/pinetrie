@@ -89,7 +89,7 @@ const start = (cards: readonly CardRecord[], parent: ThreadId | null) => {
 const ranked = (cards: readonly CardRecord[]) =>
   canvasOf(cards, K).map(c => c.id)
 
-describe("where a thread's card lands as it opens (ADR-0116, ADR-0126)", () => {
+describe("where a thread's card lands as it opens", () => {
   test("a branch just after the thread it forks from; a new root at the end", () => {
     const cards = onCanvas(
       [A, N, B],
@@ -117,7 +117,7 @@ describe("where a thread's card lands as it opens (ADR-0116, ADR-0126)", () => {
     expect(ranked([...cards, ...elsewhere])).toEqual([A, N, B, NEW])
   })
 
-  test("with no room after its parent, the crowded cards are given new ranks in the same step, every card keeping its order", () => {
+  test("with no room after its parent, the crowded cards are given new ranks in the same step", () => {
     const cards = onCanvas([A, N, B], [1000, 1001, 1002])
     const branch = start(cards, A)
     expect(branch.cards.length).toBeGreaterThan(1)

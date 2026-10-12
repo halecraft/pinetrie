@@ -1,11 +1,4 @@
-// update — a thread's base, or the thread it branched from, merged into it
-// (ADR-0104, ADR-0072).
-//
-// A history message (`history.ts`): `content` is what the model reads,
-// `details` what the column shows. An update is a fact in the thread, never
-// a prompt: without it, the agent's next run would work from files it no
-// longer has, and its `merged` is how `parentNow` knows what the lane caught
-// up with.
+// update — a thread's base, or the thread it branched from, merged into it.
 
 import { firstLine } from "@pinetrie/core"
 import type { Static } from "typebox"

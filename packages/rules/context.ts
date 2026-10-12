@@ -1,24 +1,13 @@
-// context — the entries a run's context carries besides its conversation
-// (ADR-0048, ADR-0116), one table: a thread's pinned cards, a task's pinned
-// cards and the task's canvas list. Each kind says how a stored message is
-// known as one (its decoder), what the column draws for it, and the rule
-// `<rules>` holds for it. Each is written only when it differs from the
-// newest of its kind on the thread's path (`pinnedInView`,
-// `taskPinnedInView`, `canvasInView`), so an unchanged one keeps the
-// prompt's cache (S92). pi's compaction carries the newest of each kind
-// (`carryContext`), and the system prompt lists their rules (`CONTEXT_RULES`),
-// both from this table, so a kind can be neither sent without its rule nor
-// summarised away.
+// context — the entries a run's context carries besides its conversation, in
+// one table: a thread's pinned cards, a task's, and its canvas list.
 
 import type { ContextInView } from "@pinetrie/core"
 import { CANVAS_RULE, CANVAS_TYPE, decodeCanvas } from "./canvas.ts"
 import { decodePinned, PINNED_RULE, PINNED_TYPE } from "./pinned.ts"
 import { decodeTaskPinned, TASK_PINNED_TYPE } from "./task-pinned.ts"
 
-/** Each kind of context entry. */
 export type ContextKind = "pinned-cards" | "task-pinned-cards" | "canvas"
 
-/** One kind of context entry. */
 export interface ContextSpec {
   readonly customType: string
   /** A stored message -> what it says, or undefined if it is not this kind. */
@@ -69,7 +58,7 @@ export const CONTEXT_RULES: readonly string[] = [
 
 /**
  * What `messages` carry, the newest of each kind (a compaction's retained
- * tail, read as `ContextInView`); empty when none is one. Pure.
+ * tail, read as `ContextInView`); empty when none is one.
  */
 export function contextOf(messages: readonly unknown[]): ContextInView {
   const out: Partial<Record<keyof ContextInView, unknown>> = {}

@@ -1,10 +1,4 @@
-// stack — the prompt of the run that splits a thread's offer into a stack
-// (ADR-0105, ADR-0080).
-//
-// A history message (`history.ts`): `content` is what the model reads, the
-// `offer-stack` skill's text and where the stack starts and ends, with the
-// split card's text, if any, as the person's brief; `details` are what the
-// host reads back when the run ends.
+// stack — the prompt of the run that splits a thread's offer into a stack.
 
 import { type Static, Type } from "typebox"
 import { CommitSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
@@ -43,7 +37,7 @@ const asked = (intent: string): string =>
 
 /**
  * The stack message: the skill's text, then where the stack starts and ends,
- * then what the person asked of it, when its card had text (ADR-0080).
+ * then what the person asked of it, when its card had text.
  * The bookmark it names is where the host reads the stack from.
  */
 export function planStack(input: {
@@ -54,7 +48,7 @@ export function planStack(input: {
   } | null
   readonly bookmark: string
   readonly details: Omit<StackDetails, "skill">
-  /** What the person asked of the split, from its card (ADR-0080); "" for nothing. */
+  /** What the person asked of the split, from its card; "" for nothing. */
   readonly intent?: string
   readonly timestamp: number
 }): StackMessage {

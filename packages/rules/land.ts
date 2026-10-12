@@ -1,16 +1,4 @@
-// land — the prompt of a resolution run (ADR-0033, ADR-0105, ADR-0108,
-// ADR-0084).
-//
-// Bringing a thread up to date merges accepted work, or the work of the
-// thread it branched from (ADR-0072), into its lane, in the lane's own copy;
-// when that conflicts, the agent resolves it. The run starts with a land
-// message: a history message (`history.ts`) whose `content` is what the
-// model reads (the resolution skill and the conflict material) and whose
-// `details` are what the column shows (one short line, and the files). The model never reads the
-// details; the column never shows the content. The content fits what pi
-// keeps when it compacts (`resolutionFloor`, `planResolution`). How the run
-// ended is read as any run's is (ADR-0080, S104): the conflicts left are the
-// offer's, and an ask is the agent's `ask_about_conflict` in the tree.
+// land — the prompt of a resolution run.
 
 import { type Static, Type } from "typebox"
 import { CommitSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
@@ -21,7 +9,7 @@ export const LAND_TYPE = "pinetrie.land"
 
 const LandDetailsSchema = Type.Object({
   lane: ThreadIdSchema,
-  /** The base's commit that was merged: accepted work's, or a WIP's copy (ADR-0104). */
+  /** The base's commit that was merged: accepted work's, or a WIP's copy. */
   yours: List(CommitSchema),
   /** The files that conflicted when it merged. */
   files: List(Type.String()),
@@ -69,7 +57,7 @@ export interface ConflictFile {
 }
 
 /**
- * A prompt's limit, in the unit pi's compaction counts (ADR-0084): the
+ * A prompt's limit, in the unit pi's compaction counts: the
  * prompt fits when `estimate` of its content is at most `tokens`.
  */
 export interface PromptBudget {
@@ -77,7 +65,7 @@ export interface PromptBudget {
   readonly estimate: (content: string) => number
 }
 
-/** The skill a resolution follows, read from your working copy (ADR-0033). */
+/** The skill a resolution follows, read from your working copy. */
 export interface LandSkill {
   readonly path: string
   readonly content: string
@@ -106,7 +94,7 @@ export interface ConflictSection {
  * Each conflict in `content`: from a line of seven or more `<` (followed by a
  * space or the line's end) to the next line of as many `>`. jj makes its
  * markers longer than seven when the file holds lines that look like them.
- * An unclosed conflict runs to the file's end. Pure.
+ * An unclosed conflict runs to the file's end.
  */
 export function conflictSections(content: string): readonly ConflictSection[] {
   const lines = content.split("\n")
@@ -194,7 +182,7 @@ function introOf(
   }
 }
 
-/** The person's text under its own heading, after everything else (ADR-0108). */
+/** The person's text under its own heading, after everything else. */
 const askedOf = (intent: string): string =>
   intent === "" ? "" : `\n\n## What the person asked\n\n${intent}`
 
@@ -210,7 +198,7 @@ const joined = (
 /**
  * The floor for a resolution: its `count` message, measured. Too large only
  * when the skill and the person's text alone overflow the budget; then the
- * caller refuses before it merges (ADR-0084). Pure.
+ * caller refuses before it merges.
  */
 export function resolutionFloor(input: {
   readonly budget: PromptBudget
@@ -262,7 +250,7 @@ function fileText(f: ConflictFile, shown: FileShown): string {
   }
 }
 
-/** A conflicted file in the land message: its text as shown, then both labelled sides with their newest `k` reasons (ADR-0010). */
+/** A conflicted file in the land message: its text as shown, then both labelled sides with their newest `k` reasons. */
 const renderFile = (f: ConflictFile, shown: FileShown, k: number): string =>
   `## ${f.path}\n\n${fileText(f, shown)}\n\n` +
   `### ${f.ours.label}: ${f.ours.who}\n${reasonLines(f.ours.reasons, k)}\n` +
@@ -270,16 +258,16 @@ const renderFile = (f: ConflictFile, shown: FileShown, k: number): string =>
 
 /**
  * The land message for a resolution: the skill's text, then the conflicted
- * files with both sides labelled (ADR-0010: the labels are always present and
+ * files with both sides labelled (the labels are always present and
  * the destination's side is never dropped), then what the person asked, the
- * text of the card that brought the thread up to date (ADR-0108).
+ * text of the card that brought the thread up to date.
  *
- * It fits `floor.budget`, measured on the whole message (ADR-0084). The
+ * It fits `floor.budget`, measured on the whole message. The
  * files are shown the fullest way that fits with each side's newest reason
  * (`ConflictShown`), the same way for every file; then each side keeps as
  * many newest reasons as fit. So the code gives way before the reasons do:
  * the agent can read the files in its lane again, and its own reasons may be
- * compacted away. When no way fits, the message is the floor's. Pure.
+ * compacted away. When no way fits, the message is the floor's.
  */
 export function planResolution(input: {
   readonly floor: Floor

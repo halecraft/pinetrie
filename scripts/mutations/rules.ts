@@ -65,8 +65,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (of === undefined || of.scope.kind === "person") return false\n',
     to: "    if (of === undefined) return false\n",
     command: unit,
-    expect:
-      "at startup, a task the session does not hold is retired too; an id that names no task, and a person's history outside any task, are left (ADR-0126)",
+    expect: "at startup, a task the session does not hold is retired too",
   },
   {
     name: "a discard on no task enters no history",
@@ -75,7 +74,7 @@ export const mutations: readonly Mutation[] = [
     to: "      return discardHistory(from, discards) === null ? null : historyScope(discardHistory(from, discards))\n",
     command: unit,
     expect:
-      "a discard from an inventory on no task: its sender's history outside any task (ADR-0126)",
+      "a discard from an inventory on no task: its sender's history outside any task",
   },
   {
     name: "a trashed thread runs",
@@ -84,7 +83,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return FREE",
     command: unit,
     expect:
-      "a trashed thread is held by nobody, but its discard stops its run, and a command in it is refused to be restored first",
+      "a trashed thread is held by nobody, but its discard stops its run and a command in it is refused",
   },
   {
     name: "a thread discarded keeps running",
@@ -92,8 +91,7 @@ export const mutations: readonly Mutation[] = [
     from: '    (c.place.kind === "inventory" || c.place.kind === "trash") &&\n',
     to: '    c.place.kind === "inventory" &&\n',
     command: unit,
-    expect:
-      "a thread in a trash is held as in an inventory: its discard stops its run, and its holder holds it (ADR-0126)",
+    expect: "a trashed thread is held by nobody, but its discard stops its run",
   },
   {
     name: "a thread's origin this build does not know is read as a root",
@@ -136,7 +134,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (false)\n",
     command: unit,
     expect:
-      "a thread out of reach is refused first, the asked one's or the asker's (ADR-0128)",
+      "a thread out of reach is refused first, the asked one's or the asker's",
   },
   {
     name: "an answer is sent to a thread out of reach",
@@ -144,7 +142,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (fromReach.kind !== "open")\n',
     to: "  if (false)\n",
     command: unit,
-    expect: "an answer to a thread gone out of reach is not sent (ADR-0128)",
+    expect: "an answer to a thread gone out of reach is not sent",
   },
   // ── agents talking (ADR-0128) ──
   {
@@ -178,7 +176,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "blankQueued: a queued message with no command and no text, whose text is held as its queuer had it; not one whose text has not arrived",
+      "blankQueued: a queued message with no command and no text, as its queuer had it",
   },
   {
     name: "a lane with no copy of its own is stored with one",
@@ -187,7 +185,7 @@ export const mutations: readonly Mutation[] = [
     to: '    work: { kind: "own" },',
     command: unit,
     expect:
-      "a lane's copy of its own is stored as its work, as records before ADR-0102 hold it",
+      "a lane's copy of its own is stored as its work, as records from when a lane could work directly hold it",
   },
   // ── the lanes suite, proven in a lane (ADR-0130) ──
   {
@@ -394,8 +392,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (copy.bookmark === null) return "no-bookmark"\n',
     to: '  if (copy.bookmark === null) return "off-line"\n',
     command: unit,
-    expect:
-      "with no bookmark: refused as that, not as off accepted work (S114)",
+    expect: "with no bookmark: refused as that, not as off accepted work",
   },
   {
     name: "the agent's own commit is off its line",
@@ -528,8 +525,7 @@ export const mutations: readonly Mutation[] = [
     from: "  if (asked !== null && asked > record.at)",
     to: "  if (asked !== null)",
     command: unit,
-    expect:
-      "an ask about a conflict counts only when newer than the offer (ADR-0080)",
+    expect: "an ask about a conflict counts only when newer than the offer",
   },
   {
     name: "behind its base, catching up stays in the menu",
@@ -556,7 +552,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return true\n",
     command: unit,
     expect:
-      "catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)",
+      "catchUpOf: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "a lane the host has not read is caught up",
@@ -565,7 +561,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (base === undefined) return { kind: "current" }',
     command: unit,
     expect:
-      "catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)",
+      "catchUpOf: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "a WIP thread is measured against accepted work",
@@ -574,7 +570,7 @@ export const mutations: readonly Mutation[] = [
     to: "    true\n      ? { bookmark: accepted.acceptedBookmark, commit }",
     command: unit,
     expect:
-      "catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)",
+      "catchUpOf: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "accepted work is named by its bookmark",
@@ -645,7 +641,7 @@ export const mutations: readonly Mutation[] = [
     to: "        r.acceptedAs !== undefined ? r.acceptedAs : null,",
     command: unit,
     expect:
-      "an offer record written before ADR-0100 reads its `integratedAs` as `acceptedAs`",
+      "an offer record written before the rename reads its `integratedAs` as `acceptedAs`",
   },
   {
     name: "an old `integratedAs` overrides an offer record's own null",
@@ -654,7 +650,7 @@ export const mutations: readonly Mutation[] = [
     to: "        r.acceptedAs ?? r.integratedAs ?? null,",
     command: unit,
     expect:
-      "an offer record written before ADR-0100 reads its `integratedAs` as `acceptedAs`",
+      "an offer record written before the rename reads its `integratedAs` as `acceptedAs`",
   },
   {
     name: "an offer of no files is open",
@@ -662,8 +658,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const held = record.files.length === 0 && !record.edited\n",
     to: "  const held = false\n",
     command: unit,
-    expect:
-      "offerStatus: one decoding of a record, which every reader shares (ADR-0067)",
+    expect: "offerStatus: one decoding of a record, which every reader shares",
   },
   {
     name: "an untraced thread's edited offer offers a rebuild",
@@ -672,7 +667,7 @@ export const mutations: readonly Mutation[] = [
     to: "      true\n",
     command: unit,
     expect:
-      "an untraced thread's offer you edited can be accepted, never rebuilt (S97)",
+      "an untraced thread's offer you edited can be accepted, never rebuilt",
   },
   {
     name: "an untraced thread keeps catching up in the menu",
@@ -681,7 +676,7 @@ export const mutations: readonly Mutation[] = [
     to: '      kind === "brings" && menu.includes("update")',
     command: unit,
     expect:
-      "an untraced thread offers nothing, and catching up beside it, never quiet (S97)",
+      "an untraced thread offers nothing, and catching up beside it, never quiet",
   },
   {
     name: "catching up into the lane's own work is not quiet",
@@ -690,7 +685,7 @@ export const mutations: readonly Mutation[] = [
     to: '      ...(!input.untraced && kind === "current"',
     command: unit,
     expect:
-      "catching up that would change nothing is listed, but quiet; one not yet read is not (S97)",
+      "catching up that would change nothing is listed, but quiet; one not yet read is not",
   },
   {
     name: "the host's read of catching up counts at any commit",
@@ -699,7 +694,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (read === null) return { kind: "unknown" }',
     command: unit,
     expect:
-      "catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)",
+      "catchUpOf: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "a record left from a gone offer is kept",
@@ -708,7 +703,7 @@ export const mutations: readonly Mutation[] = [
     to: '      ? { kind: "untouched" }\n      : { kind: "build", place }',
     command: unit,
     expect:
-      "no offer in your repo (never built, accepted, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten",
+      "no offer in your repo: build, unless the lane holds nothing you lack",
   },
   {
     name: "a lane whose work undoes itself is offered",
@@ -726,7 +721,7 @@ export const mutations: readonly Mutation[] = [
     to: '    return work === "none" || reached\n',
     command: unit,
     expect:
-      "what jj could not tell never builds an offer, and keeps one that is there (ADR-0067)",
+      "what jj could not tell never builds an offer, and keeps one that is there",
   },
   {
     name: "an untraced thread's edited offer is withdrawn",
@@ -735,7 +730,7 @@ export const mutations: readonly Mutation[] = [
     to: '      ? { kind: "withdraw", offer }\n      : { kind: "withdraw", offer }',
     command: unit,
     expect:
-      "an untraced start builds nothing, withdraws an offer, and leaves one you edited, or one divergent, untouched (S97)",
+      "an untraced start builds nothing, withdraws an offer, and leaves one you edited, or one divergent, untouched",
   },
   {
     name: "an archived thread's offer stays",
@@ -1397,7 +1392,7 @@ export const mutations: readonly Mutation[] = [
     from: '      fact: c.fact ?? "",\n',
     to: '      fact: c.fact ?? "{",\n',
     command: unit,
-    expect: "a card stored before facts is a message (ADR-0080)",
+    expect: "a card stored before facts is a message",
   },
   {
     name: "a fact card can be moved",
@@ -2946,7 +2941,7 @@ export const mutations: readonly Mutation[] = [
     to: '      after?.kind === "thread" &&\n      input.running.has(after.id) &&\n      from === to\n',
     command: unit,
     expect:
-      "a running thread moved to another task is told it moved; the tasks' threads are told it was taken and added (ADR-0124)",
+      "a running thread moved to another task is told it moved; the tasks' threads are told it was taken and added",
   },
   {
     name: "a thread card's moves are in no history",
@@ -2955,7 +2950,7 @@ export const mutations: readonly Mutation[] = [
     to: '    const from = keyOf(was.place)\n    if (sameKey(from, to) || is.kind === "thread") continue\n',
     command: unit,
     expect:
-      "a thread's card: each move between tasks and into an inventory is in its history, naming its task, and leaves no trace (ADR-0124)",
+      "a thread's card: each move between tasks and into an inventory is in its history",
   },
   {
     name: "a spun thread moved away is lifted back",
@@ -2963,7 +2958,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (card?.place.kind !== "canvas") return false\n',
     to: "",
     command: unit,
-    expect: "its thread's card taken into an inventory: refused (ADR-0124)",
+    expect: "its thread's card taken into an inventory: refused",
   },
   {
     name: "a spun thread whose card moved since is lifted back",
@@ -2971,7 +2966,7 @@ export const mutations: readonly Mutation[] = [
     from: "  if ((input.histories.get(thread)?.events.length ?? 0) > 1) return false\n",
     to: "",
     command: unit,
-    expect: "its thread's card moved since it was made: refused (ADR-0124)",
+    expect: "its thread's card moved since it was made: refused",
   },
   {
     name: "a spun task holding more is lifted back",
@@ -2979,7 +2974,7 @@ export const mutations: readonly Mutation[] = [
     from: '      (c.place.kind === "canvas" || c.place.kind === "task-pinned") &&\n',
     to: '      c.place.kind === "task-pinned" &&\n',
     command: unit,
-    expect: "another card on its task's canvas: refused (ADR-0124)",
+    expect: "another card on its task's canvas: refused",
   },
   {
     name: "a spun task with a pin is lifted back",
@@ -2987,7 +2982,7 @@ export const mutations: readonly Mutation[] = [
     from: '      (c.place.kind === "canvas" || c.place.kind === "task-pinned") &&\n',
     to: '      c.place.kind === "canvas" &&\n',
     command: unit,
-    expect: "a card pinned to its task: refused (ADR-0124)",
+    expect: "a card pinned to its task: refused",
   },
   {
     name: "an archive keeps no thread end's snapshot",
@@ -2996,7 +2991,7 @@ export const mutations: readonly Mutation[] = [
     to: "  const keep = new Set(newest.values())\n",
     command: unit,
     expect:
-      "archive keeps the snapshot nearest each thread's end, a copy's files (ADR-0124)",
+      "archive keeps the snapshot nearest each thread's end, a copy's files",
   },
   {
     name: "an archive asks to keep no thread end's snapshot",
@@ -3005,7 +3000,7 @@ export const mutations: readonly Mutation[] = [
     to: "      keep: new Set(),\n",
     command: unit,
     expect:
-      "archive keeps the snapshot nearest each thread's end, a copy's files (ADR-0124)",
+      "archive keeps the snapshot nearest each thread's end, a copy's files",
   },
   {
     name: "a fork clones a snapshot that is gone",
@@ -3014,7 +3009,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (above.snapshot !== null && !input.kept && input.kept)\n",
     command: unit,
     expect:
-      "from a turn whose snapshot is gone: the base snapshot and where agent work begins, its snapshot named lost (ADR-0124)",
+      "from a turn whose snapshot is gone: the base snapshot and where agent work begins, its snapshot named lost",
   },
   {
     name: "a copy forks at an end in another thread",
@@ -3023,7 +3018,7 @@ export const mutations: readonly Mutation[] = [
     to: "    threadAt(input.index, copy.end) === null\n",
     command: unit,
     expect:
-      "refused: an end in another thread, or none; an id in use; a thread someone else holds; another's inventory, or a full one",
+      "refused: an end elsewhere, an id in use, a held thread, or another's or a full inventory",
   },
   {
     name: "a copy of a thread someone else holds is made",
@@ -3032,7 +3027,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (holding.kind === "held" && holding.by === sender)\n',
     command: unit,
     expect:
-      "refused: an end in another thread, or none; an id in use; a thread someone else holds; another's inventory, or a full one",
+      "refused: an end elsewhere, an id in use, a held thread, or another's or a full inventory",
   },
   {
     name: "a copy forgets its fork",
@@ -3050,7 +3045,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (facts.away && false)\n    return top !== undefined && isQueuedFact(top)\n",
     command: unit,
     expect:
-      "planNextQueuedCardPop: a thread in an inventory pops no message, but a fact on top: it starts no run (ADR-0124, ADR-0126)",
+      "planNextQueuedCardPop: a thread in an inventory pops no message, but a fact on top: it starts no run",
   },
   {
     name: "a send at a held thread's end runs",
@@ -3115,7 +3110,7 @@ export const mutations: readonly Mutation[] = [
       "apps/pinetrie/host/commands/cards.test.ts",
     ],
     expect:
-      "takenIn: the threads a change puts in an inventory that were not in one (ADR-0124)",
+      "takenIn: the threads a change puts in an inventory that were not in one",
   },
   {
     name: "a copy's first send is refused while its source is held",
@@ -3133,7 +3128,7 @@ export const mutations: readonly Mutation[] = [
     to: '      return ""\n',
     command: unit,
     expect:
-      "wordsOf: a text card's words are its document's, a fact's its line, a thread's none (ADR-0126)",
+      "wordsOf: a text card's words are its document's, a fact's its line, a thread's none",
   },
   {
     name: "a stop's fact waits behind the queue",
@@ -3142,7 +3137,7 @@ export const mutations: readonly Mutation[] = [
     to: "    false\n      ? orderBetween(null, queue[0]?.place.order ?? null)",
     command: unit,
     expect:
-      "with a message card queued, a stop holds the queue, so the run's end sends nothing, and its fact goes first (ADR-0048 step 7)",
+      "with a message card queued, a stop holds the queue, so the run's end sends nothing, and its fact goes first",
   },
   {
     name: "a run's end names nobody before its stop's fact is appended",
@@ -3160,7 +3155,7 @@ export const mutations: readonly Mutation[] = [
     to: "    if (!isPastAddress(address)) return [{ label, markdown: label }]",
     command: unit,
     expect:
-      "linkedQuotes: each past referent a message links to, from the message it is in; a thread's link, or an entry not held, none",
+      "linkedQuotes: each past referent a message links to, from the message it is in",
   },
   {
     name: "a link's label keeps its brackets",
@@ -3180,7 +3175,7 @@ export const mutations: readonly Mutation[] = [
     to: "  const before = cards",
     command: unit,
     expect:
-      "an edit as text is a paste replacing its reference: the reference to the trash first, then the text card in its very place, in a full inventory too (ADR-0133)",
+      "an edit as text is a paste replacing its reference, in its very place",
   },
   {
     name: "a queued ask is no queued card",
@@ -3197,7 +3192,7 @@ export const mutations: readonly Mutation[] = [
     to: "        if (true) {\n",
     command: unit,
     expect:
-      "planMoveRequest, a text card or a reference dropped on a canvas: a note column made at the spot, the card its first note, in one step (WRAPS)",
+      "planMoveRequest, a text card or a reference dropped on a canvas: the first note of a new column",
   },
   {
     name: "a queued reference is no message",
@@ -3205,8 +3200,7 @@ export const mutations: readonly Mutation[] = [
     from: '  c.kind === "text" || c.kind === "reference"\n',
     to: '  c.kind === "text"\n',
     command: unit,
-    expect:
-      "a reference queued is a message too: the stopper holds the queue (ADR-0126)",
+    expect: "a reference queued is a message too: the stopper holds the queue",
   },
   {
     name: "a margin holds every entry's comments",
@@ -3215,7 +3209,7 @@ export const mutations: readonly Mutation[] = [
     to: '        hasPlaceKind(c, "margin"),\n',
     command: unit,
     expect:
-      "a comment goes to its margin's end; it reorders among that entry's comments alone, next to each other; a move into a margin naming another thread is refused (ADR-0126)",
+      "a comment goes to its margin's end, and reorders among that entry's comments alone",
   },
   {
     name: "a margin may name any thread",
@@ -3224,7 +3218,7 @@ export const mutations: readonly Mutation[] = [
     to: "        if (false)\n",
     command: unit,
     expect:
-      "a comment goes to its margin's end; it reorders among that entry's comments alone, next to each other; a move into a margin naming another thread is refused (ADR-0126)",
+      "a comment goes to its margin's end, and reorders among that entry's comments alone",
   },
   {
     name: "a comment reorders past its neighbours",
@@ -3233,7 +3227,7 @@ export const mutations: readonly Mutation[] = [
     to: "    siblings: (cards, at) => marginCards(cards, at.entry),\n    adjacent: false,\n",
     command: unit,
     expect:
-      "a comment goes to its margin's end; it reorders among that entry's comments alone, next to each other; a move into a margin naming another thread is refused (ADR-0126)",
+      "a comment goes to its margin's end, and reorders among that entry's comments alone",
   },
   {
     name: "a reference's quote is read as no words",
@@ -3241,7 +3235,7 @@ export const mutations: readonly Mutation[] = [
     from: "      return read.blob(source.sha)\n",
     to: '      return ""\n',
     command: unit,
-    expect: "wordsOf: a reference's words are its quote's blob (ADR-0126)",
+    expect: "wordsOf: a reference's words are its quote's blob",
   },
   {
     name: "a reference with no quote is sent empty",
@@ -3250,7 +3244,7 @@ export const mutations: readonly Mutation[] = [
     to: '    return { kind: "send", card }\n',
     command: unit,
     expect:
-      "a reference's quote is sent; one with none is skipped, not sent empty (ADR-0126)",
+      "a reference's quote is sent; one with none is skipped, not sent empty",
   },
   {
     name: "the archive's time is its card's first move there",
@@ -3307,7 +3301,7 @@ export const mutations: readonly Mutation[] = [
     to: "    if (false)",
     command: unit,
     expect:
-      "a cut card moves out of its cutter's own trash; one in someone else's, or in none, is gone; no move takes one out (ADR-0132)",
+      "a cut card moves out of its cutter's own trash; one in anyone else's is gone",
   },
   {
     name: "a paste enters no history",
@@ -3316,7 +3310,7 @@ export const mutations: readonly Mutation[] = [
     to: '      if (cause === "never") return historyScope(taskOf(move.to))',
     command: unit,
     expect:
-      "a paste's creation enters the history of the task it lands in, or into a slot its sender's outside any task; a move's creation enters none (ADR-0132)",
+      "a paste's creation enters the history of the task it lands in; a move's enters none",
   },
   {
     name: "a paste's first move may go anywhere",
@@ -3387,6 +3381,6 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a new task: its card at the end of the board's first state, the card first on its canvas, in one step; none with no states",
+      "a new task: its card at the end of the board's first state, first on its canvas, in one step",
   },
 ]

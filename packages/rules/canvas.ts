@@ -1,13 +1,4 @@
-// canvas — what a run's agent is told of its task's canvas (ADR-0116).
-//
-// A canvas entry is a history message (`history.ts`): one line per card on
-// the task's canvas, in the order everyone sees them, its kind, its title
-// and who put it there; a thread's name and what its agent is doing, the
-// reading thread marked; a note column's count of notes. Not the cards'
-// contents: only pinned cards' are given (`pinned.ts`, `task-pinned.ts`).
-// The host plans one when a run starts and the list differs from the newest
-// on the thread's path (`canvasInView`), so an unchanged canvas keeps the
-// prompt's cache (S92). The task column shows the same lines.
+// canvas — what a run's agent is told of its task's canvas.
 
 import type {
   CanvasView,
@@ -104,7 +95,7 @@ function cardLine(c: CanvasCard, f: CanvasFacts): string {
   }
 }
 
-/** The canvas list `facts` make: at most `CANVAS_CAP` lines, the rest counted. Pure. */
+/** The canvas list `facts` make: at most `CANVAS_CAP` lines, the rest counted. */
 export function canvasList(facts: CanvasFacts): CanvasView {
   const lines = facts.canvas.map(c => cardLine(c, facts))
   return {
@@ -124,7 +115,7 @@ const sameCanvas = (a: CanvasView, b: CanvasView): boolean =>
 
 /**
  * The canvas list a run is told, or null when the newest on its path says
- * the same. Pure.
+ * the same.
  */
 export const planCanvasRead = (input: {
   readonly inView: CanvasView | null
@@ -160,13 +151,13 @@ export const encodeCanvas = (
     timestamp,
   )
 
-// ── a change during a run (ADR-0116) ─────────────────────────────────────
+// ── a change during a run ─────────────────────────────────────
 
 /**
  * A card added to a task's canvas or taken from it, as a running thread of
  * the task is told; or, told to a running thread itself, its card moved to
- * another task's canvas (ADR-0124): a fact line, steered after the turn in
- * flight as base news is (ADR-0080, S103). Reorders, widths and titles wait
+ * another task's canvas: a fact line, steered after the turn in
+ * flight as base news is. Reorders, widths and titles wait
  * for the next run's list.
  */
 export interface CanvasFact {
@@ -250,11 +241,11 @@ export interface CanvasSteer {
 
 /**
  * What a change to the places tells the running threads of each task a card
- * was added to or taken from (ADR-0116): one steer per card per running
+ * was added to or taken from: one steer per card per running
  * lane of that task, the card's own thread left out; and a running thread
- * whose card moved from one task's canvas to another's, that it moved
- * (ADR-0124). `by` is who moved it; a change the host made itself tells
- * nothing. Pure.
+ * whose card moved from one task's canvas to another's, that it moved.
+ * `by` is who moved it; a change the host made itself tells
+ * nothing.
  */
 export function planCanvasFacts(input: {
   readonly before: readonly CardRecord[]

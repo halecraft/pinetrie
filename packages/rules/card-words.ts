@@ -1,5 +1,5 @@
 // card-words — what a card says, read from where its kind keeps its words
-// (`textSourceOf`, ADR-0126).
+// (`textSourceOf`).
 
 import type { Sha256, TextCardId, TextSource } from "@pinetrie/core"
 import { factLine } from "./fact.ts"

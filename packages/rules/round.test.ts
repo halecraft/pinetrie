@@ -5,7 +5,7 @@ import { NOTHING_NEXT, roundReplyOf, roundRequest } from "./round.ts"
 const fox = threadIdFor("fox")
 const members = new Map([["amber-fox", fox]])
 
-describe("after a round of answers (ADR-0128)", () => {
+describe("after a round of answers", () => {
   test("a reply is nothing, an ask of a member, or a line for the people", () => {
     expect(roundReplyOf("nothing", members)).toEqual(NOTHING_NEXT)
     expect(roundReplyOf("ask amber-fox: answer slate-owl", members)).toEqual({

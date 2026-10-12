@@ -36,7 +36,7 @@ const chat = (at: Extract<Intent, { kind: "chat" }>["at"]): Intent => ({
   state: null,
 })
 
-describe("runsIn: what each command runs or writes a message in (ADR-0124)", () => {
+describe("runsIn: what each command runs or writes a message in", () => {
   test.each([
     [
       "a send at a thread's end: the thread",
@@ -129,7 +129,7 @@ describe("runsIn: what each command runs or writes a message in (ADR-0124)", () 
   })
 })
 
-test("takenIn: the threads a change puts in an inventory that were not in one (ADR-0124)", () => {
+test("takenIn: the threads a change puts in an inventory that were not in one", () => {
   const on: CardRecord = {
     kind: "thread",
     id: T,
@@ -144,7 +144,7 @@ test("takenIn: the threads a change puts in an inventory that were not in one (A
   expect(takenIn([held], [on])).toEqual([])
 })
 
-test("a trashed thread is held by nobody, but its discard stops its run, and a command in it is refused to be restored first", () => {
+test("a trashed thread is held by nobody, but its discard stops its run and a command in it is refused", () => {
   const on: CardRecord = {
     kind: "thread",
     id: T,

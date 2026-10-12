@@ -179,7 +179,7 @@ const factCard = (over: Partial<FactCard> = {}): FactCard => ({
   ...over,
 })
 
-describe("planCarry (ADR-0080)", () => {
+describe("planCarry", () => {
   const queued = (command: CardCommand | null): QueuedText => ({
     ...card({ content: { command, unsent: null, origin: null } }),
     place: queuedPlace,
@@ -208,7 +208,7 @@ describe("planCarry (ADR-0080)", () => {
     expect(planCarry(c, text)).toEqual({ ...plan, card: c })
   })
 
-  test("a reference's quote is sent; one with none is skipped, not sent empty (ADR-0126)", () => {
+  test("a reference's quote is sent; one with none is skipped, not sent empty", () => {
     const reference: QueuedCard = {
       kind: "reference",
       id: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e9"),
@@ -293,7 +293,7 @@ describe("planCarry (ADR-0080)", () => {
     ).toBe(true)
   })
 
-  test("wordsOf: a text card's words are its document's, a fact's its line, a thread's none (ADR-0126)", () => {
+  test("wordsOf: a text card's words are its document's, a fact's its line, a thread's none", () => {
     const docs = {
       doc: (id: TextCardId) => `text of ${id}`,
       blob: (sha: Sha256) => `quote ${sha}`,
@@ -310,7 +310,7 @@ describe("planCarry (ADR-0080)", () => {
     ).toBe("")
   })
 
-  test("wordsOf: a reference's words are its quote's blob (ADR-0126)", () => {
+  test("wordsOf: a reference's words are its quote's blob", () => {
     const quote = "a".repeat(64) as Sha256
     expect(
       wordsOf(
@@ -331,7 +331,7 @@ describe("planCarry (ADR-0080)", () => {
     ).toEqual([])
   })
 })
-/** Your message at a thread not yet started (ADR-0126): a thread with no entry. */
+/** Your message at a thread not yet started: a thread with no entry. */
 const unstartedPlace = (thread: string) =>
   ({ kind: "composing", thread: threadIdFor(thread) }) as const
 const queued = (id: string, order: string, lane = LANE): QueuedText => ({
@@ -393,7 +393,7 @@ describe("where a card sits", () => {
     ).toBeNull()
   })
 
-  test("yourCard: your message only, never a note of yours at the same end (ADR-0113)", () => {
+  test("yourCard: your message only, never a note of yours at the same end", () => {
     const yours = note({
       id: cardIdFor("c9"),
     })
@@ -405,7 +405,7 @@ describe("where a card sits", () => {
     ).toBeUndefined()
   })
 
-  test("yourCard: by thread end, or by its thread before it starts (ADR-0126), never another writer's", () => {
+  test("yourCard: by thread end, or by its thread before it starts, never another writer's", () => {
     const beas = card({
       id: cardIdFor("c2"),
       owner: BEA,
@@ -453,7 +453,7 @@ describe("where a card sits", () => {
   })
 })
 
-describe("note columns (ADR-0116)", () => {
+describe("note columns", () => {
   const T2 = threadIdFor("two")
   const keys = orderKeys(7)
   const K = (n: number) => keys[n] ?? ""
@@ -501,7 +501,7 @@ describe("note columns (ADR-0116)", () => {
     expect(nearest([thread(T2, K(2))])).toEqual({ kind: "none" })
   })
 
-  test("notesNear decides, minting nothing: a column, one to make there, or the holder's inventory; null for a thread with no card", () => {
+  test("notesNear decides, minting nothing: a column, one to make there, or the holder's inventory", () => {
     const cards = [thread(LANE, K(2)), column("l", K(3))]
     expect(
       notesNear(cards, { kind: "notes", near: "thread", thread: LANE }),
@@ -535,7 +535,7 @@ describe("note columns (ADR-0116)", () => {
     ).toBeNull()
   })
 
-  test("a task's own nearest notes: its first note column, or one made before every card (ADR-0116)", () => {
+  test("a task's own nearest notes: its first note column, or one made before every card", () => {
     const toTask = { kind: "notes", near: "task", task: TEST_TASK } as const
     expect(
       notesNear(
@@ -551,7 +551,7 @@ describe("note columns (ADR-0116)", () => {
     })
   })
 
-  test("notesNear: with no room after the thread's card, the crowded canvas cards are renumbered around the new column's rank", () => {
+  test("notesNear: with no room after the thread's card, the crowded canvas cards are renumbered", () => {
     const tight = (Number.parseInt(K(2), 36) + 1).toString(36).padStart(10, "0")
     const near = notesNear([thread(LANE, K(2)), thread(T2, tight)], {
       kind: "notes",
@@ -567,7 +567,7 @@ describe("note columns (ADR-0116)", () => {
     expect(order(LANE) < near.order && near.order < order(T2)).toBe(true)
   })
 
-  test("toNotes: a note at the nearest column's end; a column made, written first, where the task has none, its id minted then alone", () => {
+  test("toNotes: where the task has no column, one is written first, its id minted then alone", () => {
     const n1 = card({
       id: cardIdFor("c5"),
       place: {
@@ -614,7 +614,7 @@ describe("note columns (ADR-0116)", () => {
     expect(minted).toBe(1)
   })
 
-  test("planMoveTargets, notes: each move to a thread's notes to a column; one made for the first takes the rest; a thread with no card, refused", () => {
+  test("planMoveTargets, notes: each move to a thread's notes to a column; a thread with no card, refused", () => {
     const cards = [
       thread(LANE, K(2)),
       queued(cardIdFor("c1"), "a"),
@@ -648,7 +648,7 @@ describe("note columns (ADR-0116)", () => {
     ).toEqual({ kind: "refused", code: "no-place", now: lost })
   })
 
-  test("planMoveTargets, a drop on a canvas: ranked just after the card it names, first with none, at the end when that card is gone; a column made there is in its task's history (ADR-0116)", () => {
+  test("planMoveTargets, a drop on a canvas: ranked just after the card it names", () => {
     const [x, y] = [thread(LANE, K(2)), thread(threadIdFor("y"), K(4))]
     const made = cardIdOfKind(
       "note-column",
@@ -727,7 +727,7 @@ describe("note columns (ADR-0116)", () => {
     })
   })
 
-  test("planMoveRequest, a text card or a reference dropped on a canvas: a note column made at the spot, the card its first note, in one step (WRAPS)", () => {
+  test("planMoveRequest, a text card or a reference dropped on a canvas: the first note of a new column", () => {
     const [x, y] = [thread(LANE, K(2)), thread(threadIdFor("y"), K(4))]
     const inventory = { kind: "inventory", holder: ADA } as const
     const text = card({ place: inventory })
@@ -852,7 +852,7 @@ describe("note columns (ADR-0116)", () => {
     ).toBe("refused")
   })
 
-  test("a comment goes to its margin's end; it reorders among that entry's comments alone, next to each other; a move into a margin naming another thread is refused (ADR-0126)", () => {
+  test("a comment goes to its margin's end, and reorders among that entry's comments alone", () => {
     const entry = entryId("e2")
     const at = { kind: "margin", entry, thread: LANE } as const
     const c = (id: string, order: string, on = entry): TextCard =>
@@ -942,7 +942,7 @@ describe("note columns (ADR-0116)", () => {
     ).toBeNull()
   })
 
-  test("a note and a note column round-trip through their stored form; a note column held elsewhere than a canvas is malformed", () => {
+  test("a note and a note column round-trip through their stored form", () => {
     const n = note()
     expect(decodeCard(n.id, encodeCard(n))).toEqual(n)
     const col = column("01a0ffd2-0000-7000-8000-0000000000c2", K(1))
@@ -1060,7 +1060,7 @@ describe("the queue", () => {
     })
   })
 
-  test("planNextQueuedCardPop: a thread in an inventory pops no message, but a fact on top: it starts no run (ADR-0124, ADR-0126)", () => {
+  test("planNextQueuedCardPop: a thread in an inventory pops no message, but a fact on top: it starts no run", () => {
     const top = queued(cardIdFor("c1"), "a")
     const away = { ...idle, away: true }
     expect(planNextQueuedCardPop([top], LANE, away)).toEqual({ kind: "idle" })
@@ -1074,7 +1074,7 @@ describe("the queue", () => {
     ).toEqual({ kind: "idle" })
   })
 
-  test("planNextQueuedCardPop: a held queue pops no message, nor a card someone types in; a fact on top goes whatever (ADR-0048 step 7)", () => {
+  test("planNextQueuedCardPop: a held queue pops no message, nor a card someone types in; a fact on top goes whatever", () => {
     const top = queued(cardIdFor("c1"), "a")
     const cards = [top, queued(cardIdFor("c2"), "b")]
     expect(planNextQueuedCardPop(cards, LANE, { ...idle, held: true })).toEqual(
@@ -1109,7 +1109,7 @@ describe("the queue", () => {
     ).toEqual({ kind: "idle" })
   })
 
-  describe("planNextQueuedCardPop passes over a blank message, which stays where it is (ADR-0113)", () => {
+  describe("planNextQueuedCardPop passes over a blank message, which stays where it is", () => {
     const empty = queued(cardIdFor("c1"), "a")
     const next = queued(cardIdFor("c2"), "b")
     const fact = factCard({ place: { ...queuedPlace, order: "c" } })
@@ -1166,7 +1166,7 @@ describe("the queue", () => {
     })
   })
 
-  test("blankQueued: a queued message with no command and no text, whose text is held as its queuer had it; not one whose text has not arrived", () => {
+  test("blankQueued: a queued message with no command and no text, as its queuer had it", () => {
     const empty = queued(cardIdFor("c1"), "a")
     const behind = {
       ...queued(cardIdFor("c2"), "b"),
@@ -1186,7 +1186,7 @@ describe("the queue", () => {
     expect([...blank]).toEqual([empty.id])
   })
 
-  test("planUnqueueAll: every message card queued on the lane, to the note column nearest its thread, in order; a fact and another lane's stay", () => {
+  test("planUnqueueAll: every message card queued on the lane, to the note column nearest its thread", () => {
     const fact = factCard({ place: { ...queuedPlace, order: "0" } })
     const cards = [
       queued(cardIdFor("c2"), "b"),
@@ -1243,7 +1243,7 @@ describe("the queue", () => {
     ])
   })
 
-  test("planUnsent: a thread in a full inventory keeps its card queued, saying why, and holds its queue (ADR-0117)", () => {
+  test("planUnsent: a thread in a full inventory keeps its card queued, saying why, and holds its queue", () => {
     const q = queued(cardIdFor("c1"), "a")
     const held = {
       ...threadCardOf({ thread: LANE, task: TEST_TASK, by: BEA, cards: [] }),
@@ -1292,7 +1292,7 @@ describe("the queue", () => {
   })
 })
 
-describe("handoffs (ADR-0059)", () => {
+describe("handoffs", () => {
   const C1 = cardIdFor("c1")
   const atEnd = {
     kind: "composing",
@@ -1441,7 +1441,7 @@ describe("handoffs (ADR-0059)", () => {
       to: queuedKey,
       lands: { order: orderAfter([]), by: BEA },
     },
-  ] as const)("a card moves straight from $name (Move to ▸, ADR-0111)", ({
+  ] as const)("a card moves straight from $name (Move to ▸)", ({
     place,
     to,
     lands,
@@ -1453,7 +1453,7 @@ describe("handoffs (ADR-0059)", () => {
     })
   })
 
-  describe("a discard (ADR-0111)", () => {
+  describe("a discard", () => {
     const gone = (_: CardRecord["place"]) => DISCARDED
     test.each([
       ["your message", atEnd],
@@ -1608,7 +1608,7 @@ describe("handoffs (ADR-0059)", () => {
     expect(planMoveCommand([], [move], ADA, () => false).drain).toEqual([])
   })
 
-  describe("planMoves: several moves, accepted whole or refused (ADR-0066)", () => {
+  describe("planMoves: several moves, accepted whole or refused", () => {
     const C2 = cardIdFor("c2")
     const C3 = cardIdFor("c3")
     const inv = { kind: "inventory", holder: ADA } as const
@@ -1720,7 +1720,7 @@ test("planCardSweep: a card with a command stays, whatever its text", () => {
   ).toEqual({ records: [], docs: [] })
 })
 
-describe("planReorder (ADR-0048 step 7)", () => {
+describe("planReorder", () => {
   const key = (n: number) => n.toString(36).padStart(10, "0")
   const queuedAt = {
     kind: "queued",
@@ -1737,7 +1737,7 @@ describe("planReorder (ADR-0048 step 7)", () => {
       ? (step.record.place as { order: string }).order
       : null
 
-  test("up and down: only the order changes, between the neighbours its sender saw; placer, queuer, version and why kept", () => {
+  test("up and down: only the order changes, between the neighbours its sender saw", () => {
     const [a, b, c] = [
       q(cardIdFor("ca"), 100),
       q(cardIdFor("cb"), 200),
@@ -1893,7 +1893,7 @@ describe("planReorder (ADR-0048 step 7)", () => {
   })
 })
 
-describe("a reorder on a canvas (ADR-0116)", () => {
+describe("a reorder on a canvas", () => {
   const key = (n: number) => n.toString(36).padStart(10, "0")
   const at = { kind: "canvas", task: TEST_TASK } as const
   const onCanvas = (
@@ -1996,7 +1996,7 @@ describe("a reorder on a canvas (ADR-0116)", () => {
   })
 })
 
-describe("cards pinned to a task (ADR-0116)", () => {
+describe("cards pinned to a task", () => {
   const key = (n: number) => n.toString(36).padStart(10, "0")
   const pinnedTo = (id: string, n: number, task = TEST_TASK): CardRecord =>
     card({
@@ -2155,7 +2155,7 @@ describe("storage", () => {
     expect(decodeCard(C, null)).toBeUndefined()
     expect(decodeCard(C, { ...ok, command: "pull" })).toBeUndefined()
     // A fact on a text card's id, a fact this build cannot read, or a fact
-    // with a command (ADR-0080, ADR-0126).
+    // with a command.
     const stored = encodeCard(factCard())
     expect(decodeCard(C, { ...ok, fact: stored.fact })).toBeUndefined()
     expect(decodeCard(FACT_ID, { ...stored, fact: "{" })).toBeUndefined()
@@ -2181,7 +2181,7 @@ describe("storage", () => {
     ).toBeUndefined()
   })
 
-  test("a card stored before facts is a message (ADR-0080)", () => {
+  test("a card stored before facts is a message", () => {
     const { fact: _, ...before } = encodeCard(card())
     expect(decodeCard(cardIdFor("c1"), before)).toEqual(card())
   })
@@ -2193,7 +2193,7 @@ describe("storage", () => {
     expect(decodeCard(id, stored)).toBeUndefined()
   })
 
-  test("a card's kind is its id's: a thread's card decodes on a canvas, a text card there does not (ADR-0116)", () => {
+  test("a card's kind is its id's: a thread's card decodes on a canvas, a text card there does not", () => {
     const onCanvas = threadCardOf({
       thread: T_E,
       task: TEST_TASK,
@@ -2207,7 +2207,7 @@ describe("storage", () => {
   })
 })
 
-describe("historyOf: the task a move enters the sender's history in (ADR-0066, ADR-0116)", () => {
+describe("historyOf: the task a move enters the sender's history in", () => {
   const C1 = cardIdFor("c1")
   const T_OTHER = threadIdFor("other")
   const OTHER_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
@@ -2301,14 +2301,14 @@ describe("historyOf: the task a move enters the sender's history in (ADR-0066, A
     ).toEqual(want === null ? null : historyScope(want))
   })
 
-  test("a discard from an inventory on no task: its sender's history outside any task (ADR-0126)", () => {
+  test("a discard from an inventory on no task: its sender's history outside any task", () => {
     const moves = [{ card: C1, from: inv, to: DISCARDED }]
     expect(historyOf(moves, at(inv), { tasks, here: null }, "move")).toEqual(
       PERSON_HISTORY,
     )
   })
 
-  test("a paste's creation enters the history of the task it lands in, or into a slot its sender's outside any task; a move's creation enters none (ADR-0132)", () => {
+  test("a paste's creation enters the history of the task it lands in; a move's enters none", () => {
     const made = (to: Move["to"]) => [{ card: C1, from: null, to }]
     const notes = { kind: "notes", near: "thread", thread: T_OTHER } as const
     expect(historyOf(made(notes), [], { tasks, here: null }, "paste")).toEqual(
@@ -2321,7 +2321,7 @@ describe("historyOf: the task a move enters the sender's history in (ADR-0066, A
   })
 })
 
-describe("undoAnswer (ADR-0066)", () => {
+describe("undoAnswer", () => {
   const PLACES = "places"
   const part = (...ids: string[]) => ({
     docId: PLACES,
@@ -2384,7 +2384,7 @@ describe("undoAnswer (ADR-0066)", () => {
   })
 })
 
-test("crossesArchive: a step whose task card last went into or out of the archive is not undone; one within open states, or no task's, is (ADR-0126)", () => {
+test("crossesArchive: a step whose task card last crossed the archive's edge is not undone", () => {
   const K = taskIdFor("01a0ffd2-0000-7000-8000-000000000001")
   const [open, other, done] = ["o", "p", "x"].map(workflowStateIdFor) as [
     WorkflowStateId,
@@ -2425,7 +2425,7 @@ test("crossesArchive: a step whose task card last went into or out of the archiv
   expect(crossesArchive([K], moved(open, done), null)).toBe(false)
 })
 
-describe("planHistorySweep (ADR-0066)", () => {
+describe("planHistorySweep", () => {
   const DAY = 24 * 60 * 60 * 1000
   const NOW = 100 * DAY
   const K = (n: string) => taskIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`)
@@ -2452,15 +2452,15 @@ describe("planHistorySweep (ADR-0066)", () => {
       startup,
     })
 
-  test("a task archived 7 days and a second ago is retired; one archived 6 days ago, a restored one and one never archived are not", () => {
+  test("a task archived 7 days and a second ago is retired; one archived 6 days ago is not", () => {
     expect(sweep(false)).toEqual([doc(K("1"))])
   })
-  test("at startup, a task the session does not hold is retired too; an id that names no task, and a person's history outside any task, are left (ADR-0126)", () => {
+  test("at startup, a task the session does not hold is retired too", () => {
     expect(sweep(true)).toEqual([doc(K("1")), doc(K("5"))])
   })
 })
 
-describe("references (ADR-0126)", () => {
+describe("references", () => {
   const REF = cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1")
   const NEW = textCardId("01a0ffd2-0000-7000-8000-0000000000e2")
   const address = {
@@ -2511,7 +2511,7 @@ describe("references (ADR-0126)", () => {
       }),
     )
 
-  test("planPaste makes a reference where it lands, through planMake; never on a canvas, never twice (ADR-0132)", () => {
+  test("planPaste makes a reference where it lands, through planMake; never on a canvas, never twice", () => {
     expect(paste([], asReference, inv)).toEqual({
       kind: "steps",
       steps: [{ kind: "write", record: reference }],
@@ -2544,7 +2544,7 @@ describe("references (ADR-0126)", () => {
     })
   })
 
-  test("an edit as text is a paste replacing its reference: the reference to the trash first, then the text card in its very place, in a full inventory too (ADR-0133)", () => {
+  test("an edit as text is a paste replacing its reference, in its very place", () => {
     const full = [reference, ...filling(INVENTORY_SLOTS - 1)]
     const step = paste(full, asText, inv, { card: REF, from: inv })
     expect(step).toMatchObject({
@@ -2575,7 +2575,7 @@ describe("references (ADR-0126)", () => {
     })
   })
 
-  test("a cut card moves out of its cutter's own trash; one in someone else's, or in none, is gone; no move takes one out (ADR-0132)", () => {
+  test("a cut card moves out of its cutter's own trash; one in anyone else's is gone", () => {
     const trashed = (holder: WriterId) =>
       ({
         ...reference,
@@ -2711,7 +2711,7 @@ describe("out of a trash: a restore back where the card was, and a new task", ()
     ).toMatchObject({ kind: "refused", code: "gone" })
   })
 
-  test("a new task: its card at the end of the board's first state, the card first on its canvas, in one step; none with no states", () => {
+  test("a new task: its card at the end of the board's first state, first on its canvas, in one step", () => {
     const NEW = taskIdFor("01a0ffd2-0000-7000-8000-0000000000dd")
     const workflow = {
       open: [{ id: workflowStateIdFor("d"), name: "Doing" }],

@@ -64,7 +64,7 @@ const PINNED: CardPlace = {
   thread: LANE,
   order: "1",
 }
-/** Pinned to the task the fixtures' threads are in (ADR-0116). */
+/** Pinned to the task the fixtures' threads are in. */
 const TASK_PINNED: CardPlace = {
   kind: "task-pinned",
   task: TEST_TASK,
@@ -159,7 +159,7 @@ describe("planProvenance: each card's history", () => {
     expect(events[0]?.by).toBe(cause.kind === "host" ? null : cause.by)
   })
 
-  test("a thread's card: each move between tasks and into an inventory is in its history, naming its task, and leaves no trace (ADR-0124)", () => {
+  test("a thread's card: each move between tasks and into an inventory is in its history", () => {
     const OTHER = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
     const thread = (
       place: CardPlace & { kind: "canvas" | "inventory" },
@@ -304,7 +304,7 @@ describe("planProvenance: traces", () => {
     ).toHaveLength(1)
   })
 
-  test("a note moved by someone else leaves no trace: a note column is everyone's scratch (ADR-0116)", () => {
+  test("a note moved by someone else leaves no trace: a note column is everyone's scratch", () => {
     expect(
       newTraces(
         plan({

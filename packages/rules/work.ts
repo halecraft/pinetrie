@@ -1,9 +1,5 @@
-// work — where lanes work (ADR-0032 to ADR-0034): each lane's setting
-// (`pinetrie.lane`), the commit and disk at each entry (`pinetrie.revision`), and
-// what the host found where it runs (`pinetrie.project`). What a turn records
-// (`planTurnRecord`), where a fork starts (`forkPoint`), which snapshots go
-// (`planRetention`) and how a message names your working copy in a lane
-// (`showHostWorkingCopy`) are pure, over what the host gathers.
+// work — where lanes work: each lane's setting, the commit and disk at each
+// entry, and what the host found where it runs.
 
 import {
   type Above,
@@ -62,11 +58,11 @@ const RevisionRecordSchema = Type.Object({
   snapshot: Type.Optional(
     Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
   ),
-  // Absent in records written before turns recorded their paths (ADR-0106).
+  // Absent in records written before turns recorded their paths.
   paths: Type.Optional(Type.Array(Type.String())),
-  // Absent in records written before they recorded conflicts (ADR-0072).
+  // Absent in records written before they recorded conflicts.
   conflicts: Type.Optional(Type.Array(Type.String())),
-  // Absent in records written before turns diffed their disk (ADR-0131).
+  // Absent in records written before turns diffed their disk.
   ignored: Type.Optional(
     Type.Union([
       Type.Object({
@@ -86,9 +82,10 @@ const ProjectRecordSchema = Type.Object({
 })
 
 /**
- * Each lane's record, written as the lane is created: the root it works in
- * (ADR-0063), and whether it has a copy of its own, stored as its work
- * (`{ kind: "own" }`, or null for none) as records before ADR-0102 hold it.
+ * Each lane's record, written as the lane is created: the root it works in,
+ * and whether it has a copy of its own, stored as its work
+ * (`{ kind: "own" }`, or null for none) as records from when a lane could work
+ * directly hold it.
  */
 export const LANE: RecordSpec<LaneRecord, ThreadId, "session"> = {
   namespace: "pinetrie.lane",
@@ -157,7 +154,8 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
         ProjectRecordSchema,
         contents,
         fixedKey(PROJECT_KEY, key),
-        // A record before ADR-0102 has a kind and a default: not read.
+        // A record from when a lane could work directly has a kind and a
+        // default: not read.
         r => ({ root: r.root }),
       ),
   }
@@ -171,10 +169,10 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
  * records the lane's newest revision, so a branch from it names the commit
  * its disk was at even after its base moved. A lane with no copy of its own
  * records its prompts only, with neither. Only a turn's own commit carries the paths
- * it changed: a prompt's newest revision is what came before it (ADR-0106).
+ * it changed: a prompt's newest revision is what came before it.
  * Every record with a commit carries that commit's conflicts, so a branch
- * from any of them knows its copy's (ADR-0072). A turn whose `catch_up`
- * merged (ADR-0080) records the lane's newest revision, which the merge is,
+ * from any of them knows its copy's. A turn whose `catch_up`
+ * merged records the lane's newest revision, which the merge is,
  * with no paths: a branch from it starts with the merged files.
  */
 export function planTurnRecord(input: {
@@ -195,7 +193,7 @@ export function planTurnRecord(input: {
   /** The files conflicted in the commit the record names: `committed`, else `newest`. */
   readonly conflicts: readonly string[]
   /**
-   * The turn merged into the lane (`turnMerged`, ADR-0080): its `catch_up`
+   * The turn merged into the lane (`turnMerged`): its `catch_up`
    * moved the bookmark, so with no commit of its own the turn names it.
    */
   readonly merged: boolean
@@ -235,7 +233,7 @@ export function planTurnRecord(input: {
 export type DiskClass = "tracked" | "own" | "derived" | "cache" | "ignored"
 
 /**
- * What each path a turn's whole-disk diff names is (ADR-0131): tracked, if
+ * What each path a turn's whole-disk diff names is: tracked, if
  * the repo's commits between the two snapshots changed it; pine·trie's or a
  * repo's own; under a recipe's output; under a recipe's cache; else an
  * ignored file the turn wrote. A shared directory is no part of the disk:
@@ -298,10 +296,9 @@ export function ignoredFiles(
  * Where a new lane of its own starts. With a revision above it: the nearest
  * snapshot above, else the base snapshot, and that revision's commit. With
  * none (a root thread, or a branch above any agent work): the base snapshot,
- * which is accepted work's, and `begin`: accepted work, or a WIP's copy (ADR-0104).
+ * which is accepted work's, and `begin`: accepted work, or a WIP's copy.
  * Either way the fork starts on a commit of its own, because a cloned disk
- * carries its parent's working-copy change, which the fork must leave (S42
- * item 2).
+ * carries its parent's working-copy change, which the fork must leave.
  */
 export function forkPoint(input: {
   readonly above: Above
@@ -309,7 +306,7 @@ export function forkPoint(input: {
   /**
    * Whether the snapshot above is still there. Archiving deletes snapshots
    * its revision records still name (`planRetention`), so one that is gone
-   * is read as missing: the fork starts from its base (ADR-0124).
+   * is read as missing: the fork starts from its base.
    */
   readonly kept: boolean
 }): {
@@ -336,7 +333,7 @@ export function forkPoint(input: {
 
 /**
  * A lane that began from its base because the files it was forked from
- * were not kept (ADR-0124): a copy from the archive whose snapshot was
+ * were not kept: a copy from the archive whose snapshot was
  * deleted. Its fork row says so.
  */
 export interface FilesLostRecord {
@@ -364,7 +361,7 @@ export const FILES_LOST: RecordSpec<FilesLostRecord, ThreadId, "session"> = {
  * The snapshots to delete. An open root keeps every one: any visible turn can
  * be branched from. An archived root keeps each lane's newest, which
  * restoring it clones, and `keep`: the one nearest each thread's end, which
- * a copy of it clones (ADR-0124). Entry ids are uuidv7, so the greatest is
+ * a copy of it clones. Entry ids are uuidv7, so the greatest is
  * the newest. The base snapshot is never deleted.
  */
 export function planRetention(input: {

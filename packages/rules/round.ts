@@ -1,7 +1,6 @@
 // round — what comes after several agents a person asked at once have all
-// answered (ADR-0128): one small request, the `agents-round` skill, whose
-// reply is read as a value. A reply in any other shape is nothing
-// (ADR-0067): the host never acts on what it cannot tell.
+// answered. A reply in any other shape is nothing: the host never acts on what
+// it cannot tell.
 
 import type { ThreadId } from "@pinetrie/core"
 import { fitNewest, LEFT_OUT_NOTE, leftOut } from "./request.ts"
@@ -21,7 +20,7 @@ export const ROUND_ROOM = 12_000
 
 /**
  * The round's request: the skill, the members by name, and the thread's
- * newest lines that fit, the oldest cut first. Pure.
+ * newest lines that fit, the oldest cut first.
  */
 export function roundRequest(input: {
   readonly skill: string
@@ -38,7 +37,7 @@ export function roundRequest(input: {
 /**
  * The model's reply as a value: `nothing`; `ask <name>: <text>`, naming a
  * member; or `people: <line>`. Anything else, an `ask` naming no member or
- * with nothing to ask included, is nothing. Pure.
+ * with nothing to ask included, is nothing.
  */
 export function roundReplyOf(
   reply: string,

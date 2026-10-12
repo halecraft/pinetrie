@@ -1,13 +1,5 @@
-// card-history — each card's history, and the traces left where someone
-// else moved your card (ADR-0048 step 6). Both are host-written session
-// records: a card's history is keyed by the card and goes with it; a trace
-// is keyed by its own id, since it outlives its card ("Bea sent this →").
-// The places document holds neither: it grows for good (S90), and a field
-// every event changes would refuse each whole undo of a move (S82).
-//
-// `planProvenance` decides both from the cards before and after a write, so
-// an undo, whose revert Kyneta writes, is read like any other change. The
-// host gathers and writes (`apps/pinetrie/host/provenance.ts`). Pure.
+// card-history — each card's history, and the traces left where someone else
+// moved your card.
 
 import {
   asPlaceFields,
@@ -59,10 +51,10 @@ const FieldsSchema = Type.Object({
   by: Str,
   seen: Str,
   holder: Str,
-  /** Absent from an event stored before tasks (ADR-0116): read as "". */
+  /** Absent from an event stored before tasks: read as "". */
   task: Type.Optional(Str),
   width: Type.Optional(Str),
-  /** Absent from an event stored before tasks were cards (ADR-0126): read as "". */
+  /** Absent from an event stored before tasks were cards: read as "". */
   state: Type.Optional(Str),
 })
 const OrNull = <T extends ReturnType<typeof Type.Object>>(t: T) =>
@@ -225,7 +217,7 @@ export const traceEnd = (
 
 /**
  * Out of a queue or a thread's or a task's pinned cards to a note: an
- * unqueue or an unpin, to the nearest note column (ADR-0116), which leaves
+ * unqueue or an unpin, to the nearest note column, which leaves
  * no trace.
  */
 function movedBack(
@@ -439,7 +431,6 @@ export const TRASH_KEEP_MS = 7 * 24 * 60 * 60 * 1000
  * When a trashed card is deleted: its newest history event (its discard, or
  * what came after) plus `TRASH_KEEP_MS`; `now` for one with no history to
  * tell. The sweep and the task column's list of its trash both read it.
- * Pure.
  */
 export function trashDeadline(
   card: CardId,
@@ -460,7 +451,7 @@ export interface TrashSweep {
  * The cards to delete, record and text: each trashed card past its
  * `trashDeadline`, and with it every card on a surface it owns
  * (`ownerOf`), trashed or not, and so on down: a note column's notes, a
- * thread's message, pinned, queued and margin cards. Pure.
+ * thread's message, pinned, queued and margin cards.
  */
 export function planTrashSweep(input: {
   readonly cards: readonly CardRecord[]

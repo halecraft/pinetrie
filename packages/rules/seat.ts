@@ -1,11 +1,4 @@
-// seat — which person each seat is, as the host saw it (ADR-0037, ADR-0048).
-//
-// A text's operations carry their seat's Yjs `clientID`, which says who wrote
-// them only to a peer that knows the seat's principal. A client's only peer is
-// the host, and the host forgets a seat once it leaves. So the host writes a
-// `pinetrie.seat` value per seat when it connects, keyed by its peer, and
-// anyone derives a text's writers from its `clientID`s (`writersOfClients`)
-// whenever they need them. Nobody stores a contributors list.
+// seat — which person each seat is, as the host saw it.
 
 import type { SeatRecord, WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
@@ -74,8 +67,8 @@ export function writersOfClients(
 
 /**
  * Seat records no stored text names, to delete. A store-less client is a new
- * seat on every load (ADR-0037), so without this the records would grow with
- * every visit. Pure; the host's startup runs it over every text it holds.
+ * seat on every load, so without this the records would grow with
+ * every visit. The host's startup runs it over every text it holds.
  */
 export function planSeatSweep(
   seats: readonly SeatRecord[],

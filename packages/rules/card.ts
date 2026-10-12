@@ -1,12 +1,4 @@
-// card — a card's record and where it sits (ADR-0048, ADR-0059).
-//
-// A card is live text in a place. Its text is its own `TextDoc`, written by
-// clients; its record is in the places document (`PlacesDoc` in
-// @pinetrie/schema), which only the host writes, through handoffs it applies
-// or refuses (`planMove`). This module decodes a record, and decides where a
-// card sits now, which moves and reorders the host accepts, which queued
-// card is popped next to be sent, and which are swept. Who wrote in it is `writersOfClients`
-// (`seat.ts`).
+// card — a card's record and where it sits.
 
 import {
   asPlaceFields,
@@ -56,20 +48,20 @@ const StoredCard = Type.Object({
   by: Type.String(),
   seen: Type.String(),
   command: Type.String(),
-  /** A fact the card carries (ADR-0080), as JSON; absent before facts were. */
+  /** A fact the card carries, as JSON; absent before facts were. */
   fact: Type.Optional(Type.String()),
-  /** An ask card's relay (ADR-0128), as JSON; absent before it had its own. */
+  /** An ask card's relay, as JSON; absent before it had its own. */
   relay: Type.Optional(Type.String()),
   unsent: Type.String(),
   placer: Type.String({ minLength: 1 }),
   holder: Type.String(),
-  /** A canvas or trashed card's task (ADR-0116); absent before tasks. */
+  /** A canvas or trashed card's task; absent before tasks. */
   task: Type.Optional(Type.String()),
   /** A canvas card's width; absent before tasks. */
   width: Type.Optional(Type.String()),
   /** A task's card's workflow state; absent before tasks were cards. */
   state: Type.Optional(Type.String()),
-  /** A reference's address, printed (ADR-0126); absent before references. */
+  /** A reference's address, printed; absent before references. */
   address: Type.Optional(Type.String()),
   /** A reference's quote's blob; absent before references. */
   quote: Type.Optional(Type.String()),
@@ -132,7 +124,7 @@ interface ContentCodec<K extends PlacedKind> {
 }
 
 /**
- * Each kind's content as the places document stores it (ADR-0126): a row
+ * Each kind's content as the places document stores it: a row
  * per kind with records, so a kind without one does not compile.
  */
 export const CARD_CODEC: { readonly [K in PlacedKind]: ContentCodec<K> } = {
@@ -301,7 +293,7 @@ export const placeEnd = (
 ): EntryId | null => threadEnd(index, place.thread)
 
 /**
- * Your message's thread end now (ADR-0113); null for any other card, or a
+ * Your message's thread end now; null for any other card, or a
  * place gone. A pinned card's end is `cardsAt`'s alone: resolved here, it
  * could take your composer (`yourCard`).
  */
@@ -333,7 +325,7 @@ export const isOrdered = (place: CardPlace): place is OrderedPlace =>
 export const orderOf = (c: CardRecord): string =>
   isOrdered(c.place) ? c.place.order : ""
 
-/** By `order`, then by id (S69). */
+/** By `order`, then by id. */
 export const byOrder = (a: CardRecord, b: CardRecord): number => {
   const [x, y] = [orderOf(a), orderOf(b)]
   if (x !== y) return x < y ? -1 : 1
@@ -341,15 +333,15 @@ export const byOrder = (a: CardRecord, b: CardRecord): number => {
 }
 
 /**
- * Where a column's composer is: a thread's end, or a thread not yet started
- * (ADR-0126), which has no end yet.
+ * Where a column's composer is: a thread's end, or a thread not yet started,
+ * which has no end yet.
  */
 type CardWhere =
   | { readonly kind: "end"; readonly end: EntryId }
   | { readonly kind: "thread"; readonly thread: ThreadId }
 
 /**
- * Your message where a column's composer is (ADR-0113); never another
+ * Your message where a column's composer is; never another
  * writer's, and never a note. Of several at one end, the newest (ids are
  * uuidv7).
  */
@@ -375,7 +367,7 @@ export function yourCard(
  * What a starting host deletes: text cards whose text is empty and that
  * carry no command, and stored `card:` documents with no record. Only a
  * text card's words are a document (`KINDS`' `text`), so no other kind is
- * swept for its lack of one. Pure.
+ * swept for its lack of one.
  */
 export function planCardSweep(input: {
   readonly cards: readonly CardRecord[]

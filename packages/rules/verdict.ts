@@ -1,10 +1,4 @@
-// verdict — how a thread's last run ended, for the people who follow it
-// (ADR-0077). The record is a host-written `pinetrie.verdict` value in the
-// session, keyed by lane, so your inbox and the board read it across
-// roots. It holds what happened; what that asks of each person is decided
-// on their client. The host carries the plan out
-// (`apps/pinetrie/host/digests.ts`): one request at a run's end, for the
-// verdict and the final digest together.
+// verdict — how a thread's last run ended, for the people who follow it.
 
 import {
   type AskOutcome,
@@ -95,7 +89,7 @@ export interface SaidLine {
 }
 
 /**
- * Pure. One verdict line: `needs you: <reason>`, `worth a read: <reason>`
+ * One verdict line: `needs you: <reason>`, `worth a read: <reason>`
  * or `done`, in any case. Null for any other line, a missing reason, or a
  * reason over `REASON_WORDS` words: never cut, as `digestOf` never cuts.
  */
@@ -118,7 +112,7 @@ export interface EndReply {
 }
 
 /**
- * Pure. A run's final reply as `answer` asked for it: the verdict line
+ * A run's final reply as `answer` asked for it: the verdict line
  * first, then the digest. Each half is refused on its own, so a good digest
  * survives a bad verdict line and the other way round. A verdict alone must
  * be the reply's only line.
@@ -156,7 +150,7 @@ export interface RunEndedPlan {
 }
 
 /**
- * Pure. A failed or stopped run's verdict is its facts, and the model is
+ * A failed or stopped run's verdict is its facts, and the model is
  * asked only for its digest, if one is due. An answered run's verdict is
  * the model's, asked with the digest when one is due (`digest`, from
  * `planDigest`). A run with no entry to read is unclassified. A run whose
@@ -217,7 +211,7 @@ export const pendingVerdict = (
 ): VerdictRecord => ({ lane, ask, end, verdict: { kind: "pending" } })
 
 /**
- * Pure. What a run's final reply writes, in one write. The verdict, when
+ * What a run's final reply writes, in one write. The verdict, when
  * asked for: the model's, or `unclassified` when the request failed or its
  * line was refused; nothing when the stored verdict is another run's, since
  * the next run's end has replaced it. The digest, when asked for, as

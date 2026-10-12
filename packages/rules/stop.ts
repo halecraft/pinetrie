@@ -1,15 +1,4 @@
-// stop — who stopped an ask's run (ADR-0106, ADR-0126), and carrying on
-// after it (ADR-0082). pi's entries say that a run was aborted, never by
-// whom (S70), so Stop queues a fact naming who pressed it (`planStop`), a
-// fact card the run's end appends to the thread first: the agent's next run
-// reads it, and the asks read who stopped a run from it (`stoppedBy`). The
-// first press is the one named: `planStop` queues no second.
-//
-// pi cannot continue a run Stop ended (S105), so carrying on is a new run
-// whose prompt is a carry-on message, a history message (`history.ts`):
-// `content` is what the model reads, `details` what the column shows.
-// `carryOnState` is the one rule for when a lane may carry on, read by the
-// host's `planCarryOn` and the dock's `nextOf` (`@pinetrie/interface`).
+// stop — who stopped an ask's run, and carrying on after it.
 
 import {
   type AskIndex,
@@ -68,14 +57,14 @@ const queuedStopper = (
 
 /**
  * What stopping a thread's lane does: abort its running turn, queueing a
- * fact that names who stopped its ask (ADR-0106, ADR-0126), unless a stop of
+ * fact that names who stopped its ask, unless a stop of
  * it is queued already or the thread names its stopper, so the first press
  * is the one named; and hold its queue when a message card waits there, so
- * the run's end does not send the next one (ADR-0048 step 7). The fact goes
+ * the run's end does not send the next one. The fact goes
  * before the cards queued, and the run's end pops it whatever the hold.
  * Nothing when it is idle (stopping is idempotent). A spent budget stops a
- * run too (ADR-0128): its fact names the budget, and it holds no queue,
- * which is the stopped thread's own people's. Pure.
+ * run too: its fact names the budget, and it holds no queue,
+ * which is the stopped thread's own people's.
  */
 export function planStop(
   lane: LaneView,
@@ -129,9 +118,9 @@ export function planStop(
 }
 
 /**
- * Who stopped `prompt`'s run (ADR-0126): its stop's fact, appended
+ * Who stopped `prompt`'s run: its stop's fact, appended
  * (`stoppedBy`), or still queued on its lane, as it is from Stop until the
- * run's end appends it; null for nobody named. Pure.
+ * run's end appends it; null for nobody named.
  */
 export const stopperOf = (
   asks: AskIndex,
@@ -141,7 +130,7 @@ export const stopperOf = (
 
 /**
  * How `prompt`'s run ended, as its run's end reads it: who stopped it named
- * by `stopperOf`, since its fact is still queued then. Pure.
+ * by `stopperOf`, since its fact is still queued then.
  */
 export function endedOutcome(
   index: TreeIndex,
@@ -155,7 +144,7 @@ export function endedOutcome(
     : outcome
 }
 
-// ── carrying on (ADR-0082) ───────────────────────────────────────────────
+// ── carrying on ───────────────────────────────────────────────
 
 const CARRY_ON_TYPE = "pinetrie.carry-on"
 
@@ -195,14 +184,14 @@ const refusedFor = (code: ErrCode): CarryOnState => ({ kind: "refused", code })
  * unless its queue is held, and the ask at its tip ended stopped. A stop's
  * fact at the tip is no ask (`promptOf` passes it), so the stopped ask is
  * still found. A message written after the stop is the tip's ask, with no
- * work, so it refuses; an update is no ask, so it does not. Pure.
+ * work, so it refuses; an update is no ask, so it does not.
  */
 export function carryOnState(
   lane: LaneView,
   facts: { readonly index: TreeIndex; readonly asks: AskIndex },
 ): CarryOnState {
   if (lane.tip === null) return refusedFor(ERR.UNKNOWN_TARGET)
-  // A held queue waits for a release, not for this turn (ADR-0048 step 7).
+  // A held queue waits for a release, not for this turn.
   if (lane.running || (isBusy(lane) && lane.heldBy === null))
     return refusedFor(ERR.BUSY)
   const prompt = promptOf(facts.index, lane.tip)
@@ -228,7 +217,7 @@ function refusedCarryOn(code: ErrCode): Refusal {
 /**
  * What carrying on a lane does: a run whose prompt is a carry-on message,
  * or the refusal `carryOnState` gives; refused for a lane no root holds
- * (`here` null). Pure.
+ * (`here` null).
  */
 export function planCarryOn(
   here: {

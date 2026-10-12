@@ -1,11 +1,4 @@
-// relay — another thread's agent asked, and its answer (ADR-0128).
-//
-// An ask reaches the asked agent's own thread as two history messages: what
-// it has not heard of the asking thread (`pinetrie.heard`, its text frozen,
-// S144), then the ask itself (`pinetrie.relay`), its run's prompt. The run's
-// last message goes back to the asking thread as `pinetrie.answer`: a prompt
-// when it wakes an agent that asked, else a message no one must answer.
-// Where each goes is `planDelivery`'s (`chat.ts`), as a chat's is.
+// relay — another thread's agent asked, and its answer.
 
 import {
   type AnswerDetails,
@@ -79,7 +72,7 @@ export type HeardMessage = HistoryMessage<typeof HEARD_TYPE, HeardDetails>
 export type RelayMessage = HistoryMessage<typeof RELAY_TYPE, RelayDetails>
 export type AnswerMessage = HistoryMessage<typeof ANSWER_TYPE, AnswerDetails>
 
-/** An ask card's relay, in the places document's flat strings (ADR-0128). */
+/** An ask card's relay, in the places document's flat strings. */
 export const encodeRelay = (relay: RelayDetails): string =>
   JSON.stringify(relay)
 
@@ -98,8 +91,8 @@ export const decodeRelay = RELAY.decode
 export const decodeAnswer = ANSWER.decode
 
 /**
- * The line every agent thread's `<rules>` holds on other threads' agents
- * (ADR-0128): how to ask one, that an ask does not wait, and what an asked
+ * The line every agent thread's `<rules>` holds on other threads' agents:
+ * how to ask one, that an ask does not wait, and what an asked
  * agent's answer is.
  */
 export const AGENTS_RULE =
@@ -139,7 +132,7 @@ export const encodeAnswer = (
   timestamp: number,
 ): AnswerMessage => ANSWER.encode(d, answerContent(d), timestamp)
 
-/** The one line an ask card shows (ADR-0128): who asks, from where, what. */
+/** The one line an ask card shows: who asks, from where, what. */
 export const askLine = (d: RelayDetails): string =>
   `⇢ ${d.askerName} in ${d.fromName} asks: ${firstLine(d.text, 120)}`
 
@@ -150,7 +143,7 @@ export const heardLine = (d: HeardDetails): string =>
 /** Why an ask was refused, as a value; `relayRefusalText` words it. */
 export type RelayRefusal =
   | { readonly kind: "unknown"; readonly name: string }
-  /** The asked thread, or the one that asked, is out of reach (ADR-0128). */
+  /** The asked thread, or the one that asked, is out of reach. */
   | {
       readonly kind: "away"
       readonly side: "to" | "from"
@@ -199,10 +192,10 @@ export type RelayPlan =
   | { readonly kind: "refused"; readonly why: RelayRefusal }
 
 /**
- * Whether both threads of an ask are in reach (ADR-0128): the asked one, and
+ * Whether both threads of an ask are in reach: the asked one, and
  * the one that asked, which may have gone while its ask waited as a card.
  * Null when both are open. The host asks it before it opens either thread's
- * root, and `planRelay` again. Pure.
+ * root, and `planRelay` again.
  */
 export function unreachableRefusal(input: {
   readonly fromName: string
@@ -228,7 +221,7 @@ export function unreachableRefusal(input: {
 }
 
 /**
- * An ask relayed from thread `from` into `to`'s thread (ADR-0128). Pure.
+ * An ask relayed from thread `from` into `to`'s thread.
  *
  * - Both threads must be in reach (`unreachableRefusal`), before anything else.
  * - Only a member is asked, and only a thread with a lane has an agent to
@@ -329,16 +322,16 @@ export type AnswerPlan =
   | { readonly kind: "undelivered"; readonly reach: Away }
 
 /**
- * What a relayed run's end sends back to the thread that asked (ADR-0128).
- * Pure.
+ * What a relayed run's end sends back to the thread that asked.
+ *
  *
  * - An answered run's last message is the answer. It wakes the asker only
  *   when an agent asked and its budget is not spent: an answer to a person's
  *   ask wakes nobody, and nothing else wakes anyone.
  * - A stopped or failed run sends no answer, and wakes nobody: the asking
  *   thread is told it went unanswered.
- * - Nothing is sent to a thread that asked and has since gone out of reach
- *   (ADR-0128): its task archived, or taken into an inventory. The answering
+ * - Nothing is sent to a thread that asked and has since gone out of reach:
+ *   its task archived, or taken into an inventory. The answering
  *   thread is told instead.
  */
 export function planAnswer(input: {

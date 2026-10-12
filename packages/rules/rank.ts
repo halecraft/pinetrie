@@ -1,6 +1,5 @@
-// rank — where a card goes among ranked cards (ADR-0116): a rank just after
-// a card, a drop's rank, and where a branch lands on a canvas, beside the
-// thread it forks from.
+// rank — where a card goes among ranked cards: just after a card, at a drop,
+// and where a branch lands on a canvas.
 
 import {
   type CardId,
@@ -13,12 +12,12 @@ import { orderAfter, orderBetween, respace } from "./order.ts"
 import type { CanvasCard } from "./task.ts"
 
 /**
- * Where a branch of `parent` lands on `canvas` (ADR-0116): the index of the
+ * Where a branch of `parent` lands on `canvas`: the index of the
  * card it goes just after, its parent thread's; the last card's when the
  * parent is not on this canvas or there is none (a new root lands at the
  * end); -1 on an empty canvas. The host ranks a branch's card by it and the
  * page draws the branch's column there (`canvasColumns`), so the column does not
- * move as its first send lands. Pure.
+ * move as its first send lands.
  */
 export function branchAfter(
   canvas: readonly CanvasCard[],
@@ -35,7 +34,7 @@ type RankedCard = CardRecord & { readonly place: OrderedPlace }
  * A rank for a card going just after index `after` of `canvas`, ranked
  * cards in order (-1: before every card), and the cards given new ranks to
  * make room when its neighbours have none between them (`respace`), each
- * at its new rank. Pure.
+ * at its new rank.
  */
 export function rankAfter(
   canvas: readonly RankedCard[],
@@ -68,7 +67,7 @@ export function rankAfter(
  * The rank of a drop among `canvas`, ranked cards in order, just after the
  * card `after` (null: before every card), or at the end when that card is
  * not among them (`CanvasTarget`), with the cards given new ranks to make
- * room (`rankAfter`). Pure.
+ * room (`rankAfter`).
  */
 export function rankOfDrop(
   canvas: readonly RankedCard[],

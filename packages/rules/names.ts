@@ -1,7 +1,6 @@
-// names — a thread's name as people say it (ADR-0039): two words from two
-// lists, chosen once from a hash of the lane's id and stored. Stored, because
-// a name computed at every read could collide unseen, and a changed list
-// would rename every thread.
+// names — a thread's name as people say it. Stored, since a name computed at
+// every read could collide unseen, and a changed list would rename every
+// thread.
 
 import {
   ADJECTIVES,
@@ -78,7 +77,7 @@ export function planNames(
   return planned
 }
 
-/** What a `reserve` command does (ADR-0057). */
+/** What a `reserve` command does. */
 export type ReservePlan =
   /** The id already has a name: nothing to write. */
   | { readonly kind: "known" }
@@ -108,7 +107,7 @@ const NameRecordSchema = Type.Object({
   at: Type.Number(),
 })
 
-/** Each thread's name, `word-word`, at its lane (ADR-0039). */
+/** Each thread's name, `word-word`, at its lane. */
 export const NAME: RecordSpec<NameRecord, ThreadId, "session"> = {
   namespace: "pinetrie.name",
   home: "session",

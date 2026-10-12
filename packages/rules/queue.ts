@@ -1,6 +1,5 @@
-// queue — a thread's queued cards (ADR-0048 step 3, S69): which is popped
-// next to be sent, what a pop carries, what unqueueing writes back, and
-// the cards a run's facts make.
+// queue — a thread's queued cards: which is popped next, what a pop carries,
+// what unqueueing writes back, and the cards a run's facts make.
 
 import {
   type AskCardId,
@@ -32,7 +31,7 @@ import { type PlaceStep, planMake } from "./moves.ts"
 import { toNotes } from "./notes.ts"
 import { orderAfter, orderBetween, respace } from "./order.ts"
 
-// ── the queue (ADR-0048 step 3, S69) ──────────────────────────────────────
+// ── the queue ──────────────────────────────────────
 
 /**
  * A queued card: a card of any kind `KINDS` queues (a text card, a fact on
@@ -46,7 +45,7 @@ export type QueuedText = Extract<QueuedCard, { readonly kind: "text" }>
 
 /**
  * A queued card sent as its queuer's message: a text card, or a reference,
- * whose quote is sent (ADR-0126).
+ * whose quote is sent.
  */
 export type QueuedMessage = Extract<
   QueuedCard,
@@ -81,7 +80,7 @@ export type TaskPinnedCard = TextCard & {
   readonly place: Extract<CardPlace, { kind: "task-pinned" }>
 }
 
-/** The cards pinned to `task` (ADR-0116), in the order they were pinned: by `order`, then id. */
+/** The cards pinned to `task`, in the order they were pinned: by `order`, then id. */
 export const taskPinnedOf = (
   cards: readonly CardRecord[],
   task: TaskId,
@@ -110,7 +109,7 @@ export function queuedOn(
 export type NextQueuedCardPopStep =
   /** It runs, or nothing is queued. */
   | { readonly kind: "idle" }
-  /** Its queue is held, and its top card is a message (ADR-0048 step 7). */
+  /** Its queue is held, and its top card is a message. */
   | { readonly kind: "held" }
   /** Someone is typing in its top card: it waits until they stop. */
   | { readonly kind: "typing"; readonly card: QueuedText }
@@ -122,7 +121,7 @@ export type NextQueuedCardPopStep =
   | { readonly kind: "pop"; readonly card: QueuedCard }
 
 /**
- * A message with no command and nothing but whitespace (ADR-0113): "+ add
+ * A message with no command and nothing but whitespace: "+ add
  * to queue"'s card before anyone writes in it. The drain passes over it,
  * leaving it where it is, rather than send nothing.
  */
@@ -132,10 +131,9 @@ export const isBlankMessage = (card: TextCard, text: string): boolean =>
 /**
  * The queued cards that are blank messages (`isBlankMessage`), as whoever
  * holds their texts reads them: the drain passes over them, and no lane
- * counts them as waiting (ADR-0113). A card whose text `texts` does not yet
+ * counts them as waiting. A card whose text `texts` does not yet
  * hold as its queuer had it is not blank: its record can arrive before its
- * text (S96), and passing over it would send the cards behind it first.
- * Pure.
+ * text, and passing over it would send the cards behind it first.
  */
 export function blankQueued(
   cards: readonly CardRecord[],
@@ -169,14 +167,14 @@ export const NONE_BLANK: ReadonlySet<CardId> = new Set()
  * is held or someone is typing in that card. A blank card is passed over
  * and stays where it is, so the cards behind it are not stuck behind
  * nothing. A fact is popped whatever the hold or the typing: it is nobody's
- * instruction, and starts no run. Pure.
+ * instruction, and starts no run.
  */
 export function planNextQueuedCardPop(
   cards: readonly CardRecord[],
   lane: ThreadId,
   facts: {
     readonly running: boolean
-    /** Its thread is in someone's inventory (`heldIn`, ADR-0124): nothing runs there. */
+    /** Its thread is in someone's inventory (`heldIn`): nothing runs there. */
     readonly away: boolean
     readonly held: boolean
     /** The cards someone is typing in now (`typingIn`). */
@@ -188,9 +186,9 @@ export function planNextQueuedCardPop(
   if (facts.running) return { kind: "idle" }
   const queue = queuedOn(cards, lane)
   const top = queue.find(c => !facts.blank.has(c.id))
-  // A thread in an inventory has no runner (ADR-0124): its messages wait.
+  // A thread in an inventory has no runner: its messages wait.
   // A fact on top starts no run, so it is appended there too: a take's
-  // stop is in the thread, and its face says so (ADR-0126).
+  // stop is in the thread, and its face says so.
   if (facts.away)
     return top !== undefined && isQueuedFact(top)
       ? { kind: "pop", card: top }
@@ -209,11 +207,11 @@ export function planNextQueuedCardPop(
 }
 
 /**
- * Unqueue all (ADR-0048 step 7): every message card queued on the lane
- * back below the line where it was queued, a note (ADR-0113), in queue
+ * Unqueue all: every message card queued on the lane
+ * back below the line where it was queued, a note, in queue
  * order. A fact stays:
  * nobody moves it. Planned by the host from the queue as it is, so a card
- * popped since the click is not in it. Pure.
+ * popped since the click is not in it.
  */
 export const planUnqueueAll = (
   cards: readonly CardRecord[],
@@ -227,12 +225,12 @@ export const planUnqueueAll = (
  * A popped card the host could not send, written back saying why, its
  * command and placer kept, since the host's own write is nobody's move: a
  * note in the column nearest its thread, made in this step when its task
- * has none (`notesOf`, ADR-0116); for a thread in an inventory, in that
- * inventory (ADR-0117). Never queued again, or the next drain would pop it
- * and fail the same way (S69, answer 5). Where it cannot go (that
+ * has none (`notesOf`); for a thread in an inventory, in that
+ * inventory. Never queued again, or the next drain would pop it
+ * and fail the same way (answer 5). Where it cannot go (that
  * inventory full, or a thread with no card), it stays queued, saying why,
  * and its queue is held (`hold`), so the drain passes it by until someone
- * moves it. Pure.
+ * moves it.
  */
 export function planUnsent(input: {
   readonly cards: readonly CardRecord[]
@@ -282,7 +280,7 @@ export const inventoryFull = (
   ).length >= INVENTORY_SLOTS
 
 /**
- * A fact's card (ADR-0080, ADR-0126): queued on its lane, made by the host
+ * A fact's card: queued on its lane, made by the host
  * for whoever acted (`makeCard`, `planMake`), its owner and placer, with no
  * text to wait for (`seen` ""). What a command on the offer did goes after
  * every card there, in order with them. A stop goes before them: it
@@ -290,7 +288,7 @@ export const inventoryFull = (
  * first, whatever the hold (`planNextQueuedCardPop`), and nothing queued
  * may pass it. With no room before the first card, the crowded cards are
  * given new ranks (`respace`), written with it. Null when the host's own
- * make is refused, which no queue does: the host's shell logs it. Pure.
+ * make is refused, which no queue does: the host's shell logs it.
  */
 export function planFactCard(input: {
   readonly cards: readonly CardRecord[]
@@ -346,10 +344,10 @@ export function planFactCard(input: {
 }
 
 /**
- * An ask for a busy agent, queued as an ask card after the cards there
- * (ADR-0128): the host makes it, for the person behind the chain, and the
+ * An ask for a busy agent, queued as an ask card after the cards there:
+ * the host makes it, for the person behind the chain, and the
  * drain relays it when the lane is free. Null when the host's own make is
- * refused, which no queue does. Pure.
+ * refused, which no queue does.
  */
 export function planAskCard(input: {
   readonly cards: readonly CardRecord[]
@@ -380,7 +378,7 @@ export function planAskCard(input: {
 }
 
 /**
- * What the drain does with a popped card (ADR-0080), decided before it acts:
+ * What the drain does with a popped card, decided before it acts:
  * append a fact; catch up through a command, then send the text or, with
  * none, nothing; or send a plain message. A blank plain message is never
  * popped (`isBlankMessage`).
@@ -403,17 +401,17 @@ export type CarryPlan =
   | { readonly kind: "send"; readonly card: QueuedMessage }
   /**
    * A reference whose quote was not read (its blob is missing), or is
-   * empty: nothing is sent, and the queue goes on (ADR-0126).
+   * empty: nothing is sent, and the queue goes on.
    */
   | { readonly kind: "skip"; readonly card: QueuedMessage }
-  /** Relay an ask from another thread: its run starts here (ADR-0128). */
+  /** Relay an ask from another thread: its run starts here. */
   | { readonly kind: "relay"; readonly relay: RelayDetails }
 
 /**
  * A popped card and its words (`textSourceOf`: a text card's document, a
  * reference's quote, a fact's fact) -> what the drain does with it: a
  * reference's quote is sent as a message, with no command, and one with no
- * quote is skipped rather than sent empty. Pure.
+ * quote is skipped rather than sent empty.
  */
 export function planCarry(card: QueuedCard, text: string): CarryPlan {
   if (card.kind === "fact") return { kind: "fact", fact: card.content.fact }

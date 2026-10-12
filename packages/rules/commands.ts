@@ -1,11 +1,5 @@
-// commands — your pi skills and prompt templates, as `/package:name` commands
-// (ADR-0036).
-//
-// pi's own syntax, qualified by the package a command comes from: a prompt
-// template is `/<package>:<name>`, a skill `/<package>:skill:<name>`. So a
-// skill and a template of the same name never collide, and installing a
-// package never changes what a name already meant. Everything here is pure:
-// the host gathers what pi loaded, and reads the file a command names.
+// commands — your pi skills and prompt templates, as `/package:name`
+// commands.
 
 import type {
   CommandKind,

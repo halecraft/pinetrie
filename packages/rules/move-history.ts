@@ -1,5 +1,5 @@
 // move-history — the history of each sender's moves, what an undo of a
-// step answers, and when a history retires (ADR-0066).
+// step answers, and when a history retires.
 
 import {
   type ArchivedTask,
@@ -29,7 +29,7 @@ import {
   taskOfTarget,
 } from "./task.ts"
 
-// ── moves' history (ADR-0066) ─────────────────────────────────────────────
+// ── moves' history ─────────────────────────────────────────────
 
 /**
  * What names a discard's history, the host's to decide: the tasks, and the
@@ -45,7 +45,7 @@ export const NO_DISCARDS: Discards = { tasks: NO_TASK_INDEX, here: null }
 
 /**
  * The history a card leaving `from` for gone is in: the task it leaves,
- * else, from an inventory, the task its sender is on. Pure.
+ * else, from an inventory, the task its sender is on.
  */
 export const discardHistory = (
   from: CardPlace,
@@ -53,8 +53,8 @@ export const discardHistory = (
 ): TaskId | null => taskOfPlace(discards.tasks, from) ?? discards.here
 
 /**
- * The history of the sender's moves `moves` enter, or null for none
- * (ADR-0066, ADR-0116, ADR-0126, ADR-0132). A creation enters one when its
+ * The history of the sender's moves `moves` enter, or null for none.
+ * A creation enters one when its
  * command's `cause` is a paste (a card pasted, a thread copied), or when it
  * is a note column made for a note: the task it lands in, or with none the
  * sender's history outside any task (a slot). A creation a move makes (a
@@ -63,12 +63,12 @@ export const discardHistory = (
  * record, since the host accepts a move only from where the card is. So a
  * take into the inventory is recorded where it left, a put where it went, a
  * drag across tasks where it went, and a discard in the task it leaves
- * (`discardHistory`), which the page does not name (ADR-0066), or, leaving
+ * (`discardHistory`), which the page does not name, or, leaving
  * no task, in its sender's history outside any task. Of several, the first
  * that names a history names the step's: a paste's discard of the card it
  * replaces, when there is one. A place at a thread, or a thread's nearest
  * notes, is in its thread's task, a spot on a canvas in its canvas's
- * (`taskOfTarget`). Pure.
+ * (`taskOfTarget`).
  */
 export function historyOf(
   moves: readonly Move[],
@@ -94,17 +94,17 @@ export function historyOf(
   return null
 }
 
-/** How long an archived task's histories are kept (ADR-0066). */
+/** How long an archived task's histories are kept. */
 const ARCHIVED_HISTORY_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
- * The histories of moves to retire (ADR-0066): those of a task archived
+ * The histories of moves to retire: those of a task archived
  * `ARCHIVED_HISTORY_MS` ago or longer; and, at startup only, those of a
  * task the session does not hold (a new tab that never sent, or a task
  * gone). An id that names no task is left: a person's history outside any
  * task (`moves:<writer>`), or a document no history names. After a run's end that second
  * rule would retire the history of a new tab open now. `stored` is every
- * stored `moves:` document. Pure.
+ * stored `moves:` document.
  */
 export function planHistorySweep(input: {
   readonly stored: readonly string[]
@@ -128,10 +128,10 @@ export function planHistorySweep(input: {
 
 /**
  * Whether an undo or a redo of a step that wrote `cards` would move a
- * task's card across the archive's edge (ADR-0126): the newest event of a
+ * task's card across the archive's edge: the newest event of a
  * task's card among them, the step's own while nobody moved it since, went
  * into or out of the archive. Such an undo is refused `archived`: the
- * board's move gathers what crossing the edge needs. Pure.
+ * board's move gathers what crossing the edge needs.
  */
 export function crossesArchive(
   cards: readonly CardId[],
@@ -186,7 +186,7 @@ type UndoAnswer =
 /**
  * The cards `parts` wrote in the places document `placesId`, each once.
  * Read from a stack's `top` before an undo, they are the cards that undo
- * would move (S139). Pure.
+ * would move.
  */
 export function cardsOfParts(
   parts: readonly StepPart[],
@@ -208,7 +208,7 @@ export function cardsOfParts(
 /**
  * An undo's answer, from what Kyneta did and the cards after it: the cards
  * its step wrote (their footprints in the places document) and where each
- * is now; or, refused, the first card it could not undo as it is now. Pure.
+ * is now; or, refused, the first card it could not undo as it is now.
  */
 export function undoAnswer(
   result: UndoResult,

@@ -1,13 +1,5 @@
-// fact — what the host records in a thread (ADR-0080, ADR-0126): what a
-// command on its offer did (an acceptance, a description asked for again, a
-// squash, a refresh), who stopped a run, a member dismissed or gone, and a
-// budget spent (ADR-0128).
-//
-// A history message (`history.ts`): `content` is what the model reads,
-// `details` the fact, which the column words as one line (`factLine`). It
-// reaches the thread through a fact card (`planFactCard`, `queue.ts`),
-// popped with the other cards: at once on an idle thread, when the run ends
-// on a running one.
+// fact — what the host records in a thread: what a command on its offer did,
+// who stopped a run, a member dismissed or gone, and a budget spent.
 
 import type {
   Away,
@@ -222,9 +214,9 @@ export const encodeFact = (
 ): FactMessage => FACT.encode(fact, factContent(fact, name), timestamp)
 
 /**
- * An acceptance's fact (ADR-0080), from the decision it carried out: the change it
+ * An acceptance's fact, from the decision it carried out: the change it
  * added, the bookmark it moved, and that bookmark as the thread knows it,
- * accepted work or a WIP. Pure.
+ * accepted work or a WIP.
  */
 export const acceptedFact = (input: {
   readonly lane: ThreadId
@@ -233,7 +225,6 @@ export const acceptedFact = (input: {
     OfferAcceptanceDecision,
     { readonly kind: "accept" }
   >
-  /** Accepted work's bookmark. */
   readonly acceptedBookmark: string
 }): OfferFact => {
   const { destination, top } = input.decision
@@ -250,7 +241,7 @@ export const acceptedFact = (input: {
   }
 }
 
-/** The fact of an offer action that is not an acceptance: what it did, and who asked. Pure. */
+/** The fact of an offer action that is not an acceptance: what it did, and who asked. */
 export const actionFact = (
   action: "describe" | "squash" | "refresh",
   lane: ThreadId,

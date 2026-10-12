@@ -1,7 +1,4 @@
-// title — a model's few words for a root, written as the root's mark
-// (ADR-0045, ADR-0074): unasked when the root's first lane starts, or when a
-// person asks for one (Auto-update title). The host carries the plan out
-// (`apps/pinetrie/host/titles.ts`).
+// title — a model's few words for a root, written as the root's mark.
 
 import {
   type AgentId,
@@ -80,7 +77,7 @@ type TitlingPlan =
     }
 
 /**
- * Pure. Whether to ask for `root`'s title, and from what. Unasked, only for
+ * Whether to ask for `root`'s title, and from what. Unasked, only for
  * the root's first lane, with titles on, no mark, and none asked already:
  * from the messages above where the lane starts, and its prompt. Asked,
  * always, from the path to the root's newest message; refused for a root
@@ -89,7 +86,7 @@ type TitlingPlan =
 export function planTitling(input: {
   readonly index: TreeIndex
   readonly root: RootId
-  /** Whether the task has a title already (ADR-0116). */
+  /** Whether the task has a title already. */
   readonly marked: boolean
   /** Every lane's record: which lanes work in `root`. */
   readonly lanes: Iterable<LaneRecord>
@@ -135,7 +132,7 @@ export function planTitling(input: {
 export const TITLE_REQUEST_HEAD = "How it began:"
 
 /**
- * Pure. The request: the skill, the root's first message always, since it
+ * The request: the skill, the root's first message always, since it
  * usually says what the thread is for, then the newest that fit.
  */
 export function titleRequest(input: {
@@ -160,7 +157,7 @@ export function titleRequest(input: {
 const TITLE_WORDS = 5
 
 /**
- * Pure. The model's reply as a title (`bareLine`). Null for a reply of more
+ * The model's reply as a title (`bareLine`). Null for a reply of more
  * than `TITLE_WORDS` words, or one `parseTitle` refuses (more than one line,
  * or too long): the root keeps its label. It never cuts a reply, which could
  * leave "Fixing the".
@@ -173,7 +170,7 @@ export function titleOf(reply: string): string | null {
 }
 
 /**
- * Pure. Whether a title that came back may be written over `stored`, the
+ * Whether a title that came back may be written over `stored`, the
  * root's mark now. One a person asked for always is. An unasked one gives
  * way to any mark written while it was asked.
  */

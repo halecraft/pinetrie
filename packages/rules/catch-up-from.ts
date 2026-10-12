@@ -1,7 +1,5 @@
-// catch-up-from — what a catch-up merges or a thread was told of
-// (`CatchUpFrom`): its stored shape in a thread's history, and every wording
-// of it, for people (`catchUpName`, `baseMovedOn`) and for the model
-// (`incomingWords`).
+// catch-up-from — what a catch-up merges or a thread was told of, and every
+// wording of it.
 
 import type { BaseMerge, CatchUpFrom } from "@pinetrie/core"
 import { Type } from "typebox"
@@ -28,8 +26,8 @@ export const mergedFrom = (merge: BaseMerge): CatchUpFrom =>
 
 /**
  * What a catch-up merges, as people read it: accepted work is
- * "accepted work", whatever its bookmark is called (ADR-0090); a WIP is its
- * bookmark; the thread a thread branched from is its name (ADR-0072). The
+ * "accepted work", whatever its bookmark is called; a WIP is its
+ * bookmark; the thread a thread branched from is its name. The
  * one place it is worded: the bookmark of accepted work goes in titles only.
  */
 export const catchUpName = (from: CatchUpFrom): string =>

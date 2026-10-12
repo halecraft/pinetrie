@@ -54,7 +54,10 @@ follow this list. A name only this package uses is imported from its module.
   agent's `catch_up` and `split_offer` (ADR-0080).
 - `live.ts`: what each stream event, and a run's end and a host's start, do
   to `pinetrie:live`, as `LiveOp`s `@pinetrie/schema`'s `applyLiveOps` writes
-  (`packages/schema/TECHNICAL.md`, Streams).
+  (`packages/schema/TECHNICAL.md`, Streams; ADR-0014, ADR-0107). A stream
+  stays until its entry is written, which is before the next reply's request
+  and by the run's end (S55); a reply's own entry moves its lane's tip in the
+  commit that writes it (S35).
 - `card.ts`, `notes.ts`, `queue.ts`, `moves.ts`, `in-place.ts`,
   `move-history.ts`: a card's record, where it is and the sweep; note
   columns and where a card leaving a thread goes; the queue's pops and
@@ -117,7 +120,9 @@ cannot reach the wrong document and needs no guard at run time.
   Each mention names its thread (`threadAt`), so the inbox reads its task.
   `ROOT` is `derived`: built from the root's document alone, so a record
   that does not decode in this build's shape is rebuilt at a host's start
-  (`host/directory.ts`, `planRebuild`), never migrated.
+  (`host/directory.ts`, `planRebuild`), never migrated. The host refreshes
+  it whenever the root's document changes, so it lags a running turn by one
+  step of the host's queue.
 - **`VERDICT`** (`verdict.ts`, ADR-0077): a thread's last run's verdict,
   keyed by lane, in the session: the run's prompt and last entry, and what
   happened (pending, said, failed, stopped, unclassified), never a level,
@@ -143,7 +148,10 @@ Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
 `@pinetrie/reads` reads from the document; `setIfChanged` writes only a
 record that changed. `RECORD_SPECS` (`specs.ts`) lists every spec, its
 address and decoder, for a check over every record, as a migration's
-(ADR-0096); a test fails when a spec is left out of it.
+(ADR-0096); a test fails when a spec is left out of it. A starting host
+deletes every record whose namespace no spec declares, or that is stored
+outside its spec's home (`planUndeclaredSweep`, ADR-0100), so a renamed,
+retired or rehomed record type leaves nothing behind.
 
 - **The address holds the key; the contents never repeat it.** `encode`
   leaves the key field out (`entry`, `root`, `lane`, `id`, `prompt`,
@@ -171,7 +179,9 @@ address and decoder, for a check over every record, as a migration's
 
 # Chat (`chat.ts`)
 
-A human message is a pi `CustomMessage`, `customType: "pinetrie.chat"` (ADR-0018).
+A human message is a pi `CustomMessage`, `customType: "pinetrie.chat"`
+(ADR-0018), not a custom entry, so the host can append one to a lane without
+a run (S19).
 `content` is the attributed text the model reads ("Alice: …"); `details` hold
 the author (a `WriterId`, from the transport), the display name as written, the
 text, and the `Responder` it compels. `encodeChat` and the total `decodeChat`
@@ -209,7 +219,8 @@ are the only code that builds or reads the shape.
   | compelled `reply`, raced | `conflict` | `conflict` | `conflict` |
   | `queue` (the host's pop) | as `reply` | as `reply` | as `reply` when only cards are queued; `busy` while it runs |
 
-  `busy` writes nothing: the dispatcher queues the chat's card in the same step, and answers `queued` (ADR-0059).
+  `busy` writes nothing, since a lane is never written while it runs (S21):
+  the dispatcher queues the chat's card in the same step, and answers `queued` (ADR-0059).
   `queue` is the host's own mode (`PlanMode`; a client sends a `ChatMode`), for a card it pops, which heads the queue
   it is in: so only a run makes the lane busy, and a race does not count.
   | `branch` | plain: `appendToTree` at its fork; compelled: `createAndRun` at its fork | the same: a branch never continues a lane | the same |
@@ -290,7 +301,8 @@ are the only code that builds or reads the shape.
   appended with no reply, rather than lost; the author already heard
   `started`.
 - **`planStartup`** (`startup.ts`): a starting host resumes every lane a
-  crash interrupted, whose run's end then drains it, and drains every other
+  crash interrupted, before anything queued for it, since it holds its
+  operation open (S36); its run's end then drains it. It drains every other
   lane with cards queued for it, since no run's end will. A verdict left
   pending lost its request with the last host and is `unclassified`, unless
   its lane is resumed. What does not survive a process (runs and streams)
@@ -723,7 +735,9 @@ Both are session records the host writes: `CARD_HISTORY`
 (`pinetrie.trace`, keyed by its own id, since a trace outlives its card). A
 place in them is stored as core's flat key fields (`placeFields`,
 `keyOfFields`), the wire's own codec; an event whose place this build cannot
-read is dropped, not its history.
+read is dropped, not its history. The places document holds neither: it
+grows for good (S90), and a field every event changes would refuse each
+whole undo of a move (S82).
 
 - **`planProvenance` is the one decision**, from the cards before and after
   a write, the cause, the records, the presence pairs (`reading`) and each
@@ -934,7 +948,7 @@ board is the team's: everyone in the session shares it.
 # The archive (`archive.ts`, ADR-0029, ADR-0122, ADR-0116)
 
 A task put aside for everyone: one in the archive. Moving it there or out
-writes only its card's place: entries are immutable, so a task is hidden
+writes only its card's place: entries are immutable (ADR-0004), so a task is hidden
 and made read-only, never removed.
 
 - **`planLanesGone`**: what lanes that will not run again lose, an
@@ -987,7 +1001,7 @@ home).
   refused `unknown_target`; the title already stored, or clearing a task
   with none, is `unchanged` and writes nothing; otherwise `write`, or
   `remove` for a cleared title. The last write wins: nobody types a title
-  together.
+  together, so it is session JSON, not a text (ADR-0023).
 - **Clearing deletes the record.** A stored empty title would read as chosen.
 - **A mark in an archived task is refused by the archive's gate:**
   `writesIn` names a mark's task, so `planMark` has no check of its own.
@@ -1057,7 +1071,7 @@ headline is a digest with nothing to draw. No agent reads it.
 - **`digestDue` is asked on events, never on a timer**: each turn done,
   and the run's end. While the run lasts, only when nothing is asked
   already, someone reads the thread (`readsAsk`, over presence's
-  `reading`) and `DIGEST_EVERY` has passed; at the end, once, for the
+  `reading`, ADR-0024) and `DIGEST_EVERY` has passed; at the end, once, for the
   final one.
 - **`planDigest`** is the decision and the request's parts: a long ask only
   (`isLongAsk`, core's `LONG_ASK`, which the rail draws as a capsule of its own), then `digestDue`, then the
@@ -1151,9 +1165,9 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 
 | record | namespace | key | written |
 |---|---|---|---|
-| a lane's setting: its own copy, or directly in a directory | `pinetrie.lane` | the lane | once, when the lane is created |
+| a lane's setting: the root it works in, and whether it has a copy of its own, stored as `work` (`{ kind: "own" }` or null), as records from when a lane could work directly hold it (ADR-0102) | `pinetrie.lane` | the lane | once, when the lane is created |
 | the commit and disk at an entry, and the paths its commit changed | `pinetrie.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
-| what the host found where it runs: `lanes`, or `direct` and why | `pinetrie.project` | `project` | at every start |
+| what the host found where it runs: its root (an older record's kind and default are not read) | `pinetrie.project` | `project` | at every start |
 
 - **Every run's prompt has a revision record**, so the nearest record above
   any entry names its lane, its commit and its disk (`nearestRevision`, in
@@ -1193,7 +1207,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   above it, else the base snapshot; and the nearest commit, else the
   thread's base (`planBegin`): accepted work's commit, or a WIP's copy on accepted work
   commit under it. The start is always named: a cloned disk carries its
-  parent's working-copy change, and the fork must leave it. A snapshot
+  parent's working-copy change, and the fork must leave it (S42). A snapshot
   that is gone (`kept` false, which the host asks the runtime) is read as
   missing: the fork starts from its base, and names the snapshot `lost`;
   the host records it (`FILES_LOST`, `pinetrie.files-lost`, keyed by lane),
@@ -1218,6 +1232,10 @@ repo. Its record is `OFFER` (`offer.ts`):
 | record | namespace | key | written |
 |---|---|---|---|
 | a lane's offer in your repo | `pinetrie.offer` | the lane | when a trigger changed it, or it was accepted |
+
+A record written before accepted work was named (ADR-0100) holds
+`integratedAs`, which decodes as `acceptedAs`; one written since keeps its
+own, null too.
 
 What the host decides about it is `offer.ts`'s, from the facts
 `@pinetrie/repo` gathers, as decisions typed in `@pinetrie/core`
@@ -1535,11 +1553,13 @@ and the total `decodePinned` are the only code that builds or reads it, and
   compaction's retained tail through it, and `CONTEXT_RULES` are the lines
   `packages/pi` puts in `<rules>`.
 - **The canvas list** (`canvasList`): a line per card on the canvas, in
-  its order, at most `CANVAS_CAP` (50), the rest counted. `planCanvasRead`
+  its order, at most `CANVAS_CAP` (50), the rest counted: its kind, its
+  title and who put it there, never its contents, which only pinned cards
+  give. `planCanvasRead`
   writes it only when it differs from the newest on the path
   (`canvasInView`), so an unchanged canvas keeps the prompt's cache.
 - **A card added or taken while a run goes on** is a fact line steered
-  into the lane (`planCanvasFacts`, `encodeCanvasFact`), never a queued fact
+  into the lane after the turn in flight, as base news is (S103) (`planCanvasFacts`, `encodeCanvasFact`), never a queued fact
   card, which the drain would pop only after the run. Reorders and widths
   wait for the next run's list.
 - **Cards pinned to the task** (`task-pinned` places, `taskPinnedOf`) are
@@ -1606,13 +1626,14 @@ the tip it must match, and the bookmark to leave on it.
   `then` is forbidden by the linter, hence `after`.
 - **`planBaseNews` is one decision** for a lane whose base has new work:
   `tell` (a behind entry, `pinetrie.behind`, before the run's prompt and its
-  cards entry, or a steer into a running lane), `catch-up` (a lane whose
+  cards entry, or a steer into a running lane, S103), `catch-up` (a lane whose
   work changes no file, `BaseRecord.work`, is caught up quietly before a
   chat's run: `planChat`'s `catch-up-first`), or `nothing`. What the thread
   already heard of or merged is read from the tree (`baseKnown`, core), so
   a commit is told once, and again only past a compaction.
 - **`planCatchUpCall`** decides `catch_up` from the documents before
-  anything is queued: a lane of its own, the only call in its turn, and new
+  anything is queued: a lane of its own, the only call in its turn (a
+  sibling's edit would leave the copy, S103), and new
   work (`brings`, or `unknown`, which the merge's own read decides). The
   parent only when it is ahead and idle. `planCopyReady` refuses a working
   copy off its lane's line (`off-line`), and a repo with no bookmark of the
@@ -1692,7 +1713,7 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
 
 - **Three history messages.** `pinetrie.heard` (role `heard`, a one-line
   message): what an asked agent was told of the thread that asked, its text
-  frozen in `content`, the source ids in `details`. `pinetrie.relay` (role
+  frozen in `content` (S144), the source ids in `details`. `pinetrie.relay` (role
   `relay`): the ask, the asked agent's prompt, carrying where it came from,
   its asker, its chain's budget and the person behind it (`by`).
   `pinetrie.answer` (role `answer`): the asked agent's last message, in the
@@ -1719,7 +1740,9 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
 - **A budget** (`BUDGET`, keyed by the person's message that set it) holds
   its limit, its count as of the last write, and `over`. `planSpend`
   counts, and returns the record to write only when a spend crosses the
-  limit; `mayRequest` reads it. The user config's
+  limit, or at a run's end, so a session write is not made for every model
+  request: the host counts what runs spend live (`budgets.ts`). `mayRequest`
+  reads it. The user config's
   `agents.budget` is `decodeAgentsConfig`'s.
 - **Facts**: `dismissed` and `left` (a member gone, read by `threadMembers`),
   `unanswered`, `round` (what the round told the people) and

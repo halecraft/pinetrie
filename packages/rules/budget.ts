@@ -1,12 +1,5 @@
-// budget — the tokens agents may spend talking (ADR-0128). A person's message
-// that leads to agents talking sets one, keyed by that message: every run
-// an ask or an answer starts spends from it, and so do those runs' verdict,
-// digest and round requests. The person's own run spends nothing from it.
-//
-// What has been spent while runs go on is counted live (the host's
-// `budgets.ts`); the record holds the limit, and is rewritten only when the
-// count crosses it and at a run's end, so a session write is
-// not made for every model request.
+// budget — the tokens agents may spend talking, keyed by the person's message
+// that set them talking.
 
 import type { EntryId, ThreadId, ValueWrite, WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
@@ -69,7 +62,6 @@ export function decodeAgentsConfig(json: unknown): number {
     : DEFAULT_BUDGET
 }
 
-/** A new budget for `message`. Pure. */
 export const newBudget = (input: {
   readonly message: EntryId
   readonly thread: ThreadId
@@ -86,7 +78,7 @@ export interface Spend {
 
 /**
  * `tokens` more spent from `record`, whose live count is `spent`. The
- * record is rewritten only by the spend that crosses its limit. Pure.
+ * record is rewritten only by the spend that crosses its limit.
  */
 export function planSpend(
   record: BudgetRecord,
@@ -103,6 +95,6 @@ export function planSpend(
   }
 }
 
-/** Whether a run spending `record` may make another model request. Pure. */
+/** Whether a run spending `record` may make another model request. */
 export const mayRequest = (record: BudgetRecord | undefined): boolean =>
   record === undefined || !record.over

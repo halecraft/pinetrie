@@ -1,7 +1,5 @@
-// What a one-shot model request outside a thread is made from: a thread's
-// messages as lines, and the newest of them that fit a budget, as the commit
-// message's request (`describeRequest`, below) uses them; and a one-line
-// answer read back (`bareLine`).
+// request — what a one-shot model request outside a thread is made from, and
+// a one-line answer read back (`bareLine`).
 
 import { firstLine, type TranscriptMessage } from "@pinetrie/core"
 
@@ -23,8 +21,8 @@ export const transcriptLine = (
 
 /**
  * The roles spoken by someone a line names: a person's chat, pi's own user
- * message, and an ask from another thread or an asked agent's answer
- * (ADR-0128), whose speakers are the asker and the answering thread.
+ * message, and an ask from another thread or an asked agent's answer,
+ * whose speakers are the asker and the answering thread.
  */
 const SPOKEN: ReadonlySet<string> = new Set(["chat", "user", "relay", "answer"])
 
@@ -104,7 +102,7 @@ export function describeRequest(input: {
 const WRAPPED = /^["'`*_“‘]+|["'`*_”’]+$/g
 
 /**
- * Pure. A model's one-line answer (a title, a digest's headline) without
+ * A model's one-line answer (a title, a digest's headline) without
  * surrounding quotes or emphasis, or a trailing full stop, colon or the
  * like.
  */

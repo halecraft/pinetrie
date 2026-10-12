@@ -93,7 +93,7 @@ const EACH: { readonly [K in PlacedKind]: CardRecord } = {
 
 const kinds = Object.keys(EACH) as PlacedKind[]
 
-describe("a card's content as stored (CARD_CODEC, ADR-0126)", () => {
+describe("a card's content as stored (CARD_CODEC)", () => {
   test.each(kinds)("a %s card round-trips", kind => {
     const card = EACH[kind]
     const stored = JSON.parse(JSON.stringify(encodeCard(card)))

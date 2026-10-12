@@ -1,10 +1,5 @@
-// spin-off — a text card that becomes a thread (ADR-0111, ADR-0113,
-// ADR-0126): dropped on a workflow state, or in the sidebar, it opens a new
-// conversation root's first thread in a new task (`planThreadOpen`), whose
-// record says it was spun from the card, sends the card's text as its first
-// message, and moves the card to its sender's trash. The undo key lifts the
-// root back into the card while the root holds that first message alone
-// (S139). Pure.
+// spin-off — a text card that becomes a thread, and the undo that lifts it
+// back into the card.
 
 import {
   type CardHistoryRecord,
@@ -37,7 +32,7 @@ export interface SpinOffPlan {
   readonly kind: "spin"
   /** The new conversation root. */
   readonly root: RootId
-  /** The thread its first message starts (ADR-0117). */
+  /** The thread its first message starts. */
   readonly thread: ThreadId
   /** Its record, its task's, and its card on its task's canvas (`planThreadOpen`). */
   readonly open: Extract<ThreadOpen, { kind: "open" }>
@@ -113,7 +108,7 @@ export function planSpinOff(input: {
 
 /**
  * What a lift needs to know of a thread spun from a card an undo moves
- * (its record's `origin`, ADR-0126).
+ * (its record's `origin`).
  */
 export interface SpunThread {
   readonly thread: ThreadId
@@ -142,13 +137,13 @@ export type LiftPlan =
 
 /**
  * Whether an undo that moves cards spun into threads (`spun`, those whose
- * record names a card the step moves, S139) may lift those threads back:
+ * record names a card the step moves) may lift those threads back:
  * each must hold its first message alone, with no lane and no card in it
  * but those the undo moves (`lifting`), and its card must still be where
  * the spin-off put it, alone on its task's canvas with nothing pinned to
- * the task (ADR-0124): an undo restores exactly what was there, or does
+ * the task: an undo restores exactly what was there, or does
  * nothing. A thread the directory no longer names has nothing to lift.
- * Refused `replied`, naming who wrote second, when any holds more. Pure.
+ * Refused `replied`, naming who wrote second, when any holds more.
  */
 export function planLiftRoot(input: {
   readonly lifting: readonly CardId[]

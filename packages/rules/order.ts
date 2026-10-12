@@ -1,7 +1,5 @@
 // order — order keys: a field on each item that sorts a list by plain string
-// comparison (S69), so two writers ordering one list never put an item in it
-// twice. A lane's queue and pinned cards (`card.ts`) and the board's roots
-// (`board.ts`) use them.
+// comparison, so two writers ordering one list never put an item in it twice.
 
 /**
  * Order keys are fixed-width base-36 integers, so string order is numeric
@@ -73,7 +71,7 @@ export const orderKeys = (n: number): readonly string[] =>
  * found none: the fewest keys around `index` given new ones, spread evenly
  * between the nearest keys outside them. The window widens one key each
  * side until every key in it, and the new one, fits at least two apart.
- * Returns the keys that change, by index, and the new key. Pure.
+ * Returns the keys that change, by index, and the new key.
  */
 export function respace(
   orders: readonly string[],

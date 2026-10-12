@@ -1,8 +1,6 @@
-// thread — a thread's record (ADR-0117): its root, who started it and when,
-// and how it began: a root's first thread, spun from a card or not, or a
-// fork at an entry, a branch or a copy. Where a thread starts and ends is the
-// tree's (each entry's `thread`, `firstOf` and `threadEnd` in @pinetrie/core,
-// ADR-0125), never a record's.
+// thread — a thread's record. Where a thread starts and ends is the tree's
+// (each entry's `thread`, `firstOf` and `threadEnd` in @pinetrie/core), never
+// a record's.
 
 import {
   entryId,

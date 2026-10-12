@@ -1,9 +1,5 @@
-// copy — a thread copied (ADR-0117, ADR-0124): a new thread forked at the
-// source's end as its copier saw it, put as its own card where it was
-// dropped. It writes no entry: its record names its fork, and its first send
-// is a branch there, as any branch's is, which starts its lane when it asks
-// the agent (ADR-0021). The fork stays in its record after that send, so
-// its fork row can say it was copied. Pure.
+// copy — a thread copied: a new thread forked at the source's end, put as its
+// own card where it was dropped.
 
 import {
   type CardRecord,
@@ -36,7 +32,7 @@ export type CopyPlan =
       /**
        * `unknown`: the source has no record, or `end` is not in it;
        * `taken`: the copy's id names a thread already; `held`: someone
-       * else holds the source (ADR-0117); or a move's refusal.
+       * else holds the source; or a move's refusal.
        */
       readonly why: "unknown" | "taken" | "held" | MoveRefusal
     }

@@ -17,7 +17,7 @@ const BLOCK = {
   block: { kind: "table", n: 0 },
 } as const
 
-describe("links to addresses (ADR-0126)", () => {
+describe("links to addresses", () => {
   test("a put's link is found again in the text, with its label; one in code is text", () => {
     const text = `see ${addressLink(BLOCK, "the [plan] table")} and \`${addressLink(BLOCK, "x")}\``
     expect(addressLinks(text)).toEqual([
@@ -48,7 +48,7 @@ describe("links to addresses (ADR-0126)", () => {
   })
 })
 
-test("linkedQuotes: each past referent a message links to, from the message it is in; a thread's link, or an entry not held, none", () => {
+test("linkedQuotes: each past referent a message links to, from the message it is in", () => {
   const text = [
     addressLink(BLOCK, "the table"),
     addressLink({ kind: "thread", thread: T }, "a thread"),

@@ -1,16 +1,16 @@
-// startup — what a starting host does with the lanes it finds, pure.
+// startup — what a starting host does with the lanes it finds.
 
 import type { CardRecord, ThreadId, VerdictRecord } from "@pinetrie/core"
 import { queuedOn } from "./queue.ts"
 
 /**
- * What a starting host runs, pure. A lane a crash interrupted holds its
- * operation open, so it is resumed before anything queued for it (S36 item
- * 18), and its run's end drains it. Every other lane with cards queued for
- * it is drained, since no run's end will. A verdict left pending lost its
- * request with the last host, and is `unclassified`, unless its lane is
- * resumed, whose run's end writes another (ADR-0077). What does not survive
- * a process (runs, streams) is cleared first (`planClear`, `live.ts`).
+ * What a starting host runs. A lane a crash interrupted holds its operation
+ * open, so it is resumed before anything queued for it, and its run's end
+ * drains it. Every other lane with cards queued for it is drained, since no
+ * run's end will. A verdict left pending lost its request with the last host,
+ * and is `unclassified`, unless its lane is resumed, whose run's end writes
+ * another. What does not survive a process (runs, streams) is cleared first
+ * (`planClear`, `live.ts`).
  */
 export function planStartup(input: {
   readonly cards: readonly CardRecord[]

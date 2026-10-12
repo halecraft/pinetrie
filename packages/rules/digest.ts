@@ -1,8 +1,4 @@
-// digest — a model's headline and few points for a long ask's work
-// (ADR-0106, ADR-0075), unless the user config turns digests off. The record
-// is a host-written `pinetrie.digest` value keyed by the ask's prompt; no agent
-// reads it, so it puts no tokens in any context. The host carries the plan
-// out (`apps/pinetrie/host/digests.ts`).
+// digest — a model's headline and few points for a long ask's work.
 
 import {
   type AskIndex,
@@ -67,7 +63,7 @@ const words = (text: string): number => text.split(/\s+/).length
 const BULLET = /^[-*] +/
 
 /**
- * Pure. The model's reply as a digest: its first line the headline
+ * The model's reply as a digest: its first line the headline
  * (`bareLine`, leading `#`s dropped), every other line a `- ` or `* ` point,
  * or `nothing to add` alone for none. Null for a reply in any other shape,
  * or with a headline, a point or a list too long: the stored digest stays.
@@ -88,12 +84,12 @@ export function digestOf(reply: string): DigestBody | null {
   return { headline, points }
 }
 
-/** Pure. Points as a markdown list, one `- point` line each. */
+/** Points as a markdown list, one `- point` line each. */
 export const pointsText = (points: readonly string[]): string =>
   points.map(p => `- ${p}`).join("\n")
 
 /**
- * Pure. A digest in the shape the model is asked to answer in, so
+ * A digest in the shape the model is asked to answer in, so
  * `digestOf(digestText(b))` is `b`: the request's summary so far, and the
  * rail's tooltip.
  */
@@ -104,7 +100,7 @@ export const digestText = (body: DigestBody): string =>
 
 // ── the setting ───────────────────────────────────────────────────────────
 
-/** The user config's `digests`: on unless `enabled` is `false` (ADR-0071). Total. */
+/** The user config's `digests`: on unless `enabled` is `false`. Total. */
 export const decodeDigestConfig = (json: unknown): boolean =>
   recordOf(recordOf(json)?.digests)?.enabled !== false
 
@@ -114,7 +110,7 @@ export const decodeDigestConfig = (json: unknown): boolean =>
 export const DIGEST_EVERY = 60_000
 
 /**
- * Pure. Whether to ask for an ask's digest now. It is asked on events, a
+ * Whether to ask for an ask's digest now. It is asked on events, a
  * turn done and a run's end, never on a timer: those are when there is
  * something new to say. At the end, once, for the final one. While the run
  * lasts, only when nothing is asked already, someone has a column reading
@@ -148,7 +144,7 @@ export interface AskLines {
 }
 
 /**
- * Pure. `ask`'s run as transcript lines, or null for a run with no entry.
+ * `ask`'s run as transcript lines, or null for a run with no entry.
  * The lines come from the ask's own entries, walked up from its run's last
  * entry, so they do not depend on where its lane went after. `said` is
  * worded from the prompt itself: `transcriptLines` leaves out a land or
@@ -182,7 +178,7 @@ export interface DigestPlan extends AskLines {
 }
 
 /**
- * Pure. The digest to ask for `ask` now, or null: none for a short ask
+ * The digest to ask for `ask` now, or null: none for a short ask
  * (`isLongAsk`) or when `digestDue` says no. Its lines are `askLines`.
  */
 export function planDigest(input: {
@@ -207,7 +203,7 @@ export function planDigest(input: {
 }
 
 /**
- * Pure. The record to write for a reply that came back, or null for none.
+ * The record to write for a reply that came back, or null for none.
  * A live one can come back after the final one was written: it is dropped,
  * so the final one stays. A refused live one leaves the last good digest. A
  * refused final one writes an empty final digest, since a live headline says
@@ -230,7 +226,7 @@ export function digestToWrite(input: {
 
 /**
  * What a request asks the model to answer with. At a run's end it is asked
- * for the verdict too (ADR-0077), first, then the digest when there is one
+ * for the verdict too, first, then the digest when there is one
  * to ask for.
  */
 export type Answer = "digest" | "verdict" | "verdict and digest"
@@ -282,8 +278,8 @@ export function digestRequest(input: {
 }
 
 /**
- * Pure. Whether someone has a column reading an ask: a column's reported end
- * (presence's `reading`, ADR-0024) is the lane's tip, the ask's message, or
+ * Whether someone has a column reading an ask: a column's reported end
+ * (presence's `reading`) is the lane's tip, the ask's message, or
  * an entry of its work, so it follows the run.
  */
 export function readsAsk(

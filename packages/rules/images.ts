@@ -1,8 +1,5 @@
-// rules/images — the images a message's markdown shows (ADR-0042).
-//
-// The host decides what a sent message's images are from the tree the client
-// draws (`parseMarkdown`), so the images it finds are the ones the client
-// draws. A pasted image is `![name](/blob/<sha256>)`.
+// rules/images — the images a message's markdown shows, read from the tree
+// the client draws (`parseMarkdown`).
 
 import {
   blobOfUrl,
@@ -70,7 +67,7 @@ type ImagesDecision =
 /**
  * A message's images, from the blobs its text shows and the refs the store
  * holds of them; refused if one is not stored, since the model would then
- * not see what the sender saw. Pure.
+ * not see what the sender saw.
  */
 export function planImages(
   shas: readonly Sha256[],

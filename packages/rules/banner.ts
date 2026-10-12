@@ -1,6 +1,5 @@
 // banner — the image in a thread's column header: whether a thread gets one,
-// what the image model is asked, the setting that turns it on, and its
-// record (`pinetrie.banner`). The host carries the plan out.
+// what the image model is asked, the setting that turns it on, and its record.
 
 import {
   type BannerRecord,
@@ -69,7 +68,7 @@ export interface BannerAsk {
 }
 
 /**
- * Pure. Whether a thread, just named or at its run's end, is due a banner:
+ * Whether a thread, just named or at its run's end, is due a banner:
  * only when it has none and none is being made. So a new thread gets one as
  * it is named, enabling banners never makes one for every old thread, and a
  * failed one is tried again at the thread's next run's end.
@@ -86,7 +85,7 @@ type AskPlan =
   | { readonly kind: "refused"; readonly reason: "not_stored" }
 
 /**
- * Pure. A pasted image is used when stored and refused otherwise; anything
+ * A pasted image is used when stored and refused otherwise; anything
  * else makes a new one, even while one is being made.
  */
 export const planAsk = (

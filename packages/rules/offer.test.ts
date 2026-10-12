@@ -106,7 +106,7 @@ describe("planRefresh", () => {
   })
   /** What `planRefresh` decides, by its kind. */
   const plan = (f: RefreshFacts) => planRefresh(f).kind
-  test("no offer in your repo (never built, accepted, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten", () => {
+  test("no offer in your repo: build, unless the lane holds nothing you lack", () => {
     expect(plan(facts(null))).toBe("build")
     expect(plan(facts(null, TIP, [TIP]))).toBe("forget")
   })
@@ -117,12 +117,12 @@ describe("planRefresh", () => {
       "leave",
     )
   })
-  test("what jj could not tell never builds an offer, and keeps one that is there (ADR-0067)", () => {
+  test("what jj could not tell never builds an offer, and keeps one that is there", () => {
     expect(plan(facts(null, TIP, [BASE], "unknown"))).toBe("forget")
     expect(plan(facts(read(), TIP, [BASE], "unknown"))).toBe("none")
     expect(plan(facts(read(), T2, [BASE], "unknown"))).toBe("rebuild")
   })
-  test("an untraced start builds nothing, withdraws an offer, and leaves one you edited, or one divergent, untouched (S97)", () => {
+  test("an untraced start builds nothing, withdraws an offer, and leaves one you edited, or one divergent, untouched", () => {
     const untraced: StartRead = {
       kind: "untraced",
       acceptedOfferCommits: [BASE],
@@ -196,7 +196,7 @@ describe("planRefresh", () => {
   test("an offer with no ledger, built before offers carried one, reads as moved: it is followed once", () => {
     expect(plan(facts(read({ ledger: null })))).toBe("rebuild")
   })
-  test("you edited it: a version of yours that changed a revision, a commit of yours between, or its bottom moved (S48 item 7)", () => {
+  test("you edited it: a version of yours that changed a revision, a commit of yours between, or its bottom moved", () => {
     const changed = { reached: true, yoursChanged: true }
     expect(plan(facts(read({ revisions: [rev(changed)] })))).toBe("leave")
     expect(plan(facts(read({ revisions: [rev(changed), rev()] }), T2))).toBe(
@@ -205,7 +205,7 @@ describe("planRefresh", () => {
     expect(plan(facts(read({ chained: false })))).toBe("leave")
     expect(plan(facts(read({ placed: false, onTarget: false })))).toBe("leave")
   })
-  test("a revision the host never made is yours; a version only the host made is not (S73)", () => {
+  test("a revision the host never made is yours; a version only the host made is not", () => {
     expect(
       plan(
         facts(
@@ -288,7 +288,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
 })
 
 describe("records", () => {
-  test("an offer, accepted work and a base round-trip (ADR-0104)", () => {
+  test("an offer, accepted work and a base round-trip", () => {
     const o = setRecord(OFFER, offer)
     expect([o.namespace, o.key]).toEqual(["pinetrie.offer", LANE])
     expect(OFFER.decode(structuredClone(o.value), LANE)).toEqual(offer)
@@ -326,7 +326,7 @@ describe("records", () => {
     expect([b.namespace, b.key]).toEqual(["pinetrie.base", LANE])
     expect(BASE_RECORD.decode(structuredClone(b.value), LANE)).toEqual(base)
     // One stored before what catching up changes was read: dropped, so the
-    // page reads it as unknown until the host writes it again (ADR-0067).
+    // page reads it as unknown until the host writes it again.
     const {
       catchUp: _c,
       untraced: _u,
@@ -375,7 +375,7 @@ describe("the update and stack messages", () => {
       "The work on wip/a was merged",
     )
   })
-  test("an update from the thread it branched from names it, for the column and the model (ADR-0072)", () => {
+  test("an update from the thread it branched from names it, for the column and the model", () => {
     const fromParent = {
       ...details,
       from: {
@@ -440,7 +440,7 @@ describe("the update and stack messages", () => {
     expect(renderableMessage(m)).toMatchObject({ role: "stack" })
     expect(m.content).not.toContain("What the person asked")
   })
-  test("a split card's text is the stack's brief, under its own heading, last (ADR-0080)", () => {
+  test("a split card's text is the stack's brief, under its own heading, last", () => {
     const m = planStack({
       skill: null,
       bookmark: "pinetrie/t-1-stack",
@@ -454,7 +454,7 @@ describe("the update and stack messages", () => {
   })
 })
 
-describe("offerAcceptanceDestinations (ADR-0104)", () => {
+describe("offerAcceptanceDestinations", () => {
   const line = { kind: "accepted" } as const
   const wip = { kind: "wip", bookmark: "wip/x" } as const
   const of = (
@@ -489,7 +489,7 @@ describe("offerAcceptanceDestinations (ADR-0104)", () => {
   })
 })
 
-describe("the offer's policy over a gather (ADR-0105, ADR-0104)", () => {
+describe("the offer's policy over a gather", () => {
   const NAME = "amber-fox" as ThreadName
   const NOT_YOURS = { reached: true, yoursChanged: false }
   const START = commitId("s0")
@@ -628,7 +628,7 @@ describe("the offer's policy over a gather (ADR-0105, ADR-0104)", () => {
     ])
   })
 
-  describe("planOfferAcceptance (ADR-0104, ADR-0065)", () => {
+  describe("planOfferAcceptance", () => {
     const o = read({
       revisions: [
         { commit: commitId("b1"), change: "kbot", since: NOT_YOURS },
@@ -834,7 +834,7 @@ describe("the offer's policy over a gather (ADR-0105, ADR-0104)", () => {
       facts: StackFacts | "no-top" = { revisions: sources, differing: [] },
       gathered: OfferGather | null = gather(),
     ) => planStackEnded({ stack: span, facts, gathered })
-    test("a stack of exactly the tip's files is built from its own start and tip, its revisions bottom first, the offer's abandoned", () => {
+    test("a stack of exactly the tip's files is built from its own start and tip, bottom first", () => {
       expect(stack()).toEqual({
         kind: "rebuild",
         name: NAME,
@@ -915,7 +915,7 @@ describe("the offer's policy over a gather (ADR-0105, ADR-0104)", () => {
     })
   })
 
-  describe("a commit message: asked, then settled (ADR-0105)", () => {
+  describe("a commit message: asked, then settled", () => {
     test("planDescribeAsk: the offer's one revision while it is on its WIP line, or forced", () => {
       expect(planDescribeAsk(gather(), false)).toBe(NOW_COMMIT)
       expect(

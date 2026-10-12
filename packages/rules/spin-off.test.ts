@@ -49,7 +49,7 @@ const card = (over: Partial<TextCard> = {}): TextCard => ({
   ...over,
 })
 
-describe("planSpinOff (ADR-0111)", () => {
+describe("planSpinOff", () => {
   const plan = (
     over: {
       cards?: CardRecord[]
@@ -78,7 +78,7 @@ describe("planSpinOff (ADR-0111)", () => {
       now: 5,
     })
 
-  test("the thread opens spun from the card in its new task, its first message the card's text, trimmed, naming no agent; the card goes to the trash, recording where it was", () => {
+  test("the thread opens spun from the card, its first message the card's text, trimmed, naming no agent", () => {
     const planned = plan()
     expect(planned).toMatchObject({
       kind: "spin",
@@ -125,7 +125,7 @@ describe("planSpinOff (ADR-0111)", () => {
   })
 })
 
-describe("planLiftRoot (S139)", () => {
+describe("planLiftRoot", () => {
   const gone = card({
     place: { ...spun, left: { kind: "inventory", holder: ADA } },
   })
@@ -206,7 +206,7 @@ describe("planLiftRoot (S139)", () => {
       { kind: "replied", by: null },
     ],
     [
-      "its thread's card taken into an inventory: refused (ADR-0124)",
+      "its thread's card taken into an inventory: refused",
       thread([ADA]),
       {
         cards: [
@@ -217,7 +217,7 @@ describe("planLiftRoot (S139)", () => {
       { kind: "replied", by: null },
     ],
     [
-      "its thread's card moved since it was made: refused (ADR-0124)",
+      "its thread's card moved since it was made: refused",
       thread([ADA]),
       {
         histories: new Map([
@@ -242,7 +242,7 @@ describe("planLiftRoot (S139)", () => {
       { kind: "replied", by: null },
     ],
     [
-      "another card on its task's canvas: refused (ADR-0124)",
+      "another card on its task's canvas: refused",
       thread([ADA]),
       {
         cards: [
@@ -264,7 +264,7 @@ describe("planLiftRoot (S139)", () => {
       { kind: "replied", by: null },
     ],
     [
-      "a card pinned to its task: refused (ADR-0124)",
+      "a card pinned to its task: refused",
       thread([ADA]),
       {
         cards: [
@@ -318,7 +318,7 @@ describe("planLiftRoot (S139)", () => {
   })
 })
 
-test("planRootDelete: its directory record, its thread's, its task's title, the cards in it, on its task's canvas and the task's own, its document and the task's stacks", () => {
+test("planRootDelete: the root's records, its task's cards and title, its document and stacks", () => {
   const inThread = card({
     id: cardIdFor("c2"),
     place: { ...note, thread: STARTS },

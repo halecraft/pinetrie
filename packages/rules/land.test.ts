@@ -206,7 +206,7 @@ describe("planResolution: the land message", () => {
           expect(Math.ceil(m.content.length / 4)).toBeLessThanOrEqual(tokens)
         }
   })
-  test("a conflict the size of S106's shows its files by name, within 20 000 tokens", () => {
+  test("a conflict of 38 large files shows each by name, within 20 000 tokens", () => {
     const files = Array.from({ length: 38 }, (_, i) =>
       file(
         `f${i}.ts`,
@@ -219,7 +219,7 @@ describe("planResolution: the land message", () => {
     expect(m.content).toContain("## f37.ts")
     expect(m.content).toContain("each file below is named only")
   })
-  test("the floor: too large only when the skill and the person's text overflow; else the count message, for any number of files", () => {
+  test("the floor: too large only when the skill and the person's text overflow", () => {
     expect(
       resolutionFloor({
         budget: budgetOf(100),

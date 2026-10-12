@@ -43,7 +43,7 @@ const offer: OfferRecord = {
   at: 10,
 }
 
-describe("the review (ADR-0047)", () => {
+describe("the review", () => {
   const C1 = commitId("c1")
   const C2 = commitId("c2")
   const open: OfferRecord = { ...offer, commits: [C1, C2] }
@@ -92,7 +92,7 @@ describe("the review (ADR-0047)", () => {
     }
     expect([path(""), path("a\nb"), path("a\u007f")]).toEqual([400, 400, 400])
   })
-  test("planOfferRead: a range only between two commits one lane's turns recorded (ADR-0106)", () => {
+  test("planOfferRead: a range only between two commits one lane's turns recorded", () => {
     const OTHER = threadIdFor("other")
     const record = (entry: string, lane: typeof LANE, commit: string) =>
       [

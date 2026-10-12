@@ -78,7 +78,7 @@ const plan = (
     ...over,
   })
 
-describe("planArchive (ADR-0116)", () => {
+describe("planArchive", () => {
   test("archiving tears down and lets go of the roots nothing else holds a thread of", () => {
     expect(plan()).toEqual({
       kind: "cross",
@@ -113,7 +113,7 @@ describe("planArchive (ADR-0116)", () => {
       plan({ crossing: "restore", lanes: [lane("mine", { running: true })] }),
     ).toMatchObject({ kind: "cross", unload: [] })
   })
-  describe("what follows the record, off the documents' keeper (ADR-0065)", () => {
+  describe("what follows the record, off the documents' keeper", () => {
     const [A, B] = [threadIdFor("la"), threadIdFor("lb")]
     const revision = (
       entry: string,
@@ -158,7 +158,7 @@ describe("planArchive (ADR-0116)", () => {
         unload: [TEST_ROOT],
       })
     })
-    test("archive keeps the snapshot nearest each thread's end, a copy's files (ADR-0124)", () => {
+    test("archive keeps the snapshot nearest each thread's end, a copy's files", () => {
       // A conversation thread from `a`, which A's turn there recorded.
       const T = threadIdFor("talk")
       const forked = indexTree(
@@ -175,7 +175,7 @@ describe("planArchive (ADR-0116)", () => {
         teardown: { snapshots: [] },
       })
     })
-    test("restore: each lane's ref back at its tip's nearest revision; none without a tip; nothing forgotten or deleted, nor unloaded", () => {
+    test("restore: each lane's ref back at its tip's nearest revision", () => {
       expect(plan({ crossing: "restore", own, revisions })).toMatchObject({
         teardown: {
           forget: [],
@@ -195,7 +195,7 @@ const NOTES_X = cardIdOfKind(
   "01a0ffd2-0000-7000-8000-0000000000a1",
 )
 
-describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
+describe("writesIn: the tasks a command writes in", () => {
   // LANE_X's card is on OTHER_TASK's canvas, T_B's on TASK's.
   const cards: CardRecord[] = [
     threadCardOf({ thread: LANE_X, task: OTHER_TASK, by: BEA, cards: [] }),
@@ -301,7 +301,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
     ],
     ["a reservation", { kind: "reserve", lane: threadIdFor("x") }, []],
     [
-      "a copy: the task its card lands in, never its source's, which may be archived (ADR-0117)",
+      "a copy: the task its card lands in, never its source's, which may be archived",
       {
         kind: "copy-thread",
         source: LANE_X,
@@ -378,7 +378,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
       [TASK],
     ],
     [
-      "a thread opened: the task its card lands in (ADR-0126)",
+      "a thread opened: the task its card lands in",
       {
         kind: "open-thread",
         thread: threadIdFor("new"),
@@ -390,7 +390,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
       [OTHER_TASK],
     ],
     [
-      "an undo of moves outside any task: none (ADR-0126)",
+      "an undo of moves outside any task: none",
       { kind: "undo-move", task: null, direction: "undo" },
       [],
     ],

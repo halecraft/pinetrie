@@ -1,6 +1,5 @@
-// notes — note columns and the notes in them (ADR-0116): where a card
-// leaving a thread goes (`nearestNoteColumn`, `toNotes`), and a note's
-// place at its column's end.
+// notes — note columns and the notes in them: where a card leaving a thread
+// goes, and a note's place at its column's end.
 
 import {
   type CanvasPlace,
@@ -22,7 +21,7 @@ import { orderAfter } from "./order.ts"
 import { rankAfter } from "./rank.ts"
 import { type CanvasCard, canvasOf } from "./task.ts"
 
-// ── note columns (ADR-0116) ────────────────────────────────────────────────
+// ── note columns ────────────────────────────────────────────────
 
 /** A note, with its place narrowed. */
 export type NoteCard = TextCard & {
@@ -46,13 +45,13 @@ export const notesIn = (
 export const NEW_NOTES_TITLE = "Notes"
 
 /**
- * Where a card leaving a queue or pinned cards goes (ADR-0116), from
+ * Where a card leaving a queue or pinned cards goes, from
  * `canvas`, the cards of its task in order: the note column nearest the
  * card of `from`, the thread whose they were, or, with null, the task
  * column, which stands before every card (a card pinned to the task); the
  * one after on a tie. With none, a new one goes just after that card
  * (`make`, after canvas index `after`, -1 for first). `none` when the thread
- * is not on `canvas`. Pure.
+ * is not on `canvas`.
  */
 export function nearestNoteColumn(
   canvas: readonly CanvasCard[],
@@ -79,10 +78,10 @@ export function nearestNoteColumn(
 }
 
 /**
- * Where a card's nearest notes are (ADR-0116), decided and not yet written:
+ * Where a card's nearest notes are, decided and not yet written:
  * a note column of its task; one to make there, at `order`, the canvas
  * cards `renumbered` to fit it; or, for a thread whose card is in an
- * inventory, that inventory (ADR-0117).
+ * inventory, that inventory.
  */
 export type NotesNear =
   | { readonly kind: "column"; readonly column: NoteColumnId }
@@ -97,7 +96,7 @@ export type NotesNear =
 /**
  * Where the notes nearest `to` are (`nearestNoteColumn` over its task's
  * canvas): a thread's, or a task's own; null for a thread with no card.
- * Decides, mints nothing. Pure.
+ * Decides, mints nothing.
  */
 export function notesNear(
   cards: readonly CardRecord[],
@@ -141,7 +140,7 @@ export function notesNear(
  * to fit it. The one step every write to notes takes: a move's, an unsent
  * card's, a migrated fresh column's cards'. The column is made through
  * `planMake`, as every card is. Null for a thread with no card, or a column
- * whose make is refused, which none is. Pure.
+ * whose make is refused, which none is.
  */
 export function toNotes(input: {
   readonly cards: readonly CardRecord[]
@@ -178,7 +177,7 @@ export function toNotes(input: {
 /**
  * A new note column, `column`, at `at` on a canvas, made by `by` through
  * `planMake` as every card is, and the place of its first note. Null when
- * the make is refused, which none is. Pure.
+ * the make is refused, which none is.
  */
 export function makeNoteColumn(
   cards: readonly CardRecord[],

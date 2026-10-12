@@ -85,7 +85,7 @@ const facts = (over: Partial<CanvasFacts> = {}): CanvasFacts => ({
   ...over,
 })
 
-describe("the canvas list (ADR-0116)", () => {
+describe("the canvas list", () => {
   test("one line per card in the canvas's order: kind, title, state, who put it; the reading thread marked", () => {
     const list = canvasList(facts())
     expect(list.lines).toEqual([
@@ -134,7 +134,7 @@ describe("the canvas list (ADR-0116)", () => {
   })
 })
 
-describe("the cards pinned to a task (ADR-0116)", () => {
+describe("the cards pinned to a task", () => {
   const read = (id: string, text: string) => ({
     id: threadIdFor(id),
     text,
@@ -170,7 +170,7 @@ describe("the cards pinned to a task (ADR-0116)", () => {
   })
 })
 
-describe("the context table (ADR-0116)", () => {
+describe("the context table", () => {
   const pinned = encodePinned(
     { lane: A, cards: [read2("c1")], retired: [] },
     () => "Ada",
@@ -211,7 +211,7 @@ function read2(id: string) {
   return { id: threadIdFor(id), text: "t", by: ADA }
 }
 
-describe("a canvas change during a run (ADR-0116)", () => {
+describe("a canvas change during a run", () => {
   const before = canvas([A, B])
   const after = canvas([A, B, N])
   const facts = (over: Partial<Parameters<typeof planCanvasFacts>[0]> = {}) =>
@@ -263,7 +263,7 @@ describe("a canvas change during a run (ADR-0116)", () => {
     ).toEqual([])
   })
 
-  test("a running thread moved to another task is told it moved; the tasks' threads are told it was taken and added (ADR-0124)", () => {
+  test("a running thread moved to another task is told it moved; the tasks' threads are told it was taken and added", () => {
     const L = taskIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
     const moved = [
       ...canvas([B]),
@@ -319,7 +319,7 @@ describe("a canvas change during a run (ADR-0116)", () => {
   })
 })
 
-test("a switch over a canvas card's kind that leaves one out does not compile (ADR-0116)", () => {
+test("a switch over a canvas card's kind that leaves one out does not compile", () => {
   const kindOf = (c: CanvasCard): string => {
     switch (c.kind) {
       case "thread":

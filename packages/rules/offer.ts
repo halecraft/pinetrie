@@ -1,16 +1,5 @@
-// offer — what the host decides about a lane's offer in your repo (ADR-0105,
-// ADR-0104, ADR-0067), pure, over the facts `@pinetrie/repo` gathers.
-//
-// Each decision is a value typed in `@pinetrie/core` (`core/offers.ts`) that
-// carries the facts its steps need: what a trigger does (`planRefresh`), a
-// acceptance (`planOfferAcceptance`), a split's stack or a squash rebuilt
-// (`planStackEnded`, `planRebuild`), and a commit message (`planDescribeAsk`,
-// `planDescribeSettle`). `@pinetrie/repo` turns each into jj steps
-// (`offerEffects`), and the host only connects the two. What a record says
-// (`offerStatus`) and the record itself (`offerRecord`, `planYourEdits`) are
-// here too, since the host and the page read them alike. The page's view is
-// `offer-view.ts`, the review's wire `review.ts`, and the commit message's
-// format `@pinetrie/core`'s `trailers.ts`.
+// offer — what the host decides about a lane's offer in your repo, over the
+// facts `@pinetrie/repo` gathers.
 
 import {
   type CommitId,
@@ -47,24 +36,24 @@ const OfferRecordSchema = Type.Object({
   stale: Type.Boolean(),
   files: Type.Array(Type.String()),
   conflicts: Type.Array(Type.String()),
-  // Absent from a record written before it (ADR-0072): read as none.
+  // Absent from a record written before it: read as none.
   startConflicts: Type.Optional(Type.Array(Type.String())),
   yourEdits: Type.Array(Type.String()),
   described: Type.Boolean(),
   edited: Type.Boolean(),
   bookmark: Type.String({ minLength: 1 }),
-  // Optional only while records written before ADR-0100 hold
+  // Optional only while records written before its rename hold
   // `integratedAs` instead; a record holds one of the two.
   acceptedAs: Type.Optional(
     Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
   ),
-  // pre-accepted: before ADR-0100, what `acceptedAs` was called. Read,
+  // pre-accepted: what `acceptedAs` was called before its rename. Read,
   // never written. Delete once every host has rewritten its offer records.
   integratedAs: Type.Optional(
     Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
   ),
   commits: Type.Array(CommitSchema),
-  // Absent from a record written before it (ADR-0065): read as null.
+  // Absent from a record written before it: read as null.
   ledger: Type.Optional(
     Type.Union([
       Type.Object({
@@ -108,7 +97,7 @@ export const OFFER: RecordSpec<OfferRecord, ThreadId, "session"> = {
       described: r.described,
       edited: r.edited,
       bookmark: r.bookmark,
-      // A record written since ADR-0100 says `acceptedAs`, null or not.
+      // A record written since the rename says `acceptedAs`, null or not.
       acceptedAs:
         r.acceptedAs !== undefined ? r.acceptedAs : (r.integratedAs ?? null),
       commits: r.commits.map(commitId),
@@ -125,16 +114,16 @@ export const OFFER: RecordSpec<OfferRecord, ThreadId, "session"> = {
 
 /**
  * Whether you edited a revision: a version an operation not the host's made
- * changed it since the host's newest version (S73). A revision the host
+ * changed it since the host's newest version. A revision the host
  * never made is yours. A rebase jj made because you reworded a commit below
- * is your operation but changes nothing (S48 item 7), so it is no edit.
+ * is your operation but changes nothing so it is no edit.
  */
 const revisionEdited = (r: RevisionFacts): boolean =>
   !r.reached || r.yoursChanged
 
 /**
  * Whether you edited the offer: a revision edited, a commit of yours between
- * its revisions, or its bottom moved off its base (S48 item 7). The host
+ * its revisions, or its bottom moved off its base. The host
  * never touches it again; nothing it writes later can hide your version.
  */
 const offerEdited = (offer: OfferNow): boolean =>
@@ -165,8 +154,8 @@ const sameStart = (a: readonly CommitId[], b: readonly CommitId[]): boolean =>
  * What a trigger does to a lane's offer (`RefreshDecision`). An archived
  * thread's offer goes whatever its state, an edited one too: an offer is
  * immutable, so editing one is an expert's own act. An offer is built only
- * when the lane's work is known to change a file from a known start
- * (ADR-0067): one built from less would be empty, or bring back what you
+ * when the lane's work is known to change a file from a known start:
+ * one built from less would be empty, or bring back what you
  * accepted, and withdrawing it would repeat on every poll, since each step moves
  * your repo's operation head. An unknown answer keeps what is there. An
  * untraced start withdraws an offer the host made, and touches nothing else.
@@ -221,7 +210,7 @@ function acceptStack(input: {
 // ── where an acceptance goes, and what a record says ──────────────
 
 /**
- * Where an acceptance may move a bookmark to the offer (ADR-0104): a forward move,
+ * Where an acceptance may move a bookmark to the offer: a forward move,
  * never a rebase, so every destination gives the same tree.
  */
 export interface OfferAcceptanceDestination {
@@ -234,11 +223,11 @@ export interface OfferAcceptanceDestination {
 }
 
 /**
- * The bookmarks an acceptance may move to the offer, the default first (ADR-0104):
+ * The bookmarks an acceptance may move to the offer, the default first:
  * the one the lane is based on, and, for a WIP, accepted work too, landing the
  * WIP's commits with it. Only a clean offer lands on accepted work: accepted work is
  * immutable, and a conflict accepted into it would stay in its history. A WIP
- * gone without landing has none; one that landed is accepted work's. Pure.
+ * gone without landing has none; one that landed is accepted work's.
  */
 export function offerAcceptanceDestinations(input: {
   readonly base: ThreadBase
@@ -273,12 +262,12 @@ export function offerAcceptanceDestinations(input: {
 }
 
 /**
- * What a lane's `pinetrie.offer` record says, decoded once (ADR-0067): every
+ * What a lane's `pinetrie.offer` record says, decoded once: every
  * reader of the page switches on this, never on the record's fields.
  * - `none`: no record;
  * - `accepted`: accepted, as the change `as`;
  * - `held`: open, but it brings no file: accepted work already holds its work,
- *   by a route the ledger does not record (S89), so there is nothing to add;
+ *   by a route the ledger does not record, so there is nothing to add;
  * - `open`: work to add. One you edited is open whatever its files: it is
  *   yours.
  */
@@ -302,10 +291,10 @@ export const isNotYetAccepted = (
 ): status is Extract<OfferStatus, { readonly kind: "open" | "held" }> =>
   status.kind === "open" || status.kind === "held"
 
-// ── its record, the page's cache (ADR-0104) ──────────────────────────────
+// ── its record, the page's cache ──────────────────────────────
 
 /**
- * An offer's record, from the offer as your repo holds it (ADR-0104): what it
+ * An offer's record, from the offer as your repo holds it: what it
  * holds, whether an agent described it, whether you edited it, and whether
  * a stack's lane moved on (`offerMoved`, the rule `planRefresh` uses).
  * `commits` are what a review may read.
@@ -356,7 +345,7 @@ export const planYourEdits = (
     .filter(r => isNotYetAccepted(offerStatus(r)))
     .map(r => ({ ...r, yourEdits: r.files.filter(f => editing.has(f)) }))
 
-// ── an acceptance (ADR-0104, ADR-0065) ─────────────────────────────
+// ── an acceptance ─────────────────────────────
 
 /** A gather with an offer and the thread's name: what an acceptance, a rebuild or a description acts on. */
 type NamedOffer = OfferGather & {
@@ -374,7 +363,7 @@ const sameLedger = (a: OfferLedger | null, b: OfferLedger | null): boolean =>
     : a.source === b.source && sameStart(a.start, b.start)
 
 /**
- * Whether the offer is not the one an acceptance was shown (ADR-0065): it
+ * Whether the offer is not the one an acceptance was shown: it
  * brings other work (another ledger), or it conflicts now and did not then.
  * A rebase onto a moved target keeps the ledger, and so does your edit: both
  * are accepted.
@@ -384,7 +373,7 @@ const offerChanged = (offer: OfferNow, seen: OfferSeen): boolean =>
   (offer.conflicts.length > 0 && !seen.conflicted)
 
 /**
- * An acceptance (ADR-0104), decided from the offer read in its own
+ * An acceptance, decided from the offer read in its own
  * command: the destination asked for (`to`, else the default), which must be
  * one of the offer's destinations now (`offerAcceptanceDestinations`) and at
  * or below its bottom's parent, so the move is forward; and the record marked
@@ -396,13 +385,12 @@ const offerChanged = (offer: OfferNow, seen: OfferSeen): boolean =>
 export function planOfferAcceptance(input: {
   readonly lane: ThreadId
   readonly gathered: OfferGather | null
-  /** What the acceptance was shown (ADR-0065); null when it names none. */
+  /** What the acceptance was shown; null when it names none. */
   readonly seen: OfferSeen | null
   /** What only an acceptance reads (`gatherOfferAcceptance`); null without an offer to accept. */
   readonly acceptance: OfferAcceptanceFacts | null
   /** Files `@` changes, for the accepted record's `yourEdits`. */
   readonly editing: ReadonlySet<string>
-  /** Accepted work's bookmark. */
   readonly acceptedBookmark: string
   readonly to: string | null
   readonly now: number
@@ -457,7 +445,7 @@ export function planOfferAcceptance(input: {
   }
 }
 
-// ── an offer rebuilt (ADR-0105) ───────────────────────────────────────────
+// ── an offer rebuilt ───────────────────────────────────────────
 
 /** An offer rebuilt, or why not. */
 type RebuildDecision<Refusal> =
@@ -465,7 +453,7 @@ type RebuildDecision<Refusal> =
   | { readonly kind: "refused"; readonly why: Refusal }
 
 /**
- * A split's run ended (ADR-0105): its stack replaces the offer when it holds
+ * A split's run ended: its stack replaces the offer when it holds
  * exactly the lane tip's files, built at the offer's place from the stack's
  * own start and tip, which its ledger names. An untraced place accepts it: the
  * stack brings its own start. Why not, in words the agent reads.
@@ -508,7 +496,7 @@ export function planStackEnded(input: {
 }
 
 /**
- * A squash or a refresh (ADR-0105): the offer rebuilt from the lane's tip as
+ * A squash or a refresh: the offer rebuilt from the lane's tip as
  * one revision on its WIP line, which an untraced start cannot do.
  */
 export function planRebuild(
@@ -524,7 +512,7 @@ export function planRebuild(
   return { kind: "rebuild", name, place, changes: changesOf(offer), sources }
 }
 
-// ── its commit message (ADR-0105) ─────────────────────────────────────────
+// ── its commit message ─────────────────────────────────────────
 
 /**
  * Whether an offer is one to ask a commit message for: a single revision,

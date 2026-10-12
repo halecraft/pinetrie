@@ -74,7 +74,7 @@ const relay = (over: Partial<Parameters<typeof planRelay>[0]> = {}) =>
     ...over,
   })
 
-describe("planRelay (ADR-0128)", () => {
+describe("planRelay", () => {
   test("it hears what was said from its invite on, not the ask nor its own answers", () => {
     const plan = relay()
     expect(plan.kind).toBe("relay")
@@ -95,7 +95,7 @@ describe("planRelay (ADR-0128)", () => {
     const plan = relay({ heard: entryId("4") })
     expect(plan.kind === "relay" && plan.heard).toBeNull()
   })
-  test("a thread out of reach is refused first, the asked one's or the asker's (ADR-0128)", () => {
+  test("a thread out of reach is refused first, the asked one's or the asker's", () => {
     expect(relay({ toReach: ARCHIVED, members: [] })).toEqual({
       kind: "refused",
       why: { kind: "away", side: "to", name: "amber-fox", reach: ARCHIVED },
@@ -120,7 +120,7 @@ describe("planRelay (ADR-0128)", () => {
   })
 })
 
-describe("planAnswer (ADR-0128)", () => {
+describe("planAnswer", () => {
   const asked: RelayDetails = {
     from: here,
     fromName: "sable-meadow",
@@ -165,7 +165,7 @@ describe("planAnswer (ADR-0128)", () => {
     const spent = answer({ spent: true })
     expect(spent.kind === "answer" && spent.answer.wakes).toBe(false)
   })
-  test("an answer to a thread gone out of reach is not sent (ADR-0128)", () => {
+  test("an answer to a thread gone out of reach is not sent", () => {
     expect(answer({ fromReach: ARCHIVED })).toEqual({
       kind: "undelivered",
       reach: ARCHIVED,

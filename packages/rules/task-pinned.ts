@@ -1,11 +1,4 @@
-// task-pinned — the cards pinned to a task that a run reads (ADR-0116).
-//
-// A task's cards entry is a history message (`history.ts`) of its own, beside
-// a thread's (`pinned.ts`), so neither's stored shape changes and each is
-// restated only when it changes: the host plans one when a run starts and
-// the task's pinned cards differ from those the model last read on the path
-// (`taskPinnedInView`), compared as a thread's are (`pinnedDiff`). It
-// restates every card pinned to the task now, and names each unpinned since.
+// task-pinned — the cards pinned to a task that a run reads.
 
 import {
   firstLine,
@@ -101,8 +94,8 @@ export const encodeTaskPinned = (
 /**
  * The cards pinned to `task` a run reads, or null when the model already
  * reads them as they are: every card read, none retired, the same order.
- * Cards read for another task (a thread moved since, ADR-0117) are all
- * retired. Pure.
+ * Cards read for another task (a thread moved since) are all
+ * retired.
  */
 export function planTaskPinnedRead(input: {
   readonly inView: TaskPinnedView | null

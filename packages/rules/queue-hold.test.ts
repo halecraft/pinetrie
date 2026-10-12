@@ -89,7 +89,7 @@ describe("holdOnStop", () => {
       at: 3,
     })
   })
-  test("a reference queued is a message too: the stopper holds the queue (ADR-0126)", () => {
+  test("a reference queued is a message too: the stopper holds the queue", () => {
     const reference: QueuedCard = {
       kind: "reference",
       id: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1"),
@@ -123,7 +123,7 @@ describe("holdOnStop", () => {
   })
 })
 
-test("planHoldSweep: a hold whose thread has no card, or whose task is archived, goes; a live one, or one in an inventory, stays", () => {
+test("planHoldSweep: a hold whose thread has no card, or whose task is archived, goes", () => {
   const L2 = threadIdFor("2")
   const L3 = threadIdFor("3")
   const L4 = threadIdFor("4")
@@ -149,7 +149,7 @@ test("planHoldSweep: a hold whose thread has no card, or whose task is archived,
   ).toEqual([L2, L3])
 })
 
-describe("planQueueCard (ADR-0113)", () => {
+describe("planQueueCard", () => {
   const _at = atEntry(entryId("e1"))
   const atEnd = { kind: "composing", thread: L } as const
   const card: CardRecord = {

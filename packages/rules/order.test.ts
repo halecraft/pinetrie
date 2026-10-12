@@ -85,7 +85,7 @@ describe("respace", () => {
   const ascending = (keys: readonly string[]) =>
     keys.every((k, i) => i === 0 || (keys[i - 1] ?? "") < k)
 
-  test("in a crowded run, only the crowded keys change, every key keeps its order, and the new one has room on each side", () => {
+  test("in a crowded run, only the crowded keys change, and every key keeps its order", () => {
     const orders = [key(0), key(1000), key(1001), key(1002), key(5000)]
     const { changed } = respace(orders, 2)
     expect(changed.has(0)).toBe(false)

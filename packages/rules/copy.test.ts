@@ -53,7 +53,7 @@ const plan = (
   sender = ADA,
 ) => planCopy({ copy: copy(over), sender, cards, threads, index, now: 7 })
 
-describe("planCopy (ADR-0117, ADR-0124)", () => {
+describe("planCopy", () => {
   test("a copy is a new thread forked at the end its copier saw, its card where it was dropped, and no entry", () => {
     const planned = plan()
     expect(planned).toMatchObject({
@@ -95,7 +95,7 @@ describe("planCopy (ADR-0117, ADR-0124)", () => {
     ).toMatchObject({ kind: "copy" })
   })
 
-  test("refused: an end in another thread, or none; an id in use; a thread someone else holds; another's inventory, or a full one", () => {
+  test("refused: an end elsewhere, an id in use, a held thread, or another's or a full inventory", () => {
     expect(plan({ end: entryId("c") })).toEqual({
       kind: "refused",
       why: "unknown",

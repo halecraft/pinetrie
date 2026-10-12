@@ -42,7 +42,7 @@ const FACTS: readonly OfferFact[] = [
   { kind: "refreshed", lane: LANE, by: ADA },
 ]
 
-describe("a fact (ADR-0080)", () => {
+describe("a fact", () => {
   test("round-trips as a message and as a card's field; junk is none", () => {
     for (const fact of FACTS) {
       expect(decodeFact(encodeFact(fact, "Ada", 1))).toEqual(fact)
@@ -57,7 +57,7 @@ describe("a fact (ADR-0080)", () => {
     ).toBeUndefined()
   })
 
-  test("an answer not sent says where its asker went, and round-trips (ADR-0128)", () => {
+  test("an answer not sent says where its asker went, and round-trips", () => {
     const fact: QueuedFact = {
       kind: "undelivered",
       lane: LANE,

@@ -1,9 +1,5 @@
-// base — a thread's base and catching up with it (ADR-0104, ADR-0061,
-// ADR-0072): each lane's base record (`pinetrie.base`), the base a thread
-// follows (`effectiveBase`), what catching up with it would do (`catchUpOf`)
-// and merge (`planUpdateFrom`), where a new lane begins (`planBegin`), and
-// the thread a lane branched from (`parentNow`, `planParentUpdate`,
-// `parentAhead`). What a catch-up merges is named in `catch-up-from.ts`.
+// base — a thread's base and catching up with it, and the thread a lane
+// branched from.
 
 import {
   type AcceptedRecord,
@@ -96,7 +92,7 @@ export const BASE: RecordSpec<BaseRecord, ThreadId, "session"> = {
 }
 
 /**
- * The base a thread is brought up to date with and accepted into (ADR-0104): its
+ * The base a thread is brought up to date with and accepted into: its
  * WIP while the WIP is there, else accepted work: for a thread on accepted work, a WIP that
  * landed, and one gone (which only "continue on accepted work" moves). Null, the
  * lane's base not yet read, is accepted work.
@@ -120,7 +116,7 @@ interface BaseMove {
 
 /**
  * How a thread's base has moved on since its lane last forked from it or
- * caught up (ADR-0104), or null: the commit its newest `Pinetrie-Base` names
+ * caught up, or null: the commit its newest `Pinetrie-Base` names
  * (`start`) against where the base is now, accepted work's `commit` or the WIP's.
  * Never for a WIP gone, which only "continue on accepted work" moves. Commits
  * only: whether catching up would change a file is `catchUpOf`'s, which
@@ -143,7 +139,7 @@ function baseMoved(
 }
 
 /**
- * What catching up would do to a thread, as the page can tell (S97):
+ * What catching up would do to a thread, as the page can tell:
  * - `current`: its base has not moved since the lane last caught up with
  *   it, or there is no line to catch up with;
  * - `unknown`: it moved, and the host has not yet read what that changes;
@@ -193,11 +189,11 @@ export type ForkBegin = Extract<
 >
 
 /**
- * Where a new lane begins when it has no agent work to inherit (ADR-0104),
+ * Where a new lane begins when it has no agent work to inherit,
  * from the thread's base and what the host read of your repo: accepted work's
  * commit, or a copy of the WIP on accepted commit under it. Refused with no
  * line (`not_set_up`), and for a base that is not a WIP bookmark above accepted work
- * (`bad_base`). Pure.
+ * (`bad_base`).
  */
 export function planBegin(input: {
   /** The WIP bookmark chosen at the first message; null for accepted work. */
@@ -222,7 +218,7 @@ export function planBegin(input: {
   return { kind: "wip", bookmark: base, ...facts.wip }
 }
 
-/** What an update merges into a lane (ADR-0104), or nothing. */
+/** What an update merges into a lane, or nothing. */
 type UpdateFrom =
   | BaseMerge
   /** The WIP already holds nothing the lane lacks. */
@@ -230,7 +226,7 @@ type UpdateFrom =
 
 /**
  * Why an update is refused: no line, or a WIP gone without landing; for a
- * catch-up with the parent, none, or its agent running (ADR-0072).
+ * catch-up with the parent, none, or its agent running.
  */
 export type UpdateRefusal =
   | typeof ERR.NOT_SET_UP
@@ -239,14 +235,14 @@ export type UpdateRefusal =
   | typeof ERR.PARENT_RUNNING
 
 /**
- * What bringing a thread up to date merges (ADR-0104): the base the thread
+ * What bringing a thread up to date merges: the base the thread
  * follows (`effectiveBase`), so the button that names it names what is
  * merged. A WIP thread merges a fresh copy of its WIP, on the lane's
  * previous copy, unless the lane's base already names the WIP's commit now. A
  * thread on accepted work, a lane with no base, and a landed WIP merge accepted work's commit.
  * A WIP gone without landing refuses (`base_gone`) until `toLine` ("continue
  * on accepted work") moves the thread to accepted work, marking the move even when
- * nothing is merged. With no line, refused (`not_set_up`). Pure.
+ * nothing is merged. With no line, refused (`not_set_up`).
  */
 export function planUpdateFrom(input: {
   /** The lane's base, from its own history; null for a lane with none, on accepted work. */
@@ -280,7 +276,7 @@ export function planUpdateFrom(input: {
     : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.start }
 }
 
-/** The thread a lane branched from, as the document says it now (`parentNow`, ADR-0072). */
+/** The thread a lane branched from, as the document says it now (`parentNow`). */
 export interface ParentNow extends ParentThread {
   /** Its newest commit: the nearest above its thread's end. */
   readonly newest: CommitId
@@ -297,7 +293,7 @@ export interface ParentNow extends ParentThread {
  * one this lane last caught up with. That is the fork commit, or the newest
  * commit of the parent's that an update or a resolution below the lane's
  * first prompt merged. Null for a lane that began at its base, or a parent
- * with no name or no commit yet. Pure.
+ * with no name or no commit yet.
  */
 export function parentNow(input: {
   readonly index: TreeIndex
@@ -347,9 +343,9 @@ export function parentNow(input: {
 }
 
 /**
- * What catching up with the parent merges (ADR-0072): its newest commit;
+ * What catching up with the parent merges: its newest commit;
  * nothing when the lane holds it; refused with no parent, or while the
- * parent's agent runs, since its copy moves with every turn. Pure.
+ * parent's agent runs, since its copy moves with every turn.
  */
 export function planParentUpdate(
   parent: ParentNow | null,

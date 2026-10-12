@@ -1,7 +1,5 @@
 // live — what each stream event, and a run's start and end, do to
-// `pinetrie:live` (ADR-0014, ADR-0107, S55). Pure: the host gathers the
-// streams, these return `LiveOp`s, and `applyLiveOps` (@pinetrie/schema)
-// writes them.
+// `pinetrie:live`, as `LiveOp`s `applyLiveOps` (@pinetrie/schema) writes.
 
 import {
   type EntryId,
@@ -19,7 +17,7 @@ import {
 /**
  * Whether `s` is its lane's reply being written now: the lane's tip has not
  * moved since it opened. The reply's own entry moves the tip, in the commit
- * that writes it (S35), so the entry and the end of this are one change. The
+ * that writes it, so the entry and the end of this are one change. The
  * host appends to this reply, and the reader draws it.
  */
 export const isCurrentReply = (s: StreamRecord, tip: EntryId | null): boolean =>
@@ -38,7 +36,7 @@ export const closeStreams = (
  * Nothing happens when a message or a tool ends: a stream stays until its
  * entry is written, so a reader never sees neither. Streams go when they can
  * no longer be drawn: a new reply closes its lane's streams, whose entries
- * are written before its request (S55); a tool closes its lane's replies that
+ * are written before its request; a tool closes its lane's replies that
  * are no longer current. A tool's output arrives as whole snapshots of a view
  * that keeps only the tail, written as `tailEdit`s. An event for a lane that
  * is not running changes nothing.
@@ -109,7 +107,7 @@ export function planStream(input: {
 
 /**
  * A run ended. Its lane's streams close with its key: every entry of the run
- * is written by now (S55), and a stopped run's may never come. A run that is
+ * is written by now, and a stopped run's may never come. A run that is
  * no longer the lane's (`running` is another, or none) changes nothing.
  */
 export function planEndRun(input: {
@@ -117,7 +115,6 @@ export function planEndRun(input: {
   readonly run: RunId
   /** The run the lane is running, as stored. */
   readonly running: RunId | undefined
-  /** The lane's streams. */
   readonly streams: readonly StreamRecord[]
 }): readonly LiveOp[] {
   if (input.running !== input.run) return []

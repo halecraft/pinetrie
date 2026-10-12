@@ -92,7 +92,7 @@ describe("planStop", () => {
     content: { command: null, unsent: null, origin: null },
   }
 
-  test("a running lane is aborted, and a fact naming who stopped its ask is queued (ADR-0126)", () => {
+  test("a running lane is aborted, and a fact naming who stopped its ask is queued", () => {
     expect(planStop(lane(true), facts())).toEqual({
       kind: "abort",
       fact: [
@@ -111,7 +111,7 @@ describe("planStop", () => {
       hold: null,
     })
   })
-  test("with a message card queued, a stop holds the queue, so the run's end sends nothing, and its fact goes first (ADR-0048 step 7)", () => {
+  test("with a message card queued, a stop holds the queue, so the run's end sends nothing, and its fact goes first", () => {
     const planned = planStop(lane(true), facts([queued]))
     expect(planned).toMatchObject({
       kind: "abort",
@@ -125,7 +125,7 @@ describe("planStop", () => {
       ).map(c => c.id),
     ).toEqual([FACT, queued.id])
   })
-  test("a spent budget stops the run, names the budget, and holds no queue (ADR-0128)", () => {
+  test("a spent budget stops the run, names the budget, and holds no queue", () => {
     const planned = planStop(lane(true), {
       ...facts([queued]),
       budget: entryId("m"),
@@ -197,7 +197,7 @@ describe("planStop", () => {
   })
 })
 
-describe("carrying on (ADR-0082)", () => {
+describe("carrying on", () => {
   const s = threadIdFor("s")
   const ada = writerId("ada")
   /** A lane over a chain of messages, oldest first: its tip is the last. */
@@ -255,7 +255,7 @@ describe("carrying on (ADR-0082)", () => {
     expect(state(over([ask, aborted]))).toEqual({ kind: "ok" })
     expect(state(over([ask, call, result]))).toEqual({ kind: "ok" })
   })
-  test("a stop's fact at the tip is no ask: the stopped ask still carries on, and names who stopped it (ADR-0126)", () => {
+  test("a stop's fact at the tip is no ask: the stopped ask still carries on, and names who stopped it", () => {
     const o = over([ask, aborted])
     const prompt = entryId("1-e")
     const fact = renderableMessage(
@@ -291,7 +291,7 @@ describe("carrying on (ADR-0082)", () => {
       refusedWith(ERR.BUSY),
     )
   })
-  test("held cards wait for a release, not for this turn: the lane may carry on (ADR-0048 step 7)", () => {
+  test("held cards wait for a release, not for this turn: the lane may carry on", () => {
     expect(
       state(over([ask, aborted], { waiting: 1, heldBy: writerId("bea") })),
     ).toEqual({ kind: "ok" })

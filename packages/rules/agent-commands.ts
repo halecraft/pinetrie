@@ -1,7 +1,6 @@
-// agent-commands — the commands an agent calls as tools (ADR-0080): when
-// `catch_up` may merge and `split_offer` may queue, and what each answers. Each decides from the state of
-// what it acts on (the lane's copy, its base, its parent), never from how the
-// run began, so a refusal names something true the agent can change.
+// agent-commands — the commands an agent calls as tools. Each decides from the
+// state of what it acts on, never from how the run began, so a refusal names
+// something true the agent can change.
 
 import {
   CATCH_UP_TOOL,
@@ -34,7 +33,7 @@ export interface ToolAnswer {
 
 /** Why `catch_up` did not merge. */
 export type CatchUpRefusal =
-  /** Another call is in the same batch: a sibling's edit would leave the copy (S103 item 2). */
+  /** Another call is in the same batch: a sibling's edit would leave the copy. */
   | "alone"
   /** The base, or the parent, has nothing the copy lacks. */
   | "nothing-new"
@@ -77,7 +76,7 @@ export function catchUpRefusal(code: CatchUpRefusal): string {
  * facts, before anything is queued: a lane of its own, the only call in its
  * turn, and new work in what it merges. From the base, `brings`, or a move
  * or a lane the host has not read, which the merge's own read decides
- * (`unknown`, S97); from the parent, one ahead and idle. Pure.
+ * (`unknown`); from the parent, one ahead and idle.
  */
 export function planCatchUpCall(input: {
   readonly from: "base" | "parent"
@@ -106,14 +105,13 @@ export function planCatchUpCall(input: {
 }
 
 /**
- * Whether the lane's copy may take a merge (ADR-0080): `@` on the thread's
+ * Whether the lane's copy may take a merge: `@` on the thread's
  * own line, its one parent the lane's bookmark or the agent's own commit on
  * it (`planTurnCommit`'s rule). Otherwise the merge would land beside where
  * the agent works, as while a split's stack is the working copy. A repo
  * with no bookmark of the lane's has no line to be on, and is refused as
- * that, not as off it: a split is not the cause (S114). Conflicts do not
- * refuse it: catching up is how a conflict the copy came with is settled
- * (ADR-0072). Pure.
+ * that, not as off it: a split is not the cause. Conflicts do not
+ * refuse it: catching up is how a conflict the copy came with is settled.
  */
 export const planCopyReady = (
   copy: CopyFacts,
@@ -130,7 +128,7 @@ export const planCopyReady = (
 /**
  * What `catch_up` answers once it merged: the update's text and what it
  * merged; or, conflicted, the conflicts and the resolution skill, which the
- * agent resolves in the same run. Pure.
+ * agent resolves in the same run.
  */
 export function catchUpAnswer(
   settled:
@@ -191,11 +189,11 @@ export const SPLIT_QUEUED =
   "Queued: the split runs when this run ends, as a run of its own."
 
 /**
- * Whether `split_offer` queues a split (ADR-0080), from any run: an open
+ * Whether `split_offer` queues a split, from any run: an open
  * offer to split, none queued, and no split running. A card waits for the
  * run's end, so queueing one touches nothing in the run. The card carries
  * the `split` command and no text, queued after the lane's last card by the
- * person behind the run (`promptAuthor`). Pure.
+ * person behind the run (`promptAuthor`).
  */
 export function planSplitCall(input: {
   readonly offer: OfferStatus

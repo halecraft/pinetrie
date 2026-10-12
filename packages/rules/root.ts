@@ -1,7 +1,5 @@
-// root — deleting a conversation root: a thread a card was spun into, lifted
-// back by the undo key while it held its first message alone (ADR-0111),
-// with the task it was spun into (ADR-0116). Pure: the host writes what this
-// plans.
+// root — deleting a conversation root a card was spun into, with the task it
+// was spun into.
 
 import {
   type CardRecord,
@@ -23,11 +21,11 @@ import { ROOT } from "./roots.ts"
 import { THREAD } from "./thread.ts"
 
 /**
- * The tasks a step leaves empty that were a new tab's (ADR-0126): a thread
+ * The tasks a step leaves empty that were a new tab's: a thread
  * card that left `task`'s canvas for a trash, its thread a new root's not
  * yet started (its root one the directory does not name, `started`), and
  * nothing left on that canvas or pinned to the task. Closing an unsent new
- * tab sends its task's card to the trash too (`planTasksTrashed`). Pure.
+ * tab sends its task's card to the trash too (`planTasksTrashed`).
  */
 export function emptiedTasks(input: {
   readonly before: readonly CardRecord[]
@@ -62,7 +60,7 @@ export function emptiedTasks(input: {
  * Each of `tasks`' cards from the board to the trash, remembering where it
  * was there, its closer its placer: written in the close's step, so the
  * undo key brings the task back with its thread. A task with no card on
- * the board is left. Pure.
+ * the board is left.
  */
 export function planTasksTrashed(
   cards: readonly CardRecord[],
@@ -100,7 +98,7 @@ export interface RootDelete {
 /**
  * Delete `root`, its one thread, and the task it was spun into: their
  * records, the task's title, the document and every card in either, the
- * task's own included. Pure.
+ * task's own included.
  */
 export function planRootDelete(
   root: RootId,

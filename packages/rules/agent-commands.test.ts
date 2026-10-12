@@ -23,7 +23,7 @@ import {
   splitRefusal,
 } from "./index.ts"
 
-/** A resolution's floor with room to spare (ADR-0084). */
+/** A resolution's floor with room to spare. */
 function floor(): Floor {
   const found = resolutionFloor({
     budget: { tokens: 10_000, estimate: c => Math.ceil(c.length / 4) },
@@ -55,7 +55,7 @@ const parent = (over: Partial<ParentNow> = {}): ParentNow => ({
   ...over,
 })
 
-describe("planCatchUpCall (ADR-0080)", () => {
+describe("planCatchUpCall", () => {
   const call = (over: Partial<Parameters<typeof planCatchUpCall>[0]> = {}) =>
     planCatchUpCall({
       from: "base",
@@ -118,7 +118,7 @@ describe("planCatchUpCall (ADR-0080)", () => {
   })
 })
 
-describe("planCopyReady (ADR-0080)", () => {
+describe("planCopyReady", () => {
   test.each([
     [
       "on the bookmark",
@@ -141,7 +141,7 @@ describe("planCopyReady (ADR-0080)", () => {
       "off-line",
     ],
     [
-      "with no bookmark: refused as that, not as off accepted work (S114)",
+      "with no bookmark: refused as that, not as off accepted work",
       { parents: [B], bookmark: null, descends: false },
       "no-bookmark",
     ],
@@ -151,7 +151,7 @@ describe("planCopyReady (ADR-0080)", () => {
 })
 
 describe("catchUpAnswer", () => {
-  test("clean: the update's text, and what it merged; conflicted: the conflicts and what it merged; nothing: nothing new", () => {
+  test("the answer says what it merged, and any conflicts", () => {
     const update = encodeUpdate(
       {
         lane: LANE,
@@ -188,7 +188,7 @@ describe("catchUpAnswer", () => {
   })
 })
 
-describe("planSplitCall (ADR-0080)", () => {
+describe("planSplitCall", () => {
   const _ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
   const open = {
     kind: "open",

@@ -1,10 +1,5 @@
-// held — a thread taken into an inventory, or trashed: no agent and no
-// runner there. One gate, decided per command kind as the archive's is
-// (`writesIn`): what each command would run or write a message in
-// (`runsIn`), and whether a thread held or trashed is among it (`heldIn`).
-// The host checks it before every command and every popped card, and the
-// drain asks it before it pops, so nothing runs there until the thread is
-// on a canvas again.
+// held — a thread taken into an inventory, or trashed: no agent and no runner
+// there.
 
 import type {
   CardRecord,
@@ -28,7 +23,7 @@ export type ThreadHolding =
 const FREE: ThreadHolding = { kind: "free" }
 const TRASHED: ThreadHolding = { kind: "trashed" }
 
-/** Where `thread`'s card leaves it (`ThreadHolding`). Pure. */
+/** Where `thread`'s card leaves it (`ThreadHolding`). */
 export function holdingOf(
   cards: readonly CardRecord[],
   thread: ThreadId,
@@ -71,12 +66,11 @@ export type RunAt =
     }
 
 /**
- * What a command runs or writes a message in (ADR-0124), every kind said:
+ * What a command runs or writes a message in, every kind said:
  * a new kind of command does not compile until it is. A send at a thread's
  * end, a carry-on, an offer action that may ask the agent, and a pop run in
  * their thread; a branch in the thread its fork is in, which stays its
  * holder's; a new root in none. A stop, an unqueue or a hold runs nothing.
- * Pure.
  */
 export function runsIn(command: Intent | QueuePop): readonly RunAt[] {
   const thread = (t: ThreadId): RunAt => ({ kind: "thread", thread: t })
@@ -103,7 +97,7 @@ export function runsIn(command: Intent | QueuePop): readonly RunAt[] {
       return []
     // Describing an offer asks its agent, and a squash or a refresh asks
     // it again when its description is wanted; an acceptance acts in your
-    // repo alone (ADR-0117: offers stay there while a thread is held).
+    // repo alone (offers stay there while a thread is held).
     case "offer":
       return command.action === "accept" ? [] : [thread(command.lane)]
     case "stop":
@@ -137,7 +131,7 @@ export function runsIn(command: Intent | QueuePop): readonly RunAt[] {
  * trashed, and how; null when none is. An entry's thread is `threadAt`'s,
  * from its root's tree; but a copy's first send, at its record's fork
  * (`forkOf`), runs in the copy, whose copier was shown the entries it
- * forks from. Pure.
+ * forks from.
  */
 export function heldIn(
   at: readonly RunAt[],
@@ -163,11 +157,11 @@ export function heldIn(
 }
 
 /**
- * The threads a change to the places takes into an inventory or a trash
- * (ADR-0124, ADR-0126): each thread card there after it that was not
+ * The threads a change to the places takes into an inventory or a trash:
+ * each thread card there after it that was not
  * there before. Whatever wrote the change (a move, an undo or a redo, a
  * copy), their runs stop with it, as the taker's own stop: there is no
- * agent in either. Pure.
+ * agent in either.
  */
 export function takenIn(
   before: readonly CardRecord[],

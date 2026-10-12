@@ -1,6 +1,5 @@
-// margin — the cards beside an entry (ADR-0126): comments on it, shared by
-// everyone in its task and never read by the agent. A margin names its
-// entry and the entry's thread, so its task is found without a tree.
+// margin — the cards beside an entry: comments on it, shared by everyone in
+// its task and never read by the agent.
 
 import {
   type CardInPlace,

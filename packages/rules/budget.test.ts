@@ -17,7 +17,7 @@ const budget: BudgetRecord = {
   over: false,
 }
 
-describe("a budget for agents talking (ADR-0128)", () => {
+describe("a budget for agents talking", () => {
   test("a spend counts live, and only the one that crosses the limit writes", () => {
     expect(planSpend(budget, 40, 50)).toEqual({ spent: 90, over: null })
     expect(planSpend(budget, 90, 20)).toEqual({

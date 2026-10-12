@@ -1,13 +1,5 @@
-// queue-hold — a thread's queue held (ADR-0048 step 7): who holds it, a hold
-// or a release, the hold a Stop leaves, and the holds the host sweeps.
-//
-// While a lane's queue is held, the host pops no message card from it, only
-// facts (`planNextQueuedCardPop`, `card.ts`). So people can line up several
-// cards on an idle thread and let them go together. A send there queues
-// (`sendWaits`, @pinetrie/core) and, on an idle thread, releases the hold
-// with it (`planQueueCard`, ADR-0113): sending removes the hold. The hold
-// is a session record, so it outlasts a restart: a queue staged overnight
-// must not drain when the host starts.
+// queue-hold — a thread's queue held: who holds it, a hold or a release, the
+// hold a Stop leaves, and the holds the host sweeps.
 
 import type {
   CardCommand,
@@ -48,7 +40,7 @@ export const QUEUE_HOLD: RecordSpec<QueueHold, ThreadId, "session"> = {
 /**
  * Hold a lane's queue, or release it. A hold is written only where there is
  * none, so the first holder stays named; a release deletes it. Nothing,
- * either way, when the queue is already so. Pure.
+ * either way, when the queue is already so.
  */
 export function planQueueHold(input: {
   readonly holds: ReadonlyMap<ThreadId, QueueHold>
@@ -66,14 +58,14 @@ export function planQueueHold(input: {
 }
 
 /**
- * A card queued, and its queue's hold changed with it (ADR-0113): the move
+ * A card queued, and its queue's hold changed with it: the move
  * planned as any move is (`planMoveCommand`), and, only when it is
  * accepted, the hold's writes. The hold goes first when the host carries it
  * out, so the drain the move asks for finds the queue as this says: held
  * before a staged card can be popped, released before the drain. A move
  * that queues nothing changes no hold. A card created in the queue carries
  * `command` from its first write: a command set by a later request could
- * come after the drain popped the card. Pure.
+ * come after the drain popped the card.
  */
 export function planQueueCard(input: {
   readonly cards: readonly CardRecord[]
@@ -135,7 +127,7 @@ const withCommand = (step: MovesStep, command: CardCommand): MovesStep =>
 /**
  * The hold a Stop leaves on its lane's queue: one when a message card is
  * queued and nobody holds the queue yet. A Stop with nothing queued holds
- * nothing, or the correction sent after it would be held too. Pure.
+ * nothing, or the correction sent after it would be held too.
  */
 export function holdOnStop(input: {
   readonly queue: readonly QueuedCard[]
@@ -153,9 +145,9 @@ export function holdOnStop(input: {
 
 /**
  * The holds to delete: each whose lane's thread has no card, or whose card
- * is in an archived task (ADR-0116). A thread in an inventory keeps its
+ * is in an archived task. A thread in an inventory keeps its
  * hold. Archiving is refused while cards are queued, so a hold swept holds
- * nothing. Pure.
+ * nothing.
  */
 export function planHoldSweep(input: {
   readonly holds: ReadonlyMap<ThreadId, QueueHold>

@@ -24,7 +24,7 @@ const relay: RelayDetails = {
 }
 const ID = cardIdOfKind("ask", "01a0ffd2-0000-7000-8000-0000000000a1")
 
-describe("an ask card (ADR-0128)", () => {
+describe("an ask card", () => {
   const step = planAskCard({ cards: [], id: ID, lane, relay })
   const card = step?.kind === "write" ? step.record : undefined
   test("the host queues it for the person behind the chain, its relay its content", () => {

@@ -59,7 +59,7 @@ const columns = (board: ReturnType<typeof boardOf>) =>
     [...board.open, board.archive].map(c => [c.state.name, c.tasks]),
   )
 
-describe("boardOf (ADR-0126)", () => {
+describe("boardOf", () => {
   test("each task's card by rank, then id; one in a state gone at the end of the first open state", () => {
     const cards = [
       card(R(1), DOING, 20),
@@ -90,7 +90,7 @@ describe("boardOf (ADR-0126)", () => {
   })
 })
 
-describe("archivedOf (ADR-0126)", () => {
+describe("archivedOf", () => {
   const history = (
     task: TaskId,
     ...events: [WorkflowStateId, typeof ADA, number][]
@@ -135,7 +135,7 @@ test.each([
   expect(transitionOf(WORKFLOW, from, to)).toBe(want)
 })
 
-describe("planBoardMove (ADR-0126)", () => {
+describe("planBoardMove", () => {
   const cards = [
     card(R(1), DOING, 10),
     card(R(2), DOING, 20),
