@@ -1,0 +1,15 @@
+{
+  "oneProcess": {
+    "writes": 2000,
+    "stampCollisions": 0,
+    "mtimeCollisions": 0,
+    "ctimeDeltaNs": {
+      "min": 176917,
+      "median": 193001
+    }
+  },
+  "twoProcessesAlternating": {
+    "writes": 2000,
+    "stampCollisions": 0
+  }
+}

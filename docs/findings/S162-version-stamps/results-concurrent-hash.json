@@ -1,0 +1,59 @@
+{
+  "stats": {
+    "rounds": 100,
+    "a write overwrote another it never read (truth)": 20,
+    "flagged concurrent by the line": 21,
+    "truth and line agree": 99,
+    "each capture holds its own writer's content": 98
+  },
+  "mismatches": [
+    {
+      "round": 2,
+      "lost": true,
+      "flagged": ["A"],
+      "attributionOk": false,
+      "events": [
+        ["A", "capture-open", 7],
+        ["B", "capture-open", 7],
+        ["A", "capture-open", 7],
+        ["B", "capture-open", 7],
+        ["B", "capture-close", 0],
+        ["A", "capture-close", 0],
+        ["B", "capture-dup", 30],
+        ["A", "capture-dup", 30]
+      ]
+    },
+    {
+      "round": 16,
+      "lost": true,
+      "flagged": ["B"],
+      "attributionOk": false,
+      "events": [
+        ["A", "capture-open", 8],
+        ["B", "capture-open", 8],
+        ["B", "capture-open", 8],
+        ["A", "capture-open", 8],
+        ["A", "capture-close", 0],
+        ["B", "capture-close", 0],
+        ["A", "capture-dup", 30],
+        ["B", "capture-dup", 30]
+      ]
+    },
+    {
+      "round": 79,
+      "lost": false,
+      "flagged": ["B"],
+      "attributionOk": true,
+      "events": [
+        ["A", "capture-open", 8],
+        ["A", "capture-open", 8],
+        ["A", "capture-close", 0],
+        ["B", "capture-open", 0],
+        ["A", "capture-dup", 31],
+        ["B", "capture-open", 31],
+        ["B", "capture-close", 0],
+        ["B", "capture-dup", 30]
+      ]
+    }
+  ]
+}

@@ -95,11 +95,11 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 
 ## The base and the recipe (ADR-0131)
 
-- **ADR-0135, proposed, would replace this section.** Recipes would be learned
-  from what each tool call read and wrote, not declared. A disk for a new
-  state would carry each output whose recipe's key still holds there, and
-  pine·trie would run no recipe itself. Until it is accepted, what follows
-  holds.
+- **ADR-0135, proposed, would replace this section.** A recipe would be
+  any recorded run of a tool call that made derived files, keyed by what it
+  read, not a declared command. A disk for a new state would carry each
+  output whose key still holds there, and pine·trie would run no recipe
+  itself. Until it is accepted, what follows holds.
 - **A recipe** (`Recipe`, `lanes.install`) is how a disk's dependencies are
   made: a command, the tracked files whose content keys it (its inputs,
   `lanes.installWhen`, one or a list), and directories carried from one

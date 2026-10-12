@@ -1,0 +1,6 @@
+{
+  "changedAfterStore": false,
+  "changedAfterMsync": true,
+  "secondStoreThenUnmapWithoutMsyncChanged": true,
+  "contentOnDisk": "helloworld"
+}

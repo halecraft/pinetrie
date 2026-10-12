@@ -10,9 +10,10 @@
   - ADR-0103: on the Mac, a shared directory is a read-write entry of its
     host's slot in the lane VM, shared when the host starts.
   - ADR-0118: a shared directory is a live part of its branched source.
-  - ADR-0135: a shared directory keeps a history: a single line of states,
-    each write attributed to the tool call that made it, and a write based on
-    an old version shown as concurrent. It is still live, and never branched.
+  - ADR-0135: a write to a shared directory is attributed to the tool call
+    that made it, and given a version; a write based on a version that is no
+    longer current is shown as concurrent. The directory stays live, with no
+    history, and is never branched.
 
 **Context.** ADR-0034 gives each lane its own disk, and a branch clones it.
 That is right for a project's files, and wrong for the person's own working

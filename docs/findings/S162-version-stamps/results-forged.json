@@ -1,0 +1,22 @@
+{
+  "rewrite, then utime to the old mtime": {
+    "contentChanged": true,
+    "mtimeRestored": true,
+    "stampChanged": true
+  },
+  "rewrite, then touch -r": {
+    "contentChanged": true,
+    "mtimeRestored": true,
+    "stampChanged": true
+  },
+  "cp -p over it, same size and mtime": {
+    "contentChanged": true,
+    "mtimeRestored": true,
+    "stampChanged": true
+  },
+  "tar -x over it, same size and mtime": {
+    "contentChanged": true,
+    "mtimeRestored": false,
+    "stampChanged": true
+  }
+}

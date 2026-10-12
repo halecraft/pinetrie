@@ -11,7 +11,7 @@
     recipe again when its inputs change; `installWhen` is one lockfile or a
     list, and `installCaches` names what is carried.
 - **Amended by:**
-  - ADR-0135: a recipe is any recorded run of a command that made derived
+  - ADR-0135: a recipe is any recorded run of a tool call that made derived
     files, learned rather than declared (`lanes.install`, `installWhen` and
     `installCaches` go). pine·trie runs none itself; a disk made for a new
     state carries each output whose recipe's key still holds there.

@@ -1,214 +1,221 @@
-# ADR-0135 — A project's state is its source files, named by their git tree: a path's class comes from what wrote it, unless a file in the project declares otherwise; recipes are learned from what commands read; and jj is a codec that pine·trie writes commits through
+# ADR-0135 — A state is a turn's snapshot; `.gitignore` alone declares what is not source, and what a recorded run made is derived; recipes are learned from what each tool call read; jj, where a project has it, commits as it always does
 
 - **Status:** Proposed (2026-10-11)
-- **Area:** `packages/lanes/TECHNICAL.md`, `docs/the-jujutsu-repo.md`,
-  `docs/01-architecture.md`
-- **Evidence:** S146, S148, S155, S156, S157, S158, S159, S160, S161
+- **Area:** `packages/lanes/TECHNICAL.md`, `docs/01-architecture.md`
+- **Evidence:** S146, S148, S155, S156, S157, S158, S159, S160, S161, S162
 - **Amends:**
-  - ADR-0131: a recipe is any recorded run of a command that made derived
+  - ADR-0131: a recipe is any recorded run of a tool call that made derived
     files, learned rather than declared (`lanes.install`, `installWhen` and
     `installCaches` go). pine·trie runs none itself; a disk made for a new
     state carries each output whose recipe's key still holds there.
   - ADR-0130: a change to `pinetrie.json` that widens what a lane may do or
     share takes effect only from accepted work; a lane's own copy can only
     narrow it.
-  - ADR-0035: a shared directory keeps a history: a single line of states,
-    each write attributed to the tool call that made it, and a write based on
-    an old version shown as concurrent. It is still live, and never branched.
+  - ADR-0035: a write to a shared directory is attributed to the tool call
+    that made it, and given a version; a write based on a version that is no
+    longer current is shown as concurrent. The directory stays live, with no
+    history, and is never branched.
 
-**Context.** pine·trie names a state by a jj commit, and lets jj's ignore
-rules decide which files are part of it. Four problems follow:
-- **No state without a VCS.** A project without jj or git, or with no
-  files yet, has no state at all.
-- **The boundaries leak.** The class boundaries rest on rules any commit
-  can override. A tracked file under `.plans` defeats the ignore (lucky-
-  falcon's probe).
-- **Recipes are declared, and declared inputs are incomplete.** ADR-0131's
-  recipe is declared (`lanes.install`, `installWhen`), and its key misses
-  inputs: every `package.json`, `.npmrc`, `~/.npmrc`.
-- **Config is read once.** `pinetrie.json` is read once, at the host's
-  startup, from your working copy (`prepareLanes`). So a lane whose state
-  holds another version still gets the startup one.
+**Context.** pine·trie leans on jj for what a project's state is, and on
+jj's ignore rules for which files belong to it. Five problems follow:
+- **No state without a VCS.** A project without jj or git, or with no files
+  yet, has no state.
+- **The boundaries leak.** Once a commit tracks a file under `.plans`,
+  jj snapshots that shared directory's live edits, and a checkout deletes
+  the file, as a probe in `/tmp` showed. Ignore rules are all that keep a
+  shared directory out.
+- **Recipes are declared, and their inputs are incomplete.** ADR-0131's
+  recipe is a command someone names (`lanes.install`), keyed by a lockfile
+  (`installWhen`). Every lockfile-only key measured missed inputs: every
+  `package.json`, `.npmrc`, `~/.npmrc` (S157).
+- **Config is read once,** at the host's startup, from your working copy
+  (`prepareLanes`). A lane whose own files hold another `pinetrie.json`
+  still gets the startup one.
+- **Shared directories lose writes silently.** Two lanes writing one plan
+  file keep only the last write, and nothing says who wrote what.
 
-Six spikes measured what a model built on the disk itself would rest on:
-- **S155: classes by origin.** "A command wrote it, after reading source"
-  marked exactly what git ignores, on 29,712 files across pine·trie,
-  ripgrep and flask. Without a VCS, only a lockfile's first write, and
-  what must stay local, needed someone's intent.
-- **S156: naming states.** A hasher of git's tree format gives git's tree
-  id on four repos, and updates it after a turn in 0.3–0.5 ms. A large
-  file has to be chunked: rehashing a 4 GB blob takes 3 s. With content-
-  defined chunks and FIEMAP, an edit in place costs 2–7 ms, plus up to
-  46 ms of FIEMAP.
-- **S157: recipes.** Every lockfile-only key misses inputs. A replay at the
-  same path differs only in timestamps, and every lane is at `/workspace`.
-- **S158: attribution.** A seccomp user-notification listener per tool
-  call, needing no privilege, attributed all 24 files of a scenario
-  correctly:
-  - daemons, static binaries, `env -i` and parallel tool calls among
-    them;
-  - at 1.0–1.25× for opens (milliseconds on small commands).
-
-  It also sees lookups of files that don't exist. Attributing by time loses
-  work, because pi runs tool calls in parallel, and fsatrace crashes
-  background processes.
-- **S159: jj as a codec.** jj's snapshot gives the state's name once the
-  codec writes the exclude file first. pine·trie can write a turn's commit
-  in 4–5 ms and `jj git import` it in 10–88 ms, against 17–189 ms for
-  `jj commit`. jj drops new files over 1 MiB with only a warning, and
-  cannot take a gigabyte in a lane.
-- **S160: merge.** A path-by-path merge agreed with jj on 99.8% of the
-  paths both sides changed in 313 real merges. It needs a tree-level
-  check, the mode as its own field, and renames offered as a guess.
+The spikes behind this decision:
+- **S146, S148:** a turn's btrfs snapshot and its diff, about 2 ms, with
+  deletions.
+- **S155:** "a command wrote it, after reading source" marked exactly what
+  git ignores, on all 29,712 files the commands of three real repos wrote.
+  What must stay local, and a lockfile's first write, needed someone's
+  intent.
+- **S156:** a whole state can be hashed as a git tree, and updated after a
+  turn in under a millisecond. But a large file costs 0.6–0.9 s per GB to
+  hash again after any change, unless it is split into chunks that no
+  other tool can read.
+- **S157:** the inputs a recipe really reads, against the lockfile it
+  declares. A replay at the same path differs only in timestamps, and every
+  lane is at `/workspace`.
+- **S158:** a seccomp user-notification listener per tool call attributes
+  every write and read to the call that made it, with no privilege: daemons,
+  static binaries, `env -i` and parallel calls included. It costs about
+  26 µs per watched call. It also sees lookups of files that do not exist.
+- **S159:** jj's snapshot equals the source files' tree once ignores match.
+  jj leaves new files over 1 MiB untracked with only a warning.
+- **S160:** a path-by-path merge agreed with jj on 99.8% of the paths both
+  sides changed, in 313 real merges.
+- **S161:** a lane's writes into a shared directory are all seen, and
+  concurrent writes are flagged exactly. The Mac's watcher saw every write,
+  from lanes and from the Mac.
+- **S162:** a file's stamp (inode, size, ctime) changed on every change of
+  its content, mtimes restored by `touch -r` or `cp -p` included, and
+  decided S161's races as content hashes did.
 
 **Decision.**
-- **A state is the tree of its source files, named by its git tree id.**
-  - The name is updated every turn from the turn's changed paths (S156).
-  - Derived and local files are not part of it.
-  - A file above a size threshold is stored as content-defined chunks
-    (about 1 MiB each), and its entry names the list of them. The
-    threshold is a constant set from a turn's time budget, tens of MB, not
-    a setting. Which chunks an edit touched comes from FIEMAP.
-  - Naming a large file that an app rewrote runs in the background. The
-    turn's name is pending until it finishes, and a branch at that turn
-    waits for it.
-- **Every path is source, derived or local.** The first of these that
-  answers decides:
-  1. the classification file;
-  2. what a VCS says, at import: tracked means source;
-  3. origin;
-  4. source.
-
-  **Origin:**
-  - A tool's write is source.
-  - A command's write is source if it edited the file in place, or read no
+- **A state is a turn's snapshot.**
+  - Each turn's btrfs snapshot is the state it leaves. What a turn changed is
+    the diff of two snapshots (S146).
+  - Whether two states hold the same files is whether their diff is empty.
+  - Nothing hashes a whole state. A file is hashed only when something
+    needs its content: a recipe that read it (below), or jj committing it.
+- **Every path is source, derived or local.**
+  - **Source:** what the project is made of. It travels with its state, to
+    forks, to offers, and to commits where the project has a VCS.
+  - **Derived:** what a recorded run made from source. It may be dropped
+    and made again.
+  - **Local:** neither. It stays on the disk it is on, and is never sent,
+    offered or committed.
+- **`.gitignore` is the only declaration, with or without git.**
+  - A path `.gitignore` does not ignore is source. A path it ignores is not
     source.
-  - Otherwise it is derived.
+  - Among ignored paths, derived or local is observed, not declared:
+    - **derived** if a recorded run made it: a tool call's command that
+      read source, and did not edit the file in place;
+    - **local** otherwise: `.env`, `scratch/`, anything a tool wrote, or a
+      command wrote from nothing.
 
-  A derived file a later command rewrites stays derived.
-- **The classification file is a file in the project, and it is the only
-  interface.**
-  - Its lines are `pattern class`, sorted, where the class is `keep`,
-    `derived` or `local`.
-  - There is no tool to declare a class. The agent, a command and you all
-    edit the file, and the UI is a view of it and an editor for it.
-  - It is checked wherever it can change: at the end of a turn, at an
-    import, and at a catch up. When a tool writes it, the check's errors
-    go into that tool's result.
-  - A file that does not parse only tightens: every path the last valid
-    version called `local` stays local.
-  - A change that makes a path shareable or droppable is shown in the
-    turn's record. A `local` declaration must precede the first send.
+    A derived path a later run rewrites stays derived. A tool's write inside
+    a derived path is local, so a hand edit there is never dropped.
+  - `.gitignore` is the one ignore format git, jj, ripgrep, fd and editors
+    all read, so they all see the same project pine·trie sees.
+- **Origin advises; it never decides silently.**
+  - Origin is what a tool call wrote, and what its commands read (S155).
+  - When a run makes files that `.gitignore` does not ignore (thousands of
+    files under `node_modules/`, a `dist/`), the turn's record says so. The
+    agent then proposes a `.gitignore` edit, which is reviewed with the
+    offer like any change.
+  - A folder without a `.gitignore` treats everything as source until one
+    is written.
 - **Every tool call runs under a supervisor.**
   - The supervisor is a child subreaper. It installs a seccomp filter that
     sends each open, rename, unlink, mkdir, link and symlink to it, and
-    every process the call starts inherits the filter.
+    every process the call starts inherits the filter (S158).
   - A write is attributed to the call whose process tree made it, however
-    and whenever that process runs. A write nothing attributes is source.
+    and whenever that process runs. A write nothing attributes is treated
+    as a tool's write: source, or local where `.gitignore` ignores it.
   - Stat and access calls are not watched, for their cost (up to 2.7×,
     S158). Directory listings on the path to each input stand in for them.
   - The supervisor's listener must never stop. If it does, its call hangs,
     and if its descriptor closes, its processes' file calls fail (S158).
-  - `$HOME` is on the lane's disk.
 - **A recipe is a recorded run, not a declaration.**
-  - Any tool call that made derived files is one. pine·trie keeps its
-    command, its image, the blob ids of the source it read, the lookups it
-    made that found nothing, and `$HOME`'s configuration as a whole. Their
-    hash is its key.
-  - pine·trie never schedules a run.
-  - When it makes a disk for a new state (a fork, the base, a catch up),
-    it carries, by reflink, each output whose recipe's key holds on that
-    state. It leaves out the others, for whoever works there to rebuild.
-    An output left out stays in the snapshot it was made in.
-- **What pine·trie knows about files is a fact of a state.**
-  - A fact is a pure function of some paths, keyed by their blob ids, and
-    computed again on each new state. Examples: the class map, the lane
-    config, and whether a recipe's key holds.
-  - No change pine·trie acts on reaches it except as a state. A shared
-    directory's states are its own line (below), never a thread's.
-  - **Authority follows the direction of a change.** A lane can always
-    narrow what it may do or share. Only accepted work widens it:
-    - grants;
-    - a class that becomes shareable or droppable;
-    - any key with no order.
+  - Any tool call whose commands made derived files is one.
+  - **Its key** is a hash of:
+    - its command and its image;
+    - the content of each source file it read;
+    - the files it looked for and did not find;
+    - `$HOME`'s configuration as a whole, since `$HOME` is on the lane's
+      disk.
 
-    The check's reply tells the agent which applies, and an offer's review
-    lists the widenings it would make.
-- **A shared directory is a single line of states, outside every thread's
-  state** (S161).
-  - **Its paths come out of every thread's state by where they are
-    mounted, never by ignore rules.** The state's walk, the turn's diff
-    and the codec's exclude file all skip it. A commit that tracks a
-    shared path is reported at import, as a local one is.
-  - **A lane's write goes on the line** as its tool call's capture, taken
-    when the file is released (`close`, `dup3`, `exit_group`, `execve`),
-    with the version the writer read when it opened the file.
-  - **A write whose version read is not the line's head is shown as
-    concurrent,** not silently lost.
-  - **A write from the Mac goes on the line from the host's watcher** and
-    a hash. It carries no version read, so it cannot be checked for
-    concurrency.
-  - **A turn's record names the shared states it read and wrote.**
-  - **No fact that grants authority reads a shared path.** A recipe that
-    read one is carried only if the shared content it read is still the
-    line's head when the new disk is made.
-  - **The line is never branched.** Branching at a turn shows the shared
-    directory as it was, but the directory itself stays live.
-- **jj is a codec, used only by projects that have it.**
-  - pine·trie writes each turn's commit itself: the blobs that changed,
-    the trees above them, and the commit. jj imports it. The commit's tree
-    is the state's name by construction.
-  - jj's own snapshot, which runs when the agent or you use jj, is kept in
-    line:
-    - `.git/info/exclude` is generated from the derived and local sets,
-      written before jj's first snapshot;
-    - kept files in ignored places are tracked with `--include-ignored`;
-    - a reclassified path is untracked;
-    - `snapshot.max-new-file-size` is 0.
-  - Each turn checks that jj's tree is the state's name.
-  - At an import, a commit that tracks a path the class map calls local is
-    reported, never settled silently.
-  - A project without a VCS has the same states, with no codec.
-- **A merge is pine·trie's own, path by path.**
-  - A path changed on one side takes that side, and the same change on
-    both sides is taken once.
+    Those files are small (manifests, lockfiles, config), and their hashes
+    are cached while a file is unchanged.
+  - pine·trie never schedules a run. The agent, or you, run commands as a
+    developer would.
+  - **When pine·trie makes a disk for a new state** (a fork, the base, a
+    catch up), it carries, by reflink, each derived output whose recipe's
+    key holds on that state, and leaves out the rest, for whoever works
+    there to make again. The base is accepted work's files plus the outputs
+    whose keys hold there.
+- **What pine·trie knows about a project's files is a fact of a state.**
+  - A fact is a pure function of some files, keyed by their content, and
+    computed again on each new state where they changed. `pinetrie.json`,
+    the lane config, is one.
+  - No change pine·trie acts on reaches it except as a state, or as a
+    write to a shared directory (below).
+  - **Authority follows the direction of a change.** A lane can always
+    narrow what it may do or share. Only accepted work widens it: a grant,
+    or any setting whose values have no order. The reply to the tool call
+    that changed the file says which applies, and an offer's review lists
+    the widenings it would make.
+- **A shared directory stays live, with every write attributed and
+  versioned.**
+  - **It is outside every state by where it is mounted,** never by ignore
+    rules. A snapshot's diff, and jj, never see it.
+  - **Each write is numbered** by the host as it is made, and attributed to
+    the tool call that made it, or to the Mac.
+  - **A lane's write carries the version its writer read:** the version
+    current when the file was opened. The supervisor sees the open and the
+    release (`close`, `dup3`, `exit_group` or `execve`; S161).
+  - **A version is the file's stamp: its inode, size and ctime,** read with
+    one `stat`, so no file is read or hashed (S162). No program can set
+    ctime, so a tool that restores an mtime still changes the stamp, and a
+    save by rename changes the inode.
+  - **A write based on a version that is no longer current is shown as
+    concurrent,** not silently lost. A write from the Mac carries no
+    version read, so it cannot be checked.
+  - **Two writes that overlap,** each opened before the other was
+    released, are flagged, but which one's content survived is not known
+    (S162).
+  - **A turn's record names the versions it read and wrote.**
+  - **No fact that grants authority reads a shared file.** A recipe that
+    read one is carried only while that file's version is unchanged.
+- **jj, where a project has it, works as it always does.**
+  - Each turn is committed with jj's own snapshot. pine·trie writes no
+    objects of its own.
+  - jj's refusal of a new file over its size limit (1 MiB by default)
+    appears in the turn's record, with the file's name, rather than only on
+    a stderr nobody reads (S159). The project then ignores it or tracks it.
+  - A project without a VCS has the same states, the snapshots, with no
+    commits.
+- **Merging two states without a VCS is path by path** (S160).
+  - A path changed on one side takes that side, and the same change on both
+    sides is taken once.
   - The mode is merged as a field of its own.
-  - Text is merged three ways (`git merge-file` or jj). Anything else is a
-    conflict, kept as a value.
+  - Text is merged three ways. Anything else is a conflict.
   - The result is checked as a tree, so that a directory and a file never
     meet at one path.
   - A rename inferred from the two diffs is offered as a resolution, never
     applied on its own.
 
+  In a jj project, jj merges, and S160 found that it decides as this does.
+- **A conflict is a record, never a file.** This holds with or without a
+  VCS; a jj project keeps jj's own conflicts as well.
+  - **It names one path and three versions:** the base, ours and theirs.
+    All three are already in snapshots pine·trie keeps.
+  - **The folder holds one version:** the receiving side's. On a catch up,
+    the thread keeps its own file, so work in progress is never
+    overwritten. No markers, and no conflicted copies beside the file.
+  - **Resolving is choosing a version.** A media file offers the three.
+    Text also offers a three-way merge, and an agent may offer a merge of
+    its own; each is a candidate, and you choose.
+  - **An agent reads the three versions with ordinary tools,** read-only,
+    outside the project. Open conflicts are listed in its context.
+  - **An offer with an open conflict cannot be accepted,** so a conflict
+    never reaches accepted work.
+
 **Consequences.**
 - **Projects:**
   - A project without jj or git works, from its first file.
-  - Nothing has to be configured. The classification file is needed only
-    where intent differs from origin: a lockfile at its first write,
-    generated code people keep, secrets in a project without a VCS.
+  - Nothing is configured. `.gitignore` is the one file that says what a
+    project is, and it is a file every developer already knows.
+  - pine·trie, git, jj and your editor see the same project.
 - **What it costs:**
-  - About 26 µs per watched file call. That is a few milliseconds on an
-    everyday command, +0.3 s on a `pnpm install`, +0.9 s on a test run, and
-    nothing measurable on builds (S158).
-  - Naming a turn takes under a millisecond. A large file costs 2–50 ms
-    when edited in place, and about a second per GB when rewritten, off the
-    critical path (S156).
-  - The first lane after a merge that changed a recipe's inputs pays one
-    run of it: about a second for pnpm with its store warm.
+  - About 26 µs per watched file call: a few milliseconds on an everyday
+    command, +0.3 s on a `pnpm install`, +0.9 s on a test run, and nothing
+    measurable on builds (S158).
+  - Hashing a recipe's inputs, which are small and cached.
+  - Large files cost nothing, unless a recipe reads them, or jj commits
+    them as it would without pine·trie.
+  - The first lane after a merge that changed a recipe's inputs runs it
+    again, as a developer would after a pull: about a second for pnpm with
+    its store warm.
+  - A project without a `.gitignore` has its first derived output treated
+    as source, until the agent adds one in a visible edit.
 - **What goes:**
   - `lanes.install`, `installWhen` and `installCaches`;
-  - dependency layers built by pine·trie;
-  - the in-lane re-install;
-  - `commitTurn`'s `jj commit`;
+  - dependency layers built by pine·trie, and the in-lane re-install;
   - reading `pinetrie.json` once at startup.
-- **Grants:** a grant in a lane's `pinetrie.json` that widens takes effect
-  only when its offer is accepted.
-- **Shared directories:**
-  - A branch can show `.plans` as it was at its turn.
-  - Two lanes writing one plan see a conflict instead of losing a write.
-  - Opening a shared file costs about 3 ms on virtiofs, plus up to 2.7 ms
-    to capture it. That was measured on a busy VM, so it is an upper bound
-    (S161).
 - **Risks:**
   - The supervisor sits on every file call's path.
   - setuid programs cannot gain privilege inside a tool call
@@ -217,26 +224,40 @@ Six spikes measured what a model built on the disk itself would rest on:
   - io_uring's opens bypass seccomp. Whether Docker blocks them was not
     checked.
 - **Left open:**
-  - how a file of a gigabyte reaches a git remote, as one blob or a
-    pointer;
-  - large binaries in a shared directory (1.8 GB in `.plans`, files up to
-    322 MB): chunked as S156 would chunk them, or kept off the line;
-  - the last version written by a process killed by a signal, which is
-    captured only when its tool call ends;
+  - where an agent reads a conflict's three versions (a read-only path
+    outside the project, such as `/.pinetrie/conflicts/<path>/`);
+  - states moving between machines. Between lane VMs, `btrfs send` (S146,
+    S148) is where to start; the boundary with the Mac is a separate
+    problem;
   - syncing your folder on the Mac with your thread (S149, S150, put
-    aside);
-  - the chunking threshold's exact value.
+    aside).
 
 **Alternatives rejected.**
+- **A content hash for every state, as a git tree id** (S156). Nothing needs
+  one: snapshots identify states and their diffs say what changed. A large
+  file would cost 0.6–0.9 s per GB of hashing on every change, in CPU and
+  battery, unless it were chunked.
+- **Chunked large files, and pointers in commits.** They are formats no
+  other tool reads: a clone from a remote would hold pointers, and jj would
+  disagree with the files on disk.
+- **Declaring classes in a file of pine·trie's own** (`[classes]` in a
+  `pinetrie.toml`, or a list of patterns). It is a second source of truth
+  beside `.gitignore`. Derived and local can be observed instead.
+- **A generated `.git/info/exclude`.** Git, jj and editors would hide files
+  no visible file ignores, and another clone would see a different project.
+- **pine·trie writing commits for jj to import** (S159). jj's operation log
+  would show imports where people expect snapshots, and a person using jj
+  in a lane would race pine·trie's writes.
 - **jj as the record of the state.** A project without jj would need a
-  second model. jj also drops large files without saying so, and holds
-  four times a file in memory (S159).
-- **Naming a disk by its btrfs subvolume.** That names the disk, not its
-  content.
-- **A name over the whole disk, derived files included.** It costs 1.2 s
-  on every turn that installs (S156).
-- **Large files as single blobs.** Each edit rehashes and stores the whole
-  file (S156).
+  second model.
+- **Conflicted copies in the folder,** as Dropbox and Syncthing write
+  them. They sync, get edited, and multiply. A record outside the folder
+  points at versions that already exist.
+- **Content hashes as a shared file's version** (S161). Every open and
+  release would read the whole file, and a stamp decides the same (S162).
+- **A history of a shared directory's content.** It would hash and copy
+  every version of every file written, 322 MB files included, with nothing
+  that needs it beyond concurrency, which versions give.
 - **strace for reads.** It is 20–73× on builds (S155, S157).
 - **fsatrace.** It crashes processes that outlive their command, and does
   not see static binaries or `env -i` (S158).
@@ -247,9 +268,7 @@ Six spikes measured what a model built on the disk itself would rest on:
   same job without either problem.
 - **Declared recipes and lockfile-only keys.** Every one measured missed
   inputs (S157).
-- **A tool to declare a class.** Direct edits to the file have to work
-  anyway, so the file has to be the interface.
 - **Splitting `pinetrie.json` by authority.** The direction of a change
-  decides authority for every key, with no section to remember.
+  decides authority for every setting, with no section to remember.
 - **Following renames on every merge, as git does.** In 313 merges it
   invented a rename twice (S160).
