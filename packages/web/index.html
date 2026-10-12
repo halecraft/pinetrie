@@ -114,9 +114,6 @@
       .menu-items { display: flex; flex-direction: column; }
       .menu button { text-align: left; background: none; color: #ddd; padding: .3rem .5rem; }
       .menu button:disabled { color: #777; cursor: default; }
-      /* `.icon` is a block, so an item that leads with one lays out in a row,
-         or its label falls to a line of its own. */
-      .menu button:has(> .icon) { display: flex; align-items: center; gap: .3rem; }
       .menu .why { font-size: .75rem; }
       /* ＋: a split button, dashed, at the foot of the sidebar and of each
          board column. */
@@ -956,7 +953,7 @@
       .clipboard-cell-head { display: flex; gap: .3rem; align-items: center; }
       .clipboard-cell-face { display: flex; flex-direction: column; gap: .15rem; color: #c9d1d9; min-width: 0; }
       .clipboard-cell-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .clipboard-cell .keep { align-self: flex-start; display: inline-flex; gap: .3rem; align-items: center; }
+      .clipboard-cell .keep { align-self: flex-start; }
       .card-head:focus-visible { outline: 2px solid var(--tone, #8b93a1); outline-offset: -2px; }
       /* A card drawn normal: the card itself, bounded at a column's height. */
       .card-normal { display: flex; flex-direction: column; max-height: 18rem;
@@ -1121,6 +1118,10 @@
       .inventory-toggle[aria-pressed="true"] { color: var(--on); background: var(--page);
         --surface: var(--page); }
       .icon { flex: none; display: block; }
+      /* A block, an icon would put its button's label on a line of its own;
+         so a button that holds one lays out in a row. `:where` keeps this
+         under every button's own layout. */
+      :where(button:has(> .icon)) { display: inline-flex; align-items: center; gap: .3rem; }
       .inventory-count { font-size: .72rem; font-variant-numeric: tabular-nums; }
       .footer-right { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
       .sync-note { font-size: .75rem; color: #6f7784; }
