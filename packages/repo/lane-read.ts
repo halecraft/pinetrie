@@ -1,11 +1,6 @@
-// repo/lane-read — one lane's refresh facts in one `jj log` (ADR-0065):
-// where its offer sits and starts, and the offer as your repo holds it, read
-// as rows and decided by pure code here (`planLaneRead`), with the shared
-// facts (`shared.ts`). It reads what `laneTipIn`, `laneBase`,
-// `startOfOffer`, `readOffer` and `workChanges` read, and says the same
-// (`repo.test.ts` holds them side by side). Only a refresh of a lane on the
-// line takes this path (`gatherRefresh` chooses it): a WIP's base reads more
-// of your repo, and keeps the separate reads.
+// One lane's refresh facts in one `jj log`, for a lane on the line: what
+// `laneTipIn`, `laneBase`, `startOfOffer`, `readOffer` and `workChanges` read
+// separately, and the same values (`repo.test.ts` holds them side by side).
 
 import {
   baseOf,
@@ -195,7 +190,7 @@ export type LanePlan =
           }
     }
 
-/** Pure: what the rows say of the lane's base, start and offer. */
+/** What the rows say of the lane's base, start and offer. */
 export function planLaneRead(
   rows: readonly LaneRow[],
   input: {
@@ -368,7 +363,7 @@ export async function gatherLane(
   // Asked of the lane's own work, never read from the offer's files: those
   // are its diff against the target, empty once accepted work holds the lane's
   // work, while the work itself still changes files. Read from the offer, an
-  // empty one was withdrawn and then built again, without end (S89).
+  // empty one was withdrawn and then built again, without end.
   const work = await workChanges(jj, { start, tip })
   const catchUp = await readCatchUp(jj, {
     base,

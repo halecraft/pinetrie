@@ -38,7 +38,7 @@ const argvs = (steps: readonly RepoStep[]) =>
       : `jj as ${s.as}: ${s.args.join(" ")}`,
   )
 
-describe("logRevset: the offers added to your log (S77 item 8)", () => {
+describe("logRevset: the offers added to your log", () => {
   test("added to jj's default when the repo defines none, and idempotent", () => {
     const once = logRevset(null)
     expect(once).toBe('builtin_log() | bookmarks(glob:"pinetrie-offer/*")')
@@ -62,11 +62,11 @@ describe("immutableHeads: accepted work and its offers added to yours", () => {
   })
 })
 
-describe("offers (ADR-0105)", () => {
+describe("offers", () => {
   const op = (...args: string[]) => `jj as host: ${args.join(" ")}`
-  /** A rewrite of an offer, which may be immutable on accepted work (ADR-0104). */
+  /** A rewrite of an offer, which may be immutable on accepted work. */
   const rw = (...args: string[]) => op("--ignore-immutable", ...args)
-  test("offerStart: the base's commit, and the history of each accepted source (ADR-0104)", () => {
+  test("offerStart: the base's commit, and the history of each accepted source", () => {
     expect(offerStart({ tip: C1, start: C2, sources: [] })).toBe(
       "heads(::c1 & (c2))",
     )
@@ -78,7 +78,7 @@ describe("offers (ADR-0105)", () => {
       }),
     ).toBe("heads(::c1 & (c2 | ::(present(t1) | present(t2))))")
   })
-  test("acceptedOfferCommitsRevset: accepted sources above the commit the base holds, never a WIP's copy (S81)", () => {
+  test("acceptedOfferCommitsRevset: accepted sources above the commit the base holds, never a WIP's copy", () => {
     const accepted =
       'description(regex:"(?m)^(Pine(?:trie|ta)-Source|Pine(?:trie|ta)-Thread): ")'
     expect(
@@ -155,7 +155,7 @@ describe("offers (ADR-0105)", () => {
       rw("describe", "-r", "ch", "-m", "WIP (amber-fox): x"),
     )
   })
-  test("planOfferAcceptanceSteps: the destination moved forward to the top, as the host, never with --allow-backwards (ADR-0104)", () => {
+  test("planOfferAcceptanceSteps: the destination moved forward to the top, as the host, never with --allow-backwards", () => {
     expect(
       argvs(
         planOfferAcceptanceSteps({
@@ -184,7 +184,7 @@ describe("offers (ADR-0105)", () => {
     ])
     expect(laneRefSteps([])).toEqual([])
   })
-  test("planImport: git fetches the bundle as the lane's remote bookmark, then jj imports it, as the host (S87 item 7)", () => {
+  test("planImport: git fetches the bundle as the lane's remote bookmark, then jj imports it, as the host", () => {
     expect(
       argvs(planImport({ lane: LANE, bundle: "/tmp/b.bundle", stack: false })),
     ).toEqual([
@@ -199,7 +199,7 @@ describe("offers (ADR-0105)", () => {
       `git fetch -q /tmp/b.bundle +refs/heads/pinetrie/${LANE}-stack:refs/remotes/pinetrie-${LANE}/stack`,
     )
   })
-  test("accepted work's setup is the host's bookmark and your config (ADR-0104)", () => {
+  test("accepted work's setup is the host's bookmark and your config", () => {
     expect(
       argvs(
         planSetup({
@@ -214,7 +214,7 @@ describe("offers (ADR-0105)", () => {
       "jj as you: config set --repo revsets.log L",
     ])
   })
-  test("a publish: your catch-up is yours; the move is the host's, or yours in one step when it accepts your commits; its undo reverts, never restores (ADR-0090, S111)", () => {
+  test("a publish: your catch-up is yours, the move the host's or yours; its undo reverts, never restores", () => {
     expect(
       argvs(planPublishCatchUp({ acceptedBookmark: "pinetrie-accepted" })),
     ).toEqual(['jj as you: rebase -b @ -d "pinetrie-accepted"'])
@@ -359,7 +359,7 @@ describe("planObserve: what moved between two fingerprints", () => {
   test.each([
     ["nothing moved", fp(base), none],
     [
-      "accepted work moved: the base snapshot follows it (ADR-0090)",
+      "accepted work moved: the base snapshot follows it",
       fp({ ...base, "pinetrie-accepted": "c9" }),
       { ...none, all: true, acceptedMoved: true },
     ],
@@ -371,7 +371,7 @@ describe("planObserve: what moved between two fingerprints", () => {
       { ...none, yours: true },
     ],
     [
-      "the publish bookmark moved: accepted work's record alone (ADR-0076)",
+      "the publish bookmark moved: accepted work's record alone",
       fp({ ...base, main: "c1" }),
       { ...none, published: true },
     ],
@@ -513,7 +513,7 @@ describe("planLaneRead: what one lane's rows say", () => {
       read([tip, based, under], [{ commit: "t2", sources: ["s2"] }]),
     ).toMatchObject({ start: { kind: "known", start: ["c0"] } })
   })
-  test("an accepted-offer commit of the lane that names no source, above the base, makes the start untraced; one under it does not (S97)", () => {
+  test("an accepted-offer commit of the lane that names no source, above the base, makes the start untraced; one under it does not", () => {
     const above = row("u1", { untraced: true })
     const under = row("u2", { untraced: true, underBase: true })
     const accepted = row("t1", { accepted: true })
@@ -539,7 +539,7 @@ describe("planLaneRead: what one lane's rows say", () => {
   })
 })
 
-describe("wipState: landed, gone, or ok (ADR-0104, S77 item 2)", () => {
+describe("wipState: landed, gone, or ok", () => {
   const W = commitId("w1")
   test.each([
     [

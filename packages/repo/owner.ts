@@ -1,22 +1,6 @@
-// repo/owner — the one writer of your repo (ADR-0065).
-//
-// The owner is the only thing that knows the head. Writes run on it, one at a
-// time, commands first; everything else reads at the head it last saw.
-//
-// - `command`: a step someone waits on. `later`: upkeep, at most one queued per
-//   key, started only when no command waits. Both get `RepoOps`, unpinned.
-// - A write observes at once, inside its step: `execute` as soon as its steps
-//   ran, `jjAsYou` as the step ends. So a read after it is pinned to what it
-//   wrote, and so is any record the step writes after it, which a page may
-//   read from at once. A step that only read observes nothing.
-// - `read`: pure reads pinned to the last observed operation, never queued: a
-//   read with `--at-op` writes nothing, whatever runs beside it (S87).
-// - Observation (`later("observe")`): `jj op log -n 1`, which merges divergent
-//   heads and names the result (S87 item 4); if it is new, the fingerprint is
-//   read at it, `planObserve` says what moved, and the listeners hear it.
-// - The watch: `fs.watch` on the heads directory, and a `readdir` every few
-//   seconds as the backstop. Neither starts jj: a new head queues an
-//   observation.
+// The one writer of your repo, and the only thing that knows the head. Writes
+// run on it one at a time, commands first; reads are pinned to the head it
+// last observed.
 
 import { type FSWatcher, watch } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
@@ -56,7 +40,6 @@ export interface RepoOps {
 /** What a read may run: jj pinned to the last observed operation, and git. */
 export type RepoReads = Pick<RepoOps, "jj" | "git">
 
-/** What the owner's upkeep is keyed by. */
 export type RepoKey = `refresh:${ThreadId}` | "accepted" | "observe" | "shared"
 
 /** What a step on the owner may read and run: at the head, unpinned. */

@@ -1,8 +1,6 @@
-// repo/shared — what accepted work's record and every lane's refresh read, read
-// once per operation (ADR-0065): accepted work's facts, the accepted-offer
-// commits on accepted work with their sources or the lanes they name none for,
-// and the files `@` changes. An operation id names the repo
-// exactly, so the owner keeps one set until the head moves.
+// What accepted work's record and every lane's refresh read, read once per
+// operation: an operation id names the repo exactly, so the owner keeps one
+// set until the head moves.
 
 import {
   type AcceptedFacts,
@@ -26,11 +24,11 @@ import { ACCEPTED_OFFER_COMMITS } from "./plan.ts"
 /** A commit on accepted work carrying accepted offers' `Pinetrie-Source` trailers. */
 export interface AcceptedOfferCommit {
   readonly commit: CommitId
-  /** The lane commits it names, from every paragraph (S77 item 6). */
+  /** The lane commits it names, from every paragraph: a squash of two accepted offers keeps both. */
   readonly sources: readonly CommitId[]
 }
 
-/** An accepted-offer commit on accepted work whose sources are not named, for the lanes it names (S97). */
+/** An accepted-offer commit on accepted work that names lanes but no sources: accepted before offers carried their ledger. */
 export interface Untraced {
   readonly commit: CommitId
   readonly lanes: readonly ThreadId[]

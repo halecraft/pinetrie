@@ -1,12 +1,8 @@
-// repo/offer-repair — a divergent offer repaired in your favour (S48 items
-// 2 and 8).
-//
-// The one offer step that reads between its steps, and must: abandoning the
-// host's commit of one change rebases the host's commits above it, so each
-// change's commits are read only once the step before it has run. A step
-// that named a commit read before an earlier rewrite would act on a hidden
-// commit and fork the change (S48 item 2). Each change's split is decided by
-// `hostCommitIn`'s read, and its steps by `planRepair`.
+// A divergent offer repaired in your favour: the one offer step that reads
+// between its steps. Abandoning the host's commit of one change rebases the
+// host's commits above it, so each change's commits are read only once the
+// step before it has run: a commit id read before an earlier rewrite names a
+// hidden commit, and acting on it forks the change.
 
 import { hostCommitIn } from "./offer.ts"
 import type { RepoOps } from "./owner.ts"

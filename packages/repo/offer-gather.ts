@@ -1,13 +1,7 @@
-// repo/offer-gather — every read an offer step plans from (ADR-0105,
-// ADR-0104), each returning values in core's words (`core/offers.ts`).
-//
-// The host reads what only the documents know (the thread's name, whether
-// its root is archived, the last catch-up read) and passes it in; everything
-// else is read here, through the jj a step or a pinned read gives. Nothing
-// here writes. Where an offer sits is decided once, as an `OfferPlace`, and
-// which read path a lane takes is chosen here: a refresh of a lane on the
-// line reads it in one `jj log` (`gatherLane`), every other gather the
-// separate reads. `repo.test.ts` holds the two side by side.
+// Every read an offer step plans from, in core's types. The host passes in
+// what only the documents know (`OfferInput`). Nothing here writes. A refresh
+// of a lane on the line reads it in one `jj log` (`gatherLane`), every other
+// gather the separate reads: `repo.test.ts` holds them to the same values.
 
 import type {
   BaseRecord,
@@ -79,7 +73,7 @@ export type RefreshGather =
       readonly facts: RefreshFacts
     }
 
-/** The lane's base record, as the repo says it now (ADR-0104). */
+/** The lane's base record, as the repo says it now. */
 const baseRecord = (
   lane: ThreadId,
   input: {
@@ -173,7 +167,7 @@ async function placeOf(
     target === null
       ? null
       : await readCatchUp(jj, { base, start, target, tip, known: input.known })
-  // An untraced start reads nothing: its work is unknown (ADR-0067).
+  // An untraced start reads nothing: its work is unknown, which builds no offer.
   const work = await workChanges(jj, { start, tip })
   return {
     place: placeFrom({
@@ -220,7 +214,7 @@ export async function gatherOffer(
  * What a refresh plans from. An archived thread's offer is read against the
  * line: its lane's history is gone, and with it its base, and the thread's
  * trailer leaves a WIP's own commits out of the offer. A lane on accepted work is
- * read in one `jj log` with the shared facts (ADR-0065); a lane on a WIP the
+ * read in one `jj log` with the shared facts; a lane on a WIP the
  * separate way, since its target and state need more of your repo.
  */
 export async function gatherRefresh(

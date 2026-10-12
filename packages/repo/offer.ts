@@ -1,15 +1,5 @@
-// repo/offer — the separate reads of an offer in your repo (ADR-0105).
-//
-// Reads only, each a query over jj on your repo (a step's, or a pinned read's)
-// returning values: the facts an offer step plans from (`readOffer`,
-// `startOfOffer` and `readStart`, `laneTipIn`, `workChanges`), what a review
-// shows of a commit (`revisionRead`, `fileDiff`), and which of a divergent
-// revision's commits the host made (`hostCommitIn`, from `evologOf`). The
-// gathers in `offer-gather.ts` call them, or read a lane on accepted work in one
-// `jj log` instead (`lane-read.ts`). What the facts mean is decided in
-// `@pinetrie/rules`' `offer.ts`, and its decisions become steps in
-// `offer-steps.ts`. A lane's base is read by `@pinetrie/lanes`' `laneBase`,
-// since a lane reads it too.
+// The separate reads of an offer in your repo, and a review's reads of a
+// commit or a range. Reads only.
 
 import {
   type CommitId,
@@ -94,8 +84,9 @@ export async function laneTipIn(
  * What the accepted-offer commits `acceptedOfferCommitsRevset` finds say
  * for `lane`: the lane commits they name in `Pinetrie-Source` trailers, what
  * you have of lanes that the lane's base does not already hold, read from
- * every paragraph of each message (S77 item 6); and the accepted-offer
- * commits of `lane` that name none (`untracedLanes`, S97).
+ * every paragraph of each message, since jj's `trailers` reads only the
+ * last; and the accepted-offer commits of `lane` that name none
+ * (`untracedLanes`).
  */
 async function acceptedOfferCommitFacts(
   jj: Runner,
@@ -171,7 +162,7 @@ export async function readStart(
  * diff from it to the tip: what a build restores, so the two agree. From
  * several, one diff over `start..tip`, from its roots' parents, merged, to
  * the tip. jj refuses a range with gaps, as after a catch-up merged an
- * accepted-offer commit (S97): that, or an untraced start, is `unknown`.
+ * accepted-offer commit: that, or an untraced start, is `unknown`.
  */
 export async function workChanges(
   jj: Runner,
@@ -277,7 +268,7 @@ export async function offerRevisions(
 /**
  * The files conflicted at an offer's start, as its ledger names it: read
  * only when the offer conflicts, since only then can its conflict have come
- * with the lane's copy (`conflictCause`, ADR-0072). A start your repo no
+ * with the lane's copy (`conflictCause`). A start your repo no
  * longer has names none.
  */
 export async function startConflictsOf(
@@ -298,9 +289,9 @@ export async function startConflictsOf(
  * what each one's evolog says since the host's newest version, its ledger
  * and first line, where it sits, its files and conflicts. Null when its
  * bookmark is gone (you abandoned it, or accepted it by hand). Divergent when
- * the bookmark is conflicted or a change id names two commits (S48 item 8):
- * then only its change ids. Every read after the first names commits, so no
- * read acts on a hidden one (S48 item 2).
+ * the bookmark is conflicted or a change id names two commits: then only
+ * its change ids. Every read after the first names commits, so no read acts
+ * on a hidden one.
  */
 export async function readOffer(
   jj: Runner,
@@ -369,7 +360,7 @@ export async function readOffer(
 
 /**
  * A range's files, each as one JSON object per line: a `TreeDiffEntry` has
- * a path, how it is shown and its status, but no line counts (S70), which
+ * a path, how it is shown and its status, but no line counts, which
  * `spanRead` takes from the range's git diff. A change to it bumps
  * `OFFER_WIRE`.
  */
@@ -407,7 +398,7 @@ function gitDiffCounts(
  * it (`answerReview`). A revision is one `REVISION_READ`, its description
  * and stats together. A range has no description: its files from
  * `RANGE_FILES`, and their counts from its git diff, which lists them in
- * the same order (S70). Null when jj fails, prints no JSON, or the two
+ * the same order. Null when jj fails, prints no JSON, or the two
  * listings disagree.
  */
 export async function revisionRead(
@@ -451,7 +442,7 @@ export async function revisionRead(
  * One file's git diff in a span; null when jj fails. `root-file:` names
  * the file from the repo's root, and exactly it: a bare path is read from the
  * process's directory, and `root:` matches every file under a directory of
- * that name (S57). A change to the flags bumps `OFFER_WIRE`.
+ * that name. A change to the flags bumps `OFFER_WIRE`.
  */
 export async function fileDiff(
   jj: Runner,
@@ -473,7 +464,7 @@ export async function fileDiff(
 /**
  * A divergent revision's commits, split into the one the host's own
  * operation made and yours: the newest evolog entry of each names the
- * operation's user (S48 item 8). Null unless exactly one is the host's.
+ * operation's user. Null unless exactly one is the host's.
  */
 export async function hostCommitIn(
   jj: Runner,
@@ -494,7 +485,6 @@ export async function hostCommitIn(
     : null
 }
 
-/** A commit's change id. */
 export async function changeOf(jj: Runner, commit: string): Promise<string> {
   return (
     await query(jj, ["log", "--no-graph", "-r", commit, "-T", "change_id"])

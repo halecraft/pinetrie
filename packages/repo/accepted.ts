@@ -1,8 +1,6 @@
-// repo/accepted — accepted work in your repo (ADR-0104): what it is now,
-// read as values for the host to plan from, and what catching the working copy up
-// with it would do (S80). Reads only; the host's steps that set it up and
-// publish it are `planSetup`, `planPublishCatchUp`, `planPublishMove` and
-// `planCatchUpUndo` (`plan.ts`, ADR-0090).
+// Accepted work in your repo, read for the host to plan from, and what
+// catching the working copy up with it would do. Reads only: the steps are
+// in `plan.ts`.
 
 import {
   type AcceptedFacts,
@@ -21,7 +19,7 @@ import {
 } from "@pinetrie/lanes"
 import { changeOf } from "./offer.ts"
 
-/** What `planPublishCatchUp`'s rebase would do to the working copy (S80): `AcceptedRecord`'s shape. */
+/** What `planPublishCatchUp`'s rebase would do to the working copy: `AcceptedRecord`'s shape. */
 type CatchUpPreview = NonNullable<AcceptedFacts["yours"]["catchUp"]>
 
 const count = async (jj: Runner, revset: string): Promise<number> =>
@@ -110,7 +108,7 @@ export async function acceptedFacts(
 }
 
 /**
- * The publish bookmark against accepted work (ADR-0076), read as a WIP's pair:
+ * The publish bookmark against accepted work, read as a WIP's pair:
  * accepted commits it lacks, and its commits accepted work lacks.
  */
 async function publishedFacts(
@@ -129,7 +127,7 @@ async function publishedFacts(
 
 /**
  * `git merge-tree` exits 1 on conflicts and prints the merged tree, then the
- * conflicting paths, then a blank line and its messages (S80 item 3). Null
+ * conflicting paths, then a blank line and its messages. Null
  * when `@` descends from no commit of accepted work, or git cannot merge.
  */
 async function catchUpPreview(
@@ -235,12 +233,12 @@ async function wipFacts(
 }
 
 /**
- * A WIP base's state (ADR-0104): landed when its bookmark points into the
- * line (moved there, or squashed into accepted work, which keeps the bookmark and
- * drops the WIP's change, S77 item 2), or, with the bookmark gone, when the
- * commit the lane's `Pinetrie-Base` names, or its change, is on accepted work.
- * Gone when the bookmark is gone and the WIP did not land; else ok. No
- * facts, a base on accepted work, is ok. Pure.
+ * A WIP base's state: landed when its bookmark points into the line (moved
+ * there, or squashed into accepted work, which keeps the bookmark and drops
+ * the WIP's change), or, with the bookmark gone, when the commit the lane's
+ * `Pinetrie-Base` names, or its change, is on accepted work. Gone when the
+ * bookmark is gone and the WIP did not land; else ok. No facts, a base on
+ * accepted work, is ok.
  */
 export function wipState(
   facts: {

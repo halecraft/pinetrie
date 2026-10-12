@@ -1,11 +1,6 @@
-// repo — your repo, as the host reads and writes it (ADR-0105, ADR-0104,
-// ADR-0065): the offers, accepted work, and lanes' refs in it, all
-// through one owner (`startRepoOwner`). What a lane also runs, through a
-// runner it is given, stays in `@pinetrie/lanes`. The runners on your repo are
-// the owner's alone: this package exports none. Only what other packages
-// use is exported: every read of an offer goes through a gather
-// (`offer-gather.ts`), which picks the read path, so the separate reads and
-// the one-read path stay inside.
+// Only what other packages use. No runner: steps run on the owner alone. An
+// offer is read only through a gather (`offer-gather.ts`), which picks the
+// read path, so the separate reads and the one-read path stay inside.
 
 export { beginFacts, readWipState } from "./accepted.ts"
 export type { Moved } from "./observe.ts"

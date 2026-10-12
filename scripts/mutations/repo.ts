@@ -100,7 +100,7 @@ export const mutations: readonly Mutation[] = [
     to: '  you("rebase", "-r", "@", "-d", revsetName(input.acceptedBookmark)),',
     command: repoTest,
     expect:
-      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded",
+      "a publish's catch-up: a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded",
   },
   {
     name: "the preview names no conflict",
@@ -109,7 +109,7 @@ export const mutations: readonly Mutation[] = [
     to: "  const conflicts = [].filter(",
     command: repoTest,
     expect:
-      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded",
+      "a publish's catch-up: a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded",
   },
   {
     name: "the preview counts no other head",
@@ -119,7 +119,7 @@ export const mutations: readonly Mutation[] = [
     to: "    heads: 0,",
     command: repoTest,
     expect:
-      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded",
+      "a publish's catch-up: a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded",
   },
   {
     name: "a lane's work always changes a file",
@@ -146,7 +146,7 @@ export const mutations: readonly Mutation[] = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `(::${bookmark} ~ ::(${input.target})) & ${bookmark}`,",
     command: unit,
-    expect: "an offer on accepted work (ADR-0104)",
+    expect: "an offer on accepted work: built, immutable",
   },
   {
     name: "an offer's revisions include what is already under its base",
@@ -156,7 +156,7 @@ export const mutations: readonly Mutation[] = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `(::${bookmark}) & (${thread} | ${bookmark})`,",
     command: unit,
-    expect: "an offer on accepted work (ADR-0104)",
+    expect: "an offer on accepted work: built, immutable",
   },
   {
     name: "setting up accepted work leaves your log as it was",
@@ -164,7 +164,7 @@ export const mutations: readonly Mutation[] = [
     from: '  you("config", "set", "--repo", "revsets.log", input.log),',
     to: '  you("config", "set", "--repo", "revsets.log", "builtin_log()"),',
     command: unit,
-    expect: "an offer on accepted work (ADR-0104)",
+    expect: "an offer on accepted work: built, immutable",
   },
   {
     name: "the offers are added to your log again at each setup",
@@ -332,7 +332,7 @@ export const mutations: readonly Mutation[] = [
     from: "    sources: [...new Set(accepted.flatMap(t => sourcesOf(t.description)))],\n",
     to: "    sources: [] as CommitId[],\n",
     command: unit,
-    expect: "an offer on accepted work (ADR-0104)",
+    expect: "an offer on accepted work: built, immutable",
   },
   {
     name: "a stale base working copy is not recovered",
@@ -357,7 +357,7 @@ export const mutations: readonly Mutation[] = [
     from: "  user.startsWith(`${HOST_OPERATOR}@`)",
     to: "  false",
     command: unit,
-    expect: "an offer on accepted work (ADR-0104)",
+    expect: "an offer on accepted work: built, immutable",
   },
   {
     name: "a turn that changed nothing is committed",
@@ -473,7 +473,7 @@ export const mutations: readonly Mutation[] = [
     from: '    rewrite("rebase", "-s", change, ...input.start.flatMap(c => ["-o", c])),',
     to: '    rewrite("rebase", "-s", change, "-o", input.target),',
     command: repoTest,
-    expect: "an offer on accepted work (ADR-0104)",
+    expect: "an offer on accepted work: built, immutable",
   },
   {
     name: "the repair keeps the host's commit",
@@ -481,7 +481,7 @@ export const mutations: readonly Mutation[] = [
     from: '  rewrite("abandon", input.hosts),',
     to: '  rewrite("abandon", input.yours),',
     command: unit,
-    expect: "an offer on accepted work (ADR-0104)",
+    expect: "an offer on accepted work: built, immutable",
   },
   {
     name: "a lane's tip is fetched as a local bookmark",
@@ -656,7 +656,7 @@ export const mutations: readonly Mutation[] = [
     from: "    files: found.length === 1 ? top.files : null,",
     to: "    files: top.files,",
     command: repoTest,
-    expect: "an offer on accepted work (ADR-0104)",
+    expect: "an offer on accepted work: built, immutable",
   },
   {
     name: "the offer's own files say whether the lane's work changes any",
@@ -691,7 +691,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: repoTest,
     expect:
-      "an accepted-offer commit of the lane that names no source makes its start untraced, read either way, until it catches up past it (S97)",
+      "an accepted-offer commit of the lane that names no source makes its start untraced, read either way, until it catches up past it",
   },
   {
     name: "an untraced accepted-offer commit is left out of the one read",
@@ -700,7 +700,7 @@ export const mutations: readonly Mutation[] = [
     to: "    false\n",
     command: unit,
     expect:
-      "an accepted-offer commit of the lane that names no source, above the base, makes the start untraced; one under it does not (S97)",
+      "an accepted-offer commit of the lane that names no source, above the base, makes the start untraced; one under it does not",
   },
   {
     name: "catching up counts every file the base changed",

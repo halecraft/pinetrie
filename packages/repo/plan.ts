@@ -1,9 +1,5 @@
-// repo/plan — every decision about your repo, as values (ADR-0105,
-// ADR-0104, ADR-0061, ADR-0090).
-//
-// Each function here is pure and returns `RepoStep`s (`step.ts`), carried out
-// by `executeRepo`. What is gathered is read by `offer.ts` and `line.ts`. So
-// each rule below is tested without jj or git.
+// The steps of every change to your repo, as `RepoStep`s, and the revsets
+// they and the reads share: each rule here is tested without jj or git.
 
 import {
   type AcceptedFacts,
@@ -30,11 +26,11 @@ import {
 import { git, host, type RepoStep, you } from "./step.ts"
 
 /**
- * Your repo's `immutable_heads()` with accepted work and the offers on it added
- * (ADR-0104): `current` is the definition the repo has, null for jj's
- * builtin. `present()`, or a repo with no line fails every jj command
- * (S77). An offer is immutable only while its parent is accepted work, so nothing
- * of yours above accepted work is frozen. Given its own output, it returns it.
+ * Your repo's `immutable_heads()` with accepted work and the offers on it
+ * added: `current` is the definition the repo has, null for jj's builtin.
+ * `present()`, or a repo with no line fails every jj command. An offer is
+ * immutable only while its parent is accepted work, so nothing of yours
+ * above accepted work is frozen. Given its own output, it returns it.
  */
 export function immutableHeads(
   repoConfig: RepoConfig,
@@ -52,10 +48,10 @@ export const acceptedHeads = (bookmark: string): string => {
 }
 
 /**
- * Your repo's `revsets.log` with the offers added (ADR-0104): `current` is
+ * Your repo's `revsets.log` with the offers added: `current` is
  * the definition the repo has, null for jj's default. An offer on accepted work is
  * an immutable head, which `builtin_log()` leaves out, so jj and jjui would
- * not show it (S77 item 8). Given its own output, it returns it.
+ * not show it. Given its own output, it returns it.
  */
 export function logRevset(current: string | null): string {
   const added = OFFER_BOOKMARKS
@@ -64,7 +60,7 @@ export function logRevset(current: string | null): string {
 }
 
 /**
- * Set up accepted work (ADR-0104): its bookmark at your `@-`, as the
+ * Set up accepted work: its bookmark at your `@-`, as the
  * host, then your repo's `immutable_heads()` (`immutableHeads`), written in
  * the repo's own config. Run only on your command, after you saw `heads`.
  */
@@ -88,8 +84,7 @@ export const planSetup = (input: {
  * `bookmarks` moved forward to `to`, in one operation: an acceptance
  * and a publish are each one. Never `--allow-backwards`: jj refuses a move
  * that is not forward, so a move planned on stale facts fails rather than
- * dropping commits (S77 item 1); with several bookmarks, a refusal of one
- * moves none (S111).
+ * dropping commits; with several bookmarks, a refusal of one moves none.
  */
 export const moveForward = (
   as: "host" | "you",
@@ -99,9 +94,9 @@ export const moveForward = (
   (as === "host" ? host : you)("bookmark", "move", ...bookmarks, "--to", to)
 
 /**
- * A publish's catch-up (ADR-0090): your work above accepted work rebased onto it,
+ * A publish's catch-up: your work above accepted work rebased onto it,
  * as you, since it changes the working copy; jj snapshots it first. `-b @` moves
- * every head on your work with `@` (S80 item 1); `-r` would strip them of the
+ * every head on your work with `@`; `-r` would strip them of the
  * commits under them. A conflict is recorded, not refused, and
  * `planPublishFinish` reads it.
  */
@@ -112,9 +107,8 @@ export const planPublishCatchUp = (input: {
 ]
 
 /**
- * The move that ends a publish (ADR-0090): the publish bookmark forward to
- * accepted work, as the host, since it changes no file and anyone admitted may
- * (ADR-0076); or, accepting your commits, accepted work and the publish bookmark
+ * The move that ends a publish: the publish bookmark forward to accepted
+ * work, as the host, since it changes no file and anyone admitted may; or, accepting your commits, accepted work and the publish bookmark
  * together to your `@-`, as you, since it is your act.
  */
 export const planPublishMove = (input: PublishMove): RepoStep[] => [
@@ -124,7 +118,7 @@ export const planPublishMove = (input: PublishMove): RepoStep[] => [
 ]
 
 /**
- * Undo a publish's catch-up (S111): its operation reverted, as you. Never `op
+ * Undo a publish's catch-up: its operation reverted, as you. Never `op
  * restore`, which deletes from disk an edit made since.
  */
 export const planCatchUpUndo = (op: string): RepoStep[] => [
@@ -149,8 +143,7 @@ export const setupProposal = (
  * `--ignore-working-copy` imports no git refs, so every ref pinetrie writes is
  * imported at once. With the flag, the import leaves your working copy
  * unsnapshotted: 12-47 ms, where a plain `jj git import` snapshots it too
- * (about 100 ms, S44 item 8). As the host, so the operation is
- * `pinetrie-host`'s (S87 item 7).
+ * (about 100 ms). As the host, so the operation is `pinetrie-host`'s.
  */
 export const IMPORT: RepoStep = host("git", "import")
 
@@ -180,8 +173,7 @@ export function planImport(input: {
 /**
  * Point lanes' remote bookmarks in your repo at commits, or delete them
  * (null), then import: the one writer of `laneTipRef` besides the fetch.
- * Archiving a root deletes its lanes' refs; restoring it writes them back
- * (S48 item 20).
+ * Archiving a root deletes its lanes' refs; restoring it writes them back.
  */
 export const laneRefSteps = (
   updates: readonly {
@@ -204,7 +196,7 @@ export const laneRefSteps = (
 export const ACCEPTED_OFFER_COMMITS = trailerRevset(["source", "thread"])
 
 /**
- * Where an offer starts, as a revset (ADR-0104): the newest ancestors of the
+ * Where an offer starts, as a revset: the newest ancestors of the
  * lane's tip you already have. That is the commit the lane's base names
  * (`start`: accepted work's commit, or the WIP's copy), and every lane commit a
  * accepted offer's `Pinetrie-Source` names above what the base holds
@@ -227,8 +219,9 @@ export function offerStart(input: {
 /**
  * The accepted-offer commits `offerStart` reads, by their `Pinetrie-Source`
  * or `Pinetrie-Thread` trailers: an accepted offer's sources, or none for an
- * offer accepted before offers carried them (`untracedLanes`, S97). Those in `::<accepted>`, and in `::<wip>` for a
- * lane on a WIP, but not in the history of the base's `source` (S81). The lane merged that commit, so it holds
+ * offer accepted before offers carried them (`untracedLanes`). Those in
+ * `::<accepted>`, and in `::<wip>` for a lane on a WIP, but not in the
+ * history of the base's `source`. The lane merged that commit, so it holds
  * what was accepted below it. An offer keeps the diff from the merge of its
  * start to the tip, so a source the target holds as another commit would be
  * subtracted from the target, and conflict where accepted work changed it since.
@@ -299,7 +292,7 @@ export function parseEvolog(stdout: string): EvologEntry[] {
  * with no such predecessor, one the read did not return, or a cycle.
  * `yours` are the versions an operation not the host's made, each with the
  * version before it: only those can be your edit. The evolog says who made
- * each version, so nothing the host remembers is needed (S73).
+ * each version, so nothing the host remembers is needed.
  */
 export function walkToHost(
   entries: readonly EvologEntry[],
@@ -325,9 +318,9 @@ export function walkToHost(
 }
 
 /**
- * A host operation that rewrites an offer. An offer on accepted work is immutable
- * (ADR-0104), so the host's own rewrites of it pass `--ignore-immutable`; a
- * bookmark move rewrites no commit and needs none (S77 item 7).
+ * A host operation that rewrites an offer. An offer on accepted work is
+ * immutable, so the host's own rewrites of it pass `--ignore-immutable`; a
+ * bookmark move rewrites no commit and needs none.
  */
 const rewrite = (...args: string[]): RepoStep =>
   host("--ignore-immutable", ...args)
@@ -335,7 +328,7 @@ const rewrite = (...args: string[]): RepoStep =>
 /**
  * The revset naming the `i`th commit an offer's plan makes, until the plan's
  * last steps describe it. `jj new` has no template, so a commit it makes can
- * be found again only by something unique the plan chose (S48 item 18).
+ * be found again only by something unique the plan chose.
  */
 export const nonceRevset = (nonce: string, i: number): string =>
   `description(exact:"${nonce}-${i}\n")`
@@ -345,9 +338,9 @@ export const nonceRevset = (nonce: string, i: number): string =>
  * first on `start`, a merge when it names several heads), with that source's
  * files restored into it; the whole of it rebased onto `target`; the top
  * bookmarked; then each described, which retires its nonce. A single offer
- * has one source, the lane's tip; a stack has one per lane revision
- * (ADR-0105, S48 items 16 and 18). Every step is the host's, by nonce, never
- * a commit id kept across steps (S48 item 2).
+ * has one source, the lane's tip; a stack has one per lane revision. Every
+ * step is the host's, by nonce, never a commit id kept across steps: one
+ * kept names a hidden commit once an earlier step rewrote it.
  */
 export function planOffer(input: {
   readonly name: ThreadName
@@ -393,11 +386,11 @@ export const planRefreshOffer = (
 ): RepoStep[] => [rewrite("rebase", "-s", bottom, "-o", target)]
 
 /**
- * A single offer rebuilt from its lane in place (ADR-0039): back onto where it
+ * A single offer rebuilt from its lane in place: back onto where it
  * starts now, the lane's tip restored into it, onto the target again. Its
  * tree is then your target plus the lane's change since the start, which the
- * tip's files cannot give where it sits; its change id and bookmark stay
- * (S49). With `description`, it is described again: the WIP line, when the
+ * tip's files cannot give where it sits; its change id and bookmark stay.
+ * With `description`, it is described again: the WIP line, when the
  * agent's message no longer describes it.
  */
 export function planRebuildOffer(input: {
@@ -429,7 +422,7 @@ export const planDescribe = (change: string, message: string): RepoStep[] => [
 
 /**
  * After a race left a revision divergent: abandon the commit the host's own
- * operation made, and point the offer's bookmark at yours (S48 item 8).
+ * operation made, and point the offer's bookmark at yours.
  */
 export const planRepair = (input: {
   /** The offer's bookmark, as its record holds it. */
@@ -454,7 +447,7 @@ export const planRepair = (input: {
 ]
 
 /**
- * Accept an offer (ADR-0104): its destination bookmark moved forward to its
+ * Accept an offer: its destination bookmark moved forward to its
  * top (`moveForward`), as the host, then the offer's bookmark deleted. Never
  * a rebase, and never your `@`.
  */

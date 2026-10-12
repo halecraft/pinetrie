@@ -108,7 +108,7 @@ describe("the owner of your repo", () => {
     close(owner)
   })
 
-  test("a move of the publish bookmark is observed as accepted work's alone (ADR-0076)", async () => {
+  test("a move of the publish bookmark is observed as accepted work's alone", async () => {
     const { dir, jj } = await repo("publish")
     // A commit nothing else the owner watches points at: main alone reads it.
     await jj("new", "root()", "-m", "side")

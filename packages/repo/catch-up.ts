@@ -1,11 +1,6 @@
-// repo/catch-up — what catching up would change in a lane, read in your repo
-// before the update runs (S97, S102 item 11): the forecast the page's ↓, a
-// base's news and `catch_up`'s refusals read, through `pinetrie.base`.
-//
-// The rules are pure (`planCatchUpRead`, `catchUpHolds`, `catchUpFilesOf`);
-// `catchUpFiles` and `readCatchUp` read jj and run them. Both gathers call
-// `readCatchUp`: `gatherLane` (`lane-read.ts`) and `placeOf`
-// (`offer-gather.ts`).
+// What catching up would change in a lane, read in your repo before the
+// update runs: the forecast the page's ↓, a base's news and `catch_up`'s
+// refusals read, through `pinetrie.base`.
 
 import type {
   CatchUpRead,
@@ -46,7 +41,7 @@ export function planCatchUpRead(input: {
  * The commits the forecast diffs from: where the lane's next offer would
  * start. When the update merges accepted work, that is the offer's start,
  * which holds every accepted source the lane has: the sources `mergeBase`
- * joins to their accepted-offer commits before it merges (S102), so the
+ * joins to their accepted-offer commits before it merges, so the
  * lane's own accepted work does not count as coming in. A WIP's copy is no
  * merge, and an untraced start names no source: both diff from the base's
  * start.

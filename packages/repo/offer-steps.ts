@@ -1,12 +1,6 @@
-// repo/offer-steps — what a decision about an offer runs on your repo, and
-// what the host does after (ADR-0105, ADR-0104).
-//
-// `@pinetrie/rules` decides (`planRefresh`, `planOfferAcceptance`, `planStackEnded`,
-// `planRebuild`, `planDescribeSettle`); these turn each decision into
-// `RepoStep`s, pure. Every decision carries the facts its steps need, so
-// each kind has exactly one translation, and none that runs nothing because
-// a case cannot happen. The host runs the steps on the owner and carries out
-// `after` (`executeOffer`).
+// A decision about an offer, from `@pinetrie/rules`, as the steps it runs on
+// your repo and what the host does after. Each decision carries the facts its
+// steps need, so each kind has one translation, and none that runs nothing.
 
 import {
   changesOf,
@@ -41,7 +35,7 @@ export interface OfferAt {
 
 /** What a build needs besides: the WIP line, and a fresh nonce its commits are named by (`nonceRevset`). */
 export interface BuildAt extends OfferAt {
-  /** Accepted work an offer carries until an agent describes it (`wipDescription`). */
+  /** The WIP line an offer carries until an agent describes it (`wipDescription`). */
   readonly wip: string
   /** `pinetrie-offer-<uuid>`, fresh for each build: the host makes it. */
   readonly nonce: string
@@ -146,7 +140,7 @@ export function offerEffects(
       )
     case "rebuild": {
       // It holds more now: a work in progress again, its ledger the new tip
-      // and start (ADR-0104).
+      // and start.
       const { place, offer } = decision
       const [bottom] = changesOf(offer)
       if (bottom === undefined) return NOTHING
@@ -195,7 +189,7 @@ export function offerEffects(
   }
 }
 
-/** An acceptance (ADR-0104): the destination moved forward to the offer's top, the offer's bookmark deleted, then its record marked accepted. */
+/** An acceptance: the destination moved forward to the offer's top, the offer's bookmark deleted, then its record marked accepted. */
 export const offerAcceptanceEffects = (
   decision: Extract<OfferAcceptanceDecision, { readonly kind: "accept" }>,
 ): OfferEffects => ({

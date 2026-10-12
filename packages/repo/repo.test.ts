@@ -327,8 +327,8 @@ describe("a lane's repo, with jj", () => {
     ])
     expect(committed.stdout).toContain("shared.txt")
     expect(committed.stdout).not.toContain(".plans")
-    // The turn's paths, from the lane's root, as its revision records them
-    // (ADR-0106): what jj says changed, from the bookmark before it.
+    // The turn's paths, from the lane's root, as its revision records them:
+    // what jj says changed, from the bookmark before it.
     expect(await changedPaths(laneJj, base[0] ?? null, r1)).toEqual([
       "shared.txt",
     ])
@@ -336,11 +336,10 @@ describe("a lane's repo, with jj", () => {
 
     // Your repo fetches it by bundle, as the lane's remote bookmark: out of
     // your default log, and immutable with jj's builtin config, your commit
-    // below it included (S48 items 11 and 19).
+    // below it included.
     await fetchInto(laneDir, LANE, base)
     expect(await laneTipIn(yoursOps, LANE)).toBe(r1)
-    // The import is the host's operation, as every write of the host's is
-    // (S87 item 7).
+    // The import is the host's operation, as every write of the host's is.
     expect(
       (await yoursOps(["op", "log", "--no-graph", "-n", "1", "-T", "user"]))
         .stdout,
@@ -355,7 +354,7 @@ describe("a lane's repo, with jj", () => {
       (await laneJj(["describe", "-r", base[0] ?? "", "-m", "x"])).ok,
     ).toBe(false)
 
-    // You change the same line on a WIP (ADR-0104), and commit.
+    // You change the same line on a WIP, and commit.
     await yoursJj(["new"])
     await writeFile(
       path.join(yoursDir, "shared.txt"),
@@ -381,7 +380,7 @@ describe("a lane's repo, with jj", () => {
     expect(
       (await laneJj(["file", "show", "-r", copy, 'root:"shared.txt"'])).stdout,
     ).toContain("two (you)")
-    // The copy is no commit of yours: your WIP stays yours (ADR-0104).
+    // The copy is no commit of yours: your WIP stays yours.
     expect(await commitsOf(laneJj, `${copy} & ${wip1.commit}`)).toEqual([])
     expect(await newestBase(laneJj, copy, "wip/")).toEqual({
       at: copy,
@@ -492,7 +491,7 @@ describe("a lane's repo, with jj", () => {
     // The fork cannot rewrite what it inherited.
     expect((await forkJj(["describe", "-r", point, "-m", "x"])).ok).toBe(false)
 
-    // A root fork from a copy of the WIP (ADR-0104): it sees the WIP's
+    // A root fork from a copy of the WIP: it sees the WIP's
     // files, and its work back in your repo makes nothing divergent.
     await cp(laneDir, rootDir, { recursive: true, verbatimSymlinks: true })
     await inLane(
@@ -512,7 +511,7 @@ describe("a lane's repo, with jj", () => {
       (await rootJj(["describe", "-r", rootCopy ?? "", "-m", "x"])).ok,
     ).toBe(false)
     // Only in the lane's repo: another repo under the same config lacks the
-    // fork point, and would fail every command if the config reached it (S50).
+    // fork point, and would fail every command if the config reached it.
     const scratch = path.join(top, "scratch")
     await run("jj", ["git", "init", scratch])
     expect(
@@ -539,8 +538,7 @@ describe("a lane's repo, with jj", () => {
     )
 
   // The agent commits in a turn, with jj or with git. The turn's revision is
-  // its commit: the offer holds it, and a branch at that turn starts with it
-  // (S56).
+  // its commit: the offer holds it, and a branch at that turn starts with it.
   for (const how of ["jj", "git"] as const)
     test(`a commit the agent makes itself is the turn's revision (${how})`, async () => {
       const { laneDir, laneJj, ops, inLane, fetch, edit, base, first } =
@@ -584,7 +582,7 @@ describe("a lane's repo, with jj", () => {
       expect(await readFile(path.join(forkDir, "b.txt"), "utf8")).toBe("b\n")
     }, 60_000)
 
-  test("an update in jj, end to end (ADR-0104): clean, conflicted, nothing, a move to accepted work, and a WIP's copies", async () => {
+  test("an update in jj, end to end: clean, conflicted, nothing, a move to accepted work, and a WIP's copies", async () => {
     const {
       yoursDir,
       laneDir,
@@ -675,7 +673,7 @@ describe("a lane's repo, with jj", () => {
     })
     if (clean.kind !== "clean") throw new Error("not clean")
     expect([...clean.files].sort()).toEqual(["a.txt", "c.txt"])
-    // What `catchUpFiles` said catching up would change, it changed (S97).
+    // What `catchUpFiles` said catching up would change, it changed.
     expect(
       (
         await catchUpFiles(laneRoot, { holds: [base], to: line1, tip: before })
@@ -836,7 +834,7 @@ describe("a lane's repo, with jj", () => {
     expect(await bookmarkOf(laneJj, LANE)).toBe(merge)
   }, 60_000)
 
-  test("a review reads an offer's commit: its description, files and one file's diff (S57)", async () => {
+  test("a review reads an offer's commit: its description, files and one file's diff", async () => {
     const { laneDir, yoursJj, ops, laneJj, fetch, edit, build, base } =
       await turnRig("review")
     // Names the template and the fileset must quote, a file under a
@@ -910,7 +908,7 @@ describe("a lane's repo, with jj", () => {
     expect(await fileDiff(ops, span, "dir/f.txt")).toContain("+under")
 
     // A range reads the same files, with no description, its counts from
-    // the range's git diff (ADR-0106, S70): here the range is the revision.
+    // the range's git diff: here the range is the revision.
     const [parent] = await commitsOf(ops, `${w}-`)
     if (parent === undefined) throw new Error("no parent")
     const range = { kind: "range", from: parent, to: w } as const
@@ -955,8 +953,7 @@ describe("a lane's repo, with jj", () => {
 
   /**
    * Your repo and one lane's, in `top/<tag>-…`, with the lane's steps run on
-   * the host, and an offer built as the host builds it, on accepted work
-   * (ADR-0104).
+   * the host, and an offer built as the host builds it, on accepted work.
    */
   const offerRig = async (tag: string) => {
     const yoursDir = path.join(top, `${tag}-yours`)
@@ -1062,8 +1059,8 @@ describe("a lane's repo, with jj", () => {
     }
     /**
      * "Bring up to date" with accepted work as the host runs it, in the lane at
-     * `dir`: `planMerge`, then `mergeUpdate`, which joins the accepted-offer commits it holds
-     * first (S102).
+     * `dir`: `planMerge`, then `mergeUpdate`, which joins the accepted-offer
+     * commits it holds first.
      */
     const catchUp = async (dir = laneDir, lane: ThreadId = LANE) => {
       const commit = await acceptedNow()
@@ -1207,7 +1204,7 @@ describe("a lane's repo, with jj", () => {
     return { ...rig, base, first }
   }
 
-  test("an offer on accepted work (ADR-0104): built, immutable, refreshed, followed, accepted by a forward move, and the next one", async () => {
+  test("an offer on accepted work: built, immutable, refreshed, followed, accepted by a forward move, and the next one", async () => {
     const {
       yoursDir,
       laneDir,
@@ -1248,12 +1245,12 @@ describe("a lane's repo, with jj", () => {
       files: ["a.txt"],
       onTarget: true,
       placed: true,
-      // Its ledger, read from its message: no record needed (ADR-0104).
+      // Its ledger, read from its message: no record needed.
       ledger: { source: t1, start: base },
     })
     expect((await yoursJj(["describe", "-r", c1, "-m", "mine"])).ok).toBe(false)
     // Yet your log shows it: setup added the offers to `revsets.log`, since
-    // jj's default leaves an immutable head out (S77 item 8).
+    // jj's default leaves an immutable head out.
     expect(
       (
         await yoursJj([
@@ -1278,7 +1275,7 @@ describe("a lane's repo, with jj", () => {
     await executeRepo(yoursDir, planDescribe(c1, "offer: described"))
 
     // The host rewrote it, and nothing recorded that: its newest version is
-    // the host's, so it is not yours (S73, by construction).
+    // the host's, so it is not yours.
     const sinceNow = async () => {
       const read = await readOffer(ops, {
         name: NAME,
@@ -1303,7 +1300,7 @@ describe("a lane's repo, with jj", () => {
     )
 
     // A race: your edit and a host rewrite from the same operation make it
-    // divergent. The host keeps yours (S48 item 8).
+    // divergent. The host keeps yours.
     const opNow = async () =>
       (
         await yoursJj([
@@ -1364,7 +1361,7 @@ describe("a lane's repo, with jj", () => {
     expect(
       await commitsOf(ops, `present(bookmarks(exact:"${bookmark}"))`),
     ).toEqual([])
-    // jj itself refuses an acceptance that is not forward (S77 item 1).
+    // jj itself refuses an acceptance that is not forward.
     expect(
       (
         await ops([
@@ -1392,7 +1389,7 @@ describe("a lane's repo, with jj", () => {
     expect(next.files).toEqual(["b.txt"])
     expect(next.conflicted).toBe(false)
     // You reword your commit under it: jj rebases the offer, as your
-    // operation, but changes nothing in it, so it is not yours (S48 item 7).
+    // operation, but changes nothing in it, so it is not yours.
     await yoursJj([
       "describe",
       "--ignore-immutable",
@@ -1403,7 +1400,7 @@ describe("a lane's repo, with jj", () => {
     ])
     expect(await sinceNow()).toEqual([{ reached: true, yoursChanged: false }])
 
-    // The lane moves on: the offer is rebuilt from it in place (ADR-0039), its
+    // The lane moves on: the offer is rebuilt from it in place, its
     // change kept, holding what a fresh build would.
     await edit(laneDir, "f.txt", "f\n")
     const t3 = await turnOn(laneJj, { ...TURN, entry: entryId("e-3") })
@@ -1466,7 +1463,7 @@ describe("a lane's repo, with jj", () => {
     expect(per).toEqual([["b.txt", "d.txt"], ["e.txt"]])
   }, 60_000)
 
-  test("a squash of two accepted offers keeps both sources: the next offer starts above them (S77 item 6)", async () => {
+  test("a squash of two accepted offers keeps both sources: the next offer starts above them", async () => {
     const {
       laneDir,
       yoursJj,
@@ -1509,7 +1506,7 @@ describe("a lane's repo, with jj", () => {
     expect(await commitsOf(ops, "divergent()")).toEqual([])
   }, 60_000)
 
-  test("an offer after a catch-up starts at accepted work it merged, not at what you accepted below it (S51 item 3, S81)", async () => {
+  test("an offer after a catch-up starts at accepted work it merged, not at what you accepted below it", async () => {
     const {
       laneDir,
       yoursDir,
@@ -1527,9 +1524,9 @@ describe("a lane's repo, with jj", () => {
     await accept(await offer(base))
     const t1 = await laneTipIn(ops, LANE)
     if (t1 === null) throw new Error("no tip")
-    // You change accepted work you accepted into, then the lane catches up with
-    // it: the accepted-offer commit is joined to the lane's commit, so the merge is clean, and the
-    // lane has your text (S102).
+    // You change accepted work you accepted into, then the lane catches up
+    // with it: the accepted-offer commit is joined to the lane's commit, so
+    // the merge is clean, and the lane has your text.
     await yoursJj(["new", line.acceptedBookmark])
     await edit(yoursDir, "a.txt", "a, then yours\n")
     await yoursJj(["commit", "-m", "yours: a.txt"])
@@ -1553,7 +1550,7 @@ describe("a lane's repo, with jj", () => {
     ])
   }, 60_000)
 
-  test("a branch cloned from a conflicted catch-up: its offer's conflict came with its copy, and catching up with its parent settles it (ADR-0072, S99)", async () => {
+  test("a branch cloned from a conflicted catch-up: its offer's conflict came with its copy, and catching up with its parent settles it", async () => {
     const rig = await turnRig("parent")
     const { laneDir, yoursDir, yoursJj, ops, line, edit, offer, accept, turn } =
       rig
@@ -1721,7 +1718,7 @@ describe("a lane's repo, with jj", () => {
     ).toBe("none")
   }, 60_000)
 
-  test("a lane's ref deleted and imported: the history under accepted work is kept (S78)", async () => {
+  test("a lane's ref deleted and imported: the history under accepted work is kept", async () => {
     const { yoursDir, yoursJj, ops, edit, offer, accept, base } =
       await turnRig("refgone")
     await accept(await offer(base))
@@ -1734,7 +1731,7 @@ describe("a lane's repo, with jj", () => {
     expect(await commitsOf(ops, "conflicts()")).toEqual([])
   }, 60_000)
 
-  test("a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded", async () => {
+  test("a publish's catch-up: a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded", async () => {
     const { yoursDir, yoursJj, ops, edit, line, setUpAccepted } =
       await offerRig("catchup")
     const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
@@ -1809,7 +1806,7 @@ describe("a lane's repo, with jj", () => {
     ).toHaveLength(1)
   }, 60_000)
 
-  test("publish's move (ADR-0076): main moved forward to accepted work as the host, git's main with it; refused once main has its own commits", async () => {
+  test("publish's move: main moved forward to accepted work as the host, git's main with it; refused once main has its own commits", async () => {
     const { yoursDir, yoursJj, ops, edit, line, setUpAccepted } =
       await offerRig("publish")
     const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
@@ -1871,7 +1868,7 @@ describe("a lane's repo, with jj", () => {
     expect((await acceptedFacts(ops, git, line)).published.commit).toBe(moved)
   }, 60_000)
 
-  test("publish from an empty @ on main (ADR-0090): main at accepted work, and @ empty on it", async () => {
+  test("publish from an empty @ on main: main at accepted work, and @ empty on it", async () => {
     const { yoursDir, yoursJj, ops, edit, line, setUpAccepted } =
       await offerRig("publish-empty")
     const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
@@ -1909,7 +1906,7 @@ describe("a lane's repo, with jj", () => {
     expect(await readFile(path.join(yoursDir, "b.txt"), "utf8")).toBe("b\n")
   }, 60_000)
 
-  test("publish with your commits (ADR-0090): rebased onto accepted work, counted, then accepted work and main moved to them in one operation", async () => {
+  test("publish with your commits: rebased onto accepted work, counted, then accepted work and main moved to them in one operation", async () => {
     const { yoursDir, yoursJj, ops, edit, line, setUpAccepted } =
       await offerRig("publish-mine")
     const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
@@ -1956,7 +1953,7 @@ describe("a lane's repo, with jj", () => {
     expect(await commitsOf(ops, "main")).toEqual(mine)
   }, 60_000)
 
-  test("a publish's second round reads your commits conflicted by the catch-up, which the preview of @ cannot show; reverting the catch-up puts everything back, an edit made before it included (ADR-0090, S111)", async () => {
+  test("a publish's second round reads your commits conflicted by the catch-up, and its revert keeps your edit", async () => {
     const { yoursDir, yoursJj, ops, edit, line, setUpAccepted } =
       await offerRig("publish-undo")
     const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
@@ -2015,7 +2012,7 @@ describe("a lane's repo, with jj", () => {
     expect(await readFile(path.join(yoursDir, "g.txt"), "utf8")).toBe("base\n")
   }, 60_000)
 
-  test("an unchanged offer's refresh reads at most 3 jj processes (ADR-0065), and what catching up changes is read once per move (S97)", async () => {
+  test("an unchanged offer's refresh reads at most 3 jj processes, and what catching up changes is read once per move", async () => {
     const rig = await turnRig("count")
     const { ops, line, fetch, build, acceptedNow, base } = rig
     await fetch(base)
@@ -2152,7 +2149,7 @@ describe("a lane's repo, with jj", () => {
     await agrees()
   }, 60_000)
 
-  test("an accepted-offer commit of the lane that names no source makes its start untraced, read either way, until it catches up past it (S97)", async () => {
+  test("an accepted-offer commit of the lane that names no source makes its start untraced, read either way, until it catches up past it", async () => {
     const {
       ops,
       laneDir,
@@ -2246,7 +2243,7 @@ describe("a lane's repo, with jj", () => {
     })
   }, 60_000)
 
-  test("catching up with your own acceptance of the lane's work changes no file, as catchUpFiles says (S97)", async () => {
+  test("catching up with your own acceptance of the lane's work changes no file, as catchUpFiles says", async () => {
     const { ops, laneJj, inLane, offer, accept, acceptedNow, base } =
       await turnRig("own-acceptance")
     await accept(await offer(base))
@@ -2267,7 +2264,7 @@ describe("a lane's repo, with jj", () => {
     ).toEqual([])
   }, 60_000)
 
-  describe("catching up past an accepted-offer commit of the lane's work (S102)", () => {
+  describe("catching up past an accepted-offer commit of the lane's work", () => {
     /** Six lines; `at` replaces line n (1-based). */
     const doc = (at: Record<number, string> = {}) =>
       `${[1, 2, 3, 4, 5, 6].map(n => at[n] ?? `line ${n}`).join("\n")}\n`
@@ -2390,7 +2387,7 @@ describe("a lane's repo, with jj", () => {
       expect(merged.files).toEqual([])
     }, 60_000)
 
-    test("two acceptances, your edit to the first between them: clean (S102 item 7)", async () => {
+    test("two acceptances, your edit to the first between them: clean", async () => {
       const rig = await acceptedOfferRig("past-two")
       await yoursOnAccepted(rig, doc({ 1: "yours" }), "yours: doc line 1")
       await rig.edit(rig.laneDir, "doc.txt", doc({ 5: "lane" }))
@@ -2407,7 +2404,7 @@ describe("a lane's repo, with jj", () => {
       )
     }, 60_000)
 
-    test("a branch holding its parent's accepted work catches up clean (ADR-0072)", async () => {
+    test("a branch holding its parent's accepted work catches up clean", async () => {
       const rig = await turnRig("past-parent")
       await rig.edit(rig.laneDir, "doc.txt", doc())
       const t1 = await rig.turn()
@@ -2535,7 +2532,7 @@ describe("a lane's repo, with jj", () => {
     ).toBe("unknown")
   }, 60_000)
 
-  test("a thread on a WIP starts from its copy, and freezes nothing of yours (ADR-0104)", async () => {
+  test("a thread on a WIP starts from its copy, and freezes nothing of yours", async () => {
     const rig = await offerRig("wipcopy")
     await rig.edit(rig.yoursDir, "base.txt", "base\n")
     await rig.yoursJj(["commit", "-m", "your base"])
@@ -2768,7 +2765,7 @@ describe("a lane's repo, with jj", () => {
         }),
       )
       // You edit what it brought, on accepted work: an offer that started below
-      // it would put the lane's a.txt back over yours (S81).
+      // it would put the lane's a.txt back over yours.
       await yoursJj(["new", line.acceptedBookmark])
       await edit(yoursDir, "a.txt", "a, then yours\n")
       await yoursJj(["commit", "-m", "yours: a.txt"])
@@ -2779,7 +2776,7 @@ describe("a lane's repo, with jj", () => {
     }, 60_000)
   })
 
-  test("a base refreshes after your @- was rewritten, not built on (S74)", async () => {
+  test("a base refreshes after your @- was rewritten, not built on", async () => {
     const yoursDir = path.join(top, "rewritten-yours")
     const baseDir = path.join(top, "rewritten-base")
     await run("mkdir", ["-p", yoursDir, baseDir])

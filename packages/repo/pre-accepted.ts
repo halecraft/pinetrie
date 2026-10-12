@@ -1,17 +1,16 @@
-// repo/pre-accepted — once, as a starting host's first command on your repo
-// (ADR-0100, S121): the bookmark `pinetrie-onto` renamed `pinetrie-accepted`,
-// and the `immutable_heads()` setup wrote in your repo's config rewritten to
-// name it. Each write is planned from what the repo holds, so a start that
-// stopped between them finishes the other. Delete this file, its test and
-// its call (`apps/pinetrie/host/work/setup.ts`) once Duane's repo has passed
-// it.
+// Once, as a starting host's first command on your repo: the bookmark
+// `pinetrie-onto` renamed `pinetrie-accepted`, and the `immutable_heads()`
+// setup wrote in your repo's config rewritten to name it. Each write is
+// planned from what the repo holds, so a start that stopped between them
+// finishes the other. Delete this file, its test and its call
+// (`apps/pinetrie/host/work/setup.ts`) once Duane's repo has passed it.
 
 import { commitsOf, DEFAULT_REPO, revsetName } from "@pinetrie/lanes"
 import type { RepoOps } from "./owner.ts"
 import { acceptedHeads } from "./plan.ts"
 import { host, type RepoStep, you } from "./step.ts"
 
-/** Accepted work's bookmark before ADR-0100. */
+/** Accepted work's bookmark before it was renamed. */
 export const OLD_ACCEPTED = "pinetrie-onto"
 
 /** What the rename is planned from, read from your repo and the config. */
@@ -29,7 +28,7 @@ export interface AcceptedRenameFacts {
 /**
  * The rename's steps and what the host says of them. Only with the default
  * bookmark configured: a config that names its own was chosen, and is left
- * as it is. Pure.
+ * as it is.
  */
 export function planAcceptedRename(facts: AcceptedRenameFacts): {
   readonly steps: readonly RepoStep[]
@@ -43,7 +42,7 @@ export function planAcceptedRename(facts: AcceptedRenameFacts): {
   if (facts.old && !facts.current) {
     steps.push(host("bookmark", "rename", OLD_ACCEPTED, configured))
     lines.push(
-      `renamed ${OLD_ACCEPTED} to ${configured} in your repo (ADR-0100); jj op revert undoes it`,
+      `renamed ${OLD_ACCEPTED} to ${configured} in your repo; jj op revert undoes it`,
     )
   } else if (facts.old)
     lines.push(

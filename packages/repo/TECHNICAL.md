@@ -96,20 +96,24 @@ everything else reads at the head it last saw.**
   `pinetrie-*` remote bookmarks, each with its commit (a conflicted one with
   all its targets), and `@`'s commit. A bookmark of yours outside those is
   not read, so moving it moves nothing. The publish bookmark moving is
-  `Moved.line`, not `all`: no offer depends on it, so it refreshes the
-  line's record alone (`planMarks`). Accepted work's bookmark moving is also
-  `Moved.onto`, which the host's base snapshot follows (ADR-0090), wherever
-  the move came from. `planObserve` says what moved; the listeners hear it, and the fingerprint
-  advances. The first observation reports `all`, and not `onto`, since
-  startup reads the base itself; a listener that subscribes after it hears
-  one `all` of its own, likewise without `onto`.
+  `Moved.published`, not `all`: no offer depends on it, so it refreshes
+  accepted work's record alone (`planMarks`). Accepted work's bookmark
+  moving is also `Moved.acceptedMoved`, which the host's base snapshot
+  follows (ADR-0090), wherever the move came from. `planObserve` says what
+  moved; the listeners hear it, and the fingerprint advances. The first
+  observation reports `all`, and not `acceptedMoved`, since startup reads
+  the base itself; a listener that subscribes after it hears one `all` of
+  its own, likewise without `acceptedMoved`.
 - **The watch** (`fs.watch` on `op_heads/heads`, S87 items 5 and 6) and a
   `readdir` every 5 s as its backstop: neither starts jj. Heads that are
   exactly the last observed one do nothing; anything else queues an
   observation. `.jj/repo` is a file naming the repo in a secondary
   workspace (`headsDir`). `close()` stops both and refuses every step.
 - **`importLane`** is `planImport` as a command: the host's operation
-  (`pinetrie-host`, S87 item 7), in the order the bundles were made.
+  (`pinetrie-host`, S87 item 7), in the order the bundles were made. Its
+  `jj git import` passes `--ignore-working-copy`, which leaves your working
+  copy unsnapshotted: 12-47 ms, against about 100 ms with the snapshot (S44
+  item 8).
 
 ## Shared facts and one read per lane (`shared.ts`, `lane-read.ts`)
 
@@ -453,8 +457,8 @@ update's merge will change.**
   operation is `pinetrie-host`'s), and every read and plan here. It covers the
   base, a turn, an update with a conflict, forks from a turn and from a copy
   of your `@`, checked for divergence and immutability, and a repo beside a
-  fork that the fork's config leaves alone; a commit the agent makes itself,
-  with jj and with git, reaching the offer and a branch at its turn, and an
+  fork that the fork's config leaves alone (S50); a commit the agent makes
+  itself, with jj and with git (S56), reaching the offer and a branch at its turn, and an
   update merging on it, while a stack's commits are never adopted; an offer
   built, refreshed, left, rewritten by the host with its record lost (S73),
   repaired, accepted under your edits and beside them, the next offer, and a
@@ -476,7 +480,11 @@ update's merge will change.**
   catch-up past an accepted-offer commit of the lane's own work, of its
   parent's, two of them, a conflict both sides made, and an acceptance of
   an offer you edited (S102): the lane holds the accepted-offer commit's
-  source, so that commit is joined to it and the update is clean.
+  source, so that commit is joined to it and the update is clean. Then a
+  lane's ref deleted and imported again, which keeps the history under
+  accepted work (S78); a branch cloned from a conflicted catch-up, whose
+  offer's conflict came with its copy (S99); and a base refreshed after your
+  `@-` was rewritten, not built on (S74).
 - **`offer-steps.test.ts`**: each decision's steps, as the planners make
   them, and that each `after` carries the decision's place.
 - **`apps/pinetrie/host/offers/refresh.test.ts`** runs the host's own refresh

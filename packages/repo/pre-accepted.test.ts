@@ -24,7 +24,7 @@ const facts = (over: Partial<AcceptedRenameFacts> = {}) => ({
 const argvs = (f: AcceptedRenameFacts) =>
   planAcceptedRename(f).steps.map(s => s.args.join(" "))
 
-describe("planAcceptedRename: pinetrie-onto becomes pinetrie-accepted, once (ADR-0100)", () => {
+describe("planAcceptedRename: pinetrie-onto becomes pinetrie-accepted, once", () => {
   test("the bookmark renamed, as the host, and setup's immutable_heads() rewritten, as you", () => {
     const planned = planAcceptedRename(facts())
     expect(planned.steps.map(s => (s.tool === "jj" ? s.as : "git"))).toEqual([
@@ -72,7 +72,7 @@ describe("planAcceptedRename: pinetrie-onto becomes pinetrie-accepted, once (ADR
   })
 })
 
-describe("renameAccepted, with jj (S121)", () => {
+describe("renameAccepted, with jj", () => {
   let top = ""
   beforeAll(async () => {
     top = await realpath(await mkdtemp(path.join(tmpdir(), "pinetrie-rename-")))

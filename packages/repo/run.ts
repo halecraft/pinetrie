@@ -1,15 +1,8 @@
-// repo/run — jj and git on your repo: the one runner factory.
-//
-// Every runner comes from `runnerFor`, through `repoCommand`, which adds
-// `-R <root>` and the flags of who runs it: as the host, never snapshotting
-// your working copy and every operation marked as the host's (S48 items 1 and
-// 8); as you, nothing more; pinned to an operation, `--at-op` and no snapshot,
-// so a read writes nothing whatever runs beside it (S87). The host's jj and
-// git run from the repo's root, so paths they print are the repo's; jj as you
-// runs from the host's own directory, as it always has.
-//
-// Only the owner (`owner.ts`) and this package's tests use these: the package
-// exports none of them.
+// The one runner factory for your repo. As the host, a command never
+// snapshots your working copy and its operation is marked as the host's;
+// pinned to an operation, a read writes nothing whatever runs beside it. The
+// host's jj and git run from the repo's root, so paths they print are the
+// repo's. Only the owner and this package's tests use these.
 
 import { HOST_OPERATOR, NO_EDITOR } from "@pinetrie/core"
 import {
@@ -38,7 +31,7 @@ export interface RepoCommand {
   readonly cwd: string | null
 }
 
-/** Pure: the command `args` becomes when `as` runs it on your repo at `root`. */
+/** The command `args` becomes when `as` runs it on your repo at `root`. */
 export function repoCommand(
   root: string,
   as: RepoRunner,

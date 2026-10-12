@@ -1,6 +1,5 @@
-// repo/observe — what an outside change moved in your repo, as values: the
-// fingerprint read at one operation (`fingerprintRead`, `parseFingerprint`),
-// and what moved between two (`planObserve`). Pure; the owner reads and acts.
+// What an outside change moved in your repo: the fingerprint read at one
+// operation, and what moved between two. The owner reads and acts.
 
 import type { ThreadName } from "@pinetrie/core"
 import {
@@ -32,13 +31,14 @@ export interface Fingerprint {
 }
 
 /**
- * `all`: accepted work or a WIP moved, or this is the first observation. `acceptedMoved`:
- * accepted work's bookmark moved since an earlier observation, which the base
- * snapshot follows (ADR-0090); never on the first, since startup reads the
- * base itself. `line`: the publish bookmark moved, which changes only the
- * line's record, since no offer depends on it (ADR-0076). `yours`: `@` moved, which changes only each
- * record's `yourEdits` and accepted work's preview. `lanes`: lanes' refs moved.
- * `offers`: offer bookmarks moved, by thread name.
+ * `all`: accepted work or a WIP moved, or this is the first observation.
+ * `acceptedMoved`: accepted work's bookmark moved since an earlier
+ * observation, which the base snapshot follows; never on the first, since
+ * startup reads the base itself. `published`: the publish bookmark moved,
+ * which changes only accepted work's record, since no offer depends on it.
+ * `yours`: `@` moved, which changes only each record's `yourEdits` and
+ * accepted work's preview. `lanes`: lanes' refs moved. `offers`: offer
+ * bookmarks moved, by thread name.
  */
 export interface Moved {
   readonly all: boolean
@@ -116,7 +116,7 @@ export function parseFingerprint(
   }
 }
 
-/** Pure: what moved from `prev` to `next`. A bookmark that appears, moves or goes counts as moved. */
+/** What moved from `prev` to `next`. A bookmark that appears, moves or goes counts as moved. */
 export function planObserve(
   prev: Fingerprint | null,
   next: Fingerprint,
