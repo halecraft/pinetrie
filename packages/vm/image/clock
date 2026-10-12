@@ -1,0 +1,21 @@
+#!/bin/sh
+# clock <RTC seconds file> [once]: every 15 s, step the clock to the RTC
+# when they are more than 2 s apart. Both are whole seconds, so 1 s apart is
+# only their rounding. `once` checks once and exits.
+# `hwclock`, not `date -s`: busybox's `date -s` exits 0 when it cannot set
+# the clock.
+rtc=$1
+while :; do
+  if r=$(cat "$rtc"); then
+    d=$((r - $(date +%s)))
+    if [ "${d#-}" -gt 2 ]; then
+      if hwclock -s -u; then
+        echo "clock: stepped ${d} s to the RTC"
+      else
+        echo "clock: ${d} s from the RTC, and could not step it"
+      fi
+    fi
+  fi
+  [ "${2:-}" = once ] && exit 0
+  sleep 15
+done

@@ -1,7 +1,8 @@
 #!/bin/sh
 # PID 1 of pine·trie's lane VM (S128), on the system image stage 1 switched to.
-# It loads the drivers, mounts the data disk and each host's slot, and starts
-# Docker, each slot's ssh agent and a sync on vsock 2377. Docker is bridged
+# It loads the drivers, keeps the clock to the RTC, mounts the data disk and
+# each host's slot, and starts Docker, each slot's ssh agent and a sync on
+# vsock 2377. Docker is bridged
 # to vsock 2375 only once the lanes' fence is set. No shell listens on any
 # port. Every stage logs a `T+` line, the guest's uptime, to the console.
 #
@@ -32,6 +33,9 @@ modprobe -a $(cat /etc/pinetrie/modules)
 # Docker in a lane needs for its network (S127).
 chmod 666 /dev/net/tun
 t "drivers loaded"
+
+# The clock, kept to the RTC (`clock`).
+/usr/local/sbin/pinetrie-clock /sys/class/rtc/rtc0/since_epoch &
 
 # The data disk: Docker's store and the lanes' subvolumes. An unprivileged
 # container deletes subvolumes only with user_subvol_rm_allowed (S125).

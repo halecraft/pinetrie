@@ -22,7 +22,7 @@ describe("the image's sources", () => {
       expect(version, name).toMatch(/^\d[\w.]*-r\d+$/)
   })
   test("the scripts parse", () => {
-    for (const name of ["build.sh", "init", "stage1-init"])
+    for (const name of ["build.sh", "init", "clock", "stage1-init"])
       execFileSync("sh", ["-n", path.join(import.meta.dirname, "image", name)])
   })
   test("the VM's init opens no shell on any vsock port", () => {
@@ -49,6 +49,14 @@ describe("the image's sources", () => {
       "iptables -I DOCKER-USER -d 192.168.127.1 -p tcp --dport 53 -j RETURN",
     )
   })
+  test("the init starts the clock on the RTC, which build.sh installs", () => {
+    expect(imageFile("init")).toContain(
+      "/usr/local/sbin/pinetrie-clock /sys/class/rtc/rtc0/since_epoch &",
+    )
+    expect(imageFile("build.sh")).toContain(
+      'cp "$src/clock" "$root/usr/local/sbin/pinetrie-clock"',
+    )
+  })
   test("the init loads the manifest's modules, which build.sh writes", () => {
     expect(imageFile("init")).toContain(
       "modprobe -a $(cat /etc/pinetrie/modules)",
@@ -56,6 +64,56 @@ describe("the image's sources", () => {
     expect(imageFile("build.sh")).toContain(
       `jq -r '.modules[]' "$m" > "$root/etc/pinetrie/modules"`,
     )
+  })
+})
+
+describe("the clock", () => {
+  /** One check of `clock` with the clock at `now` and the RTC at `rtc`: whether it stepped, and what it said. */
+  async function check(now: number, rtc: number) {
+    const dir = await mkdtemp(path.join(tmpdir(), "vm-clock-"))
+    try {
+      const bin = path.join(dir, "bin")
+      await mkdir(bin)
+      const stub = async (name: string, body: string) =>
+        writeFile(path.join(bin, name), `#!/bin/sh\n${body}\n`, {
+          mode: 0o755,
+        })
+      await stub("date", `[ "$1" = +%s ] && echo ${now}`)
+      const stepped = path.join(dir, "stepped")
+      await stub("hwclock", `echo "$*" > ${stepped}`)
+      await writeFile(path.join(dir, "rtc"), `${rtc}\n`)
+      const said = execFileSync(
+        "sh",
+        [
+          path.join(import.meta.dirname, "image", "clock"),
+          path.join(dir, "rtc"),
+          "once",
+        ],
+        { env: { PATH: `${bin}:/usr/bin:/bin` }, encoding: "utf8" },
+      )
+      return {
+        stepped: existsSync(stepped)
+          ? readFileSync(stepped, "utf8").trim()
+          : null,
+        said,
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }
+
+  test("a clock behind the RTC is stepped to it, in UTC", async () => {
+    expect(await check(1_000, 60_000)).toEqual({
+      stepped: "-s -u",
+      said: "clock: stepped 59000 s to the RTC\n",
+    })
+  })
+  test("a clock ahead of the RTC is stepped to it", async () => {
+    expect((await check(60_000, 1_000)).stepped).toBe("-s -u")
+  })
+  test("a clock within 2 s of the RTC is left alone", async () => {
+    for (const now of [9_998, 10_000, 10_002])
+      expect(await check(now, 10_000)).toEqual({ stepped: null, said: "" })
   })
 })
 

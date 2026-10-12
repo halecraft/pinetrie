@@ -20,6 +20,7 @@ const sources: ImageSources = {
   "manifest.json": '{"alpine":"3.23"}',
   "build.sh": "build",
   init: "init",
+  clock: "clock",
   "stage1-init": "stage1",
 }
 

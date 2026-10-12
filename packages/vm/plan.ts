@@ -8,6 +8,7 @@ export const IMAGE_FILES = [
   "manifest.json",
   "build.sh",
   "init",
+  "clock",
   "stage1-init",
 ] as const
 export type ImageFile = (typeof IMAGE_FILES)[number]

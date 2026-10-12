@@ -94,6 +94,6 @@ content does. A version is the stamp (inode, size, ctime), read with one
 **Found on the way: the lane VM's clock is 16.6 hours behind the Mac's.**
 A shared file's times come from the Mac (59,749 s ahead of the VM's
 `time()`, as `tar` noted). Stamps are only compared for equality, so the
-offset does not matter to them. It is likely why `apt-get update` refused
-Debian's signatures earlier in this work as "not live until" a time
-already past on the Mac.
+offset does not matter to them. It is why `apt-get update` refused Debian's
+signatures earlier in this work as "not live until" a time already past on
+the Mac (S163).

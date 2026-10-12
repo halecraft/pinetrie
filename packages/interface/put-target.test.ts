@@ -56,7 +56,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     "k-unstarted",
     unstarted === null ? null : { place: unstarted, message: null },
   )
-  const targets: PutTarget[] = [
+  const targets = [
     { kind: "column", key: "k-thread" },
     { kind: "column", key: "k-unstarted" },
     { kind: "composer", key: "k-thread" },
@@ -78,7 +78,18 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     { kind: "taskPinned", task: TEST_TASK },
     { kind: "canvas", task: TEST_TASK, after: LANE },
     { kind: "canvas", task: TEST_TASK, after: null },
-  ]
+    { kind: "task", task: TEST_TASK },
+  ] satisfies PutTarget[]
+  /** A kind of target missing from `targets` fails to compile; a text box is never marked. */
+  const everyKind: [
+    Exclude<PutTarget["kind"], (typeof targets)[number]["kind"] | "text-box">,
+  ] extends [never]
+    ? true
+    : never = true
+
+  test("every kind a drop can mark is round-tripped below; a missing one fails to compile", () => {
+    expect(everyKind).toBe(true)
+  })
 
   test.each(targets)("a drop on %o lands where a put to it lands", target => {
     const dropped = targetOfElement(marked(dropProps(target)))

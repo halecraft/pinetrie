@@ -32,7 +32,13 @@ const element = (attrs: Readonly<Record<string, string>>) => ({
 })
 
 test("a handle's source round-trips through its attributes; an element with none is no handle", () => {
-  for (const s of [card, task, { kind: "card", card: cardIdFor("c") }] as const)
+  const stateless: DragSource = { kind: "task", drag: { task: K, state: null } }
+  for (const s of [
+    card,
+    task,
+    stateless,
+    { kind: "card", card: cardIdFor("c") },
+  ] as const)
     expect(sourceOfElement(element(dragProps(s)))).toEqual(s)
   expect(sourceOfElement(element({}))).toBeNull()
 })

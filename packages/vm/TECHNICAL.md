@@ -39,9 +39,18 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   `/dev/net/tun` made 0666 (no udev, S127); the btrfs data disk with
   `user_subvol_rm_allowed`, formatted on first boot; each slot's share at
   `/mnt/host-shares/<i>`; Docker on vsock 2375 and each slot's ssh agent;
-  `sync` on vsock 2377 for the launcher's stop. No shell listens on any
-  port. `socat -t 3600`: without it, socat cuts a stream 0.5 s after its
-  input ends (S128, S129).
+  `sync` on vsock 2377 for the launcher's stop; the clock (below). No
+  shell listens on any port. `socat -t 3600`: without it, socat cuts a
+  stream 0.5 s after its input ends (S128, S129).
+- **The clock is kept to the RTC** (`clock`, installed as
+  `/usr/local/sbin/pinetrie-clock`, started by `init`). The kernel reads
+  the RTC, Virtualization's PL031 on the Mac's time, only at boot, and the
+  guest's clock falls behind while the VM runs, most likely while the Mac
+  sleeps: S163 found it 16.6 h behind after 14 h up, and apt in every lane
+  image build refused Debian's signatures as "not live until". Every 15 s,
+  more than 2 s apart (both are whole seconds) steps it with
+  `hwclock -s -u`. A lane cannot set the clock (no `CAP_SYS_TIME`), so the
+  VM must.
 - **Built in this lane, measured:** 15 s in an Alpine 3.23 chroot; `Image`
   34.6 MB, `stage1.cpio` 1.6 MB, `system.erofs` 102.3 MB.
 

@@ -4025,4 +4025,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a column's ⋯ holds its fold first, yours alone, for a thread and a note column alike",
   },
+  {
+    name: "a drop's kind of target is never round-tripped",
+    file: "packages/interface/put-target.test.ts",
+    from: '    { kind: "task", task: TEST_TASK },\n  ] satisfies PutTarget[]',
+    to: "  ] satisfies PutTarget[]",
+    // tsc names no failing check (`failingChecks`): with the interface's
+    // typecheck clean, any error is the mutant's.
+    command: ["pnpm", "exec", "tsc", "--noEmit", "-p", "packages/interface"],
+  },
 ]
