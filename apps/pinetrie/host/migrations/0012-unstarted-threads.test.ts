@@ -40,7 +40,7 @@ const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
 const BRANCH = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
 const TAB = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
 const SPUN = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f3")
-const [M1, M2, M3, S1, ASK] = [
+const [M1, M2, M3, SPUN_CARD, ASK] = [
   cardIdFor("c1"),
   cardIdFor("c2"),
   cardIdFor("c3"),
@@ -77,7 +77,7 @@ const plan = () =>
       [M2]: fresh(BRANCH, ROOT, TASK, "e-1"),
       [M3]: fresh(TAB, NEW_ROOT, NEW_TASK, ""),
       // A card spun into a thread, and an ask with its relay in `fact`.
-      [S1]: {
+      [SPUN_CARD]: {
         ...ROW,
         kind: "spun",
         task: TASK,
@@ -146,8 +146,8 @@ describe("0012-unstarted-threads", () => {
 
   test("a spun card is in its spinner's trash, in the old shape 0014-trash-left deletes; an ask's relay is in `relay`; no row keeps a root", () => {
     const { rows } = plan()
-    expect(rows[S1]).toMatchObject({ kind: "discarded", holder: ADA })
-    expect(oldTrashRows({ s: rows[S1] ?? {} })).toEqual(["s"])
+    expect(rows[SPUN_CARD]).toMatchObject({ kind: "discarded", holder: ADA })
+    expect(oldTrashRows({ s: rows[SPUN_CARD] ?? {} })).toEqual(["s"])
     expect(decodeCard(ASK, rows[ASK])).toMatchObject({
       kind: "ask",
       content: { relay: { text: "hi" } },

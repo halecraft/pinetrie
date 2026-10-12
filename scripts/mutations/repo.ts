@@ -23,7 +23,7 @@ const offersRefresh = [
 ]
 
 export const mutations: readonly Mutation[] = [
-  // ── the lanes suite, proven in a lane (ADR-0130) ──
+  // ── the lanes suite, proven in a lane ──
   {
     name: "nothing in your repo is immutable",
     file: "packages/repo/plan.ts",

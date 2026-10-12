@@ -4,15 +4,4 @@
 // code holds, so an id added fails, and one removed lowers its area's entry.
 // An entry only shrinks, and is deleted at zero.
 
-export const CODE_CITATIONS: Readonly<Record<string, number>> = {
-  "apps/pinetrie/host": 5,
-  "packages/core": 11,
-  "packages/interface": 9,
-  "packages/lanes": 12,
-  "scripts/mutations/core.ts": 2,
-  "scripts/mutations/docker.ts": 3,
-  "scripts/mutations/repo.ts": 1,
-  "scripts/mutations/rules.ts": 17,
-  "scripts/mutations/scripts.ts": 2,
-  "scripts/mutations/session.ts": 2,
-}
+export const CODE_CITATIONS: Readonly<Record<string, number>> = {}

@@ -970,15 +970,15 @@ describe("openTrace: where a trace leads", () => {
 })
 
 describe("a card made a thread", () => {
-  const S1 = workflowStateIdFor("s-1")
+  const STATE1 = workflowStateIdFor("s-1")
   // The host names the move's history: the page names none.
   const spun = { kind: "trash" } as const
   test.each([
     [
       "a note dropped on a state: its thread there, sent with the task you are on",
       card(C1, note),
-      { kind: "state", state: S1 },
-      { from: noteKey, state: S1, sidebar: null, here: TEST_TASK },
+      { kind: "state", state: STATE1 },
+      { from: noteKey, state: STATE1, sidebar: null, here: TEST_TASK },
     ],
     [
       "an inventory card dropped in the sidebar: placed before the task it was dropped on, sent with the new task, which you will be on",
@@ -994,8 +994,8 @@ describe("a card made a thread", () => {
     [
       "an inventory card dropped on a state, sent with the task you are on",
       card(C1, { kind: "inventory", holder: ADA }),
-      { kind: "state", state: S1 },
-      { from: inventory, state: S1, sidebar: null, here: TEST_TASK },
+      { kind: "state", state: STATE1 },
+      { from: inventory, state: STATE1, sidebar: null, here: TEST_TASK },
     ],
   ] as const)("%s", (_, c, target, want) => {
     expect(
@@ -1028,14 +1028,17 @@ describe("a card made a thread", () => {
   test("a note's ⋯ Move to a new thread in a state is the same as its drop there", () => {
     const s = state({ cards: [card(C1, note)] })
     expect(
-      plan(inColumn({ kind: "spinOff", card: C1, state: S1 }, TRUNK_COLUMN), s),
+      plan(
+        inColumn({ kind: "spinOff", card: C1, state: STATE1 }, TRUNK_COLUMN),
+        s,
+      ),
     ).toEqual(
       plan(
         {
           kind: "put",
           source: { kind: "card", card: C1 },
           how: "move",
-          target: { kind: "state", state: S1 },
+          target: { kind: "state", state: STATE1 },
         },
         s,
       ),
@@ -1050,7 +1053,7 @@ describe("a card made a thread", () => {
           kind: "put",
           source: { kind: "card", card: C1 },
           how: "move",
-          target: { kind: "state", state: S1 },
+          target: { kind: "state", state: STATE1 },
         },
         state({ cards: [theirs] }),
       ),

@@ -340,7 +340,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "each card's version as this client has it",
   },
-  // ── your attention document (ADR-0077) ──
+  // ── your attention document ──
   {
     name: "a read mark moves back",
     file: "packages/session/read-marks.ts",
@@ -382,7 +382,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a reorder is drawn where the host would put it",
   },
-  // ── the sidebar (ADR-0122) ──
+  // ── the sidebar ──
   {
     name: "the repair drops the root you are on",
     file: "packages/session/open-repair.ts",

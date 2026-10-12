@@ -167,7 +167,7 @@ export const planStoredOpen = (stored: ReadonlyMap<string, string>): OpenPlan =>
 export const refusalLine = (
   plan: Extract<OpenPlan, { kind: "refuse" }>,
 ): string =>
-  `${PRODUCT_NAME} cannot open ${plan.docId}: it was written under schema ${plan.stored}, this build opens it under ${plan.expected}, and no migration goes from one to the other. Restore the migration from the revision that deleted it, or run the build that wrote the store (ADR-0096).`
+  `${PRODUCT_NAME} cannot open ${plan.docId}: it was written under schema ${plan.stored}, this build opens it under ${plan.expected}, and no migration goes from one to the other. Restore the migration from the revision that deleted it, or run the build that wrote the store.`
 
 /** Kyneta's warning for a stored record it could not load. */
 const LOAD_FAILURE =

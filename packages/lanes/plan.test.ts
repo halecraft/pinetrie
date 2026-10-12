@@ -636,37 +636,37 @@ test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's o
 describe("planJoins: the accepted-offer commits a lane holds, joined before it catches up", () => {
   const T1 = commitId("t1")
   const T2 = commitId("t2")
-  const S1 = commitId("s1")
-  const S2 = commitId("s2")
+  const SRC1 = commitId("s1")
+  const SRC2 = commitId("s2")
   const X = commitId("x1")
   test("an accepted-offer commit whose sources the lane lacks is not joined", () => {
     expect(
-      planJoins([{ acceptedOfferCommit: T1, sources: [X] }], new Set([S1])),
+      planJoins([{ acceptedOfferCommit: T1, sources: [X] }], new Set([SRC1])),
     ).toEqual([])
   })
   test("a squash naming one source held and one not is joined, with the held one alone", () => {
     expect(
       planJoins(
-        [{ acceptedOfferCommit: T1, sources: [S1, X] }],
-        new Set([S1]),
+        [{ acceptedOfferCommit: T1, sources: [SRC1, X] }],
+        new Set([SRC1]),
       ).map(j => [j.acceptedOfferCommit, j.sources]),
-    ).toEqual([[T1, [S1]]])
+    ).toEqual([[T1, [SRC1]]])
   })
   test("several accepted-offer commits keep their order, oldest first", () => {
     expect(
       planJoins(
         [
-          { acceptedOfferCommit: T1, sources: [S1] },
-          { acceptedOfferCommit: T2, sources: [S2] },
+          { acceptedOfferCommit: T1, sources: [SRC1] },
+          { acceptedOfferCommit: T2, sources: [SRC2] },
         ],
-        new Set([S1, S2]),
+        new Set([SRC1, SRC2]),
       ).map(j => j.acceptedOfferCommit),
     ).toEqual([T1, T2])
   })
   test("a join's message names the accepted-offer commit and its sources, and carries no trailer", () => {
     const [join] = planJoins(
-      [{ acceptedOfferCommit: T1, sources: [S1] }],
-      new Set([S1]),
+      [{ acceptedOfferCommit: T1, sources: [SRC1] }],
+      new Set([SRC1]),
     )
     expect(join?.message).toBe("join: t1 holds s1")
     expect(join?.message).not.toMatch(/^Pinetrie-/m)

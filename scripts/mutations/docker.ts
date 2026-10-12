@@ -15,7 +15,7 @@ const launcher = "packages/vm/launcher/launcher.swift"
 const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 
 export const mutations: readonly Mutation[] = [
-  // ── the lanes suite, proven in a lane (ADR-0130) ──
+  // ── the lanes suite, proven in a lane ──
   {
     name: "lanes share the network of the machine Docker runs on",
     file: "packages/docker/plan.ts",
@@ -334,7 +334,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a diff between two snapshots of a lane reports a file it deleted, and one it made",
   },
-  // ── the network (S135, S136), the contract's checks ──
+  // ── the network, the contract's checks ──
   {
     name: "(Mac) a lane is on the VM's own network, outside the fence",
     file: plan,

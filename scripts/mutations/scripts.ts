@@ -206,7 +206,7 @@ export const mutations: readonly Mutation[] = [
     from: "    .filter(([, same]) => same.length > 1)",
     to: "    .filter(([, same]) => same.length > 2)",
     command: numbering,
-    expect: "two files with one number clash, and S7 is not S72",
+    expect: "two files with one number clash",
   },
   {
     name: "numberingGaps passes every title",

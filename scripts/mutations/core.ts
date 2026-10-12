@@ -28,7 +28,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "an inline code span, of one backtick or several, is text",
   },
-  // ── agents talking (ADR-0128) ──
+  // ── agents talking ──
   {
     name: "a first mention asks rather than invites",
     file: core,
@@ -45,7 +45,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "invites add, in the order invited, and a fact removes",
   },
-  // ── the lanes suite, proven in a lane (ADR-0130) ──
+  // ── the lanes suite, proven in a lane ──
   {
     name: "an offer's message names its thread under another key",
     file: "packages/core/trailers.ts",

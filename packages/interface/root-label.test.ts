@@ -220,7 +220,7 @@ describe("initialsOf", () => {
   test.each<[string, string]>([
     ["Kanban outside click", "KO"],
     ["Sidebar", "SI"],
-    ["ADR-0048 next steps", "A0"],
+    ["RFC-0048 next steps", "R0"],
     ["  project menu: jj state", "PM"],
     ["été à Paris", "ÉÀ"],
     ["(no text)", "NT"],

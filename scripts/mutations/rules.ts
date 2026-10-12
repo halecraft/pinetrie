@@ -5,7 +5,7 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
-  // ── a turn's whole-disk diff (ADR-0131) ──
+  // ── a turn's whole-disk diff ──
   {
     name: "a recipe's outputs count as ignored files",
     file: "packages/rules/work.ts",
@@ -22,8 +22,8 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "ignoredFiles: the topmost, sorted",
   },
-  // ── a card's content as stored (ADR-0126) ──
-  // ── threads opened before their first entry (ADR-0126) ──
+  // ── a card's content as stored ──
+  // ── threads opened before their first entry ──
   {
     name: "a branch opens at an entry in no root it holds",
     file: "packages/rules/open.ts",
@@ -134,7 +134,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a row holding a column of another kind's content is refused",
   },
-  // ── agents across tasks (ADR-0128) ──
+  // ── agents across tasks ──
   {
     name: "a thread's reach ignores the archive",
     file: "packages/rules/reach.ts",
@@ -160,7 +160,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "an answer to a thread gone out of reach is not sent",
   },
-  // ── agents talking (ADR-0128) ──
+  // ── agents talking ──
   {
     name: "a budget goes over at every spend past its limit",
     file: "packages/rules/budget.ts",
@@ -203,7 +203,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a lane's copy of its own is stored as its work, as records from when a lane could work directly hold it",
   },
-  // ── the lanes suite, proven in a lane (ADR-0130) ──
+  // ── the lanes suite, proven in a lane ──
   {
     name: "a fork at a turn starts from the base snapshot",
     file: "packages/rules/work.ts",
@@ -273,7 +273,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "planTrashSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere",
   },
-  // ── card history and traces (ADR-0048 step 6) ──
+  // ── card history and traces ──
   {
     name: "a trace is left for the card's own mover",
     file: "packages/rules/card-history.ts",
@@ -651,7 +651,7 @@ export const mutations: readonly Mutation[] = [
       "an acceptance is stored as the fact it is; one stored under the kind facts began with does not decode",
   },
   {
-    name: "an offer record from before ADR-0100 forgets its acceptance",
+    name: "an offer record written before the rename forgets its acceptance",
     file: "packages/rules/offer.ts",
     from: "        r.acceptedAs !== undefined ? r.acceptedAs : (r.integratedAs ?? null),",
     to: "        r.acceptedAs !== undefined ? r.acceptedAs : null,",
@@ -2231,7 +2231,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "the first press is named: a stop of the same ask queued, or one in the thread, queues no second",
   },
-  // ── a run's verdict (ADR-0077) ──
+  // ── a run's verdict ──
   {
     name: "the model decides a failed run's verdict",
     file: "packages/rules/verdict.ts",
@@ -2306,7 +2306,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "planCarryOn: a run whose prompt names who resumed, read back as its line",
   },
-  // ── queue control (ADR-0048 step 7) ──
+  // ── queue control ──
   {
     name: "a reorder forgets why the card was not sent",
     file: "packages/rules/in-place.ts",
@@ -2427,7 +2427,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "an idle lane whose queue is held: busy",
   },
-  // ── the board (ADR-0122) ──
+  // ── the board ──
   {
     name: "the board leaves out a task in a state gone",
     file: "packages/rules/board.ts",
@@ -2477,7 +2477,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "orderBetween between two neighbours",
   },
-  // ── pinetrie:live (ADR-0014, S55) ──
+  // ── pinetrie:live ──
   {
     name: "every reply is current: a second message appends to the first",
     file: "packages/rules/live.ts",
@@ -2534,7 +2534,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "planClear closes every stream",
   },
-  // ── the host's records (ADR-0095) ──
+  // ── the host's records ──
   {
     name: "every write goes to the first document",
     file: "packages/rules/records.ts",
@@ -2559,7 +2559,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "planWorkflowSeed: a store with no workflow gets the default one",
   },
-  // ── a person's picture (packages/rules/participant.ts, ADR-0098) ──
+  // ── a person's picture (packages/rules/participant.ts) ──
   {
     name: "a picture too large on one side only is set unfitted",
     file: "packages/rules/participant.ts",
@@ -2774,7 +2774,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "planWidth: a card's width on its canvas",
   },
-  // One rule places a branch for the host and the page (ADR-0116): each
+  // One rule places a branch for the host and the page: each
   // side's test catches it.
   {
     name: "a branch's card lands at the canvas's end",
@@ -2860,7 +2860,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "planMoveTargets, a drop on a canvas",
   },
-  // ── what a run is told of its task (ADR-0116) ──────────────────────────
+  // ── what a run is told of its task ──────────────────────────
   {
     name: "the reading thread is not marked on the canvas",
     file: "packages/rules/canvas.ts",

@@ -38,9 +38,9 @@ const E = threadIdFor("e")
 const C1 = commitId("c1")
 const C2 = commitId("c2")
 const CB = commitId("cb")
-const S1 = snapshotId("1-p1")
-const S2 = snapshotId("2-m1")
-const S4 = snapshotId("4-m2")
+const SNAP1 = snapshotId("1-p1")
+const SNAP2 = snapshotId("2-m1")
+const SNAP4 = snapshotId("4-m2")
 const SB = snapshotId("6-pb")
 
 // Lane A: a person's prompt p1, an assistant message m1 whose tool call wrote
@@ -71,7 +71,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       entry: entryId("1-p1"),
       lane: A,
       commit: C1,
-      snapshot: S1,
+      snapshot: SNAP1,
       paths: [],
       conflicts: [],
       ignored: null,
@@ -81,7 +81,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       entry: entryId("2-m1"),
       lane: A,
       commit: C2,
-      snapshot: S2,
+      snapshot: SNAP2,
       paths: [],
       conflicts: [],
       ignored: null,
@@ -91,7 +91,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       entry: entryId("4-m2"),
       lane: A,
       commit: null,
-      snapshot: S4,
+      snapshot: SNAP4,
       paths: [],
       conflicts: [],
       ignored: null,
@@ -152,7 +152,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
       lane: A,
       commit: C2,
       commitLane: A,
-      snapshot: S2,
+      snapshot: SNAP2,
     })
   })
   test("a tool result has the record above it", () => {
@@ -160,7 +160,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
       lane: A,
       commit: C2,
       commitLane: A,
-      snapshot: S2,
+      snapshot: SNAP2,
     })
   })
   test("a turn that changed only ignored files: its disk, and the commit above", () => {
@@ -168,7 +168,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
       lane: A,
       commit: C2,
       commitLane: A,
-      snapshot: S4,
+      snapshot: SNAP4,
     })
   })
   test("a conversation below a lane's message belongs to that lane", () => {
@@ -176,7 +176,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
       lane: A,
       commit: C2,
       commitLane: A,
-      snapshot: S2,
+      snapshot: SNAP2,
     })
   })
   test("a person's prompt gives the disk from before the answer", () => {
@@ -184,7 +184,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
       lane: A,
       commit: C1,
       commitLane: A,
-      snapshot: S1,
+      snapshot: SNAP1,
     })
   })
   test("a branch lane's prompt claims its own entries, never its parent's", () => {
