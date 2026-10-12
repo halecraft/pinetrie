@@ -1,6 +1,6 @@
 // channel/client — the host's side of a held channel: one server process,
 // reached through one long-lived stream (a runtime's `exec -i`, or a local
-// process in tests). A call takes 0.2–1 ms (S43 item 2, S147).
+// process in tests). A call takes 0.2–1 ms.
 
 import { spawn } from "node:child_process"
 import readline from "node:readline"
@@ -21,7 +21,10 @@ export interface Channel<Hello, Call, Update, Result> {
     signal?: AbortSignal,
     onUpdate?: (update: Update) => void,
   ): Promise<Result>
-  /** End the server's input: it finishes and exits. Never a signal (S43 item 2). */
+  /**
+   * End the server's input: it finishes and exits. Never a signal: killing
+   * the `exec` process does not reach the server.
+   */
   close(): void
   /** Settles when the server has exited. */
   readonly closed: Promise<void>

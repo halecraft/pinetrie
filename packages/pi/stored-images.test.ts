@@ -1,4 +1,4 @@
-// A message's images stored as references (ADR-0051): the split, the rejoin,
+// A message's images stored as references: the split, the rejoin,
 // and both through `KynetaStorage`, for the entry and for pi's pending entry.
 
 import {

@@ -1,7 +1,7 @@
 // pi/banner — `set_banner`, the tool that sets a thread's column banner when
 // the person asks, and the arguments it takes. The host decides and writes
 // (`planAsk`); this only reads the call. Also drawing a banner's image
-// (`banners`, ADR-0050, ADR-0053), and what its request adds for OpenRouter
+// (`banners`), and what its request adds for OpenRouter
 // (`bannerImageConfig`).
 
 import {
@@ -28,7 +28,7 @@ const imageOf = (s: string): Sha256 | null =>
 /**
  * The call's arguments as an ask, or why not: an image argument that names
  * no pasted image is refused, not ignored, or the agent would report a
- * banner the person did not get. Pure.
+ * banner the person did not get.
  */
 export function parseBannerArgs(args: {
   readonly image?: string
@@ -50,8 +50,8 @@ export function parseBannerArgs(args: {
  * OpenRouter's `image_config` for a banner, which pi-ai does not send. 1:1
  * suits every model, since OpenRouter clamps a ratio to what the model has.
  * A Recraft model is also given the black background that the prompt asks
- * for and the client blends away (ADR-0053). The field is Recraft's alone,
- * so another model is not sent it. Pure.
+ * for and the client blends away. The field is Recraft's alone, so another
+ * model is not sent it.
  */
 export function bannerImageConfig(modelId: string): {
   readonly aspect_ratio: "1:1"
@@ -151,7 +151,7 @@ export async function drawnOf(data: string): Promise<Drawn> {
     : { kind: "failed", reason: prepared.reason }
 }
 
-/** How long one image request may take: S60 measured about 9 s. */
+/** How long one image request may take: one takes about 9 s. */
 const DRAW_TIMEOUT_MS = 120_000
 
 export interface Banners {

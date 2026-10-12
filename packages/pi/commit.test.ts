@@ -96,7 +96,7 @@ test("planCommit: one operation and one arrival per write, with pi's seqs", () =
   expect(checkpoint).toMatchObject({ text: "out", record: { sealed: true } })
 })
 
-describe("threadOfEntries: a commit's entries are in the thread its context names (ADR-0125)", () => {
+describe("threadOfEntries: a commit's entries are in the thread its context names", () => {
   const OTHER = threadIdFor("b")
   const commit = (lane?: string) =>
     prepareStorageCommit(

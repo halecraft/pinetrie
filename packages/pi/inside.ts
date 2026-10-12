@@ -1,7 +1,7 @@
 // pi/inside — what a facade carries that only this package may read.
 //
-// The host holds `Scribe` and `PiSetup`, whose types name no pi type
-// (ADR-0003). `createAgent` needs what is behind them: the scribe's sessions,
+// The host holds `Scribe` and `PiSetup`, whose types name no pi type.
+// `createAgent` needs what is behind them: the scribe's sessions,
 // the setup's model runtime. Each factory seals that beside the facade it
 // returns, and `createAgent` opens it. This module is not exported from
 // `index.ts`, so nothing outside the package can open a facade.

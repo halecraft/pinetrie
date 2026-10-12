@@ -1,6 +1,6 @@
 // pi/commit — a commit's writes as document operations and index arrivals.
-// Pure: `KynetaStorage` gathers the image lookups, writes the operations in
-// one batch, and then applies the arrivals.
+// `KynetaStorage` gathers the image lookups, writes the operations in one
+// batch, and then applies the arrivals.
 
 import type {
   prepareStorageCommit,
@@ -52,12 +52,12 @@ export type DocOp =
     }
 
 /**
- * The thread of a commit's entries (ADR-0125): the one its context names,
+ * The thread of a commit's entries: the one its context names,
  * else `fallback`, which only pi's conformance suite gives. Throws when
  * neither names one, or when the commit moves the tip of a lane other than
- * the thread its context names: a lane is named by its thread (ADR-0120),
- * so its entries can be in no other. A fallback says nothing about lanes,
- * so tips are not checked against it. Pure.
+ * the thread its context names: a lane is named by its thread, so its
+ * entries can be in no other. A fallback says nothing about lanes, so tips
+ * are not checked against it.
  */
 export function threadOfEntries(
   writes: readonly CommittedWrite[],

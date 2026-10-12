@@ -1,6 +1,6 @@
 // pi/queries — the rules of pi's `Storage` reads, over stored rows. They
 // restate pi's `InMemoryStorageState`, which pi does not export; its
-// conformance suite checks that they still agree. Pure.
+// conformance suite checks that they still agree.
 
 import type {
   EntryCursor,

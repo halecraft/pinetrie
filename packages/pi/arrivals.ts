@@ -1,4 +1,4 @@
-// pi/arrivals — the replica-local arrival index behind pi's `seq` (ADR-0013).
+// pi/arrivals — the replica-local arrival index behind pi's `seq`.
 //
 // `seq` is not stored in the shared document. Each replica numbers items in
 // the order it first observes them. pi pages with `cursor.seq + 1`
@@ -14,7 +14,7 @@
 //
 // Nothing about seq is replicated. Each item's identity in the shared document
 // is coordination-free:
-//     entries    -> id   (uuidv7, ADR-0009)
+//     entries    -> id   (uuidv7)
 //     usage rows -> id
 //     values     -> wid  (unique token per write, peer-tagged)
 //     list elems -> eid  (unique token per append, peer-tagged)
@@ -130,7 +130,6 @@ export class ArrivalLine {
   }
 }
 
-/** What the planner asks of the index. */
 export interface Known {
   readonly lastSeq: number
   hasEntry(id: string): boolean

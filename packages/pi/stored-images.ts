@@ -1,7 +1,7 @@
-// pi/stored-images — a pi message's images as the session stores them
-// (ADR-0051): a reference to the blob store in place of each image's base64,
-// and the base64 restored when pi reads the message back. Pure; `KynetaStorage`
-// gathers the lookups.
+// pi/stored-images — a pi message's images as the session stores them: a
+// reference to the blob store in place of each image's base64, and the base64
+// restored when pi reads the message back. `KynetaStorage` gathers the
+// lookups.
 
 import {
   type ImageMime,

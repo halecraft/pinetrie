@@ -1,10 +1,7 @@
 // pi/scripted — a model whose replies a suite writes in advance.
 //
-// pi-ai's faux provider, behind pinetrie's own shapes so no pi type crosses
-// (ADR-0003). Suites script tool calls with it, so a tool run is repeatable
-// and spends nothing (S22). A suite can also give a standing reply for any
-// request with nothing queued (`answer`), and pause the reply to a prompt, so
-// a check sees its run in progress for as long as it needs (`pause`).
+// pi-ai's faux provider, behind pinetrie's own shapes. Suites script tool
+// calls with it, so a tool run is repeatable and spends nothing.
 
 import { createHash } from "node:crypto"
 import {
@@ -40,7 +37,6 @@ export type ScriptStep =
       readonly text?: string
     }
 
-/** A paused reply (`ScriptedModel.pause`). */
 export interface Paused {
   /** Whether the paused request has arrived: its run has started. Poll it with a timeout. */
   readonly reached: boolean
@@ -67,7 +63,7 @@ const handles = new WeakMap<
 /** What a scripted model answers a describe request with, by default. */
 export const SCRIPTED_DESCRIPTION = "offer: scripted"
 
-/** What a scripted model says of a run's end (ADR-0077): nothing is needed. */
+/** What a scripted model says of a run's end: nothing is needed. */
 export const SCRIPTED_VERDICT = "done"
 
 /**
@@ -92,13 +88,13 @@ export function scriptedModel(
     /** Given whenever nothing is queued, and never used up. Without it, such a request gets an error reply. */
     readonly answer?: ScriptStep
     /**
-     * Commit messages (ADR-0105), answered by a provider of their own, so a
-     * describe request never takes a reply from the run's script (S48 item 22).
+     * Commit messages, answered by a provider of their own, so a describe
+     * request never takes a reply from the run's script.
      */
     readonly describe?: ScriptStep
     /**
      * The model's context window, in tokens: small, pi compacts within a
-     * test (S92). pi's own default otherwise.
+     * test. pi's own default otherwise.
      */
     readonly contextWindow?: number
   } = {},
@@ -172,7 +168,7 @@ type Choose = (
  * `faux`, answering each request with `choose`'s step. Faux takes a response
  * off its queue when a request arrives but runs a factory a microtask later,
  * so a factory that queued itself again would leave the queue empty for a
- * second request in the same tick (S52 item 6). Each request queues its own,
+ * second request in the same tick. Each request queues its own,
  * just before faux takes it.
  */
 function perRequest(
@@ -230,7 +226,6 @@ function render(
   return fauxAssistantMessage(step.text)
 }
 
-/** The text of the request's last user message, or "". */
 function lastUserText(context: TranscriptContext): string {
   const user = context.messages.findLast(m => m.role === "user")
   return user === undefined ? "" : textOf(user.content)
@@ -265,7 +260,6 @@ const textOf = (content: unknown): string =>
           .join("")
       : ""
 
-/** The faux provider behind a scripted model's runs. */
 export function fauxOf(model: ScriptedModel): FauxProviderHandle {
   const faux = handles.get(model)
   if (faux === undefined) throw new Error("not a scripted model")

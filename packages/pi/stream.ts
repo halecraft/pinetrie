@@ -1,6 +1,5 @@
-// pi/stream — pi's harness events as pinetrie's `StreamEvent`s (ADR-0107).
-// Nothing else of pi's events leaves this package. Which events are mapped,
-// and why the end events are not, is in `TECHNICAL.md`, "Streaming".
+// pi/stream — pi's harness events as pinetrie's `StreamEvent`s. Nothing else
+// of pi's events leaves this package.
 
 import type { HarnessEvent } from "@earendil-works/pi-agent-core"
 import { isThreadId, type StreamEvent } from "@pinetrie/core"

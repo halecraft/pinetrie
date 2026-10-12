@@ -1,7 +1,7 @@
 // channel/serve — the server's side of a held channel, over its own stdin and
 // stdout. Calls are answered concurrently: pi runs a turn's tool calls in
 // parallel. The client closes the channel by ending stdin; killing the
-// `exec` process does not reach the server (S43 item 2).
+// `exec` process does not reach the server.
 
 import readline from "node:readline"
 import { decode, encode, type Reply, type Request } from "./wire.ts"

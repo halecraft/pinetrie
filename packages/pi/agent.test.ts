@@ -1,9 +1,7 @@
 // The agent over pi's lanes: its error mapping, creating a lane under the
 // id the host gives, a harness per root, and what the model reads.
-//
-// Co-located inside packages/pi for the same reason as stored-row.test.ts: both
-// concern pi's behaviour, and a test under test/ would reach across the
-// boundary ADR-0003 holds.
+// In packages/pi because it drives pi's harness, which only this package may
+// import.
 
 import {
   atEntry,
@@ -55,9 +53,9 @@ import { laneErrCode } from "./thread-lanes.ts"
 describe("laneErrCode", () => {
   test("maps pi's refusals onto our codes", () => {
     expect(laneErrCode("UnknownTarget")).toBe(ERR.UNKNOWN_TARGET)
-    // Nothing navigates a lane any more (ADR-0120).
+    // Nothing navigates a lane.
     expect(laneErrCode("InvalidNavigation")).toBe(ERR.REFUSED)
-    // A crash leaves pi's operation open: busy until resumed (S36 item 18).
+    // A crash leaves pi's operation open: busy until resumed.
     expect(laneErrCode("LaneBusy")).toBe(ERR.BUSY)
   })
 
@@ -77,7 +75,7 @@ describe("laneErrCode", () => {
   })
 })
 
-describe("createThreadLane (ADR-0057)", () => {
+describe("createThreadLane", () => {
   const over = async (doc: RootDocHandle) =>
     (
       await startPi(oneRoot(doc), {
@@ -136,7 +134,7 @@ describe("createThreadLane (ADR-0057)", () => {
   })
 })
 
-describe("a pi session per root (ADR-0063)", () => {
+describe("a pi session per root", () => {
   const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
   const chat = (text: string) =>
     encodeChat(
@@ -222,7 +220,7 @@ describe("a pi session per root (ADR-0063)", () => {
   })
 })
 
-describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
+describe("pinned cards: what the model reads", () => {
   const ADA = writerId("ada@x.io")
   const asked = (text: string) =>
     encodeChat(
@@ -300,7 +298,7 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     expect(seen.at(-1)).toBe("Ada: go")
   })
 
-  test("a base's news goes in before the cards entry, in the run's commit; the model reads it first, and the next run keeps the cache (ADR-0080)", async () => {
+  test("a base's news goes in before the cards entry, in the run's commit, and the model reads it first", async () => {
     const script = scriptedModel()
     let seen: readonly string[] = []
     script.use([
@@ -410,7 +408,7 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     expect(seen.indexOf(pinned.content)).toBeGreaterThan(summary)
   })
 
-  test("a branch's run, its context entry first, writes in the branch, and the trunk carrying on from the same fork writes in the trunk (ADR-0125)", async () => {
+  test("a branch's run writes in the branch, and the trunk carrying on from the same fork in the trunk", async () => {
     const doc = newRootDoc()
     const { agent } = await startPi(oneRoot(doc), {
       model: { kind: "scripted", script: scriptedModel() },
@@ -457,7 +455,7 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
   })
 })
 
-describe("agents talking (ADR-0128, S144)", () => {
+describe("agents talking", () => {
   const ADA = writerId("ada@x.io")
   const asked = (text: string) =>
     encodeChat(

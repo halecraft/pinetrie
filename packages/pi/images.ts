@@ -1,5 +1,5 @@
-// pi/images — an image fitted for the store and the model, by pi (ADR-0042),
-// and `read`'s images put in the store before pi writes them (ADR-0051).
+// pi/images — an image fitted for the store and the model, by pi, and
+// `read`'s images put in the store before pi writes them.
 
 import { createHash } from "node:crypto"
 import type { ReadImageProcessor } from "@earendil-works/pi-agent-core"
@@ -41,9 +41,9 @@ export interface ImageFit {
  * `bytes` as the store keeps them: the type read from the bytes, never
  * declared, and the image fitted to `fit`, else pi's default of 2000×2000,
  * and 4.5 MB of base64, which Anthropic accepts inline (its limit is 5 MB).
- * A person's picture is fitted smaller (ADR-0098). pi's resize returns null
- * both for bytes it cannot decode and for an image nothing fits (S53), hence
- * one reason for both.
+ * A person's picture is fitted smaller. pi's resize returns null both for
+ * bytes it cannot decode and for an image nothing fits, hence one reason for
+ * both.
  */
 export async function prepareImage(
   bytes: Uint8Array,
@@ -78,7 +78,7 @@ const OMITTED: Record<Extract<PreparedImage, { ok: false }>["reason"], string> =
 /**
  * pi's `read`, for an image: fitted as a pasted image is, and put in `blobs`
  * before it is returned, so every write pi makes of the result finds it there
- * by hash and stores a reference (S93). pi adds `hints` to the result's text.
+ * by hash and stores a reference. pi adds `hints` to the result's text.
  */
 export const readImageProcessor =
   (blobs: Pick<BlobStore, "put">): ReadImageProcessor =>

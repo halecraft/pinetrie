@@ -1,4 +1,4 @@
-// pi/pi-setup — the person's pi setup, loaded (ADR-0092): the model and its
+// pi/pi-setup — the person's pi setup, loaded: the model and its
 // one-off requests, the image model for banners, and the commands and skills
 // pi found in the agent directory and the project. It reads no document, so
 // the host loads it before lane work, and `createAgent` builds every harness
@@ -27,7 +27,7 @@ import { sealed } from "./inside.ts"
 /**
  * pinetrie's own skills, loaded after yours and the repo's: `resolve-conflicts`,
  * `commit-message`, `offer-stack`, `column-banner`, `ask-digest`,
- * `tab-title` and `agents-round` (ADR-0128).
+ * `tab-title` and `agents-round`.
  */
 const SKILLS_DIR = path.join(import.meta.dirname, "skills")
 
@@ -44,7 +44,7 @@ export interface PiSetup extends CommandFiles, Banners {
    * One request outside every thread, with no tools and no session
    * (`complete` in `config.ts`), on the title model for `purpose` `title`,
    * else the describe model: its text, null when it fails, and the tokens
-   * it spent (ADR-0128).
+   * it spent.
    */
   complete(request: {
     readonly system: string
@@ -66,11 +66,11 @@ export interface PiSetupOptions {
    * load only when this is given: a suite's fixture, never the person's own.
    */
   readonly agentDir?: string
-  /** The user config's `commands.names`: pi's `source` → a label (ADR-0036). */
+  /** The user config's `commands.names`: pi's `source` → a label. */
   readonly commandRenames?: Readonly<Record<string, string>>
   /** Column banners' image model, when the user config enables them; without it `drawBanner` draws nothing. */
   readonly banner?: BannerConfig
-  /** The user config's title model (ADR-0074); null or absent for the run's. */
+  /** The user config's title model; null or absent for the run's. */
   readonly titleModel?: ModelRef | null
 }
 

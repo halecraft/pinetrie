@@ -125,7 +125,10 @@ Five rules hold them together:
    only guard.
 2. **`seq` is passed to `fromStoredRow`, never read from the row.** It is a
    replica-local arrival index (ADR-0013) and never lives in the document.
-   Passing it keeps the pairing visible in the type.
+   Passing it keeps the pairing visible in the type. The columns need no
+   check on the way back: a row from a peer on another build reads a missing
+   field as its schema default (S17). `payload` is unchecked, since pi ships
+   no schema for `Entry`.
 3. **Absent and null are different facts.** `fromId` exists only on
    `branch_summary`, so the column holds `null` for every other type and the
    rejoin restores *absence*. Every message entry hits this path.
@@ -282,7 +285,9 @@ bytes (`detectSupportedImageMimeType`), then `resizeImage`, in a worker
 thread, to 2000×2000 and 4.5 MB of base64. A type no provider takes inline
 (BMP) is "not an image"; a resize that returns null is "unreadable", since
 pi's null means either undecodable or impossible to fit. After a resize,
-`resized` is pi's note of the original size (`formatDimensionNote`).
+`resized` is pi's note of the original size (`formatDimensionNote`). A
+person's picture is given a smaller box, 512 on its longer side (`ImageFit`,
+ADR-0098).
 
 ### Pinned cards: what the model reads (ADR-0048, S92)
 
@@ -375,7 +380,9 @@ never cuts the newest, so a prompt within it is kept whole (S106).
   - A second faux provider answers commit-message requests (`describe`, by
     default `SCRIPTED_DESCRIPTION`), so a describe request never takes a
     reply from the run's script (S48 item 22). `ModelSetup.describeModel` is
-    that model when scripted, and the run's model otherwise.
+    that model when scripted, and the run's model otherwise. A run's end
+    asks for a verdict (ADR-0077), and the scripted model answers
+    `SCRIPTED_VERDICT` first, so a suite's threads are done.
   - **Each request queues its own response** (`perRequest`): both providers
     are wrapped so that `stream` and `streamSimple` append one dispatcher,
     then delegate. Faux takes a response off its queue when a request
@@ -494,7 +501,8 @@ item 18, and in `lanes.test.ts` against the harness.
     from inside its own drive could wait on itself.
   - It acts on `assistant` requests only; compaction and summaries request
     too.
-  - `run` and `resume` call it once more after the run, for the last turn.
+  - `run` and `resume` call it once more after the run, for the last turn,
+    however the run ends: a Stop, or a model that fails (S104).
   - A hook that throws is reported by pi, and the run goes on.
 - **Resume after a crash.** `Agent.interrupted()` lists lanes whose
   `inspectExecution` shows an open operation; `ThreadLaneHandle.resume()`
@@ -668,7 +676,10 @@ what a record is lives in `@pinetrie/rules`.
 
 ### `seq` is derived, not stored
 
-`planArrivals` (`arrivals.ts`) assigns arrival order. Entries are ordered by
+Nothing about `seq` is replicated: an entry is named by its uuidv7 id,
+written once (ADR-0009), and entries and usage rows are only ever added
+(ADR-0004), so `dirtyFrom` re-indexes the whole field for a change to
+either that sets no key. `planArrivals` (`arrivals.ts`) assigns arrival order. Entries are ordered by
 `orderNewEntries` in `@pinetrie/core`, which is pure and property-tested there for
 permutation invariance. Its `unresolved` ids are a parent cycle and the entries
 below one: a parent outside the batch never blocks a child, whether or not it
@@ -795,7 +806,7 @@ the root its label. A scripted model answers it from its own provider
   page no longer documents it, and the model's OpenRouter description
   names it.
 - **`drawBanner` never rejects**: `drawn` with an image, or `failed` and
-  why. The image is fitted in pi, as `read`'s are (`drawnOf` runs
+  why. A request may take 120 s; one takes about 9 s (S60). The image is fitted in pi, as `read`'s are (`drawnOf` runs
   `prepareImage`), so the host stores what it is given; bytes that are not an
   image are a failure, and the host tries again. `canDrawBanners` is asked
   first, so a host with no key reads no skill and asks no model.

@@ -1,14 +1,10 @@
 // pi/storage — our implementation of pi's `Storage` port, over a Kyneta doc.
 //
-// `seq` is a replica-local arrival index, never stored (ADR-0013;
-// `arrivals.ts`). Two paths index the document: a local commit indexes its own
+// `seq` is a replica-local arrival index, never stored (`arrivals.ts`). Two
+// paths index the document: a local commit indexes its own
 // writes with pi's seqs, and a replayed change (hydration, or a merge from
 // another replica) marks keys dirty, which the next read indexes. Both end in
 // `ArrivalIndex.apply`.
-//
-// This file is the shell: it reads the document, calls the pure planners
-// (`dirty.ts`, `arrivals.ts`, `commit.ts`, `queries.ts`), writes their plans,
-// and keeps the commit queue and close state.
 
 import type {
   CommitResult,
@@ -133,12 +129,12 @@ export interface KynetaStorageOptions {
   readonly peerId?: string
   readonly now?: () => number
   /**
-   * Where a message's images are kept (ADR-0051). Without it, every image
+   * Where a message's images are kept. Without it, every image
    * part is stored inline, as pi wrote it.
    */
   readonly blobs?: Pick<BlobStore, "get" | "ref">
   /**
-   * The thread of an entry whose commit's context names none (ADR-0125).
+   * The thread of an entry whose commit's context names none.
    * Only pi's storage conformance suite gives one: its commits are made
    * outside any thread. Without it, such a commit throws (`threadOfEntries`).
    */
@@ -300,7 +296,7 @@ export class KynetaStorage implements Storage {
 
   /**
    * The stored image of each inline image in `writes`, by its base64. `read`
-   * stores its images before pi writes them (S93), so each is found by the
+   * stores its images before pi writes them, so each is found by the
    * hash of its bytes.
    */
   #refOf(writes: readonly CommittedWrite[]): RefOf {

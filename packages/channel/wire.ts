@@ -1,11 +1,10 @@
-// channel/wire — one message as one JSON line, over a held `exec -i` stream
-// (S43, S44).
+// channel/wire — one message as one JSON line, over a held `exec -i` stream.
 //
 // Values cross with three things JSON cannot carry:
 // - bytes: `Uint8Array`, and so `Buffer`, as base64;
 // - errors: as `{ name, code, message, path }`, rebuilt as `Error`s with those
-//   fields. pi's `NodeExecutionEnv` returns its errors inside results (S44
-//   item 5), so this applies at any depth;
+//   fields. pi's `NodeExecutionEnv` returns its errors inside results, so
+//   this applies at any depth;
 // - `undefined` inside arrays stays JSON's `null`.
 
 /** What the client sends: a call by id, or the abort of one. */
@@ -41,8 +40,7 @@ const toBase64 = (b: Uint8Array): string =>
 
 /**
  * The replacer reads `this[key]`, the value before its `toJSON`: `Buffer`'s
- * own `toJSON` runs first and would hand it `{ type: "Buffer", data: [...] }`
- * (S43 item 2).
+ * own `toJSON` runs first and would hand it `{ type: "Buffer", data: [...] }`.
  */
 function replacer(this: unknown, key: string, value: unknown): unknown {
   const raw = (this as Record<string, unknown>)[key]

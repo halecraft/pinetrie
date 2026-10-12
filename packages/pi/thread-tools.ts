@@ -1,7 +1,7 @@
-// pi/thread-tools — the tools an agent acts on its own thread with (ADR-0080):
+// pi/thread-tools — the tools an agent acts on its own thread with:
 // `catch_up`, which merges its base's or its parent's new work into its copy
 // during the run, and `split_offer`, which queues its offer's split; and the
-// tools it talks to other threads' agents with (ADR-0128): `ask`, which
+// tools it talks to other threads' agents with: `ask`, which
 // relays an ask to a member without waiting, and `leave`. The host
 // decides and carries them out (`LaneHooks`); this only reads the call and
 // hands back the host's answer, as the model reads it.
@@ -20,7 +20,7 @@ import { threadOfContext } from "./thread-context.ts"
 
 type Context = Parameters<typeof threadOfContext>[0]
 
-/** `catch_up`'s `from` as the agent passed it: the base unless it named the parent. Pure. */
+/** `catch_up`'s `from` as the agent passed it: the base unless it named the parent. */
 export const parseCatchUpArgs = (args: {
   readonly from?: string
 }): "base" | "parent" => (args.from === "parent" ? "parent" : "base")
@@ -44,9 +44,9 @@ const NO_LANE: ToolAnswer = {
 }
 
 /**
- * `catch_up` (ADR-0080): the host merges in the run, refusing a call beside
- * another in its turn, or with nothing new. Every lane has it, so a lane's
- * tool list never changes between runs (S85).
+ * `catch_up`: the host merges in the run, refusing a call beside another in
+ * its turn, or with nothing new. Every lane has it, so a lane's tool list
+ * never changes between runs.
  */
 export function catchUpTool(
   catchUp: (lane: ThreadId, from: "base" | "parent") => Promise<ToolAnswer>,
@@ -82,7 +82,7 @@ export function catchUpTool(
 }
 
 /**
- * `split_offer` (ADR-0080): the host queues a card that splits the offer when
+ * `split_offer`: the host queues a card that splits the offer when
  * the run ends, as the strip's button does.
  */
 export function splitTool(askSplit: (lane: ThreadId) => Promise<ToolAnswer>) {
@@ -107,9 +107,9 @@ export function splitTool(askSplit: (lane: ThreadId) => Promise<ToolAnswer>) {
 }
 
 /**
- * `ask` (ADR-0128): relay an ask to another thread's agent, a member of this
- * thread. It never waits for the answer, which arrives as a message: two
- * agents that waited on each other would never finish (S144).
+ * `ask`: relay an ask to another thread's agent, a member of this thread. It
+ * never waits for the answer, which arrives as a message: two agents that
+ * waited on each other would never finish.
  */
 export function askTool(
   ask: (lane: ThreadId, to: string, text: string) => Promise<ToolAnswer>,
@@ -141,7 +141,7 @@ export function askTool(
   }
 }
 
-/** `leave` (ADR-0128): this thread's agent leaves another thread's members. */
+/** `leave`: this thread's agent leaves another thread's members. */
 export function leaveTool(
   leave: (lane: ThreadId, thread: string) => Promise<ToolAnswer>,
 ) {

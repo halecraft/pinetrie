@@ -1,9 +1,7 @@
-// pi/agent — the agent at work in threads' lanes (ADR-0120, ADR-0092): a
-// harness per root (ADR-0063), built through the scribe over that root's one
-// pi session, from the person's pi setup. Only this package may import pi
-// (ADR-0003, enforced by module resolution): everything pi-shaped is
-// converted to pinetrie's shapes here or in the modules `createAgent` wires,
-// so the host never sees a pi type.
+// pi/agent — the agent at work in threads' lanes: a harness per root, built
+// through the scribe over that root's one pi session, from the person's pi
+// setup. Everything pi-shaped is converted to pinetrie's shapes here or in
+// the modules `createAgent` wires, so the host never sees a pi type.
 
 import {
   type AgentMessage,
@@ -61,14 +59,10 @@ const NO_BLOBS: Pick<BlobStore, "get"> = { get: () => undefined }
 /** A lane no root holds: every write to it is refused. */
 const UNKNOWN_LANE: LaneRefusal = { kind: "refused", code: ERR.UNKNOWN_TARGET }
 
-/** Coordination-free id, used for peer ids. Same generator pi uses for entries. */
+/** A peer id, from the generator pi uses for entries. */
 export const newId = (): string => uuidv7()
 
-/**
- * The documents pi's sessions are over (ADR-0063), as the host opens them:
- * the session's, where the scribe writes the host's session-wide records, and
- * each root's, a pi session of its own.
- */
+/** The documents pi's sessions are over, a pi session for each root. */
 export interface AgentDocuments {
   /** A root's document, held and loaded: opened if it is not. */
   root(root: RootId): Promise<RootDocHandle>
@@ -78,7 +72,7 @@ export interface AgentDocuments {
 
 export interface CreateAgentOptions {
   readonly documents: Pick<AgentDocuments, "root" | "rootOfLane">
-  /** Each root's harness is built over the scribe's session for it (S113). */
+  /** Each root's harness is built over the scribe's session for it. */
   readonly scribe: Scribe
   readonly setup: PiSetup
   /**
@@ -86,14 +80,14 @@ export interface CreateAgentOptions {
    * the host's user, so they are on only when asked for.
    */
   readonly tools: {
-    /** How a lane's tools reach its files: its container (ADR-0034); null for a lane with no copy of its own. */
+    /** How a lane's tools reach its files: its container; null for a lane with no copy of its own. */
     readonly access: (lane: ThreadId) => LaneAccess | null
     readonly hooks: LaneHooks
   } | null
   /**
-   * Where images are kept. A chat's are read from it for every request
-   * (ADR-0042); `read` puts each image it reads there (ADR-0051). Without it,
-   * a chat's images reach the model as "no longer stored".
+   * Where images are kept. A chat's are read from it for every request;
+   * `read` puts each image it reads there. Without it, a chat's images reach
+   * the model as "no longer stored".
    */
   readonly blobs?: Pick<BlobStore, "get" | "put" | "ref">
   /**
@@ -104,30 +98,28 @@ export interface CreateAgentOptions {
     lane: ThreadId,
     ask: BannerAsk,
   ) => Promise<BannerAnswer>
-  /** What a running turn writes, in pinetrie's own words, per lane. */
   readonly onStream?: (event: StreamEvent) => void
   /**
    * A lane's request starts otherwise than its last one did: its earlier
-   * thinking is dropped, and its prompt cached again (`prefix.ts`, S85).
+   * thinking is dropped, and its prompt cached again (`prefix.ts`).
    */
   readonly onPrefixChange?: (lane: ThreadId) => void
   /**
-   * Each model request's tokens, pi's `totalTokens`, per lane, as pi reports
-   * them (S144): what a budget for agents talking spends (ADR-0128).
+   * Each model request's tokens, pi's `totalTokens`, per lane: what a budget
+   * for agents talking spends.
    */
   readonly onUsage?: (lane: ThreadId, tokens: number) => void
   /**
    * Asked before each model request of a lane's run; false aborts the run
-   * before the request is sent (S144), so a spent budget overruns by at most
-   * the request that crossed it (ADR-0128). Absent: every request is sent.
+   * before the request is sent, so a spent budget overruns by at most the
+   * request that crossed it. Absent: every request is sent.
    */
   readonly mayRequest?: (lane: ThreadId) => boolean
 }
 
 /**
  * What the model reads: pi's own conversion, after each chat's images are
- * attached. Gathers the blobs, then `withChatImages` places them. Read from
- * the store for every request, uncached (S53 item 7).
+ * attached. Read from the store for every request, uncached.
  */
 function providerMessages(
   messages: AgentMessage[],
@@ -153,7 +145,7 @@ function providerMessages(
   return convertToLlm(withChatImages(messages, found))
 }
 
-/** The pi stack over one root's session: its harness's lanes, and how it closes. */
+/** The pi stack over one root's session. */
 export interface Stack {
   readonly lanes: ThreadLanes
   /** Closes the harness, which closes the session it was built over. */
@@ -170,10 +162,9 @@ export interface Stack {
 export interface Agent {
   /**
    * Create a thread's lane at `spot`, in its root, named `lane` (the host
-   * decides the id, ADR-0057). Refused `lane_id_in_use` for an id pi holds.
+   * decides the id). Refused `lane_id_in_use` for an id pi holds.
    */
   createThreadLane(spot: Spot, lane: ThreadId): Promise<CreateOutcome>
-  /** A thread's lane, in the root its record names. */
   lane(name: ThreadId): ThreadLaneHandle
   /** Lanes pi holds an operation open on, in `roots`: a crash interrupted them. */
   interrupted(roots: readonly RootId[]): Promise<readonly ThreadId[]>
@@ -241,7 +232,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         toProviderMessages: messages =>
           providerMessages(messages, options.blobs ?? NO_BLOBS),
         // pinetrie's queued cards mean pi's own queue is never used; should it
-        // be, it answers one message at a time rather than batching (S20).
+        // be, it answers one message at a time rather than batching.
         followUpMode: "one-at-a-time",
         compaction: PINETRIE_COMPACTION,
       },
@@ -259,9 +250,9 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         return undefined
       })
     }
-    // A spent budget stops the run before its next request (ADR-0128, S144).
-    // The abort is not awaited: this hook runs inside the lane's drive,
-    // which an awaited abort would wait on.
+    // A spent budget stops the run before its next request. The abort is not
+    // awaited: this hook runs inside the lane's drive, which an awaited abort
+    // would wait on.
     const { mayRequest } = options
     if (mayRequest !== undefined)
       harness.hooks.on("before_request", async event => {
@@ -282,8 +273,8 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
             if (isThreadId(event.lane))
               onUsage(event.lane, event.row.usage.totalTokens)
           })
-    // A compaction keeps the context the model last read in view (S92):
-    // the newest entry of each kind summarised is carried into pi's
+    // A compaction keeps the context the model last read in view: the
+    // newest entry of each kind summarised is carried into pi's
     // retained tail. Nothing is thrown: if `compact` fails, pi compacts on
     // its own, and only the context is lost, until the next run restates it.
     harness.hooks.on("before_compaction", async event => {
@@ -335,7 +326,6 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     }
   }
 
-  /** `root`'s stack, built once through the scribe. */
   const ofRoot = (root: RootId): Promise<Stack> =>
     inside.over(root, session => buildStack(session, root))
 

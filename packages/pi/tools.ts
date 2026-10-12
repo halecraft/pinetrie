@@ -42,7 +42,7 @@ export interface ToolsInput {
 }
 
 /**
- * Each tool, made, by its id (ADR-0114): a tool with no factory fails to
+ * Each tool, made, by its id: a tool with no factory fails to
  * compile, and `tools.test.ts` checks each is named its id, which catches a
  * pi upgrade renaming one of its own. pi-agent-core makes `read`, `write`,
  * `edit` and `bash`; pine·trie makes the rest.
@@ -51,7 +51,7 @@ export const TOOLS: Readonly<
   Record<ToolId, (input: ToolsInput) => { readonly name: string }>
 > = {
   // `read` fits an image and stores it before pi writes the result, so the
-  // session keeps a reference (ADR-0051).
+  // session keeps a reference.
   [READ_TOOL]: input =>
     createReadTool(
       input.blobs === undefined
@@ -77,7 +77,7 @@ export const TOOLS: Readonly<
 
 /**
  * The file tools: pi-agent-core's `read`, `write`, `edit` and `bash`, and our
- * `grep` and `find` (ADR-0064). Each lane uses them in its own directory
+ * `grep` and `find`. Each lane uses them in its own directory
  * (`toolContextOf`, in `lanes.ts`). They are also pi's `selectedTools`, and
  * naming `grep` or `find` there drops pi's rule to search with bash.
  */
@@ -92,9 +92,7 @@ const FILE_TOOLS: readonly ToolId[] = [
 
 /**
  * Every tool the harness registers, in `TOOL_IDS`' order, and the names of
- * the file tools among them. Besides the file tools, the tools the host
- * answers: `ask_about_conflict`, `catch_up` and `split_offer` (ADR-0080),
- * `set_banner`, and `ask` and `leave` (ADR-0128).
+ * the file tools among them.
  */
 export function assembleTools(input: ToolsInput): {
   readonly registered: readonly unknown[]
@@ -111,8 +109,8 @@ export function assembleTools(input: ToolsInput): {
  * `set_banner` only when banners are on. One list for every run, a
  * resolution's included, whatever kind of lane runs it: a tool that does not
  * apply answers why. A list that changed between runs would change every
- * request's prefix, and Anthropic then drops the lane's earlier thinking
- * (S85). pi stores the list in a lane's configuration, and fails a run whose
+ * request's prefix, and Anthropic then drops the lane's earlier thinking.
+ * pi stores the list in a lane's configuration, and fails a run whose
  * list names a tool not registered, so `assembleTools` registers every tool
  * whatever the setting, and a lane stored with another list is given this
  * one when it is first held (`threadLanes`).

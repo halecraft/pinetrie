@@ -1,4 +1,4 @@
-// pi/search — the `grep` and `find` tools (ADR-0064): rg and fd, run through
+// pi/search — the `grep` and `find` tools: rg and fd, run through
 // the tool context's `env`, so in a lane of its own they search the lane and
 // not the host. pi-coding-agent's tools of the same names spawn rg and fd on
 // the host, and so cannot serve a lane.
@@ -54,10 +54,8 @@ const atLeast = (min: number, n: number | undefined, otherwise: number) =>
     ? otherwise
     : Math.max(min, Math.floor(n))
 
-/** Lines of output a grep call keeps. */
 export const grepLimit = (p: GrepParams): number =>
   atLeast(1, p.limit, GREP_LIMIT)
-/** Results a find call keeps. */
 export const findLimit = (p: FindParams): number =>
   atLeast(1, p.limit, FIND_LIMIT)
 
@@ -91,7 +89,7 @@ export function grepArgs(p: GrepParams): readonly string[] {
  * fd's arguments. It is asked for one result more than the limit, so a cut
  * capture means there were more (`searchOutcome`). fd matches a glob against
  * the basename, or with `--full-path` against the absolute path, so a
- * pattern with a `/` needs a leading `**` segment to match anything (S88).
+ * pattern with a `/` needs a leading `**` segment to match anything.
  */
 export function findArgs(p: FindParams): readonly string[] {
   const full = p.pattern.includes("/")

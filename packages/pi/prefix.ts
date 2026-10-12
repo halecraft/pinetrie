@@ -1,4 +1,4 @@
-// pi/prefix — whether a request starts as the lane's last one did (S85).
+// pi/prefix — whether a request starts as the lane's last one did.
 //
 // Anthropic drops an earlier thinking block when anything before it changed
 // since it was written, and pi asks it to (`drop_block`). Everything in a

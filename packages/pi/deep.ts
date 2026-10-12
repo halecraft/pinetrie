@@ -3,8 +3,8 @@
 // `createAgentHarness`, `addUsage`/`emptyUsage` and `ModelRuntime` are real,
 // stable parts of pi's surface but are not listed in either package's
 // `exports` map, so a package specifier is refused. A file URL bypasses the
-// map. Every such import is collected HERE so the blast radius of pi's
-// churn is one file (roadmap: "keep `Storage` the only deep coupling").
+// map. Every such import is collected here, so a change in pi's files
+// breaks this one file.
 //
 // Verified export maps at 0.87.1:
 //   @earendil-works/pi-agent-core  -> ".", "./node", "./harness/context",
@@ -17,7 +17,7 @@
 // pulls in dist/experimental/server.js, which requires `@earendil-works/pi-server`,
 // a package the install does not ship. So `ModelRuntime`, and the pieces that
 // load a person's pi setup (`SettingsManager`, `CONFIG_DIR_NAME`,
-// `DefaultResourceLoader`, `buildSystemPrompt`; S23), come from their files.
+// `DefaultResourceLoader`, `buildSystemPrompt`), come from their files.
 //
 // TYPING NOTE: the runtime import is a URL, which carries no types — but the
 // matching `.d.ts` files DO exist on disk. `typeof import(...)` recovers pi's

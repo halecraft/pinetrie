@@ -1,5 +1,5 @@
 // pi/commands — every skill and prompt template pi loaded, as commands to be
-// labelled (ADR-0036), and a command's file as the model reads it.
+// labelled, and a command's file as the model reads it.
 //
 // pi keeps the first skill or template of each name and drops the rest,
 // with a `collision` diagnostic naming the loser's file. A command is named
@@ -271,7 +271,7 @@ export function expandCommand(
 }
 
 export interface CommandFiles {
-  /** Every command pi loaded, labelled by package (ADR-0036). */
+  /** Every command pi loaded, labelled by package. */
   commands(): readonly CommandSource[]
   /** Commands refused for their labels, with why. */
   refusedCommands(): readonly {

@@ -1,4 +1,4 @@
-// The arrival index (ADR-0013): what a replay's observed document adds to it,
+// The arrival index: what a replay's observed document adds to it,
 // and how a batch is applied.
 import { describe, expect, test } from "vitest"
 import {

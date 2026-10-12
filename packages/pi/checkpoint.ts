@@ -2,10 +2,9 @@
 //
 // While a tool runs, pi writes its whole output view to a
 // `pi.pending.tool_output` value every 2 s, for recovery after a crash. Stored
-// as a value, each write is a new copy: 231–235 KB for one 51 KB result (S22).
+// as a value, each write is a new copy: 231–235 KB for one 51 KB result.
 // `KynetaStorage` stores the text part in `checkpointText` instead, written as
-// edits, and keeps the rest of the value as a small shell. Pure; the storage
-// shell calls these.
+// edits, and keeps the rest of the value as a small shell.
 
 /** pi's namespace for tool-output checkpoints (`pendingToolOutput`). */
 export const CHECKPOINT_NAMESPACE = "pi.pending.tool_output"
@@ -19,7 +18,7 @@ const textParts = (value: unknown): readonly Part[] | undefined => {
 
 /**
  * A checkpoint with exactly one text part -> the value with that text emptied,
- * and the text. Any other shape is undefined: stored whole, as before.
+ * and the text. Any other shape is undefined: stored whole.
  */
 export function sealCheckpoint(
   value: unknown,

@@ -58,7 +58,7 @@ describe("carryContext: what a compaction carries into its retained tail", () =>
     ).toEqual([])
   })
 
-  test("every kind is carried, the newest of each, in the context table's order; a kind the tail holds is not (ADR-0116)", () => {
+  test("every kind is carried, the newest of each, in the context table's order; a kind the tail holds is not", () => {
     const [c, t, p] = [canvas("one"), taskCards("pin"), cards("mine")]
     expect(
       carryContext(prep([p, user("a"), t, canvas("old"), c], [], [user("c")])),

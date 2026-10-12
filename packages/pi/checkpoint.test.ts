@@ -1,5 +1,5 @@
-// Checkpoints stored as text, and which model is picked. Co-located in
-// packages/pi because both concern pi's shapes (ADR-0003).
+// Checkpoints stored as text, and which model is picked. In packages/pi
+// because both concern pi's shapes, which only this package may import.
 
 import {
   BACKGROUND_CONTEXT,

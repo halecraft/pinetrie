@@ -1,6 +1,6 @@
 // pi/config — which model answers, and what its system prompt knows.
 //
-// A person's pi setup is loaded as pi loads it (S23): `SettingsManager` and
+// A person's pi setup is loaded as pi loads it: `SettingsManager` and
 // `DefaultResourceLoader` over `~/.pi/agent`, then the extensions' provider
 // registrations applied to a `ModelRuntime`. Only providers: an extension's
 // tools, commands, handlers and UI hooks belong to pi's coding agent, and
@@ -76,8 +76,8 @@ export interface SettingsLayer {
 
 /**
  * The model to use, field by field: the override's, else the project
- * settings', else the global settings', as pi merges them. Pure; undefined
- * when no source names a provider, or none names a model.
+ * settings', else the global settings', as pi merges them. Undefined when no
+ * source names a provider, or none names a model.
  */
 export function pickModel(
   settings: { readonly global: SettingsLayer; readonly project: SettingsLayer },
@@ -118,7 +118,6 @@ export function pickModel(
 
 export const DEFAULT_AGENT_DIR = path.join(homedir(), ".pi", "agent")
 
-/** A `ModelRuntime` over the person's `auth.json` and `models.json`. */
 const openRuntime = (agentDir: string) =>
   ModelRuntime.create({
     authPath: path.join(agentDir, "auth.json"),
@@ -196,15 +195,15 @@ export interface ModelSetup {
   readonly model: Model
   readonly origin: ModelOrigin
   /**
-   * The model a commit message is asked of (ADR-0105): the run's, except for
-   * a scripted model, whose describe requests have a provider of their own so
-   * they never take a reply from the run's script (S48 item 22).
+   * The model a commit message is asked of: the run's, except for a scripted
+   * model, whose describe requests have a provider of their own so they never
+   * take a reply from the run's script.
    */
   readonly describeModel: Model
   /** Context files for the system prompt, such as the repo's `AGENTS.md`. */
   readonly contextFiles: PromptInput["contextFiles"]
   readonly skills: PromptInput["skills"]
-  /** Every skill and prompt template pi loaded, as commands (ADR-0036). */
+  /** Every skill and prompt template pi loaded, as commands. */
   readonly commands: readonly GatheredCommand[]
   readonly images: ImagesSetup
 }
@@ -222,7 +221,7 @@ export async function loadModelSetup(
     /**
      * pinetrie's own skills. pi keeps one skill per name for the model, and
      * these come after yours and the repo's; as commands, each is reachable
-     * under its own package (ADR-0036).
+     * under its own package.
      */
     readonly skillsDir?: string
   },
@@ -350,7 +349,7 @@ function found(
 }
 
 /**
- * The model a root's title is asked of (ADR-0074): `named`, unless it is
+ * The model a root's title is asked of: `named`, unless it is
  * null, the model is scripted (whose describe provider answers every request
  * outside a thread), or pi has no such model. `found` is false only for
  * the last, which the host logs.
@@ -369,21 +368,20 @@ export function titleModelOf(
 }
 
 /**
- * One request outside every thread, on `model`: an offer's commit message
- * (ADR-0105), an ask's digest (ADR-0106) or a root's title (ADR-0074). No
- * tools, no session, so nothing enters the tree or a lane's context. Null
- * when it fails.
- */
-/**
  * A request outside every thread, answered: its text, null when it failed,
- * and the tokens it spent, which a budget for agents talking counts
- * (ADR-0128); 0 when nothing came back.
+ * and the tokens it spent, which a budget for agents talking counts; 0 when
+ * nothing came back.
  */
 export interface Completed {
   readonly text: string | null
   readonly tokens: number
 }
 
+/**
+ * One request outside every thread, on `model`: an offer's commit message, an
+ * ask's digest or a root's title. No tools, no session, so nothing enters the
+ * tree or a lane's context.
+ */
 export async function complete(
   setup: Pick<ModelSetup, "models">,
   model: Model,

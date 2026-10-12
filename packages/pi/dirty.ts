@@ -1,5 +1,5 @@
 // pi/dirty — which of `KynetaStorage`'s indexes a replayed change can
-// invalidate. Pure.
+// invalidate.
 
 import type { Segment } from "@kyneta/schema"
 
@@ -87,7 +87,7 @@ export function dirtyFrom(
   const item = asKey(segments[1])
   if (item !== undefined) return { kind: "field", field, keys: [item] }
   const ch = asMapChange(change)
-  // Entries (ADR-0004) and usage rows are only ever added, so a change that
+  // Entries and usage rows are only ever added, so a change that
   // sets none of them is unexpected, and re-indexes them all.
   if (field === "entries" || field === "usageRows")
     return {

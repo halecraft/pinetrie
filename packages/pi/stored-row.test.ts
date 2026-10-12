@@ -1,9 +1,7 @@
-// ADR-0015's split and rejoin, stated as tests.
+// The split of pi's entry into a row, and its rejoin.
 //
-// Co-located INSIDE packages/pi on purpose. `toStoredRow` takes pi's `Entry`,
-// so a test in `test/` would have to import a pi type across the boundary that
-// ADR-0003 exists to hold. Here the test is inside the boundary, and nothing
-// pi-shaped escapes.
+// In packages/pi because `toStoredRow` takes pi's `Entry`, which only this
+// package may import.
 //
 // The round-trip cases below are NOT sufficient on their own. A `payload` that
 // duplicates the hoisted columns round-trips perfectly, because rejoining from
@@ -117,7 +115,7 @@ describe("toStoredRow / fromStoredRow", () => {
     expect(back.parentId).toBeNull()
   })
 
-  test("no seq reaches the row (ADR-0013, now structural)", () => {
+  test("no seq reaches the row", () => {
     const withSeq = { ...message, seq: 99 }
     expect(findSeqKeys(toStoredRow(withSeq))).toEqual([])
   })

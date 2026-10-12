@@ -1,4 +1,4 @@
-// The person's pi setup, loaded with no document (ADR-0092).
+// The person's pi setup, loaded with no document.
 
 import { expect, test } from "vitest"
 import { loadPiSetup } from "./pi-setup.ts"

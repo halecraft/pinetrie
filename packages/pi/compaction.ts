@@ -1,5 +1,5 @@
 // pi/compaction — the compaction settings every lane's harness runs with,
-// and the land message's budget derived from them (ADR-0084).
+// and the land message's budget derived from them.
 //
 // pi keeps the newest messages back to `keepRecentTokens`, by
 // `estimateTokens`, and summarises the rest; it never cuts the newest

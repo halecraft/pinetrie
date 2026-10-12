@@ -1,4 +1,4 @@
-// pi/thread-lanes — each thread's pi lane (ADR-0120) in one root's document,
+// pi/thread-lanes — each thread's pi lane in one root's document,
 // held while that root's harness is (`Scribe.release` closes it), behind
 // handles that speak only pinetrie's types. A lane is never moved, and its tip
 // is never read here: readers use the document.
@@ -57,13 +57,10 @@ export type CreateOutcome =
   | LaneRefusal
 
 /**
- * pi's refusal tag -> our `ErrCode`, as a value.
- *
- * Pure, so it is unit-testable without a harness. Runs and lane creation
- * refuse with pi TaggedErrors whose `_tag` is the discriminant, and none of
- * pi's vocabulary passes the boundary (ADR-0003). The host never writes to a
- * running lane (S21), but after a crash pi holds the interrupted operation
- * open, and the lane is `LaneBusy` until it is resumed (S36 item 18).
+ * pi's refusal tag as our `ErrCode`, so none of pi's vocabulary passes the
+ * boundary. The host never writes to a running lane, but after a crash pi
+ * holds the interrupted operation open, and the lane is `LaneBusy` until it
+ * is resumed.
  */
 export function laneErrCode(tag: string): ErrCode {
   if (tag === "UnknownTarget") return ERR.UNKNOWN_TARGET
@@ -94,7 +91,7 @@ async function orRefused<T>(f: () => Promise<T>): Promise<T | LaneRefusal> {
   }
 }
 
-/** Position -> pi's spelling of it, which uses `null` for the root. */
+/** pi's spelling of a position, which uses `null` for the root. */
 export const toPi = (p: Position): string | null =>
   p.kind === "root" ? null : p.id
 
@@ -105,8 +102,8 @@ type PiResult =
 
 /**
  * What goes into a run's commit before its prompt (`ThreadLaneHandle.run`):
- * what an asked agent heard of the thread that asked (ADR-0128), a base's
- * news, and the context entries (ADR-0048, ADR-0116).
+ * what an asked agent heard of the thread that asked, a base's news, and the
+ * context entries.
  */
 export type BeforePrompt =
   | HeardMessage
@@ -116,26 +113,26 @@ export type BeforePrompt =
   | CanvasMessage
 
 /**
- * A thread's lane (ADR-0120). It is never moved: it advances only by its own
- * appends and runs, so its tip stays its thread's end. The host touches it only
- * while it is idle (S21).
+ * A thread's lane. It is never moved: it advances only by its own appends and
+ * runs, so its tip stays its thread's end. The host touches it only while it
+ * is idle: a message appended to a running lane lands at a moment no one
+ * chose.
  */
 export interface ThreadLaneHandle {
   readonly name: ThreadId
   /**
    * Append with no run, through the pi `Lane`: it plans from its own cached
-   * tip, so a write that bypasses it would be dropped from its next turn (S19).
-   * A chat, or a host's fact: an update (ADR-0105), or what a command on the
-   * thread's offer did (ADR-0080).
+   * tip, so a write that bypasses it would be dropped from its next turn.
+   * A chat, or a host's fact: an update, or what a command on the thread's
+   * offer did.
    */
   append(
     message: ChatMessage | UpdateMessage | FactMessage | AnswerMessage,
   ): Promise<AppendOutcome>
   /**
-   * Run one turn with `message` as the prompt itself (S19). `before` goes
-   * in first, in order: a base's news (ADR-0080) and a cards entry, which
-   * stays the prompt's parent. pi writes them all in the commit that admits
-   * the run, or none (S92).
+   * Run one turn with `message` as the prompt itself. `before` goes in first,
+   * in order: a base's news and a cards entry, which stays the prompt's
+   * parent. pi writes them all in the commit that admits the run, or none.
    */
   run(
     message: PromptMessage,
@@ -143,8 +140,8 @@ export interface ThreadLaneHandle {
   ): Promise<WriteOutcome>
   /**
    * Tell a running lane something that changed while it runs: its base has
-   * new work (ADR-0080, S103 item 4), a card was added to or taken from
-   * its task (ADR-0116), or an agent it asked answered (ADR-0128). pi places the message after the tool results of the
+   * new work, a card was added to or taken from its task, or an agent it
+   * asked answered. pi places the message after the tool results of the
    * turn in flight, at its next boundary, appended, so the prompt cache
    * holds. A steer that arrives after the run's last tool call makes one
    * more request.
@@ -156,16 +153,16 @@ export interface ThreadLaneHandle {
   resume(): Promise<WriteOutcome>
   /**
    * End the lane's running turn. A tool running is aborted, and its result
-   * recorded as aborted (S22); the lane then takes its next message.
+   * recorded as aborted; the lane then takes its next message.
    */
   abort(): Promise<void>
 }
 
 export interface ThreadLanes {
   /**
-   * Create a thread's lane at `at`, named `lane` (the host decides the id,
-   * ADR-0057). Called only where no lane is; refused `lane_id_in_use` for an id
-   * pi holds, since `harness.lane` would return that lane instead.
+   * Create a thread's lane at `at`, named `lane` (the host decides the id).
+   * Called only where no lane is; refused `lane_id_in_use` for an id pi
+   * holds, since `harness.lane` would return that lane instead.
    */
   createThreadLane(at: Position, lane: ThreadId): Promise<CreateOutcome>
   lane(name: ThreadId): ThreadLaneHandle

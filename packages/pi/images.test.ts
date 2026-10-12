@@ -79,7 +79,7 @@ test("a large image is fitted to 2000 wide, its size read from the resize", asyn
   )
 })
 
-test("a fit given is the box: a person's picture fits 512 on its longer side, its ratio kept (ADR-0098)", async () => {
+test("a fit given is the box: a person's picture fits 512 on its longer side, its ratio kept", async () => {
   const prepared = await prepareImage(greyPng(1200, 800), {
     maxWidth: 512,
     maxHeight: 512,

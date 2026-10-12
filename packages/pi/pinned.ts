@@ -1,5 +1,5 @@
 // pi/pinned — the context entries a run read, kept in view across pi's
-// compaction (ADR-0048, ADR-0116, S92).
+// compaction.
 //
 // pi compacts in the middle of a run, and a context entry summarised away
 // (a thread's pinned cards, a task's, the canvas list) would leave the model
@@ -19,7 +19,7 @@ import { CONTEXT, CONTEXT_KINDS } from "@pinetrie/rules"
 /**
  * The context entries to carry into the retained tail: of each kind, the
  * newest one being summarised, when the tail holds none of that kind; in
- * the table's order. Empty when there is nothing to carry. Pure.
+ * the table's order. Empty when there is nothing to carry.
  */
 export function carryContext(
   preparation: Pick<
@@ -39,7 +39,7 @@ export function carryContext(
   })
 }
 
-/** pi's compaction with `carried` at the head of its retained tail. Pure. */
+/** pi's compaction with `carried` at the head of its retained tail. */
 export const withCarried = (
   result: CompactResult,
   carried: readonly AgentMessage[],

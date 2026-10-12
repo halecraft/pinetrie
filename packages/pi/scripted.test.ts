@@ -108,7 +108,7 @@ test("a scripted tool step's call carries its arguments", async () => {
   ).toMatchObject([{ name: "read", arguments: { path: "notes.txt" } }])
 })
 
-test("a run's end is answered with a verdict line, first, so the suites' threads are done (ADR-0077)", async () => {
+test("a run's end is answered with a verdict line, first, so the suites' threads are done", async () => {
   const setup = await loadModelSetup(
     { kind: "scripted", script: scriptedModel() },
     { cwd },

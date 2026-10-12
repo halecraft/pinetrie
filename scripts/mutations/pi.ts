@@ -4,7 +4,7 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
-  // ── agents talking (ADR-0128) ──
+  // ── agents talking ──
   {
     name: "a spent budget does not stop the run",
     file: "packages/pi/agent.ts",
@@ -22,7 +22,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "toolContextOf: no access is no lane, named by the project's root, whose every call is refused",
   },
-  // ── the lanes suite, proven in a lane (ADR-0130) ──
+  // ── the lanes suite, proven in a lane ──
   {
     name: "a lane's prompt lists its skills at their host paths",
     file: "packages/pi/lanes.ts",
@@ -142,7 +142,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     // The mutant: one factory that queues itself again, which faux runs a
-    // microtask after taking it off the queue (S52 item 6).
+    // microtask after taking it off the queue.
     name: "concurrent requests share one dispatcher",
     file: "packages/pi/scripted.ts",
     from: "    const step = await choose(context, options?.signal)\n    return step === null ? NO_REPLY : render(step, context)\n  }\n  const base = faux.provider\n  const provider: Provider = {\n    id: base.id,\n    name: base.name,\n    auth: base.auth,\n    getModels: () => base.getModels(),\n    stream: (model, context, streamOptions) => {\n      faux.appendResponses([dispatch])\n      return base.stream(model, context, streamOptions)\n    },\n    streamSimple: (model, context, streamOptions) => {\n      faux.appendResponses([dispatch])\n      return base.streamSimple(model, context, streamOptions)\n    },\n  }\n  return { ...faux, provider }",
@@ -473,7 +473,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a run's last turn is recorded at its newest entry, however it ends: a Stop, or a model that fails (S104)",
+      "a run's last turn is recorded at its newest entry, however it ends: a Stop, or a model that fails",
   },
   {
     name: "a lane stored before banners were on keeps its old tools",
@@ -735,7 +735,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "every kind is carried, the newest of each",
   },
-  // ── every entry names its thread (ADR-0125) ──
+  // ── every entry names its thread ──
   {
     name: "a commit forgets the thread its context names",
     file: "packages/pi/storage.ts",
@@ -743,7 +743,7 @@ export const mutations: readonly Mutation[] = [
     to: "    const named = undefined\n",
     command: unit,
     expect:
-      "a branch's run, its context entry first, writes in the branch, and the trunk carrying on from the same fork writes in the trunk",
+      "a branch's run writes in the branch, and the trunk carrying on from the same fork in the trunk",
   },
   {
     name: "a commit in one thread may move another lane's tip",

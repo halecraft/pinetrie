@@ -1,13 +1,10 @@
-// pi/lanes — where each lane's tools work, as pi sees it (ADR-0032,
-// ADR-0034), and what a lane is told: its system prompt, and for a lane of
-// its own, a block about itself (ADR-0121).
+// pi/lanes — where each lane's tools work, as pi sees it, and what a lane is
+// told: its system prompt, and for a lane of its own, a block about itself.
 //
 // One harness serves every lane, but pi resolves the tools' context from the
-// run's `Context` only: `toolContext` is a function of it. So every call that
-// drives a lane carries its thread in its `Context` (`threadContext`,
-// `thread-context.ts`), and the rest comes from the host's `access(lane)`:
-// one source for where a lane works (S36 item 18). pi's hooks see the lane's
-// name directly.
+// run's `Context` only. So every call that drives a lane carries its thread in
+// its `Context` (`threadContext`), and the rest comes from the host's
+// `access(lane)`. pi's hooks see the lane's name directly.
 
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core"
 import {
@@ -40,8 +37,8 @@ type Context = Parameters<typeof threadOfContext>[0]
 export interface LaneAccess {
   readonly facts: LaneFacts
   /**
-   * Host paths mounted read-only at `/mnt/host` and their path
-   * (ADR-0036): the roots of the skills this lane can read.
+   * Host paths mounted read-only at `/mnt/host` and their path: the roots of
+   * the skills this lane can read.
    */
   readonly hostPaths: readonly string[]
   /** Where the lane runtime's programs are in the lane (`RUNTIME_BIN`). */
@@ -50,21 +47,18 @@ export interface LaneAccess {
 }
 
 /**
- * What a lane of its own is told about itself (ADR-0121). The host builds
- * every name in it: `PINETRIE_MOUNT` and `LANE_NOTE` are in `@pinetrie/lanes`,
- * which this package does not declare. Nothing here changes while the lane
- * lives: a change would alter every request's prefix, and Anthropic then
- * drops the lane's earlier thinking (S85).
+ * What a lane of its own is told about itself. The host builds every name in
+ * it: `PINETRIE_MOUNT` and `LANE_NOTE` are in `@pinetrie/lanes`, which this
+ * package does not declare. Nothing here changes while the lane lives: a
+ * change would alter every request's prefix, and Anthropic then drops the
+ * lane's earlier thinking.
  */
 export interface LaneFacts {
   /** `WORKSPACE_ROOT` in a container; the helper's own directory in tests. */
   readonly dir: string
-  /**
-   * Directories shared read-write with the person and every other lane,
-   * relative to `dir` (ADR-0035).
-   */
+  /** Shared read-write with the person and every other lane, relative to `dir`. */
   readonly shared: readonly string[]
-  /** What `pinetrie.json` lets into the lane (ADR-0034). */
+  /** What `pinetrie.json` lets into the lane. */
   readonly grants: {
     readonly ssh: boolean
     /** Names of environment variables passed in. */
@@ -74,13 +68,12 @@ export interface LaneFacts {
   }
   /**
    * The lane runs pinetrie's default image, which carries Chromium's headless
-   * shell (ADR-0041) and python3 (ADR-0064). A project's own image may carry
-   * neither.
+   * shell and python3. A project's own image may carry neither.
    */
   readonly defaultImage: boolean
   /**
    * The project's recipe, by its command, which pine·trie runs again when a
-   * turn changes its inputs (ADR-0131); null with none.
+   * turn changes its inputs; null with none.
    */
   readonly recipe: string | null
   /** pinetrie's install, mounted read-only in the lane. */
@@ -104,10 +97,10 @@ const listed = (words: readonly string[]): string =>
     : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`
 
 /**
- * The block a lane of its own is told, one guideline per line (ADR-0121).
- * Guidelines, not a section of its own: `pi-anthropic-auth` rebuilds the
- * prompt by its section tags, keeping `<rules>` and dropping `<docs>` (S23).
- * pi drops a guideline equal to an earlier one, so no two lines may be equal.
+ * The block a lane of its own is told, one guideline per line. Guidelines,
+ * not a section of its own: `pi-anthropic-auth` rebuilds the prompt by its
+ * section tags, keeping `<rules>` and dropping `<docs>`. pi drops a guideline
+ * equal to an earlier one, so no two lines may be equal.
  */
 export function laneGuidelines(facts: LaneFacts): string[] {
   const { dir, grants } = facts
@@ -154,16 +147,16 @@ export interface LaneHooks {
   /**
    * `ask_about_conflict` was called. True when the lane's copy has a
    * conflict to ask about, which then needs the person; false when it has
-   * none, and nothing is asked (ADR-0080).
+   * none, and nothing is asked.
    */
   askedAboutConflict(lane: ThreadId, question: string): Promise<boolean>
-  /** `catch_up` was called (ADR-0080): the host's answer. */
+  /** `catch_up` was called: the host's answer. */
   catchUp(lane: ThreadId, from: "base" | "parent"): Promise<ToolAnswer>
-  /** `split_offer` was called (ADR-0080): the host's answer. */
+  /** `split_offer` was called: the host's answer. */
   askSplit(lane: ThreadId): Promise<ToolAnswer>
-  /** `ask` was called (ADR-0128): the host relays it, and answers at once. */
+  /** `ask` was called: the host relays it, and answers at once. */
   ask(lane: ThreadId, to: string, text: string): Promise<ToolAnswer>
-  /** `leave` was called (ADR-0128): the host's answer. */
+  /** `leave` was called: the host's answer. */
   leave(lane: ThreadId, thread: string): Promise<ToolAnswer>
 }
 
@@ -184,11 +177,9 @@ export interface ToolContext {
   } | null
 }
 
-/** Why a call without a lane is refused. */
 const NO_TOOLS =
   "this thread's agent has no tools here: it works in no lane of its own"
 
-/** A program the search tools run: one the lane runtime carries. */
 export type SearchProgram = Extract<RuntimeProgram, "rg" | "fd">
 
 /** Where `program` is in the file system the tools run in: the lane runtime's. */
@@ -221,7 +212,7 @@ export function toolContextOf(
 
 /**
  * The skills a lane of its own can read, at the paths it reads them: those
- * under a host path it has mounted, at `/mnt/host` and their path (ADR-0036).
+ * under a host path it has mounted, at `/mnt/host` and their path.
  */
 function skillsInLane<S extends { filePath: string; baseDir: string }>(
   skills: readonly S[] | undefined,
@@ -239,12 +230,8 @@ function skillsInLane<S extends { filePath: string; baseDir: string }>(
 
 /**
  * pi's own prompt, with the repo's context files and the person's skills, so
- * an extension that shapes pi's prompt sections finds them (S23). It names
- * the lane's directory, and does not wait for its setup. Every thread is told
- * what its context entries are (`CONTEXT_RULES`: pinned cards, a task's
- * pinned cards, the canvas list); a lane of its own is also told about
- * itself (`laneGuidelines`), and sees its skills at the paths it can read
- * them (`skillsInLane`).
+ * an extension that shapes pi's prompt sections finds them. It names the
+ * lane's directory, and does not wait for its setup.
  */
 export const systemPromptFor =
   (
@@ -270,17 +257,16 @@ export const systemPromptFor =
             ],
     })
 
-/** What `ask_about_conflict` answers with no conflict in the lane's copy. */
 export const NO_CONFLICTS =
   "There is no conflict in this thread's copy to ask about."
 
 /**
- * The tool an agent leaves a conflict with (ADR-0033, ADR-0080): when its two
- * sides meant different things, the agent leaves it as it is and asks, and
- * the thread needs the person whatever the files say. Taken while the lane's
- * copy has a conflict, in any run; its result's `details` say it asked, which
- * is how the page reads it. Every lane has it, so a lane's tool list never
- * changes between runs (S85).
+ * The tool an agent leaves a conflict with: when its two sides meant
+ * different things, the agent leaves it as it is and asks, and the thread
+ * needs the person whatever the files say. Its result's `details` say it
+ * asked, which is how the page reads it. Every lane has it, so a lane's tool
+ * list never changes between runs: a change drops the lane's earlier
+ * thinking.
  */
 export function conflictTool(
   onAsk: (lane: ThreadId, question: string) => Promise<boolean>,

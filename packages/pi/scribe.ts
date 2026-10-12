@@ -1,10 +1,10 @@
-// pi/scribe — the host's writes into a root's tree, through pi (ADR-0092): a
-// conversation thread's messages (S21). The host writes its records itself
-// (ADR-0095). The scribe writes what the host decided, and decides nothing.
+// pi/scribe — the host's writes into a root's tree, through pi: a
+// conversation thread's messages. The scribe writes what the host decided,
+// and decides nothing.
 //
 // It holds one pi session per document, and nothing else may open one: two
 // sessions over one document drift apart, since each indexes only its own
-// commits (S113). So the agent builds each root's harness through the
+// commits. So the agent builds each root's harness through the
 // scribe, over that session (`scribeInside.over`), and the scribe ends both:
 // at `release` of the root, or at `close`.
 
@@ -33,8 +33,8 @@ const CTX = BACKGROUND_CONTEXT
 /** Every member is a closure: it may be passed on its own. */
 export interface Scribe {
   /**
-   * Append at exactly `spot`, with no lane: a conversation thread (S21 Q1),
-   * the entry in `thread` (ADR-0125). The host's serial executor guarantees
+   * Append at exactly `spot`, with no lane: a conversation thread, the entry
+   * in `thread`. The host's serial executor guarantees
    * nothing was written there since it planned, so no re-read is needed here.
    */
   appendToTree(
@@ -43,7 +43,7 @@ export interface Scribe {
     thread: ThreadId,
   ): Promise<AppendOutcome>
   /**
-   * Before the host lets `root`'s document go (ADR-0063): what was built over
+   * Before the host lets `root`'s document go: what was built over
    * its session closes, then the session. The next call that needs the root
    * opens it again.
    */
@@ -84,7 +84,7 @@ export function createScribe(options: {
   readonly replicaId: string
   /**
    * Where images are kept: a message's image the store holds is stored as a
-   * reference to it (ADR-0051). Without it, every image is stored inline.
+   * reference to it. Without it, every image is stored inline.
    */
   readonly blobs?: Pick<BlobStore, "get" | "ref">
 }): Scribe {

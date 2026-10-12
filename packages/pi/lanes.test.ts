@@ -1,6 +1,5 @@
-// A lane's directory, as pi uses it (ADR-0032, ADR-0034). Co-located inside packages/pi,
-// like agent.test.ts: it drives pi's harness, which only this package may
-// import.
+// A lane's directory, as pi uses it. In packages/pi because it drives pi's
+// harness, which only this package may import.
 
 import { existsSync, readFileSync } from "node:fs"
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
@@ -43,7 +42,7 @@ import { startPi } from "./start-pi.ts"
 import { threadContext } from "./thread-context.ts"
 import { assembleTools } from "./tools.ts"
 
-// ── what a lane of its own is told (ADR-0121) ────────────────────────────
+// ── what a lane of its own is told ───────────────────────────────────────
 
 /** A lane's facts with nothing granted, no shared directory, on a project's own image. */
 const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
@@ -128,7 +127,7 @@ test("the prompt no longer tells the model to search with bash", () => {
   expect(without).toContain("file operations like ls, rg, find")
 })
 
-test("every thread is told what pinned cards are, once, in a line of its own (ADR-0048)", () => {
+test("every thread is told what pinned cards are, once, in a line of its own", () => {
   const prompt = systemPromptFor(
     { contextFiles: [], skills: [] },
     [],
@@ -138,7 +137,7 @@ test("every thread is told what pinned cards are, once, in a line of its own (AD
   expect(laneGuidelines(facts())).not.toContain(PINNED_RULE)
 })
 
-describe("ask_about_conflict (ADR-0080)", () => {
+describe("ask_about_conflict", () => {
   const ask = (taken: boolean) =>
     conflictTool(async () => taken).execute(
       "call-1",
@@ -172,7 +171,7 @@ describe("laneGuidelines", () => {
     )
   })
 
-  test("names no bookmark, which changes when the thread is named (S85)", () => {
+  test("names no bookmark, which changes when the thread is named", () => {
     const told = text(facts())
     expect(told).toContain("your work as one commit, and never sees")
     expect(told).not.toContain("pinetrie-offer")
@@ -215,7 +214,7 @@ describe("laneGuidelines", () => {
     expect(told).toContain("and so is python3")
   })
 
-  test("names the recipe, run again at a turn's end, only with one (ADR-0131)", () => {
+  test("names the recipe, run again at a turn's end, only with one", () => {
     expect(text(facts())).not.toContain("derived.json")
     expect(text(facts({ recipe: "pnpm install --frozen-lockfile" }))).toContain(
       "When a turn changes its lockfile, pine·trie removes what `pnpm install --frozen-lockfile` made and runs it again at the turn's end. /workspace/.pinetrie-lane/derived.json says how it went.",
@@ -451,7 +450,7 @@ describe("lanes in a harness", () => {
     await agent.lane(lane).run(prompt("write, then look"), [])
     const all = texts().map(t => messageText(t.message as never))
     expect(all.some(t => t.includes(`${dir}\nin the lane`))).toBe(true)
-    // In <rules>: `pi-anthropic-auth` keeps it when it rebuilds the prompt (S23).
+    // In <rules>: `pi-anthropic-auth` keeps it when it rebuilds the prompt.
     const rules = /<rules>\n([\s\S]*?)\n<\/rules>/.exec(told)?.[1] ?? ""
     for (const line of laneGuidelines(facts({ dir, shared: [".plans"] })))
       expect(rules).toContain(`- ${line}`)
@@ -583,7 +582,7 @@ describe("lanes in a harness", () => {
     await crashed
   })
 
-  test("a run's last turn is recorded at its newest entry, however it ends: a Stop, or a model that fails (S104)", async () => {
+  test("a run's last turn is recorded at its newest entry, however it ends: a Stop, or a model that fails", async () => {
     const dir = path.join(root, "endings")
     const { mkdir } = await import("node:fs/promises")
     await mkdir(dir)
@@ -634,7 +633,7 @@ describe("lanes in a harness", () => {
     await agent.close()
   })
 
-  test("a steer lands after the tool results of the turn in flight, before the next request, which keeps the cache; that request's turn is recorded from it (ADR-0080, S103)", async () => {
+  test("a steer lands after the tool results of the turn in flight, before the next request", async () => {
     const dir = path.join(root, "steer")
     const { mkdir } = await import("node:fs/promises")
     await mkdir(dir)

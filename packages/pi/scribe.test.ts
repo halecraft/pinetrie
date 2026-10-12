@@ -1,5 +1,5 @@
 // The scribe: the host's appends, one pi session per root, and the end of
-// each session (ADR-0092, S113).
+// each session.
 
 import {
   BACKGROUND_CONTEXT as CTX,
@@ -27,7 +27,7 @@ const chat = (text: string) =>
     1,
   )
 
-describe("one session per document (S113)", () => {
+describe("one session per document", () => {
   test("the agent's harness is over the scribe's session", async () => {
     const doc = newRootDoc()
     const pi = await startPi(oneRoot(doc), {
@@ -48,7 +48,7 @@ describe("one session per document (S113)", () => {
       talk,
     )
     if (appended.kind !== "appended") throw new Error("not appended")
-    // Its row is in the thread the append named (ADR-0125).
+    // Its row is in the thread the append named.
     expect(doc.entries()[appended.id]?.thread).toBe(talk)
     const there = threadIdFor(newId())
     expect(
@@ -89,7 +89,7 @@ describe("one session per document (S113)", () => {
     await expect(session.getStats(CTX)).rejects.toThrow("Session is closed")
   })
 
-  test("a released root runs again, over a new session and harness (S113 case G)", async () => {
+  test("a released root runs again, over a new session and harness", async () => {
     const pi = await startPi(oneRoot(), {
       model: {
         kind: "scripted",

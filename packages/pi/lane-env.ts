@@ -1,4 +1,4 @@
-// pi/lane-env — the host side of a lane's channel (ADR-0034, S43).
+// pi/lane-env — the host side of a lane's channel.
 //
 // One helper process per running lane, reached through one long-lived
 // stream: the lane runtime's `exec -i` in production, a local process in tests. Over
@@ -10,7 +10,7 @@
 // - `laneRunner`: the host's own jj and git in the lane, with exit status,
 //   separate stdout and stderr, and bytes. pi's `exec` reports only an exit
 //   code, and its output is capped text with stderr mixed in.
-// A call takes 0.3–1 ms (S43 item 2).
+// A call takes 0.3–1 ms.
 
 import { type ExecutionEnv, FileError } from "@earendil-works/pi-agent-core"
 import { openChannel as open, type RunResult } from "@pinetrie/channel"
@@ -38,7 +38,10 @@ export interface LaneChannel {
     bytes: boolean,
     signal?: AbortSignal,
   ): Promise<RunResult>
-  /** End the helper's input: it finishes and exits. Never a signal (S43 item 2). */
+  /**
+   * End the helper's input: it finishes and exits. Never a signal: killing
+   * the `exec` process does not reach the helper.
+   */
   close(): void
   /** Settles when the helper has exited. */
   readonly closed: Promise<void>

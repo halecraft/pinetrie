@@ -21,7 +21,7 @@ const input = {
   bannerAsks: undefined,
 }
 
-describe("TOOLS (ADR-0114)", () => {
+describe("TOOLS", () => {
   test.each(TOOL_IDS)("%s is the name of the tool made for it", id => {
     expect(TOOLS[id](input).name).toBe(id)
   })
@@ -34,7 +34,7 @@ describe("TOOLS (ADR-0114)", () => {
 })
 
 describe("activeToolNames", () => {
-  // The order is every request's prefix (S85): pinned, not derived.
+  // The order is part of every request's prefix: pinned, not derived.
   const always = [
     "read",
     "write",
@@ -70,7 +70,7 @@ describe("toolsChanged", () => {
   })
 })
 
-describe("parseCatchUpArgs (ADR-0080)", () => {
+describe("parseCatchUpArgs", () => {
   test("the parent only when named; the base otherwise", () => {
     expect(parseCatchUpArgs({ from: "parent" })).toBe("parent")
     expect(parseCatchUpArgs({ from: "base" })).toBe("base")

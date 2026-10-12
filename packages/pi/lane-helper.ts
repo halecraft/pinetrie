@@ -1,4 +1,4 @@
-// pi/lane-helper — the guest side of a lane's channel (ADR-0034, S43, S44).
+// pi/lane-helper — the guest side of a lane's channel.
 //
 // The host starts this once per running lane, through its runtime's
 // `docker exec -i` (`helperCommand`):
@@ -10,9 +10,9 @@
 // (`toolExecution` defaults to `"parallel"`). `{ abort }` cancels one.
 //
 // It runs on the lane runtime's Node through its bundled loader, so
-// `process.execPath` is the loader, not Node (S44 item 2): nothing here may
-// re-execute it. The host closes the channel by ending stdin: killing the
-// `exec` process does not reach the guest (S43 item 2).
+// `process.execPath` is the loader, not Node: nothing here may re-execute
+// it. The host closes the channel by ending stdin: killing the `exec`
+// process does not reach the guest.
 
 import {
   BACKGROUND_CONTEXT,

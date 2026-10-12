@@ -1,5 +1,5 @@
 // pi/start-pi — for tests: the scribe, the person's pi setup and the agent,
-// made in the order the host makes them (ADR-0092).
+// made in the order the host makes them.
 
 import {
   type Agent,

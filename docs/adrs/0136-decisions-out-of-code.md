@@ -34,7 +34,7 @@ Numbered 0135 until 2026-10-11, when two files held that number.
   comment says it in a sentence; the trail from a module to its decisions
   runs through its `TECHNICAL.md`, which cites them.
 - **The ids left in code are counted, and the count only shrinks**
-  (`scripts/code-citations.ts`, `citationsInCode`): `pnpm test` fails until
+  (`scripts/code-citations.ts`, `citationsByArea`): `pnpm test` fails until
   it equals what the code holds, so an id added fails and one removed
   lowers it. They go as code is next changed for its own reasons, and in a
   cleanup pass for each package once the threads in flight have landed.

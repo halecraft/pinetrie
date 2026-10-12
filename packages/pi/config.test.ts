@@ -1,4 +1,4 @@
-// Commands from pi's loader (ADR-0036), over a fixture pi directory whose
+// Commands from pi's loader, over a fixture pi directory whose
 // settings list two packages that each have a skill named `hello`.
 
 import path from "node:path"
@@ -55,7 +55,7 @@ test("a scripted model given no agent directory loads nothing of pi's, and still
   ])
 })
 
-test("a scripted model answers commit messages from a provider of its own: the run's script is untouched (S48 item 22)", async () => {
+test("a scripted model answers commit messages from a provider of its own: the run's script is untouched", async () => {
   const script = scriptedModel({
     describe: { reply: context => `feat: ${context.at(-1)?.length}` },
   })

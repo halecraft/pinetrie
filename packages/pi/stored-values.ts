@@ -1,8 +1,8 @@
 // pi/stored-values — how pi's values are stored, by namespace. Two of pi's
 // namespaces are stored differently from the value pi wrote: a tool-output
-// checkpoint as a shell plus text edits (`checkpoint.ts`, S22), and a pending
-// entry with its message's images as references (ADR-0051). Every other value
-// is stored as it is. Pure; `KynetaStorage` gathers the lookups.
+// checkpoint as a shell plus text edits (`checkpoint.ts`), and a pending
+// entry with its message's images as references. Every other value is
+// stored as it is. `KynetaStorage` gathers the lookups.
 
 import type { StoredValueRecord } from "@pinetrie/schema"
 import {
