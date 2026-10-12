@@ -256,10 +256,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "code's citations go uncounted",
     file: "scripts/record.ts",
-    from: "  [...input.inCode.values()].reduce((sum, n) => sum + n, 0)",
-    to: "  [...input.inCode.values()].reduce((sum, n) => sum, 0)",
+    from: "    counts[area] = (counts[area] ?? 0) + n",
+    to: "    counts[area] = counts[area] ?? 0",
     command: record,
-    expect: "code names exactly CODE_CITATIONS decision ids",
+    expect: "code names exactly CODE_CITATIONS decision ids in each area",
+  },
+  {
+    name: "the pine·trie app is one area",
+    file: "scripts/record.ts",
+    from: '      ? segments.slice(0, 3).join("/")',
+    to: '      ? "apps/pinetrie"',
+    command: record,
+    expect: "the pine·trie app's files count in its subfolder, or in the app",
   },
   {
     name: "an ADR id may run on",

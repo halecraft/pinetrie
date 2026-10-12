@@ -4,8 +4,9 @@ import { CODE_CITATIONS } from "./code-citations.ts"
 import { type RecordFile, readRecord } from "./numbering.ts"
 import {
   type Citations,
+  citationArea,
   citations,
-  citationsInCode,
+  citationsByArea,
   decisionCitations,
   gatherInput,
   type Parsed,
@@ -262,6 +263,40 @@ describe("decisionCitations", () => {
   })
 })
 
+describe("citationsByArea", () => {
+  test("a package's or the conformance app's files count in its folder", () => {
+    expect(citationArea("packages/pi/src/a/b.ts")).toBe("packages/pi")
+    expect(citationArea("apps/conformance/x/y.ts")).toBe("apps/conformance")
+  })
+
+  test("the pine·trie app's files count in its subfolder, or in the app", () => {
+    expect(citationArea("apps/pinetrie/host/a/b.ts")).toBe("apps/pinetrie/host")
+    expect(citationArea("apps/pinetrie/e2e/a.ts")).toBe("apps/pinetrie/e2e")
+    expect(citationArea("apps/pinetrie/vite.config.ts")).toBe("apps/pinetrie")
+  })
+
+  test("a mutation list, or any other file, is an area of its own", () => {
+    expect(citationArea("scripts/mutations/pi.ts")).toBe(
+      "scripts/mutations/pi.ts",
+    )
+    expect(citationArea("scripts/record.ts")).toBe("scripts/record.ts")
+    expect(citationArea("workspace.test.ts")).toBe("workspace.test.ts")
+  })
+
+  test("sums each area's files, and leaves out an area at zero", () => {
+    expect(
+      citationsByArea({
+        inCode: new Map([
+          ["packages/pi/a.ts", 2],
+          ["packages/pi/b/c.ts", 3],
+          ["packages/web/a.ts", 0],
+          ["workspace.test.ts", 1],
+        ]),
+      }),
+    ).toEqual({ "packages/pi": 5, "workspace.test.ts": 1 })
+  })
+})
+
 describe("recordGaps", () => {
   const none: Citations = { paths: [], adrIds: [] }
   const input = (over: Partial<RecordInput>): RecordInput => ({
@@ -366,7 +401,7 @@ describe("the repository's record", () => {
     })
   })
 
-  test("code names exactly CODE_CITATIONS decision ids, a count that only shrinks", () => {
-    expect(citationsInCode(gatherInput(root))).toBe(CODE_CITATIONS)
+  test("code names exactly CODE_CITATIONS decision ids in each area", () => {
+    expect(citationsByArea(gatherInput(root))).toEqual(CODE_CITATIONS)
   })
 })
