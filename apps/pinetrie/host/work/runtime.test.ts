@@ -76,7 +76,12 @@ describe.skipIf(process.platform === "darwin")(
       }
     }
     const find = (dir: string) =>
-      findProject({ dir, machine: { slots: null }, log: () => {} })
+      findProject({
+        dir,
+        machine: { slots: null },
+        hostSocket: path.join(dir, ".no-ssh.sock"),
+        log: () => {},
+      })
     test("a folder with no jj repo, with how to make one", () =>
       inRepo(["git", "init"], async dir => {
         expect(await find(dir)).toEqual({
@@ -104,6 +109,7 @@ describe.skipIf(process.platform === "darwin")(
         await findProject({
           dir: null,
           machine: { slots: null },
+          hostSocket: "/no-ssh.sock",
           log: () => {},
         }),
       ).toBeNull()

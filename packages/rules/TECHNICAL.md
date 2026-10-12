@@ -132,6 +132,15 @@ cannot reach the wrong document and needs no guard at run time.
 - **`WORKFLOW`** (`board.ts`, ADR-0122): the session's workflow states, a
   singleton. A task is a card on the board (ADR-0126): no record says
   where it is, who opened it or when; its card and its card's history do.
+- **`ACCESS`** (`access.ts`, ADR-0140): a lane's ssh identities, keyed by
+  lane, in the session: its use of its owner's (waiting, approved,
+  refused, unanswered), and the service identities and hosts it used, each
+  name once. `ACCESS_ANSWERS` is what the owner may answer from each state:
+  `planAccessAnswer` refuses any other, and the page offers exactly these.
+  `planAccessChange` says what a change does to a held signature (release,
+  refuse, or cut), and `planAccessRecovery` what a starting host leaves
+  (nothing waiting). The owner is the project record's (`PROJECT`'s
+  `owner`), never a lane's.
 - **`QUEUE_HOLD`** (`queue-hold.ts`, ADR-0048 step 7): a thread's queue
   held, keyed by lane, in the session: who held it and when.
 - **The archive gate** reads the tasks a command writes in (`writesIn`) and

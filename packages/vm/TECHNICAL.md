@@ -93,9 +93,11 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   `SSH_AUTH_SOCK`) answers `slot`; `fill` answers `filled`; anything else is
   `refused` with a reason the host words (`launcherWords`). A lease lasts as
   long as its connection.
-- **Each slot's ssh agent:** the guest's socat listens on
+- **Each slot's ssh socket:** the guest's socat listens on
   `/run/pinetrie/ssh-<i>.sock` and connects to vsock `2400+i`, where the
-  launcher connects it to the agent its lease named. A lane cannot open a
+  launcher connects it to the socket its lease named: the host's ssh
+  socket (`@pinetrie/ssh`, ADR-0140), not the person's agent. The launcher
+  bridges bytes, so the lease's field keeps its name, `agent`. A lane cannot open a
   vsock socket (S128), so only that socat reaches it.
 - **The network is gvproxy's** (gvisor-tap-vsock, S136), which the
   launcher starts before the VM and stops with it; if it exits, the VM

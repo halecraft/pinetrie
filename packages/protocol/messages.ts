@@ -104,6 +104,8 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     clears it with `""`.
  *   - `traces-seen` names the sender's traces they have seen, a JSON list
  *     of ids in `text`; the host deletes them.
+ *   - `ssh-access` answers a lane's use of its owner's ssh identity: `mode`
+ *     `approve`, `refuse` or `revoke`, for the thread `lane`.
  */
 export const COMMAND_KINDS = [
   "chat",
@@ -132,6 +134,7 @@ export const COMMAND_KINDS = [
   "publish",
   "undo-move",
   "traces-seen",
+  "ssh-access",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -170,13 +173,13 @@ export interface Command {
   /**
    * `chat`: `reply` or `branch`; `offer` and `workflow`: the action;
    * `set-command`: the command; `undo-move`: `undo` or `redo`;
-   * `card-width`: `1` or `2`; `""` otherwise.
+   * `card-width`: `1` or `2`; `ssh-access`: the answer; `""` otherwise.
    */
   readonly mode: string
   /**
    * `chat`: its thread, which names its lane too; `stop`,
-   * `carry-on`, `unqueue-all`, `queue-hold`, `reserve`: the thread whose lane
-   * it acts on.
+   * `carry-on`, `unqueue-all`, `queue-hold`, `reserve`, `ssh-access`: the
+   * thread whose lane it acts on.
    */
   readonly lane: string
   /** `chat`: a Start Agent column, where no mention asks the agent. */
@@ -250,6 +253,7 @@ export const OUTCOME_KINDS = [
   "unmoved",
   "undone",
   "nothing",
+  "answered",
   "refused",
   "failed",
 ] as const

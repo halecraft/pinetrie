@@ -42,11 +42,14 @@ import {
 } from "@pinetrie/lanes"
 import { type PiSetup, supervisionEnv } from "@pinetrie/pi"
 import { type RepoOwner, renameAccepted, startRepoOwner } from "@pinetrie/repo"
+import { decodeOwner } from "@pinetrie/rules"
 import { type Basics, failed, slow } from "../basics.ts"
+import type { Records } from "../records.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
 import { type LaneConfigs, startLaneConfigs } from "./config.ts"
 import { openLinkOf } from "./registry.ts"
 import type { Found } from "./runtime.ts"
+import { type LaneSsh, type PersonalSshPlaces, startLaneSsh } from "./ssh.ts"
 
 /** A running lane's memory ceiling. */
 const LANE_MEMORY = "4G"
@@ -82,8 +85,10 @@ export type PreparedLanes = Awaited<ReturnType<typeof prepareLanes>>
  * project, a runtime, your repo's owner and the lanes' configs.
  */
 export interface Setup {
-  /** What the host found where it runs. */
+  /** What the host found where it runs, and whom its config names its owner. */
   readonly project: ProjectRecord
+  /** Lanes' ssh: what each lane is given, and its owner's answers. */
+  readonly ssh: LaneSsh
   /** The project's root. */
   readonly root: string
   /** The one writer of your repo. */
@@ -134,12 +139,21 @@ export async function startSetup(input: {
   readonly setup: Pick<PiSetup, "commands" | "agentDir">
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
+  /** Where lane work writes its records: lanes' ssh writes each lane's access. */
+  readonly records: Pick<Records, "writeValues">
+  /** The directory of the host's ssh socket, which the runtime mounts. */
+  readonly sshDir: string
+  readonly personalSsh: PersonalSshPlaces
 }): Promise<Setup | null> {
   const { basics, keeper, found } = input
   const { log } = basics
   if (found === null) return null
-  const { project, runtime } = found
-  const { root } = project
+  const { runtime } = found
+  const { root } = found.project
+  const project: ProjectRecord = {
+    root,
+    owner: decodeOwner(input.userConfig.json),
+  }
   log(
     "[host] each thread's agent works in its own container, on a disk cloned from its fork point; your working copy is /mnt/host-working-copy there, read-only",
   )
@@ -172,6 +186,19 @@ export async function startSetup(input: {
     user: lanes.user,
     userFile: input.userConfig.file,
     log,
+  })
+  // Before any lane is made: every lane's shape names what it attaches. The
+  // project's grant is accepted work's now, and each lane's own as it runs.
+  const ssh = await startLaneSsh({
+    basics,
+    records: input.records,
+    root,
+    userConfig: input.userConfig,
+    projectGrant: configs.accepted().authority.grants.ssh,
+    laneGrant: lane => configs.laneConfig(lane).grants.ssh,
+    owner: project.owner,
+    personal: input.personalSsh,
+    dir: input.sshDir,
   })
   // Read at startup, as `prepareImages` reads it, so a lane's prompt says
   // what its image has before the images are ready.
@@ -212,11 +239,11 @@ export async function startSetup(input: {
         hostPaths: base ? [] : hostPaths,
       }),
       grants: {
-        ssh: grants.ssh,
         nested: grants.nested,
         hostPorts: grants.hostPorts,
         env: grants.env,
       },
+      attached: ssh.attachedFor(lane),
       identity: r.identity,
       memory: LANE_MEMORY,
       observation: supervisionEnv(RUNTIME_BIN),
@@ -259,7 +286,9 @@ export async function startSetup(input: {
       at: root,
       runtime,
       runtimeReady: found.ready,
-      mountsOf: r => specOf(BASE_LANE, r).mounts,
+      // The base lane's, and what lanes holding an ssh identity attach: on
+      // the Mac, the slot shares every directory a lane mounts.
+      mountsOf: r => [...specOf(BASE_LANE, r).mounts, ...ssh.mounts],
       // The VM is told once: a port accepted work grants later reaches it
       // at the next start.
       hostPorts: configs.accepted().authority.grants.hostPorts,
@@ -284,6 +313,7 @@ export async function startSetup(input: {
 
   return {
     project,
+    ssh,
     root,
     owner,
     runtime,

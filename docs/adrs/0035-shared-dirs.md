@@ -14,6 +14,9 @@
     that made it, and given a version; a write based on a version that is no
     longer current is shown as concurrent. The directory stays live, with no
     history, and is never branched.
+  - ADR-0140: the user config's `lanes.ssh` sets the person's own identity
+    (`personal`, `hosts`, `approvalSeconds`), and its `owner` names who
+    approves.
 
 **Context.** ADR-0034 gives each lane its own disk, and a branch clones it.
 That is right for a project's files, and wrong for the person's own working

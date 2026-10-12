@@ -175,6 +175,10 @@ export const ERR = {
    * ledger), or now conflicts where it did not.
    */
   OFFER_CHANGED: "offer_changed",
+  /** An answer to a lane's use of an ssh identity, from someone not its owner. */
+  NOT_OWNER: "not_owner",
+  /** An answer the lane's access does not take now: nothing waits, or it is already so. */
+  NOTHING_TO_ANSWER: "nothing_to_answer",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -346,6 +350,12 @@ export type Intent =
   | { readonly kind: "stop"; readonly lane: ThreadId }
   /** Start a new turn on a thread whose last ask was stopped. */
   | { readonly kind: "carry-on"; readonly lane: ThreadId }
+  /** The owner's answer to a lane's use of their ssh identity. */
+  | {
+      readonly kind: "ssh-access"
+      readonly lane: ThreadId
+      readonly answer: AccessAnswer
+    }
   /**
    * Hold a thread's queue, or release it: while it is held, no message card
    * queued there is popped.
@@ -1165,6 +1175,11 @@ export interface RevisionRecord {
  */
 export interface ProjectRecord {
   readonly root: string
+  /**
+   * Whom the host's user config names its owner (`owner`): who answers when
+   * a lane asks for their ssh identity. Null with none.
+   */
+  readonly owner: WriterId | null
 }
 
 /**
@@ -1347,6 +1362,50 @@ export interface BannerRecord {
   readonly sha: Sha256
   readonly at: number
 }
+
+/**
+ * A lane's use of its owner's ssh identity: asked, and what the owner
+ * answered. The host's to change: a request held while it is `waiting` is
+ * released or refused as it changes.
+ */
+export type PersonalAccess =
+  | {
+      readonly kind: "waiting"
+      /** The host it is for; null when the lane's session named none. */
+      readonly host: string | null
+      readonly since: number
+    }
+  | { readonly kind: "approved"; readonly by: WriterId; readonly at: number }
+  | {
+      readonly kind: "refused"
+      readonly by: WriterId
+      readonly at: number
+      /** Approved, then taken back. */
+      readonly revoked: boolean
+    }
+  /** Nobody answered in time, or the host stopped while it waited. */
+  | {
+      readonly kind: "unanswered"
+      readonly host: string | null
+      readonly at: number
+    }
+
+/**
+ * What ssh identities a lane holds and has used: a host-written
+ * `pinetrie.access` value keyed by lane, which the column's header shows.
+ */
+export interface AccessRecord {
+  readonly lane: ThreadId
+  /** Null until the lane first asks for its owner's identity. */
+  readonly personal: PersonalAccess | null
+  /** Service identities it has signed with, by name, in first-use order. */
+  readonly services: readonly string[]
+  /** Names the host connected for it, in first-use order. */
+  readonly hosts: readonly string[]
+}
+
+/** What the owner can say to a lane's use of their ssh identity. */
+export type AccessAnswer = "approve" | "refuse" | "revoke"
 
 /**
  * Accepted work in your repo, as the host last read it: a host-written

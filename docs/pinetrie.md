@@ -296,6 +296,22 @@ a host-written `pinetrie.mark` value keyed by the entry, set from the tab's
 label everywhere it is named, the Archive search included. ADR-0028's
 descriptions, section headers and boundaries are still to do.
 
+**A lane can ssh where its host can** (ADR-0140). Your own identity is
+your agent's keys; lanes use it once you approve each lane, in its
+column's header. Turn it on for every project, and say who approves, in
+`~/.config/pinetrie/config.json`:
+
+```json
+{ "owner": "you@example.com", "lanes": { "ssh": { "personal": true, "hosts": ["pop", "*.lan"], "approvalSeconds": 120 } } }
+```
+
+`hosts` and `approvalSeconds` are optional; a project grants it with
+`lanes.ssh: true`, and `false` in yours declines it. Service identities
+are key pairs in `~/.config/pinetrie/ssh/`, with an optional ssh `config`
+beside them naming their hosts (a relative `IdentityFile` means that
+folder); every lane uses them unasked. The host reads your `~/.ssh/config`
+for names, so `ssh pop` works in a lane.
+
 **A thread's column can have a banner** (ADR-0050, ADR-0053), when
 `~/.config/pinetrie/config.json` has `{ "banner": { "enabled": true } }` and
 pi has an OpenRouter key. A thread is named as its column first wants an

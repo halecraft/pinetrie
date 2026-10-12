@@ -3,6 +3,7 @@ import { projectDisks } from "@pinetrie/lanehost"
 import {
   type ContainerShape,
   type LaneSpec,
+  NOTHING_ATTACHED,
   planMounts,
   planShape,
 } from "@pinetrie/lanes"
@@ -15,6 +16,7 @@ import {
   isRootless,
   type Listed,
   labelled,
+  laneCommand,
   lanehostContainer,
   NESTED_MOUNT,
   parseMountinfo,
@@ -42,7 +44,8 @@ const spec: LaneSpec = {
     shared: [{ path: ".plans", source: "/Users/ada/p/.plans" }],
     hostPaths: [],
   }),
-  grants: { ssh: false, nested: false, hostPorts: [], env: [] },
+  grants: { nested: false, hostPorts: [], env: [] },
+  attached: NOTHING_ATTACHED,
   observation: {},
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "4G",
@@ -54,7 +57,7 @@ const mac: DockerTarget = {
   socket: "/s/docker.sock",
   pathOf: p => `/mnt/host-shares/3/${p.replaceAll("/", "_")}`,
   labels: { "pinetrie.slot": "3" },
-  sshAgent: "/run/pinetrie/ssh-3.sock",
+  hostSocket: "/run/pinetrie/ssh-3.sock",
   hostAddress: "192.168.127.254",
 }
 const render = (shape: ContainerShape, target = mac) =>
@@ -67,7 +70,18 @@ const render = (shape: ContainerShape, target = mac) =>
 
 const shapes: readonly ContainerShape[] = [
   planShape(spec, {}),
-  planShape({ ...spec, grants: { ...spec.grants, ssh: true } }, {}),
+  planShape(
+    {
+      ...spec,
+      attached: {
+        hostSocket: "/run/pinetrie/ssh-host.sock",
+        mounts: [],
+        env: {},
+        starts: ["hop serve"],
+      },
+    },
+    {},
+  ),
   planShape({ ...spec, grants: { ...spec.grants, nested: true } }, {}),
 ]
 
@@ -113,17 +127,32 @@ describe("renderRun: a lane's shape as a container", () => {
       ["sleep", "infinity"],
     ])
   })
-  test("ssh: the slot's agent, only with the grant", () => {
+  test("the host socket is mounted where the shape says, only when it asks for one", () => {
     expect(JSON.stringify(render(shapes[0] as ContainerShape))).not.toContain(
       "ssh",
     )
     const made = render(shapes[1] as ContainerShape)
     expect(made.mounts).toContainEqual({
       source: "/run/pinetrie/ssh-3.sock",
-      target: "/run/pinetrie/ssh-agent.sock",
+      target: "/run/pinetrie/ssh-host.sock",
       readonly: false,
     })
-    expect(made.env).toContain("SSH_AUTH_SOCK=/run/pinetrie/ssh-agent.sock")
+  })
+  test("a lane's starts run in the background before its wait, and before a nested lane's Docker", () => {
+    expect(laneCommand({ nested: false, starts: [] })).toEqual([
+      "sleep",
+      "infinity",
+    ])
+    expect(laneCommand({ nested: false, starts: ["a", "b"] })).toEqual([
+      "sh",
+      "-c",
+      "(a &); (b &); exec sleep infinity",
+    ])
+    expect(laneCommand({ nested: true, starts: ["a"] })).toEqual([
+      "sh",
+      "-c",
+      "(a &); (pinetrie-inner-docker &); exec sleep infinity",
+    ])
   })
   test("the nested options only for a nested shape; every other lane has no-new-privileges", () => {
     const plain = render(shapes[0] as ContainerShape)
@@ -154,7 +183,7 @@ describe("renderRun: a lane's shape as a container", () => {
       socket: "/var/run/docker.sock",
       pathOf: p => p,
       labels: {},
-      sshAgent: null,
+      hostSocket: null,
       hostAddress: null,
     }
     const made = render(shapes[1] as ContainerShape, linux)
@@ -163,7 +192,7 @@ describe("renderRun: a lane's shape as a container", () => {
       target: "/mnt/host-working-copy",
       readonly: true,
     })
-    expect(made.env.join(" ")).not.toContain("SSH_AUTH_SOCK")
+    expect(JSON.stringify(made.mounts)).not.toContain("ssh-host.sock")
     expect(made.labels).toEqual({ "pinetrie.project": key })
   })
   test("the spec label is a label like any other", () => {

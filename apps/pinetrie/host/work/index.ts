@@ -35,6 +35,7 @@ import { startSetup } from "./setup.ts"
 import { createSharedLineages } from "./shared.ts"
 import { startSharedWatch } from "./shared-watch.ts"
 import { createSplits, type Splits } from "./split.ts"
+import type { PersonalSshPlaces } from "./ssh.ts"
 import { createTurns } from "./turns.ts"
 import { createUpdates, type Updates } from "./update.ts"
 
@@ -97,6 +98,10 @@ export async function startLaneWork(input: {
   >
   /** Name every lane that has none (`host/names.ts`): a new lane, before its first run. */
   readonly ensureNames: () => Promise<void>
+  /** The directory of the host's ssh socket, which the runtime mounts. */
+  readonly sshDir: string
+  /** The person's ssh files and agent. */
+  readonly personalSsh: PersonalSshPlaces
 }): Promise<LaneWork> {
   const { basics } = input
   const { session } = basics
@@ -108,6 +113,9 @@ export async function startLaneWork(input: {
     userConfig: input.userConfig,
     setup: input.piSetup,
     keeper,
+    records: input.records,
+    sshDir: input.sshDir,
+    personalSsh: input.personalSsh,
   })
   if (setup === null)
     return {

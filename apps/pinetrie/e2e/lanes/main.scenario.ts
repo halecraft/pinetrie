@@ -2,17 +2,8 @@
 // whose threads' agents each work in a Linux container on a disk cloned from
 // where they branched.
 
-import {
-  chmodSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs"
-import { createServer } from "node:net"
-import { homedir, tmpdir } from "node:os"
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { homedir } from "node:os"
 import path from "node:path"
 import {
   ancestry,
@@ -93,7 +84,6 @@ async function mainSection(
   })
   const script = scriptedModel()
   const logs: string[] = []
-  const agent = await standInAgent()
   const wh = await lanes.startHost({
     model: { kind: "scripted", script },
     project: { dir: project, tools: true },
@@ -197,7 +187,7 @@ async function mainSection(
       {
         tool: "bash",
         args: {
-          command: `touch /mnt/host-working-copy/from-bash 2>&1; echo "home: $(ls ${marker} 2>&1)"; echo "ssh: $SSH_AUTH_SOCK"; ls /mnt/host-working-copy/shared.txt`,
+          command: `touch /mnt/host-working-copy/from-bash 2>&1; echo "home: $(ls ${marker} 2>&1)"; ls /mnt/host-working-copy/shared.txt`,
         },
       },
       {
@@ -230,11 +220,6 @@ async function mainSection(
       "your home directory is not in a lane; your working copy is, at /mnt/host-working-copy",
       bash?.includes("No such file or directory") === true &&
         bash.includes("/mnt/host-working-copy/shared.txt"),
-    )
-    check(
-      "with ssh granted, the lane has SSH_AUTH_SOCK",
-      /ssh: \S+/.test(bash ?? ""),
-      `${bash?.match(/ssh: .*/)?.[0] ?? "none"}`,
     )
 
     // ── revisions: in the document, and in your repo by bundle ─────────────
@@ -1238,7 +1223,7 @@ async function mainSection(
     const granted = toolResults(configured).at(-1) ?? ""
     check(
       "a lane's own pinetrie.json narrows its grants from its next run, and widens none until accepted",
-      note.includes("gives up your ssh agent from its next run") &&
+      note.includes("gives up your ssh identity from its next run") &&
         note.includes("$PINETRIE_E2E_WIDE only once") &&
         granted.includes("ssh: \n") &&
         granted.includes("wide: \n"),
@@ -1249,33 +1234,6 @@ async function mainSection(
     rmSync(marker, { force: true })
     await wu.close().catch(() => {})
     await wh.shutdown().catch(() => {})
-    agent?.close()
     cleanUp(wh.session, project)
-  }
-}
-
-/**
- * On Linux a host forwards its own ssh agent to a lane granted one, and a
- * host may have none: then a socket of the scenario's own stands in, named
- * by `SSH_AUTH_SOCK` while the scenario runs. A lane is only handed the
- * socket, so nothing need answer on it. Opened to the rootless user that a
- * nested lane's Docker runs as, which mounts it. Null where none is needed.
- */
-async function standInAgent(): Promise<{ close(): void } | null> {
-  if (process.platform === "darwin" || process.env.SSH_AUTH_SOCK !== undefined)
-    return null
-  const dir = realpathSync(mkdtempSync(path.join(tmpdir(), "pinetrie-agent-")))
-  chmodSync(dir, 0o755)
-  const socket = path.join(dir, "agent.sock")
-  const server = createServer(c => c.end())
-  await new Promise<void>(resolve => server.listen(socket, resolve))
-  chmodSync(socket, 0o777)
-  process.env.SSH_AUTH_SOCK = socket
-  return {
-    close() {
-      delete process.env.SSH_AUTH_SOCK
-      server.close()
-      rmSync(dir, { recursive: true, force: true })
-    },
   }
 }

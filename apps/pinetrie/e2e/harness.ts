@@ -388,6 +388,24 @@ export function suiteConfigFile(): string {
   return suiteConfig
 }
 
+let suiteSsh: { readonly dir: string; readonly agent: null } | undefined
+
+/**
+ * The ssh places a suite's host reads: an empty `~/.ssh` and no agent, so no
+ * suite reads the person's ssh config or uses their keys. A scenario that
+ * tests ssh passes its own.
+ */
+export function suiteSshPlaces(): {
+  readonly dir: string
+  readonly agent: null
+} {
+  suiteSsh ??= {
+    dir: mkdtempSync(path.join(tmpdir(), "pinetrie-suite-ssh-")),
+    agent: null,
+  }
+  return suiteSsh
+}
+
 /**
  * A suite's host whose agent has no tools: it opens no lanes, so it runs
  * anywhere. A host with tools comes only from `LaneHosts`
@@ -404,7 +422,11 @@ export type SuiteHostOptions = Omit<StartHostOptions, "project"> & {
 export const startSuiteHost = (
   options: SuiteHostOptions,
 ): Promise<RunningHost> =>
-  startHost({ userConfig: suiteConfigFile(), ...options })
+  startHost({
+    userConfig: suiteConfigFile(),
+    ssh: suiteSshPlaces(),
+    ...options,
+  })
 
 /** Start a host, give it to `body`, and shut it down however `body` ends. */
 export async function withHost<T>(

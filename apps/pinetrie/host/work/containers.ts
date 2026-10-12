@@ -10,6 +10,7 @@ import {
 import type { Keeper } from "@pinetrie/keeper"
 import {
   executeOrThrow,
+  KILL_SSH,
   LANE_NOTE,
   oldNamesOnDisk,
   PINETRIE_MOUNT,
@@ -23,7 +24,7 @@ import {
   specHashOf,
 } from "@pinetrie/lanes"
 import type { LaneAccess } from "@pinetrie/pi"
-import { readLaneSnapshots, readThreadName } from "@pinetrie/reads"
+import { readLaneSnapshots, readRunning, readThreadName } from "@pinetrie/reads"
 import { type Basics, failed } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
 import { removeStaleOutputs } from "./disk.ts"
@@ -61,6 +62,19 @@ export function createContainers(deps: {
 }): Containers {
   const { basics, setup, registry, keeper, offers } = deps
   const { session, docs, log } = basics
+
+  // A lane whose use of its owner's identity is taken back: its sessions
+  // through the host are closed already; any that went around the host end
+  // here, if it runs.
+  setup.ssh.onCut(lane => {
+    if (!registry.isOwn(lane) || !readRunning(basics.live, lane)) return
+    void keeper.track(
+      registry
+        .handleOf(lane)
+        .runners.lane(KILL_SSH.argv)
+        .catch(failed(basics, "ending ssh sessions", lane)),
+    )
+  })
 
   /** The snapshots of `lane`'s own records, newest first. */
   async function ownSnapshots(lane: ThreadId): Promise<SnapshotId[]> {
@@ -138,7 +152,7 @@ export function createContainers(deps: {
           dir: WORKSPACE_ROOT,
           shared: setup.configs.laneShared(lane).map(d => d.path),
           grants: {
-            ssh: grants.ssh,
+            ssh: setup.ssh.holdsFor(lane),
             env: grants.env,
             mounts: grants.mounts.map(m => m.target),
           },
@@ -184,6 +198,7 @@ export function createContainers(deps: {
     startContainer,
 
     async close() {
+      await setup.ssh.close()
       await registry.stopAll()
     },
   }

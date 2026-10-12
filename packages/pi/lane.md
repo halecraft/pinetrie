@@ -146,6 +146,23 @@ changes pine·trie can keep this note true. You can skip them.
 - Their services listening on all interfaces are at `192.168.64.1`.
   <!-- docs/adrs/0034-lane-containers.md 192.168.64.1 -->
 
+## ssh
+
+- `ssh` goes through the host. `ssh <alias>` works for the aliases the
+  person's ssh config and their service folder's name: the host resolves
+  the name and connects, and you check its host key against the
+  `known_hosts` you are given. An alias you write in your own
+  `~/.ssh/config` wins. <!-- packages/ssh/lane-files.ts planLaneSsh -->
+- `SSH_AUTH_SOCK` lists the identities you hold, service ones first. A
+  service identity signs at once. Your owner's own signs only once they
+  approve this lane: until they answer, ssh waits; unanswered or refused,
+  it says "agent refused operation". <!-- packages/ssh/relay-step.ts relayStep -->
+- `Match` blocks and hosts reached through a `ProxyCommand` are not
+  carried into a lane. <!-- packages/ssh/lane-files.ts CARRIED -->
+- A project's own image needs `openssh-client` and the line
+  `Include /pinetrie-ssh/config` in `/etc/ssh/ssh_config.d/`.
+  <!-- packages/lanes/image/Containerfile 10-pinetrie.conf -->
+
 ## People
 
 - Several people may write in one thread. Each message you read begins with

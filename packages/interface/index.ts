@@ -2,6 +2,7 @@
 // client. It exports by name only what another package imports;
 // a name only this package and its tests use is imported from its module.
 
+export { type AccessView, accessWords } from "./access-view.ts"
 export {
   type AccountItem,
   accountView,
@@ -19,6 +20,7 @@ export {
   type RailStub,
   type ReadOnly,
   railStubWords,
+  type SshAsk,
   type Stage,
   type TaskRail,
   taskRail,

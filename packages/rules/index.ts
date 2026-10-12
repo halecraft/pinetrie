@@ -18,6 +18,20 @@ export {
   publishWork,
 } from "./accepted.ts"
 export {
+  ACCESS,
+  ACCESS_ANSWERS,
+  type AccessEffect,
+  type AccessRefusal,
+  accessOf,
+  answersFor,
+  planAccessAnswer,
+  planAccessAsk,
+  planAccessChange,
+  planAccessRecovery,
+  planAccessTimeout,
+  planAccessUse,
+} from "./access.ts"
+export {
   type CatchUpRefusal,
   catchUpAnswer,
   catchUpRefusal,
@@ -207,7 +221,7 @@ export {
   parseCommand,
   resolveCommand,
 } from "./commands.ts"
-export type { ModelRef } from "./config.ts"
+export { decodeOwner, type ModelRef } from "./config.ts"
 export {
   CONTEXT,
   CONTEXT_KINDS,

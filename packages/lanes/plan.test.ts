@@ -31,6 +31,7 @@ import {
   laneIgnores,
   machineConfig,
   NO_GRANTS,
+  NOTHING_ATTACHED,
   parseBaseFacts,
   planBaseCheckout,
   planBaseFacts,
@@ -82,7 +83,8 @@ const spec: LaneSpec = {
   image: "pinetrie-lane:abc",
   imagePath: "/usr/local/bin:/usr/bin:/bin",
   mounts: planMounts(parts),
-  grants: { ssh: false, nested: false, hostPorts: [], env: [] },
+  grants: { nested: false, hostPorts: [], env: [] },
+  attached: NOTHING_ATTACHED,
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "2G",
   observation: { PINETRIE_OBSERVE: "o" },
@@ -177,7 +179,8 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
       image: "pinetrie-lane:abc",
       memory: "2G",
       mounts: spec.mounts,
-      ssh: false,
+      hostSocket: null,
+      starts: [],
     })
   })
   test("every repo in the lane ignores what the ignore file lists, through git's own variables", () => {
@@ -205,7 +208,6 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
       {
         ...spec,
         grants: {
-          ssh: true,
           nested: false,
           hostPorts: [],
           env: ["GITHUB_TOKEN", "MISSING"],
@@ -213,9 +215,35 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
       },
       { GITHUB_TOKEN: "t" },
     )
-    expect(granted.ssh).toBe(true)
     expect(granted.env.GITHUB_TOKEN).toBe("t")
     expect(Object.keys(granted.env)).not.toContain("MISSING")
+  })
+  test("what is attached joins the mounts and variables, before pine·trie's own", () => {
+    const attached = planShape(
+      {
+        ...spec,
+        attached: {
+          hostSocket: "/run/pinetrie/host.sock",
+          mounts: [
+            { source: "/h/ssh", target: "/pinetrie-ssh", readonly: true },
+          ],
+          env: { SSH_AUTH_SOCK: "/run/a.sock", JJ_USER: "not this" },
+          starts: ["hop serve"],
+        },
+      },
+      {},
+    )
+    expect(attached.mounts.at(-1)).toEqual({
+      source: "/h/ssh",
+      target: "/pinetrie-ssh",
+      readonly: true,
+    })
+    expect(attached).toMatchObject({
+      hostSocket: "/run/pinetrie/host.sock",
+      starts: ["hop serve"],
+    })
+    expect(attached.env.SSH_AUTH_SOCK).toBe("/run/a.sock")
+    expect(attached.env.JJ_USER).toBe("agent")
   })
   test("its home on its disk, its observation's variables, and the shared directories", () => {
     const sharing = planShape(
@@ -1144,7 +1172,7 @@ describe("config as a fact of a state: accepted work's, narrowed by the lane's",
       shared: accepted.shared,
     }
     expect(configChangeNote(accepted, written)).toBe(
-      "pine·trie: this lane gives up your ssh agent from its next run.\npine·trie: this lane gets $TOKEN only once this change to pinetrie.json is accepted.",
+      "pine·trie: this lane gives up your ssh identity from its next run.\npine·trie: this lane gets $TOKEN only once this change to pinetrie.json is accepted.",
     )
     expect(configChangeNote(accepted, accepted)).toBeNull()
   })

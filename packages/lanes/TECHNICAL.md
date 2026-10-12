@@ -23,7 +23,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 
 - **A lane's container is decided once, as a value** (`planShape`): a
   `ContainerShape` holds its name, its lane (its disk, at `/workspace`), the
-  image, memory, mounts (`planMounts`), environment, ssh and `nested`, and no
+  image, memory, mounts (`planMounts`), environment, what is attached
+  (`hostSocket`, `starts`) and `nested`, and no
   runtime's flags. A runtime renders it (`runSpec`); the hash of that value
   is its spec label (`specHashOf`).
 - **Planners return values; a runtime turns them into commands.** A plan is a
@@ -392,6 +393,27 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   - **In your repo,** a shared directory nothing already ignores is added to
     `.git/info/exclude`, as `/.pinetrie/` is. `git check-ignore` decides, so
     your global git ignore counts.
+
+## What the host attaches (ADR-0140)
+
+- **A lane spec's `attached` is a service of the host's, unnamed here:** a
+  socket of the runtime's (`hostSocket`, where it is mounted in the lane),
+  further mounts, variables, and shell commands started in the background
+  at each start of the container (`starts`). `planShape` puts its mounts
+  after `planMounts`', and its variables before pine·trie's own, so a
+  variable of pine·trie's always wins. Lanes' ssh is its one user
+  (`@pinetrie/ssh`, `apps/pinetrie/host/work/ssh.ts`); this package never
+  imports it.
+- **`LaneGrants.ssh` is only a grant:** the project lets lanes ask for their
+  owner's ssh identity (`lanes.ssh: true`). It rides the grants' model
+  (`effectiveLaneConfig`): a lane can give it up, and only acceptance
+  widens it. What it means is the host's.
+- **`pinetrieDir`'s `laneSsh` and `sshSecret`** are the files every lane
+  holding an identity mounts at `/pinetrie-ssh`, and the secret its token
+  is made under; the app writes both.
+- **`KILL_SSH`** ends every `ssh` process in a lane, by its name in `/proc`,
+  which every image has: a revoke's backstop for a session that went around
+  the host.
 
 ## Mounts, and granted host paths (ADR-0036)
 

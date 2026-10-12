@@ -691,8 +691,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the default image has no python3",
     file: "packages/lanes/image/Containerfile",
-    from: "curl procps python3 \\",
-    to: "curl procps \\",
+    from: "curl procps python3 openssh-client \\",
+    to: "curl procps openssh-client \\",
     suite: "lanes",
     scenario: "images",
     expect: "the default image has python3",

@@ -486,6 +486,8 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: true },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: false },
+    { kind: "ssh-access", lane: threadIdFor("abc"), answer: "approve" },
+    { kind: "ssh-access", lane: threadIdFor("abc"), answer: "revoke" },
     { kind: "unqueue-all", lane: threadIdFor("abc") },
     {
       kind: "reorder",
@@ -602,6 +604,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "moved" },
     { kind: "held" },
     { kind: "released" },
+    { kind: "answered" },
     {
       kind: "undone",
       cards: [
@@ -1182,8 +1185,27 @@ test("decode: a malformed reorder or queue hold is refused", () => {
   )
 })
 
+test("decode: an ssh answer is approve, refuse or revoke", () => {
+  assert.equal(
+    refusalCode(
+      decodeCommand({
+        kind: "ssh-access",
+        lane: threadIdFor("abc"),
+        mode: "allow",
+      }),
+    ),
+    ERR.UNKNOWN_KIND,
+  )
+})
+
 test("decode: stop and carry-on must name a thread's lane", () => {
-  for (const kind of ["stop", "carry-on", "unqueue-all", "queue-hold"])
+  for (const kind of [
+    "stop",
+    "carry-on",
+    "unqueue-all",
+    "queue-hold",
+    "ssh-access",
+  ])
     assert.equal(
       refusalCode(decodeCommand({ kind, lane: "w-someone" })),
       ERR.UNKNOWN_TARGET,

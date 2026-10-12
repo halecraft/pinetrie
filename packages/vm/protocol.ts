@@ -9,7 +9,10 @@ export interface ShareEntry {
 }
 
 export type ToLauncher =
-  /** Take a slot; `agent` is this host's SSH_AUTH_SOCK, or null. */
+  /**
+   * Take a slot; `agent` is the socket the slot's ssh socket is bridged to,
+   * the host's own ssh socket (not the person's agent), or null.
+   */
   | { readonly kind: "lease"; readonly agent: string | null }
   /** Fill the slot, once: the host has removed every container labelled with it. */
   | { readonly kind: "fill"; readonly entries: readonly ShareEntry[] }

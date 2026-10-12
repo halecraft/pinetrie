@@ -40,6 +40,10 @@
   - ADR-0135: the base is the base before it, with accepted work checked out
     on it, and runs no command; no fork installs, and nothing installs for a
     lane: its agent does, as a developer would after a clone.
+  - ADR-0140: the ssh grant is no longer the person's agent forwarded. It is
+    identities a host relays: service ones from a folder of the person's, and
+    the person's own, which each lane uses only once its owner approves. A
+    broker on the host connects names only the host's ssh config knows.
 
 **Context.** ADR-0032 gave each lane a jj workspace on the host and made a
 branch's inherited history read as if it had always worked there, by

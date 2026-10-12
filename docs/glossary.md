@@ -36,6 +36,9 @@ words they were written with.
 | **cache** | A derived directory commands only add to, or one holding a `CACHEDIR.TAG`, such as pnpm's store: kept when its recipe goes stale. | `isCache` | `installCaches` |
 | **shared file version** | One write to a file in a shared directory, a thread's or yours; one based on a version another write replaced is concurrent. | `SharedVersion` | |
 | **lineage** | A shared file's versions in order, each based on the one its writer last read, and what each thread last read of the file. | `SharedLineage`, `planSharedLineages` | line (of a shared file) |
+| **your identity** | Your own ssh keys, in your agent, which a lane uses only once you approve that lane (ADR-0140). | `PersonalSsh`, `PersonalAccess`, `mayUsePersonal` | your ssh agent |
+| **service identity** | A key pair in the `ssh/` folder beside your config: a project's or a team's, which every lane uses unasked (ADR-0140). | `serviceKeyCheck`, `startServiceAgent` | |
+| **access row** | The row of a column's header that says which ssh identities its lane holds and used, and offers you, its owner, approve, refuse or revoke (ADR-0140). | `AccessRecord`, `ACCESS`, `ACCESS_ANSWERS`, `accessView` | |
 
 ## Cards and where they are
 

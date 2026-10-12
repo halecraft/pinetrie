@@ -92,6 +92,9 @@ importers:
       '@pinetrie/session':
         specifier: workspace:*
         version: link:../../packages/session
+      '@pinetrie/ssh':
+        specifier: workspace:*
+        version: link:../../packages/ssh
       '@pinetrie/vm':
         specifier: workspace:*
         version: link:../../packages/vm
@@ -312,6 +315,8 @@ importers:
       unbash:
         specifier: 5.0.0
         version: 5.0.0
+
+  packages/ssh: {}
 
   packages/vm:
     dependencies:

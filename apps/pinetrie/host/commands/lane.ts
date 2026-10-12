@@ -22,14 +22,19 @@ import {
   readLanes,
   readParticipantNames,
   readPlaces,
+  readProject,
   readPromptMessage,
   readQueueHolds,
+  readRecords,
   readRunningLanes,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
+  ACCESS,
+  accessOf,
   decodeRelay,
   displayName,
+  planAccessAnswer,
   planCarryOn,
   planFactCard,
   planQueueHold,
@@ -316,4 +321,40 @@ export async function actOnAccepted(
   return refused === null
     ? { kind: "accepted-moved" }
     : { kind: "refused", ...refused }
+}
+
+/**
+ * The owner's answer to a lane's use of their ssh identity: the access
+ * record as `planAccessAnswer` makes it, written. The host's ssh wiring
+ * follows the record, so this only writes: the waiting signature is signed
+ * or refused, and a revoke's sessions end, as the record changes.
+ */
+export async function handleSshAccess(
+  deps: Pick<LaneDeps, "basics" | "records">,
+  sender: WriterId,
+  intent: Extract<Intent, { kind: "ssh-access" }>,
+): Promise<Outcome> {
+  const { session, now } = deps.basics
+  const planned = planAccessAnswer({
+    record:
+      readRecords(session, ACCESS).get(intent.lane) ?? accessOf(intent.lane),
+    answer: intent.answer,
+    sender,
+    owner: readProject(session)?.owner ?? null,
+    now: now(),
+  })
+  if ("refused" in planned)
+    return planned.refused === "not_owner"
+      ? {
+          kind: "refused",
+          code: ERR.NOT_OWNER,
+          message: "only this host's owner answers for their ssh identity",
+        }
+      : {
+          kind: "refused",
+          code: ERR.NOTHING_TO_ANSWER,
+          message: `this lane's ssh takes no ${intent.answer} now`,
+        }
+  await deps.records.writeValues([setRecord(ACCESS, planned.record)])
+  return { kind: "answered" }
 }

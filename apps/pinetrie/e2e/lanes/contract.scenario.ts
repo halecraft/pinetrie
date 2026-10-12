@@ -154,7 +154,13 @@ async function dockerContract(
   writeFileSync(path.join(probe, "writer.js"), WRITER)
   ownForInnerLanes(probe)
   ownForInnerLanes(path.join(projA, ".plans"))
-  const a = await findProject({ dir: projA, machine, log })
+  const a = await findProject({
+    dir: projA,
+    machine,
+    // No lane here holds an ssh identity: nothing listens there.
+    hostSocket: path.join(projA, ".no-ssh.sock"),
+    log,
+  })
   if (a?.kind !== "found")
     throw new Error(`no Docker runtime: ${a === null ? "no project" : a.words}`)
   const { runtime } = a
@@ -192,7 +198,8 @@ async function dockerContract(
       memory: "1g",
       mounts,
       env: {},
-      ssh: false,
+      hostSocket: null,
+      starts: [],
       nested: false,
       hostPorts: [],
     })
@@ -456,7 +463,12 @@ async function dockerContract(
     const mountsOfB = [
       { source: projB, target: "/mnt/host-working-copy", readonly: true },
     ] as const
-    const b = await findProject({ dir: projB, machine, log })
+    const b = await findProject({
+      dir: projB,
+      machine,
+      hostSocket: path.join(projB, ".no-ssh.sock"),
+      log,
+    })
     if (b?.kind === "found") {
       await b.ready({
         defaultImage: "",

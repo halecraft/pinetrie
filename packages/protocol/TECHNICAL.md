@@ -55,6 +55,7 @@ decisions:
 | `undo-move` | ADR-0066; `""` names your history outside any task (ADR-0126) |
 | `set-command` | ADR-0108 |
 | `traces-seen` | ADR-0048 |
+| `ssh-access` | ADR-0140; `mode` is the answer: `approve`, `refuse` or `revoke` |
 
 A new thread's, root's or task's id is in the shape a client mints
 (`parseNewThread`, `parseNewRoot`, `parseNewTask`; ADR-0057, ADR-0117). A

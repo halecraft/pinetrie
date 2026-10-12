@@ -3,6 +3,7 @@
 
 import {
   type AcceptedRecord,
+  type AccessRecord,
   type AskIndex,
   ancestry,
   type BannerRecord,
@@ -59,6 +60,7 @@ import {
   type QueuedCard,
 } from "@pinetrie/rules"
 import type { OfferActing } from "@pinetrie/session"
+import { type AccessView, accessView } from "./access-view.ts"
 import { commandWords } from "./card-words.ts"
 import type { ColumnView } from "./column-paths.ts"
 import type { Column } from "./columns.ts"
@@ -96,6 +98,8 @@ export interface WorkFacts {
   readonly offers: ReadonlyMap<ThreadId, OfferRecord>
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   readonly banners: ReadonlyMap<ThreadId, BannerRecord>
+  /** Each lane's ssh identities and its owner's answers. */
+  readonly access: ReadonlyMap<ThreadId, AccessRecord>
   /** Accepted work, as the host last read it. */
   readonly accepted: AcceptedRecord | null
   /** Each lane's base, as its history says it. */
@@ -329,6 +333,8 @@ export interface ColumnShows {
   /** Dividers, by the entry they sit above. */
   readonly joins: ReadonlyMap<EntryId, LaneJoin>
   readonly strip: WorkStrip
+  /** The access row: the lane's ssh identities; null when it holds and used none. */
+  readonly access: AccessView | null
   /** What `Column` does to have its thread named before it starts. */
   readonly reserve: ReserveStep
   /** The thread's base when it is not accepted work, worded; null otherwise. */
@@ -388,6 +394,15 @@ export function columnView(f: ColumnFacts): ColumnShows {
     origin: originOf(f, stretches),
     joins: joinsOf(view, stretches, work.names),
     strip: workStrip(f, parent),
+    access:
+      head === null
+        ? null
+        : accessView({
+            record: work.access.get(head),
+            owner: work.project?.owner ?? null,
+            me: f.origins.reader.me,
+            nameOf: f.nameOf,
+          }),
     reserve: reserveStep(f),
     base: baseWords(head === null ? undefined : work.bases.get(head)),
     behind,

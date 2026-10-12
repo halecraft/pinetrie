@@ -5,6 +5,9 @@
 //
 // Imports NO pi. Everything pi-shaped arrives through pi/.
 
+import { rm } from "node:fs/promises"
+import { homedir } from "node:os"
+import path from "node:path"
 import {
   createInMemoryStore,
   Exchange,
@@ -81,6 +84,7 @@ import {
   type SessionDocHandle,
   TextDoc,
 } from "@pinetrie/schema"
+import { hostSocketIn } from "@pinetrie/ssh"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
 import { createBanners } from "./banners.ts"
 import { createBaseNews } from "./base-news.ts"
@@ -147,6 +151,7 @@ import { tasksNow } from "./tasks.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
 import { findProject } from "./work/runtime.ts"
+import { type PersonalSshPlaces, prepareSshDir } from "./work/ssh.ts"
 
 /** How long an image nothing shows is kept, from its upload or last touch: for one pasted and not yet sent. */
 export const BLOB_GRACE_MS = 24 * 60 * 60 * 1000
@@ -176,6 +181,12 @@ export interface StartHostOptions {
    * and jj read too.
    */
   readonly userConfig?: string
+  /**
+   * The person's ssh files (`~/.ssh`: its `config` and `known_hosts`) and
+   * agent (`SSH_AUTH_SOCK`), which lanes' ssh reads. A suite passes its own,
+   * so no suite reads the person's.
+   */
+  readonly ssh?: PersonalSshPlaces
   /**
    * pi's agent directory, by default pi's own. With a scripted or named model,
    * skills and prompts load only from one given here: a suite's fixture.
@@ -253,6 +264,10 @@ export async function startHost({
   model,
   project = null,
   userConfig = userConfigFile(),
+  ssh = {
+    dir: path.join(homedir(), ".ssh"),
+    agent: process.env.SSH_AUTH_SOCK ?? null,
+  },
   agentDir,
   store: storeFile = null,
   blobs: givenBlobs,
@@ -271,14 +286,21 @@ export async function startHost({
   const userJson = configJson(userRead)
   // The project, before anything opens, so a refusal leaves nothing to close,
   // and before pi's setup, which loads from its root.
+  // The host's ssh socket's directory, named before the runtime is found:
+  // the Mac's lease names the socket, which listens once lane work starts.
+  const sshDir = await prepareSshDir()
   const found = await findProject({
+    hostSocket: hostSocketIn(sshDir),
     dir: toolsIn,
     // A port of 0 is chosen when the host listens, after this.
     ownPort: port === 0 ? null : port,
     machine: decodeLaneConfig(userJson, toolsIn ?? "/").machine,
     log,
   })
-  if (found?.kind === "refused") throw new HostRefused(found.words)
+  if (found?.kind === "refused") {
+    await rm(sshDir, { recursive: true, force: true })
+    throw new HostRefused(found.words)
+  }
 
   // --- transport + exchange ------------------------------------------------
   const serverTransport = new WebsocketServerTransport()
@@ -479,6 +501,8 @@ export async function startHost({
     basics,
     found,
     userConfig: { file: userConfig, json: userJson },
+    sshDir,
+    personalSsh: ssh,
     records,
     piSetup,
     ensureNames: names.ensure,
@@ -760,7 +784,8 @@ export async function startHost({
           return scribe.close()
         case "work":
           // A container runs only while its lane runs.
-          return work.close()
+          await work.close()
+          return rm(sshDir, { recursive: true, force: true })
         case "exchange":
           histories.dispose()
           await exchange.flush()

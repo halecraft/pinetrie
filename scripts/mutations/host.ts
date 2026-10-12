@@ -85,7 +85,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a host whose lanes cannot run starts anyway",
     file: "apps/pinetrie/host/index.ts",
-    from: '  if (found?.kind === "refused") throw new HostRefused(found.words)\n',
+    from: "    throw new HostRefused(found.words)\n",
     to: "",
     command: unit,
     expect:

@@ -31,7 +31,9 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   which turns the automatic title off (ADR-0074), unless a scenario names
   its own file; one that writes its own spreads `SUITE_CONFIG` into it.
   `startHost` without a `userConfig` would read
-  `~/.config/pinetrie/config.json`.
+  `~/.config/pinetrie/config.json`. Nor the person's ssh: every suite host
+  gets an empty `~/.ssh` and no agent (`suiteSshPlaces`), unless a scenario
+  passes its own, as `lanes/ssh` does (ADR-0140).
 - **Lanes run on Docker** (ADR-0130): on the Mac against the lane VM, on
   Linux against the host's Docker, and inside a pine·trie lane granted
   `lanes.nested` against the lane's rootless Docker, its lanes in

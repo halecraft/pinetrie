@@ -3,6 +3,7 @@
 import type { HostNamespace, Target, ValueWrite } from "@pinetrie/core"
 
 import { ACCEPTED } from "./accepted.ts"
+import { ACCESS } from "./access.ts"
 import { BANNER } from "./banner.ts"
 import { BASE } from "./base.ts"
 import { WORKFLOW } from "./board.ts"
@@ -32,6 +33,7 @@ export type AnyRecordSpec = Pick<
 
 /** Every record's spec. */
 export const RECORD_SPECS: readonly AnyRecordSpec[] = [
+  ACCESS,
   BANNER,
   BASE,
   BUDGET,

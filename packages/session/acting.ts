@@ -1,8 +1,10 @@
-// session/acting — your offer, setup and publish commands while they are
-// out, and what the host answered; `nextActing` decides.
+// session/acting — your offer, setup and publish commands, and your answers
+// to lanes' use of your ssh identity, while they are out, and what the host
+// answered; `nextActing` decides.
 
 import type {
   AcceptedAction,
+  AccessAnswer,
   ErrCode,
   OfferAction,
   ThreadId,
@@ -36,6 +38,8 @@ export type Acting<A> =
 
 /** An offer command of yours on a lane. */
 export type OfferActing = Acting<OfferAction>
+/** An answer of yours to a lane's use of your ssh identity. */
+export type AccessActing = Acting<AccessAnswer>
 /** A setup or publish of yours: setting up, or publishing. */
 export type AcceptedActing = Acting<AcceptedAction>
 
@@ -78,10 +82,15 @@ export function nextActing<A>(
 /** Every command of yours this tab has out or was refused: per lane, and accepted work. */
 export interface ActingState {
   readonly offers: ReadonlyMap<ThreadId, OfferActing>
+  readonly access: ReadonlyMap<ThreadId, AccessActing>
   readonly accepted: AcceptedActing | null
 }
 
-export const NO_ACTING: ActingState = { offers: new Map(), accepted: null }
+export const NO_ACTING: ActingState = {
+  offers: new Map(),
+  access: new Map(),
+  accepted: null,
+}
 
 /** What a command is on: a lane's offer, or accepted work. */
 type ActingOn =
@@ -90,17 +99,36 @@ type ActingOn =
       readonly lane: ThreadId
       readonly event: ActingEvent<OfferAction>
     }
+  | {
+      readonly kind: "access"
+      readonly lane: ThreadId
+      readonly event: ActingEvent<AccessAnswer>
+    }
   | { readonly kind: "accepted"; readonly event: ActingEvent<AcceptedAction> }
+
+/** A lane's entry after one event: gone once the answer carried it out. */
+function laneStep<A>(
+  map: ReadonlyMap<ThreadId, Acting<A>>,
+  lane: ThreadId,
+  event: ActingEvent<A>,
+): ReadonlyMap<ThreadId, Acting<A>> {
+  const next = nextActing(map.get(lane) ?? null, event)
+  const out = new Map(map)
+  if (next === null) out.delete(lane)
+  else out.set(lane, next)
+  return out
+}
 
 /** The state after one event. */
 function actingStep(state: ActingState, on: ActingOn): ActingState {
-  if (on.kind === "accepted")
-    return { ...state, accepted: nextActing(state.accepted, on.event) }
-  const next = nextActing(state.offers.get(on.lane) ?? null, on.event)
-  const offers = new Map(state.offers)
-  if (next === null) offers.delete(on.lane)
-  else offers.set(on.lane, next)
-  return { ...state, offers }
+  switch (on.kind) {
+    case "accepted":
+      return { ...state, accepted: nextActing(state.accepted, on.event) }
+    case "offer":
+      return { ...state, offers: laneStep(state.offers, on.lane, on.event) }
+    case "access":
+      return { ...state, access: laneStep(state.access, on.lane, on.event) }
+  }
 }
 
 /** A command to send and track: an offer action on a lane, or a line action. */
@@ -111,7 +139,53 @@ export type ActingCommand =
       readonly action: OfferAction
       readonly to: string | null
     }
+  | {
+      readonly kind: "access"
+      readonly lane: ThreadId
+      readonly answer: AccessAnswer
+    }
   | { readonly kind: "accepted"; readonly action: AcceptedAction }
+
+/** What `command` is on, with `event`. */
+function actingOn(
+  command: ActingCommand,
+  event:
+    | { readonly kind: "sent"; readonly id: string }
+    | {
+        readonly kind: "answered"
+        readonly id: string
+        readonly outcome: Outcome
+      },
+): ActingOn {
+  switch (command.kind) {
+    case "offer":
+      return {
+        kind: "offer",
+        lane: command.lane,
+        event:
+          event.kind === "sent"
+            ? { ...event, action: command.action, to: command.to }
+            : event,
+      }
+    case "access":
+      return {
+        kind: "access",
+        lane: command.lane,
+        event:
+          event.kind === "sent"
+            ? { ...event, action: command.answer, to: null }
+            : event,
+      }
+    case "accepted":
+      return {
+        kind: "accepted",
+        event:
+          event.kind === "sent"
+            ? { ...event, action: command.action, to: null }
+            : event,
+      }
+  }
+}
 
 /** Mark `command` sent in `store`, send it, and record the answer when it comes. */
 export function sendActing(
@@ -120,26 +194,14 @@ export function sendActing(
   send: () => Promise<Outcome>,
   id: string = crypto.randomUUID(),
 ): Promise<Outcome> {
-  const sent: ActingOn =
-    command.kind === "offer"
-      ? {
-          kind: "offer",
-          lane: command.lane,
-          event: { kind: "sent", id, action: command.action, to: command.to },
-        }
-      : {
-          kind: "accepted",
-          event: { kind: "sent", id, action: command.action, to: null },
-        }
-  store.set(actingStep(store.current(), sent))
+  store.set(
+    actingStep(store.current(), actingOn(command, { kind: "sent", id })),
+  )
   return send().then(outcome => {
-    const event = { kind: "answered", id, outcome } as const
     store.set(
       actingStep(
         store.current(),
-        sent.kind === "offer"
-          ? { ...sent, event }
-          : { kind: "accepted", event },
+        actingOn(command, { kind: "answered", id, outcome }),
       ),
     )
     return outcome

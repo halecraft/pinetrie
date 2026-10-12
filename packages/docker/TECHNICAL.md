@@ -10,7 +10,7 @@ they differ only in the `DockerTarget` the app hands it
 | `socket` | the lane VM's `docker.sock` (the launcher's) | `$DOCKER_HOST`, else `/var/run/docker.sock` |
 | `pathOf` | under the host's slot, `/mnt/host-shares/<slot>/<name>` | the path itself |
 | `labels` | `pinetrie.slot=<slot>` | none |
-| `sshAgent` | the slot's socket in the VM | `$SSH_AUTH_SOCK` |
+| `hostSocket` | the slot's socket in the VM, bridged to the one the lease names (ADR-0140) | the host's ssh socket itself |
 | lanes directory | `/var/lib/lanehost`, the VM's data disk | `$XDG_STATE_HOME/pinetrie/lanes`, or `/var/lib/pinetrie-lanes` in a nested lane |
 
 It declares `@pinetrie/core` and `@pinetrie/lanes`, and only the app
@@ -97,6 +97,16 @@ declares it (`workspace.test.ts`).
 - **On Linux the grant applies to nothing:** a lane reaches the host's
   services bound to all interfaces at Docker's bridge gateway, and never
   its loopback. The host says so once.
+
+## A lane's command (`laneCommand`)
+
+- **Its starts run first, then a nested lane's Docker, then the wait:**
+  each start in a subshell sent to the background that exits at once, so
+  `--init` adopts and reaps it, as the inner Docker is started. A lane with
+  neither runs `sleep infinity` alone.
+- **The host socket is mounted only when both sides name one:** the shape
+  (`ContainerShape.hostSocket`, where in the lane) and the target (where on
+  Docker's machine).
 
 ## What a lane never gets
 

@@ -25,6 +25,7 @@ import {
   type Moments,
   markOf,
   type OpenOffer,
+  type SshAsk,
   type Status,
   taskStatus,
   threadStatus,
@@ -58,6 +59,10 @@ export function useAttention(input: {
   readonly directory: ReadonlyMap<RootId, RootRecord>
   readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
   readonly offers: readonly OpenOffer[]
+  /** Lanes waiting for their owner's answer about ssh. */
+  readonly sshAsks: readonly SshAsk[]
+  /** Whom the host names its owner. */
+  readonly owner: WriterId | null
   /** Lanes running in any root (`readRunningLanes`). */
   readonly running: readonly { readonly lane: ThreadId }[]
   /** The held roots' lanes, with their queues. */
@@ -108,6 +113,8 @@ export function useAttention(input: {
       writers,
       verdicts: input.verdicts,
       offers: input.offers,
+      sshAsks: input.sshAsks,
+      owner: input.owner,
       person,
       busy,
       archived,
@@ -121,6 +128,8 @@ export function useAttention(input: {
     writers,
     input.verdicts,
     input.offers,
+    input.sshAsks,
+    input.owner,
     person,
     busy,
     archived,

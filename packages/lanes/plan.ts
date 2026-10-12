@@ -112,6 +112,7 @@ export const laneContainer = (lane: LaneOwner): string => `pinetrie-${lane}`
 
 /** What a project lets cross a lane's boundary, from `pinetrie.json`. */
 export interface LaneGrants {
+  /** Lanes may ask for their owner's ssh identity (`lanes.ssh`); each asks the owner first. */
   readonly ssh: boolean
   /** Lanes of their own inside each lane: rootless Docker. */
   readonly nested: boolean
@@ -138,6 +139,27 @@ export const NO_GRANTS: LaneGrants = {
   mounts: [],
 }
 
+/**
+ * What the host attaches to a lane beside its grants, from a service of its
+ * own (the ssh relay): its socket, mounts, variables, and commands started
+ * with the container. This package knows none of them by name.
+ */
+export interface LaneAttached {
+  /** Where the runtime's host socket is mounted in the lane; null for none. */
+  readonly hostSocket: string | null
+  readonly mounts: readonly Mount[]
+  readonly env: Readonly<Record<string, string>>
+  /** Shell commands started in the background, in order, at each start of the container. */
+  readonly starts: readonly string[]
+}
+
+export const NOTHING_ATTACHED: LaneAttached = {
+  hostSocket: null,
+  mounts: [],
+  env: {},
+  starts: [],
+}
+
 /** A lane's spec: a thread's, unless `L` says the base's scratch lane. */
 export interface LaneSpec<L extends LaneOwner = ThreadId> {
   readonly lane: L
@@ -146,8 +168,9 @@ export interface LaneSpec<L extends LaneOwner = ThreadId> {
   readonly imagePath: string
   /** Every host path the lane sees, from `planMounts`. */
   readonly mounts: readonly Mount[]
-  /** The grants that are not mounts: your ssh agent, lanes inside, named variables. */
-  readonly grants: Pick<LaneGrants, "ssh" | "nested" | "hostPorts" | "env">
+  /** The grants that are not mounts: lanes inside, the Mac's ports, named variables. */
+  readonly grants: Pick<LaneGrants, "nested" | "hostPorts" | "env">
+  readonly attached: LaneAttached
   readonly identity: { readonly name: string; readonly email: string }
   readonly memory: string
   /** How the lane's tool calls are observed: its variables, carried unread. */
@@ -258,11 +281,13 @@ export interface ContainerShape {
   readonly lane: LaneOwner
   readonly image: string
   readonly memory: string
-  /** Host paths, from `planMounts`. */
+  /** Host paths, from `planMounts`, then what is attached. */
   readonly mounts: readonly Mount[]
   readonly env: Readonly<Record<string, string>>
-  /** Your ssh agent, forwarded. */
-  readonly ssh: boolean
+  /** Where the runtime's host socket is mounted; null for none (`LaneAttached`). */
+  readonly hostSocket: string | null
+  /** Started in the background at each start, before the lane's wait. */
+  readonly starts: readonly string[]
   /** Lanes of its own inside it: rootless Docker. */
   readonly nested: boolean
   /** Ports of the Mac's loopback it may reach (`LaneGrants.hostPorts`). */
@@ -270,10 +295,11 @@ export interface ContainerShape {
 }
 
 /**
- * A lane's container. It mounts what `planMounts` listed: nothing of your
- * home directory unless a grant or a skill's root names it, so credentials
- * stay out of reach. Only variables a grant names are copied
- * from `env`, first, so pine·trie's own come after them.
+ * A lane's container. It mounts what `planMounts` listed, then what is
+ * attached: nothing of your home directory unless a grant or a skill's root
+ * names it, so credentials stay out of reach. Only variables a grant names
+ * are copied from `env`; they and the attached ones come first, so
+ * pine·trie's own come after them.
  */
 export function planShape(
   spec: LaneSpec<LaneOwner>,
@@ -288,12 +314,14 @@ export function planShape(
     lane: spec.lane,
     image: spec.image,
     memory: spec.memory,
-    mounts: spec.mounts,
-    ssh: spec.grants.ssh,
+    mounts: [...spec.mounts, ...spec.attached.mounts],
+    hostSocket: spec.attached.hostSocket,
+    starts: spec.attached.starts,
     nested: spec.grants.nested,
     hostPorts: spec.grants.hostPorts,
     env: Object.fromEntries([
       ...passed,
+      ...Object.entries(spec.attached.env),
       ["JJ_USER", spec.identity.name],
       ["JJ_EMAIL", spec.identity.email],
       ["JJ_CONFIG", LANE_JJ_CONFIG],
@@ -815,6 +843,10 @@ export function pinetrieDir(root: string): {
   readonly runtime: string
   /** The lanes' ignore file's directory (`laneIgnores`). */
   readonly laneGit: string
+  /** What every lane's ssh is given, read-only (`@pinetrie/ssh`'s files). */
+  readonly laneSsh: string
+  /** The secret a lane's ssh token is made under. */
+  readonly sshSecret: string
 } {
   const dir = path.join(root, PROJECT_DIR)
   return {
@@ -823,6 +855,8 @@ export function pinetrieDir(root: string): {
     snapshots: path.join(dir, "snapshots"),
     runtime: path.join(dir, "runtime"),
     laneGit: path.join(dir, "lane-git"),
+    laneSsh: path.join(dir, "lane-ssh"),
+    sshSecret: path.join(dir, "ssh-secret"),
   }
 }
 
@@ -914,6 +948,15 @@ export type Step = LaneStep | { readonly in: "runtime"; readonly op: RuntimeOp }
 const inLane = (...argv: string[]): LaneStep => ({ in: "lane", argv })
 const onRuntime = (op: RuntimeOp): Step => ({ in: "runtime", op })
 const laneShell = (script: string): LaneStep => inLane("sh", "-c", script)
+
+/**
+ * Ends every `ssh` process in a lane, found by its name in `/proc`, which
+ * every image has. A revoke runs it after closing the lane's connections
+ * through the host, for a session that went around them.
+ */
+export const KILL_SSH: LaneStep = laneShell(
+  'cd /proc && for p in [0-9]*; do [ "$(cat "$p/comm" 2>/dev/null)" = ssh ] && kill "$p"; done; true',
+)
 
 /**
  * Fetch `commits` from `from` (your working copy, at `/mnt/host-working-copy`) when the disk

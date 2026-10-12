@@ -101,6 +101,8 @@ export type Outcome =
   /** A thread's queue is held now, whoever held it first. */
   | { readonly kind: "held" }
   | { readonly kind: "released" }
+  /** An answer to a lane's use of an ssh identity was taken. */
+  | { readonly kind: "answered" }
   /** An undo or redo of moves moved these cards, each to the place it is now. */
   | { readonly kind: "undone"; readonly cards: readonly MovedCard[] }
   /** An undo or redo found nothing to do. */
@@ -213,6 +215,15 @@ export function decodeCommand(
     return mode === "hold" || mode === "release"
       ? { kind, lane, held: mode === "hold" }
       : refused(ERR.UNKNOWN_KIND, `unknown queue hold: ${mode}`)
+  }
+  if (kind === "ssh-access") {
+    const lane = text(wire?.lane)
+    if (!isThreadId(lane))
+      return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+    const answer = text(wire?.mode)
+    return answer === "approve" || answer === "refuse" || answer === "revoke"
+      ? { kind, lane, answer }
+      : refused(ERR.UNKNOWN_KIND, `unknown ssh answer: ${answer}`)
   }
   if (kind === "reorder") {
     const reorder = decodeReorder(text(wire?.cardId), text(wire?.moves))
@@ -978,6 +989,13 @@ export function encodeIntent(id: string, intent: Intent): Command {
     case "carry-on":
     case "unqueue-all":
       return command({ id, kind: intent.kind, lane: intent.lane })
+    case "ssh-access":
+      return command({
+        id,
+        kind: "ssh-access",
+        lane: intent.lane,
+        mode: intent.answer,
+      })
     case "queue-hold":
       return command({
         id,
@@ -1188,6 +1206,8 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "held" })
     case "released":
       return reply({ id, outcome: "released" })
+    case "answered":
+      return reply({ id, outcome: "answered" })
     case "undone":
       return reply({
         id,
@@ -1258,6 +1278,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "moved" }
     case "held":
       return { kind: "held" }
+    case "answered":
+      return { kind: "answered" }
     case "released":
       return { kind: "released" }
     case "undone":

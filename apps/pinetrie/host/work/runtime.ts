@@ -35,7 +35,8 @@ import {
 /** What the host found where it runs: the project, and the runtime its lanes run on. */
 export interface Found {
   readonly kind: "found"
-  readonly project: ProjectRecord
+  /** Where the project is; setup adds the rest of its record. */
+  readonly project: Pick<ProjectRecord, "root">
   readonly runtime: LaneRuntime
   /**
    * Called once by setup, before any lane starts: pine·trie's default image,
@@ -120,12 +121,19 @@ export async function findProject(input: {
   readonly ownPort?: number | null
   /** The user config's `lanes.vm.slots`, as written. */
   readonly machine: WrittenMachine
+  /**
+   * The host's ssh socket, mounted in every lane that holds an identity. It
+   * need not listen yet: Docker binds it as a lane is made, and the launcher
+   * connects to it for each of a lane's connections.
+   */
+  readonly hostSocket: string
   readonly log: (line: string) => void
 }): Promise<Found | Refused | null> {
   if (input.dir === null) return null
   return runtimeFound(
     input.dir,
     input.machine,
+    input.hostSocket,
     input.log,
     input.ownPort ?? null,
   )
@@ -136,6 +144,7 @@ const refusedWith = (words: string): Refused => ({ kind: "refused", words })
 async function runtimeFound(
   dir: string,
   written: WrittenMachine,
+  hostSocket: string,
   log: (line: string) => void,
   ownPort: number | null,
 ): Promise<Found | Refused> {
@@ -149,19 +158,27 @@ async function runtimeFound(
   })
   const root = planRoot(await prepareProjectDir(dir))
   if ("refused" in root) return refusedWith(root.refused)
-  const project: ProjectRecord = { root: root.ok }
+  const project = { root: root.ok }
   return planned.kind === "docker-vm"
-    ? vmFound(project, root.ok, planned.lanesDir, machine.slots, log, ownPort)
-    : hostDockerFound(project, root.ok, planned.lanesDir, log)
+    ? vmFound(
+        project,
+        planned.lanesDir,
+        machine.slots,
+        hostSocket,
+        log,
+        ownPort,
+      )
+    : hostDockerFound(project, planned.lanesDir, hostSocket, log)
 }
 
 /** Docker on this machine (Linux): its socket, paths as they are. */
 async function hostDockerFound(
-  project: ProjectRecord,
-  root: string,
+  project: Found["project"],
   lanesDir: string,
+  hostSocket: string,
   log: (line: string) => void,
 ): Promise<Found | Refused> {
+  const { root } = project
   const host = process.env.DOCKER_HOST
   const target: DockerTarget = {
     socket: host?.startsWith("unix://")
@@ -169,7 +186,7 @@ async function hostDockerFound(
       : "/var/run/docker.sock",
     pathOf: p => p,
     labels: {},
-    sshAgent: process.env.SSH_AUTH_SOCK ?? null,
+    hostSocket,
     hostAddress: null,
   }
   const refusal = planDockerHost(await gatherDockerHost(target, lanesDir))
@@ -198,18 +215,19 @@ async function hostDockerFound(
  * filled when setup knows every directory lanes mount.
  */
 async function vmFound(
-  project: ProjectRecord,
-  root: string,
+  project: Found["project"],
   lanesDir: string,
   slots: number,
+  hostSocket: string,
   log: (line: string) => void,
   ownPort: number | null,
 ): Promise<Found | Refused> {
+  const { root } = project
   const leaseNow = () =>
     leaseVm({
       stateDir: vmStateDir(process.env, homedir()),
       slots,
-      agent: process.env.SSH_AUTH_SOCK ?? null,
+      agent: hostSocket,
       log,
     })
   const leased = await leaseNow().catch((error: unknown) =>
@@ -232,7 +250,7 @@ async function vmFound(
     get labels() {
       return { [SLOT_LABEL]: String(current.slot) }
     },
-    get sshAgent() {
+    get hostSocket() {
       return `/run/pinetrie/ssh-${current.slot}.sock`
     },
     hostAddress: GVPROXY_HOST_ADDRESS,

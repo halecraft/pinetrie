@@ -212,7 +212,7 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "notNeeded":
       if (effect.raised.kind === "verdict")
         ports.attention.dismiss(effect.lane, effect.raised.ask)
-      else if (effect.raised.source !== null)
+      else if (effect.raised.kind === "offer" && effect.raised.source !== null)
         ports.attention.dismissOffer(effect.lane, effect.raised.source)
       return
     case "createCard":

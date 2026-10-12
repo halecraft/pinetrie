@@ -430,7 +430,7 @@ describe("sendChat", () => {
   })
 
   test("in a thread that works in its own copy, your working copy's paths are stored as the lane sees them", async () => {
-    const { started, deps } = setUp({ root: "/proj" })
+    const { started, deps } = setUp({ root: "/proj", owner: null })
     await sendChat(deps, ALICE, "s-1", chat("@agent read /proj/a.txt"))
     expect(started[0]?.details.text).toBe(
       "@agent read /mnt/host-working-copy/a.txt",

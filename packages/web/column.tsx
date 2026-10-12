@@ -2,6 +2,7 @@
 
 import { useSelector } from "@kyneta/react"
 import {
+  type AccessAnswer,
   type AgentRun,
   type ArchivedTask,
   type AskIndex,
@@ -36,6 +37,8 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import {
+  type AccessView,
+  accessWords,
   agentsRow,
   agentsWords,
   askLine,
@@ -114,7 +117,7 @@ import {
   yourCard,
 } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
-import type { AttentionStore } from "@pinetrie/session"
+import type { AccessActing, AttentionStore } from "@pinetrie/session"
 import { drawnPlace, newCardId, type SessionClient } from "@pinetrie/session"
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -1019,6 +1022,16 @@ export function Column(p: ColumnProps) {
               }}
               strip={shows.strip}
             />
+            {/* The access row: the lane's ssh identities, and the owner's answers. */}
+            {shows.access !== null && lane.kind === "lane" && (
+              <AccessRowView
+                acting={acting.access.get(lane.name) ?? null}
+                answer={answer =>
+                  void p.session.access(lane.name, answer).catch(() => {})
+                }
+                view={shows.access}
+              />
+            )}
           </header>
           {/* Under a search, the thread stays as it is, covered and inert,
           with its matches laid over it: leaving needs no
@@ -1513,6 +1526,44 @@ function Bookmark({ name }: { name: string }) {
     >
       {name}
     </button>
+  )
+}
+
+/**
+ * A lane's ssh identities: what it holds and has used, and for the owner the
+ * answers its state takes, which wait while one is out.
+ */
+function AccessRowView({
+  view,
+  acting,
+  answer,
+}: {
+  view: AccessView
+  acting: AccessActing | null
+  answer: (answer: AccessAnswer) => void
+}) {
+  const words = accessWords(view, acting)
+  return (
+    <div
+      className="work access"
+      data-state={view.personal?.kind ?? "service"}
+      role="status"
+    >
+      <span className="access-line">{words.line}</span>
+      {words.note !== null && <span className="access-note">{words.note}</span>}
+      <span className="work-space" />
+      {words.answers.map(({ answer: a, label }) => (
+        <button
+          className={`access-${a}`}
+          disabled={words.waiting}
+          key={a}
+          onClick={() => answer(a)}
+          type="button"
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   )
 }
 

@@ -36,6 +36,7 @@ import {
   lanesOf,
   setUpAccepted,
   suiteConfigFile,
+  suiteSshPlaces,
   treeOf,
   waitFor,
 } from "./harness.ts"
@@ -61,6 +62,8 @@ export async function runtimeProblem(): Promise<string | null> {
     const found = await findProject({
       dir,
       machine: { slots: null },
+      // Nothing listens there: this probe makes no lane.
+      hostSocket: path.join(dir, ".no-ssh.sock"),
       log: () => {},
     })
     if (found === null) return "no project"
@@ -126,7 +129,11 @@ export const laneHosts: LaneHosts = {
 }
 
 const startLaneHost = (options: StartHostOptions): Promise<RunningHost> =>
-  startHost({ userConfig: suiteConfigFile(), ...options })
+  startHost({
+    userConfig: suiteConfigFile(),
+    ssh: suiteSshPlaces(),
+    ...options,
+  })
 
 /**
  * A host of its own for a section: a project (`files`, or an existing `dir`),

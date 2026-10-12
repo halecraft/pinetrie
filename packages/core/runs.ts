@@ -419,7 +419,7 @@ export type ConfigWidening =
 export function wideningWords(w: ConfigWidening): string {
   switch (w.kind) {
     case "ssh":
-      return "your ssh agent"
+      return "your ssh identity"
     case "nested":
       return "lanes of its own"
     case "env":

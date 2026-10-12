@@ -103,6 +103,7 @@ export function runsIn(command: Intent | QueuePop): readonly RunAt[] {
     case "stop":
     case "queue-hold":
     case "unqueue-all":
+    case "ssh-access":
     case "name":
     case "picture":
     case "move-task":

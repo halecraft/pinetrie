@@ -8,8 +8,12 @@ export interface DockerTarget {
   readonly pathOf: (hostPath: string) => string
   /** Labels every container made here carries (the slot, on the Mac). */
   readonly labels: Readonly<Record<string, string>>
-  /** The ssh agent's socket on Docker's machine, for a lane granted ssh; null with none. */
-  readonly sshAgent: string | null
+  /**
+   * The host's socket on Docker's machine, mounted where a lane's shape says
+   * (`ContainerShape.hostSocket`); null with none. On the Mac a slot's socket
+   * in the VM, which the launcher bridges to the one the lease named.
+   */
+  readonly hostSocket: string | null
   /**
    * Where a lane reaches the host's loopback, for the ports a project
    * grants (`lanes.hostPorts`): gvproxy's host address in the Mac's lane VM;

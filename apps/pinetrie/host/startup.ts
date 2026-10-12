@@ -18,10 +18,12 @@ import {
   readWorkflow,
 } from "@pinetrie/reads"
 import {
+  ACCESS,
   COMMANDS,
   COMMANDS_KEY,
   deleteRecord,
   PROJECT,
+  planAccessRecovery,
   planCardSweep,
   planClear,
   planSeatSweep,
@@ -53,7 +55,7 @@ import type { LaneWork } from "./work/index.ts"
 export interface StartupDeps {
   readonly basics: Pick<
     Basics,
-    "session" | "docs" | "live" | "places" | "log" | "newId"
+    "session" | "docs" | "live" | "places" | "log" | "newId" | "now"
   >
   /** The roots this host opened at its start (`planLoads`): every lane that could be running. */
   readonly roots: readonly RootId[]
@@ -131,6 +133,12 @@ export async function recover(deps: StartupDeps): Promise<void> {
   }
   const changed = [
     ...planned.unclassified.map(v => setRecord(VERDICT, v)),
+    // A lane that waited for its owner's answer waits no longer: the request
+    // went with the host that held it.
+    ...planAccessRecovery(
+      [...readRecords(doc, ACCESS).values()],
+      deps.basics.now(),
+    ).map(r => setRecord(ACCESS, r)),
     ...(work.project === null
       ? []
       : setIfChanged(PROJECT, work.project, readProject(doc) ?? undefined)),

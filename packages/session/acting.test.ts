@@ -130,7 +130,29 @@ describe("sendActing: the session's store, around one command", () => {
     )
     expect(store.current()).toEqual({
       offers: new Map(),
+      access: new Map(),
       accepted: { kind: "failed", action: "publish", message: "jj said no" },
     })
+  })
+  test("an ssh answer is kept per lane, apart from its offer", async () => {
+    const store = snapshotStore<ActingState>(NO_ACTING)
+    await sendActing(
+      store,
+      { kind: "access", lane: A, answer: "approve" },
+      () =>
+        Promise.resolve({
+          kind: "refused",
+          code: "not_owner",
+          message: "not yours",
+        }),
+      "1",
+    )
+    expect(store.current().access.get(A)).toEqual({
+      kind: "refused",
+      code: "not_owner",
+      action: "approve",
+      message: "not yours",
+    })
+    expect(store.current().offers.has(A)).toBe(false)
   })
 })

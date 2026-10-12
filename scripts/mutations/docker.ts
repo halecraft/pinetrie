@@ -36,15 +36,6 @@ export const mutations: readonly Mutation[] = [
       "two lanes write the same file, each on its own disk, and your working copy is untouched",
   },
   {
-    name: "a lane granted ssh is given no agent",
-    file: "packages/docker/plan.ts",
-    from: "  const ssh = shape.ssh && target.sshAgent !== null",
-    to: "  const ssh = false && target.sshAgent !== null",
-    suite: "lanes",
-    scenario: "main",
-    expect: "with ssh granted, the lane has SSH_AUTH_SOCK",
-  },
-  {
     name: "a snapshot is a new empty subvolume, not a snapshot of the lane",
     file: "packages/lanehost/disks.ts",
     from: '      case "snapshot":\n        await btrfs([\n          "subvolume",\n          "snapshot",\n          ...(step.readonly ? ["-r"] : []),\n          step.from,\n          step.to,\n        ])\n',
@@ -123,12 +114,22 @@ export const mutations: readonly Mutation[] = [
     expect: "the project's and the target's labels",
   },
   {
-    name: "ssh is forwarded without the grant",
+    name: "the host socket is mounted in a lane that asks for none",
     file: plan,
-    from: "  const ssh = shape.ssh && target.sshAgent !== null",
-    to: "  const ssh = target.sshAgent !== null",
+    from: "    shape.hostSocket !== null && target.hostSocket !== null\n",
+    to: "    target.hostSocket !== null\n",
     command: unit("packages/docker"),
-    expect: "ssh: the slot's agent, only with the grant",
+    expect:
+      "the host socket is mounted where the shape says, only when it asks for one",
+  },
+  {
+    name: "a lane's starts are never run",
+    file: plan,
+    from: "  if (!lane.nested && lane.starts.length === 0)",
+    to: "  if (!lane.nested)",
+    command: unit("packages/docker"),
+    expect:
+      "a lane's starts run in the background before its wait, and before a nested lane's Docker",
   },
   {
     name: "every lane gets the nested options",

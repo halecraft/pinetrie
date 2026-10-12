@@ -932,6 +932,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | `split.ts` | a split's prompt, and its end (`finishSplit`, which moves the lane back to its tip even when a step before it throws: left on the stack, the lane refuses every catch-up) |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
 | `runtime.ts` | the composition root, the one place that picks the runtime: gathers, plans (`planRuntime`, `planBuilder` for `pnpm vm:build`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
+| `ssh.ts` | lanes' ssh (ADR-0140): what the host reads of the person's and the service folder's ssh files, the lanes' files, the service agent and the host's socket (`@pinetrie/ssh`), what each lane is given (`attachedFor`, `holdsFor`), and the owner's answers, which it follows in `pinetrie.access` |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed
   after it. Each lane's handle is the registry's. Each coordination set is
@@ -1023,6 +1024,33 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 - **A lane's `LaneQueue` breaks on a fatal failure and the host's keepers
   do not.** A failed start or fork must stop the lane's tools, which wait on
   its queue; a failed host step must not stop the steps behind it.
+
+## Lanes' ssh (`work/ssh.ts`, ADR-0140)
+
+- **Its socket's path comes first:** `prepareSshDir` makes its directory
+  before the runtime is found, since the Mac's lease names the socket
+  (`hostSocketIn`); it listens only once setup has read the configs, before
+  any lane is made. Docker binds it as a lane is made, and the launcher
+  connects to it for each of a lane's connections.
+- **A lane is given ssh only if it holds an identity:** a usable service
+  key, or the person's own, which the user config grants, or the project
+  does and the lane's own config keeps (`laneMayAsk`). Its agent is told
+  the same (`holdsFor`).
+- **The record is the one truth.** The relay asks `mayUsePersonal`: an
+  approved lane signs, a refused one does not, and anything else writes
+  `waiting` and holds the signature until the record changes or
+  `approvalSeconds` pass (`unanswered`). The `ssh-access` command only
+  writes the record; a subscription to the session's records carries out
+  each change (`planAccessChange`): release, refuse, or cut, which closes
+  the lane's connections through the host and runs `KILL_SSH` in it.
+- **A starting host leaves nothing waiting** (`recover`,
+  `planAccessRecovery`): a held signature goes with the host that held it.
+- **Shutdown** is part of lane work's close (`"work"`): every waiting
+  signature is refused, each ask's deadline cleared, the socket and the
+  service agent closed, and the socket's directory removed.
+- **No suite reads the person's ssh:** `startHost`'s `ssh` names the
+  folder and agent, and the harness gives every suite host an empty one
+  and none (`suiteSshPlaces`).
 
 ## Offers (`offers/`)
 

@@ -166,7 +166,7 @@ interface LeaseInput {
   readonly stateDir: string
   /** The slots a VM this host starts boots with. */
   readonly slots: number
-  /** This host's SSH_AUTH_SOCK, or null. */
+  /** The socket the slot's ssh socket is bridged to (the host's own ssh socket), or null. */
   readonly agent: string | null
   readonly log: (line: string) => void
 }

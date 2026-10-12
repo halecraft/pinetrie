@@ -444,6 +444,12 @@
       .work .offer-note { font-size: .75rem; color: #8b93a1; }
       .work .offer-note[data-acting="said"] { color: #e8c07a; }
       .work button:disabled { opacity: .5; cursor: progress; }
+      .work.access .access-line { font-size: .75rem; color: #aab; }
+      .work.access[data-state="waiting"] .access-line { color: #e8c07a; }
+      .work.access[data-state="refused"] .access-line,
+      .work.access[data-state="unanswered"] .access-line { color: #8b93a1; }
+      .work .access-note { font-size: .75rem; color: #e8c07a; }
+      .work .access-approve { border-color: #4f7a4f; color: #a8d8a8; }
 
       /* A column's pane (ADR-0078, ADR-0087): beside the thread, filling what
          the strip has beside it, or, where the strip can't hold the thread

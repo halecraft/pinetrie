@@ -8,6 +8,7 @@
 
 import {
   type AcceptedRecord,
+  type AccessRecord,
   type AgentMessageLike,
   type AgentRun,
   type ArchivedTask,
@@ -65,6 +66,7 @@ import {
 import {
   ACCEPTED,
   ACCEPTED_KEY,
+  ACCESS,
   archivedOf,
   BANNER,
   BASE,
@@ -738,6 +740,11 @@ export const readNames = (
   new Map([...readRecords(doc, NAME).values()].map(r => [r.lane, r.name]))
 
 /** Each thread's banner (`pinetrie.banner`), by lane. */
+/** Each lane's ssh identities and its owner's answers (`pinetrie.access`), by lane. */
+export const readAccess = (
+  doc: SessionDocHandle,
+): ReadonlyMap<ThreadId, AccessRecord> => readRecords(doc, ACCESS)
+
 export const readBanners = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, BannerRecord> => readRecords(doc, BANNER)

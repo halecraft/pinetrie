@@ -60,7 +60,15 @@ export interface LaneFacts {
   readonly shared: readonly string[]
   /** What `pinetrie.json` lets into the lane. */
   readonly grants: {
-    readonly ssh: boolean
+    /**
+     * The ssh identities the lane holds through its host: its owner's own,
+     * which each lane uses only once its owner approves, and service ones,
+     * by name.
+     */
+    readonly ssh: {
+      readonly personal: boolean
+      readonly services: readonly string[]
+    }
     /** Names of environment variables passed in. */
     readonly env: readonly string[]
     /** Where each granted read-only mount is, in the lane. */
@@ -102,7 +110,14 @@ const listed = (words: readonly string[]): string =>
 export function laneGuidelines(facts: LaneFacts): string[] {
   const { dir, grants } = facts
   const allowed = [
-    ...(grants.ssh ? ["your ssh agent"] : []),
+    ...(grants.ssh.personal
+      ? ["your owner's ssh identity (once they approve this lane)"]
+      : []),
+    ...(grants.ssh.services.length === 0
+      ? []
+      : [
+          `the ssh ${grants.ssh.services.length === 1 ? "identity" : "identities"} ${listed(grants.ssh.services)}`,
+        ]),
     ...grants.env.map(name => `$${name}`),
     ...(grants.mounts.length === 0
       ? []

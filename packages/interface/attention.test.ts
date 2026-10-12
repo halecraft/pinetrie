@@ -67,6 +67,8 @@ const input = (over: Partial<AttentionInput> = {}): AttentionInput => ({
   ]),
   verdicts: new Map([[A, verdict(A, said("needsYou"))]]),
   offers: [],
+  sshAsks: [],
+  owner: null,
   person: person(),
   busy: new Set(),
   archived: new Set(),
@@ -105,6 +107,30 @@ test.each<[string, Verdict, "needsYou" | "worthARead" | null]>([
 })
 
 describe("attentionOf", () => {
+  test("a lane waiting on your ssh needs you, its owner, even unfollowed and running", () => {
+    const C = threadIdFor("c")
+    const asks = [{ lane: C, end: entryId("e-c"), host: "pop" }]
+    expect(
+      attentionOf(
+        input({
+          verdicts: new Map(),
+          sshAsks: asks,
+          owner: ADA,
+          busy: new Set([C]),
+        }),
+      ),
+    ).toEqual([
+      {
+        lane: C,
+        end: entryId("e-c"),
+        level: "needsYou",
+        raised: { kind: "ssh", host: "pop" },
+      },
+    ])
+    expect(
+      attentionOf(input({ verdicts: new Map(), sshAsks: asks, owner: BEA })),
+    ).toEqual([])
+  })
   test("a verdict on a thread you follow, ended after where you read, is raised", () => {
     expect(attentionOf(input())).toEqual([
       {

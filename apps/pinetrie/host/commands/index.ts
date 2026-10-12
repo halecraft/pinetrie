@@ -58,6 +58,7 @@ import {
   actOnOffer,
   handleCarryOn,
   handleQueueHold,
+  handleSshAccess,
   handleStop,
   type LaneDeps,
 } from "./lane.ts"
@@ -281,6 +282,8 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(await handleStop(deps, intent.lane, writer))
       case "carry-on":
         return settled(await handleCarryOn(deps, intent.lane, writer))
+      case "ssh-access":
+        return settled(await handleSshAccess(deps, writer, intent))
       case "move-task":
         return handleTaskMove({ ...deps, moves: cardCommands }, writer, intent)
       case "workflow":

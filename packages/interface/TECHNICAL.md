@@ -1096,6 +1096,23 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
   takes a reference to the selected entry. The selection is the column's
   view state, marked `data-selected` on its message.
 
+## The access row (`access-view.ts`, ADR-0140)
+
+- **`accessView` decides, `accessWords` words it.** A lane with no
+  `pinetrie.access` record, or one that never asked and used no service
+  identity, has no row. Service identities come first, then the owner's
+  identity's state, then the hosts the lane reached.
+- **Only the owner is offered answers,** exactly `ACCESS_ANSWERS`' for the
+  state, the table the host refuses by; everyone else reads the state. The
+  owner reads "your ssh"; others read the owner's name.
+- **An answer out makes the buttons wait,** and a refused or failed one is
+  said, as an offer command's is: the session keeps your answers per lane
+  (`acting.ts`'s `access`).
+- **An ask needs its owner wherever they are:** `appView`'s `sshAsks` raise
+  an inbox item (`Raised` `ssh`) for the owner alone, whether or not they
+  follow the thread and while its lane runs, since the lane asks mid-run.
+  It has no "not needed": answering clears it.
+
 ## What a column shows (`column-view.ts`, ADR-0040)
 
 `Column` gathers the facts (`ColumnFacts`), `columnView` decides, and

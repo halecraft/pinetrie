@@ -502,6 +502,17 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A column shown again is where you left it** (ADR-0058): the same message
   at the same height, or its end if you were following it. If its thread
   grew meanwhile, it comes back at its old end, with ↓ new below.
+- **A row of the column's header, the access row, says which ssh
+  identities its lane holds** (ADR-0140): its service identities, then
+  your identity's state, then the hosts it reached ("🔑 deploy, Duane's
+  ssh · pop"). A lane waiting for you reads "🔑 wants your ssh for pop"
+  with **approve** and **refuse**; an approved one offers **revoke**, and
+  a refused, revoked or unanswered one **approve**. Only the owner sees
+  the buttons; everyone else reads "🔑 waiting for Duane". While your
+  answer is out its buttons wait, and a refusal is said there. A lane
+  that never asked and used no service identity has no row. A lane
+  waiting for you is also in your inbox ("wants your ssh for pop"),
+  whether or not you follow it; answering clears it.
 - **A row of the column's header, the work strip, says what became of the
   agent's files** (ADR-0040, ADR-0113): an agent on its own copy shows its offer in plain words ("2
   files ready"), with **accept** and its bookmark, which a press copies. The

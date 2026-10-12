@@ -37,6 +37,7 @@ import {
 } from "@pinetrie/core"
 import {
   readAccepted,
+  readAccess,
   readAgentActivity,
   readBanners,
   readBases,
@@ -188,6 +189,7 @@ function readFacts(view: HeldView): SessionFacts {
       offers: readOffers(doc),
       names: readNames(doc),
       banners: readBanners(doc),
+      access: readAccess(doc),
       accepted: readAccepted(doc),
       bases: readBases(doc),
       filesLost: readFilesLost(doc),

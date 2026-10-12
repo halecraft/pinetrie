@@ -171,7 +171,7 @@ describe("lanesAlong", () => {
   })
 })
 
-const PROJECT: ProjectRecord = { root: "/p" }
+const PROJECT: ProjectRecord = { root: "/p", owner: null }
 const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   project: PROJECT,
   commands: [],
@@ -180,6 +180,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   offers: new Map(),
   names: new Map(),
   banners: new Map(),
+  access: new Map(),
   accepted: null,
   bases: new Map(),
   forks: new Map(),

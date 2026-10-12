@@ -14,7 +14,7 @@ import type {
 } from "@pinetrie/core"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import type { Attention } from "@pinetrie/schema"
-import type { OpenOffer } from "./app-view.ts"
+import type { OpenOffer, SshAsk } from "./app-view.ts"
 
 /** Lowest first: `highest` and every comparison read this order. */
 export const LEVELS = ["worthARead", "needsYou"] as const
@@ -82,6 +82,8 @@ export type Raised =
       /** Its `ledger.source`: what "not needed" dismisses; null, it cannot be. */
       readonly source: string | null
     }
+  /** A lane waits for you to answer its use of your ssh identity: answering clears it. */
+  | { readonly kind: "ssh"; readonly host: string | null }
 
 /** One thing a thread raises for you. */
 export interface Item {
@@ -98,6 +100,10 @@ export interface AttentionInput {
   readonly writers: ReadonlyMap<ThreadId, readonly WriterId[]>
   readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
   readonly offers: readonly OpenOffer[]
+  /** Lanes waiting for their owner's answer about ssh (`appView`'s `sshAsks`). */
+  readonly sshAsks: readonly SshAsk[]
+  /** Whom the host names its owner: the asks are theirs alone. */
+  readonly owner: WriterId | null
   /** Your attention document, read. */
   readonly person: Attention
   /** Lanes running or with cards queued, in any root. */
@@ -149,6 +155,17 @@ export function attentionOf(input: AttentionInput): readonly Item[] {
       raised: { kind: "offer", source: o.source },
     })
   }
+  // An ask reaches its owner whether or not they follow the thread, and
+  // while its lane runs: it asks mid-run, and waits on them.
+  if (input.owner === me)
+    for (const a of input.sshAsks)
+      if (!input.archived.has(a.lane))
+        items.push({
+          lane: a.lane,
+          end: a.end,
+          level: "needsYou",
+          raised: { kind: "ssh", host: a.host },
+        })
   return items
 }
 
@@ -290,6 +307,8 @@ export function attentionWords(
   nameOf: (writer: WriterId) => string,
 ): string {
   if (raised.kind === "offer") return "work ready to accept"
+  if (raised.kind === "ssh")
+    return `wants your ssh for ${raised.host ?? "a host"}`
   const v = raised.verdict
   switch (v.kind) {
     case "said":

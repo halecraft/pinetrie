@@ -114,7 +114,7 @@ export async function startLaneConfigs(input: {
   const describe = (a: AcceptedLanes): string[] => {
     const { grants } = a.authority
     const on = [
-      grants.ssh ? "your ssh agent" : null,
+      grants.ssh ? "your ssh identity" : null,
       ...grants.env.map(e => `$${e}`),
       ...grants.mounts.map(m => m.source),
     ].filter(g => g !== null)

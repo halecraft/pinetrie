@@ -14,6 +14,7 @@ import { type CommitOptions, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 import {
   type AcceptedAction,
+  type AccessAnswer,
   type CardCommand,
   type CardId,
   type CardPlace,
@@ -349,6 +350,8 @@ export interface SessionClient {
   ): Promise<Outcome>
   /** Set up accepted work, or publish it. Tracked in `acting`. */
   actOnAccepted(action: AcceptedAction): Promise<Outcome>
+  /** Your answer to `lane`'s use of your ssh identity. Tracked in `acting`. */
+  access(lane: ThreadId, answer: AccessAnswer): Promise<Outcome>
   /** Your offer, setup and publish commands out now, or refused or failed (`acting.ts`). */
   readonly acting: Readable<ActingState>
   /** Let go of every part, then shut the exchange down; rejects only when that fails. */
@@ -772,6 +775,11 @@ export async function connectSession(
     actOnAccepted(action) {
       return sendActing(acting, { kind: "accepted", action }, () =>
         send({ kind: action }),
+      )
+    },
+    access(lane, answer) {
+      return sendActing(acting, { kind: "access", lane, answer }, () =>
+        send({ kind: "ssh-access", lane, answer }),
       )
     },
     acting: readable(acting),

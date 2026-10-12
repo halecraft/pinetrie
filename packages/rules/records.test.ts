@@ -21,6 +21,7 @@ import { describe, expect, test } from "vitest"
 import { BUDGET } from "./budget.ts"
 import {
   ACCEPTED,
+  ACCESS,
   BANNER,
   BASE,
   byTarget,
@@ -233,7 +234,18 @@ const SAMPLES: readonly Sample[] = [
     { message: E, thread: L, by: ADA, limit: 200, spent: 10, over: false },
     "message",
   ),
-  sample("project", PROJECT, { root: "/p" }, null),
+  sample("project", PROJECT, { root: "/p", owner: ADA }, null),
+  sample(
+    "access",
+    ACCESS,
+    {
+      lane: L,
+      personal: { kind: "approved", by: ADA, at: 1 },
+      services: ["deploy"],
+      hosts: ["pop"],
+    },
+    "lane",
+  ),
   sample("commands", COMMANDS, { commands: [] }, null),
   sample("root", ROOT, rootRecord, "root"),
   sample(
@@ -384,6 +396,7 @@ test("each record lives where it is read: across roots in the session, by entry 
     base: "session",
     name: "session",
     banner: "session",
+    access: "session",
     "queue hold": "session",
     budget: "session",
     project: "session",

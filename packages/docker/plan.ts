@@ -32,14 +32,30 @@ export const LANEHOST_LABEL = "pinetrie.lanehost"
 export const NESTED_MOUNT = "/var/lib/pinetrie-lanes"
 /** The inner Docker's socket, which a nested lane's own host uses. */
 export const INNER_DOCKER_HOST = `unix:///run/user/${ROOTLESS_UID}/docker.sock`
-/** Where a lane granted ssh finds the agent. */
-export const SSH_AGENT_IN_LANE = "/run/pinetrie/ssh-agent.sock"
 /**
  * A nested lane's command: its inner Docker, then the lane's own wait. The
  * inner Docker starts in a subshell that exits at once, so `--init` adopts
  * it and reaps it when it ends: `sleep` would leave it a zombie.
  */
 export const NESTED_COMMAND = "(pinetrie-inner-docker &); exec sleep infinity"
+
+/**
+ * A lane's command: each start in the background, in a subshell that exits
+ * at once so `--init` adopts and reaps it, then a nested lane's inner Docker,
+ * then the wait. Null for a lane with neither: the image runs `sleep`.
+ */
+export function laneCommand(lane: {
+  readonly nested: boolean
+  readonly starts: readonly string[]
+}): readonly string[] {
+  if (!lane.nested && lane.starts.length === 0) return ["sleep", "infinity"]
+  const starts = lane.starts.map(s => `(${s} &); `).join("")
+  return [
+    "sh",
+    "-c",
+    `${starts}${lane.nested ? NESTED_COMMAND : "exec sleep infinity"}`,
+  ]
+}
 
 /** Each project's lanes are on a network of their own, so a grant is its project's. */
 export const projectNetwork = (key: string): string => `pinetrie-${key}`
@@ -111,7 +127,10 @@ export function renderRun(
   },
 ): ContainerSpec {
   const { target, disks } = input
-  const ssh = shape.ssh && target.sshAgent !== null
+  const hostSocket =
+    shape.hostSocket !== null && target.hostSocket !== null
+      ? { source: target.hostSocket, target: shape.hostSocket }
+      : null
   const nested = shape.nested
   const hostPorts = target.hostAddress !== null && shape.hostPorts.length > 0
   return {
@@ -120,10 +139,9 @@ export function renderRun(
     // container's id.
     hostname: shape.name,
     image: shape.image,
-    cmd: nested ? ["sh", "-c", NESTED_COMMAND] : ["sleep", "infinity"],
+    cmd: [...laneCommand(shape)],
     workingDir: WORKSPACE_ROOT,
     env: [
-      ...(ssh ? [`SSH_AUTH_SOCK=${SSH_AGENT_IN_LANE}`] : []),
       ...(hostPorts
         ? [
             `${HOST_ENV}=${target.hostAddress}`,
@@ -141,15 +159,7 @@ export function renderRun(
         readonly: false,
       },
       ...shape.mounts.map(m => bind(m, target.pathOf)),
-      ...(ssh && target.sshAgent !== null
-        ? [
-            {
-              source: target.sshAgent,
-              target: SSH_AGENT_IN_LANE,
-              readonly: false,
-            },
-          ]
-        : []),
+      ...(hostSocket === null ? [] : [{ ...hostSocket, readonly: false }]),
       ...(nested
         ? [
             {

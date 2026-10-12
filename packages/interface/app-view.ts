@@ -6,6 +6,7 @@
 // memoised child new props.
 
 import {
+  type AccessRecord,
   type ArchivedTask,
   ancestry,
   type EntryId,
@@ -75,6 +76,8 @@ export interface AppViewInput {
   readonly workflow: Workflow | null
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly offers: ReadonlyMap<ThreadId, OfferRecord>
+  /** Each lane's ssh identities and its owner's answers. */
+  readonly access: ReadonlyMap<ThreadId, AccessRecord>
   /** The lanes of the roots this tab holds. */
   readonly lanes: readonly LaneView[]
   /** Every lane's root entry (`laneRootsOf`), held or not. */
@@ -151,13 +154,35 @@ export interface OpenOffer {
   readonly source: string | null
 }
 
+/** A lane waiting for its owner's answer about ssh, where choosing it opens. */
+export interface SshAsk {
+  readonly lane: ThreadId
+  readonly end: EntryId
+  readonly host: string | null
+}
+
 export function appView(input: AppViewInput): {
   readonly stage: Stage
   /** Open offers whose lane has a tip, for your inbox and the board. */
   readonly offers: readonly OpenOffer[]
+  /** Lanes waiting for their owner's answer, for the owner's inbox. */
+  readonly sshAsks: readonly SshAsk[]
 } {
-  return { stage: stageOf(input), offers: openOffers(input) }
+  return {
+    stage: stageOf(input),
+    offers: openOffers(input),
+    sshAsks: sshAsks(input),
+  }
 }
+
+/** Each lane that waits for its owner, at its tip where this tab holds it, else its root. */
+const sshAsks = (input: AppViewInput): readonly SshAsk[] =>
+  [...input.access.values()].flatMap(a => {
+    const root = input.laneRoots.get(a.lane)
+    if (a.personal?.kind !== "waiting" || root === undefined) return []
+    const tip = input.lanes.find(l => l.name === a.lane)?.tip ?? null
+    return [{ lane: a.lane, end: tip ?? root, host: a.personal.host }]
+  })
 
 function stageOf(input: AppViewInput): Stage {
   const { active, columns, tracks } = input

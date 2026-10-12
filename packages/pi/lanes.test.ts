@@ -48,7 +48,7 @@ import { assembleTools } from "./tools.ts"
 const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   dir: "/workspace",
   shared: [],
-  grants: { ssh: false, env: [], mounts: [] },
+  grants: { ssh: { personal: false, services: [] }, env: [], mounts: [] },
   defaultImage: false,
   install: "/pinetrie",
   note: "/pinetrie/packages/pi/lane.md",
@@ -192,17 +192,25 @@ describe("laneGuidelines", () => {
       text(
         facts({
           grants: {
-            ssh: true,
+            ssh: { personal: true, services: ["deploy", "ci"] },
             env: ["NPM_TOKEN", "CI"],
             mounts: ["/data", "/ref"],
           },
         }),
       ),
     ).toContain(
-      "or credentials except your ssh agent, $NPM_TOKEN, $CI, read-only files at /data, /ref. ",
+      "or credentials except your owner's ssh identity (once they approve this lane), the ssh identities deploy and ci, $NPM_TOKEN, $CI, read-only files at /data, /ref. ",
     )
     expect(
-      text(facts({ grants: { ssh: false, env: ["CI"], mounts: [] } })),
+      text(
+        facts({
+          grants: {
+            ssh: { personal: false, services: [] },
+            env: ["CI"],
+            mounts: [],
+          },
+        }),
+      ),
     ).toContain("or credentials except $CI. ")
   })
 
@@ -248,7 +256,11 @@ describe("laneGuidelines", () => {
       facts({
         shared: [".plans", "notes"],
         defaultImage: true,
-        grants: { ssh: true, env: ["A"], mounts: ["/m"] },
+        grants: {
+          ssh: { personal: true, services: ["deploy"] },
+          env: ["A"],
+          mounts: ["/m"],
+        },
       }),
     )
     expect(new Set(lines).size).toBe(lines.length)

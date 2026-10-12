@@ -188,6 +188,17 @@ test("channel declares nothing: a lane's helper and lanehost both run it from pi
   assert.deepEqual(allDeps(read("packages/channel")), [])
 })
 
+test("ssh declares nothing: a lane's hop runs it from pine·trie's install", () => {
+  assert.deepEqual(allDeps(read("packages/ssh")), [])
+})
+
+test("only the app declares ssh: lanes and Docker know a host socket, never ssh", () => {
+  const declaring = WORKSPACE.filter(dir =>
+    allDeps(read(dir)).includes("@pinetrie/ssh"),
+  ).sort()
+  assert.deepEqual(declaring, ["apps/pinetrie"])
+})
+
 test("lanehost declares only core and channel: it knows nothing of lanes or Docker", () => {
   assert.deepEqual(deps(read("packages/lanehost")).sort(), [
     "@pinetrie/channel",

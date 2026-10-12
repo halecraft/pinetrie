@@ -1,7 +1,12 @@
 // session — one client's connection to a host. This lists every name another
 // package imports; a name only this package and its tests use is not here.
 
-export type { AcceptedActing, OfferActing, Unsuccessful } from "./acting.ts"
+export type {
+  AcceptedActing,
+  AccessActing,
+  OfferActing,
+  Unsuccessful,
+} from "./acting.ts"
 export type { AttentionStore, SeenMentions } from "./attention-doc.ts"
 export {
   type ActedAt,

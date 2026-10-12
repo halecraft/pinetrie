@@ -56,6 +56,7 @@ const input = (over: Partial<AppViewInput>): AppViewInput => ({
   workflow: WORKFLOW,
   nameOf,
   offers: new Map(),
+  access: new Map(),
   lanes: [],
   laneRoots: new Map(),
   ...over,

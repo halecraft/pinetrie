@@ -7,11 +7,14 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Agent } from "@pinetrie/pi"
-import { readCardHistories, readPlaces } from "@pinetrie/reads"
+import { readCardHistories, readPlaces, readRecords } from "@pinetrie/reads"
 import {
+  ACCESS,
+  accessOf,
   deleteRecord,
   encodeCard,
   PARTICIPANT,
+  PROJECT,
   QUEUE_HOLD,
   queuedOn,
   setRecord,
@@ -36,6 +39,7 @@ import type { RunStart } from "../runs.ts"
 import {
   handleCarryOn,
   handleQueueHold,
+  handleSshAccess,
   handleStop,
   recordFact,
 } from "./lane.ts"
@@ -203,6 +207,42 @@ test("a hold is written once, its release deleted and the lane drained, each ans
   expect(
     (await handleQueueHold(deps, threadIdFor("ffff"), true, ada)).kind,
   ).toBe("refused")
+})
+
+test("the owner's answer to a lane's ssh is written; anyone else's is refused", async () => {
+  const b = basics()
+  const lane = threadIdFor("0123456789abcdef")
+  applyWrites(b, [
+    setRecord(PROJECT, { root: "/p", owner: ada }),
+    setRecord(ACCESS, {
+      ...accessOf(lane),
+      personal: { kind: "waiting", host: "pop", since: 1 },
+    }),
+  ])
+  const deps = {
+    basics: b,
+    records: {
+      writeValues: async (w: Parameters<Records["writeValues"]>[0]) =>
+        applyWrites(b, w),
+    },
+  }
+  const approve = { kind: "ssh-access", lane, answer: "approve" } as const
+  expect(await handleSshAccess(deps, bea, approve)).toMatchObject({
+    kind: "refused",
+    code: "not_owner",
+  })
+  expect(await handleSshAccess(deps, ada, approve)).toEqual({
+    kind: "answered",
+  })
+  expect(readRecords(b.session, ACCESS).get(lane)?.personal).toEqual({
+    kind: "approved",
+    by: ada,
+    at: 1_000,
+  })
+  expect(await handleSshAccess(deps, ada, approve)).toMatchObject({
+    kind: "refused",
+    code: "nothing_to_answer",
+  })
 })
 
 test("an offer's fact is queued as a card at the thread's end, and the lane's drain asked for", async () => {

@@ -28,6 +28,7 @@ import {
   entryKey,
   fixedKey,
   threadKey,
+  WriterIdSchema,
 } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
@@ -94,6 +95,7 @@ const RevisionRecordSchema = Type.Object({
 
 const ProjectRecordSchema = Type.Object({
   root: Type.String({ minLength: 1 }),
+  owner: Type.Union([WriterIdSchema, Type.Null()]),
 })
 
 /**
@@ -168,9 +170,7 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
         ProjectRecordSchema,
         contents,
         fixedKey(PROJECT_KEY, key),
-        // A record from when a lane could work directly has a kind and a
-        // default: not read.
-        r => ({ root: r.root }),
+        r => ({ root: r.root, owner: r.owner }),
       ),
   }
 

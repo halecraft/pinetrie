@@ -6,6 +6,14 @@
 
 import type { ConfigRead } from "@pinetrie/lanes"
 import type { FieldSource, ModelOrigin } from "@pinetrie/pi"
+import type {
+  DroppedIdentity,
+  PersonalOff,
+  ServiceKeyCheck,
+  ServiceKeyRefusal,
+  SshSettingRefusal,
+  SshSettings,
+} from "@pinetrie/ssh"
 import type { StoreChoice } from "./invocation.ts"
 
 /** `[host] label` padded so the values line up. */
@@ -83,3 +91,89 @@ export function agentReadyLine(agent: {
 export const listeningLine = (url: string): string => line("listening", url)
 
 export const openLine = (invite: string): string => line("open", invite)
+
+const PERSONAL_OFF: Readonly<Record<PersonalOff, string | null>> = {
+  // Neither config asked for it: nothing to say.
+  "not-granted": null,
+  declined: "your ssh identity: declined in your config",
+  "invalid-hosts":
+    "your ssh identity: off, since lanes.ssh.hosts is not a list of host patterns",
+  "no-owner":
+    "your ssh identity: off, since your config names no owner (owner: your email) to approve it",
+  "no-agent":
+    "your ssh identity: off, since this host has no ssh agent (SSH_AUTH_SOCK)",
+}
+
+const KEY_REFUSED: Readonly<Record<ServiceKeyRefusal, string>> = {
+  readable: "group or others can read it (chmod 600 it)",
+  passphrase: "it has a passphrase, which nobody is there to type",
+  "no-pub": "no public key beside it",
+  "not-a-key": "it is not a private key",
+}
+
+const DROPPED: Readonly<Record<DroppedIdentity["why"], string>> = {
+  "outside-folder": "it is outside the service folder",
+  relative: "ssh reads a relative path where it runs",
+  token: "it names a token only ssh expands, per connection",
+  "no-pub": "no public key beside it",
+}
+
+/** What a starting host says of lanes' ssh: what they hold, and each thing it refused. */
+export function sshLines(facts: {
+  readonly settings: SshSettings
+  readonly refusedSettings: readonly SshSettingRefusal[]
+  readonly checks: readonly ServiceKeyCheck[]
+  readonly failed: readonly { readonly name: string; readonly said: string }[]
+  /** The service identities the agent holds. */
+  readonly added: readonly string[]
+  readonly dropped: readonly DroppedIdentity[]
+  readonly hasSsh: boolean
+  readonly hasAgent: boolean
+  /** The user config's file, which the settings are in. */
+  readonly file: string
+}): readonly string[] {
+  const { personal, approvalSeconds } = facts.settings
+  const holds = [
+    ...(personal.kind === "on"
+      ? [
+          `your identity (on approval, ${approvalSeconds} s${personal.hosts === "all" ? "" : `; hosts: ${personal.hosts.join(", ")}`})`,
+        ]
+      : []),
+    ...(facts.added.length === 0
+      ? []
+      : [`service identities ${facts.added.join(", ")}`]),
+  ]
+  const off = personal.kind === "off" ? PERSONAL_OFF[personal.why] : null
+  return [
+    ...facts.refusedSettings.map(
+      r => `[host] ${r.setting} in ${facts.file} is not taken: ${r.written}`,
+    ),
+    ...(holds.length === 0 ? [] : [`[host] lanes' ssh: ${holds.join(", ")}`]),
+    ...(off === null ? [] : [`[host] ${off}`]),
+    ...facts.checks.flatMap(c =>
+      c.kind === "refused"
+        ? [
+            `[host] ssh service key ${c.name} is not used: ${KEY_REFUSED[c.why]}`,
+          ]
+        : [],
+    ),
+    ...facts.failed.map(
+      f =>
+        `[host] ssh service key ${f.name} is not used: ssh-add said ${f.said}`,
+    ),
+    ...facts.dropped.map(
+      d =>
+        `[host] ${d.side === "service" ? "the service" : "your"} ssh config's IdentityFile ${d.file} is not given to lanes: ${DROPPED[d.why]}`,
+    ),
+    ...(holds.length > 0 && !facts.hasSsh
+      ? [
+          "[host] this host has no ssh: lanes connect directly, without your ssh config's names",
+        ]
+      : []),
+    ...(holds.length > 0 && !facts.hasAgent
+      ? [
+          "[host] this host has no ssh-agent: no service identities, and narrowed hosts refuse your identity",
+        ]
+      : []),
+  ]
+}

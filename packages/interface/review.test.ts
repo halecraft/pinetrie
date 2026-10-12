@@ -46,7 +46,7 @@ describe("reviewView", () => {
       }),
     ]).revisions[0]?.state
     expect(widened?.kind === "ready" ? widened.value.widens : null).toBe(
-      "Accepting this lets lanes use your ssh agent, $TOKEN.",
+      "Accepting this lets lanes use your ssh identity, $TOKEN.",
     )
   })
   const at = { lane: LANE, name: "amber-fox" as ThreadName, entry: "e1" }

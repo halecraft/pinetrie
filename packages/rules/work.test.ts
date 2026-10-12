@@ -49,7 +49,7 @@ describe("records: one spec each, total decoders", () => {
       shared: NO_SHARED,
     },
   }
-  const project = { root: "/p" }
+  const project = { root: "/p", owner: writerId("duane@x.io") }
   test("each record round-trips, keyed as its reader expects", () => {
     const l = setRecord(LANE_RECORD, lane)
     expect([l.namespace, l.key, LANE_RECORD.decode(l.value, l.key)]).toEqual([
@@ -83,14 +83,6 @@ describe("records: one spec each, total decoders", () => {
   test("a record from before conflicts were recorded decodes with none", () => {
     const { conflicts: _, ...old } = revision
     expect(REVISION.decode(old, "e1")).toEqual({ ...old, conflicts: [] })
-  })
-  test("a project record from when a lane could work directly reads as its root alone, and is rewritten at start", () => {
-    expect(
-      PROJECT.decode(
-        { kind: "lanes", root: "/p", rootDefault: "own" },
-        "project",
-      ),
-    ).toEqual({ root: "/p" })
   })
   test("a lane's copy of its own is stored as its work, as records from when a lane could work directly hold it", () => {
     expect(LANE_RECORD.encode(lane)).toMatchObject({ work: { kind: "own" } })

@@ -255,6 +255,9 @@ export function writesIn(
     case "set-command":
     // Traces are the session's, in no task.
     case "traces-seen":
+    // An answer to a lane's ssh writes its access record, in no task: the
+    // owner can take back what an archived task's lane holds.
+    case "ssh-access":
       return []
   }
 }
