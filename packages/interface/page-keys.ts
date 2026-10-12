@@ -16,9 +16,12 @@
 // keys here: they are the page's `copy`, `cut` and `paste` events
 // (`clipboard.ts` in the page, ADR-0132). `/` opens a search outside a text
 // box; Escape closes it from the search itself, its field included.
+// Alt+← and Alt+→ move the column focus is in one place, outside a text box,
+// where they move by word, and outside the inventory, where they swap slots.
 
 import type { Focus } from "./focus.ts"
 import type { Intent } from "./intent.ts"
+import { keyMove } from "./reorder.ts"
 
 /** The part of a `KeyboardEvent` read here. */
 export interface KeyLike {
@@ -54,6 +57,15 @@ export function keyAct(event: KeyLike, focus: Focus): Intent | null {
           target: { kind: "column", key: focus.column },
           how: "move",
         }
+  const altOnly =
+    event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
+  if (altOnly && !focus.inText && !focus.inPanel && focus.inColumn !== null) {
+    const { card, position, count } = focus.inColumn
+    const to = keyMove(position, count, event.key)
+    return to === null
+      ? null
+      : { kind: "moveColumn", column: { kind: "card", card }, to }
+  }
   if (focus.inText || event.altKey) return null
   if (plain && event.key === "/" && focus.search !== "unavailable")
     return { kind: "search", act: { kind: "open" } }

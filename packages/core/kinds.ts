@@ -89,7 +89,7 @@ export const KINDS = {
   },
   "note-column": {
     prefix: "n-",
-    places: ["canvas"],
+    places: ["canvas", "trash"],
     moves: true,
     reordered: true,
     text: "none",

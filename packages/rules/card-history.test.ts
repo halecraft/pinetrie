@@ -33,6 +33,7 @@ import {
   TRACED,
   TRACED_PLACES,
   TRASH_KEEP_MS,
+  trashDeadline,
   verbOf,
 } from "./card-history.ts"
 
@@ -444,11 +445,7 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
 })
 
 test("planTrashSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere", () => {
-  const discarded: CardPlace = {
-    kind: "trash",
-    task: TEST_TASK,
-    holder: ADA,
-  }
+  const discarded = { kind: "trash", left: DRAFTING } as const
   const event = (when: number) => ({
     kind: "moved" as const,
     by: ADA,
@@ -475,5 +472,65 @@ test("planTrashSweep: a card discarded a week ago or more, or with no history to
       ]),
       now,
     }),
-  ).toEqual([old, silent])
+  ).toEqual({ cards: [old, silent], threads: [] })
+  expect(
+    trashDeadline(old, new Map([[old, { card: old, events: [event(50)] }]]), 1),
+  ).toBe(50 + TRASH_KEEP_MS)
+  expect(trashDeadline(silent, new Map(), 7)).toBe(7)
+})
+
+test("planTrashSweep: a card on a surface a deleted card owns goes with it, trashed or not, and so on down", () => {
+  const column = cardIdOfKind(
+    "note-column",
+    "01a0ffd2-0000-7000-8000-0000000000b1",
+  )
+  const kept = cardIdOfKind(
+    "note-column",
+    "01a0ffd2-0000-7000-8000-0000000000b2",
+  )
+  const thread = threadIdFor("swept")
+  const trashedColumn: CardRecord = {
+    kind: "note-column",
+    id: column,
+    owner: ADA,
+    placer: ADA,
+    place: {
+      kind: "trash",
+      left: { kind: "canvas", task: TEST_TASK, order: "a", width: 1 },
+    },
+    content: NO_CONTENT,
+  }
+  const trashedThread: CardRecord = {
+    kind: "thread",
+    id: thread,
+    owner: ADA,
+    placer: ADA,
+    place: {
+      kind: "trash",
+      left: { kind: "canvas", task: TEST_TASK, order: "b", width: 1 },
+    },
+    content: NO_CONTENT,
+  }
+  const note = {
+    ...card({ kind: "note", column, order: "a" }),
+    id: cardIdFor("n1"),
+  }
+  const other = {
+    ...card({ kind: "note", column: kept, order: "a" }),
+    id: cardIdFor("n2"),
+  }
+  const message = {
+    ...card({ kind: "composing", thread }),
+    id: cardIdFor("m1"),
+  }
+  expect(
+    planTrashSweep({
+      cards: [trashedColumn, trashedThread, note, other, message],
+      histories: new Map(),
+      now: 1,
+    }),
+  ).toEqual({
+    cards: [column, thread, note.id, message.id],
+    threads: [thread],
+  })
 })

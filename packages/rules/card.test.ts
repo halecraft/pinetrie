@@ -1,4 +1,5 @@
 import {
+  BACK,
   type CardCommand,
   type CardId,
   type CardPlace,
@@ -69,9 +70,9 @@ import {
   undoAnswer,
 } from "./move-history.ts"
 import {
-  type Discards,
   NO_DISCARDS,
   ownsPlace,
+  planFromTrash,
   planMove,
   planMoveCommand,
   planMoveRequest,
@@ -94,7 +95,7 @@ import {
   queuedOn,
   taskPinnedOf,
 } from "./queue.ts"
-import { canvasOf, indexTasks, NO_TASK_INDEX } from "./task.ts"
+import { canvasOf, indexTasks } from "./task.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
@@ -240,7 +241,6 @@ describe("planCarry (ADR-0080)", () => {
         [fact],
         { card: fact.id, from: keyOf(fact.place), to: DISCARDED },
         ADA,
-        NO_DISCARDS,
       ),
     ).toEqual({ kind: "refused", code: "no-place", now: fact })
     expect(
@@ -252,7 +252,6 @@ describe("planCarry (ADR-0080)", () => {
           to: { kind: "queued", thread: T_E, seen: "" },
         },
         ADA,
-        NO_DISCARDS,
       ),
     ).toEqual({ kind: "refused", code: "no-place", now: fact })
     expect(planSetCommand([fact], fact.id, "bring-up-to-date")).toEqual({
@@ -698,7 +697,6 @@ describe("note columns (ADR-0116)", () => {
       // @ts-expect-error: planMove takes a canvas only with its rank
       { card: made, from: null, to: { kind: "canvas", task: TEST_TASK } },
       ADA,
-      NO_DISCARDS,
     )
     const { step } = planMoveRequest(
       [x, y],
@@ -711,7 +709,6 @@ describe("note columns (ADR-0116)", () => {
       ],
       ADA,
       () => false,
-      { tasks: indexTasks([x, y], new Map()), here: null },
       () => MADE,
       new Map(),
     )
@@ -757,7 +754,6 @@ describe("note columns (ADR-0116)", () => {
         ],
         ADA,
         () => false,
-        { tasks: indexTasks([x, y], new Map()), here: null },
         () => MADE,
         new Map(),
       )
@@ -789,7 +785,6 @@ describe("note columns (ADR-0116)", () => {
       planUnqueueAll([q], LANE),
       ADA,
       () => false,
-      NO_DISCARDS,
       () => MADE,
       new Map(),
     )
@@ -810,7 +805,7 @@ describe("note columns (ADR-0116)", () => {
       to: { kind: "notes", near: "thread", thread: LANE },
     } as const
     // @ts-expect-error a thread's nearest notes are resolved before planning
-    planMove([note()], unresolved, ADA, NO_DISCARDS)
+    planMove([note()], unresolved, ADA)
   })
 
   test("a move into a note column lands at its end; a reorder moves a note among its column's own", () => {
@@ -831,7 +826,6 @@ describe("note columns (ADR-0116)", () => {
         to: { kind: "note", column: NOTES },
       },
       ADA,
-      NO_DISCARDS,
     )
     const placed = step.kind === "write" ? step.record.place : null
     expect(placed?.kind === "note" && placed.order > K(1)).toBe(true)
@@ -876,7 +870,6 @@ describe("note columns (ADR-0116)", () => {
       [card({ id: cardIdFor("c5") }), ...comments],
       { card: cardIdFor("c5"), from: keyOf(card().place), to: at },
       ADA,
-      NO_DISCARDS,
     )
     const placed = step.kind === "write" ? step.record.place : null
     expect(
@@ -925,9 +918,7 @@ describe("note columns (ADR-0116)", () => {
       "01a0ffd2-0000-7000-8000-0000000000c1",
     )
     const to = { kind: "canvas", task: TEST_TASK, order: "m" } as const
-    expect(
-      planMove([], { card: id, from: null, to }, ADA, NO_DISCARDS),
-    ).toMatchObject({
+    expect(planMove([], { card: id, from: null, to }, ADA)).toMatchObject({
       kind: "write",
       record: { kind: "note-column", id, owner: ADA, place: to },
     })
@@ -936,7 +927,6 @@ describe("note columns (ADR-0116)", () => {
         [],
         { card: id, from: null, to: { kind: "inventory", holder: ADA } },
         ADA,
-        NO_DISCARDS,
       ),
     ).toEqual({ kind: "refused", code: "no-place", now: null })
     expect(
@@ -1315,9 +1305,7 @@ describe("handoffs (ADR-0059)", () => {
   } as const
 
   test("a creation: the sender owns and placed it, with no command; refused when the id is in use", () => {
-    expect(
-      planMove([], { card: C1, from: null, to: atEnd }, BEA, NO_DISCARDS),
-    ).toEqual({
+    expect(planMove([], { card: C1, from: null, to: atEnd }, BEA)).toEqual({
       kind: "write",
       record: {
         kind: "text",
@@ -1329,23 +1317,18 @@ describe("handoffs (ADR-0059)", () => {
       },
     })
     const taken = card()
-    expect(
-      planMove([taken], { card: C1, from: null, to: atEnd }, BEA, NO_DISCARDS),
-    ).toEqual({ kind: "refused", code: "exists", now: taken })
+    expect(planMove([taken], { card: C1, from: null, to: atEnd }, BEA)).toEqual(
+      { kind: "refused", code: "exists", now: taken },
+    )
   })
 
   test("the compare: gone when there is no record, moved when it is not where the sender saw it", () => {
-    expect(
-      planMove([], { card: C1, from: atEnd, to: queuedKey }, BEA, NO_DISCARDS),
-    ).toEqual({ kind: "refused", code: "gone", now: null })
+    expect(planMove([], { card: C1, from: atEnd, to: queuedKey }, BEA)).toEqual(
+      { kind: "refused", code: "gone", now: null },
+    )
     const elsewhere = card({ place: unstartedPlace("k") })
     expect(
-      planMove(
-        [elsewhere],
-        { card: C1, from: atEnd, to: queuedKey },
-        BEA,
-        NO_DISCARDS,
-      ),
+      planMove([elsewhere], { card: C1, from: atEnd, to: queuedKey }, BEA),
     ).toEqual({ kind: "refused", code: "moved", now: elsewhere })
   })
 
@@ -1359,7 +1342,6 @@ describe("handoffs (ADR-0059)", () => {
       [before, c],
       { card: C1, from: atEnd, to: queuedKey },
       BEA,
-      NO_DISCARDS,
     )
     expect(step).toEqual({
       kind: "write",
@@ -1377,12 +1359,7 @@ describe("handoffs (ADR-0059)", () => {
       ...queued(cardIdFor("c1"), "zz"),
       placer: ADA,
     }
-    const step = planMove(
-      [q],
-      { card: C1, from: queuedKey, to: atEnd },
-      BEA,
-      NO_DISCARDS,
-    )
+    const step = planMove([q], { card: C1, from: queuedKey, to: atEnd }, BEA)
     expect(step).toEqual({
       kind: "write",
       record: { ...q, place: atEnd, placer: BEA },
@@ -1395,12 +1372,7 @@ describe("handoffs (ADR-0059)", () => {
       placer: ADA,
     }
     expect(
-      planMove(
-        [q],
-        { card: C1, from: queuedKey, to: queuedKey },
-        BEA,
-        NO_DISCARDS,
-      ),
+      planMove([q], { card: C1, from: queuedKey, to: queuedKey }, BEA),
     ).toEqual({ kind: "refused", code: "moved", now: q })
   })
 
@@ -1409,12 +1381,7 @@ describe("handoffs (ADR-0059)", () => {
       ...queued(cardIdFor("c1"), "a"),
       content: { command: "bring-up-to-date", unsent: "x", origin: null },
     } as const
-    const step = planMove(
-      [q],
-      { card: C1, from: queuedKey, to: atEnd },
-      ADA,
-      NO_DISCARDS,
-    )
+    const step = planMove([q], { card: C1, from: queuedKey, to: atEnd }, ADA)
     expect(step.kind === "write" && step.record).toMatchObject({
       content: { command: "bring-up-to-date", unsent: "x", origin: null },
     })
@@ -1428,12 +1395,7 @@ describe("handoffs (ADR-0059)", () => {
     const elsewhere = pinned("p-1", orderAfter([]), threadIdFor("f1"))
     const c = card({ place: atEnd })
     expect(
-      planMove(
-        [elsewhere, c],
-        { card: C1, from: atEnd, to: pinnedKey },
-        BEA,
-        NO_DISCARDS,
-      ),
+      planMove([elsewhere, c], { card: C1, from: atEnd, to: pinnedKey }, BEA),
     ).toEqual({
       kind: "write",
       record: {
@@ -1456,9 +1418,7 @@ describe("handoffs (ADR-0059)", () => {
       kind: "pinned",
       thread: LANE,
     } as const
-    expect(
-      planMove([p], { card: C1, from, to: atEnd }, BEA, NO_DISCARDS),
-    ).toEqual({
+    expect(planMove([p], { card: C1, from, to: atEnd }, BEA)).toEqual({
       kind: "write",
       record: { ...p, place: atEnd, placer: BEA },
     })
@@ -1487,9 +1447,7 @@ describe("handoffs (ADR-0059)", () => {
     lands,
   }) => {
     const c = card({ place })
-    expect(
-      planMove([c], { card: C1, from: keyOf(place), to }, BEA, NO_DISCARDS),
-    ).toEqual({
+    expect(planMove([c], { card: C1, from: keyOf(place), to }, BEA)).toEqual({
       kind: "write",
       record: { ...c, place: { ...to, ...lands }, placer: BEA },
     })
@@ -1497,14 +1455,6 @@ describe("handoffs (ADR-0059)", () => {
 
   describe("a discard (ADR-0111)", () => {
     const gone = (_: CardRecord["place"]) => DISCARDED
-    // Lane `x` on TEST_TASK's canvas; the sender on another task.
-    const onTask: Discards = {
-      tasks: indexTasks(
-        [threadCardOf({ thread: LANE, task: TEST_TASK, by: ADA, cards: [] })],
-        new Map(),
-      ),
-      here: taskIdFor("01a0ffd2-0000-7000-8000-00000000000e"),
-    }
     test.each([
       ["your message", atEnd],
       [
@@ -1525,24 +1475,15 @@ describe("handoffs (ADR-0059)", () => {
           seen: "",
         },
       ],
-    ] as const)("of %s: gone in the task it leaves, by its discarder", (_, place) => {
+    ] as const)("of %s: in the trash, recording the place it left, its discarder its placer", (_, place) => {
       const c = card({ place })
       expect(
-        planMove(
-          [c],
-          { card: C1, from: keyOf(place), to: gone(place) },
-          ADA,
-          onTask,
-        ),
+        planMove([c], { card: C1, from: keyOf(place), to: gone(place) }, ADA),
       ).toEqual({
         kind: "write",
         record: {
           ...c,
-          place: {
-            kind: "trash",
-            task: TEST_TASK,
-            holder: ADA,
-          },
+          place: { kind: "trash", left: place },
           placer: ADA,
         },
       })
@@ -1550,27 +1491,17 @@ describe("handoffs (ADR-0059)", () => {
 
     test("a gone card is moved by no handoff, and a popped one is gone", () => {
       const discarded = card({
-        place: {
-          kind: "trash",
-          task: TEST_TASK,
-          holder: ADA,
-        },
+        place: { kind: "trash", left: { kind: "inventory", holder: ADA } },
       })
       expect(
         planMove(
           [discarded],
           { card: C1, from: keyOf(discarded.place), to: atEnd },
           ADA,
-          NO_DISCARDS,
         ),
       ).toEqual({ kind: "refused", code: "gone", now: null })
       expect(
-        planMove(
-          [],
-          { card: C1, from: atEnd, to: gone(card().place) },
-          ADA,
-          NO_DISCARDS,
-        ),
+        planMove([], { card: C1, from: atEnd, to: gone(card().place) }, ADA),
       ).toEqual({ kind: "refused", code: "gone", now: null })
     })
   })
@@ -1592,9 +1523,7 @@ describe("handoffs (ADR-0059)", () => {
         place: atEnd,
         content: { command: "bring-up-to-date", unsent: "x", origin: null },
       })
-      expect(
-        planMove([c], { card: C1, from: atEnd, to: mine }, ADA, NO_DISCARDS),
-      ).toEqual({
+      expect(planMove([c], { card: C1, from: atEnd, to: mine }, ADA)).toEqual({
         kind: "write",
         record: { ...c, place: mine, placer: ADA },
       })
@@ -1602,20 +1531,16 @@ describe("handoffs (ADR-0059)", () => {
 
     test("into or out of someone else's inventory is refused not-yours", () => {
       const c = card({ place: atEnd })
-      expect(
-        planMove([c], { card: C1, from: atEnd, to: beas }, ADA, NO_DISCARDS),
-      ).toEqual({
+      expect(planMove([c], { card: C1, from: atEnd, to: beas }, ADA)).toEqual({
         kind: "refused",
         code: "not-yours",
         now: c,
       })
       const held = card({ place: beas })
       expect(
-        planMove([held], { card: C1, from: beas, to: atEnd }, ADA, NO_DISCARDS),
+        planMove([held], { card: C1, from: beas, to: atEnd }, ADA),
       ).toEqual({ kind: "refused", code: "not-yours", now: held })
-      expect(
-        planMove([], { card: C1, from: null, to: beas }, ADA, NO_DISCARDS),
-      ).toEqual({
+      expect(planMove([], { card: C1, from: null, to: beas }, ADA)).toEqual({
         kind: "refused",
         code: "not-yours",
         now: null,
@@ -1625,68 +1550,41 @@ describe("handoffs (ADR-0059)", () => {
     test("the nineteenth card is refused full, a creation too; another person's full inventory is not yours", () => {
       const c = card({ place: atEnd })
       expect(
-        planMove(
-          [...full(ADA), c],
-          { card: C1, from: atEnd, to: mine },
-          ADA,
-          NO_DISCARDS,
-        ),
+        planMove([...full(ADA), c], { card: C1, from: atEnd, to: mine }, ADA),
       ).toEqual({ kind: "refused", code: "full", now: c })
       expect(
-        planMove(
-          full(ADA),
-          { card: C1, from: null, to: mine },
-          ADA,
-          NO_DISCARDS,
-        ),
+        planMove(full(ADA), { card: C1, from: null, to: mine }, ADA),
       ).toEqual({ kind: "refused", code: "full", now: null })
       expect(
-        planMove(
-          [...full(BEA), c],
-          { card: C1, from: atEnd, to: mine },
-          ADA,
-          NO_DISCARDS,
-        ).kind,
+        planMove([...full(BEA), c], { card: C1, from: atEnd, to: mine }, ADA)
+          .kind,
       ).toBe("write")
       expect(
-        planMove(
-          full(ADA).slice(1),
-          { card: C1, from: null, to: mine },
-          ADA,
-          NO_DISCARDS,
-        ).kind,
+        planMove(full(ADA).slice(1), { card: C1, from: null, to: mine }, ADA)
+          .kind,
       ).toBe("write")
     })
 
-    test("a discard from your own inventory is gone in the task you are on, or none; from someone else's refused", () => {
+    test("a discard from your own inventory records that it left it; from someone else's, refused", () => {
       const held = card({ place: mine })
       const to = DISCARDED
-      const here = { tasks: NO_TASK_INDEX, here: TEST_TASK }
-      expect(
-        planMove([held], { card: C1, from: mine, to }, ADA, here),
-      ).toMatchObject({
-        kind: "write",
-        record: { place: { kind: "trash", task: TEST_TASK } },
-      })
-      expect(
-        planMove([held], { card: C1, from: mine, to }, ADA, NO_DISCARDS),
-      ).toMatchObject({
-        kind: "write",
-        record: { place: { kind: "trash", task: null } },
-      })
-      expect(planMove([held], { card: C1, from: mine, to }, BEA, here)).toEqual(
+      expect(planMove([held], { card: C1, from: mine, to }, ADA)).toMatchObject(
         {
-          kind: "refused",
-          code: "not-yours",
-          now: held,
+          kind: "write",
+          record: { place: { kind: "trash", left: mine } },
         },
       )
+      expect(planMove([held], { card: C1, from: mine, to }, BEA)).toEqual({
+        kind: "refused",
+        code: "not-yours",
+        now: held,
+      })
     })
 
     test("a key names its holder: Bea's inventory is not Ada's", () => {
       const held = card({ place: beas })
       expect(
-        planMove([held], { card: C1, from: mine, to: atEnd }, ADA, NO_DISCARDS),
+        planMove([held], { card: C1, from: mine, to: atEnd }, ADA),
       ).toEqual({ kind: "refused", code: "moved", now: held })
     })
 
@@ -1702,24 +1600,12 @@ describe("handoffs (ADR-0059)", () => {
   test("planMoveCommand: the lanes to drain where a card ends queued on a lane not running", () => {
     const c = card({ place: atEnd })
     const move = { card: C1, from: atEnd, to: queuedKey } as const
+    expect(planMoveCommand([c], [move], ADA, () => false).drain).toEqual([LANE])
+    expect(planMoveCommand([c], [move], ADA, () => true).drain).toEqual([])
     expect(
-      planMoveCommand([c], [move], ADA, () => false, NO_DISCARDS).drain,
-    ).toEqual([LANE])
-    expect(
-      planMoveCommand([c], [move], ADA, () => true, NO_DISCARDS).drain,
+      planMoveCommand([c], [{ ...move, to: atEnd }], ADA, () => false).drain,
     ).toEqual([])
-    expect(
-      planMoveCommand(
-        [c],
-        [{ ...move, to: atEnd }],
-        ADA,
-        () => false,
-        NO_DISCARDS,
-      ).drain,
-    ).toEqual([])
-    expect(
-      planMoveCommand([], [move], ADA, () => false, NO_DISCARDS).drain,
-    ).toEqual([])
+    expect(planMoveCommand([], [move], ADA, () => false).drain).toEqual([])
   })
 
   describe("planMoves: several moves, accepted whole or refused (ADR-0066)", () => {
@@ -1739,7 +1625,6 @@ describe("handoffs (ADR-0059)", () => {
             { card: C2, from: unstarted, to: inv },
           ],
           ADA,
-          NO_DISCARDS,
         ),
       ).toEqual({ kind: "refused", code: "moved", now: moved })
     })
@@ -1755,7 +1640,6 @@ describe("handoffs (ADR-0059)", () => {
           { card: C2, from: unstarted, to: inv },
         ],
         ADA,
-        NO_DISCARDS,
       )
       expect(step).toMatchObject({ kind: "refused", code: "full" })
     })
@@ -1769,7 +1653,6 @@ describe("handoffs (ADR-0059)", () => {
           { card: C3, from: unstarted, to: inv },
         ],
         ADA,
-        NO_DISCARDS,
       )
       expect(step).toEqual({
         kind: "steps",
@@ -2131,7 +2014,6 @@ describe("cards pinned to a task (ADR-0116)", () => {
       ],
       { card: cardIdFor("c1"), from: keyOf(card().place), to: at },
       BEA,
-      NO_DISCARDS,
     )
     expect(step).toMatchObject({
       kind: "write",
@@ -2193,7 +2075,6 @@ describe("cards pinned to a task (ADR-0116)", () => {
       ],
       ADA,
       () => false,
-      { tasks: indexTasks([pin, onCanvas], new Map()), here: null },
       () => made,
       new Map(),
     )
@@ -2616,7 +2497,6 @@ describe("references (ADR-0126)", () => {
       },
       replacing,
       sender,
-      NO_DISCARDS,
     )
   const asReference: Paste = { kind: "reference", card: REF, address, quote }
   const asText: Paste = { kind: "text", card: NEW, origin: address }
@@ -2672,7 +2552,7 @@ describe("references (ADR-0126)", () => {
       steps: [
         {
           kind: "write",
-          record: { id: REF, place: { kind: "trash", holder: ADA } },
+          record: { id: REF, place: { kind: "trash", left: inv } },
         },
         {
           kind: "write",
@@ -2697,7 +2577,11 @@ describe("references (ADR-0126)", () => {
 
   test("a cut card moves out of its cutter's own trash; one in someone else's, or in none, is gone; no move takes one out (ADR-0132)", () => {
     const trashed = (holder: WriterId) =>
-      ({ ...reference, place: { kind: "trash", holder, task: null } }) as const
+      ({
+        ...reference,
+        placer: holder,
+        place: { kind: "trash", left: { kind: "inventory", holder: BEA } },
+      }) as const
     const uncut: Paste = { kind: "uncut", card: REF }
     expect(paste([trashed(ADA)], uncut, inv)).toMatchObject({
       kind: "steps",
@@ -2712,12 +2596,7 @@ describe("references (ADR-0126)", () => {
       code: "gone",
     })
     expect(
-      planMove(
-        [trashed(ADA)],
-        { card: REF, from: DISCARDED, to: inv },
-        ADA,
-        NO_DISCARDS,
-      ),
+      planMove([trashed(ADA)], { card: REF, from: DISCARDED, to: inv }, ADA),
     ).toMatchObject({ kind: "refused", code: "gone" })
   })
 
@@ -2732,5 +2611,141 @@ describe("references (ADR-0126)", () => {
     expect(
       decodeCard(REF, { ...encodeCard(reference), quote: "nope" }),
     ).toBeUndefined()
+  })
+})
+
+describe("out of a trash: a restore back where the card was, and a new task", () => {
+  const C1 = cardIdFor("c1")
+  const COLUMN_PLACE = { kind: "note", column: NOTES, order: "q" } as const
+  const columnCard: CardRecord = {
+    kind: "note-column",
+    id: NOTES,
+    owner: ADA,
+    placer: ADA,
+    place: { kind: "canvas", task: TEST_TASK, order: "a", width: 1 },
+    content: NO_CONTENT,
+  }
+  const trashed = (left: Parameters<typeof keyOf>[0], placer = ADA) =>
+    card({
+      placer,
+      place: { kind: "trash", left: left as never },
+    })
+  const restore = (cards: readonly CardRecord[], sender = BEA) =>
+    planMoveRequest(
+      cards,
+      [{ card: C1, from: DISCARDED, to: BACK }],
+      sender,
+      () => false,
+      () => NOTES,
+      new Map(),
+    ).step
+
+  test("a note goes back to its column at its old rank, whoever trashed it", () => {
+    expect(restore([columnCard, trashed(COLUMN_PLACE)])).toMatchObject({
+      kind: "steps",
+      steps: [
+        {
+          kind: "write",
+          record: {
+            id: C1,
+            place: { kind: "note", column: NOTES },
+            placer: BEA,
+          },
+        },
+      ],
+    })
+  })
+
+  test("refused: its column trashed or gone, someone else's message, or yours where you wrote anew", () => {
+    const columnTrashed: CardRecord = {
+      ...columnCard,
+      place: {
+        kind: "trash",
+        left: { kind: "canvas", task: TEST_TASK, order: "a", width: 1 },
+      },
+    }
+    expect(restore([columnTrashed, trashed(COLUMN_PLACE)])).toMatchObject({
+      kind: "refused",
+      code: "left-gone",
+    })
+    expect(restore([trashed(COLUMN_PLACE)])).toMatchObject({
+      kind: "refused",
+      code: "left-gone",
+    })
+    const yours = { kind: "composing", thread: T_E } as const
+    const thread = threadCardOf({
+      thread: T_E,
+      task: TEST_TASK,
+      by: ADA,
+      cards: [],
+    })
+    expect(restore([thread, trashed(yours)])).toMatchObject({
+      kind: "refused",
+      code: "not-yours",
+    })
+    const newer = card({ id: cardIdFor("c2") })
+    expect(restore([thread, trashed(yours), newer], ADA)).toMatchObject({
+      kind: "refused",
+      code: "left-taken",
+    })
+    expect(restore([thread, trashed(yours)], ADA)).toMatchObject({
+      kind: "steps",
+    })
+  })
+
+  test("a move from a trash anywhere but where it was is gone; an uncut goes anywhere, by its cutter alone", () => {
+    const inBeas = trashed({ kind: "inventory", holder: BEA })
+    expect(
+      planMove(
+        [inBeas],
+        { card: C1, from: DISCARDED, to: { kind: "inventory", holder: ADA } },
+        ADA,
+      ),
+    ).toMatchObject({ kind: "refused", code: "gone" })
+    const to = { kind: "inventory", holder: ADA } as const
+    expect(
+      planFromTrash([inBeas], C1, ADA, { kind: "uncut", to }),
+    ).toMatchObject({ kind: "write" })
+    expect(
+      planFromTrash([inBeas], C1, BEA, { kind: "uncut", to }),
+    ).toMatchObject({ kind: "refused", code: "gone" })
+  })
+
+  test("a new task: its card at the end of the board's first state, the card first on its canvas, in one step; none with no states", () => {
+    const NEW = taskIdFor("01a0ffd2-0000-7000-8000-0000000000dd")
+    const workflow = {
+      open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
+      archive: { id: workflowStateIdFor("x"), name: "Done" },
+    }
+    const plan = (wf: typeof workflow | null) =>
+      planMoveRequest(
+        [columnCard],
+        [
+          {
+            card: NOTES,
+            from: { kind: "canvas", task: TEST_TASK },
+            to: { kind: "new-task", task: NEW },
+          },
+        ],
+        ADA,
+        () => false,
+        () => NOTES,
+        new Map(),
+        wf,
+      ).step
+    expect(plan(workflow)).toMatchObject({
+      kind: "steps",
+      steps: [
+        {
+          kind: "write",
+          record: { id: NEW, kind: "task", place: { kind: "board" } },
+        },
+        {
+          kind: "write",
+          record: { id: NOTES, place: { kind: "canvas", task: NEW } },
+        },
+      ],
+    })
+    expect(plan(null)).toMatchObject({ kind: "refused", code: "no-place" })
   })
 })

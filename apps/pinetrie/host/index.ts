@@ -670,7 +670,7 @@ export async function startHost({
       })
       await sweepHistories({ basics, store, histories, startup: false })
       await sweepHolds({ basics, records })
-      await sweepTrash({ basics, cards: cardPort })
+      await sweepTrash({ basics, cards: cardPort, work })
       await provenance.sweep()
     },
   })
@@ -722,7 +722,7 @@ export async function startHost({
   })
   await sweepHistories({ basics, store, histories, startup: true })
   await sweepHolds({ basics, records })
-  await sweepTrash({ basics, cards: cardPort })
+  await sweepTrash({ basics, cards: cardPort, work })
   await provenance.sweep()
   const seats = startSeats({ exchange, basics, keeper, records, histories })
   const control = startControl({

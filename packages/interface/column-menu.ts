@@ -1,11 +1,12 @@
-// interface/column-menu — a card column's ⋯ (ADR-0116): what it offers for
-// the canvas everyone shares, as values: its width, one column or two, the
-// card's and the same for everyone; a note column made just after it; and
-// for a thread's card, a copy here or in your inventory, and a take into
-// your inventory (ADR-0127). Pure: the page's columns draw it.
+// interface/column-menu — a card column's ⋯, as values: first what is
+// yours alone, its fold; then what changes the canvas everyone shares, its
+// width, one column or two, and a note column made just after it; and for a
+// thread's card, a copy here or in your inventory, and a take into your
+// inventory. Pure: the page's columns draw it.
 
 import { type CardId, type CardWidth, isThreadId } from "@pinetrie/core"
 import { moveWords } from "./card-frame.ts"
+import { FOLD } from "./folded-column-view.ts"
 import type { Intent } from "./intent.ts"
 
 /** One item of a column's ⋯. */
@@ -16,9 +17,9 @@ export interface ColumnMenuItem {
   readonly intent: Intent
 }
 
-/** A run of a column's ⋯: the canvas's own items, or a thread's. */
+/** A run of a column's ⋯: yours alone, the canvas's own items, or a thread's. */
 export interface ColumnMenuSection {
-  readonly key: "canvas" | "thread"
+  readonly key: "yours" | "canvas" | "thread"
   readonly items: readonly ColumnMenuItem[]
 }
 
@@ -32,6 +33,17 @@ export function columnMenu(input: {
   readonly width: CardWidth
 }): readonly ColumnMenuSection[] {
   const wide = input.width === 2
+  const yours: ColumnMenuSection = {
+    key: "yours",
+    items: [
+      {
+        key: "fold",
+        label: "Fold",
+        title: FOLD.title,
+        intent: { kind: "fold", card: input.card, unfolded: false },
+      },
+    ],
+  }
   const canvas: ColumnMenuSection = {
     key: "canvas",
     items: [
@@ -51,9 +63,10 @@ export function columnMenu(input: {
       },
     ],
   }
-  if (!isThreadId(input.card)) return [canvas]
+  if (!isThreadId(input.card)) return [yours, canvas]
   const source = input.card
   return [
+    yours,
     canvas,
     {
       key: "thread",
@@ -90,4 +103,4 @@ export const FIRST_NOTE_COLUMN = {
 } as const
 
 /** The ⋯'s own name, for a screen reader. */
-export const COLUMN_MENU_LABEL = "more for this column, for everyone"
+export const COLUMN_MENU_LABEL = "more for this column"

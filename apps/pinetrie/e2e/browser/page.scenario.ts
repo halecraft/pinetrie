@@ -701,7 +701,7 @@ async function run(check: Checks["check"]): Promise<void> {
         }),
       )
 
-      // ── moving a column: drag its header, or its grip's keys ───────────────
+      // ── moving a column: drag its header, or Alt+arrows ───────────────────
       const keys = () =>
         page.$$eval(".column", ns => ns.map(n => n.getAttribute("data-key")))
       /** Press column `n`'s header, and move to `dx` px into column `into`. */
@@ -721,21 +721,24 @@ async function run(check: Checks["check"]): Promise<void> {
             document
               .querySelector(".column[data-dragging]")
               ?.getAttribute("data-position") ?? null,
-          drop: [...document.querySelectorAll(".column[data-drop]")]
-            .map(
-              n =>
-                `${n.getAttribute("data-position")}:${n.getAttribute("data-drop")}`,
-            )
+          // The neighbours slid apart to open the gap it would land in.
+          shifted: [
+            ...document.querySelectorAll<HTMLElement>(
+              ".column:not([data-dragging])",
+            ),
+          ]
+            .filter(n => n.style.transform !== "")
+            .map(n => n.getAttribute("data-position"))
             .join(),
         }))
       const unmoved = await keys()
       const pressed = await dragHeader(2, 0, 60)
       const mid = await marked()
       check(
-        "a dragged header's column is lifted and a bar marks where it will land; nothing moves before the drop",
+        "a dragged header's column is lifted and its neighbours slide apart where it will land; nothing moves before the drop",
         pressed &&
           mid.dragging === "2" &&
-          mid.drop === "0:before" &&
+          mid.shifted === "0,1" &&
           (await keys()).join() === unmoved.join(),
         `${JSON.stringify(mid)}`,
       )
@@ -746,11 +749,31 @@ async function run(check: Checks["check"]): Promise<void> {
         "Escape cancels a drag: nothing moves, and nothing stays marked",
         (await keys()).join() === unmoved.join() &&
           after.dragging === null &&
-          after.drop === "",
+          after.shifted === "",
         `${JSON.stringify(after)}`,
       )
+      // A cancelled drag springs back: the header is pressed where it rests.
+      await page
+        .waitForFunction(
+          () =>
+            [...document.querySelectorAll<HTMLElement>(".column")].every(
+              c => c.style.transform === "" && c.style.transition === "",
+            ),
+          undefined,
+          { timeout: 5_000 },
+        )
+        .catch(() => {})
       await dragHeader(2, 0, 60)
       await page.mouse.up()
+      // The canvas's order is the host's: it is drawn once its answer comes.
+      await page
+        .waitForFunction(
+          k =>
+            document.querySelector(".column")?.getAttribute("data-key") === k,
+          unmoved[2],
+          { timeout: 5_000 },
+        )
+        .catch(() => {})
       const dropped = await keys()
       check(
         "a dropped column moves there, and the others keep their order",
@@ -783,24 +806,26 @@ async function run(check: Checks["check"]): Promise<void> {
         leftover === 0,
         `${leftover}px`,
       )
-      await page.focus(`${col(0)} .grip`)
-      await page.keyboard.press("ArrowRight")
+      // Alt+arrows move the column focus is in, outside a text box.
+      await page.focus(`${col(0)} .column-head button`)
+      await page.keyboard.press("Alt+ArrowRight")
       const stepped = await keys()
-      const focused = await page.evaluate(() => {
-        const a = document.activeElement
-        return a?.classList.contains("grip") === true
-          ? (a.closest(".column")?.getAttribute("data-key") ?? null)
-          : null
-      })
+      const focused = await page.evaluate(
+        () =>
+          document.activeElement
+            ?.closest(".column")
+            ?.getAttribute("data-key") ?? null,
+      )
       check(
-        "→ on a column's grip moves it one place right, and its grip keeps focus",
+        "Alt+→ in a column moves it one place right, and focus stays in it",
         stepped.join() ===
           [dropped[1], dropped[0], ...dropped.slice(2)].join() &&
           focused === dropped[0],
         `${focused}`,
       )
       // The strip is wider than the page, so the last column starts cut off.
-      await page.keyboard.press("End")
+      for (let i = 1; i < dropped.length - 1; i++)
+        await page.keyboard.press("Alt+ArrowRight")
       const shown = await page.evaluate(() => {
         const strip = document.querySelector("#strip")
         const moved = document.activeElement?.closest(".column")
@@ -814,13 +839,14 @@ async function run(check: Checks["check"]): Promise<void> {
         }
       })
       check(
-        "End on its grip moves it last, and scrolls the strip to show it",
+        "Alt+→ on to the last place scrolls the strip to show it",
         shown?.overflows === true &&
           shown.last === String(dropped.length - 1) &&
           shown.inView,
         `${JSON.stringify(shown)}`,
       )
-      await page.keyboard.press("Home")
+      for (let i = 1; i < dropped.length; i++)
+        await page.keyboard.press("Alt+ArrowLeft")
 
       // ── a busy thread: the composer says it will queue, and it does ────────
       // On one host the page sees another writer's run start almost at once, so
@@ -1086,8 +1112,8 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // ── the agent in a thread no column shows: the rail pulses ──────────────
-      await page.click(`${col(1)} .fold`)
-      await page.click(`${col(1)} .fold`)
+      await chooseFromMenu(page, `${col(1)} .column-menu`, ".column-fold")
+      await chooseFromMenu(page, `${col(1)} .column-menu`, ".column-fold")
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 1,
         undefined,
@@ -1315,11 +1341,17 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.waitForSelector(`${asideCol} .composer`, { timeout: 15_000 })
       await page.inputValue(`${asideCol} .composer .input`)
       await page.click(`${asideCol} .close`)
-      await page.waitForFunction(
-        () => document.querySelectorAll(".column").length === 2,
-        undefined,
-        { timeout: 15_000 },
-      )
+      const asideClosed = await page
+        .waitForFunction(
+          () => document.querySelectorAll(".column").length === 2,
+          undefined,
+          { timeout: 15_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check("× on a branch's column takes it off the canvas", asideClosed)
 
       // ── a message's tools: one row; edit is a sibling; a first message's new tab
       // (ADR-0043). A person's message in agent work has all three tools.
@@ -1511,6 +1543,16 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.click(`${person} > .tools > .edit`)
       const editCol = col(before + 1)
       await page.waitForSelector(`${editCol} .composer`, { timeout: 15_000 })
+      // Its text is filled in a moment after the composer is drawn.
+      await page
+        .waitForFunction(
+          sel =>
+            (document.querySelector<HTMLTextAreaElement>(sel)?.value ?? "") !==
+            "",
+          `${editCol} .composer .input`,
+          { timeout: 10_000 },
+        )
+        .catch(() => {})
       const editStart = await page.inputValue(`${editCol} .composer .input`)
       const editTrack = await page.getAttribute(editCol, "data-track")
       const forkOnParent = await page
@@ -1533,7 +1575,7 @@ async function run(check: Checks["check"]): Promise<void> {
           (await texts(before)).includes("say exactly: DOWN-TWO"),
         `"${editStart}", its fork dot on the parent: ${forkOnParent}`,
       )
-      await page.click(`${editCol} .fold`)
+      await chooseFromMenu(page, `${editCol} .column-menu`, ".column-fold")
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 2,
         undefined,
@@ -2102,16 +2144,15 @@ async function run(check: Checks["check"]): Promise<void> {
               "canvas",
           `"${convo}", ${opened}`,
         )
-        // Closed unsent, discarding what it holds: its task goes too.
+        // Closed unsent, by ×, asking nothing: its task goes too.
         await page.fill(`${col(0)} .composer .input`, "never sent")
         await page.click(`${col(0)} .close`)
-        await page.click(`${col(0)} .close-discard`).catch(() => {})
         const gone = await waitFor(
           () => readTasks(host.places).size === tasksBefore,
           10_000,
         )
         check(
-          "an unsent new tab closed with discard takes its task away, and its thread's card to your trash (ADR-0126)",
+          "an unsent new tab closed with × takes its task away, and its thread's card to the trash, asking nothing",
           gone >= 0 &&
             readPlaces(host.places).find(c => c.id === tab)?.place.kind ===
               "trash",
@@ -3297,13 +3338,6 @@ async function run(check: Checks["check"]): Promise<void> {
           c => c.place.kind !== "trash",
         ).length
         await page.click(`${col(1)} .close`)
-        const asks = await page
-          .waitForSelector(`${col(1)} .close-ask`, { timeout: 5_000 })
-          .then(
-            () => true,
-            () => false,
-          )
-        await page.click(`${col(1)} .close-discard`).catch(() => {})
         const closed = await page
           .waitForFunction(
             () => document.querySelectorAll(".column").length === 1,
@@ -3317,10 +3351,10 @@ async function run(check: Checks["check"]): Promise<void> {
         const shown = () =>
           readPlaces(host.places).filter(c => c.place.kind !== "trash").length
         await waitFor(() => shown() < cardsBefore, 5_000)
-        // Its message and its thread's card, both to your trash.
+        // Its thread's card to the trash; its message stays on it.
         check(
-          "closing a new branch that holds text asks first, and discarding takes its card away",
-          asks && closed && shown() === cardsBefore - 2,
+          "× on a new branch that holds text trashes its card at once, asking nothing",
+          closed && shown() === cardsBefore - 1,
         )
         // Marks (ADR-0048, step 2): a pip where a card of yours holds text.
         const pipIn = (p: typeof page, sel: string) =>
@@ -3751,7 +3785,8 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.click(".inventory .discard-card")
       await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       const columnsBefore = await page.locator(".column").count()
-      // Closing an unstarted branch with text keeps its card, in the slot selected.
+      // × on an unstarted branch with text trashes it; the task column's
+      // trash lists it, and restore brings it back, its text with it.
       const branchable = page
         .locator(
           `${col(columnsBefore - 1)} .msg[data-entry]:has(> .tools > .branch)`,
@@ -3770,27 +3805,49 @@ async function run(check: Checks["check"]): Promise<void> {
         { timeout: 10_000 },
       )
       const thought = (await page.getAttribute(unstartedBox, "data-card")) ?? ""
-      await page.click('.inventory .slot[data-slot="5"]')
+      const branchCard = (await page.getAttribute(branch, "data-card")) ?? ""
       await page.click(`${branch} .close`)
-      await page.click(`${branch} .close-keep`)
-      const keptOnClose = await appears(
-        `.inventory .slot[data-slot="5"][data-card="${thought}"]`,
-      )
-      const closedFresh = await page
-        .waitForFunction(
-          n => document.querySelectorAll(".column").length === n,
-          columnsBefore,
-          { timeout: 10_000 },
-        )
-        .then(
-          () => true,
-          () => false,
-        )
+      const columnsAre = (n: number) =>
+        page
+          .waitForFunction(
+            n => document.querySelectorAll(".column").length === n,
+            n,
+            { timeout: 10_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+      const closedFresh = await columnsAre(columnsBefore)
+      // The inventory, docked in the middle, covers the task column: its
+      // controls are pressed from the keyboard.
+      const press = async (sel: string) => {
+        await page.focus(sel, { timeout: 10_000 })
+        await page.keyboard.press("Enter")
+      }
+      if ((await page.$(".task-column.folded-column")) !== null)
+        await press(".task-column.folded-column .folded-title")
+      const trashRow = `.task-trash .trash-row[data-card="${branchCard}"]`
+      await press(".task-trash summary").catch(() => {})
+      const listed = await appears(trashRow)
+      await press(`${trashRow} .trash-restore`).catch(() => {})
+      const restored = await columnsAre(columnsBefore + 1)
       check(
-        "closing an unstarted branch with text keeps its card in your inventory",
-        keptOnClose && closedFresh && placeOf(thought)?.kind === "inventory",
-        `slot ${keptOnClose}, closed ${closedFresh}, ${placeOf(thought)?.kind}`,
+        "× on an unstarted branch trashes it, the task's trash lists it, and restore brings it back with its text",
+        closedFresh &&
+          listed &&
+          restored &&
+          placeOf(branchCard)?.kind === "canvas" &&
+          placeOf(thought)?.kind === "composing",
+        `closed ${closedFresh}, listed ${listed}, restored ${restored}, ${placeOf(branchCard)?.kind}`,
       )
+      // Its text taken into slot 5, which a reload below keeps.
+      await page.click('.inventory .slot[data-slot="5"]')
+      await page.focus(unstartedBox)
+      await page.keyboard.press("Control+Shift+I")
+      await appears(`.inventory .slot[data-slot="5"][data-card="${thought}"]`)
+      await page.click(`${branch} .close`)
+      await columnsAre(columnsBefore)
 
       // Pinned cards (ADR-0048 step 5), in the DOWN thread's agent column:
       // pin moves the composer's card to the strip at the column's top, above

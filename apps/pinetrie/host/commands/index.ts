@@ -30,8 +30,8 @@ import {
 import {
   archivedIn,
   displayName,
-  HELD_WORDS,
   heldIn,
+  holdingWords,
   PARTICIPANT,
   type QueuePop,
   runsIn,
@@ -341,9 +341,9 @@ export function createCommands(deps: CommandDeps): Commands {
  */
 /**
  * A command that would run, or write a message, in a thread someone holds
- * in their inventory is refused (ADR-0124): `runsIn` says where each kind
- * of command runs, and a branch's fork is read from its root's tree. Null
- * when the command may go on.
+ * in their inventory, or one trashed, is refused: `runsIn` says where each
+ * kind of command runs, and a branch's fork is read from its root's tree.
+ * Null when the command may go on.
  */
 async function refuseHeld(
   basics: Pick<Basics, "places" | "docs" | "session">,
@@ -367,7 +367,11 @@ async function refuseHeld(
   )
   return held === null
     ? null
-    : { kind: "refused", code: ERR.REFUSED, message: HELD_WORDS }
+    : {
+        kind: "refused",
+        code: ERR.REFUSED,
+        message: holdingWords(held.holding),
+      }
 }
 
 function refuseInArchive(

@@ -19,7 +19,12 @@ import type {
   TreeIndex,
   WriterId,
 } from "@pinetrie/core"
-import { placeEnd, type TaskIndex, taskOfPlace } from "@pinetrie/rules"
+import {
+  isOnCanvas,
+  placeEnd,
+  type TaskIndex,
+  taskOfPlace,
+} from "@pinetrie/rules"
 import type { Level, Status } from "./attention.ts"
 import { needsCard } from "./card-state.ts"
 import { type Layout, unlisted } from "./layout.ts"
@@ -143,6 +148,8 @@ export function unsentSignals(input: {
     if (!input.filled.has(card.id)) continue
     switch (card.place.kind) {
       case "composing": {
+        // A trashed thread's message is in the trash with it.
+        if (!isOnCanvas(input.tasks, card.place.thread)) break
         // A thread in a root this tab does not hold has no end here, and
         // still marks its task (ADR-0063).
         const end = placeEnd(card.place, input.index)
@@ -153,6 +160,7 @@ export function unsentSignals(input: {
       }
       // A note marks its note column's task (ADR-0116).
       case "note": {
+        if (!isOnCanvas(input.tasks, card.place.column)) break
         const task = taskOfPlace(input.tasks, card.place)
         if (task !== null) tasks.add(task)
         break

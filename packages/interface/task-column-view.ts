@@ -6,9 +6,24 @@
 // Folded, it shows the title and how many cards are pinned to the task.
 // Pure: `TaskColumn` (`packages/web/task-column.tsx`) draws it.
 
-import type { MarkRecord, TaskId, Workflow } from "@pinetrie/core"
-import type { ControlWords } from "./card-words.ts"
+import type {
+  CardHistoryRecord,
+  CardId,
+  CardRecord,
+  MarkRecord,
+  NoteColumnId,
+  NoteColumnRecord,
+  TaskId,
+  ThreadId,
+  ThreadName,
+  Workflow,
+  WriterId,
+} from "@pinetrie/core"
+import { NEW_NOTES_TITLE, trashDeadline } from "@pinetrie/rules"
+import { type ControlWords, who } from "./card-words.ts"
+import { UNNAMED_THREAD } from "./folded-column-view.ts"
 import { NO_TEXT, type TaskSummary } from "./root-label.ts"
+import type { Reader } from "./send.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 
 /** The task column, as drawn. */
@@ -27,7 +42,95 @@ export interface TaskColumnView {
   readonly moves: readonly ThreadMove[]
   /** Nothing may be changed here: an archived task's column. */
   readonly readOnly: boolean
+  /** The columns trashed from its canvas, newest first (`canvasTrash`). */
+  readonly trash: readonly TrashRow[]
 }
+
+/** A column in the trash of a task's canvas, as its list draws it. */
+export interface TrashRow {
+  readonly card: ThreadId | NoteColumnId
+  /** The thread's name, or the note column's title. */
+  readonly title: string
+  /** Who trashed it: its placer. */
+  readonly by: WriterId
+  /** Whole days until the sweep deletes it (`trashDeadline`), at least 0. */
+  readonly deletesInDays: number
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The columns trashed from `task`'s canvas: each thread or note column in a
+ * trash whose `left` is that canvas, the newest discard first. Pure.
+ */
+export function canvasTrash(input: {
+  readonly cards: readonly CardRecord[]
+  readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
+  readonly task: TaskId
+  readonly now: number
+  readonly names: ReadonlyMap<ThreadId, ThreadName>
+  readonly noteTitles: ReadonlyMap<NoteColumnId, NoteColumnRecord>
+}): readonly TrashRow[] {
+  const rows = input.cards.flatMap(c => {
+    if (
+      c.place.kind !== "trash" ||
+      c.place.left.kind !== "canvas" ||
+      c.place.left.task !== input.task
+    )
+      return []
+    const deadline = trashDeadline(c.id, input.histories, input.now)
+    const row = (card: ThreadId | NoteColumnId, title: string) => [
+      {
+        deadline,
+        row: {
+          card,
+          title,
+          by: c.placer,
+          deletesInDays: Math.max(
+            0,
+            Math.ceil((deadline - input.now) / DAY_MS),
+          ),
+        },
+      },
+    ]
+    switch (c.kind) {
+      case "thread":
+        return row(c.id, input.names.get(c.id) ?? UNNAMED_THREAD)
+      case "note-column":
+        return row(c.id, input.noteTitles.get(c.id)?.title ?? NEW_NOTES_TITLE)
+      default:
+        return []
+    }
+  })
+  return rows
+    .sort((a, b) =>
+      b.deadline !== a.deadline
+        ? b.deadline - a.deadline
+        : a.row.card < b.row.card
+          ? -1
+          : 1,
+    )
+    .map(r => r.row)
+}
+
+/** A trash row's words: who trashed it, and when it is deleted. */
+export const trashWords = (row: TrashRow, reader: Reader): string =>
+  `${who(row.by, reader)} trashed it · deleted ${
+    row.deletesInDays === 0
+      ? "today"
+      : row.deletesInDays === 1
+        ? "in 1 day"
+        : `in ${row.deletesInDays} days`
+  }`
+
+/** The trash list's heading, with how many it holds. */
+export const trashHeading = (n: number): string => `trash · ${n}`
+
+/** A trash row's button, and what it does. */
+export const RESTORE_WORDS = {
+  label: "restore",
+  title: "bring it back where it was, for everyone",
+} as const
 
 /** The task column of `task`, from its thread card's head and its title's record. */
 export function taskColumnView(input: {
@@ -38,6 +141,8 @@ export function taskColumnView(input: {
   readonly summary: TaskSummary | undefined
   readonly workflow: Workflow | null
   readonly archived: boolean
+  /** Its canvas's trash (`canvasTrash`). */
+  readonly trash: readonly TrashRow[]
 }): TaskColumnView {
   const { head, workflow } = input
   const state =
@@ -54,6 +159,7 @@ export function taskColumnView(input: {
     state,
     moves: input.archived ? [] : (head?.moves ?? []),
     readOnly: input.archived,
+    trash: input.trash,
   }
 }
 

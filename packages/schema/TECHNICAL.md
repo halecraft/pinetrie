@@ -310,10 +310,14 @@ would refuse each whole undo of a move (S82).
   from before ADR-0066 a `json` `pinetrie:places` document, that no code
   opens; delete them by hand. The startup sweep removes the texts no record
   names.
-- **A card in a trash is stored `discarded`** (ADR-0111, ADR-0126): whose
-  trash in `holder`, the task it left in `task` ("" for none), whose
-  history its discard is in. A card spun into a thread is in its spinner's
-  trash too; its thread's record names it (`origin` `spun`).
+- **A card in a trash is stored as the place it left** (ADR-0134): that
+  place's own row, its kind prefixed `discarded-` (`discarded-note`,
+  `discarded-canvas`, `discarded-drafting`, …), so no field was added and
+  the schema's hash held. Who trashed it is the row's `placer`. A row of
+  the old shape, `discarded` with `holder` and `task`, does not decode:
+  record migration `0014-trash-left` deletes them. A card spun into a
+  thread is in a trash too; its thread's record names it (`origin`
+  `spun`).
 - **The row has no `root`** (ADR-0126): only a fresh card's row named one,
   and a branch or a new tab is a thread card now. Migration
   `0012-unstarted-threads` dropped it with its data moved: each fresh

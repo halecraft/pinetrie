@@ -349,7 +349,7 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   column is a `.task-column.folded-column`.
 - **`data-position` is a column's index among whole thread columns**
   (`drawnAt`), which the suite's `col(n)` selects by; `position`, its index
-  on the canvas, is the grip's.
+  on the canvas, is what Alt+arrows move by.
 - **A column's ⋯** (`column-menu.tsx`, `columnMenu`) is its card's, for
   everyone: its width, one column or two (`cardWidth`), and a note column
   after it; a thread's adds a section of Copy to this task, Copy to your
@@ -357,8 +357,6 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   `columnMenu` returns the sections, and each item's class is
   `column-<key>` (`.column-copy`, `.column-copy-inventory`,
   `.column-take`). The task column's **+ note column** puts one first.
-- **⇲ in a thread column's header** is a card drag (`dragCard`), which a
-  slot of your inventory takes; the header's own drag reorders.
 - **A copy's fork row and a parent elsewhere's** (`Origin`, kind `source`)
   follow a `ThreadLink`; one held by someone else is disabled. A column
   whose path above its thread is folded (`ColumnView.above`) draws
@@ -368,8 +366,13 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
 - **A thread in your inventory** is a `ThreadFaceView` in its slot and a
   `ThreadPreviewView` opened (`thread-preview.tsx`), whose **put** puts it
   on the canvas you are on.
-- **Only an unstarted thread's column has ×** (`closable` in `ColumnSlot`);
-  every column folds (⇤, `.fold`).
+- **Every unfolded column's header ends in ⋯ and ×** (`.column-menu`,
+  `.close`), a note column's too: × is the `discard` intent of its card, and
+  Fold is the ⋯'s first item (`.column-fold`). A focused column moves with
+  Alt+←/→ (`Focus.inColumn`), and is scrolled into view when it moves with
+  focus inside it.
+- **The task column lists its canvas's trash** (`.task-trash`, a row per
+  column, `.trash-row[data-card]`, its `.trash-restore`).
 
 ## A column's view (`viewport.ts`, `use-viewport.ts`, ADR-0058)
 
@@ -421,40 +424,53 @@ serves the rail's outline and the column's spot.
   `.rail-tick[data-key][data-track]`, keyed by their column. The browser suite tests "around a dot" over every outline of
   a column: a column's view can lie on two branches.
 
-## Moving columns (`reorder.ts`, `use-column-drag.ts`)
+## Dragging (`use-drag.ts`, ADR-0134, S153)
 
-A card's column moves for everyone (ADR-0116): its header
-(`[data-column-head]`, a folded strip's and a note column's too) is its drag
-handle, once the canvas has two cards, and its grip (`.grip`) moves it from
-the keyboard. A branch not yet sent and the task column do not move: only
-`#strip > [data-card]` is dragged among. The drop is one `moveColumn`
-intent, a reorder of the card on the canvas (`planColumnMove`), which the
-host orders and the undo key takes back; `reorder.ts` decides, purely, which gap a pointer is in (`gapAt`),
-where a drop there lands (`landing`), what a key does (`keyMove`), and how
-fast the strip scrolls near an edge (`edgeScroll`).
+Every drag that starts in the page is one engine's: a column's header (a
+folded strip's, a note column's too), a card frame's header, a slot's card,
+a board card, a sidebar row. Each handle carries `dragProps` (`data-drag-card`
+or `data-drag-task`), and the engine finds its source with
+`sourceOfElement`. It decides nothing: `drag.ts` in `@pinetrie/interface`
+does (`dragVerdict` over `putLanding` and `planRootDrop`, `drawPlan`,
+`dropIntents`, `hoverOpens`).
 
-- **Nothing moves until the drop.** Moving a column changes what the columns
-  right of it show (`projectColumns`), so a live reorder would redraw the
-  columns under the pointer. During a drag, the column slides with the pointer
-  and `data-drop` (`before`, or `after` on the last column) marks the gap.
-- **A drag writes to the DOM, not to React state:** a transform,
-  `data-dragging` on the column, `data-reordering` on the strip. A render of
-  `App` per pointer move would redraw every column. The column's centres are
-  measured once, when the drag starts, in the strip's content coordinates, so
-  edge scrolling does not skew them.
-- **The slide is clamped to the strip's ends.** A transform widens a scroll
-  container's overflow, so an unclamped column dragged right would keep
-  widening the strip that the edge scroll is chasing.
-- **A press on a control starts no drag** (`NOT_A_HANDLE`): the name and the
-  origin row are buttons. A thread's details are drawn below the header,
-  outside it, so no press on them starts one. The header is `user-select: none`; the offer's
-  bookmark, which a press copies, is in the work strip, outside it. A press is
-  a drag only once it has moved 5 px, so clicks still reach the header.
-- **Escape or a cancelled pointer moves nothing.** A drop in the gap on either
-  side of the column also moves nothing, and marks nothing.
-- **After a move by key, the column is scrolled into view.** Its grip keeps
-  focus through React's DOM move in Chromium, which the browser suite checks.
-  Its mutation removing an explicit `focus()` survived, so there is none.
+- **What the first frame needs is armed at the press**, before the 5 px
+  threshold (`DRAG_START`): the strip's box, the columns' widths and
+  centres, the neighbours' transitions, the card face (a copy of the
+  column's header). S153 found a drag's one long frame is its first; armed
+  at `pointerdown` it falls before anything is seen to move. Columns still
+  springing back from a cancel are reset before they are measured, or a
+  quick second drag reads a column where it was drawn, not where it is.
+- **A dragged column only translates.** No scale, rotation or shadow on
+  it: on a slow machine a long column so drawn cost frames (S153). The lift
+  is on its header (`--lean`, a shadow), and off the strip the column is
+  hidden and its card face drawn under the pointer.
+- **A style is written only when it changes** (`write`). Writing every
+  transform each frame, the same as the last, brought the 95th percentile
+  frame to 33 ms at 4× throttling; written on change, it is the
+  baseline's.
+- **A drag writes to the DOM, never to React state**: a transform,
+  `data-dragging` on what moves, `data-reordering` on the strip,
+  `data-card-drag` on the body (an empty pinned strip shows, and drop zones
+  are outlined), `data-drag-verdict` on the target (`move`, `copy`,
+  `replace`, `refused`), `data-hover-open` on a sidebar task or ▦ while its
+  ring fills. It reads the intent state from a function each frame, never
+  rebuilt for it. The order changes once, on the drop: a reorder's
+  `moveColumn`, a landing's `put`, a task's own drop, the intents a key or
+  a menu would send.
+- **The click a release sends after a drag is swallowed**, so a header's
+  buttons start drags too and a press that moves less than 5 px is their
+  click. Text fields, selects and an open menu start none (`NOT_A_HANDLE`).
+  The browser's own `dragstart` inside a handle is prevented, so a link or
+  an image there does not take the pointer.
+- **Touch does not drag** (S154 is open): only a mouse or a pen starts one.
+- **Escape, `pointercancel`, or a drop where nothing lands** springs
+  everything back; with `prefers-reduced-motion` the springs and the ring
+  have no duration.
+- **Nothing else in the page uses HTML drag and drop** but
+  `picture-field.tsx`'s file drop, which only the browser's drag can
+  bring from the desktop: `boundaries.test.ts` keeps it so, as it keeps
+  the clipboard in `clipboard.ts`.
 - **The order is never realigned.** A column moved right keeps its scroll,
   though it now starts after its fork point. A column moved first loses its
   spacer (`column.tsx`).
@@ -1466,8 +1482,8 @@ What S151 measured, and these handlers rest on:
   from a reader on a thread card. To step away from a root so its columns
   unmount, a check opens a new tab and closes its column again, which
   discards its task (`stepAway`, `stepBack`).
-- **`.column` must stay `#strip`'s direct child**: `use-column-drag.ts`
-  queries `:scope > .column`. A column's `.column-body` is inside
+- **`.column` must stay `#strip`'s direct child**: `use-drag.ts` and
+  `focus.ts` query `#strip > [data-card]`. A column's `.column-body` is inside
   `.column-thread`.
 - **A button's copy needs a secure context.** An invite link over plain
   http has no `navigator.clipboard`, which only a button's copy uses

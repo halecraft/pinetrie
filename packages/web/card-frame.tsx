@@ -1,5 +1,5 @@
 // web/card-frame — the frame every text card is drawn in (ADR-0111): a
-// header that is its grip and its signals (its kind's icon, its place, state,
+// header that is its drag handle and its signals (its kind's icon, its place, state,
 // who put it there, a command's chip, ⋯ and ×), its body, and a footer of
 // ↑ ↓ and its one primary action. What it shows is `cardFrame`'s value, in
 // `cardFrameWords`'s words; the frame's colour is the place's, the icon the
@@ -10,9 +10,8 @@
 // (`card-editor.tsx`), so the frame's wrappers are the same with a card and
 // without one, and only the header's contents change.
 
-import { type CardId, isTextCard, type WriterId } from "@pinetrie/core"
+import { isTextCard, type WriterId } from "@pinetrie/core"
 import {
-  CARD_MIME,
   type CardFrameView,
   type CatchUps,
   CLEAR_COMMAND,
@@ -21,6 +20,7 @@ import {
   DISCARD_CARD,
   DISCARD_CARD_TITLE,
   type DrawnCard,
+  dragProps,
   HISTORY_TITLE,
   historyItemWords,
   KIND_ICON,
@@ -28,7 +28,7 @@ import {
   moveWords,
   type Reader,
 } from "@pinetrie/interface"
-import { type ReactNode, useRef, useState } from "react"
+import { type ReactNode, useState } from "react"
 import { CardHistory, MovedBack } from "./card-history.tsx"
 import { InventoryIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
@@ -66,8 +66,6 @@ export function CardFrame(p: {
   const { view, card } = p
   const words = cardFrameWords(view, p.reader, p.catchUps, p.writers ?? [])
   const [history, setHistory] = useState(false)
-  // A press on ⋯, ×, or the menu's items starts no drag of the card.
-  const onControl = useRef(false)
   const sections = [
     {
       key: "moves",
@@ -113,24 +111,17 @@ export function CardFrame(p: {
       data-queued={view.tone === "queued" ? card?.id : undefined}
       data-tone={view.tone}
     >
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: a drag handle; the keyboard moves a card through its ⋯ and Ctrl+Shift+I */}
       <div
         className="card-head"
         data-card={card?.id}
         // The card itself takes focus here, outside its text box, so Cmd+C
-        // and Cmd+X copy and cut the card (ADR-0132); a click focuses it.
+        // and Cmd+X copy and cut the card; a click focuses it. It is the
+        // card's drag handle too, a card you may discard being one you may
+        // move (`use-drag.ts`).
         tabIndex={card === null ? undefined : 0}
-        // A card you may discard is one you may move.
-        draggable={card !== null && view.discards}
-        onDragStart={e => {
-          if (card === null || onControl.current) return e.preventDefault()
-          dragCard(e, card.id)
-        }}
-        onPointerDown={e => {
-          onControl.current =
-            e.target instanceof Element &&
-            e.target.closest("button, [role='menu'], .popover") !== null
-        }}
+        {...(card !== null && view.discards
+          ? dragProps({ kind: "card", card: card.id })
+          : {})}
       >
         <span aria-hidden className="card-icon">
           {KIND_ICON[card?.kind ?? "text"]}
@@ -214,15 +205,6 @@ export function CardFrame(p: {
       </div>
     </div>
   )
-}
-
-/** Start a card's drag: its id, under pinetrie's own type (`put-target.ts`). */
-export const dragCard = (
-  e: { readonly dataTransfer: DataTransfer | null },
-  card: CardId,
-) => {
-  e.dataTransfer?.setData(CARD_MIME, card)
-  if (e.dataTransfer !== null) e.dataTransfer.effectAllowed = "move"
 }
 
 /** A card's ×: discards it, and the undo key outside a box brings it back (ADR-0111). */

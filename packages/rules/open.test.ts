@@ -1,6 +1,7 @@
 import {
   entryId,
   indexTree,
+  livePlaceOf,
   rootIdFor,
   type ThreadRecord,
   taskIdFor,
@@ -179,7 +180,7 @@ describe("closing a new tab before its first send (ADR-0126)", () => {
   const tab = threadCardOf({ thread: NEW, task: NEW_TASK, by: ADA, cards: [] })
   const trashed = {
     ...tab,
-    place: { kind: "trash", holder: ADA, task: NEW_TASK },
+    place: { kind: "trash", left: livePlaceOf(tab.place) },
   } as const
   const threads = new Map([[NEW, record(NEW, NEW_ROOT)]])
   test("its thread to the trash leaves its task empty: the task's card goes to the closer's trash, remembering the task", () => {
@@ -197,7 +198,7 @@ describe("closing a new tab before its first send (ADR-0126)", () => {
         kind: "write",
         record: {
           ...card,
-          place: { kind: "trash", holder: ADA, task: NEW_TASK },
+          place: { kind: "trash", left: livePlaceOf(card.place) },
           placer: ADA,
         },
       },

@@ -4,6 +4,7 @@ import {
   type CardRecord,
   cardIdOfKind,
   ERR,
+  livePlaceOf,
   type TaskCard,
   type TaskId,
   taskIdFor,
@@ -74,9 +75,11 @@ describe("boardOf (ADR-0126)", () => {
     })
   })
   test("a task's card in a trash is on no board, and no task the session holds", () => {
+    const onBoard = card(R(1), DOING, 1)
     const trashed: CardRecord = {
-      ...card(R(1), DOING, 1),
-      place: { kind: "trash", holder: ADA, task: R(1) },
+      ...onBoard,
+      place: { kind: "trash", left: livePlaceOf(onBoard.place) },
+      placer: ADA,
     }
     expect(columns(boardOf(WORKFLOW, [trashed]))).toEqual({
       Backlog: [],

@@ -22,7 +22,7 @@ import type {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, threadKey } from "./decode.ts"
-import { type MovesStep, NO_DISCARDS, planMoveCommand } from "./moves.ts"
+import { type MovesStep, planMoveCommand } from "./moves.ts"
 import { isQueuedMessage, type QueuedCard } from "./queue.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
@@ -92,13 +92,7 @@ export function planQueueCard(input: {
 } {
   const { move, hold } = input
   // A queueing discards nothing: its target is a queue.
-  const planned = planMoveCommand(
-    input.cards,
-    [move],
-    input.by,
-    input.running,
-    NO_DISCARDS,
-  )
+  const planned = planMoveCommand(input.cards, [move], input.by, input.running)
   const { drain } = planned
   const step =
     move.from === null && input.command !== null

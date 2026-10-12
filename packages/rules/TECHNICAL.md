@@ -362,7 +362,7 @@ which are swept.
   discarded first, so a replacement into a full inventory never meets
   `full`, then a new text card or reference made through `planMake` (in
   the replaced card's very place when the target is its place), or a cut
-  card moved out of the sender's own trash (`planUncut`). "The replaced
+  card moved out of a trash by its cutter (`planFromTrash`'s `uncut`). "The replaced
   card is discarded first" holds in two places: here, for a paste, and in
   the client's `moveCards` set for a drop on a filled slot, which
   `planMoves` plans in order.
@@ -397,8 +397,9 @@ which are swept.
   names its thread (ADR-0125). Their rows keep no `at` (migration
   `0009-card-content` cleared the old ones); the row's `at` field is a
   comment's entry. A canvas card has its task, rank and width; a card in a
-  trash is stored `discarded`, whose trash in `holder` and the task it left
-  in `task` ("" for none); a queued card has its `order` and `by`, and `seen`, its text's version as its queuer had it (S96), which
+  trash is stored as the place it left, its row's kind that place's
+  prefixed `discarded-` (`discarded-note`, `discarded-canvas`, …), so no
+  field was added; a queued card has its `order` and `by`, and `seen`, its text's version as its queuer had it (S96), which
   the queue's key carries from the client. Every field is required: the
   host writes a record whole. A
   `command` this build does not know makes the card malformed. A text card
@@ -432,25 +433,38 @@ which are swept.
   history. Where each kind of card may be is one table, core's
   `PLACES_OF`, which `fitsPlace`, `placed` and each record's place type
   (`PlaceOf`) read. Nobody removes a card:
-  `Move.to` is never null. A discard is a move to its sender's trash
-  (`DISCARDED`, ADR-0111, ADR-0126), from any place the sender may move
-  out of: a text card, a reference or a thread's card (`KINDS`). Its key
-  names neither whose trash nor which history: the host fills in its
-  sender (`placeAt`) and names its history (`historyOf`, over `Discards`),
-  the task the card leaves (`taskOfPlace`), or for a card in an inventory
-  the task its sender is on (`here`, which a `move` carries), or, on none,
-  its sender's history outside any task. A spin-off's `here` is the task
-  its sender will be on: the new one for a drop in the sidebar, else the
-  tab's. A queueing passes `NO_DISCARDS`, since its target is a queue. A
-  card in a trash keeps its record and text, is drawn nowhere (every read
-  of a place names the kinds it draws), and moves only by an undo or its
-  cutter's paste: `planMove` refuses a handoff from a trash `gone`, and
-  only `planUncut` takes one out, from the sender's own trash. Both share
-  `handoff`, the compare-and-set and every check after it. A thread's card in a trash is
-  held as in an inventory (`holderOf`, `takenIn`): its run stops, and its
-  queue waits. `planTrashSweep`
-  (`card-history.ts`) deletes it once its newest history event is older
-  than `TRASH_KEEP_MS` (7 days). Queueing puts it after the lane's
+  `Move.to` is never null. A discard is a move to a trash (`DISCARDED`,
+  ADR-0134), from any place the sender may move out of: a text card, a
+  reference, a thread's card or a note column (`KINDS`). Its key names no
+  place left: the host fills it in from where the card is (`placeAt`:
+  `{ kind: "trash", left }`), and the sender is its placer, as for any
+  move. Nothing else decides where it is: whose trash it is, who sees it,
+  where a restore goes and which history it is in follow from `left`
+  (`ownerOf`, `livePlaceOf`, core). Its history (`historyOf`, over
+  `Discards`) is the task it left (`taskOfPlace`), or for a card in an
+  inventory the task its sender is on (`here`, which a `move` carries),
+  or, on none, its sender's history outside any task. A spin-off's `here`
+  is the task its sender will be on: the new one for a drop in the
+  sidebar, else the tab's. A queueing passes `NO_DISCARDS`, since its
+  target is a queue. A card in a trash keeps its record and text, is drawn
+  nowhere (every read of a place names the kinds it draws), and moves only
+  by an undo or `planFromTrash`: `planMove` refuses any other handoff from
+  a trash `gone`. `planFromTrash` takes a card out for its cutter's paste
+  (`uncut`: its placer only, to the paste's target) or a restore (back to
+  `left`, a canvas at its old rank, for anyone a move into `left` allows;
+  refused `left-gone` when what `left` is on is trashed or has no record,
+  `left-taken` for your message's place where you have a newer one, and
+  `not-yours` for someone else's message). A move to `BACK`, or out of a
+  trash to the very place the card left, is a restore. All of them share
+  `handoff`, the compare-and-set and every check after it. A thread's
+  card in a trash is held by nobody (`holdingOf`: `trashed`), but its run
+  stops (`takenIn`) and its queue waits. `planTrashSweep`
+  (`card-history.ts`) deletes it once `trashDeadline` (its newest history
+  event plus `TRASH_KEEP_MS`, 7 days) has passed, and with it every card
+  on a surface it owns, down the owners: a thread's message, pinned,
+  queued and margin cards, a note column's notes. The host's sweep removes
+  a deleted thread's lanes as an archive's teardown does
+  (`planLanesGone`). Queueing puts it after the lane's
   last card, queued by the sender, and clears why it was not sent before;
   below the line, or into an inventory, it keeps both. A move to where the
   card already is is refused `moved`: it would queue the card last under its
@@ -458,7 +472,11 @@ which are swept.
   Refusals (`MoveRefusal`): `gone` (no record, or discarded), `moved`,
   `exists`, `full`, `not-yours`, `no-place` (a place the card's kind is
   never in, or a kind no person moves: every move of a fact is refused so,
-  with no check of its own), and an undo's `replied`.
+  with no check of its own), a restore's `left-gone` and `left-taken`, and
+  an undo's `replied`. A move to `new-task` makes a task (`planTaskOpening`,
+  `task.ts`, by the mover, at the end of the board's first state; `no-place`
+  before the board has states) and puts the card first on its canvas, one
+  step in the new task's history.
 - **A reorder is a card's action in place, not a move** (`planReorder`,
   ADR-0048 step 7). It names the card, its place's key, and the two cards
   it goes between as its sender saw them; the host checks them against the
@@ -689,9 +707,9 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
 - **`emptiedTasks`** (`root.ts`): the tasks a step leaves empty that were
   a new tab's: a thread card that left its canvas for a trash, its thread a
   new root's not yet started (its root one the directory does not name),
-  and nothing left on that canvas or pinned to the task. The host sends
-  each one's card to the closer's trash in the same step
-  (`planTasksTrashed`, remembering the task), in their history outside any
+  and nothing left whose owner is the task (`ownerOf`). The host sends
+  each one's card to the trash in the same step (`planTasksTrashed`, its
+  board place as `left`, its closer the placer), in their history outside any
   task, since the task leaves their view: the undo key on no task brings
   the task and its thread back (ADR-0126).
 - **The history's verb is `discarded`** (`verbOf`): the spin-off's card is
@@ -770,6 +788,20 @@ width, so a card has one place by construction.
   command, `commands/index.ts`) and the page (`tasksOf`) both read it, so
   they cannot disagree on where something is. A note is in its note
   column's task (`taskOfCard`).
+- **A trashed card is in the task its `left` is in.** The index records a
+  trashed thread's or note column's task in `taskOfThread` and
+  `taskOfCard`, never in `canvases`: so its own cards keep their task (their
+  history, the archive gate) while nothing trashed is drawn, and
+  `taskOfPlace` of any place is its owner's task (`ownerOf`, `taskOfOwner`).
+  A reader that means "on the canvas" reads `canvases` (`canvasOf`,
+  `isOnCanvas`), never `taskOfThread`. `rootsHeld` holds a trashed
+  thread's root, so a restart within the week keeps its messages loaded for
+  a restore or a link.
+- **One way to make a task** (`planTaskOpening`): its card by the host,
+  its opener its owner, at the end of its state on the board (`boardEnd`);
+  `no-place` before the board has states. A thread opening in a new tab's
+  task (`planThreadOpen`) and a card dropped between tasks (`new-task`)
+  both use it.
 - **A place at a thread names its thread and no root** (composing, pinned,
   queued; the thread in the row's `lane`). Its task is its
   thread's (`taskOfPlace`), and its root its thread's record's
@@ -808,7 +840,9 @@ width, so a card has one place by construction.
 A thread's card is a canvas's, an inventory's or a trash's
 (`PLACES_OF.thread`), and moves between them as any card does
 (`planMove`, typed at the codec by `typedMove`). An inventory, and a
-trash, have no agent and no runner.
+trash, have no agent and no runner. Where its card leaves it is
+`holdingOf`: `free` on a canvas, `held` by an inventory's holder, or
+`trashed`, held by nobody.
 
 - **One gate, per command kind** (`runsIn`, beside `writesIn`): what each
   `Intent`, or a queue's pop, runs or writes a message in: a send at a
@@ -816,13 +850,14 @@ trash, have no agent and no runner.
   an acceptance) and a pop run in their thread; a branch in the thread its
   fork is in, read from its root's tree; a new root in none. Exhaustive, so
   a new kind of command does not compile until it says. `heldIn` finds
-  the first of those someone holds (`holderOf`); a copy's first send, at
+  the first of those held or trashed (`holdingOf`); a copy's first send, at
   its own record's fork, runs in the copy. The host refuses before every
   command and popped card (`refuseHeld`), and the drain asks before it
   pops (`planNextQueuedCardPop`'s `away`), so its messages wait, held. A
   fact on top is popped there all the same: it starts no run, and a take's
   stop must be in the thread for its face to say so (ADR-0126). Refused
-  with `HELD_WORDS`, "put it on a canvas first".
+  with `HELD_WORDS`, "put it on a canvas first", or for a trashed thread
+  `TRASHED_WORDS`, "restore it first" (`holdingWords`).
 - **A take stops the run** (`takenIn(before, after)`): every thread card
   in an inventory or a trash after a change that was not there before. The host's
   provenance step reads it from every person's change to the places (a
@@ -902,6 +937,11 @@ A task put aside for everyone: one in the archive. Moving it there or out
 writes only its card's place: entries are immutable, so a task is hidden
 and made read-only, never removed.
 
+- **`planLanesGone`**: what lanes that will not run again lose, an
+  archived task's or a thread the trash sweep deleted: each forgotten, its
+  ref deleted (which withdraws its offer), and every snapshot but its
+  newest and the one nearest each thread's end in the trees given. An
+  archive's teardown and the trash sweep both ask it.
 - **`planArchive` decides what crossing the edge does**, pure, for a
   `Crossing` (`close` or `reopen`). Closing is refused `task_busy` while
   any lane of the task's threads runs or has cards queued (`threadsWork`).

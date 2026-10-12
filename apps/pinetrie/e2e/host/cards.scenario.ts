@@ -4,6 +4,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
+  BACK,
   type CardId,
   DISCARDED,
   type EntryId,
@@ -786,6 +787,40 @@ async function run(check: Checks["check"]): Promise<void> {
         uncutUndone.kind === "undone" &&
         onHost(cutCard)?.place.kind === "trash",
       `${uncut.kind}, landed ${uncutLanded}; ${uncutUndone.kind}, ${onHost(cutCard)?.place.kind}`,
+    )
+    // A thread's card trashed by Ada, and restored by Bea: back on its
+    // canvas at its rank, its root still loaded.
+    const columnThread = threadHolding(ch, tipOf())
+    const wasOn = onHost(columnThread)?.place
+    if (wasOn?.kind === "canvas") {
+      await ada.moveCard(
+        {
+          card: columnThread,
+          from: { kind: "canvas", task: wasOn.task },
+          to: DISCARDED,
+        },
+        { actedAt: { kind: "inventory" }, slot: null },
+        null,
+        here,
+      )
+      await waitFor(() => onHost(columnThread)?.place.kind === "trash", 5_000)
+    }
+    const trashedLeft = onHost(columnThread)?.place
+    const restored = await bea.moveCard(
+      { card: columnThread, from: DISCARDED, to: BACK },
+      { actedAt: { kind: "inventory" }, slot: null },
+    )
+    await waitFor(() => onHost(columnThread)?.place.kind === "canvas", 5_000)
+    const back = onHost(columnThread)?.place
+    check(
+      "a thread's card trashed by one writer is restored by another, back on its canvas at its rank",
+      trashedLeft?.kind === "trash" &&
+        restored.kind === "accepted" &&
+        back?.kind === "canvas" &&
+        wasOn?.kind === "canvas" &&
+        back.order === wasOn.order &&
+        onHost(columnThread)?.placer === bea.writer,
+      `${trashedLeft?.kind}, ${restored.kind}, ${back?.kind}`,
     )
     // Ada's last move in this root, to undo after a restart (section 6).
     const lastMove = newCard(ada, tipOf(), "moved before the restart")

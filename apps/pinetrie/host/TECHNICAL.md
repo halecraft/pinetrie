@@ -250,7 +250,10 @@ until the next compaction (S120), and the host compacts at startup. So
   has run it. Registered now: `0009-card-content` (ADR-0126): each
   place at a thread loses the `at` its row and its history events kept,
   and each fact stored on a text card's id moves to an `x-` fact card's,
-  with its history. `0003-workflow-archive` (the
+  with its history; and `0014-trash-left` (ADR-0134): each place row of the
+  old trash shape (`discarded`, with `holder` and `task`) is deleted, since
+  it says too little to rebuild where the card was, and is at most a week
+  old. `0003-workflow-archive` (the
   workflow's `closed` state renamed `archive`), `0004-threads` (each thread
   named in its first message, ADR-0117), `0005-tasks`' records (a task per
   root, ADR-0116), `0006-note-columns` (each thread's notes moved from
@@ -710,9 +713,13 @@ rejects `shutdown()`.
   not, so an undo takes the card back and leaves the hold. One with no
   `from` makes the card in the queue with its command (`targetId` on the
   wire), in no history, as any creation.
-- **Discarded cards are swept** (`sweepTrash`, `housekeeping.ts`): a card
-  gone more than `TRASH_KEEP_MS` loses its record, then its text, at startup
-  and in `settle`'s sweep, before the provenance's sweep deletes its history.
+- **Trashed cards are swept** (`sweepTrash`, `housekeeping.ts`): a card past
+  its `trashDeadline`, and every card on a surface it owns, loses its
+  record, then its text, at startup and in `settle`'s sweep, before the
+  provenance's sweep deletes its history. A deleted thread's lanes of
+  their own go as an archive's do (`planLanesGone`, through
+  `work.teardown`, off the documents' keeper), which withdraws their
+  offers; the thread's record stays, since its entries name it.
 - **`reorder` and `unqueue-all` are moves of their own** (`commands/cards.ts`).
   A reorder is written in the sender's history of its place's root
   (`planReorder`), through `carry`, and drains nothing. Unqueue all plans

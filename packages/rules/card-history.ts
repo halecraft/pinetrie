@@ -18,13 +18,18 @@ import {
   type CardRecord,
   type EntryId,
   entryId,
+  isThreadId,
   keyOf,
   keyOfFields,
+  livePlaceOf,
+  ownerCard,
+  ownerOf,
   type PlaceFields,
   type PlaceKey,
   parseCardId,
   placeFields,
   sameKey,
+  type ThreadId,
   type TracedKind,
   type TracedPlace,
   type TraceRecord,
@@ -427,26 +432,64 @@ export function planProvenance(input: {
   return { histories, traces }
 }
 
-/** How long a discarded card is kept for the undo key to bring back (ADR-0111). */
+/** How long a trashed card is kept for a restore or the undo key to bring back. */
 export const TRASH_KEEP_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
- * The cards in a trash to delete, record and text: each whose newest history
- * event, its discard or what came after, is older than `TRASH_KEEP_MS`, or
- * that has no history to tell. Pure.
+ * When a trashed card is deleted: its newest history event (its discard, or
+ * what came after) plus `TRASH_KEEP_MS`; `now` for one with no history to
+ * tell. The sweep and the task column's list of its trash both read it.
+ * Pure.
+ */
+export function trashDeadline(
+  card: CardId,
+  histories: ReadonlyMap<CardId, CardHistoryRecord>,
+  now: number,
+): number {
+  const last = histories.get(card)?.events.at(-1)
+  return last === undefined ? now : last.at + TRASH_KEEP_MS
+}
+
+/** What the trash sweep deletes: the cards, and among them the threads, whose lanes go too. */
+export interface TrashSweep {
+  readonly cards: readonly CardId[]
+  readonly threads: readonly ThreadId[]
+}
+
+/**
+ * The cards to delete, record and text: each trashed card past its
+ * `trashDeadline`, and with it every card on a surface it owns
+ * (`ownerOf`), trashed or not, and so on down: a note column's notes, a
+ * thread's message, pinned, queued and margin cards. Pure.
  */
 export function planTrashSweep(input: {
   readonly cards: readonly CardRecord[]
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
   readonly now: number
-}): readonly CardId[] {
-  return input.cards
-    .filter(c => {
-      if (c.place.kind !== "trash") return false
-      const last = input.histories.get(c.id)?.events.at(-1)
-      return last === undefined || input.now - last.at > TRASH_KEEP_MS
-    })
-    .map(c => c.id)
+}): TrashSweep {
+  const doomed = new Set<CardId>(
+    input.cards
+      .filter(
+        c =>
+          c.place.kind === "trash" &&
+          trashDeadline(c.id, input.histories, input.now) <= input.now,
+      )
+      .map(c => c.id),
+  )
+  // Down the owners: each pass adds the cards on a surface a doomed card owns.
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const c of input.cards) {
+      if (doomed.has(c.id)) continue
+      const owner = ownerCard(ownerOf(livePlaceOf(c.place)))
+      if (owner !== null && doomed.has(owner)) {
+        doomed.add(c.id)
+        grew = true
+      }
+    }
+  }
+  const cards = input.cards.filter(c => doomed.has(c.id)).map(c => c.id)
+  return { cards, threads: cards.filter(isThreadId) }
 }
 
 /**

@@ -69,6 +69,18 @@ lift costs about 25 more frames over 20 ms per drag.
    is 33–50 ms in every variant (83–100 ms for the copy without layers),
    against the baseline's 16.8 ms.
 
+**The engine as built** (`packages/web/use-drag.ts`, measured
+2026-10-12 with the probe's `engine` mode, in which the page's own engine
+takes the press). At 4× its 95th percentile equals the baseline's
+(16.8 ms), with 12–27 frames over 20 ms per drag against the baseline's
+3–4, and 4–5 over 50 ms, the longest 133–200 ms, against the baseline's
+0–1. A first build that wrote every style each frame, changed or not,
+made 44–153 frames over 20 ms and a 95th percentile of 33 ms: writing
+only what changed is what brought it to the baseline. Against the kill
+criterion as written it still fails on its few long frames, which fall at
+the press and as columns slide on a gap change, the same frames the
+stand-in paid; nothing else is slow.
+
 **How it was measured.** `docs/findings/S153-drag-frames/probe.ts` (run
 from `apps/pinetrie/e2e/`, as its header says) starts a suite host with the
 scripted model, and writes one task through the session: a trunk of 200

@@ -875,7 +875,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a gap to the right lands one short",
   },
   {
-    name: "a grip's keys move a column past either end",
+    name: "Alt+arrows move a column past either end",
     file: "packages/interface/reorder.ts",
     from: "  return to === null || to < 0 || to >= count || to === from ? null : to",
     to: "  return to === null || to === from ? null : to",
@@ -1787,12 +1787,12 @@ export const mutations: readonly Mutation[] = [
     expect: "signing out forgets who you are, then reloads",
   },
   {
-    name: "a closed branch's card is not discarded",
+    name: "a new tab's emptied task stays in your sidebar",
     file: "packages/interface/card-intents.ts",
-    from: "  const away: SlotMove = { move: moveOf(card, DISCARDED), slot: null }",
-    to: '  const away: SlotMove = { move: moveOf(card, { kind: "inventory", holder: facts.me }), slot: null }',
+    from: "      close: closeTaskEffects(emptied),",
+    to: "      close: [],",
     command: unit,
-    expect: "closing an unstarted thread's column: its card to your trash",
+    expect: "× on any column trashes its card alone",
   },
   {
     name: "every column takes focus when it mounts",
@@ -3244,8 +3244,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a discard names no task you are on",
     file: "packages/interface/card-intents.ts",
-    from: "  return [moveCard(moveOf(now, DISCARDED), how, false, null, taskOfTab(state))]",
-    to: "  return [moveCard(moveOf(now, DISCARDED), how, false, null, null)]",
+    from: "    return [moveCard(move, how, false, null, taskOfTab(state))]",
+    to: "    return [moveCard(move, how, false, null, null)]",
     command: unit,
     expect:
       "goes back to its thread's notes from its ⋯, and to the trash from its ×",
@@ -3415,14 +3415,6 @@ export const mutations: readonly Mutation[] = [
     to: '    case "unfold":\n      return [\n        ...fold,',
     command: unit,
     expect: "an entry no unfolded column shows unfolds its thread's, revealed",
-  },
-  {
-    name: "a card's column offers close",
-    file: "packages/interface/app-view.ts",
-    from: "      closable: isClosable(c),",
-    to: "      closable: true,",
-    command: unit,
-    expect: "only a thread not yet started closes",
   },
   {
     name: "the tab's rail draws every tree",
@@ -3597,14 +3589,6 @@ export const mutations: readonly Mutation[] = [
       "a branch not yet sent from a held thread leaves that thread's entries out (ADR-0124)",
   },
   {
-    name: "a copy's column closes",
-    file: "packages/interface/columns.ts",
-    from: '  column.mode.kind === "unstarted"\n',
-    to: '  column.mode.kind !== "unstarted"\n',
-    command: unit,
-    expect: "a thread not yet started closes with ×",
-  },
-  {
     name: "a branch in a held thread is drawn as any other",
     file: "packages/interface/canvas-columns.ts",
     from: "                : heldAt(index, opening.fork, facts.holders)),\n",
@@ -3738,8 +3722,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a text card put on a canvas is put nowhere",
     file: "packages/interface/card-intents.ts",
-    from: '  if (target.kind === "canvas")\n    return [\n      moveCard(\n        moveOf(now, canvasSpot(target)),',
-    to: "  if (false)\n    return [\n      moveCard(\n        moveOf(now, canvasSpot(target)),",
+    from: '  if (target.kind === "canvas" || target.kind === "task") {',
+    to: "  if (false) {",
     command: unit,
     expect:
       "to a spot on a canvas: a text card goes there for the host to make it a note column (WRAPS, ADR-0126)",
@@ -3945,8 +3929,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a cut card in your trash is pasted as a copy",
     file: "packages/interface/card-intents.ts",
-    from: "        cut.place.holder === state.cards.me",
-    to: '        cut.place.holder === "nobody"',
+    from: "        cut.placer === state.cards.me",
+    to: '        cut.placer === "nobody"',
     command: unit,
     expect:
       "a cut card still in your trash comes out of it; anywhere else it lands as its copy",
@@ -3967,5 +3951,78 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "Edit as text is a paste of its quote replacing the reference, in its place and slot",
+  },
+  // ── the drag engine's decisions ──
+  {
+    name: "a dragged column follows the pointer up and down",
+    file: "packages/interface/drag.ts",
+    from: "    dragged: { x: pointer.x - armed.start.x, y: 0 },",
+    to: "    dragged: { x: pointer.x - armed.start.x, y: pointer.y - armed.start.y },",
+    command: unit,
+    expect:
+      "drawPlan: a column only translates, along the strip; off it, its face is drawn instead",
+  },
+  {
+    name: "a column off the strip is drawn whole",
+    file: "packages/interface/drag.ts",
+    from: "    return { dragged: null, face: pointer, shifts: still, mark, lean }",
+    to: "    return { dragged: pointer, face: null, shifts: still, mark, lean }",
+    command: unit,
+    expect:
+      "drawPlan: a column only translates, along the strip; off it, its face is drawn instead",
+  },
+  {
+    name: "a refused landing is dropped anyway",
+    file: "packages/interface/drag.ts",
+    from: '        verdict.landing.kind !== "refused"',
+    to: "        true",
+    command: unit,
+    expect:
+      "a drop sends what a key or a menu would: moveColumn, put or the task's drop, nothing else",
+  },
+  {
+    name: "a sidebar row is all onto its task",
+    file: "packages/interface/drag.ts",
+    from: '  if (at < 0.25) return { kind: "sidebar", before: task }',
+    to: '  if (false) return { kind: "sidebar", before: task }',
+    command: unit,
+    expect:
+      "a sidebar row: between rows in its top and bottom quarters, onto its task in between",
+  },
+  {
+    name: "Alt+arrows move a column from a text box",
+    file: "packages/interface/page-keys.ts",
+    from: "  if (altOnly && !focus.inText && !focus.inPanel && focus.inColumn !== null) {",
+    to: "  if (altOnly && !focus.inPanel && focus.inColumn !== null) {",
+    command: unit,
+    expect:
+      "Alt+→ and Alt+← move the column focus is in one place, never past an end, nor in a text box or the panel",
+  },
+  {
+    name: "the canvas's trash lists another task's columns",
+    file: "packages/interface/task-column-view.ts",
+    from: "      c.place.left.task !== input.task\n",
+    to: "      false\n",
+    command: unit,
+    expect:
+      "canvasTrash: the columns trashed from this canvas, newest first, with who trashed them and the days left",
+  },
+  {
+    name: "a trashed thread's link opens nothing",
+    file: "packages/interface/thread-link.ts",
+    from: '    case "trashed":\n      return { kind: "restore", thread: link.thread }',
+    to: '    case "trashed":\n      return { kind: "nothing" }',
+    command: unit,
+    expect:
+      "a link to a trashed thread names the task it left, says so, and restores it",
+  },
+  {
+    name: "a column's ⋯ has no fold",
+    file: "packages/interface/column-menu.ts",
+    from: "  if (!isThreadId(input.card)) return [yours, canvas]",
+    to: "  if (!isThreadId(input.card)) return [canvas]",
+    command: unit,
+    expect:
+      "a column's ⋯ holds its fold first, yours alone, for a thread and a note column alike",
   },
 ]

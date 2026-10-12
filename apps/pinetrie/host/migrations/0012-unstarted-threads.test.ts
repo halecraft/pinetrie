@@ -9,6 +9,7 @@ import { cardIdFor, taskCard } from "@pinetrie/core/fixtures"
 import { CARD_HISTORY, decodeCard, THREAD } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { planUnstartedThreads } from "./0012-unstarted-threads.ts"
+import { oldTrashRows } from "./0014-trash-left.ts"
 
 const ADA = "w-ada@x.io"
 const ROW = {
@@ -143,13 +144,10 @@ describe("0012-unstarted-threads (ADR-0126)", () => {
     })
   })
 
-  test("a spun card is in its spinner's trash; an ask's relay is in `relay`; no row keeps a root", () => {
+  test("a spun card is in its spinner's trash, in the old shape 0014-trash-left deletes; an ask's relay is in `relay`; no row keeps a root", () => {
     const { rows } = plan()
-    expect(decodeCard(S1, rows[S1])?.place).toEqual({
-      kind: "trash",
-      holder: ADA,
-      task: TASK,
-    })
+    expect(rows[S1]).toMatchObject({ kind: "discarded", holder: ADA })
+    expect(oldTrashRows({ s: rows[S1] ?? {} })).toEqual(["s"])
     expect(decodeCard(ASK, rows[ASK])).toMatchObject({
       kind: "ask",
       content: { relay: { text: "hi" } },

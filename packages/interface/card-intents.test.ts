@@ -8,11 +8,14 @@ import {
   INVENTORY_SLOTS,
   indexAsks,
   KINDS,
+  livePlaceOf,
+  NO_CONTENT,
   type PlacedKind,
   rootIdFor,
   type Sha256,
   type TextCard,
   type TextPlace,
+  taskIdFor,
   textCardId,
   threadIdFor,
   workflowStateIdFor,
@@ -51,6 +54,7 @@ import { afterSpinOff } from "./spin-off.ts"
 
 /** The thread `index` is: its first entry names it (`withThreads`). */
 const TEST_THREAD = threadIdFor("1-r1")
+const R1_TASK_FOR_DROP = taskIdFor("01a0ffd2-0000-7000-8000-0000000000d1")
 const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("ada@x.io")
@@ -1146,9 +1150,11 @@ describe("landing a copy (ADR-0132, ADR-0133)", () => {
 
   test("a cut card still in your trash comes out of it; anywhere else it lands as its copy", () => {
     const cut: Clip = { ...textCard, cut: true }
+    const atCard = card(C1, atEnd)
     const trashed = {
-      ...card(C1, atEnd),
-      place: { kind: "trash", holder: ADA, task: null },
+      ...atCard,
+      placer: ADA,
+      place: { kind: "trash", left: livePlaceOf(atCard.place) },
     } as const
     expect(land(cut, column, state({ cards: [trashed] }))).toEqual({
       kind: "uncut",
@@ -1184,6 +1190,59 @@ describe("landing a copy (ADR-0132, ADR-0133)", () => {
             to: { kind: "canvas-at", task: TEST_TASK, after: TEST_THREAD },
           },
         },
+      },
+    ])
+  })
+
+  test("a column dropped onto a sidebar task goes to the end of its canvas; between tasks, a new task holds it, placed there, and you stay", () => {
+    const thread: CardRecord = {
+      kind: "thread",
+      id: F1,
+      owner: ADA,
+      placer: ADA,
+      place: { kind: "canvas", task: R1_TASK_FOR_DROP, order: "a", width: 1 },
+      content: NO_CONTENT,
+    }
+    const s = state({ cards: [thread] })
+    const onto = planPut(
+      { kind: "card", card: F1 },
+      { kind: "task", task: TEST_TASK },
+      "move",
+      s,
+      MINTED,
+    )
+    expect(onto[0]).toMatchObject({
+      kind: "moveCard",
+      move: { card: F1, to: { kind: "canvas-at", task: TEST_TASK } },
+    })
+    const between = planPut(
+      { kind: "card", card: F1 },
+      { kind: "sidebar", before: TEST_TASK },
+      "move",
+      s,
+      MINTED,
+    )
+    expect(between).toEqual([
+      {
+        kind: "moveCards",
+        moves: [
+          {
+            move: {
+              card: F1,
+              from: { kind: "canvas", task: R1_TASK_FOR_DROP },
+              to: { kind: "new-task", task: NEW_TASK },
+            },
+            slot: null,
+          },
+        ],
+        actedAt: { kind: "inventory" },
+        close: [
+          {
+            kind: "list",
+            act: { kind: "place", task: NEW_TASK, before: TEST_TASK },
+          },
+        ],
+        here: NEW_TASK,
       },
     ])
   })

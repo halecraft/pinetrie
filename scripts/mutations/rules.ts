@@ -78,13 +78,13 @@ export const mutations: readonly Mutation[] = [
       "a discard from an inventory on no task: its sender's history outside any task (ADR-0126)",
   },
   {
-    name: "a thread in a trash is held by no one",
+    name: "a trashed thread runs",
     file: "packages/rules/held.ts",
-    from: '  return card?.place.kind === "inventory" || card?.place.kind === "trash"\n',
-    to: '  return card?.place.kind === "inventory"\n',
+    from: '  return card?.place.kind === "trash" ? TRASHED : FREE',
+    to: "  return FREE",
     command: unit,
     expect:
-      "a thread in a trash is held as in an inventory: its discard stops its run, and its holder holds it (ADR-0126)",
+      "a trashed thread is held by nobody, but its discard stops its run, and a command in it is refused to be restored first",
   },
   {
     name: "a thread discarded keeps running",
@@ -253,8 +253,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a discarded card is kept for good",
     file: "packages/rules/card-history.ts",
-    from: "      return last === undefined || input.now - last.at > TRASH_KEEP_MS",
-    to: "      return last === undefined",
+    from: "          trashDeadline(c.id, input.histories, input.now) <= input.now,",
+    to: "          false,",
     command: unit,
     expect:
       "planTrashSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere",
@@ -1768,8 +1768,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archive keeps every snapshot",
     file: "packages/rules/archive.ts",
-    from: "      snapshots: planRetention({",
-    to: "      snapshots: [] ?? planRetention({",
+    from: "    snapshots: planRetention({",
+    to: "    snapshots: [] ?? planRetention({",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
     expect: "archive: its lanes forgotten, their refs deleted",
   },
@@ -2665,7 +2665,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note is in no task",
     file: "packages/rules/task.ts",
-    from: "      return tasks.taskOfCard.get(place.column) ?? null",
+    from: "      return tasks.taskOfCard.get(owner.column) ?? null",
     to: "      return null",
     command: ["pnpm", "exec", "vitest", "run", "packages/interface"],
     expect: "a note you own marks its note column's task",
@@ -2927,8 +2927,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread put from an inventory is not drained",
     file: "packages/rules/moves.ts",
-    from: '      was.get(record.id) === "inventory"\n      ? [record.id]',
-    to: '      was.get(record.id) === "nowhere"\n      ? [record.id]',
+    from: '      (from === "inventory" || from === "trash")',
+    to: '      from === "nowhere"',
     command: [
       "pnpm",
       "exec",
@@ -3001,8 +3001,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archive asks to keep no thread end's snapshot",
     file: "packages/rules/archive.ts",
-    from: "        keep: endSnapshots(input.trees, input.revisions),\n",
-    to: "        keep: new Set(),\n",
+    from: "      keep: endSnapshots(trees, revisions),\n",
+    to: "      keep: new Set(),\n",
     command: unit,
     expect:
       "archive keeps the snapshot nearest each thread's end, a copy's files (ADR-0124)",
@@ -3095,8 +3095,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a held thread is never found held",
     file: "packages/rules/held.ts",
-    from: "    if (by !== null) return { thread, by }",
-    to: "    if (by === null) return { thread, by: thread as never }",
+    from: '    if (holding.kind !== "free") return { thread, holding }',
+    to: '    if (holding.kind === "free") return { thread, holding: TRASHED }',
     command: unit,
     expect:
       "heldIn: the first thread among them someone holds, an entry's by its tree",
@@ -3279,8 +3279,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a closed new tab's task card forgets its task",
     file: "packages/rules/root.ts",
-    from: '              place: { kind: "trash", holder: closer, task: c.id },',
-    to: '              place: { kind: "trash", holder: closer, task: null },',
+    from: '              place: { kind: "trash", left: c.place },',
+    to: '              place: { kind: "trash", left: { kind: "inventory", holder: closer } },',
     command: unit,
     expect: "remembering the task",
   },
@@ -3303,8 +3303,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a cut card comes out of anyone's trash",
     file: "packages/rules/moves.ts",
-    from: "    now.place.holder !== sender",
-    to: "    false",
+    from: "    if (now.placer !== sender)",
+    to: "    if (false)",
     command: unit,
     expect:
       "a cut card moves out of its cutter's own trash; one in someone else's, or in none, is gone; no move takes one out (ADR-0132)",
@@ -3326,5 +3326,67 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
       "decode: a paste names its card's move, from nowhere or a trash, after at most a discard of the card it replaces (ADR-0132)",
+  },
+  // ── a trash that records where the card was ──
+  {
+    name: "a trashed thread is in no task",
+    file: "packages/rules/task.ts",
+    from: '    if (c.place.kind !== "trash" || c.place.left.kind !== "canvas") continue',
+    to: "    if (true) continue",
+    command: unit,
+    expect: "in its task by the index, and on no canvas",
+  },
+  {
+    name: "a trashed thread's root is let go",
+    file: "packages/rules/task.ts",
+    from: "    const place = livePlaceOf(c.place)\n",
+    to: "    const place = c.place\n",
+    command: unit,
+    expect: "its root stays held until it is deleted",
+  },
+  {
+    name: "a restore goes back into a trashed column",
+    file: "packages/rules/moves.ts",
+    from: '  return holds === undefined || holds.place.kind === "trash"\n    ? "left-gone"',
+    to: '  return holds === undefined\n    ? "left-gone"',
+    command: unit,
+    expect:
+      "refused: its column trashed or gone, someone else's message, or yours where you wrote anew",
+  },
+  {
+    name: "a restore takes back your message over a newer one",
+    file: "packages/rules/moves.ts",
+    from: '    if (newer) return "left-taken"',
+    to: "    if (newer) void newer",
+    command: unit,
+    expect:
+      "refused: its column trashed or gone, someone else's message, or yours where you wrote anew",
+  },
+  {
+    name: "a discard forgets where the card was",
+    file: "packages/rules/moves.ts",
+    from: '        : { kind: "trash", left: now.place }',
+    to: '        : { kind: "trash", left: { kind: "inventory", holder: sender } }',
+    command: unit,
+    expect:
+      "of your message: in the trash, recording the place it left, its discarder its placer",
+  },
+  {
+    name: "the sweep keeps what a deleted card owns",
+    file: "packages/rules/card-history.ts",
+    from: "      if (owner !== null && doomed.has(owner)) {",
+    to: "      if (owner !== null && false) {",
+    command: unit,
+    expect:
+      "planTrashSweep: a card on a surface a deleted card owns goes with it, trashed or not, and so on down",
+  },
+  {
+    name: "a new task holding a card is made on no board",
+    file: "packages/rules/moves.ts",
+    from: "        first.push(made)\n",
+    to: "",
+    command: unit,
+    expect:
+      "a new task: its card at the end of the board's first state, the card first on its canvas, in one step; none with no states",
   },
 ]

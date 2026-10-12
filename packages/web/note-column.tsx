@@ -5,21 +5,22 @@
 // queue. A drop anywhere on the column makes the card a note at its end;
 // "+ add a note" makes an empty one there. A column of its task's canvas, at
 // its rank there (`canvasColumns`); its header is a drag handle, as a thread
-// column's is, and ⇤ folds it.
+// column's is, its ⋯ folds it, and × trashes it with its notes.
 
 import type { CardId, CardWidth, SeatRecord, WriterId } from "@pinetrie/core"
 import {
   ADD_NOTE,
   type ColumnAct,
   columnMenu,
+  dragProps,
   dropProps,
-  FOLD,
   type Intent,
   NOTES_EMPTY,
   type NoteColumnView,
   noteCountWords,
   type Reader,
   type ReadOnly,
+  TRASH_COLUMN,
 } from "@pinetrie/interface"
 import { newCardId, type SessionClient } from "@pinetrie/session"
 import { useEffect, useRef, useState } from "react"
@@ -75,7 +76,11 @@ export function NoteColumn(p: {
       data-width={p.width}
       {...(p.readOnly === null ? dropProps({ kind: "notes", column }) : {})}
     >
-      <header className="note-column-head" data-column-head="">
+      <header
+        className="note-column-head"
+        data-column-head=""
+        {...dragProps({ kind: "card", card: column })}
+      >
         {renaming && p.readOnly === null ? (
           <TitleField
             label="title for this note column"
@@ -106,17 +111,23 @@ export function NoteColumn(p: {
           onIntent={p.onIntent}
           sections={columnMenu({ card: column, width: p.width })}
         />
-        <button
-          aria-label={FOLD.title}
-          className={FOLD.className}
-          onClick={() =>
-            p.onIntent({ kind: "fold", card: column, unfolded: false })
-          }
-          title={FOLD.title}
-          type="button"
-        >
-          {FOLD.label}
-        </button>
+        {p.readOnly === null && (
+          <button
+            aria-label={TRASH_COLUMN}
+            className="close"
+            onClick={() =>
+              p.onIntent({
+                kind: "discard",
+                card: column,
+                at: { kind: "column", key: column },
+              })
+            }
+            title={TRASH_COLUMN}
+            type="button"
+          >
+            ×
+          </button>
+        )}
       </header>
       <div className="note-column-notes" ref={notes}>
         {view.notes.length === 0 && (

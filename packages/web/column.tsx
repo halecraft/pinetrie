@@ -14,7 +14,6 @@ import {
   conflictsAt,
   type DigestRecord,
   type EntryId,
-  isThreadId,
   type LaneView,
   laneOf,
   nearestRevision,
@@ -52,19 +51,17 @@ import {
   type Column as ColumnSpec,
   type ColumnView,
   type ComposerPlacesStore,
-  closeAskWords,
   columnMenu,
   columnView,
   composerPlace,
   crossTaskLinks,
   DENSITIES,
   type Density,
-  DISCARD,
   densityWords,
   detailsTitle,
+  dragProps,
   type EditorState,
   earlierWords,
-  FOLD,
   type FoldMemory,
   gridKeyAct,
   type HeadBanner,
@@ -73,10 +70,8 @@ import {
   headLane,
   type Intent,
   identityWords,
-  KEEP_IN_INVENTORY,
   keepSpot,
   keptTraces,
-  keyMove,
   type LiveWork,
   leftLine,
   NEW_PIN,
@@ -99,6 +94,7 @@ import {
   startedWords,
   type ThreadDetails,
   type ThreadLink,
+  TRASH_COLUMN,
   threadLink,
   traceGroups,
   tracesAt,
@@ -134,7 +130,6 @@ import {
   useSyncExternalStore,
 } from "react"
 import { CardEditor } from "./card-editor.tsx"
-import { dragCard } from "./card-frame.tsx"
 import { ColumnMenu } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
@@ -234,8 +229,6 @@ export interface ColumnProps {
    * focus. True once per opening.
    */
   takeFocus: (key: string) => boolean
-  /** Whether × shows (`ColumnSlot.closable`). */
-  closable: boolean
   /**
    * What each column knew of its end when last unmounted, by its key
    * (`follow.ts`).
@@ -274,10 +267,6 @@ export interface ColumnProps {
   matches: ColumnMatches | null
 }
 
-/** The take handle's words: what dropping it on a slot does. */
-const TAKE_DRAG =
-  "drag onto a slot of your inventory to put this thread away: its run stops"
-
 /** A place a text card may be in; undefined for any other. */
 const textPlaceOf = (place: CardPlace | undefined): TextPlace | undefined =>
   place === undefined ? undefined : placeOfKind("text", place)
@@ -301,17 +290,15 @@ export function Column(p: ColumnProps) {
   const spacer = useRef<HTMLDivElement>(null)
   const floor = useRef<HTMLDivElement>(null)
 
-  // A move from the grip's keys brings the column into view: End can put it
-  // past the strip's edge. Its grip keeps focus through React's move.
-  const grip = useRef<HTMLButtonElement>(null)
-  const movedByKey = useRef(false)
+  // A move by Alt+arrows brings the column into view: it can land past the
+  // strip's edge. Focus stays where it was, inside the column, through
+  // React's move.
+  const section = useRef<HTMLElement>(null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the column has moved
   useLayoutEffect(() => {
-    if (!movedByKey.current) return
-    movedByKey.current = false
-    grip.current
-      ?.closest(".column")
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" })
+    const el = section.current
+    if (el === null || !el.contains(document.activeElement)) return
+    el.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [p.position])
 
   // The spacer exists to line a new column up with its fork point. A column
@@ -921,24 +908,6 @@ export function Column(p: ColumnProps) {
       void p.session.request({ kind: "traces-seen", traces })
   }, [traceIds, visible])
   const traceRows = traceGroups(keptTraces(keptHere, traces))
-  // Closing a unstarted column whose cards hold text asks first: they have no
-  // thread to stay on. Keeping them in your inventory is the default, and can
-  // be undone; discarding them is final (ADR-0048).
-  const [askClose, setAskClose] = useState<readonly CardId[] | null>(null)
-  const close = () => {
-    const typed = unstarted
-      ? (mine === undefined ? [] : [mine])
-          .filter(c => p.session.cardText(c.id).text().trim() !== "")
-          .map(c => c.id)
-      : []
-    if (typed.length > 0) setAskClose(typed)
-    else if (unstarted)
-      p.onIntent({
-        kind: "closeUnstarted",
-        card: p.column.thread,
-        keep: false,
-      })
-  }
   const branchInstead = (pending: Pending) => {
     if (at.kind === "entry") act({ kind: "branchInstead", at: at.id, pending })
   }
@@ -946,6 +915,7 @@ export function Column(p: ColumnProps) {
   return (
     <section
       className="column"
+      ref={section}
       data-card={card ?? undefined}
       data-density={density}
       data-width={p.width}
@@ -961,28 +931,9 @@ export function Column(p: ColumnProps) {
             className="column-head"
             data-color={colors.slot(p.track)}
             data-column-head={card === null ? undefined : ""}
+            {...(card === null ? {} : dragProps({ kind: "card", card }))}
           >
             <div className="head-row">
-              {card !== null && p.count > 1 && (
-                <button
-                  aria-keyshortcuts="ArrowLeft ArrowRight Home End"
-                  aria-label="move column"
-                  className="grip"
-                  onKeyDown={e => {
-                    const to = keyMove(p.position, p.count, e.key)
-                    if (to === null) return
-                    e.preventDefault()
-                    movedByKey.current = true
-                    if (columnKey.kind === "card")
-                      p.onIntent({ kind: "moveColumn", column: columnKey, to })
-                  }}
-                  ref={grip}
-                  title="drag to move · ← → Home End"
-                  type="button"
-                >
-                  ⠿
-                </button>
-              )}
               <Identity
                 banner={shows.banner}
                 detailsId={detailsId}
@@ -1039,47 +990,24 @@ export function Column(p: ColumnProps) {
                   session={p.session}
                 />
               )}
-              {card !== null && isThreadId(card) && (
-                // A thread's card dragged onto a slot of your inventory is
-                // taken there (ADR-0117, ADR-0124); the header itself drags
-                // the column along the canvas.
-                <button
-                  aria-label={TAKE_DRAG}
-                  className="take-drag"
-                  draggable
-                  onDragStart={e => dragCard(e, card)}
-                  title={TAKE_DRAG}
-                  type="button"
-                >
-                  ⇲
-                </button>
-              )}
               {card !== null && (
                 <ColumnMenu
                   onIntent={p.onIntent}
                   sections={columnMenu({ card, width: p.width })}
                 />
               )}
-              {card !== null && (
+              {card !== null && writable && (
                 <button
-                  aria-label={FOLD.title}
-                  className={FOLD.className}
-                  onClick={() =>
-                    card !== null &&
-                    p.onIntent({ kind: "fold", card: card, unfolded: false })
-                  }
-                  title={FOLD.title}
-                  type="button"
-                >
-                  {FOLD.label}
-                </button>
-              )}
-              {p.closable && (
-                <button
-                  aria-label="close column"
+                  aria-label={TRASH_COLUMN}
                   className="close"
-                  onClick={close}
-                  title="close column"
+                  onClick={() =>
+                    p.onIntent({
+                      kind: "discard",
+                      card,
+                      at: { kind: "column", key: p.column.key },
+                    })
+                  }
+                  title={TRASH_COLUMN}
                   type="button"
                 >
                   ×
@@ -1112,48 +1040,6 @@ export function Column(p: ColumnProps) {
               }}
               strip={shows.strip}
             />
-            {askClose !== null && (
-              <div className="close-ask">
-                {closeAskWords(askClose.length)}{" "}
-                <button
-                  // biome-ignore lint/a11y/noAutofocus: the default answer to the ask just shown
-                  autoFocus
-                  className="close-keep"
-                  onClick={() => {
-                    setAskClose(null)
-                    p.onIntent({
-                      kind: "closeUnstarted",
-                      card: p.column.thread,
-                      keep: true,
-                    })
-                  }}
-                  type="button"
-                >
-                  {KEEP_IN_INVENTORY}
-                </button>{" "}
-                <button
-                  className="close-discard"
-                  onClick={() => {
-                    setAskClose(null)
-                    p.onIntent({
-                      kind: "closeUnstarted",
-                      card: p.column.thread,
-                      keep: false,
-                    })
-                  }}
-                  type="button"
-                >
-                  {DISCARD}
-                </button>{" "}
-                <button
-                  className="close-cancel"
-                  onClick={() => setAskClose(null)}
-                  type="button"
-                >
-                  cancel
-                </button>
-              </div>
-            )}
           </header>
           {/* Under a search, the thread stays as it is, covered and inert,
           with its matches laid over it (ADR-0101, S126): leaving needs no
@@ -1517,7 +1403,6 @@ function BannerImage({ url, fade }: { url: string; fade: boolean }) {
         className="banner"
         data-fade={fade || undefined}
         data-loaded={loaded || undefined}
-        draggable={false}
         onLoad={() => setLoaded(true)}
         src={url}
       />

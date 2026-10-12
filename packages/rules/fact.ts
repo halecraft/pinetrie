@@ -77,6 +77,7 @@ const QueuedFactSchema = Type.Union([
         }),
       }),
       Type.Object({ kind: Type.Literal("held"), by: WriterIdSchema }),
+      Type.Object({ kind: Type.Literal("trashed"), task: TaskIdSchema }),
       Type.Object({ kind: Type.Literal("gone") }),
     ]),
     by: WriterIdSchema,

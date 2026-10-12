@@ -1,11 +1,12 @@
 // web/folded-column — a column folded to a narrow strip with its title, in its
 // place on the canvas (ADR-0116): its card's face (ADR-0126), worded for a
 // strip (`foldedWords`). Pressing it unfolds it. Its head is a drag handle,
-// as an unfolded column's is (`use-column-drag.ts`): folds are yours, the
-// order everyone's.
+// as an unfolded column's is (`use-drag.ts`): folds are yours, the order
+// everyone's. It has no ⋯ and no ×: a column is unfolded to act on it.
 
 import {
   cardOfFace,
+  dragProps,
   dropProps,
   type FoldedFace,
   foldedWords,
@@ -31,7 +32,11 @@ export function FoldedColumn(p: {
       data-kind={face.kind}
     >
       {/* The handle a drag starts from; the strip below unfolds. */}
-      <header className="column-head folded-head" data-column-head="">
+      <header
+        className="column-head folded-head"
+        data-column-head=""
+        {...dragProps({ kind: "card", card })}
+      >
         <span aria-hidden="true" className="folded-grip">
           ⠿
         </span>

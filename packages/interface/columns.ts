@@ -119,13 +119,6 @@ export interface UnstartedMode {
  */
 export type ColumnMode = { readonly kind: "bound" } | UnstartedMode
 
-/** A column whose thread is not yet started: × closes it, discarding its card. */
-export type ClosableColumn = Column & { readonly mode: UnstartedMode }
-
-/** Whether `column` closes with ×: its thread is not yet started (`ClosableColumn`). */
-export const isClosable = (column: Column): column is ClosableColumn =>
-  column.mode.kind === "unstarted"
-
 /** A column's unstarted mode, or undefined for a bound one. */
 export const unstartedOf = (
   column: Pick<Column, "mode">,

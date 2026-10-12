@@ -16,11 +16,14 @@ import {
   KINDS,
   keyOf,
   kindOfCard,
+  type LivePlace,
   type Move,
   type MoveRefusal,
   makeCard,
   NO_CONTENT,
   type NoteColumnId,
+  ownerCard,
+  ownerOf,
   type Paste,
   type PlaceKey,
   placed,
@@ -33,6 +36,7 @@ import {
   seenAt,
   type TaskId,
   type ThreadId,
+  type Workflow,
   type WriterId,
   wrapperKind,
 } from "@pinetrie/core"
@@ -41,7 +45,13 @@ import { makeNoteColumn, noteAt, toNotes } from "./notes.ts"
 import { orderAfter } from "./order.ts"
 import { inventoryFull, isPinned, queuedOn, taskPinnedOf } from "./queue.ts"
 import { rankAfter, rankOfDrop } from "./rank.ts"
-import { canvasOf, NO_TASK_INDEX, type TaskIndex, taskOfPlace } from "./task.ts"
+import {
+  canvasOf,
+  NO_TASK_INDEX,
+  planTaskOpening,
+  type TaskIndex,
+  taskOfPlace,
+} from "./task.ts"
 
 // ── handoffs (ADR-0059) ───────────────────────────────────────────────────
 
@@ -86,7 +96,7 @@ export const discardHistory = (
 
 /**
  * A key as the place it becomes, with what the host assigns to a queued or
- * pinned one, and a gone one's history (`discardHistory`). A pinned card goes after every pinned card in the session, not
+ * pinned one, and a trashed one's place left. A pinned card goes after every pinned card in the session, not
  * only its thread's: a thread is found through the tree, which a handoff
  * does not read, and an order only has to grow within a thread.
  */
@@ -95,7 +105,6 @@ function placeAt(
   cards: readonly CardRecord[],
   sender: WriterId,
   now: CardRecord | undefined,
-  discards: Discards,
 ): CardPlace | undefined {
   switch (key.kind) {
     // At the rank it was given there (`planMoveTargets`), as wide as it was
@@ -132,15 +141,11 @@ function placeAt(
         key.entry,
         key.thread,
       )
+    // The place it leaves: a card is made in no trash, nor trashed twice.
     case "trash":
-      return {
-        ...key,
-        holder: sender,
-        task:
-          now === undefined
-            ? discards.here
-            : discardHistory(now.place, discards),
-      }
+      return now === undefined || now.place.kind === "trash"
+        ? undefined
+        : { kind: "trash", left: now.place }
     default:
       return key
   }
@@ -236,10 +241,11 @@ function madeAt(
  *   (`planMake`).
  * - A fact is the host's (ADR-0080): no person moves its kind (`KINDS`),
  *   so every move of it is refused `no-place`.
- * - To a trash: a discard (ADR-0111), from any place the sender may move
- *   out of. A card in a trash moves only by an undo, which is no handoff,
- *   or by its cutter's paste (`planUncut`): a move out of a trash is
- *   refused `gone`.
+ * - To a trash: a discard, from any place the sender may move out of; the
+ *   card records the place it left. A card in a trash moves only by an
+ *   undo, which is no handoff, or by `planFromTrash` (its cutter's paste,
+ *   or a restore to `back`): any other move out of a trash is refused
+ *   `gone`.
  * - Into or out of an inventory: only its holder's, and into it only while
  *   it holds fewer than `INVENTORY_SLOTS` cards. A creation obeys both.
  * - To the queue: after the lane's last card, queued by the sender, and why
@@ -251,54 +257,123 @@ export function planMove(
   cards: readonly CardRecord[],
   move: ResolvedMove,
   sender: WriterId,
-  discards: Discards,
 ): MoveStep {
   const now = cards.find(c => c.id === move.card)
   if (move.from === null) {
     // A move makes a text card, or a note column on a canvas: a thread's
     // card is the host's to make, with its thread's first message or a
     // copy (`planCopy`), and a fact's with its fact (`planFactCard`).
-    const place = placeAt(move.to, cards, sender, undefined, discards)
+    const place = placeAt(move.to, cards, sender, undefined)
     const made =
       place === undefined ? undefined : madeAt(move.card, place, sender)
     return made === undefined
       ? { kind: "refused", code: "no-place", now: null }
       : planMake(cards, made, sender)
   }
+  // A move out of a trash to the very place the card left is a restore.
+  if (now?.place.kind === "trash" && isBack(now.place.left, move.to))
+    return planFromTrash(cards, move.card, sender, RESTORE)
   if (now === undefined || now.place.kind === "trash")
     return { kind: "refused", code: "gone", now: null }
-  return handoff(cards, now, { ...move, from: move.from }, sender, discards)
+  return handoff(cards, now, { ...move, from: move.from }, sender)
 }
 
 /**
- * A cut card moved out of its cutter's trash to `move.to` (ADR-0132): the
- * first paste after a cut. Only the sender's own trash gives a card back
- * this way; one in someone else's trash, or in none, is refused `gone`.
- * Then it is a handoff as any move is. Pure.
+ * Why a card leaves a trash besides an undo: its cutter's paste (`uncut`),
+ * to the paste's target; or a restore, back to the place it left.
  */
-export function planUncut(
+export type FromTrash =
+  | { readonly kind: "uncut"; readonly to: ResolvedTarget }
+  | { readonly kind: "restore" }
+
+/** A restore: back to where the card was. */
+export const RESTORE: FromTrash = { kind: "restore" }
+
+/**
+ * A card moved out of a trash: the one way but an undo. Refused `gone`
+ * unless the card is in a trash; an uncut, unless the sender trashed it
+ * (its placer: the first paste after a cut). A restore goes back to the
+ * place the card left, a canvas card at the rank it had there; refused
+ * `left-gone` when what that place is on (a task, a note column, a thread)
+ * is itself trashed or has no record, `left-taken` for your message's
+ * place where you have written a newer one, and `not-yours` for someone
+ * else's message. Then it is a handoff as any move is. Pure.
+ */
+export function planFromTrash(
   cards: readonly CardRecord[],
-  move: ResolvedMove,
+  card: CardId,
   sender: WriterId,
-  discards: Discards,
+  why: FromTrash,
 ): MoveStep {
-  const now = cards.find(c => c.id === move.card)
-  if (
-    now === undefined ||
-    now.place.kind !== "trash" ||
-    now.place.holder !== sender
-  )
+  const now = cards.find(c => c.id === card)
+  if (now === undefined || now.place.kind !== "trash")
     return { kind: "refused", code: "gone", now: null }
-  return handoff(cards, now, { ...move, from: DISCARDED }, sender, discards)
+  if (why.kind === "uncut") {
+    if (now.placer !== sender)
+      return { kind: "refused", code: "gone", now: null }
+    return handoff(cards, now, { card, from: DISCARDED, to: why.to }, sender)
+  }
+  const { left } = now.place
+  // A task's card goes back by the board's own move, or by an undo.
+  if (left.kind === "board") return { kind: "refused", code: "no-place", now }
+  const refusal = refuseBack(cards, now, left, sender)
+  if (refusal !== null) return { kind: "refused", code: refusal, now }
+  return handoff(
+    cards,
+    now,
+    { card, from: DISCARDED, to: backTo(left) },
+    sender,
+  )
 }
 
-/** `planMove`'s and `planUncut`'s checks once each has found the card where it may leave. */
+/** Why a restore of `now` to `left` is refused; null when it may go back. */
+function refuseBack(
+  cards: readonly CardRecord[],
+  now: CardRecord,
+  left: LivePlace,
+  sender: WriterId,
+): MoveRefusal | null {
+  if (left.kind === "composing") {
+    if (now.owner !== sender) return "not-yours"
+    const newer = cards.some(
+      c =>
+        c.id !== now.id &&
+        c.owner === now.owner &&
+        c.place.kind === "composing" &&
+        c.place.thread === left.thread,
+    )
+    if (newer) return "left-taken"
+  }
+  const owner = ownerCard(ownerOf(left))
+  if (owner === null) return null
+  const holds = cards.find(c => c.id === owner)
+  return holds === undefined || holds.place.kind === "trash"
+    ? "left-gone"
+    : null
+}
+
+/** Whether `to` is the place `left`: a canvas by its task, whatever its rank. */
+const isBack = (left: LivePlace, to: ResolvedTarget): boolean =>
+  left.kind !== "board" &&
+  sameKey(
+    keyOf(left),
+    to.kind === "canvas" ? { kind: "canvas", task: to.task } : to,
+  )
+
+/** Where a restore sends a card: the place it left, a canvas at its old rank. */
+const backTo = (
+  left: Exclude<LivePlace, { readonly kind: "board" }>,
+): ResolvedTarget =>
+  left.kind === "canvas"
+    ? { kind: "canvas", task: left.task, order: left.order }
+    : keyOf(left)
+
+/** `planMove`'s and `planFromTrash`'s checks once each has found the card where it may leave. */
 function handoff(
   cards: readonly CardRecord[],
   now: CardRecord,
   move: ResolvedMove & { readonly from: PlaceKey },
   sender: WriterId,
-  discards: Discards,
 ): MoveStep {
   if (!seenAt(keyOf(now.place), move.from))
     return { kind: "refused", code: "moved", now }
@@ -310,7 +385,7 @@ function handoff(
     return { kind: "refused", code: "not-yours", now }
   const refusal = refuseInto(move.to, cards, move.card, sender)
   if (refusal !== null) return { kind: "refused", code: refusal, now }
-  const place = placeAt(move.to, cards, sender, now, discards)
+  const place = placeAt(move.to, cards, sender, now)
   const record = place === undefined ? undefined : placed(now, place)
   if (record === undefined) return { kind: "refused", code: "no-place", now }
   return {
@@ -331,7 +406,7 @@ function handoff(
  * replaces discarded first (ADR-0133), so a replacement in a full inventory
  * never meets `full`; then the card made where `move` sends it (a text
  * card keeping its origin, or a reference), or the cut card moved out of
- * the sender's trash (`planUncut`). A card made in the place of the one it
+ * a trash by its cutter (`planFromTrash`). A card made in the place of the one it
  * replaces takes that very place (its rank in a note column or a queue): an
  * edit as text keeps the reference's spot. Refused as the discard, the
  * make or the move would be. Pure.
@@ -342,7 +417,6 @@ export function planPaste(
   move: ResolvedMove,
   replacing: Replacing | null,
   sender: WriterId,
-  discards: Discards,
 ): MovesStep {
   const old =
     replacing === null ? undefined : cards.find(c => c.id === replacing.card)
@@ -353,17 +427,14 @@ export function planPaste(
           cards,
           { card: replacing.card, from: replacing.from, to: DISCARDED },
           sender,
-          discards,
         )
   if (discard?.kind === "refused") return discard
   const before = discard === null ? cards : afterStep(cards, discard)
   if (paste.kind === "uncut") {
-    const step = planUncut(
-      before,
-      { ...move, card: paste.card },
-      sender,
-      discards,
-    )
+    const step = planFromTrash(before, paste.card, sender, {
+      kind: "uncut",
+      to: move.to,
+    })
     if (step.kind === "refused") return step
     return {
       kind: "steps",
@@ -373,7 +444,7 @@ export function planPaste(
   const place =
     old !== undefined && sameKey(keyOf(old.place), move.to)
       ? old.place
-      : placeAt(move.to, before, sender, undefined, discards)
+      : placeAt(move.to, before, sender, undefined)
   const made =
     place === undefined ? undefined : pastedCard(paste, place, sender)
   if (made === undefined)
@@ -455,6 +526,8 @@ export function planMoveTargets(input: {
   readonly newColumn: () => NoteColumnId
   /** The thread of each entry a move's margin names, as its root's index says; absent for one not found. */
   readonly entryThreads: ReadonlyMap<EntryId, ThreadId>
+  /** The board's states, for a new task a move makes; null refuses one. */
+  readonly workflow?: Workflow | null
 }):
   | {
       readonly kind: "resolved"
@@ -538,6 +611,37 @@ export function planMoveTargets(input: {
           }
         moves.push({ ...move, to })
         break
+      // Back to the place the card left: a restore, which `planMove` tells
+      // by its target.
+      case "back": {
+        const card = now.find(c => c.id === move.card)
+        if (card?.place.kind !== "trash" || card.place.left.kind === "board")
+          return { kind: "refused", code: "gone", now: card ?? null }
+        moves.push({ ...move, to: backTo(card.place.left) })
+        break
+      }
+      // A new task made by the mover, the card first on its canvas.
+      case "new-task": {
+        const made = planTaskOpening(
+          to.task,
+          input.sender,
+          { workflow: input.workflow ?? null, state: null },
+          now,
+        )
+        if (made.kind === "refused")
+          return {
+            ...made,
+            now: now.find(c => c.id === move.card) ?? null,
+          }
+        first.push(made)
+        now = afterSteps(now, [made])
+        moves.push({
+          ...move,
+          to: rankOnCanvas(now, move.card, { kind: "canvas", task: to.task })
+            .to,
+        })
+        break
+      }
       // No person's move takes a task's card (`KINDS`): the board's own
       // move places it (`planBoardMove`).
       case "board":
@@ -586,9 +690,9 @@ export function planMoveRequest(
   moves: readonly Move[],
   sender: WriterId,
   running: (lane: ThreadId) => boolean,
-  discards: Discards,
   newColumn: () => NoteColumnId,
   entryThreads: ReadonlyMap<EntryId, ThreadId>,
+  workflow: Workflow | null = null,
 ): MoveCommand {
   const resolved = planMoveTargets({
     cards,
@@ -596,6 +700,7 @@ export function planMoveRequest(
     sender,
     newColumn,
     entryThreads,
+    workflow,
   })
   if (resolved.kind === "refused") return REFUSED(resolved)
   const command = planMoveCommand(
@@ -603,7 +708,6 @@ export function planMoveRequest(
     resolved.moves,
     sender,
     running,
-    discards,
   )
   const { step } = command
   return {
@@ -644,12 +748,11 @@ export function planMoves(
   cards: readonly CardRecord[],
   moves: readonly ResolvedMove[],
   sender: WriterId,
-  discards: Discards,
 ): MovesStep {
   const steps: PlaceStep[] = []
   let now = cards
   for (const move of moves) {
-    const step = planMove(now, move, sender, discards)
+    const step = planMove(now, move, sender)
     if (step.kind === "refused") return step
     steps.push(step)
     now = afterStep(now, step)
@@ -676,9 +779,8 @@ export function planMoveCommand(
   moves: readonly ResolvedMove[],
   sender: WriterId,
   running: (lane: ThreadId) => boolean,
-  discards: Discards,
 ): MoveCommand {
-  const step = planMoves(cards, moves, sender, discards)
+  const step = planMoves(cards, moves, sender)
   if (step.kind === "refused") return REFUSED(step)
   return { step, drain: lanesToDrain(cards, step.steps, running) }
 }
@@ -686,7 +788,8 @@ export function planMoveCommand(
 /**
  * The lanes `steps` leave to drain, those not running: each a step leaves
  * a card queued on (a move's, or a reference made there), and each thread
- * put out of an inventory, whose queue waited there (ADR-0124). Pure.
+ * put on a canvas from an inventory or a trash, whose queue waited there.
+ * Pure.
  */
 export function lanesToDrain(
   cards: readonly CardRecord[],
@@ -698,9 +801,10 @@ export function lanesToDrain(
     if (s.kind !== "write") return []
     const { record } = s
     if (record.place.kind === "queued") return [record.place.thread]
+    const from = was.get(record.id)
     return record.kind === "thread" &&
-      record.place.kind !== "inventory" &&
-      was.get(record.id) === "inventory"
+      record.place.kind === "canvas" &&
+      (from === "inventory" || from === "trash")
       ? [record.id]
       : []
   })

@@ -105,6 +105,7 @@ export const NO_FOCUS: Focus = {
   block: null,
   selected: null,
   cell: false,
+  inColumn: null,
   zone: null,
 }
 

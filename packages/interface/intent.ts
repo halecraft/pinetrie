@@ -30,7 +30,12 @@ import {
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { isQueuedMessage } from "@pinetrie/rules"
-import { type ActedAt, AT_BOARD, IN_COLUMN } from "@pinetrie/session"
+import {
+  type ActedAt,
+  AT_BOARD,
+  AT_INVENTORY,
+  IN_COLUMN,
+} from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
 import { BOARD_SEARCH } from "./board-view.ts"
@@ -41,7 +46,6 @@ import {
   moveCard,
   type PutHow,
   type PutSource,
-  planCloseUnstarted,
   planComment,
   planDiscard,
   planEditAsText,
@@ -51,6 +55,7 @@ import {
   planPinToTask,
   planPut,
   planQueueReference,
+  planRestore,
   planToNote,
   planUndoMove,
   planUnpin,
@@ -233,16 +238,6 @@ export type Intent =
       readonly column: CardKey
       readonly to: number
     }
-  /**
-   * Close the column of a thread not yet started (ADR-0126): its card to
-   * your trash, and your message there to your inventory (`keep`) or your
-   * trash, in one move. A new tab's task, then empty, leaves the sidebar.
-   */
-  | {
-      readonly kind: "closeUnstarted"
-      readonly card: ThreadId
-      readonly keep: boolean
-    }
   /** A thread you opened sent its first message: what it started with is spent. */
   | { readonly kind: "sentFirst"; readonly card: ThreadId }
   /** Unfold a column of the task you are on, or fold it (ADR-0116). */
@@ -369,6 +364,8 @@ export type Intent =
    * (ADR-0111). A cut is a copy, then this (ADR-0132).
    */
   | { readonly kind: "discard"; readonly card: CardId; readonly at: ActedAt }
+  /** Bring a trashed card back to where it was, for anyone who may. */
+  | { readonly kind: "restore"; readonly card: CardId; readonly at: ActedAt }
   /** The page copied `clip` to the clipboard: the clipboard cell shows it (ADR-0132). */
   | { readonly kind: "copied"; readonly clip: Clip }
   /** A paste of `clip` at `target`: a copy landed there (ADR-0132). */
@@ -479,8 +476,6 @@ function planOf(
         ? planColumnMove(intent.column.card, intent.to, active.task, state)
         : []
     }
-    case "closeUnstarted":
-      return planCloseUnstarted(intent.card, intent.keep, state)
     case "sentFirst":
       return onTaskYouAreOn(state, { kind: "sent", card: intent.card })
     case "fold":
@@ -613,6 +608,8 @@ function planOf(
       return planEditAsText(intent, state)
     case "discard":
       return planDiscard(intent.card, { actedAt: intent.at, slot: null }, state)
+    case "restore":
+      return planRestore(intent.card, { actedAt: intent.at, slot: null }, state)
     case "copied":
       return [{ kind: "clipboardCell", clip: intent.clip }]
     case "paste":
@@ -832,6 +829,12 @@ export function planOpenLink(
             { kind: "openSelected" },
           ]
     }
+    case "restore":
+      return planRestore(
+        open.thread,
+        { actedAt: AT_INVENTORY, slot: null },
+        state,
+      )
     case "nothing":
       return []
   }

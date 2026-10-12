@@ -345,7 +345,8 @@ export const LAST_ORDER = "\uffff"
  * waits for the host to give it an order, so it is drawn last among its
  * kind, a queued one queued by you, a canvas card one column wide; a gone
  * one is gone by you, in no history until the host names it one
- * (`historyOf`). A thread's nearest notes are the note column the host
+ * (`historyOf`); a discard records where it was, and a restore goes back
+ * there. A thread's nearest notes are the note column the host
  * would choose from `cards` (`notesOf`); undefined, drawn where it was,
  * when the host would make one, or the thread has no card. A spot on a
  * canvas is drawn at the rank the host would give it (`rankOfDrop`).
@@ -354,6 +355,7 @@ export function drawnPlace(
   key: MoveTarget,
   me: WriterId,
   cards: readonly CardRecord[],
+  now?: CardRecord,
 ): CardPlace | undefined {
   switch (key.kind) {
     case "queued":
@@ -366,8 +368,17 @@ export function drawnPlace(
       return { ...key, order: LAST_ORDER }
     case "canvas":
       return { ...key, order: LAST_ORDER, width: 1 }
+    // A discard records where the card was; a card not yet drawn is
+    // drawn nowhere until the host writes it.
     case "trash":
-      return { ...key, holder: me, task: null }
+      return now === undefined || now.place.kind === "trash"
+        ? undefined
+        : { kind: "trash", left: now.place }
+    // A restore, back where it was, at its old rank.
+    case "back":
+      return now?.place.kind === "trash" ? now.place.left : undefined
+    case "new-task":
+      return { kind: "canvas", task: key.task, order: LAST_ORDER, width: 1 }
     // Drawn at the rank the host would give it there.
     case "canvas-at":
       return {
@@ -459,7 +470,7 @@ export function withPending(
     // Placed among the others, as the host places it: a spot on a canvas is
     // ranked without the card that moves there.
     const others = [...cards.values()].filter(c => c.id !== p.move.card)
-    const place = drawnPlace(p.move.to, me, others)
+    const place = drawnPlace(p.move.to, me, others, now)
     cards.set(
       p.move.card,
       (place === undefined ? undefined : placed(now, place)) ?? now,

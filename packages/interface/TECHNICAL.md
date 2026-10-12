@@ -96,7 +96,9 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
 - **A link to a thread is a `ThreadLink`** (`thread-link.ts`, ADR-0117,
   ADR-0124), which only `threadLink(thread, cards, me)` makes (a brand): `open`
   in a task, `mine` in your inventory (its preview opens: `openSelected`),
-  `held` in someone else's, `gone` with no card. The inbox's rows, a
+  `held` in someone else's, `trashed` in the trash of the task it left
+  (following it restores it, `planRestore`), `gone` with no card, worded
+  "deleted". The inbox's rows, a
   mention, a reader's thread, a copy's or a parent elsewhere's fork row and
   a rail stub all follow one through the `openLink` intent
   (`planOpenLink`); `linkWords` words it, "Bea has it" (`heldWords`).
@@ -370,10 +372,10 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   `put-target.ts` is for a card's: `rootDropProps` marks a column, an item
   or the sidebar (`data-root-state`, `data-root-before`, `data-list-before`),
   `rootTargetOfElement` reads it, and `planRootDrop` gives the same intent
-  the keyboard's moves send. A root's drag carries `ROOT_MIME`, never a
-  card's; `App`'s card handlers ignore it, and `useRootDrag`'s ignore
-  `CARD_MIME`.
-- **A drag shows where it lands** (`use-root-drag.ts`). A board column,
+  the keyboard's moves send. A root's drag is a task source (`DragSource`,
+  `drag.ts`), which never takes a card's drop zone, and a card's never a
+  root's (*Drags*, below).
+- **A drag shows where it lands** (`packages/web/use-drag.ts`). A board column,
   the archive and the sidebar are each a group of places
   (`rootGroupProps`), and anywhere in a group lands by the pointer's height
   alone (`landingIn`): before the first item whose centre is below it, or
@@ -381,15 +383,12 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   made the gaps between items the column's end, and the line flickered
   between there and the gap as the pointer moved down a column. The place
   carries `data-root-drop`, drawn as a line in the gap; the item dragged
-  carries `data-root-dragging`, set a tick after `dragstart` so the drag's
-  image is not dimmed. The place just after the item dragged is its `home`
+  carries `data-dragging`. The place just after the item dragged is its `home`
   (`placeAfter`), where a drop moves nothing (`planRootDrop`), so over the
   item itself no line is drawn. The archive is one target: its rows are a search, newest
   activity first, so no row is a place to drop before, and the panel is
-  outlined instead. One drag start, `startRootDrag`, serves the board and
-  the sidebar; its image is the whole item, held where the pointer took it
-  (`setDragImage`). All of it is DOM attributes, never React state, as a
-  column's drag is.
+  outlined instead. All of it is DOM attributes, never React state, as
+  every drag is.
 - **`markOf` is the one rule for a mark over several roots** (`attention.ts`):
   a board column's head, a strip state's and ▦'s (the roots not in the
   sidebar, `unlisted`).
@@ -435,6 +434,11 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
 - **The strip is `[TaskColumn, ...CardColumn[]]`** (`stripOf`,
   `taskStrip`): the task column first by type, with no card's id, so no
   move, reorder or width can name it.
+- **The task column lists its canvas's trash** (`canvasTrash`,
+  `task-column-view.ts`): each thread or note column in a trash whose
+  `left` is this task's canvas, the newest discard first, with who trashed
+  it (its placer) and the days until the sweep (`trashDeadline`, the
+  sweep's own). Its **restore** is `planRestore`, a move to `BACK`.
 - **A branch is a card from the moment it opens** (ADR-0126): `→` asks the
   host to open its thread (`open-thread`, `planOpenBranch`), whose card
   lands just after the thread its fork is in (`branchAfter`,
@@ -463,10 +467,10 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   first send) is a column of mode `unstarted` (`UnstartedMode`), from
   `unstartedThreads` (`@pinetrie/rules`): ending at its fork, or, a new
   tab's, at its root (anchor null), its next send a branch there
-  (`branchesAt`). Shared as any card; it also closes (`isClosable`):
-  `closeUnstarted` moves its card to your trash and your message there to
-  your inventory (keep) or your trash, one move (`planCloseUnstarted`);
-  a new tab's task, then empty, leaves the sidebar, and the host deletes it.
+  (`branchesAt`). Shared as any card, and trashed by × as any column is
+  (`planDiscard`), your message staying on it; a new tab's only thread,
+  so trashed, takes its task out of the sidebar in the same move, and the
+  host trashes the task's card.
 - **A thread whose parent thread is on no column of the canvas** carries
   `foldAbove`, its own thread: `projectColumns` folds the path above the
   first node in that thread into `ColumnView.above` when no column to its
@@ -1519,16 +1523,14 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   planned from `IntentState.cards` (`CardFacts`: the drawn cards, the
   lanes, the drawn slots, the selection and the composer places), carried
   out by `perform`. Several moves sent as one (a closing branch's cards
-  kept in your inventory, a slot's replacement) are the `moveCards`
-  effect, which the host accepts or refuses whole, `full` among its
-  refusals; a closing branch's column closes once accepted (`afterKeep`).
-- **Drag** is HTML drag and drop, not the column drag's pointer events: it
-  crosses elements and roots. A card's drag carries its id under
-  `CARD_MIME`; its handle is its frame's header (`CardFrame`), or a slot. `App` listens on
-  the document for `dragover` and `drop`; a drag held over a root in your
-  list for `ITEM_HOVER_MS` opens it. A root's drag is not a card's
-  (`ROOT_MIME`, The board, above). `NOT_A_HANDLE` includes `[draggable='true']`, so
-  a card's drag never starts a column's.
+  kept in your inventory, a slot's replacement, a new tab's only thread
+  trashed with its task closed, a column dropped between tasks with the
+  new task placed) are the `moveCards` effect, which the host accepts or
+  refuses whole, `full` among its refusals; what follows (`close`) is done
+  once accepted (`afterKeep`).
+- **Drag** is the one pointer engine's (*Drags*, below): a card's handle
+  is its frame's header (`CardFrame`), or a slot, and its drop lands by
+  `putLanding`, the put key's and a paste's own planner.
 - **Keys** (`page-keys.ts`, `keyAct`): one table of the page's own keys,
   not only the inventory's, read by one `keydown` listener in `App` that
   decides nothing, from one record of where focus is (`Focus`, `focus.ts`,
@@ -1560,8 +1562,36 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   .discard-card`, `#bottom .inventory-toggle` (`.account-inventory` in the
   account menu while the sidebar is folded), the clipboard cell's
   `.inventory .clipboard-cell` and its `.keep`, a card's focusable
-  `.card-head[data-card]`, and an unstarted thread's column's `.close-keep`,
-  `.close-discard` and `.close-cancel`.
+  `.card-head[data-card]`.
+
+## Drags (`drag.ts`, ADR-0134)
+
+What the page's one drag engine (`packages/web/use-drag.ts`) decides, as
+values; the engine gathers and applies.
+
+- **A source is a card or a task** (`DragSource`). A column is its card on
+  a canvas, drawn whole: no source of its own. Only over the strip does a
+  card's drag reorder (`DragOver` `strip`, `landing` over `gapAt`);
+  anywhere else it lands as any card does (`putLanding`), so a column on a
+  slot is a take, onto a sidebar task a move to that canvas's end, between
+  tasks a `new-task`. A task's drag lands only on a root zone
+  (`planRootDrop`).
+- **What a drop would do is the same function each frame and on the
+  drop** (`dragVerdict`), so what is drawn is what happens. Alt is read
+  each frame as `how: "copy"`.
+- **A drop sends the intents a key or a menu would** (`dropIntents`):
+  `moveColumn`, `put` with its source, target and how, or the root drop's
+  own; each runs its own planner. A refused landing sends nothing.
+- **What a frame draws is a value** (`drawPlan`): the dragged element's
+  translate (never a scale, a rotation or a shadow, S153), the card face's
+  position off the strip, each column's shift (`neighbourShifts`), the
+  target's mark (`dropMark`), and the handle's lean. S153's drawing
+  conditions are its unit tests.
+- **A sidebar row splits in quarters** (`sidebarSpotAt`): its top and
+  bottom are between rows, its middle onto its task. A task's drag
+  ignores it and reorders among the rows (`landingIn`).
+- **Held over a task in the sidebar or ▦** for `ITEM_HOVER_MS`, a drag
+  opens it (`hoverOpens`).
 
 ## Copy, cut and paste (`clip.ts`, ADR-0132)
 

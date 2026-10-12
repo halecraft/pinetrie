@@ -1,10 +1,10 @@
-// held — a thread taken into an inventory (ADR-0117, ADR-0124): its
-// holder's alone, with no agent and no runner. One gate, decided per
-// command kind as the archive's is (`writesIn`): what each command would
-// run or write a message in (`runsIn`), and whether a held thread is among
-// it (`heldIn`). The host checks it before every command and every popped
-// card, and the drain asks it before it pops, so nothing runs there until
-// the thread is on a canvas again.
+// held — a thread taken into an inventory, or trashed: no agent and no
+// runner there. One gate, decided per command kind as the archive's is
+// (`writesIn`): what each command would run or write a message in
+// (`runsIn`), and whether a thread held or trashed is among it (`heldIn`).
+// The host checks it before every command and every popped card, and the
+// drain asks it before it pops, so nothing runs there until the thread is
+// on a canvas again.
 
 import type {
   CardRecord,
@@ -16,19 +16,48 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 
-/** Who holds `thread` in their inventory or trash, or null for a thread on a canvas or with no card. Pure. */
+/**
+ * Where a thread's card leaves it to run: free on a canvas (or with no
+ * card), held in someone's inventory, or in a trash, which nobody holds.
+ */
+export type ThreadHolding =
+  | { readonly kind: "free" }
+  | { readonly kind: "held"; readonly by: WriterId }
+  | { readonly kind: "trashed" }
+
+const FREE: ThreadHolding = { kind: "free" }
+const TRASHED: ThreadHolding = { kind: "trashed" }
+
+/** Where `thread`'s card leaves it (`ThreadHolding`). Pure. */
+export function holdingOf(
+  cards: readonly CardRecord[],
+  thread: ThreadId,
+): ThreadHolding {
+  const card = cards.find(c => c.id === thread)
+  if (card?.place.kind === "inventory")
+    return { kind: "held", by: card.place.holder }
+  return card?.place.kind === "trash" ? TRASHED : FREE
+}
+
+/** Who holds `thread` in their inventory, or null for one free or trashed. Pure. */
 export function holderOf(
   cards: readonly CardRecord[],
   thread: ThreadId,
 ): WriterId | null {
-  const card = cards.find(c => c.id === thread)
-  return card?.place.kind === "inventory" || card?.place.kind === "trash"
-    ? card.place.holder
-    : null
+  const holding = holdingOf(cards, thread)
+  return holding.kind === "held" ? holding.by : null
 }
 
 /** Why a command in a thread in an inventory is refused. */
 export const HELD_WORDS = "put it on a canvas first"
+
+/** Why a command in a trashed thread is refused. */
+export const TRASHED_WORDS = "restore it first"
+
+/** Why a command in a thread held or trashed is refused, as the host says it. */
+export const holdingWords = (
+  holding: Exclude<ThreadHolding, { readonly kind: "free" }>,
+): string => (holding.kind === "held" ? HELD_WORDS : TRASHED_WORDS)
 
 /** A queued card's pop: the drain's, which runs its thread's next send. */
 export interface QueuePop {
@@ -113,17 +142,21 @@ export function runsIn(command: Intent | QueuePop): readonly RunAt[] {
 }
 
 /**
- * The first thread among `at` someone holds in their inventory, and who;
- * null when none is. An entry's thread is `threadAt`'s, from its root's
- * tree; but a copy's first send, at its record's fork (`forkOf`), runs in
- * the copy, whose copier was shown the entries it forks from. Pure.
+ * The first thread among `at` someone holds in their inventory, or that is
+ * trashed, and how; null when none is. An entry's thread is `threadAt`'s,
+ * from its root's tree; but a copy's first send, at its record's fork
+ * (`forkOf`), runs in the copy, whose copier was shown the entries it
+ * forks from. Pure.
  */
 export function heldIn(
   at: readonly RunAt[],
   cards: readonly CardRecord[],
   threadAt: (root: RootId, entry: EntryId) => ThreadId | null,
   forkOf: ReadonlyMap<ThreadId, ThreadFork>,
-): { readonly thread: ThreadId; readonly by: WriterId } | null {
+): {
+  readonly thread: ThreadId
+  readonly holding: Exclude<ThreadHolding, { readonly kind: "free" }>
+} | null {
   for (const a of at) {
     const thread =
       a.kind === "thread"
@@ -132,8 +165,8 @@ export function heldIn(
           ? a.starts
           : threadAt(a.root, a.entry)
     if (thread === null) continue
-    const by = holderOf(cards, thread)
-    if (by !== null) return { thread, by }
+    const holding = holdingOf(cards, thread)
+    if (holding.kind !== "free") return { thread, holding }
   }
   return null
 }

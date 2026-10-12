@@ -882,6 +882,8 @@ const PLACE_REFUSALS = {
   replied: true,
   archived: true,
   "no-place": true,
+  "left-gone": true,
+  "left-taken": true,
   fact: true,
   "order-changed": true,
 } as const satisfies Record<PlaceRefusal, true>

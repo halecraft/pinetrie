@@ -95,6 +95,34 @@ describe("keyAct", () => {
     expect(keyAct(key("z"), focus())).toBeNull()
   })
 
+  test("Alt+→ and Alt+← move the column focus is in one place, never past an end, nor in a text box or the panel", () => {
+    const T = cardIdOfKind("thread", "a")
+    const inColumn = { card: T, position: 1, count: 3 }
+    const alt = (k: string) => key(k, { altKey: true })
+    expect(keyAct(alt("ArrowRight"), focus({ inColumn }))).toEqual({
+      kind: "moveColumn",
+      column: { kind: "card", card: T },
+      to: 2,
+    })
+    expect(keyAct(alt("ArrowLeft"), focus({ inColumn }))).toMatchObject({
+      to: 0,
+    })
+    expect(
+      keyAct(
+        alt("ArrowLeft"),
+        focus({ inColumn: { ...inColumn, position: 0 } }),
+      ),
+    ).toBeNull()
+    expect(
+      keyAct(alt("ArrowRight"), focus({ inColumn, inText: true })),
+    ).toBeNull()
+    expect(
+      keyAct(alt("ArrowRight"), focus({ inColumn, inPanel: true })),
+    ).toBeNull()
+    expect(keyAct(key("ArrowRight"), focus({ inColumn }))).toBeNull()
+    expect(keyAct(alt("ArrowRight"), focus())).toBeNull()
+  })
+
   test("a grid's keys are its own (`gridKeyAct`): none here", () => {
     expect(keyAct(key("l"), focus({ inPanel: true }))).toBeNull()
     expect(keyAct(key("ArrowUp"), focus({ inPanel: true }))).toBeNull()

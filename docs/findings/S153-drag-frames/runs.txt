@@ -88,3 +88,11 @@ page {"nodes":24563,"columns":10,"messages":1280,"strip":{"x":289,"y":0,"width":
 4 efp+flat 0 frames p50 16.7 p95 16.8 max 66.7 over20 9 over50 1 | work p50 0 p95 0.4 max 23.4 | gaps 6 offs 2 | slow frames after: {'the press': 1}
 4 efp+flat 1 frames p50 16.7 p95 16.8 max 100 over20 6 over50 1 | work p50 0 p95 0.3 max 28 | gaps 6 offs 2 | slow frames after: {'the press': 1}
 4 efp+flat 2 frames p50 16.7 p95 16.8 max 66.6 over20 8 over50 1 | work p50 0 p95 0.2 max 25.5 | gaps 6 offs 2 | slow frames after: {'the press': 1}
+
+# The engine as built (packages/web/use-drag.ts), 4x, mode engine: the page's own engine takes the press
+4 off 0 frames p50 16.7 p95 16.8 max 50 over20 3 over50 0
+4 off 1 frames p50 16.7 p95 16.8 max 133.3 over20 4 over50 1
+4 off 2 frames p50 16.7 p95 16.7 max 33.4 over20 3 over50 0
+4 engine 0 frames p50 16.7 p95 16.8 max 133.3 over20 12 over50 5
+4 engine 1 frames p50 16.7 p95 16.8 max 133.3 over20 12 over50 4
+4 engine 2 frames p50 16.7 p95 16.8 max 200 over20 27 over50 4

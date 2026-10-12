@@ -28,6 +28,7 @@ import {
   CLEAR_FILTER,
   type Count,
   clickClosesBoard,
+  dragProps,
   dropProps,
   elsewhereWords,
   filterTitle,
@@ -60,7 +61,6 @@ import { AddButton } from "./sidebar.tsx"
 import { SignalMark } from "./signal-mark.tsx"
 import { isTextBox } from "./text-box.ts"
 import { ThreadHead } from "./thread-card.tsx"
-import { startRootDrag } from "./use-root-drag.ts"
 
 /**
  * The strip: ▦, then, while the board is closed, each state's name, count,
@@ -594,9 +594,11 @@ function ItemCard({
     <div className="thread-card" data-task={item.task} {...drop}>
       <button
         className="board-open"
-        draggable
+        {...dragProps({
+          kind: "task",
+          drag: { task: item.task, state: item.state },
+        })}
         onClick={() => onIntent(item.show)}
-        onDragStart={startRootDrag({ task: item.task, state: item.state })}
         title={item.label}
         type="button"
       >

@@ -2,9 +2,7 @@ import { entryId, type LaneView, rootIdFor, threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import {
   BOUND,
-  type ClosableColumn,
   type Column,
-  isClosable,
   keyText,
   threadAnchor,
   unstartedOf,
@@ -55,11 +53,6 @@ test("a thread not yet started closes with ×; a started one does not (ADR-0126)
       root: rootIdFor("01a0ffd2-0000-7000-8000-00000000000a"),
     },
   }
-  expect(isClosable(bound)).toBe(false)
-  expect(isClosable(unstarted)).toBe(true)
   expect(unstartedOf(bound)).toBeUndefined()
   expect(unstartedOf(unstarted)?.fork).toBe("1-a")
-  // @ts-expect-error: a started thread's column closes as no unstarted one does
-  const closable: ClosableColumn = bound
-  expect(closable.key).toBe(T)
 })

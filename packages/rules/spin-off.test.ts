@@ -17,7 +17,7 @@ import { describe, expect, test } from "vitest"
 import { threadCardOf } from "./fixtures.ts"
 import { planRootDelete } from "./root.ts"
 import { planLiftRoot, planSpinOff, type SpunThread } from "./spin-off.ts"
-import { indexTasks, NO_TASK_INDEX, type TaskIndex } from "./task.ts"
+import { NO_TASK_INDEX, type TaskIndex } from "./task.ts"
 
 const TEST_THREAD = threadIdFor("e")
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -78,7 +78,7 @@ describe("planSpinOff (ADR-0111)", () => {
       now: 5,
     })
 
-  test("the thread opens spun from the card in its new task, its first message the card's text, trimmed, naming no agent; the card goes to its sender's trash (ADR-0126)", () => {
+  test("the thread opens spun from the card in its new task, its first message the card's text, trimmed, naming no agent; the card goes to the trash, recording where it was", () => {
     const planned = plan()
     expect(planned).toMatchObject({
       kind: "spin",
@@ -88,7 +88,7 @@ describe("planSpinOff (ADR-0111)", () => {
       mentions: [],
       step: {
         kind: "write",
-        record: { ...card(), place: { ...spun, holder: ADA, task: TEST_TASK } },
+        record: { ...card(), place: { ...spun, left: card().place } },
       },
     })
     const opened = planned.kind === "spin" ? planned.open : null
@@ -103,18 +103,6 @@ describe("planSpinOff (ADR-0111)", () => {
       kind: "write",
       record: { id: STARTS, place: { kind: "canvas", task: NEW_TASK } },
     })
-  })
-
-  test("its history is the task the card leaves; from no task, the one its sender will be on", () => {
-    const placeOf = (p: ReturnType<typeof plan>) =>
-      p.kind === "spin" ? p.step.record.place : null
-    const other = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
-    const tasks = indexTasks(
-      [threadCardOf({ thread: TEST_THREAD, task: other, by: ADA, cards: [] })],
-      new Map(),
-    )
-    expect(placeOf(plan({ tasks }))).toMatchObject({ task: other })
-    expect(placeOf(plan())).toMatchObject({ task: TEST_TASK })
   })
 
   test.each([
@@ -138,7 +126,9 @@ describe("planSpinOff (ADR-0111)", () => {
 })
 
 describe("planLiftRoot (S139)", () => {
-  const gone = card({ place: { ...spun, holder: ADA, task: TEST_TASK } })
+  const gone = card({
+    place: { ...spun, left: { kind: "inventory", holder: ADA } },
+  })
   const thread = (
     writers: SpunThread["writers"],
     known = true,

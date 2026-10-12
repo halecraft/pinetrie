@@ -384,7 +384,7 @@ describe("planIntent", () => {
     ).toEqual([])
   })
 
-  test("closing an unstarted thread's column: its card to your trash, your message there kept or trashed with it, in one move; a new tab's task, then empty, leaves the sidebar (ADR-0126)", () => {
+  test("× on any column trashes its card alone, asking nothing, your message there staying with it; a new tab's only thread, not yet started, takes its task out of the sidebar too", () => {
     const thread: CardRecord = {
       kind: "thread",
       id: F,
@@ -393,52 +393,19 @@ describe("planIntent", () => {
       place: { kind: "canvas", task: R1_ID, order: "zz", width: 1 },
       content: NO_CONTENT,
     }
-    const message: CardRecord = {
-      kind: "text",
-      id: textCardId("c"),
-      owner: ME,
-      placer: ME,
-      place: { kind: "composing", thread: F },
-      content: { command: null, unsent: null, origin: null },
-    }
     const state = at(onRoot("1-r1"), undefined, {
       ...NO_CARDS,
-      cards: [thread, message],
+      cards: [thread],
     })
     const away = {
-      move: {
-        card: F,
-        from: { kind: "canvas", task: R1_ID },
-        to: { kind: "trash" },
-      },
-      slot: null,
+      card: F,
+      from: { kind: "canvas", task: R1_ID },
+      to: { kind: "trash" },
     }
-    expect(
-      plan({ kind: "closeUnstarted", card: F, keep: true }, state),
-    ).toEqual([
-      {
-        kind: "moveCards",
-        moves: [
-          {
-            move: {
-              card: "c",
-              from: { kind: "composing", thread: F },
-              to: { kind: "inventory", holder: ME },
-            },
-            slot: 0,
-          },
-          away,
-        ],
-        actedAt: { kind: "column", key: F },
-        close: [],
-        here: R1_ID,
-      },
-    ])
-    expect(
-      plan({ kind: "closeUnstarted", card: F, keep: false }, state)[0],
-    ).toMatchObject({
-      moves: [{ move: { card: "c", to: { kind: "trash" } }, slot: null }, away],
-    })
+    const column = { kind: "column", key: F } as const
+    expect(plan({ kind: "discard", card: F, at: column }, state)).toMatchObject(
+      [{ kind: "moveCard", move: away, how: { actedAt: column } }],
+    )
     // Alone on its task's canvas: a new tab's, whose task then leaves the sidebar.
     const alone = { ...thread, place: { ...thread.place, task: NEW_TASK } }
     const onTab = {
@@ -448,9 +415,7 @@ describe("planIntent", () => {
         index: { ...TASKS.index, canvases: new Map([[NEW_TASK, [alone]]]) },
       },
     } as IntentState
-    expect(
-      plan({ kind: "closeUnstarted", card: F, keep: false }, onTab),
-    ).toEqual([
+    expect(plan({ kind: "discard", card: F, at: column }, onTab)).toEqual([
       {
         kind: "moveCards",
         moves: [
@@ -463,7 +428,7 @@ describe("planIntent", () => {
             slot: null,
           },
         ],
-        actedAt: { kind: "column", key: F },
+        actedAt: column,
         close: [
           { kind: "list", act: { kind: "close", task: NEW_TASK } },
           { kind: "layout", action: { kind: "closeTask", task: NEW_TASK } },

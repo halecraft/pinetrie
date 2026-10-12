@@ -9,6 +9,7 @@
 // reachable by put, and every place put reaches accepts a drop.
 
 import {
+  type BackTarget,
   type CanvasTarget,
   type CardId,
   isNoteColumnId,
@@ -61,17 +62,19 @@ export type PutTarget =
   | { readonly kind: "inventory"; readonly slot: number | null }
   /** A workflow state, on the board or the footer's strip: a new thread there (ADR-0111). */
   | { readonly kind: "state"; readonly state: WorkflowStateId }
-  /** A place in the sidebar, before a task or at its end: a new thread there. */
+  /**
+   * A place in the sidebar, before a task or at its end: a new task there,
+   * a thread spun from a text card, or holding a column dropped there.
+   */
   | { readonly kind: "sidebar"; readonly before: TaskId | null }
+  /** A task in the sidebar, onto it: a column moves to the end of its canvas. */
+  | { readonly kind: "task"; readonly task: TaskId }
   /**
    * The text box that has focus (ADR-0132): a paste there types its text,
    * or a link to what it names, at the caret. Nothing is put or dropped
    * into one.
    */
   | { readonly kind: "text-box" }
-
-/** The drag data type a card's id travels under, pinetrie's own. */
-export const CARD_MIME = "application/x-pinetrie-card"
 
 /** The attribute a column's drop zone carries: its key. */
 const PUT_COLUMN = "data-put-column"
@@ -94,9 +97,11 @@ const PUT_STATE = "data-put-state"
 /** The attribute a place in the sidebar carries: the task it goes before, or `end`. */
 const PUT_SIDEBAR = "data-put-sidebar"
 const END = "end"
+/** The attribute a task's row in the sidebar carries, a drop onto it: its id. */
+const PUT_TASK = "data-put-task"
 
 /** What an element a drop may land on matches: any mark. */
-export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_TASK_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_CANVAS}],[${PUT_STATE}],[${PUT_SIDEBAR}]`
+export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_TASK_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_CANVAS}],[${PUT_STATE}],[${PUT_SIDEBAR}],[${PUT_TASK}]`
 
 /** The attributes that mark an element as `target`, spread onto it by the page. */
 export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
@@ -121,6 +126,8 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       return { [PUT_STATE]: target.state }
     case "sidebar":
       return { [PUT_SIDEBAR]: target.before ?? END }
+    case "task":
+      return { [PUT_TASK]: target.task }
     // A text box is pasted into alone: no drop lands there.
     case "text-box":
       return {}
@@ -143,6 +150,8 @@ export function targetOfElement(el: {
   const state = el.getAttribute(PUT_STATE)
   if (state !== null && isWorkflowStateId(state))
     return { kind: "state", state }
+  const onto = el.getAttribute(PUT_TASK)
+  if (onto !== null && isTaskId(onto)) return { kind: "task", task: onto }
   const before = el.getAttribute(PUT_SIDEBAR)
   if (before === END) return { kind: "sidebar", before: null }
   if (before !== null && isTaskId(before)) return { kind: "sidebar", before }
@@ -202,7 +211,7 @@ export function placeOfTarget(
   target: PutTarget,
   places: ComposerPlaces,
   me: WriterId,
-): Exclude<TargetOf<"text">, CanvasTarget> | null {
+): Exclude<TargetOf<"text">, CanvasTarget | BackTarget> | null {
   if (target.kind === "inventory") return { kind: "inventory", holder: me }
   if (target.kind === "notes") return { kind: "note", column: target.column }
   if (target.kind === "taskPinned")
@@ -210,6 +219,7 @@ export function placeOfTarget(
   if (
     target.kind === "state" ||
     target.kind === "sidebar" ||
+    target.kind === "task" ||
     target.kind === "text-box" ||
     target.kind === "canvas"
   )

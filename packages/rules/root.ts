@@ -5,6 +5,8 @@
 
 import {
   type CardRecord,
+  livePlaceOf,
+  ownerOf,
   type RootId,
   rootDocId,
   type TaskId,
@@ -18,7 +20,6 @@ import { MARK } from "./mark.ts"
 import type { PlaceStep } from "./moves.ts"
 import { deleteRecord } from "./records.ts"
 import { ROOT } from "./roots.ts"
-import { rootOfPlace } from "./task.ts"
 import { THREAD } from "./thread.ts"
 
 /**
@@ -47,21 +48,21 @@ export function emptiedTasks(input: {
       out.includes(task)
     )
       continue
-    const holds = input.after.some(
-      d =>
-        (d.place.kind === "canvas" || d.place.kind === "task-pinned") &&
-        d.place.task === task,
-    )
+    const holds = input.after.some(d => {
+      if (d.place.kind === "trash") return false
+      const owner = ownerOf(d.place)
+      return owner.kind === "task" && owner.task === task
+    })
     if (!holds) out.push(task)
   }
   return out
 }
 
 /**
- * Each of `tasks`' cards from the board to `closer`'s trash (ADR-0126),
- * remembering the task, whose closer placed it there: written in the
- * close's step, so the undo key brings the task back with its thread. A
- * task with no card on the board is left. Pure.
+ * Each of `tasks`' cards from the board to the trash, remembering where it
+ * was there, its closer its placer: written in the close's step, so the
+ * undo key brings the task back with its thread. A task with no card on
+ * the board is left. Pure.
  */
 export function planTasksTrashed(
   cards: readonly CardRecord[],
@@ -75,7 +76,7 @@ export function planTasksTrashed(
             kind: "write",
             record: {
               ...c,
-              place: { kind: "trash", holder: closer, task: c.id },
+              place: { kind: "trash", left: c.place },
               placer: closer,
             },
           },
@@ -115,12 +116,13 @@ export function planRootDelete(
       deleteRecord(MARK, task),
     ],
     cards: cards
-      .filter(
-        c =>
-          c.id === task ||
-          rootOfPlace(c.place, rootOfThread) === root ||
-          (c.place.kind === "canvas" && c.place.task === task),
-      )
+      .filter(c => {
+        if (c.id === task) return true
+        const owner = ownerOf(livePlaceOf(c.place))
+        return owner.kind === "task"
+          ? owner.task === task
+          : owner.kind === "thread" && rootOfThread.get(owner.thread) === root
+      })
       .map(c => ({ kind: "remove", id: c.id })),
     doc: rootDocId(root),
     histories: task,

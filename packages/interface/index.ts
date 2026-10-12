@@ -124,7 +124,13 @@ export {
   moveWords,
   type QueueOn,
 } from "./card-frame.ts"
-export { clipFacts } from "./card-intents.ts"
+export {
+  clipFacts,
+  type Landing,
+  type PutHow,
+  type PutSource,
+  putLanding,
+} from "./card-intents.ts"
 export { cardKeyAct } from "./card-keys.ts"
 export {
   type EditorEvent,
@@ -139,8 +145,6 @@ export {
   type CatchUps,
   CLEAR_COMMAND,
   canvasMarkerWords,
-  closeAskWords,
-  DISCARD,
   DISCARD_CARD,
   DISCARD_CARD_TITLE,
   HISTORY_TITLE,
@@ -148,7 +152,6 @@ export {
   historyWords,
   INVENTORY,
   KEEP,
-  KEEP_IN_INVENTORY,
   KEEP_TITLE,
   movedBackWords,
   NEW_PIN,
@@ -163,6 +166,7 @@ export {
   retiredWords,
   sizeWords,
   TAKE,
+  TRASH_COLUMN,
   taskPinnedMarkerWords,
   traceWords,
   writtenWords,
@@ -228,11 +232,9 @@ export {
   BOUND,
   branchesAt,
   type CardKey,
-  type ClosableColumn,
   type Column,
   type ColumnKey,
   type ColumnMode,
-  isClosable,
   keyText,
   type Pending,
   type Prefill,
@@ -243,6 +245,29 @@ export {
 export { matchCommands } from "./commands.ts"
 export { copyText } from "./copy-text.ts"
 export { plural } from "./counts.ts"
+export {
+  type Armed,
+  DRAG_HANDLE,
+  DRAG_START,
+  type DragFrom,
+  type DragOver,
+  type DragSource,
+  type DragVerdict,
+  type DrawPlan,
+  type DropMark,
+  dragProps,
+  dragVerdict,
+  drawPlan,
+  dropIntents,
+  dropMark,
+  type HoverOver,
+  hoverOpens,
+  ITEM_HOVER_MS,
+  NOT_A_HANDLE,
+  type Point,
+  sidebarSpotAt,
+  sourceOfElement,
+} from "./drag.ts"
 export type { Effect, IntentState } from "./effects.ts"
 export {
   cardOfFace,
@@ -450,7 +475,6 @@ export {
   publishWords,
 } from "./publish-view.ts"
 export {
-  CARD_MIME,
   type ComposerPlacesStore,
   composerPlacesStore,
   DROP_ZONE,
@@ -480,6 +504,7 @@ export {
   gapAt,
   keyMove,
   landing,
+  neighbourShifts,
 } from "./reorder.ts"
 export {
   DIFF_LINES_SHOWN,
@@ -502,14 +527,11 @@ export {
   summariesOf,
 } from "./root-label.ts"
 export {
-  encodeRootDrag,
   landingIn,
-  parseRootDrag,
   placeAfter,
   planRootDrop,
   ROOT_DROP_ZONE,
   ROOT_GROUP_ZONE,
-  ROOT_MIME,
   type RootDrag,
   type RootTarget,
   rootDropProps,
@@ -589,14 +611,19 @@ export {
 } from "./signals.ts"
 export {
   boardStateWords,
+  canvasTrash,
   FOLD_TASK,
   pinnedCountWords,
   RENAME_TASK_TITLE,
+  RESTORE_WORDS,
   TASK_LIST_HEADING,
   TASK_PINS_EMPTY,
   TASK_PINS_HEADING,
   type TaskColumnView,
+  type TrashRow,
   taskColumnView,
+  trashHeading,
+  trashWords,
   UNFOLD_TASK,
 } from "./task-column-view.ts"
 export {

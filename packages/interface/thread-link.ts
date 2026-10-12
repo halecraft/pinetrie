@@ -1,8 +1,8 @@
-// interface/thread-link — what a link to a thread opens (ADR-0117,
-// ADR-0124): an inbox row, a mention, a copy's or a branch's fork row, a
-// rail's stub. A thread in someone else's inventory is theirs alone, so its
-// link opens nothing and says who has it; one in your own opens its preview
-// there. `threadLink` is the only maker of a link, read from `threadReach`
+// interface/thread-link — what a link to a thread opens: an inbox row, a
+// mention, a copy's or a branch's fork row, a rail's stub. A thread in
+// someone else's inventory is theirs alone, so its link opens nothing and
+// says who has it; one in your own opens its preview there; a trashed one's
+// restores it, and a deleted one's opens nothing. `threadLink` is the only maker of a link, read from `threadReach`
 // (`@pinetrie/rules`), the one reader of where a thread is; opening one
 // (`planOpenLink`) takes nothing else, so no link reaches a held thread.
 
@@ -33,7 +33,13 @@ export type ThreadLink = (
   | { readonly kind: "mine"; readonly thread: ThreadId }
   /** In someone else's inventory: it opens nothing. */
   | { readonly kind: "held"; readonly thread: ThreadId; readonly by: WriterId }
-  /** With no card: lifted back into the card it was spun from, or never placed. */
+  /** In the trash of `task`'s canvas: following it restores it. */
+  | {
+      readonly kind: "trashed"
+      readonly thread: ThreadId
+      readonly task: TaskId
+    }
+  /** With no card: deleted from the trash, lifted back into the card it was spun from, or never placed. */
   | { readonly kind: "gone"; readonly thread: ThreadId }
 ) & { readonly [threadLinkBrand]: true }
 
@@ -53,7 +59,9 @@ export function threadLink(
         ? reach.by === me
           ? { kind: "mine" as const, thread }
           : { kind: "held" as const, thread, by: reach.by }
-        : { kind: "gone" as const, thread }
+        : reach.kind === "trashed"
+          ? { kind: "trashed" as const, thread, task: reach.task }
+          : { kind: "gone" as const, thread }
   return link as ThreadLink
 }
 
@@ -63,7 +71,7 @@ export const heldWords = (by: WriterId, reader: Reader): string =>
 
 /**
  * Where a link leads, in words: its task's label, "in your inventory",
- * "Bea has it", or "no longer here".
+ * "Bea has it", "in the trash", or "deleted".
  */
 export function linkWords(
   link: ThreadLink,
@@ -77,19 +85,22 @@ export function linkWords(
       return "in your inventory"
     case "held":
       return heldWords(link.by, reader)
+    case "trashed":
+      return "in the trash"
     case "gone":
-      return "no longer here"
+      return "deleted"
   }
 }
 
-/** Whether a link opens anything. */
+/** Whether a link opens anything: a trashed thread's restores it. */
 export const opens = (link: ThreadLink): boolean =>
-  link.kind === "open" || link.kind === "mine"
+  link.kind === "open" || link.kind === "mine" || link.kind === "trashed"
 
 /** What following a link to `entry` in its thread asks of the page. */
 export type LinkOpen =
   | { readonly kind: "task"; readonly task: TaskId; readonly entry: EntryId }
   | { readonly kind: "preview"; readonly thread: ThreadId }
+  | { readonly kind: "restore"; readonly thread: ThreadId }
   | { readonly kind: "nothing" }
 
 /** What following `link` to `entry` does. Pure. */
@@ -99,6 +110,8 @@ export function openOf(link: ThreadLink, entry: EntryId): LinkOpen {
       return { kind: "task", task: link.task, entry }
     case "mine":
       return { kind: "preview", thread: link.thread }
+    case "trashed":
+      return { kind: "restore", thread: link.thread }
     case "held":
     case "gone":
       return { kind: "nothing" }

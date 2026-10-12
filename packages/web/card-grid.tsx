@@ -12,13 +12,13 @@
 import type { CardRecord } from "@pinetrie/core"
 import {
   type DrawnCard,
+  dragProps,
   dropProps,
   type GridView,
   gridKeyAct,
   type PutTarget,
 } from "@pinetrie/interface"
 import { type ReactNode, useEffect, useRef } from "react"
-import { dragCard } from "./card-frame.tsx"
 import { DrawFace } from "./renderings.tsx"
 import { isTextBox } from "./text-box.ts"
 
@@ -104,16 +104,15 @@ export function CardGrid(p: {
             data-card={cell.card?.id}
             {...{ [names.attr]: String(cell.index) }}
             {...dropProps(p.targetOf(cell.index))}
-            draggable={cell.card !== null}
+            {...(cell.card === null
+              ? {}
+              : dragProps({ kind: "card", card: cell.card.id }))}
             // A click selects, and the panel previews the card; a click on
             // the card already selected opens it, as Enter does (ADR-0126).
             onClick={() => {
               const again = cell.selected && cell.card !== null
               select(cell.index)
               if (again) setOpen(true)
-            }}
-            onDragStart={e => {
-              if (cell.card !== null) dragCard(e, cell.card.id)
             }}
             type="button"
           >

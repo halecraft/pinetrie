@@ -80,8 +80,8 @@ describe("appView's stage", () => {
     }
     const two = stage({ columns: [a as Column, unstarted], tracks: [3] })
     expect(two.kind === "task" && two.slots).toEqual([
-      { key: "a", closable: false, track: 3 },
-      { key: "b", closable: true, track: PENDING_TRACK },
+      { key: "a", track: 3 },
+      { key: "b", track: PENDING_TRACK },
     ])
   })
 

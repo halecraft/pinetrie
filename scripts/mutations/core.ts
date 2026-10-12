@@ -881,8 +881,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a gone key carries a task on the wire",
     file: "packages/core/places.ts",
-    from: '    kinds: ["canvas", "canvas-at", "task-pinned", "notes"],',
-    to: '    kinds: ["canvas", "canvas-at", "task-pinned", "notes", "discarded"],',
+    from: '    kinds: ["canvas", "canvas-at", "task-pinned", "notes", "new-task"],',
+    to: '    kinds: ["canvas", "canvas-at", "task-pinned", "notes", "new-task", "discarded-canvas"],',
     command: unit,
     expect: "no task but a canvas's and a spot's",
   },
@@ -913,11 +913,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note column fits an inventory",
     file: "packages/core/kinds.ts",
-    from: '    prefix: "n-",\n    places: ["canvas"],',
-    to: '    prefix: "n-",\n    places: ["canvas", "inventory"],',
+    from: '    prefix: "n-",\n    places: ["canvas", "trash"],',
+    to: '    prefix: "n-",\n    places: ["canvas", "trash", "inventory"],',
     command: unit,
     expect:
-      "fitsPlace: a text card anywhere but a canvas, a thread's card on a canvas or in an inventory, a note column on a canvas alone",
+      "fitsPlace: a text card anywhere but a canvas, a thread's card on a canvas or in an inventory, a note column on a canvas, and each of them in a trash",
   },
   {
     name: "a note column is placed anywhere",
@@ -969,13 +969,6 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
   {
-    name: "a gone row stores its task in no field of its own",
-    file: places,
-    from: '  discarded: ["task", "holder"],',
-    to: '  discarded: ["holder"],',
-    command: ["pnpm", "exec", "tsc", "--noEmit"],
-  },
-  {
     name: "a move is typed whatever place it is from",
     file: places,
     from: "  if (move.from !== null && !fitsPlace(kind, move.from.kind)) return undefined\n",
@@ -993,8 +986,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a target that is no place is typed as any place",
     file: places,
-    from: "      ? TARGET_PLACES[to.kind]\n",
-    to: '      ? "canvas"\n',
+    from: "      return TARGET_PLACES[to.kind]\n",
+    to: '      return "canvas"\n',
     command: [
       "pnpm",
       "exec",

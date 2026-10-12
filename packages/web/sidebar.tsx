@@ -12,6 +12,7 @@
 
 import type { TaskId, ThreadId, TreeIndex, WriterId } from "@pinetrie/core"
 import {
+  dragProps,
   dropProps,
   dropsWords,
   type Intent,
@@ -29,7 +30,6 @@ import {
 import { TASK_BUSY_REASON } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import {
-  type DragEvent,
   type KeyboardEvent,
   type ReactNode,
   useEffect,
@@ -43,7 +43,6 @@ import { Readers, type ReadersProps, RootStatus } from "./root-signals.tsx"
 import { SignalMark } from "./signal-mark.tsx"
 import { ThreadHead } from "./thread-card.tsx"
 import { TitleField } from "./title-field.tsx"
-import { startRootDrag } from "./use-root-drag.ts"
 
 /** Up and Down move focus between items. */
 function moveFocus(e: KeyboardEvent<HTMLElement>) {
@@ -137,7 +136,7 @@ export function Sidebar({
                       }
                     : null
                 }
-                startDrag={startRootDrag(dragOf(item.task))}
+                drag={dragProps({ kind: "task", drag: dragOf(item.task) })}
               />
             )
           const { task } = item
@@ -173,8 +172,7 @@ export function Sidebar({
                   .filter(c => c !== "")
                   .join(" ")}
                 data-task={task}
-                draggable
-                onDragStart={startRootDrag(dragOf(task))}
+                {...dragProps({ kind: "task", drag: dragOf(task) })}
                 onClick={() => onIntent(item.show)}
                 title={item.label}
                 type="button"
@@ -284,7 +282,7 @@ function FoldedItem({
   onIntent,
   onRename,
   rename,
-  startDrag,
+  drag,
   pip,
   readers,
   nameOf,
@@ -297,7 +295,8 @@ function FoldedItem({
     readonly onSend: (title: string | null) => void
     readonly onEnd: (focusItem: boolean) => void
   } | null
-  startDrag: ((e: DragEvent<HTMLElement>) => void) | undefined
+  /** Its drag handle's attributes (`dragProps`). */
+  drag: Readonly<Record<string, string>>
   pip: ReactNode
   readers: ReadersProps
   nameOf: ReadonlyMap<WriterId, string>
@@ -370,8 +369,7 @@ function FoldedItem({
         triggerProps={{
           "aria-current": item.selected || undefined,
           "data-task": item.task,
-          draggable: true,
-          onDragStart: startDrag,
+          ...drag,
           onBlur: () => setTip(false),
           onClick: () => onIntent(item.show),
           onFocus: showTip,

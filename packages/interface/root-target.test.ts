@@ -1,9 +1,7 @@
 import { taskIdFor, workflowStateIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
-  encodeRootDrag,
   landingIn,
-  parseRootDrag,
   placeAfter,
   planRootDrop,
   type RootDrag,
@@ -90,16 +88,8 @@ describe("a root's drop lands where a key could move it", () => {
     ).not.toBeNull()
   })
 
-  test("an element with no mark, or a drag that is no task's, lands nowhere", () => {
+  test("an element with no mark lands nowhere", () => {
     expect(rootTargetOfElement(element({}))).toBeNull()
-    expect(parseRootDrag(encodeRootDrag(drag))).toEqual(drag)
-    for (const bad of [
-      "",
-      "{",
-      JSON.stringify({ ...drag, task: "x" }),
-      JSON.stringify({ ...drag, state: "doing" }),
-    ])
-      expect(parseRootDrag(bad)).toBeNull()
   })
 })
 

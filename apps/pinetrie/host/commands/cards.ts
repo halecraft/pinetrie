@@ -71,7 +71,6 @@ import {
   lanesToDrain,
   type MoveStep,
   type MovesStep,
-  NO_DISCARDS,
   type OpenPlan,
   type OpenThread,
   planCopy,
@@ -318,13 +317,13 @@ export function createCardCommands(deps: CardCommandDeps) {
       moves,
       writer,
       running,
-      discards,
       newColumn,
       entryThreads,
+      readWorkflow(session),
     )
     // A new tab closed before its first send leaves its task empty: its
-    // card goes to the closer's trash in the same step (ADR-0126), which is
-    // in their history outside any task, since the task leaves their view.
+    // card goes to the trash in the same step, its closer its placer, in
+    // their history outside any task, since the task leaves their view.
     const emptied =
       planned.step.kind === "steps"
         ? emptiedTasks({
@@ -513,7 +512,7 @@ export function createCardCommands(deps: CardCommandDeps) {
      * keeper: planned (`planSpinOff`), then the thread's records (its own,
      * spun from the card, and its new task's), its first message, the
      * card's text, sent by `start`, then its card on its task's canvas and
-     * the card's move to its sender's trash, in its history's step. A send
+     * the card's move to the trash, in its history's step. A send
      * that took nothing deletes the records again. The answer is the
      * thread's start, its first message's id among it.
      */
@@ -668,7 +667,7 @@ export function createCardCommands(deps: CardCommandDeps) {
      * A paste (ADR-0132): the card it replaces discarded, then a card made
      * from a copy where its target resolves to (a thread's nearest notes,
      * made where its task has none; a margin checked against its entry's
-     * thread), or a cut card out of the sender's trash (`planPaste`). One
+     * thread), or a cut card out of a trash by its cutter (`planPaste`). One
      * step of the sender's history in the task it lands in, so the undo key
      * takes it back. Queued on an idle thread, it is drained.
      */
@@ -714,7 +713,6 @@ export function createCardCommands(deps: CardCommandDeps) {
         move,
         pasted.replacing,
         writer,
-        discards,
       )
       if (step.kind === "refused") return unmoved(step)
       const steps = [...resolved.first, ...step.steps]
@@ -846,7 +844,6 @@ export function createCardCommands(deps: CardCommandDeps) {
         ],
         writer,
         running,
-        NO_DISCARDS,
       )
       if (step.kind !== "steps") return null
       const { rev } = await carry(step, drain, {

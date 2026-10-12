@@ -162,7 +162,9 @@ session or someone else's inventory throws before it is made.
 - **A discard names no history** (ADR-0116): `moveCard` and `moveCards`
   take `here`, the task the tab is on, which the `move` carries; the host
   names the history from it for a card leaving your inventory. Until the
-  host answers, a gone card is drawn in no history (`drawnPlace`).
+  host answers, a discarded card is drawn in the trash recording the place
+  it was drawn at, and a restore (`back`) back there; a move to a new task
+  is drawn on that task's canvas, last (`drawnPlace`).
 - **Notices are values** (`CardNotice`, kept by `movesStep` until your
   next move where you acted): a refusal, or a discard the host accepted
   (ADR-0111), which says the undo key brings it back. The page words them

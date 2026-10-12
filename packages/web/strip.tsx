@@ -2,7 +2,7 @@
 // column first, then each card of the canvas in its order, folded to a
 // strip or drawn whole (a thread's column, a note column), a branch not yet
 // sent among them (ADR-0126). What is drawn is decided in `@pinetrie/interface` (`taskStrip`);
-// this draws it. A column's header is its drag handle (`use-column-drag.ts`).
+// this draws it. A column's header is its drag handle (`use-drag.ts`).
 
 import type {
   CardId,
@@ -36,7 +36,7 @@ import {
   type ThreadFace,
 } from "@pinetrie/interface"
 import type { CanvasCard } from "@pinetrie/rules"
-import type { PointerEvent, ReactElement, RefObject } from "react"
+import type { ReactElement, RefObject } from "react"
 import { useMemo } from "react"
 import { Column, type ColumnProps } from "./column.tsx"
 import { FoldedColumn } from "./folded-column.tsx"
@@ -50,7 +50,6 @@ export type SharedColumnProps = Omit<
   ColumnProps,
   | "column"
   | "columnKey"
-  | "closable"
   | "task"
   | "count"
   | "onTyping"
@@ -71,7 +70,6 @@ interface Projected {
   readonly column: ColumnSpec
   readonly view: ColumnView
   readonly path: ReadonlySet<EntryId>
-  readonly closable: boolean
   readonly track: number
   /** Who holds the thread a branch not yet sent forks in, when someone else does (ADR-0124). */
   readonly heldBy: WriterId | null
@@ -81,7 +79,6 @@ interface Projected {
 
 export function Strip(p: {
   stripRef: RefObject<HTMLDivElement | null>
-  onPointerDown: (e: PointerEvent<HTMLDivElement>) => void
   stage: Extract<Stage, { kind: "task" | "new" }>
   /** The task's strip; null off a task. */
   strip: StripView | null
@@ -110,7 +107,7 @@ export function Strip(p: {
   const { stage } = p
   const readOnly: ReadOnly | null =
     stage.kind === "task" ? stage.readOnly : null
-  // Each card's place on the canvas: what its grip moves it from.
+  // Each card's place on the canvas: what Alt+arrows move it from.
   const positions = useMemo(
     () => new Map<string, number>(p.canvas.map((c, i) => [c.id, i])),
     [p.canvas],
@@ -125,7 +122,6 @@ export function Strip(p: {
     return (
       <Column
         {...p.shared}
-        closable={projected.closable}
         column={projected.column}
         drawnAt={projected.at}
         columnKey={{ kind: "card", card: item.card }}
@@ -206,7 +202,6 @@ export function Strip(p: {
     <div
       {...(endDrop === null ? {} : dropProps(endDrop))}
       id="strip"
-      onPointerDown={p.onPointerDown}
       ref={p.stripRef}
     >
       {p.taskColumn !== null && (

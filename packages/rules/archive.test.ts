@@ -22,7 +22,7 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import { archivedIn, planArchive, writesIn } from "./archive.ts"
+import { archivedIn, planArchive, planLanesGone, writesIn } from "./archive.ts"
 import { threadCardOf } from "./fixtures.ts"
 import { indexTasks } from "./task.ts"
 
@@ -416,5 +416,18 @@ describe("archivedIn", () => {
   test("tasks not archived, and none, do not", () => {
     expect(archivedIn([OTHER_TASK], archive)).toBeNull()
     expect(archivedIn([], archive)).toBeNull()
+  })
+})
+
+test("planLanesGone: a deleted thread's lanes forgotten, their refs deleted, no snapshot kept with no revision", () => {
+  expect(planLanesGone([LANE_X], new Map(), [])).toEqual({
+    forget: [LANE_X],
+    refs: [{ lane: LANE_X, commit: null }],
+    snapshots: [],
+  })
+  expect(planLanesGone([], new Map(), [])).toEqual({
+    forget: [],
+    refs: [],
+    snapshots: [],
   })
 })

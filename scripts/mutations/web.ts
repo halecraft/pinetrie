@@ -318,6 +318,14 @@ export const mutations: readonly Mutation[] = [
     from: "    const written = writeTextByButton(text)",
     to: "    const written = navigator.clipboard?.writeText(text) ?? null",
     command: unit,
-    expect: "only clipboard.ts touches the clipboard (ADR-0132)",
+    expect: "only its door touches 'the clipboard'",
+  },
+  {
+    name: "a slot drags itself",
+    file: "packages/web/card-grid.tsx",
+    from: "            {...dropProps(p.targetOf(cell.index))}\n",
+    to: "            {...dropProps(p.targetOf(cell.index))}\n            draggable={cell.card !== null}\n",
+    command: unit,
+    expect: "only its door touches 'HTML drag and drop'",
   },
 ]

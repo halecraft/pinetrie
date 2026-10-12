@@ -2,7 +2,7 @@
 // (ADR-0122, ADR-0116). Pure.
 //
 // A task is dragged from the board or from the sidebar. A drop names a target
-// by the attributes the drop code marks it with (`rootDropProps`), and
+// by the attributes the page marks it with (`rootDropProps`), and
 // `planRootDrop` turns it into an intent: on the board, the one a board
 // item's Move to ▸, Move up or Move down (`stepsIn`) sends; on the sidebar, a
 // `moveInList`. Where in a group of places (`rootGroupProps`) the pointer
@@ -16,9 +16,6 @@ import {
 } from "@pinetrie/core"
 import type { Intent } from "./intent.ts"
 import { gapAt } from "./reorder.ts"
-
-/** The drag data type a task travels under, pinetrie's own; never a card's. */
-export const ROOT_MIME = "application/x-pinetrie-root"
 
 /** A task being dragged: which, and the state it is in. */
 export interface RootDrag {
@@ -145,28 +142,6 @@ export function stepsIn<T>(
     up: above === undefined ? null : { before: above },
     down: belowAt < 0 ? null : { before: order[belowAt + 1] ?? null },
   }
-}
-
-/** A drag's data, as it travels; `parseRootDrag` reads it back. */
-export const encodeRootDrag = (drag: RootDrag): string => JSON.stringify(drag)
-
-/** A drag's data, or null for anything else. */
-export function parseRootDrag(text: string): RootDrag | null {
-  let raw: unknown
-  try {
-    raw = JSON.parse(text)
-  } catch {
-    return null
-  }
-  if (typeof raw !== "object" || raw === null) return null
-  const { task, state } = raw as Record<string, unknown>
-  if (typeof task !== "string" || !isTaskId(task)) return null
-  if (
-    state !== null &&
-    (typeof state !== "string" || !isWorkflowStateId(state))
-  )
-    return null
-  return { task, state }
 }
 
 /**

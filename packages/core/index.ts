@@ -382,8 +382,8 @@ export type Intent =
    * Make a text card a thread (ADR-0111, ADR-0126): a new conversation root,
    * `root`, its thread `thread`, whose first message is the card's text, in
    * a new task, `task`, in `state`, or the first open state for null; the
-   * card goes to its sender's trash, in the history `here` names when it
-   * leaves no task.
+   * card goes to the trash, in the history `here` names when it leaves no
+   * task.
    */
   | {
       readonly kind: "spin-off"
@@ -479,7 +479,7 @@ export type Intent =
     }
   /**
    * Paste (ADR-0132): make a card from a copy, or move a cut card out of
-   * its sender's trash, where `to` sends it, after discarding the card it
+   * a trash by its cutter, where `to` sends it, after discarding the card it
    * replaces (ADR-0133). One step of the sender's history, in the task it
    * lands in; `here`, the task its sender is on, names a discard's from an
    * inventory (ADR-0116).
@@ -751,9 +751,11 @@ export type Reach =
       readonly record: ArchivedTask
     }
   | { readonly kind: "held"; readonly by: WriterId }
+  /** In the trash of `task`'s canvas, until it is restored or deleted. */
+  | { readonly kind: "trashed"; readonly task: TaskId }
   | { readonly kind: "gone" }
 
-/** A thread out of reach: its task archived, held in an inventory, or gone. */
+/** A thread out of reach: its task archived, held in an inventory, trashed, or gone. */
 export type Away = Exclude<Reach, { readonly kind: "open" }>
 
 /**

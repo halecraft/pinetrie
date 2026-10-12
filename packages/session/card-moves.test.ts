@@ -155,9 +155,8 @@ describe("the tab's moves (ADR-0059)", () => {
     ])
     // In no history until the host names one.
     expect(withPending(host, s, ME)[0]?.place).toEqual({
-      ...gone,
-      holder: ME,
-      task: null,
+      kind: "trash",
+      left: host[0]?.place,
     })
     expect(movesStep(s, sent(queueIt)).notices).toEqual([])
   })

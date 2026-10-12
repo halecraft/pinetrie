@@ -2,6 +2,7 @@ import {
   type CardRecord,
   entryId,
   type Intent,
+  livePlaceOf,
   NO_CONTENT,
   rootIdFor,
   taskIdFor,
@@ -9,7 +10,15 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { heldIn, holderOf, runsIn, takenIn } from "./held.ts"
+import {
+  heldIn,
+  holderOf,
+  holdingOf,
+  holdingWords,
+  runsIn,
+  TRASHED_WORDS,
+  takenIn,
+} from "./held.ts"
 
 const T = threadIdFor("t")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -94,7 +103,7 @@ describe("runsIn: what each command runs or writes a message in (ADR-0124)", () 
     const none = new Map()
     expect(
       heldIn([{ kind: "thread", thread: T }], held, () => null, none),
-    ).toEqual({ thread: T, by: BEA })
+    ).toEqual({ thread: T, holding: { kind: "held", by: BEA } })
     const COPY = threadIdFor("copy")
     const branch = {
       kind: "entry",
@@ -104,7 +113,7 @@ describe("runsIn: what each command runs or writes a message in (ADR-0124)", () 
     } as const
     expect(heldIn([branch], held, () => T, none)).toEqual({
       thread: T,
-      by: BEA,
+      holding: { kind: "held", by: BEA },
     })
     // A copy's first send, at its record's fork, runs in the copy.
     expect(
@@ -136,7 +145,7 @@ test("takenIn: the threads a change puts in an inventory that were not in one (A
   expect(takenIn([held], [on])).toEqual([])
 })
 
-test("a thread in a trash is held as in an inventory: its discard stops its run, and its holder holds it (ADR-0126)", () => {
+test("a trashed thread is held by nobody, but its discard stops its run, and a command in it is refused to be restored first", () => {
   const on: CardRecord = {
     kind: "thread",
     id: T,
@@ -147,14 +156,15 @@ test("a thread in a trash is held as in an inventory: its discard stops its run,
   }
   const trashed: CardRecord = {
     ...on,
-    place: {
-      kind: "trash",
-      holder: BEA,
-      task: TASK,
-    },
+    place: { kind: "trash", left: livePlaceOf(on.place) },
   }
   expect(takenIn([on], [trashed])).toEqual([T])
   expect(takenIn([trashed], [trashed])).toEqual([])
-  expect(holderOf([trashed], T)).toBe(BEA)
-  expect(holderOf([on], T)).toBeNull()
+  expect(holderOf([trashed], T)).toBeNull()
+  expect(holdingOf([trashed], T)).toEqual({ kind: "trashed" })
+  expect(holdingOf([on], T)).toEqual({ kind: "free" })
+  expect(
+    heldIn([{ kind: "thread", thread: T }], [trashed], () => null, new Map()),
+  ).toEqual({ thread: T, holding: { kind: "trashed" } })
+  expect(holdingWords({ kind: "trashed" })).toBe(TRASHED_WORDS)
 })

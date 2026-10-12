@@ -378,7 +378,6 @@ export async function stepAway(p: Page): Promise<void> {
  */
 export async function stepBack(p: Page, task: string): Promise<void> {
   await p.click(".column[data-card] .close")
-  await p.click(".column .close-discard", { timeout: 2_000 }).catch(() => {})
   await p.click(itemSel(task))
 }
 /**

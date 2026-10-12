@@ -50,8 +50,20 @@ export function focusFacts(at: FocusContext): Focus {
         ?.querySelector<HTMLElement>(".msg[data-selected]")?.dataset.entry ??
       null,
     cell: el?.closest(".clipboard-cell") != null,
+    inColumn: columnOf(html),
     zone: zoneEl === null ? null : targetOfElement(zoneEl),
   }
+}
+
+/** The card column `el` is inside, by its index among the strip's card columns. */
+function columnOf(el: HTMLElement | null): Focus["inColumn"] {
+  const column = el?.closest<HTMLElement>("#strip > [data-card]") ?? null
+  const card = cardOrNull(column?.dataset.card)
+  if (column === null || card === null) return null
+  const columns = [
+    ...(column.parentElement?.querySelectorAll(":scope > [data-card]") ?? []),
+  ]
+  return { card, position: columns.indexOf(column), count: columns.length }
 }
 
 /** A selection that is not collapsed: its text, and the message it is all inside, if any. */

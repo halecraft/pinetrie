@@ -1,15 +1,17 @@
 // host/housekeeping — what the host does between runs besides draining:
 // compact the session (ADR-0023), delete images nothing shows (ADR-0042),
 // retire histories of moves no one will undo again (ADR-0066), and delete
-// holds on queues nobody can use (ADR-0048 step 7), and delete discarded
-// cards no one brought back in a week (ADR-0111).
+// holds on queues nobody can use (ADR-0048 step 7), and delete trashed
+// cards no one brought back in a week, a deleted thread's lane with it.
 
 import type { Exchange, Store } from "@kyneta/exchange"
 import {
   type BlobStore,
+  type EntryId,
   isTextCard,
   isTextCardId,
   MOVES_DOC_PREFIX,
+  type RevisionRecord,
   type RootId,
   rootDocId,
   textSourceOf,
@@ -23,15 +25,20 @@ import {
   planSweep,
   readArchived,
   readCardHistories,
+  readLaneRecords,
   readPlaces,
   readQueueHolds,
   readReferencedBlobs,
+  readRevisions,
   readTasks,
+  readThreads,
+  readTreeIndex,
 } from "@pinetrie/reads"
 import {
   deleteRecord,
   planHistorySweep,
   planHoldSweep,
+  planLanesGone,
   planTrashSweep,
   QUEUE_HOLD,
 } from "@pinetrie/rules"
@@ -40,6 +47,7 @@ import type { CardPort } from "./cards.ts"
 import type { MoveHistories } from "./move-history.ts"
 import { applyPlaceSteps } from "./places.ts"
 import type { Records } from "./records.ts"
+import type { LaneWork } from "./work/index.ts"
 
 /**
  * The documents a compaction replaces with what they hold now: `roots`',
@@ -176,27 +184,48 @@ export async function sweepHolds(input: {
 }
 
 /**
- * Delete the cards discarded more than `TRASH_KEEP_MS` ago (ADR-0111): gather
- * the places and the cards' histories, plan (`planTrashSweep`), then delete
- * each record, then its text (S64). The histories left with no card go with
- * the provenance's own sweep, which the caller runs after.
+ * Delete the trashed cards past their deadline, and every card on a surface
+ * one owns (`planTrashSweep`): gather the places, the cards' histories and,
+ * for the threads among them, their lanes of their own with their roots'
+ * revisions and trees; plan; then delete each record, then its text (S64),
+ * then the deleted threads' lanes, as an archive's teardown removes them
+ * (`planLanesGone`). Their messages stay in their roots. The histories left
+ * with no card go with the provenance's own sweep, which the caller runs
+ * after.
  */
 export async function sweepTrash(input: {
-  readonly basics: Pick<Basics, "session" | "places" | "log" | "now">
+  readonly basics: Pick<Basics, "session" | "places" | "docs" | "log" | "now">
   readonly cards: Pick<CardPort, "destroy">
+  readonly work: Pick<LaneWork, "teardown" | "repo">
 }): Promise<void> {
-  const { session, places, log, now } = input.basics
+  const { session, places, docs, log, now } = input.basics
   // gather
   const cards = readPlaces(places)
   const histories = readCardHistories(session)
+  const swept = planTrashSweep({ cards, histories, now: now() })
+  if (swept.cards.length === 0) return
+  const records = readLaneRecords(session)
+  const own =
+    input.work.repo === null
+      ? []
+      : swept.threads.filter(t => records.get(t)?.ownCopy === true)
+  const threads = readThreads(session)
+  const revisions = new Map<EntryId, RevisionRecord>()
+  const trees = []
+  for (const root of new Set(own.flatMap(t => threads.get(t)?.root ?? []))) {
+    const doc = await docs.root(root)
+    trees.push(readTreeIndex(doc))
+    for (const [entry, r] of readRevisions(doc)) revisions.set(entry, r)
+  }
   // plan
-  const doomed = planTrashSweep({ cards, histories, now: now() })
+  const teardown = planLanesGone(own, revisions, trees)
   // execute
-  if (doomed.length === 0) return
   applyPlaceSteps(
     places,
-    doomed.map(id => ({ kind: "remove", id })),
+    swept.cards.map(id => ({ kind: "remove", id })),
   )
-  for (const id of doomed) if (isTextCardId(id)) await input.cards.destroy(id)
-  log(`[host] deleted ${doomed.length} card(s) discarded over a week ago`)
+  for (const id of swept.cards)
+    if (isTextCardId(id)) await input.cards.destroy(id)
+  await input.work.teardown(teardown)
+  log(`[host] deleted ${swept.cards.length} card(s) trashed over a week ago`)
 }

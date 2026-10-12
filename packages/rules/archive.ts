@@ -115,30 +115,20 @@ export function planArchive(input: {
 }
 
 /**
- * Archive: every own lane forgotten, its ref deleted, and every snapshot but
- * each lane's newest and the one nearest each thread's end in its roots,
- * whatever task the thread is in (`planRetention`), so a copy from the
- * archive finds its files (ADR-0124). Restore: each lane's ref back at its
- * tip's nearest revision (`nearestRevision`), none for a lane with no tip or
- * no revision yet.
+ * Archive: every own lane gone (`planLanesGone`). Restore: each lane's ref
+ * back at its tip's nearest revision (`nearestRevision`), none for a lane
+ * with no tip or no revision yet.
  */
 function planTeardown(
   crossing: Crossing,
   input: Pick<Parameters<typeof planArchive>[0], "own" | "revisions" | "trees">,
 ): ArchiveTeardown {
-  const lanes = input.own.map(o => o.lane)
-  if (crossing === "archive") {
-    const inRoot = new Set<string>(lanes)
-    return {
-      forget: lanes,
-      refs: lanes.map(lane => ({ lane, commit: null })),
-      snapshots: planRetention({
-        records: [...input.revisions.values()].filter(r => inRoot.has(r.lane)),
-        archived: true,
-        keep: endSnapshots(input.trees, input.revisions),
-      }),
-    }
-  }
+  if (crossing === "archive")
+    return planLanesGone(
+      input.own.map(o => o.lane),
+      input.revisions,
+      input.trees,
+    )
   return {
     forget: [],
     refs: input.own.flatMap(({ lane, tip, index }) => {
@@ -150,6 +140,30 @@ function planTeardown(
       return commit === null ? [] : [{ lane, commit }]
     }),
     snapshots: [],
+  }
+}
+
+/**
+ * Lanes that will not run again, an archived task's or a deleted thread's:
+ * each forgotten, its ref deleted (which withdraws its offer), and every
+ * snapshot of it but its newest and the one nearest each thread's end in
+ * `trees`, whatever task that thread is in (`planRetention`), so a copy
+ * from the archive finds its files. Pure.
+ */
+export function planLanesGone(
+  lanes: readonly ThreadId[],
+  revisions: ReadonlyMap<EntryId, RevisionRecord>,
+  trees: readonly TreeIndex[],
+): ArchiveTeardown {
+  const gone = new Set<string>(lanes)
+  return {
+    forget: lanes,
+    refs: lanes.map(lane => ({ lane, commit: null })),
+    snapshots: planRetention({
+      records: [...revisions.values()].filter(r => gone.has(r.lane)),
+      archived: true,
+      keep: endSnapshots(trees, revisions),
+    }),
   }
 }
 

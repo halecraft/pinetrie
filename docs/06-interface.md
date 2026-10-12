@@ -338,8 +338,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   everyone shares. A thread card's column is its thread's path; a note
   column's is its notes. Each is **folded** for you until you open it: a
   narrow strip in its place with its title, which a click unfolds. Folding
-  (⇤ in a column's header) is yours alone, and moves nothing for anyone
-  else.
+  (**Fold**, first in a column's ⋯) is yours alone, and moves nothing for
+  anyone else.
 - **The task column comes first**, folded the same way: the task's title,
   which anyone renames there, **Move to ▸** among the board's states, who is
   reading, the cards pinned to the task, the canvas list its agents are
@@ -390,19 +390,36 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A column grows as replies arrive.** It shows one thread to its end,
   including the agent's reply (`threadEnd`, ADR-0117). A branch, which
   starts another thread, however new, never pulls it away.
+- **Every unfolded column's header ends in ⋯ and ×** (ADR-0134), threads,
+  sent or not, and note columns alike. Its ⋯ holds **Fold** first, yours
+  alone, then what changes the canvas for everyone: its width, one or two
+  columns wide, and a note column after it; a thread's adds its copies and
+  its take. A folded strip has neither: unfold it first.
 - **Columns are reordered by dragging their headers, for everyone**: the
   canvas's order is shared, and a drag moves a card on it. Whichever column
   is first shows its whole path, so moving a branch to the far left makes it
-  read as the trunk. A grip (⠿) leads each header, and is the keyboard's way
-  to do the same: ←/→ move a column one place, and Home/End move it to
-  either end. A column's ⋯ sets its width, one or two columns wide, for
-  everyone.
+  read as the trunk. The whole header is the handle: a press on its name or
+  a button that moves 5 px drags, one that does not is its click. With focus
+  anywhere in a column outside a text box, Alt+← and Alt+→ move it one
+  place, and it is scrolled into view.
+- **Every drag in the page is one kind of drag** (ADR-0134): a column's, a
+  card's, a slot's, a task's, by the mouse or a pen. What is dragged follows
+  the pointer, its header raised and leaning with its speed; along the strip
+  the other columns slide apart to open the gap it would land in, and off
+  the strip a column shrinks to its card face. What a drop there would do
+  shows on the target: a move, a copy with Alt held, a slot's card to be
+  replaced, or grey for a refusal. A drop lands; Escape, or a drop where
+  nothing lands, springs it back. With reduced motion the same states show
+  without moving. Touch does not drag yet: a touch scrolls and taps. Files
+  dragged in from your desktop still drop on a picture field.
 - **A thread is a card** (ADR-0117, ADR-0124): one place, on a task's canvas
   or in someone's inventory. A thread column's ⋯ has **Copy to this
   task**, **Copy to your inventory** and **Move to your inventory**, and
-  lists no tasks (ADR-0127); ⇲ in its header, dragged onto a slot, takes
-  it too. A thread reaches another task through your inventory: taken,
-  then put down there, so a running thread moved that way stops. Taken
+  lists no tasks (ADR-0127); its header dragged onto a slot takes it too.
+  Dragged onto a task in the sidebar, a column moves to the end of that
+  task's canvas, for everyone, and a running thread keeps running; you stay
+  where you are. Dragged between two tasks there, it makes a new task
+  holding it, placed there in your sidebar (ADR-0134). Taken
   into an inventory, its run stops at once, the taker's own stop ("Bea
   stopped it"); nothing is sent in it there, nor branched from its entries
   ("put it on a canvas first"), and its queue waits, held. Put on a canvas
@@ -418,20 +435,27 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   above its own first message folded behind "↑ N earlier messages" when
   the thread it forks from is on no column of the canvas. A canvas with
   threads of several roots draws each root's tree on the rail.
-- **Every column's header is to end in ⋯ and ×, and the whole header to
-  be its handle** (ADR-0134, accepted, not yet built): × trashes any column
-  for everyone, into the trash of the place it left, and the task column
-  lists its canvas's trash for anyone to restore; a column dropped on a
-  task in the sidebar moves there, still running; one pointer engine drags
-  columns, cards and tasks. Until it is built, what follows holds.
-- **Only a thread not yet sent closes** (×), a branch or a new tab: its
-  card goes to your trash, asked first when your message there holds text,
-  which you keep in your inventory or discard with it, undone by the undo
-  key. A new tab's task, then empty, goes too. A branch not yet sent from a
-  thread someone else has since taken keeps its text, but its column says
-  "Bea has it" in place of that thread's messages and sends nothing until
-  the thread is on a canvas again. Every column folds. The cards at a
-  thread's end stay with the thread.
+- **× trashes any column, for everyone, asking nothing** (ADR-0134): a
+  thread, running or not, sent or not, and a note column with its notes.
+  A running thread's run stops, as a take's does ("Ada stopped it"). The
+  cards at a thread's end, your message among them, stay with the thread,
+  in the trash with it. A new tab's only thread, not yet sent, takes its
+  task out of your sidebar too. The undo key brings any of it back.
+- **A task's trash is the task's**: the task column lists the columns
+  trashed from its canvas, newest first, each with who trashed it and
+  "deleted in N days"; anyone on the task **restore**s one, back where it
+  was, at its rank. An archived task's list is read only. A restore whose
+  place is gone (a note whose column was trashed after it) or taken (your
+  message where you have written a newer one) is refused, saying so.
+  Nothing is sent in a trashed thread ("restore it first"); a link to it
+  says "in the trash" and restores it. A week after its discard a trashed
+  card is deleted, with everything on it; a thread takes its lane, its
+  bookmark and its offer with it, and its messages stay in their root,
+  where a link to it says "deleted".
+- **A branch not yet sent from a thread someone else has since taken**
+  keeps its text, but its column says "Bea has it" in place of that
+  thread's messages and sends nothing until the thread is on a canvas
+  again.
 - **Each column's foot is its dock** (ADR-0113), pinned there while the
   messages scroll above it: the queue's header, which says what happens
   next, the cards queued, **+ add to queue**, the line, and your message.
@@ -810,8 +834,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   at once, placed at the end of the first open state from your list's ＋,
   of its own state from a board column's (ADR-0122). Its first send makes
   the root, and the board shows it from then: others find it there.
-  Closing it unsent with discard sends the task to your trash with its
-  thread, and the undo key, on no task, brings both back.
+  Closing it unsent with × sends the task to your trash with its thread,
+  and the undo key, on no task, brings both back.
 - **An empty session** shows the board, with nothing in it, and ＋.
 - **A page with nothing in the sidebar** (a first visit, or a list you
   emptied) opens on the board, which shows every root to open: nothing opens
@@ -1172,7 +1196,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   of the panel onto a column: a note in the note column nearest its thread,
   or, onto a note column, at its end. Dropped on a
   composer, it becomes your message there. Held over a root in the sidebar,
-  a drag opens it. The open card's **×** discards it; the undo key brings
+  or over ▦, a drag opens it while a ring around it fills. The open card's **×** discards it; the undo key brings
   it back.
 - **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
   Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it (ADR-0066). It undoes your

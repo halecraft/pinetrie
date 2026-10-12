@@ -72,8 +72,20 @@ export function afterSpinOff(
   sidebar: { readonly before: TaskId | null } | null,
 ): readonly Effect[] {
   if (sidebar === null || outcome.kind !== "appended") return []
-  return [
-    list({ kind: "place", task, before: sidebar.before }),
-    layout({ kind: "show", here: { kind: "task", task } }),
-  ]
+  return newTaskEffects(task, sidebar.before, true)
 }
+
+/**
+ * A new task made from the sidebar, once the host made it: placed in your
+ * sidebar before `before` (at its end for null), and shown when `show`. A
+ * spin-off shows the task it made; a column dropped between tasks does not,
+ * so you stay where you were.
+ */
+export const newTaskEffects = (
+  task: TaskId,
+  before: TaskId | null,
+  show: boolean,
+): readonly Effect[] => [
+  list({ kind: "place", task, before }),
+  ...(show ? [layout({ kind: "show", here: { kind: "task", task } })] : []),
+]

@@ -80,7 +80,7 @@
       .sidebar-item:hover .open-close, .sidebar-item:focus-within .open-close { visibility: visible; }
       /* Where a root dragged to the end of the sidebar lands. */
       .open-end { display: block; min-height: .6rem; }
-      /* Where a dragged root would land (use-root-drag.ts): a line in the gap
+      /* Where a dragged root would land (use-drag.ts): a line in the gap
          above the item it goes before, or at the list's end. */
       .sidebar-item[data-root-drop]::before { content: ""; position: absolute; z-index: 1;
         left: 0; right: 0; top: calc(-.05rem - 1.5px); height: 3px; border-radius: 2px;
@@ -304,8 +304,6 @@
         white-space: nowrap; text-align: left; font-size: .75rem; color: #7f8896; }
       .column-head .origin:hover, .column-head .origin:focus-visible { color: #d0d4da; }
       /* A column's path above its own thread, folded (ADR-0117). */
-      .column-head .take-drag { padding: 0 .2rem; color: #8b93a1; cursor: grab; }
-      .column-head .take-drag:hover { color: #d0d4da; }
       .column-head .agents-row { padding: .1rem 0; font-size: .75rem; color: #8b93a1; }
       .column-head .earlier { display: block; padding: .1rem 0; font-size: .75rem; color: #8b93a1;
         background: none; border: 0; cursor: pointer; }
@@ -314,20 +312,13 @@
         border-radius: 50%; vertical-align: middle; background: var(--track, #777); }
       .column-head .close { padding: 0 .2rem; font-size: 1rem; line-height: 1; color: #8b93a1; }
       .column-head .close:hover, .column-head .close:focus-visible { color: #e6e6e6; }
-      /* A card's column's header is its drag handle (use-column-drag.ts), once
-         there are two on the canvas. */
+      /* Every handle a drag starts from (use-drag.ts): a column's header, a
+         card's, a slot's, a task's. */
       .column-head { user-select: none; }
-      #strip:has(> [data-card] + [data-card]) [data-column-head] { cursor: grab; }
-      .column-head .grip { border: none; padding: 0 .1rem; color: #6f7784; cursor: grab;
-        font-size: .9rem; line-height: 1; }
-      .column-head .grip:hover, .column-head .grip:focus-visible { color: #e6e6e6; }
-      /* The header holds the pointer while it drags, so its cursor is the one shown. */
-      #strip[data-reordering] [data-dragging] [data-column-head],
-      #strip[data-reordering] [data-dragging] .grip { cursor: grabbing; }
-      #strip > [data-dragging] { position: relative; z-index: 2; background: var(--page); opacity: .92;
-        box-shadow: 0 0 0 1px #3a3f48, 0 8px 24px rgb(0 0 0 / .5); }
-      #strip > [data-drop="before"] { box-shadow: inset 3px 0 0 #8ab4f8; }
-      #strip > [data-drop="after"] { box-shadow: inset -3px 0 0 #8ab4f8; }
+      [data-drag-card], [data-drag-task] { cursor: grab; }
+      /* The handle holds the pointer while it drags, so its cursor is the one shown. */
+      [data-dragging] [data-drag-card], [data-dragging] [data-drag-task],
+      [data-dragging][data-drag-card], [data-dragging][data-drag-task] { cursor: grabbing; }
       /* Past the last column: a drop there is a spot on the canvas (ADR-0126),
          marked while a card is dragged. */
       #strip > .canvas-end { flex: 0 0 4rem; }
@@ -367,13 +358,20 @@
       .task-pins-heading { font-size: .72rem; color: #b392f0; }
       body[data-card-drag] .task-pins { outline: 1px dashed #6f7784; outline-offset: 2px; }
       .task-told summary { font-size: .72rem; color: #8b93a1; cursor: pointer; }
+      .task-trash summary { font-size: .72rem; color: #8b93a1; cursor: pointer; }
+      .trash-row { display: flex; align-items: baseline; gap: .3rem; font-size: .72rem;
+        padding-left: .6rem; }
+      .trash-title { color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .trash-restore { margin-left: auto; background: none; border: 0; padding: 0;
+        font-size: .72rem; color: #8b93a1; cursor: pointer; }
+      .trash-restore:hover:not(:disabled) { color: #e6e6e6; }
       .task-told-line, .canvas-read-line { font-size: .72rem; color: #aaa; padding-left: .6rem;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .add-note-column { align-self: flex-start; background: none; border: 0; padding: 0;
         font-size: .72rem; color: #8b93a1; cursor: pointer; }
       .add-note-column:hover { color: #ddd; }
-      /* ⇤ in a column's head folds it; only you see your folds. */
-      .column-head .fold, .note-column-head .fold { background: none; border: 0; padding: 0;
+      /* ⇤ in the task column's head folds it; only you see your folds. */
+      .task-column-head .fold { background: none; border: 0; padding: 0;
         color: #6f7784; cursor: pointer; font-size: .9rem; line-height: 1; }
       .column-head .fold:hover, .note-column-head .fold:hover { color: #e6e6e6; }
       .avatars { display: inline-flex; gap: 2px; flex: 0 0 auto; }
@@ -808,7 +806,6 @@
       .composer .card-frame { margin: 0; }
       .card-head { display: flex; align-items: center; gap: .4rem; min-height: 1.6rem;
         padding: .15rem .5rem; font-size: .72rem; color: #8b93a1; }
-      .card-head[draggable="true"] { cursor: grab; }
       .card-icon, .card-place { color: var(--tone); }
       .card-icon { font-weight: 600; }
       .card-state { color: #c3c8d0; }
@@ -1164,7 +1161,7 @@
       .thread-card { position: relative; display: flex; flex-direction: column; gap: .2rem;
         padding: .5rem .6rem; background: var(--page); border: 1px solid var(--edge);
         border-radius: 6px; --surface: var(--page); }
-      /* Where a dragged root would land (use-root-drag.ts): a line in the gap
+      /* Where a dragged root would land (use-drag.ts): a line in the gap
          above the card it goes before, or below a column's last card. The
          archive keeps no order of its own, so it is outlined whole. The
          card dragged stays, dimmed, in its place until it is dropped. */
@@ -1370,6 +1367,37 @@
       .msg[data-landed] { animation: landed 1.6s ease-out; }
       @keyframes landed { 0%, 50% { outline: 2px solid var(--track, #777); outline-offset: 2px; }
         100% { outline: 2px solid transparent; outline-offset: 2px; } }
+      /* The drag engine's looks (use-drag.ts), last: they draw over a card's own. */
+      /* What is dragged only translates: a scaled, rotated or shadowed column
+         costs frames on a slow machine. Its header rises instead, leaning with
+         the pointer's speed (--lean). */
+      #strip > [data-dragging] { position: relative; z-index: 2; background: var(--page); }
+      [data-dragging] > [data-column-head], [data-dragging] > .card-head,
+      [data-dragging] > [data-drag-task] {
+        box-shadow: 0 10px 24px rgb(0 0 0 / .55); transform: rotate(var(--lean, 0deg));
+        transition: transform 80ms linear; position: relative; z-index: 1; }
+      .card-frame[data-dragging], .card-grid-cell[data-dragging], .thread-card[data-dragging],
+      .sidebar-item[data-dragging] { position: relative; z-index: 20; }
+      /* A column off the strip is drawn as its card face, under the pointer. */
+      .drag-face { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none;
+        width: 16rem; max-height: 4rem; overflow: hidden; margin: -1rem 0 0 -8rem;
+        background: #1d2026; border: 1px solid #3a3f48; border-radius: 6px;
+        box-shadow: 0 12px 28px rgb(0 0 0 / .55); }
+      /* What a drop there would do. */
+      [data-drag-verdict="move"] { outline: 2px solid #8ab4f8; outline-offset: -2px; }
+      [data-drag-verdict="copy"] { outline: 2px dashed #8ab4f8; outline-offset: -2px; }
+      [data-drag-verdict="replace"] { outline: 2px solid #e3b341; outline-offset: -2px; }
+      [data-drag-verdict="refused"] { outline: 2px solid #6f7784; outline-offset: -2px; opacity: .6; }
+      /* Held over a task in the sidebar, or ▦: a ring fills until it opens. */
+      [data-hover-open] { position: relative; }
+      [data-hover-open]::after { content: ""; position: absolute; inset: -2px; border-radius: 6px;
+        border: 2px solid #8ab4f8; animation: hover-open 600ms linear forwards; pointer-events: none; }
+      @keyframes hover-open { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+      @media (prefers-reduced-motion: reduce) {
+        [data-dragging] > [data-column-head], [data-dragging] > .card-head,
+        [data-dragging] > [data-drag-task] { transform: none; transition: none; }
+        [data-hover-open]::after { animation: none; }
+      }
     </style>
   </head>
   <body>

@@ -14,7 +14,15 @@ import {
 import { describe, expect, test } from "vitest"
 import { orderKey } from "./order.ts"
 import { branchAfter, rankAfter } from "./rank.ts"
-import { canvasOf, planThreadOpen, type ThreadPlacement } from "./task.ts"
+import {
+  canvasOf,
+  indexTasks,
+  isOnCanvas,
+  planThreadOpen,
+  rootsHeld,
+  type ThreadPlacement,
+  taskOfPlace,
+} from "./task.ts"
 import { THREAD } from "./thread.ts"
 
 const ADA = writerId("ada@x.io")
@@ -192,4 +200,46 @@ test("branchAfter and rankAfter: the parent's index, else the last; a rank betwe
   )
   expect(rankAfter(canvas, -1).order < orderKey(100)).toBe(true)
   expect(rankAfter([], -1).order).toBeTruthy()
+})
+
+describe("a trashed card is in the task its left place is in", () => {
+  const trashedB: CardRecord = {
+    kind: "thread",
+    id: B,
+    owner: ADA,
+    placer: ADA,
+    place: {
+      kind: "trash",
+      left: { kind: "canvas", task: K, order: orderKey(2), width: 1 },
+    },
+    content: NO_CONTENT,
+  }
+  const cards = [...onCanvas([A], [1]), trashedB]
+  const threads = new Map([
+    [A, { thread: A, root: ROOT, by: ADA, createdAt: 0, origin: ROOT_ORIGIN }],
+    [B, { thread: B, root: ROOT, by: ADA, createdAt: 0, origin: ROOT_ORIGIN }],
+  ])
+
+  test("in its task by the index, and on no canvas", () => {
+    const tasks = indexTasks(cards, threads)
+    expect(tasks.taskOfThread.get(B)).toBe(K)
+    expect(tasks.taskOfCard.get(B)).toBe(K)
+    expect(canvasOf(cards, K).map(c => c.id)).toEqual([A])
+    expect(tasks.threadsOf.get(K)).toEqual([A])
+    expect([isOnCanvas(tasks, A), isOnCanvas(tasks, B)]).toEqual([true, false])
+    const pinned = { kind: "pinned", thread: B, order: "a" } as const
+    expect(taskOfPlace(tasks, pinned)).toBe(K)
+    const trashed = cards.find(c => c.id === B)
+    expect(trashed && taskOfPlace(tasks, trashed.place)).toBe(K)
+  })
+
+  test("its root stays held until it is deleted", () => {
+    const started = new Set([ROOT])
+    const alone = cards.filter(c => c.id === B)
+    expect(rootsHeld(alone, threads, new Set(), started)).toEqual(
+      new Set([ROOT]),
+    )
+    expect(rootsHeld([], threads, new Set(), started)).toEqual(new Set())
+    expect(rootsHeld(alone, threads, new Set([K]), started)).toEqual(new Set())
+  })
 })

@@ -50,6 +50,24 @@ test("a link opens a thread's task, your own held thread's preview, and nothing 
   expect(linkWords(held, reader, () => "")).toBe("Bea has it")
   const gone = threadLink(T, [], ADA)
   expect([openOf(gone, E), opens(gone)]).toEqual([{ kind: "nothing" }, false])
+  expect(linkWords(gone, reader, () => "")).toBe("deleted")
+})
+
+test("a link to a trashed thread names the task it left, says so, and restores it", () => {
+  const trashed = threadLink(
+    T,
+    at({
+      kind: "trash",
+      left: { kind: "canvas", task: TASK, order: "1", width: 1 },
+    }),
+    ADA,
+  )
+  expect(trashed).toMatchObject({ kind: "trashed", thread: T, task: TASK })
+  expect([openOf(trashed, E), opens(trashed)]).toEqual([
+    { kind: "restore", thread: T },
+    true,
+  ])
+  expect(linkWords(trashed, reader, () => "")).toBe("in the trash")
 })
 
 test("a link is made only by threadLink", () => {

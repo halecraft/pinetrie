@@ -17,12 +17,15 @@ import {
   forkEntry,
   hasPlaceKind,
   isThreadId,
+  livePlaceOf,
   type MoveTarget,
   makeCard,
   NO_CONTENT,
+  ownerOf,
   type PlaceKey,
   type PlaceOf,
   type RootId,
+  type SurfaceOwner,
   type TaskId,
   type ThreadFork,
   type ThreadId,
@@ -77,9 +80,13 @@ const byRank = (a: CanvasCard, b: CanvasCard): number =>
 export interface TaskIndex {
   /** Each task's cards, in its canvas's order: by rank, then by id. */
   readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
-  /** Each canvas card's task: a thread's, a note column's. */
+  /**
+   * Each canvas card's task, a thread's or a note column's; a trashed one's
+   * is the task its canvas place was in, so its own cards keep a task while
+   * it is in the trash.
+   */
   readonly taskOfCard: ReadonlyMap<CardId, TaskId>
-  /** Each thread's task; a thread in an inventory has none. */
+  /** Each thread's task, a trashed one's as `taskOfCard`'s; a thread in an inventory has none. */
   readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
   /** Each task's thread cards, in canvas order. */
   readonly threadsOf: ReadonlyMap<TaskId, readonly ThreadId[]>
@@ -134,6 +141,12 @@ export function indexTasks(
     for (const root of roots)
       tasksOfRoot.set(root, [...(tasksOfRoot.get(root) ?? []), task])
   }
+  // A trashed card is in the task its `left` is in, and on no canvas.
+  for (const c of cards) {
+    if (c.place.kind !== "trash" || c.place.left.kind !== "canvas") continue
+    taskOfCard.set(c.id, c.place.left.task)
+    if (isThreadId(c.id)) taskOfThread.set(c.id, c.place.left.task)
+  }
   const rootOfThread = new Map(
     [...threads].map(([thread, r]) => [thread, r.root] as const),
   )
@@ -171,34 +184,36 @@ export const rootOfPlace = (
 export const NO_TASK_INDEX: TaskIndex = indexTasks([], new Map())
 
 /**
- * The task a place is in (ADR-0116): a canvas card's, a card pinned to a
- * task's or a trashed card's own; a note, its note column's; a card at a thread or
- * in an entry's margin, its thread's task (a queued card's thread is its
- * lane). Null for an
- * inventory, the board (a task's card is in no task: the board is the
- * team's), or a thread or a note column in none. Pure.
+ * The task a place is in: its surface's owner's (`ownerOf`). A task's own;
+ * a note column's or a thread's task; none for an inventory, or the board
+ * (a task's card is in no task: the board is the team's). A trashed card's
+ * is the place it left's; a trash key names none, since the host fills in
+ * where a discard leaves. Pure.
  */
 export function taskOfPlace(
   tasks: TaskIndex,
   place: CardPlace | PlaceKey,
 ): TaskId | null {
-  switch (place.kind) {
-    case "canvas":
-    case "task-pinned":
-      return place.task
-    // A trash key names no history: the host gives it one (`historyOf`).
-    case "trash":
-      return "task" in place ? place.task : null
-    case "inventory":
-    case "board":
+  if (place.kind === "trash")
+    return "left" in place ? taskOfPlace(tasks, place.left) : null
+  return taskOfOwner(tasks, ownerOf(place))
+}
+
+/** The task a surface's owner is in: a task itself, a note column's or a thread's. */
+export function taskOfOwner(
+  tasks: TaskIndex,
+  owner: SurfaceOwner,
+): TaskId | null {
+  switch (owner.kind) {
+    case "task":
+      return owner.task
+    case "note-column":
+      return tasks.taskOfCard.get(owner.column) ?? null
+    case "thread":
+      return tasks.taskOfThread.get(owner.thread) ?? null
+    case "person":
+    case "team":
       return null
-    case "note":
-      return tasks.taskOfCard.get(place.column) ?? null
-    case "queued":
-    case "composing":
-    case "pinned":
-    case "margin":
-      return tasks.taskOfThread.get(place.thread) ?? null
   }
 }
 
@@ -216,10 +231,26 @@ export function taskOfTarget(
         ? (tasks.taskOfThread.get(to.thread) ?? null)
         : to.task
     case "canvas-at":
+    case "new-task":
       return to.task
+    // A restore's task is its card's, read from where the card is.
+    case "back":
+      return null
     default:
       return taskOfPlace(tasks, to)
   }
+}
+
+/**
+ * Whether card `id` is on its task's canvas now: not in an inventory, and
+ * not trashed, though the index still names a trashed card's task.
+ */
+export const isOnCanvas = (tasks: TaskIndex, id: CardId): boolean => {
+  const task = tasks.taskOfCard.get(id)
+  return (
+    task !== undefined &&
+    (tasks.canvases.get(task) ?? []).some(c => c.id === id)
+  )
 }
 
 /** The task a card is in now: its place's (`taskOfPlace`); null for none. */
@@ -345,15 +376,30 @@ export function planThreadOpen(input: {
   const task = ranked.to.kind === "canvas" ? ranked.to.task : null
   if (input.opens === null || task === null)
     return { kind: "open", records, steps: [...ranked.first, made] }
-  const { workflow, state } = input.opens
+  const opened = planTaskOpening(task, by, input.opens, cards)
+  if (opened.kind === "refused") return opened
+  return { kind: "open", records, steps: [opened, ...ranked.first, made] }
+}
+
+/**
+ * A task made for `by`, its owner: its card by the host at the end of its
+ * state on the board (`boardEnd`), the one way a task is made, as a thread
+ * opens in it or a card is dropped between tasks in the sidebar. Refused
+ * `no-place` before the board has states, `exists` for an id in use. Pure.
+ */
+export function planTaskOpening(
+  task: TaskId,
+  by: WriterId,
+  opens: TaskOpening,
+  cards: readonly CardRecord[],
+): MakeStep {
+  const { workflow, state } = opens
   if (workflow === null) return { kind: "refused", code: "no-place", now: null }
-  const opened = planMake(
+  return planMake(
     cards,
     makeCard("task", task, boardEnd(workflow, cards, state), NO_CONTENT, by),
     "host",
   )
-  if (opened.kind === "refused") return opened
-  return { kind: "open", records, steps: [opened, ...ranked.first, made] }
 }
 
 /** Where a thread not yet started begins: its root, and its fork, or null for a new root's first. */
@@ -403,9 +449,12 @@ export function rootsHeld(
   const held = new Set<RootId>()
   for (const c of cards) {
     if (c.kind !== "thread") continue
+    // A trashed thread's root is held until the sweep deletes it, so a
+    // restore, or a link to it, finds its messages.
+    const place = livePlaceOf(c.place)
     const live =
-      c.place.kind === "inventory" ||
-      (c.place.kind === "canvas" && !archived.has(c.place.task))
+      place.kind === "inventory" ||
+      (place.kind === "canvas" && !archived.has(place.task))
     const root = threads.get(c.id)?.root
     if (live && root !== undefined && started.has(root)) held.add(root)
   }

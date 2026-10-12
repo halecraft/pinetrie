@@ -1,6 +1,5 @@
-// interface/discardable — whether you may discard a card (ADR-0111): the
-// one test a discard, a cut (ADR-0132) and a slot's replacement (ADR-0133)
-// all ask. Pure.
+// interface/discardable — whether you may discard a card: the one test a
+// discard, a cut and a slot's replacement all ask. Pure.
 
 import {
   type CardFittingPlace,
@@ -19,8 +18,9 @@ export type Discardable = Extract<
 
 /**
  * Whether you, `me`, may discard `card`: a kind that may be in a trash
- * (`PLACES_OF`) and that a person moves (a task's card is the host's to
- * trash), not in someone else's inventory (ADR-0059).
+ * (`PLACES_OF`: a thread, sent or not, and a note column too) and that a
+ * person moves (a task's card is the host's to trash), not in a trash
+ * already, nor in someone else's inventory.
  */
 export const isDiscardable = (
   card: CardRecord,
@@ -28,4 +28,5 @@ export const isDiscardable = (
 ): card is Discardable =>
   cardFitsPlace(card, "trash") &&
   isMovable(card) &&
+  card.place.kind !== "trash" &&
   !(card.place.kind === "inventory" && card.place.holder !== me)

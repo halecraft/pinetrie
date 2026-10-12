@@ -709,6 +709,23 @@ test("a move's target may be a spot on a canvas, after a card or first, and no p
   )
 })
 
+test("a move's target may be back where a trashed card was, or a new task; neither is a place", () => {
+  const made = cardIdOfKind(
+    "note-column",
+    "01a0ffd2-0000-7000-8000-0000000000a1",
+  )
+  for (const to of [
+    { kind: "back" },
+    { kind: "new-task", task: TEST_TASK },
+  ] as const) {
+    const moves = decodeMoves(
+      encodeMoves([{ card: made, from: { kind: "trash" }, to }]),
+    )
+    assert.deepEqual(typeof moves === "string" ? moves : moves[0]?.to, to)
+  }
+  assert.equal(decodeKey('{"kind":"back"}'), undefined)
+})
+
 test("decode: a move is typed by its card's kind, refused to or from a place that kind is never in (ADR-0117); a spot on a canvas for a kind WRAPS (ADR-0126)", () => {
   const canvas = { kind: "canvas", task: TEST_TASK } as const
   const inventory = {

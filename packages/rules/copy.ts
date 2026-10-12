@@ -78,7 +78,8 @@ export function planCopy(input: {
     return { kind: "refused", why: "held" }
   // Onto a canvas, ranked where it was dropped; or into an inventory.
   const { to } = move
-  if (to.kind === "trash") return { kind: "refused", why: "no-place" }
+  if (to.kind === "trash" || to.kind === "back" || to.kind === "new-task")
+    return { kind: "refused", why: "no-place" }
   const opened = planThreadOpen({
     thread: move.card,
     origin: { kind: "fork", at: copy.end, how: "copy" },

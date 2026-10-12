@@ -1,6 +1,10 @@
 import {
+  type CardRecord,
+  cardIdOfKind,
   entryId,
+  NO_CONTENT,
   taskIdFor,
+  threadIdFor,
   type Workflow,
   workflowStateIdFor,
   writerId,
@@ -15,8 +19,10 @@ import {
 import { NO_TEXT } from "./root-label.ts"
 import {
   boardStateWords,
+  canvasTrash,
   pinnedCountWords,
   taskColumnView,
+  trashWords,
 } from "./task-column-view.ts"
 import { threadCardHead } from "./thread-card.ts"
 
@@ -58,6 +64,7 @@ describe("taskColumnView (ADR-0116)", () => {
       },
       workflow: WORKFLOW,
       archived: false,
+      trash: [],
     })
     expect(view).toMatchObject({
       label: "Fix the sync bug",
@@ -79,6 +86,7 @@ describe("taskColumnView (ADR-0116)", () => {
       summary: undefined,
       workflow: null,
       archived: true,
+      trash: [],
     })
     expect(view).toMatchObject({
       folded: true,
@@ -99,6 +107,7 @@ describe("taskColumnView (ADR-0116)", () => {
         summary: undefined,
         workflow: WORKFLOW,
         archived: true,
+        trash: [],
       }).moves,
     ).toEqual([])
   })
@@ -125,4 +134,76 @@ test("a strip's task column is first, folded by default, and no card's column (A
   // @ts-expect-error: and the task column is never among the cards
   const taskAmong: readonly CardColumn[] = [strip[0]]
   expect([cardFirst, taskAmong]).toHaveLength(2)
+})
+
+test("canvasTrash: the columns trashed from this canvas, newest first, with who trashed them and the days left", () => {
+  const DAY = 24 * 60 * 60 * 1000
+  const BEA = writerId("bea@x.io")
+  const other = taskIdFor("01a0ffd2-0000-7000-8000-0000000000dd")
+  const T1 = threadIdFor("old")
+  const T2 = threadIdFor("new")
+  const N = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1")
+  const left = (task = K) =>
+    ({ kind: "canvas", task, order: "a", width: 1 }) as const
+  const cards: CardRecord[] = [
+    {
+      kind: "thread",
+      id: T1,
+      owner: ADA,
+      placer: ADA,
+      place: { kind: "trash", left: left() },
+      content: NO_CONTENT,
+    },
+    {
+      kind: "thread",
+      id: T2,
+      owner: ADA,
+      placer: BEA,
+      place: { kind: "trash", left: left() },
+      content: NO_CONTENT,
+    },
+    {
+      kind: "note-column",
+      id: N,
+      owner: ADA,
+      placer: ADA,
+      place: { kind: "trash", left: left(other) },
+      content: NO_CONTENT,
+    },
+    {
+      kind: "thread",
+      id: threadIdFor("live"),
+      owner: ADA,
+      placer: ADA,
+      place: left(),
+      content: NO_CONTENT,
+    },
+  ]
+  const event = (at: number) => ({
+    kind: "moved" as const,
+    by: ADA,
+    from: null,
+    to: { kind: "trash" as const },
+    at,
+  })
+  const rows = canvasTrash({
+    cards,
+    histories: new Map([
+      [T1, { card: T1, events: [event(0)] }],
+      [T2, { card: T2, events: [event(3 * DAY)] }],
+    ]),
+    task: K,
+    now: 4 * DAY,
+    names: new Map([[T2, "amber-fox" as never]]),
+    noteTitles: new Map(),
+  })
+  expect(rows).toEqual([
+    { card: T2, title: "amber-fox", by: BEA, deletesInDays: 6 },
+    { card: T1, title: "a thread", by: ADA, deletesInDays: 3 },
+  ])
+  const reader = { me: ADA, nameOf: new Map([[BEA, "Bea"]]) }
+  expect(rows.map(r => trashWords(r, reader))).toEqual([
+    "Bea trashed it · deleted in 6 days",
+    "you trashed it · deleted in 3 days",
+  ])
 })

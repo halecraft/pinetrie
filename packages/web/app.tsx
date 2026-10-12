@@ -29,7 +29,6 @@ import {
   type EntryId,
   isPastAddress,
   parseAddress,
-  parseCardId,
   pathIds,
   type TaskId,
   type TextCard,
@@ -45,9 +44,9 @@ import {
   BOARD_SEARCH,
   boardView,
   branchColors,
-  CARD_MIME,
   type Clip,
   type Column as ColumnSpec,
+  canvasTrash,
   claimFocus,
   clipboardCellView,
   clipFacts,
@@ -55,7 +54,6 @@ import {
   columnMatches,
   composerPlacesStore,
   type Dock,
-  DROP_ZONE,
   type Effect,
   type Focus,
   foldMemory,
@@ -119,7 +117,6 @@ import {
   summariesOf,
   type ThreadLink,
   type TypedLast,
-  targetOfElement,
   taskColumnView,
   taskRail,
   taskSprites,
@@ -205,7 +202,7 @@ import type { DeviceState, TabState } from "./tab-state.ts"
 import { ThreadStates } from "./thread-states.ts"
 import { useAttention } from "./use-attention.ts"
 import { useBlankQueued } from "./use-blank-queued.ts"
-import { useColumnDrag } from "./use-column-drag.ts"
+import { useDrag } from "./use-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
 import { FLIGHT_MS, useFlight } from "./use-flight.ts"
 import { PLACED } from "./use-follow.ts"
@@ -213,7 +210,6 @@ import { useInbox } from "./use-inbox.ts"
 import { NarrowContext, useStripNarrow } from "./use-narrow.ts"
 import { goTo, usePage } from "./use-page.ts"
 import { useLanding, useReveal, useRevealCard } from "./use-reveal.ts"
-import { useRootDrag } from "./use-root-drag.ts"
 import { useSameData } from "./use-same-data.ts"
 import { useSmallWindow } from "./use-small-window.ts"
 import { useStable } from "./use-stable.ts"
@@ -231,7 +227,6 @@ export interface AppStores {
 }
 
 /** How long a card's drag held over a root in the sidebar opens it. */
-const ITEM_HOVER_MS = 600
 
 /**
  * Where search stands for the keys (`Focus.search`): focused in the bar,
@@ -1003,7 +998,6 @@ export function App({
                   column,
                   view: columnView,
                   path: paths[i] ?? new Set<EntryId>(),
-                  closable: slot.closable,
                   track: slot.track,
                   heldBy: unstartedOf(column)?.held?.by ?? null,
                   matches: search === null ? null : (matches?.[i] ?? null),
@@ -1093,8 +1087,29 @@ export function App({
             summary: summaries.get(strip[0].task),
             workflow,
             archived: archivedTasks.has(strip[0].task),
+            // The time is read as the list is drawn: a day's change waits
+            // for the next change to the cards.
+            trash: canvasTrash({
+              cards,
+              histories,
+              task: strip[0].task,
+              now: Date.now(),
+              names: workFacts.names,
+              noteTitles,
+            }),
           }),
-    [strip, heads, marks, summaries, workflow, archivedTasks],
+    [
+      strip,
+      heads,
+      marks,
+      summaries,
+      workflow,
+      archivedTasks,
+      cards,
+      histories,
+      workFacts.names,
+      noteTitles,
+    ],
   )
   // The canvas list the task's agents are told, read from no thread, and
   // what the agent of its first column last read of its pins (ADR-0116).
@@ -1486,92 +1501,14 @@ export function App({
     document.addEventListener("focusin", onFocus)
     return () => document.removeEventListener("focusin", onFocus)
   }, [])
-  // A card's drag (HTML drag and drop: it crosses elements and roots). A
-  // drop lands only where put can (`targetOfElement`); held over a root in
-  // the sidebar, the drag opens it, and held over ▦, the board, to drop it
-  // on a state there (ADR-0111). A root's drag is not a card's: it is
-  // `ROOT_MIME`, and lands by `useRootDrag`.
-  useEffect(() => {
-    let hover: {
-      readonly over: TaskId | "board"
-      readonly timer: ReturnType<typeof setTimeout>
-    } | null = null
-    const carriesCard = (e: DragEvent) =>
-      e.dataTransfer?.types.includes(CARD_MIME) === true
-    const targetOf = (e: DragEvent) => {
-      const el =
-        e.target instanceof Element
-          ? e.target.closest<HTMLElement>(DROP_ZONE)
-          : null
-      return el === null ? null : targetOfElement(el)
-    }
-    const onOver = (e: DragEvent) => {
-      if (!carriesCard(e)) return
-      const item =
-        e.target instanceof Element
-          ? e.target.closest<HTMLElement>(".open-root[data-task]")?.dataset.task
-          : undefined
-      // The item's task, as the sidebar holds it, or ▦.
-      const board =
-        e.target instanceof Element &&
-        e.target.closest(".board-toggle") !== null
-      const over = board ? "board" : layout.open.find(r => r === item)
-      if (over !== hover?.over) {
-        if (hover !== null) clearTimeout(hover.timer)
-        const opens: Intent | null =
-          over === undefined
-            ? null
-            : over === "board"
-              ? { kind: "board", open: true, focus: false }
-              : { kind: "show", here: { kind: "task", task: over } }
-        hover =
-          over === undefined || opens === null
-            ? null
-            : {
-                over,
-                timer: setTimeout(() => onIntent(opens), ITEM_HOVER_MS),
-              }
-      }
-      if (targetOf(e) !== null) e.preventDefault()
-    }
-    // While a card is dragged, the page says so (`data-card-drag`): an empty
-    // pinned strip shows only then, as somewhere to drop it.
-    const dragging = (on: boolean) => {
-      if (on) document.body.dataset.cardDrag = ""
-      else delete document.body.dataset.cardDrag
-    }
-    const onEnter = (e: DragEvent) => {
-      if (carriesCard(e)) dragging(true)
-    }
-    const onEnd = () => dragging(false)
-    const onDrop = (e: DragEvent) => {
-      dragging(false)
-      const target = targetOf(e)
-      const card = parseCardId(e.dataTransfer?.getData(CARD_MIME) ?? "")
-      if (target === null || card === undefined) return
-      e.preventDefault()
-      onIntent({
-        kind: "put",
-        source: { kind: "card", card },
-        target,
-        how: "move",
-      })
-    }
-    document.addEventListener("dragover", onOver)
-    document.addEventListener("dragenter", onEnter)
-    document.addEventListener("dragend", onEnd)
-    document.addEventListener("drop", onDrop)
-    return () => {
-      if (hover !== null) clearTimeout(hover.timer)
-      dragging(false)
-      document.removeEventListener("dragover", onOver)
-      document.removeEventListener("dragenter", onEnter)
-      document.removeEventListener("dragend", onEnd)
-      document.removeEventListener("drop", onDrop)
-    }
-  }, [onIntent, layout.open])
-  // A root's drag, from the board or the sidebar (ADR-0122).
-  useRootDrag(onIntent, workflow?.archive.id ?? null)
+  // Every drag that starts in the page: a column's, a card's, a slot's, a
+  // task's (`use-drag.ts`).
+  useDrag({
+    strip: stripEl,
+    state: intentState,
+    archive: workflow?.archive.id ?? null,
+    onIntent,
+  })
   /** A task's drag from the sidebar: its id and state. */
   const dragOf = (task: TaskId): RootDrag => ({
     task,
@@ -1581,12 +1518,6 @@ export function App({
   /** Follow `link` to `entry` (ADR-0124): a held thread's opens nothing. */
   const openLink = (entry: EntryId, link: ThreadLink) =>
     onIntent({ kind: "openLink", link, entry })
-  // The card's id is the DOM's (`data-card`): read at the edge.
-  const dragColumn = useColumnDrag(stripEl, (id, to) => {
-    const card = parseCardId(id)
-    if (card !== undefined)
-      onIntent({ kind: "moveColumn", column: { kind: "card", card }, to })
-  })
 
   // This device's name for you and the session's, made to agree once the
   // document has settled: before, a missing name means not yet arrived.
@@ -1779,7 +1710,6 @@ export function App({
                           noteViews={noteViews}
                           threadFaceOf={threadFaceOf}
                           onIntent={onIntent}
-                          onPointerDown={dragColumn}
                           projected={projected}
                           reader={historyFacts.reader}
                           readers={readers}

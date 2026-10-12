@@ -4,6 +4,7 @@
 import assert from "node:assert/strict"
 import {
   address,
+  asPlaceFields,
   atEntry,
   type CardId,
   type CardPlace,
@@ -24,6 +25,7 @@ import {
   keyOfFields,
   kindOfCard,
   latestTip,
+  livePlaceOf,
   type MoveTarget,
   messageText,
   moveOf,
@@ -36,6 +38,7 @@ import {
   normalizeEmail,
   normalizeName,
   noteOf,
+  ownerOf,
   PERSON_HISTORY,
   parseCardId,
   parseMentions,
@@ -449,8 +452,11 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       order: "b",
     },
     { kind: "inventory", holder: ADA },
-    { kind: "trash", holder: ADA, task: TEST_TASK },
-    { kind: "trash", holder: ADA, task: null },
+    {
+      kind: "trash",
+      left: { kind: "canvas", task: TEST_TASK, order: "m", width: 2 },
+    },
+    { kind: "trash", left: { kind: "inventory", holder: ADA } },
   ]
 
   test("every place, and its key, round-trips", () => {
@@ -524,8 +530,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(keyFieldsOf(note)).toHaveProperty("column", NOTES)
     const gone = placeFields({
       kind: "trash",
-      task: TEST_TASK,
-      holder: writerId("ada@example.com"),
+      left: { kind: "canvas", task: TEST_TASK, order: "m", width: 1 },
     })
     expect(keyFieldsOf(gone)).not.toHaveProperty("task")
   })
@@ -545,12 +550,14 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(at(`f-${UUID}`)).toBe("file")
   })
 
-  test("fitsPlace: a text card anywhere but a canvas, a thread's card on a canvas or in an inventory, a note column on a canvas alone", () => {
+  test("fitsPlace: a text card anywhere but a canvas, a thread's card on a canvas or in an inventory, a note column on a canvas, and each of them in a trash", () => {
     const fits = (kind: Parameters<typeof fitsPlace>[0]) =>
-      (["note", "canvas", "inventory"] as const).filter(p => fitsPlace(kind, p))
-    expect(fits("text")).toEqual(["note", "inventory"])
-    expect(fits("thread")).toEqual(["canvas", "inventory"])
-    expect(fits("note-column")).toEqual(["canvas"])
+      (["note", "canvas", "inventory", "trash"] as const).filter(p =>
+        fitsPlace(kind, p),
+      )
+    expect(fits("text")).toEqual(["note", "inventory", "trash"])
+    expect(fits("thread")).toEqual(["canvas", "inventory", "trash"])
+    expect(fits("note-column")).toEqual(["canvas", "trash"])
     expect(fits("media")).toEqual([])
   })
 
@@ -697,15 +704,39 @@ describe("moves, built once (ADR-0059)", () => {
     })
   })
 
-  test("a trash place is stored as discarded, with whose trash it is (ADR-0126)", () => {
-    const place = { kind: "trash", task: TEST_TASK, holder: ADA } as const
+  test("a trashed card is stored as the place it left, its kind prefixed; an old trash row does not decode", () => {
+    const left = { kind: "note", column: NOTES, order: "c" } as const
+    const place = { kind: "trash", left } as const
     const fields = placeFields(place)
-    expect(fields).toMatchObject({ kind: "discarded", holder: ADA })
+    expect(fields).toMatchObject({ kind: "discarded-note", column: NOTES })
     expect(placeOfFields(fields)).toEqual(place)
-    expect(keyOfFields({ ...fields, holder: "" })).toEqual(keyOf(place))
-    expect(placeOfFields({ ...fields, task: "" })).toMatchObject({ task: null })
-    expect(placeOfFields({ ...fields, holder: "" })).toBeUndefined()
     expect(keyOfFields(fields)).toEqual({ kind: "trash" })
+    expect(placeOfFields({ ...fields, column: "" })).toBeUndefined()
+    expect(
+      placeOfFields(asPlaceFields({ kind: "discarded", holder: ADA })),
+    ).toBeUndefined()
+    expect(keyOfFields(placeFields(DISCARDED))).toEqual(DISCARDED)
+  })
+
+  test("a surface's owner, and the live place of a trashed card", () => {
+    const thread = threadIdFor("x")
+    expect(ownerOf({ kind: "note", column: NOTES, order: "c" })).toEqual({
+      kind: "note-column",
+      column: NOTES,
+    })
+    expect(ownerOf({ kind: "composing", thread })).toEqual({
+      kind: "thread",
+      thread,
+    })
+    expect(
+      ownerOf({ kind: "task-pinned", task: TEST_TASK, order: "a" }),
+    ).toEqual({ kind: "task", task: TEST_TASK })
+    expect(ownerOf({ kind: "inventory", holder: ADA })).toEqual({
+      kind: "person",
+      holder: ADA,
+    })
+    const left = { kind: "inventory", holder: ADA } as const
+    expect(livePlaceOf({ kind: "trash", left })).toEqual(left)
   })
 
   test("seenAt: a note is where its sender saw it in its column, whatever its rank", () => {
@@ -801,7 +832,7 @@ test("every place writes only the fields its kind's row stores (`ROWS`)", () => 
     { kind: "notes", near: "thread", thread },
     { kind: "notes", near: "task", task },
     { kind: "inventory", holder: writerId("a@x.io") },
-    { kind: "trash", task, holder: writerId("a@x.io") },
+    { kind: "trash", left: { kind: "canvas", task, order: "a", width: 1 } },
   ]
   for (const place of places) {
     const { kind, ...fields } = placeFields(place)

@@ -1,5 +1,5 @@
-// interface/reorder — where a column being moved lands. Pure; `use-column-drag.ts`
-// and the header's grip are its shell.
+// interface/reorder — where a column being moved lands. Pure; the drag
+// engine (`use-drag.ts`) and Alt+arrows (`page-keys.ts`) are its shell.
 //
 // A gap is a place between columns: gap 0 is before the first, gap n after
 // the last of n. A column dropped in the gap either side of itself does not move.
@@ -15,22 +15,30 @@ export function landing(from: number, gap: number): number | null {
   return gap > from ? gap - 1 : gap
 }
 
-/** Where a key on its grip moves the column at `from` of `count`, or null for other keys and no move. */
+/**
+ * Each column's `translateX` while the one at `from` is dragged to `gap`:
+ * those it would pass slide over by its width, to open the gap it would land
+ * in; the rest, and the dragged one, stay. Pure.
+ */
+export function neighbourShifts(
+  from: number,
+  gap: number,
+  widths: readonly number[],
+): readonly number[] {
+  const width = widths[from] ?? 0
+  return widths.map((_, i) =>
+    i > from && i < gap ? -width : i < from && i >= gap ? width : 0,
+  )
+}
+
+/** Where Alt+← or Alt+→ moves the column at `from` of `count`, or null for other keys and no move. */
 export function keyMove(
   from: number,
   count: number,
   key: string,
 ): number | null {
   const to =
-    key === "ArrowLeft"
-      ? from - 1
-      : key === "ArrowRight"
-        ? from + 1
-        : key === "Home"
-          ? 0
-          : key === "End"
-            ? count - 1
-            : null
+    key === "ArrowLeft" ? from - 1 : key === "ArrowRight" ? from + 1 : null
   return to === null || to < 0 || to >= count || to === from ? null : to
 }
 

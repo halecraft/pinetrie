@@ -28,7 +28,7 @@ import {
 } from "@pinetrie/core"
 import { displayName, offerStatus } from "@pinetrie/rules"
 import { PENDING_TRACK } from "./column-paths.ts"
-import { type Column, isClosable } from "./columns.ts"
+import type { Column } from "./columns.ts"
 import type { Intent } from "./intent.ts"
 import type { Here } from "./layout.ts"
 import { rootSeed, SLOTS, STRIDE } from "./palette.ts"
@@ -49,11 +49,6 @@ export interface ReadOnly {
 /** One thread column drawn whole, of the task you are on or of a new tab. */
 export interface ColumnSlot {
   readonly key: string
-  /**
-   * Whether × shows: on a branch not yet sent, which is yours alone, and on
-   * a new tab's one column, which closes the tab. A card's column folds.
-   */
-  readonly closable: boolean
   readonly track: number
 }
 
@@ -171,7 +166,6 @@ function stageOf(input: AppViewInput): Stage {
   const slots = columns.map(
     (c, position): ColumnSlot => ({
       key: c.key,
-      closable: isClosable(c),
       track: tracks[position] ?? PENDING_TRACK,
     }),
   )

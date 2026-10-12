@@ -15,6 +15,7 @@
 
 import {
   type Address,
+  BACK,
   type CanvasTarget,
   type CardId,
   type CardRecord,
@@ -53,7 +54,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { addressLink, taskOfPlace, yourCard } from "@pinetrie/rules"
+import { addressLink, taskOfPlace } from "@pinetrie/rules"
 import {
   type ActedAt,
   AT_INVENTORY,
@@ -64,7 +65,6 @@ import {
   LAST_ORDER,
   type MoveAnswer,
   type MoveHow,
-  type SlotMove,
   type Slots,
 } from "@pinetrie/session"
 import { addressWords } from "./address-words.ts"
@@ -82,7 +82,7 @@ import {
 import type { MessageAct } from "./message-tools.ts"
 import { intoMessage, type PutTarget, placeOfTarget } from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
-import { planSpinOff } from "./spin-off.ts"
+import { newTaskEffects, planSpinOff } from "./spin-off.ts"
 
 /**
  * A move to send; `fly`: whether its card animates to where it lands;
@@ -397,7 +397,7 @@ function clipLanding(
         clip.cut &&
         cut !== undefined &&
         cut.place.kind === "trash" &&
-        cut.place.holder === state.cards.me
+        cut.placer === state.cards.me
       )
         return { kind: "uncut", card: of.card, to: target }
       switch (of.kind) {
@@ -622,24 +622,47 @@ function putCard(
   state: IntentState,
   minted: Minted,
 ): readonly Effect[] {
-  if (target.kind === "state" || target.kind === "sidebar")
-    return planSpinOff(now.id, target, minted, state)
+  if (target.kind === "state") return planSpinOff(now.id, target, minted, state)
+  // Between tasks in the sidebar: a text card spins a new task off; a
+  // column makes one holding it, placed there, and you stay where you are.
+  if (target.kind === "sidebar") {
+    if (now.kind !== "thread" && now.kind !== "note-column")
+      return planSpinOff(now.id, target, minted, state)
+    return [
+      {
+        kind: "moveCards",
+        moves: [
+          {
+            move: moveOf(now, { kind: "new-task", task: minted.task }),
+            slot: null,
+          },
+        ],
+        actedAt: AT_INVENTORY,
+        close: newTaskEffects(minted.task, target.before, false),
+        here: minted.task,
+      },
+    ]
+  }
   // A thread's card or a note column goes on a canvas (ADR-0117); a kind
   // the host alone places is put nowhere.
   if (!isMovable(now)) return []
   if (now.kind === "thread" || now.kind === "note-column")
     return putOnCanvas(now, target, state)
   if (now.kind !== "text" && now.kind !== "reference") return []
-  // A text card or a reference on a canvas lands in a note column made for
-  // it (`WRAPS`).
-  if (target.kind === "canvas")
-    return [
-      moveCard(
-        moveOf(now, canvasSpot(target)),
-        { actedAt: actedAtOf(target), slot: null },
-        true,
-      ),
-    ]
+  // A text card or a reference on a canvas, or onto a task in the sidebar,
+  // lands in a note column made for it (`WRAPS`).
+  if (target.kind === "canvas" || target.kind === "task") {
+    const spot = spotOnCanvas(target, state)
+    return spot === null
+      ? []
+      : [
+          moveCard(
+            moveOf(now, { kind: "canvas-at", ...spot }),
+            { actedAt: actedAtOf(target), slot: null },
+            true,
+          ),
+        ]
+  }
   // Only a text card becomes your message.
   if (
     now.kind === "text" &&
@@ -675,6 +698,7 @@ const actedAtOf = (target: PutTarget): ActedAt => {
     case "inventory":
     case "state":
     case "sidebar":
+    case "task":
     case "text-box":
     case "canvas":
       return AT_INVENTORY
@@ -735,6 +759,12 @@ function spotOnCanvas(
       return { task: target.task, after: target.after }
     case "taskPinned":
       return { task: target.task, after: null }
+    // Onto a task in the sidebar: at the end of its canvas.
+    case "task":
+      return {
+        task: target.task,
+        after: state.tasks.index.canvases.get(target.task)?.at(-1)?.id ?? null,
+      }
     case "notes":
       return here === null ? null : { task: here, after: target.column }
     case "column":
@@ -1019,58 +1049,55 @@ export function planDiscard(
 ): readonly Effect[] {
   const now = cardOf(state.cards, card)
   if (now === undefined || !isDiscardable(now, state.cards.me)) return []
-  return [moveCard(moveOf(now, DISCARDED), how, false, null, taskOfTab(state))]
-}
-
-/**
- * Close the column of `thread`, not yet started (ADR-0126): its card to
- * your trash, and your message there, if you have one, to your inventory
- * (`keep`, into the first empty slot from the selected one) or your trash,
- * one move the host accepts or refuses whole. The only thread of a new
- * tab's task leaves the task empty: it leaves the sidebar once the host
- * accepts. Nothing for a thread whose card is not on a canvas.
- */
-export function planCloseUnstarted(
-  thread: ThreadId,
-  keep: boolean,
-  state: IntentState,
-): readonly Effect[] {
-  const facts = state.cards
-  const card = facts.cards.find(c => c.id === thread)
-  if (card?.kind !== "thread" || card.place.kind !== "canvas") return []
-  const { task } = card.place
-  const message = yourCard(
-    facts.me,
-    { kind: "thread", thread },
-    facts.cards,
-    state.index,
-  )
-  const slots: Record<string, CardId> = { ...facts.slots }
-  const slot = keep ? firstEmpty(slots, facts.selected) : null
-  const away: SlotMove = { move: moveOf(card, DISCARDED), slot: null }
-  const moves: readonly [SlotMove, ...SlotMove[]] =
-    message === undefined
-      ? [away]
-      : [
-          {
-            move: moveOf(
-              message,
-              keep ? { kind: "inventory", holder: facts.me } : DISCARDED,
-            ),
-            slot,
-          },
-          away,
-        ]
-  const alone = (state.tasks.index.canvases.get(task) ?? []).length === 1
+  const move = moveOf(now, DISCARDED)
+  const emptied = emptiedNewTab(now, state)
+  if (emptied === null)
+    return [moveCard(move, how, false, null, taskOfTab(state))]
+  // The only thread of a new tab, not yet started: the task leaves your
+  // sidebar too, once the host accepts, as the host trashes its card.
   return [
     {
       kind: "moveCards",
-      moves,
-      actedAt: atColumn(thread),
-      close: alone ? closeTaskEffects(task) : [],
-      here: task,
+      moves: [{ move, slot: null }],
+      actedAt: how.actedAt,
+      close: closeTaskEffects(emptied),
+      here: emptied,
     },
   ]
+}
+
+/**
+ * The task a discard of `card` empties, when it is a new tab's: a thread
+ * not yet started, the only card on its canvas. Null for any other card.
+ */
+function emptiedNewTab(card: CardRecord, state: IntentState): TaskId | null {
+  if (card.kind !== "thread" || card.place.kind !== "canvas") return null
+  if (state.index.firstOf.has(card.id)) return null
+  const { task } = card.place
+  return (state.tasks.index.canvases.get(task) ?? []).length === 1 ? task : null
+}
+
+/**
+ * Restore a trashed card back to where it was, for anyone who may: the
+ * host resolves `back` and refuses one whose place is gone or taken.
+ * Nothing for a card not drawn in a trash.
+ */
+export function planRestore(
+  card: CardId,
+  how: MoveHow,
+  state: IntentState,
+): readonly Effect[] {
+  const now = cardOf(state.cards, card)
+  if (now === undefined || now.place.kind !== "trash") return []
+  switch (now.kind) {
+    case "text":
+    case "reference":
+    case "thread":
+    case "note-column":
+      return [moveCard(moveOf(now, BACK), how, false)]
+    default:
+      return []
+  }
 }
 
 /** After a keep's answer: the column closes only if the keep was accepted. */

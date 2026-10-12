@@ -92,8 +92,8 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     sender saw it (ADR-0117): `moves` is the copy's one move, its new
  *     thread's card from nowhere onto a canvas spot or into the sender's
  *     inventory.
- *   - `paste` makes a card from a copy, or moves a cut one out of its
- *     sender's trash (ADR-0132): `mode` is `text`, `reference` or `uncut`;
+ *   - `paste` makes a card from a copy, or moves a cut one out of a trash
+ *     by its cutter (ADR-0132): `mode` is `text`, `reference` or `uncut`;
  *     `moves` ends with the card's move (from nowhere, or from a trash),
  *     after the discard of the card it replaces, if any (ADR-0133); `text`
  *     is a reference's address, or a text card's origin (`""` for none),

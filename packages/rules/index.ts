@@ -36,6 +36,7 @@ export {
   archivedIn,
   type Crossing,
   planArchive,
+  planLanesGone,
   TASK_BUSY_REASON,
   writesIn,
 } from "./archive.ts"
@@ -161,7 +162,10 @@ export {
   TRACE_MAX_AGE_MS,
   TRACED,
   TRACED_PLACES,
+  TRASH_KEEP_MS,
+  type TrashSweep,
   traceEnd,
+  trashDeadline,
   type Verb,
   verbOf,
 } from "./card-history.ts"
@@ -246,9 +250,13 @@ export {
   HELD_WORDS,
   heldIn,
   holderOf,
+  holdingOf,
+  holdingWords,
   type QueuePop,
   type RunAt,
   runsIn,
+  type ThreadHolding,
+  TRASHED_WORDS,
   takenIn,
 } from "./held.ts"
 export { pastedImages, planImages } from "./images.ts"
@@ -299,6 +307,7 @@ export {
 export {
   afterSteps,
   type Discards,
+  type FromTrash,
   lanesToDrain,
   type MakeStep,
   type MoveCommand,
@@ -307,11 +316,13 @@ export {
   NO_DISCARDS,
   type PlaceStep,
   pastedCard,
+  planFromTrash,
   planMake,
   planMoveCommand,
   planMoveRequest,
   planMoveTargets,
   planPaste,
+  RESTORE,
   rankOnCanvas,
 } from "./moves.ts"
 export {
@@ -507,7 +518,9 @@ export {
   canvasOf,
   indexTasks,
   isCanvasCard,
+  isOnCanvas,
   NO_TASK_INDEX,
+  planTaskOpening,
   planThreadOpen,
   rootOfPlace,
   rootsHeld,
@@ -517,6 +530,7 @@ export {
   type ThreadOpening,
   type ThreadPlacement,
   taskOfCard,
+  taskOfOwner,
   taskOfPlace,
   taskOfTarget,
   unstartedThreads,

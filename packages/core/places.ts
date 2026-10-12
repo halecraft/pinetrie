@@ -38,27 +38,24 @@ import {
 import { KINDS } from "./kinds.ts"
 
 /**
- * Where a card is (ADR-0113, ADR-0116). Composing: your message, in your
+ * Where a card is, any place but a trash. Composing: your message, in your
  * composer at a thread's end, which only you see; kept as its thread, and
  * resolved to the thread's end (`placeEnd`) whenever it is needed, so it
  * follows its thread as the thread grows. Note: in a note column, at its
- * rank there, shared by everyone in the task (ADR-0116). Pinned: at the top
- * of a thread's column, kept and resolved the same way; the agent reads it
- * on every run. Queued: above the line, waiting for its thread's lane, until
+ * rank there, shared by everyone in the task. Pinned: at the top of a
+ * thread's column, kept and resolved the same way; the agent reads it on
+ * every run. Queued: above the line, waiting for its thread's lane, until
  * the host pops it or someone unqueues it. Margin: beside an entry, a
- * comment on it, shared by everyone in the task and never read by the agent
- * (ADR-0126); it names the entry's thread too, so its task is found without
- * reading a tree. Canvas: a thread card or a note column in a task, at
- * its rank there: the only record of where it is, so a card has one place
- * by construction; a thread not yet started is a thread card there too
- * (ADR-0126). Inventory: in its holder's inventory; which slot holds it is
- * the holder's own document (`InventoryDoc`), not the host's (ADR-0059).
- * Trash: discarded into its holder's trash, drawn nowhere, kept so the undo
- * key can bring it back until the host sweeps it (ADR-0111, ADR-0126).
- * Board: a task's card, in a workflow state of the team's board, at its
- * rank there (ADR-0122, ADR-0126).
+ * comment on it, shared by everyone in the task and never read by the
+ * agent; it names the entry's thread too, so its task is found without
+ * reading a tree. Canvas: a thread card or a note column in a task, at its
+ * rank there: the only record of where it is, so a card has one place by
+ * construction; a thread not yet started is a thread card there too.
+ * Inventory: in its holder's inventory; which slot holds it is the
+ * holder's own document (`InventoryDoc`), not the host's. Board: a task's
+ * card, in a workflow state of the team's board, at its rank there.
  */
-export type CardPlace =
+export type LivePlace =
   | {
       readonly kind: "composing"
       /**
@@ -125,16 +122,69 @@ export type CardPlace =
       /** Its rank in the state: an order key (S69), the host's to give. */
       readonly order: string
     }
-  | {
-      readonly kind: "trash"
-      /** Whose trash: who discarded it (ADR-0126). */
-      readonly holder: WriterId
-      /**
-       * The task it left, whose history of moves the discard is in; null
-       * for none, and then its holder's history outside any task is.
-       */
-      readonly task: TaskId | null
-    }
+
+/**
+ * Where a card is. A trashed card is drawn nowhere and records the place
+ * it left, and nothing else: whose trash it is, who may restore it, where
+ * a restore puts it and which history it is in all follow from `left`
+ * (`ownerOf`). Who trashed it is the card's placer, as for any move. It is
+ * kept so a restore or the undo key can bring it back, until the host
+ * sweeps it.
+ */
+export type CardPlace =
+  | LivePlace
+  | { readonly kind: "trash"; readonly left: LivePlace }
+
+/** The live place a card's surface is on: its place, or for a trashed card the place it left. */
+export const livePlaceOf = (place: CardPlace): LivePlace =>
+  place.kind === "trash" ? place.left : place
+
+/**
+ * Who a surface belongs to: a task (its canvas, its pinned cards), a note
+ * column (its notes), a thread (its dock and its entries' margins), a
+ * person (their inventory) or the team (its board).
+ */
+export type SurfaceOwner =
+  | { readonly kind: "task"; readonly task: TaskId }
+  | { readonly kind: "note-column"; readonly column: NoteColumnId }
+  | { readonly kind: "thread"; readonly thread: ThreadId }
+  | { readonly kind: "person"; readonly holder: WriterId }
+  | { readonly kind: "team" }
+
+/**
+ * Who the surface `place` (or a key of it) is on belongs to. A trashed
+ * card's trash is its `left`'s owner's.
+ */
+export function ownerOf(
+  place: LivePlace | Exclude<PlaceKey, { readonly kind: "trash" }>,
+): SurfaceOwner {
+  switch (place.kind) {
+    case "canvas":
+    case "task-pinned":
+      return { kind: "task", task: place.task }
+    case "note":
+      return { kind: "note-column", column: place.column }
+    case "composing":
+    case "pinned":
+    case "queued":
+    case "margin":
+      return { kind: "thread", thread: place.thread }
+    case "inventory":
+      return { kind: "person", holder: place.holder }
+    case "board":
+      return { kind: "team" }
+  }
+}
+
+/** The card a surface owner is, if it is one: a task's, a note column's or a thread's id. */
+export const ownerCard = (owner: SurfaceOwner): CardId | null =>
+  owner.kind === "task"
+    ? owner.task
+    : owner.kind === "note-column"
+      ? owner.column
+      : owner.kind === "thread"
+        ? owner.thread
+        : null
 
 /** How many columns a card on a canvas is drawn across (ADR-0116). */
 export type CardWidth = 1 | 2
@@ -163,8 +213,8 @@ export type PlaceKey =
       "order" | "by" | "width"
     >
   /**
-   * A discard names neither whose trash nor which history: the host's to
-   * decide, its sender's and the task it leaves (`historyOf`, ADR-0066).
+   * A discard names no place left: the host fills it in from where the
+   * card is, and names its history from it (`historyOf`).
    */
   | { readonly kind: "trash" }
 
@@ -197,7 +247,34 @@ export interface CanvasTarget {
 }
 
 /** Where a move sends a card: a place's key, a thread's nearest notes, or a spot on a canvas. */
-export type MoveTarget = PlaceKey | NotesTarget | CanvasTarget
+export type MoveTarget =
+  | PlaceKey
+  | NotesTarget
+  | CanvasTarget
+  | BackTarget
+  | NewTaskTarget
+
+/**
+ * Back to where a trashed card was: a restore. The host resolves it to the
+ * card's `left`, at the rank it had there, and refuses it when that place
+ * can no longer take the card.
+ */
+export interface BackTarget {
+  readonly kind: "back"
+}
+
+/** The one restore target. */
+export const BACK: BackTarget = { kind: "back" }
+
+/**
+ * A new task, made by the mover at the end of the board's first state,
+ * with the card first on its canvas: a column dropped between two tasks in
+ * the sidebar. `task` is the new task's id, minted by the page.
+ */
+export interface NewTaskTarget {
+  readonly kind: "new-task"
+  readonly task: TaskId
+}
 
 /** A canvas's key with the rank a drop was given there (`CanvasTarget`, resolved). */
 export interface RankedCanvas {
@@ -409,12 +486,16 @@ export function moveOf(
   to: CanvasTarget,
 ): TypedMove
 export function moveOf(
+  card: ThreadCard | NoteColumnCard,
+  to: NewTaskTarget,
+): TypedMove
+export function moveOf(
   card: TextCard | ReferenceCard,
   to: NotesTarget,
 ): TypedMove
 export function moveOf(
-  card: TextCard | ReferenceCard | ThreadCard,
-  to: Extract<PlaceKey, { readonly kind: "trash" }>,
+  card: TextCard | ReferenceCard | ThreadCard | NoteColumnCard,
+  to: Extract<PlaceKey, { readonly kind: "trash" }> | BackTarget,
 ): TypedMove
 export function moveOf(card: CardRecord, to: MoveTarget): Move {
   return { card: card.id, from: keyOf(card.place), to }
@@ -438,9 +519,8 @@ export const threadOfPlace = (place: CardPlace | PlaceKey): ThreadId | null =>
     : null
 
 /**
- * Where a discard puts a card (ADR-0111, ADR-0126): its discarder's trash.
- * Which history it is in is the host's to name (`historyOf`), from where
- * the card leaves.
+ * Where a discard puts a card: a trash, the host filling in the place it
+ * left, from which its history is named (`historyOf`).
  */
 export const DISCARDED: Extract<PlaceKey, { readonly kind: "trash" }> = {
   kind: "trash",
@@ -485,6 +565,13 @@ export type MoveRefusal =
    * a canvas, a thread's card into a queue, a fact out of its queue.
    */
   | "no-place"
+  /**
+   * A restore whose place is gone: what that place is on (a note column, a
+   * thread, a task) is itself trashed, or has no record.
+   */
+  | "left-gone"
+  /** A restore of your message where you have written a newer one. */
+  | "left-taken"
 
 /** Any refusal of a change of place, as the wire carries it: a move's or a reorder's. */
 export type PlaceRefusal = MoveRefusal | ReorderRefusal
@@ -521,7 +608,7 @@ export interface PlaceFields {
   readonly by: string
   readonly seen: string
   readonly holder: string
-  /** A canvas card's, or a trashed card's, task (ADR-0116). */
+  /** A canvas card's task, or one a card is pinned to. */
   readonly task: string
   /** A canvas card's width, `1` or `2`. */
   readonly width: string
@@ -555,7 +642,7 @@ const PLACE_FIELDS = {
   // A trash key names no task: the host names a discard's history.
   task: {
     key: "for",
-    kinds: ["canvas", "canvas-at", "task-pinned", "notes"],
+    kinds: ["canvas", "canvas-at", "task-pinned", "notes", "new-task"],
   },
   width: { key: "never" },
   state: { key: "always" },
@@ -609,8 +696,9 @@ export const keyFieldsFrom = (
  * - a thread's nearest notes, its id in `lane`; a task's, its id in `task`;
  * - a spot on a canvas, the card it goes after in `column` ("" for first);
  * - a comment, its entry in `at` and the entry's thread in `lane`;
- * - a card in a trash as `discarded`, whose trash in `holder`, the task
- *   it left in `task` ("" for none);
+ * - a trash's key as `discarded`, every field "" (a card in a trash is
+ *   stored as the place it left, its kind `discarded-` and that place's
+ *   stored kind: `trashedFields`);
  * - a task's card on the board, its workflow state in `state`.
  */
 const ROWS = {
@@ -619,12 +707,14 @@ const ROWS = {
   notes: ["lane", "task"],
   "task-pinned": ["task", "order"],
   "canvas-at": ["task", "column"],
+  back: [],
+  "new-task": ["task"],
   pinned: ["lane", "order"],
   queued: ["lane", "order", "by", "seen"],
   margin: ["at", "lane", "order"],
   canvas: ["task", "order", "width"],
   inventory: ["holder"],
-  discarded: ["task", "holder"],
+  discarded: [],
   board: ["state", "order"],
 } as const satisfies Record<
   string,
@@ -653,8 +743,10 @@ const rowOf = (f: PlaceFields): Row | undefined =>
   f.kind in ROWS ? (f as Row) : undefined
 
 /** The fields each stored kind carries (`ROWS`), for tests. */
-export const rowFieldsOf = (kind: string): readonly string[] | undefined =>
-  kind in ROWS ? ROWS[kind as RowKind] : undefined
+export const rowFieldsOf = (kind: string): readonly string[] | undefined => {
+  const of = kind.startsWith(TRASHED) ? kind.slice(TRASHED.length) : kind
+  return of in ROWS ? ROWS[of as RowKind] : undefined
+}
 
 /**
  * A place (or a key, whose `order`, `by` and `width` are "", or a move's
@@ -682,6 +774,10 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
       })
     case "canvas-at":
       return row("canvas-at", { task: place.task, column: place.after ?? "" })
+    case "back":
+      return row("back", {})
+    case "new-task":
+      return row("new-task", { task: place.task })
     case "pinned":
       return row("pinned", {
         lane: place.thread,
@@ -714,20 +810,22 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
         order: "order" in place ? place.order : "",
       })
     case "trash":
-      return row("discarded", {
-        task: "task" in place ? (place.task ?? "") : "",
-        holder: "holder" in place ? place.holder : "",
-      })
+      return "left" in place ? trashedFields(place.left) : row("discarded", {})
   }
+}
+
+/** What a trashed card's row kind starts with, before its left place's stored kind. */
+const TRASHED = "discarded-"
+
+/** A trashed card's row: the place it left, its kind prefixed `discarded-`. */
+const trashedFields = (left: LivePlace): PlaceFields => {
+  const fields = placeFields(left)
+  return { ...fields, kind: `${TRASHED}${fields.kind}` }
 }
 
 /** A stored width -> a card's width; undefined for any other. */
 const widthOf = (width: string): CardWidth | undefined =>
   width === "1" ? 1 : width === "2" ? 2 : undefined
-
-/** A trashed card's stored task: "" is none; undefined for one that is no task. */
-const trashTaskOf = (task: string): TaskId | null | undefined =>
-  task === "" ? null : isTaskId(task) ? task : undefined
 
 /** A place at a thread: its `thread`, from the row's `lane`; undefined for none. */
 const atThread = (r: {
@@ -738,17 +836,29 @@ const atThread = (r: {
 /**
  * Flat strings -> a place; undefined for one that is malformed. A card at a
  * thread's end, pinned or queued names its thread alone. A canvas card
- * needs its `TaskId`. An inventory's or a trash's holder is never "". A pinned card needs its order, and a
+ * needs its `TaskId`. An inventory's holder is never "". A trashed card's
+ * row is the place it left, read the same way. A pinned card needs its order, and a
  * canvas card its order and width. A queued card needs its order and who
  * queued it. A note needs its column and its order. A target's row is no
  * place.
  */
 export function placeOfFields(f: PlaceFields): CardPlace | undefined {
+  if (f.kind.startsWith(TRASHED)) {
+    const left = livePlaceOfFields({ ...f, kind: f.kind.slice(TRASHED.length) })
+    return left === undefined ? undefined : { kind: "trash", left }
+  }
+  return livePlaceOfFields(f)
+}
+
+/** Flat strings -> a place but a trash; undefined for one that is malformed. */
+function livePlaceOfFields(f: PlaceFields): LivePlace | undefined {
   const r = rowOf(f)
   switch (r?.kind) {
     case undefined:
     case "notes":
     case "canvas-at":
+    case "back":
+    case "new-task":
       return undefined
     case "canvas": {
       const width = widthOf(r.width)
@@ -772,12 +882,8 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
       return !isWorkflowStateId(r.state) || r.order === ""
         ? undefined
         : { kind: "board", state: r.state, order: r.order }
-    case "discarded": {
-      const task = trashTaskOf(r.task)
-      return r.holder === "" || task === undefined
-        ? undefined
-        : { kind: "trash", holder: r.holder as WriterId, task }
-    }
+    case "discarded":
+      return undefined
     case "drafting": {
       const at = atThread(r)
       return at === undefined ? undefined : { kind: "composing", ...at }
@@ -813,10 +919,11 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
  * Flat strings -> a key, as a move names one; undefined for one that is
  * malformed. A queued key has no order and no queuer, and keeps its text's
  * version; a pinned key has no order, nor a canvas key its order and width,
- * nor a note's key its order; a trash key names no holder and no task, which is the host's
- * to give. A move's target may be a thread's nearest notes (`targetOfFields`).
+ * nor a note's key its order; a trash key names no place left, which is the host's
+ * to fill in. A move's target may be a thread's nearest notes (`targetOfFields`).
  */
 export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
+  if (f.kind.startsWith(TRASHED)) return { kind: "trash" }
   const r = rowOf(f)
   switch (r?.kind) {
     case "pinned": {
@@ -878,6 +985,10 @@ export function targetOfFields(f: PlaceFields): MoveTarget | undefined {
         ? undefined
         : { kind: "canvas-at", task: r.task, after }
     }
+    case "back":
+      return BACK
+    case "new-task":
+      return isTaskId(r.task) ? { kind: "new-task", task: r.task } : undefined
     default:
       return keyOfFields(f)
   }
@@ -1008,8 +1119,11 @@ export type KeyOf<K extends CardKind> = Extract<
 const TARGET_PLACES = {
   notes: "note",
   "canvas-at": "canvas",
+  // Only a card a trash takes is ever in one to come back from.
+  back: "trash",
+  "new-task": "canvas",
 } as const satisfies Record<
-  (NotesTarget | CanvasTarget)["kind"],
+  (NotesTarget | CanvasTarget | BackTarget | NewTaskTarget)["kind"],
   CardPlace["kind"]
 >
 
@@ -1051,7 +1165,10 @@ type TargetKindOf<K extends CardKind> =
 /** Where a move may send a card of `K`: a key or a target of a place it is ever in. */
 export type TargetOf<K extends CardKind> =
   | KeyOf<K>
-  | Extract<NotesTarget | CanvasTarget, { readonly kind: TargetKindOf<K> }>
+  | Extract<
+      NotesTarget | CanvasTarget | BackTarget | NewTaskTarget,
+      { readonly kind: TargetKindOf<K> }
+    >
 
 /** A move of a card of `K`, from and to places that kind is ever in. */
 export interface MoveOf<K extends CardKind> extends Move<TargetOf<K>> {
@@ -1075,12 +1192,20 @@ const fitsTarget = (kind: CardKind, to: MoveTarget): boolean => {
     const wrap = wrapperKind(kind)
     return wrap !== null && fitsPlace(wrap, "canvas")
   }
-  return fitsPlace(
-    kind,
-    to.kind === "notes" || to.kind === "canvas-at"
-      ? TARGET_PLACES[to.kind]
-      : to.kind,
-  )
+  return fitsPlace(kind, placeKindOfTarget(to))
+}
+
+/** The kind of place a target lands in: a key's own, or the place `TARGET_PLACES` names. */
+const placeKindOfTarget = (to: MoveTarget): CardPlace["kind"] => {
+  switch (to.kind) {
+    case "notes":
+    case "canvas-at":
+    case "back":
+    case "new-task":
+      return TARGET_PLACES[to.kind]
+    default:
+      return to.kind
+  }
 }
 
 /** Whether `to` is a target a card of `kind` may be sent to (`TargetOf`). */

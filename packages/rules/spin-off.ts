@@ -86,10 +86,7 @@ export function planSpinOff(input: {
   if (input.threads.has(thread)) return { kind: "refused", code: "exists" }
   const text = input.text.trim()
   if (text === "") return { kind: "blank" }
-  const step = planMove(input.cards, move, input.sender, {
-    tasks: input.tasks,
-    here: input.request.here,
-  })
+  const step = planMove(input.cards, move, input.sender)
   if (step.kind === "refused") return { kind: "refused", code: step.code }
   if (step.kind !== "write") return { kind: "refused", code: "moved" }
   const open = planThreadOpen({

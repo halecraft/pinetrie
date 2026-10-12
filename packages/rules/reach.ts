@@ -26,6 +26,8 @@ export function threadReach(
 ): Reach {
   const place = facts.cards.find(c => c.id === thread)?.place
   if (place?.kind === "inventory") return { kind: "held", by: place.holder }
+  if (place?.kind === "trash" && place.left.kind === "canvas")
+    return { kind: "trashed", task: place.left.task }
   if (place?.kind !== "canvas") return { kind: "gone" }
   const record = facts.archived.get(place.task)
   return record === undefined
@@ -69,6 +71,8 @@ export function reachWords(
       return `${name}'s task was archived by ${nameOf(reach.record.by)}`
     case "held":
       return `${nameOf(reach.by)} has ${name}`
+    case "trashed":
+      return `${name} is in the trash`
     case "gone":
       return `${name} is no longer on any task`
   }
@@ -84,6 +88,8 @@ export function awayWords(
       return `archived by ${nameOf(reach.record.by)}`
     case "held":
       return `${nameOf(reach.by)} has it`
+    case "trashed":
+      return "in the trash"
     case "gone":
       return "gone"
   }

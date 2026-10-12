@@ -46,6 +46,15 @@ export interface Focus {
   readonly selected: string | null
   /** Focus is on the clipboard cell (ADR-0132). */
   readonly cell: boolean
+  /**
+   * The card column focus is inside now (not the last one), its index among
+   * the canvas's columns and how many there are: what Alt+← and Alt+→ move.
+   */
+  readonly inColumn: {
+    readonly card: CardId
+    readonly position: number
+    readonly count: number
+  } | null
   /** The nearest drop zone around focus (`targetOfElement`): where a paste lands. */
   readonly zone: PutTarget | null
 }

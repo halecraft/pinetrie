@@ -22,6 +22,7 @@ import {
   type Intent,
   pinnedCountWords,
   RENAME_TASK_TITLE,
+  RESTORE_WORDS,
   type Reader,
   type ReadOnly,
   renameIntent,
@@ -29,6 +30,8 @@ import {
   TASK_PINS_EMPTY,
   TASK_PINS_HEADING,
   type TaskColumnView,
+  trashHeading,
+  trashWords,
   UNFOLD_TASK,
 } from "@pinetrie/interface"
 import { TASK_BUSY_REASON } from "@pinetrie/rules"
@@ -199,6 +202,32 @@ export function TaskColumn(p: {
             </div>
           ))}
         </details>
+        {view.trash.length > 0 && (
+          <details className="task-trash">
+            <summary>{trashHeading(view.trash.length)}</summary>
+            {view.trash.map(row => (
+              <div className="trash-row" data-card={row.card} key={row.card}>
+                <span className="trash-title">{row.title}</span>
+                <span className="why"> · {trashWords(row, p.reader)}</span>
+                <button
+                  className="trash-restore"
+                  disabled={view.readOnly}
+                  onClick={() =>
+                    p.onIntent({
+                      kind: "restore",
+                      card: row.card,
+                      at: { kind: "column", key: view.task },
+                    })
+                  }
+                  title={RESTORE_WORDS.title}
+                  type="button"
+                >
+                  {RESTORE_WORDS.label}
+                </button>
+              </div>
+            ))}
+          </details>
+        )}
         <div className="task-here">
           <ReaderMenus {...p.readers} task={view.task} thread={p.thread} />
         </div>

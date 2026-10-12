@@ -78,7 +78,7 @@ export const commandNote = (command: CardCommand, at: CatchUps): string =>
 /** The × beside a command: what pressing it does. */
 export const CLEAR_COMMAND = "send it as a plain message"
 
-const who = (by: WriterId, reader: Reader): string =>
+export const who = (by: WriterId, reader: Reader): string =>
   by === reader.me ? "you" : displayName(by, reader.nameOf.get(by))
 
 /** A control's words: its label, its title and its class. */
@@ -156,6 +156,10 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
         : `not lifted back: ${who(by, reader)} replied`
     case "archived":
       return "not undone: restore or archive it on the board"
+    case "left-gone":
+      return "not restored: where it was is gone"
+    case "left-taken":
+      return "not restored: you have written a new message there"
     case "exists":
     case "no-place":
       return "not moved"
@@ -182,14 +186,9 @@ export const PUT_TITLE =
 export const DISCARD_CARD = "×"
 export const DISCARD_CARD_TITLE =
   "discard (Ctrl+Shift+Backspace) · the undo key brings it back"
-/** Closing an unstarted thread's column that holds text: the default, and the final choice. */
-export const KEEP_IN_INVENTORY = "keep in inventory"
-export const DISCARD = "discard"
-/** The close ask's question, by how many cards hold text. */
-export const closeAskWords = (n: number): string =>
-  n === 1
-    ? "keep what you typed in your inventory?"
-    : `keep the ${n} cards here in your inventory?`
+/** A column's ×: its card to the trash of the task, which anyone on it restores from. */
+export const TRASH_COLUMN =
+  "trash this column, for everyone: anyone on the task restores it from the task's trash"
 
 /** A notice's React key: what it is about, and why. */
 export const noticeKey = (notice: CardNotice): string =>

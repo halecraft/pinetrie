@@ -315,7 +315,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
       [{ card: C1, from: mine, to: gone }],
       elsewhere,
     )
-    expect(textsIn(held.b.places)[0]?.place).toMatchObject({ task: elsewhere })
+    expect(textsIn(held.b.places)[0]?.place).toEqual({ ...gone, left: mine })
     expect(held.recorded).toEqual([[ADA, elsewhere]])
     const atThread = setUp()
     atThread.put()
@@ -324,9 +324,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
       [{ card: C1, from: atEnd, to: gone }],
       elsewhere,
     )
-    expect(textsIn(atThread.b.places)[0]?.place).toMatchObject({
-      task: TEST_TASK,
-    })
+    expect(textsIn(atThread.b.places)[0]?.place).toMatchObject(gone)
     expect(atThread.recorded).toEqual([[ADA, TEST_TASK]])
   })
 
@@ -352,11 +350,9 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
       "trash",
     )
     expect(readTasks(b.places).has(TAB_TASK)).toBe(false)
-    expect(readPlaces(b.places).find(c => c.id === TAB_TASK)?.place).toEqual({
-      kind: "trash",
-      holder: ADA,
-      task: TAB_TASK,
-    })
+    expect(
+      readPlaces(b.places).find(c => c.id === TAB_TASK)?.place,
+    ).toMatchObject({ kind: "trash", left: { kind: "board" } })
     expect(recorded).toEqual([[ADA, "person"]])
   })
 
@@ -445,11 +441,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     const { b, commands, put, recorded, histories } = setUp()
     put({ place: mine })
     await commands.move(ADA, [{ card: C1, from: mine, to: gone }], null)
-    expect(textsIn(b.places)[0]?.place).toEqual({
-      ...gone,
-      holder: ADA,
-      task: null,
-    })
+    expect(textsIn(b.places)[0]?.place).toEqual({ ...gone, left: mine })
     expect(recorded).toEqual([[ADA, "person"]])
     await commands.undoMove(ADA, null, "undo")
     expect(histories.calls.at(-1)?.args).toEqual([ADA, PERSON_HISTORY, "undo"])
@@ -469,7 +461,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
       ).outcome,
     ).toEqual({ kind: "moved" })
     expect(textsIn(b.places).map(c => c.place)).toEqual([
-      { ...gone, holder: ADA, task: TEST_TASK },
+      { ...gone, left: pinnedPlace },
     ])
     expect(cards.calls).toEqual([])
     expect(recorded).toEqual([[ADA, TEST_TASK]])
@@ -1182,10 +1174,9 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
         state: null,
       },
     ])
-    expect(textsIn(b.places)[0]?.place).toEqual({
+    expect(textsIn(b.places)[0]?.place).toMatchObject({
       ...spun,
-      holder: ADA,
-      task: TEST_TASK,
+      left: { kind: "note" },
     })
     expect(recorded).toEqual([[ADA, TEST_TASK]])
     expect(readThreads(b.session).get(STARTS)?.origin).toEqual({
@@ -1229,7 +1220,7 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
 
   test("an undo while the thread holds its first message alone lifts it back: the card where it was, the thread deleted", async () => {
     const { b, commands, put, undoes } = setUp()
-    put({ place: { ...spun, holder: ADA, task: TEST_TASK } })
+    put({ place: { ...spun, left: { ...noteKey, order: "m" } } })
     await thread(b, [ADA])
     undoes(spunStep, () => put())
     const done = await commands.undoMove(ADA, TEST_TASK, "undo")
@@ -1245,7 +1236,7 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
 
   test("once someone replied, the undo is refused, naming them, and nothing is reverted", async () => {
     const { b, commands, put, undoes } = setUp()
-    put({ place: { ...spun, holder: ADA, task: TEST_TASK } })
+    put({ place: { ...spun, left: { ...noteKey, order: "m" } } })
     await thread(b, [ADA, BEA])
     let reverted = false
     undoes(spunStep, () => {

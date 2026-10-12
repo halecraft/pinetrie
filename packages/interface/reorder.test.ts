@@ -42,18 +42,16 @@ describe("landing", () => {
 })
 
 describe("keyMove", () => {
-  test("arrows move one place, Home and End to either end", () => {
+  test("arrows move one place; Home and End move nothing", () => {
     expect(keyMove(1, 4, "ArrowLeft")).toBe(0)
     expect(keyMove(1, 4, "ArrowRight")).toBe(2)
-    expect(keyMove(2, 4, "Home")).toBe(0)
-    expect(keyMove(1, 4, "End")).toBe(3)
+    expect(keyMove(2, 4, "Home")).toBeNull()
+    expect(keyMove(1, 4, "End")).toBeNull()
   })
 
   test("no move past either end, to where it is, or for another key", () => {
     expect(keyMove(0, 4, "ArrowLeft")).toBeNull()
     expect(keyMove(3, 4, "ArrowRight")).toBeNull()
-    expect(keyMove(0, 4, "Home")).toBeNull()
-    expect(keyMove(3, 4, "End")).toBeNull()
     expect(keyMove(1, 4, "Enter")).toBeNull()
   })
 })
