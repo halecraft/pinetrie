@@ -80,6 +80,7 @@ import {
   storedName,
   TO_NOBODY,
   twoFrames,
+  waitForListWidth,
 } from "./page.ts"
 
 export const scenario: Scenario = {
@@ -2295,14 +2296,16 @@ async function run(check: Checks["check"]): Promise<void> {
         // The corner at 11.5rem (ADR-0098): your name gives way, so it, your
         // inbox with a two-digit badge and your inventory sit side by side.
         const viewport = page.viewportSize()
-        const folded = async () =>
-          (await page.$(':root[data-list="icons"]')) !== null
-        const wasFolded = await folded()
+        const wasFolded = (await page.$(':root[data-list="icons"]')) !== null
         await page.setViewportSize({
           width: 860,
           height: viewport?.height ?? 720,
         })
-        if (await folded()) await page.click("#sidebar .list-fold")
+        // Folded by the small window (nobody here has chosen its width) or
+        // by a choice, the sidebar shows icons; unfolding chooses full.
+        const folds = await waitForListWidth(page, "icons")
+        if (folds) await page.click("#sidebar .list-fold")
+        const unfolded = folds && (await waitForListWidth(page, "full"))
         const corner = await page
           .evaluate(() => {
             const badge = document.querySelector(
@@ -2334,12 +2337,18 @@ async function run(check: Checks["check"]): Promise<void> {
           })
           .catch(() => null)
         if (viewport !== null) await page.setViewportSize(viewport)
-        if (wasFolded !== (await folded()))
+        // Full is now chosen, at any width; fold it back if it was folded.
+        if (wasFolded) {
           await page.click("#sidebar .list-fold")
+          await waitForListWidth(page, "icons")
+        }
         check(
           "the corner holds you, your inbox and your inventory side by side at 11.5rem with a two-digit badge",
-          corner?.inside === true && corner.apart && corner.width < 200,
-          JSON.stringify(corner),
+          unfolded &&
+            corner?.inside === true &&
+            corner.apart &&
+            corner.width < 200,
+          `unfolded ${unfolded}, ${JSON.stringify(corner)}`,
         )
         const picked = await chooseFromMenu(
           page,

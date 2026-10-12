@@ -2,7 +2,11 @@
 // words, menus, frames and render counts, a page made a person, and selectors.
 
 import { errorText, NOBODY, THE_AGENT } from "@pinetrie/core"
-import { identityCodec, recipientWords } from "@pinetrie/interface"
+import {
+  identityCodec,
+  type ListWidth,
+  recipientWords,
+} from "@pinetrie/interface"
 import { COMMIT_MARK } from "@pinetrie/web/commit-marks"
 import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Browser } from "@playwright/test"
@@ -321,6 +325,21 @@ export const asPerson = (p: Page, email: string, name: string) =>
  * default 1280, the pane covers the page.
  */
 export const PANE_VIEWPORT = { width: 1440, height: 720 }
+/**
+ * Wait until the sidebar shows `width`, and say whether it did. A resize
+ * folds or unfolds a sidebar nobody has chosen a width for a few frames
+ * after `setViewportSize` resolves, so a read straight after one sees the
+ * old width.
+ */
+export const waitForListWidth = (p: Page, width: ListWidth) =>
+  p
+    .waitForFunction(w => document.documentElement.dataset.list === w, width, {
+      timeout: 10_000,
+    })
+    .then(
+      () => true,
+      () => false,
+    )
 /** Column `n` of the strip, by position. */
 export const col = (n: number) => `.column[data-position="${n}"]`
 /**
