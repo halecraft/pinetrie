@@ -664,34 +664,12 @@ const FIXTURES = ["scripts/record.test.ts"]
 const NUMBERING = ["scripts/numbering.ts", "scripts/numbering.test.ts"]
 const CODE = ["**/*.ts", "**/*.tsx", "**/*.mjs"]
 
-/**
- * The part of the tree a code file's ids are counted in, so that tasks
- * clearing different parts edit different lines of `CODE_CITATIONS`: a
- * package, an app's folder, or else the file itself.
- */
-export function citationArea(file: string): string {
-  const segments = file.split("/")
-  if (segments[0] === "packages" || file.startsWith("apps/conformance/"))
-    return segments.slice(0, 2).join("/")
-  if (file.startsWith("apps/pinetrie/"))
-    return segments.length > 3
-      ? segments.slice(0, 3).join("/")
-      : "apps/pinetrie"
-  return file
-}
-
-/** Every decision id in code, summed by `citationArea`; an area at zero is left out. */
-export const citationsByArea = (
+/** The code files that name a decision by its id, which code never does. */
+export const filesNamingDecisions = (
   input: Pick<RecordInput, "inCode">,
-): Readonly<Record<string, number>> => {
-  const counts: Record<string, number> = {}
-  for (const [file, n] of input.inCode) {
-    if (n === 0) continue
-    const area = citationArea(file)
-    counts[area] = (counts[area] ?? 0) + n
-  }
-  return counts
-}
+): readonly string[] =>
+  [...input.inCode].filter(([, n]) => n > 0).map(([file]) => file)
+
 const UNTRACKED = [
   "**/node_modules/**",
   ".plans/**",

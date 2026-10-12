@@ -819,9 +819,7 @@ describe("afterUndo: what an undo's answer brings into view", () => {
           { card: C2, place: atEnd },
         ],
       }),
-    ).toEqual(
-      answered({ kind: "undone", cards: [{ card: C1, place: atEnd }] }),
-    )
+    ).toEqual(answered({ kind: "undone", cards: [{ card: C1, place: atEnd }] }))
   })
 
   test("an undone pin: shown at its thread's end, as a note is", () => {

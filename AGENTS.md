@@ -48,9 +48,8 @@ spent spikes: history, which search skips unless you name the folder.
 - Code names no decision (ADR-0136): no ADR, spike or plan id in a
   comment, a test title or a mutation list. Where a reader needs the
   reason, say it in a sentence; the module's `TECHNICAL.md` cites the
-  decisions it rests on. The ids still in code are counted by area in
-  `scripts/code-citations.ts`, whose entries only shrink: remove a file's
-  when you change it for its own reasons, and lower its area's entry.
+  decisions it rests on. `scripts/record.test.ts` fails on any id in
+  code, naming its file.
 - A test's title states one behaviour, briefly.
 - A `TECHNICAL.md` states rules, invariants and gotchas, and names the
   module they live in; a function's name in its prose goes stale on the

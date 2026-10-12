@@ -426,8 +426,7 @@ context.**
 - Periodically diff pi upstream; `pnpm run conformance` is the gate.
 - At each milestone, sweep the record: for each living doc, check the ADRs
   whose Area it is against the code, and supersede any whose decision no
-  longer holds (`docs/adrs/README.md`, Amendments). Lower
-  `scripts/code-citations.ts` as the ids leave the code.
+  longer holds (`docs/adrs/README.md`, Amendments).
 
 ---
 

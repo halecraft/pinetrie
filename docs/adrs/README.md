@@ -61,9 +61,8 @@ whole header in one layout, so a hand edit to a generated field is lost:
 them, and while any header does not parse, names an Area that is not a
 living doc, names a record that does not exist, or is in force with no Area
 that cites it. It also fails when a tracked file cites a `docs/adrs/` or
-`docs/findings/` path that does not exist, and when the decision ids left
-in code differ from `scripts/code-citations.ts`, a count by area that only
-shrinks: code names no decision (ADR-0136, `scripts/record.test.ts`).
+`docs/findings/` path that does not exist, and when code names a decision
+by its id: code names none (ADR-0136, `scripts/record.test.ts`).
 
 **Never deleted; archived.** An ADR is in force while it is Proposed or
 Accepted. A Superseded or Rejected one moves to `docs/adrs/archive/`: the

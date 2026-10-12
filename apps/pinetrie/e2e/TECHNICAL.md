@@ -147,10 +147,9 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
   record` would write it (back links, a superseded status, each file in its
   folder or `archive/`), and `recordGaps` finds nothing: no header that
   fails to parse, no unknown or uncited Area, no id naming no record, no
-  cited record path that is missing. The decision ids left in code are
-  exactly `scripts/code-citations.ts`'s count in each area, which only
-  shrinks. It runs in `pnpm test` because each rule is a fact about the tree, read in
-  milliseconds. An ADR added in the older prose Status format fails it
+  cited record path that is missing, and no code file that names a
+  decision by its id. It runs in `pnpm test` because each rule is a fact
+  about the tree, read in milliseconds. An ADR added in the older prose Status format fails it
   until its header is converted, by whoever resolves the landing that
   brings it; an ADR that amends another fails it in its own lane until
   `pnpm run record` writes the back link; and a landing that merges two

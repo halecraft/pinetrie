@@ -4,6 +4,9 @@ Numbered 0135 until 2026-10-11, when two files held that number.
 
 - **Status:** Accepted (Duane, 2026-10-11)
 - **Area:** `AGENTS.md`
+- **Revised:**
+  - 2026-10-12: the cleanup is done, so the count is gone:
+    `scripts/record.test.ts` fails on any id in code, naming its file.
 
 **Context.**
 
@@ -33,11 +36,11 @@ Numbered 0135 until 2026-10-11, when two files held that number.
   test title or a mutation list. Where a reader needs the reason, the
   comment says it in a sentence; the trail from a module to its decisions
   runs through its `TECHNICAL.md`, which cites them.
-- **The ids left in code are counted, and the count only shrinks**
-  (`scripts/code-citations.ts`, `citationsByArea`): `pnpm test` fails until
-  it equals what the code holds, so an id added fails and one removed
-  lowers it. They go as code is next changed for its own reasons, and in a
-  cleanup pass for each package once the threads in flight have landed.
+- **The ids were removed in a cleanup pass for each package**, while a
+  count of those left, by area, only shrank. With none left, the count is
+  gone: `pnpm test` fails on any id in code (`scripts/record.ts`,
+  `filesNamingDecisions`), naming its file, and a thread whose landing
+  brings one in removes it.
 - **A unit mutation is declared beside the test that kills it**, naming
   that test, not copying its title into a list elsewhere. The lists in
   `scripts/mutations/` keep the suite mutations, whose checks span
@@ -51,12 +54,11 @@ Numbered 0135 until 2026-10-11, when two files held that number.
 **Consequences.**
 
 - **`scripts/record.test.ts` no longer checks the amendment limit** or
-  code citing a superseded ADR. It checks the count of decision ids in
-  code instead.
+  code citing a superseded ADR. It checks that code names no decision
+  instead.
 - **ADR-0126 stays in force with its four amendments**, and no citation
   moves.
-- **Each change to cited code may lower the count**, and a thread whose
-  landing brings in new ids removes them before it lands.
+- **A thread whose landing brings in an id removes it** before it lands.
 - **A reader following a decision from code goes through
   `TECHNICAL.md`.** A module whose `TECHNICAL.md` says nothing of a
   decision it rests on is a gap in that file.
