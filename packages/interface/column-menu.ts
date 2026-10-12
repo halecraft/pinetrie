@@ -1,15 +1,11 @@
-// interface/column-menu — a card column's ⋯, as values: first what is
-// yours alone, its fold; then what changes the canvas everyone shares, its
-// width, one column or two, and a note column made just after it; and for a
-// thread's card, a copy here or in your inventory, and a take into your
-// inventory. Pure: the page's columns draw it.
+// interface/column-menu — a card column's ⋯, as values: first what is yours
+// alone, its fold; then what changes the canvas everyone shares.
 
 import { type CardId, type CardWidth, isThreadId } from "@pinetrie/core"
 import { moveWords } from "./card-frame.ts"
 import { FOLD } from "./folded-column-view.ts"
 import type { Intent } from "./intent.ts"
 
-/** One item of a column's ⋯. */
 export interface ColumnMenuItem {
   readonly key: string
   readonly label: string
@@ -25,8 +21,7 @@ export interface ColumnMenuSection {
 
 /**
  * What a column's ⋯ offers for its card `card`, now `width` columns wide.
- * It lists no task: a thread reaches another task through your inventory
- * (ADR-0127).
+ * It lists no task: a thread reaches another task through your inventory.
  */
 export function columnMenu(input: {
   readonly card: CardId

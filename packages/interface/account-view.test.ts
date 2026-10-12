@@ -6,7 +6,7 @@ import {
   inventoryWords,
 } from "./account-view.ts"
 
-describe("accountView (ADR-0098)", () => {
+describe("accountView", () => {
   const inventory = { count: 1, open: false }
   test.each([
     [false, 0, ["profile", "signOut"], null],

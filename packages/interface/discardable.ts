@@ -1,5 +1,5 @@
 // interface/discardable — whether you may discard a card: the one test a
-// discard, a cut and a slot's replacement all ask. Pure.
+// discard, a cut and a slot's replacement all ask.
 
 import {
   type CardFittingPlace,

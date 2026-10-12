@@ -1,8 +1,7 @@
-// interface/ask-segments — what a column draws of each ask (ADR-0106): its
-// work folded, and what that work holds. The column folds each ask's work
-// (`segmentPath`), and the rail compacts the same stretches (`compactRail`):
-// both draw `railLandmarks` apart, so a fold never hides what the rail draws
-// on its own. Pure.
+// interface/ask-segments — what a column draws of each ask: its work folded,
+// and what that work holds. The column's folds and the rail's compacted
+// stretches both leave `railLandmarks` apart, so a fold never hides what the
+// rail draws on its own.
 
 import {
   type AskIndex,

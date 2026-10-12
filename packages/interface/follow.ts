@@ -1,16 +1,16 @@
-// interface/follow — when a scroller follows its end, as a pure rule.
+// interface/follow — when a scroller follows its end.
 //
 // The scroller only ever moves down on its own, so a move up was the reader's.
 // It remembers where it last left the scroll: a scroll event above that is
 // the reader leaving, unless it lands exactly at the end, where content that
-// shrank clamps it. The echo of its own follow never
-// is, however much the content has grown since (S32: the browser dispatches
-// scroll events before ResizeObserver callbacks, so the reader's scroll is
-// seen before the next follow could undo it).
+// shrank clamps it. The echo of its own follow never is, however much the
+// content has grown since: the browser dispatches scroll events before
+// ResizeObserver callbacks, so the reader's scroll is seen before the next
+// follow could undo it.
 //
 // While something works at the end (`holding`), a following scroller does not
 // get shorter: a shrink is taken up by a floor below the content, which what
-// grows next fills (S35). A ResizeObserver callback runs after layout and
+// grows next fills. A ResizeObserver callback runs after layout and
 // before paint, so the floor is painted in the frame the content shrank in.
 // The floor is at most FLOOR_MAX of the view: past that the scroller shrinks,
 // and two thirds of it still show content.
@@ -21,7 +21,7 @@
 //
 // Released, it keeps the column's tip from when the reader left the end
 // (`releasedTip`): an ask whose run ended after it stays open under the
-// reader until they come back down (ADR-0106).
+// reader until they come back down.
 
 import type { EntryId } from "@pinetrie/core"
 

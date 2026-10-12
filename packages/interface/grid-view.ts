@@ -1,7 +1,5 @@
-// interface/grid-view — your inventory's slots as they are drawn (ADR-0048):
-// cells in reading order, each a face or empty, the selection, and its rows
-// (core's `grid.ts`). Pure: `inventoryView` builds one,
-// and `CardGrid` (`packages/web/card-grid.tsx`) draws it.
+// interface/grid-view — your inventory's slots as they are drawn: cells in
+// reading order, each a face or empty, the selection, and its rows.
 
 import type { CardId, Grid, NoteColumnId, ThreadId } from "@pinetrie/core"
 import type { CardTone } from "./card-frame.ts"
@@ -39,7 +37,7 @@ export function gridView(input: {
   readonly selected: number
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>
-  /** Each thread's face, by its id (ADR-0124). */
+  /** Each thread's face, by its id. */
   readonly threads?: ReadonlyMap<ThreadId, ThreadFace>
   /** Each note column, as its column draws it. */
   readonly notes?: ReadonlyMap<NoteColumnId, NoteColumnView>

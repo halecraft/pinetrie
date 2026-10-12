@@ -1,8 +1,5 @@
-// interface/ask-view — what a column draws of each ask (ADR-0106). Pure.
-//
-// `segmentPath` (`ask-segments.ts`) decides what folds; this groups each ask's segments
-// so one component draws an ask's work, and decides the words and facts that
-// work is drawn with.
+// interface/ask-view — each ask's segments grouped, so one component draws an
+// ask's work, and the words and facts that work is drawn with.
 
 import {
   type AskIndex,
@@ -59,8 +56,8 @@ export function columnRows(
 }
 
 /**
- * The column's last ask whose run has ended: outline keeps its last word
- * (ADR-0106). The running ask is passed over, so a new run leaves the reply
+ * The column's last ask whose run has ended: outline keeps its last word.
+ * The running ask is passed over, so a new run leaves the reply
  * before it in place until it ends itself.
  */
 export function lastEndedAsk(
@@ -88,10 +85,10 @@ export interface AskView {
   readonly live: string | null
   /**
    * What outline folds with its work: its last word (`lastWord`), unless it
-   * is the column's last ended ask (ADR-0106).
+   * is the column's last ended ask.
    */
   readonly outlineHides: EntryId | null
-  /** Its model-written digest's headline, live or final (ADR-0075). */
+  /** Its model-written digest's headline, live or final. */
   readonly headline: string | null
   /** Its final digest's points; none while its digest is live, since those change each time. */
   readonly points: readonly string[]

@@ -1,4 +1,4 @@
-// interface/app-view — what the page shows, decided. PURE.
+// interface/app-view — what the page shows, decided.
 //
 // `appView` decides; it does not project. The projections (`projectColumns`,
 // `pathIds`, `branchColors`, `unsentSignals`) stay in `App`'s own `useMemo`s and
@@ -71,7 +71,6 @@ export interface AppViewInput {
   readonly columns: readonly Column[]
   /** `branchColors(tracks, views).track`, memoised by `App`. */
   readonly tracks: readonly number[]
-  /** The tasks in the archive. */
   readonly archived: ReadonlyMap<TaskId, ArchivedTask>
   readonly workflow: Workflow | null
   readonly nameOf: ReadonlyMap<WriterId, string>
@@ -233,7 +232,7 @@ export const NO_RAIL: TaskRail = { rows: [], stubs: [] }
  * tree is drawn in its root's palette: its tracks are shifted so the
  * page's seed (`seed`) gives each one the slot its root's seed would
  * (`trackSlot`), so its columns and fork dots, which take their rows'
- * tracks, agree. None off a task. Pure.
+ * tracks, agree. None off a task.
  */
 export function taskRail(input: {
   readonly index: TreeIndex

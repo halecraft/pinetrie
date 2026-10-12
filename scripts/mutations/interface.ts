@@ -27,7 +27,7 @@ export const mutations: readonly Mutation[] = [
     from: '  return [{ kind: "undoMoves", task: taskOfTab(state), direction }]\n',
     to: '  const task = taskOfTab(state)\n  return task === null ? [] : [{ kind: "undoMoves", task, direction }]\n',
     command: unit,
-    expect: "on no task: your history outside any task (ADR-0126)",
+    expect: "on no task: your history outside any task",
   },
   {
     name: "a branch's fork row says it was copied",
@@ -493,7 +493,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return null\n",
     command: unit,
     expect:
-      "worded as the project, with the files catching up changes, the bookmark and both commits in its title",
+      "worded as the project, its title naming the files, the bookmark and both commits",
   },
   {
     name: "the header marks a thread behind by its own work",
@@ -502,7 +502,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (now.kind === "current") return null\n',
     command: unit,
     expect:
-      "none once caught up, before the host read the base, or when catching up would change nothing or is not yet read (S97)",
+      "none once caught up, before the host read the base, or with nothing read to catch up",
   },
   {
     name: "catching up that would change nothing is enabled",
@@ -511,7 +511,7 @@ export const mutations: readonly Mutation[] = [
     to: "    false\n",
     command: unit,
     expect:
-      "catching up that would change nothing is disabled, and says why; one not yet read is not (S97)",
+      "catching up that would change nothing is disabled, and says why; one not yet read is not",
   },
   {
     name: "an untraced thread reads as having nothing yet",
@@ -520,7 +520,7 @@ export const mutations: readonly Mutation[] = [
     to: "      ? false\n",
     command: unit,
     expect:
-      "an untraced thread says why nothing is offered, and offers catching up (S97)",
+      "an untraced thread says why nothing is offered, and offers catching up",
   },
   {
     name: "a command's button never says it sends the text",
@@ -1833,8 +1833,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (offerStatus(o).kind !== "open" || root === undefined) return []',
     to: "    if (o.acceptedAs !== null || root === undefined) return []",
     command: unit,
-    expect:
-      "the header's offers are the open ones, never one accepted work already holds",
+    expect: "the header's offers are the open ones",
   },
   {
     name: "a held offer reviews nothing, but the strip offers it",
@@ -2588,7 +2587,8 @@ export const mutations: readonly Mutation[] = [
     from: '    working: tasks.filter(t => headOf(t).status?.kind === "working").length,',
     to: "    working: tasks.length,",
     command: unit,
-    expect: "an item's ⇡ names its threads with work ready",
+    expect:
+      "a column counts its items working and ready, not threads; an item's ⇡ names its threads",
   },
   {
     name: "a column counts ready threads, not items",
@@ -2596,7 +2596,8 @@ export const mutations: readonly Mutation[] = [
     from: "    ready: tasks.filter(t => headOf(t).ready.length > 0).length,",
     to: "    ready: tasks.reduce((n, t) => n + headOf(t).ready.length, 0),",
     command: unit,
-    expect: "an item's ⇡ names its threads with work ready",
+    expect:
+      "a column counts its items working and ready, not threads; an item's ⇡ names its threads",
   },
   {
     name: "a thread card never carries ⇡",
@@ -2604,7 +2605,8 @@ export const mutations: readonly Mutation[] = [
     from: "    ready: facts.offered.get(task) ?? [],",
     to: "    ready: [],",
     command: unit,
-    expect: "an item's ⇡ names its threads with work ready",
+    expect:
+      "a column counts its items working and ready, not threads; an item's ⇡ names its threads",
   },
   {
     name: "a thread the host has not named has no ready mark",
@@ -2686,7 +2688,7 @@ export const mutations: readonly Mutation[] = [
     from: "    if (!yours(o.lane)) continue\n",
     to: "    if (!yours(o.lane) || person.read.has(o.lane)) continue\n",
     command: unit,
-    expect: "an offer on a thread you follow needs you, reading clears it not",
+    expect: "an offer you follow needs you until not needed",
   },
   {
     name: "a busy lane raises attention",
@@ -3422,7 +3424,7 @@ export const mutations: readonly Mutation[] = [
     from: "  for (const { root, entry } of input.roots) {\n",
     to: "  for (const { root, entry } of index.roots.map(entry => ({ root: entry as never, entry }))) {\n",
     command: unit,
-    expect: "a task's rail is a forest: a tree for each root of its threads",
+    expect: "a task's rail is a tree per root of its threads",
   },
   {
     name: "a column move goes before the card it lands after",
@@ -3463,7 +3465,7 @@ export const mutations: readonly Mutation[] = [
     to: "    null",
     command: unit,
     expect:
-      "pin to the task: to the pins of the task it is in, else the one you are on",
+      "pin to the task: the task it is in, else the one you are on; unpinned, to its notes",
   },
   {
     name: "an unpin from the task is ignored",
@@ -3472,7 +3474,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (false)",
     command: unit,
     expect:
-      "pin to the task: to the pins of the task it is in, else the one you are on",
+      "pin to the task: the task it is in, else the one you are on; unpinned, to its notes",
   },
   {
     name: "a card gone from the canvas keeps its view as stored",
@@ -3497,7 +3499,7 @@ export const mutations: readonly Mutation[] = [
     to: "    false\n  )\n    at = index.parentOf(at)\n  return at",
     command: unit,
     expect:
-      "pinnedMarkers: a run's task pins and canvas list, written above its prompt with its cards entry, mark it too (ADR-0116)",
+      "pinnedMarkers: a run's task pins and canvas list, above its prompt, mark it too",
   },
   {
     name: "a link to someone else's held thread opens it",
@@ -3551,7 +3553,7 @@ export const mutations: readonly Mutation[] = [
     to: "    ...[].flatMap(\n",
     command: unit,
     expect:
-      "the roots of the threads in your inventory too, which their slots and previews read (ADR-0124)",
+      "the roots of the threads in your inventory too, which their slots and previews read",
   },
   {
     name: "a copy's column is left out before its first send",
@@ -3577,7 +3579,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return null\n",
     command: unit,
     expect:
-      "a thread whose parent thread is on no column of the canvas folds its path above its own thread; one whose parent is here does not (ADR-0117)",
+      "a thread whose parent thread is on no column of the canvas folds its path above it",
   },
   {
     name: "a branch from a held thread shows its entries",
@@ -3586,7 +3588,7 @@ export const mutations: readonly Mutation[] = [
     to: "    const own = spine.slice(cut + 1)\n",
     command: unit,
     expect:
-      "a branch not yet sent from a held thread leaves that thread's entries out (ADR-0124)",
+      "a branch not yet sent from a held thread leaves that thread's entries out",
   },
   {
     name: "a branch in a held thread is drawn as any other",
@@ -3611,7 +3613,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a task's rail is a forest: a tree for each root of its threads, in order, each cut to the paths to its threads, a fork elsewhere a stub; nothing off a task (ADR-0116, ADR-0117)",
+      "a task's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub",
   },
   {
     name: "the rail draws no stub",
@@ -3620,7 +3622,7 @@ export const mutations: readonly Mutation[] = [
     to: '        if (link.kind === "gone")\n          stubs.push({',
     command: unit,
     expect:
-      "a task's rail is a forest: a tree for each root of its threads, in order, each cut to the paths to its threads, a fork elsewhere a stub; nothing off a task (ADR-0116, ADR-0117)",
+      "a task's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub",
   },
   {
     name: "every root's tree is in the page's palette",
@@ -3629,7 +3631,7 @@ export const mutations: readonly Mutation[] = [
     to: "    const shift = 0 * shiftOf(input.seed, rootSeed(root))\n",
     command: unit,
     expect:
-      "a task's rail is a forest: a tree for each root of its threads, in order, each cut to the paths to its threads, a fork elsewhere a stub; nothing off a task (ADR-0116, ADR-0117)",
+      "a task's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub",
   },
   // ── a thread's first entry is not always a message (ADR-0125) ──
   {
@@ -3656,7 +3658,7 @@ export const mutations: readonly Mutation[] = [
     to: "            at: child,\n",
     command: unit,
     expect:
-      "a rail stub for a branch whose first run wrote a context entry above its prompt opens at its first message",
+      "a rail stub opens at its branch's first message, below a context entry",
   },
   {
     name: "Cmd+X takes into the inventory again",
@@ -3682,8 +3684,7 @@ export const mutations: readonly Mutation[] = [
     from: '  label.replace(ADDRESS_LINK, "$1")',
     to: "  label",
     command: unit,
-    expect:
-      "search reads a link to an address by its label, not its address (ADR-0126)",
+    expect: "search reads a link to an address by its label, not its address",
   },
   {
     name: "an entry's markdown leaves out its tool calls",
@@ -3726,7 +3727,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (false) {",
     command: unit,
     expect:
-      "to a spot on a canvas: a text card goes there for the host to make it a note column (WRAPS, ADR-0126)",
+      "to a spot on a canvas: a text card goes there for the host to make it a note column (WRAPS)",
   },
   {
     name: "a drop on a canvas names no card it is after",
@@ -3743,7 +3744,7 @@ export const mutations: readonly Mutation[] = [
     to: '    case "margin":\n      return [take]\n    case "fresh-x" as never:\n      return [\n        {\n          to: "reference",',
     command: unit,
     expect:
-      "a comment: a reference queued on its thread, which leaves it where it is; your inventory (ADR-0126)",
+      "a comment: a reference queued on its thread, which leaves it where it is; your inventory",
   },
   {
     name: "a comment is made as a note",
@@ -3752,7 +3753,7 @@ export const mutations: readonly Mutation[] = [
     to: '          kind: "composing",\n          entry: act.entry,',
     command: unit,
     expect:
-      "a comment is a new, empty note made at the end of its entry's margin; a reference to it is queued on its thread, its quote the comment",
+      "a comment is a new note at its margin's end; a reference to it is queued on its thread",
   },
   {
     name: "a queued comment's quote names no entry",
@@ -3770,7 +3771,7 @@ export const mutations: readonly Mutation[] = [
     to: "    return at.hasCard && !event.altKey\n",
     command: unit,
     expect:
-      "a column's messages are a grid one cell wide (ADR-0126): j and k step through them, stopping at either end; Enter opens the margin, c comments, Escape shuts it",
+      "a column's messages are a grid one cell wide: j and k step, Enter opens the margin, c comments",
   },
   {
     name: "a reference's ⋯ offers a pin",
@@ -3779,7 +3780,7 @@ export const mutations: readonly Mutation[] = [
     to: "      ? moveItems(card, facts)\n",
     command: unit,
     expect:
-      "a queued reference's ⋯ offers only the moves its kind may make: back to the notes, into your inventory, never pinned; it reorders and is discarded (ADR-0126)",
+      "a queued reference's ⋯ offers only the moves its kind may make, never a pin",
   },
   {
     name: "a queued reference is never unqueued",
@@ -3871,7 +3872,7 @@ export const mutations: readonly Mutation[] = [
     to: "      true",
     command: unit,
     expect:
-      "text from elsewhere: no carrier, a carrier on other text, from another host, malformed, or Shift held",
+      "text from elsewhere: no carrier, or one on other text, from another host, malformed, or Shift held",
   },
   {
     name: "a carrier from another host is believed",
@@ -3880,7 +3881,7 @@ export const mutations: readonly Mutation[] = [
     to: "      true &&",
     command: unit,
     expect:
-      "text from elsewhere: no carrier, a carrier on other text, from another host, malformed, or Shift held",
+      "text from elsewhere: no carrier, or one on other text, from another host, malformed, or Shift held",
   },
   {
     name: "a system clipboard's \\r\\n breaks the carrier",
@@ -3915,7 +3916,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return true",
     command: unit,
     expect:
-      "a slot holding a card you may not discard is not replaced; a thread's copy lands only in an empty one",
+      "a slot is replaced only when its card is yours to discard, and never by a thread's copy",
   },
   {
     name: "a drop's replacement discards the slot's card last",

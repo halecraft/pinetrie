@@ -1,9 +1,7 @@
-// interface/clip — copy, cut and paste (ADR-0132): what a copy takes, what
-// it writes on the system clipboard, and what a paste received means. Pure:
-// the page reads focus, the selection and `clipboardData` (`clipboard.ts`,
-// `packages/web`), and these decide.
+// interface/clip — copy, cut and paste: what a copy takes, what it writes on
+// the system clipboard, and what a paste received means.
 //
-// pine·trie's own data rides beside the text twice (S151): as
+// pine·trie's own data rides beside the text twice: as
 // `application/x-pinetrie`, which only one browser keeps, and as a
 // `data-pinetrie` attribute in `text/html`, which every path keeps but
 // WebKit writes again in its own form, so the page parses it. Either counts
@@ -105,7 +103,6 @@ export interface Carrier {
   readonly text: string
 }
 
-/** What one copy writes. */
 export interface ClipWrite {
   readonly plain: string
   readonly html: string
@@ -149,11 +146,11 @@ const linkTo = (address: Address): string =>
   addressLink(address, addressWords(address))
 
 /**
- * `card`'s clip by its kind (ADR-0132): a text card's text; a reference's
+ * `card`'s clip by its kind: a text card's text; a reference's
  * address and quote blob, its text the quote if fetched, else its link; a
  * thread's end as this tab holds it; a note column's or a task's link.
  * Null for a kind nobody copies (a fact, an ask), or a thread with no end
- * here. Pure.
+ * here.
  */
 export function cardClip(card: CardRecord, facts: ClipFacts): CardClip | null {
   switch (card.kind) {
@@ -209,7 +206,7 @@ export type CopyPlan =
   | { readonly kind: "clip"; readonly clip: Clip }
 
 /**
- * What a copy takes, from where focus is (ADR-0132). First match wins: a
+ * What a copy takes, from where focus is. First match wins: a
  * text box, or a selection outside any message, is the browser's own
  * copy; a selection in a message is its text, keeping the range a range of
  * the message's text names, else the message, as its origin; then a focused
@@ -217,7 +214,7 @@ export type CopyPlan =
  * clipboard cell's clip. Nothing else is the browser's too. `cut` says the
  * gesture was Cmd+X: only a focused card you may discard is cut, as × would
  * discard it; anything else is left to the browser, which cuts only in a
- * text box. Pure.
+ * text box.
  */
 export function clipOfFocus(
   focus: Focus,
@@ -290,10 +287,10 @@ export function clipOfFocus(
 }
 
 /**
- * What a copy of `clip` writes (ADR-0132): its text as `text/plain`; as
+ * What a copy of `clip` writes: its text as `text/plain`; as
  * `text/html`, the selection's own HTML (`fragment`), or the text escaped,
  * in one element carrying `data-pinetrie`; and the carrier's JSON under
- * `application/x-pinetrie`. Pure.
+ * `application/x-pinetrie`.
  */
 export function planCopy(
   clip: Clip,
@@ -324,11 +321,11 @@ export interface Received {
 }
 
 /**
- * What a paste received is (ADR-0132): pine·trie's clip, from the custom
+ * What a paste received is: pine·trie's clip, from the custom
  * type, else `data-pinetrie`, when it decodes, was written on `host`, and
  * names the text pasted (newlines as `\n`, since a system clipboard may
  * write `\r\n`); otherwise, or with Shift held, the text, a clip with no
- * origin. Pure.
+ * origin.
  */
 export function readPaste(received: Received, host: string): Clip {
   const text: Clip = { kind: "text", text: received.plain, origin: null }

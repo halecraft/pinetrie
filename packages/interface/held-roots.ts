@@ -1,11 +1,9 @@
-// interface/held-roots — which roots this tab asks its session to hold
-// (ADR-0063, ADR-0116). Pure.
+// interface/held-roots — which roots this tab asks its session to hold.
 //
 // A tab loads only what it shows: the roots of every thread in the tasks of
 // the sidebar and the task you are on, archived or not, and of each thread
-// in your inventory, whose slot and preview read it (ADR-0124). Every other root is
-// read from the directory alone, the board's included. What holding them
-// opens and lets go is `planHold` (`root-hold.ts`).
+// in your inventory, whose slot and preview read it. Every other root is
+// read from the directory alone, the board's included.
 
 import type {
   CardRecord,

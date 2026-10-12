@@ -163,7 +163,7 @@ describe("attentionOf", () => {
     expect(attentionOf(input({ archived: new Set([A]) }))).toEqual([])
   })
 
-  test("an offer on a thread you follow needs you, reading clears it not, and not needed holds until new work", () => {
+  test("an offer you follow needs you until not needed, which holds until new work", () => {
     const read = person({ read: new Map([[A, entryId("e-9")]]) })
     const items = attentionOf(
       input({
@@ -199,7 +199,7 @@ describe("attentionOf", () => {
   })
 })
 
-describe("threadStatus and taskStatus (ADR-0116)", () => {
+describe("threadStatus and taskStatus", () => {
   const facts = { work: new Map(), verdicts: new Map() }
   test("working wins, and a pending verdict is working; else the highest item", () => {
     const items = attentionOf(input({ offers: [offer(A, cardIdFor("c1"))] }))
@@ -234,7 +234,7 @@ describe("threadStatus and taskStatus (ADR-0116)", () => {
     expect(threadStatus({ ...facts, items: [] }).size).toBe(0)
   })
 
-  test("a task's status is its threads' together: working wins, else the highest; a thread in no task counts for none", () => {
+  test("a task's status is its threads' together: working wins, else the highest", () => {
     const [item] = attentionOf(input())
     if (item === undefined) throw new Error("no item")
     const C = threadIdFor("c")

@@ -1,11 +1,6 @@
-// interface/attention — what needs you, and where (ADR-0077), decided. A
-// thread's followers are everyone who has written on its path; what it
-// raises for them is how its last run ended (its verdict), and its open
-// offer. A verdict clears by reading past it, an offer by accepting or
-// withdrawing it, and either by "not needed". Status is each thread's:
-// working while its agent works or its verdict is pending, else the highest
-// of what it raises; a task's is its threads' together (`taskStatus`,
-// ADR-0116). Worded in `attentionWords`. Pure.
+// interface/attention — what needs you, and where, decided. A verdict clears
+// by reading past it, an offer by accepting or withdrawing it, and either by
+// "not needed".
 
 import type {
   EntryId,
@@ -107,7 +102,7 @@ export interface AttentionInput {
   readonly person: Attention
   /** Lanes running or with cards queued, in any root. */
   readonly busy: ReadonlySet<ThreadId>
-  /** The threads of archived tasks (ADR-0116): they raise nothing. */
+  /** The threads of archived tasks: they raise nothing. */
   readonly archived: ReadonlySet<ThreadId>
 }
 
@@ -165,7 +160,7 @@ export type Status =
 /**
  * The highest level among `keys` (`highest`): what one mark says for them
  * all. The one rule for a task's item, a board column's dot and ▦'s, which
- * covers the tasks not in the sidebar (ADR-0122). Working raises nothing.
+ * covers the tasks not in the sidebar. Working raises nothing.
  */
 export const markOf = <K>(
   status: ReadonlyMap<K, Status>,
@@ -191,7 +186,7 @@ const withItem = (now: Status | undefined, next: Status): Status => {
  * Each thread's status: working while its agent works, cards wait for it
  * to be free, or its verdict is pending (the agent's side is not finished);
  * else its highest item. Cards behind a held queue are not work: they wait
- * for a person (ADR-0113). A thread with none of these has none.
+ * for a person. A thread with none of these has none.
  */
 export function threadStatus(input: {
   readonly items: readonly Item[]
@@ -210,7 +205,7 @@ export function threadStatus(input: {
 }
 
 /**
- * Each task's status (ADR-0116): its threads' together, working when any
+ * Each task's status: its threads' together, working when any
  * works, else the highest item among them. A thread in no task counts for
  * none.
  */

@@ -54,7 +54,7 @@ const WORKFLOW: Workflow = {
   ],
   archive: { id: DONE, name: "Done" },
 }
-/** Task `n`, holding task `n`'s threads (ADR-0116). */
+/** Task `n`, holding task `n`'s threads. */
 const ID = (n: number) =>
   taskIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
 /** Task `n` as the facts and the expectations name it. */
@@ -145,14 +145,14 @@ describe("boardView", () => {
     ])
   })
 
-  test("a task with no message yet is on no column: a new tab's joins with its first send (ADR-0126)", () => {
+  test("a task with no message yet is on no column: a new tab's joins with its first send", () => {
     const view = boardView(
       input({ cards: [...input().cards, place(6, BACKLOG, 1)] }),
     )
     expect(view.open[0]?.items.map(t => t.task)).toEqual([E(3)])
   })
 
-  test("a titled card's body is its first line; an untitled card, or one titled by it, has none (ADR-0111)", () => {
+  test("a titled card's body is its first line; an untitled card, or one titled by it, has none", () => {
     const done = boardView(input()).archive.rows
     expect(done.map(t => [t.label, t.body])).toEqual([
       ["Palette work", "can we try warmer colours?"],
@@ -188,7 +188,7 @@ describe("boardView", () => {
     expect(view.strip.map(s => s.mark)).toEqual([null, "needsYou", null])
   })
 
-  test("an item's ⇡ names its threads with work ready; a column counts its items working (a pending verdict is working, `threadStatus`), and its items ready, not threads; the strip copies them, the archive 0 (ADR-0091)", () => {
+  test("a column counts its items working and ready, not threads; an item's ⇡ names its threads", () => {
     const status = new Map<TaskId, Status>([
       [E(1), { kind: "working" }],
       [E(3), { kind: "working" }],
@@ -263,7 +263,7 @@ describe("boardView", () => {
     expect(second?.down).toBeNull()
   })
 
-  test("a column moves left or right one place; one holding a task, or the only open one, says why it cannot be removed", () => {
+  test("a column moves one place either way, and says why it cannot be removed", () => {
     const [backlog, doing] = boardView(input()).open
     expect(backlog?.left).toBeNull()
     expect(backlog?.right).toEqual({
@@ -294,7 +294,7 @@ test("clickClosesBoard: a click pressed and let go outside the board and its str
   expect(clickClosesBoard(null, "elsewhere")).toBe(false)
 })
 
-describe("the board's search (ADR-0109)", () => {
+describe("the board's search", () => {
   const labels = new Map([
     [E(1), "Board search design"],
     [E(2), "Palette work"],
@@ -318,7 +318,7 @@ describe("the board's search (ADR-0109)", () => {
     expect(view.shown).toEqual({ kind: "all", total: 5 })
     expect(view.open.map(c => c.count.kind)).toEqual(["all", "all"])
   })
-  test("it keeps, in every state and in place, the tasks whose label holds every word, case-insensitively, in any order (labels, not messages: ADR-0063)", () => {
+  test("it keeps the tasks whose label holds every word, in any order and case", () => {
     expect(kept(find("SEARCH"))).toEqual([[E(3)], [E(1)], [E(5)]])
     expect(kept(find(" design  board "))).toEqual([[], [E(1)], []])
     expect(kept(find("board nothing"))).toEqual([[], [], []])
@@ -503,7 +503,7 @@ test("nameStateIntent renames a state; addStateIntent adds one where it was aske
   })
 })
 
-test("search reads a link to an address by its label, not its address (ADR-0126)", () => {
+test("search reads a link to an address by its label, not its address", () => {
   const text = "see [the plan table](/a/b/t-1/e-1/table-0) now"
   expect(searchedText(text)).toBe("see the plan table now")
 })

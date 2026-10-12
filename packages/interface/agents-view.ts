@@ -1,7 +1,6 @@
-// interface/agents-view — other threads' agents in a column's header
-// (ADR-0128): the thread's members, those out of reach marked away, and
-// what agents talking from its messages have spent. Decided here, worded
-// once (`agentsWords`).
+// interface/agents-view — other threads' agents in a column's header: the
+// thread's members, those out of reach marked away, and what agents talking
+// from its messages have spent.
 
 import type {
   EntryId,
@@ -32,7 +31,7 @@ export interface AgentsRow {
  * budget. `budgets` is every budget, in the order the session holds them;
  * the last of this thread's is shown. A member is away exactly when it is
  * not in `inReach` (`reachableAgents`), so `threadReach` is read for those alone,
- * to say why. Pure.
+ * to say why.
  */
 export function agentsRow(input: {
   readonly thread: ThreadId

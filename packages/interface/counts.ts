@@ -1,4 +1,4 @@
-// interface/counts — how a count, a list of names and an age read. Pure.
+// interface/counts — how a count, a list of names and an age read.
 
 /** "1 message", "6 messages": a noun whose plural adds an s. */
 export const plural = (n: number, noun: string): string =>

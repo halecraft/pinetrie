@@ -66,24 +66,24 @@ export const tree = (
     ),
   )
 
-/** The root a test's places and entries are in (ADR-0063). */
+/** The root a test's places and entries are in. */
 export const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-/** A root a new tab minted as it opened (ADR-0066), in the shape the host accepts. */
+/** A root a new tab minted as it opened, in the shape the host accepts. */
 export const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
-/** A thread a column minted as it opened (ADR-0117, ADR-0126), in the shape the host accepts. */
+/** A thread a column minted as it opened, in the shape the host accepts. */
 export const NEW_THREAD = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
 
-/** A note column minted for an intent (ADR-0116), in `parseCardId`'s shape. */
+/** A note column minted for an intent, in `parseCardId`'s shape. */
 export const NEW_NOTE_COLUMN = cardIdOfKind(
   "note-column",
   "01a0ffd2-0000-7000-8000-0000000000cc",
 )
 
-/** A text card a paste made (ADR-0132), a bare uuidv7. */
+/** A text card a paste made, a bare uuidv7. */
 export const NEW_TEXT = textCardId("01a0ffd2-0000-7000-8000-0000000000dd")
 
 /**
- * What a copy reads beyond the cards, for a test (ADR-0132): every text
+ * What a copy reads beyond the cards, for a test: every text
  * card holds "copied text", no quote is fetched, nothing is in the cell.
  */
 export const NO_CLIPS: ClipLookups = {
@@ -109,14 +109,14 @@ export const NO_FOCUS: Focus = {
   zone: null,
 }
 
-/** The task a new tab's first send starts, in `parseNewTask`'s shape (ADR-0116). */
+/** The task a new tab's first send starts, in `parseNewTask`'s shape. */
 export const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
 
 /** A task the fixtures' threads are in. */
 export const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 /**
- * The page's tasks for a test (ADR-0116): each task holding every thread of
+ * The page's tasks for a test: each task holding every thread of
  * `index` whose first entry is under the root entry named with it, each a
  * thread card on its canvas in thread order, its root `TEST_ROOT`.
  */
@@ -156,7 +156,7 @@ export function tasksFor(
 
 /**
  * The page's tasks for a test, each of `known` a task whose card is on
- * the board (ADR-0126), beside `cards`.
+ * the board, beside `cards`.
  */
 export const tasksWith = (input: {
   readonly known: readonly TaskId[]

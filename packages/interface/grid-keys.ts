@@ -1,10 +1,6 @@
-// interface/grid-keys — the keys a grid takes while it has focus (ADR-0048):
-// your inventory's, and a column's messages as a grid one cell wide
-// (ADR-0126). Arrows and `hjkl` move the selection, Alt+arrows move the
-// selected card a cell, Enter opens it, Escape folds it again, and `c`
-// comments on a column's selected entry.
-// Pure: one table, from a key and the grid's state to an act or nothing. The
-// key-system redesign replaces this file.
+// interface/grid-keys — the keys a grid takes while it has focus: your
+// inventory's, and a column's messages as a grid one cell wide. One table,
+// from a key and the grid's state to an act or nothing.
 
 import { type Grid, type GridStep, step } from "@pinetrie/core"
 import type { KeyLike } from "./page-keys.ts"
@@ -15,7 +11,7 @@ export type GridAct =
   | { readonly kind: "move"; readonly from: number; readonly to: number }
   | { readonly kind: "open" }
   | { readonly kind: "fold" }
-  /** Comment on the selected entry: a note in its margin (ADR-0126). */
+  /** Comment on the selected entry: a note in its margin. */
   | { readonly kind: "comment" }
 
 const STEPS: Readonly<Record<string, GridStep>> = {

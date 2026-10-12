@@ -1,6 +1,5 @@
-// interface/ask-fold — whether an ask's work is drawn open (ADR-0106), what
-// it draws (`planAskWork`), and the reader's choice for each ask, kept for
-// the page's life. Pure but for the memory's listeners.
+// interface/ask-fold — whether an ask's work is drawn open, what it draws,
+// and the reader's choice for each ask, kept for the page's life.
 //
 // An ask folds once its run has ended and the column is at its end: what
 // folds is above the view then. A reader scrolled up into the work keeps it
@@ -35,8 +34,8 @@ export interface FoldFacts {
 /**
  * The reader's choice wins. Otherwise, in outline nothing opens; in raw,
  * everything does; in story, a running ask is open, since folding text as
- * it turned out to be interim would shorten the column during a run
- * (ADR-0044), and an ended one is open only while it ended while away.
+ * it turned out to be interim would shorten the column during a run,
+ * and an ended one is open only while it ended while away.
  */
 export function foldOpen(f: FoldFacts): boolean {
   if (f.choice !== null) return f.choice === "open"
@@ -87,7 +86,7 @@ export interface AskDraw {
  * (`foldWords`) is built once and drawn in one place: outline's line, the
  * head of its first fold on this path, or nowhere when it has no fold. The
  * digest's headline is drawn whole under the line or with no summary, and
- * in the first fold's head otherwise (ADR-0075). So nothing the ask holds
+ * in the first fold's head otherwise. So nothing the ask holds
  * is said twice, however the work is split or opened.
  */
 export function planAskWork(
@@ -153,7 +152,7 @@ export const toggled = (open: boolean): FoldChoice => (open ? "closed" : "open")
 
 /**
  * Each ask's choice, by its prompt, kept while the page lives, as tool rows'
- * are (ADR-0123). A fold reads its own key, so a choice redraws only the ask
+ * are. A fold reads its own key, so a choice redraws only the ask
  * it is for. A reload remembers nothing.
  */
 export interface FoldMemory {

@@ -1,7 +1,6 @@
 // interface/clipboard-cell — what the clipboard cell beside the inventory's
-// grid shows (ADR-0132): the last copy this tab made, never a slot. No page
-// can read the system clipboard before a paste, so it says no more than
-// that: "last copied here". Pure.
+// grid shows: the last copy this tab made, never a slot. No page can read
+// the system clipboard before a paste, so it says no more than that.
 
 import { firstLine } from "@pinetrie/core"
 import { firstEmpty, type Slots } from "@pinetrie/session"

@@ -68,7 +68,7 @@ describe("appView's stage", () => {
     expect(stage({ active: { kind: "nothing" } }).kind).toBe("nothing")
   })
 
-  test("in a task, only a thread not yet started closes: a card's column folds (ADR-0116, ADR-0126)", () => {
+  test("in a task, only a thread not yet started closes: a card's column folds", () => {
     const [a, b] = columns("a", "b")
     const unstarted: Column = {
       ...(b as Column),
@@ -114,7 +114,7 @@ test("readOnlyWords offers no Restore before the board has states", () => {
   })
 })
 
-test("the header's offers are the open ones, never one accepted work already holds: a held lane's at its tip, if it has one; another's at its root (ADR-0063)", () => {
+test("the header's offers are the open ones: a held lane's at its tip, another's at its root", () => {
   const A = threadIdFor("a")
   const B = threadIdFor("b")
   const C = threadIdFor("c")
@@ -164,7 +164,7 @@ test("the header's offers are the open ones, never one accepted work already hol
   ])
 })
 
-test("a task's rail is a forest: a tree for each root of its threads, in order, each cut to the paths to its threads, a fork elsewhere a stub; nothing off a task (ADR-0116, ADR-0117)", () => {
+test("a task's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub", () => {
   // 1-r1 -> 2-a -> 3-b; 4-c, a branch at 2-a, is another thread; 5-r2 -> 6-d.
   const index = tree({
     "1-r1": null,
@@ -242,7 +242,7 @@ test("a task's rail is a forest: a tree for each root of its threads, in order, 
   ).toEqual(NO_RAIL)
 })
 
-test("a rail stub for a branch whose first run wrote a context entry above its prompt opens at its first message (ADR-0125)", () => {
+test("a rail stub opens at its branch's first message, below a context entry", () => {
   const T = threadIdFor("t")
   const B = threadIdFor("b")
   const index = indexTree(
@@ -284,7 +284,7 @@ test("a rail stub for a branch whose first run wrote a context entry above its p
   expect(rail.stubs).toMatchObject([{ from: "1-r", at: "3-b", thread: B }])
 })
 
-test("threadWork and taskWork: each busy held lane's work, and each lane running anywhere, by thread; a task's is the most of its threads' (ADR-0091, ADR-0116)", () => {
+test("threadWork and taskWork: a thread's work by its lanes, a task's the most of its threads'", () => {
   const [a, b, c, d] = ["a", "b", "c", "d"].map(threadIdFor) as [
     ThreadId,
     ThreadId,

@@ -302,7 +302,7 @@ describe("columnView: the header", () => {
     })
     expect(columnView(facts(1)).identity).toEqual({ kind: "none" })
   })
-  test("a lane about to start is named by its thread's id, and only while the next send creates it (ADR-0057, ADR-0117)", () => {
+  test("a lane about to start is named by its thread's id, and only while the next send creates it", () => {
     const sha = "a".repeat(64) as Sha256
     const banners = new Map([[B, { lane: B, sha, at: 1 }]])
     const about = (over: Partial<ColumnFacts>) =>
@@ -359,11 +359,11 @@ describe("columnView: the header", () => {
       { kind: "none" },
     ],
     [
-      "named as a conversation's thread, opened before its lane: its banner is due (ADR-0126)",
+      "named as a conversation's thread, opened before its lane: its banner is due",
       { thread: A, createsLane: true, work: work({ names: NAMES }) },
       { kind: "ask", lane: A },
     ],
-  ] as const)("the reserve step: %s (ADR-0057, ADR-0117)", (_, over, step) => {
+  ] as const)("the reserve step: %s", (_, over, step) => {
     expect(columnView(facts(1, over)).reserve).toEqual(step)
   })
   test("the banner is the thread's at the column's end; a conversation has none", () => {
@@ -441,7 +441,7 @@ describe("columnView: the header", () => {
   })
 })
 
-describe("columnView: the fork row of a thread forked elsewhere (ADR-0117)", () => {
+describe("columnView: the fork row of a thread forked elsewhere", () => {
   const index = tree(BRANCH)
   const thread = threadAt(index, entryId("b1"))
   const row = (how: "branch" | "copy") => {
@@ -461,7 +461,7 @@ describe("columnView: the fork row of a thread forked elsewhere (ADR-0117)", () 
   })
 })
 
-describe("columnView: a thread's details (ADR-0073)", () => {
+describe("columnView: a thread's details", () => {
   const detailsOf = (shows: ReturnType<typeof columnView>) =>
     shows.identity.kind === "agent" ? shows.identity.details : null
   const onB = (over: Partial<ColumnFacts> = {}) =>
@@ -863,7 +863,7 @@ describe("offerWords", () => {
       "wip/search has moved on since this thread started",
     )
   })
-  test("catching up that would change nothing is disabled, and says why; one not yet read is not (S97)", () => {
+  test("catching up that would change nothing is disabled, and says why; one not yet read is not", () => {
     const update = (catchUp: CatchUpNow) =>
       words(offer, "idle", ACCEPTED_BASE, { catchUp }).menu.find(
         b => b.button === "update",
@@ -893,7 +893,7 @@ describe("offerWords", () => {
       }).line,
     ).toBe("2 files ready")
   })
-  test("an untraced thread says why nothing is offered, and offers catching up (S97)", () => {
+  test("an untraced thread says why nothing is offered, and offers catching up", () => {
     const w = words(undefined, "idle", ACCEPTED_BASE, { untraced: true })
     expect(w.line).toBe(
       "an earlier accept of this thread can't be traced: catch up with accepted work to offer what's new",
@@ -908,7 +908,7 @@ describe("offerWords", () => {
         .line,
     ).toBe("catching up with accepted work…")
   })
-  test("only a clean offer lands on accepted work: a conflicted one on accepted work is caught up and resolved, on a WIP added anyway to it", () => {
+  test("only a clean offer lands on accepted work; on a WIP, a conflicted one is added anyway", () => {
     const conflicted = { ...offer, conflicts: ["a.txt"] }
     expect(words(conflicted).buttons.map(b => b.label)).toEqual([
       "catch up with accepted work and resolve",
@@ -923,7 +923,7 @@ describe("offerWords", () => {
       words(conflicted, "idle", WIP_BASE).menu.map(b => b.label),
     ).not.toContain("accept, with your 2 commits beneath it")
   })
-  test("a conflict that came with the copy says so, and names the thread that resolved it (ADR-0072)", () => {
+  test("a conflict that came with the copy says so, and names the thread that resolved it", () => {
     const parent: ParentNow = {
       kind: "parent",
       lane: B,
@@ -1035,14 +1035,14 @@ describe("offerWords", () => {
 })
 
 describe("behindMark: the header's mark for a base that moved on", () => {
-  test("worded as the project, with the files catching up changes, the bookmark and both commits in its title", () => {
+  test("worded as the project, its title naming the files, the bookmark and both commits", () => {
     expect(behindMark(BASE, ACCEPTED)).toEqual({
       mark: "↓",
       title:
         "accepted work has moved on since this thread started, in 2 files · pinetrie-accepted: aaaaaaaa → bbbbbbbb",
     })
   })
-  test("a thread's details say it in full (ADR-0073)", () => {
+  test("a thread's details say it in full", () => {
     const shows = columnView(
       facts(1, {
         lane: onLane(laneView(B, "b2")),
@@ -1058,7 +1058,7 @@ describe("behindMark: the header's mark for a base that moved on", () => {
     })
     expect(shows.behind?.title).toBe(behindMark(BASE, ACCEPTED)?.title)
   })
-  test("none once caught up, before the host read the base, or when catching up would change nothing or is not yet read (S97)", () => {
+  test("none once caught up, before the host read the base, or with nothing read to catch up", () => {
     expect(behindMark({ ...BASE, start: ACCEPTED.commit }, ACCEPTED)).toBe(null)
     expect(behindMark(undefined, ACCEPTED)).toBe(null)
     const read = BASE.catchUp
@@ -1100,7 +1100,7 @@ describe("startedWords", () => {
   })
 })
 
-describe("where the agent read pinned cards (ADR-0048)", () => {
+describe("where the agent read pinned cards", () => {
   const card = (id: string, text: string) => ({
     id: textCardId(id),
     text,
@@ -1184,7 +1184,7 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
     ])
   })
 
-  test("pinnedMarkers: a run's task pins and canvas list, written above its prompt with its cards entry, mark it too (ADR-0116)", () => {
+  test("pinnedMarkers: a run's task pins and canvas list, above its prompt, mark it too", () => {
     const K = taskIdFor("k")
     const canvas = { task: K, title: "T", lines: ["thread a"], more: 0 }
     const taskCards = [card(cardIdFor("c2"), "all")]
@@ -1228,7 +1228,7 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
   })
 })
 
-test("pinnedStatus: read, changed or unread against what the agent reads, by the host's comparison; none for a card with no text", () => {
+test("pinnedStatus: read, changed or unread against what the agent reads", () => {
   const card = {
     kind: "text" as const,
     id: cardIdFor("c1"),

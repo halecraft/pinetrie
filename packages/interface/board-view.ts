@@ -1,15 +1,5 @@
-// interface/board-view — what the board shows and offers (ADR-0122), decided.
-// PURE: `Board` and `BoardStrip` (`board.tsx`) draw it.
-//
-// The board is everyone's: every task with a message, in its workflow state
-// (ADR-0116). Its strip, in the footer, says each state's name, count and
-// highest mark, and how many of its tasks the agent works in and have work
-// ready to accept (ADR-0091); opened, each open state is a column of cards,
-// each ⇡ when a thread of it has work ready, whose head says what the
-// strip's button did, and the archive is a count and its most recent tasks.
-// One search over labels, and "mine", filter every state in place
-// (ADR-0109), and what the board shows says whether a filter is on
-// (`BoardShown`, ADR-0115).
+// interface/board-view — what the board shows and offers, decided; `Board`
+// and `BoardStrip` (`board.tsx`) draw it.
 
 import type {
   CardRecord,
@@ -29,7 +19,7 @@ import { stepsIn } from "./root-target.ts"
 import type { ThreadCardHead } from "./thread-card.ts"
 
 /**
- * A task on the board, its card (ADR-0111, ADR-0116): its header, the one the
+ * A task on the board, its card: its header, the one the
  * sidebar draws too (`ThreadCardHead`), spread here and kept whole as
  * `head`, with what only the board adds.
  */
@@ -138,7 +128,7 @@ export const BOARD_SEARCH = "board-search"
 
 export interface BoardViewInput {
   readonly workflow: Workflow
-  /** Every card: the board's are each task's (ADR-0126). */
+  /** Every card: the board's are each task's. */
   readonly cards: readonly CardRecord[]
   /** Each task with a message (`summariesOf`): its first line is a titled card's body. */
   readonly summaries: ReadonlyMap<TaskId, TaskSummary>
@@ -335,7 +325,7 @@ export function parseSearch(query: string, mine: boolean): BoardSearch | null {
   return words.length === 0 && !mine ? null : { words, mine }
 }
 
-/** A link to an address (ADR-0126), `[label](/a/…)`, as its label alone. */
+/** A link to an address, `[label](/a/…)`, as its label alone. */
 const ADDRESS_LINK = /\[([^\]]*)\]\(\/a\/[^)\s]*\)/g
 
 /**
@@ -349,7 +339,7 @@ export const searchedText = (label: string): string =>
  * What `search` keeps: the tasks whose label (`labelsOf`, so a title is
  * found) holds every word, in any order, and with `mine`, those `me` wrote a
  * chat in. Labels, not messages: a search of every message would hold every
- * root's document (ADR-0063).
+ * root's document.
  */
 function boardFilter(
   search: BoardSearch,
@@ -415,7 +405,7 @@ export function boardKeyAct(
   return null
 }
 
-/** Why an open state cannot be removed, or null when it can (ADR-0122). */
+/** Why an open state cannot be removed, or null when it can. */
 export function removeWords(tasks: number, openStates: number): string | null {
   if (tasks > 0)
     return `holds ${tasks === 1 ? "a task" : `${tasks} tasks`}: move ${tasks === 1 ? "it" : "them"} first`
@@ -455,7 +445,7 @@ export const addStateIntent = (
   edit: { action: "add", state: null, name, before },
 })
 
-/** A state's ◌ and ⇡, as their titles say them, in the strip and in a column's head (ADR-0091). */
+/** A state's ◌ and ⇡, as their titles say them, in the strip and in a column's head. */
 export const stateWords = (
   signals: Pick<StateSignals, "working" | "ready">,
 ): { readonly working: string; readonly ready: string } => ({

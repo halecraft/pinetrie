@@ -94,7 +94,7 @@ const shape = (columns: readonly CardColumn[]) =>
       : [c.column.mode.kind, c.column.key, c.folded],
   )
 
-describe("canvasColumns (ADR-0116)", () => {
+describe("canvasColumns", () => {
   test("every card is a column in the canvas's order, the first alone unfolded by default", () => {
     const canvas = canvasFor([TRUNK, N1, C])
     expect(shape(draw(canvas, defaultView(TRUNK)))).toEqual([
@@ -133,7 +133,7 @@ describe("canvasColumns (ADR-0116)", () => {
     ).toEqual([["bound", TRUNK, true]])
   })
 
-  test("a thread whose parent thread is on no column of the canvas folds its path above its own thread; one whose parent is here does not (ADR-0117)", () => {
+  test("a thread whose parent thread is on no column of the canvas folds its path above it", () => {
     const view: TaskView = {
       ...defaultView(C),
       cards: new Map([
@@ -149,7 +149,7 @@ describe("canvasColumns (ADR-0116)", () => {
     ).toEqual([undefined, undefined])
   })
 
-  test("a thread not yet started ends at its fork, with what its opener starts it with, and sends as a branch there (ADR-0126)", () => {
+  test("a thread not yet started ends at its fork, and sends as a branch there", () => {
     const F = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
     const view: TaskView = {
       ...defaultView(TRUNK),
@@ -200,7 +200,7 @@ describe("canvasColumns (ADR-0116)", () => {
     expect(draw(canvasFor([F]), defaultView(F))).toEqual([])
   })
 
-  test("a thread not yet started in a thread someone else holds says who, and is drawn without that thread's entries; one you hold is drawn whole (ADR-0124)", () => {
+  test("a thread not yet started in a thread someone else holds says who, drawn without its entries", () => {
     const F = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
     const BEA = writerId("bea@x.io")
     const opened = new Map([[F, { root: ROOT, fork: entryId("3-b") }]])
@@ -237,7 +237,7 @@ describe("canvasColumns (ADR-0116)", () => {
     })
   })
 
-  test("a started thread follows its end, bound (ADR-0117)", () => {
+  test("a started thread follows its end, bound", () => {
     const [drawn] = draw(canvasFor([E]), defaultView(E))
     expect(drawn).toMatchObject({
       card: E,
@@ -258,7 +258,7 @@ describe("canvasColumns (ADR-0116)", () => {
     ).toEqual([TRUNK, C])
   })
 
-  test("a task's view holds no order (ADR-0116)", () => {
+  test("a task's view holds no order", () => {
     const none = { task: { unfolded: false } }
     const listed: TaskView = {
       ...none,

@@ -1,12 +1,8 @@
-// interface/canvas-columns — a task's columns, from its canvas (ADR-0116).
+// interface/canvas-columns — a task's columns, from its canvas.
 //
-// Every card on a task's canvas is a column, in the canvas's order, the
-// same for everyone: a thread opened and not yet sent is a card there too
-// (ADR-0126). What is yours is the task's view (`TaskView`): which columns
-// you unfolded, how you read each, and what a thread you opened starts
-// with. It holds maps and a flag and no list, so it has nowhere to keep an
-// order of its own (`canvasColumns` reads the order from the canvas alone).
-// Pure.
+// The order is the canvas's alone, the same for everyone. What is yours, the
+// task's view (`TaskView`), holds maps and a flag and no list, so it has
+// nowhere to keep an order of its own.
 
 import {
   type CardId,
@@ -32,16 +28,16 @@ import {
   type UnstartedMode,
 } from "./columns.ts"
 
-/** Your view of one column, by its card: none of it is shared (ADR-0116). */
+/** Your view of one column, by its card: none of it is shared. */
 export interface CardView {
   /** Drawn whole; else a narrow strip with its title. */
   readonly unfolded?: true
-  /** How much of each ask is drawn (ADR-0106); absent is story. */
+  /** How much of each ask is drawn; absent is story. */
   readonly density?: Density
-  /** The thread's details are open under the header (ADR-0073). */
+  /** The thread's details are open under the header. */
   readonly details?: true
   /**
-   * A thread you opened, until its first send (ADR-0126): a first message
+   * A thread you opened, until its first send: a first message
    * its column sends as it opens ("branch here" after a conflict), never
    * stored, since a reload would send it twice.
    */
@@ -53,8 +49,8 @@ export interface CardView {
 }
 
 /**
- * Your view of one task: maps and a flag, so no order can be kept in it
- * (ADR-0116). The task column is no card, so its fold is apart.
+ * Your view of one task: maps and a flag, so no order can be kept in it.
+ * The task column is no card, so its fold is apart.
  */
 export interface TaskView {
   /** Your view of each column, by its card (a thread card's id is its thread's). */
@@ -96,7 +92,7 @@ export type CardColumn =
     }
 
 /**
- * The task column (ADR-0116): the task's own place on its canvas, drawn
+ * The task column: the task's own place on its canvas, drawn
  * before every card and outside the order. It is no card, so it has no
  * card's id, and nothing moves, reorders or widens it.
  */
@@ -133,7 +129,7 @@ const readerOf = (
 
 /**
  * A task's columns: each card of its canvas in its order. A thread whose
- * root this tab does not hold yet is left out. Pure.
+ * root this tab does not hold yet is left out.
  */
 export function canvasColumns(input: {
   readonly canvas: readonly CanvasCard[]
@@ -155,7 +151,7 @@ export function canvasColumns(input: {
 /**
  * A card's column; null for a thread whose root this tab does not hold. A
  * thread not yet started ends at its fork, or, a new tab's, at its root,
- * and its first send is a branch there (ADR-0117, ADR-0126).
+ * and its first send is a branch there.
  */
 function cardColumn(
   c: CanvasCard,
@@ -219,7 +215,7 @@ function cardColumn(
 
 /**
  * `thread`, when the thread it forks from is on no column of this canvas
- * (`onCanvas`), so its path above folds (ADR-0117); null for a thread at its
+ * (`onCanvas`), so its path above folds; null for a thread at its
  * root, or whose parent is here.
  */
 function foldAboveOf(
@@ -235,7 +231,7 @@ function foldAboveOf(
   return from === null || onCanvas.has(from) ? null : thread
 }
 
-/** The thread `at` is in, and who holds it, when someone else does (ADR-0124). */
+/** The thread `at` is in, and who holds it, when someone else does. */
 const heldAt = (
   index: TreeIndex,
   at: EntryId,

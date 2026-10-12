@@ -270,7 +270,7 @@ function edges(segments: readonly Segment[], path: readonly EntryId[]) {
   return { starts, ends }
 }
 
-test("over every tree of 6 entries: no fold crosses a prompt, landmarks are drawn, and every rail capsule's edges are column edges", () => {
+test("over every tree of 6 entries, the column's folds agree with the rail's capsules", () => {
   let checked = 0
   for (const shape of shapes(6))
     for (const role of roles(6)) {

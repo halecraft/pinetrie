@@ -1,8 +1,6 @@
 // interface/folded-column-view — what a folded column says: a narrow strip
 // with its card's mark and title, in its place on the canvas, so the
-// arrangement reads the same for everyone whatever you have folded. A folded
-// column is its card's face. `FoldedColumn` (`packages/web/folded-column.tsx`)
-// draws it.
+// arrangement reads the same for everyone whatever you have folded.
 
 import type { NoteColumnId, ThreadId } from "@pinetrie/core"
 import type { CardColumn } from "./canvas-columns.ts"

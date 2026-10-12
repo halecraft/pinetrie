@@ -843,7 +843,8 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
 
 - **`AskWork` is `ToolRow`'s twin.** `foldOpen` (`ask-fold.ts`, called in
   `planAskWork`) is the rule, as `rowView` is; the reader's choice is kept in a `FoldMemory` by
-  the ask's prompt, made once in `App`, as tool rows' `RowMemory.open` is. Each `AskWork`
+  the ask's prompt, made once in `App`, as tool rows' `RowMemory.open` is
+  (ADR-0123). Each `AskWork`
   reads its own key with `useSyncExternalStore`, so opening one redraws it
   alone and `MessageList` gets no new prop. Its messages are drawn only
   while open: a closed fold creates none of their elements (S59).
@@ -1069,9 +1070,12 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
 ## What a column shows (`column-view.ts`, ADR-0040)
 
 `Column` gathers the facts (`ColumnFacts`), `columnView` decides, and
-`Column` draws what it returns: who works in the column (`identity`), where
-it forks (`origin`), where lanes start on its path (`joins`), and what
-became of its files (`strip`, a row of the column's header, ADR-0113).
+`Column` draws what it returns: who works in the column (`identity`, its
+thread's name, ADR-0039), where it forks (`origin`), where lanes start on
+its path (`joins`), and what became of its files (`strip`, a row of the
+column's header, ADR-0113): each lane's offer in your repo (ADR-0105), and
+what its review reads (`ReviewTarget`, ADR-0047), an offer's revisions or
+an ask's range.
 What the thread does next is the dock's (`nextOf`, *Threads, lanes and the
 composer*).
 
@@ -1090,7 +1094,7 @@ composer*).
   take core's `CatchUpFrom`, never a bookmark string, and accepted work's
   bookmark goes only in titles: `offerWords`' button titles ("moves
   pinetrie-accepted forward to pinetrie-offer/amber-fox"), `behindMark`'s,
-  `baseChoices`'. A card's command is worded from `CatchUps` (the thread's
+  `baseChoices`'. A card's command (ADR-0108) is worded from `CatchUps` (the thread's
   base and its parent), which `Column` keeps as one object while it says
   the same, since the composer is memoised. A base that moved is worded by
   `baseMovedOn` beside it ("accepted work has moved on"), never as "has new
@@ -1400,7 +1404,8 @@ composer*).
 
 - **Presence's verb is *reading*** (ADR-0077): a person is reading a thread
   now. A person *follows* a thread they have written on (`follows`,
-  `attention.ts`), and a column *follows its end* (`follow.ts`), a column's
+  `attention.ts`), and a column *follows its end* (`follow.ts`, whose rule
+  rests on the order S32 measured, `packages/web/TECHNICAL.md`), a column's
   verb, never a person's. Docs and comments keep to these; no word a person
   sees says that someone follows a thread they are only reading.
 - **Every column of the tab you are on is reported** (ADR-0029), since there

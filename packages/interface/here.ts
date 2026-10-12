@@ -1,11 +1,8 @@
-// interface/here — who else is in the session, for the board and the sidebar
-// (ADR-0030, ADR-0122). Pure.
+// interface/here — who else is in the session, for the board and the sidebar.
 //
-// Presence is thread-level (ADR-0024): each column of the task a person is
-// on reports the end of its thread. `peopleHere` groups those by person,
-// where `readingAt` groups them by thread end; "never you" is `readingAt`'s.
-// A thread card's readers are those people in its task (`peopleIn`); your
-// list's avatars are the same people turned around, by task (ADR-0116).
+// Presence is thread-level: each column of the task a person is on reports
+// the end of its thread. `peopleHere` groups those by person, where
+// `readingAt` groups them by thread end; "never you" is `readingAt`'s.
 
 import {
   type EntryId,
@@ -30,7 +27,7 @@ export interface PersonHere {
  * grouped by person, in `order` (`writerOrder`, so every window agrees).
  * An end's task is its thread's (`threadAt`, `taskOfThread`), else what its
  * reader reported (`readReadingTasks`), for a root this window does not
- * hold (ADR-0063). An end with neither, not arrived yet, is left out.
+ * hold. An end with neither, not arrived yet, is left out.
  */
 export function peopleHere(
   readingAt: ReadonlyMap<EntryId, readonly WriterId[]>,
@@ -69,7 +66,7 @@ export const readerHeading = (name: string, gone: boolean): string =>
 
 /**
  * The people reading in `tasks`, each with only their threads there: a
- * board item's readers, or a board state's (ADR-0122). A person reading
+ * board item's readers, or a board state's. A person reading
  * elsewhere only is left out.
  */
 export function peopleIn(

@@ -1,6 +1,6 @@
 // interface/column-paths — the open columns' paths side by side, each shown
 // past what the columns to its left show, and the colour each takes from the
-// rail. Pure.
+// rail.
 
 import {
   type EntryId,

@@ -1,8 +1,6 @@
 // interface/effects — what an intent does, as values (`Effect`), and what
-// planning one reads (`IntentState`): the vocabulary `planIntent`
-// (`intent.ts`), the card intents (`card-intents.ts`) and the reveal
-// (`reveal.ts`) plan in, and `perform` carries out through a client's ports.
-// Showing a root and an entry are here because all three plan them. Pure.
+// planning one reads (`IntentState`). Showing a root and an entry are here
+// because `planIntent`, the card intents and the reveal all plan them.
 
 import type {
   Address,

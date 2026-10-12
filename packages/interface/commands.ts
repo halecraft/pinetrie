@@ -1,4 +1,4 @@
-// interface/commands — finding a command as you type it (ADR-0036).
+// interface/commands — finding a command as you type it.
 //
 // A command is always typed in full, `/<package>:<name>` or
 // `/<package>:skill:<name>`, so no name is ever ambiguous; completion finds

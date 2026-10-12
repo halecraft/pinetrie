@@ -1,8 +1,6 @@
-// interface/card-keys — the keys a card's own box takes for what the card does
-// in its place (ADR-0048, *Physics* 5; ADR-0111): Alt+↑ and Alt+↓ move a
-// queued or pinned card one place up or down, and Ctrl+Shift+Backspace
-// discards a card. Pure: a key and the card's list as drawn, to an act or
-// nothing. The key-system redesign replaces this file.
+// interface/card-keys — the keys a card's own box takes for what the card
+// does in its place: Alt+↑ and Alt+↓ move a queued or pinned card one place
+// up or down, and Ctrl+Shift+Backspace discards a card.
 //
 // Only queued and pinned boxes take Alt+↑/↓. On a Mac, Option+↑/↓ moves a
 // textarea's caret to its paragraph's start or end; those boxes lose that,

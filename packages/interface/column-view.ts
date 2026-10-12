@@ -1,6 +1,5 @@
-// interface/column-view — what a column shows about who works in it, where it
-// came from, and what became of its files (ADR-0040). `Column` gathers the
-// facts, `columnView` decides, and `Column` draws what it returns.
+// interface/column-view — what a column shows about who works in it, where
+// it came from, and what became of its files.
 
 import {
   type AcceptedRecord,
@@ -74,7 +73,7 @@ export const AGENT_MARK = "✦"
 
 /**
  * A column's mark's tooltip: whether its lane is running, and on which ask
- * (`askWords`, ADR-0106), when its message is known.
+ * (`askWords`), when its message is known.
  */
 export const workingWords = (
   running: boolean,
@@ -89,31 +88,29 @@ export const workingWords = (
 /** What the host records about where lanes work, read with everything else. */
 export interface WorkFacts {
   readonly project: ProjectRecord | null
-  /** The commands the host's pi loaded (ADR-0036). */
+  /** The commands the host's pi loaded. */
   readonly commands: readonly CommandSummary[]
   readonly lanes: ReadonlyMap<ThreadId, LaneRecord>
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
-  /** Each lane's offer in your repo (ADR-0105). */
+  /** Each lane's offer in your repo. */
   readonly offers: ReadonlyMap<ThreadId, OfferRecord>
-  /** Each lane's name (ADR-0039). */
   readonly names: ReadonlyMap<ThreadId, ThreadName>
-  /** Each thread's column banner. */
   readonly banners: ReadonlyMap<ThreadId, BannerRecord>
-  /** Accepted work, as the host last read it (ADR-0104). */
+  /** Accepted work, as the host last read it. */
   readonly accepted: AcceptedRecord | null
-  /** Each lane's base, as its history says it (ADR-0104). */
+  /** Each lane's base, as its history says it. */
   readonly bases: ReadonlyMap<ThreadId, BaseRecord>
-  /** Each forked thread's fork, a branch's or a copy's (`TaskIndex.forkOf`, ADR-0117). */
+  /** Each forked thread's fork, a branch's or a copy's (`TaskIndex.forkOf`). */
   readonly forks: ReadonlyMap<ThreadId, ThreadFork>
-  /** The lanes that began from their base, their fork's files not kept (ADR-0124). */
+  /** The lanes that began from their base, their fork's files not kept. */
   readonly filesLost: ReadonlyMap<ThreadId, FilesLostRecord>
-  /** Each budget for agents talking, by the message that set it (ADR-0128). */
+  /** Each budget for agents talking, by the message that set it. */
   readonly budgets: ReadonlyMap<EntryId, BudgetRecord>
 }
 
 /**
- * The thread `lane` branched from, and where both stand (`parentNow`,
- * ADR-0072), from the column's tree and each lane's thread end.
+ * The thread `lane` branched from, and where both stand (`parentNow`),
+ * from the column's tree and each lane's thread end.
  */
 const parentOfLane = (
   index: TreeIndex,
@@ -183,7 +180,7 @@ export type HeadIdentity =
   | { readonly kind: "none" }
 
 /**
- * What a named thread's details show, under the header (ADR-0073). Only a
+ * What a named thread's details show, under the header. Only a
  * named agent has them: a conversation has no thread to describe, and a new
  * agent not yet named has nothing to show.
  */
@@ -220,7 +217,7 @@ export type HeadOrigin =
     }
   /**
    * A copy, or a branch whose parent thread is in another task or an
-   * inventory (ADR-0117): it names its source and where that is, and opens
+   * inventory: it names its source and where that is, and opens
    * it there by its link, at the fork.
    */
   | {
@@ -233,7 +230,7 @@ export type HeadOrigin =
     }
   | { readonly kind: "none" }
 
-/** What a fork row needs to name a source in another task (ADR-0117). */
+/** What a fork row needs to name a source in another task. */
 export interface OriginFacts {
   /** The task the column is on; null for a new tab. */
   readonly task: TaskId | null
@@ -268,8 +265,8 @@ export interface LabelledButton {
 }
 
 /**
- * What a review is read from (ADR-0047): an offer's revisions, or an ask's
- * range (ADR-0106), each a span, and which of their files to flag. `title`
+ * What a review is read from: an offer's revisions, or an ask's
+ * range, each a span, and which of their files to flag. `title`
  * heads a review whose spans have no description: an ask's line.
  */
 export type ReviewTarget = Pick<
@@ -293,7 +290,7 @@ export type WorkStrip =
       readonly waiting: boolean
       readonly bookmark: string | null
       readonly review: ReviewTarget | null
-      /** Where `accept` and `accept-into-accepted` go (ADR-0104). */
+      /** Where `accept` and `accept-into-accepted` go. */
       readonly destinations: OfferView["destinations"]
     }
   | { readonly kind: "none" }
@@ -309,7 +306,7 @@ export interface ColumnFacts {
   readonly createsLane: boolean
   /** The reader has the thread's details open (`Column.details`). */
   readonly detailsOpen: boolean
-  /** The column's thread (ADR-0117); null for a column not yet settled on one. */
+  /** The column's thread; null for a column not yet settled on one. */
   readonly thread: ThreadId | null
   /** The banner's URL as the column mounted (`bannerUrl`), or null. */
   readonly mountedBanner: string | null
@@ -334,17 +331,17 @@ export interface ColumnShows {
   readonly strip: WorkStrip
   /** What `Column` does to have its thread named before it starts. */
   readonly reserve: ReserveStep
-  /** The thread's base when it is not accepted work (ADR-0104), worded; null otherwise. */
+  /** The thread's base when it is not accepted work, worded; null otherwise. */
   readonly base: string | null
   /** Catching up would change files in the thread (`catchUpOf`'s `brings`). */
   readonly behind: { readonly mark: string; readonly title: string } | null
-  /** The thread this one branched from, and where both stand (ADR-0072); null for none. */
+  /** The thread this one branched from, and where both stand; null for none. */
   readonly parent: ParentNow | null
 }
 
 /**
- * How a column gets its thread named before its first send (ADR-0057,
- * ADR-0117). Asking again is harmless: the host does nothing for an id it has
+ * How a column gets its thread named before its first send.
+ * Asking again is harmless: the host does nothing for an id it has
  * named.
  */
 export type ReserveStep =
@@ -431,7 +428,7 @@ function reserveStep(f: ColumnFacts): ReserveStep {
   )
     return { kind: "none" }
   // A thread opened before its lane is named already, as a conversation's,
-  // with no banner (ADR-0126): the reservation makes its banner due.
+  // with no banner: the reservation makes its banner due.
   return f.work.names.has(f.thread) && f.work.banners.has(f.thread)
     ? { kind: "none" }
     : { kind: "ask", lane: f.thread }
@@ -452,7 +449,7 @@ const bannerOf = (
 ): HeadBanner | null => (url === null ? null : { url, fade: url !== mounted })
 
 /**
- * A thread's base in its header (ADR-0104): the WIP it is on, or that the
+ * A thread's base in its header: the WIP it is on, or that the
  * WIP is gone; nothing for accepted work, or a WIP that landed on it.
  */
 export function baseWords(base: BaseRecord | undefined): string | null {
@@ -537,8 +534,8 @@ const isFirst = (index: TreeIndex, id: EntryId): boolean => {
 
 /**
  * A column's fork row: a copy names its source, wherever it is; a thread
- * whose parent thread is in another task or an inventory names that
- * (ADR-0117); else the message it forks from on the path to its left.
+ * whose parent thread is in another task or an inventory names that;
+ * else the message it forks from on the path to its left.
  */
 function originOf(
   f: ColumnFacts,
@@ -577,7 +574,7 @@ function sourceOf(f: ColumnFacts): HeadOrigin | null {
   if (parent === null) return null
   const link = origins.linkOf(parent)
   const copied = fork?.how === "copy"
-  // A branch whose parent is on this canvas keeps today's row.
+  // A branch whose parent is on this canvas names the message it forks from.
   if (!copied && link.kind === "open" && link.task === origins.task) return null
   const name = f.work.names.get(parent) ?? "a thread"
   const where =
@@ -737,7 +734,7 @@ export function offerWords(
   const parent = facts.parent === null ? null : catchUpName(facts.parent)
   const conflicted = count(facts.conflicts, "file", "files")
   // A conflict that came with the lane's copy says so, and whether the
-  // thread it branched from has resolved it (ADR-0072).
+  // thread it branched from has resolved it.
   const conflicts =
     facts.conflicts === 0
       ? ""
@@ -877,7 +874,7 @@ export function offerWords(
 
 /**
  * Catching up's title: what it merges, and what that changes, or why it
- * changes nothing (S97).
+ * changes nothing.
  */
 function catchUpTitle(
   catchUp: CatchUpNow,
@@ -909,9 +906,9 @@ export function joinWords(join: LaneJoin): string {
 }
 
 /**
- * Where a column takes a card (ADR-0048): your message at its thread, its
- * end once it has one, or its first message's while it is not yet started
- * (ADR-0113, ADR-0126). The composer creates its card here, and a drop on
+ * Where a column takes a card: your message at its thread, its
+ * end once it has one, or its first message's while it is not yet started.
+ * The composer creates its card here, and a drop on
  * it lands here (`placeOfTarget`). None for a started thread's column with
  * no end in this tab.
  */
@@ -938,8 +935,8 @@ export const newPinAt = (f: {
   !f.canPin || f.pinning ? null : f.pinned === 0 ? "header" : "strip"
 
 /**
- * What a column draws above a run's prompt for the context the run read
- * (ADR-0048, ADR-0116): its thread's pinned cards, the cards pinned to its
+ * What a column draws above a run's prompt for the context the run read:
+ * its thread's pinned cards, the cards pinned to its
  * task, and the canvas list it was told.
  */
 export interface PinnedMarker {

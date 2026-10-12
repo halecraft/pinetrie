@@ -1,13 +1,11 @@
-// interface/card-state — your message's editor, decided (ADR-0048,
-// ADR-0113).
+// interface/card-state — your message's editor, decided: `editorState`
+// decides each step and names what `card-editor.tsx` must do.
 //
 // One textarea edits your message at a column's end. Until there is
 // something worth keeping it is local, and takes your message here when it
 // finds one. The input that makes it worth keeping creates the card and binds the same
 // element to it; a send holds it until the host answers. Undo and redo in the
-// box reach only its card (ADR-0052).
-// `editorState` decides each step and names what the component must do;
-// `card-editor.tsx` does it. Pure.
+// box reach only its card.
 
 import type { CardRecord, TextCardId } from "@pinetrie/core"
 import type { Pending, Prefill } from "./columns.ts"
@@ -41,7 +39,7 @@ export type EditorEvent =
   | { readonly kind: "found"; readonly card: TextCardId }
   /**
    * Your card here is gone: someone sent it, or it was discarded. An undo
-   * past its creation only empties it (ADR-0059), so it is not gone.
+   * past its creation only empties it, so it is not gone.
    */
   | { readonly kind: "gone" }
   | { readonly kind: "send" }

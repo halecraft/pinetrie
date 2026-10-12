@@ -73,7 +73,7 @@ const facts: FaceFacts = {
   ]),
 }
 
-describe("faceOf (ADR-0126)", () => {
+describe("faceOf", () => {
   test("a text card: its first three lines, a short command chip, whose", () => {
     const face = faceOf(text, facts)
     expect(face).toEqual({
@@ -169,7 +169,7 @@ describe("foldedMark", () => {
   })
 })
 
-describe("detailOf (ADR-0126, Renderings)", () => {
+describe("detailOf", () => {
   test("a canvas draws whole, a dock or a list normal, an inventory faces; a fold is a face", () => {
     expect(detailOf("canvas", false)).toBe("whole")
     expect(detailOf("canvas", true)).toBe("face")

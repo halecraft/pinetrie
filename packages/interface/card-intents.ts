@@ -1,17 +1,9 @@
 // interface/card-intents — what take into the inventory, put, a paste, keep,
-// discard and undo do (ADR-0048 step 4, ADR-0052, ADR-0059, ADR-0066,
-// ADR-0132), as effects. Pure: `planIntent` calls these, and `perform`
-// carries out what they return.
+// discard and undo do, as effects.
 //
-// Every input lands by one planner (`planPut`): a key, a button, a drop and
-// a paste each name a source and a target, and `putLanding` decides what
-// that does. A take, keep or a copy into your inventory lands in the
-// selected slot when it is empty, else the first empty one (`firstEmpty`);
-// a drop or a paste aimed at a filled slot replaces its card (ADR-0133); a
-// put lands at the place its target names (`placeOfTarget`): a note at a
-// column's end, or your message in its composer. Each move says where it
-// was made, so a refusal is said there. Which history a move enters is the
-// host's to decide (`historyOf`); an undo names only the task you are on.
+// Each move says where it was made, so a refusal is said there. Which
+// history a move enters is the host's to decide (`historyOf`); an undo names
+// only the task you are on.
 
 import {
   type Address,
@@ -98,7 +90,7 @@ export const moveCard = (
 
 /**
  * `card` queued on `to.lane` from `to.at`. Its text's version is left
- * empty: the session reads it as it sends (S96).
+ * empty: the session reads it as it sends.
  */
 export const queueMove = (
   card: TextCard,
@@ -106,7 +98,7 @@ export const queueMove = (
 ): QueueMove => moveOf(card, { kind: "queued", thread: to.lane, seen: "" })
 
 /**
- * A card made in `to.lane`'s queue (ADR-0113): a move with no `from`, so
+ * A card made in `to.lane`'s queue: a move with no `from`, so
  * it is never drawn anywhere before the queue.
  */
 export const queueNew = (
@@ -120,9 +112,9 @@ export const queueNew = (
 
 /**
  * A queued or pinned card moved one place up (`step` -1) or down (1) in
- * `among`, its list as drawn (ADR-0048 step 7): the reorder naming its new
+ * `among`, its list as drawn: the reorder naming its new
  * neighbours. Null at an edge, for a card in neither kind of place, or when
- * the card it would pass is a fact, which keeps its place. Pure.
+ * the card it would pass is a fact, which keeps its place.
  */
 export function reorderOf(
   card: CardRecord,
@@ -164,7 +156,7 @@ export const textCardOf = (
   return now?.kind === "text" ? now : undefined
 }
 
-/** What a put, a paste or a drop lands (ADR-0132): a card where it is, or a clip. */
+/** What a put, a paste or a drop lands: a card where it is, or a clip. */
 export type PutSource =
   /** A card where it is: a take, a put, a drop, or an Alt-drag's copy of it. */
   | { readonly kind: "card"; readonly card: CardId }
@@ -195,7 +187,7 @@ type Lands = Extract<
 >
 
 /**
- * What a landing does (ADR-0132, ADR-0133), as a value: the drag engine
+ * What a landing does, as a value: the drag engine
  * draws it before a drop (a lift, a + badge, the slot's card leaving for
  * the trash, grey when refused), and `planPut` carries it out, so the two
  * cannot differ.
@@ -232,7 +224,7 @@ export type Landing =
   | { readonly kind: "uncut"; readonly card: CardId; readonly to: PutTarget }
   /** Text typed into the text box that has focus: text, or a link. */
   | { readonly kind: "insert"; readonly text: string }
-  /** `landing` into an aimed slot, its card `old` to your trash first (ADR-0133). */
+  /** `landing` into an aimed slot, its card `old` to your trash first. */
   | {
       readonly kind: "replace"
       readonly old: CardId
@@ -263,9 +255,9 @@ export const clipFacts = (state: IntentState): ClipFacts => ({
 })
 
 /**
- * What landing `source` at `target` does (ADR-0132, ADR-0133). Pure.
+ * What landing `source` at `target` does.
  *
- * - **A move** of a card is a put or a drop, as ever: onto a canvas, a
+ * - **A move** of a card is a put or a drop: onto a canvas, a
  *   column, a composer, a state or the sidebar (`planPut` keeps those
  *   rules); a card in your inventory on another's slot swaps with it.
  * - **A copy** of a clip lands by what it is and where: into a text box,
@@ -275,7 +267,7 @@ export const clipFacts = (state: IntentState): ClipFacts => ({
  *   copy, a note column or a task as a reference to it where one may be.
  *   A cut card still in your trash is moved out of it instead.
  * - **The past** only ever copies: a drop of it with `move` copies.
- * - **A slot** (ADR-0133): aimed and empty, the card lands there; aimed and
+ * - **A slot**: aimed and empty, the card lands there; aimed and
  *   filled, it replaces the card there, which must be one you may discard;
  *   unaimed, the selected slot if empty, else the first empty one, else
  *   refused `full`.
@@ -352,7 +344,7 @@ function slotFor(
     : { kind: "slot", slot, taken: null }
 }
 
-/** `lands` into your inventory at `aimed`, or at the first free slot for null (ADR-0133). */
+/** `lands` into your inventory at `aimed`, or at the first free slot for null. */
 function intoSlot(
   lands: Lands,
   aimed: number | null,
@@ -370,7 +362,7 @@ function intoSlot(
     : { kind: "refused", code: "not-replaced", card: old.id }
 }
 
-/** What a copy of `clip` lands as at `target` (ADR-0132's table), before its slot. */
+/** What a copy of `clip` lands as at `target` before its slot. */
 function clipLanding(
   clip: Clip,
   target: PutTarget,
@@ -453,15 +445,15 @@ const refusedAt = (
     : { card, actedAt: AT_INVENTORY, code, by: null, fromQueue: false }
 
 /**
- * Land `source` at `target` (ADR-0132): what `putLanding` decides, carried
+ * Land `source` at `target`: what `putLanding` decides, carried
  * out. A move of a card keeps every put's rules: a state or a place in the
  * sidebar makes a new thread there (`planSpinOff`); a thread's column, a
- * note in the note column nearest it; a note column, a note at its end
- * (ADR-0116); a spot on a canvas, a text card in a note column made for it
- * there (`WRAPS`, ADR-0126); a composer, your message there
+ * note in the note column nearest it; a note column, a note at its end;
+ * a spot on a canvas, a text card in a note column made for it
+ * there (`WRAPS`); a composer, your message there
  * (`putInMessage`). A copy is one paste the host makes, or a thread's copy;
  * into a text box, text typed at the caret. Anything landing in your
- * inventory from outside shows the panel briefly. Pure.
+ * inventory from outside shows the panel briefly.
  */
 export function planPut(
   source: PutSource,
@@ -515,7 +507,7 @@ function effectsOfLanding(
       const how = { actedAt: AT_INVENTORY, slot: landing.to.slot }
       if (replacing === null) return [...show, moveCard(into, how, true)]
       // One move set, the slot's card to your trash first, so the host
-      // never finds your inventory full (ADR-0133).
+      // never finds your inventory full.
       return [
         ...show,
         {
@@ -643,7 +635,7 @@ function putCard(
       },
     ]
   }
-  // A thread's card or a note column goes on a canvas (ADR-0117); a kind
+  // A thread's card or a note column goes on a canvas; a kind
   // the host alone places is put nowhere.
   if (!isMovable(now)) return []
   if (now.kind === "thread" || now.kind === "note-column")
@@ -715,7 +707,7 @@ const canvasSpot = (
 })
 
 /**
- * A card that lives on a canvas, put from your inventory (ADR-0117): on the
+ * A card that lives on a canvas, put from your inventory: on the
  * canvas of the task you are on, just after the column it was put on, or
  * first on a task's pinned cards' column, or at the spot on a canvas it was
  * dropped on; unfolded, so you see it land.
@@ -779,7 +771,7 @@ function spotOnCanvas(
 }
 
 /**
- * `now` as your message in column `key`'s composer (ADR-0113). A message
+ * `now` as your message in column `key`'s composer. A message
  * there with text takes `now`'s place, a slot of your inventory included,
  * in one move the host accepts or refuses whole, so one undo; an empty one
  * is discarded.
@@ -822,7 +814,7 @@ function putInMessage(
   ]
 }
 
-/** Your message `card` to the note column nearest its thread (ADR-0116). */
+/** Your message `card` to the note column nearest its thread. */
 export function planToNote(
   card: CardId,
   key: string,
@@ -835,7 +827,7 @@ export function planToNote(
 }
 
 /**
- * A new, empty note made at the end of note column `column` (ADR-0116): a
+ * A new, empty note made at the end of note column `column`: a
  * creation, in no history, drawn last until the host gives it its order.
  */
 export function planNewNote(
@@ -861,7 +853,7 @@ export function planNewNote(
 }
 
 /**
- * A comment on an entry (ADR-0126): a new, empty note in its margin, made
+ * A comment on an entry: a new, empty note in its margin, made
  * by you, which the host places at the margin's end.
  */
 export function planComment(
@@ -891,8 +883,8 @@ export function planComment(
 }
 
 /**
- * Edit a reference as text (ADR-0126): a paste of its quote as a text card
- * that replaces it (ADR-0132, ADR-0133), in its very place, keeping its
+ * Edit a reference as text: a paste of its quote as a text card
+ * that replaces it, in its very place, keeping its
  * address as its origin; one step of history, the reference to your trash
  * first, so a full inventory takes it too. Nothing for a card that is no
  * reference, or one you may not discard.
@@ -931,8 +923,8 @@ export function planEditAsText(
 }
 
 /**
- * A reference to a comment, `card`, queued on its thread as `reference`
- * (ADR-0126): a paste (ADR-0132), its quote the comment's text under a
+ * A reference to a comment, `card`, queued on its thread as `reference`:
+ * a paste, its quote the comment's text under a
  * link to its entry (`commentMarkdown`), read and kept as it is queued;
  * the comment stays.
  */
@@ -973,7 +965,7 @@ export function planQueueReference(
 /**
  * Pin `card`, your message or a queued card, at the top of its thread's
  * column. A move like any other: the host records it, and an undo
- * of moves reverses it (ADR-0066).
+ * of moves reverses it.
  */
 export function planPin(
   card: CardId,
@@ -989,7 +981,7 @@ export function planPin(
 
 /**
  * Unpin `card`: to the note column nearest its thread; pinned to the task,
- * to the one nearest the task column (ADR-0116).
+ * to the one nearest the task column.
  */
 export function planUnpin(
   card: CardId,
@@ -1011,7 +1003,7 @@ export function planUnpin(
 }
 
 /**
- * Pin `card` to the task it is in (ADR-0116), else the task you are on:
+ * Pin `card` to the task it is in, else the task you are on:
  * every thread of it reads the card on every run. A move like any other,
  * which the undo key takes back.
  */
@@ -1038,7 +1030,7 @@ export function planPinToTask(
 }
 
 /**
- * Discard `card` (ADR-0111): a move to gone, in the history of the root it
+ * Discard `card`: a move to gone, in the history of the root it
  * is in, else of the root you are on, so the undo key there brings it back.
  * Made where `how` says; nothing for a card not drawn or not yours to move.
  */
@@ -1108,7 +1100,7 @@ export const afterKeep = (
 
 /**
  * The task an undo of moves acts in, and a discard's history: the task you
- * are on (ADR-0066, ADR-0116). None on nothing.
+ * are on. None on nothing.
  */
 export function taskOfTab(state: IntentState): TaskId | null {
   const active = state.layout.active
@@ -1117,8 +1109,8 @@ export function taskOfTab(state: IntentState): TaskId | null {
 
 /**
  * Undo or redo your newest move in the task you are on, or, on none, in
- * your history outside any task, which the host does whole or refuses
- * (ADR-0066, ADR-0126); with the inventory panel focused, this tab's
+ * your history outside any task, which the host does whole or refuses;
+ * with the inventory panel focused, this tab's
  * newest swap.
  */
 export function planUndoMove(
@@ -1131,8 +1123,8 @@ export function planUndoMove(
 }
 
 /**
- * What the host's answer to an undo of moves brings into view (ADR-0052:
- * undo shows where it acts): each place a card went back to, once; or,
+ * What the host's answer to an undo of moves brings into view, so an undo
+ * shows where it acts: each place a card went back to, once; or,
  * refused, the card where it is now, saying who moved it.
  */
 export function afterUndo(
@@ -1175,7 +1167,7 @@ export function afterUndo(
 }
 
 /**
- * Where a trace leads (ADR-0048, *Other people*): the card's place now, or,
+ * Where a trace leads: the card's place now, or,
  * for a card sent, the message it became. Nothing for a card in someone
  * else's inventory, or one gone some other way.
  */

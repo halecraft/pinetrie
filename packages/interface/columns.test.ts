@@ -31,13 +31,13 @@ test("threadAnchor: a thread's end, never a newer branch; with no entry yet, its
   expect(threadAnchor(i, [], T)).toBeNull()
 })
 
-test("keyText: a column's key as the page draws it, whatever its kind (ADR-0116)", () => {
+test("keyText: a column's key as the page draws it, whatever its kind", () => {
   const T = threadIdFor("t")
   expect(keyText({ kind: "card", card: T })).toBe(T)
   expect(keyText({ kind: "task", task: TEST_TASK })).toBe(TEST_TASK)
 })
 
-test("a thread not yet started closes with ×; a started one does not (ADR-0126)", () => {
+test("a thread not yet started closes with ×; a started one does not", () => {
   const T = threadIdFor("new")
   const bound: Column = {
     key: T,

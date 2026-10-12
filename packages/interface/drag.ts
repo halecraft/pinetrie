@@ -1,14 +1,9 @@
-// interface/drag — what the one drag engine decides, as values: what a
-// press grabs (`sourceOfElement`), what a drop where the pointer is would do
-// (`dragVerdict`), the intents a drop sends (`dropIntents`), what holding
-// there opens (`hoverOpens`), and what to draw each frame (`drawPlan`). The
-// page's engine (`packages/web/use-drag.ts`) gathers the pointer and the
-// element under it, asks these, and applies the answer; it decides nothing.
+// interface/drag — what the one drag engine decides, as values; the page's
+// engine (`packages/web/use-drag.ts`) gathers the pointer and decides nothing.
 //
 // A column is a card on a canvas drawn whole: its drag is its card's, and
 // only over the strip does it reorder. Elsewhere it lands as any card does
-// (`putLanding`). A task, from the board or the sidebar, lands by
-// `planRootDrop`.
+// (`putLanding`).
 
 import {
   type CardId,
@@ -103,7 +98,7 @@ export interface DragFrom {
 
 const NOTHING: DragVerdict = { kind: "nothing" }
 
-/** What dropping `source` over `over` would do, `how` its Alt. Pure. */
+/** What dropping `source` over `over` would do, `how` its Alt. */
 export function dragVerdict(
   source: DragSource,
   from: DragFrom,
@@ -138,7 +133,7 @@ export function dragVerdict(
 /**
  * The intents a drop sends: the ones a key or a menu would. A reorder is
  * `moveColumn`, a landing a `put`, a task's drop its own; each runs its
- * own planner, so a drop does what the put key or Move up does. Pure.
+ * own planner, so a drop does what the put key or Move up does.
  */
 export function dropIntents(
   source: DragSource,
@@ -186,7 +181,7 @@ export type HoverOver =
   | { readonly kind: "board" }
   | { readonly kind: "none" }
 
-/** What being held over `over` opens: a task in the sidebar, or the board. Pure. */
+/** What being held over `over` opens: a task in the sidebar, or the board. */
 export function hoverOpens(over: HoverOver): Intent | null {
   switch (over.kind) {
     case "task":
@@ -202,7 +197,7 @@ export function hoverOpens(over: HoverOver): Intent | null {
  * A row of the sidebar the pointer is over: onto its task in the middle
  * half, between it and the one above in its top quarter, and between it
  * and the one below in its bottom quarter. Only a card's drag reads it; a
- * task's drag reorders among the rows. Pure.
+ * task's drag reorders among the rows.
  */
 export function sidebarSpotAt(
   y: number,
@@ -255,7 +250,7 @@ export interface DrawPlan {
   readonly lean: number
 }
 
-/** How a verdict is marked: what it would do there. Pure. */
+/** How a verdict is marked: what it would do there. */
 export function dropMark(verdict: DragVerdict, how: PutHow): DropMark | null {
   switch (verdict.kind) {
     case "reorder":
@@ -283,7 +278,7 @@ const MAX_LEAN = 3
  * pointer is over it, and leaves it as its card face; anything else moves
  * whole. The dragged element only ever translates: a scaled, rotated or
  * shadowed column costs frames on a slow machine, and the lift is drawn on
- * its handle instead. Pure.
+ * its handle instead.
  */
 export function drawPlan(
   armed: Armed,

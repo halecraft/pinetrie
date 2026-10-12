@@ -1,10 +1,7 @@
-// interface/card-frame — what a card's frame shows, in every place
-// (ADR-0111): a text card's, and a queued reference's (ADR-0126): its header (place, state, who put it there, a command, ⋯ and
-// ×), and its footer (one primary action, and ↑ ↓ in a list). The frame is
-// the place's: its colour says who reads the card. The card's icon and its
-// face are the kind's (`face.ts`, ADR-0126). Pure: `cardFrame` decides it as
-// a value, `cardFrameWords` words it, and `CardFrame`
-// (`packages/web/card-frame.tsx`) draws it.
+// interface/card-frame — what a card's frame shows in every place: its header
+// (place, state, who put it there, a command, ⋯ and ×) and its footer (one
+// primary action, and ↑ ↓ in a list). The card's icon and face are its
+// kind's (`face.ts`).
 
 import type {
   CardCommand,
@@ -32,8 +29,8 @@ import { namesOf } from "./names.ts"
 import { lineWords, type Reader } from "./send.ts"
 
 /**
- * A card's colour, which says who reads it: its place (ADR-0111). Your
- * message is yours alone; a note is the team's (ADR-0113).
+ * A card's colour, which says who reads it: its place. Your
+ * message is yours alone; a note is the team's.
  */
 export type CardTone = "inventory" | "composing" | "note" | "queued" | "pinned"
 
@@ -50,12 +47,12 @@ export type CardState =
 /** The footer's one primary action: put for the inventory, send for your message. */
 export type CardPrimary = "put" | "send"
 
-/** Where a Move to ▸ item takes a card: a place, or a new thread in a state (ADR-0111). */
+/** Where a Move to ▸ item takes a card: a place, or a new thread in a state. */
 export type CardMoveTo =
   | "message"
   | "note"
   | "queue"
-  /** A reference to it, queued on its thread; it stays (ADR-0126). */
+  /** A reference to it, queued on its thread; it stays. */
   | "reference"
   | "pinned"
   | "task"
@@ -65,7 +62,7 @@ export type CardMoveTo =
 /**
  * The place each Move to ▸ item sends a card to, which its kind must be
  * ever in (`PLACES_OF`) to be offered it: a reference is never pinned, so
- * its ⋯ has no pin (ADR-0126). A new thread's first message is your
+ * its ⋯ has no pin. A new thread's first message is your
  * message sent, so a card that is never your message makes none. Queueing
  * a reference to a comment leaves the comment where it is: any comment may.
  */
@@ -183,7 +180,7 @@ const moveItems = (
         ...threads,
       ]
     // A note column is no thread's: a note has no message, queue or pinned
-    // strip of its own to go to (ADR-0116); a drag takes it there.
+    // strip of its own to go to; a drag takes it there.
     case "note":
       return [pinTask, take, ...threads]
     case "queued":
@@ -206,8 +203,7 @@ const moveItems = (
     // Unpinned from the task, it goes to the task's first note column.
     case "task-pinned":
       return [{ to: "note", act: { kind: "unpin", card: id } }, take]
-    // A comment stays beside its entry: a reference to it tells the agent
-    // (ADR-0126).
+    // A comment stays beside its entry: a reference to it tells the agent.
     case "margin":
       return [
         {
@@ -265,7 +261,7 @@ const byOf = (card: CardRecord, me: WriterId): WriterId | null => {
  * The frame of `card`, drawn as `tone`; with no card, the composer before
  * its first keystroke or the "+ pin" box: its tone and place alone, nothing
  * to move or discard yet. A kind no person moves (`KINDS`: a fact, the
- * host's, ADR-0080) neither moves nor is discarded, and a read-only column
+ * host's) neither moves nor is discarded, and a read-only column
  * moves nothing.
  */
 export function cardFrame(

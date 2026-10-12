@@ -1,7 +1,6 @@
 // interface/focus — where focus is, as one record the page gathers once
-// (`focusFacts`, `packages/web/focus.ts`): what the keys (`keyAct`), a copy
-// (`clipOfFocus`) and a paste's target (`targetOfFocus`) decide from. Pure:
-// no DOM here, only what was read of it.
+// (`packages/web/focus.ts`), which the keys, a copy and a paste's target
+// decide from.
 
 import type { BlockRef, CardId } from "@pinetrie/core"
 import type { PutTarget } from "./put-target.ts"
@@ -19,7 +18,7 @@ export interface Focus {
   /** The column that last held focus, by key: where a put lands. */
   readonly column: string | null
   /**
-   * A page covers the stage (ADR-0098): no key but the list's fold acts,
+   * A page covers the stage: no key but the list's fold acts,
    * since a take, a put or an undo would act on columns no one can see.
    */
   readonly page: boolean
@@ -44,7 +43,7 @@ export interface Focus {
    * is inside that column: a selection left behind never beats a focused card.
    */
   readonly selected: string | null
-  /** Focus is on the clipboard cell (ADR-0132). */
+  /** Focus is on the clipboard cell. */
   readonly cell: boolean
   /**
    * The card column focus is inside now (not the last one), its index among

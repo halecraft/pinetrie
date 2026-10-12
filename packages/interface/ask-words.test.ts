@@ -76,7 +76,7 @@ describe("workWords", () => {
       "12 messages from Ada and Bea · 3 steps",
     ],
     [
-      "ignored files a turn wrote, and a recipe that failed (ADR-0131)",
+      "ignored files a turn wrote, and a recipe that failed",
       stats({ agent: 2, files: ["a"], ignored: 3, recipeFailed: 1 }),
       "2 steps · 1 file · 3 ignored files · dependencies failed to install",
     ],

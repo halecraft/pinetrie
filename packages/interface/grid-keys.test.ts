@@ -22,7 +22,7 @@ const at = (over: Partial<GridKeyState> = {}): GridKeyState => ({
   ...over,
 })
 
-describe("gridKeyAct (ADR-0113)", () => {
+describe("gridKeyAct", () => {
   test.each([
     ["ArrowLeft", 6],
     ["h", 6],
@@ -77,7 +77,7 @@ describe("gridKeyAct (ADR-0113)", () => {
     })
   })
 
-  test("a column's messages are a grid one cell wide (ADR-0126): j and k step through them, stopping at either end; Enter opens the margin, c comments, Escape shuts it", () => {
+  test("a column's messages are a grid one cell wide: j and k step, Enter opens the margin, c comments", () => {
     const column = (selected: number, over: Partial<GridKeyState> = {}) =>
       at({
         grid: { width: 1, rows: 4 },

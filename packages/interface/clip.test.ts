@@ -71,7 +71,7 @@ describe("what a copy takes (`clipOfFocus`)", () => {
     })
   })
 
-  test("a selection in a message is its text, keeping the range it names, else the message, as its origin; it beats a focused block", () => {
+  test("a selection in a message is its text, its origin the range it names; it beats a focused block", () => {
     const block = { entry: "2-a", block: { kind: "paragraph", n: 0 } } as const
     expect(copied({ selection: { entry: "2-a", text: "2-" }, block })).toEqual({
       kind: "clip",
@@ -138,7 +138,7 @@ describe("what a copy takes (`clipOfFocus`)", () => {
   })
 })
 
-describe("the carrier (S151)", () => {
+describe("the carrier", () => {
   const clip: Clip = {
     kind: "past",
     taken: { address: entryAddress, markdown: "two\nlines" },
@@ -168,7 +168,7 @@ describe("the carrier (S151)", () => {
     ).toEqual(clip)
   })
 
-  test("text from elsewhere: no carrier, a carrier on other text, from another host, malformed, or Shift held", () => {
+  test("text from elsewhere: no carrier, or one on other text, from another host, malformed, or Shift held", () => {
     const text = (plain: string): Clip => ({
       kind: "text",
       text: plain,

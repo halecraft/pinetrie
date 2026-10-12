@@ -19,7 +19,7 @@ const [K1, K2, K3] = ["1", "2", "3"].map(taskIdFor) as [
   ReturnType<typeof taskIdFor>,
   ReturnType<typeof taskIdFor>,
 ]
-/** Each root's thread, each in a task of its own (ADR-0116). */
+/** Each root's thread, each in a task of its own. */
 const facts = {
   taskOfThread: new Map([
     [threadIdFor("1-r1"), K1],
@@ -28,7 +28,7 @@ const facts = {
   reported: new Map(),
 }
 
-test("peopleHere groups each person's columns, in order, by the task each thread is in, and drops an end not arrived", () => {
+test("peopleHere groups each person's columns by the task each thread is in", () => {
   const readingAt = new Map([
     [entryId("2-a"), [BEA, CY]],
     [entryId("3-r2"), [BEA]],
@@ -46,7 +46,7 @@ test("peopleHere groups each person's columns, in order, by the task each thread
   ])
 })
 
-test("peopleHere names the task its reader reported for an end in a root not held (ADR-0063)", () => {
+test("peopleHere names the task its reader reported for an end in a root not held", () => {
   const readingAt = new Map([[entryId("8-far"), [BEA]]])
   expect(
     peopleHere(readingAt, index, [BEA], {

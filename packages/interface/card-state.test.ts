@@ -77,7 +77,7 @@ describe("editorState", () => {
     })
   })
 
-  test("an undo past its creation empties the card but keeps it (ADR-0059): typing in the box goes on in the same card", () => {
+  test("an undo past its creation empties the card but keeps it: typing in the box goes on in the same card", () => {
     // Emptied, the card is still found, and no event detaches the box; only
     // `gone` does, when it is sent or removed.
     expect(step(bound, { kind: "found", card: C1 }).state).toBe(bound)

@@ -1,4 +1,4 @@
-// interface/address-words — what an address names, in words (ADR-0126):
+// interface/address-words — what an address names, in words:
 // a reference's chip and a link's label, and a reference's *Edit as text*.
 
 import type { Address, BlockKind } from "@pinetrie/core"
@@ -23,7 +23,7 @@ export function addressWords(address: Address): string {
   }
 }
 
-/** A reference's *Edit as text* (ADR-0126). */
+/** A reference's *Edit as text*. */
 export const EDIT_AS_TEXT = {
   label: "Edit as text",
   title:

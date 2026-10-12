@@ -27,7 +27,7 @@ const record = (n: string): RootRecord => ({
 const _directory = new Map(
   ["1", "2", "3", "4"].map(n => [rootIdFor(`r${n}`), record(n)] as const),
 )
-/** Task `k-<n>` holds the thread `t-<n>`, in root `r<n>` (ADR-0116). */
+/** Task `k-<n>` holds the thread `t-<n>`, in root `r<n>`. */
 const K = (n: string) => taskIdFor(n)
 const tasks = tasksWith({
   known: ["1", "2", "3", "4"].map(K),
@@ -58,8 +58,8 @@ const held = (
   },
 ) => [...planHeldRoots({ inventory: [], ...input })].sort()
 
-describe("planHeldRoots (ADR-0116)", () => {
-  test("the roots of the threads in your inventory too, which their slots and previews read (ADR-0124)", () => {
+describe("planHeldRoots", () => {
+  test("the roots of the threads in your inventory too, which their slots and previews read", () => {
     expect(
       held({
         layout: { open: [], active: null },

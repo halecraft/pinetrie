@@ -1,4 +1,4 @@
-// interface/align — where a newly shown column is placed, as a pure rule.
+// interface/align — where a newly shown column is placed.
 //
 // A column opens with its first message level with its fork point in the
 // column that shows it: by scrolling, or by a spacer above its first message

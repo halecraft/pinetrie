@@ -34,7 +34,7 @@ const reach = {
   nameOf: () => "Bea",
 }
 
-describe("other threads' agents in a column's header (ADR-0128)", () => {
+describe("other threads' agents in a column's header", () => {
   test("a member out of reach is named away, with why", () => {
     const row = agentsRow({
       ...reach,

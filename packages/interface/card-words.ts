@@ -1,5 +1,5 @@
-// interface/card-words — what a card says about its place and its command
-// (ADR-0048, ADR-0108), each label in one function. Pure.
+// interface/card-words — what a card says about its place and its command,
+// each label in one function.
 
 import type {
   CanvasView,
@@ -27,14 +27,14 @@ import type { TraceGroup } from "./traces.ts"
 export interface CatchUps {
   /** The thread's base (`effectiveBase`). */
   readonly base: ThreadBase
-  /** The thread it branched from; null for one that began at its base (ADR-0072). */
+  /** The thread it branched from; null for one that began at its base. */
   readonly parent: ParentThread | null
 }
 
 /**
  * What a command merges: the base for `bring-up-to-date`, accepted work for
- * `continue-on-accepted` (ADR-0104), the thread it branched from for
- * `catch-up-with-parent` (ADR-0072). Null for that one without a parent.
+ * `continue-on-accepted`, the thread it branched from for
+ * `catch-up-with-parent`. Null for that one without a parent.
  */
 const commandFrom = (
   command: CatchUpCommand,
@@ -50,7 +50,7 @@ const commandFrom = (
   }
 }
 
-/** A split's words: the button's, and above a card that carries it (ADR-0080). */
+/** A split's words: the button's, and above a card that carries it. */
 const SPLIT = "split into a stack"
 
 const fromName = (from: CatchUpFrom | null) =>
@@ -89,7 +89,7 @@ export interface ControlWords {
 }
 
 /**
- * A queued or pinned card's ↑ or ↓ (ADR-0048 step 7): it moves one place,
+ * A queued or pinned card's ↑ or ↓: it moves one place,
  * as Alt+↑ or Alt+↓ in its box does.
  */
 export const reorderWords = (step: -1 | 1): ControlWords =>
@@ -113,10 +113,10 @@ export const DISCARDED_NOTICE =
   "discarded · the undo key (⌘Z outside a box) brings it back"
 
 /**
- * Something of yours to say where you acted: a discard (ADR-0111), or a
- * refusal (ADR-0059): a move, a reorder or an undo the host refused, or an
+ * Something of yours to say where you acted: a discard, or a
+ * refusal: a move, a reorder or an undo the host refused, or an
  * undone swap whose slots changed. Gone from the queue, the host had popped
- * the card first (S69), so it was sent as its queuer's message; moved,
+ * the card first, so it was sent as its queuer's message; moved,
  * someone else moved it first; order changed, the cards a reorder named
  * moved first.
  */
@@ -168,13 +168,13 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
 
 /** The inventory panel's name, and its button in the footer. */
 export const INVENTORY = "inventory"
-/** Take into your inventory (ADR-0132): one name and one key wherever it is offered. */
+/** Take into your inventory: one name and one key wherever it is offered. */
 export const TAKE = "take into your inventory (Ctrl+Shift+I)"
-/** The clipboard cell's button: its copy into a free slot (ADR-0132). */
+/** The clipboard cell's button: its copy into a free slot. */
 export const KEEP = "keep"
 export const KEEP_TITLE =
   "keep this in your inventory, in a free slot: a copy, as a paste makes"
-/** The clipboard cell's heading: what it shows, and that it knows no more (ADR-0132). */
+/** The clipboard cell's heading: what it shows, and that it knows no more. */
 export const CLIPBOARD_CELL = "last copied here"
 export const CLIPBOARD_CELL_TITLE =
   "what you last copied in this tab; a copy made in another app shows here once you paste it"
@@ -182,7 +182,7 @@ export const CLIPBOARD_CELL_TITLE =
 export const PUT = "put"
 export const PUT_TITLE =
   "put below the line in the column you were in (Ctrl+Shift+O)"
-/** A card's button that discards it; the undo key brings it back (ADR-0111). */
+/** A card's button that discards it; the undo key brings it back. */
 export const DISCARD_CARD = "×"
 export const DISCARD_CARD_TITLE =
   "discard (Ctrl+Shift+Backspace) · the undo key brings it back"
@@ -194,7 +194,7 @@ export const TRASH_COLUMN =
 export const noticeKey = (notice: CardNotice): string =>
   `${notice.code}:${notice.card ?? ""}`
 
-// ── pinned cards (ADR-0048 step 5) ────────────────────────────────────────
+// ── pinned cards ──────────────────────────────────────────────────────────
 
 /** A column's button that opens a box for a new pinned card. */
 export const NEW_PIN = "+ pin"
@@ -228,7 +228,7 @@ export const pinnedMarkerWords = (marker: PinnedMarker): string =>
     ? "the agent was told pinned cards no longer apply"
     : `the agent read ${marker.cards.length} pinned ${marker.cards.length === 1 ? "card" : "cards"}`
 
-/** The marker's line for the cards pinned to the task a run read (ADR-0116). */
+/** The marker's line for the cards pinned to the task a run read. */
 export const taskPinnedMarkerWords = (
   marker: NonNullable<PinnedMarker["taskPinned"]>,
 ): string =>
@@ -236,7 +236,7 @@ export const taskPinnedMarkerWords = (
     ? "the agent was told the task's pinned cards no longer apply"
     : `the agent read ${marker.cards.length} ${marker.cards.length === 1 ? "card" : "cards"} pinned to the task`
 
-/** The marker's line for the canvas list a run was told (ADR-0116). */
+/** The marker's line for the canvas list a run was told. */
 export const canvasMarkerWords = (canvas: CanvasView): string => {
   const n = canvas.lines.length + canvas.more
   return `the agent was told the task's canvas: ${n} ${n === 1 ? "card" : "cards"}`
@@ -246,7 +246,7 @@ export const canvasMarkerWords = (canvas: CanvasView): string => {
 export const retiredWords = (line: string): string =>
   `no longer applies: “${line}”`
 
-// ── history and traces (ADR-0048 step 6) ──────────────────────────────────
+// ── history and traces ────────────────────────────────────────────────────
 
 /** A card's ⋯ item that shows where it has been, or hides it again. */
 export const historyItemWords = (open: boolean): string =>

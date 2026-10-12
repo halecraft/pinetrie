@@ -24,7 +24,7 @@ import { entriesOf, entry, fromParents, threadOfEntry } from "./fixtures.ts"
 const tree = (parents: Record<string, string | null>) =>
   fromParents(parents, id => ({ role: "chat", content: id, author: "A" }))
 
-// The plan's example: a trunk T1 -> T2 -> T3, a branch A off T1, a branch B off
+// An example: a trunk T1 -> T2 -> T3, a branch A off T1, a branch B off
 // T2. The trunk's continuation is older than each branch.
 const forks = tree({
   "1-t1": null,
@@ -39,7 +39,7 @@ const ids = (nodes: readonly { id: string }[]) => nodes.map(n => n.id)
 
 describe("projectColumns", () => {
   const i = indexTree(forks)
-  test("over two roots: each tree's shared part shown once, the trees apart (ADR-0117)", () => {
+  test("over two roots: each tree's shared part shown once, the trees apart", () => {
     const two = indexTree(
       tree({
         "1-t1": null,
@@ -66,7 +66,7 @@ describe("projectColumns", () => {
       ["6-b1", "7-b2"],
     ])
   })
-  test("a column whose parent thread is on no column folds its path above its own first message; one a column to its left shares does not (ADR-0117)", () => {
+  test("a column whose parent thread is on no column folds its path above its first message", () => {
     const [b] = projectColumns(i, [
       { anchor: entryId("7-b2"), foldAbove: threadOfEntry("6-b1") },
     ])
@@ -80,7 +80,7 @@ describe("projectColumns", () => {
     ])
     expect([shared?.forkFrom, ids(shared?.above ?? [])]).toEqual(["1-t1", []])
   })
-  test("a branch not yet sent from a held thread leaves that thread's entries out (ADR-0124)", () => {
+  test("a branch not yet sent from a held thread leaves that thread's entries out", () => {
     const held = threadAt(i, entryId("6-b1"))
     expect(held).not.toBeNull()
     const [c] = projectColumns(i, [
@@ -152,7 +152,7 @@ describe("projectColumns", () => {
   })
 })
 
-describe("a branch whose first entry is a context entry no column draws (ADR-0125)", () => {
+describe("a branch whose first entry is a context entry no column draws", () => {
   // Under 2-t2, branch B's first run wrote its canvas entry, then its prompt;
   // then the trunk's next run wrote its own canvas entry, prompt and reply.
   const T = threadIdFor("t")

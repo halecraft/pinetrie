@@ -265,7 +265,7 @@ describe("the floor, while work is written at the end", () => {
   })
 })
 
-describe("releasedTip: the tip a reader left the end at (ADR-0106)", () => {
+describe("releasedTip: the tip a reader left the end at", () => {
   test("a scroll up keeps the tip of the moment, and more of the run does not move it", () => {
     expect(released.releasedTip).toBe("t1")
     const later = follow(released, {

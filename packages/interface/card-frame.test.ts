@@ -77,7 +77,7 @@ const pin = { kind: "pin", card: C1 } as const
 const take = { kind: "takeIntoInventory", card: C1 } as const
 const pinTask = { kind: "pinToTask", card: C1 } as const
 
-describe("cardFrame (ADR-0111)", () => {
+describe("cardFrame", () => {
   test.each<[string, TextPlace, CardTone, readonly unknown[]]>([
     [
       "your message: the notes, the queue, pinned, the task, your inventory",
@@ -92,7 +92,7 @@ describe("cardFrame (ADR-0111)", () => {
       ],
     ],
     [
-      "a note: the task, your inventory, its note column being no thread's (ADR-0116)",
+      "a note: the task, your inventory, its note column being no thread's",
       note,
       "note",
       [
@@ -126,7 +126,7 @@ describe("cardFrame (ADR-0111)", () => {
       ],
     ],
     [
-      "pinned to the task: the notes, your inventory (ADR-0116)",
+      "pinned to the task: the notes, your inventory",
       { kind: "task-pinned", task: TEST_TASK, order: "a" },
       "pinned",
       [
@@ -135,7 +135,7 @@ describe("cardFrame (ADR-0111)", () => {
       ],
     ],
     [
-      "a comment: a reference queued on its thread, which leaves it where it is; your inventory (ADR-0126)",
+      "a comment: a reference queued on its thread, which leaves it where it is; your inventory",
       { kind: "margin", entry: entryId("e-1"), thread: LANE, order: "a" },
       "note",
       [
@@ -198,7 +198,7 @@ describe("cardFrame (ADR-0111)", () => {
     })
   })
 
-  test("a queued reference's ⋯ offers only the moves its kind may make: back to the notes, into your inventory, never pinned; it reorders and is discarded (ADR-0126)", () => {
+  test("a queued reference's ⋯ offers only the moves its kind may make, never a pin", () => {
     const id = cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1")
     const reference: CardRecord = {
       kind: "reference",

@@ -75,7 +75,7 @@ describe("card words", () => {
       "↓ catches up with accepted work first, then sends what you write",
     ],
     [
-      "commandWords, the thread it branched from (ADR-0072)",
+      "commandWords, the thread it branched from",
       commandWords("catch-up-with-parent", {
         base: { kind: "accepted" },
         parent: {
@@ -134,7 +134,7 @@ describe("card words", () => {
       "inventory full",
     ],
     [
-      "noticeWords, an undo across the archive's edge (ADR-0126)",
+      "noticeWords, an undo across the archive's edge",
       noticeWords(refusal({ code: "archived" }), READER),
       "not undone: restore or archive it on the board",
     ],
@@ -143,7 +143,7 @@ describe("card words", () => {
   })
 })
 
-describe("pinned card words (ADR-0048 step 5)", () => {
+describe("pinned card words", () => {
   const card = { id: textCardId("p-1"), text: "x", by: ME }
   test.each([
     ["read", pinnedStatusWords("read"), "read by the agent"],
@@ -180,7 +180,7 @@ describe("pinned card words (ADR-0048 step 5)", () => {
   })
 })
 
-describe("history and traces (ADR-0048 step 6)", () => {
+describe("history and traces", () => {
   const _ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
   const atEnd: PlaceKey = {
     kind: "note",

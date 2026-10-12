@@ -1,10 +1,6 @@
-// interface/face — a card at its least detail (ADR-0126): a folded column's
-// strip, a grid's cell, and later a mark in a margin. One union, a case per
-// kind that is drawn, so every surface that draws a face draws the same
-// value. Its frame (tone, state, actions) is the place's (`card-frame.ts`);
-// what is here is the kind's. Pure: `faceOf` decides it, `textFaceWords`
-// words a text card's, and `RENDERINGS` (`packages/web/renderings.tsx`)
-// draws each.
+// interface/face — a card at its least detail: a folded column's strip, a
+// grid's cell, a mark in a margin. One union, a case per kind that is drawn,
+// so every surface that draws a face draws the same value.
 
 import type {
   Address,
@@ -61,14 +57,14 @@ export interface NoteColumnFace {
   readonly notes: number | null
 }
 
-/** A fact's face (ADR-0126): the fact, worded by `factLine`. */
+/** A fact's face: the fact, worded by `factLine`. */
 export interface FactFace {
   readonly kind: "fact"
   readonly card: FactCardId
   readonly fact: QueuedFact
 }
 
-/** A reference's face (ADR-0126): a chip naming what it names. */
+/** A reference's face: a chip naming what it names. */
 export interface ReferenceFace {
   readonly kind: "reference"
   readonly card: ReferenceCardId
@@ -78,7 +74,7 @@ export interface ReferenceFace {
   readonly key: string | null
 }
 
-/** An ask card's face (ADR-0128): the ask relayed, worded by `askLine`. */
+/** An ask card's face: the ask relayed, worded by `askLine`. */
 export interface AskFace {
   readonly kind: "ask"
   readonly card: AskCardId
@@ -94,10 +90,8 @@ export type Face =
   | ReferenceFace
   | AskFace
 
-/** The face of a card of `K`. */
 export type FaceOf<K extends DrawnKind> = Extract<Face, { readonly kind: K }>
 
-/** The card a face draws. */
 export const cardOfFace = (face: Face): CardId =>
   face.kind === "thread" ? face.thread : face.card
 
@@ -166,7 +160,7 @@ export function noteColumnFace(
 }
 
 /**
- * Each kind's icon (ADR-0126): a card's icon and shape say its kind, and its
+ * Each kind's icon: a card's icon and shape say its kind, and its
  * frame's colour its place, so the two never cross.
  */
 export const KIND_ICON: Readonly<Record<DrawnKind, string>> = {
@@ -204,7 +198,7 @@ const COMMAND_CHIP: Readonly<Record<CardCommand, string>> = {
   split: "split",
 }
 
-// ── levels of detail (ADR-0126, *Renderings*) ─────────────────────────────
+// ── levels of detail ──────────────────────────────────────────────────────
 
 /**
  * How much of a card is drawn: a face (a strip, a cell, a mark), normal (the
@@ -213,7 +207,7 @@ const COMMAND_CHIP: Readonly<Record<CardCommand, string>> = {
 export type Detail = "face" | "normal" | "whole"
 
 /**
- * The level each place draws its cards at (ADR-0126's table), total, so a
+ * The level each place draws its cards at total, so a
  * new place does not compile until it says how its cards draw. A dock and a
  * list draw normal, a canvas whole, an inventory faces in its grid (its
  * selected card normal in the preview, and whole when opened). An entry's

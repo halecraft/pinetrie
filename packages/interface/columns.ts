@@ -1,8 +1,4 @@
-// interface/columns — a thread's column as the page draws it (ADR-0117).
-//
-// Which columns a task shows, and in what order, is its canvas's
-// (`canvas-columns.ts`, ADR-0116): a thread not yet started is a thread card
-// there too (ADR-0126), whose column ends at its fork. Pure.
+// interface/columns — a thread's column as the page draws it.
 
 import {
   type CardId,
@@ -33,7 +29,7 @@ export interface Prefill {
 /**
  * A first message an unstarted thread's column sends as it opens ('branch
  * here' after a conflict), and the card it came from, which that send
- * spends (ADR-0048).
+ * spends.
  */
 export interface Pending {
   readonly text: string
@@ -42,8 +38,7 @@ export interface Pending {
 
 /**
  * What the shell mints for one intent: a key, the root and the task a new
- * tab opens (ADR-0066, ADR-0116), the thread a column opens (ADR-0117,
- * ADR-0126), and a note column made on a canvas (ADR-0116).
+ * tab opens, the thread a column opens, and a note column made on a canvas.
  */
 export interface Minted {
   readonly key: string
@@ -51,9 +46,9 @@ export interface Minted {
   readonly task: TaskId
   readonly thread: ThreadId
   readonly noteColumn: NoteColumnId
-  /** A reference a paste makes where it lands (ADR-0132). */
+  /** A reference a paste makes where it lands. */
   readonly reference: ReferenceCardId
-  /** A text card a paste makes where it lands (ADR-0132). */
+  /** A text card a paste makes where it lands. */
   readonly text: TextCardId
 }
 
@@ -67,40 +62,40 @@ export interface Column {
    */
   readonly anchor: EntryId | null
   /**
-   * The thread it shows (ADR-0117), which names its lane when it has one
-   * (`laneOf`). A column opens its thread before its first send (ADR-0126).
+   * The thread it shows, which names its lane when it has one
+   * (`laneOf`). A column opens its thread before its first send.
    */
   readonly thread: ThreadId
   /** A Start Agent column: a message with no mention asks the agent. */
   readonly asksAgent?: true
   /**
    * Its own thread, when the thread it forks from is on no column of its
-   * canvas (ADR-0117): the path above the thread's first message folds
+   * canvas: the path above the thread's first message folds
    * behind its fork row.
    */
   readonly foldAbove?: ThreadId
   /**
-   * How much of each ask is drawn (ADR-0106); absent is story. The reader's
+   * How much of each ask is drawn; absent is story. The reader's
    * choice, never the document's.
    */
   readonly density?: Density
   /**
-   * The thread's details are open under the header (ADR-0073). The reader's
+   * The thread's details are open under the header. The reader's
    * choice, never the document's.
    */
   readonly details?: true
   /**
-   * How its next send writes (ADR-0117): at its thread's end; or, not yet
+   * How its next send writes: at its thread's end; or, not yet
    * started, as a branch at its anchor, its thread's first message.
    */
   readonly mode: ColumnMode
 }
 
 /**
- * A thread not yet started (ADR-0126): its card is on its task's canvas,
+ * A thread not yet started: its card is on its task's canvas,
  * shared, and its first send writes its first entry, a branch at `fork`, or
  * a new root's first for null, in `root`. `held`: the thread it forks from,
- * when someone else holds it (ADR-0124): its entries are left out, the
+ * when someone else holds it: its entries are left out, the
  * column says who has it, and a send there is refused until it is on a
  * canvas again. `pending` and `prefill` are the opener's own (`CardView`).
  */
@@ -133,7 +128,7 @@ export const branchesAt = (column: Pick<Column, "mode">): boolean =>
   column.mode.kind !== "bound"
 
 /**
- * Which column something is said or done in, by kind (ADR-0116), carried
+ * Which column something is said or done in, by kind, carried
  * in an intent so what each kind allows is the type's: a card's column on
  * the canvas folds, moves and, unstarted, closes; the task column holds the
  * task's pins. `keyText` is its key as the page draws it.
@@ -153,7 +148,7 @@ export const keyText = (key: ColumnKey): string =>
   key.kind === "card" ? key.card : key.task
 
 /**
- * A reader's setting (ADR-0106, ADR-0073): how much of each ask a column
+ * A reader's setting: how much of each ask a column
  * draws, and whether its thread's details are open.
  */
 export type ReaderAction =
