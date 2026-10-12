@@ -10,7 +10,7 @@ import {
 } from "./identity.ts"
 import { failedWords } from "./send.ts"
 
-describe("identity (ADR-0037)", () => {
+describe("identity", () => {
   test("the form's input is normalized, or names the field that is not usable", () => {
     expect(parseIdentity(" Ada@X.io ", " Ada ")).toEqual({
       ok: true,

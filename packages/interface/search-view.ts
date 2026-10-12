@@ -1,6 +1,5 @@
-// interface/search-view — what a search shows (ADR-0101): each column's own
-// matches, as rows with the gaps between them; the bar's line; and the words
-// of both. Pure.
+// interface/search-view — what a search shows: each column's own matches, as
+// rows with the gaps between them; the bar's line; and the words of both.
 //
 // A match belongs to the column that draws its message (`ColumnView.nodes`),
 // so no match is drawn twice. One match is one message, however often the

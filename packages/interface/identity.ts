@@ -1,4 +1,4 @@
-// interface/identity — who this browser says it is (ADR-0037).
+// interface/identity — who this browser says it is.
 //
 // A person is their email: the principal every Exchange of theirs names, and
 // so their writer. It is kept per device, shared by its tabs, so a reload, a
@@ -97,8 +97,8 @@ export function renameProblem(
 }
 
 /**
- * What the profile page says of the host's answer to a picture (ADR-0098):
- * a refusal's reason or a failure, as for a rename; null when it took.
+ * What the profile page says of the host's answer to a picture: a refusal's
+ * reason or a failure, as for a rename; null when it took.
  */
 export const pictureProblem = (outcome: Outcome): string | null =>
   renameProblem(outcome)?.message ?? null

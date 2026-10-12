@@ -1,5 +1,4 @@
 // interface/rail-view — the view's part of the rail's stretches (`compactRail`).
-// Pure.
 
 import type { AgentRun, DigestBody, EntryId, RailRow } from "@pinetrie/core"
 import { digestText } from "@pinetrie/rules"
@@ -36,11 +35,11 @@ export function railKeep(input: {
 const NO_RINGS: ReadonlyMap<EntryId, unknown> = new Map()
 
 /**
- * What a root's columns draw apart from any fold (ADR-0106): the rail's
- * landmarks, kept as `railKeep` keeps them but for the rings. A ring is a
- * thread end, and a thread end on a column's path is the column's own end,
- * kept already; leaving presence out keeps a presence write from redrawing
- * every column (S59). Sorted, so a list of the same is equal by value.
+ * What a root's columns draw apart from any fold: the rail's landmarks, kept as
+ * `railKeep` keeps them but for the rings. A ring is a thread end, and a thread
+ * end on a column's path is the column's own end, kept already; leaving
+ * presence out keeps a presence write from redrawing every column. Sorted, so a
+ * list of the same is equal by value.
  */
 export function columnLandmarks(
   rows: readonly RailRow[],
@@ -50,9 +49,9 @@ export function columnLandmarks(
 }
 
 /**
- * A capsule's tooltip: its ask, when it is one long ask's work (ADR-0106),
- * then what it holds (`workWords`), then its digest as the model wrote it
- * (`digestText`), when it has a headline.
+ * A capsule's tooltip: its ask, when it is one long ask's work, then what it
+ * holds (`workWords`), then its digest as the model wrote it (`digestText`),
+ * when it has a headline.
  */
 export const stretchWords = (
   ask: string | null,
@@ -98,11 +97,11 @@ export function pickAt(
 export interface RailMarks {
   /** On an open column's path: `data-open`. A stretch's first message speaks for it. */
   readonly open: boolean
-  /** Your colour when an unsent card of yours waits here (ADR-0048), else null. */
+  /** Your colour when an unsent card of yours waits here, else null. */
   readonly yours: string | null
   /**
-   * How many of its messages a search finds (`itemMatches`, ADR-0101): 0 to
-   * dim it, null while not searching.
+   * How many of its messages a search finds (`itemMatches`): 0 to dim it, null
+   * while not searching.
    */
   readonly matches: number | null
 }
@@ -182,9 +181,9 @@ export interface RailView {
 }
 
 /**
- * Where a column's view lies on the rail (ADR-0058): `ids`, the messages from
- * the view's top edge to its bottom edge, `first` and `last` how far into the
- * first and the last the edges are.
+ * Where a column's view lies on the rail: `ids`, the messages from the view's
+ * top edge to its bottom edge, `first` and `last` how far into the first and
+ * the last the edges are.
  *
  * The bands are whole items, so an outline only ever wraps a dot or a capsule
  * entire, and keeps their shape: messages in a row on one branch make one

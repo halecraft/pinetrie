@@ -56,7 +56,7 @@ import { threadLink } from "./thread-link.ts"
 const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-/** Each root's task, by its root entry: the sidebar's key (ADR-0116). */
+/** Each root's task, by its root entry: the sidebar's key. */
 const R1_ID = taskIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
 const R2_ID = taskIdFor("01a0ffd2-0000-7000-8000-0000000000a2")
 const R9_ID = taskIdFor("01a0ffd2-0000-7000-8000-0000000000a9")
@@ -129,7 +129,7 @@ const shown = (root: string, id: TaskId): Effect[] => [
   { kind: "list", act: { kind: "ensure", task: id } },
 ]
 const ME = writerId("ada@x.io")
-/** A thread whose card a link finds (ADR-0117). */
+/** A thread whose card a link finds. */
 const LINKED = threadIdFor("linked")
 const inventoryOf = (holder: WriterId): ThreadCard => ({
   kind: "thread",
@@ -208,7 +208,7 @@ describe("planIntent", () => {
     expect(plan({ kind: "close", here: { kind: "nothing" } })).toEqual([])
   })
 
-  test("showing a root opens it in the sidebar; reordering the sidebar places it by id (ADR-0122)", () => {
+  test("showing a root opens it in the sidebar; reordering the sidebar places it by id", () => {
     expect(
       plan({ kind: "show", here: { kind: "task", task: TASK_OF("5-r2") } }),
     ).toEqual(shown("5-r2", R2_ID))
@@ -235,7 +235,7 @@ describe("planIntent", () => {
     ])
   })
 
-  test("a move on the board asks the host; into the archive it closes the root for you once accepted (ADR-0122)", () => {
+  test("a move on the board asks the host; into the archive it closes the root for you once accepted", () => {
     const [from, to] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
     const move = (closes: boolean) =>
       plan({ kind: "moveTask", task: R1_ID, from, to, before: null, closes })
@@ -462,12 +462,12 @@ describe("planIntent", () => {
 
   test.each([
     [
-      "density (ADR-0106)",
+      "density",
       { kind: "density", density: "outline" },
       { kind: "density", card: C, density: "outline" },
     ],
     [
-      "details (ADR-0073)",
+      "details",
       { kind: "details", open: true },
       { kind: "details", card: C, open: true },
     ],
@@ -543,7 +543,7 @@ describe("planIntent", () => {
     expect(made(false)[2]).toEqual(onR1({ kind: "opened", card: NEW_THREAD }))
   })
 
-  test("a width is asked of the host, from the canvas the card is on; a card on none, nothing (ADR-0116)", () => {
+  test("a width is asked of the host, from the canvas the card is on; a card on none, nothing", () => {
     expect(plan({ kind: "cardWidth", card: C, width: 2 })).toEqual([
       {
         kind: "request",
@@ -558,7 +558,7 @@ describe("planIntent", () => {
     expect(plan({ kind: "cardWidth", card: F, width: 2 })).toEqual([])
   })
 
-  test("a move reorders the column's card on the canvas, for everyone; a branch's or a new tab's has nowhere to move (ADR-0116)", () => {
+  test("a move reorders the column's card on the canvas, for everyone; a branch's or a new tab's has nowhere to move", () => {
     const move = (card: CardId, to: number): Intent => ({
       kind: "moveColumn",
       column: { kind: "card", card },
@@ -611,7 +611,7 @@ describe("planIntent", () => {
       expect(effects.some(e => e.kind === "armFocus")).toBe(false)
     })
 
-    test("a pick into an ask's work opens its fold before it is revealed (ADR-0106)", () => {
+    test("a pick into an ask's work opens its fold before it is revealed", () => {
       const asks: AskIndex = {
         askOf: new Map([[entryId("4-c"), entryId("2-a")]]),
         work: new Map([[entryId("2-a"), [entryId("4-c")]]]),
@@ -636,7 +636,7 @@ describe("planIntent", () => {
       ).toBe(false)
     })
 
-    test("copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas", () => {
+    test("copyThread: a copy lands after its source, or in your inventory; none into a full one or from no canvas", () => {
       expect(plan({ kind: "copyThread", source: TRUNK, to: "here" })).toEqual([
         {
           kind: "request",
@@ -685,7 +685,7 @@ describe("planIntent", () => {
       ).toEqual([])
     })
 
-    test("put: a thread's card from your inventory lands on the canvas you are on, just after the column it was put on, unfolded", () => {
+    test("put: a thread's card from your inventory lands unfolded just after the column it was put on", () => {
       const held: CardRecord = {
         kind: "thread",
         id: LINKED,
@@ -718,7 +718,7 @@ describe("planIntent", () => {
       expect(effects[1]).toMatchObject({ kind: "layout" })
     })
 
-    test("openLink: an entry this tab holds opens as openAt does; another root is shown, archived or not, and the entry once it arrives (ADR-0063)", () => {
+    test("openLink: an entry this tab holds opens as openAt does; another root is shown, and the entry once it arrives", () => {
       expect(
         plan({
           kind: "openLink",
@@ -773,7 +773,7 @@ describe("planIntent", () => {
     })
   })
 
-  describe("cards (ADR-0048, ADR-0108)", () => {
+  describe("cards", () => {
     const lane = threadIdFor("x")
     const where = atEntry(entryId("3-b"))
     const ada = writerId("ada@x.test")
@@ -858,7 +858,7 @@ describe("planIntent", () => {
         plan(unqueue, at(onRoot("1-r1"), undefined, withCard(atEnd))),
       ).toEqual([])
     })
-    test("a reorder moves the card one place among the list as drawn, said in the column; at an edge, or past a fact, nothing (ADR-0048 step 7)", () => {
+    test("a reorder moves the card one place among the list as drawn; at an edge, or past a fact, nothing", () => {
       const q = (id: string, order: string) =>
         ({
           ...yours,
@@ -949,7 +949,7 @@ describe("planIntent", () => {
         plan(column({ kind: "offer", lane, action: "squash", to: null })),
       ).toEqual([{ kind: "offer", lane, action: "squash", to: null }])
     })
-    test("continue on accepted work queues its own command (ADR-0104)", () => {
+    test("continue on accepted work queues its own command", () => {
       expect(
         plan(
           column({
@@ -988,7 +988,7 @@ describe("planIntent", () => {
   })
 })
 
-test("afterTaskMove: what follows a move runs only once the host accepts it; a refusal of its card's move is said on the board (ADR-0126)", () => {
+test("afterTaskMove: what follows a move runs only once the host accepts it; a refusal of its card's move is said on the board", () => {
   const moved: Effect[] = [
     {
       kind: "layout",
@@ -1053,7 +1053,7 @@ test("foldList asks for the width the sidebar does not show", () => {
   ])
 })
 
-describe("a page over the stage (ADR-0098)", () => {
+describe("a page over the stage", () => {
   const onPage: IntentState = { ...R1, page: "profile" }
   const leave: Effect = { kind: "page", to: null }
   const r2: Intent = {
@@ -1098,7 +1098,7 @@ describe("a page over the stage (ADR-0098)", () => {
   })
 })
 
-describe("a search over the root you are on (ADR-0101)", () => {
+describe("a search over the root you are on", () => {
   const searching: IntentState = { ...R1, searching: true }
   const close: Effect = { kind: "search", act: { kind: "close" } }
   const openAt: Intent = { kind: "openAt", entry: entryId("3-b") }

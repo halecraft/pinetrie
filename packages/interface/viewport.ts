@@ -1,6 +1,6 @@
 // interface/viewport — what a column shows of its messages, and where a column
-// left is placed when it comes back (ADR-0058). Pure: `use-viewport.ts`
-// measures, the rail draws, `App` places.
+// left is placed when it comes back. `use-viewport.ts` measures, the rail
+// draws, `App` places.
 //
 // One measurement serves both: the first message in view and how far into it
 // the view's top is, and the last and how far into it its bottom is. The rail
@@ -228,10 +228,10 @@ export interface Viewports {
 }
 
 /**
- * Every mounted column's view, for the rail (ADR-0058). Made once in `App`;
- * columns write it once a frame at most, and only the rail's outlines read
- * it, so a scroll redraws no column. Each write is a new snapshot, as
- * `useSyncExternalStore` needs.
+ * Every mounted column's view, for the rail. Made once in `App`; columns write
+ * it once a frame at most, and only the rail's outlines read it, so a scroll
+ * redraws no column. Each write is a new snapshot, as `useSyncExternalStore`
+ * needs.
  */
 export interface ViewportStore {
   get(): Viewports
@@ -275,9 +275,9 @@ export function viewportStore(): ViewportStore {
 }
 
 /**
- * Where columns were left, kept for the page's life (ADR-0058). A plain
- * object made once in `App`, as `screenMemory` is; its value is the same
- * shape a store shared by a person's devices would hold.
+ * Where columns were left, kept for the page's life. A plain object made once
+ * in `App`, as `screenMemory` is; its value is the same shape a store shared by
+ * a person's devices would hold.
  */
 export interface SpotStore {
   load(): Spots

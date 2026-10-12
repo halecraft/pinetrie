@@ -1,7 +1,7 @@
-// interface/note-column-view — a task's note columns as the page draws them
-// (ADR-0116): each a title and its notes in one order, a column of the
-// canvas at its rank there (`canvasColumns`). Pure: `NoteColumn`
-// (`packages/web/note-column.tsx`) draws one.
+// interface/note-column-view — a task's note columns as the page draws them:
+// each a title and its notes in one order, a column of the canvas at its rank
+// there (`canvasColumns`). `NoteColumn` (`packages/web/note-column.tsx`) draws
+// one.
 
 import type { CardRecord, NoteColumnId, NoteColumnRecord } from "@pinetrie/core"
 import {

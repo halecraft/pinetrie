@@ -150,7 +150,7 @@ describe("sendable", () => {
     const edit = { text: "@agent try again ", blank: false }
     expect(sendable(edit.text, edit, false)).toBe("@agent try again")
   })
-  test("a card with a command is sent with no text (ADR-0108)", () => {
+  test("a card with a command is sent with no text", () => {
     expect(sendable("  ", blank, false, "bring-up-to-date")).toBe("")
     expect(sendable("@agent ", blank, false, "bring-up-to-date")).toBe("")
     expect(sendable("check it", blank, false, "bring-up-to-date")).toBe(
@@ -160,7 +160,7 @@ describe("sendable", () => {
   })
 })
 
-describe("planSend: what the send does, as the host will decide (ADR-0021)", () => {
+describe("planSend: what the send does, as the host will decide", () => {
   const plan = (
     text: string,
     over: Partial<Parameters<typeof planSend>[0]> = {},
@@ -226,7 +226,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       agentByDefault: true,
     })
   })
-  test("a busy lane queues the next card, a question or a person's message (ADR-0048)", () => {
+  test("a busy lane queues the next card, a question or a person's message", () => {
     expect(plan("hi", { lane: lane({ running: true }) })).toMatchObject({
       mode: "queue",
       queue: { kind: "next" },
@@ -242,7 +242,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       to: { compels: NOBODY, people: ["Ada"] },
     })
   })
-  test("on an idle lane whose queue is held, a send queues last and releases it; on a running one it waits (ADR-0113)", () => {
+  test("on an idle lane whose queue is held, a send queues last and releases it; on a running one it waits", () => {
     expect(
       plan("hi", { lane: lane({ heldBy: BEA, waiting: 2, lastWaiting: BEA }) }),
     ).toMatchObject({
@@ -254,7 +254,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       plan("hi", { lane: lane({ heldBy: BEA, running: true }) }),
     ).toMatchObject({ mode: "queue", hold: "keep", queue: { kind: "next" } })
   })
-  test("a card with a command is queued, even on an idle lane; with no lane it is not (ADR-0108)", () => {
+  test("a card with a command is queued, even on an idle lane; with no lane it is not", () => {
     expect(
       plan("check it", { lane: lane(), command: "bring-up-to-date" }).mode,
     ).toBe("queue")
@@ -454,7 +454,7 @@ describe("raceWords", () => {
 })
 
 describe("what a new lane starts from: its line", () => {
-  test("forkWords: a new lane cloned from a conflicted commit says so (ADR-0072)", () => {
+  test("forkWords: a new lane cloned from a conflicted commit says so", () => {
     expect(forkWords(1)).toBe(
       "starts from a copy with an unresolved conflict in 1 file",
     )

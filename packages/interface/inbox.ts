@@ -1,12 +1,11 @@
-// interface/inbox — the messages that mention you, and which you have seen
-// (ADR-0030). Pure.
+// interface/inbox — the messages that mention you, and which you have seen.
 //
 // The items are derived from each root's directory record, so a mention in a
-// root this tab does not hold is in the inbox too (ADR-0063); only what you
-// have seen is stored, in your attention document, on every device of yours
-// (`use-inbox.ts`, ADR-0077). `since` is a watermark: every mention at or
-// before it is seen, and `seen` holds the ids of later ones you have seen.
-// Entry ids are uuidv7, so id order is creation order (S9).
+// root this tab does not hold is in the inbox too; only what you have seen is
+// stored, in your attention document, on every device of yours
+// (`use-inbox.ts`). `since` is a watermark: every mention at or before it is
+// seen, and `seen` holds the ids of later ones you have seen. Entry ids are
+// uuidv7, so id order is creation order.
 
 import {
   address,
@@ -23,7 +22,7 @@ export interface InboxItem {
   readonly id: EntryId
   /** The root it is in. */
   readonly root: RootId
-  /** The thread it is in, whose task it opens in (ADR-0116). */
+  /** The thread it is in, whose task it opens in. */
   readonly thread: ThreadId
   readonly by: WriterId
   readonly text: string
@@ -33,7 +32,7 @@ export interface InboxItem {
  * Every chat that names you, newest first: its mentions resolve (`address`)
  * to your display name. Your own messages never mention you. Only chats
  * count, as `RootRecord.mentions` holds only chats: `address` decides who
- * a person's message is for (ADR-0021).
+ * a person's message is for.
  */
 export function mentionsOf(input: {
   /** Every root's directory record. */

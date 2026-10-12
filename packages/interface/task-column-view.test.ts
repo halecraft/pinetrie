@@ -50,7 +50,7 @@ const head = threadCardHead(K, {
   work: new Map(),
 })
 
-describe("taskColumnView (ADR-0116)", () => {
+describe("taskColumnView", () => {
   test("its title, stored or not, its state by name, and Move to ▸ its thread card's", () => {
     const view = taskColumnView({
       task: K,
@@ -120,7 +120,7 @@ describe("taskColumnView (ADR-0116)", () => {
   })
 })
 
-test("a strip's task column is first, folded by default, and no card's column (ADR-0116)", () => {
+test("a strip's task column is first, folded by default, and no card's column", () => {
   const strip = stripOf(K, defaultView(null), [])
   expect(strip[0]).toEqual({ kind: "task", task: K, folded: true })
   const card = {

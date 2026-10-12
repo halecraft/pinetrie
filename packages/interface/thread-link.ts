@@ -29,7 +29,7 @@ export type ThreadLink = (
       readonly thread: ThreadId
       readonly task: TaskId
     }
-  /** In your inventory: it opens the thread's preview there (ADR-0124). */
+  /** In your inventory: it opens the thread's preview there. */
   | { readonly kind: "mine"; readonly thread: ThreadId }
   /** In someone else's inventory: it opens nothing. */
   | { readonly kind: "held"; readonly thread: ThreadId; readonly by: WriterId }
@@ -43,7 +43,7 @@ export type ThreadLink = (
   | { readonly kind: "gone"; readonly thread: ThreadId }
 ) & { readonly [threadLinkBrand]: true }
 
-/** Where `thread`'s card is, as a link `me` follows. Pure. */
+/** Where `thread`'s card is, as a link `me` follows. */
 export function threadLink(
   thread: ThreadId,
   cards: readonly CardRecord[],
@@ -103,7 +103,7 @@ export type LinkOpen =
   | { readonly kind: "restore"; readonly thread: ThreadId }
   | { readonly kind: "nothing" }
 
-/** What following `link` to `entry` does. Pure. */
+/** What following `link` to `entry` does. */
 export function openOf(link: ThreadLink, entry: EntryId): LinkOpen {
   switch (link.kind) {
     case "open":
@@ -118,7 +118,7 @@ export function openOf(link: ThreadLink, entry: EntryId): LinkOpen {
   }
 }
 
-/** Where a row's other thread is, when it is not this task's (ADR-0128). */
+/** Where a row's other thread is, when it is not this task's. */
 export interface CrossTaskLink {
   readonly link: ThreadLink
   readonly words: string
@@ -127,7 +127,7 @@ export interface CrossTaskLink {
 /**
  * Each ask, answer and heard row from another thread, by its entry, with
  * where that thread is: its task's label, or who has it. A thread on the
- * column's own task (`here`) adds nothing to its name, and has none. Pure.
+ * column's own task (`here`) adds nothing to its name, and has none.
  */
 export function crossTaskLinks(
   nodes: readonly {

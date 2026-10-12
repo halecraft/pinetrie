@@ -1,6 +1,6 @@
-// interface/tasks — the tasks a page shows (ADR-0116): the rules' task index
+// interface/tasks — the tasks a page shows: the rules' task index
 // (`indexTasks`, the host's too), each task with its threads and their
-// roots. A task's signals are its threads' (`taskStatus`, `taskWork`). Pure.
+// roots. A task's signals are its threads' (`taskStatus`, `taskWork`).
 
 import type {
   CardRecord,
@@ -35,7 +35,7 @@ export const NO_TASKS: Tasks = { index: NO_TASK_INDEX, byId: new Map() }
 
 /**
  * Every task whose card is on the board (`boardTasks`), its canvas read
- * from `cards`, and each thread's root from its record. Pure.
+ * from `cards`, and each thread's root from its record.
  */
 export function tasksOf(input: {
   readonly cards: readonly CardRecord[]

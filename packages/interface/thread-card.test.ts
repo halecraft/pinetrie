@@ -42,7 +42,7 @@ const facts = (over: Partial<ThreadCardFacts> = {}): ThreadCardFacts => ({
   ...over,
 })
 
-describe("threadCardHead (ADR-0111, ADR-0116)", () => {
+describe("threadCardHead", () => {
   test("its label, ⇡, your pip, and Move to ▸ each other state; into the archive refused while the agent works, naming the offers it withdraws", () => {
     const head = threadCardHead(K1, facts())
     expect(head).toMatchObject({

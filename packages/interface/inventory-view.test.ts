@@ -111,7 +111,7 @@ describe("inventoryView", () => {
   })
 })
 
-test("a thread's card is drawn by its face: its name, its first line, where it ended, and its status (ADR-0124)", () => {
+test("a thread's card is drawn by its face: its name, its first line, where it ended, and its status", () => {
   const T = threadIdFor("t")
   const index = indexTree(
     fromParents({ "1-r": null, "2-a": "1-r" }, id => ({
@@ -165,7 +165,7 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
   })
 })
 
-test("a thread's face reads its first message, not the context entry its first run wrote above it (ADR-0125)", () => {
+test("a thread's face reads its first message, not the context entry its first run wrote above it", () => {
   const T = threadIdFor("t")
   const B = threadIdFor("b")
   const index = indexTree(
@@ -196,7 +196,7 @@ test("a thread's face reads its first message, not the context entry its first r
   expect([face.first, face.last]).toEqual(["an aside", "ok"])
 })
 
-test("a thread's preview is its path from its root, read only (ADR-0124)", () => {
+test("a thread's preview is its path from its root, read only", () => {
   const index = indexTree(
     fromParents({ "1-r": null, "2-a": "1-r", "3-b": "1-r" }, id => ({
       role: "chat",

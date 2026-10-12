@@ -1,5 +1,5 @@
 // interface/reveal — bringing a card's place into view where an undo of moves
-// acted (ADR-0052, ADR-0066). Pure.
+// acted.
 //
 // The host answers an undo with each card it moved and where it is now, so
 // the place is shown as the undo acts.
@@ -22,11 +22,10 @@ const at = (key: string): ActedAt => ({ kind: "column", key })
 
 /**
  * The effects that show `place`, and where a refusal there is said: your
- * inventory's panel; a thread's end, or a comment's entry, as `openAt`
- * shows an entry; a note
- * column, unfolded; your message at a thread not yet started, its card,
- * unfolded in its task; a task's card, the board. A queued `card` is scrolled to in its column's
- * dock, which scrolls apart from the thread (ADR-0113).
+ * inventory's panel; a thread's end, or a comment's entry, as `openAt` shows an
+ * entry; a note column, unfolded; your message at a thread not yet started, its
+ * card, unfolded in its task; a task's card, the board. A queued `card` is
+ * scrolled to in its column's dock, which scrolls apart from the thread.
  */
 export function revealOf(
   place: PlaceKey,
@@ -39,7 +38,7 @@ export function revealOf(
         effects: [{ kind: "showInventory", brief: false }],
         actedAt: AT_INVENTORY,
       }
-    // A card on a canvas: its column, unfolded in its task (ADR-0116).
+    // A card on a canvas: its column, unfolded in its task.
     case "canvas":
       return {
         effects:
@@ -55,7 +54,7 @@ export function revealOf(
               ],
         actedAt: AT_INVENTORY,
       }
-    // A note: its note column, unfolded in its task (ADR-0116).
+    // A note: its note column, unfolded in its task.
     case "note": {
       const task = state.tasks.index.taskOfCard.get(place.column)
       return {
@@ -73,7 +72,7 @@ export function revealOf(
         actedAt: at(place.column),
       }
     }
-    // Pinned to a task: its task column, unfolded (ADR-0116).
+    // Pinned to a task: its task column, unfolded.
     case "task-pinned":
       return {
         effects: [
@@ -82,7 +81,7 @@ export function revealOf(
         ],
         actedAt: at(place.task),
       }
-    // A task's card on the board: the board, open (ADR-0126).
+    // A task's card on the board: the board, open.
     case "board":
       return {
         effects: [layout({ kind: "board", open: true })],
@@ -95,7 +94,7 @@ export function revealOf(
     case "pinned":
     case "queued":
     case "margin": {
-      // A comment's entry, as a thread end is opened (ADR-0126).
+      // A comment's entry, as a thread end is opened.
       const end =
         place.kind === "margin"
           ? place.entry in state.index.entries

@@ -2345,8 +2345,7 @@ export const mutations: readonly Mutation[] = [
     from: '  return column.mode.kind === "unstarted" || at.kind === "entry"\n',
     to: '  return at.kind === "entry"\n',
     command: unit,
-    expect:
-      "composerPlace: your message at its thread, at its end once it has one, or at an unstarted thread's",
+    expect: "composerPlace: at the thread's end, or an unstarted thread's",
   },
   {
     name: "the undo keys reach into a text box",
@@ -3542,7 +3541,7 @@ export const mutations: readonly Mutation[] = [
     to: '        : { kind: "canvas", task, after: null }\n',
     command: unit,
     expect:
-      "copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas",
+      "copyThread: a copy lands after its source, or in your inventory; none into a full one or from no canvas",
   },
   {
     name: "a copy here from no canvas is sent anyway",
@@ -3551,7 +3550,7 @@ export const mutations: readonly Mutation[] = [
     to: '      : task === undefined\n        ? { kind: "inventory", slot: null }\n',
     command: unit,
     expect:
-      "copyThread: a copy at the source's end, just after it on its canvas, or into your inventory; refused here into a full one, and nothing here from no canvas",
+      "copyThread: a copy lands after its source, or in your inventory; none into a full one or from no canvas",
   },
   {
     name: "a thread put from the inventory goes in a note column",
@@ -3560,7 +3559,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "put: a thread's card from your inventory lands on the canvas you are on, just after the column it was put on, unfolded",
+      "put: a thread's card from your inventory lands unfolded just after the column it was put on",
   },
   {
     name: "a tab holds no root of a thread in your inventory",
@@ -3692,7 +3691,7 @@ export const mutations: readonly Mutation[] = [
     to: "    return focus.selectedCard === null || focus.column === null || focus.inText",
     command: unit,
     expect:
-      "the put key in a text box puts the card in your hand in the column, whatever its kind: only a paste types into a box",
+      "the put key in a text box puts the card in your hand in the column: only a paste types into a box",
   },
   {
     name: "search reads a link's address",

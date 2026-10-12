@@ -54,7 +54,7 @@ const editText = (edit: MessageTools["edit"]): string | undefined =>
   edit?.kind === "branch" ? edit.branch.prefill?.text : edit?.prefill.text
 
 describe("edit", () => {
-  // Messages as their threads' defaults and mentions made them (ADR-0021).
+  // Messages as their threads' defaults and mentions made them.
   const cases: readonly TranscriptMessage[] = [
     chat("just us", false),
     chat("fix the test", true),
@@ -204,7 +204,7 @@ test("showsText: a message that only called tools shows only its rows", () => {
   ).toBe(true)
 })
 
-describe("taking from the past (ADR-0126)", () => {
+describe("taking from the past", () => {
   const node = {
     id: entryId("5-m"),
     thread: FIXTURE_THREAD,

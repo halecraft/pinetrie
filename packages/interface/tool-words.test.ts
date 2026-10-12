@@ -2,7 +2,7 @@ import { TOOL_IDS, type ToolCall, type ToolId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { callLabel, PREVIEW_LENGTH, toolWord } from "./tool-words.ts"
 
-describe("toolWord (ADR-0114)", () => {
+describe("toolWord", () => {
   const WORDS: Readonly<Record<ToolId, string>> = {
     read: "read",
     write: "write",

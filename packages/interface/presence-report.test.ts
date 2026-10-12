@@ -31,7 +31,7 @@ describe("planReading", () => {
   })
 })
 
-test("typing is written at most once a second, and at once in another card (ADR-0048 step 7)", () => {
+test("typing is written at most once a second, and at once in another card", () => {
   const last = {
     at: 0,
     card: cardIdFor("c1"),

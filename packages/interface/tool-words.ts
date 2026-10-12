@@ -1,7 +1,7 @@
-// interface/tool-words — what people call each tool, and a call as one line
-// of words (ADR-0114). The model calls a tool by its id (`TOOL_IDS`, core);
-// a person reads its word. Revision titles, an ask's live line, copied
-// calls and a row's tag all read these.
+// interface/tool-words — what people call each tool, and a call as one line of
+// words. The model calls a tool by its id (`TOOL_IDS`, core); a person reads
+// its word. Revision titles, an ask's live line, copied calls and a row's tag
+// all read these.
 
 import {
   ASK_TOOL,

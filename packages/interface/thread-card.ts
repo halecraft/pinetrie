@@ -1,8 +1,7 @@
-// interface/thread-card — what a task's card shows in its header (ADR-0111,
-// ADR-0116): a task on the board, or in the sidebar, is one card, its header
-// built once per task (`threadCardHeads`) and read by both views. Its signals
-// are its threads' together, whatever roots they are in (ADR-0116).
-// Neutral: never in the thread's colour. PURE.
+// interface/thread-card — what a task's card shows in its header: a task on the
+// board, or in the sidebar, is one card, its header built once per task
+// (`threadCardHeads`) and read by both views. Its signals are its threads'
+// together, whatever roots they are in. Neutral: never in the thread's colour.
 
 import type {
   RootWork,
@@ -21,7 +20,7 @@ export interface ThreadMove {
   readonly closes: boolean
   /** Why it is refused now (`ROOT_BUSY_REASON`'s key), into the archive only. */
   readonly busy: RootWork | null
-  /** Into the archive, the threads whose offers it withdraws (ADR-0061). */
+  /** Into the archive, the threads whose offers it withdraws. */
   readonly drops: readonly string[]
   readonly intent: Intent
 }
@@ -32,7 +31,7 @@ export interface ThreadCardHead {
   readonly label: string
   /** What its mark draws (`taskStatus`), or null for none. */
   readonly status: Status | null
-  /** Its threads with work ready to accept (`offeredByTask`): ⇡, for everyone (ADR-0091). */
+  /** Its threads with work ready to accept (`offeredByTask`): ⇡, for everyone. */
   readonly ready: readonly string[]
   /** An unsent card of yours is in it (`UnsentSignals.tasks`): your pip. */
   readonly pip: boolean
@@ -50,7 +49,7 @@ export interface ThreadCardFacts {
   readonly stateOf: ReadonlyMap<TaskId, WorkflowStateId>
   /** Each task's label (`labelsOf`). */
   readonly labels: ReadonlyMap<TaskId, string>
-  /** Each task's status (`taskStatus`, ADR-0077). */
+  /** Each task's status (`taskStatus`). */
   readonly status: ReadonlyMap<TaskId, Status>
   /** Tasks holding an unsent card of yours (`UnsentSignals.tasks`). */
   readonly pips: ReadonlySet<TaskId>
@@ -60,7 +59,6 @@ export interface ThreadCardFacts {
   readonly work: ReadonlyMap<TaskId, RootWork>
 }
 
-/** The header of `task`. */
 export function threadCardHead(
   task: TaskId,
   facts: ThreadCardFacts,

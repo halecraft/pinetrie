@@ -11,11 +11,11 @@ import {
 
 const WIDE = { width: 1200, height: 800 }
 
-test("the browser's picture is never one the host must fit (ADR-0098)", () => {
+test("the browser's picture is never one the host must fit", () => {
   expect(PICTURE_SIZE).toBeLessThanOrEqual(PICTURE_MOST)
 })
 
-describe("a picture's crop (ADR-0098)", () => {
+describe("a picture's crop", () => {
   test("it starts as the largest square, centred", () => {
     expect(cropSource(fitCrop(WIDE), WIDE)).toEqual({
       sx: 200,

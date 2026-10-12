@@ -39,7 +39,7 @@ const words = (r: AcceptedRecord) => {
   return publishWords(view, null)
 }
 
-describe("publishView: one button, only with something to do (ADR-0090)", () => {
+describe("publishView: one button, only with something to do", () => {
   test("no record: absent", () => {
     expect(publishView(null).kind).toBe("absent")
   })
@@ -70,7 +70,7 @@ describe("publishView: one button, only with something to do (ADR-0090)", () => 
   })
 })
 
-describe("publishWords: what the button says it will do (ADR-0090)", () => {
+describe("publishWords: what the button says it will do", () => {
   test("main forward over accepted work, the host's move in jj", () => {
     const w = words(record(unpublished(2)))
     expect(w.label).toBe("publish")
@@ -126,7 +126,7 @@ describe("publishWords: what the button says it will do (ADR-0090)", () => {
   })
 })
 
-describe("publishToast (ADR-0090)", () => {
+describe("publishToast", () => {
   test.each([
     ["nothing", null, null],
     [
@@ -164,7 +164,7 @@ describe("publishToast (ADR-0090)", () => {
   })
 })
 
-describe("the thread's base in its header, and the bases a new lane may start from (ADR-0104)", () => {
+describe("the thread's base in its header, and the bases a new lane may start from", () => {
   const lane = threadIdFor("1")
   const base = (state: "ok" | "landed" | "gone") =>
     ({

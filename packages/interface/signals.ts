@@ -1,15 +1,14 @@
-// interface/signals — what a mark says (ADR-0126): one family of signals,
-// each worded once (`signalWords`), and the unsent signal: where your
-// unsent cards are (ADR-0048, step 2), on the sidebar's tasks, on the rail at
-// a thread's end, on the board's items, and on ▦ for a task not in the
-// sidebar (ADR-0122). An archived task's work is done, so it lights only its
-// own item on the board, never ▦. They answer "where was I?", so they count
-// only the cards you own (contributors wait for Kyneta, ADR-0048's *Who
-// contributed*). A card counts while it holds text, not while its record
-// exists: a record outlives its text. Only your messages and your notes
-// count (ADR-0113): a queued card is on its way to being sent,
-// not left somewhere. A trace marks nothing yet: raising it is for
-// `attentionOf` (ADR-0077), beside verdicts and offers. Pure.
+// interface/signals — what a mark says: one family of signals, each worded once
+// (`signalWords`), and the unsent signal: where your unsent cards are, on the
+// sidebar's tasks, on the rail at a thread's end, on the board's items, and on
+// ▦ for a task not in the sidebar. An archived task's work is done, so it
+// lights only its own item on the board, never ▦. They answer "where was I?",
+// so they count only the cards you own: who contributed to a card waits on
+// Kyneta naming the writers whose text still stands. A card counts while it
+// holds text, not while its record exists: a record outlives its text. Only
+// your messages and your notes count: a queued card is on its way to being
+// sent, not left somewhere. A trace marks nothing yet: raising it is for
+// `attentionOf`, beside verdicts and offers.
 
 import type {
   CardId,
@@ -31,10 +30,10 @@ import { type Layout, unlisted } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
 
 /**
- * What a mark says, each named for it (ADR-0126): unsent text of yours
- * (ADR-0048), needs you or worth a read (ADR-0077's levels), running (its
- * agent works, ADR-0069) and done (a run you follow ended asking nothing).
- * `SignalMark` draws every one, as `.signal[data-signal]`.
+ * What a mark says, each named for it: unsent text of yours, needs you or worth
+ * a read (`Level`, `attention.ts`), running (its agent works) and done (a run
+ * you follow ended asking nothing). `SignalMark` draws every one, as
+ * `.signal[data-signal]`.
  */
 export type Signal =
   | "unsent"
@@ -67,14 +66,14 @@ export const signalWords = (signal: Signal): string => SIGNAL_WORDS[signal]
 export const signalOfLevel = (level: Level): Signal =>
   level === "needsYou" ? "needs-you" : "worth-a-read"
 
-/** ▦'s mark's title: what the tasks not in the sidebar raise (ADR-0122). */
+/** ▦'s mark's title: what the tasks not in the sidebar raise. */
 export const elsewhereWords = (level: Level): string =>
   `a thread not in the sidebar: ${signalWords(signalOfLevel(level))}`
 
 /**
- * The signal a thread's or a task's status draws (ADR-0077): running while
- * its agent works, its level's when something is raised, done while a run
- * you follow that ended asking nothing still fades (`moving`), else none.
+ * The signal a thread's or a task's status draws: running while its agent
+ * works, its level's when something is raised, done while a run you follow that
+ * ended asking nothing still fades (`moving`), else none.
  */
 export const statusSignal = (
   status: Status | null,
@@ -86,7 +85,7 @@ export const statusSignal = (
 
 /**
  * The cards that are yours, as the marks count them: those you own. Cards you
- * contributed to wait for Kyneta (ADR-0048, *Who contributed*).
+ * contributed to wait for Kyneta.
  */
 export const ownCards = (
   me: WriterId,
@@ -124,8 +123,7 @@ export interface UnsentSignals {
   /** Thread ends holding your message: dots on the rail. */
   readonly ends: ReadonlySet<EntryId>
   /**
-   * A task in `tasks` is not in the sidebar and not archived: ▦ is marked
-   * (ADR-0122).
+   * A task in `tasks` is not in the sidebar and not archived: ▦ is marked.
    */
   readonly elsewhere: boolean
 }
@@ -136,7 +134,7 @@ export function unsentSignals(input: {
   /** Cards that hold text (`holdsText`), by id. */
   readonly filled: ReadonlySet<CardId>
   readonly layout: Layout
-  /** Tasks in the archive (ADR-0029, ADR-0122). */
+  /** Tasks in the archive. */
   readonly archived: ReadonlySet<TaskId>
   /** Every task: a card at a thread marks the thread's task. */
   readonly tasks: TaskIndex
@@ -151,14 +149,14 @@ export function unsentSignals(input: {
         // A trashed thread's message is in the trash with it.
         if (!isOnCanvas(input.tasks, card.place.thread)) break
         // A thread in a root this tab does not hold has no end here, and
-        // still marks its task (ADR-0063).
+        // still marks its task.
         const end = placeEnd(card.place, input.index)
         if (end !== null) ends.add(end)
         const task = taskOfPlace(input.tasks, card.place)
         if (task !== null) tasks.add(task)
         break
       }
-      // A note marks its note column's task (ADR-0116).
+      // A note marks its note column's task.
       case "note": {
         if (!isOnCanvas(input.tasks, card.place.column)) break
         const task = taskOfPlace(input.tasks, card.place)
@@ -166,8 +164,8 @@ export function unsentSignals(input: {
         break
       }
       // The inventory is no tab, a pinned card is a thread's or a task's
-      // direction, not unsent work (ADR-0048), a comment is shared, and a
-      // canvas or the board holds no text card.
+      // direction, not unsent work, a comment is shared, and a canvas or the
+      // board holds no text card.
       case "queued":
       case "margin":
       case "pinned":

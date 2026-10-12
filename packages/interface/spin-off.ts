@@ -1,8 +1,8 @@
-// interface/spin-off — a text card made a thread (ADR-0111): dropped on a
-// workflow state, on the board or the footer's strip, or in the sidebar,
-// or chosen from its ⋯. The page mints the new root's, thread's and task's
-// ids; the host opens the thread in the task, sends the card's text as its
-// first message, and moves the card to its sender's trash (ADR-0126). Pure.
+// interface/spin-off — a text card made a thread: dropped on a workflow state,
+// on the board or the footer's strip, or in the sidebar, or chosen from its ⋯.
+// The page mints the new root's, thread's and task's ids; the host opens the
+// thread in the task, sends the card's text as its first message, and moves the
+// card to its sender's trash.
 
 import {
   type CardId,

@@ -1,6 +1,6 @@
-// interface/sidebar-view — what the sidebar shows and offers (ADR-0030,
-// ADR-0122), full or folded to icons (ADR-0088), decided. PURE: `Sidebar`
-// (`sidebar.tsx`) draws it, and each click sends the intent it names.
+// interface/sidebar-view — what the sidebar shows and offers, full or folded
+// to icons: `Sidebar` (`sidebar.tsx`) draws it, and each click sends the
+// intent it names.
 
 import type {
   BannerRecord,
@@ -24,22 +24,22 @@ import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 /** What a task's ⋯ in the sidebar offers. */
 export type ItemMenuItem =
   | { readonly kind: "rename" }
-  /** What the task raises is not needed (ADR-0077). */
+  /** What the task raises is not needed. */
   | { readonly kind: "notNeeded"; readonly intent: Intent }
-  /** Ask a model for a title from the task's first thread (ADR-0074). */
+  /** Ask a model for a title from the task's first thread. */
   | { readonly kind: "retitle"; readonly intent: Intent }
   /**
-   * Move the task on the board to another workflow state (ADR-0122), its
-   * thread card's (`ThreadMove`). Into the archive it is archived:
-   * refused while its agent works there (`busy`), and it withdraws the
-   * offers of its threads named in `drops` (ADR-0061).
+   * Move the task on the board to another workflow state, its thread card's
+   * (`ThreadMove`). Into the archive it is archived: refused while its agent
+   * works there (`busy`), and it withdraws the offers of its threads named in
+   * `drops`.
    */
   | ({ readonly kind: "moveTo" } & ThreadMove)
 
 /**
- * What an item draws while the sidebar is folded (ADR-0088): the sprite of the
+ * What an item draws while the sidebar is folded: the sprite of the
  * task's earliest thread with one (`taskSprites`), else its initials on a
- * colour seeded by its id (ADR-0089).
+ * colour seeded by its id.
  */
 export type ItemIcon =
   | { readonly kind: "sprite"; readonly src: string }
@@ -55,7 +55,7 @@ interface ItemCommon {
   readonly icon: ItemIcon
   readonly selected: boolean
   readonly show: Intent
-  /** An unsent card of yours is in it (ADR-0048, `unsentSignals`). */
+  /** An unsent card of yours is in it (`unsentSignals`). */
   readonly pip: boolean
   readonly close: Intent
 }
@@ -168,9 +168,8 @@ function iconOf(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
 }
 
 /**
- * Each task's sprite (ADR-0053, ADR-0116): the banner of its earliest
- * thread that has one. A thread's id is `t-` and a uuidv7, so ids sort by
- * creation. Pure.
+ * Each task's sprite: the banner of its earliest thread that has one. A
+ * thread's id is `t-` and a uuidv7, so ids sort by creation.
  */
 export function taskSprites(
   threadsOf: ReadonlyMap<TaskId, readonly ThreadId[]>,
@@ -210,9 +209,9 @@ function menuOf(task: TaskId, head: ThreadCardHead): readonly ItemMenuItem[] {
 export const listKey = (item: ItemView): string => `task:${item.task}`
 
 /**
- * The window's title: what needs you (`inboxCount`, your inbox's badge),
- * then the page over the stage (ADR-0098), else the task you are on.
- * `here` is null on nothing, and before anything is chosen.
+ * The window's title: what needs you (`inboxCount`, your inbox's badge), then
+ * the page over the stage, else the task you are on. `here` is null on nothing,
+ * and before anything is chosen.
  */
 export const pageTitle = (
   count: number,
@@ -226,10 +225,10 @@ export const pageTitle = (
 }
 
 /**
- * The threads with an open offer, by their task (ADR-0116), each as people
- * read it (`threadNameOf`), named or not: what archiving that task
- * withdraws, and what a thread card's ⇡ names (ADR-0091). `offers` are the
- * open offers (`appView`'s); one whose thread is in no task is left out.
+ * The threads with an open offer, by their task, each as people read it
+ * (`threadNameOf`), named or not: what archiving that task withdraws, and what
+ * a thread card's ⇡ names. `offers` are the open offers (`appView`'s); one
+ * whose thread is in no task is left out.
  */
 export function offeredByTask(
   offers: readonly { readonly lane: ThreadId }[],

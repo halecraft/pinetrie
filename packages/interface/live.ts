@@ -1,10 +1,10 @@
-// interface/live — which streams a column draws, as a pure read of one moment.
+// interface/live — which streams a column draws, read in one moment.
 //
 // A stream is drawn until the entry that replaces it is on screen, and goes in
-// the same render (S35, S55). A reply is drawn while it is its lane's current
-// reply (`isCurrentReply`, the host's own rule): its entry moves the lane's
-// tip. A tool's stream is drawn by its call's row, which stops drawing it once
-// the row has a result.
+// the same render. A reply is drawn while it is its lane's current reply
+// (`isCurrentReply`, the host's own rule): its entry moves the lane's tip. A
+// tool's stream is drawn by its call's row, which stops drawing it once the row
+// has a result.
 
 import type { AgentRun, StreamId, StreamRecord, ToolCall } from "@pinetrie/core"
 import { isCurrentReply } from "@pinetrie/rules"

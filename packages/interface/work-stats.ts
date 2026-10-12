@@ -1,5 +1,5 @@
 // interface/work-stats — what some messages hold: a stretch on the rail, or
-// an ask's work in a column, counted alike. Pure.
+// an ask's work in a column, counted alike.
 
 import {
   type EntryId,
@@ -31,7 +31,7 @@ export interface WorkStats {
   readonly files: readonly string[]
   /**
    * Ignored files its turns wrote, from their records: each record's topmost
-   * paths and how many more it counted (ADR-0131).
+   * paths and how many more it counted.
    */
   readonly ignored: number
   /** Turns whose recipe failed to run. */

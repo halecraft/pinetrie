@@ -1,9 +1,9 @@
-// interface/margin — an entry's margin as its column draws it (ADR-0126):
-// its comments, notes that people read and the agent does not. Shut, the
-// margin is a face beside its entry, the count of its comments; open, its
-// comments drawn normal under the entry (`DETAIL_ON`). Pure: the words here,
-// `marginCounts` (`@pinetrie/rules`) the counts, and `Margin`
-// (`packages/web/margin.tsx`) draws it.
+// interface/margin — an entry's margin as its column draws it: its comments,
+// notes that people read and the agent does not. Shut, the margin is a face
+// beside its entry, the count of its comments; open, its comments drawn normal
+// under the entry (`DETAIL_ON`). The words are here, `marginCounts`
+// (`@pinetrie/rules`) the counts, and `Margin` (`packages/web/margin.tsx`)
+// draws it.
 
 import { plural } from "./counts.ts"
 

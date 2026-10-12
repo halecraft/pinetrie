@@ -75,7 +75,7 @@ test("a call's status: running without a result, failed by its result's error; a
   expect(callMark("ok")).toBe("✓")
 })
 
-describe("headLines and tailLines (ADR-0123)", () => {
+describe("headLines and tailLines", () => {
   test("a text of five lines or fewer is shown whole", () => {
     expect(headLines(plain(numbered(3)))).toEqual({
       runs: plain(numbered(3)),
@@ -143,7 +143,7 @@ test("the detail's output is whole, or its end after a count of what it leaves o
   )
 })
 
-describe("moreWords (ADR-0123)", () => {
+describe("moreWords", () => {
   const none = { command: 0, output: 0, cut: false, image: false }
   test.each<[Partial<typeof none>, string | undefined]>([
     [{ command: 3, output: 335 }, "+3 lines · +335 lines of output"],
@@ -163,7 +163,7 @@ describe("moreWords (ADR-0123)", () => {
   })
 })
 
-describe("rowView (ADR-0123)", () => {
+describe("rowView", () => {
   const call = (subject: string): ToolCall => ({
     id: "c",
     name: "bash",
@@ -213,7 +213,7 @@ describe("rowView (ADR-0123)", () => {
   })
 })
 
-describe("rowSummary (ADR-0114)", () => {
+describe("rowSummary", () => {
   const call = (name: string, subject?: string): ToolCall =>
     subject === undefined ? { id: "c", name } : { id: "c", name, subject }
 

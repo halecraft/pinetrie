@@ -1,7 +1,7 @@
-// interface/traces — which of your traces a column draws, and how they group
-// (ADR-0048, *Other people*). A trace stays where your card was when someone
-// else moved it while you were away; the host leaves it (`planProvenance`)
-// and deletes it once you have seen it (`traces-seen`). Pure.
+// interface/traces — which of your traces a column draws, and how they group. A
+// trace stays where your card was when someone else moved it while you were
+// away; the host leaves it (`planProvenance`) and deletes it once you have seen
+// it (`traces-seen`).
 
 import type {
   EntryId,

@@ -10,8 +10,8 @@ import type { WriterId } from "@pinetrie/core"
 import { displayName } from "@pinetrie/rules"
 
 /**
- * A message written together names its sender, then the others who wrote it
- * (ADR-0048): "Ada, with Bea". Each by their current name.
+ * A message written together names its sender, then the others who wrote it:
+ * "Ada, with Bea". Each by their current name.
  */
 export const withContributors = (speaker: string, others: readonly string[]) =>
   others.length === 0 ? speaker : `${speaker}, with ${others.join(", ")}`
@@ -41,7 +41,7 @@ const ROLE_LABEL: Readonly<Record<string, string>> = {
  * Who a message is from, as its column names it: a person by their name now
  * (`speakerLabel`), with those who wrote it with them (`withContributors`);
  * another thread's ask by its asker, and an answer by the thread that
- * answered (ADR-0128); any other role by `ROLE_LABEL`, else the role itself.
+ * answered; any other role by `ROLE_LABEL`, else the role itself.
  */
 export function speakerWords(
   message: {

@@ -1,7 +1,6 @@
-// interface/page — a page that covers the stage (ADR-0098): its name in
-// the URL's hash, how leaving it treats the browser's history, and its words.
-// Pure: the page's shell (`use-page.ts`) reads `location` and `history` and
-// carries these out.
+// interface/page — a page that covers the stage: its name in the URL's hash,
+// how leaving it treats the browser's history, and its words. The page's shell
+// (`use-page.ts`) reads `location` and `history` and carries these out.
 
 /** A page that covers the stage. The profile is the first. */
 export type PageName = "profile"

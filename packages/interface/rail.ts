@@ -1,7 +1,7 @@
 // interface/rail — what the rail draws of one root's tree: `projectRail`'s
 // rows (core's, since a root's messages are counted by them), with each
 // straight stretch of uneventful messages drawn as one capsule, each item
-// placed in rows and across. Pure.
+// placed in rows and across.
 
 import {
   type AskIndex,
@@ -41,8 +41,8 @@ export interface RailStretch extends RailItemBase {
   readonly kind: "stretch"
   readonly stats: WorkStats
   /**
-   * The ask whose work it is, when it is all one long ask's work (ADR-0106);
-   * null for short exchanges merged together.
+   * The ask whose work it is, when it is all one long ask's work; null for
+   * short exchanges merged together.
    */
   readonly ask: EntryId | null
 }
@@ -93,15 +93,13 @@ export interface RailAsks {
  * What the rail draws: `projectRail`'s rows, with each straight stretch of
  * uneventful messages drawn as one capsule.
  *
- * A row is uneventful when it is not one of `railLandmarks`, and not the
- * prompt of a long ask (`isLongAsk`, ADR-0106). A stretch never crosses a
- * long ask's edge, so a long ask is a dot and a capsule of its own, while
- * short exchanges still merge. A message steered into a run is in its
- * ask's capsule (`runOf`).
- * So a stretch holds no structure, and the compacted rail has every branch
- * the full one has.
- * An uneventful row's only child is the next row in depth-first order, so a
- * stretch is a run of consecutive rows. The items come back placed
+ * A row is uneventful when it is not one of `railLandmarks`, and not the prompt
+ * of a long ask (`isLongAsk`). A stretch never crosses a long ask's edge, so a
+ * long ask is a dot and a capsule of its own, while short exchanges still
+ * merge. A message steered into a run is in its ask's capsule (`runOf`). So a
+ * stretch holds no structure, and the compacted rail has every branch the full
+ * one has. An uneventful row's only child is the next row in depth-first order,
+ * so a stretch is a run of consecutive rows. The items come back placed
  * (`placeRail`), in the rows' order.
  *
  * `spanOf` is the rows a client draws a capsule of `size` messages in. A

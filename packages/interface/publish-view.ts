@@ -1,6 +1,6 @@
-// interface/publish-view — the footer's one publish button (ADR-0090): what the
-// host last read of accepted work, decided as a value (`publishView`), worded in
-// one function (`publishWords`), and the toast a refusal or failure leaves
+// interface/publish-view — the footer's one publish button: what the host last
+// read of accepted work, decided as a value (`publishView`), worded in one
+// function (`publishWords`), and the toast a refusal or failure leaves
 // (`publishToast`). Whether a command may run is `@pinetrie/rules`'
 // `acceptedActionState`, the rule the host decides by.
 
@@ -59,7 +59,7 @@ export function publishView(record: AcceptedRecord | null): PublishView {
 
 /**
  * jjui's own `[revisions] revset` replaces `revsets.log`, so the log the
- * setup writes does not reach it (S77 item 8, `docs/the-jujutsu-repo.md`).
+ * setup writes does not reach it (`docs/the-jujutsu-repo.md`).
  */
 const JJUI_NOTE =
   'jjui with a revset of its own: add | bookmarks(glob:"pinetrie-offer/*") to it'
@@ -158,8 +158,7 @@ export function publishWords(
 
 /**
  * What a toast says of your last setup or publish command: its refusal or
- * failure. A conflict in the working copy is said, and left to jj
- * (ADR-0102).
+ * failure. A conflict in the working copy is said, and left to jj.
  */
 export interface PublishToast {
   readonly text: string

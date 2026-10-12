@@ -1,5 +1,4 @@
-// interface/put-target — where a put, a drop or a paste lands (ADR-0048,
-// ADR-0132). Pure.
+// interface/put-target — where a put, a drop or a paste lands.
 //
 // Every input makes the same moves: a drop names a target by the attribute
 // the drop code marks it with, and a put by key or button names the same
@@ -31,36 +30,35 @@ import type { Focus } from "./focus.ts"
 
 export type PutTarget =
   /**
-   * A thread's column: a note in the note column nearest it (`noteOf`,
-   * ADR-0116).
+   * A thread's column: a note in the note column nearest it (`noteOf`).
    */
   | { readonly kind: "column"; readonly key: string }
   /** A column's composer: your message, which a message with text there gives way to by a swap. */
   | { readonly kind: "composer"; readonly key: string }
-  /** A note column (ADR-0116): a note at its end. */
+  /** A note column: a note at its end. */
   | { readonly kind: "notes"; readonly column: NoteColumnId }
   /**
    * A spot on a task's canvas, just after `after` (first for null), where
    * no column takes a drop: a folded column, or the canvas past its last.
    * A thread's card or a note column lands there; a text card or a
-   * reference in a note column made for it there (`WRAPS`, ADR-0126).
+   * reference in a note column made for it there (`WRAPS`).
    */
   | {
       readonly kind: "canvas"
       readonly task: TaskId
       readonly after: CardId | null
     }
-  /** The pinned strip at the top of a thread's column (ADR-0048). */
+  /** The pinned strip at the top of a thread's column. */
   | { readonly kind: "pinned"; readonly key: string }
-  /** The cards pinned to a task, in its task column (ADR-0116). */
+  /** The cards pinned to a task, in its task column. */
   | { readonly kind: "taskPinned"; readonly task: TaskId }
   /**
    * Your inventory: a slot aimed at (a drop on it, a paste on it), or, with
    * null, none (a take, keep): the selected slot if empty, else the first
-   * empty one (ADR-0133).
+   * empty one.
    */
   | { readonly kind: "inventory"; readonly slot: number | null }
-  /** A workflow state, on the board or the footer's strip: a new thread there (ADR-0111). */
+  /** A workflow state, on the board or the footer's strip: a new thread there. */
   | { readonly kind: "state"; readonly state: WorkflowStateId }
   /**
    * A place in the sidebar, before a task or at its end: a new task there,
@@ -70,9 +68,8 @@ export type PutTarget =
   /** A task in the sidebar, onto it: a column moves to the end of its canvas. */
   | { readonly kind: "task"; readonly task: TaskId }
   /**
-   * The text box that has focus (ADR-0132): a paste there types its text,
-   * or a link to what it names, at the caret. Nothing is put or dropped
-   * into one.
+   * The text box that has focus: a paste there types its text, or a link to
+   * what it names, at the caret. Nothing is put or dropped into one.
    */
   | { readonly kind: "text-box" }
 
@@ -176,9 +173,9 @@ export function targetOfElement(el: {
 }
 
 /**
- * Where a put or a paste lands, from where focus is (ADR-0132): the text
- * box that has focus, else the drop zone around focus, else the column
- * last focused; null with none of them.
+ * Where a put or a paste lands, from where focus is: the text box that has
+ * focus, else the drop zone around focus, else the column last focused; null
+ * with none of them.
  */
 export function targetOfFocus(
   focus: Pick<Focus, "inText" | "zone" | "column">,
@@ -199,7 +196,7 @@ export interface ComposerSpot {
 /** Column key to its composer (`ComposerSpot`). */
 export type ComposerPlaces = ReadonlyMap<string, ComposerSpot>
 
-/** Whether a put on `target` lands in a composer, as your message (ADR-0113). */
+/** Whether a put on `target` lands in a composer, as your message. */
 export const intoMessage = (target: PutTarget): boolean =>
   target.kind === "composer"
 

@@ -1,7 +1,7 @@
-// interface/list-width — the sidebar full or folded to icons (ADR-0088). The
-// choice is kept by each client: the page's is this browser tab's, a new tab
-// starting from the device's latest (`tabState`). Until you choose, a small
-// window shows icons. Pure.
+// interface/list-width — the sidebar full or folded to icons. The choice is
+// kept by each client: the page's is this browser tab's, a new tab starting
+// from the device's latest (`tabState`). Until you choose, a small window shows
+// icons.
 
 import type { Codec } from "./codec.ts"
 

@@ -1,5 +1,5 @@
-// interface/upload — a blob kept by the host (ADR-0042, ADR-0126): a pasted
-// image's bytes, or a reference's quote as markdown, posted to `/blob`.
+// interface/upload — a blob kept by the host: a pasted image's bytes, or a
+// reference's quote as markdown, posted to `/blob`.
 
 import {
   errorText,
@@ -45,6 +45,6 @@ async function postBlob<R>(
 export const uploadImage = (file: Blob): Promise<Upload> =>
   postBlob(file.type, file)
 
-/** `POST /blob` with markdown (ADR-0126): a reference's quote, kept as a blob. */
+/** `POST /blob` with markdown: a reference's quote, kept as a blob. */
 export const uploadText = (markdown: string): Promise<TextUpload> =>
   postBlob(`${TEXT_MIME}; charset=utf-8`, markdown)

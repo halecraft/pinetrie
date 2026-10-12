@@ -1,19 +1,18 @@
 // interface/layout — which task you are on, the sidebar, and your view of
-// each task's canvas (ADR-0029, ADR-0030, ADR-0122, ADR-0116).
+// each task's canvas.
 //
 // The task you are on shows its rail and its columns: one per card on its
 // canvas, in the canvas's order (`canvasColumns`), which is everyone's. The
-// sidebar is the tasks you have open, in your order: it is your own
-// document, the same on every device (`openThreads`, `@pinetrie/session`),
-// and comes in here as a fact, so the layout draws it but never stores it.
-// The layout keeps your view of each task you have opened (`TaskView`:
-// which columns are unfolded, how each is read, what a thread you opened
-// starts with). A branch or a new tab is a thread card on its task's canvas
-// from the moment it opens (ADR-0126), so it is a column like any other,
-// and a new tab is its own task. Which task you are on, the views and
-// whether the board is open are this browser tab's view state, never
-// written to the document; they are stored per browser tab (ADR-0027) in
-// the form at the end of this file. Pure.
+// sidebar is the tasks you have open, in your order: it is your own document,
+// the same on every device (`openThreads`, `@pinetrie/session`), and comes in
+// here as a fact, so the layout draws it but never stores it. The layout keeps
+// your view of each task you have opened (`TaskView`: which columns are
+// unfolded, how each is read, what a thread you opened starts with). A branch
+// or a new tab is a thread card on its task's canvas from the moment it opens,
+// so it is a column like any other, and a new tab is its own task. Which task
+// you are on, the views and whether the board is open are this browser tab's
+// view state, never written to the document; they are stored per browser tab in
+// the form at the end of this file.
 
 import {
   type CardId,
@@ -70,7 +69,7 @@ export interface Layout {
    * none is drawn as `defaultView` says.
    */
   readonly tasks: ReadonlyMap<TaskId, TaskView>
-  /** Whether the board is open over the columns (ADR-0122). */
+  /** Whether the board is open over the columns. */
   readonly board: boolean
 }
 
@@ -80,17 +79,17 @@ export type ViewChange =
   | { readonly kind: "fold"; readonly card: CardId; readonly unfolded: boolean }
   /** Unfold the task column, or fold it. */
   | { readonly kind: "foldTask"; readonly unfolded: boolean }
-  /** How much of each ask a column draws (ADR-0106). */
+  /** How much of each ask a column draws. */
   | {
       readonly kind: "density"
       readonly card: CardId
       readonly density: Density
     }
-  /** Whether a thread's details are open under its header (ADR-0073). */
+  /** Whether a thread's details are open under its header. */
   | { readonly kind: "details"; readonly card: CardId; readonly open: boolean }
   /**
-   * A thread you opened (ADR-0126): its column unfolded, with what it
-   * starts with, until its first send.
+   * A thread you opened: its column unfolded, with what it starts with, until
+   * its first send.
    */
   | {
       readonly kind: "opened"
@@ -129,7 +128,7 @@ export type LayoutAction =
   /** Once, after the documents settle: the tasks the session lacks go, and `active` is chosen. */
   | ({
       readonly kind: "prune"
-      /** Every task the session holds (ADR-0116). */
+      /** Every task the session holds. */
       readonly known: ReadonlySet<TaskId>
     } & LayoutFacts)
 
@@ -137,9 +136,9 @@ export type LayoutAction =
 export interface CanvasFacts {
   /** Each task's canvas, in order (`TaskIndex.canvases`). */
   readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
-  /** Each thread opened and not yet started (`unstartedThreads`, ADR-0126). */
+  /** Each thread opened and not yet started (`unstartedThreads`). */
   readonly unstarted: ReadonlyMap<ThreadId, ThreadOpening>
-  /** Each thread someone else holds, by its holder (`heldByOthers`, ADR-0124). */
+  /** Each thread someone else holds, by its holder (`heldByOthers`). */
   readonly holders: ReadonlyMap<ThreadId, WriterId>
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
@@ -147,7 +146,7 @@ export interface CanvasFacts {
 
 /** The document facts a layout follows: one moment's, read together. */
 export interface LayoutFacts extends CanvasFacts {
-  /** The tasks in the archive (ADR-0122). */
+  /** The tasks in the archive. */
   readonly archived: ReadonlySet<TaskId>
   /** The sidebar (`openThreads`). */
   readonly list: readonly TaskId[]
@@ -258,7 +257,7 @@ const sameList = (a: readonly TaskId[], b: readonly TaskId[]): boolean =>
 
 /**
  * What to show once `closed` is closed: its neighbour below in the sidebar,
- * else above, else nothing. `layout` is before the close. Pure.
+ * else above, else nothing. `layout` is before the close.
  */
 export function afterClosing(layout: Layout, closed: Here): Here {
   const items = listOf(layout)
@@ -269,7 +268,7 @@ export function afterClosing(layout: Layout, closed: Here): Here {
 
 /**
  * Whether `action` shows something in the stage: a task or the board. A
- * page over the stage (ADR-0098) is left for it.
+ * page over the stage is left for it.
  */
 export function showsStage(action: LayoutAction): boolean {
   switch (action.kind) {
@@ -317,7 +316,7 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
 /**
  * The layout to draw: `stored` brought up to `facts`. `App` draws this in the
  * render that reads the facts, and stores it after, so no render pairs new
- * entries with an old anchor (S35). The sidebar is the facts' (`drawnList`).
+ * entries with an old anchor. The sidebar is the facts' (`drawnList`).
  * Returns `stored` itself when nothing changes.
  */
 export function resolveLayout(stored: Layout, facts: LayoutFacts): Layout {
@@ -330,8 +329,7 @@ export function resolveLayout(stored: Layout, facts: LayoutFacts): Layout {
  * what to show is chosen. The view of a card no longer on the canvas goes
  * as the layout is stored (`storedLayout`). A task you were on that is
  * gone or archived gives way to the last task of the sidebar, else nothing,
- * and with nothing the board opens: nothing opens a task by itself
- * (ADR-0030).
+ * and with nothing the board opens: nothing opens a task by itself.
  */
 function pruneLayout(
   state: Layout,
@@ -347,7 +345,7 @@ function pruneLayout(
   }
   const list = facts.list.filter(t => known.has(t) && !facts.archived.has(t))
   const active = state.active
-  // An archived task you were on is left at a reload (ADR-0029).
+  // An archived task you were on is left at a reload.
   const stays =
     active !== null &&
     (active.kind === "nothing" ||
@@ -368,9 +366,9 @@ function pruneLayout(
 }
 
 /**
- * `layout` as it is stored (ADR-0027): without the view of a card not on
- * its task's canvas. Only a task whose canvas holds a card is read: an
- * empty one may not have arrived. The same layout when nothing goes. Pure.
+ * `layout` as it is stored: without the view of a card not on its task's
+ * canvas. Only a task whose canvas holds a card is read: an empty one may not
+ * have arrived. The same layout when nothing goes.
  */
 export function storedLayout(
   layout: Layout,
@@ -400,9 +398,9 @@ export function listOf(
 }
 
 /**
- * The tasks among `tasks` not in the sidebar and not archived: what ▦ marks
- * for them (ADR-0077, ADR-0122). An archived task's work is done, so it marks
- * only its own row on the board.
+ * The tasks among `tasks` not in the sidebar and not archived: what ▦ marks for
+ * them. An archived task's work is done, so it marks only its own row on the
+ * board.
  */
 export const unlisted = (
   layout: Pick<Layout, "open">,
@@ -496,7 +494,7 @@ export function planOpen(
   return { kind: "unfold", task, card: thread }
 }
 
-// ── stored form (ADR-0027) ────────────────────────────────────────────────
+// ── stored form ────────────────────────────────────────────────
 //
 // Kept per browser tab through `tab-state.ts`. Built field by field both ways,
 // so a field the schema does not name is never stored or restored. A thread
@@ -524,7 +522,7 @@ const StoredCardView = Type.Object({
   asksAgent: Type.Optional(Type.Literal(true)),
 })
 
-/** A task's view as stored: records by id, so no order can be kept (ADR-0116). */
+/** A task's view as stored: records by id, so no order can be kept. */
 const StoredTaskView = Type.Object({
   cards: Type.Record(Type.String(), StoredCardView),
   task: Type.Object({ unfolded: Type.Boolean() }),
@@ -537,8 +535,8 @@ const StoredHere = Type.Union([
 
 /**
  * `v` changes when the shape does; an older layout is dropped, not migrated.
- * `v: 9` (ADR-0126): a thread you opened is a card, so no task view keeps
- * branches of its own, and no new tab is kept apart from its task.
+ * `v: 9`: a thread you opened is a card, so no task view keeps branches of its
+ * own, and no new tab is kept apart from its task.
  */
 const StoredLayout = Type.Object({
   v: Type.Literal(9),

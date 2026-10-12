@@ -1,6 +1,6 @@
 // interface/send — what a composer says and does: before a send, what it will
 // do (`planSend`), its button in words (`sendButton`) and where a new lane
-// works; after it, what the composer shows (`settleSend`). Pure decisions;
+// works; after it, what the composer shows (`settleSend`).
 // `card-editor.tsx` draws them.
 
 import {
@@ -31,24 +31,23 @@ import type { Prefill } from "./columns.ts"
 export type ColumnHow = Pick<ChatHow, "base" | "root" | "pinned"> & {
   readonly asksAgent: boolean
   readonly column: string
-  /** The column's thread (ADR-0117): the one a unstarted column's first send starts. */
+  /** The column's thread: the one a unstarted column's first send starts. */
   readonly thread: ThreadId
   /**
-   * The task the column is on (ADR-0116), where a thread its send starts
-   * goes; a new tab's, minted as it opened. Null before it is known:
-   * nothing is sent meanwhile.
+   * The task the column is on, where a thread its send starts goes; a new
+   * tab's, minted as it opened. Null before it is known: nothing is sent
+   * meanwhile.
    */
   readonly task: TaskId | null
 }
 
 /**
- * What the composer shows after the host answers. Nothing is put back: the
- * box was never cleared, and a message the host did not write leaves its card
- * where it was (ADR-0048), a conflict or a refusal such as a root archived a
- * moment before (ADR-0029). A failure leaves the card too, though the host
- * may have written the message before it failed. A send that found its lane
- * busy is queued by the host in the same step (`queued`): the card has left
- * the composer, as a sent one has (ADR-0059).
+ * What the composer shows after the host answers. Nothing is put back: the box
+ * was never cleared, and a message the host did not write leaves its card where
+ * it was, a conflict or a refusal such as a root archived a moment before. A
+ * failure leaves the card too, though the host may have written the message
+ * before it failed. A send that found its lane busy is queued by the host in
+ * the same step (`queued`): the card has left the composer, as a sent one has.
  */
 export interface SendSettled {
   readonly status: string
@@ -117,11 +116,11 @@ export function settleSend(
 }
 
 /**
- * What a composer sends: its text trimmed, or null for nothing to send. A
- * text that is only its column's blank prefill is nothing: `@agent ` alone
- * would ask the agent with no question. A card with a command is sent with
- * no text: the command alone is something to do (ADR-0108). Nothing is sent
- * while an image is uploading: its markdown is not in the text yet.
+ * What a composer sends: its text trimmed, or null for nothing to send. A text
+ * that is only its column's blank prefill is nothing: `@agent ` alone would ask
+ * the agent with no question. A card with a command is sent with no text: the
+ * command alone is something to do. Nothing is sent while an image is
+ * uploading: its markdown is not in the text yet.
  */
 export function sendable(
   text: string,
@@ -147,7 +146,7 @@ export function sendable(
 /**
  * What a composer's send does: a chat in its mode, or `queue`, which asks
  * the host to queue the card and sends no chat: the host pops it when its
- * lane is free (ADR-0059).
+ * lane is free.
  */
 export type ComposerMode = ChatMode | "queue"
 
@@ -160,14 +159,14 @@ export interface SendPlan {
   /** Where a queued send would wait: the button's in `queue` mode, and a conflict's. */
   readonly queue: QueuePlace
   /**
-   * What a queued send does to the queue's hold (ADR-0113): on an idle thread
-   * whose queue is held, it releases it, so the queue goes and this card
-   * after it; else it leaves the hold as it is.
+   * What a queued send does to the queue's hold: on an idle thread whose queue
+   * is held, it releases it, so the queue goes and this card after it; else it
+   * leaves the hold as it is.
    */
   readonly hold: Extract<QueueHoldChange, "keep" | "release">
   /**
-   * The card's command (ADR-0108), and whether it has text to send after
-   * it: the button then names the command.
+   * The card's command, and whether it has text to send after it: the button
+   * then names the command.
    */
   readonly command: {
     readonly command: CardCommand
@@ -182,15 +181,15 @@ export interface SendPlan {
 /**
  * What a composer's next send does, decided as the host will decide it: who
  * the message is for is `addressChat`, which `@pinetrie/rules`' `planChat`
- * runs too, over the thread `threadOf` gives (ADR-0021).
+ * runs too, over the thread `threadOf` gives.
  *
  * - A unstarted column sends `branch`. Elsewhere, a send to a busy lane, plain or
  *   asking the agent, queues its card behind the others; so does a card with
  *   a command, even on an idle lane, since only the host's pop carries a
- *   command out (ADR-0108).
+ *   command out.
  * - A send that asks the agent creates a lane where there is none, and in a
  *   an unstarted thread's column always, since a branch never continues a lane: then a chip
- *   says where that lane will work (ADR-0032).
+ *   says where that lane will work.
  */
 export function planSend(input: {
   readonly text: string
@@ -198,10 +197,10 @@ export function planSend(input: {
   readonly lane: ThreadLane
   readonly asksAgent: boolean
   readonly participants: readonly string[]
-  /** Other threads' agents on open tasks' canvases (ADR-0128). */
+  /** Other threads' agents on open tasks' canvases. */
   readonly agents: readonly AgentCandidate[]
   readonly reader: Reader
-  /** The card's command (ADR-0108), or null. */
+  /** The card's command, or null. */
   readonly command: CardCommand | null
 }): SendPlan {
   const { unstarted, lane } = input
@@ -278,7 +277,7 @@ export function sendButton(plan: SendPlan, busy: EditorBusy): SendButton {
  * Who a send is for, in the button's words. A send that asks the agent says
  * so, whoever else it names. Other threads' agents it invites come first
  * ("invite amber-fox · send to agent"), and those it asks are named as
- * people are (ADR-0128): `names` gives each its thread's name.
+ * people are: `names` gives each its thread's name.
  */
 export function recipientWords(
   to: Recipients,
@@ -309,8 +308,8 @@ function sendWords(
 }
 
 /**
- * The send button of a card with a command (ADR-0108): the command, then
- * the card's text if it has some. Where it waits goes in its title.
+ * The send button of a card with a command: the command, then the card's text
+ * if it has some. Where it waits goes in its title.
  */
 export function commandSendWords(
   command: NonNullable<SendPlan["command"]>,
@@ -343,8 +342,8 @@ export const placeholderWords = (plan: SendPlan): string =>
 /** Where a message queued now would wait: what the queue button says. */
 export type QueuePlace =
   /**
-   * Last in a held queue that the send releases (ADR-0113): `count` cards go,
-   * this one with them.
+   * Last in a held queue that the send releases: `count` cards go, this one
+   * with them.
    */
   | { readonly kind: "releases"; readonly count: number }
   /** Nothing waits: it is popped when the run ends. */
@@ -405,11 +404,11 @@ export function raceWords(by: WriterId | null, reader: Reader): string {
   return `${displayName(by, reader.nameOf.get(by))} asked the agent a moment before you`
 }
 
-// ── where a new lane starts (ADR-0104) ────────────────────────────────────
+// ── where a new lane starts ────────────────────────────────────
 
 /**
  * A new lane here would be cloned from a commit with conflicts: its offer
- * would start conflicted until it catches up (ADR-0072).
+ * would start conflicted until it catches up.
  */
 export const forkWords = (files: number): string =>
   `starts from a copy with an unresolved conflict in ${files} ${files === 1 ? "file" : "files"}`

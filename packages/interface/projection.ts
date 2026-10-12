@@ -1,6 +1,6 @@
 // interface/projection — what `App` draws from, read from the session's
 // documents in one moment: the session's, `pinetrie:live`, and the roots this
-// tab holds (ADR-0063), read as one tree.
+// tab holds, read as one tree.
 //
 // The facts the host also decides from (the tree, rules, names, references)
 // are read by `@pinetrie/reads`, shared with the host, so a composer cannot
@@ -8,7 +8,7 @@
 // with the cards (`session.cards`), read on their own, by `readHeldLanes` in
 // `App`. Which streams are drawn is `liveWork` (`live.ts`), over the stream
 // records alone: a stream's text is read where it is drawn, so a delta does
-// not re-run this (S55).
+// not re-run this.
 //
 // Pure reads: no subscription, no pi.
 
@@ -82,7 +82,7 @@ export interface HeldView {
 
 export interface SessionFacts {
   readonly index: TreeIndex
-  /** Every ask (ADR-0106), from `index`: the rail and the columns read one. */
+  /** Every ask, from `index`: the rail and the columns read one. */
   readonly asks: AskIndex
   /** Each ask's model-written digest, when digests are on, by its prompt. */
   readonly digests: ReadonlyMap<EntryId, DigestRecord>
@@ -94,19 +94,18 @@ export interface SessionFacts {
   }[]
   /** The streams to draw, from the same moment as `index`. */
   readonly live: LiveWork
-  /** Every seat the host has seen: who wrote in a card (ADR-0048). */
+  /** Every seat the host has seen: who wrote in a card. */
   readonly seats: readonly SeatRecord[]
-  /** The board's workflow states (ADR-0122), or null before the host wrote them. */
+  /** The board's workflow states, or null before the host wrote them. */
   readonly workflow: Workflow | null
-  /** Each task's title (ADR-0045, ADR-0116): its label. */
+  /** Each task's title: its label. */
   readonly marks: ReadonlyMap<TaskId, MarkRecord>
-  /** Each titled note column's title (ADR-0116). */
+  /** Each titled note column's title. */
   readonly noteColumns: ReadonlyMap<NoteColumnId, NoteColumnRecord>
-  /** Every thread (ADR-0117), by id: each one's root. */
+  /** Every thread, by id: each one's root. */
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
-  /** Each thread's last run's verdict, in any root (ADR-0077), by lane. */
+  /** Each thread's last run's verdict, in any root, by lane. */
   readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
-  /** Each card's history (ADR-0048 step 6), by card. */
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
   /** Every trace, by id: each column draws its reader's own. */
   readonly traces: ReadonlyMap<string, TraceRecord>
@@ -149,11 +148,10 @@ function keptFields<T extends object>(
 }
 
 /**
- * Any write to the session's values (a card's move writes its history,
- * ADR-0048) reads every fact again, and each read builds new maps. Kept
- * while the same, they redraw nothing: every message list compares its
- * props by identity (S54, S59). The tree and the asks are kept by their own
- * reads, and are too large to compare.
+ * Any write to the session's values (a card's move writes its history) reads
+ * every fact again, and each read builds new maps. Kept while the same, they
+ * redraw nothing: every message list compares its props by identity. The tree
+ * and the asks are kept by their own reads, and are too large to compare.
  */
 function keptFacts(before: SessionFacts, next: SessionFacts): SessionFacts {
   return keptFields(
@@ -199,9 +197,8 @@ function readFacts(view: HeldView): SessionFacts {
 }
 
 /**
- * Every lane in the roots this tab holds, with its queue from the cards and
- * who holds it from the session (ADR-0048 step 7); a blank queued card
- * (`blank`) does not wait (ADR-0113).
+ * Every lane in the roots this tab holds, with its queue from the cards and who
+ * holds it from the session; a blank queued card (`blank`) does not wait.
  */
 export const readHeldLanes = (
   view: HeldView,

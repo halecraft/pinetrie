@@ -37,7 +37,7 @@ import {
 import type { UnsentSignals } from "./signals.ts"
 import { type ThreadCardFacts, threadCardHeads } from "./thread-card.ts"
 
-/** Each root's task, one a root (ADR-0116): `K("r1")` holds root r1's threads. */
+/** Each root's task, one a root: `K("r1")` holds root r1's threads. */
 const K = (root: string) => taskIdFor(root)
 const R1: Here = { kind: "task", task: K("r1") }
 const R2: Here = { kind: "task", task: K("r2") }
@@ -210,7 +210,7 @@ describe("sidebarView", () => {
     expect(dropsWords([])).toBe(null)
   })
 
-  test("offeredByTask: each open offer's thread, under its task; one the host has not named yet by its id's end; one in no task left out (ADR-0116)", () => {
+  test("offeredByTask: each open offer's thread, under its task; one the host has not named yet by its id's end; one in no task left out", () => {
     const lane = (n: string) => n as ThreadId
     const names = new Map([
       [lane("l1"), "amber-fox" as ThreadName],
@@ -245,7 +245,7 @@ describe("sidebarView", () => {
     expect(items().map(t => t.pip)).toEqual([false, false, false])
   })
 
-  test("a root draws its status, and what arrived as you watched (ADR-0077)", () => {
+  test("a root draws its status, and what arrived as you watched", () => {
     const item: Item = {
       lane: threadIdFor("a"),
       end: entryId("e"),
@@ -323,13 +323,13 @@ describe("pageTitle", () => {
   ])("%i needing you, on %s", (count, _, here, words) => {
     expect(pageTitle(count, here ?? null, null)).toBe(words)
   })
-  test("a page over the stage names the window, not the root under it (ADR-0098)", () => {
+  test("a page over the stage names the window, not the root under it", () => {
     expect(pageTitle(2, r1 ?? null, "profile")).toBe("(2) Profile · pine·trie")
     expect(pageTitle(0, null, "profile")).toBe("Profile · pine·trie")
   })
 })
 
-describe("icons (ADR-0088)", () => {
+describe("icons", () => {
   const SHA = "b".repeat(64) as Sha256
   test("a task with a sprite draws it; one without, its initials on a colour its id seeds", () => {
     const [r1, r2, r3] = items({
@@ -358,7 +358,7 @@ describe("taskSprites", () => {
   ]
   const [early, late, other] = [thread(1), thread(2), thread(3)]
 
-  test("a task takes the banner of its earliest thread with one, whatever its canvas order (ADR-0116)", () => {
+  test("a task takes the banner of its earliest thread with one, whatever its canvas order", () => {
     const sprites = taskSprites(
       new Map([
         [K("r1"), [late, early]],

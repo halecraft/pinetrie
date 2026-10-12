@@ -97,7 +97,7 @@ const facts = (
   }
 }
 
-describe("nextOf: what the thread does next, as the host decides it (ADR-0113)", () => {
+describe("nextOf: what the thread does next, as the host decides it", () => {
   test.each<[string, Partial<LaneView>, Parameters<typeof facts>[0], Next]>([
     [
       "running",

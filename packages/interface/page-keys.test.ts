@@ -32,7 +32,7 @@ describe("keyAct", () => {
     }
   })
 
-  test("the put key in a text box puts the card in your hand in the column, whatever its kind: only a paste types into a box", () => {
+  test("the put key in a text box puts the card in your hand in the column: only a paste types into a box", () => {
     const REF = cardIdOfKind(
       "reference",
       "01a0ffd2-0000-7000-8000-0000000000e1",
@@ -129,7 +129,7 @@ describe("keyAct", () => {
   })
 })
 
-test("while a page covers the stage only the list's fold acts (ADR-0098)", () => {
+test("while a page covers the stage only the list's fold acts", () => {
   const onPage = focus({ page: true, card: C1 })
   expect(keyAct(key("L", chord), onPage)).toEqual({ kind: "foldList" })
   expect(keyAct(key("I", chord), onPage)).toBeNull()
@@ -137,7 +137,7 @@ test("while a page covers the stage only the list's fold acts (ADR-0098)", () =>
   expect(keyAct(key("z", { metaKey: true }), onPage)).toBeNull()
 })
 
-describe("keyAct: search (ADR-0101)", () => {
+describe("keyAct: search", () => {
   const open = { kind: "search", act: { kind: "open" } }
   const close = { kind: "search", act: { kind: "close" } }
   test.each<[string, KeyLike, Partial<Focus>, unknown]>([

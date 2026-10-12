@@ -1,10 +1,10 @@
-// interface/task-column-view — the task column (ADR-0116): the task's own
-// place on its canvas, first, outside the order. It shows the task's title,
-// renamed there; its state on the board, changed there; who is here; the
-// cards pinned to the task; and the canvas list its agents are told. Its
-// title and its state are the same intents the sidebar and the board send.
-// Folded, it shows the title and how many cards are pinned to the task.
-// Pure: `TaskColumn` (`packages/web/task-column.tsx`) draws it.
+// interface/task-column-view — the task column: the task's own place on its
+// canvas, first, outside the order. It shows the task's title, renamed there;
+// its state on the board, changed there; who is here; the cards pinned to the
+// task; and the canvas list its agents are told. Its title and its state are
+// the same intents the sidebar and the board send. Folded, it shows the title
+// and how many cards are pinned to the task. `TaskColumn`
+// (`packages/web/task-column.tsx`) draws it.
 
 import type {
   CardHistoryRecord,
@@ -61,7 +61,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 /**
  * The columns trashed from `task`'s canvas: each thread or note column in a
- * trash whose `left` is that canvas, the newest discard first. Pure.
+ * trash whose `left` is that canvas, the newest discard first.
  */
 export function canvasTrash(input: {
   readonly cards: readonly CardRecord[]
@@ -192,7 +192,7 @@ export const TASK_PINS_EMPTY =
 /** The heading over the task's pinned cards. */
 export const TASK_PINS_HEADING = "pinned to the task"
 
-/** The heading over the canvas list the task's agents are told (ADR-0116). */
+/** The heading over the canvas list the task's agents are told. */
 export const TASK_LIST_HEADING = "what its agents are told of the canvas"
 
 /** What the state's line says: where the task is on the board. */

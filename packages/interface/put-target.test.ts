@@ -34,11 +34,11 @@ const marked = (attrs: Readonly<Record<string, string>>) => ({
   getAttribute: (name: string) => attrs[name] ?? null,
 })
 const LANE = threadIdFor("x")
-/** A thread opened and not yet started (ADR-0126). */
+/** A thread opened and not yet started. */
 const UNSTARTED = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
 const E1 = atEntry(entryId("e-1"))
 
-describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
+describe("one landing rule: every input has full fidelity", () => {
   const store = composerPlacesStore()
   const thread = composerPlace({ thread: LANE, mode: BOUND }, E1)
   const unstarted = composerPlace(
@@ -127,7 +127,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     expect(at(targets[5] as PutTarget)).toBeNull()
   })
 
-  test("a column's pinned strip lands pinned at its composer's thread, an unstarted one's too (ADR-0126)", () => {
+  test("a column's pinned strip lands pinned at its composer's thread, an unstarted one's too", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
     expect(at(targets[6] as PutTarget)).toEqual({
       kind: "pinned",
@@ -139,7 +139,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     })
   })
 
-  test("a task column's pins land pinned to the task (ADR-0116)", () => {
+  test("a task column's pins land pinned to the task", () => {
     expect(
       placeOfTarget(targets[12] as PutTarget, store.current(), ME),
     ).toEqual({ kind: "task-pinned", task: TEST_TASK })
@@ -157,7 +157,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   })
 })
 
-test("composerPlace: your message at its thread, at its end once it has one, or at an unstarted thread's; none for a started thread with no end here (ADR-0126)", () => {
+test("composerPlace: at the thread's end, or an unstarted thread's; none for a started thread with no end here", () => {
   expect(composerPlace({ thread: LANE, mode: BOUND }, E1)).toEqual({
     kind: "composing",
     thread: LANE,
@@ -176,7 +176,7 @@ test("composerPlace: your message at its thread, at its end once it has one, or 
   ).toBeNull()
 })
 
-describe("targetOfFocus (ADR-0132)", () => {
+describe("targetOfFocus", () => {
   const zone = { kind: "inventory", slot: 3 } as const
   test("the text box that has focus, else the drop zone around focus, else the column last focused", () => {
     const at = (over: Partial<Focus>) => targetOfFocus({ ...NO_FOCUS, ...over })

@@ -1,7 +1,7 @@
-// interface/picture-crop — the square of an image a person's picture shows
-// (ADR-0098): chosen on the profile page by dragging and zooming, drawn by
-// the browser at `PICTURE_SIZE` before anything is uploaded. Pure: every
-// step goes through one clamp, which keeps the square inside the image.
+// interface/picture-crop — the square of an image a person's picture shows:
+// chosen on the profile page by dragging and zooming, drawn by the browser at
+// `PICTURE_SIZE` before anything is uploaded. Every step goes through one
+// clamp, which keeps the square inside the image.
 
 /** The side of the picture the browser sends, in pixels. */
 export const PICTURE_SIZE = 256

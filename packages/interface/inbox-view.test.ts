@@ -45,7 +45,7 @@ const view = (
   })
 }
 
-describe("inboxCount (ADR-0077, ADR-0091)", () => {
+describe("inboxCount", () => {
   test("counts what needs you, offers of threads you follow and unseen mentions; never what is worth a read", () => {
     expect(
       inboxCount(
@@ -57,7 +57,7 @@ describe("inboxCount (ADR-0077, ADR-0091)", () => {
   })
 })
 
-describe("inboxView (ADR-0091)", () => {
+describe("inboxView", () => {
   test("each verdict under its level, each offer under ready, in the order given", () => {
     const a = verdict("a", "needsYou")
     const b = offer("b")
@@ -96,7 +96,7 @@ describe("inboxView (ADR-0091)", () => {
   })
 })
 
-describe("inboxWords (ADR-0091)", () => {
+describe("inboxWords", () => {
   test("the label says what needs you, and never where the agent works", () => {
     const words = inboxWords(
       view({

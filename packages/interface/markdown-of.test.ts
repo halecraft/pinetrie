@@ -15,7 +15,7 @@ const message: TranscriptMessage = {
 } as unknown as TranscriptMessage
 const facts = { messageOf: (id: string) => (id === E ? message : undefined) }
 
-describe("markdownOf (ADR-0126)", () => {
+describe("markdownOf", () => {
   test("an entry's markdown is its copy, as `copyText` gives it", () => {
     const entry = markdownOf({ kind: "entry", thread: T, entry: E }, facts)
     expect(entry).toBe(copyText(message))

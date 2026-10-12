@@ -1,5 +1,5 @@
-// interface/reorder — where a column being moved lands. Pure; the drag
-// engine (`use-drag.ts`) and Alt+arrows (`page-keys.ts`) are its shell.
+// interface/reorder — where a column being moved lands. The drag engine
+// (`use-drag.ts`) and Alt+arrows (`page-keys.ts`) are its shell.
 //
 // A gap is a place between columns: gap 0 is before the first, gap n after
 // the last of n. A column dropped in the gap either side of itself does not move.
@@ -18,7 +18,7 @@ export function landing(from: number, gap: number): number | null {
 /**
  * Each column's `translateX` while the one at `from` is dragged to `gap`:
  * those it would pass slide over by its width, to open the gap it would land
- * in; the rest, and the dragged one, stay. Pure.
+ * in; the rest, and the dragged one, stay.
  */
 export function neighbourShifts(
   from: number,

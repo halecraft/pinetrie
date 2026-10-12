@@ -1,5 +1,5 @@
 // interface/intent — what a reader asks of the page, as a value, and what it
-// does. PURE.
+// does.
 //
 // A click reaches `App` as an `Intent`. `planIntent` turns it into `Effect`s
 // and `perform` (`perform.ts`) carries them out. A column's acts are nested
@@ -309,7 +309,6 @@ export type Intent =
       /** `to` is the archive. */
       readonly closes: boolean
     }
-  /** Change the board's workflow states. */
   | { readonly kind: "editWorkflow"; readonly edit: WorkflowEdit }
   /** Close the board. */
   | { readonly kind: "board"; readonly open: false }
@@ -388,7 +387,6 @@ export type Intent =
       readonly card: TextCardId
       readonly text: string
     }
-  /** Select an inventory slot. */
   | { readonly kind: "selectSlot"; readonly slot: number }
   /**
    * Undo or redo your newest move in the task you are on, or, with the

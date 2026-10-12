@@ -1,11 +1,11 @@
-// interface/tool-row — what a tool call's row shows, as pure rules: what the
-// call touched (`rowSummary`, ADR-0114), and how much of it and of what it
-// returned the row draws (`rowView`, ADR-0123).
+// interface/tool-row — what a tool call's row shows: what the call touched
+// (`rowSummary`), and how much of it and of what it returned the row draws
+// (`rowView`).
 //
 // A row is its summary or its detail. The summary shows the command's first
-// SUMMARY_LINES lines and the output's last, so the live output and the
-// result that replaces it draw the same height (S142); only the reader opens
-// the detail, which shows both whole.
+// SUMMARY_LINES lines and the output's last, so the live output and the result
+// that replaces it draw the same height; only the reader opens the detail,
+// which shows both whole.
 
 import {
   BASH_TOOL,
@@ -21,12 +21,12 @@ import { readShell, type ShellRole } from "@pinetrie/shell"
 import { elapsed, plural } from "./counts.ts"
 import { toolWord } from "./tool-words.ts"
 
-/** How long a call's output streams before its row is ringed and timed (ADR-0054). */
+/** How long a call's output streams before its row is ringed and timed. */
 export const REVEAL_MS = 500
 
 /**
  * What a row decides for itself. It outlives the row, kept by its call's id,
- * since a tab shown again mounts its columns anew (ADR-0123).
+ * since a tab shown again mounts its columns anew.
  */
 export interface RowMemory {
   /** The call's output streamed for REVEAL_MS while this row was drawn: its ring and time show. */
@@ -100,9 +100,9 @@ export interface RowSummary {
 
 /**
  * How many columns a shell command is laid out to. A command has its row's
- * whole width: a 28rem column's row is 26.5rem, 424px, which is 55
- * characters of the Mac's SF Mono at a row's .8rem (0.6em each, S142). Only
- * its first line runs beside the tag and status, and wraps once when long.
+ * whole width: a 28rem column's row is 26.5rem, 424px, which is 55 characters
+ * of the Mac's SF Mono at a row's .8rem (0.6em each). Only its first line runs
+ * beside the tag and status, and wraps once when long.
  */
 export const LAYOUT_WIDTH = 55
 
@@ -114,7 +114,7 @@ const VIEWS: Readonly<Partial<Record<ToolId, (subject: string) => Run[]>>> = {
   },
 }
 
-/** What a call's row shows of what it touched. Pure; a row keeps it for its call. */
+/** What a call's row shows of what it touched; a row keeps it for its call. */
 export function rowSummary(call: ToolCall): RowSummary {
   const word = toolWord(call.name)
   if (call.subject === undefined)
@@ -276,7 +276,7 @@ const textOf = (runs: readonly Run[]) => runs.map(r => r.text).join("")
 /**
  * What a row draws, from what its call touched (`rowSummary`), its output's
  * text (the live stream's, or the result's), its body, and whether the
- * reader opened its detail. Pure.
+ * reader opened its detail.
  */
 export function rowView(
   summary: RowSummary,

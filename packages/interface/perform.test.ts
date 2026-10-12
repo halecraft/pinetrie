@@ -295,7 +295,7 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
   )
 })
 
-test("a move on the board runs what follows it only once the host accepts it, the refusal said there before gone; a refusal is said there (ADR-0122, ADR-0126)", async () => {
+test("a move on the board runs what follows it only once the host accepts it; a refusal is said there", async () => {
   const request = {
     kind: "move-task",
     task: TEST_TASK,
@@ -335,7 +335,7 @@ test("a move on the board runs what follows it only once the host accepts it, th
   expect(q.dispatch).not.toHaveBeenCalled()
 })
 
-test("a spin-off into the sidebar places and shows its thread only once the host started it (ADR-0111)", async () => {
+test("a spin-off into the sidebar places and shows its thread only once the host started it", async () => {
   const request = {
     kind: "spin-off",
     move: {
@@ -409,7 +409,7 @@ test("a comment queued as a reference keeps its text under a link to its entry, 
   )
 })
 
-test("a pasted text card is sent with its text, to be written first; a kept quote is sent as it is (ADR-0132)", () => {
+test("a pasted text card is sent with its text, to be written first; a kept quote is sent as it is", () => {
   const p = ports()
   const text = textCardId("01a0ffd2-0000-7000-8000-0000000000d3")
   const to = { kind: "inventory", holder: ada } as const
@@ -472,7 +472,7 @@ test("a fold that moves goes through the fold's port, whose commit lands it; one
   expect(q.dispatch).toHaveBeenCalledWith(action)
 })
 
-test("not needed marks a verdict by its ask, an offer by its source, and an offer with none not at all (ADR-0077)", () => {
+test("not needed marks a verdict by its ask, an offer by its source, and an offer with none not at all", () => {
   const p: Ports = ports()
   const lane = threadIdFor("a")
   perform(

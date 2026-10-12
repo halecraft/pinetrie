@@ -17,7 +17,7 @@ describe("rootSeed", () => {
     expect(used.size).toBe(size)
   })
 
-  test("a task's slot is seeded by its id, the same on every device (ADR-0116)", () => {
+  test("a task's slot is seeded by its id, the same on every device", () => {
     const task = newTaskId()
     expect(taskSlot(task)).toBe(taskSlot(task))
     expect(taskSlot(task)).not.toBe("pending")

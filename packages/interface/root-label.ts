@@ -1,5 +1,5 @@
-// interface/root-label — what a task is called on screen (ADR-0045,
-// ADR-0116), and the rename field's submit. Pure.
+// interface/root-label — what a task is called on screen, and the rename
+// field's submit.
 
 import {
   type EntryId,
@@ -23,7 +23,7 @@ export interface MessageCount {
   readonly total: number
 }
 
-/** Summed from the directory (ADR-0063), so a root not held counts in `total`. */
+/** Summed from the directory, so a root not held counts in `total`. */
 export const messageCount = (
   directory: ReadonlyMap<RootId, RootRecord>,
   held: ReadonlySet<RootId>,
@@ -37,11 +37,11 @@ export const messageCount = (
   return { held: inHeld, total }
 }
 
-/** The count's tooltip: ▦'s, in the footer (ADR-0122). */
+/** The count's tooltip: ▦'s, in the footer. */
 export const messageCountTitle = ({ held, total }: MessageCount): string =>
   `${held} in the threads this tab has loaded, of ${total} in the session`
 
-/** What a task's card shows of its threads' roots (ADR-0116), from the directory. */
+/** What a task's card shows of its threads' roots, from the directory. */
 export interface TaskSummary {
   /** Its first root's first message's first line: its label while it has no title. */
   readonly line: string
@@ -52,9 +52,9 @@ export interface TaskSummary {
 }
 
 /**
- * Every task with a message, as the sidebar and the board read it: from
- * the directory (ADR-0063), not the tree, so a root this tab does not hold
- * counts too. A task whose first root has no message yet is left out.
+ * Every task with a message, as the sidebar and the board read it: from the
+ * directory, not the tree, so a root this tab does not hold counts too. A task
+ * whose first root has no message yet is left out.
  */
 export function summariesOf(
   tasks: Tasks,
@@ -77,14 +77,14 @@ export function summariesOf(
   return out
 }
 
-/** What an untitled task no agent has worked in is called (ADR-0074). */
+/** What an untitled task no agent has worked in is called. */
 export const CHAT_LABEL = "Chat"
 
 /**
- * Every task's label: its title (ADR-0045); else its first card's: for a
- * thread no lane works in (only people have written there) `CHAT_LABEL`,
- * else its root's first line. `App` builds it once per change, and the
- * sidebar, the board and your inbox look labels up in it.
+ * Every task's label: its title; else its first card's: for a thread no lane
+ * works in (only people have written there) `CHAT_LABEL`, else its root's first
+ * line. `App` builds it once per change, and the sidebar, the board and your
+ * inbox look labels up in it.
  */
 export function labelsOf(input: {
   readonly tasks: Tasks
@@ -147,9 +147,9 @@ export function renameKey(
 }
 
 /**
- * What a folded list draws for a root without a sprite (ADR-0088): the first
- * letters of the label's first two words, or a one-word label's first two
- * letters, in capitals. A word is a run of letters and digits.
+ * What a folded list draws for a root without a sprite: the first letters of
+ * the label's first two words, or a one-word label's first two letters, in
+ * capitals. A word is a run of letters and digits.
  */
 export function initialsOf(label: string): string {
   const words = label.match(/[\p{L}\p{N}]+/gu) ?? []

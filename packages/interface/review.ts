@@ -1,6 +1,6 @@
-// interface/review — what a column's review of its offer draws, pure (ADR-0047):
-// each revision's title, body and files, what each file's section shows, and
-// a diff's lines by kind. `review-pane.tsx` draws it; `use-fetched.ts` reads.
+// interface/review — what a column's review of its offer draws: each revision's
+// title, body and files, what each file's section shows, and a diff's lines by
+// kind. `review-pane.tsx` draws it; `use-fetched.ts` reads.
 
 import {
   type DiffSpan,
@@ -198,7 +198,7 @@ export function diffLines(text: string): readonly DiffLine[] {
   })
 }
 
-/** A review head's toggle (ADR-0087): wrapping long lines, or the file list. */
+/** A review head's toggle: wrapping long lines, or the file list. */
 export type ReviewPref = "wrap" | "listFolded"
 
 /** A review toggle's glyph and label, by what it does from `on`. */

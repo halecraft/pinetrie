@@ -10,7 +10,8 @@ what the session and the documents hold (`@pinetrie/session`,
 session document through `@pinetrie/reads` and `projection.ts`, and of your
 own documents through the session; the only state a client keeps of its own
 is the layout (which task you are on, your view of each task's columns,
-whether the board is open), which the page keeps per browser tab. What is typed is a
+whether the board is open), which the page keeps per browser tab
+(ADR-0027, *Kept per tab* in `packages/web/TECHNICAL.md`). What is typed is a
 card (ADR-0048): a document of its own, written by its client, and kept on
 its thread.
 
@@ -117,12 +118,18 @@ the document's entries, and returns the same index until one changes. The
 columns, the rail and the agent's path all read that one index
 (`packages/core/tree.ts`). `App` reads it through `readSessionFacts`
 (`projection.ts`), together with the entry count, the agent's activity, the
-streams to draw (`liveWork`, over the stream records alone), the
+streams to draw (`liveWork`, `live.ts`, over the stream records alone), the
 participants, the archive and the work facts, so they are always from the
 same moment. The lanes are read from two documents, the session and the
 cards (`readLanes(doc, index, cards)`), by a `useSelector` over the session
 whose selector changes with the cards. `resolveLayout` takes the index, the
 lanes and the archive together.
+
+**A stream gives way to its entry in one render** (`live.ts`): it is drawn
+until the entry that replaces it is on screen. That rests on the order the
+host writes a turn in: a message's entry before its tool streams, its tool
+results before the next reply, and a reply's tip held until its entry
+(S35, S55).
 
 **Ids arrive branded.** Every entry id the client holds came from the reads
 as an `EntryId`, and every lane as a `ThreadId` (`packages/reads/TECHNICAL.md`),
@@ -684,7 +691,8 @@ pending.
   `address` resolves to your display name, never your own; `InboxItem` is one
   (core's `Mention` is a mention parsed from text). What you have seen is
   `{ since, seen }`: every mention at or before `since`, and the ids above it
-  in `seen`. Marking compacts: `since` moves past a run of seen mentions, so
+  in `seen`; entry ids are uuidv7 (S9), so id order is creation order and
+  `since` is a watermark. Marking compacts: `since` moves past a run of seen mentions, so
   `seen` holds only those above an unseen one.
 - **`useInbox`** is its shell, over your attention document's
   `mentionsSince` and `seen` (ADR-0077), so what you have seen is seen on
@@ -1130,7 +1138,8 @@ composer*).
   button is "catch up with \<base\> and resolve". The parent's catch-up,
   quiet while it runs, is titled why.
 - **A branch from a conflicted copy is warned** (`forkWords`, ADR-0072): a
-  column whose next send creates a lane of its own, at a commit whose
+  column whose next send creates a lane of its own (its own jj workspace,
+  ADR-0032; the where line says where it will work), at a commit whose
   records carry conflicts (`conflictsAt` of `nearestRevision`'s commit),
   shows `.where-fork-conflict` under the where line.
 - **An acceptance names the offer this tab shows** (ADR-0065): `SessionClient.offer`
@@ -1468,7 +1477,7 @@ every one through `SignalMark`, `.signal[data-signal]`, the one selector
 the suites use. Attention keeps its `LEVELS` as what it decides
 (`attention.ts`); `signalOfLevel` is the one mapping of a level to its
 signal, and `statusSignal` a thread's or a task's status to its mark
-(running while its agent works, its level's when raised, done while a
+(running while its agent works, ADR-0069, its level's when raised, done while a
 finished run fades). The plan's four signals are five: worth a read is a
 level of its own, with its own dim mark.
 

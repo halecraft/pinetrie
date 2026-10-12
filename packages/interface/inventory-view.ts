@@ -1,7 +1,6 @@
-// interface/inventory-view — what the inventory panel draws (ADR-0048 step 4,
-// ADR-0059): `settleSlots`, the one slot rule the repair writes too, as a
-// card grid (`gridView`), each of the first nine slots labelled 1–9, and the
-// selected card's preview (ADR-0126). Pure.
+// interface/inventory-view — what the inventory panel draws: `settleSlots`,
+// the one slot rule the repair writes too, as a card grid (`gridView`), each
+// of the first nine slots labelled 1–9, and the selected card's preview.
 
 import {
   type CardId,
@@ -16,8 +15,8 @@ import { type GridView, gridView } from "./grid-view.ts"
 import type { ThreadFace } from "./thread-face.ts"
 
 /**
- * The selected card, drawn beside the grid (ADR-0126): normal, one column
- * wide, read only. Opened, it is drawn whole in place instead.
+ * The selected card, drawn beside the grid: normal, one column wide, read only.
+ * Opened, it is drawn whole in place instead.
  */
 export interface CardPreview {
   readonly card: CardRecord
@@ -45,7 +44,7 @@ export function inventoryView(input: {
   readonly selected: number
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>
-  /** Each thread's face, for a thread's card (ADR-0124). */
+  /** Each thread's face, for a thread's card. */
   readonly threads: ReadonlyMap<ThreadId, ThreadFace>
   /** The selected card is open, drawn whole in its slot. */
   readonly open: boolean

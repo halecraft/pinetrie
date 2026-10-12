@@ -1,6 +1,6 @@
-// interface/inventory-dock — where the inventory panel floats (ADR-0048): left,
+// interface/inventory-dock — where the inventory panel floats: left,
 // centre or right, the nearest third to where its frame is dropped. Kept per
-// device, not per session. Pure.
+// device, not per session.
 
 import type { Codec } from "./codec.ts"
 

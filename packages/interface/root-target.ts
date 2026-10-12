@@ -1,5 +1,4 @@
-// interface/root-target — where a task moves to, by drag or by key
-// (ADR-0122, ADR-0116). Pure.
+// interface/root-target — where a task moves to, by drag or by key.
 //
 // A task is dragged from the board or from the sidebar. A drop names a target
 // by the attributes the page marks it with (`rootDropProps`), and
@@ -83,7 +82,6 @@ export function rootTargetOfElement(el: {
   return isTaskId(list) ? { kind: "list", before: list } : null
 }
 
-/** Whether two targets are the same place. */
 export const sameTarget = (a: RootTarget, b: RootTarget): boolean =>
   a.kind === "state"
     ? b.kind === "state" && a.state === b.state && a.before === b.before

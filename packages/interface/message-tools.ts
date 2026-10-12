@@ -1,10 +1,8 @@
-// interface/message-tools — which tools a message offers, as a pure rule: copy,
-// comment, edit (or new tab), and `→` (ADR-0021, ADR-0043). Nothing is
-// taken from the past (ADR-0132): a message is copied, and kept from the
-// clipboard cell. `Column`
-// gathers the facts, and `Message` draws the result. Each tool but copy is the
-// `MessageAct` it sends, which reaches `App` as its column's intent
-// (`intent.ts`).
+// interface/message-tools — which tools a message offers: copy, comment, edit
+// (or new tab), and `→`. Nothing is taken from the past: a message is copied,
+// and kept from the clipboard cell. `Column` gathers the facts, and `Message`
+// draws the result. Each tool but copy is the `MessageAct` it sends, which
+// reaches `App` as its column's intent (`intent.ts`).
 
 import {
   type Address,
@@ -27,7 +25,6 @@ const AGENT_PREFIX = `@${THE_AGENT} `
 /** `@agent ` as a box starts with it: the one blank prefill, nothing typed. */
 export const AGENT_PREFILL: Prefill = { text: AGENT_PREFIX, blank: true }
 
-/** A branch to open at `at` (ADR-0126). */
 export interface OpenBranch {
   readonly at: EntryId
   readonly prefill: Prefill | undefined
@@ -41,7 +38,7 @@ export interface MessageTools {
    * list would join every call's output.
    */
   readonly copy: boolean
-  /** Comment on it: a note in its margin (ADR-0126), where the column can be written. */
+  /** Comment on it: a note in its margin, where the column can be written. */
   readonly comment: boolean
   /** Send it again: a sibling at its parent, or a root's first message in a new tab. */
   readonly edit: Extract<MessageAct, { kind: "branch" | "newTab" }> | undefined
@@ -52,7 +49,7 @@ export interface MessageTools {
 /**
  * What a branch's composer starts with: `@agent ` in agent work, so going on
  * with the agent is already typed, and deleting it makes the branch a
- * conversation (ADR-0021). Nothing in a conversation.
+ * conversation. Nothing in a conversation.
  */
 export const branchPrefill = (lane: ThreadLane): Prefill | undefined =>
   lane.kind === "lane" ? AGENT_PREFILL : undefined
@@ -69,7 +66,7 @@ export type MessageAct =
   | { readonly kind: "openAt"; readonly entry: EntryId }
   /**
    * Comment on the message `entry`, in `thread`: a new, empty note `card`
-   * in its margin (ADR-0126).
+   * in its margin.
    */
   | {
       readonly kind: "comment"
@@ -146,8 +143,8 @@ function editOf(
 }
 
 /**
- * What taking `node` takes (ADR-0126): the block named (a table's bar, an
- * image), else the whole message. Pure.
+ * What taking `node` takes: the block named (a table's bar, an image), else the
+ * whole message.
  */
 export function messageReference(
   node: TranscriptMessage,
@@ -161,11 +158,11 @@ export function messageReference(
 }
 
 /**
- * What taking your selection in `node` takes (ADR-0126): a range of the
- * message's text when the selection's text is in it as written. Null
- * otherwise, as when the selection crosses formatting, whose drawn text is
- * not its markdown: the selection is no part of the message a range can
- * name, and the whole message is not what you selected. Pure.
+ * What taking your selection in `node` takes: a range of the message's text
+ * when the selection's text is in it as written. Null otherwise, as when the
+ * selection crosses formatting, whose drawn text is not its markdown: the
+ * selection is no part of the message a range can name, and the whole message
+ * is not what you selected.
  */
 export function selectionReference(
   node: TranscriptMessage,

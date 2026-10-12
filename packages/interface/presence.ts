@@ -1,10 +1,9 @@
-// interface/presence — what a client shows of who else is here. Pure.
+// interface/presence — what a client shows of who else is here.
 //
-// Presence is thread-level (ADR-0024): each column of the tab a person is on
-// reports the end of the thread it follows (ADR-0029). Someone is on your
-// thread when their end and yours lie on one path: one is the other, or an
-// ancestor of it (a column that has not yet caught up). Someone on a sibling
-// branch is not.
+// Presence is thread-level: each column of the tab a person is on reports the
+// end of the thread it follows. Someone is on your thread when their end and
+// yours lie on one path: one is the other, or an ancestor of it (a column that
+// has not yet caught up). Someone on a sibling branch is not.
 //
 // Each function takes one field's entries, so a part of the screen reads only
 // the field it shows, and a write to another field redraws nothing of it.
@@ -21,7 +20,7 @@ type Entries = readonly (readonly [WriterId, EntryId])[]
 
 /**
  * Everyone but `me` whose value is `value`, each once: a person here from two
- * seats has two entries (ADR-0037): who types at a thread end.
+ * seats has two entries: who types at a thread end.
  */
 export function whoIsAt(
   entries: Entries,

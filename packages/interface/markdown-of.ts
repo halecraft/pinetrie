@@ -1,6 +1,6 @@
-// interface/markdown-of — the markdown of what an address names (ADR-0126):
-// what Cmd+C puts on the system clipboard and what a reference keeps as its
-// quote, from one rule. Pure.
+// interface/markdown-of — the markdown of what an address names: what Cmd+C
+// puts on the system clipboard and what a reference keeps as its quote, from
+// one rule.
 
 import type { Address, EntryId, TranscriptMessage } from "@pinetrie/core"
 import { addressLink, pastMarkdown } from "@pinetrie/rules"
@@ -28,10 +28,9 @@ export function markdownOf(
 }
 
 /**
- * A comment's quote, as a queued reference to it sends it (ADR-0126): a
- * link to the entry it is on, then its text. The agent reads the entry
- * quoted under the link (`pastMarkdown`, the host's), so the comment reads
- * under what it is about.
+ * A comment's quote, as a queued reference to it sends it: a link to the entry
+ * it is on, then its text. The agent reads the entry quoted under the link
+ * (`pastMarkdown`, the host's), so the comment reads under what it is about.
  */
 export const commentMarkdown = (entry: Address, text: string): string =>
   `A comment on ${addressLink(entry, "a message")}:\n\n${text.trim()}`

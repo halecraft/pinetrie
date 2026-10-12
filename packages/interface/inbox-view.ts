@@ -1,11 +1,11 @@
-// interface/inbox-view — your inbox, under the sidebar beside your avatar
-// (ADR-0091), or in the menu your avatar opens while the sidebar is folded
-// (ADR-0098): how the threads you follow ended, their work ready to accept,
-// what is worth a read, and mentions of you. It lists exactly what it
-// counts: the badge is what needs you (`inboxCount`), the one count the
-// window's title shows too. Decided as a value (`inboxView`) and worded in
-// one function (`inboxWords`). Everyone's facts (where the agent works,
-// which roots have work ready) are the board's, not here.
+// interface/inbox-view — your inbox, under the sidebar beside your avatar, or
+// in the menu your avatar opens while the sidebar is folded: how the threads
+// you follow ended, their work ready to accept, what is worth a read, and
+// mentions of you. It lists exactly what it counts: the badge is what needs you
+// (`inboxCount`), the one count the window's title shows too. Decided as a
+// value (`inboxView`) and worded in one function (`inboxWords`). Everyone's
+// facts (where the agent works, which roots have work ready) are the board's,
+// not here.
 
 import type { Item } from "./attention.ts"
 import { count } from "./counts.ts"
@@ -55,7 +55,7 @@ export function inboxView(input: {
   readonly unseen: number
   /**
    * The sections shown when the menu opened, empty while it is closed: an
-   * open menu keeps them until you close it (ADR-0030).
+   * open menu keeps them until you close it.
    */
   readonly kept: readonly InboxSection[]
 }): InboxView {
@@ -85,7 +85,7 @@ export interface InboxWords {
   readonly sections: Readonly<Record<InboxSection, string>>
 }
 
-/** The inbox's name: its trigger's label leads with it, and the account menu's item is it (ADR-0098). */
+/** The inbox's name: its trigger's label leads with it, and the account menu's item is it. */
 export const INBOX = "Inbox"
 
 export function inboxWords(view: InboxView): InboxWords {

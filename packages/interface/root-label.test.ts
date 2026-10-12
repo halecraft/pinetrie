@@ -45,7 +45,7 @@ const directory = new Map(
   ].map(r => [r.root, r] as const),
 )
 
-/** Each root's task, one a root, its thread `t-<n>` (ADR-0116); task 1 titled. */
+/** Each root's task, one a root, its thread `t-<n>`; task 1 titled. */
 const K = (n: string) => taskIdFor(n)
 const thread = (n: string) => threadIdFor(`thread-${n}`)
 const threads = new Map(
@@ -76,7 +76,7 @@ const marks = new Map([
   [K("1"), { task: K("1"), title: "Tab names", by: writerId("p-ada"), at: 1 }],
 ])
 
-describe("labels and summaries, from the directory (ADR-0063)", () => {
+describe("labels and summaries, from the directory", () => {
   const laneIn = (n: string): [LaneRecord["lane"], LaneRecord] => {
     const lane = threadIdFor(n)
     return [
@@ -127,7 +127,7 @@ describe("labels and summaries, from the directory (ADR-0063)", () => {
     expect(messageCountTitle(count)).toBe(words)
   })
 
-  test("summaries: each task whose first root has a message, its first line, writers and newest message (ADR-0116)", () => {
+  test("summaries: each task whose first root has a message, its first line, writers and newest message", () => {
     expect(summariesOf(tasks, directory)).toEqual(
       new Map([
         [

@@ -55,7 +55,7 @@ describe("presence: others, by thread", () => {
       whoIsAt(typing, entryId("4"), me),
     ]).toEqual([[bea], [cy]])
   })
-  test("a person typing from two seats shows once (ADR-0037)", () => {
+  test("a person typing from two seats shows once", () => {
     const typing: Entries = [
       [bea, entryId("3")],
       [bea, entryId("3")],

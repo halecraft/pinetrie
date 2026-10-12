@@ -1,7 +1,7 @@
-// interface/thread-face — a thread's card in your inventory (ADR-0124):
-// known at a glance, as a game's inventory shows what it holds: its name and
-// banner, its first line, the first line of where it ended, and its status.
-// The whole path is its preview's, when it is opened. Pure.
+// interface/thread-face — a thread's card in your inventory: known at a glance,
+// as a game's inventory shows what it holds: its name and banner, its first
+// line, the first line of where it ended, and its status. The whole path is its
+// preview's, when it is opened.
 
 import {
   type BannerRecord,
@@ -26,7 +26,7 @@ export interface ThreadFace {
   readonly thread: ThreadId
   /** Its two-word name; null before it has one. */
   readonly name: ThreadName | null
-  /** Its banner's image, null for none (ADR-0039). */
+  /** Its banner's image, null for none. */
   readonly sprite: string | null
   /** The first line of its first message; "" before it has one (a copy). */
   readonly first: string
@@ -51,7 +51,7 @@ export function threadFace(input: {
 }): ThreadFace {
   const { thread, index } = input
   // Its first message, not its first entry, which is often a context entry
-  // its branch's first run wrote above its prompt (ADR-0125).
+  // its branch's first run wrote above its prompt.
   const firstId = firstMessageOf(index, thread)
   const end = threadEnd(index, thread)
   const lane = input.lanes.find(l => l.name === thread)
@@ -104,9 +104,9 @@ export interface PreviewRow {
 }
 
 /**
- * A thread in your inventory, opened (ADR-0124): its path from its root to
- * its end, its people's and its agent's messages, read only. Its own type,
- * which no composer, dock or queue takes, so a preview cannot send.
+ * A thread in your inventory, opened: its path from its root to its end, its
+ * people's and its agent's messages, read only. Its own type, which no
+ * composer, dock or queue takes, so a preview cannot send.
  */
 export interface ThreadPreview {
   readonly kind: "preview"

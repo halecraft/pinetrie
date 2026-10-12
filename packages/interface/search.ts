@@ -1,5 +1,5 @@
-// interface/search — finding a phrase in the task you are on (ADR-0101): the
-// query, the matcher, a match's snippet, and the search's own state. Pure.
+// interface/search — finding a phrase in the task you are on: the query, the
+// matcher, a match's snippet, and the search's own state.
 //
 // A match starts at a word's start, and every word but the last is whole;
 // the last may be the start of a longer word, since it may be the one still

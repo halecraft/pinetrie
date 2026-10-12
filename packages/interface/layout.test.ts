@@ -50,8 +50,8 @@ const parents = {
 }
 const index = tree(parents)
 /**
- * Each root's task, one a root (ADR-0116): `7-r3` is the root a new tab's
- * first send writes, so its task is the one the tab minted.
+ * Each root's task, one a root: `7-r3` is the root a new tab's first send
+ * writes, so its task is the one the tab minted.
  */
 const TK = (root: string): TaskId =>
   root === "7-r3" ? NEW_TASK : taskIdFor(root)
@@ -156,7 +156,7 @@ describe("layoutReducer", () => {
     expect(defaultView(null).task).toEqual({ unfolded: false })
   })
 
-  test("a reader's settings are kept by card, folded or not (ADR-0106, ADR-0073)", () => {
+  test("a reader's settings are kept by card, folded or not", () => {
     const l = layoutReducer(
       layoutReducer(
         initialLayout(),
@@ -386,7 +386,7 @@ describe("listOf", () => {
   })
 })
 
-test("unlisted: the tasks not in the sidebar, and not archived (ADR-0077, ADR-0122)", () => {
+test("unlisted: the tasks not in the sidebar, and not archived", () => {
   const open = { open: [TK("1-r1")] }
   expect(
     unlisted(open, new Set([TK("7-r3")]), [TK("1-r1"), TK("5-r2"), TK("7-r3")]),
@@ -395,7 +395,7 @@ test("unlisted: the tasks not in the sidebar, and not archived (ADR-0077, ADR-01
 
 describe("planOpen", () => {
   const l = at(initialLayout())
-  test("a thread that carried on past a branch's older context entry shows its own continuation (ADR-0125)", () => {
+  test("a thread that carried on past a branch's older context entry shows its own continuation", () => {
     // Under 3-b, branch X's first run wrote its canvas entry, then its
     // prompt; then the trunk's next run wrote its own canvas entry and
     // prompt. Neither canvas entry is a message a column draws.
@@ -555,7 +555,7 @@ describe("encodeLayout / decodeLayout", () => {
     for (const raw of [
       { v: 1, columns: [] },
       { v: 6, active: null, roots: {}, newTabs: [], board: false },
-      // v8 kept branches and new tabs of this tab's own (ADR-0126).
+      // v8 kept branches and new tabs of this tab's own.
       { ...good, v: 8 },
       // A view keyed by something that is no task.
       { ...good, tasks: { "1-r1": goodView } },

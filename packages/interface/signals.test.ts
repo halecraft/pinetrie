@@ -66,7 +66,7 @@ const atEnd = (id: string, at: string, owner = ADA): TextCard => ({
   },
   content: { command: null, unsent: null, origin: null },
 })
-/** Your message at a thread not yet started (ADR-0126): it has no end. */
+/** Your message at a thread not yet started: it has no end. */
 const atUnstarted = (id: string, thread: ThreadId): TextCard => ({
   kind: "text",
   id: textCardId(id),
@@ -75,7 +75,7 @@ const atUnstarted = (id: string, thread: ThreadId): TextCard => ({
   place: { kind: "composing", thread },
   content: { command: null, unsent: null, origin: null },
 })
-/** Each root's task, one a root (ADR-0116): e1's, g1's and the far f1's. */
+/** Each root's task, one a root: e1's, g1's and the far f1's. */
 const K = (root: string) => taskIdFor(root)
 /** A note column on g1's task's canvas. */
 const NOTES = cardIdOfKind(
@@ -84,7 +84,7 @@ const NOTES = cardIdOfKind(
 )
 /** Thread `far` is recorded in the far root. */
 const FAR_THREAD = threadIdFor("far")
-/** A branch not yet started on e1's canvas, and one on g1's (ADR-0126). */
+/** A branch not yet started on e1's canvas, and one on g1's. */
 const BRANCH = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
 const G_BRANCH = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
 const tasks = tasksWith({
@@ -137,7 +137,7 @@ const sets = (m: ReturnType<typeof marks>) => ({
   elsewhere: m.elsewhere,
 })
 
-describe("signals as one family (ADR-0126)", () => {
+describe("signals as one family", () => {
   test("each attention level maps to one signal of its own", () => {
     const signals = LEVELS.map(signalOfLevel)
     expect(signals).toEqual(["worth-a-read", "needs-you"])
@@ -187,7 +187,7 @@ describe("unsentSignals", () => {
     })
   })
 
-  test("a note you own marks its note column's task, and no thread's end (ADR-0116)", () => {
+  test("a note you own marks its note column's task, and no thread's end", () => {
     const note: CardRecord = {
       ...atEnd("c", "e2"),
       place: { kind: "note", column: NOTES, order: "a" },
@@ -217,7 +217,7 @@ describe("unsentSignals", () => {
     })
   })
 
-  test("your message in a root this tab does not hold marks its thread's task, with no end (ADR-0063)", () => {
+  test("your message in a root this tab does not hold marks its thread's task, with no end", () => {
     const m = marks([atEnd("c", "f2")])
     expect(sets(m).tasks).toEqual([K("f1")])
     expect(sets(m).ends).toEqual([])
@@ -231,7 +231,7 @@ describe("unsentSignals", () => {
     ]).toEqual(["e3"])
   })
 
-  test("your message at a thread not yet started marks its task, with no end (ADR-0126)", () => {
+  test("your message at a thread not yet started marks its task, with no end", () => {
     expect(sets(marks([atUnstarted("c", BRANCH)]))).toEqual({
       tasks: [K("e1")],
       ends: [],

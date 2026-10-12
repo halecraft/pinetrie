@@ -1,7 +1,7 @@
-// interface/next — what a thread does next, for its dock's queue header
-// (ADR-0113): the run, the queue's top card, a stop to resume, or nothing.
-// Read from the host's own rules (`planNextQueuedCardPop`, `carryOnState`),
-// so ▸ and the host cannot disagree. PURE.
+// interface/next — what a thread does next, for its dock's queue header: the
+// run, the queue's top card, a stop to resume, or nothing. Read from the host's
+// own rules (`planNextQueuedCardPop`, `carryOnState`), so ▸ and the host cannot
+// disagree.
 
 import {
   type AskIndex,
@@ -156,11 +156,11 @@ export interface QueueHeadPlan {
 }
 
 /**
- * One button, the rest in ⋯ (ADR-0113): stop while it runs; send queue
- * while held with something to send, resume in ⋯ when the turn may carry
- * on; resume when stopped; none when idle or sending. Hold queue while it
- * is not held, release while it is held with nothing to send, and unqueue
- * all while a message card waits. Pure.
+ * One button, the rest in ⋯: stop while it runs; send queue while held with
+ * something to send, resume in ⋯ when the turn may carry on; resume when
+ * stopped; none when idle or sending. Hold queue while it is not held, release
+ * while it is held with nothing to send, and unqueue all while a message card
+ * waits.
  */
 export function queueHeadPlan(head: QueueHead): QueueHeadPlan {
   const { next } = head
@@ -246,7 +246,6 @@ export function nextButtonWords(
   }
 }
 
-/** A ⋯ item in words. */
 export function nextItemWords(item: NextItem): ControlWords {
   switch (item) {
     case "resume":

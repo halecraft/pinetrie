@@ -1,5 +1,5 @@
 // interface/paste — an image pasted into a composer, referred to in the text
-// as markdown once the host keeps it (`upload.ts`, ADR-0042).
+// as markdown once the host keeps it (`upload.ts`).
 
 import { blobUrl, type ImageRef } from "@pinetrie/core"
 
@@ -13,7 +13,7 @@ export interface Selection {
  * `snippet` in place of `selection`, on lines of its own: a newline is added
  * where it would touch other text. Returns the text and the cursor, after
  * the snippet. A selection past the text's end, which an edit made during an
- * upload can leave, is clamped to it. Pure.
+ * upload can leave, is clamped to it.
  */
 export function insertAt(
   text: string,

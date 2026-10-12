@@ -1,6 +1,6 @@
 // interface/same-data — structural equality of plain data: what a read compares
 // to keep a value while it is unchanged (`projection.ts`), and the page's
-// memo rules (`same-props.ts`). Pure.
+// memo rules (`same-props.ts`).
 
 const isPlain = (x: object): boolean => {
   const proto = Object.getPrototypeOf(x)

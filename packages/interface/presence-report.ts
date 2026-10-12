@@ -1,6 +1,6 @@
 // interface/presence-report — what this page writes about you: which thread end
-// each column of the root you are on reads (ADR-0024, ADR-0029), and when you
-// are typing, and in which card. PURE: `App` gathers and writes.
+// each column of the root you are on reads, and when you are typing, and in
+// which card. `App` gathers and writes.
 
 import type { CardId } from "@pinetrie/core"
 
@@ -40,7 +40,7 @@ export interface TypedLast {
 /**
  * Whether typing at `now` in `card` is written: a second after the last
  * write, or at once in another card, since the host pops no card someone
- * is typing in (ADR-0048 step 7).
+ * is typing in.
  */
 export const typingDue = (
   last: TypedLast,
