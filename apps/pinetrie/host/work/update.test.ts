@@ -30,6 +30,7 @@ import {
 import { newRootDoc, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { basics, putLane, putValue, record, row } from "../fakes.ts"
+import type { Ready } from "./setup.ts"
 import {
   applySettle,
   createUpdates,
@@ -43,10 +44,8 @@ import {
 
 /** A project's lane configs: none of its own. */
 const LANES = {
-  shared: [],
-  refused: [],
-  config: decodeLaneConfig({}, "/p", false),
   repoConfig: DEFAULT_REPO,
+  user: decodeLaneConfig({}, "/p"),
 }
 
 const LANE = threadIdFor("0123456789abcdef")
@@ -439,7 +438,12 @@ describe("askedAboutConflict", () => {
     }
     const updates = createUpdates({
       basics: b,
-      setup: { root: "/p", owner: record<RepoOwner>().port, lanes: LANES },
+      setup: {
+        root: "/p",
+        owner: record<RepoOwner>().port,
+        lanes: LANES,
+        ready: Promise.resolve({ image: "img" } as Ready),
+      },
       registry: record<Parameters<typeof createUpdates>[0]["registry"]>({
         isOwn: () => own,
         laneJjOf: () => jj,
@@ -453,7 +457,6 @@ describe("askedAboutConflict", () => {
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
       fetchLane: async () => {},
       writeRevision: async () => {},
-      recipes: record<Parameters<typeof createUpdates>[0]["recipes"]>().port,
     })
     return { updates, asked }
   }
@@ -546,7 +549,12 @@ describe("catchUpInRun", () => {
     }
     const updates = createUpdates({
       basics: b,
-      setup: { root: "/p", owner: record<RepoOwner>().port, lanes: LANES },
+      setup: {
+        root: "/p",
+        owner: record<RepoOwner>().port,
+        lanes: LANES,
+        ready: Promise.resolve({ image: "img" } as Ready),
+      },
       registry: record<Parameters<typeof createUpdates>[0]["registry"]>({
         isOwn: () => true,
         laneJjOf: () => jj,
@@ -564,7 +572,6 @@ describe("catchUpInRun", () => {
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
       fetchLane: async () => {},
       writeRevision: async () => {},
-      recipes: record<Parameters<typeof createUpdates>[0]["recipes"]>().port,
     })
     return { updates, asked }
   }

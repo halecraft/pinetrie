@@ -898,10 +898,11 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   `intent.ts`), as `sent` is: `planColumn` sends them
   through `onColumn`, as your view of the column's card.
 - **`workWords` counts what the work's records say** (`statsOf`): the
-  files its turns changed, the ignored files they wrote ("3 ignored
-  files", each record's topmost and how many more, ADR-0131), and
-  "dependencies failed to install" when a turn's recipe failed, after the
-  failed calls.
+  files its turns changed, the local files they wrote ("3 local files",
+  each record's topmost and how many more), the directories made from
+  source that `.gitignore` misses, the source files jj left out of a
+  commit, and the writes to shared files over another's, from each
+  record's `disk` (ADR-0135).
 - **What `askView` decides:** what its work holds (`work`, `workWords`
   over `askStats`), the outcome's words, the live line while it runs, the
   last word outline hides (none in the column's last ended ask,
@@ -1103,7 +1104,9 @@ thread's name, ADR-0039), where it forks (`origin`), where lanes start on
 its path (`joins`), and what became of its files (`strip`, a row of the
 column's header, ADR-0113): each lane's offer in your repo (ADR-0105), and
 what its review reads (`ReviewTarget`, ADR-0047), an offer's revisions or
-an ask's range.
+an ask's range. A revision whose `pinetrie.json` would let lanes do more
+once accepted says what, in one line (`wideningLine`, ADR-0135), worded
+from core's `wideningWords`, as the agent's reply to the write is.
 What the thread does next is the dock's (`nextOf`, *Threads, lanes and the
 composer*).
 

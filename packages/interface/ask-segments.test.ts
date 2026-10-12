@@ -5,6 +5,7 @@ import {
   entryId,
   indexAsks,
   indexTree,
+  NO_SHARED,
   projectRail,
   type RevisionRecord,
   startsRun,
@@ -51,10 +52,7 @@ describe("workStats", () => {
   const rev = (
     entry: string,
     paths: string[],
-    disk: Pick<RevisionRecord, "ignored" | "recipe"> = {
-      ignored: null,
-      recipe: null,
-    },
+    disk: RevisionRecord["disk"] = null,
   ): [EntryId, RevisionRecord] => [
     entryId(entry),
     {
@@ -64,20 +62,29 @@ describe("workStats", () => {
       snapshot: null,
       paths,
       conflicts: [],
-      ...disk,
+      disk,
     },
   ]
   const revisions = new Map([
     rev("2-a", ["a.txt", "b.txt"], {
-      ignored: { paths: [".env", "dist"], more: 1 },
-      recipe: null,
+      derived: { paths: ["node_modules"], more: 0 },
+      local: { paths: [".env", "out.log"], more: 1 },
+      unignored: ["dist"],
+      leftovers: [],
+      shared: NO_SHARED,
     }),
     rev("4-a", ["b.txt", "c.txt"], {
-      ignored: { paths: [".env"], more: 0 },
-      recipe: "failed",
+      derived: { paths: [], more: 0 },
+      local: { paths: [".env"], more: 0 },
+      unignored: ["dist"],
+      leftovers: ["big.bin"],
+      shared: {
+        read: [],
+        wrote: [{ path: ".plans/p.md", version: 2, concurrent: true }],
+      },
     }),
   ])
-  test("counts the work, the union of its turns' paths and ignored files, and its time", () => {
+  test("counts the work, the union of its turns' paths and local files, and its time", () => {
     expect(
       workStats(
         index,
@@ -92,8 +99,10 @@ describe("workStats", () => {
       calls: 2,
       failed: 1,
       files: ["a.txt", "b.txt", "c.txt"],
-      ignored: 3,
-      recipeFailed: 1,
+      local: 3,
+      unignored: 1,
+      leftovers: 1,
+      concurrent: 1,
       first: 110,
       last: 200,
     })

@@ -1,0 +1,5 @@
+== 18:58:44 each set of privileges
+privileged                                    root: open 1, release yes, lstat 2:1791853123892464436; uid 1000: open 1, release yes, lstat 2:1791853125079168853; 
+BPF PERFMON SYS_PTRACE, default profile       root: open 1, release yes, lstat 2:1791853127981572021; uid 1000: open 1, release yes, lstat 2:1791853129174536105; 
+BPF PERFMON, default profile                  root: open 1, release yes, lstat -; uid 1000: open 1, release yes, lstat -; 
+== done: results/caps.log

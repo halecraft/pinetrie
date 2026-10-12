@@ -275,7 +275,7 @@ export async function startHost({
     dir: toolsIn,
     // A port of 0 is chosen when the host listens, after this.
     ownPort: port === 0 ? null : port,
-    machine: decodeLaneConfig(userJson, toolsIn ?? "/", false).machine,
+    machine: decodeLaneConfig(userJson, toolsIn ?? "/").machine,
     log,
   })
   if (found?.kind === "refused") throw new HostRefused(found.words)

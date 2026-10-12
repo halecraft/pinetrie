@@ -102,7 +102,12 @@ declares it (`workspace.test.ts`).
 
 `renderRun` never passes `--privileged`, `--cap-add` or a Docker socket
 (ADR-0130): a lane with the VM's socket reads every lane's disk (S125).
-Every lane but a nested one runs with `no-new-privileges`. Under Docker's
+Every lane but a nested one runs with `no-new-privileges`, and every tool
+call's processes run with `no_new_privs` in any lane, nested ones included:
+the supervisor's seccomp filter needs it (`packages/lanes/TECHNICAL.md`,
+The channel into a lane). So `sudo` fails in a tool call. A nested lane's
+inner Docker is started by the container's command, not by a tool call, so
+its `newuidmap` keeps the capabilities it needs. Under Docker's
 default seccomp profile a lane cannot open a vsock socket (S128), so it
 never reaches the VM's Docker or the launcher's ports.
 

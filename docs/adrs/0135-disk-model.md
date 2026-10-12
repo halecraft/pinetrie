@@ -1,13 +1,20 @@
 # ADR-0135 — A state is a turn's snapshot; `.gitignore` alone declares what is not source, and what a recorded run made is derived; recipes are learned from what each tool call read; jj, where a project has it, commits as it always does
 
-- **Status:** Proposed (2026-10-11)
+- **Status:** Accepted (Duane, 2026-10-12)
 - **Area:** `packages/lanes/TECHNICAL.md`, `docs/01-architecture.md`
-- **Evidence:** S146, S148, S155, S156, S157, S158, S159, S160, S161, S162
+- **Evidence:** S146, S147, S148, S155, S156, S157, S158, S159, S160, S161,
+  S162, S169, S170, S171, S172, S173
+- **Supersedes:**
+  - ADR-0131: derived state is learned from what each tool call's commands
+    read and wrote, not declared (`lanes.install`, `installWhen` and
+    `installCaches` go). pine·trie runs no recipe and builds no dependency
+    layer: the base is the base before it, checked out at accepted work, and a
+    disk made for a new state loses the outputs whose recipe's key broke. A
+    turn's record classes what it wrote as derived and local.
 - **Amends:**
-  - ADR-0131: a recipe is any recorded run of a tool call that made derived
-    files, learned rather than declared (`lanes.install`, `installWhen` and
-    `installCaches` go). pine·trie runs none itself; a disk made for a new
-    state carries each output whose recipe's key still holds there.
+  - ADR-0034: the base is the base before it, with accepted work checked out
+    on it, and runs no command; no fork installs, and nothing installs for a
+    lane: its agent does, as a developer would after a clone.
   - ADR-0130: a change to `pinetrie.json` that widens what a lane may do or
     share takes effect only from accepted work; a lane's own copy can only
     narrow it.
@@ -15,6 +22,22 @@
     that made it, and given a version; a write based on a version that is no
     longer current is shown as concurrent. The directory stays live, with no
     history, and is never branched.
+- **Revised:**
+  - 2026-10-12 (S172): a version two lanes' turns both claim is contested, and
+    flagged concurrent.
+  - 2026-10-12 (S172): an eBPF observer was measured, as an alternative to the
+    supervisor.
+  - 2026-10-12 (S171): a tracer supervisor was measured: it ends the EINTR but
+    takes `strace` and `gdb` from lanes. A listener's not nesting is a known
+    risk.
+  - 2026-10-12 (S170): a known risk: any watched call can return EINTR to a
+    program whose signal handler does not restart calls.
+  - 2026-10-12 (S169): a shared file's version is its size and ctime, which
+    the host and a lane read alike (on the Mac the inode differs, across
+    virtiofs), and versions order by ctime, the host's clock for every write,
+    on the Mac and on Linux; so the host's watcher puts your writes on a
+    file's lineage as they are made. A lane's write is based on what that lane
+    last read, across tool calls and turns, not on what its own call read.
 
 **Context.** pine·trie leans on jj for what a project's state is, and on
 jj's ignore rules for which files belong to it. Five problems follow:
@@ -24,6 +47,10 @@ jj's ignore rules for which files belong to it. Five problems follow:
   jj snapshots that shared directory's live edits, and a checkout deletes
   the file, as a probe in `/tmp` showed. Ignore rules are all that keep a
   shared directory out.
+- **Derived files outlive what made them.** jj manages tracked files only,
+  and pnpm does not prune an importer it no longer lists: a package deleted
+  from accepted work left its `node_modules/` in the base, and in every
+  lane forked from it.
 - **Recipes are declared, and their inputs are incomplete.** ADR-0131's
   recipe is a command someone names (`lanes.install`), keyed by a lockfile
   (`installWhen`). Every lockfile-only key measured missed inputs: every
@@ -130,7 +157,10 @@ The spikes behind this decision:
   - **A disk for a new state is always a copy of a disk that exists,** then
     a subtraction:
     - a fork clones its parent's snapshot;
-    - the base clones the previous base and checks out accepted work;
+    - the base clones the previous base and checks out accepted work. It
+      says what it holds inside itself (`.pinetrie-lane/base.json`), not
+      in a file beside it, and runs no command, so it holds nothing
+      derived;
     - a catch up merges in the lane itself.
 
     pine·trie then deletes each derived output whose recipe's key no longer
@@ -139,6 +169,11 @@ The spikes behind this decision:
     deleted, as a developer would after a pull. A deleted package's
     `node_modules` goes, because pine·trie knows every output it recorded,
     and caches stay warm.
+  - **pnpm's store stays where pnpm keeps it,** at the root of the file
+    system it installs on, which in a lane is the disk's
+    (`/workspace/.pnpm-store`). pnpm refuses a `node_modules` made with
+    another store path (S148). No repo in a lane tracks it, whatever the
+    project ignores.
 - **What pine·trie knows about a project's files is a fact of a state.**
   - A fact is a pure function of some files, keyed by their content, and
     computed again on each new state where they changed. `pinetrie.json`,
@@ -150,26 +185,61 @@ The spikes behind this decision:
     or any setting whose values have no order. The reply to the tool call
     that changed the file says which applies, and an offer's review lists
     the widenings it would make.
+    - A lane narrows by what its own copy dropped from the copy it started
+      on: a grant accepted after it started reaches it, and one its copy
+      adds never does.
+    - Your repo's names (`accepted`, `wip`, `publish`) are not a fact of a
+      state. They are how accepted work is found, so they come from your
+      config and your working copy's `pinetrie.json`, at startup. Before
+      any project file exists, pine·trie runs on its defaults and your
+      config: a project grants nothing until accepted work's
+      `pinetrie.json` does.
+    - Host ports and mount sources reach the lane VM when the host starts,
+      so a widening of either applies at the next start, after acceptance.
 - **A shared directory stays live, with every write attributed and
   versioned.**
   - **It is outside every state by where it is mounted,** never by ignore
     rules. A snapshot's diff, and jj, never see it.
   - **Each write is numbered** by the host as it is made, and attributed to
     the tool call that made it, or to the Mac.
-  - **A lane's write carries the version its writer read:** the version
-    current when the file was opened. The supervisor sees the open and the
-    release (`close`, `dup3`, `exit_group` or `execve`; S161).
-  - **A version is the file's stamp: its inode, size and ctime,** read with
-    one `stat`, so no file is read or hashed (S162). No program can set
-    ctime, so a tool that restores an mtime still changes the stamp, and a
-    save by rename changes the inode.
+  - **A lane's write carries the version its lane last read:** what the
+    agent knew of the file, by any tool, in this turn or an earlier one;
+    with no read, the version current when the file was opened. An append
+    is based on the version it appended to: it loses nothing. The
+    supervisor sees the open and the release (`close`, `dup3`, `exit_group`
+    or `execve`; S161), and the read and write tools are stamped alike.
+  - **A version is the file's stamp: its size and ctime,** read with one
+    `stat`, so no file is read or hashed (S162). No program can set ctime,
+    so a tool that restores an mtime still changes the stamp, and so does a
+    save by rename. The inode is left out: on the Mac a lane and the host
+    see different inodes for one file, and the same size and ctime (S169).
   - **A write based on a version that is no longer current is shown as
     concurrent,** not silently lost. A write from the Mac carries no
     version read, so it cannot be checked.
   - **Two writes that overlap,** each opened before the other was
     released, are flagged, but which one's content survived is not known
     (S162).
+  - **A version two lanes' turns both claim is contested.** A release's
+    stamp is read after the call has returned, tens of µs later on the Mac
+    (S172), so another writer's version can land first and be read as this
+    write's; the watcher, which stats 11–68 ms after its event (S169),
+    never sees the one it replaced. Both writes, and any write based on
+    the contested version, are flagged concurrent, and the version keeps
+    its first writer. A program outside pine·trie that writes in that
+    window is not caught: it claims no version.
   - **A turn's record names the versions it read and wrote.**
+  - **Versions order by their ctime, not by when they are learnt.** ctime
+    is the host's clock for a lane's write and for yours alike, on the Mac
+    and on Linux (S169); a step back of that clock would misorder the
+    writes either side of it. A
+    turn is recorded at its end, so a write may be recorded before an
+    earlier rival; it is found concurrent once the rival is, and its record
+    says so then.
+  - **Your writes on the Mac** are seen by the host's watcher as they are
+    made, each with the stamp a lane would read. A version the watcher saw
+    that a lane's turn later reports is that lane's; one no lane reports is
+    yours. A stamp no lineage has seen, when a lane reads or writes the file,
+    is yours too.
   - **No fact that grants authority reads a shared file.** A recipe that
     read one is carried only while that file's version is unchanged.
 - **jj, where a project has it, works as it always does.**
@@ -227,6 +297,9 @@ The spikes behind this decision:
   - The first lane after a merge that changed a recipe's inputs runs it
     again, as a developer would after a pull: about a second for pnpm with
     its store warm.
+  - A turn's record waits for its classes and its diff, and a branch at the
+    turn waits for its record: a few milliseconds for the diff (S146). A
+    turn's snapshot is off the critical path; a fork's is not (S147).
   - A project without a `.gitignore` has its first derived output treated
     as source, until the agent adds one in a visible edit.
 - **What goes:**
@@ -240,8 +313,26 @@ The spikes behind this decision:
   - setuid programs cannot gain privilege inside a tool call
     (`no_new_privs`). Lanes run as root; an image that relies on `sudo`
     would notice.
-  - io_uring's opens bypass seccomp. Whether Docker blocks them was not
-    checked.
+  - io_uring's opens bypass seccomp. Docker's default profile refuses
+    io_uring, and the nested lanes' profile is the default with namespace
+    calls added (S172).
+  - A watched call can be cut short with EINTR, which it never returns
+    unsupervised, when a signal its program handles without `SA_RESTART`
+    arrives before the supervisor has received the call (S170). `bash`
+    restarts; `dash`, Debian's `/bin/sh`, does not. It is seccomp's user
+    notification itself, so no listener removes it; a supervisor that is
+    the call's tracer (`SECCOMP_RET_TRACE`) ends it at about a listener's
+    cost, but then `strace` and `gdb` cannot run in a lane (S171).
+  - An eBPF observer, loaded from outside the lane, attributes as the
+    supervisor does without stopping any call, at 1.7× a run's time where
+    the supervisor costs 7.4× (S172). Over virtiofs it reads a release's
+    stamp with its own `lstat`, tens of µs after the release. Its
+    container needs `CAP_BPF`, `CAP_PERFMON` and `CAP_SYS_PTRACE`, under
+    Docker's own seccomp profile (S173).
+  - A listener cannot nest: a process under one is refused another
+    (EBUSY), so `supervise` under `supervise` exits 126 (S171). A lane's
+    tool call cannot run the supervisor's own tests, and an inner Docker
+    started from a tool call would refuse every inner lane's.
 - **Left open:**
   - states moving between machines. Between lane VMs, `btrfs send` (S146,
     S148) is where to start; the boundary with the Mac is a separate
@@ -319,6 +410,14 @@ The spikes behind this decision:
   same job without either problem.
 - **Declared recipes and lockfile-only keys.** Every one measured missed
   inputs (S157).
+- **`git clean -fdX` in the base:** it deletes `.jj/` and pnpm's store.
+- **Deleting directories that hold only ignored files:** a guess at what is
+  stale, needing a rule for each kind of output. Recorded runs know.
+- **pnpm's store on a volume of its own, mounted into lanes:** pnpm refuses
+  a `node_modules` made with another store path, and a store lanes write is
+  a channel between them.
+- **Naming the base by its subvolume's id:** an id is the disk's identity,
+  not its content.
 - **Building the base fresh each time,** as ADR-0131 did. It loses every
   cache, so each change of a lockfile means a cold download. A copy of the
   previous base, minus the outputs whose keys broke, leaves nothing stale,

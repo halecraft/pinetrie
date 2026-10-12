@@ -9,13 +9,19 @@
 // flag). Your repo is its owner's (`Setup.owner`, `@pinetrie/repo`); offers are
 // `host/offers/`'s, and accepted work `line.ts`'s.
 
-import type { ProjectRecord, ThreadId } from "@pinetrie/core"
+import {
+  PROJECT_CONFIG_FILE,
+  type ProjectRecord,
+  type ThreadId,
+  WORKSPACE_ROOT,
+} from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
+
 import { readRunning } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
 import { refusedAnswer } from "@pinetrie/rules"
-import type { Basics } from "../basics.ts"
+import { type Basics, failed } from "../basics.ts"
 import { type Offers, startOffers } from "../offers/index.ts"
 import type { Records } from "../records.ts"
 import { type AcceptedWork, createAcceptedWork } from "./accepted.ts"
@@ -23,10 +29,11 @@ import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes, recordLane } from "./create.ts"
 import { createFetches } from "./fetch.ts"
-import { createRecipes } from "./recipe.ts"
 import { createRegistry } from "./registry.ts"
 import type { Found } from "./runtime.ts"
 import { startSetup } from "./setup.ts"
+import { createSharedLineages } from "./shared.ts"
+import { startSharedWatch } from "./shared-watch.ts"
 import { createSplits, type Splits } from "./split.ts"
 import { createTurns } from "./turns.ts"
 import { createUpdates, type Updates } from "./update.ts"
@@ -147,14 +154,12 @@ export async function startLaneWork(input: {
     },
     acceptedWork: accepted,
   })
-  const recipes = createRecipes({ basics, setup })
   const containers = createContainers({
     basics,
     setup,
     registry,
     keeper,
     offers,
-    recipes,
   })
   const { fetchLane } = createFetches({
     basics,
@@ -163,6 +168,22 @@ export async function startLaneWork(input: {
     keeper,
     startContainer: containers.startContainer,
   })
+  const sharedLineages = createSharedLineages({
+    basics,
+    records: input.records,
+  })
+  const sharedWatch = startSharedWatch({
+    lineages: sharedLineages,
+    failed: what => failed(basics, what),
+  })
+  void sharedWatch
+    .sync(setup.configs.accepted().shared)
+    .catch(failed(basics, "watching the shared directories"))
+  setup.configs.onShared(shared => {
+    void sharedWatch
+      .sync(shared)
+      .catch(failed(basics, "watching the shared directories"))
+  })
   const turns = createTurns({
     basics,
     setup,
@@ -170,7 +191,7 @@ export async function startLaneWork(input: {
     keeper,
     records: input.records,
     fetchLane,
-    recipes,
+    shared: sharedLineages,
   })
   const newLanes = createNewLanes({
     basics,
@@ -189,7 +210,6 @@ export async function startLaneWork(input: {
     containers,
     fetchLane,
     writeRevision: turns.writeRevision,
-    recipes,
   })
   const splits = createSplits({
     basics,
@@ -210,6 +230,16 @@ export async function startLaneWork(input: {
       turnDone: turns.turnDone,
       askedAboutConflict: updates.askedAboutConflict,
       catchUp: updates.catchUpInRun,
+      async configWritten(lane) {
+        const { channel } = await registry.handleOf(lane).link()
+        const read = await channel.run(
+          ["cat", `${WORKSPACE_ROOT}/${PROJECT_CONFIG_FILE}`],
+          false,
+        )
+        return setup.configs.configNote(
+          read.code === 0 ? String(read.stdout) : null,
+        )
+      },
     },
     checkBegin: newLanes.checkBegin,
     prepareLane: newLanes.prepareLane,
@@ -225,6 +255,7 @@ export async function startLaneWork(input: {
       await owner.idle()
     },
     async close() {
+      await sharedWatch.close()
       await containers.close()
       // After the lanes stop: on the Mac, the lease ends and the slot empties.
       await input.found?.close()
@@ -245,6 +276,7 @@ const NO_LANES: LaneWork = {
     turnDone: async () => {},
     askedAboutConflict: async () => false,
     catchUp: async () => refusedAnswer("no-copy"),
+    configWritten: async () => null,
   },
   checkBegin: async () => null,
   prepareLane: async () => {},

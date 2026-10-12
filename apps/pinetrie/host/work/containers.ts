@@ -26,7 +26,7 @@ import type { LaneAccess } from "@pinetrie/pi"
 import { readLaneSnapshots, readThreadName } from "@pinetrie/reads"
 import { type Basics, failed } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
-import type { Recipes } from "./recipe.ts"
+import { removeStaleOutputs } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 
@@ -58,7 +58,6 @@ export function createContainers(deps: {
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
   readonly offers: Offers
-  readonly recipes: Recipes
 }): Containers {
   const { basics, setup, registry, keeper, offers } = deps
   const { session, docs, log } = basics
@@ -82,6 +81,9 @@ export function createContainers(deps: {
     const r = await ready
     const handle = registry.handleOf(lane)
     const container = handle.container
+    // Its own pinetrie.json may narrow what it gets: a narrowing changes the
+    // spec, so the container is made anew below.
+    await setup.configs.readLane(lane)
     const spec = setup.specOf(lane, r)
     const decided = planContainer({
       facts: await runtime.containerFacts(container),
@@ -118,10 +120,11 @@ export function createContainers(deps: {
     }
     // Made just now, or read above: running unless it was stopped.
     await handle.start(decided === "start" ? "stopped" : "running")
-    // A container made anew may run another image, whose dependencies the
-    // disk's do not match: the recipe's key says.
-    if (decided === "create" || decided === "recreate")
-      await deps.recipes.onQueue(lane, handle, registry.laneJjOf(lane), "all")
+    // Every run starts on a disk whose recipes are checked, whatever made it
+    // (a fork, a restore, a merge, another image): what went stale goes.
+    await removeStaleOutputs(handle, r.image).catch(
+      failed(basics, "removing stale outputs", lane),
+    )
   }
 
   return {
@@ -129,18 +132,17 @@ export function createContainers(deps: {
       // A lane with no copy of its own, or no record, gets no tools.
       if (!registry.isOwn(lane)) return null
       const handle = registry.handleOf(lane)
-      const { grants } = setup.lanes.config
+      const { grants } = setup.configs.laneConfig(lane)
       return {
         facts: {
           dir: WORKSPACE_ROOT,
-          shared: setup.lanes.shared.map(d => d.path),
+          shared: setup.configs.laneShared(lane).map(d => d.path),
           grants: {
             ssh: grants.ssh,
             env: grants.env,
             mounts: grants.mounts.map(m => m.target),
           },
           defaultImage: setup.defaultImage,
-          recipe: setup.lanes.config.recipe?.command ?? null,
           install: PINETRIE_MOUNT,
           note: LANE_NOTE,
         },

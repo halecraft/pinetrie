@@ -2,7 +2,7 @@ import { expect, test } from "vitest"
 import { blobResponse, offerResponse, uploadRefusal } from "./responses.ts"
 
 test("a review and a diff are immutable; a refusal is never stored", () => {
-  const review = { description: "feat: x\n", files: [] }
+  const review = { description: "feat: x\n", files: [], widenings: [] }
   const r = offerResponse({ kind: "review", review })
   expect(r.status).toBe(200)
   expect(JSON.parse(r.body)).toEqual(review)

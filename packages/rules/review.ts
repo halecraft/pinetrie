@@ -28,9 +28,19 @@ const ReviewFileSchema = Type.Object({
   removed: Type.Integer({ minimum: 0 }),
 })
 
+const WideningSchema = Type.Union([
+  Type.Object({ kind: Type.Literal("ssh") }),
+  Type.Object({ kind: Type.Literal("nested") }),
+  Type.Object({ kind: Type.Literal("env"), name: Type.String() }),
+  Type.Object({ kind: Type.Literal("mount"), target: Type.String() }),
+  Type.Object({ kind: Type.Literal("hostPort"), port: Type.Integer() }),
+  Type.Object({ kind: Type.Literal("shared"), path: Type.String() }),
+])
+
 const RevisionReviewSchema = Type.Object({
   description: Type.String(),
   files: Type.Array(ReviewFileSchema),
+  widenings: Type.Array(WideningSchema),
 })
 
 /**
@@ -47,7 +57,7 @@ export const decodeRevisionReview = (
  * flags, and the URLs' spans. Every answer is cached as immutable under a URL holding it,
  * so a change to any of them bumps it, or pages keep the old shape.
  */
-export const OFFER_WIRE = 2
+export const OFFER_WIRE = 3
 
 /**
  * What a page asks: a span's review, or one file's diff in it. The commits

@@ -1,6 +1,7 @@
 // e2e/lanes/shared — directories every lane and you see, never branched.
 
 import {
+  chmodSync,
   existsSync,
   mkdtempSync,
   readFileSync,
@@ -12,9 +13,19 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { atEntry, entryId, ROOT } from "@pinetrie/core"
-import { readRevisions } from "@pinetrie/reads"
+import {
+  readAccepted,
+  readRevisions,
+  readSharedLineages,
+} from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
-import { BRANCH, rootRecordsOf, START_AGENT, SUITE_CONFIG } from "../harness.ts"
+import {
+  BRANCH,
+  rootRecordsOf,
+  START_AGENT,
+  SUITE_CONFIG,
+  waitFor,
+} from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 import { lanesWriteAs } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
@@ -44,7 +55,11 @@ async function sharedSection(
     }),
   )
   let h = await lanes.sectionHost({
-    files: { "shared.txt": "one\n" },
+    files: {
+      "shared.txt": "one\n",
+      // A publish brings your commits into accepted work (section 3).
+      "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
+    },
     store,
     userConfig,
     logs,
@@ -84,6 +99,87 @@ async function sharedSection(
       (await h.results("read the plan")).at(-1)?.includes("the plan") === true,
     )
 
+    // 1b. Two lanes write one shared file: the second reads it, waits for
+    // the first to write, then writes on what it read. Its write is flagged
+    // concurrent, the first's is not. Files in the shared directory order
+    // them, whichever lane starts first.
+    // Yours, as a file you make on the Mac is: lanes may write it.
+    const race = path.join(dir, ".plans", "race.md")
+    writeFileSync(race, "yours\n")
+    chmodSync(race, 0o666)
+    const wait = (file: string) =>
+      `timeout 60 sh -c 'until [ -e .plans/${file} ]; do :; done'`
+    h.script.use([
+      {
+        tool: "bash",
+        args: {
+          command: `${wait("b-read")} && echo a > .plans/race.md && touch .plans/a-wrote`,
+        },
+      },
+      {
+        tool: "bash",
+        args: {
+          command: `v=$(cat .plans/race.md) && touch .plans/b-read && ${wait("a-wrote")} && echo "$v b" > .plans/race.md`,
+        },
+      },
+      { text: "raced" },
+      { text: "raced" },
+    ])
+    await Promise.all([
+      h.user.chat("lane a: write the race", ROOT, START_AGENT),
+      h.user.chat("lane b: write the race", ROOT, START_AGENT),
+    ])
+    await h.idle()
+    const raced = [...rootRecordsOf(h.host, readRevisions).values()].flatMap(
+      r =>
+        (r.disk?.shared.wrote ?? []).filter(w => w.path === ".plans/race.md"),
+    )
+    check(
+      "two lanes write one shared file: the write over the other's is flagged concurrent, the other is not",
+      raced.length === 2 &&
+        raced.filter(w => w.concurrent).length === 1 &&
+        readFileSync(race, "utf8") === "yours b\n",
+      JSON.stringify(raced),
+    )
+
+    // 1c. Your writes, seen by the host's watcher. A lane reads your file
+    // with the read tool; you change it; in its next turn the lane writes
+    // its version with the write tool, based on what it read: concurrent.
+    const mine = path.join(dir, ".plans", "mine.md")
+    const versionsOfMine = () =>
+      readSharedLineages(h.host.session).get(".plans/mine.md")?.versions ?? []
+    writeFileSync(mine, "yours, first\n")
+    chmodSync(mine, 0o666)
+    await waitFor(() => versionsOfMine().length === 1, 30_000)
+    h.script.use([
+      { tool: "read", args: { path: ".plans/mine.md" } },
+      { text: "read it" },
+    ])
+    await h.user.chat("read mine", ROOT, START_AGENT)
+    await h.idle()
+    writeFileSync(mine, "yours, changed\n")
+    await waitFor(() => versionsOfMine().length === 2, 30_000)
+    const reader = h.laneWith("read mine")
+    h.script.use([
+      {
+        tool: "write",
+        args: { path: ".plans/mine.md", content: "the lane's, on the first\n" },
+      },
+      { text: "wrote it" },
+    ])
+    await h.user.chat("write mine", atEntry(entryId(reader?.tip ?? "")), {
+      thread: reader?.name,
+    })
+    await h.idle()
+    const versions = versionsOfMine()
+    check(
+      "your writes are versions as you make them, and a lane's write over one it never read is concurrent",
+      versions.map(v => v.writer.kind).join(",") === "outside,outside,lane" &&
+        versions.at(-1)?.concurrent === true &&
+        versions.slice(0, 2).every(v => !v.concurrent),
+      JSON.stringify(versions),
+    )
+
     // 2. Never branched: not in the lane's commit, your repo, a snapshot or @.
     const writer = h.laneWith("write a plan")
     const files = (rev: string) =>
@@ -119,11 +215,31 @@ async function sharedSection(
           ?.includes("after the fork") === true,
     )
 
-    // 3. The project shares one more; after a restart, the existing lane has it.
+    // 3. The project shares one more, published to accepted work: after a
+    // restart, the existing lane has it, though its own copy predates it.
+    jj(
+      dir,
+      "bookmark",
+      "create",
+      "main",
+      "-r",
+      "roots(::pinetrie-accepted ~ root())",
+    )
     writeFileSync(
       path.join(dir, "pinetrie.json"),
-      JSON.stringify({ lanes: { shared: ["notes"] } }),
+      JSON.stringify({
+        lanes: { shared: ["notes"] },
+        publish: { catchUp: true },
+      }),
     )
+    jj(dir, "commit", "-m", "you share notes")
+    // Published once accepted work's record has seen your commit.
+    await waitFor(
+      () => (readAccepted(h.host.session)?.yours.catchUp ?? null) !== null,
+      30_000,
+    )
+    await h.user.actOnAccepted("publish")
+    await h.idle()
     await h.close(true)
     h = await lanes.sectionHost({ dir, store, userConfig, logs })
     h.script.use([

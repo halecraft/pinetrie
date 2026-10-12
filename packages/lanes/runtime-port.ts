@@ -13,11 +13,6 @@ export type DiskOp =
   | {
       readonly kind: "create"
       readonly lane: LaneOwner
-      /** Paths copied into the new disk from a snapshot, by reflink; null with none. */
-      readonly carry: {
-        readonly from: SnapshotId
-        readonly paths: readonly string[]
-      } | null
     }
   | {
       readonly kind: "restore"

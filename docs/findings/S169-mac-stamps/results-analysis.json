@@ -1,0 +1,271 @@
+{
+  "views": {
+    "files": 62,
+    "sameIno": 0,
+    "sameSize": 62,
+    "sameCtime": 62,
+    "sameMtime": 62,
+    "examples": [
+      {
+        "file": "go",
+        "lane": {
+          "ino": "4988",
+          "size": "54",
+          "ctimeNs": "1791827924300895482",
+          "mtimeNs": "1791827924300895482",
+          "kind": "file"
+        },
+        "mac": {
+          "ino": "15062055",
+          "size": "54",
+          "ctimeNs": "1791827924300895482",
+          "mtimeNs": "1791827924300895482",
+          "kind": "file"
+        }
+      },
+      {
+        "file": "lane/c0.md",
+        "lane": {
+          "ino": "4991",
+          "size": "12",
+          "ctimeNs": "1791827951923297795",
+          "mtimeNs": "1791827951605000019",
+          "kind": "file"
+        },
+        "mac": {
+          "ino": "15062172",
+          "size": "12",
+          "ctimeNs": "1791827951923297795",
+          "mtimeNs": "1791827951605000019",
+          "kind": "file"
+        }
+      },
+      {
+        "file": "lane/c1.md",
+        "lane": {
+          "ino": "4993",
+          "size": "12",
+          "ctimeNs": "1791827952705243512",
+          "mtimeNs": "1791827952394999980",
+          "kind": "file"
+        },
+        "mac": {
+          "ino": "15062176",
+          "size": "12",
+          "ctimeNs": "1791827952705243512",
+          "mtimeNs": "1791827952394999980",
+          "kind": "file"
+        }
+      },
+      {
+        "file": "lane/c2.md",
+        "lane": {
+          "ino": "4995",
+          "size": "12",
+          "ctimeNs": "1791827953489092184",
+          "mtimeNs": "1791827953174000024",
+          "kind": "file"
+        },
+        "mac": {
+          "ino": "15062178",
+          "size": "12",
+          "ctimeNs": "1791827953489092184",
+          "mtimeNs": "1791827953174000024",
+          "kind": "file"
+        }
+      },
+      {
+        "file": "lane/c3.md",
+        "lane": {
+          "ino": "4997",
+          "size": "12",
+          "ctimeNs": "1791827954269995903",
+          "mtimeNs": "1791827953957999944",
+          "kind": "file"
+        },
+        "mac": {
+          "ino": "15062180",
+          "size": "12",
+          "ctimeNs": "1791827954269995903",
+          "mtimeNs": "1791827953957999944",
+          "kind": "file"
+        }
+      },
+      {
+        "file": "lane/c4.md",
+        "lane": {
+          "ino": "4999",
+          "size": "12",
+          "ctimeNs": "1791827955051586955",
+          "mtimeNs": "1791827954736999988",
+          "kind": "file"
+        },
+        "mac": {
+          "ino": "15062182",
+          "size": "12",
+          "ctimeNs": "1791827955051586955",
+          "mtimeNs": "1791827954736999988",
+          "kind": "file"
+        }
+      },
+      {
+        "file": "lane/c5.md",
+        "lane": {
+          "ino": "5001",
+          "size": "12",
+          "ctimeNs": "1791827955838156913",
+          "mtimeNs": "1791827955523000001",
+          "kind": "file"
+        },
+        "mac": {
+          "ino": "15062185",
+          "size": "12",
+          "ctimeNs": "1791827955838156913",
+          "mtimeNs": "1791827955523000001",
+          "kind": "file"
+        }
+      },
+      {
+        "file": "lane/c6.md",
+        "lane": {
+          "ino": "5003",
+          "size": "12",
+          "ctimeNs": "1791827956622146834",
+          "mtimeNs": "1791827956312000036",
+          "kind": "file"
+        },
+        "mac": {
+          "ino": "15062187",
+          "size": "12",
+          "ctimeNs": "1791827956622146834",
+          "mtimeNs": "1791827956312000036",
+          "kind": "file"
+        }
+      },
+      {
+        "file": "lane/c7.md",
+        "lane": {
+          "ino": "5005",
+          "size": "12",
+          "ctimeNs": "1791827957407467378",
+          "mtimeNs": "1791827957088999986",
+          "kind": "file"
+        },
+        "mac": {
+          "ino": "15062189",
+          "size": "12",
+          "ctimeNs": "1791827957407467378",
+          "mtimeNs": "1791827957088999986",
+          "kind": "file"
+        }
+      },
+      {
+        "file": "lane/c8.md",
+        "lane": {
+          "ino": "5007",
+          "size": "12",
+          "ctimeNs": "1791827958191026884",
+          "mtimeNs": "1791827957875000000",
+          "kind": "file"
+        },
+        "mac": {
+          "ino": "15062193",
+          "size": "12",
+          "ctimeNs": "1791827958191026884",
+          "mtimeNs": "1791827957875000000",
+          "kind": "file"
+        }
+      }
+    ]
+  },
+  "laneWriteVsMacFinal": {
+    "restore-mtime": {
+      "n": 10,
+      "ino": 0,
+      "size": 10,
+      "ctime": 10
+    },
+    "rename": {
+      "n": 10,
+      "ino": 0,
+      "size": 10,
+      "ctime": 10
+    },
+    "fast": {
+      "n": 10,
+      "ino": 0,
+      "size": 10,
+      "ctime": 10
+    }
+  },
+  "macWriteVsLaneFinal": {
+    "restore-mtime": {
+      "n": 10,
+      "ino": 0,
+      "size": 10,
+      "ctime": 10
+    },
+    "rename": {
+      "n": 10,
+      "ino": 0,
+      "size": 10,
+      "ctime": 10
+    },
+    "fast": {
+      "n": 10,
+      "ino": 0,
+      "size": 10,
+      "ctime": 10
+    }
+  },
+  "clocks": {
+    "laneCtimeMinusLaneWallMs": {
+      "n": 60,
+      "min": 824.992901,
+      "median": 825.681118,
+      "p95": 826.316147,
+      "max": 826.467378
+    },
+    "macCtimeMinusMacWallMs": {
+      "n": 60,
+      "min": -0.207481,
+      "median": 0.325049,
+      "p95": 0.735811,
+      "max": 0.807965
+    },
+    "laneStartMinusMacGoMs": 26173,
+    "ctimeKeepsOrder": {
+      "lane": {
+        "pairs": 59,
+        "kept": 59
+      },
+      "mac": {
+        "pairs": 59,
+        "kept": 59
+      }
+    },
+    "withinAMillisecond": {
+      "lane": {
+        "n": 10,
+        "ctimeDiffers": 10
+      },
+      "mac": {
+        "n": 10,
+        "ctimeDiffers": 10
+      }
+    }
+  },
+  "watcher": {
+    "events": 144,
+    "errors": [],
+    "laneEvents": 60,
+    "laneEventsWithALaneStamp": 0,
+    "macWallMinusCtimeMs": {
+      "n": 60,
+      "min": 10.877692,
+      "median": 64.702205,
+      "p95": 67.686824,
+      "max": 67.820162
+    }
+  }
+}

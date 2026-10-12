@@ -121,6 +121,7 @@ describe("banners in a harness", () => {
         hooks: {
           turnDone: async () => {},
           askedAboutConflict: async () => false,
+          configWritten: async () => null,
           catchUp: async () => {
             throw new Error("no catch_up here")
           },

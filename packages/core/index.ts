@@ -33,6 +33,7 @@ import type {
   SentCard,
   TypedMove,
 } from "./places.ts"
+import type { ConfigWidening, TurnShared } from "./runs.ts"
 import { isThreadNameHandle } from "./thread-names.ts"
 
 // --- records of threads and tasks -----------------------------------------
@@ -953,12 +954,27 @@ export const WORKSPACE_ROOT = "/workspace"
 /** Where every lane of its own sees your working copy, read-only. */
 export const HOST_WORKING_COPY = "/mnt/host-working-copy"
 
+/** A project's config, at its repo's root. */
+export const PROJECT_CONFIG_FILE = "pinetrie.json"
+
+/**
+ * A lane's home directory: on its disk, so what tools keep there (caches,
+ * config) persists and travels with forks; under `.pinetrie-lane`, so it is
+ * pine·trie's own and never committed.
+ */
+export const LANE_HOME_PATH = ".pinetrie-lane/home"
+/** The lane's home, absolute. */
+export const LANE_HOME = `${WORKSPACE_ROOT}/${LANE_HOME_PATH}`
+
+/** The variable listing a lane's shared directories, absolute, one per line. */
+export const SHARED_ENV = "PINETRIE_SHARED"
+
 /**
  * The programs the lane runtime carries into every lane of its own, on its
  * `PATH` whatever the image. Each must be a static build in pinetrie's default
  * image, which the runtime is copied out of.
  */
-export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const
+export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd", "supervise"] as const
 export type RuntimeProgram = (typeof RUNTIME_PROGRAMS)[number]
 
 /** `s` as one POSIX shell word. */
@@ -1016,12 +1032,6 @@ export const snapshotId = (id: string): SnapshotId => id as SnapshotId
 /** The project's disk at accepted work's commit, which root lanes fork from. */
 export const BASE_SNAPSHOT = snapshotId("base")
 
-/** The names of dependency layers' snapshots. */
-export const DEPS_PREFIX = "deps-"
-/** A dependency layer: the snapshot of the disk a recipe made, named by its key. */
-export const depsSnapshot = (key: string): SnapshotId =>
-  snapshotId(`${DEPS_PREFIX}${key}`)
-
 /**
  * One path that differs between two snapshots of a disk, from the disk's
  * root. A renamed directory is its old path deleted and its new one added,
@@ -1035,9 +1045,9 @@ export interface DiskChange {
 }
 
 /**
- * Paths on a lane's disk that no person and no recipe writes: pine·trie's own,
- * the repos', and the file system's. A recipe never owns one, and a turn's diff
- * counts none as the turn's.
+ * Paths on a lane's disk that pine·trie, the repos and the file system keep:
+ * never classed, never a recipe's output, never deleted as stale. The lane's
+ * home, under `.pinetrie-lane`, is classed all the same (`LANE_HOME_PATH`).
  */
 export const DISK_OWN_ROOTS: readonly string[] = [
   ".pinetrie-lane",
@@ -1055,6 +1065,16 @@ export const isPathInside = (p: string): boolean =>
   p !== "" &&
   !p.startsWith("/") &&
   p.split("/").every(s => s !== "" && s !== "." && s !== "..")
+
+declare const diskPathBrand: unique symbol
+/**
+ * A path checked to stay inside a disk (`isPathInside`), as a recipe's
+ * outputs are: what pine·trie deletes on a lane's disk is one of these.
+ */
+export type DiskPath = string & { readonly [diskPathBrand]: true }
+/** `p` as a `DiskPath`; null for a path that leaves the disk. */
+export const diskPath = (p: string): DiskPath | null =>
+  isPathInside(p) ? (p as DiskPath) : null
 
 /** What differs between two snapshots of a disk, sorted by path. */
 export interface DiskDiff {
@@ -1079,14 +1099,33 @@ export interface LaneRecord {
   readonly createdAt: number
 }
 
-/** Ignored files a turn wrote: the first of them, and how many more. */
-export interface IgnoredFiles {
+/** Some of a turn's paths: the first of them, and how many more. */
+export interface ListedPaths {
   readonly paths: readonly string[]
   readonly more: number
 }
 
-/** How many of a turn's ignored files its record lists. */
-export const IGNORED_LISTED = 100
+/** How many paths of each class a turn's record lists. */
+export const DISK_LISTED = 100
+
+/**
+ * What a turn did to its lane's disk, beyond its commit: its runs' records
+ * and tool writes classed by `.gitignore`, and what its whole-disk diff
+ * found that no tool call wrote. Paths are topmost: a directory stands for
+ * what is under it.
+ */
+export interface TurnDisk {
+  /** Derived roots its runs wrote. */
+  readonly derived: ListedPaths
+  /** Local paths it wrote: ignored, and not made from source. */
+  readonly local: ListedPaths
+  /** Directories its runs made from source that `.gitignore` does not ignore. */
+  readonly unignored: readonly string[]
+  /** Source files it wrote that its commit left out: jj's size limit, for one. */
+  readonly leftovers: readonly string[]
+  /** The shared files' versions it read and wrote (`SharedLineage`). */
+  readonly shared: TurnShared
+}
 
 /**
  * The files at an entry: a host-written `pinetrie.revision` value keyed by the
@@ -1112,14 +1151,11 @@ export interface RevisionRecord {
   /** The files conflicted in `commit`: what a branch from here starts with. */
   readonly conflicts: readonly string[]
   /**
-   * Ignored files the turn wrote that are no recipe's output, no cache and not
-   * pine·trie's own, from its whole-disk diff: the topmost of them, sorted, at
-   * most `IGNORED_LISTED`, and how many more. Null for a prompt's record, a
-   * lane with no copy of its own, and records written before.
+   * What the turn did to its disk beyond its commit. Null for a prompt's
+   * record, a lane with no copy of its own, an update, and records written
+   * before.
    */
-  readonly ignored: IgnoredFiles | null
-  /** Whether the lane's recipe ran at the turn's end, and how it went; null when it did not run. */
-  readonly recipe: "ran" | "failed" | null
+  readonly disk: TurnDisk | null
 }
 
 /**
@@ -1213,6 +1249,11 @@ export interface RevisionReview {
   /** Its description, the host's trailers included. */
   readonly description: string
   readonly files: readonly ReviewFile[]
+  /**
+   * What its change to `pinetrie.json` would let lanes do or share once
+   * accepted; none when it leaves the file, or only narrows it.
+   */
+  readonly widenings: readonly ConfigWidening[]
 }
 
 /**
@@ -1782,6 +1823,7 @@ export * from "./paste.ts"
 export * from "./paths.ts"
 export * from "./places.ts"
 export * from "./roots.ts"
+export * from "./runs.ts"
 export * from "./thread-names.ts"
 export * from "./tools.ts"
 export * from "./trailers.ts"

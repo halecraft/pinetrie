@@ -25,6 +25,18 @@ words they were written with.
 | **catch up** | Bring the working copy, or a thread's copy, up to date with what it is based on. Its commit is titled `catch up: accepted work`, `catch up: <thread>`, or `copy of <wip>`. | `catchUp`, `CatchUpFrom`, `catchUpName` | update, follow, bring up to date |
 | **lane** | A thread's own copy of your repo, in a container of its own (ADR-0034), named by its thread's id (ADR-0117). | `lane`, `ThreadId`, `laneOf` | |
 
+## A lane's disk
+
+| word | what it is | in code | retired |
+|---|---|---|---|
+| **source** | A path `.gitignore` does not ignore: what the project is made of, committed and offered (ADR-0135). | `PathClass` `"source"` | tracked (as a class) |
+| **derived** | An ignored path a command made from source: a lane drops it when what it was made from changes, and makes it again. | `PathClass` `"derived"`, `TurnDisk.derived` | recipe output |
+| **local** | An ignored path no command made from source, such as `.env`: it stays on its disk, and is never sent. The page counts **local files**. | `PathClass` `"local"`, `TurnDisk.local` | ignored file |
+| **recipe** | A recorded command that made derived files, kept with what it read; never declared. | `Recipe`, `Registry` | `lanes.install` |
+| **cache** | A derived directory commands only add to, or one holding a `CACHEDIR.TAG`, such as pnpm's store: kept when its recipe goes stale. | `isCache` | `installCaches` |
+| **shared file version** | One write to a file in a shared directory, a thread's or yours; one based on a version another write replaced is concurrent. | `SharedVersion` | |
+| **lineage** | A shared file's versions in order, each based on the one its writer last read, and what each thread last read of the file. | `SharedLineage`, `planSharedLineages` | line (of a shared file) |
+
 ## Cards and where they are
 
 | word | what it is | in code | retired |
@@ -145,7 +157,7 @@ word alone.)
   cards' line in a column (above it queued, below it your message,
   ADR-0048, ADR-0113),
   and Kyneta's command **Line** (`host/control.ts`), one per seat. None of
-  them is accepted work.
+  them is accepted work, and none is a shared file's **lineage**.
 - **take**: take a card into your inventory (ADR-0083); a thread's run
   stops as it is taken (ADR-0124). Nothing is done to an offer by taking
   it.

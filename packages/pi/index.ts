@@ -25,6 +25,7 @@ export {
   laneRunner,
   openChannel,
 } from "./lane-env.ts"
+export { drainLaneRuns, supervisorSource } from "./lane-runs.ts"
 export type { LaneAccess, LaneHooks } from "./lanes.ts"
 export { loadPiSetup, type PiSetup } from "./pi-setup.ts"
 export { createScribe, type Scribe } from "./scribe.ts"
@@ -37,6 +38,7 @@ export {
   scriptedModel,
 } from "./scripted.ts"
 export { KynetaStorage } from "./storage.ts"
+export { supervisionEnv } from "./supervisor.ts"
 export type {
   BeforePrompt,
   ThreadLaneHandle,

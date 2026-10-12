@@ -200,6 +200,11 @@ function ReviewPaneView(p: ReviewPaneProps) {
                         {r.state.value.body}
                       </div>
                     )}
+                    {r.state.value.widens !== "" && (
+                      <div className="review-widens">
+                        {r.state.value.widens}
+                      </div>
+                    )}
                   </div>
                   {r.state.value.files.map(f => (
                     <ReviewFile key={f.key} row={f} watch={watch} />

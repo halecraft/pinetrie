@@ -1,13 +1,13 @@
 // host/work/turns — each turn of a lane of its own, recorded: its revision
-// committed on the lane's queue, its disk snapshotted, its history fetched into
-// your repo.
+// committed on the lane's queue, its disk classed and snapshotted
+// (`disk.ts`), its history fetched into your repo.
 
 import {
   type CommitId,
   type EntryId,
   firstLine,
-  type IgnoredFiles,
   messageText,
+  NO_SHARED,
   nearestRevision,
   promptOf,
   type RevisionRecord,
@@ -26,24 +26,19 @@ import {
   changedPaths,
   commitTurn,
   conflictedFilesAt,
-  type LaneRuntime,
-  type Runner,
+  executeOrThrow,
+  planSnapshot,
 } from "@pinetrie/lanes"
 import type { LaneHooks } from "@pinetrie/pi"
 import { readRevisions, readTreeIndex } from "@pinetrie/reads"
-import {
-  classifyDisk,
-  ignoredFiles,
-  planTurnRecord,
-  REVISION,
-  setRecord,
-} from "@pinetrie/rules"
+import { planTurnRecord, REVISION, setRecord } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
+import { classifyWritesOnQueue, diskOfTurn } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"
-import type { Recipes } from "./recipe.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
+import type { SharedLineages } from "./shared.ts"
 
 /** A revision's title: a message's first line, cut. */
 const TITLE_LENGTH = 72
@@ -79,13 +74,13 @@ interface Disk {
 
 export function createTurns(deps: {
   readonly basics: Basics
-  readonly setup: Pick<Setup, "lanes">
-  readonly recipes: Recipes
+  readonly setup: Pick<Setup, "configs" | "ready">
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
   readonly records: Pick<Records, "writeValues">
   readonly fetchLane: Fetches["fetchLane"]
+  readonly shared: SharedLineages
 }): Turns {
   const { basics, registry, keeper } = deps
   const { docs } = basics
@@ -106,33 +101,6 @@ export function createTurns(deps: {
     return above.snapshot === null
       ? null
       : { snapshot: above.snapshot, commit: above.commit }
-  }
-
-  /** A turn's ignored files: its whole-disk diff, sorted (`classifyDisk`). */
-  async function turnIgnored(input: {
-    readonly jj: Runner
-    readonly runtime: LaneRuntime
-    readonly from: Disk
-    readonly to: Disk
-    /** The turn's own commit's paths. */
-    readonly paths: readonly string[]
-    readonly outputs: readonly string[]
-  }): Promise<IgnoredFiles | null> {
-    const { from, to } = input
-    const diff = await input.runtime.diff(from.snapshot, to.snapshot)
-    const tracked =
-      from.commit !== null && to.commit !== null && from.commit !== to.commit
-        ? await changedPaths(input.jj, from.commit, to.commit)
-        : input.paths
-    return ignoredFiles(
-      classifyDisk({
-        diff,
-        tracked,
-        outputs: input.outputs,
-        caches: deps.setup.lanes.config.recipe?.caches ?? [],
-        shared: deps.setup.lanes.shared.map(d => d.path),
-      }),
-    )
   }
 
   /** A revision, in the root its lane works in. */
@@ -235,48 +203,72 @@ export function createTurns(deps: {
             snapshot: planned.snapshot,
             commit: planned.commit ?? newest,
           })
-        // The recipe, if an input changed, then the snapshot: queued, so the
-        // next tool call waits for both, and not awaited, so the next request
-        // does not.
-        const ended = deps.recipes
-          .snapshotOnQueue(
-            lane,
-            handle,
-            jj,
-            merged ? "all" : changed,
-            snapshotId(entry),
-          )
-          .then(end => {
-            if (!end.snapped) last.delete(lane)
-            return end
+        const shared = deps.setup.configs.laneShared(lane).map(d => d.path)
+        // One queued step, so the next tool call waits for all of it and the
+        // next request does not: the turn's classes and the registry they
+        // leave, the snapshot, then its diff, read while the container
+        // still runs.
+        const ended = handle.queue
+          .enqueue(async () => {
+            const classed = await classifyWritesOnQueue({
+              handle,
+              changed,
+              shared,
+              image: (await deps.setup.ready).image,
+            }).catch(error => {
+              failed(basics, "classing the turn's writes", lane)(error)
+              return null
+            })
+            await executeOrThrow(
+              planSnapshot({ lane, snapshot: snapshotId(entry) }),
+              handle.runners,
+            )
+            const disk =
+              classed === null
+                ? null
+                : await diskOfTurn({
+                    handle,
+                    writes: classed.writes,
+                    diff:
+                      previous === null
+                        ? null
+                        : await handle.runners.runtime.diff(
+                            previous.snapshot,
+                            snapshotId(entry),
+                          ),
+                    shared,
+                  }).catch(error => {
+                    failed(basics, "the turn's diff", lane)(error)
+                    return null
+                  })
+            return { snapped: true, disk, touched: classed?.touched ?? null }
+          })
+          .catch(error => {
+            failed(basics, "the snapshot", lane)(error)
+            last.delete(lane)
+            return { snapped: false, disk: null, touched: null }
           })
         const recorded = keeper.track(
           ended
-            .then(async ({ snapped, outcome, outputs }) => {
-              // What else the turn wrote: its whole disk against the one
-              // before, sorted by what each path is.
-              const ignored =
-                snapped && previous !== null && planned.snapshot !== null
-                  ? await turnIgnored({
-                      jj,
-                      runtime: handle.runners.runtime,
-                      from: previous,
-                      to: {
-                        snapshot: planned.snapshot,
-                        commit: planned.commit ?? newest,
-                      },
-                      paths: changed,
-                      outputs,
-                    }).catch(error => {
-                      failed(basics, "the turn's diff", lane)(error)
-                      return null
-                    })
-                  : null
+            .then(async ({ snapped, disk, touched }) => {
+              // Off the lane's queue: the lineages are every lane's.
+              const shared =
+                touched === null
+                  ? NO_SHARED
+                  : await deps.shared
+                      .record(lane, entry, touched)
+                      .catch(error => {
+                        failed(
+                          basics,
+                          "the shared files' versions",
+                          lane,
+                        )(error)
+                        return NO_SHARED
+                      })
               await writeRevision({
                 ...planned,
                 snapshot: snapped ? planned.snapshot : null,
-                ignored,
-                recipe: outcome,
+                disk: disk === null ? null : { ...disk, shared },
               })
             })
             .catch(failed(basics, "recording a turn", lane)),

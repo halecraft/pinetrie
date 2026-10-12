@@ -7,11 +7,11 @@ import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import path from "node:path"
 import {
-  type CommitId,
   errorText,
+  isThreadId,
   PRODUCT_NAME,
+  PROJECT_CONFIG_FILE,
   type ProjectRecord,
-  type SnapshotId,
 } from "@pinetrie/core"
 import { createKeeper, type Keeper } from "@pinetrie/keeper"
 import {
@@ -20,35 +20,31 @@ import {
   commitsOf,
   configJson,
   decodeLaneConfig,
-  depsKey,
-  ensureDepsLayer,
   ensureRuntime,
   gatherLinks,
-  inputsHash,
   jjIn,
   type LaneOwner,
   type LaneRuntime,
   type LaneSpec,
   type Mount,
-  normalShared,
   PINETRIE_INSTALL,
   pinetrieDir,
   planHostMounts,
   planLinks,
   planMounts,
   prepareImages,
-  prepareShared,
   projectContainerfile,
-  type Runner,
+  RUNTIME_BIN,
   readConfigFile,
   refreshBase,
   repoConfig,
   revsetName,
 } from "@pinetrie/lanes"
-import type { PiSetup } from "@pinetrie/pi"
+import { type PiSetup, supervisionEnv } from "@pinetrie/pi"
 import { type RepoOwner, renameAccepted, startRepoOwner } from "@pinetrie/repo"
 import { type Basics, failed, slow } from "../basics.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
+import { type LaneConfigs, startLaneConfigs } from "./config.ts"
 import { openLinkOf } from "./registry.ts"
 import type { Found } from "./runtime.ts"
 
@@ -77,7 +73,7 @@ export interface Ready {
   readonly identity: { readonly name: string; readonly email: string }
 }
 
-/** The lane configs and shared directories, read at startup. */
+/** Your repo's names and your config's `lanes`, read at startup. */
 export type PreparedLanes = Awaited<ReturnType<typeof prepareLanes>>
 
 /**
@@ -95,6 +91,8 @@ export interface Setup {
   /** What lanes run on. */
   readonly runtime: LaneRuntime
   readonly lanes: PreparedLanes
+  /** Each lane's grants and shared directories, as facts of states. */
+  readonly configs: LaneConfigs
   /**
    * Whether lanes run pinetrie's default image, with its browser and python3:
    * the project has no `pinetrie.Containerfile`.
@@ -107,7 +105,10 @@ export interface Setup {
    * pi loaded.
    */
   readonly hostPaths: readonly string[]
-  /** A lane's spec. The base lane gets no shared directories and no host paths. */
+  /**
+   * A lane's spec, from the config it runs with (`configs`). The base lane
+   * gets accepted work's grants, and no shared directories or host paths.
+   */
   specOf<L extends LaneOwner>(
     lane: L,
     ready: Ready,
@@ -121,10 +122,6 @@ export interface Setup {
    * set up or moved since the last refresh.
    */
   baseAtAccepted(): Promise<void>
-  /** The dependency layer's key at `rev` of the repo `jj` reads. */
-  keyAt(jj: Runner, rev: string, ready: Ready): Promise<string>
-  /** The dependency layer `key` names, at `commits`: made if missing, after the base's builds queued before. */
-  depsLayerAt(commits: readonly CommitId[], key: string): Promise<SnapshotId>
 }
 
 export async function startSetup(input: {
@@ -167,6 +164,15 @@ export async function startSetup(input: {
       },
       failed(basics, "renaming accepted work's bookmark"),
     )
+  // Before anything mounts a shared directory or grants a lane anything.
+  const configs = await startLaneConfigs({
+    root,
+    owner,
+    repoConfig: lanes.repoConfig,
+    user: lanes.user,
+    userFile: input.userConfig.file,
+    log,
+  })
   // Read at startup, as `prepareImages` reads it, so a lane's prompt says
   // what its image has before the images are ready.
   const defaultImage = await stat(projectContainerfile(root)).then(
@@ -188,7 +194,9 @@ export async function startSetup(input: {
     r: Ready,
     base = false,
   ): LaneSpec<L> => {
-    const grants = lanes.config.grants
+    const own = !base && isThreadId(lane) ? lane : null
+    const { grants } =
+      own === null ? configs.accepted().authority : configs.laneConfig(own)
     return {
       lane,
       image: r.image,
@@ -200,7 +208,7 @@ export async function startSetup(input: {
         ignoreDir: pinetrieDir(root).laneGit,
         links: r.links,
         grants: grants.mounts,
-        shared: base ? [] : lanes.shared,
+        shared: own === null ? [] : configs.laneShared(own),
         hostPaths: base ? [] : hostPaths,
       }),
       grants: {
@@ -211,6 +219,7 @@ export async function startSetup(input: {
       },
       identity: r.identity,
       memory: LANE_MEMORY,
+      observation: supervisionEnv(RUNTIME_BIN),
     }
   }
 
@@ -221,35 +230,19 @@ export async function startSetup(input: {
    */
   async function refreshBaseNow(r: Ready) {
     const acceptedBookmark = revsetName(lanes.repoConfig.acceptedBookmark)
-    const { recipe } = lanes.config
-    const read = await owner.read(async ({ jj }) => {
-      const yours = await commitsOf(jj, `present(${acceptedBookmark})`)
-      const [commit] = yours
-      if (commit === undefined) return null
-      return { yours, commit, key: await keyAt(jj, commit, r) }
-    })
-    if (read === null) return
-    const { yours, commit, key } = read
-    const made = await refreshBase({
-      ...scratchOf(r),
-      yours,
-      recipe,
-      key,
-    })
-    if (made)
+    const yours = await owner.read(({ jj }) =>
+      commitsOf(jj, `present(${acceptedBookmark})`),
+    )
+    const [commit] = yours
+    if (commit === undefined) return
+    const made = await refreshBase({ ...scratchOf(r), yours })
+    if (made) {
       log(
         `[host] the base snapshot is at accepted work (${commit.slice(0, 8)})`,
       )
-  }
-
-  /** The dependency layer's key at `rev` of a repo `jj` reads. */
-  async function keyAt(jj: Runner, rev: string, r: Ready): Promise<string> {
-    const { recipe } = lanes.config
-    return depsKey({
-      recipe,
-      image: r.image,
-      inputs: recipe === null ? "" : await inputsHash(jj, rev, recipe.inputs),
-    })
+      // Accepted work moved: what it grants may have.
+      await configs.refreshAccepted()
+    }
   }
 
   /** What the scratch lane builds with. Nothing in it should see a shared directory. */
@@ -267,7 +260,9 @@ export async function startSetup(input: {
       runtime,
       runtimeReady: found.ready,
       mountsOf: r => specOf(BASE_LANE, r).mounts,
-      hostPorts: lanes.config.grants.hostPorts,
+      // The VM is told once: a port accepted work grants later reaches it
+      // at the next start.
+      hostPorts: configs.accepted().authority.grants.hostPorts,
       refreshBaseNow,
       log,
     }),
@@ -281,19 +276,6 @@ export async function startSetup(input: {
   async function baseAtAccepted(): Promise<void> {
     await base.run(async () => refreshBaseNow(await ready))
   }
-  /** The dependency layer for `commits`, made if missing, one build at a time with the base's. */
-  async function depsLayerAt(commits: readonly CommitId[], key: string) {
-    const r = await ready
-    return base.run(() =>
-      ensureDepsLayer({
-        ...scratchOf(r),
-        commits,
-        recipe: lanes.config.recipe,
-        key,
-      }),
-    )
-  }
-
   function refreshBaseSoon(): void {
     void keeper.track(
       baseAtAccepted().catch(failed(basics, "refreshing the base snapshot")),
@@ -306,55 +288,35 @@ export async function startSetup(input: {
     owner,
     runtime,
     lanes,
+    configs,
     defaultImage,
     ready,
     hostPaths,
     specOf,
     refreshBaseSoon,
     baseAtAccepted,
-    keyAt,
-    depsLayerAt,
   }
 }
 
+/**
+ * Your repo's names, from your config and your working copy's
+ * `pinetrie.json`, read once: they find accepted work, so they cannot come
+ * from it. And your config's `lanes`, whose shared directories always apply.
+ */
 async function prepareLanes(
   at: string,
   userConfig: { readonly file: string; readonly json: unknown },
   log: (m: string) => void,
 ) {
-  const pnpmLock = await stat(path.join(at, "pnpm-lock.yaml")).then(
-    () => true,
-    () => false,
-  )
   // A missing pinetrie.json is the usual case, and goes unsaid.
-  const read = await readConfigFile(path.join(at, "pinetrie.json"))
+  const read = await readConfigFile(path.join(at, PROJECT_CONFIG_FILE))
   if (read.kind === "broken")
-    log(brokenConfigLine("pinetrie.json", read.reason))
-  const config = decodeLaneConfig(configJson(read), at, pnpmLock)
-  const user = decodeLaneConfig(userConfig.json, at, false)
-  const { grants } = config
-  const on = [
-    grants.ssh ? "your ssh agent" : null,
-    ...grants.env.map(e => `$${e}`),
-    ...grants.mounts.map(m => m.source),
-  ].filter(g => g !== null)
-  if (on.length > 0) log(`[host] lanes are granted: ${on.join(", ")}`)
-  const sharing = await prepareShared(
-    at,
-    { user: user.shared, project: config.shared },
-    config.recipe?.caches ?? [],
-  )
-  for (const d of sharing.shared) {
-    const from = user.shared.some(p => normalShared(p) === d.path)
-      ? userConfig.file
-      : "pinetrie.json"
-    log(`[host] ${d.path}/ is shared read-write with every lane (${from})`)
-  }
-  for (const r of sharing.refused)
-    log(`[host] ${r.path} is not shared: ${r.reason}`)
+    log(brokenConfigLine(PROJECT_CONFIG_FILE, read.reason))
+  const config = decodeLaneConfig(configJson(read), at)
+  const user = decodeLaneConfig(userConfig.json, at)
   const { repoConfig: names, refused } = repoConfig(user.repo, config.repo)
   for (const r of refused) log(`[host] ${r}`)
-  return { config, repoConfig: names, ...sharing }
+  return { repoConfig: names, user }
 }
 
 /**

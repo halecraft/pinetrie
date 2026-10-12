@@ -39,12 +39,6 @@ describe("names: every path is built from names checked first", () => {
     expect(() =>
       planDisk({ kind: "deleteSnapshots", ids: ["ok", "../../x"] }, disks),
     ).toThrow("not a disk's name")
-    expect(() =>
-      planDisk(
-        { kind: "create", lane: "l", carry: { from: "s", paths: ["../x"] } },
-        disks,
-      ),
-    ).toThrow("not a path inside a disk")
   })
 })
 
@@ -82,28 +76,11 @@ describe("planDisk: each disk operation as steps", () => {
       },
     ])
   })
-  test("a create carries paths from a snapshot only when asked", () => {
-    expect(planDisk({ kind: "create", lane: "l", carry: null }, disks)).toEqual(
-      [
-        { kind: "parent", path: disks.lane("l") },
-        { kind: "create", path: disks.lane("l") },
-      ],
-    )
-    expect(
-      planDisk(
-        {
-          kind: "create",
-          lane: "l",
-          carry: { from: "deps-1", paths: [".pnpm-store"] },
-        },
-        disks,
-      ).at(-1),
-    ).toEqual({
-      kind: "carry",
-      from: disks.snapshot("deps-1"),
-      to: disks.lane("l"),
-      paths: [".pnpm-store"],
-    })
+  test("a create makes its parent, then the disk", () => {
+    expect(planDisk({ kind: "create", lane: "l" }, disks)).toEqual([
+      { kind: "parent", path: disks.lane("l") },
+      { kind: "create", path: disks.lane("l") },
+    ])
   })
   test("a lane's delete takes its inner lanes' disk; snapshots are deleted by name", () => {
     expect(planDisk({ kind: "delete", lane: "l" }, disks)).toEqual([
@@ -186,7 +163,7 @@ describe("readLaneFile: pine·trie's own file inside a snapshot", () => {
         path.join(d.snapshot("s"), ".pinetrie-lane", "leak.json"),
       )
       expect(await readLaneFile(d, "s", "base.json")).toBe("{}")
-      expect(await readLaneFile(d, "s", "derived.json")).toBeNull()
+      expect(await readLaneFile(d, "s", "recipes.json")).toBeNull()
       await expect(readLaneFile(d, "s", "leak.json")).rejects.toThrow(
         "leaves its snapshot",
       )

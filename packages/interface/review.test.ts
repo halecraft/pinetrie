@@ -37,14 +37,28 @@ const target: ReviewTarget = {
 }
 
 describe("reviewView", () => {
+  test("a revision whose pinetrie.json widens what lanes may do says what, in one line", () => {
+    const widened = reviewView({ ...target, spans: [span(C1)] }, [
+      ready({
+        description: "feat: grant\n",
+        files: [file("pinetrie.json", 1, 0)],
+        widenings: [{ kind: "ssh" }, { kind: "env", name: "TOKEN" }],
+      }),
+    ]).revisions[0]?.state
+    expect(widened?.kind === "ready" ? widened.value.widens : null).toBe(
+      "Accepting this lets lanes use your ssh agent, $TOKEN.",
+    )
+  })
   const at = { lane: LANE, name: "amber-fox" as ThreadName, entry: "e1" }
   const one: RevisionReview = {
     description: withTrailers("feat: one\n\nwhy it changed", at),
     files: [file("a.txt", 3, 1), file("b.txt", 0, 0)],
+    widenings: [],
   }
   const two: RevisionReview = {
     description: "feat: two\n",
     files: [{ ...file("a.txt", 401, 0), change: "added" }],
+    widenings: [],
   }
   test("flags conflicts and your edits by path, and counts lines", () => {
     const view = reviewView(target, [ready(one), ready(two)])
@@ -80,7 +94,7 @@ describe("reviewView", () => {
     expect([
       listed(alone, [ready(two)]),
       listed(alone, [{ kind: "loading" }]),
-      listed(alone, [ready({ description: "x", files: [] })]),
+      listed(alone, [ready({ description: "x", files: [], widenings: [] })]),
       listed(alone, [ready(one)]),
       listed(target, [ready(two), ready(two)]),
       listed(target, [{ kind: "loading" }, { kind: "loading" }]),
@@ -103,14 +117,18 @@ describe("reviewView", () => {
     }
     expect(
       reviewView(ask, [
-        ready({ description: "", files: [file("a.txt", 1, 0)] }),
+        ready({ description: "", files: [file("a.txt", 1, 0)], widenings: [] }),
       ]).title,
     ).toBe('Ada: "Fix it"')
   })
   test("a file over 400 changed lines starts collapsed; one at 400 does not", () => {
     const rows = (added: number) => {
       const v = reviewView({ ...target, spans: [span(C1)] }, [
-        ready({ description: "x", files: [file("a.txt", added, 0)] }),
+        ready({
+          description: "x",
+          files: [file("a.txt", added, 0)],
+          widenings: [],
+        }),
       ]).revisions[0]?.state
       return v?.kind === "ready" ? v.value.files[0]?.startsCollapsed : null
     }

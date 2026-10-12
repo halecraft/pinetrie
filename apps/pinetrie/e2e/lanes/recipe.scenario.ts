@@ -1,13 +1,15 @@
-// e2e/lanes/recipe — derived state is rebuilt from its key, never carried: a
-// package deleted from accepted work, or in a lane, leaves no output of its own
-// behind, and a turn's record names the ignored files it wrote. The project's
-// recipe is offline: it writes `out-<p>/marker` for each package `pkgs.txt`
-// lists.
+// e2e/lanes/recipe — what commands make is learnt, not declared: a turn's
+// record classes what its runs wrote; and a catch up, or a run's start, after
+// a file a recipe read changed removes what it made, its cache kept. The
+// project's build is offline: it writes `out-<p>/marker` for each package
+// `pkgs.txt` lists, and each package into `.store/`, a cache with a
+// `CACHEDIR.TAG`.
 
 import { rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import {
   ancestry,
+  CATCH_UP_TOOL,
   type EntryId,
   entryId,
   messageText,
@@ -22,7 +24,6 @@ import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
   at,
-  BRANCH,
   committedProject,
   entriesOf,
   idleNow,
@@ -54,12 +55,9 @@ async function recipeSection(
     "pkgs.txt": "a\nb\nc\n",
     "c.txt": "c's source\n",
     "build.sh":
-      'for p in $(cat pkgs.txt); do mkdir -p "out-$p" && echo built > "out-$p/marker"; done\n',
-    ".gitignore": "out-*/\n.env\n",
-    "pinetrie.json": `${JSON.stringify({
-      publish: { catchUp: true },
-      lanes: { install: "sh build.sh", installWhen: "pkgs.txt" },
-    })}\n`,
+      'mkdir -p .store && touch .store/CACHEDIR.TAG && for p in $(cat pkgs.txt); do echo "$p" > ".store/$p"; mkdir -p "out-$p" && echo built > "out-$p/marker"; done\n',
+    ".gitignore": "out-*/\n.env\n.store/\n",
+    "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
   })
   const script = scriptedModel()
   const wh = await lanes.startHost({
@@ -126,68 +124,91 @@ async function recipeSection(
 
   try {
     await setUpAccepted(wh.session, wu)
-    // A fork waits for the base at accepted work: one with all three outputs.
-    const before = await ask("@agent which outputs are there first?", GONE)
+    // A new thread forks from the base, which runs no command.
+    const first = await ask("@agent which outputs are there first?", GONE)
+    if (first === undefined) throw new Error("no lane")
 
-    // Accepted work deletes package c: the next base is made from it alone.
+    // A turn of three runs: one makes outputs and a cache from source, one
+    // writes an ignored file from nothing, one makes a directory from
+    // source that no `.gitignore` names.
+    script.use([
+      { tool: "bash", args: { command: "sh build.sh" } },
+      { tool: "bash", args: { command: "echo SECRET=1 > .env" } },
+      {
+        tool: "bash",
+        args: { command: "mkdir -p dist && cp pkgs.txt dist/pkgs.txt" },
+      },
+      { text: "wrote them" },
+    ])
+    const earlier = recordsOf(first).length
+    await wu.chat("@agent build, and write .env", at(laneTip(first)), {
+      thread: first,
+    })
+    await idle()
+    // Each tool call is a turn of its own, with its own record.
+    const wrote = recordsOf(first).slice(earlier)
+    const derived = wrote.flatMap(r => r.disk?.derived.paths ?? [])
+    const local = wrote.flatMap(r => r.disk?.local.paths ?? [])
+    check(
+      "a turn's record names its runs' outputs derived, and a file a command wrote from nothing local",
+      derived.includes("out-a") &&
+        local.includes(".env") &&
+        !local.some(p => p.startsWith("out-")) &&
+        // No record names a path only the diff's own machinery made.
+        !recordsOf(first).some(r =>
+          (r.disk?.local.paths ?? []).some(
+            p => /^o\d+-\d+-\d+(\/|$)/.test(p) || p.startsWith(".git/"),
+          ),
+        ),
+      JSON.stringify(wrote.map(r => r.disk)),
+    )
+    check(
+      "a directory a run made from source that .gitignore misses is named in the turn's record",
+      wrote.some(r => r.disk?.unignored.includes("dist") === true),
+      JSON.stringify(wrote.map(r => r.disk?.unignored)),
+    )
+
+    // Accepted work deletes package c; the lane catches up.
     jj(project, "bookmark", "create", "main", "-r", "pinetrie-accepted")
     writeFileSync(path.join(project, "pkgs.txt"), "a\nb\n")
     rmSync(path.join(project, "c.txt"))
     jj(project, "commit", "-m", "you delete package c")
     await wu.actOnAccepted("publish")
     await wh.quiet()
-    const first = await ask("@agent which outputs are there?", GONE)
+    script.use([
+      { tool: CATCH_UP_TOOL, args: {} },
+      { tool: "bash", args: { command: `${GONE}; ls .store` } },
+      { text: "caught up" },
+    ])
+    await wu.chat("@agent catch up", at(laneTip(first)), { thread: first })
+    await idle()
+    const after = lastResult(first)
     check(
-      "a package deleted from accepted work leaves no output of its own in the next fork",
-      lastResult(before).trim() === "out-a\nout-b\nout-c\nchecked" &&
-        lastResult(first).trim() === "out-a\nout-b\nchecked",
-      JSON.stringify({ before: lastResult(before), after: lastResult(first) }),
+      "a catch up that changes what a recipe read removes what it made, and keeps its cache",
+      after.trim() === "checked\nCACHEDIR.TAG\na\nb\nc",
+      JSON.stringify(after),
     )
 
-    // In a lane, a turn deletes package b: the recipe runs again before the
-    // turn's snapshot, its old outputs removed first.
-    if (first === undefined) throw new Error("no lane")
+    // The lane builds, then changes what the build read: its next run
+    // starts without the outputs that went stale.
     script.use([
+      { tool: "bash", args: { command: "sh build.sh" } },
       { tool: "bash", args: { command: "printf 'a\\n' > pkgs.txt" } },
-      { text: "deleted b" },
+      { text: "built, then changed" },
     ])
-    await wu.chat("@agent delete package b", at(laneTip(first)), {
+    await wu.chat("@agent build, then drop package b", at(laneTip(first)), {
       thread: first,
     })
     await idle()
-    const ran = recordsOf(first).find(r => r.recipe === "ran")
-    const branched = await ask(
-      "@agent which outputs are there now?",
-      GONE,
-      at(ran?.entry ?? null),
-      BRANCH,
-    )
-    check(
-      "a package deleted in a lane leaves no output of its own in a branch from that turn",
-      ran !== undefined && lastResult(branched).trim() === "out-a\nchecked",
-      JSON.stringify({ ran, out: lastResult(branched) }),
-    )
-
-    // A turn that writes an ignored file: its record names it, and no
-    // recipe output.
-    script.use([
-      { tool: "bash", args: { command: "echo SECRET=1 > .env" } },
-      { text: "wrote it" },
-    ])
-    await wu.chat("@agent write .env", at(laneTip(first)), { thread: first })
+    script.use([{ tool: "bash", args: { command: GONE } }, { text: "looked" }])
+    await wu.chat("@agent which outputs now?", at(laneTip(first)), {
+      thread: first,
+    })
     await idle()
-    const wrote = recordsOf(first).at(-1)
     check(
-      "a turn's record names the ignored files it wrote, and no recipe output",
-      wrote?.ignored?.paths.includes(".env") === true &&
-        !wrote.ignored.paths.some(p => p.startsWith("out-")) &&
-        // No record names a path only the diff's own machinery made.
-        !recordsOf(first).some(r =>
-          (r.ignored?.paths ?? []).some(
-            p => /^o\d+-\d+-\d+(\/|$)/.test(p) || p.startsWith(".git/"),
-          ),
-        ),
-      JSON.stringify(wrote),
+      "a run starts without the outputs of a recipe whose input changed since",
+      lastResult(first).trim() === "checked",
+      JSON.stringify(lastResult(first)),
     )
   } finally {
     await wu.close().catch(() => {})

@@ -73,10 +73,6 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
   is a delete with `user_subvol_rm_allowed`.
 - **A subvolume is told by its root's inode, 256** (`isSubvolume`):
   `btrfs subvolume show` needs `CAP_SYS_ADMIN` (S125).
-- **A carry copies paths from a snapshot into a new disk** by
-  `cp -a --reflink=always`, every block shared (S148: a 329 MB pnpm store in
-  about 300 ms). `-a` copies a symlink as a link, so a carried path never
-  reads through one.
 - **A snapshot's time is its birth time** (`statx`), which btrfs keeps.
 
 ## Diffs (`diff.ts`)

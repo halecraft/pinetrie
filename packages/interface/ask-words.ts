@@ -10,7 +10,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { AskView } from "./ask-view.ts"
-import { listOf, plural } from "./counts.ts"
+import { count, listOf, plural } from "./counts.ts"
 import type { WorkStats } from "./work-stats.ts"
 
 /** How long an ask's first line is shown. */
@@ -54,7 +54,7 @@ export function durationWords(ms: number): string {
 
 /**
  * What some work holds, as one line: "12 messages from Ada and Bea · 38 steps
- * · 61 tool calls · 7 files · 3 ignored files · 4m 12s · 2 failed". A part
+ * · 61 tool calls · 7 files · 3 local files · 4m 12s · 2 failed". A part
  * that is zero is left out; failures come last, a failed recipe after the
  * failed calls. A capsule's tooltip and a fold's line hold this
  * line.
@@ -73,10 +73,26 @@ export function workWords(
     stats.agent > 0 ? plural(stats.agent, "step") : "",
     stats.calls > 0 ? plural(stats.calls, "tool call") : "",
     stats.files.length > 0 ? plural(stats.files.length, "file") : "",
-    stats.ignored > 0 ? plural(stats.ignored, "ignored file") : "",
+    stats.local > 0 ? plural(stats.local, "local file") : "",
     stats.first > 0 && took >= 1000 ? durationWords(took) : "",
     stats.failed > 0 ? `${stats.failed} failed` : "",
-    stats.recipeFailed > 0 ? "dependencies failed to install" : "",
+    stats.concurrent > 0
+      ? count(
+          stats.concurrent,
+          "write to a shared file over another's",
+          "writes to shared files over others'",
+        )
+      : "",
+    stats.unignored > 0
+      ? count(
+          stats.unignored,
+          "output .gitignore misses",
+          "outputs .gitignore misses",
+        )
+      : "",
+    stats.leftovers > 0
+      ? count(stats.leftovers, "file jj left out", "files jj left out")
+      : "",
   ]
     .filter(part => part !== "")
     .join(" · ")

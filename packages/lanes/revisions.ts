@@ -11,12 +11,15 @@ import {
   type CopyFacts,
   commitId,
   type EntryId,
+  PROJECT_CONFIG_FILE,
   revisionMessage,
   type ThreadId,
 } from "@pinetrie/core"
 import { bookmarkOf, setBookmark } from "./bookmarks.ts"
 import {
+  decodeLaneConfig,
   LANE_CONFIG_DIR,
+  type LaneAuthority,
   OLD_LANE_CONFIG_DIR,
   type OldNamesOnDisk,
   planTurnCommit,
@@ -297,3 +300,36 @@ export const REVISION_READ =
   '",\\"shown\\":" ++ json(f.display_diff_path()) ++ ",\\"change\\":" ++ json(f.status()) ++ ' +
   '",\\"added\\":" ++ f.lines_added() ++ ",\\"removed\\":" ++ f.lines_removed() ++ "}").join(",") ++ ' +
   '"]}"'
+
+/**
+ * `pinetrie.json`'s grants and shared directories at `rev` of the repo `jj`
+ * reads; none when it has no such file. One that is not JSON grants nothing
+ * too, and `broken` says why.
+ */
+export async function readAuthority(
+  jj: Runner,
+  rev: string,
+  root: string,
+): Promise<{
+  readonly authority: LaneAuthority
+  readonly broken: string | null
+}> {
+  const shown = await jj([
+    "file",
+    "show",
+    "--ignore-working-copy",
+    "-r",
+    rev,
+    `root:${JSON.stringify(PROJECT_CONFIG_FILE)}`,
+  ])
+  let json: unknown = null
+  let broken: string | null = null
+  if (shown.ok)
+    try {
+      json = JSON.parse(shown.stdout)
+    } catch (error) {
+      broken = String(error)
+    }
+  const { grants, shared } = decodeLaneConfig(json, root)
+  return { authority: { grants, shared }, broken }
+}

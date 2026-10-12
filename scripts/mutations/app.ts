@@ -87,10 +87,10 @@ export const mutations: readonly Mutation[] = [
       "your home directory is not in a lane; your working copy is, at /mnt/host-working-copy",
   },
   {
-    name: "only the base snapshot's lane mounts the shared directories",
+    name: "no lane mounts the shared directories",
     file: "apps/pinetrie/host/work/setup.ts",
-    from: "        shared: base ? [] : lanes.shared,",
-    to: "        shared: base ? lanes.shared : [],",
+    from: "        shared: own === null ? [] : configs.laneShared(own),",
+    to: "        shared: [],",
     suite: "lanes",
     scenario: "shared",
     expect: "another lane reads it",

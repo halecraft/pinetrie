@@ -1,6 +1,8 @@
 // pi/lane-protocol — the calls between the host and a lane's helper,
 // carried by `@pinetrie/channel`.
 
+import type { Recipe } from "@pinetrie/core"
+
 /**
  * The environment methods a lane forwards: those whose arguments and result
  * are data. `openTextLineReader` returns an object with methods, and
@@ -43,7 +45,19 @@ export type LaneCall =
       readonly cwd: string | null
       /** stdout as bytes, for a bundle; else text. */
       readonly bytes: boolean
+      /** Its input; null for none. */
+      readonly stdin: string | null
     }
+  /** What the helper knows of its runs and tools since the last drain: a `LaneDrain`. */
+  | { readonly runs: true }
+  /** Which of these paths, relative to the helper's directory, exist: a `string[]`. */
+  | { readonly present: readonly string[] }
+  /** The supervisor's events gathered since the last call: `RunNotice[]`. */
+  | { readonly events: true }
+  /** Content hashes of paths relative to the helper's directory: a `FileHashes`. */
+  | { readonly hashes: readonly string[] }
+  /** Whether each recipe's key still holds on the disk: a `RecipeCheck` each. */
+  | { readonly checkRecipes: readonly Recipe[] }
 
 /** The helper's hello: its directory. */
 export interface LaneHello {

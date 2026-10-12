@@ -35,6 +35,9 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
+    ],
+    "ignoredBuiltDependencies": [
+      "@parcel/watcher"
     ]
   },
   "packageManager": "pnpm@10.18.0"

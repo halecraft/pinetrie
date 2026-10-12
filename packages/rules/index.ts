@@ -234,6 +234,17 @@ export {
   VERDICT_THEN_DIGEST,
 } from "./digest.ts"
 export {
+  type ClassedWrites,
+  decodeRegistry,
+  planStaleOutputs,
+  type RegistryToKey,
+  registryAfter,
+  turnDisk,
+  unattributed,
+  type WritesToClass,
+  writesToClass,
+} from "./disk.ts"
+export {
   acceptedFact,
   actionFact,
   decodeFact,
@@ -490,7 +501,26 @@ export {
   roundReplyOf,
   roundRequest,
 } from "./round.ts"
+export {
+  checkRecipe,
+  dirtyPaths,
+  drainLane,
+  drainRun,
+  foldLaneDrain,
+  foldRunEvents,
+  newRunTrace,
+  type PathTrace,
+  type RunTrace,
+} from "./runs.ts"
 export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
+export {
+  laneReads,
+  planSharedLineages,
+  SHARED_LINEAGE,
+  type SharedRead,
+  type SharedWrite,
+  sharedTouches,
+} from "./shared.ts"
 export {
   type AnyRecordSpec,
   planUndeclaredSweep,
@@ -567,12 +597,9 @@ export {
   verdictOf,
 } from "./verdict.ts"
 export {
-  classifyDisk,
-  type DiskClass,
   FILES_LOST,
   type FilesLostRecord,
   forkPoint,
-  ignoredFiles,
   LANE,
   PROJECT,
   PROJECT_KEY,

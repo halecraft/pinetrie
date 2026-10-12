@@ -1,0 +1,56 @@
+# 1162747 events, 0 lost; #ready ring 64 MiB
+PASS  r1: the command's exit is its own  (exit 3)
+PASS  r1: every kind of call is seen, with its path
+PASS  r1: a release's stamp is the file's after the run  (release 2:1791846907466770616, stat 2:1791846907466770616)
+PASS  r1: the observer's lstat at release is the file's after the run  (lstat 2:1791846907466770616, stat 2:1791846907466770616)
+PASS  r2: a daemon's write after its command returned is its run's  (release 5:1791846908469000033, stat 5:1791846908469000033)
+PASS  r2: the run ends after its daemon's last release  (release at 71, end at 72)
+PASS  r3: two runs at once: each write is its own run's  (200 opens, 0 attributed to another run)
+PASS  r4: two runs at once: each write is its own run's  (200 opens, 0 attributed to another run)
+PASS  r5: every thread's write is its run's  (16 of 16)
+PASS  r6: env -i and a static binary  (10 of 10 opens)
+PASS  r7: writes through a mapping after close are in the release's stamp  (release 8192:1791846909508000034, stat 8192:1791846909508000034)
+PASS  r8: strace runs inside a run  (exit 0 2)
+PASS  r9: no watched call is cut short  (8 calls checked)
+PASS  r10: io_uring was refused here, so nothing to see  (uring: Operation not permitted)
+PASS  r11: a run in a user and pid namespace  (exit 0)
+PASS  r12: gdb runs inside a run  (exit 0)
+PASS  r13: a process outside every run is not seen  (0 events)
+PASS  r15: a run inside a run is the inner one's
+FAIL  r20: over virtiofs, the release's stamp is the lane's stat  (release 4:1791846962310561100, lane 4:1791846962310800557, Mac 4:1791846962310800557)
+PASS  r20: over virtiofs, the lane's stamp is the Mac's  (lane 4:1791846962310800557, Mac 4:1791846962310800557)
+PASS  r20: over virtiofs, the observer's lstat at release is the lane's  (lstat 4:1791846962310800557 after 38.1 µs, lane 4:1791846962310800557)
+PASS  no path under the workload was cut short  (0 cut)
+# release to the observer's lstat, µs, over 24442 releases: median 16.7, p99 47.3, max 359.5
+# releases the observer could not lstat: 15089, e.g. /dev/null by pid 21970
+PASS  flood, 64 MiB ring run 101: every event delivered or counted lost  (100000 delivered, 0 lost, of 100000)
+PASS  flood, 64 MiB ring run 102: every event delivered or counted lost  (100000 delivered, 0 lost, of 100000)
+PASS  flood, 64 MiB ring run 103: every event delivered or counted lost  (100000 delivered, 0 lost, of 100000)
+PASS  flood, 64 MiB ring run 104: every event delivered or counted lost  (100000 delivered, 0 lost, of 100000)
+PASS  flood, 64 MiB ring run 105: every event delivered or counted lost  (100000 delivered, 0 lost, of 100000)
+PASS  flood, 64 MiB ring run 106: every event delivered or counted lost  (100000 delivered, 0 lost, of 100000)
+PASS  flood, 64 MiB ring run 107: every event delivered or counted lost  (100000 delivered, 0 lost, of 100000)
+PASS  flood, 64 MiB ring run 108: every event delivered or counted lost  (100000 delivered, 0 lost, of 100000)
+# flood, 64 MiB ring: 0 lost in all
+PASS  flood, 1 MiB ring run 201: every event delivered or counted lost  (28325 delivered, 21676 lost, of 50000)
+PASS  flood, 1 MiB ring run 202: every event delivered or counted lost  (28373 delivered, 21627 lost, of 50000)
+PASS  flood, 1 MiB ring run 203: every event delivered or counted lost  (28916 delivered, 21084 lost, of 50000)
+PASS  flood, 1 MiB ring run 204: every event delivered or counted lost  (28437 delivered, 21564 lost, of 50000)
+PASS  flood, 1 MiB ring run 205: every event delivered or counted lost  (29000 delivered, 21000 lost, of 50000)
+PASS  flood, 1 MiB ring run 206: every event delivered or counted lost  (30860 delivered, 19140 lost, of 50000)
+PASS  flood, 1 MiB ring run 207: every event delivered or counted lost  (28588 delivered, 21412 lost, of 50000)
+PASS  flood, 1 MiB ring run 208: every event delivered or counted lost  (32043 delivered, 17958 lost, of 50000)
+PASS  flood, 1 MiB ring: the small ring lost events, and said so  (165461 lost)
+
+# cost (ms; bench: ns per open and close)
+# /usr/lib/python3.12 1324 files
+bare bench                       median      521.0   runs 521.0
+bare cp-tree                     median       35.5   runs 36.0 35.4 35.5
+observed-tagged bench            median     1361.0   runs 1361.0
+observed-tagged cp-tree          median       59.0   runs 62.0 59.0 57.9
+observed-untagged bench          median      813.0   runs 813.0
+observed-untagged cp-tree        median       38.2   runs 38.4 38.2 37.2
+supervise bench                  median    58082.0   runs 58082.0
+supervise cp-tree                median      263.0   runs 260.5 263.0 264.5
+
+# 38 passed, 1 failed

@@ -10,11 +10,6 @@ export type DiskCall =
   | {
       readonly kind: "create"
       readonly lane: string
-      /** Paths copied from a snapshot into the new disk by reflink; null with none. */
-      readonly carry: {
-        readonly from: string
-        readonly paths: readonly string[]
-      } | null
     }
   | { readonly kind: "restore"; readonly lane: string; readonly from: string }
   | {

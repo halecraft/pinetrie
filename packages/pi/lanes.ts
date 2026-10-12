@@ -71,11 +71,6 @@ export interface LaneFacts {
    * shell and python3. A project's own image may carry neither.
    */
   readonly defaultImage: boolean
-  /**
-   * The project's recipe, by its command, which pine·trie runs again when a
-   * turn changes its inputs; null with none.
-   */
-  readonly recipe: string | null
   /** pinetrie's install, mounted read-only in the lane. */
   readonly install: string
   /** The lane note's path in the lane. */
@@ -85,10 +80,12 @@ export interface LaneFacts {
 /**
  * What each program the runtime carries for `bash` is preferred over. Keyed
  * by `RuntimeProgram`, so a program added to the runtime fails to type-check
- * until it says what it replaces.
+ * until it says what it replaces. jj and the supervisor replace nothing the
+ * agent would run.
  */
-const PREFERRED_OVER: Readonly<Record<Exclude<RuntimeProgram, "jj">, string>> =
-  { rg: "grep", fd: "find", sd: "sed" }
+const PREFERRED_OVER: Readonly<
+  Record<Exclude<RuntimeProgram, "jj" | "supervise">, string>
+> = { rg: "grep", fd: "find", sd: "sed" }
 
 /** `a`, `a and b`, `a, b and c`. */
 const listed = (words: readonly string[]): string =>
@@ -128,11 +125,8 @@ export function laneGuidelines(facts: LaneFacts): string[] {
           "Chromium's headless shell is installed ($PLAYWRIGHT_BROWSERS_PATH), and so is python3.",
         ]
       : []),
-    ...(facts.recipe === null
-      ? []
-      : [
-          `When a turn changes its lockfile, ${PRODUCT_NAME} removes what \`${facts.recipe}\` made and runs it again at the turn's end. ${dir}/.pinetrie-lane/derived.json says how it went.`,
-        ]),
+    `Nothing installs dependencies for you. After a catch up, ${PRODUCT_NAME} removes what commands made from files that changed (node_modules, a build): make them again as you would after a pull.`,
+    "Keep what commands make out of the repo: when one makes a directory .gitignore misses (dist/, node_modules/), add it to .gitignore.",
     `More about the lane, when you need it: ${facts.note}`,
   ]
 }
@@ -150,6 +144,11 @@ export interface LaneHooks {
    * none, and nothing is asked.
    */
   askedAboutConflict(lane: ThreadId, question: string): Promise<boolean>
+  /**
+   * The write or edit tool wrote the lane's `pinetrie.json`: what to tell
+   * the agent of it, or null for nothing.
+   */
+  configWritten(lane: ThreadId): Promise<string | null>
   /** `catch_up` was called: the host's answer. */
   catchUp(lane: ThreadId, from: "base" | "parent"): Promise<ToolAnswer>
   /** `split_offer` was called: the host's answer. */

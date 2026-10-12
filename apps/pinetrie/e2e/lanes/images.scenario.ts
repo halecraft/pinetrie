@@ -17,8 +17,9 @@ export const scenario: Scenario = {
 
 // ── 9. Any image with sh and git: pinetrie brings Node and its programs ────
 // Alpine has musl, no Node and no rg, fd or sd; the helper runs on the lane
-// runtime's Node, through its own loader, and the search tools on the
-// runtime's static rg and fd. An image with no git cannot host a lane.
+// runtime's Node, through its own loader, the search tools on the
+// runtime's static rg and fd, and every command is a run, attributed.
+// An image with no git cannot host a lane.
 
 async function imagesSection(
   check: Checks["check"],
@@ -49,7 +50,7 @@ async function imagesSection(
         tool: "bash",
         args: {
           command:
-            "rg --version | head -1; fd --version; sd --version; cat made.txt; command -v node || echo no node; ls /lib/ld-musl* >/dev/null && echo musl",
+            "rg --version | head -1; fd --version; sd --version; cat made.txt; command -v node || echo no node; ls /lib/ld-musl* >/dev/null && echo musl; mkdir -p built && cat notes.txt > built/copy.txt",
         },
       },
       { text: "done" },
@@ -72,6 +73,11 @@ async function imagesSection(
       `${JSON.stringify(ran.slice(-3))}`.slice(0, 200),
     )
     const recorded = [...rootRecordsOf(alpine.host, readRevisions).values()]
+    check(
+      "on Alpine, under Docker's default seccomp profile, a tool call's run is attributed: what it made from source is in its turn's record",
+      recorded.some(r => r.disk?.unignored.includes("built") === true),
+      JSON.stringify(recorded.map(r => r.disk?.unignored ?? null)),
+    )
     check(
       "and its turn is committed and snapshotted",
       recorded.some(r => r.commit !== null && r.snapshot !== null),

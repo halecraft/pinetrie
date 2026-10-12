@@ -866,4 +866,13 @@ export const mutations: readonly Mutation[] = [
     command: repoTest,
     expect: "a thread on a WIP starts from its copy",
   },
+  {
+    name: "a review never reads what pinetrie.json widens",
+    file: "packages/repo/offer.ts",
+    from: "  const touched = read.files.some(\n",
+    to: "  const touched = false && read.files.some(\n",
+    command: unit,
+    expect:
+      "a review reads an offer's commit: its description, files and one file's diff",
+  },
 ]

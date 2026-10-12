@@ -102,9 +102,9 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   (ADR-0034), whose snapshots `RevisionRecord` names; every thread's agent
   works in a copy of its own (ADR-0102). A conflict is resolved by the agent
   in its lane, with a `land` prompt (ADR-0033).
-- A dependency layer is a snapshot named by its recipe's key, and a turn's
-  whole-disk diff counts none of pine·trie's own paths (`DISK_OWN_ROOTS`,
-  ADR-0131).
+- A turn's classes and its whole-disk diff count none of pine·trie's own
+  paths (`DISK_OWN_ROOTS`, ADR-0135), but the lane's home
+  (`LANE_HOME_PATH`), which tools write as they would any home.
 - `NO_EDITOR`: a shell with no terminal would wait on an editor until its
   timeout (S36).
 

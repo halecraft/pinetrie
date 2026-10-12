@@ -50,7 +50,6 @@ const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   shared: [],
   grants: { ssh: false, env: [], mounts: [] },
   defaultImage: false,
-  recipe: null,
   install: "/pinetrie",
   note: "/pinetrie/packages/pi/lane.md",
   ...over,
@@ -98,6 +97,7 @@ test("the prompt no longer tells the model to search with bash", () => {
     hooks: {
       turnDone: async () => {},
       askedAboutConflict: async () => false,
+      configWritten: async () => null,
       catchUp: async () => {
         throw new Error("no catch_up here")
       },
@@ -214,11 +214,11 @@ describe("laneGuidelines", () => {
     expect(told).toContain("and so is python3")
   })
 
-  test("names the recipe, run again at a turn's end, only with one", () => {
-    expect(text(facts())).not.toContain("derived.json")
-    expect(text(facts({ recipe: "pnpm install --frozen-lockfile" }))).toContain(
-      "When a turn changes its lockfile, pine·trie removes what `pnpm install --frozen-lockfile` made and runs it again at the turn's end. /workspace/.pinetrie-lane/derived.json says how it went.",
+  test("says what is made is the agent's to make, and to keep out of the repo", () => {
+    expect(text(facts())).toContain(
+      "Nothing installs dependencies for you. After a catch up, pine·trie removes what commands made from files that changed (node_modules, a build): make them again as you would after a pull.",
     )
+    expect(text(facts())).toContain("add it to .gitignore")
   })
 
   test("names the runtime's programs for bash, on any image", () => {
@@ -302,6 +302,7 @@ describe("lanes in a harness", () => {
             turns.push("end")
           },
           askedAboutConflict: async () => false,
+          configWritten: async () => null,
           catchUp: async () => {
             throw new Error("no catch_up here")
           },
@@ -548,6 +549,7 @@ describe("lanes in a harness", () => {
         hooks: {
           turnDone: async () => {},
           askedAboutConflict: async () => false,
+          configWritten: async () => null,
           catchUp: async () => {
             throw new Error("no catch_up here")
           },

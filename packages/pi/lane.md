@@ -60,18 +60,21 @@ changes pine·trie can keep this note true. You can skip them.
   `jj diffedit`. <!-- packages/core/index.ts NO_EDITOR -->
 - Ignored files, such as `node_modules` and build output, stay on the disk,
   and a branch gets them. The person's copy of your work never includes them.
-- The project's dependencies are made by its recipe (`pnpm install
-  --frozen-lockfile` for a pnpm repo, or `lanes.install` in `pinetrie.json`).
-  When a turn changes one of its inputs (its lockfile), pine·trie removes
-  what the recipe last made and runs it again at the turn's end, before the
-  turn's snapshot, so nothing a deleted package installed stays behind.
-  `/workspace/.pinetrie-lane/derived.json` says what it made, from which
-  key, and the tail of its output if it failed.
-  <!-- apps/pinetrie/host/work/recipe.ts createRecipes -->
-  <!-- packages/lanes/plan.ts planRecipe -->
-- Each turn's record names the ignored files it wrote outside what the
-  recipe makes, and the person sees how many.
-  <!-- packages/rules/work.ts classifyDisk -->
+- Nothing installs the project's dependencies or builds it for you: run
+  `pnpm install`, a build, as you would in a fresh clone. pine·trie watches
+  what each command reads and writes, and keeps a recipe for each that made
+  ignored files from tracked ones (`/workspace/.pinetrie-lane/recipes.json`).
+  When a catch up changes a file a recipe read (a lockfile, a
+  `package.json`), pine·trie removes what that recipe made, so nothing a
+  deleted package installed stays behind; caches such as pnpm's store
+  stay. Make the rest again as you would after a pull.
+  <!-- apps/pinetrie/host/work/disk.ts removeStaleOutputs -->
+  <!-- packages/rules/disk.ts planStaleOutputs -->
+- Each turn's record classes what its commands wrote: derived (made from
+  source, under `.gitignore`), local (ignored, made from nothing tracked),
+  directories made from source that `.gitignore` misses, and source files
+  jj left out of the commit. The person sees how many.
+  <!-- packages/rules/disk.ts classifyWrites -->
 
 ## What the person gets
 

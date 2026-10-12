@@ -751,6 +751,85 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "every kind is carried, the newest of each",
   },
+  // ── a lane's runs ──
+  {
+    name: "a write tool's shared write is not stamped",
+    file: "packages/pi/lane-helper.ts",
+    from: "  if (!isUnderAny(p, sharedInside)) return method.apply(env, [...args, signal])\n",
+    to: "  return method.apply(env, [...args, signal])\n",
+    command: unit,
+    expect:
+      "a write tool's write into a shared directory is stamped before and after, as one write",
+  },
+  {
+    name: "every file a tool writes is the lane's config",
+    file: "packages/pi/tools.ts",
+    from: "        path.posix.resolve(dir, params.path) !==\n",
+    to: '        path.posix.resolve(dir, "pinetrie.json") !==\n',
+    command: unit,
+    expect: "its reply carries the host's note; another file's does not",
+  },
+  {
+    name: "a lane is not told nothing installs for it",
+    file: "packages/pi/lanes.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    `Nothing installs dependencies for you. After a catch up, ${PRODUCT_NAME} removes what commands made from files that changed (node_modules, a build): make them again as you would after a pull.`,\n",
+    to: "",
+    command: unit,
+    expect:
+      "says what is made is the agent's to make, and to keep out of the repo",
+  },
+  {
+    name: "the supervised command is not quoted",
+    file: "packages/pi/supervisor.ts",
+    from: "    .map(shellWord)\n",
+    to: "    .map(String)\n",
+    command: unit,
+    expect: "the inner shell gets the command byte for byte",
+  },
+  {
+    name: "the write tools' paths are not recorded",
+    file: "packages/pi/lane-helper.ts",
+    from: '  if (kind !== "read") toolWrites.add(p)\n',
+    to: "",
+    command: unit,
+    expect: "the write tools' paths are drained once, relative to the lane",
+  },
+  {
+    name: "a hash is cached whatever the file's stamp",
+    file: "packages/pi/lane-helper.ts",
+    from: "    if (cached?.stamp === version) {",
+    to: "    if (cached !== undefined) {",
+    command: unit,
+    expect:
+      "hashes: each file's sha256, null where none, a new one after a rewrite",
+  },
+  {
+    name: "a daemon's connection keeps the helper from exiting",
+    file: "packages/pi/supervisor.ts",
+    from: "    socket.unref()\n",
+    to: "",
+    command: unit,
+    expect:
+      "the helper exits when its channel closes, though a daemon still reports to it",
+  },
+  {
+    name: "a lane command's input is dropped",
+    file: "packages/channel/run.ts",
+    from: "    if (options.stdin !== undefined) child.stdin?.end(options.stdin)\n",
+    to: "    child.stdin?.end()\n",
+    command: unit,
+    expect: "a command's input, given whole",
+  },
+  {
+    name: "a rename's source is its tool write",
+    file: "packages/pi/lane-helper.ts",
+    from: '  renameFile: { kind: "write", path: a => a[1] },\n',
+    to: '  renameFile: { kind: "write", path: firstArg },\n',
+    command: unit,
+    expect:
+      "every write method's path is a tool write; a rename's is its destination",
+  },
   // ── every entry names its thread ──
   {
     name: "a commit forgets the thread its context names",

@@ -37,6 +37,9 @@
     whose lockfile differs starts from a layer of its own; a lane runs the
     recipe again when its inputs change; `installWhen` is one lockfile or a
     list, and `installCaches` names what is carried.
+  - ADR-0135: the base is the base before it, with accepted work checked out
+    on it, and runs no command; no fork installs, and nothing installs for a
+    lane: its agent does, as a developer would after a clone.
 
 **Context.** ADR-0032 gave each lane a jj workspace on the host and made a
 branch's inherited history read as if it had always worked there, by

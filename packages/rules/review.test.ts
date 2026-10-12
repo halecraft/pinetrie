@@ -104,8 +104,7 @@ describe("the review", () => {
           snapshot: null,
           paths: [],
           conflicts: [],
-          ignored: null,
-          recipe: null,
+          disk: null,
         },
       ] as const
     const revisions = new Map([
@@ -139,6 +138,7 @@ describe("the review", () => {
           removed: 0,
         },
       ],
+      widenings: [{ kind: "env", name: "TOKEN" }],
     }
     expect(answerReview(structuredClone(review))).toEqual({
       kind: "review",

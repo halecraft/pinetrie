@@ -1,12 +1,14 @@
 // pi/tools — the tools the harness registers, and which of them a lane's
 // runs may call.
 
+import path from "node:path"
 import {
   createBashTool,
   createEditTool,
   createReadTool,
   createWriteTool,
 } from "@earendil-works/pi-agent-core"
+import type { Context } from "@earendil-works/pi-agent-core/harness/context"
 import {
   ASK_TOOL,
   BANNER_TOOL,
@@ -18,6 +20,7 @@ import {
   FIND_TOOL,
   GREP_TOOL,
   LEAVE_TOOL,
+  PROJECT_CONFIG_FILE,
   READ_TOOL,
   SPLIT_TOOL,
   type ThreadId,
@@ -30,6 +33,7 @@ import { bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"
 import { findTool, grepTool } from "./search.ts"
+import { threadOfContext } from "./thread-context.ts"
 import { askTool, catchUpTool, leaveTool, splitTool } from "./thread-tools.ts"
 
 export interface ToolsInput {
@@ -58,8 +62,12 @@ export const TOOLS: Readonly<
         ? {}
         : { imageProcessor: readImageProcessor(input.blobs) },
     ),
-  [WRITE_TOOL]: () => createWriteTool(),
-  [EDIT_TOOL]: () => createEditTool(),
+  [WRITE_TOOL]: input =>
+    noteConfigWrites(createWriteTool(), lane =>
+      input.hooks.configWritten(lane),
+    ),
+  [EDIT_TOOL]: input =>
+    noteConfigWrites(createEditTool(), lane => input.hooks.configWritten(lane)),
   [BASH_TOOL]: () => createBashTool(),
   [GREP_TOOL]: () => grepTool(),
   [FIND_TOOL]: () => findTool(),
@@ -73,6 +81,51 @@ export const TOOLS: Readonly<
     askTool((lane, to, text) => input.hooks.ask(lane, to, text)),
   [LEAVE_TOOL]: input =>
     leaveTool((lane, thread) => input.hooks.leave(lane, thread)),
+}
+
+type Executes = {
+  readonly execute: (...args: never[]) => Promise<{
+    readonly content: readonly unknown[]
+  }>
+}
+
+/**
+ * `tool` whose result, after it wrote the lane's `pinetrie.json`, carries
+ * the host's note on it: what applies at once and what waits for
+ * acceptance. Wrapped, not replaced: its name, description and parameters
+ * stay pi's, so the tool list and the prompt do not change.
+ */
+function noteConfigWrites<T extends Executes>(
+  tool: T,
+  note: (lane: ThreadId) => Promise<string | null>,
+): T {
+  const execute = tool.execute as (...args: unknown[]) => Promise<{
+    readonly content: readonly unknown[]
+  }>
+  return {
+    ...tool,
+    async execute(...args: unknown[]) {
+      const result = await execute(...args)
+      const params = args[1] as { readonly path?: unknown } | undefined
+      const dir = (args[3] as { readonly dir?: unknown } | undefined)?.dir
+      const lane = threadOfContext(args[5] as Context)
+      if (
+        lane === undefined ||
+        typeof params?.path !== "string" ||
+        typeof dir !== "string" ||
+        path.posix.resolve(dir, params.path) !==
+          path.posix.join(dir, PROJECT_CONFIG_FILE)
+      )
+        return result
+      const said = await note(lane)
+      return said === null
+        ? result
+        : {
+            ...result,
+            content: [...result.content, { type: "text", text: said }],
+          }
+    },
+  }
 }
 
 /**

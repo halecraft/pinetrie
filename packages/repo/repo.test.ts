@@ -844,6 +844,12 @@ describe("a lane's repo, with jj", () => {
     await edit(laneDir, 'we"ird', "quote\n")
     await edit(laneDir, "dir/f.txt", "under\n")
     await edit(laneDir, "a.txt", "a\nmore\n")
+    // A grant the base's copy does not make: a widening, once accepted.
+    await edit(
+      laneDir,
+      "pinetrie.json",
+      JSON.stringify({ lanes: { ssh: true } }),
+    )
     await run("mv", [
       path.join(laneDir, "base.txt"),
       path.join(laneDir, "moved.txt"),
@@ -900,6 +906,7 @@ describe("a lane's repo, with jj", () => {
           removed: 0,
         },
       ]),
+      widenings: [{ kind: "ssh" }],
     })
     expect(await fileDiff(ops, span, 'we"ird')).toContain("+quote")
     expect(await fileDiff(ops, span, "a b.txt")).toContain("+space")
@@ -917,7 +924,10 @@ describe("a lane's repo, with jj", () => {
         (a, b) => a.path.localeCompare(b.path),
       )
     const ranged = await revisionRead(ops, range)
-    expect(ranged).toMatchObject({ description: "" })
+    expect(ranged).toMatchObject({
+      description: "",
+      widenings: [{ kind: "ssh" }],
+    })
     expect(byPath(ranged)).toEqual(byPath(read))
     expect(await fileDiff(ops, range, 'we"ird')).toContain("+quote")
 

@@ -920,12 +920,14 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | module | owns |
 |---|---|
 | `setup.ts` | `Setup`, all of it or none: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once accepted work's names are read, before anything else reads your repo), the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, ADR-0036), and the base snapshot's refreshes. The project is found before it (`findProject`), since pi's setup loads from its root |
+| `config.ts` | `pinetrie.json`'s `lanes` as a fact of a state (ADR-0135): accepted work's copy read from its commit at startup and when the base moves (`refreshAccepted`), its shared directories prepared again; a lane's own copy and the copy it started on, read from your repo before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook). A lane with no commit in your repo yet runs with accepted work's |
+| `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
+| `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
-| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, `planOldNamesOnDisk`, `pre-rename:`, since a snapshot made before the rename holds the old names (S114); a container made anew checks its recipe, `recipe.ts`), `beforeRun`, `runEnded` |
+| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, `planOldNamesOnDisk`, `pre-rename:`, since a snapshot made before the rename holds the old names (S114); every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
 | `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
-| `turns.ts` | pi's `turnDone`: the turn's revision, its recipe and snapshot, its whole-disk diff (`classifyDisk`, ADR-0131), and its fetch; the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
-| `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`), its fork (`forkFacts` waits for `pendingRecords`); a fork from a WIP whose recipe's inputs differ from accepted work's starts from a dependency layer of its own (`startSnapshot`, `Setup.depsLayerAt`) |
-| `recipe.ts` | a lane's recipe run again when its inputs change (ADR-0131): the check (`isRecipeTouched`, then `planRecipeCheck` against the key `Setup.keyAt` reads through the lane's jj), then `runRecipe`; and `snapshotOnQueue`, the recipe and a snapshot as one queued step, a turn's and an update's |
+| `turns.ts` | pi's `turnDone`: the turn's revision, its classes and snapshot (`disk.ts`), its whole-disk diff, and its fetch; the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
+| `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`), its fork (`forkFacts` waits for `pendingRecords`) |
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks jj for conflicts in the lane's copy |
 | `split.ts` | a split's prompt, and its end (`finishSplit`, which moves the lane back to its tip even when a step before it throws: left on the stack, the lane refuses every catch-up) |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
@@ -945,26 +947,41 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   made, so a lane's imports keep their order: the fetch forces its ref, and
   an older bundle imported after a newer one would move it back); and the
   base snapshot's keeper. Every read of your repo from lane work (an
-  update's line and WIP, a new lane's begin and lockfile, the base
+  update's line and WIP, a new lane's begin, the base
   snapshot's line, a split's stack) is a pinned read (`owner.read`), which
   writes nothing (S87) and waits on no queue. A fetch's bundle needs the
   lane running, about 30 ms (S43), so a container stopped since is started
   for it, then stopped.
-- **A turn's end is its recipe, then its snapshot, then its diff**
-  (`turns.ts`, ADR-0131). The commit is queued and awaited; the recipe (when
-  an input the turn's commit changed has another key than the disk's
-  outputs) and the snapshot are one queued step, not awaited, so the next
-  tool call waits for both and the next request for neither. The diff
-  runs after, between this snapshot and the one before: the newest this
-  host planned for the lane, else the nearest above the turn
-  (`nearestRevision`). Its paths are sorted by `classifyDisk`, the repo's
-  commits between the two snapshots counting as tracked, and the record,
-  written after it, names the ignored ones (`ignoredFiles`) and how the
-  recipe went. A fork waits for pending records, so a branch at a turn
-  waits for its diff: about 3 ms, up to about 600 ms after an install.
-- **An update's recipe runs before its snapshot** (`recordUpdate`), for
-  every input, since a merge may change any; so does a container's, when
-  it is made anew, since it may run another image.
+- **A turn's end is one queued step** (`turns.ts`, `disk.ts`). The commit
+  is queued and awaited; the rest is one step, not awaited, so the next
+  tool call waits for all of it and the next request for none:
+  1. the turn's runs drained from the helper, the paths they name checked
+     with `git check-ignore --no-index -z --stdin` in the lane, classed,
+     the new recipes' inputs and roots' `CACHEDIR.TAG` hashed, and the
+     registry written (ADR-0135). Each ask is a two-step value from
+     `@pinetrie/rules` (`writesToClass`, `registryAfter`): the paths to ask
+     about, then a step that accepts answers for exactly those. The paths
+     and the registry go on the `run`'s input: a turn names more paths than
+     a command line holds, and one shell argument is capped at 128 KB. The
+     host cannot reach the write tools' calls, which the helper records as
+     tool writes (`packages/pi/TECHNICAL.md`);
+  2. the snapshot, which so holds the registry its outputs are kept by;
+  3. its whole-disk diff against the snapshot before (the newest this host
+     planned for the lane, else the nearest above the turn), whose paths no run or
+     tool wrote are checked against `.gitignore` too. This is in the same
+     step because a lane's container stops after its run, and the check
+     runs in the lane.
+  The record is written after it. A fork waits for pending records, so a
+  branch at a turn waits for its classes and diff.
+- **Every run starts on a disk whose recipes hold** (`disk.ts`,
+  `removeStaleOutputs`, ADR-0135): at every container start
+  (`startContainer`), so no way of making a disk need remember it; and
+  right after an update's merge, in the same queued step, since an agent's
+  `catch_up` merges with its container running. The
+  helper checks each recipe's key (`checkRecipes`), `planStaleOutputs`
+  says what goes, the paths are deleted and the registry rewritten. A
+  failure is reported and the step goes on: a stale output is a rebuild
+  the agent misses, not a broken lane.
 - **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
   the lane's base from its own history, accepted work and the WIP from your
   repo (pinned), `planUpdateFrom`, the edits committed and `mergeUpdate`

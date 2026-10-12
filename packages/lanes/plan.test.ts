@@ -2,7 +2,6 @@ import {
   BASE_SNAPSHOT,
   baseMessage,
   commitId,
-  type DiskDiff,
   shellWord,
   snapshotId,
   type ThreadName,
@@ -10,19 +9,21 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
-  addedRoots,
+  BASE_FORMAT,
   BASE_LANE,
   bookmarkName,
+  configChangeNote,
+  configWidenings,
   DEFAULT_REPO,
   decodeLaneConfig,
-  depsKey,
+  effectiveLaneConfig,
   FETCHED_REF,
   fetchById,
   forkConfig,
   imageRefusal,
   isBaseCurrent,
   isBookmarkName,
-  isRecipeTouched,
+  isCopyableBase,
   type LaneSpec,
   type LaneStep,
   laneContainer,
@@ -30,11 +31,11 @@ import {
   laneIgnores,
   machineConfig,
   NO_GRANTS,
-  parseDerivedFacts,
+  parseBaseFacts,
   planBaseCheckout,
+  planBaseFacts,
   planBundle,
   planContainer,
-  planDepsRetention,
   planDisk,
   planExclude,
   planFork,
@@ -42,21 +43,18 @@ import {
   planHostMounts,
   planImages,
   planJoins,
+  planLeftoverLayers,
   planLinks,
   planMerge,
   planMounts,
   planOldNamesOnDisk,
   planProjectDir,
-  planRecipe,
-  planRecipeCheck,
-  planRecipeRecord,
   planRoot,
   planShape,
   planShared,
   planSnapshot,
   planStartFrom,
   planTurnCommit,
-  type Recipe,
   repoConfig,
   type Step,
   specHash,
@@ -87,6 +85,7 @@ const spec: LaneSpec = {
   grants: { ssh: false, nested: false, hostPorts: [], env: [] },
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "2G",
+  observation: { PINETRIE_OBSERVE: "o" },
 }
 
 describe("planMounts: every host path a lane sees, in one list", () => {
@@ -191,12 +190,9 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
     expect(laneGitConfig()).toBe(
       "[safe]\n\tdirectory = /mnt/host-working-copy\n\tdirectory = /mnt/host-working-copy/.git\n",
     )
+    // pnpm's store, at the disk's root, is never tracked.
     expect(laneIgnores([".plans", "notes/shared"])).toBe(
-      "/.pinetrie-lane/\n/lost+found/\n/.plans/\n/notes/shared/\n",
-    )
-    // A recipe's cache is never tracked, as a fresh disk carries it in first.
-    expect(laneIgnores([], [".pnpm-store"])).toBe(
-      "/.pinetrie-lane/\n/lost+found/\n/.pnpm-store/\n",
+      "/.pinetrie-lane/\n/lost+found/\n/.pnpm-store/\n/.plans/\n/notes/shared/\n",
     )
   })
   test("never your home directory, and no variable no grant names", () => {
@@ -220,6 +216,29 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
     expect(granted.ssh).toBe(true)
     expect(granted.env.GITHUB_TOKEN).toBe("t")
     expect(Object.keys(granted.env)).not.toContain("MISSING")
+  })
+  test("its home on its disk, its observation's variables, and the shared directories", () => {
+    const sharing = planShape(
+      {
+        ...spec,
+        mounts: [
+          ...spec.mounts,
+          { source: "/p/.plans", target: "/workspace/.plans", readonly: false },
+          {
+            source: "/p/n",
+            target: "/workspace/notes/shared",
+            readonly: false,
+          },
+        ],
+        grants: { ...spec.grants, env: ["HOME"] },
+      },
+      { HOME },
+    )
+    expect(sharing.env).toMatchObject({
+      HOME: "/workspace/.pinetrie-lane/home",
+      PINETRIE_OBSERVE: "o",
+      PINETRIE_SHARED: "/workspace/.plans\n/workspace/notes/shared",
+    })
   })
   test("jj's identity and config, no editor, and the runtime's bin last on the PATH", () => {
     expect(shape.env).toMatchObject({
@@ -347,13 +366,11 @@ describe("repoConfig: the project's values win, and a bad one falls back", () =>
   })
 })
 
-describe("decodeLaneConfig: grants, the recipe and shared directories, total", () => {
-  const empty = (pnpm: boolean) => decodeLaneConfig(undefined, "/p", pnpm)
+describe("decodeLaneConfig: grants and shared directories, total", () => {
   test("nothing, or anything malformed, grants and shares nothing", () => {
     for (const json of [undefined, {}, { lanes: 3 }])
-      expect(decodeLaneConfig(json, "/p", false)).toEqual({
+      expect(decodeLaneConfig(json, "/p")).toEqual({
         grants: NO_GRANTS,
-        recipe: null,
         shared: [],
         repo: {
           acceptedBookmark: null,
@@ -376,7 +393,6 @@ describe("decodeLaneConfig: grants, the recipe and shared directories, total", (
           },
         },
         "/p",
-        false,
       ),
     ).toEqual({
       grants: {
@@ -386,7 +402,6 @@ describe("decodeLaneConfig: grants, the recipe and shared directories, total", (
         env: ["OK_1"],
         mounts: [],
       },
-      recipe: null,
       shared: [".plans"],
       repo: {
         acceptedBookmark: null,
@@ -400,22 +415,21 @@ describe("decodeLaneConfig: grants, the recipe and shared directories, total", (
   })
   test("lanes.hostPorts: whole ports from 1 to 65535, once each, in order", () => {
     const ports = (v: unknown) =>
-      decodeLaneConfig({ lanes: { hostPorts: v } }, "/p", false).grants
-        .hostPorts
+      decodeLaneConfig({ lanes: { hostPorts: v } }, "/p").grants.hostPorts
     expect(ports([5432, 3000, 3000, 0, 70000, 2.5, "80"])).toEqual([3000, 5432])
     expect(ports("5432")).toEqual([])
     expect(ports(undefined)).toEqual([])
   })
   test("lanes.nested grants lanes inside a lane, only when true", () => {
     const nested = (v: unknown) =>
-      decodeLaneConfig({ lanes: { nested: v } }, "/p", false).grants.nested
+      decodeLaneConfig({ lanes: { nested: v } }, "/p").grants.nested
     expect(nested(true)).toBe(true)
     expect(nested("true")).toBe(false)
     expect(nested(undefined)).toBe(false)
   })
   test("lanes.vm.slots: the machine's setting, as written", () => {
     const machine = (lanes: unknown) =>
-      decodeLaneConfig({ lanes }, "/p", false).machine
+      decodeLaneConfig({ lanes }, "/p").machine
     expect(machine({ vm: { slots: 4 } })).toEqual({ slots: 4 })
     expect(machine({ vm: { slots: "4" } })).toEqual({
       slots: { invalid: '"4"' },
@@ -430,7 +444,6 @@ describe("decodeLaneConfig: grants, the recipe and shared directories, total", (
           publish: { bookmark: "master" },
         },
         "/p",
-        false,
       ).repo,
     ).toEqual({
       acceptedBookmark: "trunk",
@@ -439,9 +452,7 @@ describe("decodeLaneConfig: grants, the recipe and shared directories, total", (
       catchUp: null,
       offers: false,
     })
-    expect(
-      decodeLaneConfig({ offers: { onto: "trunk" } }, "/p", false).repo,
-    ).toEqual({
+    expect(decodeLaneConfig({ offers: { onto: "trunk" } }, "/p").repo).toEqual({
       acceptedBookmark: null,
       wipPrefix: null,
       publish: null,
@@ -451,7 +462,7 @@ describe("decodeLaneConfig: grants, the recipe and shared directories, total", (
   })
   test("publish.catchUp: a boolean, else the text written", () => {
     const flag = (catchUp: unknown) =>
-      decodeLaneConfig({ publish: { catchUp } }, "/p", false).repo.catchUp
+      decodeLaneConfig({ publish: { catchUp } }, "/p").repo.catchUp
     expect(flag(true)).toBe(true)
     expect(flag(false)).toBe(false)
     expect(flag(undefined)).toBeNull()
@@ -463,7 +474,6 @@ describe("decodeLaneConfig: grants, the recipe and shared directories, total", (
       decodeLaneConfig(
         { lanes: { ssh: true, mounts: [{ source: "../d", target: "/d" }] } },
         "/p/app",
-        false,
       ).grants,
     ).toEqual({
       ssh: true,
@@ -472,41 +482,6 @@ describe("decodeLaneConfig: grants, the recipe and shared directories, total", (
       env: [],
       mounts: [{ source: "/p/d", target: "/d", readonly: true }],
     })
-  })
-  test("the recipe: the config's, else pnpm's for a pnpm repo, else none", () => {
-    expect(
-      decodeLaneConfig(
-        { lanes: { install: "npm ci", installWhen: "package-lock.json" } },
-        "/p",
-        true,
-      ).recipe,
-    ).toEqual({ command: "npm ci", inputs: ["package-lock.json"], caches: [] })
-    expect(
-      decodeLaneConfig(
-        {
-          lanes: {
-            install: "make deps",
-            installWhen: ["Cargo.lock", "pnpm-lock.yaml"],
-            installCaches: [".cargo"],
-          },
-        },
-        "/p",
-        false,
-      ).recipe,
-    ).toEqual({
-      command: "make deps",
-      inputs: ["Cargo.lock", "pnpm-lock.yaml"],
-      caches: [".cargo"],
-    })
-    expect(
-      decodeLaneConfig({ lanes: { install: "npm ci" } }, "/p", true).recipe,
-    ).toEqual({
-      command: "pnpm install --frozen-lockfile",
-      inputs: ["pnpm-lock.yaml"],
-      caches: [".pnpm-store"],
-    })
-    expect(empty(true).recipe?.command).toBe("pnpm install --frozen-lockfile")
-    expect(empty(false).recipe).toBeNull()
   })
 })
 
@@ -776,14 +751,9 @@ test("planDisk: a new disk, or one restored from a snapshot; then the container,
   const disk = (from: typeof BASE_SNAPSHOT | null) =>
     planDisk({ spec, env: {}, from })
   expect(disk(null)).toEqual([
-    { in: "runtime", op: { kind: "create", lane: LANE, carry: null } },
+    { in: "runtime", op: { kind: "create", lane: LANE } },
     { in: "runtime", op: { kind: "run", shape: planShape(spec, {}) } },
   ])
-  const carry = { from: snapshotId("deps-k"), paths: [".pnpm-store"] }
-  expect(planDisk({ spec, env: {}, from: null, carry })[0]).toEqual({
-    in: "runtime",
-    op: { kind: "create", lane: LANE, carry },
-  })
   expect(disk(BASE_SNAPSHOT)[0]).toEqual({
     in: "runtime",
     op: { kind: "restore", lane: LANE, from: BASE_SNAPSHOT },
@@ -817,13 +787,8 @@ test("planBundle: the lane's bookmark, excluding what your repo has", () => {
   })
 })
 
-describe("the base: a dependency layer and a checkout", () => {
-  const recipe: Recipe = {
-    command: "pnpm install --frozen-lockfile",
-    inputs: ["pnpm-lock.yaml"],
-    caches: [".pnpm-store"],
-  }
-  test("planBaseCheckout: a fresh disk's git and jj, not cloned; a restored layer's stale copy recovered", () => {
+describe("the base: the base before it, checked out at accepted work", () => {
+  test("planBaseCheckout: a fresh disk's git and jj, not cloned; a copied base's stale copy recovered", () => {
     expect(argvs(planBaseCheckout({ yours: [C1], fresh: true }))).toEqual([
       "lane: git init -q",
       "lane: jj git init --colocate",
@@ -836,154 +801,34 @@ describe("the base: a dependency layer and a checkout", () => {
       "lane: jj new c2",
     ])
   })
-  test("depsKey: what made a layer, its caches not among it; with no recipe, the image alone", () => {
-    const key = depsKey({ recipe, image: "lane:1", inputs: "h" })
-    expect(key).toMatch(/^[0-9a-f]{16}$/)
-    expect(depsKey({ recipe, image: "lane:1", inputs: "i" })).not.toBe(key)
-    expect(depsKey({ recipe, image: "lane:2", inputs: "h" })).not.toBe(key)
-    expect(
-      depsKey({
-        recipe: { ...recipe, command: "pnpm i" },
-        image: "lane:1",
-        inputs: "h",
-      }),
-    ).not.toBe(key)
-    expect(
-      depsKey({
-        recipe: { ...recipe, caches: [] },
-        image: "lane:1",
-        inputs: "h",
-      }),
-    ).toBe(key)
-    const none = depsKey({ recipe: null, image: "lane:1", inputs: "" })
-    expect(none).not.toBe(key)
-    expect(depsKey({ recipe: null, image: "lane:2", inputs: "" })).not.toBe(
-      none,
+  test("isBaseCurrent: the same commits, made the way bases are now", () => {
+    const base = { commits: [C1], format: BASE_FORMAT }
+    expect(isBaseCurrent(base, [C1])).toBe(true)
+    expect(isBaseCurrent(base, [C2])).toBe(false)
+    expect(isBaseCurrent({ ...base, format: BASE_FORMAT - 1 }, [C1])).toBe(
+      false,
     )
+    expect(isBaseCurrent(null, [C1])).toBe(false)
   })
-  test("isBaseCurrent: the same commits on the same layer", () => {
-    expect(isBaseCurrent({ commits: [C1], key: "k" }, [C1], "k")).toBe(true)
-    expect(isBaseCurrent({ commits: [C1], key: "k" }, [C2], "k")).toBe(false)
-    expect(isBaseCurrent({ commits: [C1], key: "k" }, [C1], "l")).toBe(false)
-    expect(isBaseCurrent(null, [C1], "k")).toBe(false)
-  })
-  test("addedRoots: the topmost paths a run added, never a cache nor a repo's own", () => {
-    const added = (...paths: string[]): DiskDiff => ({
-      changes: paths.map(path => ({
-        path,
-        change: "added" as const,
-        kind: "dir" as const,
-      })),
-    })
+  test("isCopyableBase: a base made the way they are now; one from before was made on a layer", () => {
+    expect(isCopyableBase({ commits: [C1], format: BASE_FORMAT })).toBe(true)
     expect(
-      addedRoots(
-        {
-          changes: [
-            ...added(
-              "node_modules",
-              "node_modules/.pnpm",
-              "packages/a/node_modules",
-              "packages/a/node_modules/x",
-              ".pnpm-store",
-              ".pnpm-store/v10",
-              ".pinetrie-lane/derived.json",
-              ".jj/repo",
-            ).changes,
-            {
-              path: "packages/b/package.json",
-              change: "changed",
-              kind: "file",
-            },
-          ],
-        },
-        recipe.caches,
+      isCopyableBase(
+        parseBaseFacts(JSON.stringify({ commits: [C1], key: "k" })),
       ),
-    ).toEqual(["node_modules", "packages/a/node_modules"])
+    ).toBe(false)
+    expect(isCopyableBase(null)).toBe(false)
   })
-  test("planRecipe: the recorded outputs removed before the snapshot and the command; the snapshot after", () => {
-    const pre = snapshotId("recipe-pre-l")
-    const post = snapshotId("recipe-post-l")
-    const steps = planRecipe({
-      lane: LANE,
-      recipe,
-      outputs: ["node_modules", "packages/gone/node_modules", "../x"],
-      pre,
-      post,
-    })
-    expect(argvs(steps.before)).toEqual([
-      "lane: sh -c rm -rf -- /workspace/node_modules /workspace/packages/gone/node_modules",
-      "lane: sync",
-      `runtime: ${JSON.stringify({ kind: "snapshot", lane: LANE, snapshot: pre })}`,
-    ])
-    expect(argvs([steps.command])).toEqual([
-      "lane: sh -c pnpm install --frozen-lockfile",
-    ])
-    expect(argvs(steps.after).at(-1)).toContain(post)
-  })
-  test("planRecipeRecord: what it made, written on the disk; a failure keeps the key before it", () => {
-    const pre = snapshotId("p")
-    const post = snapshotId("q")
-    const diff: DiskDiff = {
-      changes: [{ path: "node_modules", change: "added", kind: "dir" }],
-    }
-    const record = (failed: string | null) =>
-      planRecipeRecord({
-        diff,
-        recipe,
-        key: "new",
-        previous: "old",
-        failed,
-        pre,
-        post,
-      })
-    const recorded = (failed: string | null) => argvs(record(failed).steps)
-    expect(record("boom").facts).toEqual({
-      key: "old",
-      outputs: ["node_modules"],
-      failed: "boom",
-    })
-    expect(recorded(null)[0]).toContain(
-      JSON.stringify({ key: "new", outputs: ["node_modules"], failed: null }),
-    )
-    expect(recorded("boom")[0]).toContain(
-      JSON.stringify({ key: "old", outputs: ["node_modules"], failed: "boom" }),
-    )
-    expect(recorded(null).at(-1)).toBe(
-      `runtime: ${JSON.stringify({ kind: "deleteSnapshots", ids: [pre, post] })}`,
+  test("planBaseFacts: its commits and its format, read back", () => {
+    const [written] = argvs([planBaseFacts([C1])])
+    expect(written).toContain(
+      JSON.stringify({ commits: [C1], format: BASE_FORMAT }),
     )
   })
-  test("parseDerivedFacts: none made when absent, and never an output outside the disk", () => {
-    expect(parseDerivedFacts(null)).toEqual({
-      key: null,
-      outputs: [],
-      failed: null,
-    })
+  test("planLeftoverLayers: the dependency layers, and nothing else", () => {
     expect(
-      parseDerivedFacts(
-        JSON.stringify({
-          key: "k",
-          outputs: ["node_modules", "../etc", ".jj"],
-          failed: null,
-        }),
-      ),
-    ).toEqual({ key: "k", outputs: ["node_modules"], failed: null })
-  })
-  test("planDepsRetention: every layer but the base's and the three newest", () => {
-    const at = (id: string, made: number) => ({ id, made })
-    expect(
-      planDepsRetention({
-        snapshots: [
-          at("deps-a", 1),
-          at("deps-b", 2),
-          at("deps-c", 3),
-          at("deps-d", 4),
-          at("deps-e", 5),
-          at("base", 0),
-          at("t-1-e1", 0),
-        ],
-        keep: ["a"],
-      }),
-    ).toEqual([snapshotId("deps-b")])
+      planLeftoverLayers([{ id: "deps-a" }, { id: "base" }, { id: "t-1-e1" }]),
+    ).toEqual([snapshotId("deps-a")])
   })
 })
 
@@ -1083,8 +928,16 @@ describe("the host: its root", () => {
 
 test("planImages: pinetrie's image is pinned to the app's Playwright, a project's is not", () => {
   const input = {
-    pinetrie: { file: "/pinetrie/Containerfile", content: "FROM node" },
-    project: { file: "/p/pinetrie.Containerfile", content: "FROM alpine" },
+    pinetrie: {
+      file: "/pinetrie/Containerfile",
+      content: "FROM node",
+      sources: ["int main"],
+    },
+    project: {
+      file: "/p/pinetrie.Containerfile",
+      content: "FROM alpine",
+      sources: [],
+    },
     jjVersion: "0.44.0",
     playwrightVersion: "1.56.0",
   }
@@ -1098,6 +951,23 @@ test("planImages: pinetrie's image is pinned to the app's Playwright, a project'
   expect(plans.project?.buildArgs).toEqual(["JJ_VERSION=0.44.0"])
   expect(bumped.project?.tag).toBe(plans.project?.tag)
   expect(planImages({ ...input, project: null }).project).toBeNull()
+})
+
+test("planImages: a change to a file the build copies in is a new image", () => {
+  const input = {
+    pinetrie: {
+      file: "/pinetrie/Containerfile",
+      content: "FROM node",
+      sources: ["a"],
+    },
+    project: null,
+    jjVersion: "0.44.0",
+    playwrightVersion: "1.56.0",
+  }
+  const changed = { ...input, pinetrie: { ...input.pinetrie, sources: ["b"] } }
+  expect(planImages(changed).pinetrie.tag).not.toBe(
+    planImages(input).pinetrie.tag,
+  )
 })
 
 test("imageRefusal: git 2.41 or later, named when missing or old", () => {
@@ -1193,23 +1063,89 @@ test("the base's scratch lane is no thread's: nothing that takes a thread takes 
   ])
 })
 
-describe("a lane's recipe, run again when its inputs change", () => {
-  const recipe: Recipe = {
-    command: "pnpm install --frozen-lockfile",
-    inputs: ["pnpm-lock.yaml"],
-    caches: [".pnpm-store"],
+describe("config as a fact of a state: accepted work's, narrowed by the lane's", () => {
+  const mount = { source: "/p/d", target: "/d", readonly: true }
+  const accepted = {
+    grants: {
+      ssh: true,
+      nested: true,
+      hostPorts: [5432, 6379],
+      env: ["A", "B"],
+      mounts: [mount],
+    },
+    shared: [".plans", "notes"],
   }
-  test("isRecipeTouched: an input among the paths, or every path when not known", () => {
-    expect(isRecipeTouched(recipe, ["src/a.ts"])).toBe(false)
-    expect(isRecipeTouched(recipe, ["src/a.ts", "pnpm-lock.yaml"])).toBe(true)
-    expect(isRecipeTouched(recipe, "all")).toBe(true)
+  const none = { grants: NO_GRANTS, shared: [] }
+
+  test("effectiveLaneConfig: what a lane dropped from its base's copy, key by key, it gives up", () => {
+    expect(
+      effectiveLaneConfig(accepted, {
+        base: accepted,
+        own: {
+          grants: {
+            ssh: false,
+            nested: true,
+            hostPorts: [5432, 8080],
+            env: ["B", "C"],
+            mounts: [mount, { source: "/x", target: "/x", readonly: true }],
+          },
+          shared: [".plans", "other"],
+        },
+      }),
+    ).toEqual({
+      grants: {
+        ssh: false,
+        nested: true,
+        hostPorts: [5432],
+        env: ["B"],
+        mounts: [mount],
+      },
+      shared: [".plans"],
+    })
   })
-  test("planRecipeCheck: it runs when the disk's outputs were made from another key, or never made", () => {
-    const made = { key: "k", outputs: ["node_modules"], failed: null }
-    expect(planRecipeCheck(made, "k")).toBe("none")
-    expect(planRecipeCheck(made, "l")).toBe("run")
-    expect(planRecipeCheck({ key: null, outputs: [], failed: null }, "k")).toBe(
-      "run",
+
+  test("effectiveLaneConfig: a grant accepted after the lane started reaches it; one its own copy adds never does", () => {
+    const later = {
+      grants: { ...accepted.grants, env: [...accepted.grants.env, "LATER"] },
+      shared: accepted.shared,
+    }
+    const own = {
+      grants: { ...accepted.grants, env: [...accepted.grants.env, "MINE"] },
+      shared: accepted.shared,
+    }
+    expect(
+      effectiveLaneConfig(later, { base: accepted, own }).grants.env,
+    ).toEqual(["A", "B", "LATER"])
+  })
+
+  test("effectiveLaneConfig: a lane with no copy read gets accepted work's", () => {
+    expect(effectiveLaneConfig(accepted, null)).toEqual(accepted)
+  })
+
+  test("configWidenings: what the second lets that the first does not, key by key", () => {
+    expect(configWidenings(none, accepted)).toEqual([
+      { kind: "ssh" },
+      { kind: "nested" },
+      { kind: "env", name: "A" },
+      { kind: "env", name: "B" },
+      { kind: "mount", target: "/d" },
+      { kind: "hostPort", port: 5432 },
+      { kind: "hostPort", port: 6379 },
+      { kind: "shared", path: ".plans" },
+      { kind: "shared", path: "notes" },
+    ])
+    expect(configWidenings(accepted, none)).toEqual([])
+    expect(configWidenings(accepted, accepted)).toEqual([])
+  })
+
+  test("configChangeNote: what a lane gave up applies from its next run; what it asked for waits for acceptance", () => {
+    const written = {
+      grants: { ...accepted.grants, ssh: false, env: ["A", "B", "TOKEN"] },
+      shared: accepted.shared,
+    }
+    expect(configChangeNote(accepted, written)).toBe(
+      "pine·trie: this lane gives up your ssh agent from its next run.\npine·trie: this lane gets $TOKEN only once this change to pinetrie.json is accepted.",
     )
+    expect(configChangeNote(accepted, accepted)).toBeNull()
   })
 })

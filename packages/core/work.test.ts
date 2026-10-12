@@ -74,8 +74,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: SNAP1,
       paths: [],
       conflicts: [],
-      ignored: null,
-      recipe: null,
+      disk: null,
     },
     {
       entry: entryId("2-m1"),
@@ -84,8 +83,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: SNAP2,
       paths: [],
       conflicts: [],
-      ignored: null,
-      recipe: null,
+      disk: null,
     },
     {
       entry: entryId("4-m2"),
@@ -94,8 +92,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: SNAP4,
       paths: [],
       conflicts: [],
-      ignored: null,
-      recipe: null,
+      disk: null,
     },
     {
       entry: entryId("6-pb"),
@@ -104,8 +101,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: SB,
       paths: [],
       conflicts: [],
-      ignored: null,
-      recipe: null,
+      disk: null,
     },
     {
       entry: entryId("8-pd"),
@@ -114,8 +110,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: null,
       paths: [],
       conflicts: [],
-      ignored: null,
-      recipe: null,
+      disk: null,
     },
     {
       entry: entryId("b-pe"),
@@ -124,8 +119,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
       snapshot: null,
       paths: [],
       conflicts: [],
-      ignored: null,
-      recipe: null,
+      disk: null,
     },
   ].map(r => [r.entry, r]),
 )
@@ -216,8 +210,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
           snapshot: null,
           paths: [],
           conflicts: [],
-          ignored: null,
-          recipe: null,
+          disk: null,
         },
       ],
     ])
@@ -269,8 +262,7 @@ describe("forkParent and conflictsAt: what a lane's copy was cloned from", () =>
           snapshot: null,
           paths: [],
           conflicts,
-          ignored: null,
-          recipe: null,
+          disk: null,
         },
       ] as const
     const records = new Map([

@@ -16,32 +16,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a new directory filled under its orphan name",
   },
   {
-    name: "a recipe runs over the outputs of the run before",
-    file: plan,
-    from: "  const remove = input.outputs.filter(isOutputPath)\n",
-    to: "  const remove: string[] = []\n",
-    command: unit,
-    expect:
-      "planRecipe: the recorded outputs removed before the snapshot and the command",
-  },
-  {
-    name: "a recipe's cache is one of its outputs",
-    file: plan,
-    from: "    .filter(p => isOutputPath(p) && !isUnderAny(p, caches))\n",
-    to: "    .filter(p => isOutputPath(p))\n",
-    command: unit,
-    expect:
-      "addedRoots: the topmost paths a run added, never a cache nor a repo's own",
-  },
-  {
-    name: "a dependency layer's key leaves out its inputs",
-    file: plan,
-    from: "        input.inputs,\n      ]),\n",
-    to: "      ]),\n",
-    command: unit,
-    expect: "depsKey: what made a layer, its caches not among it",
-  },
-  {
     name: "a send stream's orphan stands for nothing",
     file: "packages/lanehost/send-stream.ts",
     from: "        } else if (ORPHAN.test(pathTo)) orphans.set(pathTo, resolve(path))\n",
@@ -68,35 +42,94 @@ export const mutations: readonly Mutation[] = [
   },
   // ── the lanes suite, proven in a lane ──
   {
-    name: "a base is the base before it, checked out again",
-    file: "packages/lanes/base.ts",
-    from: "  await inScratch(input, { from: layer, carry: null }, async runners => {\n",
-    to: "  const old = (await runtime.snapshotExists(BASE_SNAPSHOT)) ? BASE_SNAPSHOT : layer\n  await inScratch(input, { from: old, carry: null }, async runners => {\n",
+    name: "a catch up leaves stale outputs",
+    file: "apps/pinetrie/host/work/update.ts",
+    from: "        await removeStaleOutputs(handle, (await setup.ready).image).catch(\n",
+    to: "        await Promise.resolve().catch(\n",
     suite: "lanes",
     scenario: "recipe",
     expect:
-      "a package deleted from accepted work leaves no output of its own in the next fork",
+      "a catch up that changes what a recipe read removes what it made, and keeps its cache",
   },
   {
-    name: "a turn that changes the recipe's inputs runs no recipe",
-    file: "apps/pinetrie/host/work/turns.ts",
-    from: '            merged ? "all" : changed,\n',
-    to: "            [],\n",
+    name: "a run starts on stale outputs",
+    file: "apps/pinetrie/host/work/containers.ts",
+    from: "    await removeStaleOutputs(handle, r.image).catch(\n",
+    to: "    await Promise.resolve().catch(\n",
     suite: "lanes",
     scenario: "recipe",
     expect:
-      "a package deleted in a lane leaves no output of its own in a branch from that turn",
+      "a run starts without the outputs of a recipe whose input changed since",
   },
   {
-    name: "every path a turn changed counts as tracked",
-    file: "packages/rules/work.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "      tracked.has(path) || [...tracked].some(t => t.startsWith(`${path}/`))\n",
-    to: "      true\n",
+    name: "a lane's own pinetrie.json widens its grants",
+    file: "packages/lanes/plan.ts",
+    from: "      env: a.env.filter(keeps(b.env, o.env, eq)),\n",
+    to: "      env: [...new Set([...a.env, ...o.env])],\n",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a lane's own pinetrie.json narrows its grants from its next run, and widens none until accepted",
+  },
+  {
+    name: "a lane runs with accepted work's config, whatever its own says",
+    file: "apps/pinetrie/host/work/containers.ts",
+    from: "    await setup.configs.readLane(lane)\n",
+    to: "",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a lane's own pinetrie.json narrows its grants from its next run, and widens none until accepted",
+  },
+  {
+    name: "the host never watches the shared directories",
+    file: "apps/pinetrie/host/work/index.ts",
+    from: "  void sharedWatch\n    .sync(setup.configs.accepted().shared)\n",
+    to: "  void sharedWatch\n    .sync([])\n",
+    suite: "lanes",
+    scenario: "shared",
+    expect:
+      "your writes are versions as you make them, and a lane's write over one it never read is concurrent",
+  },
+  {
+    name: "a read tool's read is not what the agent knows",
+    file: "packages/pi/lane-helper.ts",
+    from: "  const touched = fileAccess(call.method, args)\n",
+    to: '  const touched =\n    FILE_ACCESS[call.method]?.kind === "read" ? null : fileAccess(call.method, args)\n',
+    suite: "lanes",
+    scenario: "shared",
+    expect:
+      "your writes are versions as you make them, and a lane's write over one it never read is concurrent",
+  },
+  {
+    name: "a shared write is never concurrent",
+    file: "packages/rules/shared.ts",
+    from: "  (v.baseAt !== null &&\n",
+    to: "  (false &&\n",
+    suite: "lanes",
+    scenario: "shared",
+    expect:
+      "two lanes write one shared file: the write over the other's is flagged concurrent, the other is not",
+  },
+  {
+    name: "a run's ignored writes are all local",
+    file: "packages/rules/disk.ts",
+    from: "        ((readSource && !(readFirst.has(w.path) && !w.created)) ||\n",
+    to: "        (false ||\n",
     suite: "lanes",
     scenario: "recipe",
     expect:
-      "a turn's record names the ignored files it wrote, and no recipe output",
+      "a turn's record names its runs' outputs derived, and a file a command wrote from nothing local",
+  },
+  {
+    name: "the turn's runs are never drained",
+    file: "apps/pinetrie/host/work/disk.ts",
+    from: "  const drained = await drainLaneRuns(channel, supervisorSource(channel))\n",
+    to: "  const drained = { runs: [], toolWrites: [], toolShared: [] }\n",
+    suite: "lanes",
+    scenario: "recipe",
+    expect:
+      "a directory a run made from source that .gitignore misses is named in the turn's record",
   },
   {
     name: "a fork's inherited history is not made immutable",
@@ -540,6 +573,104 @@ export const mutations: readonly Mutation[] = [
     expect: "specHashOf: the hash of the runtime's spec",
   },
   {
+    name: "a lane's home is the image's",
+    file: "packages/lanes/plan.ts",
+    from: '      ["HOME", LANE_HOME],\n',
+    to: "",
+    command: unit,
+    expect:
+      "its home on its disk, its observation's variables, and the shared directories",
+  },
+  {
+    name: "a lane's observation is not passed on",
+    file: "packages/lanes/plan.ts",
+    from: "      ...Object.entries(spec.observation),\n",
+    to: "",
+    command: unit,
+    expect:
+      "its home on its disk, its observation's variables, and the shared directories",
+  },
+  {
+    name: "an image's tag ignores the files its build copies in",
+    file: "packages/lanes/plan.ts",
+    from: '    .update("\\0")\n    .update(containerfile.sources.join("\\0"))\n',
+    to: "",
+    command: unit,
+    expect: "planImages: a change to a file the build copies in is a new image",
+  },
+  {
+    name: "a tool call's command runs bare",
+    file: "packages/pi/lane-helper.ts",
+    from: "    args[0] = observation.launch(run, command)\n",
+    to: "",
+    suite: "lanes",
+    scenario: "images",
+    expect:
+      "on Alpine, under Docker's default seccomp profile, a tool call's run is attributed: what it made from source is in its turn's record",
+  },
+  {
+    name: "a base made another way is copied",
+    file: "packages/lanes/plan.ts",
+    from: "  base !== null && base.format === BASE_FORMAT\n",
+    to: "  base !== null\n",
+    command: unit,
+    expect:
+      "isCopyableBase: a base made the way they are now; one from before was made on a layer",
+  },
+  {
+    name: "pnpm's store may be tracked in a lane",
+    file: "packages/lanes/plan.ts",
+    from: '    "/.pnpm-store/",\n',
+    to: "",
+    command: unit,
+    expect:
+      "every repo in the lane ignores what the ignore file lists, through git's own variables",
+  },
+  {
+    name: "every snapshot is a leftover layer",
+    file: "packages/lanes/plan.ts",
+    from: '  snapshots.filter(s => s.id.startsWith("deps-")).map(s => snapshotId(s.id))\n',
+    to: "  snapshots.map(s => snapshotId(s.id))\n",
+    command: unit,
+    expect: "planLeftoverLayers: the dependency layers, and nothing else",
+  },
+  {
+    name: "a lane's own copy turns a grant on",
+    file: "packages/lanes/plan.ts",
+    from: "      ssh: a.ssh && (!b.ssh || o.ssh),\n",
+    to: "      ssh: a.ssh || o.ssh,\n",
+    command: unit,
+    expect:
+      "effectiveLaneConfig: what a lane dropped from its base's copy, key by key, it gives up",
+  },
+  {
+    name: "a shared directory a lane drops stays mounted",
+    file: "packages/lanes/plan.ts",
+    from: "      keeps(lane.base.shared, lane.own.shared, eq),\n",
+    to: "      () => true,\n",
+    command: unit,
+    expect:
+      "effectiveLaneConfig: what a lane dropped from its base's copy, key by key, it gives up",
+  },
+  {
+    name: "a grant switched on goes unnamed",
+    file: "packages/lanes/plan.ts",
+    from: '    ...(a.ssh && !b.ssh ? [{ kind: "ssh" as const }] : []),\n',
+    to: "",
+    command: unit,
+    expect:
+      "configWidenings: what the second lets that the first does not, key by key",
+  },
+  {
+    name: "the agent is not told what waits for acceptance",
+    file: "packages/lanes/plan.ts",
+    from: "  const waiting = configWidenings(accepted, written).map(wideningWords)\n",
+    to: "  const waiting: string[] = []\n",
+    command: unit,
+    expect:
+      "configChangeNote: what a lane gave up applies from its next run; what it asked for waits for acceptance",
+  },
+  {
     name: "a runtime with jj alone is taken as complete",
     file: "packages/lanes/runtime.ts",
     from: "  RUNTIME_PROGRAMS.every(p => binEntries.includes(p))",
@@ -550,8 +681,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the lane runtime leaves rg behind",
     file: "packages/core/index.ts",
-    from: 'export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const',
-    to: 'export const RUNTIME_PROGRAMS = ["jj", "fd", "sd"] as const',
+    from: 'export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd", "supervise"] as const',
+    to: 'export const RUNTIME_PROGRAMS = ["jj", "fd", "sd", "supervise"] as const',
     suite: "lanes",
     scenario: "images",
     expect:

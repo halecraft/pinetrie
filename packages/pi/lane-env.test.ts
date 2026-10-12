@@ -198,6 +198,15 @@ describe("laneRunner: the host's own commands in the lane", () => {
     expect((await run(["true"])).ok).toBe(true)
     expect((await run(["no-such-program-here"])).code).toBe(-1)
   })
+  test("a command's input, given whole", async () => {
+    const r = await channel.run(
+      ["wc", "-c"],
+      false,
+      undefined,
+      "a\0b\n".repeat(50_000),
+    )
+    expect(String(r.stdout).trim()).toBe("200000")
+  })
   test("stdout as bytes", async () => {
     const { bytes } = laneRunner(channel)
     const r = await bytes(["printf", "\\000\\001\\377"])

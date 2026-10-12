@@ -1,0 +1,17 @@
+tree	/usr/lib/python3.12	1324 files
+bare bench	521 ns per open and close
+bare cp-tree	36.0
+bare cp-tree	35.4
+bare cp-tree	35.5
+supervise bench	58082 ns per open and close
+supervise cp-tree	260.5
+supervise cp-tree	263.0
+supervise cp-tree	264.5
+observed-untagged bench	813 ns per open and close
+observed-untagged cp-tree	38.4
+observed-untagged cp-tree	38.2
+observed-untagged cp-tree	37.2
+observed-tagged bench	1361 ns per open and close
+observed-tagged cp-tree	62.0
+observed-tagged cp-tree	59.0
+observed-tagged cp-tree	57.9

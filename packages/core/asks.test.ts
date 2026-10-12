@@ -246,8 +246,7 @@ describe("askSpan", () => {
       snapshot: null,
       paths: [],
       conflicts: [],
-      ignored: null,
-      recipe: null,
+      disk: null,
     },
   ]
   test("from what the lane had before the ask to its last turn's commit", () => {

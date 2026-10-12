@@ -1196,6 +1196,54 @@ async function mainSection(
         true,
       `${toolResults(two?.name).at(-1)?.slice(0, 60) ?? "none"}`,
     )
+
+    // ── A lane's own pinetrie.json: it may give up a grant, never take one ─
+    // Accepted work grants ssh. A lane's copy that drops it, and names a
+    // variable accepted work does not, narrows at the lane's next run and
+    // widens nothing; the write's reply says which is which.
+    process.env.PINETRIE_E2E_WIDE = "granted only by acceptance"
+    script.use([
+      {
+        tool: "write",
+        args: {
+          path: "pinetrie.json",
+          content: JSON.stringify({
+            lanes: { env: ["PINETRIE_E2E_WIDE"] },
+            publish: { catchUp: true },
+          }),
+        },
+      },
+      { text: "changed" },
+    ])
+    await wu.chat("@agent change the lane config", ROOT, START_AGENT)
+    await idle()
+    const configured = laneWith("@agent change the lane config")?.name
+    const note = toolResults(configured).at(-1) ?? ""
+    script.use([
+      {
+        tool: "bash",
+        args: {
+          command:
+            'echo "ssh: $SSH_AUTH_SOCK"; echo "wide: $PINETRIE_E2E_WIDE"',
+        },
+      },
+      { text: "looked" },
+    ])
+    await wu.chat(
+      "@agent what are you granted now?",
+      at(tipOf("@agent change the lane config")),
+      { thread: configured },
+    )
+    await idle()
+    const granted = toolResults(configured).at(-1) ?? ""
+    check(
+      "a lane's own pinetrie.json narrows its grants from its next run, and widens none until accepted",
+      note.includes("gives up your ssh agent from its next run") &&
+        note.includes("$PINETRIE_E2E_WIDE only once") &&
+        granted.includes("ssh: \n") &&
+        granted.includes("wide: \n"),
+      JSON.stringify({ note, granted }),
+    )
   } finally {
     // Whatever happened above: nothing of this run is left behind.
     rmSync(marker, { force: true })

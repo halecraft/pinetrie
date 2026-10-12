@@ -43,6 +43,7 @@ const spec: LaneSpec = {
     hostPaths: [],
   }),
   grants: { ssh: false, nested: false, hostPorts: [], env: [] },
+  observation: {},
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "4G",
 }

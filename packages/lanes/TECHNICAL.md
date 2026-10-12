@@ -94,48 +94,42 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   (`.pinetrie-lane/base.json`, `BaseFacts`) and read back through the
   runtime (`readLaneFile`), so the two cannot disagree.
 
-## The base and the recipe (ADR-0131)
+## The disk model (ADR-0135)
 
-- **ADR-0135, proposed, would replace this section.** A recipe would be
-  any recorded run of a tool call that made derived files, keyed by what it
-  read, not a declared command. A disk for a new state would carry each
-  output whose key still holds there, and pine·trie would run no recipe
-  itself. Until it is accepted, what follows holds.
-- **A recipe** (`Recipe`, `lanes.install`) is how a disk's dependencies are
-  made: a command, the tracked files whose content keys it (its inputs,
-  `lanes.installWhen`, one or a list), and directories carried from one
-  build to the next (`lanes.installCaches`). A pnpm repo with no config
-  gets `pnpm install --frozen-lockfile`, keyed by `pnpm-lock.yaml`, with
-  `.pnpm-store` its cache: pnpm keeps its store at the root of the file
-  system it installs on, and refuses a `node_modules` made with another
-  store (S148), so the store stays there. No repo in a lane tracks a cache
-  (`laneIgnores`).
-- **A dependency layer** (`deps-<key>`, `depsSnapshot`) is a disk on which
-  the recipe ran once, named by what made it (`depsKey`: the recipe, the
-  content of its inputs at the commits, `inputsHash`, the lane image, and
-  `BASE_FORMAT`). It is built on a fresh disk, with only the recipe's
-  caches carried in from the newest layer by reflink (`DiskOp`'s `carry`,
-  about 300 ms for a 329 MB store, S148): it holds nothing an older layer
-  held, so a package deleted from accepted work leaves nothing behind.
-- **The base is a layer and a checkout** (`refreshBase`): the layer for
-  accepted work's key restored (built first if missing), accepted work's
-  commits fetched and checked out on it (`planBaseCheckout`), its facts
-  written, then snapshotted. It never restores an older base. With no
-  recipe, a layer is a checkout alone, keyed by the image, so a refresh
-  still fetches only what is new. A refresh does nothing when the base holds
-  the same commits on the same layer (`isBaseCurrent`).
-- **A recipe's run is planned in two halves around a gather** (`runRecipe`):
-  `planRecipe` removes the outputs the disk recorded, snapshots it
-  read-only, runs the command, and snapshots it again; the runtime's `diff`
-  of the two says what it made; `planRecipeRecord` records its outputs
-  (`addedRoots`: the topmost paths it added, never a cache) in
-  `.pinetrie-lane/derived.json` and deletes the two snapshots. A failed run
-  records its outputs too, with the key before it, so the next run removes
-  them and runs again.
-- **Old layers go after each base build** (`planDepsRetention`): every one
-  but the base's and the three newest. A fork copies its layer when it
-  starts, so a layer serves only forks to come, and is built again from its
-  key when one needs it.
+- **A path is source, derived or local, from `.gitignore` and what the
+  turn's commands did.** Every tool call's command runs under the
+  supervisor (The channel into a lane); a turn's end classes what its runs
+  and the write tools wrote, and keeps each run that made derived files as
+  a recipe in the disk's registry (`.pinetrie-lane/recipes.json`). The
+  rules are `@pinetrie/rules`' (`packages/rules/TECHNICAL.md`); the steps
+  are the host's (`apps/pinetrie/host/TECHNICAL.md`, Lane work).
+- **pine·trie runs no command of a project's.** Nothing installs or builds
+  for a lane: its agent runs `pnpm install` as a developer would after a
+  clone. There is no declared recipe; `lanes.install`, `installWhen` and
+  `installCaches` are not read.
+- **Every run starts on a disk whose recipes hold.** At each container
+  start, whatever made the disk (a fork, a restore, a merge, another image,
+  which a key holds), and right after an update's merge, since an agent's
+  `catch_up` merges mid-run: each recipe whose key no longer holds has its
+  outputs deleted, caches kept (`planStaleOutputs`). No site has to know it
+  made a new state.
+- **pnpm's store is never tracked** (`laneIgnores` lists `/.pnpm-store/`):
+  pnpm keeps it at the root of the file system it installs on, which in a
+  lane is the disk's root, and refuses a `node_modules` made with another
+  store (S148).
+- **The base is the base before it, checked out at accepted work**
+  (`refreshBase`): the base snapshot restored, accepted work's commits
+  fetched and checked out on it (`planBaseCheckout`), its facts written
+  (`base.json`: its commits and `BASE_FORMAT`), then snapshotted. A refresh
+  does nothing when the base holds the same commits, made the way bases
+  are now (`isBaseCurrent`). It runs no command, so it holds nothing
+  derived. A base made another way (`isCopyableBase`: one from before was
+  made on a dependency layer, whose outputs no registry names) is not
+  copied: the next starts empty, `git init` and `jj git init --colocate`
+  first.
+- **pre-layers:** a refresh deletes the dependency layers bases were once
+  made on (`deps-<key>`, `planLeftoverLayers`). Remove once no host has
+  one.
 
 ## Forks
 
@@ -147,10 +141,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   bookmark and immutable in your repo, would make them immutable too (S48
   item 11), and your WIP would freeze. Either commit carries
   `Pinetrie-Base: <bookmark>@<commit>` (`baseMessage`), the lane's ledger of
-  its base. The base disk holds accepted work's dependencies, so a fork from
-  a WIP whose recipe's inputs differ starts from a dependency layer of its
-  own, made at the WIP's commit if missing (the host's `create.ts`): no fork
-  installs.
+  its base.
 - **The base snapshot is made in a scratch lane that is no thread's**
   (`BASE_LANE`, a `BaseLane`): a container, a disk and snapshots are named by
   a `LaneOwner`, a thread's id or the base's, while a bookmark, a remote and
@@ -193,7 +184,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   and tags, so it does not see a commit fetched with no ref (S44 item 7).
   When your `@-` was rewritten, that branch moves sideways, and the import
   (`--ignore-working-copy`) abandons the commit it named and rebases its
-  descendants. On a base restored from a dependency layer the working-copy
+  descendants. On a base copied from the one before, the working-copy
   commit is one of them, so the working copy goes stale: `planBaseCheckout`
   runs `jj workspace update-stale` before `jj new`, which does nothing when
   it is fresh (S74).
@@ -245,7 +236,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   runtime is copied out of pine·trie's default image into
   `.pinetrie/runtime/<image tag>/`: Node, the libraries `ldd` lists for it,
   glibc's loader, and in `bin/` static builds of core's `RUNTIME_PROGRAMS`
-  (jj, rg, fd, sd). So the helper runs on any image, musl or glibc, with or
+  (jj, rg, fd, sd, supervise). So the helper runs on any image, musl or glibc, with or
   without Node (S44), and every lane has those programs (ADR-0064). Only
   `bin/` (`RUNTIME_BIN`) goes on a lane's `PATH`, after the image's own;
   pine·trie's Node needs its loader.
@@ -255,6 +246,39 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   list and fails naming one the image lacks, so the host stops at startup.
   `ensureRuntime` keeps a runtime only when its `bin/` holds every program
   (`runtimeComplete`), not only jj. sd 1.1.0 reports itself as 1.0.0.
+- **The supervisor is built in the image, not downloaded**
+  (`image/supervise.c`): a static musl build in the default Containerfile's
+  first stage, for aarch64 alone, as the image is. It names aarch64's system
+  calls and does not compile for another architecture. The image's tag
+  covers its source as well as the Containerfile (`Containerfile.sources`),
+  so a change to the C rebuilds the image.
+- **Every tool call's command runs under the supervisor (ADR-0135).** The
+  helper's `exec` wraps it (`superviseCommand`), as the planned shape tells
+  it (`SUPERVISE_ENV`, `SHARED_ENV`); the host's own `run` calls never are.
+  The supervisor runs the command with the shell pi would, behind a seccomp
+  user-notification filter that every process it starts inherits, and
+  reports each open, rename, unlink, mkdir, link and symlink under
+  `/workspace` to the helper's socket in `/run/pinetrie` (S158). The helper
+  folds them into run records (`packages/pi/TECHNICAL.md`). Its rules:
+  - **The listener is a process of its own**, in its own process group, and
+    the subreaper of everything the command starts. pi aborts a command by
+    killing its process group: a listener in it would die with it, and every
+    file call of a daemon the command left would then fail. The command
+    rejoins the caller's group, so an abort still ends it.
+  - **The listener never stops answering.** A call it does not answer waits
+    forever. It continues past `EINTR` and `ENOENT` (a caller that died),
+    and when the helper's socket breaks or stalls for 5 s, it writes to
+    `.pinetrie-lane/runs/<run>.log`, which the helper reads at its next drain.
+  - **The caller returns when the command's shell exits**, as before; the
+    listener stays until every descendant has exited, reporting a daemon's
+    writes to later drains.
+  - **`no_new_privs` applies to every tool call:** seccomp's filter needs it.
+    `sudo` in a tool call fails, nested lanes included; the inner Docker is
+    started by the container's command, not a tool call.
+  - **Under a shared directory, it also reports where a write is let go of**
+    (`close`, `dup3` over it, `exit_group`, `execve`), with the file's stamp
+    (S161, S162). A shell's redirection to fd 1 is let go of only by `dup3`
+    or the exit.
 - **A project image must still supply** a POSIX `sh` (pi's `bash` falls back
   to `sh -c`) and git 2.41 or later. Git launches its own helper programs, so
   it cannot be carried in from outside the image. `checkImage` refuses an
@@ -296,6 +320,10 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   bookmarks renamed, `pineta/fetched/*` deleted) and runs the plan. A start
   from the lane's own volume does none of it: the one-off migration renamed
   those. Remove both once no snapshot from before the rename remains.
+- **A lane's home is on its disk** (`LANE_HOME`,
+  `/workspace/.pinetrie-lane/home`, ADR-0135): what tools keep there,
+  caches and config, persists and travels with forks, and is never committed.
+  The helper creates it when it starts.
 - **A lane's container is stopped after every run** (`runEnded` in the
   host's `work/containers.ts`); the disk needs nothing more. The next run
   starts it again.
@@ -319,7 +347,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   between the host and every lane (S45 items 2 and 3).
 - **Two levels, merged:** the user's lane config
   (`$XDG_CONFIG_HOME/pinetrie/config.json`, only its `lanes.shared`), then the
-  project's `pinetrie.json`. `planShared` refuses:
+  project's `pinetrie.json` as accepted work holds it, narrowed per lane
+  (A lane's config, below). `planShared` refuses:
   - absolute paths, and paths that leave the project;
   - anything in `.git`, `.jj`, `.pinetrie` or `node_modules`;
   - a path holding files jj tracks. Checked with `jj file list`, not git's
@@ -329,6 +358,25 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   Both files are read with `readConfigFile`: a missing file is empty, and
   so is one that cannot be read or parsed (`broken`), which the host logs
   with its reason.
+- **A lane's config is a fact of a state (ADR-0135).** `lanes` in
+  `pinetrie.json` decides what a lane may do (`LaneAuthority`: its grants
+  and shared directories). A lane runs with accepted work's, less what its
+  own copy dropped from the copy it started on (`effectiveLaneConfig`): it
+  can give up a grant, and only accepted work gives one. A grant accepted
+  after a lane started reaches it without a catch up. `configWidenings`
+  says what one copy lets that another does not, which a write's reply
+  (`configChangeNote`) and an offer's review show. Your repo's names come
+  from your config and your working copy's file at startup: they find
+  accepted work, so they cannot come from it.
+- **A shared file has a lineage of versions (ADR-0135).** Every write into a
+  shared directory is attributed and numbered: a run's, from the
+  supervisor's opens and releases; a read or write tool's, from the stamps
+  the helper takes; yours, from the host's watcher. A version is a stamp,
+  size and ctime, which a lane and the host read alike (S169), never a
+  hash. A write based on a version another write replaced is concurrent.
+  The rules are `@pinetrie/rules`' (`sharedTouches`, `planSharedLineages`),
+  the lineages and the watcher the host's (`apps/pinetrie/host/TECHNICAL.md`,
+  `shared.ts`, `shared-watch.ts`).
 - **No repo may track a shared directory.**
   - **In a lane,** the host writes `.pinetrie/lane-git/ignore` (`laneIgnores`:
     `/.pinetrie-lane/`, `/lost+found/`, each shared directory). It mounts its
@@ -546,9 +594,9 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   tells it about itself and that the note it names is there (ADR-0121). It
   has seven scenarios (`apps/pinetrie/e2e/lanes/`), `main`, `images`,
   `shared`, `commands`, `catch-up`, `recipe` and `contract`, and
-  `PINETRIE_SCENARIO` picks some. `recipe` is ADR-0131's: a package deleted
-  from accepted work, or in a lane, leaves no output behind, and a turn's
-  record names the ignored files it wrote.
+  `PINETRIE_SCENARIO` picks some. `recipe` is ADR-0135's: a turn's record
+  classes what its runs wrote, and a catch up that changes what a recipe
+  read removes what it made, its cache kept.
   It runs on Docker, and where Docker cannot run lanes, each scenario
   reports SKIP with the host's own reason (`runtimeProblem`).
   Its hosts pass their own `userConfig`, so the person's own lane config

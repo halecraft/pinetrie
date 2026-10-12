@@ -3,10 +3,12 @@
 // kind. `review-pane.tsx` draws it; `use-fetched.ts` reads.
 
 import {
+  type ConfigWidening,
   type DiffSpan,
   type FileChange,
   type RevisionReview,
   spanKey,
+  wideningWords,
   withoutTrailers,
 } from "@pinetrie/core"
 import type { ReviewTarget } from "./column-view.ts"
@@ -49,6 +51,8 @@ export interface RevisionShown {
   readonly title: string
   /** The description after its first line, the host's trailers removed; "" when none. */
   readonly body: string
+  /** What its `pinetrie.json` would let lanes do once accepted (`wideningLine`); "" when nothing. */
+  readonly widens: string
   readonly files: readonly FileRow[]
 }
 
@@ -71,6 +75,12 @@ export interface ReviewView {
     readonly state: Loaded<RevisionShown>
   }[]
 }
+
+/** What a revision's `pinetrie.json` would let every lane do once accepted, in one line; "" for nothing. */
+export const wideningLine = (widenings: readonly ConfigWidening[]): string =>
+  widenings.length === 0
+    ? ""
+    : `Accepting this lets lanes use ${widenings.map(wideningWords).join(", ")}.`
 
 const LETTER: Record<FileChange, FileRow["letter"]> = {
   added: "A",
@@ -131,6 +141,7 @@ export function reviewView(
             target.title ||
             "(no description)",
           body: cut < 0 ? "" : text.slice(cut + 1).trim(),
+          widens: wideningLine(got.value.widenings),
           files,
         },
       },

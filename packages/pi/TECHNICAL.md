@@ -476,18 +476,68 @@ item 18, and in `lanes.test.ts` against the harness.
     (`runCommand`): exit status, stdout and stderr apart, and bytes for a
     bundle. pi's `exec` gives only an exit code and capped, mixed text.
 - **The protocol** (`lane-protocol.ts`) is the calls alone: an environment
-  method and its arguments, or a `run`. Bytes and errors cross as the
+  method and its arguments, a `run` (with its input, for the host's own
+  commands that take more than a command line holds), a drain of the
+  lane's `runs`, or `hashes` of paths. Bytes and errors cross as the
   channel's wire carries them, at any depth, since `NodeExecutionEnv` never
   throws: its errors are values inside results (S44 item 5).
+- **A lane's runs** (`runs.ts`, ADR-0135): each `exec` runs under the
+  supervisor the lane's shape names (`SUPERVISE_ENV`;
+  `packages/lanes/TECHNICAL.md`, The channel into a lane), and the helper
+  folds what it reports into a trace per run (`foldRunEvents`). A drain
+  (`runs`) returns, per run with news since the last, a `RunRecord`: its
+  reads, writes (created or not), deletions, failed lookups and shared
+  accesses, with the write tools' paths beside them (`ToolWrites`). Its rules:
+  - **Tool writes are the agent's alone.** Every environment method says
+    in one table keyed by `EnvMethod` whether it reads, writes or appends
+    to a file, and which (`FILE_ACCESS`), so a method added must say; a
+    rename writes its destination. Those calls
+    go under a key private to `lane-env.ts`, which only `laneEnv` uses: the
+    host's own writes go on a `run`'s input and can never count.
+  - **A write of `pinetrie.json` is answered with what it changes.** The
+    write and edit tools are wrapped (`noteConfigWrites`): after a write
+    of the lane's `pinetrie.json`, the host's note (`configWritten`) is
+    added to the reply. Wrapped, not replaced, so the tool list and the
+    prompt stay pi's.
+  - **One stamp, in the supervisor's form:** size and ctime, the inode
+    left out, since on the Mac a lane and the host see different inodes
+    (S169). Core makes it from a stat in one place (`statStamp`), for the
+    helper and the host's watcher, and a supervised test proves the
+    helper's equals the supervisor's.
+  - **The read and write tools' shared accesses** (`toolShared`): a read
+    tool's read of a shared file is an open for reading with its stamp,
+    what the agent then knows of it; a write tool's write, its
+    stamps before and after, an append marked so.
+  - **The supervisor sees a call before it happens,** not whether it
+    succeeded. So whether a written path is there is read at the drain, not
+    inferred: a temporary file renamed away reports nothing.
+  - **A path's first event decides whether it was there before the run,**
+    so a write is created or not, and a read counts only of what was there
+    before the run wrote it: a run's own output is never its input.
+  - **A drain is synchronous,** from reading the logs to the last `lstat`, so
+    no line is folded between a trace's paths being read and its drain.
+  - **`exec` returns once the run's exit is folded**, or after 2 s, so a
+    drain right after it sees the exit.
+  - **A daemon's run stays open** (`alive`) and reports again at later
+    drains, until its last process exits. Its connection to the helper's
+    socket is unref'd: held, it kept the helper from exiting when the host
+    closed the channel, and a lane's stop after its run waited forever.
+  - **`hashes`** are sha256, cached by each file's stamp (inode, size,
+    ctime), which every change of content changes (S162).
+  - **`checkRecipes`** answers, per recipe, the first fact of its key that
+    changed (`checkRecipe`): an input's hash, a failed lookup now found, a
+    shared file's stamp. Its image is the host's to compare.
+  - Without `SUPERVISE_ENV`, as in tests on the host, commands run bare and
+    no run is recorded.
 - **The helper runs on the lane runtime's Node through its own loader**, so
   `process.execPath` is the loader: nothing in it may re-execute that
   (S44 item 2).
 - **The system prompt** names the lane's directory. For a lane of its own it
   adds a block of guidelines, `laneGuidelines(facts)` in `lanes.ts`
   (ADR-0121): what holds in every lane, filled in with the lane's own
-  values, in about 260 tokens, and about 40 more for a project with a
-  recipe, whose run again at a turn's end it is told of (ADR-0131). The
-  model is sent the conversation as stored: nothing is rewritten.
+  values, in about 300 tokens, among them that nothing installs for it, and
+  that a catch up removes what was made from files that changed (ADR-0135).
+  The model is sent the conversation as stored: nothing is rewritten.
   - **Guidelines, not a section of its own.** pi joins its sections into one
     string, and a provider may rebuild that string by its tags:
     `pi-anthropic-auth` keeps `<rules>` and drops `<docs>` (S23, addendum).

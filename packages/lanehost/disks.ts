@@ -16,7 +16,6 @@ import {
 } from "node:fs/promises"
 import path from "node:path"
 import { runCommand } from "@pinetrie/channel"
-import { isPathInside } from "@pinetrie/core"
 import {
   isDiskName,
   isLaneFile,
@@ -51,18 +50,11 @@ export type DiskStep =
   | { readonly kind: "move"; readonly from: string; readonly to: string }
   /** Make a subvolume at `path` unless one is there, owned by `uid`. */
   | { readonly kind: "ensure"; readonly path: string; readonly uid: number }
-  /** Copy each of `paths` from `from` into `to` by reflink. */
-  | {
-      readonly kind: "carry"
-      readonly from: string
-      readonly to: string
-      readonly paths: readonly string[]
-    }
 
 const names = (call: DiskCall): readonly string[] => {
   switch (call.kind) {
     case "create":
-      return [call.lane, ...(call.carry ? [call.carry.from] : [])]
+      return [call.lane]
     case "restore":
       return [call.lane, call.from]
     case "snapshot":
@@ -89,24 +81,9 @@ export function planDisk(
   switch (call.kind) {
     case "create": {
       const at = disks.lane(call.lane)
-      const carry = call.carry ?? null
-      if (carry !== null && !carry.paths.every(isPathInside))
-        throw new Error(
-          `not a path inside a disk: ${JSON.stringify(carry.paths)}`,
-        )
       return [
         { kind: "parent", path: at },
         { kind: "create", path: at },
-        ...(carry === null || carry.paths.length === 0
-          ? []
-          : [
-              {
-                kind: "carry" as const,
-                from: disks.snapshot(carry.from),
-                to: at,
-                paths: carry.paths,
-              },
-            ]),
       ]
     }
     case "restore":
@@ -244,21 +221,6 @@ export async function executeDiskSteps(
         if (ran.code !== 0) throw new Error(`chown ${step.path}: ${ran.stderr}`)
         break
       }
-      case "carry":
-        for (const p of step.paths) {
-          const from = path.join(step.from, p)
-          if (!(await exists(from))) continue
-          await mkdir(path.dirname(path.join(step.to, p)), { recursive: true })
-          // `-a` copies a symlink as a link, so a carried path never reads
-          // through one into another disk.
-          const ran = await runCommand(
-            ["cp", "-a", "--reflink=always", from, path.join(step.to, p)],
-            { cwd: "/", bytes: false, signal: new AbortController().signal },
-          )
-          if (ran.code !== 0)
-            throw new Error(`carrying ${p}: ${String(ran.stderr).trim()}`)
-        }
-        break
     }
   }
 }

@@ -1,0 +1,100 @@
+{
+  "views": {
+    "files": 62,
+    "sameIno": 62,
+    "sameSize": 62,
+    "sameCtime": 62,
+    "sameMtime": 62,
+    "examples": []
+  },
+  "laneWriteVsMacFinal": {
+    "restore-mtime": {
+      "n": 10,
+      "ino": 10,
+      "size": 10,
+      "ctime": 10
+    },
+    "rename": {
+      "n": 10,
+      "ino": 10,
+      "size": 10,
+      "ctime": 10
+    },
+    "fast": {
+      "n": 10,
+      "ino": 10,
+      "size": 10,
+      "ctime": 10
+    }
+  },
+  "macWriteVsLaneFinal": {
+    "restore-mtime": {
+      "n": 10,
+      "ino": 10,
+      "size": 10,
+      "ctime": 10
+    },
+    "rename": {
+      "n": 10,
+      "ino": 10,
+      "size": 10,
+      "ctime": 10
+    },
+    "fast": {
+      "n": 10,
+      "ino": 10,
+      "size": 10,
+      "ctime": 10
+    }
+  },
+  "clocks": {
+    "laneCtimeMinusLaneWallMs": {
+      "n": 60,
+      "min": -0.999761,
+      "median": -0.999757,
+      "p95": 0.58325,
+      "max": 0.909034
+    },
+    "macCtimeMinusMacWallMs": {
+      "n": 60,
+      "min": -0.999804,
+      "median": 0.0002,
+      "p95": 0.836659,
+      "max": 0.961112
+    },
+    "laneStartMinusMacGoMs": 90946,
+    "ctimeKeepsOrder": {
+      "lane": {
+        "pairs": 59,
+        "kept": 59
+      },
+      "mac": {
+        "pairs": 59,
+        "kept": 59
+      }
+    },
+    "withinAMillisecond": {
+      "lane": {
+        "n": 10,
+        "ctimeDiffers": 10
+      },
+      "mac": {
+        "n": 10,
+        "ctimeDiffers": 10
+      }
+    }
+  },
+  "watcher": {
+    "events": 125,
+    "errors": [],
+    "laneEvents": 60,
+    "laneEventsWithALaneStamp": 60,
+    "macWallMinusCtimeMs": {
+      "n": 60,
+      "min": 49.965132,
+      "median": 54.602382,
+      "p95": 67.999759,
+      "max": 390741.055841
+    }
+  }
+}

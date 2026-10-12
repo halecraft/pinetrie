@@ -180,8 +180,7 @@ describe("askView", () => {
         snapshot: null,
         paths,
         conflicts: [],
-        ignored: null,
-        recipe: null,
+        disk: null,
       },
     ]
     const files = (prompt: string | null) =>

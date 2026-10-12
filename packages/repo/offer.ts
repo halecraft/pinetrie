@@ -12,6 +12,7 @@ import {
   type OfferLedger,
   type OfferRevision,
   offerLedger,
+  PROJECT_CONFIG_FILE,
   type RevisionFacts,
   type StartRead,
   sourcesOf,
@@ -25,6 +26,7 @@ import {
   ACCEPTED_OFFER_COMMIT_ROW,
   bookmarkRevset,
   commitsOf,
+  configWidenings,
   conflictedFilesAt,
   describeFailure,
   laneTipName,
@@ -34,6 +36,7 @@ import {
   REVISION_READ,
   type RepoConfig,
   type Runner,
+  readAuthority,
 } from "@pinetrie/lanes"
 import {
   acceptedOfferCommitsRevset,
@@ -398,13 +401,43 @@ function gitDiffCounts(
  * it (`answerReview`). A revision is one `REVISION_READ`, its description
  * and stats together. A range has no description: its files from
  * `RANGE_FILES`, and their counts from its git diff, which lists them in
- * the same order. Null when jj fails, prints no JSON, or the two
- * listings disagree.
+ * the same order. Where it changes `pinetrie.json`, what that would let
+ * lanes do beyond its start (`configWidenings`). Null when jj fails, prints
+ * no JSON, or the two listings disagree.
  */
 export async function revisionRead(
   jj: Runner,
   span: DiffSpan,
 ): Promise<unknown> {
+  const read = await spanFiles(jj, span)
+  if (read === null) return null
+  const touched = read.files.some(
+    f => (f as { readonly path?: unknown }).path === PROJECT_CONFIG_FILE,
+  )
+  const [from, to] =
+    span.kind === "revision"
+      ? [`${span.commit}-`, span.commit]
+      : [span.from, span.to]
+  return {
+    ...read,
+    widenings: touched
+      ? // A widening names a mount by its target: the root does not matter.
+        configWidenings(
+          (await readAuthority(jj, from, "/")).authority,
+          (await readAuthority(jj, to, "/")).authority,
+        )
+      : [],
+  }
+}
+
+/** A span's description and files, as jj prints them; null when it fails. */
+async function spanFiles(
+  jj: Runner,
+  span: DiffSpan,
+): Promise<{
+  readonly description: string
+  readonly files: readonly object[]
+} | null> {
   if (span.kind === "revision") {
     const ran = await jj([
       "log",
@@ -416,7 +449,14 @@ export async function revisionRead(
     ])
     if (!ran.ok) return null
     try {
-      return JSON.parse(ran.stdout) as unknown
+      const parsed = JSON.parse(ran.stdout) as {
+        readonly description?: unknown
+        readonly files?: unknown
+      }
+      return Array.isArray(parsed.files) &&
+        typeof parsed.description === "string"
+        ? { description: parsed.description, files: parsed.files as object[] }
+        : null
     } catch {
       return null
     }

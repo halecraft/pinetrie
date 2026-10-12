@@ -47,6 +47,7 @@ import {
   type RootRecord,
   type SeatRecord,
   type Sha256,
+  type SharedLineage,
   type SnapshotId,
   summarizeRoots,
   type TaskId,
@@ -100,6 +101,7 @@ import {
   recordsIn,
   renderableMessage,
   SEAT,
+  SHARED_LINEAGE,
   THREAD,
   TRACE,
   threadNameOf,
@@ -571,6 +573,11 @@ const sameHolds = (
 export const readThreads = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, ThreadRecord> => readRecords(doc, THREAD)
+
+/** Each shared file's lineage (`pinetrie.shared`), by its path. */
+export const readSharedLineages = (
+  doc: SessionDocHandle,
+): ReadonlyMap<string, SharedLineage> => readRecords(doc, SHARED_LINEAGE)
 
 /** Each lane whose fork's files were not kept (`pinetrie.files-lost`). */
 export const readFilesLost = (

@@ -11,7 +11,8 @@ export interface RunResult {
 }
 
 /**
- * Run `argv` with no shell, stdout as bytes when `bytes`. An abort kills it.
+ * Run `argv` with no shell, stdout as bytes when `bytes`, and `stdin` on
+ * its input when given. An abort kills it.
  * Never throws: a program that cannot start is code -1, with why in stderr.
  */
 export function runCommand(
@@ -20,10 +21,11 @@ export function runCommand(
     readonly cwd: string
     readonly bytes: boolean
     readonly signal: AbortSignal
+    readonly stdin?: string
   },
 ): Promise<RunResult> {
   return new Promise(resolve => {
-    execFile(
+    const child = execFile(
       argv[0] ?? "",
       argv.slice(1),
       {
@@ -46,5 +48,6 @@ export function runCommand(
         })
       },
     )
+    if (options.stdin !== undefined) child.stdin?.end(options.stdin)
   })
 }

@@ -12,6 +12,31 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a path's tab is written as is",
+    file: "packages/core/runs.ts",
+    from: "  s.replace(/[\\\\\\t\\n]/g, c =>\n",
+    to: "  s.replace(/[\\\\\\n]/g, c =>\n",
+    command: unit,
+    expect: "every event round-trips its line",
+  },
+  {
+    name: "a raced release's kernel stamp is not read",
+    file: "packages/core/runs.ts",
+    from: "    raced: stampField(f[9]),\n",
+    to: "    raced: null,\n",
+    command: unit,
+    expect:
+      "a rename's target, a file's stamp, and a raced release's kernel stamp",
+  },
+  {
+    name: "a decimal field takes hex",
+    file: "packages/core/runs.ts",
+    from: "  if (s === undefined || !(radix === 16 ? /^[0-9a-f]+$/i : /^\\d+$/).test(s))\n",
+    to: "  if (s === undefined || !/^[0-9a-f]+$/i.test(s))\n",
+    command: unit,
+    expect: "a line no observer writes is null",
+  },
+  {
     name: "a person's history of moves names no stack",
     file: ids,
     from: "    ? { writer: rest as WriterId, scope: PERSON_HISTORY }\n",

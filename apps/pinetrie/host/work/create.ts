@@ -5,7 +5,6 @@
 import {
   BASE_SNAPSHOT,
   type ErrCode,
-  type ForkStart,
   nearestRevision,
   type Position,
   type SnapshotId,
@@ -13,12 +12,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import {
-  executeOrThrow,
-  planFork,
-  removeLane,
-  revsetName,
-} from "@pinetrie/lanes"
+import { executeOrThrow, planFork, removeLane } from "@pinetrie/lanes"
 import { type RootView, readRevisions, readTreeIndex } from "@pinetrie/reads"
 import { beginFacts, type RepoOwner } from "@pinetrie/repo"
 import {
@@ -32,7 +26,7 @@ import {
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { LaneRegistry } from "./registry.ts"
-import type { Ready, Setup } from "./setup.ts"
+import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
 
 /**
@@ -121,33 +115,6 @@ export function createNewLanes(deps: {
 
   const { repoConfig } = setup.lanes
 
-  /**
-   * Where a fork from a WIP's copy starts: the base disk holds accepted work's
-   * dependencies, so a WIP whose recipe's inputs differ from accepted work's
-   * starts from a dependency layer of its own, made at its commit if missing.
-   * Any other fork starts where its point says.
-   */
-  async function startSnapshot(
-    owner: RepoOwner,
-    point: { readonly snapshot: SnapshotId; readonly start: ForkStart },
-    r: Ready,
-  ): Promise<SnapshotId> {
-    const { start } = point
-    if (point.snapshot !== BASE_SNAPSHOT || start.kind !== "wip")
-      return point.snapshot
-    const keys = await owner.read(async ({ jj }) => ({
-      wip: await setup.keyAt(jj, start.commit, r),
-      accepted: await setup.keyAt(
-        jj,
-        `present(${revsetName(repoConfig.acceptedBookmark)})`,
-        r,
-      ),
-    }))
-    return keys.wip === keys.accepted
-      ? point.snapshot
-      : setup.depsLayerAt([start.commit], keys.wip)
-  }
-
   /** Where agent work begins for `base`, read from your repo at the head its owner last observed. */
   async function beginAt(owner: RepoOwner, base: string | null) {
     return planBegin({
@@ -193,11 +160,10 @@ export function createNewLanes(deps: {
                   setRecord(FILES_LOST, { lane, snapshot: point.lost }),
                 ])
               if (point.snapshot === BASE_SNAPSHOT) await setup.baseAtAccepted()
-              const from = await startSnapshot(owner, point, r)
               await removeLane(runtime, lane)
               await executeOrThrow(
                 planFork({
-                  point: { ...point, snapshot: from },
+                  point,
                   spec: setup.specOf(lane, r),
                   env: process.env,
                 }),

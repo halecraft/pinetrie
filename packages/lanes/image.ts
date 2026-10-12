@@ -17,6 +17,8 @@ const DEFAULT_CONTAINERFILE = path.join(
   "image",
   "Containerfile",
 )
+/** What the default image's build stage compiles: the supervisor. */
+const SUPERVISE_SOURCE = path.join(import.meta.dirname, "image", "supervise.c")
 /**
  * A project's own image, when this file exists: its lanes then run it instead
  * of pine·trie's default image, which carries the browser and
@@ -59,14 +61,20 @@ export async function prepareImages(
   log: (m: string) => void,
 ): Promise<{ readonly lane: string; readonly runtimeFrom: string }> {
   const own = projectContainerfile(root)
-  const [jjVersion, pinetrie, project] = await Promise.all([
+  const [jjVersion, pinetrie, supervise, project] = await Promise.all([
     hostJjVersion(),
     readFile(DEFAULT_CONTAINERFILE, "utf8"),
+    readFile(SUPERVISE_SOURCE, "utf8"),
     readFile(own, "utf8").catch(() => null),
   ])
   const plans = planImages({
-    pinetrie: { file: DEFAULT_CONTAINERFILE, content: pinetrie },
-    project: project === null ? null : { file: own, content: project },
+    pinetrie: {
+      file: DEFAULT_CONTAINERFILE,
+      content: pinetrie,
+      sources: [supervise],
+    },
+    project:
+      project === null ? null : { file: own, content: project, sources: [] },
     jjVersion,
     playwrightVersion,
   })

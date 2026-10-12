@@ -127,8 +127,7 @@ describe("planArchive", () => {
       snapshot: snapshot === null ? null : snapshotId(snapshot),
       paths: [],
       conflicts: [],
-      ignored: null,
-      recipe: null,
+      disk: null,
     })
     const revisions = new Map([
       [

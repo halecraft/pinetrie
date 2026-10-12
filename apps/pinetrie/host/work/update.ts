@@ -29,11 +29,13 @@ import {
   commitTurn,
   conflictsIn,
   copyFacts,
+  executeOrThrow,
   laneBase,
   type Merged,
   type MergePlan,
   mergeUpdate,
   planMerge,
+  planSnapshot,
   type Runner,
   type TouchedRevision,
 } from "@pinetrie/lanes"
@@ -74,10 +76,10 @@ import {
   type UpdateRefusal,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
-import type { Basics } from "../basics.ts"
+import { type Basics, failed } from "../basics.ts"
 import type { Containers } from "./containers.ts"
+import { removeStaleOutputs } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"
-import type { Recipes } from "./recipe.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
@@ -356,13 +358,12 @@ export interface Updates {
 
 export function createUpdates(deps: {
   readonly basics: Basics
-  readonly setup: Pick<Setup, "root" | "owner" | "lanes">
+  readonly setup: Pick<Setup, "root" | "owner" | "lanes" | "ready">
   readonly registry: LaneRegistry
   readonly piSetup: Pick<PiSetup, "skill">
   readonly containers: Pick<Containers, "beforeRun" | "runEnded">
   readonly fetchLane: Fetches["fetchLane"]
   readonly writeRevision: Turns["writeRevision"]
-  readonly recipes: Recipes
 }): Updates {
   const { basics, setup, registry, containers } = deps
   const { docs } = basics
@@ -378,16 +379,18 @@ export function createUpdates(deps: {
     merge: CommitId,
   ): Promise<void> {
     const handle = registry.handleOf(lane)
-    const _jj = registry.laneJjOf(lane)
-    // The merge may have changed the recipe's inputs: it runs before the
-    // snapshot, so a branch below starts with its outputs.
-    const { snapped, outcome } = await deps.recipes.snapshotOnQueue(
-      lane,
-      handle,
-      registry.laneJjOf(lane),
-      "all",
-      snapshotId(entry),
-    )
+    const snapped = await handle.queue
+      .enqueue(async () => {
+        await executeOrThrow(
+          planSnapshot({ lane, snapshot: snapshotId(entry) }),
+          handle.runners,
+        )
+        return true
+      })
+      .catch(error => {
+        failed(basics, "the snapshot", lane)(error)
+        return false
+      })
     await deps.writeRevision({
       entry,
       lane,
@@ -397,8 +400,7 @@ export function createUpdates(deps: {
       paths: [],
       // A clean merge.
       conflicts: [],
-      ignored: null,
-      recipe: outcome,
+      disk: null,
     })
   }
 
@@ -483,6 +485,11 @@ export function createUpdates(deps: {
         if (catchUp.kind === "refused") return refused(catchUp.reason)
         await commitEdits(lane, jj)
         const merged = await mergeUpdate(jj, handle.runners, lane, catchUp.plan)
+        // The merge may have changed what a recipe read: its outputs go
+        // before anything snapshots the disk, a catch_up's turn included.
+        await removeStaleOutputs(handle, (await setup.ready).image).catch(
+          failed(basics, "removing stale outputs", lane),
+        )
         // A conflict's prompt fits the floor settled before the merge.
         const facts: SettleFacts =
           merged.kind === "conflicted"

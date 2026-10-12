@@ -1195,16 +1195,81 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     prompt's newest revision is what came before it. A record from before
     paths decodes with none. An ask's file count is the union of its turns'
     paths (`workStats`), so it is what its review lists.
-  - A turn's record names the ignored files it wrote (`ignored`, ADR-0131):
-    its whole disk diffed against the snapshot before it, each path sorted
-    by `classifyDisk` into tracked (the repo's commits between the two
-    snapshots changed it), pine·trie's or a repo's own (`.jj`, `.git`,
-    `.pinetrie-lane`, `lost+found`, a shared directory's mount point), a
-    recipe's output, a recipe's cache, or ignored; `ignoredFiles` keeps the
-    topmost of the last, at most `IGNORED_LISTED`, and how many more. It
-    also says whether the lane's recipe ran at the turn's end, and whether
-    it failed (`recipe`). A prompt's record has neither, and a record from
-    before decodes with neither.
+  - A turn's record says what it did to its disk beyond its commit
+    (`disk`, `TurnDisk`, ADR-0135), from its runs (`disk.ts`):
+    - **Asking and classing cannot drift apart.** `writesToClass` names
+      the paths whose `.gitignore` standing it needs (each write and the
+      directories above it, each read and failed lookup), and its
+      `classify` throws on a path it never named. `registryAfter` names the
+      paths to hash (new recipes' inputs, new roots' `CACHEDIR.TAG`), and
+      its `next` throws on an answer short of one.
+    - **`classifyWrites` classes each path a run or a write tool wrote.** Not
+      ignored is source. Ignored and written by a run that read source,
+      unless the run read it before writing it (an edit in place), is
+      derived, and so is any ignored write under a root the registry
+      already holds. The rest is local, and a write tool's ignored write is
+      always local, inside a derived root too.
+    - **A derived path's root** is the registry root it is under, else its
+      topmost ignored directory short of the lane's home
+      (`.pinetrie-lane/home`, whose top directories are roots of their
+      own). So pnpm's files in a store that was there before the registry
+      come under the store, not each a root.
+    - **A recipe's key** (`nextRegistry`): its command, the lane's image,
+      the hash of each source file it read and each file under the lane's
+      home outside a derived root, the paths it looked for and did not find
+      (an input gone before it was hashed joins them), and each shared file
+      it read by its stamp. A newer recipe takes an older one's outputs,
+      and a recipe left with none goes; a root deleted whole leaves the
+      registry.
+    - **A cache** (`isCache`, core) is a root holding a `CACHEDIR.TAG`, or
+      one a later run only added files to once it existed; a run that
+      changes or deletes anything under a root makes it never a cache
+      again. A root's first making shows neither: a first `pnpm install`
+      only adds, and `node_modules` must not be kept as a cache when its
+      recipe's key breaks. The evidence is kept per root
+      (`RootEvidence`).
+    - **The record lists** derived roots and local paths, topmost, at most
+      `DISK_LISTED` each with how many more (`turnDisk`); directories a run
+      made from source that `.gitignore` misses; and source files written
+      that the commit left out (jj's size limit). A path in the turn's
+      whole-disk diff that no run or tool wrote is local when ignored
+      (`unattributed`); else it is source, and in the commit.
+    - A prompt's record, an update's and a record from before have none:
+      the old `ignored` and `recipe` fields decode unread.
+    - **What a turn did to shared files** (`disk.shared`, `shared.ts`):
+      the versions it read and wrote, each write flagged concurrent when
+      another version landed after the one it was based on and before it.
+      - **A version is a stamp, size and ctime** (core's `Stamp`), which a
+        lane and the host read alike (S169), and versions order by its
+        ctime (`stampTimeUs`), the host's clock for every writer, not by
+        when they are learnt.
+      - **`sharedTouches` pairs a lane's accesses** (its runs', and the
+        read and write tools') in its monotonic order: a write is an open
+        for writing and the last release of that file by the same process.
+        It is based on what the lane last read of the file, in this turn
+        or an earlier one (kept on the line, `read`, `laneReads`), else on
+        what its open found. An append is based on what its open found. A
+        write that changed nothing is a read. A file found missing was
+        missing its open-to-release time before its write's ctime.
+      - **`planSharedLineages`** keeps each file's lineage (`SHARED_LINEAGE`, the
+        newest `SHARED_KEPT`). A stamp no lineage has seen is a version made
+        outside every lane: the host's watcher's (`seen`), or one a lane
+        reads first. A lane's write whose stamp is already there claims
+        that version. Concurrency is reckoned over the whole lineage, so a
+        write recorded before an earlier rival is found concurrent once
+        the rival is, and named in `revised`.
+      - **A version another lane turn's write already claimed is
+        contested** (`SharedVersion.contested`): a release's stamp is read
+        after the call returns, so one of the two read the other's
+        version. It keeps its first writer, both writes are concurrent
+        (the first named in `revised`), and so is any write based on it.
+        One turn's writes leaving one stamp contest nothing.
+      - A record from before decodes with none.
+    - **The registry** (`.pinetrie-lane/recipes.json`) decodes totally:
+      a broken file is an empty registry (`decodeRegistry`). A recipe's
+      outputs are `DiskPath`s (core), checked as the file is read: what
+      `planStaleOutputs` deletes can never leave the disk, whoever wrote
+      the file, the agent included.
   - Every record with a commit carries that commit's `conflicts`, a
     prompt's included, since a branch from it is cloned with them
     (ADR-0072); `conflictsAt` (core) reads them by commit. A record from

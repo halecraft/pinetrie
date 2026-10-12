@@ -47,7 +47,7 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "create", lane: "l", carry: null },
+        op: { kind: "create", lane: "l" },
       })
       await writeFile(path.join(disks.lane("l"), "f"), "one")
       await disk({
@@ -88,40 +88,6 @@ describe.skipIf(!onBtrfs)(
       expect(listed.map(s => s.id)).toEqual(["s"])
       expect(listed[0]?.made).toBeGreaterThan(0)
     })
-    test("a create carries a path from a snapshot", async () => {
-      await mkdir(path.join(disks.lane("l"), ".pnpm-store", "v10"), {
-        recursive: true,
-      })
-      await writeFile(
-        path.join(disks.lane("l"), ".pnpm-store", "v10", "x"),
-        "cached",
-      )
-      await disk({
-        kind: "disk",
-        project: KEY,
-        op: { kind: "snapshot", lane: "l", snapshot: "deps" },
-      })
-      await disk({
-        kind: "disk",
-        project: KEY,
-        op: {
-          kind: "create",
-          lane: "fresh",
-          carry: { from: "deps", paths: [".pnpm-store", "absent"] },
-        },
-      })
-      expect(
-        await readFile(
-          path.join(disks.lane("fresh"), ".pnpm-store", "v10", "x"),
-          "utf8",
-        ),
-      ).toBe("cached")
-      expect(
-        await readFile(path.join(disks.lane("fresh"), "f"), "utf8").catch(
-          () => null,
-        ),
-      ).toBe(null)
-    })
     test("a snapshot is read-only; a restore of it is writable; a delete takes it", async () => {
       await disk({
         kind: "disk",
@@ -154,7 +120,7 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "create", lane: "turn", carry: null },
+        op: { kind: "create", lane: "turn" },
       })
       await mkdir(path.join(lane, "d", "sub"), { recursive: true })
       await writeFile(path.join(lane, "d", "a"), "a\n")

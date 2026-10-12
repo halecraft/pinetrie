@@ -6,12 +6,22 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "a turn's ignored files go unsaid",
+    name: "a turn's local files go unsaid",
     file: "packages/interface/ask-words.ts",
-    from: '    stats.ignored > 0 ? plural(stats.ignored, "ignored file") : "",\n',
+    from: '    stats.local > 0 ? plural(stats.local, "local file") : "",\n',
     to: "",
     command: unit,
-    expect: "ignored files a turn wrote, and a recipe that failed",
+    expect:
+      "local files a turn wrote, outputs nothing ignores, and files jj left out",
+  },
+  {
+    name: "a turn's local files are not counted",
+    file: "packages/interface/work-stats.ts",
+    from: "    for (const p of disk?.local.paths ?? []) local.add(p)\n",
+    to: "",
+    command: unit,
+    expect:
+      "counts the work, the union of its turns' paths and local files, and its time",
   },
   {
     name: "a named thread opened before its lane asks for no banner",
@@ -4152,5 +4162,23 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a thread's strip draws its banner, or ✦ without one; a note column's draws none",
+  },
+  {
+    name: "a revision's widenings go unsaid",
+    file: "packages/interface/review.ts",
+    from: "          widens: wideningLine(got.value.widenings),\n",
+    to: '          widens: "",\n',
+    command: unit,
+    expect:
+      "a revision whose pinetrie.json widens what lanes may do says what, in one line",
+  },
+  {
+    name: "concurrent shared writes go unsaid",
+    file: "packages/interface/work-stats.ts",
+    from: "    concurrent += (disk?.shared.wrote ?? []).filter(w => w.concurrent).length\n",
+    to: "",
+    command: unit,
+    expect:
+      "counts the work, the union of its turns' paths and local files, and its time",
   },
 ]

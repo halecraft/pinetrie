@@ -59,8 +59,10 @@ test("stretchFill: the agent alone, people alone, or both", () => {
     calls: 0,
     failed: 0,
     files: [],
-    ignored: 0,
-    recipeFailed: 0,
+    local: 0,
+    unignored: 0,
+    leftovers: 0,
+    concurrent: 0,
     first: 0,
     last: 0,
   })

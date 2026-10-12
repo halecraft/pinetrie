@@ -2027,4 +2027,24 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "its history: created by its opener",
   },
+  {
+    name: "the watcher's stamp is not the lane's",
+    file: "packages/core/runs.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "}): Stamp => stamp(`${st.size}:${st.ctimeNs}`)\n",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "}): Stamp => stamp(`${st.ctimeNs}`)\n",
+    command: unit,
+    expect:
+      "a file there at the start, and one written since, each with its size and ctime",
+  },
+  {
+    name: "a file beside a shared directory is in it",
+    file: "apps/pinetrie/host/work/shared-watch.ts",
+    from: '    if (rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel))\n',
+    to: '    if (rel !== "" && !path.isAbsolute(rel))\n',
+    command: unit,
+    expect:
+      "a file under a shared directory, from the disk's root; none outside",
+  },
 ]

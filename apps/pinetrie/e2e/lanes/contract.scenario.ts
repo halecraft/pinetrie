@@ -183,7 +183,7 @@ async function dockerContract(
     const name = threadIdFor(`contract-${process.pid}-${lanes.length}`)
     lanes.push(name)
     laneRuntimes.set(name, on)
-    await on.disk({ kind: "create", lane: name, carry: null })
+    await on.disk({ kind: "create", lane: name })
     const started = Date.now()
     await on.run({
       name: laneContainer(name),

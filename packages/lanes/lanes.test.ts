@@ -79,7 +79,7 @@ describe("execute", () => {
         : ok
     }
     const steps: Step[] = [
-      { in: "runtime", op: { kind: "create", lane: LANE, carry: null } },
+      { in: "runtime", op: { kind: "create", lane: LANE } },
       { in: "lane", argv: ["sync"] },
       {
         in: "runtime",

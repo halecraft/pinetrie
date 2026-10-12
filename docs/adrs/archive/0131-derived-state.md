@@ -1,6 +1,6 @@
 # ADR-0131 — Derived state is rebuilt from its key, never carried: the base is a dependency layer and a checkout, a lane's recipe runs again when its inputs change, and a turn records the ignored files it wrote
 
-- **Status:** Accepted (Duane, 2026-10-10)
+- **Status:** Superseded (Duane, 2026-10-10)
 - **Area:** `packages/lanes/TECHNICAL.md`, `apps/pinetrie/host/TECHNICAL.md`,
   `packages/rules/TECHNICAL.md`
 - **Evidence:** S146, S147, S148
@@ -10,11 +10,13 @@
     whose lockfile differs starts from a layer of its own; a lane runs the
     recipe again when its inputs change; `installWhen` is one lockfile or a
     list, and `installCaches` names what is carried.
-- **Amended by:**
-  - ADR-0135: a recipe is any recorded run of a tool call that made derived
-    files, learned rather than declared (`lanes.install`, `installWhen` and
-    `installCaches` go). pine·trie runs none itself; a disk made for a new
-    state carries each output whose recipe's key still holds there.
+- **Superseded by:**
+  - ADR-0135: derived state is learned from what each tool call's commands
+    read and wrote, not declared (`lanes.install`, `installWhen` and
+    `installCaches` go). pine·trie runs no recipe and builds no dependency
+    layer: the base is the base before it, checked out at accepted work, and a
+    disk made for a new state loses the outputs whose recipe's key broke. A
+    turn's record classes what it wrote as derived and local.
 
 **Context.** A package deleted from accepted work left its `node_modules/`
 in the base, and in every lane forked from it. The base was refreshed by

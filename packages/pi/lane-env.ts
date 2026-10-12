@@ -14,6 +14,13 @@
 
 import { type ExecutionEnv, FileError } from "@earendil-works/pi-agent-core"
 import { openChannel as open, type RunResult } from "@pinetrie/channel"
+import type {
+  FileHashes,
+  LaneDrain,
+  Recipe,
+  RecipeCheck,
+  RunNotice,
+} from "@pinetrie/core"
 import {
   type EnvMethod,
   isEnvMethod,
@@ -23,11 +30,20 @@ import {
 
 type Context = { readonly abortSignal: AbortSignal | undefined }
 
+/**
+ * The key of a channel's environment calls: this module's alone, so only
+ * `laneEnv`, pi's tools, makes them. The helper records the tools' writes,
+ * and their accesses of shared files, from these calls; the host's own
+ * writes go on a `run`'s input instead, and can never be counted as the
+ * agent's.
+ */
+const toolCall: unique symbol = Symbol("toolCall")
+
 /** One open channel to a lane's helper. */
 export interface LaneChannel {
   /** The helper's directory, once it has said it is ready. */
   readonly ready: Promise<{ readonly cwd: string }>
-  call(
+  [toolCall](
     method: EnvMethod,
     args: readonly unknown[],
     signal: AbortSignal | undefined,
@@ -37,7 +53,18 @@ export interface LaneChannel {
     argv: readonly string[],
     bytes: boolean,
     signal?: AbortSignal,
+    stdin?: string,
   ): Promise<RunResult>
+  /** What the helper knows of its runs and tools since the last drain. */
+  runs(): Promise<LaneDrain>
+  /** Which of `paths`, relative to the lane's directory, exist. */
+  present(paths: readonly string[]): Promise<readonly string[]>
+  /** The supervisor's events, gathered in the lane since the last call. */
+  events(): Promise<readonly RunNotice[]>
+  /** sha256 of each path, relative to the lane's directory. */
+  hashes(paths: readonly string[]): Promise<FileHashes>
+  /** Whether each recipe's key, but its image, still holds on the disk. */
+  checkRecipes(recipes: readonly Recipe[]): Promise<readonly RecipeCheck[]>
   /**
    * End the helper's input: it finishes and exits. Never a signal: killing
    * the `exec` process does not reach the helper.
@@ -59,10 +86,23 @@ export function openChannel(argv: readonly string[]): LaneChannel {
   return {
     ready: channel.ready,
     closed: channel.closed,
-    call: (method, args, signal, onUpdate) =>
+    [toolCall]: (method, args, signal, onUpdate) =>
       channel.call({ method, args }, signal, onUpdate),
-    run: (run, bytes, signal) =>
-      channel.call({ run, cwd: null, bytes }, signal) as Promise<RunResult>,
+    run: (run, bytes, signal, stdin) =>
+      channel.call(
+        { run, cwd: null, bytes, stdin: stdin ?? null },
+        signal,
+      ) as Promise<RunResult>,
+    runs: () => channel.call({ runs: true }) as Promise<LaneDrain>,
+    present: paths =>
+      channel.call({ present: paths }) as Promise<readonly string[]>,
+    events: () =>
+      channel.call({ events: true }) as Promise<readonly RunNotice[]>,
+    hashes: paths => channel.call({ hashes: paths }) as Promise<FileHashes>,
+    checkRecipes: recipes =>
+      channel.call({ checkRecipes: recipes }) as Promise<
+        readonly RecipeCheck[]
+      >,
     close: channel.close,
   }
 }
@@ -108,7 +148,7 @@ export function laneEnv(
           }
         }
         const channel = await gate()
-        return channel.call(prop, rest, context?.abortSignal, onUpdate)
+        return channel[toolCall](prop, rest, context?.abortSignal, onUpdate)
       }
     },
   }) as unknown as ExecutionEnv

@@ -30,12 +30,16 @@ export interface WorkStats {
   /** Paths its turns changed, from their revision records, sorted. */
   readonly files: readonly string[]
   /**
-   * Ignored files its turns wrote, from their records: each record's topmost
+   * Local files its turns wrote, from their records: each record's topmost
    * paths and how many more it counted.
    */
-  readonly ignored: number
-  /** Turns whose recipe failed to run. */
-  readonly recipeFailed: number
+  readonly local: number
+  /** Directories its runs made from source that `.gitignore` does not ignore. */
+  readonly unignored: number
+  /** Source files its turns wrote that their commits left out. */
+  readonly leftovers: number
+  /** Its writes to shared files based on a version another write had replaced. */
+  readonly concurrent: number
   /** Its first and last entries' timestamps, results included; 0 when unknown. */
   readonly first: number
   readonly last: number
@@ -79,9 +83,11 @@ export function statsOf(
   let people = 0
   const calls: ToolCall[] = []
   const files = new Set<string>()
-  const ignored = new Set<string>()
-  let ignoredMore = 0
-  let recipeFailed = 0
+  const local = new Set<string>()
+  let localMore = 0
+  const unignored = new Set<string>()
+  const leftovers = new Set<string>()
+  let concurrent = 0
   const times: number[] = []
   for (const id of [...messages, ...others]) {
     const t = index.entries[id]?.timestamp
@@ -93,9 +99,12 @@ export function statsOf(
     calls.push(...(message?.toolCalls ?? []))
     const record = revisions.get(id)
     for (const p of record?.paths ?? []) files.add(p)
-    for (const p of record?.ignored?.paths ?? []) ignored.add(p)
-    ignoredMore += record?.ignored?.more ?? 0
-    if (record?.recipe === "failed") recipeFailed += 1
+    const disk = record?.disk ?? null
+    for (const p of disk?.local.paths ?? []) local.add(p)
+    localMore += disk?.local.more ?? 0
+    for (const p of disk?.unignored ?? []) unignored.add(p)
+    for (const p of disk?.leftovers ?? []) leftovers.add(p)
+    concurrent += (disk?.shared.wrote ?? []).filter(w => w.concurrent).length
   }
   const results = resultsOn(index, others)
   return {
@@ -105,8 +114,10 @@ export function statsOf(
     calls: calls.length,
     failed: calls.filter(c => results.get(c.id)?.isError === true).length,
     files: [...files].sort(),
-    ignored: ignored.size + ignoredMore,
-    recipeFailed,
+    local: local.size + localMore,
+    unignored: unignored.size,
+    leftovers: leftovers.size,
+    concurrent,
     first: times.length === 0 ? 0 : Math.min(...times),
     last: times.length === 0 ? 0 : Math.max(...times),
   }

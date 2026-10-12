@@ -1,19 +1,25 @@
-# pinetrie's default lane image (ADR-0034, ADR-0041, ADR-0064): the tools every
-# lane can count on.
+# pinetrie's default lane image: the tools every lane can count on.
 # - Debian trixie and Node 24.
-# - git 2.47: jj needs 2.41 or later (S42 item 7).
+# - git 2.47: jj needs 2.41 or later.
 # - pnpm, through corepack.
 # - python3.
-# - Static musl builds of jj (pinned to the host's version), rg, fd and sd.
+# - Static musl builds of jj (pinned to the host's version), rg, fd and sd,
+#   and of the supervisor every tool call runs under (`supervise.c`, built in
+#   the stage below: the image is aarch64 alone, like the release builds).
 #   The lane runtime copies them out of this image, so every lane has them
 #   whatever its image (`runtime.ts`). Debian's own rg and fd link glibc, and
 #   would not run on a musl image.
 # - Chromium's headless shell and its libraries, at the build pinetrie's
 #   Playwright drives (`PLAYWRIGHT_VERSION`).
 # - Rootless Docker, the docker CLI and buildx, for a lane granted lanes of
-#   its own (`lanes.nested`, ADR-0130); unused otherwise.
+#   its own (`lanes.nested`); unused otherwise.
 # A project's own `pinetrie.Containerfile` replaces it. The lane runtime is
 # copied out of this image (`runtime.ts`).
+FROM docker.io/library/alpine:3.22 AS supervise
+RUN apk add --no-cache build-base linux-headers
+COPY supervise.c /src/supervise.c
+RUN cc -O2 -Wall -Wextra -Werror -static -pthread -o /supervise /src/supervise.c
+
 FROM docker.io/library/node:24-trixie-slim
 ARG JJ_VERSION
 ARG RG_VERSION=15.2.0
@@ -30,12 +36,13 @@ RUN apt-get update -qq \
  && musl sharkdp/fd "v${FD_VERSION}" "fd-v${FD_VERSION}" fd \
  && musl chmln/sd "v${SD_VERSION}" "sd-v${SD_VERSION}" sd \
  && corepack enable
+COPY --from=supervise /supervise /usr/local/bin/supervise
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 ARG PLAYWRIGHT_VERSION
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium-headless-shell \
  && rm -rf /var/lib/apt/lists/* /root/.npm
-# Lanes inside a lane (ADR-0130, S125): rootless Docker, from Docker's static
+# Lanes inside a lane: rootless Docker, from Docker's static
 # bundles, which a lane granted `lanes.nested` starts as `rootless` (uid 1000)
 # on its inner lanes' btrfs subvolume (`pinetrie-inner-docker`). runc's
 # NoNewKeyring is its default: Docker's seccomp profile refuses `keyctl`.
@@ -45,7 +52,7 @@ RUN npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium-headl
 # newuidmap and newgidmap carry file capabilities, not setuid: setuid root,
 # they open uid_map as root, and writing it needs CAP_SYS_ADMIN over the new
 # namespace, which a lane lacks; as its owner (uid 1000) with CAP_SETUID they
-# may write it (S135). rootlesskit makes slirp4netns's tap device with `ip`,
+# may write it. rootlesskit makes slirp4netns's tap device with `ip`,
 # and the inner Docker sets sysctls with `sysctl`: both in /usr/sbin, which
 # its PATH has.
 ARG DOCKER_VERSION=29.8.2
@@ -85,7 +92,7 @@ RUN apt-get update -qq \
  && chmod +x /usr/local/bin/pinetrie-inner-docker \
  && printf '%s\n' \
     '#!/bin/sh' \
-    '# runc for the inner Docker of a nested lane: run and create get --no-new-keyring, for the containers of BuildKit as for those of Docker (S125).' \
+    '# runc for the inner Docker of a nested lane: run and create get --no-new-keyring, for the containers of BuildKit as for those of Docker.' \
     'n=$#' \
     'added=no' \
     'for a in "$@"; do' \

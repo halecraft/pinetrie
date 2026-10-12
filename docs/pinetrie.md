@@ -442,10 +442,11 @@ context.**
   agent has its tools, and each
   thread's agent works in its own Linux container (ADR-0034), on a disk
   cloned from the turn it branched at: a root thread's starts from your
-  committed work (`@-`), with dependencies installed, so commit what it should
-  see. It sees its own directory at `/workspace` and your working copy at
-  `/mnt/host-working-copy`, read-only, and nothing else of your machine unless `pinetrie.json`
-  grants it. Your working copy is yours, so hot reload stays on. It needs a
+  committed work (`@-`), so commit what it should see. Nothing installs its
+  dependencies: it does, as you would after a clone. It sees its own directory at `/workspace` and your working copy at
+  `/mnt/host-working-copy`, read-only, and nothing else of your machine unless
+  accepted work's `pinetrie.json` grants it: a grant you add applies once you
+  commit and publish it, and a thread's own copy can only give grants up. Your working copy is yours, so hot reload stays on. It needs a
   jj repo and Docker (ADR-0102, ADR-0130): the lane VM on the Mac (`pnpm
   vm:build` once, in any Docker on the Mac), on Linux Docker with a btrfs lanes directory; without
   them the host says what is missing and does not start. Restart the host
@@ -478,9 +479,11 @@ context.**
   `{ "lanes": { "shared": [".plans"] } }`, and ignore it in
   `~/.config/git/ignore`. Every thread's agent then reads and writes
   `/workspace/.plans`, which is your `.plans`, live, and never part of a
-  branch. A project can share a directory for everyone in `pinetrie.json`'s
-  `lanes.shared`. A changed config reaches existing threads at their next
-  run, after a host restart.
+  branch. Each write to a shared file, a thread's or yours, is a version
+  of it, and a thread's write over a version it never read is marked on
+  its turn (ADR-0135). A project can share a directory for everyone in `pinetrie.json`'s
+  `lanes.shared`, once accepted work holds it. A changed config reaches
+  existing threads at their next run, after a host restart.
 - **Accepting a thread's work** (ADR-0038 to ADR-0040, ADR-0047, ADR-0100;
   the words are `docs/glossary.md`): each thread has a two-word name, shown
   in its column's header from before its first message (ADR-0057), and
