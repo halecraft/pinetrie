@@ -34,7 +34,6 @@ import {
   type ResolvedTarget,
   sameKey,
   seenAt,
-  type TaskId,
   type ThreadId,
   type Workflow,
   type WriterId,
@@ -45,13 +44,7 @@ import { makeNoteColumn, noteAt, toNotes } from "./notes.ts"
 import { orderAfter } from "./order.ts"
 import { inventoryFull, isPinned, queuedOn, taskPinnedOf } from "./queue.ts"
 import { rankAfter, rankOfDrop } from "./rank.ts"
-import {
-  canvasOf,
-  NO_TASK_INDEX,
-  planTaskOpening,
-  type TaskIndex,
-  taskOfPlace,
-} from "./task.ts"
+import { canvasOf, planTaskOpening } from "./task.ts"
 
 // ── handoffs (ADR-0059) ───────────────────────────────────────────────────
 
@@ -72,27 +65,6 @@ export type MoveStep =
 
 /** What the host makes of a card made: its write, or a refusal. */
 export type MakeStep = Extract<MoveStep, { readonly kind: "write" | "refused" }>
-
-/**
- * What names a discard's history (ADR-0066, ADR-0116), the host's to decide:
- * the tasks, and the task the sender is on, for a card that leaves no task.
- */
-export interface Discards {
-  readonly tasks: TaskIndex
-  readonly here: TaskId | null
-}
-
-/** For moves that discard nothing: a queueing, whose target is a queue. */
-export const NO_DISCARDS: Discards = { tasks: NO_TASK_INDEX, here: null }
-
-/**
- * The history a card leaving `from` for gone is in: the task it leaves,
- * else, from an inventory, the task its sender is on. Pure.
- */
-export const discardHistory = (
-  from: CardPlace,
-  discards: Discards,
-): TaskId | null => taskOfPlace(discards.tasks, from) ?? discards.here
 
 /**
  * A key as the place it becomes, with what the host assigns to a queued or

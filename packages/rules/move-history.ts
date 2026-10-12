@@ -21,10 +21,36 @@ import {
   type Workflow,
 } from "@pinetrie/core"
 import { transitionOf } from "./board.ts"
-import { type Discards, discardHistory, type MoveStep } from "./moves.ts"
-import { taskOfTarget } from "./task.ts"
+import type { MoveStep } from "./moves.ts"
+import {
+  NO_TASK_INDEX,
+  type TaskIndex,
+  taskOfPlace,
+  taskOfTarget,
+} from "./task.ts"
 
 // ── moves' history (ADR-0066) ─────────────────────────────────────────────
+
+/**
+ * What names a discard's history, the host's to decide: the tasks, and the
+ * task the sender is on, for a card that leaves no task.
+ */
+export interface Discards {
+  readonly tasks: TaskIndex
+  readonly here: TaskId | null
+}
+
+/** For moves that discard nothing: a queueing, whose target is a queue. */
+export const NO_DISCARDS: Discards = { tasks: NO_TASK_INDEX, here: null }
+
+/**
+ * The history a card leaving `from` for gone is in: the task it leaves,
+ * else, from an inventory, the task its sender is on. Pure.
+ */
+export const discardHistory = (
+  from: CardPlace,
+  discards: Discards,
+): TaskId | null => taskOfPlace(discards.tasks, from) ?? discards.here
 
 /**
  * The history of the sender's moves `moves` enter, or null for none

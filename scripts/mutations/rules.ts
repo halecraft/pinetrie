@@ -2567,7 +2567,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a discard's history is its sender's task, not the one it leaves",
-    file: "packages/rules/moves.ts",
+    file: "packages/rules/move-history.ts",
     from: "): TaskId | null => taskOfPlace(discards.tasks, from) ?? discards.here",
     to: "): TaskId | null => discards.here",
     command: unit,
@@ -2575,7 +2575,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a discard from an inventory is in no history",
-    file: "packages/rules/moves.ts",
+    file: "packages/rules/move-history.ts",
     from: "): TaskId | null => taskOfPlace(discards.tasks, from) ?? discards.here",
     to: "): TaskId | null => taskOfPlace(discards.tasks, from)",
     command: unit,
@@ -3028,8 +3028,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy of a thread someone else holds is made",
     file: "packages/rules/copy.ts",
-    from: "  if (holder !== null && holder !== sender)\n",
-    to: "  if (holder !== null && holder === sender)\n",
+    from: '  if (holding.kind === "held" && holding.by !== sender)\n',
+    to: '  if (holding.kind === "held" && holding.by === sender)\n',
     command: unit,
     expect:
       "refused: an end in another thread, or none; an id in use; a thread someone else holds; another's inventory, or a full one",

@@ -177,8 +177,6 @@ export interface ColumnProps {
   width: CardWidth
   /** A task's label: what a fork row names a source's task by (ADR-0117). */
   labelOf: (task: TaskId) => string
-  /** How many cards the canvas holds: with two or more, a card's column can move. */
-  count: number
   view: ColumnView
   index: TreeIndex
   /** This column's colour track: `--track` on the column (`useTrackColors`). */

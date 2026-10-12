@@ -16,7 +16,7 @@ export const CODE_CITATIONS: Readonly<Record<string, number>> = {
   "packages/protocol": 100,
   "packages/reads": 74,
   "packages/repo": 151,
-  "packages/rules": 578,
+  "packages/rules": 576,
   "packages/schema": 77,
   "packages/session": 97,
   "packages/shell": 2,

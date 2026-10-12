@@ -792,7 +792,7 @@ width, so a card has one place by construction.
   trashed thread's or note column's task in `taskOfThread` and
   `taskOfCard`, never in `canvases`: so its own cards keep their task (their
   history, the archive gate) while nothing trashed is drawn, and
-  `taskOfPlace` of any place is its owner's task (`ownerOf`, `taskOfOwner`).
+  `taskOfPlace` of any place is its owner's task (`ownerOf`).
   A reader that means "on the canvas" reads `canvases` (`canvasOf`,
   `isOnCanvas`), never `taskOfThread`. `rootsHeld` holds a trashed
   thread's root, so a restart within the week keeps its messages loaded for

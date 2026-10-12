@@ -125,7 +125,6 @@ export function Strip(p: {
         column={projected.column}
         drawnAt={projected.at}
         columnKey={{ kind: "card", card: item.card }}
-        count={p.canvas.length}
         key={column.key}
         onTyping={card => p.typing(projected.view.tipId, card)}
         path={projected.path}

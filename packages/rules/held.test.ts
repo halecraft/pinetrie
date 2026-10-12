@@ -12,7 +12,6 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   heldIn,
-  holderOf,
   holdingOf,
   holdingWords,
   runsIn,
@@ -160,7 +159,6 @@ test("a trashed thread is held by nobody, but its discard stops its run, and a c
   }
   expect(takenIn([on], [trashed])).toEqual([T])
   expect(takenIn([trashed], [trashed])).toEqual([])
-  expect(holderOf([trashed], T)).toBeNull()
   expect(holdingOf([trashed], T)).toEqual({ kind: "trashed" })
   expect(holdingOf([on], T)).toEqual({ kind: "free" })
   expect(

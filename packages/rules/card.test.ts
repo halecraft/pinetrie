@@ -66,11 +66,11 @@ import { planReorder, planSetCommand, planWidth, REORDERS } from "./in-place.ts"
 import {
   crossesArchive,
   historyOf,
+  NO_DISCARDS,
   planHistorySweep,
   undoAnswer,
 } from "./move-history.ts"
 import {
-  NO_DISCARDS,
   ownsPlace,
   planFromTrash,
   planMove,

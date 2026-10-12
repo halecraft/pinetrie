@@ -39,15 +39,6 @@ export function holdingOf(
   return card?.place.kind === "trash" ? TRASHED : FREE
 }
 
-/** Who holds `thread` in their inventory, or null for one free or trashed. Pure. */
-export function holderOf(
-  cards: readonly CardRecord[],
-  thread: ThreadId,
-): WriterId | null {
-  const holding = holdingOf(cards, thread)
-  return holding.kind === "held" ? holding.by : null
-}
-
 /** Why a command in a thread in an inventory is refused. */
 export const HELD_WORDS = "put it on a canvas first"
 

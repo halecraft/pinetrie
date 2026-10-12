@@ -16,7 +16,7 @@ import {
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
-import { holderOf } from "./held.ts"
+import { holdingOf } from "./held.ts"
 import type { PlaceStep } from "./moves.ts"
 import { planThreadOpen } from "./task.ts"
 
@@ -73,8 +73,8 @@ export function planCopy(input: {
     cards.some(c => c.id === move.card)
   )
     return { kind: "refused", why: "taken" }
-  const holder = holderOf(cards, copy.source)
-  if (holder !== null && holder !== sender)
+  const holding = holdingOf(cards, copy.source)
+  if (holding.kind === "held" && holding.by !== sender)
     return { kind: "refused", why: "held" }
   // Onto a canvas, ranked where it was dropped; or into an inventory.
   const { to } = move

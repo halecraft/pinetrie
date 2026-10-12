@@ -305,8 +305,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     here: TaskId | null,
     tasks: TaskIndex,
   ): Promise<Settled> {
-    // gather. One `Discards` names both the history and a discard's
-    // trash place.
+    // gather. `Discards` names a discard's history (`historyOf`).
     const discards = { tasks, here }
     const entryThreads = await marginEntryThreads(moves)
     const cards = readPlaces(places)

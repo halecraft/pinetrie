@@ -54,7 +54,7 @@ words they were written with.
 | **note column** | A card on a task's canvas whose content is a list of notes, titled or "Notes" (ADR-0116). Named by how it is drawn (ADR-0126). | `NoteColumnId`, `NoteColumnCard`, `NOTE_COLUMN`, `nearestNoteColumn`, `NoteColumn` | notes board |
 | **queued card** | A text card above the line, which the agent reads once, when the host pops it. | `queued`, `queuedOn`, `QueuedCardEditor` | |
 | **pinned card** | A text card the agent reads on every run, at the top of its thread's column. | `pinned`, `pinnedOf`, `PinnedCardEditor` | |
-| **inventory** | Your own grid of cards, text cards and thread cards, on every task and device. A thread there is yours alone, read only and run by nobody (ADR-0124). | `inventory`, `InventoryPanel`, `holderOf`, `ThreadPreview` | |
+| **inventory** | Your own grid of cards, text cards and thread cards, on every task and device. A thread there is yours alone, read only and run by nobody (ADR-0124). | `inventory`, `InventoryPanel`, `holdingOf`, `ThreadPreview` | |
 | **the line** | What divides a thread's queued cards, which the agent reads, from your message, which it does not. | | |
 | **the dock** | A column's foot: the queue, the line and your message (ADR-0113). | | |
 | **the sidebar** | The column down the left of the page, of your open tasks. | `Sidebar`, `sidebarView`, `OpenThreads` | your list |

@@ -200,10 +200,7 @@ export function taskOfPlace(
 }
 
 /** The task a surface's owner is in: a task itself, a note column's or a thread's. */
-export function taskOfOwner(
-  tasks: TaskIndex,
-  owner: SurfaceOwner,
-): TaskId | null {
+function taskOfOwner(tasks: TaskIndex, owner: SurfaceOwner): TaskId | null {
   switch (owner.kind) {
     case "task":
       return owner.task
