@@ -114,6 +114,9 @@
       .menu-items { display: flex; flex-direction: column; }
       .menu button { text-align: left; background: none; color: #ddd; padding: .3rem .5rem; }
       .menu button:disabled { color: #777; cursor: default; }
+      /* `.icon` is a block, so an item that leads with one lays out in a row,
+         or its label falls to a line of its own. */
+      .menu button:has(> .icon) { display: flex; align-items: center; gap: .3rem; }
       .menu .why { font-size: .75rem; }
       /* ＋: a split button, dashed, at the foot of the sidebar and of each
          board column. */
