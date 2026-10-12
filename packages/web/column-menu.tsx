@@ -16,8 +16,6 @@ import { Menu } from "./menu.tsx"
 export function ColumnHeadEnd(p: {
   card: CardId
   width: CardWidth
-  /** The column the × is clicked in, where a refusal is said. */
-  columnKey: string
   /** Whether the reader may trash it: no × otherwise. */
   writable: boolean
   onIntent: (intent: Intent) => void
@@ -36,7 +34,8 @@ export function ColumnHeadEnd(p: {
             p.onIntent({
               kind: "discard",
               card: p.card,
-              at: { kind: "column", key: p.columnKey },
+              // A card's column is keyed by its card.
+              at: { kind: "column", key: p.card },
             })
           }
           title={TRASH_COLUMN}

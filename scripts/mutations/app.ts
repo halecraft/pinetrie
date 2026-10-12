@@ -1453,8 +1453,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the thread's mark is only as big as its star",
     file: "packages/web/index.html",
-    from: "      .thread-mark { position: relative; flex: 0 0 auto; width: 1.5rem; height: 1.5rem;",
-    to: "      .thread-mark { position: relative; flex: 0 0 auto;",
+    from: "      .thread-mark, .note-column-mark { position: relative; flex: 0 0 auto; width: 1.5rem; height: 1.5rem;",
+    to: "      .thread-mark, .note-column-mark { position: relative; flex: 0 0 auto;",
     suite: "browser",
     scenario: "banner",
     expect:

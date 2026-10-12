@@ -115,7 +115,6 @@ export function NoteColumn(p: {
           </span>
           <ColumnHeadEnd
             card={column}
-            columnKey={column}
             onIntent={p.onIntent}
             width={p.width}
             writable={p.readOnly === null}

@@ -989,7 +989,6 @@ export function Column(p: ColumnProps) {
               {card !== null && (
                 <ColumnHeadEnd
                   card={card}
-                  columnKey={p.column.key}
                   onIntent={p.onIntent}
                   width={p.width}
                   writable={writable}
