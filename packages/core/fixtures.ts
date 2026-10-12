@@ -35,8 +35,8 @@ export function cardIdFor(name: string): TextCardId {
 export const FIXTURE_STATE = workflowStateIdFor("fixture")
 
 /**
- * A task's card on the board (ADR-0126), at `order` in `state`, made by
- * `by`: what makes a task one the session holds.
+ * A task's card on the board, at `order` in `state`, made by `by`: what makes a
+ * task one the session holds.
  */
 export const taskCard = (
   task: TaskId,
@@ -104,11 +104,11 @@ export const fromParents = (
 export const threadOfEntry = (id: string): ThreadId => threadIdFor(id)
 
 /**
- * `entries` relabelled into threads (ADR-0125), as a branch writes them:
- * every entry with no parent, and every child with a message but its
- * parent's oldest, starts the thread `threadOfEntry(its id)`; every other
- * entry is in its parent's. Every entry is relabelled: a test that chooses
- * its threads gives them to `entry` instead.
+ * `entries` relabelled into threads, as a branch writes them: every entry with
+ * no parent, and every child with a message but its parent's oldest, starts the
+ * thread `threadOfEntry(its id)`; every other entry is in its parent's. Every
+ * entry is relabelled: a test that chooses its threads gives them to `entry`
+ * instead.
  */
 export const withThreads = (
   entries: Record<EntryId, EntryLike>,

@@ -1,17 +1,15 @@
-// agents — what the tree says of other threads' agents in a thread
-// (ADR-0128): its members, what an asked agent has heard of the thread that
-// asked, and whether a round of asks has been answered. Each is read from
-// the path, as a thread's mode is (ADR-0021): nothing about them is stored
-// beside the entries.
+// agents — what the tree says of other threads' agents in a thread: its
+// members, what an asked agent has heard of the thread that asked, and whether
+// a round of asks has been answered. Each is read from the path, as a thread's
+// mode is: nothing about them is stored beside the entries.
 
 import type { AgentCandidate, EntryId, ThreadId, ThreadName } from "./index.ts"
 import { ancestry, newestOnPath, type TreeIndex } from "./tree.ts"
 
 /**
- * The members of the thread ending at `tip`: every agent a message on the
- * path invited, in the order invited, less those a later fact says were
- * dismissed or left. A branch has the members its thread had where it
- * forked. Pure.
+ * The members of the thread ending at `tip`: every agent a message on the path
+ * invited, in the order invited, less those a later fact says were dismissed or
+ * left. A branch has the members its thread had where it forked.
  */
 export function threadMembers(
   index: TreeIndex,
@@ -32,9 +30,8 @@ export function threadMembers(
 }
 
 /**
- * The newest message on the path ending at `tip` that invited `thread`'s
- * agent; null when none did. What it is told when first asked starts there.
- * Pure.
+ * The newest message on the path ending at `tip` that invited `thread`'s agent;
+ * null when none did. What it is told when first asked starts there.
  */
 export const lastInvitation = (
   index: TreeIndex,
@@ -52,8 +49,7 @@ export const lastInvitation = (
  * The newest entry of `from` that the thread ending at `tip` has heard: the
  * last source entry of its newest heard entry from that thread. Null when it
  * has heard none since a compaction, which summarised what it heard, so the
- * next ask copies it again, as base news is told again past one (ADR-0080).
- * Pure.
+ * next ask copies it again, as base news is told again past one.
  */
 export const lastHeardEntry = (
   index: TreeIndex,
@@ -71,9 +67,9 @@ export const lastHeardEntry = (
   )
 
 /**
- * Whether the chat at `chat` has had an answer from every member it asked,
- * on the path ending at `tip`: each answer names the entry its relay came
- * from (`AnswerDetails.source`). False for a chat that asked none. Pure.
+ * Whether the chat at `chat` has had an answer from every member it asked, on
+ * the path ending at `tip`: each answer names the entry its relay came from
+ * (`AnswerDetails.source`). False for a chat that asked none.
  */
 export function isRoundAnswered(
   index: TreeIndex,
@@ -92,11 +88,11 @@ export function isRoundAnswered(
 }
 
 /**
- * The other threads' agents a message in `here` may name (ADR-0128): every
- * thread in `canvas` (every open task's named threads, `reachableAgents` in
- * rules) but `here`, each a member when `members` (`threadMembers` of its
- * path) holds it. The host and the composer both build them so, so the
- * button's promise and the host's decision agree. Pure.
+ * The other threads' agents a message in `here` may name: every thread in
+ * `canvas` (every open task's named threads, `reachableAgents` in rules) but
+ * `here`, each a member when `members` (`threadMembers` of its path) holds it.
+ * The host and the composer both build them so, so the button's promise and the
+ * host's decision agree.
  */
 export const agentCandidates = (
   canvas: readonly { readonly thread: ThreadId; readonly name: ThreadName }[],

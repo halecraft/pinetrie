@@ -73,7 +73,7 @@ const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const TEST_THREAD = threadIdFor("e")
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
-describe("who a principal is (ADR-0037)", () => {
+describe("who a principal is", () => {
   test("an email is trimmed and lower-cased", () => {
     expect(normalizeEmail("  Duane@Example.COM ")).toBe("duane@example.com")
   })
@@ -144,7 +144,7 @@ test("writerId and threadIdFor: a person and a thread are never confused", () =>
   assert.notEqual(String(threadIdFor("abc")), String(writerId("abc")))
 })
 
-test("parseNewThread: only t- and a lowercase uuidv7, since a container is named after it (ADR-0057)", () => {
+test("parseNewThread: only t- and a lowercase uuidv7, since a container is named after it", () => {
   const ok = "t-01a0f9eb-86e1-77ad-a822-2a306786223f"
   assert.equal(parseNewThread(ok), ok)
   for (const bad of [
@@ -158,7 +158,7 @@ test("parseNewThread: only t- and a lowercase uuidv7, since a container is named
     assert.equal(parseNewThread(bad), undefined, bad)
 })
 
-test("findSeqKeys: ADR-0013 — seq must not ride the wire", () => {
+test("findSeqKeys: seq must not ride the wire", () => {
   assert.deepEqual(findSeqKeys({ id: "x", accepted: true }), [])
   assert.deepEqual(findSeqKeys({ a: { seq: 3 } }), ["$.a.seq"])
   assert.deepEqual(findSeqKeys([{ seq: 1 }]), ["$[0].seq"])
@@ -282,7 +282,7 @@ test("messageText: flattens pi's content parts", () => {
   assert.equal(messageText(undefined), "")
 })
 
-describe("parseMentions: no mention inside code (ADR-0128)", () => {
+describe("parseMentions: no mention inside code", () => {
   const names = (t: string) =>
     parseMentions(t).map(m => (m.kind === "agent" ? "agent" : m.name))
   test("an inline code span, of one backtick or several, is text", () => {
@@ -300,7 +300,7 @@ describe("parseMentions: no mention inside code (ADR-0128)", () => {
   })
 })
 
-describe("address: other threads' agents are invited, then asked (ADR-0128)", () => {
+describe("address: other threads' agents are invited, then asked", () => {
   const fox = threadIdFor("01a00000-0000-7000-8000-00000000f0c5")
   const owl = threadIdFor("01a00000-0000-7000-8000-0000000000e1")
   const agents = (member: boolean) => [
@@ -353,7 +353,7 @@ describe("address: other threads' agents are invited, then asked (ADR-0128)", ()
   })
 })
 
-describe("address: mentions pick who a message is for (ADR-0021)", () => {
+describe("address: mentions pick who a message is for", () => {
   const who = (text: string, agentByDefault: boolean) =>
     address({
       mentions: parseMentions(text),
@@ -406,7 +406,7 @@ describe("address: mentions pick who a message is for (ADR-0021)", () => {
     expect(normalizeName("Agent")).toBeUndefined()
     expect(normalizeName("")).toBeUndefined()
   })
-  test("normalizeName refuses a thread's name, which a mention reads as its agent (ADR-0128)", () => {
+  test("normalizeName refuses a thread's name, which a mention reads as its agent", () => {
     expect(normalizeName("Amber-Fox")).toBeUndefined()
     expect(normalizeName("amber fox")).toBe("amber fox")
     expect(normalizeName("Mary-Jane")).toBe("Mary-Jane")
@@ -435,7 +435,7 @@ describe("address: mentions pick who a message is for (ADR-0021)", () => {
   })
 })
 
-describe("a card's place as flat fields (ADR-0059)", () => {
+describe("a card's place as flat fields", () => {
   const ADA = writerId("ada@example.com")
   const places: CardPlace[] = [
     { kind: "note", column: NOTES, order: "c" },
@@ -466,7 +466,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     }
   })
 
-  test("a comment in an entry's margin round-trips, its entry in `at` and its thread in `lane`; it needs both and its order, and its key keeps both (ADR-0126)", () => {
+  test("a margin place round-trips, and needs its entry, its thread and its order", () => {
     const margin = {
       kind: "margin",
       entry: entryId("e-1"),
@@ -542,7 +542,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     }
     expect(at(UUID)).toBe("text")
     expect(at(threadIdFor("x"))).toBe("thread")
-    // A task's id is its card's, any `isTaskId` takes (ADR-0126).
+    // A task's id is its card's, any `isTaskId` takes.
     expect(at(TEST_TASK)).toBe("task")
     expect(at(taskIdFor("x"))).toBe("task")
     expect(at(`n-${UUID}`)).toBe("note-column")
@@ -682,7 +682,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
   })
 })
 
-describe("moves, built once (ADR-0059)", () => {
+describe("moves, built once", () => {
   const ADA = writerId("ada@example.com")
   const LANE = threadIdFor("x")
   const _OTHER = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
@@ -801,7 +801,7 @@ test("nonEmpty: a list with one element or more, or null", () => {
   expect(nonEmpty(["a", "b"])).toEqual(["a", "b"])
 })
 
-describe("threads, by construction (ADR-0117)", () => {
+describe("threads, by construction", () => {
   test("a thread's id is no bare string, and a branch names the thread it starts", () => {
     // @ts-expect-error: a lane is named by a thread's id, never a string
     const lane: ThreadId = "t-x"
@@ -845,7 +845,7 @@ test("every place writes only the fields its kind's row stores (`ROWS`)", () => 
   expect(rowFieldsOf("nowhere")).toBeUndefined()
 })
 
-test("a notes target says by its tag which notes it is near, a thread's or a task's (ADR-0116)", () => {
+test("a notes target says by its tag which notes it is near, a thread's or a task's", () => {
   const thread = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
   const task = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ab")
   // @ts-expect-error: near a thread, it names the thread
@@ -866,7 +866,7 @@ test("a notes target says by its tag which notes it is near, a thread's or a tas
 const UUID = "01a0ffd2-0000-7000-8000-00000000000a"
 const NOTES = cardIdOfKind("note-column", UUID)
 
-describe("a history of moves' document (ADR-0066, ADR-0126)", () => {
+describe("a history of moves' document", () => {
   const ADA_W = writerId("ada@x.io")
   test("a task's and a person's outside any task read back as written; other ids name none", () => {
     for (const scope of [historyScope(TEST_TASK), PERSON_HISTORY])

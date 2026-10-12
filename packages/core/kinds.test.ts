@@ -26,7 +26,7 @@ import {
 const ADA = writerId("ada@x.io")
 const UUID = "01a0ffd2-0000-7000-8000-00000000000a"
 
-describe("KINDS (ADR-0126)", () => {
+describe("KINDS", () => {
   test("every id prefix is distinct, and none can begin a uuidv7: a bare id is a text card's", () => {
     const prefixes = Object.values(KINDS).flatMap(k =>
       k.prefix === null ? [] : [k.prefix],

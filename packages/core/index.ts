@@ -1,22 +1,6 @@
-// core — PURE. No I/O. Imports nothing but its own modules. Property-testable.
-//
-// FC/IS (gather -> plan -> execute): everything here is `plan`. A decision is a
-// VALUE; the shell in host/ performs it. This mirrors pi's own lane loop
-// (pi-agent-core/dist/harness/runtime/lane.js:200):
-//
-//     const decision = await plan(this.state, mutator);
-//     ... const commit = await mutator.commit(decision.writes, context);
-//     this.state = decision.next;
-//
-// Nothing in this file may import pi, Kyneta, or a Node builtin.
-//
-// What belongs here, as `@pinetrie/rules` and `@pinetrie/repo` state it too: core holds the vocabulary (ids, intents, every record's type)
-// and the reads of the tree. A format or type that `lanes` or `repo` must
-// read, write or name lives in core too, since neither can declare
-// `@pinetrie/rules`. What a stored shape says, and how the host changes it, is
-// `@pinetrie/rules`', whoever reads it. Core also holds the few pure helpers
-// several packages share (`paths.ts`, `errorText`), since every package that
-// uses one already depends on core.
+// core — the vocabulary every package shares (ids, intents, every record's
+// type) and the reads of the tree. Nothing here may import pi, Kyneta, or a
+// Node builtin (`TECHNICAL.md`).
 
 import type { CardCommand } from "./cards.ts"
 import {
@@ -55,8 +39,8 @@ import { isThreadNameHandle } from "./thread-names.ts"
 
 /**
  * A thread as the host records it, keyed by its id in the session
- * (`pinetrie.thread`, ADR-0117). Its first entry and its end are the
- * tree's: every entry names its thread (`EntryLike.thread`, ADR-0125).
+ * (`pinetrie.thread`). Its first entry and its end are the tree's: every entry
+ * names its thread (`EntryLike.thread`).
  */
 export interface ThreadRecord {
   readonly thread: ThreadId
@@ -69,11 +53,10 @@ export interface ThreadRecord {
 }
 
 /**
- * How a thread began (ADR-0117, ADR-0126): a root's first thread, a root's
- * first thread spun from a text card (ADR-0111), or a fork at `at`, a
- * branch or a copy. A fork's source is the thread its entry is in
- * (ADR-0125), so it is not stored. Before its first send a thread's column
- * ends at its fork, and its first send branches there.
+ * How a thread began: a root's first thread, a root's first thread spun from a
+ * text card, or a fork at `at`, a branch or a copy. A fork's source is the
+ * thread its entry is in, so it is not stored. Before its first send a thread's
+ * column ends at its fork, and its first send branches there.
  */
 export type ThreadOrigin =
   | { readonly kind: "root" }
@@ -128,19 +111,19 @@ export const ERR = {
   /** A display name is empty or too long. */
   INVALID_NAME: "invalid_name",
   /**
-   * A write in a task in the archive, or a move out of one (ADR-0029,
-   * ADR-0116): restore the task first. The message names who moved it there.
+   * A write in a task in the archive, or a move out of one: restore the task
+   * first. The message names who moved it there.
    */
   TASK_ARCHIVED: "task_archived",
   /** Moving a task into the archive while an agent of its works or cards are queued. */
   TASK_BUSY: "task_busy",
-  /** A workflow state the session's workflow does not hold (ADR-0122). */
+  /** A workflow state the session's workflow does not hold. */
   UNKNOWN_STATE: "unknown_state",
-  /** Removing a workflow state that still holds a task (ADR-0122). */
+  /** Removing a workflow state that still holds a task. */
   STATE_NOT_EMPTY: "state_not_empty",
-  /** Moving or removing the archive (ADR-0122). */
+  /** Moving or removing the archive. */
   STATE_ARCHIVE: "state_archive",
-  /** A workflow state named with nothing but spaces (ADR-0122). */
+  /** A workflow state named with nothing but spaces. */
   EMPTY_NAME: "empty_name",
   /** Removing the only open workflow state: a new task needs one to land in. */
   LAST_STATE: "last_state",
@@ -148,47 +131,47 @@ export const ERR = {
   BUSY: "busy",
   /** Landing a lane that has no copy of its own: a host without tools made it. */
   NOT_OWN_COPY: "not_own_copy",
-  /** An offer action on a lane with no offer in your repo (ADR-0105). */
+  /** An offer action on a lane with no offer in your repo. */
   NO_OFFER: "no_offer",
-  /** A `/package:name` command that names no command there is (ADR-0036). */
+  /** A `/package:name` command that names no command there is. */
   UNKNOWN_COMMAND: "unknown_command",
   /** A peer whose principal is not an email: nobody the host can name. */
   INVALID_IDENTITY: "invalid_identity",
-  /** A message shows a `/blob/` image the host does not store (ADR-0042). */
+  /** A message shows a `/blob/` image the host does not store. */
   IMAGE_MISSING: "image_missing",
-  /** A picture pi cannot decode or fit within `PICTURE_MOST` (ADR-0098). */
+  /** A picture pi cannot decode or fit within `PICTURE_MOST`. */
   PICTURE_UNREADABLE: "picture_unreadable",
-  /** A title with a line break, or longer than `MAX_TITLE` (ADR-0045). */
+  /** A title with a line break, or longer than `MAX_TITLE`. */
   INVALID_TITLE: "invalid_title",
-  /** A new thread's lane id that names a lane pi already holds (ADR-0057). */
+  /** A new thread's lane id that names a lane pi already holds. */
   LANE_ID_IN_USE: "lane_id_in_use",
-  /** A branch naming a thread that has started already (ADR-0117). */
+  /** A branch naming a thread that has started already. */
   THREAD_TAKEN: "thread_taken",
-  /** A new task's id that names a task the session already holds (ADR-0116). */
+  /** A new task's id that names a task the session already holds. */
   TASK_ID_IN_USE: "task_id_in_use",
-  /** A new root's id that names a root the session already holds (ADR-0063). */
+  /** A new root's id that names a root the session already holds. */
   ROOT_ID_IN_USE: "root_id_in_use",
-  /** An offer accepted, or a publish, before accepted work is set up (ADR-0104). */
+  /** An offer accepted, or a publish, before accepted work is set up. */
   NOT_SET_UP: "not_set_up",
-  /** Publishing in a repo with no publish bookmark (ADR-0076). */
+  /** Publishing in a repo with no publish bookmark. */
   NO_PUBLISH: "no_publish",
-  /** Publishing while the publish bookmark has commits accepted work lacks (ADR-0076). */
+  /** Publishing while the publish bookmark has commits accepted work lacks. */
   NOT_FAST_FORWARD: "not_fast_forward",
-  /** Publishing while the working copy has conflicts, or catching it up would make some (ADR-0090). */
+  /** Publishing while the working copy has conflicts, or catching it up would make some. */
   YOURS_CONFLICT: "yours_conflict",
   /** An acceptance into a bookmark that is not one of the offer's destinations now. */
   BAD_DESTINATION: "bad_destination",
   /** A new thread's base that is not a WIP bookmark above accepted work. */
   BAD_BASE: "bad_base",
-  /** Bringing a thread up to date with a WIP bookmark that is gone (ADR-0104). */
+  /** Bringing a thread up to date with a WIP bookmark that is gone. */
   BASE_GONE: "base_gone",
-  /** Catching up with the thread it branched from, for a thread that began at its base (ADR-0072). */
+  /** Catching up with the thread it branched from, for a thread that began at its base. */
   NO_PARENT: "no_parent",
-  /** Catching up with the thread it branched from while that thread's agent runs (ADR-0072). */
+  /** Catching up with the thread it branched from while that thread's agent runs. */
   PARENT_RUNNING: "parent_running",
   /**
-   * An acceptance that now brings other work than the one it was shown
-   * (another ledger), or now conflicts where it did not (ADR-0065).
+   * An acceptance that now brings other work than the one it was shown (another
+   * ledger), or now conflicts where it did not.
    */
   OFFER_CHANGED: "offer_changed",
 } as const
@@ -213,10 +196,7 @@ export const refused = (code: ErrCode, message: string): Refusal => ({
 
 /** A namespace of the host's own records. pi's are `pi.`, and never the host's to write. */
 export type HostNamespace = `pinetrie.${string}`
-/**
- * Which document a host record is written to (ADR-0063): the session's, or a
- * root's.
- */
+/** Which document a host record is written to: the session's, or a root's. */
 export type Target =
   | { readonly kind: "session" }
   | { readonly kind: "root"; readonly root: RootId }
@@ -224,10 +204,9 @@ export type Target =
 export const SESSION_TARGET: Target = { kind: "session" }
 
 /**
- * One write to a pi value at its address, in its document, as the host
- * decides it and pi's session carries it out (ADR-0062). Built by
- * `setRecord` and `deleteRecord` (`@pinetrie/rules`), which take the target from
- * the record's home.
+ * One write to a pi value at its address, in its document, as the host decides
+ * it and pi's session carries it out. Built by `setRecord` and `deleteRecord`
+ * (`@pinetrie/rules`), which take the target from the record's home.
  */
 export type ValueWrite =
   | {
@@ -250,21 +229,21 @@ export type ValueWrite =
  * - `reply`: continue the thread I am reading. If another writer compelled
  *   the agent there since I saw it, that is a race, and the sender is told
  *   (`conflict`) rather than guessed for.
- * - `branch`: start a thread, at the root or any message. Every thread
- *   starts this way, and a branch never continues an existing lane: a
- *   compelled one is a new line of work (ADR-0021).
+ * - `branch`: start a thread, at the root or any message. Every thread starts
+ *   this way, and a branch never continues an existing lane: a compelled one is
+ *   a new line of work.
  */
 export type ChatMode = "reply" | "branch"
 
 /**
- * Where a message goes (ADR-0117). A send at a thread's `end` names the
- * thread and the entry its sender saw as its end; the host finds the end
- * (`threadEnd`). A `branch` names the new thread the sender's column minted,
- * where it forks (an entry, or null for a thread at the root), and the task
- * its card goes in: a new one the sender's tab minted for a new root, else
- * the task its column is on (ADR-0116). So no send can land anywhere but a
- * thread's end without starting a thread, no thread's end ever gets two
- * continuations, and no thread starts without a place.
+ * Where a message goes. A send at a thread's `end` names the thread and the
+ * entry its sender saw as its end; the host finds the end (`threadEnd`). A
+ * `branch` names the new thread the sender's column minted, where it forks (an
+ * entry, or null for a thread at the root), and the task its card goes in: a
+ * new one the sender's tab minted for a new root, else the task its column is
+ * on. So no send can land anywhere but a thread's end without starting a
+ * thread, no thread's end ever gets two continuations, and no thread starts
+ * without a place.
  */
 export type ChatAt =
   | {
@@ -284,10 +263,10 @@ export const modeOf = (at: ChatAt): ChatMode =>
   at.kind === "end" ? "reply" : "branch"
 
 /**
- * How the host plans a message: a client's mode, or `queue`, for a queued
- * card it pops (ADR-0048). The lane's queue has already decided that card's
- * turn, so only a run makes the lane busy, and a race does not count. A
- * client never sends it: it queues a card instead.
+ * How the host plans a message: a client's mode, or `queue`, for a queued card
+ * it pops. The lane's queue has already decided that card's turn, so only a run
+ * makes the lane busy, and a race does not count. A client never sends it: it
+ * queues a card instead.
  */
 export type PlanMode = ChatMode | "queue"
 
@@ -315,8 +294,8 @@ export type Intent =
       readonly kind: "chat"
       readonly text: string
       /**
-       * The root it is written in (ADR-0063): a new one the sender's tab
-       * minted for a thread at the root.
+       * The root it is written in: a new one the sender's tab minted for a
+       * thread at the root.
        */
       readonly root: RootId
       readonly at: ChatAt
@@ -324,39 +303,39 @@ export type Intent =
       readonly asksAgent: boolean
       readonly mentions: readonly Mention[]
       /**
-       * The card the text was sent from, spent once it is written or running
-       * (ADR-0048), or queued when the lane is busy (ADR-0059).
+       * The card the text was sent from, spent once it is written or running,
+       * or queued when the lane is busy.
        */
       readonly card: SentCard | null
       /**
-       * Each card pinned at the sender's thread end, with its text version
-       * as the sender had it: a run waits for them (ADR-0048, S96).
+       * Each card pinned at the sender's thread end, with its text version as
+       * the sender had it: a run waits for them.
        */
       readonly pinned: readonly SentCard[]
       /**
        * The WIP bookmark a lane this message creates starts from; null for the
-       * line (ADR-0104). Read only when the message creates a lane.
+       * line. Read only when the message creates a lane.
        */
       readonly base: string | null
       /**
        * The workflow state a root this message starts lands in, at its end;
-       * null for the first open state (ADR-0122). Read only when it starts one.
+       * null for the first open state. Read only when it starts one.
        */
       readonly state: WorkflowStateId | null
     }
-  /** Name a thread before its lane exists (ADR-0057). */
+  /** Name a thread before its lane exists. */
   | { readonly kind: "reserve"; readonly lane: ThreadId }
   /** Set the sender's display name: a label, never an identity. */
   | { readonly kind: "name"; readonly name: string }
-  /** Set the sender's picture to a stored blob, or with null remove it (ADR-0098). */
+  /** Set the sender's picture to a stored blob, or with null remove it. */
   | { readonly kind: "picture"; readonly sha256: Sha256 | null }
   /** End a thread's running turn. Idempotent: an idle lane is already stopped. */
   | { readonly kind: "stop"; readonly lane: ThreadId }
-  /** Start a new turn on a thread whose last ask was stopped (ADR-0082). */
+  /** Start a new turn on a thread whose last ask was stopped. */
   | { readonly kind: "carry-on"; readonly lane: ThreadId }
   /**
-   * Hold a thread's queue, or release it (ADR-0048 step 7): while it is
-   * held, no message card queued there is popped.
+   * Hold a thread's queue, or release it: while it is held, no message card
+   * queued there is popped.
    */
   | {
       readonly kind: "queue-hold"
@@ -364,10 +343,10 @@ export type Intent =
       readonly held: boolean
     }
   /**
-   * Queue a card (ADR-0113): `move` into a lane's queue, and what it does to
-   * that queue's hold, decided with the move in one step. A move with no
-   * `from` creates the card there, carrying `command`, so the drain the
-   * queueing starts pops it with its command.
+   * Queue a card: `move` into a lane's queue, and what it does to that queue's
+   * hold, decided with the move in one step. A move with no `from` creates the
+   * card there, carrying `command`, so the drain the queueing starts pops it
+   * with its command.
    */
   | {
       readonly kind: "queue-card"
@@ -379,11 +358,10 @@ export type Intent =
   /** Take every message card queued on a thread back below the line. */
   | { readonly kind: "unqueue-all"; readonly lane: ThreadId }
   /**
-   * Make a text card a thread (ADR-0111, ADR-0126): a new conversation root,
-   * `root`, its thread `thread`, whose first message is the card's text, in
-   * a new task, `task`, in `state`, or the first open state for null; the
-   * card goes to the trash, in the history `here` names when it leaves no
-   * task.
+   * Make a text card a thread: a new conversation root, `root`, its thread
+   * `thread`, whose first message is the card's text, in a new task, `task`, in
+   * `state`, or the first open state for null; the card goes to the trash, in
+   * the history `here` names when it leaves no task.
    */
   | {
       readonly kind: "spin-off"
@@ -393,16 +371,16 @@ export type Intent =
       readonly task: TaskId
       readonly state: WorkflowStateId | null
       /**
-       * The task its sender will be on, which names the move's history for
-       * a card from an inventory: the new task for a drop in the sidebar,
-       * else the one they are on (ADR-0116).
+       * The task its sender will be on, which names the move's history for a
+       * card from an inventory: the new task for a drop in the sidebar, else
+       * the one they are on.
        */
       readonly here: TaskId | null
     }
   /**
-   * Move a task on the board (ADR-0122, ADR-0116): from the state its sender
-   * saw it in, to `to`, before `before` there, or at its end. Into the
-   * archive it archives the task, and out of it restores the task.
+   * Move a task on the board: from the state its sender saw it in, to `to`,
+   * before `before` there, or at its end. Into the archive it archives the
+   * task, and out of it restores the task.
    */
   | {
       readonly kind: "move-task"
@@ -411,23 +389,23 @@ export type Intent =
       readonly to: WorkflowStateId
       readonly before: TaskId | null
     }
-  /** Change the session's workflow states (ADR-0122). */
+  /** Change the session's workflow states. */
   | { readonly kind: "workflow"; readonly edit: WorkflowEdit }
   /**
-   * Title a task or a note column, or clear its title with null (ADR-0045,
-   * ADR-0116): one gesture, each title in its own record.
+   * Title a task or a note column, or clear its title with null: one gesture,
+   * each title in its own record.
    */
   | {
       readonly kind: "mark"
       readonly of: MarkTarget
       readonly title: string | null
     }
-  /** Ask a model for a task's title, from its first thread's messages (ADR-0074). */
+  /** Ask a model for a task's title, from its first thread's messages. */
   | { readonly kind: "retitle"; readonly task: TaskId }
   /**
-   * Act on a lane's offer in your repo (ADR-0105). An acceptance names its
-   * destination bookmark, null for the default (ADR-0104), and what it was
-   * shown (`seen`, ADR-0065); every other action, null.
+   * Act on a lane's offer in your repo. An acceptance names its destination
+   * bookmark, null for the default, and what it was shown (`seen`); every other
+   * action, null.
    */
   | {
       readonly kind: "offer"
@@ -436,13 +414,13 @@ export type Intent =
       readonly to: string | null
       readonly seen: OfferSeen | null
     }
-  /** Set up accepted work, or publish it (ADR-0104, ADR-0090). */
+  /** Set up accepted work, or publish it. */
   | { readonly kind: AcceptedAction }
   /**
-   * Move cards, create one, or remove one (ADR-0059): one move, or a keep's
-   * several, accepted whole or refused. The host records it in a task's
-   * history of the sender's moves (`historyOf`, ADR-0066); `here`, the task
-   * its sender is on, is a discard's from an inventory (ADR-0116).
+   * Move cards, create one, or remove one: one move, or a keep's several,
+   * accepted whole or refused. The host records it in a task's history of the
+   * sender's moves (`historyOf`); `here`, the task its sender is on, is a
+   * discard's from an inventory.
    */
   | {
       readonly kind: "move"
@@ -450,11 +428,11 @@ export type Intent =
       readonly here: TaskId | null
     }
   /**
-   * Open a thread before its first entry (ADR-0126), as its column opens:
-   * its record, and its card on `task`'s canvas. A branch at `at` in
-   * `root`, just after the thread `at` is in; or, with `at` null, a new
-   * tab's: a new root's first thread in a new task, which lands in `state`
-   * (the first open state for null).
+   * Open a thread before its first entry, as its column opens: its record, and
+   * its card on `task`'s canvas. A branch at `at` in `root`, just after the
+   * thread `at` is in; or, with `at` null, a new tab's: a new root's first
+   * thread in a new task, which lands in `state` (the first open state for
+   * null).
    */
   | {
       readonly kind: "open-thread"
@@ -465,11 +443,10 @@ export type Intent =
       readonly state: WorkflowStateId | null
     }
   /**
-   * Copy the thread `source` (ADR-0117, ADR-0124): a new thread, its id the
-   * move's card, forked at `end`, the source's end as its copier saw it,
-   * its card made where the move puts it: a spot on a canvas or the
-   * copier's inventory. One step of the copier's history, as a paste is
-   * (ADR-0132).
+   * Copy the thread `source`: a new thread, its id the move's card, forked at
+   * `end`, the source's end as its copier saw it, its card made where the move
+   * puts it: a spot on a canvas or the copier's inventory. One step of the
+   * copier's history, as a paste is.
    */
   | {
       readonly kind: "copy-thread"
@@ -478,11 +455,10 @@ export type Intent =
       readonly move: MoveOf<"thread"> & { readonly from: null }
     }
   /**
-   * Paste (ADR-0132): make a card from a copy, or move a cut card out of
-   * a trash by its cutter, where `to` sends it, after discarding the card it
-   * replaces (ADR-0133). One step of the sender's history, in the task it
-   * lands in; `here`, the task its sender is on, names a discard's from an
-   * inventory (ADR-0116).
+   * Paste: make a card from a copy, or move a cut card out of a trash by its
+   * cutter, where `to` sends it, after discarding the card it replaces. One
+   * step of the sender's history, in the task it lands in; `here`, the task its
+   * sender is on, names a discard's from an inventory.
    */
   | {
       readonly kind: "paste"
@@ -492,14 +468,14 @@ export type Intent =
       readonly here: TaskId | null
     }
   /**
-   * Move a queued or pinned card among its neighbours (ADR-0048 step 7),
-   * recorded in its root's history of the sender's moves (ADR-0066).
+   * Move a queued or pinned card among its neighbours, recorded in its root's
+   * history of the sender's moves.
    */
   | { readonly kind: "reorder"; readonly reorder: Reorder }
   /**
-   * Draw a card on a canvas one column wide or two (ADR-0116), from where
-   * its sender saw it (`at`): a compare-and-set, as a reorder is, recorded
-   * in the task's history of the sender's moves (ADR-0066).
+   * Draw a card on a canvas one column wide or two, from where its sender saw
+   * it (`at`): a compare-and-set, as a reorder is, recorded in the task's
+   * history of the sender's moves.
    */
   | {
       readonly kind: "card-width"
@@ -508,32 +484,31 @@ export type Intent =
       readonly width: CardWidth
     }
   /**
-   * Undo or redo the sender's newest move in `task`, or, with none, in
-   * their history outside any task (ADR-0066, ADR-0126).
+   * Undo or redo the sender's newest move in `task`, or, with none, in their
+   * history outside any task.
    */
   | {
       readonly kind: "undo-move"
       readonly task: TaskId | null
       readonly direction: MoveDirection
     }
-  /** Set a card's command, or clear it with null (ADR-0108). */
+  /** Set a card's command, or clear it with null. */
   | {
       readonly kind: "set-command"
       readonly card: CardId
       readonly command: CardCommand | null
     }
   /**
-   * The sender has seen these traces of theirs (ADR-0048, *Other people*):
-   * the host deletes them. Ids not the sender's are ignored.
+   * The sender has seen these traces of theirs: the host deletes them. Ids not
+   * the sender's are ignored.
    */
   | { readonly kind: "traces-seen"; readonly traces: readonly string[] }
 
 /**
- * What can be done with an offer: accept it into accepted work or a WIP
- * (ADR-0104, ADR-0083), squash a stack back to one revision, have the agent
- * write its description again, or rebuild it, discarding your edits
- * (ADR-0105). Splitting it is a card's command, `split`, popped when the
- * thread is free (ADR-0080).
+ * What can be done with an offer: accept it into accepted work or a WIP, squash
+ * a stack back to one revision, have the agent write its description again, or
+ * rebuild it, discarding your edits. Splitting it is a card's command, `split`,
+ * popped when the thread is free.
  */
 export type OfferAction = "accept" | "squash" | "describe" | "refresh"
 export const OFFER_ACTIONS: readonly OfferAction[] = [
@@ -544,13 +519,13 @@ export const OFFER_ACTIONS: readonly OfferAction[] = [
 ]
 
 /**
- * What can be done with accepted work: set it up at your `@-`,
- * writing your repo's immutable heads (ADR-0104), or publish it (ADR-0090).
+ * What can be done with accepted work: set it up at your `@-`, writing your
+ * repo's immutable heads, or publish it.
  */
 export type AcceptedAction = "setup" | "publish"
 export const ACCEPTED_ACTIONS: readonly AcceptedAction[] = ["setup", "publish"]
 
-// --- the board (ADR-0122) ---------------------------------------------------
+// --- the board --------------------------------------------------------------
 
 /** A workflow state: a column of the board. */
 export interface WorkflowState {
@@ -560,8 +535,8 @@ export interface WorkflowState {
 
 /**
  * The session's workflow: a host-written `pinetrie.workflow` singleton. The
- * open states in board order, then the archive, which is always there
- * and always last: a root in it is archived (ADR-0029).
+ * open states in board order, then the archive, which is always there and
+ * always last: a root in it is archived.
  */
 export interface Workflow {
   readonly open: readonly WorkflowState[]
@@ -588,14 +563,13 @@ export const WORKFLOW_ACTIONS: readonly WorkflowAction[] = [
 ]
 
 /**
- * A task's place on the board (ADR-0116): a host-written `pinetrie.board`
- * value keyed by its `TaskId`. A task has one, written as it starts and as it
- * moves.
+ * A task's place on the board: a host-written `pinetrie.board` value keyed by
+ * its `TaskId`. A task has one, written as it starts and as it moves.
  */
 export interface BoardPlace {
   readonly task: TaskId
   readonly state: WorkflowStateId
-  /** Its order within the state: an order key (S69). */
+  /** Its order within the state: an order key. */
   readonly rank: string
   /** Who moved it there, and when, in ms since the epoch. */
   readonly by: WriterId
@@ -613,7 +587,7 @@ export interface ArchivedTask {
   readonly at: number
 }
 
-// --- the directory of roots (ADR-0063) --------------------------------------
+// --- the directory of roots -------------------------------------------------
 
 /**
  * A root as the sidebar, the board and your inbox see it,
@@ -622,7 +596,7 @@ export interface ArchivedTask {
  */
 export interface RootRecord {
   readonly root: RootId
-  /** Its root entry (S30), the tab's key; null before its first message. */
+  /** Its root entry, the tab's key; null before its first message. */
   readonly entry: EntryId | null
   /** Its first message, as the rail finds it (`RootSummary.first`). */
   readonly first: EntryId | null
@@ -635,13 +609,13 @@ export interface RootRecord {
   /** Everyone who wrote a chat in it, in order of first message. */
   readonly writers: readonly WriterId[]
   /**
-   * Per thread, everyone who wrote a chat on its path from the root to its
-   * tip, in order of first message: its followers (ADR-0077).
+   * Per thread, everyone who wrote a chat on its path from the root to its tip,
+   * in order of first message: its followers.
    */
   readonly threads: Readonly<Record<ThreadId, readonly WriterId[]>>
   /**
-   * Its chats that name someone (`@`), for the inbox to resolve, each with
-   * the thread it is in, which the inbox opens it in (ADR-0116).
+   * Its chats that name someone (`@`), for the inbox to resolve, each with the
+   * thread it is in, which the inbox opens it in.
    */
   readonly mentions: readonly {
     readonly id: EntryId
@@ -653,11 +627,11 @@ export interface RootRecord {
   readonly images: readonly Sha256[]
 }
 
-// --- marks (ADR-0045) --------------------------------------------------------
+// --- marks ------------------------------------------------------------------
 
 /**
- * A task's title (ADR-0045, ADR-0116): a host-written `pinetrie.mark` value
- * in the session, keyed by the task's id, so a task has at most one.
+ * A task's title: a host-written `pinetrie.mark` value in the session, keyed by
+ * the task's id, so a task has at most one.
  */
 export interface MarkRecord {
   readonly task: TaskId
@@ -668,15 +642,15 @@ export interface MarkRecord {
   readonly at: number
 }
 
-/** What a title names (ADR-0116): a task, or a note column. */
+/** What a title names: a task, or a note column. */
 export type MarkTarget =
   | { readonly kind: "task"; readonly task: TaskId }
   | { readonly kind: "note-column"; readonly column: NoteColumnId }
 
 /**
- * A note column's title (ADR-0116): a host-written `pinetrie.note-column`
- * value in the session, keyed by the column's id, absent while untitled.
- * Who made the column is its card's owner, and when is in its id.
+ * A note column's title: a host-written `pinetrie.note-column` value in the
+ * session, keyed by the column's id, absent while untitled. Who made the column
+ * is its card's owner, and when is in its id.
  */
 export interface NoteColumnRecord {
   readonly column: NoteColumnId
@@ -687,13 +661,12 @@ export interface NoteColumnRecord {
   readonly at: number
 }
 
-// --- stops (ADR-0106, ADR-0126) --------------------------------------------
+// --- stops ------------------------------------------------------------------
 
 /**
- * Who stopped an ask's run, as a fact in its thread (ADR-0126): queued as a
- * fact card when Stop is pressed, and appended as the run ends, so the
- * agent's next run reads it. pi's entries say a run was aborted, never by
- * whom (S70).
+ * Who stopped an ask's run, as a fact in its thread: queued as a fact card when
+ * Stop is pressed, and appended as the run ends, so the agent's next run reads
+ * it. pi's entries say a run was aborted, never by whom.
  */
 export interface StopFact {
   readonly kind: "stopped"
@@ -704,15 +677,15 @@ export interface StopFact {
   /** When Stop was pressed, in ms since the epoch. */
   readonly at: number
   /**
-   * The message whose budget was spent, when it was the budget that stopped
-   * the run, and `by` is whose message it was (ADR-0128); absent for a Stop.
+   * The message whose budget was spent, when it was the budget that stopped the
+   * run, and `by` is whose message it was; absent for a Stop.
    */
   readonly budget?: EntryId
 }
 
 /**
- * Who joined or left a thread's members (ADR-0128): a person dismissed an
- * agent, or the agent left. Read back by `threadMembers`.
+ * Who joined or left a thread's members: a person dismissed an agent, or the
+ * agent left. Read back by `threadMembers`.
  */
 export type MemberFact =
   | {
@@ -730,9 +703,9 @@ export type MemberFact =
     }
 
 /**
- * An ask another thread's agent did not answer (ADR-0128): its run was
- * stopped or failed. In the thread that asked; `member` is the asked
- * thread, `by` the person behind the chain.
+ * An ask another thread's agent did not answer: its run was stopped or failed.
+ * In the thread that asked; `member` is the asked thread, `by` the person
+ * behind the chain.
  */
 export interface UnansweredFact {
   readonly kind: "unanswered"
@@ -742,7 +715,7 @@ export interface UnansweredFact {
   readonly by: WriterId
 }
 
-/** Where a thread is (ADR-0128): `threadReach` (`@pinetrie/rules`) reads it. */
+/** Where a thread is: `threadReach` (`@pinetrie/rules`) reads it. */
 export type Reach =
   | { readonly kind: "open"; readonly task: TaskId }
   | {
@@ -759,9 +732,9 @@ export type Reach =
 export type Away = Exclude<Reach, { readonly kind: "open" }>
 
 /**
- * An answer that could not be sent (ADR-0128): the thread that asked went
- * out of reach while it was answered. In the answering thread; `to` is the
- * thread that asked, `why` where it is now.
+ * An answer that could not be sent: the thread that asked went out of reach
+ * while it was answered. In the answering thread; `to` is the thread that
+ * asked, `why` where it is now.
  */
 export interface UndeliveredFact {
   readonly kind: "undelivered"
@@ -773,8 +746,8 @@ export interface UndeliveredFact {
 }
 
 /**
- * What the request after a round of answers told the people (ADR-0128): a
- * line for them, in the thread whose message asked. `by` is whose it was.
+ * What the request after a round of answers told the people: a line for them,
+ * in the thread whose message asked. `by` is whose it was.
  */
 export interface RoundFact {
   readonly kind: "round"
@@ -784,8 +757,8 @@ export interface RoundFact {
 }
 
 /**
- * Agents spent a budget (ADR-0128): its message's tokens ran out, in the
- * thread whose message set it. `by` is whose message it was.
+ * Agents spent a budget: its message's tokens ran out, in the thread whose
+ * message set it. `by` is whose message it was.
  */
 export interface BudgetSpentFact {
   readonly kind: "budget-spent"
@@ -796,9 +769,9 @@ export interface BudgetSpentFact {
 }
 
 /**
- * A thread's queue held (ADR-0048 step 7): a host-written
- * `pinetrie.queue-hold` value in the session, keyed by the lane. While it is
- * there no message card is popped, only facts, until someone releases it.
+ * A thread's queue held: a host-written `pinetrie.queue-hold` value in the
+ * session, keyed by the lane. While it is there no message card is popped, only
+ * facts, until someone releases it.
  */
 export interface QueueHold {
   readonly lane: ThreadId
@@ -807,7 +780,7 @@ export interface QueueHold {
   readonly at: number
 }
 
-/** What a digest says (ADR-0075). */
+/** What a digest says. */
 export interface DigestBody {
   /**
    * One line of at most `HEADLINE_WORDS` words (`@pinetrie/rules`'
@@ -819,7 +792,7 @@ export interface DigestBody {
   readonly points: readonly string[]
 }
 
-/** An ask's digest: replaced whole on each write, so a value, not a text (ADR-0014). */
+/** An ask's digest: replaced whole on each write, so a value, not a text. */
 export interface DigestRecord extends DigestBody {
   /** The ask's prompt: the digest's key. */
   readonly prompt: EntryId
@@ -829,12 +802,12 @@ export interface DigestRecord extends DigestBody {
   readonly final: boolean
 }
 
-/** What a model says a run's end asks of the people in its thread (ADR-0077). */
+/** What a model says a run's end asks of the people in its thread. */
 export type Said = "needsYou" | "worthARead" | "done"
 
 /**
- * How a thread's last run ended (ADR-0077): what happened, never what it
- * asks of whom. Each client decides that for its person (`levelOf`).
+ * How a thread's last run ended: what happened, never what it asks of whom.
+ * Each client decides that for its person (`levelOf`).
  */
 export type Verdict =
   /** The run has stopped running, and the model has not answered yet. */
@@ -887,12 +860,12 @@ export function parseTitle(text: string): TitleInput {
     : { kind: "set", title }
 }
 
-// --- where lanes work (ADR-0032, ADR-0033) -----------------------------------
+// --- where lanes work -------------------------------------------------------
 
 /**
  * What stops an editor from opening, for jj and for a lane's shell: a shell
- * with no terminal would wait on one until its timeout (S36 items 13 and 21).
- * With these, a command that wants one fails at once.
+ * with no terminal would wait on one until its timeout. With these, a command
+ * that wants one fails at once.
  */
 export const NO_EDITOR = {
   JJ_EDITOR: "false",
@@ -908,19 +881,19 @@ export const PRODUCT_NAME = "pine·trie"
 
 /**
  * The user every host operation on your repo carries, so the evolog says which
- * commits the host made, and a race is repaired in your favour (S48 item 8).
+ * commits the host made, and a race is repaired in your favour.
  */
 export const HOST_OPERATOR = "pinetrie-host"
 
 /**
- * Where a thread's lane starts and is brought up to date from (ADR-0104):
- * accepted work, or a WIP bookmark you chose at its first message.
+ * Where a thread's lane starts and is brought up to date from: accepted work,
+ * or a WIP bookmark you chose at its first message.
  */
 export type ThreadBase =
   | { readonly kind: "accepted" }
   | { readonly kind: "wip"; readonly bookmark: string }
 
-/** The thread a lane's copy was cloned from, by its lane and its name (ADR-0072). */
+/** The thread a lane's copy was cloned from, by its lane and its name. */
 export interface ParentThread {
   readonly kind: "parent"
   readonly lane: ThreadId
@@ -928,9 +901,9 @@ export interface ParentThread {
 }
 
 /**
- * Where a lane's working copy sits against its bookmark (ADR-0080), read
- * before a catch-up merges: `@`'s parents, the lane's bookmark, and whether
- * `@`'s one parent descends from it (the agent's own commit).
+ * Where a lane's working copy sits against its bookmark, read before a catch-up
+ * merges: `@`'s parents, the lane's bookmark, and whether `@`'s one parent
+ * descends from it (the agent's own commit).
  */
 export interface CopyFacts {
   readonly parents: readonly CommitId[]
@@ -941,7 +914,7 @@ export interface CopyFacts {
 /** What a catch-up merges from: the thread's base, or the thread it branched from. */
 export type CatchUpFrom = ThreadBase | ParentThread
 
-/** A lane's base, read from its history (`@pinetrie/lanes`' `laneBase`, ADR-0104). */
+/** A lane's base, read from its history (`@pinetrie/lanes`' `laneBase`). */
 export interface LaneBase {
   readonly base: ThreadBase
   /**
@@ -967,15 +940,15 @@ declare const commitIdBrand: unique symbol
 export type CommitId = string & { readonly [commitIdBrand]: true }
 export const commitId = (id: string): CommitId => id as CommitId
 
-/** Where every lane of its own sees its own directory (ADR-0034). */
+/** Where every lane of its own sees its own directory. */
 export const WORKSPACE_ROOT = "/workspace"
 /** Where every lane of its own sees your working copy, read-only. */
 export const HOST_WORKING_COPY = "/mnt/host-working-copy"
 
 /**
  * The programs the lane runtime carries into every lane of its own, on its
- * `PATH` whatever the image (ADR-0064). Each must be a static build in
- * pinetrie's default image, which the runtime is copied out of.
+ * `PATH` whatever the image. Each must be a static build in pinetrie's default
+ * image, which the runtime is copied out of.
  */
 export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const
 export type RuntimeProgram = (typeof RUNTIME_PROGRAMS)[number]
@@ -986,8 +959,8 @@ export const shellWord = (s: string): string =>
 
 /**
  * Where every lane of its own sees host paths it is granted: `HOST_MOUNT` and
- * then the host path (ADR-0036). One rule, so no granted path can shadow a
- * directory of the image's.
+ * then the host path. One rule, so no granted path can shadow a directory of
+ * the image's.
  */
 export const HOST_MOUNT = "/mnt/host"
 
@@ -995,7 +968,7 @@ export const HOST_MOUNT = "/mnt/host"
 export const hostPathInLane = (hostPath: string): string =>
   `${HOST_MOUNT}${hostPath}`
 
-/** A command runs a pi skill or expands a pi prompt template (ADR-0036). */
+/** A command runs a pi skill or expands a pi prompt template. */
 export type CommandKind = "skill" | "prompt"
 
 /** A command as people see it: in the composer's completion and on a sent message. */
@@ -1019,7 +992,7 @@ export interface CommandRef {
   readonly expanded: string
 }
 
-/** The commands the host's pi loaded, as people see them (ADR-0036). */
+/** The commands the host's pi loaded, as people see them. */
 export interface CommandsRecord {
   readonly commands: readonly CommandSummary[]
 }
@@ -1032,10 +1005,10 @@ declare const snapshotIdBrand: unique symbol
  */
 export type SnapshotId = string & { readonly [snapshotIdBrand]: true }
 export const snapshotId = (id: string): SnapshotId => id as SnapshotId
-/** The project's disk at accepted work's commit, which root lanes fork from (ADR-0104). */
+/** The project's disk at accepted work's commit, which root lanes fork from. */
 export const BASE_SNAPSHOT = snapshotId("base")
 
-/** The names of dependency layers' snapshots (ADR-0131). */
+/** The names of dependency layers' snapshots. */
 export const DEPS_PREFIX = "deps-"
 /** A dependency layer: the snapshot of the disk a recipe made, named by its key. */
 export const depsSnapshot = (key: string): SnapshotId =>
@@ -1054,9 +1027,9 @@ export interface DiskChange {
 }
 
 /**
- * Paths on a lane's disk that no person and no recipe writes: pine·trie's
- * own, the repos', and the file system's. A recipe never owns one, and a
- * turn's diff counts none as the turn's (ADR-0131).
+ * Paths on a lane's disk that no person and no recipe writes: pine·trie's own,
+ * the repos', and the file system's. A recipe never owns one, and a turn's diff
+ * counts none as the turn's.
  */
 export const DISK_OWN_ROOTS: readonly string[] = [
   ".pinetrie-lane",
@@ -1082,16 +1055,16 @@ export interface DiskDiff {
 
 /**
  * A lane's record: a host-written `pinetrie.lane` value keyed by the lane's
- * name, written once, when the lane is created. The setting never changes:
- * a lane's files would stop matching its conversation (ADR-0032).
+ * name, written once, when the lane is created. The setting never changes: a
+ * lane's files would stop matching its conversation.
  */
 export interface LaneRecord {
   readonly lane: ThreadId
-  /** The root the lane works in (ADR-0063). */
+  /** The root the lane works in. */
   readonly root: RootId
   /**
-   * Whether it works in a copy of its own, in its container (ADR-0102):
-   * false for a lane a host without tools made.
+   * Whether it works in a copy of its own, in its container: false for a lane a
+   * host without tools made.
    */
   readonly ownCopy: boolean
   readonly by: WriterId
@@ -1109,10 +1082,9 @@ export const IGNORED_LISTED = 100
 
 /**
  * The files at an entry: a host-written `pinetrie.revision` value keyed by the
- * entry's id (ADR-0032, ADR-0034). Every run's prompt has one, and so does
- * every assistant message of a lane of its own that made tool calls. So the
- * nearest record above any entry names its lane, its commit and its disk
- * (`nearestRevision`).
+ * entry's id. Every run's prompt has one, and so does every assistant message
+ * of a lane of its own that made tool calls. So the nearest record above any
+ * entry names its lane, its commit and its disk (`nearestRevision`).
  */
 export interface RevisionRecord {
   readonly entry: EntryId
@@ -1125,18 +1097,17 @@ export interface RevisionRecord {
    */
   readonly snapshot: SnapshotId | null
   /**
-   * The paths the turn's commit changed, from the repository's root; none
-   * for a prompt's record or a turn with no commit (ADR-0106).
+   * The paths the turn's commit changed, from the repository's root; none for a
+   * prompt's record or a turn with no commit.
    */
   readonly paths: readonly string[]
-  /** The files conflicted in `commit`: what a branch from here starts with (ADR-0072). */
+  /** The files conflicted in `commit`: what a branch from here starts with. */
   readonly conflicts: readonly string[]
   /**
-   * Ignored files the turn wrote that are no recipe's output, no cache and
-   * not pine·trie's own, from its whole-disk diff (ADR-0131): the topmost
-   * of them, sorted, at most `IGNORED_LISTED`, and how many more. Null for a
-   * prompt's record, a lane with no copy of its own, and records written
-   * before.
+   * Ignored files the turn wrote that are no recipe's output, no cache and not
+   * pine·trie's own, from its whole-disk diff: the topmost of them, sorted, at
+   * most `IGNORED_LISTED`, and how many more. Null for a prompt's record, a
+   * lane with no copy of its own, and records written before.
    */
   readonly ignored: IgnoredFiles | null
   /** Whether the lane's recipe ran at the turn's end, and how it went; null when it did not run. */
@@ -1145,8 +1116,8 @@ export interface RevisionRecord {
 
 /**
  * What the host found where it runs: a host-written `pinetrie.project` value,
- * rewritten at every start, and only by a host with tools, whose every lane
- * has its own copy (ADR-0102).
+ * rewritten at every start, and only by a host with tools, whose every lane has
+ * its own copy.
  */
 export interface ProjectRecord {
   readonly root: string
@@ -1154,13 +1125,13 @@ export interface ProjectRecord {
 
 /**
  * A lane's offer: one revision, or a stack, in your repo, holding the lane's
- * work you do not have yet (ADR-0105). A host-written `pinetrie.offer` value
- * keyed by lane: the page's cache, written from the repo after each of the
- * host's steps (`offerRecord`, `@pinetrie/rules`). The host never decides from it: it reads the
- * offer from your repo (`OfferInRepo`), so a record lost or stale changes
- * nothing. What accepting it would bring, each revision's description,
- * files and diffs, is not stored: the page reads it by commit when it asks
- * (`RevisionReview`, ADR-0047).
+ * work you do not have yet. A host-written `pinetrie.offer` value keyed by
+ * lane: the page's cache, written from the repo after each of the host's steps
+ * (`offerRecord`, `@pinetrie/rules`). The host never decides from it: it reads
+ * the offer from your repo (`OfferInRepo`), so a record lost or stale changes
+ * nothing. What accepting it would bring, each revision's description, files
+ * and diffs, is not stored: the page reads it by commit when it asks
+ * (`RevisionReview`).
  */
 export interface OfferRecord {
   readonly lane: ThreadId
@@ -1168,17 +1139,16 @@ export interface OfferRecord {
   readonly size: number
   /** The lane turned since the stack was made: it no longer holds all of it. */
   readonly stale: boolean
-  /** None when accepted work already holds its work (`offerStatus`'s `held`, S89). */
+  /** None when accepted work already holds its work (`offerStatus`'s `held`). */
   readonly files: readonly string[]
-  /** Files that conflict with your committed work (S48 item 3). */
+  /** Files that conflict with your committed work. */
   readonly conflicts: readonly string[]
   /**
-   * The files conflicted where it starts, read only when it conflicts:
-   * those of `conflicts` among them came with the lane's copy
-   * (`conflictCause`, ADR-0072).
+   * The files conflicted where it starts, read only when it conflicts: those of
+   * `conflicts` among them came with the lane's copy (`conflictCause`).
    */
   readonly startConflicts: readonly string[]
-  /** Files it touches that you are editing in `@` (S48 item 4). */
+  /** Files it touches that you are editing in `@`. */
   readonly yourEdits: readonly string[]
   /** An agent wrote its description; false while it carries the placeholder. */
   readonly described: boolean
@@ -1187,8 +1157,7 @@ export interface OfferRecord {
   /** Its bookmark in your repo, as jjui shows it. */
   readonly bookmark: string
   /**
-   * The change id its top became when you accepted it; null while it is
-   * open. Stored as `taken` before ADR-0083: `offerRecord` still reads that.
+   * The change id its top became when you accepted it; null while it is open.
    */
   readonly acceptedAs: string | null
   /**
@@ -1198,11 +1167,10 @@ export interface OfferRecord {
    */
   readonly commits: readonly CommitId[]
   /**
-   * What it brings, as its top's message says (`offerLedger`): the lane tip
-   * it holds and where it starts. An acceptance names it (`OfferSeen`,
-   * ADR-0065).
-   * Null for an offer whose message carries none, and for a record written
-   * before the field, until the owner's first observation writes it again.
+   * What it brings, as its top's message says (`offerLedger`): the lane tip it
+   * holds and where it starts. An acceptance names it (`OfferSeen`). Null for
+   * an offer whose message carries none, and for a record written before the
+   * field, until the owner's first observation writes it again.
    */
   readonly ledger: OfferLedger | null
   readonly at: number
@@ -1211,14 +1179,14 @@ export interface OfferRecord {
 /**
  * Where an offer's conflict comes from (`conflictCause`): the lane's work
  * against its target, or the copy it was cloned with, every conflicted file
- * already conflicted where it starts (ADR-0072).
+ * already conflicted where it starts.
  */
 export type ConflictCause = "work" | "start"
 
 /** How jj says a file changed in a revision. */
 export type FileChange = "added" | "modified" | "removed" | "copied" | "renamed"
 
-/** One file of one revision, as jj's diff stats read it (S57). */
+/** One file of one revision, as jj's diff stats read it. */
 export interface ReviewFile {
   readonly path: string
   /** jj's display path: `{old => new}` for a rename or copy, else `path`. */
@@ -1231,7 +1199,7 @@ export interface ReviewFile {
 
 /**
  * One revision of an offer, as its commit holds it. A commit id names its
- * content, so this never changes for a commit (ADR-0047).
+ * content, so this never changes for a commit.
  */
 export interface RevisionReview {
   /** Its description, the host's trailers included. */
@@ -1240,10 +1208,10 @@ export interface RevisionReview {
 }
 
 /**
- * What a review reads (ADR-0047, ADR-0106): one revision, the diff from its
- * parent to it, or a range, the diff from one commit to another, such as an
- * ask's work across its turns' revisions. Commit ids name their content, so
- * a review of either never changes.
+ * What a review reads: one revision, the diff from its parent to it, or a
+ * range, the diff from one commit to another, such as an ask's work across its
+ * turns' revisions. Commit ids name their content, so a review of either never
+ * changes.
  */
 export type DiffSpan =
   | { readonly kind: "revision"; readonly commit: CommitId }
@@ -1258,9 +1226,9 @@ export const spanKey = (s: DiffSpan): string =>
   s.kind === "revision" ? s.commit : `${s.from}..${s.to}`
 
 /**
- * What a fork starts on (ADR-0104): a commit a lane recorded (a branch below
- * agent work), accepted work's commit, or a copy of a WIP bookmark made on the
- * accepted commit under it, so the lane freezes nothing of yours.
+ * What a fork starts on: a commit a lane recorded (a branch below agent work),
+ * accepted work's commit, or a copy of a WIP bookmark made on the accepted
+ * commit under it, so the lane freezes nothing of yours.
  */
 export type ForkStart =
   | { readonly kind: "commits"; readonly commits: readonly CommitId[] }
@@ -1276,8 +1244,8 @@ export type ForkStart =
 
 /**
  * What bringing a thread up to date merges into its lane: accepted work's
- * commit, or a fresh copy of a WIP (ADR-0104); or the newest commit of the
- * thread it branched from (ADR-0072).
+ * commit, or a fresh copy of a WIP; or the newest commit of the thread it
+ * branched from.
  */
 export type BaseMerge =
   | {
@@ -1308,12 +1276,12 @@ export type BaseMerge =
 
 declare const threadNameBrand: unique symbol
 /**
- * A thread's name as people say it: two words, `amber-fox` (ADR-0039). Minted
- * by `@pinetrie/rules`' naming and its decoder; stored, never recomputed.
+ * A thread's name as people say it: two words, `amber-fox`. Minted by
+ * `@pinetrie/rules`' naming and its decoder; stored, never recomputed.
  */
 export type ThreadName = string & { readonly [threadNameBrand]: true }
 
-/** A lane's name: a host-written `pinetrie.name` value keyed by the lane (ADR-0039). */
+/** A lane's name: a host-written `pinetrie.name` value keyed by the lane. */
 export interface NameRecord {
   readonly lane: ThreadId
   readonly name: ThreadName
@@ -1322,8 +1290,8 @@ export interface NameRecord {
 
 /**
  * The image behind a thread's column header: a host-written `pinetrie.banner`
- * value keyed by the lane. The image is a blob (ADR-0042); a replaced one is
- * no longer referenced, and the blob sweep deletes it.
+ * value keyed by the lane. The image is a blob; a replaced one is no longer
+ * referenced, and the blob sweep deletes it.
  */
 export interface BannerRecord {
   readonly lane: ThreadId
@@ -1332,15 +1300,15 @@ export interface BannerRecord {
 }
 
 /**
- * Accepted work in your repo, as the host last read it (ADR-0104): a
- * host-written `pinetrie.accepted` value, a cache the page reads. The repo is the
- * truth; the host rewrites this whenever your repo's operation head moves.
+ * Accepted work in your repo, as the host last read it: a host-written
+ * `pinetrie.accepted` value, a cache the page reads. The repo is the truth; the
+ * host rewrites this whenever your repo's operation head moves.
  */
 export interface AcceptedRecord {
   /** Accepted work's bookmark, and the prefix that makes a bookmark a WIP. */
   readonly acceptedBookmark: string
   readonly wipPrefix: string
-  /** The bookmark publishing moves forward to accepted work (ADR-0076). */
+  /** The bookmark publishing moves forward to accepted work. */
   readonly publish: string
   /** Accepted work's commit; null before it is set up. */
   readonly commit: CommitId | null
@@ -1352,7 +1320,7 @@ export interface AcceptedRecord {
   /**
    * Your repo's `revsets.log` now (null: jj's default), and what setting up
    * accepted work writes: the offers added, since an immutable head is out of
-   * jj's default log (S77 item 8).
+   * jj's default log.
    */
   readonly log: { readonly current: string | null; readonly proposed: string }
   /** The WIP bookmarks a thread may start from, newest first. */
@@ -1365,9 +1333,9 @@ export interface AcceptedRecord {
     readonly ahead: number
   }[]
   /**
-   * The publish bookmark against accepted work (ADR-0076): its commit (null when
-   * the repo has none), accepted commits it lacks (`behind`: what publishing
-   * moves it over) and its commits accepted work lacks (`ahead`: publishing is a
+   * The publish bookmark against accepted work: its commit (null when the repo
+   * has none), accepted commits it lacks (`behind`: what publishing moves it
+   * over) and its commits accepted work lacks (`ahead`: publishing is a
    * fast-forward only at 0). Both 0 before accepted work is set up.
    */
   readonly published: {
@@ -1377,12 +1345,12 @@ export interface AcceptedRecord {
   }
   /**
    * Your `@-` against accepted work: accepted commits it lacks (`behind`), and
-   * your commits below `@` accepted work lacks (`ahead`, `::@- ~ ::<accepted>`: what
-   * a publish accepts, ADR-0090). `catchUp` is what catching the working copy
-   * up would do (S80): how many files change, those that conflict, and your
-   * other heads that move with `@`; null when nothing is behind, or `@`
-   * shares no commit with accepted work. `conflicts` are your conflicted commits
-   * above accepted work, `@` included, and the conflicted files in `@`.
+   * your commits below `@` accepted work lacks (`ahead`, `::@- ~ ::<accepted>`:
+   * what a publish accepts). `catchUp` is what catching the working copy up
+   * would do: how many files change, those that conflict, and your other heads
+   * that move with `@`; null when nothing is behind, or `@` shares no commit
+   * with accepted work. `conflicts` are your conflicted commits above accepted
+   * work, `@` included, and the conflicted files in `@`.
    */
   readonly yours: {
     readonly behind: number
@@ -1398,17 +1366,17 @@ export interface AcceptedRecord {
     }
   }
   /**
-   * `publish.catchUp` (ADR-0099): whether a publish catches the working copy up and
+   * `publish.catchUp`: whether a publish catches the working copy up and
    * accepts your commits below `@` before moving the publish bookmark.
    */
   readonly publishCatchesUp: boolean
 }
 
 /**
- * A thread's base as its lane's history says it (ADR-0104): a host-written
- * `pinetrie.base` value keyed by lane, a cache the page reads. `start` is the
- * commit the lane's newest `Pinetrie-Base` trailer names, or accepted commit it
- * forked from when it has none.
+ * A thread's base as its lane's history says it: a host-written `pinetrie.base`
+ * value keyed by lane, a cache the page reads. `start` is the commit the lane's
+ * newest `Pinetrie-Base` trailer names, or accepted commit it forked from when
+ * it has none.
  */
 export interface BaseRecord {
   readonly lane: ThreadId
@@ -1417,22 +1385,21 @@ export interface BaseRecord {
   /** A WIP base: on accepted work now (landed), gone without landing, or neither. */
   readonly state: "ok" | "landed" | "gone"
   /**
-   * What catching up would change, read at the lane's tip and the base's
-   * commit then (S97); null when the base had not moved, or jj could not
-   * say. A reader whose base has moved since reads it as unknown.
+   * What catching up would change, read at the lane's tip and the base's commit
+   * then; null when the base had not moved, or jj could not say. A reader whose
+   * base has moved since reads it as unknown.
    */
   readonly catchUp: CatchUpRead | null
   /**
    * Accepted-offer commits of this thread on accepted work, above its base,
-   * that name no source (`untracedLanes`, S97): nothing is offered until it
-   * catches up past them.
+   * that name no source (`untracedLanes`): nothing is offered until it catches
+   * up past them.
    */
   readonly untraced: readonly CommitId[]
   /**
-   * Whether the lane's work since its start changes any file (ADR-0067):
-   * `unknown` for an untraced start, or one jj could not diff. A thread is
-   * told its base has new work only with `some`, and caught up quietly only
-   * with `none` (ADR-0080).
+   * Whether the lane's work since its start changes any file: `unknown` for an
+   * untraced start, or one jj could not diff. A thread is told its base has new
+   * work only with `some`, and caught up quietly only with `none`.
    */
   readonly work: WorkChanges
 }
@@ -1446,10 +1413,9 @@ export interface CatchUpRead {
 }
 
 /**
- * A seat the host has seen: its Kyneta peer, the Yjs `clientID` its
- * operations carry, and the person it is (ADR-0037). A host-written
- * `pinetrie.seat` value keyed by the peer, so anyone can name who wrote in a
- * text after the seat has gone.
+ * A seat the host has seen: its Kyneta peer, the Yjs `clientID` its operations
+ * carry, and the person it is. A host-written `pinetrie.seat` value keyed by
+ * the peer, so anyone can name who wrote in a text after the seat has gone.
  */
 export interface SeatRecord {
   readonly peer: string
@@ -1465,7 +1431,7 @@ export interface ParticipantRecord {
   readonly name: string
 }
 
-/** A person's picture (ADR-0098): a blob, keyed by their writer. */
+/** A person's picture: a blob, keyed by their writer. */
 export interface PictureRecord {
   readonly writer: WriterId
   readonly sha256: Sha256
@@ -1476,8 +1442,7 @@ export interface PictureRecord {
 /**
  * An `@` in a message. Mentioning the agent COMPELS it to reply. Mentioning a
  * person addresses them, and so leaves the agent out; nobody can make a human
- * answer (ADR-0021). A person mention counts only if it names a participant
- * (`address`).
+ * answer. A person mention counts only if it names a participant (`address`).
  */
 export type Mention =
   | { readonly kind: "agent"; readonly agent: AgentId }
@@ -1501,11 +1466,9 @@ export const NOBODY: Responder = { kind: "none" }
 const HANDLE_CHARS = "\\p{L}\\p{N}_\\-"
 
 /**
- * `text` with its code blanked out, each character a space and each line
- * break kept: fenced blocks (``` or ~~~, to their closing fence or the end)
- * and inline code spans (a run of backticks to the next run as long). A
- * four-space indented block is left as it is: it needs the block's context,
- * which a line scan does not have. Pure.
+ * `text` with its code blanked out, each character a space and each line break
+ * kept: fenced blocks
+ * (``` or ~~~, to their closing fence or the end) and inline code spans (a run of backticks to the next run as long). A four-space indented block is left as it is: it needs the block's context, which a line scan does not have.
  */
 function withoutCode(text: string): string {
   const blank = (s: string) => s.replace(/[^\n]/g, " ")
@@ -1518,10 +1481,10 @@ function withoutCode(text: string): string {
 
 /**
  * Every `@handle` in `text`, in order, without repeats, outside code
- * (`withoutCode`): a handle in a code span or a fenced block is text.
- * `@agent` is the agent; any other handle is read as a person here, and
- * `address` finds whether it names another thread's agent instead
- * (ADR-0128). A handle starts a word, so an e-mail address is not a mention.
+ * (`withoutCode`): a handle in a code span or a fenced block is text. `@agent`
+ * is the agent; any other handle is read as a person here, and `address` finds
+ * whether it names another thread's agent instead. A handle starts a word, so
+ * an e-mail address is not a mention.
  */
 export function parseMentions(text: string): Mention[] {
   const seen = new Set<string>()
@@ -1553,17 +1516,16 @@ export const handleOf = (name: string): string =>
     .toLowerCase()
     .replace(new RegExp(`[^${HANDLE_CHARS}]`, "gu"), "")
 
-/** Who asked another thread's agent (ADR-0128): a person, or a thread's agent. */
+/** Who asked another thread's agent: a person, or a thread's agent. */
 export type Asker =
   | { readonly kind: "person"; readonly writer: WriterId }
   | { readonly kind: "agent"; readonly thread: ThreadId }
 
 /**
- * An ask relayed into another thread (ADR-0128), the asked agent's prompt:
- * where it was asked, by whom, and what. `budget` is the person's message
- * whose budget the chain spends (its run spends from it only when an agent
- * asked); `by` is the person behind the chain, who a stop, a card or a
- * run's author names.
+ * An ask relayed into another thread, the asked agent's prompt: where it was
+ * asked, by whom, and what. `budget` is the person's message whose budget the
+ * chain spends (its run spends from it only when an agent asked); `by` is the
+ * person behind the chain, who a stop, a card or a run's author names.
  */
 export interface RelayDetails {
   readonly from: ThreadId
@@ -1578,9 +1540,9 @@ export interface RelayDetails {
 }
 
 /**
- * An asked agent's answer, in the thread that asked (ADR-0128): its last
- * message of the run its relay started. `wakes` says whether it started a
- * run of the asking agent.
+ * An asked agent's answer, in the thread that asked: its last message of the
+ * run its relay started. `wakes` says whether it started a run of the asking
+ * agent.
  */
 export interface AnswerDetails {
   /** The answering thread. */
@@ -1597,8 +1559,8 @@ export interface AnswerDetails {
 }
 
 /**
- * What an asked agent heard of the thread that asked (ADR-0128): those
- * entries' ids, newest last. Their text is the heard entry's `content`.
+ * What an asked agent heard of the thread that asked: those entries' ids,
+ * newest last. Their text is the heard entry's `content`.
  */
 export interface HeardDetails {
   readonly from: ThreadId
@@ -1607,9 +1569,9 @@ export interface HeardDetails {
 }
 
 /**
- * Another thread's agent a mention may reach (ADR-0128): a thread on the
- * open task's canvas other than the one written in, by its name. `member` says
- * whether it was invited into the thread written in already.
+ * Another thread's agent a mention may reach: a thread on the open task's
+ * canvas other than the one written in, by its name. `member` says whether it
+ * was invited into the thread written in already.
  */
 export interface AgentCandidate {
   readonly thread: ThreadId
@@ -1623,32 +1585,31 @@ export interface Recipients {
   readonly compels: Responder
   /** Participants the message names, by display name. Never compelled. */
   readonly people: readonly string[]
-  /** Members, other threads' agents, that it asks: each runs (ADR-0128). */
+  /** Members, other threads' agents, that it asks: each runs. */
   readonly asks: readonly ThreadId[]
   /** Other threads' agents it invites: they become members, asked or not. */
   readonly invites: readonly ThreadId[]
 }
 
 /**
- * Who a message is for (ADR-0021, ADR-0128). A handle that is a candidate
- * agent's name is that agent, before any person: a member is asked, any
- * other invited. `@agent` compels this thread's agent. Otherwise a message
- * naming participants or asking members is for them, and the agent is left
- * out; an invite alone leaves the message where it would have gone.
- * Otherwise the thread decides: the agent where it is the default (a thread
- * with a lane, or a Start Agent column), nobody where it is not. A message
- * that then compels nobody, names no one and asks no member asks the agents
- * it invites, since nobody else would answer.
+ * Who a message is for. A handle that is a candidate agent's name is that
+ * agent, before any person: a member is asked, any other invited. `@agent`
+ * compels this thread's agent. Otherwise a message naming participants or
+ * asking members is for them, and the agent is left out; an invite alone leaves
+ * the message where it would have gone. Otherwise the thread decides: the agent
+ * where it is the default (a thread with a lane, or a Start Agent column),
+ * nobody where it is not. A message that then compels nobody, names no one and
+ * asks no member asks the agents it invites, since nobody else would answer.
  *
  * A handle that names no participant and no candidate is ignored, so
- * `@types/node` in agent work still asks the agent. Pure; the composer and
- * the host both call it.
+ * `@types/node` in agent work still asks the agent. The composer and the host
+ * both call it.
  */
 export function address(input: {
   readonly mentions: readonly Mention[]
   /** Every participant's display name, as shown. */
   readonly participants: readonly string[]
-  /** Other threads' agents on open tasks' canvases (ADR-0128). */
+  /** Other threads' agents on open tasks' canvases. */
   readonly agents: readonly AgentCandidate[]
   readonly agentByDefault: boolean
 }): Recipients {
@@ -1691,8 +1652,8 @@ export const MAX_NAME_LENGTH = 40
 /**
  * A display name as typed -> the stored one, or undefined if unusable: empty,
  * too long, or one no mention could reach (no letter or digit, spelled
- * `@agent`, which is always the agent, or a thread's name, which is always
- * that thread's agent: ADR-0128).
+ * `@agent`, which is always the agent, or a thread's name, which is always that
+ * thread's agent).
  */
 export function normalizeName(name: string): string | undefined {
   const n = name.trim()
@@ -1706,29 +1667,18 @@ export function normalizeName(name: string): string | undefined {
     : n
 }
 
-// --- wire hygiene (ADR-0013) ------------------------------------------------
+// --- wire hygiene -----------------------------------------------------------
 
 /**
- * Returns the paths at which a `seq` key appears, so a test can assert none do.
+ * The paths at which a `seq` key appears, so a test can assert none do.
  *
- * Where this does real work: STORED ENTRIES. The doc types them
- * `Schema.record(Schema.any())`, so any shape at all can be written and
- * nothing strips a stray key. Proven: writing `{ ...entry, seq: 99 }` makes
- * the e2e stored-seq check FAIL.
- *
- * Where it does NOT: LINE MESSAGES. `packages/protocol/line.ts` declares Command and
- * Reply as `Schema.struct({...})`, and Kyneta encodes only declared fields, so
- * an undeclared `seq` is dropped at the boundary. Proven: a reply sent as
- * `{ ...reply, seq: 1 }` arrives without it, and the e2e wire-seq check still
- * passes. That check is kept for the case the struct itself grows a `seq`, but
- * it is NOT what keeps seq off the wire — the struct is.
- *
- * A deleted `LocalSeq` brand used to be credited with this. It could never
- * have worked: brands constrain how a value is CREATED, while the risk for seq
- * is how it is SERIALIZED, and a branded number drops into any `number` field
- * with no error. Contrast `ThreadId`, where creation IS the danger (a writer's
- * id or "main" used as a lane, ADR-0120) and the brand therefore does real
- * work.
+ * It matters for stored entries: the doc types them
+ * `Schema.record(Schema.any())`, so nothing strips a stray key, and writing
+ * `{ ...entry, seq: 99 }` fails the e2e stored-seq check. Line messages drop
+ * one at the boundary: `packages/protocol/line.ts` declares Command and Reply
+ * as `Schema.struct({...})`, and Kyneta encodes only declared fields, so the
+ * e2e wire-seq check catches only the struct itself growing a `seq`. A brand
+ * cannot do this: a branded number drops into any `number` field.
  */
 export function findSeqKeys(value: unknown, path = "$"): string[] {
   const hits: string[] = []
@@ -1746,7 +1696,7 @@ export function findSeqKeys(value: unknown, path = "$"): string[] {
   return hits
 }
 
-// ── arrival ordering (ADR-0013) ───────────────────────────────────────────
+// ── arrival ordering ────────────────────────────────────────────────────────
 
 export interface EntryOrdering {
   /** Ids in the order they should receive their arrival seq. */
@@ -1763,11 +1713,11 @@ export interface EntryOrdering {
  * Order a batch of newly-arrived entries: parents before children, with the
  * smallest id winning any tie.
  *
- * This is the derivation behind the arrival seq, and it is pure so the claim
- * ADR-0013 actually rests on can be *tested* rather than asserted: the result
- * must not depend on the order the candidates arrive in. Two replicas seeing
- * the same delta in different orders must assign the same sequence, or stable
- * cursors silently skip entries.
+ * This is the derivation behind the arrival seq, and it is pure so that its
+ * claim can be tested rather than asserted: the result must not depend on the
+ * order the candidates arrive in. Two replicas seeing the same delta in
+ * different orders must assign the same sequence, or stable cursors silently
+ * skip entries.
  *
  * A candidate is ready at once when `parentOf` returns `null` or `undefined`,
  * or a parent that is not itself a candidate.

@@ -120,7 +120,7 @@ test("isLongAsk: a run of LONG_ASK agent messages, not one fewer", () => {
   expect(isLongAsk(indexAsks(rows(0)), entryId("0-p"))).toBe(false)
 })
 
-test("a stop's fact names who stopped its ask, and is drawn in it: the first press's (ADR-0126)", () => {
+test("a stop's fact names who stopped its ask, and is drawn in it: the first press's", () => {
   const stopFact = (by: string): Message => ({
     role: "fact",
     content: "■ the run was stopped",
@@ -143,7 +143,7 @@ test("a stop's fact names who stopped its ask, and is drawn in it: the first pre
   })
 })
 
-describe("askOutcome and lastWord, over S70's endings", () => {
+describe("askOutcome and lastWord, over each way a run ends", () => {
   const ask = (rows: readonly EntryLike[]) => {
     const index = build([entry("1-p", null, chat()), ...rows])
     const asks = indexAsks(index)

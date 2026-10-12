@@ -13,7 +13,7 @@ import {
 const T = threadIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const E = entryId("01a0ffd2-0000-7000-8000-00000000000b")
 
-describe("addresses (ADR-0126)", () => {
+describe("addresses", () => {
   const every: readonly Address[] = [
     { kind: "thread", thread: T },
     { kind: "entry", thread: T, entry: E },

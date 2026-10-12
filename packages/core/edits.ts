@@ -1,8 +1,8 @@
 // core/edits — a changing snapshot, as edits to a text.
 //
 // Kyneta text records edits, not values, so a text that grows costs what was
-// added, not a new copy each time (S22: a live tool stream as whole values
-// appended 4.35 MB; as edits, 96 KB). Every stream pinetrie writes, a reply's
+// added, not a new copy each time: a live tool stream measured as whole values
+// appended 4.35 MB; as edits, 96 KB. Every stream pinetrie writes, a reply's
 // deltas and a tool's output, goes through here.
 
 /** One edit: at `at`, remove `remove` characters, then insert `insert`. */
@@ -13,13 +13,13 @@ export interface TextEdit {
 }
 
 /**
- * The edits that turn `prev` into `next`, inserting as little as possible. Pure.
+ * The edits that turn `prev` into `next`, inserting as little as possible.
  *
  * A tool's output view keeps only its tail: as lines are added at the end,
  * lines drop off the front. A single common-prefix/common-suffix splice then
- * shares neither end and replaces everything (S22). So the candidates are a
- * pure append; "cut the front, append the end", keeping the longest suffix of
- * `prev` that `next` begins with; and one splice. The one inserting least wins.
+ * shares neither end and replaces everything. So the candidates are a pure
+ * append; "cut the front, append the end", keeping the longest suffix of `prev`
+ * that `next` begins with; and one splice. The one inserting least wins.
  */
 export function tailEdit(prev: string, next: string): readonly TextEdit[] {
   if (prev === next) return []

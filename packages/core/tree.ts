@@ -1,13 +1,12 @@
 // core/tree — every read of the conversation tree.
 //
 // The tree is read many ways (a transcript, a spine, columns, a rail, where a
-// view should follow) but indexed once: `indexTree` builds the parent and
-// child maps a view needs, and every view takes that index. Before this, each
-// view re-derived them, and a column view that calls several of them per
-// column would have rebuilt the index each time.
+// view should follow) but indexed once: `indexTree` builds the parent and child
+// maps a view needs, and every view takes that index, so a column view that
+// calls several of them does not rebuild it each time.
 //
 // Order is structural throughout: the `parentId` walk, and ids, which are
-// uuidv7 and so sort by creation (S9). Nothing here can see a seq (ADR-0013).
+// uuidv7 and so sort by creation. Nothing here can see a seq.
 //
 // A tool's result is its own entry, but it belongs to its call: `projectSpine`
 // pairs it with the call on the same path, and it is never a message itself.
@@ -40,8 +39,8 @@ export interface MessagePart {
   readonly name?: string
   readonly arguments?: unknown
   /**
-   * An `image` part as the session stores it (ADR-0051): the blob its bytes
-   * are in. An image pi wrote inline has `data` instead.
+   * An `image` part as the session stores it: the blob its bytes are in. An
+   * image pi wrote inline has `data` instead.
    */
   readonly sha256?: string
   readonly mimeType?: string
@@ -51,9 +50,9 @@ export interface MessagePart {
 }
 
 /**
- * What a thread is told when its base has new work (ADR-0080): a behind
- * entry's details, decoded. `to` is the base's commit it was told of, so it
- * is told once per commit.
+ * What a thread is told when its base has new work: a behind entry's details,
+ * decoded. `to` is the base's commit it was told of, so it is told once per
+ * commit.
  */
 export interface BehindView {
   readonly from: CatchUpFrom
@@ -66,7 +65,7 @@ export interface BehindView {
   readonly conflicts: readonly string[]
 }
 
-/** One pinned card as a run read it (ADR-0048). */
+/** One pinned card as a run read it. */
 export interface PinnedCardRead {
   readonly id: CardId
   readonly text: string
@@ -87,7 +86,7 @@ export interface PinnedView {
   }[]
 }
 
-/** The cards pinned to a task a run read (ADR-0116): a task's cards entry, decoded. */
+/** The cards pinned to a task a run read: a task's cards entry, decoded. */
 export interface TaskPinnedView {
   /** The task they are pinned to. */
   readonly task: TaskId
@@ -101,9 +100,9 @@ export interface TaskPinnedView {
 }
 
 /**
- * The task's cards a run was told of (ADR-0116): a canvas entry's details,
- * decoded. One line per card in the canvas's order, at most a cap of them,
- * and how many more there are.
+ * The task's cards a run was told of: a canvas entry's details, decoded. One
+ * line per card in the canvas's order, at most a cap of them, and how many more
+ * there are.
  */
 export interface CanvasView {
   readonly task: TaskId
@@ -115,8 +114,8 @@ export interface CanvasView {
 }
 
 /**
- * What a run's context carries besides the conversation (ADR-0116): the
- * newest entry of each kind, which a compaction keeps in view.
+ * What a run's context carries besides the conversation: the newest entry of
+ * each kind, which a compaction keeps in view.
  */
 export interface ContextInView {
   readonly pinned?: PinnedView
@@ -137,52 +136,52 @@ export interface AgentMessageLike {
   readonly sendId?: string
   /** Role `chat` only: the other people who wrote in the card it was sent from. */
   readonly contributors?: readonly WriterId[]
-  /** Role `chat` only: the command it ran, qualified (ADR-0036). */
+  /** Role `chat` only: the command it ran, qualified. */
   readonly command?: string
-  /** Role `chat` only: the `/blob/` images its text shows (ADR-0042). */
+  /** Role `chat` only: the `/blob/` images its text shows. */
   readonly images?: readonly ImageRef[]
   /** Role `toolResult` only: the call it answers, and whether it failed. */
   readonly toolCallId?: string
   readonly isError?: boolean
   /**
    * Role `assistant` only: why pi's request ended. `aborted` is a Stop and
-   * `error` a failure (S70); either carries `errorMessage`.
+   * `error` a failure; either carries `errorMessage`.
    */
   readonly stopReason?: string
   readonly errorMessage?: string
-  /** Role `pinned` only: the cards a run read (ADR-0048). */
+  /** Role `pinned` only: the cards a run read. */
   readonly pinned?: PinnedView
-  /** Role `task-pinned` only: the cards pinned to the task a run read (ADR-0116). */
+  /** Role `task-pinned` only: the cards pinned to the task a run read. */
   readonly taskPinned?: TaskPinnedView
-  /** Role `canvas` only: the task's cards a run was told of (ADR-0116). */
+  /** Role `canvas` only: the task's cards a run was told of. */
   readonly canvas?: CanvasView
   /**
-   * Roles `update` and `land`, and a `catch_up` tool result: the commits
-   * merged into the lane (ADR-0072, ADR-0080).
+   * Roles `update` and `land`, and a `catch_up` tool result: the commits merged
+   * into the lane.
    */
   readonly merged?: readonly CommitId[]
-  /** An `ask_about_conflict` tool result the host took: the agent asked (ADR-0080). */
+  /** An `ask_about_conflict` tool result the host took: the agent asked. */
   readonly asked?: true
-  /** Role `behind` only: the base's new work the thread was told of (ADR-0080). */
+  /** Role `behind` only: the base's new work the thread was told of. */
   readonly behind?: BehindView
   /**
-   * Role `fact` only, for a stop's fact: the ask whose run was stopped, and
-   * who stopped it (ADR-0126).
+   * Role `fact` only, for a stop's fact: the ask whose run was stopped, and who
+   * stopped it.
    */
   readonly stopped?: {
     readonly prompt: EntryId
     readonly by: WriterId
-    /** A spent budget's message, when the budget stopped it (ADR-0128). */
+    /** A spent budget's message, when the budget stopped it. */
     readonly budget?: EntryId
   }
-  /** Role `fact` only, for a member's: who left the thread's members (ADR-0128). */
+  /** Role `fact` only, for a member's: who left the thread's members. */
   readonly member?: { readonly gone: ThreadId }
-  /** Role `chat` only: the other threads' agents it asks and invites (ADR-0128). */
+  /** Role `chat` only: the other threads' agents it asks and invites. */
   readonly asks?: readonly ThreadId[]
   readonly invites?: readonly ThreadId[]
-  /** Role `relay` only: an ask from another thread (ADR-0128). */
+  /** Role `relay` only: an ask from another thread. */
   readonly relay?: RelayDetails
-  /** Role `answer` only: an asked agent's answer (ADR-0128). */
+  /** Role `answer` only: an asked agent's answer. */
   readonly answer?: AnswerDetails
   /** Role `heard` only: what an asked agent heard of the thread that asked. */
   readonly heard?: HeardDetails
@@ -192,7 +191,7 @@ export interface EntryLike {
   readonly id: EntryId
   readonly parentId: EntryId | null
   readonly type: string
-  /** The thread whose commit wrote it (ADR-0125): the row's column. */
+  /** The thread whose commit wrote it: the row's column. */
   readonly thread: ThreadId
   /** Absent on entries that carry no message, e.g. a compaction. */
   readonly message?: AgentMessageLike
@@ -208,7 +207,7 @@ export interface EntryLike {
 
 export interface TranscriptMessage {
   readonly id: EntryId
-  /** The thread its entry is in (ADR-0125). */
+  /** The thread its entry is in. */
   readonly thread: ThreadId
   readonly role: string
   readonly text: string
@@ -222,21 +221,21 @@ export interface TranscriptMessage {
   readonly sendId?: string
   /** Role `chat` only: the other people who wrote in the card it was sent from. */
   readonly contributors?: readonly WriterId[]
-  /** Role `chat` only: the command it ran, qualified (ADR-0036). */
+  /** Role `chat` only: the command it ran, qualified. */
   readonly command?: string
-  /** Role `chat` only: the `/blob/` images its text shows (ADR-0042). */
+  /** Role `chat` only: the `/blob/` images its text shows. */
   readonly images?: readonly ImageRef[]
   /** Role `assistant` only: the tools it called, each with its result once known. */
   readonly toolCalls?: readonly ToolCall[]
-  /** Roles `update` and `land` only: the commits merged into the lane (ADR-0072). */
+  /** Roles `update` and `land` only: the commits merged into the lane. */
   readonly merged?: readonly CommitId[]
-  /** Roles `relay`, `answer` and `heard` only: the thread it came from (ADR-0128). */
+  /** Roles `relay`, `answer` and `heard` only: the thread it came from. */
   readonly from?: ThreadId
 }
 
 /**
  * A tool call, as stored: what it is, not how it reads. Its words are
- * `@pinetrie/interface`'s (`callLabel`, ADR-0114).
+ * `@pinetrie/interface`'s (`callLabel`).
  */
 export interface ToolCall {
   readonly id: string
@@ -290,9 +289,9 @@ const isDimension = (n: unknown): n is number =>
   typeof n === "number" && Number.isInteger(n) && n > 0
 
 /**
- * An image part as the session stores it (ADR-0051), or undefined. A part
- * with its bytes inline is not one: no `/blob/` URL serves it. The session
- * keeps one from before images were blobs, or from a host with no store.
+ * An image part as the session stores it, or undefined. A part with its bytes
+ * inline is not one: no `/blob/` URL serves it. The session keeps one from
+ * before images were blobs, or from a host with no store.
  */
 export function storedImage(
   part: MessagePart | null | undefined,
@@ -363,8 +362,8 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
         : { images: entry.message.images }),
     }
   }
-  // An ask from another thread, and an asked agent's answer (ADR-0128), are
-  // messages as a chat is, spoken by the asker and by the answering thread.
+  // An ask from another thread, and an asked agent's answer, are messages as a
+  // chat is, spoken by the asker and by the answering thread.
   if (role === "relay" || role === "answer") {
     const came = role === "relay" ? entry.message?.relay : entry.message?.answer
     const author =
@@ -402,11 +401,10 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
 
 /**
  * The host's own messages, which a column shows as one line: a resolution's
- * prompt (`land`, ADR-0033), an update and a split's prompt (`update`,
- * `stack`, ADR-0105), a Resume's carry-on (`carry-on`, ADR-0082), and the
- * host's facts, what a command on the offer did (`fact`) and that the base
- * has new work (`behind`, ADR-0080), and what an asked agent heard of the
- * thread that asked (`heard`, ADR-0128).
+ * prompt (`land`), an update and a split's prompt (`update`, `stack`), a
+ * Resume's carry-on (`carry-on`), and the host's facts, what a command on the
+ * offer did (`fact`) and that the base has new work (`behind`), and what an
+ * asked agent heard of the thread that asked (`heard`).
  */
 export const LINE_ROLES: ReadonlySet<string> = new Set([
   "land",
@@ -462,9 +460,9 @@ function toolResultOf(
 }
 
 /**
- * The entries a turn ends with, newest first, from the lane's tip after it:
- * its tool results, and a host's fact steered in after them (role `behind`,
- * ADR-0080), up to the assistant message whose calls they follow.
+ * The entries a turn ends with, newest first, from the lane's tip after it: its
+ * tool results, and a host's fact steered in after them (role `behind`), up to
+ * the assistant message whose calls they follow.
  */
 function turnTail(index: TreeIndex, tip: EntryId): EntryId[] {
   const tail: EntryId[] = []
@@ -486,9 +484,9 @@ function turnTail(index: TreeIndex, tip: EntryId): EntryId[] {
 /**
  * The entry a turn is recorded against, from the lane's tip after it: a tool
  * result belongs to the assistant message whose call it answers, which sits
- * above it with only that message's other results between, so the walk goes
- * up past results, and past a steered fact after them (ADR-0080). Anything
- * else is its own turn: a prompt, or a message that called no tools.
+ * above it with only that message's other results between, so the walk goes up
+ * past results, and past a steered fact after them. Anything else is its own
+ * turn: a prompt, or a message that called no tools.
  */
 export function turnEntry(index: TreeIndex, tip: EntryId): EntryId {
   const tail = turnTail(index, tip)
@@ -497,9 +495,9 @@ export function turnEntry(index: TreeIndex, tip: EntryId): EntryId {
 }
 
 /**
- * Whether a turn merged into the lane: one of its results is a `catch_up`
- * that says what it merged (ADR-0080). The merge moved the lane's bookmark,
- * so the turn's record names it.
+ * Whether a turn merged into the lane: one of its results is a `catch_up` that
+ * says what it merged. The merge moved the lane's bookmark, so the turn's
+ * record names it.
  */
 export const turnMerged = (index: TreeIndex, tip: EntryId): boolean =>
   turnTail(index, tip).some(
@@ -508,10 +506,10 @@ export const turnMerged = (index: TreeIndex, tip: EntryId): boolean =>
 
 /**
  * The roles a run can start with: a person's message, pi's own, and a land,
- * stack or carry-on message, an ask relayed from another thread and the
- * answer that wakes its asker (ADR-0128). An update never starts one: it is
- * a fact in the thread. Nor does a cards entry (role `pinned`): it is
- * written with a run's prompt, as its parent.
+ * stack or carry-on message, an ask relayed from another thread and the answer
+ * that wakes its asker. An update never starts one: it is a fact in the thread.
+ * Nor does a cards entry (role `pinned`): it is written with a run's prompt, as
+ * its parent.
  */
 const PROMPT_ROLES: ReadonlySet<string> = new Set([
   "chat",
@@ -531,9 +529,9 @@ export const startsRun = (entry: EntryLike | undefined): boolean => {
 
 /**
  * The prompt of the run that wrote `tip`: its nearest ancestor-or-self a run
- * can start with. A lane is never written while it runs (S21), so no person's
- * message sits between a run's prompt and its tip. `indexAsks` finds every
- * run's prompt at once.
+ * can start with. A lane is never written while it runs, so no person's message
+ * sits between a run's prompt and its tip. `indexAsks` finds every run's prompt
+ * at once.
  */
 export function promptOf(
   index: TreeIndex,
@@ -585,7 +583,7 @@ export const pinnedInView = (
     e => e.carried?.pinned ?? null,
   )
 
-/** The cards pinned to the task the model reads on a run from `tip` (ADR-0116), as `pinnedInView` finds a thread's. */
+/** The cards pinned to the task the model reads on a run from `tip`, as `pinnedInView` finds a thread's. */
 export const taskPinnedInView = (
   index: TreeIndex,
   tip: EntryId | null,
@@ -597,7 +595,7 @@ export const taskPinnedInView = (
     e => e.carried?.taskPinned ?? null,
   )
 
-/** The task's cards the model was last told of on a run from `tip` (ADR-0116), as `pinnedInView` finds pinned cards. */
+/** The task's cards the model was last told of on a run from `tip`, as `pinnedInView` finds pinned cards. */
 export const canvasInView = (
   index: TreeIndex,
   tip: EntryId | null,
@@ -610,10 +608,10 @@ export const canvasInView = (
   )
 
 /**
- * The base commits the thread at `tip` last heard of or merged (ADR-0080):
- * a behind entry's `to`, or what an update, a resolution or a `catch_up`
- * merged, the newest on the path. Null with none, or past a compaction: a
- * fact pi summarised away is told again.
+ * The base commits the thread at `tip` last heard of or merged: a behind
+ * entry's `to`, or what an update, a resolution or a `catch_up` merged, the
+ * newest on the path. Null with none, or past a compaction: a fact pi
+ * summarised away is told again.
  */
 export const baseKnown = (
   index: TreeIndex,
@@ -631,8 +629,8 @@ export const baseKnown = (
 
 /**
  * When the agent last asked the person about a conflict on `tip`'s path (an
- * `ask_about_conflict` the host took, ADR-0080), or null. An ask stays a
- * fact after pi summarises it, so a compaction does not end the walk.
+ * `ask_about_conflict` the host took), or null. An ask stays a fact after pi
+ * summarises it, so a compaction does not end the walk.
  */
 export const conflictAskedAt = (
   index: TreeIndex,
@@ -669,7 +667,7 @@ export function resultsOn(
 
 export interface TreeIndex {
   readonly entries: Readonly<Record<EntryId, EntryLike>>
-  /** Children of each entry, ascending by id (creation order, S9). */
+  /** Children of each entry, ascending by id (creation order). */
   readonly childrenOf: ReadonlyMap<EntryId, readonly EntryId[]>
   /** An entry's parent id as stored; null for a root. */
   readonly parentOf: (id: EntryId) => EntryId | null
@@ -683,15 +681,15 @@ export interface TreeIndex {
    */
   readonly bySend: ReadonlyMap<string, EntryId>
   /**
-   * Each thread's first entry (ADR-0125): its entry whose parent is in
-   * another thread, or absent. Its parent is the thread's fork. Often a
-   * context entry no column draws: what a person reads first is
-   * `firstMessageOf`'s. Two such entries keep the older.
+   * Each thread's first entry: its entry whose parent is in another thread, or
+   * absent. Its parent is the thread's fork. Often a context entry no column
+   * draws: what a person reads first is `firstMessageOf`'s. Two such entries
+   * keep the older.
    */
   readonly firstOf: ReadonlyMap<ThreadId, EntryId>
   /**
-   * Each thread's end (ADR-0125): its entry with no child in its own thread.
-   * Two such entries keep the newer, as `latestTip` does.
+   * Each thread's end: its entry with no child in its own thread. Two such
+   * entries keep the newer, as `latestTip` does.
    */
   readonly endOf: ReadonlyMap<ThreadId, EntryId>
 }
@@ -809,9 +807,9 @@ export function writersOf(
 /**
  * The path to `tipId` as an ordered transcript, root first.
  *
- * Order comes from the `parentId` walk, NOT from seq (ADR-0013: "Nothing may
- * render by seq order"). A cycle throws: a transcript with a cycle in it has
- * no order to give.
+ * Order comes from the `parentId` walk, never from seq, which is local to a
+ * replica. A cycle throws: a transcript with a cycle in it has no order to
+ * give.
  */
 export function projectTranscript(
   index: TreeIndex,
@@ -917,9 +915,9 @@ function summarizeBranch(index: TreeIndex, rootId: EntryId): BranchSummary {
 /**
  * The most recently advanced tip among `tips`, or null if none has one.
  *
- * Entry ids are uuidv7, so the greatest id is the newest (S9). Chosen by
- * comparing ids, never by position in `tips`: two clients reading the same
- * document in a different order must pick the same one.
+ * Entry ids are uuidv7, so the greatest id is the newest. Chosen by comparing
+ * ids, never by position in `tips`: two clients reading the same document in a
+ * different order must pick the same one.
  */
 export function latestTip(tips: Iterable<EntryId | null>): EntryId | null {
   let latest: EntryId | null = null
@@ -948,13 +946,12 @@ export interface RailRow {
  * One root's tree as rows: a row per message, depth-first from `root`,
  * children in id order. Tracks start at 0 in every tree.
  *
- * A branch is a thread (ADR-0125): a child in its parent row's thread
- * continues its track, and any other child, or a start under a root that is
- * no message, begins a branch, whose track is its first message's rank by id
- * among every branch's first message. Ids sort in creation order (S9), so
- * the trunk is 0 and a new branch takes the next number without changing any
- * other's. Non-message entries get no row; their children attach to the
- * nearest ancestor that has one.
+ * A branch is a thread: a child in its parent row's thread continues its track,
+ * and any other child, or a start under a root that is no message, begins a
+ * branch, whose track is its first message's rank by id among every branch's
+ * first message. Ids sort in creation order, so the trunk is 0 and a new branch
+ * takes the next number without changing any other's. Non-message entries get
+ * no row; their children attach to the nearest ancestor that has one.
  */
 export function projectRail(
   index: TreeIndex,
@@ -1023,7 +1020,7 @@ export interface LaneView {
   readonly name: ThreadId
   readonly tip: EntryId | null
   readonly running: boolean
-  /** Cards queued for it (ADR-0048). */
+  /** Cards queued for it. */
   readonly waiting: number
   /** Who the agent is answering, or who queued the first card: for a conflict's "by". */
   readonly askedBy: WriterId | null
@@ -1032,7 +1029,7 @@ export interface LaneView {
    * it. Null when nothing waits.
    */
   readonly lastWaiting: WriterId | null
-  /** Who holds its queue (ADR-0048 step 7); null when it is not held. */
+  /** Who holds its queue; null when it is not held. */
   readonly heldBy: WriterId | null
 }
 
@@ -1041,42 +1038,38 @@ export type ThreadLane =
   | ({ readonly kind: "lane" } & LaneView)
 
 /**
- * A lane is busy while it runs or has cards queued: the agent works there,
- * or will once its queue is released. A root with a busy lane is not
- * archived (`rootWork`), and a
- * stopped thread does not carry on behind cards waiting (ADR-0120,
- * ADR-0048).
+ * A lane is busy while it runs or has cards queued: the agent works there, or
+ * will once its queue is released. A root with a busy lane is not archived
+ * (`rootWork`), and a stopped thread does not carry on behind cards waiting.
  */
 export const isBusy = (lane: LaneView): boolean =>
   lane.running || lane.waiting > 0
 
 /**
  * Whether a new message to the lane waits in its queue: it is busy, or its
- * queue is held, so the message would jump the queue or skip the hold
- * (ADR-0048 step 7).
+ * queue is held, so the message would jump the queue or skip the hold.
  */
 export const sendWaits = (lane: LaneView): boolean =>
   isBusy(lane) || lane.heldBy !== null
 
 /**
- * The thread `entry` is in (ADR-0125): its row's. Null only for an entry the
- * index lacks. Pure.
+ * The thread `entry` is in: its row's. Null only for an entry the index lacks.
  */
 export const threadAt = (index: TreeIndex, entry: EntryId): ThreadId | null =>
   index.entries[entry]?.thread ?? null
 
 /**
- * A thread's end (ADR-0125): its entry with no child in its own thread
- * (`TreeIndex.endOf`). Null for a thread with no entry yet. Pure.
+ * A thread's end: its entry with no child in its own thread
+ * (`TreeIndex.endOf`). Null for a thread with no entry yet.
  */
 export const threadEnd = (index: TreeIndex, thread: ThreadId): EntryId | null =>
   index.endOf.get(thread) ?? null
 
 /**
- * What a person reads first of `thread`: its first entry a column draws,
- * down the thread from `firstOf`. A branch's first run writes its context
- * entries above its prompt, so its first entry is often one no column draws.
- * Null for a thread with no message yet. Pure.
+ * What a person reads first of `thread`: its first entry a column draws, down
+ * the thread from `firstOf`. A branch's first run writes its context entries
+ * above its prompt, so its first entry is often one no column draws. Null for a
+ * thread with no message yet.
  */
 export function firstMessageOf(
   index: TreeIndex,
@@ -1096,7 +1089,7 @@ export function firstMessageOf(
   return null
 }
 
-/** A thread's lane: the one named by its id, if it has one (ADR-0120). */
+/** A thread's lane: the one named by its id, if it has one. */
 export const laneOf = (
   lanes: readonly LaneView[],
   thread: ThreadId,
@@ -1121,9 +1114,8 @@ export type ThreadSend =
   | { readonly kind: "taken" }
 
 /**
- * Which thread a send continues (ADR-0117). Pure; the host decides from it
- * and the composer labels from it, so the promise and the decision cannot
- * differ.
+ * Which thread a send continues. The host decides from it and the composer
+ * labels from it, so the promise and the decision cannot differ.
  *
  * - A `branch` starts its thread at `at`, with no lane and nothing to race;
  *   a thread that has started already is `taken`.

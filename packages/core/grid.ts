@@ -1,6 +1,5 @@
-// core/grid — the one grid rule for your inventory (ADR-0048). A cell is an
-// index in reading order: an address, the same for everyone, and a gap stays
-// a gap. Pure.
+// core/grid — the one grid rule for your inventory. A cell is an index in
+// reading order: an address, the same for everyone, and a gap stays a gap.
 
 /** A grid: its width, and its rows. */
 export interface Grid {
@@ -14,7 +13,7 @@ export type GridStep = "left" | "right" | "up" | "down"
 /** Your inventory: 3 rows of 6. */
 export const INVENTORY_GRID = { width: 6, rows: 3 } as const satisfies Grid
 
-/** How many cards an inventory holds: every cell of its grid (ADR-0048). */
+/** How many cards an inventory holds: every cell of its grid. */
 export const INVENTORY_SLOTS = INVENTORY_GRID.width * INVENTORY_GRID.rows
 
 /** Whether `n` is a cell of `grid`. */

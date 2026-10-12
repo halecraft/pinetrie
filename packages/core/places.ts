@@ -1,7 +1,6 @@
-// places — where cards are (ADR-0048, ADR-0059, ADR-0116): its places and
-// their keys, which kinds each takes (`PLACES_OF`), the targets and moves
-// between them, reorders, and the places row's fields. What a card is, is
-// `cards.ts`'. Re-exported from `index.ts`.
+// places — where cards are: its places and their keys, which kinds each takes
+// (`PLACES_OF`), the targets and moves between them, reorders, and the places
+// row's fields. What a card is, is `cards.ts`'.
 
 import type {
   Card,
@@ -59,16 +58,16 @@ export type LivePlace =
   | {
       readonly kind: "composing"
       /**
-       * Its thread, whose end it is at: every entry names its thread
-       * (ADR-0125), so the end is found from it alone.
+       * Its thread, whose end it is at: every entry names its thread, so the
+       * end is found from it alone.
        */
       readonly thread: ThreadId
     }
   | {
       readonly kind: "note"
-      /** The note column it is in (ADR-0116). */
+      /** The note column it is in. */
       readonly column: NoteColumnId
-      /** Its rank in the column: an order key (S69), the host's to give. */
+      /** Its rank in the column: an order key, the host's to give. */
       readonly order: string
     }
   | {
@@ -79,7 +78,7 @@ export type LivePlace =
     }
   | {
       readonly kind: "task-pinned"
-      /** The task it is pinned to: every thread of it reads it (ADR-0116). */
+      /** The task it is pinned to: every thread of it reads it. */
       readonly task: TaskId
       /** Sorts the task's pinned cards, in the order they were pinned. */
       readonly order: string
@@ -88,13 +87,13 @@ export type LivePlace =
       readonly kind: "queued"
       /** Its thread, whose lane pops it. */
       readonly thread: ThreadId
-      /** Sorts the lane's queue; ties go by id (S69). */
+      /** Sorts the lane's queue; ties go by id. */
       readonly order: string
       /** Who queued it: its message's author. */
       readonly by: WriterId
       /**
        * The text's version as its queuer had it (`textVersion`), "" for none:
-       * the host pops the card only once it holds that much (S96).
+       * the host pops the card only once it holds that much.
        */
       readonly seen: string
     }
@@ -102,24 +101,24 @@ export type LivePlace =
       readonly kind: "margin"
       /** The entry it comments on. */
       readonly entry: EntryId
-      /** The entry's thread (ADR-0125): its task's, read without a tree. */
+      /** The entry's thread: its task's, read without a tree. */
       readonly thread: ThreadId
-      /** Its rank among the entry's comments: an order key (S69), the host's to give. */
+      /** Its rank among the entry's comments: an order key, the host's to give. */
       readonly order: string
     }
   | {
       readonly kind: "canvas"
       readonly task: TaskId
-      /** Its rank on the task's canvas: an order key (S69), the host's to give. */
+      /** Its rank on the task's canvas: an order key, the host's to give. */
       readonly order: string
       readonly width: CardWidth
     }
   | { readonly kind: "inventory"; readonly holder: WriterId }
   | {
       readonly kind: "board"
-      /** Its workflow state (ADR-0122). */
+      /** Its workflow state. */
       readonly state: WorkflowStateId
-      /** Its rank in the state: an order key (S69), the host's to give. */
+      /** Its rank in the state: an order key, the host's to give. */
       readonly order: string
     }
 
@@ -186,13 +185,13 @@ export const ownerCard = (owner: SurfaceOwner): CardId | null =>
         ? owner.thread
         : null
 
-/** How many columns a card on a canvas is drawn across (ADR-0116). */
+/** How many columns a card on a canvas is drawn across. */
 export type CardWidth = 1 | 2
 
 /**
  * The card a chat is sent from, with its text's version as its sender had it
- * (`textVersion`): queued, the host pops it only once it holds that much
- * of the text (S96).
+ * (`textVersion`): queued, the host pops it only once it holds that much of the
+ * text.
  */
 export interface SentCard {
   readonly id: TextCardId
@@ -202,10 +201,10 @@ export interface SentCard {
 type OmitEach<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 
 /**
- * Where a card is, without what the host assigns when it queues, pins or
- * places one (its order, who queued it, a canvas card's width). A move
- * compares it and targets it. A queued key keeps its text's version
- * (`seen`), which the queuer sends with the move (S96).
+ * Where a card is, without what the host assigns when it queues, pins or places
+ * one (its order, who queued it, a canvas card's width). A move compares it and
+ * targets it. A queued key keeps its text's version (`seen`), which the queuer
+ * sends with the move.
  */
 export type PlaceKey =
   | OmitEach<
@@ -221,8 +220,8 @@ export type PlaceKey =
 /**
  * A move's target alone, never where a card is: the note column nearest
  * `thread`'s card in its task, or nearest `task`'s own column, which stands
- * before every card (`nearestNoteColumn`). The host resolves it before it
- * plans the move, making a column when the task has none (ADR-0116).
+ * before every card (`nearestNoteColumn`). The host resolves it before it plans
+ * the move, making a column when the task has none.
  */
 export type NotesTarget =
   | {
@@ -233,12 +232,11 @@ export type NotesTarget =
   | { readonly kind: "notes"; readonly near: "task"; readonly task: TaskId }
 
 /**
- * A drop on a canvas (ADR-0116): a move's target alone, never where a card
- * is: `task`'s canvas just after the card `after`, null for before every
- * card. The host ranks it there before it plans the move (`planMoveTargets`);
- * an `after` no longer on that canvas lands it at the end, a hint and not a
- * compare-and-set. Its own kind, so a target not yet ranked is never taken
- * for a canvas's key.
+ * A drop on a canvas: a move's target alone, never where a card is: `task`'s
+ * canvas just after the card `after`, null for before every card. The host
+ * ranks it there before it plans the move (`planMoveTargets`); an `after` no
+ * longer on that canvas lands it at the end, a hint and not a compare-and-set.
+ * Its own kind, so a target not yet ranked is never taken for a canvas's key.
  */
 export interface CanvasTarget {
   readonly kind: "canvas-at"
@@ -354,9 +352,9 @@ export const seenAt = (now: PlaceKey, from: PlaceKey): boolean =>
   sameKey(now, from)
 
 /**
- * What queueing a card does to its queue's hold (ADR-0113): nothing; hold an
- * idle queue first, so a card staged there is not sent while it is written;
- * or release it, so the card is sent after those queued before it.
+ * What queueing a card does to its queue's hold: nothing; hold an idle queue
+ * first, so a card staged there is not sent while it is written; or release it,
+ * so the card is sent after those queued before it.
  */
 export type QueueHoldChange = "keep" | "hold-if-idle" | "release"
 export const QUEUE_HOLD_CHANGES: readonly QueueHoldChange[] = [
@@ -370,10 +368,9 @@ export type MoveDirection = "undo" | "redo"
 export const MOVE_DIRECTIONS: readonly MoveDirection[] = ["undo", "redo"]
 
 /**
- * A handoff (ADR-0059): move a card from where its sender saw it to another
- * place. `from` null creates the card. Nobody removes one: a discard is a
- * move to the trash (ADR-0111, ADR-0126), and only the host deletes a record, for a card it
- * sends or sweeps.
+ * A handoff: move a card from where its sender saw it to another place. `from`
+ * null creates the card. Nobody removes one: a discard is a move to the trash,
+ * and only the host deletes a record, for a card it sends or sweeps.
  */
 export interface Move<To extends MoveTarget = MoveTarget> {
   readonly card: CardId
@@ -408,12 +405,11 @@ export type QueuedKey = Extract<PlaceKey, { readonly kind: "queued" }>
 export type QueueMove = Move<QueuedKey>
 
 /**
- * The places a reorder moves a card among (ADR-0048 step 7, ADR-0116): a
- * queue, a thread's pinned cards, a task's pinned cards, a note column, an
- * entry's margin (ADR-0126), or a task's canvas. Each has its rule in
- * `@pinetrie/rules`' `REORDERS`. A task's card is reordered on the board
- * by the board's own move (`planBoardMove`), which may cross the archive's
- * edge.
+ * The places a reorder moves a card among: a queue, a thread's pinned cards, a
+ * task's pinned cards, a note column, an entry's margin, or a task's canvas.
+ * Each has its rule in `@pinetrie/rules`' `REORDERS`. A task's card is
+ * reordered on the board by the board's own move (`planBoardMove`), which may
+ * cross the archive's edge.
  */
 export const REORDER_PLACES = [
   "queued",
@@ -440,10 +436,9 @@ export const isReorderAt = (key: PlaceKey): key is ReorderAt => {
 export type OrderedPlace = Extract<CardPlace, { readonly order: string }>
 
 /**
- * A card's new place among its neighbours, as its sender saw them (ADR-0048
- * step 7): what a card does in its place, not a move between places. It
- * stays in the same queue, among the same pinned cards, in the same note
- * column, or on the same canvas (ADR-0116).
+ * A card's new place among its neighbours, as its sender saw them: what a card
+ * does in its place, not a move between places. It stays in the same queue,
+ * among the same pinned cards, in the same note column, or on the same canvas.
  */
 export interface Reorder {
   readonly card: CardId
@@ -502,9 +497,9 @@ export function moveOf(card: CardRecord, to: MoveTarget): Move {
 }
 
 /**
- * Where an unqueue or an unpin puts a card, and where your message goes to
- * the notes: the note column nearest its thread, which the host resolves
- * (`notes`, ADR-0116). The one way a card at a thread becomes a note.
+ * Where an unqueue or an unpin puts a card, and where your message goes to the
+ * notes: the note column nearest its thread, which the host resolves (`notes`).
+ * The one way a card at a thread becomes a note.
  */
 export const noteOf = (
   place: Extract<CardPlace, { kind: "queued" | "pinned" | "composing" }>,
@@ -537,7 +532,7 @@ export const pinnedOf = (
     ? { kind: "pinned", thread: place.thread }
     : null
 
-/** Why the host refused a move (ADR-0059). */
+/** Why the host refused a move. */
 export type MoveRefusal =
   /** The card is no longer where the sender saw it. */
   | "moved"
@@ -550,14 +545,14 @@ export type MoveRefusal =
   /** A move into or out of someone else's inventory. */
   | "not-yours"
   /**
-   * An undo that would lift back a thread a card was spun into (ADR-0111),
-   * after someone wrote there, or the agent started on it.
+   * An undo that would lift back a thread a card was spun into, after someone
+   * wrote there, or the agent started on it.
    */
   | "replied"
   /**
-   * An undo or a redo that would move a task's card across the archive's
-   * edge (ADR-0126): archiving and restoring are done on the board, which
-   * gathers what crossing it needs.
+   * An undo or a redo that would move a task's card across the archive's edge:
+   * archiving and restoring are done on the board, which gathers what crossing
+   * it needs.
    */
   | "archived"
   /**
@@ -576,7 +571,7 @@ export type MoveRefusal =
 /** Any refusal of a change of place, as the wire carries it: a move's or a reorder's. */
 export type PlaceRefusal = MoveRefusal | ReorderRefusal
 
-/** Why the host refused a reorder (ADR-0048 step 7): never a move's answer. */
+/** Why the host refused a reorder: never a move's answer. */
 export type ReorderRefusal =
   /** The card has no record. */
   | "gone"
@@ -588,9 +583,8 @@ export type ReorderRefusal =
    */
   | "order-changed"
   /**
-   * A fact (ADR-0080), which no reorder moves, or a card that would pass
-   * one: a fact says what already happened, so nothing queued jumps ahead
-   * of it.
+   * A fact, which no reorder moves, or a card that would pass one: a fact says
+   * what already happened, so nothing queued jumps ahead of it.
    */
   | "fact"
 
@@ -612,7 +606,7 @@ export interface PlaceFields {
   readonly task: string
   /** A canvas card's width, `1` or `2`. */
   readonly width: string
-  /** A task card's workflow state (ADR-0126). */
+  /** A task card's workflow state. */
   readonly state: string
 }
 
@@ -691,8 +685,8 @@ export const keyFieldsFrom = (
  * The fields each stored kind of row carries besides `kind`; every other
  * field of its row is "". A field means what its kind's row says:
  *
- * - your message is stored as `drafting` (ADR-0113), a thread's id in
- *   `lane` (a lane is named by its thread), its root the thread's;
+ * - your message is stored as `drafting`, a thread's id in `lane` (a lane is
+ *   named by its thread), its root the thread's;
  * - a thread's nearest notes, its id in `lane`; a task's, its id in `task`;
  * - a spot on a canvas, the card it goes after in `column` ("" for first);
  * - a comment, its entry in `at` and the entry's thread in `lane`;
@@ -755,7 +749,7 @@ export const rowFieldsOf = (kind: string): readonly string[] | undefined => {
 export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
   switch (place.kind) {
     // Your message keeps the stored kind it had as a drafting card, so no
-    // stored row changed with the split (ADR-0113).
+    // stored row changed with the split.
     case "composing":
       return row("drafting", { lane: place.thread })
     case "note":
@@ -1130,11 +1124,11 @@ const TARGET_PLACES = {
 type TargetKind = keyof typeof TARGET_PLACES
 
 /**
- * The container a card of a kind no canvas takes is made in when it is
- * dropped on one (ADR-0126): a text card or a reference lands as the first
- * note of a new note column at that spot. The host resolves it
- * (`planMoveTargets`); a kind not here, sent to a spot on a canvas, is
- * refused at the edge as any target its kind is never sent to is.
+ * The container a card of a kind no canvas takes is made in when it is dropped
+ * on one: a text card or a reference lands as the first note of a new note
+ * column at that spot. The host resolves it (`planMoveTargets`); a kind not
+ * here, sent to a spot on a canvas, is refused at the edge as any target its
+ * kind is never sent to is.
  */
 export const WRAPS = {
   text: "note-column",

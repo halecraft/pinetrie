@@ -189,7 +189,7 @@ export const mutations: readonly Mutation[] = [
     to: "        true,\n",
     command: unit,
     expect:
-      "untracedLanes: an accepted offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced accepted offer's (S97)",
+      "untracedLanes: only an accepted offer's paragraph that names no source",
   },
   {
     name: "a turn reads as an untraced accepted-offer commit",
@@ -198,7 +198,7 @@ export const mutations: readonly Mutation[] = [
     to: "        true &&\n",
     command: unit,
     expect:
-      "untracedLanes: an accepted offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced accepted offer's (S97)",
+      "untracedLanes: only an accepted offer's paragraph that names no source",
   },
   {
     name: "a chat at the root may name any root",
@@ -1023,7 +1023,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a stop's fact names who stopped its ask, and is drawn in it: the first press's (ADR-0126)",
+      "a stop's fact names who stopped its ask, and is drawn in it: the first press's",
   },
   {
     name: "the last stop's fact names the stopper",
@@ -1032,7 +1032,7 @@ export const mutations: readonly Mutation[] = [
     to: "      stoppedBy.set(stop.prompt, stop.by)",
     command: unit,
     expect:
-      "a stop's fact names who stopped its ask, and is drawn in it: the first press's (ADR-0126)",
+      "a stop's fact names who stopped its ask, and is drawn in it: the first press's",
   },
   {
     name: "a range may end before it starts",
@@ -1076,7 +1076,7 @@ export const mutations: readonly Mutation[] = [
     to: '        at: "",\n',
     command: ["pnpm", "exec", "vitest", "run", "packages/core/core.test.ts"],
     expect:
-      "a comment in an entry's margin round-trips, its entry in `at` and its thread in `lane`; it needs both and its order, and its key keeps both (ADR-0126)",
+      "a margin place round-trips, and needs its entry, its thread and its order",
   },
   {
     name: "a task's id parses as no card",

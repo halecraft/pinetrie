@@ -1,7 +1,7 @@
-// thread-names — the words a thread's name is made of (ADR-0039): two
-// lists, here because a person's name may not take a thread's shape
-// (`normalizeName`), and core cannot import `@pinetrie/rules`, which names
-// threads from them (`threadNameFor`).
+// thread-names — the words a thread's name is made of: two lists, here because
+// a person's name may not take a thread's shape (`normalizeName`), and core
+// cannot import `@pinetrie/rules`, which names threads from them
+// (`threadNameFor`).
 
 /**
  * 256 adjectives and 256 nouns: lowercase, 3 to 7 letters, common, concrete,
@@ -530,8 +530,8 @@ const NOUN_SET: ReadonlySet<string> = new Set(NOUNS)
 
 /**
  * Whether `handle` is a name a thread could have: an adjective, `-`, a noun,
- * from the lists (ADR-0128). A mention of one names that thread's agent, so
- * no person may take it.
+ * from the lists. A mention of one names that thread's agent, so no person may
+ * take it.
  */
 export function isThreadNameHandle(handle: string): boolean {
   const [adjective, noun, ...rest] = handle.split("-")

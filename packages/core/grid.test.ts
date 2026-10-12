@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest"
 import { firstEmpty, INVENTORY_GRID, INVENTORY_SLOTS, step } from "./grid.ts"
 
-describe("the grid (ADR-0048)", () => {
+describe("the grid", () => {
   test("an inventory holds 18 cards", () => {
     expect(INVENTORY_SLOTS).toBe(18)
   })

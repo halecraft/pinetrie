@@ -1,12 +1,8 @@
 // core/trailers — the commit-message format: every trailer pinetrie writes into
 // a commit, and its readers, which also read the names written before the
-// rename (`READ`).
-//
-// A format or type that lanes or repo must read, write or name lives in core
-// too, since neither can declare @pinetrie/rules. This file holds the
-// trailers: what a turn's revision, a lane's base, an offer and its ledger
-// carry, written and read here alone, so `trailers.test.ts` reads back every
-// message it writes. A revset that finds commits by a trailer is
+// rename (`READ`). What a turn's revision, a lane's base, an offer and its
+// ledger carry is written and read here alone, so `trailers.test.ts` reads back
+// every message it writes. A revset that finds commits by a trailer is
 // `trailerRevset`, and matches what `hasTrailer` matches.
 
 import {
@@ -22,10 +18,10 @@ import type { OfferLedger } from "./offers.ts"
 import { firstLine } from "./tree.ts"
 
 /**
- * The trailers the host writes into commit messages: a turn names its entry
- * and lane (ADR-0032), an offer its thread too (ADR-0039). The ledger
- * (ADR-0104): a lane's start or update names its base, `<bookmark>@<commit>`;
- * an offer names the lane tip it holds and where it starts.
+ * The trailers the host writes into commit messages: a turn names its entry and
+ * lane, an offer its thread too. The ledger: a lane's start or update names its
+ * base, `<bookmark>@<commit>`; an offer names the lane tip it holds and where
+ * it starts.
  */
 export const TRAILERS = {
   thread: "Pinetrie-Thread",
@@ -66,9 +62,9 @@ const valueOn = (line: string, key: TrailerKey): string | undefined =>
   TRAILER_LINE[key].exec(line)?.[1]
 
 /**
- * Every value of trailer `key` in a message, from every paragraph, in order.
- * A squash of two commits keeps both messages, so a message can hold two
- * trailer paragraphs; jj's `trailers` template reads only the last (S77).
+ * Every value of trailer `key` in a message, from every paragraph, in order. A
+ * squash of two commits keeps both messages, so a message can hold two trailer
+ * paragraphs; jj's `trailers` template reads only the last.
  */
 export function trailerValues(message: string, key: TrailerKey): string[] {
   return message
@@ -115,7 +111,7 @@ function ourLastParagraph(text: string): number | null {
     : null
 }
 
-// ── a turn's revision (ADR-0032) ──────────────────────────────────────────
+// ── a turn's revision ─────────────────────────────────────────────────────
 
 /** A revision's description: its title, then the trailers. */
 export const revisionMessage = (input: {
@@ -134,9 +130,9 @@ export function entryOfMessage(description: string): EntryId | null {
   return entry === undefined ? null : entryId(entry)
 }
 
-// ── a lane's base (ADR-0104) ──────────────────────────────────────────────
+// ── a lane's base ─────────────────────────────────────────────────────────
 
-/** A base as its trailer names it (ADR-0100): accepted work, or a WIP by its bookmark. */
+/** A base as its trailer names it: accepted work, or a WIP by its bookmark. */
 export type BaseTrailer =
   | { readonly kind: "accepted"; readonly commit: CommitId }
   | {
@@ -146,15 +142,15 @@ export type BaseTrailer =
     }
 
 /**
- * What a base trailer names accepted work by: its kind, not its bookmark,
- * which config may rename (ADR-0100).
+ * What a base trailer names accepted work by: its kind, not its bookmark, which
+ * config may rename.
  */
 const ACCEPTED_BASE = "accepted"
 
 /**
- * A commit's message that names a lane's base (ADR-0104): accepted work or a
- * WIP bookmark, and the commit it pointed at. The newest such commit in a
- * lane's history is the thread's base (`laneBase`).
+ * A commit's message that names a lane's base: accepted work or a WIP bookmark,
+ * and the commit it pointed at. The newest such commit in a lane's history is
+ * the thread's base (`laneBase`).
  */
 export const baseMessage = (title: string, base: BaseTrailer): string =>
   `${title}\n\n${TRAILERS.base}: ${base.kind === "accepted" ? ACCEPTED_BASE : base.bookmark}@${base.commit}\n`
@@ -170,9 +166,9 @@ function parseBase(
 
 /**
  * The newest base a message carries; null for none or a malformed one. A name
- * with the WIP prefix is that WIP; any other is accepted work (ADR-0100), so
- * a base written under an older name of accepted work's bookmark
- * (`pinetrie-onto`, `pineta-onto`) still reads as accepted work.
+ * with the WIP prefix is that WIP; any other is accepted work, so a base
+ * written under an older name of accepted work's bookmark (`pinetrie-onto`,
+ * `pineta-onto`) still reads as accepted work.
  */
 export function baseOf(message: string, wipPrefix: string): BaseTrailer | null {
   const value = trailerValues(message, "base").at(-1)
@@ -184,12 +180,11 @@ export function baseOf(message: string, wipPrefix: string): BaseTrailer | null {
     : { kind: "accepted", commit }
 }
 
-// ── an offer's message (ADR-0105, ADR-0104) ───────────────────────────────
+// ── an offer's message ────────────────────────────────────────────────────
 
 /**
  * The one line an offer carries until an agent describes it: a work in
- * progress, named by its thread and the thread's own first message
- * (ADR-0039).
+ * progress, named by its thread and the thread's own first message.
  */
 export const wipDescription = (name: ThreadName, first: string): string =>
   `WIP (${name}): ${firstLine(first, 60) || "this thread's work"}`
@@ -210,11 +205,11 @@ export const withTrailers = (
   `${message.trim()}\n\n${TRAILERS.thread}: ${at.name}\n${TRAILERS.lane}: ${at.lane}\n${TRAILERS.entry}: ${at.entry}\n`
 
 /**
- * A message with the offer's ledger (ADR-0104): the lane commit it holds
+ * A message with the offer's ledger: the lane commit it holds
  * (`Pinetrie-Source`) and where it starts (`Pinetrie-Start`, one per commit).
- * Added to the host's trailer paragraph when the message ends in one, else
- * as a paragraph of its own. Accepted, the offer keeps them: they say what you
- * have of the lane, wherever its commit goes.
+ * Added to the host's trailer paragraph when the message ends in one, else as a
+ * paragraph of its own. Accepted, the offer keeps them: they say what you have
+ * of the lane, wherever its commit goes.
  */
 export function withLedger(message: string, ledger: OfferLedger): string {
   const lines = [
@@ -227,11 +222,11 @@ export function withLedger(message: string, ledger: OfferLedger): string {
 }
 
 /**
- * A message for one revision of an offer: `message` with the host's
- * trailers, then the offer's ledger, in one trailer paragraph. Every revision
- * carries both: the thread's trailer is how the host finds the offer's
- * revisions in your repo, and the ledger names the lane tip the whole offer
- * holds, so an accepted stack says you have that tip (ADR-0104).
+ * A message for one revision of an offer: `message` with the host's trailers,
+ * then the offer's ledger, in one trailer paragraph. Every revision carries
+ * both: the thread's trailer is how the host finds the offer's revisions in
+ * your repo, and the ledger names the lane tip the whole offer holds, so an
+ * accepted stack says you have that tip.
  */
 export const offerMessage = (
   message: string,
@@ -255,11 +250,11 @@ export function withoutTrailers(message: string): string {
 }
 
 /**
- * An offer's ledger as its message carries it (ADR-0104): the lane tip it
- * holds (`Pinetrie-Source`) and where it starts (`Pinetrie-Start`), from the
- * last paragraph that names a source, so a message holding an older ledger
- * above it reads as the newest. Null when no paragraph names one, as after
- * you rewrote the message without them.
+ * An offer's ledger as its message carries it: the lane tip it holds
+ * (`Pinetrie-Source`) and where it starts (`Pinetrie-Start`), from the last
+ * paragraph that names a source, so a message holding an older ledger above it
+ * reads as the newest. Null when no paragraph names one, as after you rewrote
+ * the message without them.
  */
 export function offerLedger(message: string): OfferLedger | null {
   const paragraph = message
@@ -273,23 +268,21 @@ export function offerLedger(message: string): OfferLedger | null {
   return { source: commitId(source), start: start.map(commitId) }
 }
 
-// ── an accepted-offer commit on accepted work (ADR-0104, S97) ────────────────
+// ── an accepted-offer commit on accepted work ─────────────────────────────
 
 /**
- * Every `Pinetrie-Source` an accepted-offer commit's message names, from
- * every paragraph, once each: a squash of two accepted offers keeps both
- * ledgers (S77 item 6).
+ * Every `Pinetrie-Source` an accepted-offer commit's message names, from every
+ * paragraph, once each: a squash of two accepted offers keeps both ledgers.
  */
 export const sourcesOf = (message: string): CommitId[] =>
   [...new Set(trailerValues(message, "source"))].map(commitId)
 
 /**
- * The lanes a message's accepted offers name with no source (S97): each
- * paragraph carrying `Pinetrie-Thread` and `Pinetrie-Lane` but no
- * `Pinetrie-Source`, as the offers accepted before offers carried their
- * ledger did. What such an acceptance brought cannot be placed in its
- * lane's history. A turn's commit carries no
- * `Pinetrie-Thread`, so it is never one.
+ * The lanes a message's accepted offers name with no source: each paragraph
+ * carrying `Pinetrie-Thread` and `Pinetrie-Lane` but no `Pinetrie-Source`, as
+ * the offers accepted before offers carried their ledger did. What such an
+ * acceptance brought cannot be placed in its lane's history. A turn's commit
+ * carries no `Pinetrie-Thread`, so it is never one.
  */
 export function untracedLanes(message: string): ThreadId[] {
   return message

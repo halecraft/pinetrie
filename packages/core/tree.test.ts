@@ -55,8 +55,8 @@ import {
 const tree = (parents: Record<string, string | null>) =>
   fromParents(parents, id => ({ role: "chat", content: id, author: "A" }))
 
-// The plan's example: a trunk T1 -> T2 -> T3, a branch A off T1, a branch B off
-// T2. The trunk's continuation is older than each branch.
+// A trunk T1 -> T2 -> T3, a branch A off T1, a branch B off T2. The trunk's
+// continuation is older than each branch.
 const forks = tree({
   "1-t1": null,
   "2-t2": "1-t1",
@@ -130,7 +130,7 @@ describe("writersOf", () => {
 describe("projectRail", () => {
   const rows = projectRail(indexTree(forks), entryId("1-t1"))
   const trackOf = (id: string) => rows.find(r => r.id === id)?.track
-  test("a child in its parent's thread continues its track; one in another thread takes a new track (ADR-0125)", () => {
+  test("a child in its parent's thread continues its track; one in another thread takes a new track", () => {
     expect([trackOf("1-t1"), trackOf("2-t2"), trackOf("3-t3")]).toEqual([
       0, 0, 0,
     ])
@@ -224,8 +224,7 @@ describe("agentActivity", () => {
 
 describe("threads: where each starts and ends, and where a send lands", () => {
   // 1-q is Wu's question, starting thread q; below it the agent's reply, a
-  // remark, and questions. Every entry names its thread (ADR-0125), q unless
-  // said.
+  // remark, and questions. Every entry names its thread, q unless said.
   const say = (
     id: string,
     parentId: string | null,
@@ -292,7 +291,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     expect(threadEnd(i, threadIdFor("none"))).toBeNull()
   })
 
-  test("a branch's context entry, older than its parent thread's next entry, is the branch's: the parent's end is its own (ADR-0125)", () => {
+  test("a branch's context entry, older than its parent thread's next entry, is the branch's", () => {
     // Under 4-mine: b's first run wrote its canvas entry, then its prompt;
     // later q's next run wrote its own canvas entry, then its prompt and
     // reply. The canvas entries carry no message a column draws.
@@ -667,7 +666,7 @@ describe("subjectOf, toolIdOf and tailEdit", () => {
   })
 })
 
-describe("pinned cards in the tree (ADR-0048)", () => {
+describe("pinned cards in the tree", () => {
   const card = (id: string, text: string) => ({
     id: textCardId(id),
     text,
@@ -765,7 +764,7 @@ describe("pinned cards in the tree (ADR-0048)", () => {
   })
 })
 
-describe("conflictAskedAt (ADR-0080)", () => {
+describe("conflictAskedAt", () => {
   const asked = (id: string, parent: string | null, at: number) =>
     entry(
       id,
@@ -817,7 +816,7 @@ describe("newestOnPath", () => {
   })
 })
 
-describe("one-line messages (LINE_ROLES, ADR-0080)", () => {
+describe("one-line messages (LINE_ROLES)", () => {
   test("a host's fact and its base's news show as their one line; a pinned entry does not", () => {
     const index = indexTree(
       entriesOf([
@@ -837,7 +836,7 @@ describe("one-line messages (LINE_ROLES, ADR-0080)", () => {
   })
 })
 
-describe("baseKnown (ADR-0080)", () => {
+describe("baseKnown", () => {
   const C = (s: string) => s as never
   const list = [
     entry("1-p", null, { role: "chat", content: "p", author: "A" }),
@@ -875,7 +874,7 @@ describe("baseKnown (ADR-0080)", () => {
   })
 })
 
-describe("a turn's tail (ADR-0080)", () => {
+describe("a turn's tail", () => {
   const C = (s: string) => s as never
   const list = [
     entry("1-p", null, { role: "chat", content: "p", author: "A" }),

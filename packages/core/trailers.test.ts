@@ -27,7 +27,7 @@ const LANE = threadIdFor("1")
 const NAME = "amber-fox" as ThreadName
 const C1 = commitId("c1")
 
-test("trailerValues reads a trailer from every paragraph, as a squash leaves two (S77)", () => {
+test("trailerValues reads a trailer from every paragraph, as a squash leaves two", () => {
   const squashed = [
     "accepted one",
     "",
@@ -43,7 +43,7 @@ test("trailerValues reads a trailer from every paragraph, as a squash leaves two
   expect(trailerValues(squashed, "base")).toEqual([])
 })
 
-test("offerLedger reads the newest paragraph that names a source; none without one (ADR-0104)", () => {
+test("offerLedger reads the newest paragraph that names a source; none without one", () => {
   const one =
     "offer: x\n\nPinetrie-Source: aaaa\nPinetrie-Start: s1\nPinetrie-Start: s2\n"
   expect(offerLedger(one)).toEqual({
@@ -59,7 +59,7 @@ test("offerLedger reads the newest paragraph that names a source; none without o
   expect(offerLedger("offer: x\n\nPinetrie-Source: aaaa\n")).toBeNull()
 })
 
-test("untracedLanes: an accepted offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced accepted offer's (S97)", () => {
+test("untracedLanes: only an accepted offer's paragraph that names no source", () => {
   const old = `feat: x\n\nPinetrie-Thread: amber-fox\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e\n`
   expect(untracedLanes(old)).toEqual([LANE])
   expect(
@@ -77,7 +77,7 @@ test("untracedLanes: an accepted offer's paragraph naming a thread and a lane bu
   ).toEqual([])
 })
 
-test("sourcesOf reads every paragraph of a squash, each source once (S77 item 6)", () => {
+test("sourcesOf reads every paragraph of a squash, each source once", () => {
   const ledger = (source: string) => ({
     source: commitId(source),
     start: [commitId("s1")],
@@ -129,7 +129,7 @@ describe("what is written reads back", () => {
     })
     expect(baseOf("your commit", "wip/")).toBeNull()
   })
-  test("a base is a WIP by its prefix, else accepted work, whatever name accepted work's bookmark had (ADR-0100)", () => {
+  test("a base is a WIP by its prefix, else accepted work, whatever name accepted work's bookmark had", () => {
     for (const name of ["accepted", "pinetrie-onto", "trunk"])
       expect(baseOf(`b\n\nPinetrie-Base: ${name}@c1\n`, "wip/")).toEqual({
         kind: "accepted",
@@ -191,7 +191,7 @@ describe("what is written reads back", () => {
   })
 })
 
-describe("withLedger (ADR-0104)", () => {
+describe("withLedger", () => {
   const ledger = {
     source: commitId("t1"),
     start: [commitId("s1"), commitId("s2")],

@@ -1,36 +1,36 @@
 // core/tools — the tools pine·trie registers, by the id the model calls them
 // by, and what a call to each touched. How a call reads to people is
-// `@pinetrie/interface`'s (`tool-words.ts`, ADR-0114).
+// `@pinetrie/interface`'s (`tool-words.ts`).
 
-/** Read a file, or an image (ADR-0051). */
+/** Read a file, or an image. */
 export const READ_TOOL = "read"
 /** Write a file. */
 export const WRITE_TOOL = "write"
 /** Replace text in a file. */
 export const EDIT_TOOL = "edit"
-/** Run a command in the lane's shell. People read it as "shell" (ADR-0114); the model's id stays pi's. */
+/** Run a command in the lane's shell. People read it as "shell"; the model's id stays pi's. */
 export const BASH_TOOL = "bash"
-/** Search file contents (ADR-0064). */
+/** Search file contents. */
 export const GREP_TOOL = "grep"
-/** Find files by name (ADR-0064). */
+/** Find files by name. */
 export const FIND_TOOL = "find"
-/** Leave a conflict whose two sides meant different things for the person (ADR-0080). */
+/** Leave a conflict whose two sides meant different things for the person. */
 export const CONFLICT_TOOL = "ask_about_conflict"
-/** Merge the thread's base, or its parent's work, into its copy during a run (ADR-0080). */
+/** Merge the thread's base, or its parent's work, into its copy during a run. */
 export const CATCH_UP_TOOL = "catch_up"
-/** Queue a split of the thread's offer, run when the thread is free (ADR-0080). */
+/** Queue a split of the thread's offer, run when the thread is free. */
 export const SPLIT_TOOL = "split_offer"
-/** Set the image in a thread's column header (ADR-0050). */
+/** Set the image in a thread's column header. */
 export const BANNER_TOOL = "set_banner"
-/** Ask another thread's agent, a member of this thread, without waiting (ADR-0128). */
+/** Ask another thread's agent, a member of this thread, without waiting. */
 export const ASK_TOOL = "ask"
-/** Leave another thread's members (ADR-0128). */
+/** Leave another thread's members. */
 export const LEAVE_TOOL = "leave"
 
 /**
  * Every tool pine·trie registers, in the order the model is given them. The
- * order is part of every request's prefix, and a changed prefix drops a
- * lane's earlier thinking (S85).
+ * order is part of every request's prefix, and a changed prefix drops a lane's
+ * earlier thinking.
  */
 export const TOOL_IDS = [
   READ_TOOL,

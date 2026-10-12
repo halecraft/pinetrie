@@ -44,7 +44,7 @@ const answer = (from: typeof fox, source: string): Message => ({
   },
 })
 
-describe("threadMembers (ADR-0128)", () => {
+describe("threadMembers", () => {
   const index = build([
     entry("1", null, chat({ invites: [fox] })),
     entry("2", "1", chat({ invites: [owl, fox] })),
@@ -64,7 +64,7 @@ describe("threadMembers (ADR-0128)", () => {
   })
 })
 
-describe("lastHeardEntry (ADR-0128)", () => {
+describe("lastHeardEntry", () => {
   const heard = (from: typeof fox, entries: string[]): Message => ({
     role: "heard",
     content: "",
@@ -92,7 +92,7 @@ describe("lastHeardEntry (ADR-0128)", () => {
   })
 })
 
-describe("isRoundAnswered (ADR-0128)", () => {
+describe("isRoundAnswered", () => {
   const index = build([
     entry("q", null, chat({ asks: [fox, owl] })),
     entry("1", "q", answer(fox, "q")),

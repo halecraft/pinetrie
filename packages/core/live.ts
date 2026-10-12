@@ -1,14 +1,14 @@
 // core/live — what a running turn streams, and the changes it makes to
-// `pinetrie:live` (ADR-0014, ADR-0063). `@pinetrie/rules` plans the changes
+// `pinetrie:live`. `@pinetrie/rules` plans the changes
 // (`packages/rules/live.ts`), and `@pinetrie/schema` writes them.
 
 import type { TextEdit } from "./edits.ts"
 import type { EntryId, RunId, ThreadId } from "./index.ts"
 
 /**
- * What a running turn streams, in pine·trie's own words (ADR-0003: no pi type
- * crosses). `packages/pi` maps pi's harness events onto it. There is no end
- * event: a stream stays until the entry that replaces it is written.
+ * What a running turn streams, in pine·trie's own words: no pi type crosses.
+ * `packages/pi` maps pi's harness events onto it. There is no end event: a
+ * stream stays until the entry that replaces it is written.
  */
 export type StreamEvent =
   /** Text the model is writing, as a delta. */
@@ -27,7 +27,7 @@ export type StreamEvent =
     }
 
 declare const streamIdBrand: unique symbol
-/** A stream's key in `pinetrie:live`: a fresh uuidv7 (ADR-0016). */
+/** A stream's key in `pinetrie:live`: a fresh uuidv7. */
 export type StreamId = string & { readonly [streamIdBrand]: true }
 export const streamId = (id: string): StreamId => id as StreamId
 

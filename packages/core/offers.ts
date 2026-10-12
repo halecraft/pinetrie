@@ -1,12 +1,6 @@
 // core/offers — an offer and accepted work in your repo: the facts
-// `@pinetrie/repo` reads, and the decisions it carries out (ADR-0105,
-// ADR-0104).
-//
-// A format or type that lanes or repo must read, write or name lives in core
-// too, since neither can declare @pinetrie/rules. This file holds the
-// facts `repo` reads of an offer and the decisions it carries out:
-// `@pinetrie/rules` decides from the one and returns the other, and neither package
-// imports the other.
+// `@pinetrie/repo` reads, and the decisions it carries out, which
+// `@pinetrie/rules` returns from those facts.
 
 import type {
   AcceptedRecord,
@@ -22,10 +16,10 @@ import type {
 /**
  * What a revision's evolog says since the host's newest version of it
  * (`readOffer` in `@pinetrie/repo` reads it, `revisionEdited` in
- * `@pinetrie/rules` decides from it): whether the walk back reached a
- * version the host made, and whether a version an operation not the host's
- * made on the way changed it. Read from the repo, never from a record the
- * host kept, which can be lost after its jj steps landed (S73).
+ * `@pinetrie/rules` decides from it): whether the walk back reached a version
+ * the host made, and whether a version an operation not the host's made on the
+ * way changed it. Read from the repo, never from a record the host kept, which
+ * can be lost after its jj steps landed.
  */
 export interface RevisionFacts {
   readonly reached: boolean
@@ -35,7 +29,7 @@ export interface RevisionFacts {
 /** One revision of an offer, as your repo holds it now. */
 export interface OfferRevision {
   readonly commit: CommitId
-  /** Its change id: what jj steps on it name (S48 item 2). */
+  /** Its change id: what jj steps on it name. */
   readonly change: string
   readonly since: RevisionFacts
 }
@@ -49,9 +43,9 @@ export interface OfferLedger {
 }
 
 /**
- * What an acceptance was shown (ADR-0065): the offer's ledger, and
- * whether it conflicted. An acceptance whose offer now brings other work,
- * or newly conflicts, is refused (`OFFER_CHANGED`).
+ * What an acceptance was shown: the offer's ledger, and whether it conflicted.
+ * An acceptance whose offer now brings other work, or newly conflicts, is
+ * refused (`OFFER_CHANGED`).
  */
 export interface OfferSeen {
   readonly ledger: OfferLedger | null
@@ -77,21 +71,21 @@ export type OfferInRepo =
       readonly ledger: OfferLedger | null
       /** The top's first line. */
       readonly firstLine: string
-      /** The bottom's parent is an ancestor of the target (S48 item 7). */
+      /** The bottom's parent is an ancestor of the target. */
       readonly placed: boolean
       /** The bottom's parents are exactly the target. */
       readonly onTarget: boolean
       readonly files: readonly string[]
-      /** Files conflicting in its top: with the work under it (S48 item 3). */
+      /** Files conflicting in its top: with the work under it. */
       readonly conflicts: readonly string[]
-      /** Files conflicted where its ledger says it starts, read only when it conflicts (ADR-0072). */
+      /** Files conflicted where its ledger says it starts, read only when it conflicts. */
       readonly startConflicts: readonly string[]
     }
   | { readonly kind: "divergent"; readonly changes: readonly string[] }
 
 /**
  * Whether a lane's work since its start changes any file, as far as jj can
- * tell (ADR-0067): `unknown` when it cannot, which never builds an offer.
+ * tell: `unknown` when it cannot, which never builds an offer.
  */
 export type WorkChanges = "none" | "some" | "unknown"
 
@@ -110,10 +104,10 @@ export const nonEmpty = <T extends NonNullable<unknown>>(
 }
 
 /**
- * Where a lane's offer starts (ADR-0104), or `untraced`: an accepted-offer
- * commit of this lane above its base names no source (`untracedLanes`), so
- * no start can leave out what it brought, and nothing is offered until the
- * lane catches up past it (ADR-0067).
+ * Where a lane's offer starts, or `untraced`: an accepted-offer commit of this
+ * lane above its base names no source (`untracedLanes`), so no start can leave
+ * out what it brought, and nothing is offered until the lane catches up past
+ * it.
  */
 export type StartRead =
   | { readonly kind: "known"; readonly start: NonEmpty<CommitId> }
@@ -154,16 +148,16 @@ export interface Placed {
 }
 
 /**
- * Where a lane's offer sits and starts, read from your repo now (ADR-0104),
- * decided once by the gather.
+ * Where a lane's offer sits and starts, read from your repo now, decided once
+ * by the gather.
  */
 export type OfferPlace =
   /** A WIP gone without landing: nothing sits anywhere, and nothing moves. */
   | { readonly kind: "gone"; readonly tip: CommitId; readonly base: LaneBase }
   /**
-   * An accepted-offer commit of the lane names no source (S97): nothing is
-   * built here, but an offer that is here can be accepted, since an
-   * acceptance moves a bookmark and needs no start.
+   * An accepted-offer commit of the lane names no source: nothing is built
+   * here, but an offer that is here can be accepted, since an acceptance moves
+   * a bookmark and needs no start.
    */
   | {
       readonly kind: "untraced"
@@ -182,17 +176,17 @@ export interface OfferGather {
   readonly offer: OfferInRepo | null
   /**
    * The lane's base record as the repo says it now, what catching up would
-   * change and its untraced accepted-offer commits with it: the host writes it when it
-   * differs from the page's (ADR-0104).
+   * change and its untraced accepted-offer commits with it: the host writes it
+   * when it differs from the page's.
    */
   readonly base: BaseRecord
 }
 
 /** What a refresh decides from (`planRefresh`). */
 export type RefreshFacts =
-  /** The thread's root is archived (ADR-0029): the offer alone, read against accepted work. */
+  /** The thread's root is archived: the offer alone, read against accepted work. */
   | { readonly kind: "archived"; readonly offer: OfferInRepo | null }
-  /** An accepted-offer commit of the lane names no source (S97). */
+  /** An accepted-offer commit of the lane names no source. */
   | { readonly kind: "untraced"; readonly offer: OfferInRepo | null }
   | {
       readonly kind: "placed"
@@ -213,7 +207,7 @@ export interface OfferAcceptanceFacts {
   readonly below: ReadonlySet<string>
 }
 
-/** A split's stack, as it is in your repo after its run (ADR-0105). */
+/** A split's stack, as it is in your repo after its run. */
 export interface StackFacts {
   /** Bottom first, each with its message. */
   readonly revisions: readonly OfferSource[]
@@ -241,9 +235,9 @@ export type RefreshDecision =
   | { readonly kind: "forget" }
   /** Abandon it and remove its record: archived, untraced, reached, or its work changes no file. */
   | { readonly kind: "withdraw"; readonly offer: OfferInRepo }
-  /** No offer: build one from the lane's tip (ADR-0067: known work, from a known start). */
+  /** No offer: build one from the lane's tip, from work known to change a file and a known start. */
   | { readonly kind: "build"; readonly place: Placed }
-  /** The lane, or where it starts, moved under a single offer you did not edit: rebuild it in place (ADR-0039). */
+  /** The lane, or where it starts, moved under a single offer you did not edit: rebuild it in place. */
   | {
       readonly kind: "rebuild"
       readonly place: Placed
@@ -257,17 +251,17 @@ export type RefreshDecision =
     }
   /** Nothing runs, and the record is written from the offer: unchanged, a stack the lane moved past, or yours. */
   | { readonly kind: "none" | "stale" | "leave"; readonly place: Placed }
-  /** Your edit and the host's crossed: keep yours (S48 item 8). */
+  /** Your edit and the host's crossed: keep yours. */
   | {
       readonly kind: "repair"
       readonly place: Placed
       readonly changes: readonly string[]
     }
   /**
-   * Untraced, and divergent or yours: nothing runs, and the record stays as
-   * it is. A gap ADR-0067's untraced start leaves: such an offer is neither
-   * repaired nor recorded until the lane catches up past the accepted-offer
-   * commit.
+   * Untraced, and divergent or yours: nothing runs, and the record stays as it
+   * is: the host does not act on what it cannot tell, so such an offer is
+   * neither repaired nor recorded until the lane catches up past the
+   * accepted-offer commit.
    */
   | { readonly kind: "untouched" }
 
@@ -293,7 +287,7 @@ export interface DescribeDecision {
   readonly ledger: OfferLedger
 }
 
-// ── accepted work (ADR-0104, ADR-0061) ─────────────────────────────
+// ── accepted work ─────────────────────────────────────────────────────────────
 
 /**
  * What the host reads of accepted work, each time it looks (`acceptedFacts` in
@@ -308,8 +302,8 @@ export interface AcceptedFacts
 }
 
 /**
- * A publish (ADR-0090), decided before its first step: on the host's own
- * machine, the working copy catches up with accepted work first (`catchUp`), and your
+ * A publish, decided before its first step: on the host's own machine, the
+ * working copy catches up with accepted work first (`catchUp`), and your
  * commits below `@` move onto it with the publish bookmark (`accept`).
  */
 export interface PublishDecision {
@@ -345,8 +339,8 @@ export interface PublishMove {
 }
 
 /**
- * A publish's second round (`planPublishFinish`), from accepted work as read after
- * the catch-up: the move, or the catch-up's operation reverted (S111).
+ * A publish's second round (`planPublishFinish`), from accepted work as read
+ * after the catch-up: the move, or the catch-up's operation reverted.
  */
 export type PublishFinish =
   | ({ readonly kind: "move" } & PublishMove)

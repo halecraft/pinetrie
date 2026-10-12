@@ -1,10 +1,10 @@
-// core/asks — an ask is a message that started a run, with that run
-// (ADR-0106). Derived from the tree, never stored.
+// core/asks — an ask is a message that started a run, with that run. Derived
+// from the tree, never stored.
 //
 // A run's entries are the agent's messages and their tool results below its
-// prompt (`startsRun`), up to the next prompt. A lane is never written while
-// it runs (S21), so nothing a person wrote sits inside a run: only the
-// host's news is steered in (`steered`, ADR-0080).
+// prompt (`startsRun`), up to the next prompt. A lane is never written while it
+// runs, so nothing a person wrote sits inside a run: only the host's news is
+// steered in (`steered`).
 //
 // What a column folds of each ask's work, and the rail's capsules, are the
 // interface's (`segmentPath`, `compactRail`, `@pinetrie/interface`).
@@ -36,15 +36,15 @@ export interface AskIndex {
   /** A run's prompt -> its newest entry, a tool result included. */
   readonly last: ReadonlyMap<EntryId, EntryId>
   /**
-   * An entry no run wrote, steered in between a run's entries (a base's
-   * news, ADR-0080), or a stop's fact appended after them (ADR-0126) -> the
-   * run's prompt. The column draws it in the ask's work and the rail in its
-   * capsule, so neither splits the ask in two.
+   * An entry no run wrote, steered in between a run's entries (a base's news),
+   * or a stop's fact appended after them -> the run's prompt. The column draws
+   * it in the ask's work and the rail in its capsule, so neither splits the ask
+   * in two.
    */
   readonly steered: ReadonlyMap<EntryId, EntryId>
   /**
-   * A stopped run's prompt -> who stopped it, from its stop's fact
-   * (ADR-0126). A run stopped before stops were facts names nobody.
+   * A stopped run's prompt -> who stopped it, from its stop's fact. A run
+   * stopped before stops were facts names nobody.
    */
   readonly stoppedBy: ReadonlyMap<EntryId, WriterId>
 }
@@ -58,9 +58,9 @@ export type AskOutcome =
   | { readonly kind: "running" }
   | { readonly kind: "answered" }
   /**
-   * Every abort S70 measured was a Stop: a restart resumes the run. `by` is
-   * null for a stop made before stops were facts, and until its fact is
-   * appended, as the run ends.
+   * In every case measured, an aborted ending came from a Stop: a restart
+   * resumes the run. `by` is null for a stop made before stops were facts, and
+   * until its fact is appended, as the run ends.
    */
   | { readonly kind: "stopped"; readonly by: WriterId | null }
   | { readonly kind: "failed"; readonly error: string }
@@ -106,7 +106,7 @@ export function indexAsks(index: TreeIndex): AskIndex {
   const last = new Map<EntryId, EntryId>()
   const steered = new Map<EntryId, EntryId>()
   const stoppedBy = new Map<EntryId, WriterId>()
-  // Ids are uuidv7, so sorted ids are creation order (S9).
+  // Ids are uuidv7, so sorted ids are creation order.
   const entries = Object.values(index.entries).sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
   )
@@ -144,9 +144,9 @@ export function indexAsks(index: TreeIndex): AskIndex {
 }
 
 /**
- * The agent messages a run holds from which its ask is long. The host's
- * rule, not the rail's geometry: only a long ask is given a digest
- * (ADR-0075), and the rail draws it as a dot and a capsule of its own.
+ * The agent messages a run holds from which its ask is long. The host's rule,
+ * not the rail's geometry: only a long ask is given a digest, and the rail
+ * draws it as a dot and a capsule of its own.
  */
 export const LONG_ASK = 3
 
@@ -155,11 +155,11 @@ export const isLongAsk = (asks: AskIndex, prompt: EntryId): boolean =>
   (asks.work.get(prompt)?.length ?? 0) >= LONG_ASK
 
 /**
- * How `prompt`'s run ended, from its last entries (S70): an assistant
- * message that `aborted` was stopped, and so was a run whose last entry is a
- * tool result, since only a Stop ends a run before the model reads a result;
- * one with `error` failed; anything else answered. A stop's fact names who
- * stopped it (`stoppedBy`), and is ignored when the run answered anyway.
+ * How `prompt`'s run ended, from its last entries: an assistant message that
+ * `aborted` was stopped, and so was a run whose last entry is a tool result,
+ * since only a Stop ends a run before the model reads a result; one with
+ * `error` failed; anything else answered. A stop's fact names who stopped it
+ * (`stoppedBy`), and is ignored when the run answered anyway.
  */
 export function askOutcome(
   index: TreeIndex,
@@ -192,9 +192,9 @@ const hasWords = (entry: EntryLike | undefined): boolean => {
 
 /**
  * The message an ask's work ends with, drawn after its fold: the run's last
- * agent message with text or a tool call. A stop before the first response,
- * or a failure, leaves one with neither (S70), which is skipped; null when no
- * message has any.
+ * agent message with text or a tool call. A stop before the first response, or
+ * a failure, leaves one with neither, which is skipped; null when no message
+ * has any.
  */
 export function lastWord(
   index: TreeIndex,

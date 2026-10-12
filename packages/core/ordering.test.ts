@@ -1,5 +1,5 @@
-// ADR-0013's safety claim, stated as tests. The derivation is pure so that
-// these properties need no substrate to express.
+// The arrival seq's safety claim, as tests: two replicas that see the same
+// entries in any order give them the same sequence.
 
 import { orderNewEntries } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -35,7 +35,7 @@ describe("orderNewEntries", () => {
     }
   })
 
-  test("ADR-0013: order is invariant under input permutation", () => {
+  test("order is invariant under input permutation", () => {
     // Two replicas see the same delta in different orders. If they disagree
     // on the resulting sequence, stable cursors silently skip entries.
     const tree: Tree = { a: null, b: "a", c: "a", d: "b", e: null }

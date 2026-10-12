@@ -1,5 +1,4 @@
-// core/work — where a lane works, and which files an entry had (ADR-0032,
-// ADR-0034).
+// core/work — where a lane works, and which files an entry had.
 //
 // Every run's prompt, and every assistant message of a lane of its own that
 // made tool calls, has a revision record. So one walk up from an entry finds
@@ -22,7 +21,7 @@ import { ancestry, type TreeIndex } from "./tree.ts"
 export interface Above {
   /** The nearest record's lane; null where no run has been. */
   readonly lane: ThreadId | null
-  /** The nearest recorded commit; null means the thread's base (ADR-0104). */
+  /** The nearest recorded commit; null means the thread's base. */
   readonly commit: CommitId | null
   /**
    * The lane of the record holding `commit`: the copy a fork clones. Not
@@ -71,10 +70,10 @@ export interface ForkParent {
 }
 
 /**
- * Where `lane`, whose thread ends at `tip`, was cloned from: the nearest
- * commit above its first prompt, and the lane that recorded it, which is
- * what `forkPoint` clones. Null for a lane that began at its base, with no
- * commit above it (ADR-0072).
+ * Where `lane`, whose thread ends at `tip`, was cloned from: the nearest commit
+ * above its first prompt, and the lane that recorded it, which is what
+ * `forkPoint` clones. Null for a lane that began at its base, with no commit
+ * above it.
  */
 export function forkParent(
   index: TreeIndex,
@@ -108,8 +107,8 @@ export function conflictsAt(
 /**
  * The lane's first prompt on the path to `tip`: the entry nearest the root
  * whose revision record names `lane`. A branch's path passes its parent's
- * prompts first, which name the parent's lane, so this is the branch's own
- * (ADR-0039). Null when no run of the lane is on the path.
+ * prompts first, which name the parent's lane, so this is the branch's own.
+ * Null when no run of the lane is on the path.
  */
 export function firstPromptOf(
   index: TreeIndex,

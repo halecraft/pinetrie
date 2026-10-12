@@ -1,7 +1,6 @@
-// core/address — what names a thread, an entry, a block of an entry, a range
-// of an entry's text, or a card (ADR-0126). One codec, `printAddress` and
-// `parseAddress`, total, for the record, the wire, the pane and links in
-// text (`/a/<address>`). Re-exported from `index.ts`.
+// core/address — what names a thread, an entry, a block of an entry, a range of
+// an entry's text, or a card. One codec, `printAddress` and `parseAddress`,
+// total, for the record, the wire, the pane and links in text (`/a/<address>`).
 
 import {
   type CardId,
@@ -24,9 +23,9 @@ export interface BlockRef {
 }
 
 /**
- * What an address names. An entry names its thread (ADR-0125), so an
- * address of one resolves without walking the tree. A range is in the
- * message's text as stored, `from` to `to`, `to` excluded.
+ * What an address names. An entry names its thread, so an address of one
+ * resolves without walking the tree. A range is in the message's text as
+ * stored, `from` to `to`, `to` excluded.
  */
 export type Address =
   | { readonly kind: "thread"; readonly thread: ThreadId }

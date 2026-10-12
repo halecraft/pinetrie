@@ -1,0 +1,148 @@
+# `@pinetrie/core`: technical notes
+
+Core is the vocabulary every package shares (ids, intents, every record's
+type) and the reads of the tree. It does no I/O, and imports nothing but its
+own modules: no pi (ADR-0003), no Kyneta, no Node builtin, since the client
+loads it in the browser (`paths.ts` compares paths as strings for that
+reason). Everything here is a *plan* in gather, plan, execute: a decision is
+a value, and the host performs it, as pi's own lane loop does.
+
+The rule core, `@pinetrie/rules` and `@pinetrie/repo` keep: a format or type
+that `lanes` or `repo` must read, write or name lives in core, since neither
+can declare `@pinetrie/rules`. What a stored shape says, and how the host
+changes it, is `@pinetrie/rules`', whoever reads it. Core also holds the few
+pure helpers several packages share (`paths.ts`, `errorText`), since every
+package that uses one already depends on core. `index.ts` re-exports every
+module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
+
+## Ids (`ids.ts`, `kinds.ts`)
+
+- A brand turns a swapped argument into a compile error; it cannot keep a
+  value off the wire, so no seq is branded (ADR-0013). `EntryId` and `RunId`
+  are minted only where they enter: `biome.json` refuses an `entryId` import
+  in core, the client and the host, and a `runId` import in core and the
+  client (S95).
+- A person is their email (ADR-0037), and owns no lane (ADR-0120). A thread's
+  id, `t-` and a uuidv7, is minted by the column that opens it before
+  anything is written (ADR-0057), and names its lane too (ADR-0117,
+  ADR-0120): a container and its volume are named after it, so a new one is
+  checked strictly (`parseNewThread`). A task's id is its card's (ADR-0116,
+  ADR-0126); a root's names its document, not its root entry (ADR-0063); a
+  workflow state's survives a rename (ADR-0122). A file card's is reserved
+  (ADR-0118); a fact's, a reference's (ADR-0126) and an ask's (ADR-0128) are
+  minted where the card is made.
+- A history of moves is per person and task, or the person's outside any
+  task (ADR-0066, ADR-0116, ADR-0126).
+- `KINDS` holds one row per kind of card: its id's prefix, the places it is
+  ever in (ADR-0116, ADR-0117, ADR-0126, ADR-0128), whether it is reordered
+  there, and where its words are read.
+
+## Cards and places (`cards.ts`, `places.ts`, `paste.ts`, `grid.ts`)
+
+- A card is an identity, one place and content (ADR-0126); its record is in
+  the places document, which only the host writes, and a move between
+  owners is a handoff (ADR-0059). Everything unsent is a card, and stays
+  where it was put (ADR-0048): a move someone else makes leaves a trace for
+  its placer, and a reorder is a compare-and-set on its neighbours.
+- An order key ranks a card among its neighbours, the host's to give
+  (S69). A queued card carries its text's version as its queuer had it,
+  since its text can reach the host after its record (S96).
+- A text card's command is named last and carried out when the card pops
+  (ADR-0108); every command on a thread leaves a fact in it (ADR-0080). A
+  text card spun into a thread starts a root (ADR-0111); a note is a text
+  card in a note column (ADR-0113, ADR-0116).
+- A paste makes a card from a copy, or moves a cut one out of its cutter's
+  trash (ADR-0132), after trashing the card on the slot it fills
+  (ADR-0133).
+- Your inventory is one grid, its cells addressed in reading order
+  (ADR-0048).
+
+## The tree (`tree.ts`, `asks.ts`, `agents.ts`, `roots.ts`, `address.ts`)
+
+- Order is structural: the `parentId` walk, and ids, which are uuidv7 and so
+  sort by creation (S9). Nothing reads seq, which is local to a replica
+  (ADR-0013); `orderNewEntries` derives it, and `ordering.test.ts` tests that
+  every replica derives the same.
+- Every entry names its thread (ADR-0125), so a thread's first entry and end
+  are read from its rows, and a fork's source is not stored. A thread is a
+  card, and a copy is a branch at its end (ADR-0117); one taken into an
+  inventory stops (ADR-0124).
+- A lane is never written while it runs (S21), so a run's entries are its
+  prompt's descendants up to the next prompt, with only the host's news
+  steered in (ADR-0080). An ask is a message and the run it started
+  (ADR-0106); how a run ended is read from its last entries (S70), and who
+  stopped it from its stop's fact (ADR-0126). Only a long ask gets a digest
+  (ADR-0075). Resume starts a new turn (ADR-0082).
+- A thread's mode is its lane, and a mention picks who a message is for
+  (ADR-0021). Other threads' agents are invited, then asked, and what an
+  asked agent has heard is read from the path (ADR-0128).
+- A root is a document (ADR-0063), rooted at its first message (S30). Its
+  summary, written to the directory, carries its followers (ADR-0077) and
+  its mentions, for your inbox (ADR-0030).
+- An address names a thread, an entry, a block, a range or a card, and an
+  entry's names its thread (ADR-0125, ADR-0126).
+- A tool keeps its id for the model; core reads what a call touched, and
+  `@pinetrie/interface` words it (ADR-0114). A tool's result is its own entry
+  but belongs to its call, never a message. A tool's image is a blob
+  (ADR-0051), as a pasted one is, which a message holds by reference
+  (ADR-0042); a reference card's quote is a blob too (ADR-0126).
+- `TOOL_IDS`' order is part of every request's prefix, and a changed prefix
+  drops a lane's earlier thinking (S85). The search tools run programs
+  carried into every lane (`RUNTIME_PROGRAMS`, ADR-0064).
+
+## Records (`index.ts`)
+
+- Each host record is one spec, and pi only carries its writes (ADR-0062);
+  a record lives in the session's document or a root's (ADR-0063).
+- The board's workflow states and the archive (ADR-0122, ADR-0029); a
+  task's title (ADR-0045, ADR-0116) and one a model gives (ADR-0074); a
+  person's picture (ADR-0098); a column's banner (ADR-0050); the commands a
+  pi skill or prompt makes (ADR-0036).
+- A turn that changes files is a revision (ADR-0032), on a lane's own disk
+  (ADR-0034), whose snapshots `RevisionRecord` names; every thread's agent
+  works in a copy of its own (ADR-0102). A conflict is resolved by the agent
+  in its lane, with a `land` prompt (ADR-0033).
+- A dependency layer is a snapshot named by its recipe's key, and a turn's
+  whole-disk diff counts none of pine·trie's own paths (`DISK_OWN_ROOTS`,
+  ADR-0131).
+- `NO_EDITOR`: a shell with no terminal would wait on an editor until its
+  timeout (S36).
+
+## Offers and accepted work (`offers.ts`, `trailers.ts`, `work.ts`)
+
+- A thread's work reaches your repo as an offer, one commit or a stack
+  (ADR-0105, S48), accepted by a forward bookmark move onto accepted work
+  (ADR-0104, ADR-0061), through one owner (ADR-0065). An archived root's
+  offer is withdrawn (ADR-0029). The repo is the
+  ledger: the host decides from it, never from its record, which a restart
+  can lose (S73).
+- What the host cannot tell, it does not act on (ADR-0067): an offer is
+  built only from work known to change a file, from a known start, and an
+  accepted-offer commit that names no source (S97) leaves its lane
+  untraced until it catches up past it. An offer already held is `held`
+  (S89).
+- A thread catches up with its base or the thread it branched from
+  (ADR-0072); a publish catches your files up first (ADR-0090, ADR-0099),
+  then moves the publish bookmark (ADR-0076). A publish's undo reverts its
+  operation (S111); what catching up would change is read before (S80).
+  Diff stats and review reads are jj's (S57, ADR-0047).
+- Every trailer is written and read in `trailers.ts`. jj's `trailers`
+  template reads only a message's last paragraph, and a squash keeps two,
+  so the readers read every paragraph (S77). A base trailer names accepted
+  work by its kind, not its bookmark, which config may rename (ADR-0100).
+- A thread has a name you can say, which its offer's bookmark and trailers
+  carry, and its offer holds the WIP line until an agent describes it
+  (ADR-0039).
+- A lane's work, its commit and its disk are read from the nearest revision
+  records above an entry (ADR-0032, ADR-0034).
+
+## Streams (`live.ts`, `edits.ts`)
+
+- A running turn streams through the durable document (ADR-0014), in
+  pine·trie's own words: no pi type crosses (ADR-0003). A stream's key is a
+  fresh uuidv7, unique wherever it is made (ADR-0016). An ask's digest is
+  replaced whole, so it is a value, not a text.
+- A stream is written as edits to a text, not whole values: a live tool
+  stream appended 4.35 MB as values and 96 KB as edits (S22).
+- A run's earlier thinking is dropped when its lane's tools or prompt
+  change (S85).

@@ -132,7 +132,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
 const near = (id: string) =>
   nearestRevision(index, revisions, atEntry(entryId(id)))
 
-describe("firstPromptOf: a lane's own first prompt (ADR-0039)", () => {
+describe("firstPromptOf: a lane's own first prompt", () => {
   test("a branch's first prompt is its own, below its parent's", () => {
     expect(firstPromptOf(index, revisions, B, entryId("7-mb"))).toBe("6-pb")
     expect(firstPromptOf(index, revisions, D, entryId("a-ld"))).toBe("8-pd")
@@ -197,7 +197,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
     expect(near("3-r1").lane).toBe(A)
   })
   test("a lane working directly is the lane above, but passed over for commit and disk", () => {
-    // The commit is B's: the copy a fork here clones (ADR-0072).
+    // The commit is B's: the copy a fork here clones.
     expect(near("9-md")).toEqual({
       lane: D,
       commit: CB,
@@ -237,7 +237,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
   })
 })
 
-describe("forkParent and conflictsAt: what a lane's copy was cloned from (ADR-0072)", () => {
+describe("forkParent and conflictsAt: what a lane's copy was cloned from", () => {
   test("a branch's parent is the lane whose commit is above its first prompt", () => {
     expect(forkParent(index, revisions, B, entryId("7-mb"))).toEqual({
       lane: A,
@@ -312,7 +312,7 @@ test("isBusy: running, or with cards queued", () => {
   expect(isBusy({ ...view, waiting: 1 })).toBe(true)
   // A held queue is not busy: nothing waits, and the agent is idle.
   expect(isBusy({ ...view, heldBy: writerId("ada") })).toBe(false)
-  // But a send there waits in it (ADR-0048 step 7).
+  // But a send there waits in it.
   expect(sendWaits({ ...view, heldBy: writerId("ada") })).toBe(true)
   expect(sendWaits(view)).toBe(false)
   expect(sendWaits({ ...view, waiting: 1 })).toBe(true)

@@ -1,10 +1,9 @@
-// core/roots — each root's tree, summarized (ADR-0029, ADR-0030). Pure. The
-// host writes a root's summary into its directory record (`readRootRecord`
-// in @pinetrie/reads), which the sidebar, your inbox and the board read
-// (ADR-0063).
+// core/roots — each root's tree, summarized. The host writes a root's summary
+// into its directory record (`readRootRecord` in @pinetrie/reads), which the
+// sidebar, your inbox and the board read.
 //
-// A root is found by walking up (`rootOf`), and a thread started at the root
-// is rooted at its first message (S30), so a root's id is its tab's key.
+// A root is found by walking up (`rootOf`), and a thread started at the root is
+// rooted at its first message, so a root's id is its tab's key.
 
 import type { EntryId, ThreadId, WriterId } from "./index.ts"
 import {
@@ -20,7 +19,7 @@ import {
 
 export interface RootSummary {
   readonly root: EntryId
-  /** Its first message, as the rail finds it: the tab's label until a title names it (ADR-0045). */
+  /** Its first message, as the rail finds it: the tab's label until a title names it. */
   readonly first: EntryId
   /** Its messages: the rail's rows, some of which it draws inside a run. */
   readonly messages: number
@@ -56,9 +55,9 @@ export function summarizeRoots(index: TreeIndex): readonly RootSummary[] {
 }
 
 /**
- * What a root's lanes hold: the agent running there, cards it will be sent
- * when it is free (`waiting`), or cards that wait for someone to release the
- * queue (`held`, ADR-0113).
+ * What a root's lanes hold: the agent running there, cards it will be sent when
+ * it is free (`waiting`), or cards that wait for someone to release the queue
+ * (`held`).
  */
 export type RootWork = "running" | "waiting" | "held"
 
@@ -94,9 +93,9 @@ export function rootWork(
 }
 
 /**
- * The agent's work among `threads`' lanes (ADR-0116): a task's, whatever
- * roots its threads are in. Undefined when none is busy. The one rule for
- * when a task cannot be archived.
+ * The agent's work among `threads`' lanes: a task's, whatever roots its threads
+ * are in. Undefined when none is busy. The one rule for when a task cannot be
+ * archived.
  */
 export function threadsWork(
   lanes: readonly LaneView[],

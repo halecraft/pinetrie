@@ -1,28 +1,21 @@
-// ids — every branded id, and positions in the tree (ADR-0063, ADR-0117,
-// ADR-0126). Re-exported from `index.ts`. A card's id's prefix is its kind's
-// (`KINDS`): this module reads `KINDS`' value, and `kinds.ts` imports only
-// types from here, so the two never load in a cycle.
+// ids — every branded id, and positions in the tree. A card's id's prefix is
+// its kind's (`KINDS`): this module reads `KINDS`' value, and `kinds.ts`
+// imports only types from here, so the two never load in a cycle.
 
 import { KINDS } from "./kinds.ts"
 import type { IdOf } from "./places.ts"
 
 // --- branded identifiers ----------------------------------------------------
 //
-// Several ADRs are constraints a type system can hold. Branding them moves the
-// check from a runtime assertion in e2e/ to a compile error at the call site.
-//
-// A brand prevents MIX-UPS where a value is created and passed around. It does
-// nothing about serialization, which is why a `LocalSeq` brand was deleted:
-// its risk was a seq reaching the wire, and a branded number drops into any
-// `number` field. These brands guard against swapped arguments, which is what
-// brands are for.
+// A brand turns a swapped argument into a compile error at the call site. It
+// does nothing about serialization: a branded number drops into any `number`
+// field, so no brand keeps a seq off the wire.
 
 declare const writerIdBrand: unique symbol
 /**
  * A person, as the transport identifies them, never as a message claims: the
- * principal their connection named, which is their email (ADR-0037).
- * Authorship is recorded in each message by this id; people own no lanes
- * (ADR-0120).
+ * principal their connection named, which is their email. Authorship is
+ * recorded in each message by this id; people own no lanes.
  */
 export type WriterId = string & { readonly [writerIdBrand]: true }
 
@@ -77,14 +70,13 @@ export const emailLocalPart = (writer: WriterId): string => {
 
 declare const threadIdBrand: unique symbol
 /**
- * A thread's id (ADR-0117): `t-` and a uuidv7, minted by the column that opens
- * the thread, before anything is written (ADR-0057). It also names the
- * thread's lane, when it has one (ADR-0120): a lane has no id of its own, so
- * no lane can be named by anything but a thread. `newThreadId()` mints one
- * (`@pinetrie/session`), `parseNewThread()` checks one a client sends, and
- * every reader of a stored one checks it with `isThreadId()`, so no writer's
- * id or `"main"` is one. `threadIdFor()` is for fixtures and parsers alone:
- * Biome refuses its import elsewhere.
+ * A thread's id: `t-` and a uuidv7, minted by the column that opens the thread,
+ * before anything is written. It also names the thread's lane, when it has one:
+ * a lane has no id of its own, so no lane can be named by anything but a
+ * thread. `newThreadId()` mints one (`@pinetrie/session`), `parseNewThread()`
+ * checks one a client sends, and every reader of a stored one checks it with
+ * `isThreadId()`, so no writer's id or `"main"` is one. `threadIdFor()` is for
+ * fixtures and parsers alone: Biome refuses its import elsewhere.
  */
 export type ThreadId = string & { readonly [threadIdBrand]: true }
 
@@ -115,18 +107,18 @@ const NEW_THREAD =
 
 /**
  * A new thread's id as a client makes it, `t-` and a lowercase uuidv7;
- * undefined for anything else. Stricter than `isThreadId`: a lane's
- * container and volume are named after its thread's id (ADR-0057).
+ * undefined for anything else. Stricter than `isThreadId`: a lane's container
+ * and volume are named after its thread's id.
  */
 export const parseNewThread = (s: string): ThreadId | undefined =>
   NEW_THREAD.test(s) ? (s as ThreadId) : undefined
 
 declare const taskIdBrand: unique symbol
 /**
- * A task's id (ADR-0116): `k-` and a uuidv7, minted by the tab that opens
- * the task, as it mints a `RootId`. A task is a card on the board, and this
- * is its card's id (ADR-0126): its place, its title, the sidebar and the
- * layout are keyed by it. What it holds is in the places document.
+ * A task's id: `k-` and a uuidv7, minted by the tab that opens the task, as it
+ * mints a `RootId`. A task is a card on the board, and this is its card's id:
+ * its place, its title, the sidebar and the layout are keyed by it. What it
+ * holds is in the places document.
  */
 export type TaskId = string & { readonly [taskIdBrand]: true }
 
@@ -150,10 +142,10 @@ export const parseNewTask = (s: string): TaskId | undefined =>
 
 declare const rootIdBrand: unique symbol
 /**
- * A root's document's id (ADR-0063): `r-` and a uuidv7, minted by the tab
- * whose first message starts the root, as a column mints its lane's id
- * (ADR-0057). Not the root entry's id: a lane can exist in a root before pi
- * writes its first entry. The directory (`ROOT`) maps one to the other.
+ * A root's document's id: `r-` and a uuidv7, minted by the tab whose first
+ * message starts the root, as a column mints its lane's id. Not the root
+ * entry's id: a lane can exist in a root before pi writes its first entry. The
+ * directory (`ROOT`) maps one to the other.
  */
 export type RootId = string & { readonly [rootIdBrand]: true }
 
@@ -175,9 +167,8 @@ export const parseNewRoot = (s: string): RootId | undefined =>
 
 declare const workflowStateIdBrand: unique symbol
 /**
- * A workflow state's id (ADR-0122): `w-` and an id the host mints as the
- * state is added. A state is named apart from its id, so a rename keeps
- * every root's place.
+ * A workflow state's id: `w-` and an id the host mints as the state is added. A
+ * state is named apart from its id, so a rename keeps every root's place.
  */
 export type WorkflowStateId = string & { readonly [workflowStateIdBrand]: true }
 
@@ -193,7 +184,7 @@ export const isWorkflowStateId = (s: string): s is WorkflowStateId =>
 
 const ROOT_DOC_PREFIX = "root:"
 
-/** The id of a root's document, which holds its pi storage (ADR-0063). */
+/** The id of a root's document, which holds its pi storage. */
 export const rootDocId = (root: RootId): string => `${ROOT_DOC_PREFIX}${root}`
 
 /** A document id -> the root it is, or undefined for any other document. */
@@ -206,15 +197,13 @@ export function rootOfDocId(docId: string): RootId | undefined {
 export const MOVES_DOC_PREFIX = "moves:"
 
 /**
- * Which of a person's histories of moves a step is in (ADR-0066, ADR-0116,
- * ADR-0126): a task's, or theirs outside any task (a discard from their
- * inventory while on no task).
+ * Which of a person's histories of moves a step is in: a task's, or theirs
+ * outside any task (a discard from their inventory while on no task).
  */
 export type MoveHistoryScope =
   | { readonly kind: "task"; readonly task: TaskId }
   | { readonly kind: "person" }
 
-/** A person's history outside any task. */
 export const PERSON_HISTORY: MoveHistoryScope = { kind: "person" }
 
 /** The history of `task`, or the person's own for none. */
@@ -222,9 +211,9 @@ export const historyScope = (task: TaskId | null): MoveHistoryScope =>
   task === null ? PERSON_HISTORY : { kind: "task", task }
 
 /**
- * The host's undo stack of `writer`'s moves in `scope` (ADR-0066,
- * ADR-0116): `moves:<writer>:<task>` for a task's, `moves:<writer>` for
- * theirs outside any task. Only the host holds it.
+ * The host's undo stack of `writer`'s moves in `scope`: `moves:<writer>:<task>`
+ * for a task's, `moves:<writer>` for theirs outside any task. Only the host
+ * holds it.
  */
 export const movesDocId = (
   writer: WriterId,
@@ -261,14 +250,13 @@ declare const entryIdBrand: unique symbol
 declare const runIdBrand: unique symbol
 /**
  * Entry ids and run ids are both uuidv7 strings and cannot be told apart at
- * runtime. Positions take an entry id; `activeRuns` holds run ids. Passing
- * one where the other belongs would otherwise compile, run, and fail
- * silently. Mint them only where they enter: the protocol codec, an
- * address's parser (`parseAddress`), the reads,
- * the schema's readers, `@pinetrie/rules`' decoders, the pi adapter, the client's
- * stored forms, and the host's id generator. `biome.json` refuses an
- * `entryId` import in core, the client and the host, and a `runId` import in
- * core and the client (S95).
+ * runtime. Positions take an entry id; `activeRuns` holds run ids. Passing one
+ * where the other belongs would otherwise compile, run, and fail silently. Mint
+ * them only where they enter: the protocol codec, an address's parser
+ * (`parseAddress`), the reads, the schema's readers, `@pinetrie/rules`'
+ * decoders, the pi adapter, the client's stored forms, and the host's id
+ * generator. `biome.json` refuses an `entryId` import in core, the client and
+ * the host, and a `runId` import in core and the client.
  */
 export type EntryId = string & { readonly [entryIdBrand]: true }
 export type RunId = string & { readonly [runIdBrand]: true }
@@ -277,16 +265,16 @@ export const runId = (id: string): RunId => id as RunId
 declare const textCardIdBrand: unique symbol
 /**
  * A text card's id, a bare uuidv7: the key of its record and the name of its
- * text's document (ADR-0048).
+ * text's document.
  */
 export type TextCardId = string & { readonly [textCardIdBrand]: true }
 export const textCardId = (id: string): TextCardId => id as TextCardId
 
 declare const noteColumnIdBrand: unique symbol
 /**
- * A note column's id (ADR-0116): `n-` and a uuidv7, minted by the page that
- * makes the column (`newNoteColumnId`, `@pinetrie/session`) or by the host
- * that makes one for a note with nowhere to go (`nearestNoteColumn`).
+ * A note column's id: `n-` and a uuidv7, minted by the page that makes the
+ * column (`newNoteColumnId`, `@pinetrie/session`) or by the host that makes one
+ * for a note with nowhere to go (`nearestNoteColumn`).
  */
 export type NoteColumnId = string & { readonly [noteColumnIdBrand]: true }
 
@@ -295,22 +283,22 @@ export const isNoteColumnId = (s: string): s is NoteColumnId =>
   s.startsWith(KINDS["note-column"].prefix) &&
   s.length > KINDS["note-column"].prefix.length
 declare const mediaIdBrand: unique symbol
-/** A media card's id (ADR-0116): `m-` and a uuidv7. */
+/** A media card's id: `m-` and a uuidv7. */
 export type MediaId = string & { readonly [mediaIdBrand]: true }
 declare const fileCardIdBrand: unique symbol
-/** A file card's id (ADR-0118): `f-` and a uuidv7. */
+/** A file card's id: `f-` and a uuidv7. */
 export type FileCardId = string & { readonly [fileCardIdBrand]: true }
 declare const factCardIdBrand: unique symbol
 /**
- * A fact card's id (ADR-0126): `x-` and a uuidv7, minted by the host as it
- * queues the fact (`f-` is a file card's).
+ * A fact card's id: `x-` and a uuidv7, minted by the host as it queues the fact
+ * (`f-` is a file card's).
  */
 export type FactCardId = string & { readonly [factCardIdBrand]: true }
 
 declare const referenceCardIdBrand: unique symbol
 /**
- * A reference card's id (ADR-0126): `q-` and a uuidv7, minted by the page
- * that takes it (`a-` is an ask's, `r-` a root's).
+ * A reference card's id: `q-` and a uuidv7, minted by the page that takes it
+ * (`a-` is an ask's, `r-` a root's).
  */
 export type ReferenceCardId = string & {
   readonly [referenceCardIdBrand]: true
@@ -318,8 +306,8 @@ export type ReferenceCardId = string & {
 
 declare const askCardIdBrand: unique symbol
 /**
- * An ask card's id (ADR-0128): `a-` and a uuidv7, minted by the host as it
- * queues an ask for a busy agent.
+ * An ask card's id: `a-` and a uuidv7, minted by the host as it queues an ask
+ * for a busy agent.
  */
 export type AskCardId = string & { readonly [askCardIdBrand]: true }
 
@@ -380,7 +368,6 @@ export type KindedId = {
 export const kindedId = (id: CardId): KindedId =>
   ({ kind: kindOfCard(id), id }) as KindedId
 
-/** Whether a card's id is a reference's (ADR-0126). */
 export const isReferenceCardId = (id: CardId): id is ReferenceCardId =>
   kindOfCard(id) === "reference"
 
@@ -397,13 +384,12 @@ const PREFIXED_CARD_RE = new RegExp(
 
 /**
  * A card's id as it comes in from the wire or the store; undefined for text
- * that is none. A text card's is a bare lowercase uuidv7; a note column's,
- * a fact's, a reference's, an ask's, a media card's and a file card's are
- * their prefix and one. A
- * thread's is any id `isThreadId` takes, as everywhere a thread is read, so
- * a thread the store names is never dropped for its id's shape; a task's,
- * any `isTaskId` takes, the same way. The one way text becomes a `CardId`
- * outside a minter.
+ * that is none. A text card's is a bare lowercase uuidv7; a note column's, a
+ * fact's, a reference's, an ask's, a media card's and a file card's are their
+ * prefix and one. A thread's is any id `isThreadId` takes, as everywhere a
+ * thread is read, so a thread the store names is never dropped for its id's
+ * shape; a task's, any `isTaskId` takes, the same way. The one way text becomes
+ * a `CardId` outside a minter.
  */
 export function parseCardId(id: string): CardId | undefined {
   if (isThreadId(id)) return id
@@ -419,7 +405,7 @@ export const parseTextCardId = (id: string): TextCardId | undefined =>
 declare const agentIdBrand: unique symbol
 /**
  * The agent a message compels in its own thread: the host has one, `@agent`.
- * Other threads' agents are named by their threads (`Recipients.asks`, ADR-0128).
+ * Other threads' agents are named by their threads (`Recipients.asks`).
  */
 export type AgentId = string & { readonly [agentIdBrand]: true }
 /** The host's agent, addressed as `@agent`. */
@@ -443,9 +429,9 @@ export const ROOT: Position = { kind: "root" }
 export const atEntry = (id: EntryId): Position => ({ kind: "entry", id })
 
 /**
- * A position in a given root (ADR-0063): what a command or a card's place
- * carries where it points into the tree, so the host knows the document
- * without looking the entry up.
+ * A position in a given root: what a command or a card's place carries where it
+ * points into the tree, so the host knows the document without looking the
+ * entry up.
  */
 export interface Spot {
   readonly root: RootId

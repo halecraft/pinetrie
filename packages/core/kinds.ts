@@ -1,8 +1,7 @@
-// kinds — every kind of card, once (ADR-0126): its id's prefix, the places
-// it is ever in, whether it is reordered where it is, and where what it
-// says is read. One row per kind, so a kind
-// added to `CardKind` does not compile until each is said. Re-exported from
-// `index.ts`; `PLACES_OF`, `kindOfCard` and `textSourceOf` read it.
+// kinds — every kind of card, once: its id's prefix, the places it is ever in,
+// whether it is reordered where it is, and where what it says is read. One row
+// per kind, so a kind added to `CardKind` does not compile until each is said.
+// `PLACES_OF`, `kindOfCard` and `textSourceOf` read it.
 
 import type { CardKind } from "./ids.ts"
 import type { CardPlace } from "./places.ts"
@@ -29,7 +28,7 @@ export interface KindSpec {
 }
 
 /**
- * Every kind of card (ADR-0116, ADR-0117, ADR-0126):
+ * Every kind of card:
  *
  * - a text card, anywhere but a canvas;
  * - a thread's card, on a canvas or in an inventory;
@@ -46,10 +45,10 @@ export interface KindSpec {
  * - a fact, only ever queued, until its thread's end consumes it: the
  *   host places it, no person moves it (a move is refused `no-place`), and
  *   nothing passes it in its queue (`planReorder`, refused `fact`);
- * - an ask, an ask from another thread for a busy agent (ADR-0128), only
- *   ever queued, until its thread's end consumes it: the host places it, no
- *   person moves it (it never becomes a note), and a person may reorder it,
- *   or hold the queue it waits in;
+ * - an ask, an ask from another thread for a busy agent, only ever queued,
+ *   until its thread's end consumes it: the host places it, no person moves it
+ *   (it never becomes a note), and a person may reorder it, or hold the queue
+ *   it waits in;
  * - a media card and a file card, reserved: their ids are taken, and no
  *   place takes them yet.
  *

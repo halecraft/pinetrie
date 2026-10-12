@@ -1,5 +1,5 @@
-// core/images — blobs kept by content, outside the session (ADR-0042,
-// ADR-0126): images, and a reference's quote as markdown.
+// core/images — blobs kept by content, outside the session: images, and a
+// reference's quote as markdown.
 //
 // The bytes live in the host's blob store. A message holds an `ImageRef` for
 // each image its text shows, and the text names it by its URL,
@@ -24,7 +24,7 @@ export type ImageMime = (typeof IMAGE_MIMES)[number]
 export const isImageMime = (s: string): s is ImageMime =>
   (IMAGE_MIMES as readonly string[]).includes(s)
 
-/** A blob of text: a reference's quote, as markdown (ADR-0126). */
+/** A blob of text: a reference's quote, as markdown. */
 export const TEXT_MIME = "text/markdown"
 
 /** The types a blob may have: an image's, or markdown. */
