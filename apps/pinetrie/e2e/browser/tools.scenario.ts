@@ -1046,7 +1046,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await say("sleep on it")
           const revealed = `${col(0)} .tool.live[data-revealed]`
           const outlined = await appears(revealed, 10_000)
-          await tp.waitForTimeout(400)
+          await twoFrames(tp)
           const slow = await tp
             .$eval(
               revealed,
@@ -1551,15 +1551,15 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               `${review} .review-diffs`,
             )
             .catch(() => {})
-          await tp.waitForTimeout(100)
-          const pinned = await headAtTop("long-lane.txt")
+          const pinned =
+            (await waitFor(() => headAtTop("long-lane.txt"), 5_000)) >= 0
           await tp
             .click(`${review} .review-list-file[title="from-lane.txt"]`, {
               timeout: 5_000,
             })
             .catch(() => {})
-          await tp.waitForTimeout(100)
-          const listJumped = await headAtTop("from-lane.txt")
+          const listJumped =
+            (await waitFor(() => headAtTop("from-lane.txt"), 5_000)) >= 0
           check(
             "a file's head stays pinned while its diff scrolls, and the list brings a file to the top",
             pinned && listJumped,
@@ -1669,6 +1669,26 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           tp.$eval(body(n), b => b.scrollHeight - b.scrollTop - b.clientHeight)
         const frame = () =>
           tp.evaluate(() => new Promise(r => requestAnimationFrame(r)))
+        /**
+         * Turn the wheel over column 0 by `dy`, and wait until its scroll has
+         * moved and holds across a frame: the scroll lands frames after the
+         * wheel's event. A column that ignores the wheel times out here, and
+         * its check fails on what it reads next.
+         */
+        const wheelColumn = async (dy: number) => {
+          const top = () => tp.$eval(body(0), b => b.scrollTop)
+          const from = await top()
+          await tp.hover(body(0))
+          await tp.mouse.wheel(0, dy)
+          let last = from
+          await waitFor(async () => {
+            await frame()
+            const now = await top()
+            const settled = now !== from && now === last
+            last = now
+            return settled
+          }, 2_000)
+        }
         const streamHeight = () =>
           tp
             .$eval(
@@ -1717,9 +1737,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             { timeout: 20_000 },
           )
           .catch(() => null)
-        await tp.hover(body(0))
-        await tp.mouse.wheel(0, -10)
-        await new Promise(r => setTimeout(r, 300))
+        await wheelColumn(-10)
         const heldAt = await tp.$eval(body(0), b => b.scrollTop)
         const grownFrom = await streamHeight()
         await tp
@@ -1753,9 +1771,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           `held ${Math.round(heldAt)}→${Math.round(heldTo)}, offered ${offered}, gap after ${Math.round(jumped)}, then ${after.gaps.join(" ")}`,
         )
 
-        await tp.hover(body(0))
-        await tp.mouse.wheel(0, -300)
-        await new Promise(r => setTimeout(r, 300))
+        await wheelColumn(-300)
         const away = await gapOf(0)
         script.use([{ text: "short" }])
         await say("back to the end")

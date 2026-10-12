@@ -51,8 +51,19 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
-        // Past the fade.
-        await bp.waitForTimeout(800)
+        // Past the fade: its transitions done. The mark's pulse, an
+        // animation of its own, may run on.
+        await bp
+          .waitForFunction(
+            sel =>
+              document
+                .querySelector(`${sel} .column-head .thread-mark`)
+                ?.getAnimations({ subtree: true })
+                .every(a => !(a instanceof CSSTransition)) === true,
+            col(0),
+            { timeout: 5_000 },
+          )
+          .catch(() => {})
         const header = await bp.evaluate(sel => {
           const head = document.querySelector(`${sel} .column-head`)
           const mark = head?.querySelector(".agent-name .thread-mark")

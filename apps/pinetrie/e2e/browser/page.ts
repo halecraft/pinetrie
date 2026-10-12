@@ -293,6 +293,19 @@ export const componentRenders = (p: Page) =>
   }, COMMIT_MARK)
 
 /**
+ * Wait until the page renders nothing for a quarter second, at most five
+ * seconds, and clear what it recorded: the renders counted next are what
+ * follows. A step's own writes land a few renders after it resolves.
+ */
+export async function waitForQuiet(p: Page): Promise<void> {
+  await componentRenders(p)
+  for (let tries = 0; tries < 20; tries++) {
+    await p.waitForTimeout(250)
+    if ((await componentRenders(p)).length === 0) return
+  }
+}
+
+/**
  * Chromium's headless shell. In a lane it comes with the lane's image
  * (ADR-0041); on the Mac, install it once:
  *

@@ -140,16 +140,24 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const l3 = tlane()
     await u.chat("run it", at(l3?.tip ?? null), { thread: l3?.name })
     await tidle()
-    await sleep(300)
-    const toolTexts = watched
-      .flat()
-      .filter(s => s.kind === "tool")
-      .map(s => s.text)
-    const lastLive = toolTexts.at(-1) ?? ""
-    const result =
+    const liveTexts = () =>
+      watched
+        .flat()
+        .filter(s => s.kind === "tool")
+        .map(s => s.text)
+    const resultText = () =>
       projectSpine(ttree(), tlane()?.tip ?? null)
         .spine.flatMap(n => n.toolCalls ?? [])
         .at(-1)?.result?.text ?? ""
+    // The last live update may land after the run is idle: wait for the one
+    // the result ends with.
+    await waitFor(() => {
+      const last = liveTexts().at(-1) ?? ""
+      return last.length > 0 && resultText().includes(last.slice(-300))
+    }, 5_000)
+    const toolTexts = liveTexts()
+    const lastLive = toolTexts.at(-1) ?? ""
+    const result = resultText()
     check(
       "a running command's output streamed live",
       toolTexts.length > 3 &&

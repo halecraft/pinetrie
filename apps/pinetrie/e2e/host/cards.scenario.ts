@@ -866,7 +866,6 @@ async function run(check: Checks["check"]): Promise<void> {
     const c4 = newCard(ada, tipOf(), "@Bea over to you")
     await waitFor(() => ch.cardText(c4) === "@Bea over to you", 5_000)
     await ada.close()
-    await sleep(200)
     const SEND4 = crypto.randomUUID()
     const sent4 = await bea.chat("@Bea over to you", at(tipOf()), {
       id: SEND4,

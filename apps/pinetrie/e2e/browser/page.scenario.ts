@@ -19,6 +19,7 @@ import {
   identityCodec,
   promptParent,
   queueWords,
+  RAIL_HOLD_MS,
   readerHeading,
 } from "@pinetrie/interface"
 import { SCRIPTED_DESCRIPTION } from "@pinetrie/pi"
@@ -81,6 +82,7 @@ import {
   TO_NOBODY,
   twoFrames,
   waitForListWidth,
+  waitForQuiet,
 } from "./page.ts"
 
 export const scenario: Scenario = {
@@ -455,17 +457,12 @@ async function run(check: Checks["check"]): Promise<void> {
       // The thread has a lane now, so a message naming no one asks the agent; one
       // naming only a person is for them (ADR-0021).
       await page.fill(`${col(0)} .composer .input`, FOR_ADA)
-      await label(0)
-      await page.$$eval(".msg.assistant", n => n.length)
       await page.click(`${col(0)} .composer .send`)
       await shows(FOR_ADA)
-      await new Promise(r => setTimeout(r, 1500))
       await page.fill(
         `${col(0)} .composer .input`,
         "@agent say exactly: BROWSER-TWO",
       )
-      await label(0)
-      await page.$$eval(".msg.assistant", n => n.length)
       await page.click(`${col(0)} .composer .send`)
       await idle()
       /** Messages the rail draws: one per dot, and each capsule's count. */
@@ -1792,8 +1789,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // `MessageListView`, so a count of `Message` would be 0 whatever renders.
       await page.click(`${col(0)} .composer .input`)
       await page.keyboard.type("t")
-      await page.waitForTimeout(500)
-      await componentRenders(page)
+      await waitForQuiet(page)
       await page.keyboard.type("yped while only presence changes", {
         delay: 80,
       })
@@ -2839,9 +2835,10 @@ async function run(check: Checks["check"]): Promise<void> {
                 .locator(`${col(0)} .msg[data-entry]`)
                 .last()
                 .getAttribute("data-entry")) ?? ""
-            // Away from the rail, which holds still under the pointer.
+            // Away from the rail, which holds still under the pointer and
+            // for its hold after: time is the state it waits on.
             await lp.mouse.move(600, 10)
-            await lp.waitForTimeout(1_600)
+            await lp.waitForTimeout(RAIL_HOLD_MS + 100)
             const scrollTo = (to: "top" | "end" | "middle") =>
               lp.$eval(
                 body0,
@@ -3175,11 +3172,7 @@ async function run(check: Checks["check"]): Promise<void> {
         // thread's name, a title, a run's end and the facts its drain
         // appends) lands first, so the renders counted are the card's alone.
         await idle()
-        for (let quiet = 0; quiet < 20; quiet++) {
-          await componentRenders(page)
-          await page.waitForTimeout(250)
-          if ((await componentRenders(page)).length === 0) break
-        }
+        await waitForQuiet(page)
         await second.fill(`${col(0)} .composer .input`, "thinking")
         const typing = await page
           .waitForSelector(".composer .typing", { timeout: 15_000 })

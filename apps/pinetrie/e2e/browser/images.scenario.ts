@@ -20,6 +20,7 @@ import {
   openProfile,
   PANE_VIEWPORT,
   readRaw,
+  twoFrames,
 } from "./page.ts"
 
 export const scenario: Scenario = {
@@ -560,7 +561,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         await ip.click(`${row} .tool-more`).catch(() => {})
         script.use([{ text: "Still grey." }])
         await say("@agent and now?", "Still grey.")
-        await ip.waitForTimeout(300)
+        await twoFrames(ip)
         const after = await drawn()
         const open = await ip.getAttribute(row, "data-open")
         check(
