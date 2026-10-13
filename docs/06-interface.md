@@ -788,6 +788,15 @@ The rail is E; the column is T. Seeing both at once is the product.
   and mentioned, by their email's part before the `@` (`@ada` for
   `ada@example.com`, ADR-0037). A name with no such character, or spelled
   `agent`, is refused: no mention could reach it.
+- **The composer offers whom to mention as you type `@`** (ADR-0128), as it
+  offers commands as you type `/`: `@agent`, the thread's members, the
+  people, then the other threads' agents in reach, each with who it is
+  ("this thread's agent", a person's name, "member", "another thread's
+  agent"). Those whose handle starts with what you typed come first, then
+  those that only hold it; you are never offered. Arrows move, Tab or Enter
+  puts in the handle and a space, Escape hides the list. A handle typed in
+  full, a `@` in code or inside a word (`ada@example.com`), offers nothing,
+  so Enter sends.
 - **Another thread's agent can be brought in** (ADR-0128, proposed). A
   mention can name the agent of a thread on any open task's canvas by its
   thread's name (`@amber-fox`); a person's name may not be a thread's. A

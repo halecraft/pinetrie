@@ -1573,6 +1573,9 @@ export const NOBODY: Responder = { kind: "none" }
  */
 const HANDLE_CHARS = "\\p{L}\\p{N}_\\-"
 
+/** A mention's `@`: it starts a word, so an e-mail address holds none. */
+const MENTION_AT = `(?<![${HANDLE_CHARS}@])@`
+
 /**
  * `text` with its code blanked out, each character a space and each line break
  * kept: fenced blocks
@@ -1587,22 +1590,41 @@ function withoutCode(text: string): string {
   return fenced.replace(/(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g, blank)
 }
 
+/** A mention in a text: its `@` at `start`, its handle running to `end`. */
+interface MentionSpan {
+  readonly start: number
+  readonly end: number
+  /** Empty for a bare `@`. */
+  readonly handle: string
+}
+
 /**
- * Every `@handle` in `text`, in order, without repeats, outside code
- * (`withoutCode`): a handle in a code span or a fenced block is text. `@agent`
- * is the agent; any other handle is read as a person here, and `address` finds
- * whether it names another thread's agent instead. A handle starts a word, so
- * an e-mail address is not a mention.
+ * Every `@` in `text` that starts a mention, with the handle after it, outside
+ * code (`withoutCode`): a handle in a code span or a fenced block is text. A
+ * handle starts a word, so an e-mail address holds none. The one reading of
+ * mentions, for what is sent (`parseMentions`) and what is being typed
+ * (`typedMention`) alike.
+ */
+function mentionSpans(text: string): readonly MentionSpan[] {
+  const pattern = new RegExp(`${MENTION_AT}([${HANDLE_CHARS}]*)`, "gu")
+  // `withoutCode` keeps every offset, so its indices are the text's.
+  return [...withoutCode(text).matchAll(pattern)].map(m => ({
+    start: m.index,
+    end: m.index + m[0].length,
+    handle: m[1] ?? "",
+  }))
+}
+
+/**
+ * Every `@handle` in `text`, in order, without repeats (`mentionSpans`).
+ * `@agent` is the agent; any other handle is read as a person here, and
+ * `address` finds whom it names.
  */
 export function parseMentions(text: string): Mention[] {
   const seen = new Set<string>()
   const out: Mention[] = []
-  const pattern = new RegExp(
-    `(?<![${HANDLE_CHARS}@])@([${HANDLE_CHARS}]+)`,
-    "gu",
-  )
-  for (const [, handle] of withoutCode(text).matchAll(pattern)) {
-    if (handle === undefined || seen.has(handle)) continue
+  for (const { handle } of mentionSpans(text)) {
+    if (handle === "" || seen.has(handle)) continue
     seen.add(handle)
     out.push(
       handle === THE_AGENT
@@ -1611,6 +1633,30 @@ export function parseMentions(text: string): Mention[] {
     )
   }
   return out
+}
+
+/** A mention being typed: its `@` at `start`, its handle running to `end`. */
+export interface TypedMention {
+  readonly start: number
+  readonly end: number
+  /** What is typed of its handle before the caret; empty after a bare `@`. */
+  readonly typed: string
+}
+
+/**
+ * The mention the caret at `caret` is in (`mentionSpans`), null where it is
+ * in none. Its handle runs on past the caret, so a choice replaces the whole
+ * word.
+ */
+export function typedMention(text: string, caret: number): TypedMention | null {
+  const span = mentionSpans(text).find(m => m.start < caret && caret <= m.end)
+  return span === undefined
+    ? null
+    : {
+        start: span.start,
+        end: span.end,
+        typed: span.handle.slice(0, caret - span.start - 1),
+      }
 }
 
 /**
@@ -1699,9 +1745,41 @@ export interface Recipients {
   readonly invites: readonly ThreadId[]
 }
 
+/** Whom a handle in a mention names. */
+export type MentionTarget =
+  | { readonly kind: "agent" }
+  | { readonly kind: "thread"; readonly agent: AgentCandidate }
+  | { readonly kind: "person"; readonly name: string }
+
 /**
- * Who a message is for. A handle that is a candidate agent's name is that
- * agent, before any person: a member is asked, any other invited. `@agent`
+ * Every handle a mention can name, and whom: `@agent`, this thread's agent;
+ * each candidate agent by its thread's name; each participant by their
+ * name's handle. A handle names one target: a thread's agent before a person,
+ * and of two people with one handle, the later in `participants`. In the
+ * order first named: the agent, the threads, the people. `address` resolves
+ * by it and the composer offers it, so it offers only what a send would
+ * reach.
+ */
+export function mentionTargets(
+  participants: readonly string[],
+  agents: readonly AgentCandidate[],
+): ReadonlyMap<string, MentionTarget> {
+  const targets = new Map<string, MentionTarget>([
+    [THE_AGENT, { kind: "agent" }],
+  ])
+  for (const agent of agents)
+    targets.set(handleOf(agent.name), { kind: "thread", agent })
+  for (const name of participants) {
+    const handle = handleOf(name)
+    if (targets.get(handle)?.kind !== "thread")
+      targets.set(handle, { kind: "person", name })
+  }
+  return targets
+}
+
+/**
+ * Who a message is for, each handle resolved by `mentionTargets`: another
+ * thread's agent, before any person: a member is asked, any other invited. `@agent`
  * compels this thread's agent. Otherwise a message naming participants or
  * asking members is for them, and the agent is left out; an invite alone leaves
  * the message where it would have gone. Otherwise the thread decides: the agent
@@ -1721,24 +1799,19 @@ export function address(input: {
   readonly agents: readonly AgentCandidate[]
   readonly agentByDefault: boolean
 }): Recipients {
-  const byHandle = new Map(input.participants.map(n => [handleOf(n), n]))
-  const agentByHandle = new Map(
-    input.agents.map(a => [handleOf(a.name), a] as const),
-  )
+  const targets = mentionTargets(input.participants, input.agents)
   const people: string[] = []
   const asks: ThreadId[] = []
   const invites: ThreadId[] = []
   for (const m of input.mentions) {
+    // Only `@agent` as typed names the agent (`parseMentions`).
     if (m.kind !== "person") continue
-    const handle = handleOf(m.name)
-    const agent = agentByHandle.get(handle)
-    if (agent !== undefined) {
-      const into = agent.member ? asks : invites
-      if (!into.includes(agent.thread)) into.push(agent.thread)
-      continue
-    }
-    const person = byHandle.get(handle)
-    if (person !== undefined) people.push(person)
+    const target = targets.get(handleOf(m.name))
+    if (target?.kind === "thread") {
+      const { member, thread } = target.agent
+      const into = member ? asks : invites
+      if (!into.includes(thread)) into.push(thread)
+    } else if (target?.kind === "person") people.push(target.name)
   }
   const agent = input.mentions.find(m => m.kind === "agent")
   const compels: Responder =

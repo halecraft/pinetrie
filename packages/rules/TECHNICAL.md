@@ -196,8 +196,12 @@ the author (a `WriterId`, from the transport), the display name as written, the
 text, and the `Responder` it compels. `encodeChat` and the total `decodeChat`
 are the only code that builds or reads the shape.
 
-- **A mention in code is no mention** (`parseMentions`, `withoutCode`,
-  core, ADR-0128): inline code spans and fenced blocks are blanked first.
+- **Mentions are read once** (`mentionSpans`, core): what is sent
+  (`parseMentions`) and what the composer completes at the caret
+  (`typedMention`) are both its spans, so a list never opens where a send
+  would read no mention.
+- **A mention in code is no mention** (`withoutCode`, core, ADR-0128):
+  inline code spans and fenced blocks are blanked first.
   A four-space indented block is not: a line scan cannot tell it from a
   paragraph's continuation.
 - **Who a message is for is `address`** (`@pinetrie/core`, ADR-0021): `@agent`
@@ -205,7 +209,11 @@ are the only code that builds or reads the shape.
   mention that resolves, the thread decides (`agentByDefault`: the agent where
   the thread has a lane or the column is a Start Agent column, and never by a
   lane's default for a `branch`, which is a new thread). A handle resolves
-  against `participants`: every named writer and every writer in the tree,
+  by `mentionTargets`, which the composer's list is drawn from, so it offers
+  only what a send would reach: a handle names one target, another thread's
+  agent before a person and, of two people sharing one (ADR-0037), the later
+  in `participants`. Only `@agent` as typed names the agent. People are
+  `participants`: every named writer and every writer in the tree,
   the unnamed by their email's part before the `@` (ADR-0037), through
   `handleOf`: letters and digits in
   any script, `_` and `-`, lower-cased and composed (NFC), so "José" typed

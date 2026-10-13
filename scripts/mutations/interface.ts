@@ -4181,4 +4181,55 @@ export const mutations: readonly Mutation[] = [
     expect:
       "counts the work, the union of its turns' paths and local files, and its time",
   },
+  {
+    name: "you are offered as a mention",
+    file: "packages/interface/mentions.ts",
+    from: "handle !== mine && handle.includes(typed)",
+    to: "handle.includes(typed)",
+    command: unit,
+    expect: "you are not offered, by your name or your e-mail's",
+  },
+  {
+    name: "an unnamed you is offered as a mention",
+    file: "packages/interface/mentions.ts",
+    from: "  const mine = handleOf(displayName(me, nameOf.get(me)))\n",
+    to: '  const mine = handleOf(nameOf.get(me) ?? "")\n',
+    command: unit,
+    expect: "you are not offered, by your name or your e-mail's",
+  },
+  {
+    name: "mention options keep their order, not what they start with",
+    file: "packages/interface/mentions.ts",
+    from: "[...holding.filter(leads), ...holding.filter(o => !leads(o))]",
+    to: "[...holding]",
+    command: unit,
+    expect: "a handle starting with what is typed comes before one holding it",
+  },
+  {
+    name: "a chosen mention doubles the space after it",
+    file: "packages/interface/mentions.ts",
+    from: '  const space = /^\\s/.test(input.text.slice(at.end)) ? "" : " "\n',
+    to: '  const space = " "\n',
+    command: unit,
+    expect: "a chosen handle is followed by a space unless one is there",
+  },
+  {
+    name: "a chosen command is followed by no space",
+    file: "packages/interface/commands.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "          insert: `/${c.name} `,\n",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "          insert: `/${c.name}`,\n",
+    command: unit,
+    expect:
+      "a chosen command replaces the whole text with its name and a space",
+  },
+  {
+    name: "a member is listed with the threads not yet invited",
+    file: "packages/interface/mentions.ts",
+    from: "      return target.agent.member ? 1 : 3\n",
+    to: "      return 3\n",
+    command: unit,
+    expect: "a bare @ offers the agent, members, people, then other threads",
+  },
 ]

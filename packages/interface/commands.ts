@@ -6,6 +6,7 @@
 // `/pi-pstack:skill:plan` alike.
 
 import type { CommandSummary } from "@pinetrie/core"
+import type { Completion } from "./completion.ts"
 
 /**
  * The commands matching what is typed, while the text's first word is a
@@ -33,4 +34,26 @@ export function matchCommands(
   const leads = (c: CommandSummary) =>
     (c.name.toLowerCase().split(":").at(-1) ?? "").startsWith(last)
   return [...found.filter(leads), ...found.filter(c => !leads(c))]
+}
+
+/** The commands matching what is typed, as the composer's list; null for none. */
+export function commandCompletion(
+  text: string,
+  commands: readonly CommandSummary[],
+): Completion | null {
+  const found = matchCommands(text, commands)
+  return found.length === 0
+    ? null
+    : {
+        start: 0,
+        end: text.length,
+        options: found.map(c => ({
+          key: `/${c.name}`,
+          label: `/${c.name}`,
+          hint: c.argumentHint,
+          kind: c.kind,
+          description: c.description,
+          insert: `/${c.name} `,
+        })),
+      }
 }

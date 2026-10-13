@@ -35,9 +35,11 @@ import {
   type CatchUps,
   type ColumnAct,
   type ColumnHow,
+  type CompletionOption,
   type ComposerMode,
   cardFrame,
   cardKeyAct,
+  completion,
   type EditorEvent,
   type EditorState,
   type EditorStep,
@@ -47,7 +49,6 @@ import {
   type Intent,
   imageMarkdown,
   insertAt,
-  matchCommands,
   NEW_PIN_PLACEHOLDER,
   type Pending,
   type Prefill,
@@ -242,8 +243,21 @@ export function CardEditor(p: {
   const queue = queueWords(plan.queue)
   const [hidden, setHidden] = useState<string | null>(null)
   const [picked, setPicked] = useState(0)
-  const matches = pins || hidden === text ? [] : matchCommands(text, p.commands)
-  const highlighted = matches[Math.min(picked, matches.length - 1)]
+  // Where the caret is while the box has focus; null while it has none.
+  const [caret, setCaret] = useState<number | null>(null)
+  const list =
+    pins || hidden === text
+      ? null
+      : completion({
+          text,
+          caret,
+          commands: p.commands,
+          participants: p.participants,
+          agents: p.agents,
+          reader: p.reader,
+        })
+  const options = list?.options ?? []
+  const highlighted = options[Math.min(picked, options.length - 1)]
   const { onCreatesLane, onShows } = p
   useEffect(
     () => onCreatesLane?.(plan.createsLane),
@@ -434,8 +448,9 @@ export function CardEditor(p: {
     el.dispatchEvent(new Event("input", { bubbles: true }))
   }
 
-  const choose = (name: string) => {
-    write(0, box.current?.value.length ?? 0, `/${name} `)
+  const choose = (option: CompletionOption) => {
+    if (list === null) return
+    write(list.start, list.end, option.insert)
     setPicked(0)
   }
 
@@ -576,30 +591,32 @@ export function CardEditor(p: {
           </button>
         </div>
       )}
-      {matches.length > 0 && p.readOnly === null && (
+      {options.length > 0 && p.readOnly === null && (
         <div className="command-menu" role="listbox">
-          {matches.map(c => (
+          {options.map(o => (
             <div
-              aria-selected={c === highlighted}
-              className={c === highlighted ? "command highlighted" : "command"}
-              data-command={c.name}
-              key={c.name}
+              aria-selected={o === highlighted}
+              className={o === highlighted ? "command highlighted" : "command"}
+              data-option={o.key}
+              key={o.key}
               onMouseDown={e => {
                 // Before the input loses focus.
                 e.preventDefault()
-                choose(c.name)
+                choose(o)
               }}
               role="option"
               // Focus stays in the input; the keys there move the choice.
               tabIndex={-1}
             >
-              <span className="command-name">/{c.name}</span>
-              {c.argumentHint !== null && (
-                <span className="command-hint"> {c.argumentHint}</span>
+              <span className="command-name">{o.label}</span>
+              {o.hint !== null && (
+                <span className="command-hint"> {o.hint}</span>
               )}
-              <span className="command-kind"> · {c.kind}</span>
-              {c.description !== "" && (
-                <span className="command-description"> {c.description}</span>
+              {o.kind !== null && (
+                <span className="command-kind"> · {o.kind}</span>
+              )}
+              {o.description !== "" && (
+                <span className="command-description"> {o.description}</span>
               )}
             </div>
           ))}
@@ -614,7 +631,10 @@ export function CardEditor(p: {
         className="input"
         data-card={card?.id}
         defaultValue={text}
-        onBlur={pins ? p.onLeave : undefined}
+        onBlur={() => {
+          setCaret(null)
+          if (pins) p.onLeave?.()
+        }}
         onFocus={e => {
           // Focused while it holds only what it started with: type after it.
           if (prefill === undefined || e.currentTarget.value !== prefill.text)
@@ -625,10 +645,16 @@ export function CardEditor(p: {
         onInput={e => {
           const value = e.currentTarget.value
           setText(value)
+          setCaret(e.currentTarget.selectionStart)
           setPicked(0)
           if (free(current.current) && p.place !== undefined)
             step({ kind: "input", text: value, card: newCardId() })
           p.onTyping(shownBy(current.current))
+        }}
+        onSelect={e => {
+          const at = e.currentTarget.selectionStart
+          if (at !== caret) setPicked(0)
+          setCaret(at)
         }}
         onPaste={e => {
           const files = pastedImages(e)
@@ -650,17 +676,17 @@ export function CardEditor(p: {
               return
             }
           }
-          // While commands are offered, the keys move through them.
+          // While commands or mentions are offered, the keys move through them.
           if (highlighted !== undefined) {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
               e.preventDefault()
               const by = e.key === "ArrowDown" ? 1 : -1
-              setPicked((picked + by + matches.length) % matches.length)
+              setPicked((picked + by + options.length) % options.length)
               return
             }
             if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
               e.preventDefault()
-              choose(highlighted.name)
+              choose(highlighted)
               return
             }
             if (e.key === "Escape") {

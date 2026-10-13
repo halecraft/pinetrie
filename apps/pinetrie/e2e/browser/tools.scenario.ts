@@ -1429,7 +1429,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // ── commands: found as you type, sent in full ────────────────────────
         await tp.fill(`${col(0)} .composer .input`, "/hel")
         const commandOffered = await appears(
-          `${col(0)} .command-menu [data-command="fixture:skill:hello"]`,
+          `${col(0)} .command-menu [data-option="/fixture:skill:hello"]`,
         )
         await tp.press(`${col(0)} .composer .input`, "Tab")
         const inserted = await tp.inputValue(`${col(0)} .composer .input`)

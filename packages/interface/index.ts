@@ -247,6 +247,11 @@ export {
   unstartedOf,
 } from "./columns.ts"
 export { matchCommands } from "./commands.ts"
+export {
+  type Completion,
+  type CompletionOption,
+  completion,
+} from "./completion.ts"
 export { copyText } from "./copy-text.ts"
 export { plural } from "./counts.ts"
 export {

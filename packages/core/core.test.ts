@@ -382,6 +382,22 @@ describe("address: mentions pick who a message is for", () => {
     expect(who("bump @types/node please", true).compels.kind).toBe("agent")
     expect(who("bump @types/node please", false).compels).toEqual(NOBODY)
   })
+  test("only @agent as typed names the agent; @Agent names nobody", () => {
+    expect(who("@Agent look", false).compels).toEqual(NOBODY)
+  })
+  test("of two people with one handle, the later in the list is named", () => {
+    const people = (participants: string[]) =>
+      address({
+        mentions: parseMentions("@bea look"),
+        participants,
+        agents: [],
+        agentByDefault: false,
+      }).people
+    expect(people(["B.ea", "Bea"])).toEqual(["Bea"])
+  })
+  test("a bare @, or one after another, is no mention", () => {
+    expect(parseMentions("@ and @@ada")).toEqual([])
+  })
   test("no mention: the default, either way", () => {
     expect(who("hi", true).compels.kind).toBe("agent")
     expect(who("hi", false).compels).toEqual(NOBODY)

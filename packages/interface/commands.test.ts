@@ -1,6 +1,6 @@
 import type { CommandSummary } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { matchCommands } from "./commands.ts"
+import { commandCompletion, matchCommands } from "./commands.ts"
 
 const command = (name: string, kind: CommandSummary["kind"] = "skill") => ({
   name,
@@ -39,4 +39,10 @@ test("nothing once there is more than a first word, or no slash", () => {
   expect(names("/plan now")).toEqual([])
   expect(names("plan")).toEqual([])
   expect(names("/")).toHaveLength(4)
+})
+
+test("a chosen command replaces the whole text with its name and a space", () => {
+  const list = commandCompletion("/expl", commands)
+  expect(list).toMatchObject({ start: 0, end: 5 })
+  expect(list?.options.map(o => o.insert)).toEqual(["/duane:skill:explain "])
 })

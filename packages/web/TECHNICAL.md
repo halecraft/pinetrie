@@ -1102,7 +1102,9 @@ the session sends moves and draws them until its copy holds them
 - **Who a message is for** is decided as the host will (`planSend`): the
   column's thread's lane gives its mode, and a mention picks the addressee
   (ADR-0021), another thread's agent among them (ADR-0128). The box
-  completes the commands the host's pi loaded (ADR-0036).
+  completes the commands the host's pi loaded (ADR-0036), and the handles a
+  mention may name (ADR-0128), by the caret, which it tracks only while
+  focused: a blur closes the list.
 - **Sending.** The editor sends the text it shows, with the card's id, and is
   read-only until the host answers; `sendButton` disables the button while it
   waits. Spent (`appended`, `started`, `queued`),

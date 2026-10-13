@@ -1449,6 +1449,23 @@ composer*).
   decides.
 - **A sent command** shows its name as a label beside its speaker (`node.command`).
 
+## Mentions in the composer (ADR-0128)
+
+- **One list** (`completion.ts`): the commands' while the text is a `/` and
+  a first word, else the mention's at the caret. Each option carries the
+  text a choice puts in place of the list's span, so the composer neither
+  knows nor asks which kind it shows.
+- **Completion** (`mentions.ts`): while the caret is in a mention
+  (`typedMention`, core, which reads mentions as a send does), every handle
+  of core's `mentionTargets` that holds what is typed before the caret is
+  offered: the handles `address` resolves by, so the list offers each once,
+  and none a send would ignore. Leading matches come first. You are left
+  out by your display name's handle, the one `participants` lists you by.
+- **A complete handle closes the list**, so Enter after `@bea` sends as it
+  would with no list.
+- **A choice replaces the whole handle**, past the caret too, and adds a
+  space unless one follows.
+
 ## Presence (ADR-0024)
 
 - **Presence's verb is *reading*** (ADR-0077): a person is reading a thread
