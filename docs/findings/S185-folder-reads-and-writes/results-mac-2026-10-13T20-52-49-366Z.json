@@ -1,0 +1,80 @@
+{
+  "platform": "darwin 25.6.0",
+  "node": "v24.19.0",
+  "timing": {
+    "noFsync": {
+      "files": 1000,
+      "msPerFile": 0.12,
+      "oneGiBms": 140
+    },
+    "fsync": {
+      "files": 1000,
+      "msPerFile": 5.828,
+      "oneGiBms": 263
+    }
+  },
+  "race": [
+    {
+      "mode": "in place",
+      "attempts": 5000,
+      "refused": 4988,
+      "written": 12,
+      "writerSaves": 11300,
+      "writerSavesInsideAWindow": 8,
+      "windowUs": {
+        "p50": 79.3,
+        "p99": 91.2
+      }
+    },
+    {
+      "mode": "rename",
+      "attempts": 5000,
+      "refused": 2408,
+      "written": 2592,
+      "writerSaves": 4850,
+      "writerSavesInsideAWindow": 2387,
+      "windowUs": {
+        "p50": 113.1,
+        "p99": 178.8
+      }
+    }
+  ],
+  "names": {
+    "case": {
+      "there": "foo.txt",
+      "incoming": "Foo.txt",
+      "incomingLooksPresent": true,
+      "checkedWriteRefused": true,
+      "renameAnywayLeaves": [
+        [
+          "foo.txt",
+          "forced"
+        ]
+      ]
+    },
+    "unicode form": {
+      "there": "café.txt",
+      "incoming": "café.txt",
+      "incomingLooksPresent": true,
+      "checkedWriteRefused": true,
+      "renameAnywayLeaves": [
+        [
+          "café.txt",
+          "forced"
+        ]
+      ]
+    }
+  },
+  "echo": {
+    "events": 701,
+    "paths": 701,
+    "classed": {
+      "stagingNames": 250,
+      "ours": 200,
+      "yours": 251,
+      "error": 0
+    },
+    "misclassified": [],
+    "pathsWithNoEvent": 0
+  }
+}
