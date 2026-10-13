@@ -1,0 +1,50 @@
+[
+  {
+    "kind": "rename",
+    "protocol": "check, rename",
+    "trials": 3000,
+    "written": 3000,
+    "refused": 0,
+    "losses": 2
+  },
+  {
+    "kind": "rename",
+    "protocol": "aside, link",
+    "trials": 3000,
+    "written": 2994,
+    "refused": 6,
+    "losses": 0
+  },
+  {
+    "kind": "rename",
+    "protocol": "aside, link, settle 5 ms",
+    "trials": 3000,
+    "written": 2977,
+    "refused": 23,
+    "losses": 0
+  },
+  {
+    "kind": "in place",
+    "protocol": "check, rename",
+    "trials": 3000,
+    "written": 2999,
+    "refused": 1,
+    "losses": 130
+  },
+  {
+    "kind": "in place",
+    "protocol": "aside, link",
+    "trials": 3000,
+    "written": 2854,
+    "refused": 146,
+    "losses": 10
+  },
+  {
+    "kind": "in place",
+    "protocol": "aside, link, settle 5 ms",
+    "trials": 3000,
+    "written": 2685,
+    "refused": 315,
+    "losses": 0
+  }
+]

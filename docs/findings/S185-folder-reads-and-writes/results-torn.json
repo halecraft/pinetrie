@@ -1,0 +1,14 @@
+{
+ "reads": 21460,
+ "stampMoved": 20375,
+ "clean": 1085,
+ "tornWithEqualStamps": 0,
+ "freshness": {
+  "seconds": 15,
+  "cleanReads": 289,
+  "distinctVersionsPerFileWithCleanReads": {
+   "torn-0.bin": 5,
+   "torn-10.bin": 5
+  }
+ }
+}

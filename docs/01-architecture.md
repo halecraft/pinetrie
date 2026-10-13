@@ -238,14 +238,16 @@ acceptance widens them. A shared file has a lineage of versions, each a stamp of
 size and ctime, which the host and a lane read alike: every write, a
 lane's or yours (seen by the host's watcher), is one, and a write based on
 a version another replaced is flagged concurrent. A folder with no jj
-repo is refused today; ADR-0142, proposed, would serve it as a folder
-project whose folder is its accepted work, with merge bases from a graph
-of states pine·trie keeps. Its first step is built: lane work reaches a
-lane's history and accepted work only through two ports (`LaneHistory`,
-reached on the lane's queue alone, and `Destination`), whose one adapter
-is jj's (`@pinetrie/jj`, wired in `apps/pinetrie/host/jj/`), chosen once by
-the project's kind (`host/project.ts`); `@pinetrie/lanes` runs no jj. The
-folder's adapter is not built.
+repo is refused today. ADR-0142, accepted, serves it as a folder project:
+the folder is its accepted work, a thread starts from it as it is, an
+accept writes into it without replacing a file it has not checked, and
+merge bases come from a graph of states pine·trie keeps. Its first step is
+built: lane work reaches a lane's history and accepted work only through
+two ports (`LaneHistory`, reached on the lane's queue alone, and
+`Destination`), whose one adapter is jj's (`@pinetrie/jj`, wired in
+`apps/pinetrie/host/jj/`), chosen once by the project's kind
+(`host/project.ts`); `@pinetrie/lanes` runs no jj. The folder's adapter is
+not built.
 
 Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`
 stands for "absent"; the codec decodes commands into an `Intent` union and

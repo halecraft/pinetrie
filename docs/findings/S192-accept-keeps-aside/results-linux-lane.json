@@ -1,0 +1,137 @@
+[
+  {
+    "save": "by rename, during",
+    "protocol": "check, rename",
+    "trials": 300,
+    "written": 300,
+    "refused": 0,
+    "surfaced": 0,
+    "losses": 0
+  },
+  {
+    "save": "by rename, during",
+    "protocol": "aside, link, pause 5 ms",
+    "trials": 300,
+    "written": 297,
+    "refused": 3,
+    "surfaced": 0,
+    "losses": 0
+  },
+  {
+    "save": "by rename, during",
+    "protocol": "aside, link, kept to the next read",
+    "trials": 300,
+    "written": 298,
+    "refused": 2,
+    "surfaced": 0,
+    "losses": 0
+  },
+  {
+    "save": "in place by path, during",
+    "protocol": "check, rename",
+    "trials": 300,
+    "written": 300,
+    "refused": 0,
+    "surfaced": 0,
+    "losses": 22
+  },
+  {
+    "save": "in place by path, during",
+    "protocol": "aside, link, pause 5 ms",
+    "trials": 300,
+    "written": 274,
+    "refused": 26,
+    "surfaced": 0,
+    "losses": 0
+  },
+  {
+    "save": "in place by path, during",
+    "protocol": "aside, link, kept to the next read",
+    "trials": 300,
+    "written": 282,
+    "refused": 18,
+    "surfaced": 0,
+    "losses": 0
+  },
+  {
+    "save": "slow, through a file held from before",
+    "protocol": "check, rename",
+    "trials": 60,
+    "written": 60,
+    "refused": 0,
+    "surfaced": 0,
+    "losses": 60
+  },
+  {
+    "save": "slow, through a file held from before",
+    "protocol": "aside, link, pause 5 ms",
+    "trials": 60,
+    "written": 0,
+    "refused": 60,
+    "surfaced": 0,
+    "losses": 0
+  },
+  {
+    "save": "slow, through a file held from before",
+    "protocol": "aside, link, kept to the next read",
+    "trials": 60,
+    "written": 51,
+    "refused": 9,
+    "surfaced": 51,
+    "losses": 0
+  },
+  {
+    "save": "late, through a file held from before",
+    "protocol": "check, rename",
+    "trials": 300,
+    "written": 300,
+    "refused": 0,
+    "surfaced": 0,
+    "losses": 300
+  },
+  {
+    "save": "late, through a file held from before",
+    "protocol": "aside, link, pause 5 ms",
+    "trials": 300,
+    "written": 300,
+    "refused": 0,
+    "surfaced": 0,
+    "losses": 300
+  },
+  {
+    "save": "late, through a file held from before",
+    "protocol": "aside, link, kept to the next read",
+    "trials": 300,
+    "written": 300,
+    "refused": 0,
+    "surfaced": 300,
+    "losses": 0
+  },
+  {
+    "save": "after the next read, through a held file",
+    "protocol": "check, rename",
+    "trials": 300,
+    "written": 300,
+    "refused": 0,
+    "surfaced": 0,
+    "losses": 300
+  },
+  {
+    "save": "after the next read, through a held file",
+    "protocol": "aside, link, pause 5 ms",
+    "trials": 300,
+    "written": 300,
+    "refused": 0,
+    "surfaced": 0,
+    "losses": 300
+  },
+  {
+    "save": "after the next read, through a held file",
+    "protocol": "aside, link, kept to the next read",
+    "trials": 300,
+    "written": 300,
+    "refused": 0,
+    "surfaced": 0,
+    "losses": 300
+  }
+]

@@ -1,11 +1,11 @@
 # ADR-0142 — A project without jj is a folder, and the folder is its accepted work: a thread starts from it as it is, and an accept writes into it; pine·trie keeps the graph of states, and jj becomes one adapter behind the ports both kinds share
 
-- **Status:** Proposed
+- **Status:** Accepted (Duane, 2026-10-13)
 - **Area:** `docs/01-architecture.md`, `docs/glossary.md`,
   `packages/lanes/TECHNICAL.md`, `packages/jj/TECHNICAL.md`,
   `apps/pinetrie/host/TECHNICAL.md`
 - **Evidence:** S149, S150, S155, S159, S160, S162, S169, S180, S181, S182,
-  S183, S184, S185, S186
+  S183, S184, S185, S186, S192
 - **Amends:**
   - ADR-0135: settles its second step. A folder project's accepted work is the
     folder, merge bases come from a graph of states pine·trie keeps, and
@@ -125,23 +125,57 @@ has not seen.*
   against.** Its files are the source paths whose content differs. It is
   computed against the folder's newest state, as a jj project's offer sits
   on accepted work, and a conflict refuses an accept, as now.
+- **An accept never destroys a save that reached the folder through its
+  name,** whenever it was made: a save by rename, or a write that opened
+  the path. A write through a file an app held open across the accept is
+  kept as yours, unless it comes after the folder's next quiet read (S185,
+  S192). The steps hold that by construction, with no timing constant.
 - **An accept is one step, in this order:**
-  1. read the folder;
-  2. merge the offer onto that state. The result is a new state on the
+  1. write a journal of the accept to the session's store, so a host that
+     stops part way puts back or finishes what it moved;
+  2. read the folder;
+  3. merge the offer onto that state. The result is a new state on the
      folder's line, with the lane's tip as its second parent;
-  3. write each path the merge changed into the folder: staged beside its
-     target under a reserved prefix that every scan skips, then renamed
-     into place, but only if the target's stamp (size and ctime, S162,
-     S169) is still what step 1 read, or the target is still absent;
-  4. if any check fails, put back each path already replaced, from step
-     1's state and under the same check, and refuse the accept, naming the
-     file you are editing. The thread catches up and offers again;
-  5. otherwise the new state is the folder's.
+  4. stage each path the merge changed beside its target, under a
+     reserved prefix;
+  5. for each path that exists, rename the target aside, under the same
+     prefix. Check it against step 2's read: its stamp (size and ctime,
+     S162, S169) before the move, and its inode, size and mtime after it,
+     which a rename keeps. A file that changed is put back;
+  6. link each staged file into place. A link fails if anything is at the
+     target, so a file saved there since the move is never replaced;
+  7. if any check or link fails, put back what was moved aside, remove
+     what was linked, and refuse the accept, naming the file you are
+     editing. The thread catches up and offers again. Otherwise remove the
+     staged names; the new state is the folder's;
+  8. keep each aside until the folder's next read, which comes once the
+     folder, asides included, has been quiet. An aside as step 5 left it is
+     deleted. One that changed is a write through a file held across the
+     accept: its content is kept as a state of yours, concurrent with the
+     accept, and shown as a concurrent write to a shared file is shown
+     (ADR-0135).
 
-  Mutagen and Syncthing both document that no file system call closes the
-  race between the check and the rename (S149 rule 8). The window is one
-  rename long, and its loss is recoverable: the state step 1 read keeps
-  what was there.
+  Mutagen and Syncthing check, then rename over, and both document that
+  no file system call closes the race between the two (S149 rule 8). That
+  race is real: a save landing between check and rename is replaced, and
+  since no read saw it, no state holds it. On APFS the window is 79–179
+  µs, and checking then renaming lost 1 of 3,000 saves by rename and 300
+  of 3,000 writes in place (S185). With these steps, no trial lost a save
+  of any kind they cover, on APFS or btrfs, a slow write in place through
+  a held file included (S192). A pause before deleting the aside, tried first, lost
+  every write that came later than the pause, whatever its length.
+- **Scans see asides.** They are never your files, but every read checks
+  each aside until it is deleted or kept. An aside that keeps changing (a
+  log written through a held file) does not hold the folder's read back:
+  it is kept as a state of yours at each read, and watched until it is
+  quiet.
+- **No `fsync` before the links.** It costs 5.8 ms a file on the Mac
+  (`F_FULLFSYNC`), and what an accept writes is also in its state, so a
+  write a crash loses is restored from there (S185).
+- **The watcher knows the accept's writes by their stamps** (S185): the
+  staging names by their prefix, and each written path by the stamp its
+  link left. A save of yours a moment later has a stamp of its
+  own, and is a state of yours.
 - **Anyone admitted may accept,** as anyone may publish with its catch-up
   of your files (ADR-0099). Every accept can be undone by a restore.
 - **What the folder cannot hold refuses the offer, naming the path:**
@@ -337,7 +371,10 @@ has not seen.*
     An offer with an open conflict cannot be passed to it.
   - A folder write is a step that carries what it expects to find (the
     stamp it replaces, or nothing there). No write step lacks one, so the
-    writer only compares.
+    writer only compares. It moves a file aside and links its new one in,
+    and never renames over a target, so no file it has not checked is
+    ever replaced; an aside is deleted only by a read that found it as
+    the accept left it (S185, S192).
   - A project path is relative, in NFC, with no `.` or `..`, from one
     constructor at the edge. A folder project's tree is also keyed by its
     folded name, so a collision is found when the tree is checked, never
@@ -380,14 +417,20 @@ has not seen.*
   - the snapshots kept for merge bases and history: about 2 ms and 35 KB
     each, plus whatever rewritten content they keep from being freed
     (S184);
-  - a text merge: about 3 ms a path, a `git merge-file` process (S181).
+  - a text merge: about 3 ms a path, a `git merge-file` process (S181);
+  - an accept refused when a save of yours lands while it runs. On APFS
+    its steps take a few hundred µs a file, so a save within that time of
+    it refuses it far more often than on btrfs (S192). The thread catches
+    up and offers again.
 - **What a folder project lacks:** WIPs, stacks, publish, jjui, and
   remotes.
 - **Risks:**
-  - an app that holds a file open across an accept, then saves its stale
-    content over it (S149). The accept's state keeps the accepted content,
-    and the history shows both;
-  - the race between an accept's check and its rename, described above;
+  - an app that holds a file open across an accept (S149). If it saves
+    by rename, its stale content replaces the accepted file: the accept's
+    state keeps the accepted content, and the history shows both. If it
+    writes through the open file, the write is kept as yours, unless the
+    file sat idle past the folder's next quiet read first: then the write
+    goes to an aside already deleted, and is lost (S192);
   - large media copied into the lane VM costs its size on the VM's disk,
     once per change.
 - **Left open:**
@@ -418,6 +461,10 @@ has not seen.*
 - **Mounting the folder live in lanes** (ADR-0118's live mode): no copy of
   its own, so no offer, no review and no undo. It stays available as a
   live source.
+- **Checking, then renaming over** (Mutagen's and Syncthing's way): a
+  save that lands between the two is lost unseen (S185).
+- **A pause before deleting what was moved aside.** Nothing chooses its
+  length, and a write that comes later than it is lost (S192).
 - **A text merge in TypeScript** (`node-diff3`). On pine·trie's own merges
   it reported a real conflict clean, and took 15 times as long as `git
   merge-file` (S181).
