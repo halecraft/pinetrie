@@ -90,7 +90,6 @@ test("the machine role's container is made with its grant and nothing more", () 
       SecurityOpt: ["no-new-privileges"],
       Devices: [],
       PidMode: "host",
-      CgroupnsMode: "host",
       ReadonlyRootfs: true,
       AutoRemove: true,
       Tmpfs: { "/run": "" },

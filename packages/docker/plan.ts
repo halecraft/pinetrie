@@ -100,7 +100,7 @@ export interface ContainerSpec {
   readonly securityOpt: readonly string[]
   readonly devices: readonly string[]
   /**
-   * The machine's own pid and cgroup namespaces, a read-only root with a
+   * The machine's own pid namespace, a read-only root with a
    * tmpfs at each of `tmpfs`, and removal when it stops: the machine role's
    * alone (`renderObserver`). Null for every other container.
    */
@@ -276,7 +276,7 @@ export const observerImage = (version: string): string =>
  * What the machine role's container is granted, and nothing more: loading
  * and reading BPF programs (`BPF`, `PERFMON`) and an lstat through a lane's
  * first process's root (`SYS_PTRACE`), under Docker's own seccomp
- * profile; the machine's pids and cgroups, which the loader reads; no
+ * profile; the machine's pids, which the loader reads; no
  * network, no lanes directory, a read-only root.
  */
 export const OBSERVER_GRANT = {

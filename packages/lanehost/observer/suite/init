@@ -84,8 +84,7 @@ EV=/tmp/ev.tsv
 if start 65536 $EV; then
   printf 'register\t%s\t/w/remote\n' $PA >&3
   answer "registered$T$PA$T" $EV
-  printf 'register\t%s\n' $PB >&3
-  answer "registered$T$PB$T" $EV
+  # Both cgroup fixtures are in the guest's one PID namespace.
   step registered
 
   mkdir -p /w/r1 /w/r2 /w/r34 /w/r5 /w/r6 /w/r7 /w/r10 /w/r11 /w/r13 /w/r14 /w/r16 /w/r17 /w/r22
@@ -112,14 +111,17 @@ if start 65536 $EV; then
   inrun a 10 work uring /w/r10/u.txt
   say exit 10 $?
   outside a sh -c 'echo u > /w/r13/untagged.txt'
+  printf 'unregister\t%s\n' "$(grep "^registered$T$PA$T" $EV | cut -f3)" >&3
   inrun free 19 sh -c 'echo f > /w/r13/free.txt'
+  printf 'register\t%s\t/w/remote\n' $PA >&3
+  answer "registered$T$PA$T" $EV
   inrun a 14 env PINETRIE_RUN=15 sh -c 'echo n > /w/r14/n.txt'
   inrun a 16 sh -c 'echo $$ > /sys/fs/cgroup/b/cgroup.procs; echo m > /w/r16/m.txt'
   inrun a 11 unshare -Urpf sh -c 'echo ns > /w/r11/ns.txt'
   say exit 11 $?
   inrun a 20 sh -c 'echo r > /w/remote/r.txt; cat /w/remote/r.txt > /dev/null'
   say stamp $(work stamp /w/remote/r.txt)
-  inrun b 21 sh -c 'echo r > /w/remote/b.txt'
+  inrun b 21 sh -c 'echo r > /w/r21-b.txt'
   step flush
   # The loader stopped while the run writes, then sent the flush before it
   # reads on: the run's events are all still in the ring when it answers.
@@ -128,7 +130,7 @@ if start 65536 $EV; then
   printf 'flush\tt17\n' >&3
   kill -CONT $op
   answer "flushed${T}t17\$" $EV
-  CGB=$(grep "^registered$T$PB$T" $EV | cut -f3)
+  CGB=$(grep "^registered$T$PA$T" $EV | tail -1 | cut -f3)
   printf 'unregister\t%s\n' "$CGB" >&3
   answer "unregistered$T$CGB\$" $EV
   inrun b 22 sh -c 'echo z > /w/r22/z.txt'

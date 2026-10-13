@@ -12,6 +12,7 @@ import {
   heldNotices,
   IDLE_MS,
   isRaced,
+  isStrictDescendant,
   loaderRefusal,
   noticeOf,
   type ObserverCall,
@@ -21,7 +22,9 @@ import {
   planHeld,
   planIdle,
   planObserver,
+  planRegistration,
   routeEvent,
+  translatedPid,
 } from "./observer.ts"
 
 const release = (s: string, raced: string | null): RunEvent => ({
@@ -147,6 +150,36 @@ describe("routing", () => {
       { lane: "21", run: "3", event: { kind: "lost", at: 9, count: 4 } },
       end,
     ])
+  })
+})
+
+describe("namespace registration", () => {
+  test("translation requires one outer process for the inner pid", () => {
+    const candidates = [
+      { pid: 41, nspid: [41, 7] },
+      { pid: 42, nspid: [42, 8] },
+    ]
+    expect(translatedPid(candidates, 7)).toEqual(candidates[0])
+    expect(translatedPid(candidates, 9)).toBeNull()
+    expect(
+      translatedPid([...candidates, { pid: 43, nspid: [43, 7] }], 7),
+    ).toBeNull()
+  })
+  test("ancestry is strict and reaches the forwarding namespace", () => {
+    expect(isStrictDescendant("30", ["20", "10"], "20")).toBe(true)
+    expect(isStrictDescendant("20", ["10"], "20")).toBe(false)
+    expect(isStrictDescendant("30", ["10"], "20")).toBe(false)
+  })
+  test("only an unowned namespace or its live owner may register it", () => {
+    expect(planRegistration({ kind: "unowned" }, 2)).toEqual({
+      kind: "install",
+    })
+    expect(planRegistration({ kind: "owned", connection: 2 }, 2)).toEqual({
+      kind: "refresh",
+    })
+    expect(planRegistration({ kind: "owned", connection: 1 }, 2).kind).toBe(
+      "refuse",
+    )
   })
 })
 

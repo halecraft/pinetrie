@@ -20,7 +20,7 @@ enum event_kind { EV_OPEN = 1, EV_RELEASE, EV_UNLINK, EV_MKDIR, EV_RENAME, EV_SY
 // What was at a path before the call: core's PathKind.
 enum path_kind { PK_MISSING = 0, PK_FILE, PK_DIR, PK_LINK, PK_OTHER };
 
-// A run: its number, and its lane, the cgroup it began in.
+// A run: its number, and its lane, the PID namespace it began in.
 struct run_key {
   u64 lane;
   u64 run;

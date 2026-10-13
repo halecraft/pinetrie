@@ -18,7 +18,7 @@ export {
   decodeLoaderLine,
   encodeLoaderCommand,
   isRaced,
-  type LaneCgroup,
+  type LaneNamespace,
   type LoaderCommand,
   type LoaderLine,
   MACHINE_SOCKET,

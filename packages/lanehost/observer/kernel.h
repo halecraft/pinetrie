@@ -106,6 +106,23 @@ struct mm_struct {
   unsigned long env_end;
 } CORE;
 
+struct ns_common {
+  unsigned int inum;
+} CORE;
+
+struct pid_namespace {
+  struct ns_common ns;
+} CORE;
+
+struct upid {
+  struct pid_namespace *ns;
+} CORE;
+
+struct pid {
+  unsigned int level;
+  struct upid numbers[1];
+} CORE;
+
 struct task_struct {
   pid_t pid;
   pid_t tgid;
@@ -113,6 +130,7 @@ struct task_struct {
   struct mm_struct *mm;
   struct fs_struct *fs;
   struct files_struct *files;
+  struct pid *thread_pid;
 } CORE;
 
 struct filename {

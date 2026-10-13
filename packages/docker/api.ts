@@ -138,7 +138,6 @@ export function createBody(
         ? {}
         : {
             PidMode: "host",
-            CgroupnsMode: "host",
             ReadonlyRootfs: true,
             AutoRemove: true,
             Tmpfs: Object.fromEntries(spec.machine.tmpfs.map(t => [t, ""])),

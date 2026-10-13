@@ -1,0 +1,24 @@
+Disposable change for the observer QEMU suite:
+
+1. Add these CO-RE declarations to kernel.h:
+
+struct ns_common { unsigned int inum; } __attribute__((preserve_access_index));
+struct pid_namespace { struct ns_common ns; } __attribute__((preserve_access_index));
+struct pid { struct { struct { struct pid_namespace *ns; } upid; } numbers[1]; } __attribute__((preserve_access_index));
+
+Use the repository's existing task_struct declaration and add:
+  struct pid *thread_pid;
+
+2. In observe.bpf.c's on_exec, replace the cgroup lookup temporarily with:
+
+struct pid *pid = BPF_CORE_READ(p, thread_pid);
+struct pid_namespace *ns = BPF_CORE_READ(pid, numbers[0].upid.ns);
+u64 lane = (u64)BPF_CORE_READ(ns, ns.inum);
+
+Use lane for the registered lookup and the run key. Register the guest lane's
+/proc/<pid>/ns/pid inode in the map from the loader.
+
+The production implementation should not index numbers[0]: the active namespace
+is numbers[level]. The spike only needs to prove that the CO-RE field chain loads
+and yields the namespace number; extend kernel.h with pid.level and read the
+matching upid for the product.

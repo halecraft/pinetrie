@@ -13,7 +13,7 @@
 import type { Channel } from "@pinetrie/channel"
 import { flushed, type LaneObservation, type RunNotice } from "@pinetrie/core"
 import {
-  type LaneCgroup,
+  type LaneNamespace,
   loaderRefusal,
   type ObserverCall,
   type ObserverHello,
@@ -44,8 +44,8 @@ export interface ObserverClient {
 interface Held {
   readonly pid: () => Promise<number>
   readonly remote: readonly string[]
-  /** Its cgroup on the channel now; null until registered on it. */
-  cgroup: LaneCgroup | null
+  /** Its PID namespace on the channel now; null until registered on it. */
+  namespace: LaneNamespace | null
   readonly notices: RunNotice[]
 }
 
@@ -56,11 +56,11 @@ export function observerClient(input: {
   let channel: Promise<ObserverChannel> | null = null
 
   const register = async (c: ObserverChannel, lane: Held) => {
-    lane.cgroup = (await c.call({
+    lane.namespace = (await c.call({
       kind: "register",
       pid: await lane.pid(),
       remote: lane.remote,
-    })) as LaneCgroup
+    })) as LaneNamespace
   }
 
   function opened(): Promise<ObserverChannel> {
@@ -77,10 +77,10 @@ export function observerClient(input: {
       })
       c.call({ kind: "subscribe" }, undefined, n => {
         for (const lane of lanes)
-          if (lane.cgroup === n.lane)
+          if (lane.namespace === n.lane)
             lane.notices.push({ run: n.run, event: n.event })
       }).catch(() => {})
-      for (const lane of lanes) lane.cgroup = null
+      for (const lane of lanes) lane.namespace = null
       for (const lane of lanes) await register(c, lane)
       return c
     })
@@ -93,7 +93,7 @@ export function observerClient(input: {
 
   return {
     async observe(lane) {
-      const held: Held = { ...lane, cgroup: null, notices: [] }
+      const held: Held = { ...lane, namespace: null, notices: [] }
       const c = await opened()
       // Gathering before it is registered: its first notices may come before the answer.
       lanes.add(held)
@@ -107,15 +107,15 @@ export function observerClient(input: {
         async flush() {
           const now = await opened()
           // A channel opened again since: the lane is registered on it first.
-          if (held.cgroup === null) await register(now, held)
+          if (held.namespace === null) await register(now, held)
           await now.call({ kind: "flush" })
           return flushed(held.notices.splice(0))
         },
         async close() {
           lanes.delete(held)
-          const cgroup = held.cgroup
-          if (cgroup === null || channel === null) return
-          await (await channel).call({ kind: "unregister", lane: cgroup })
+          const namespace = held.namespace
+          if (namespace === null || channel === null) return
+          await (await channel).call({ kind: "unregister", lane: namespace })
         },
       }
     },

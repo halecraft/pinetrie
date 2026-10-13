@@ -8,15 +8,15 @@
 // stdin, one command a line, fields tab-separated, paths escaped as core's
 // codec escapes them (`\\`, `\t`, `\n`):
 //   register <pid> [<remote dir>]...   the lane whose first process is <pid>:
-//                                      its cgroup is read from /proc, and a
+//                                      its PID namespace is opened from /proc, and a
 //                                      run may begin there
-//   unregister <cgroup>
+//   unregister <namespace>
 //   flush <token>
 // stdout, one a line:
 //   ready                              every program is attached
 //   ev <lane> <run> <inodes> <event>   <event> is core's line (`encodeRunEvent`)
-//   registered <pid> <cgroup>  |  refused <pid> <why>
-//   unregistered <cgroup>
+//   registered <pid> <namespace>  |  refused <pid> <why>
+//   unregistered <namespace>
 //   flushed <token>                    after every event before the flush
 // <inodes> is `-`, or `<kernel>/<lstat>` on a release under a remote
 // directory, whose call carries the lstat's stamp and, after it, the
@@ -50,7 +50,8 @@
 static struct observe_bpf *skel;
 
 struct lane {
-  unsigned long long cgroup;
+  unsigned long long namespace;
+  int namespace_fd;
   int pid;
   int nremote;
   char *remote[MAX_REMOTE];
@@ -59,13 +60,15 @@ struct lane {
 static struct lane lanes[MAX_LANES];
 static int nlanes;
 
-static struct lane *lane_of(unsigned long long cgroup) {
+static struct lane *lane_of(unsigned long long namespace) {
   for (int i = 0; i < nlanes; i++)
-    if (lanes[i].cgroup == cgroup) return &lanes[i];
+    if (lanes[i].namespace == namespace) return &lanes[i];
   return NULL;
 }
 
 static void lane_free(struct lane *l) {
+  if (l->namespace_fd >= 0) close(l->namespace_fd);
+  l->namespace_fd = -1;
   for (int i = 0; i < l->nremote; i++) free(l->remote[i]);
   l->nremote = 0;
 }
@@ -261,32 +264,20 @@ static int on_event(void *ctx, void *data, size_t len) {
   return 0;
 }
 
-// The cgroup a process is in, as its id (the cgroup directory's inode).
-static int cgroup_of(int pid, unsigned long long *id, char *why, size_t cap) {
-  char p[64], line[PATHMAX];
-  snprintf(p, sizeof p, "/proc/%d/cgroup", pid);
-  FILE *f = fopen(p, "re");
-  if (!f) {
-    snprintf(why, cap, "no process %d: %s", pid, strerror(errno));
+// A process's PID namespace, held open so its inode cannot be reused.
+static int namespace_of(int pid, int *fd, unsigned long long *id, char *why, size_t cap) {
+  char path[64];
+  snprintf(path, sizeof path, "/proc/%d/ns/pid", pid);
+  *fd = open(path, O_RDONLY | O_CLOEXEC);
+  if (*fd < 0) {
+    snprintf(why, cap, "%s: %s", path, strerror(errno));
     return -1;
   }
-  int found = 0;
-  while (fgets(line, sizeof line, f))
-    if (strncmp(line, "0::", 3) == 0) {
-      line[strcspn(line, "\n")] = 0;
-      found = 1;
-      break;
-    }
-  fclose(f);
-  if (!found) {
-    snprintf(why, cap, "process %d is in no cgroup v2", pid);
-    return -1;
-  }
-  char dir[PATHMAX + 32];
-  snprintf(dir, sizeof dir, "/sys/fs/cgroup%s", line + 3);
   struct stat st;
-  if (stat(dir, &st) != 0) {
-    snprintf(why, cap, "%s: %s", dir, strerror(errno));
+  if (fstat(*fd, &st) != 0) {
+    snprintf(why, cap, "%s: %s", path, strerror(errno));
+    close(*fd);
+    *fd = -1;
     return -1;
   }
   *id = (unsigned long long)st.st_ino;
@@ -296,27 +287,32 @@ static int cgroup_of(int pid, unsigned long long *id, char *why, size_t cap) {
 static void do_register(char **f, int n) {
   int pid = n > 1 ? atoi(f[1]) : 0;
   char why[PATHMAX + 128];
-  unsigned long long cg;
+  unsigned long long ns;
+  int ns_fd = -1;
   if (pid <= 0) {
     printf("refused\t%d\tnot a process id\n", pid);
     return;
   }
-  if (cgroup_of(pid, &cg, why, sizeof why) != 0) {
+  if (namespace_of(pid, &ns_fd, &ns, why, sizeof why) != 0) {
     printf("refused\t%d\t", pid);
     put_escaped(why);
     putchar('\n');
     return;
   }
-  struct lane *l = lane_of(cg);
+  struct lane *l = lane_of(ns);
   if (!l) {
     if (nlanes == MAX_LANES) {
       printf("refused\t%d\tthe observer holds %d lanes already\n", pid, MAX_LANES);
+      close(ns_fd);
       return;
     }
     l = &lanes[nlanes++];
+    memset(l, 0, sizeof *l);
+    l->namespace_fd = -1;
   }
   lane_free(l);
-  l->cgroup = cg;
+  l->namespace = ns;
+  l->namespace_fd = ns_fd;
   l->pid = pid;
   for (int i = 2; i < n && l->nremote < MAX_REMOTE; i++) {
     size_t len = unescape(f[i]);
@@ -326,24 +322,24 @@ static void do_register(char **f, int n) {
     l->nremote++;
   }
   unsigned char one = 1;
-  if (bpf_map__update_elem(skel->maps.registered, &cg, sizeof cg, &one, sizeof one, 0) != 0) {
+  if (bpf_map__update_elem(skel->maps.registered, &ns, sizeof ns, &one, sizeof one, 0) != 0) {
     printf("refused\t%d\tthe observer's map of lanes is full\n", pid);
     lane_free(l);
     *l = lanes[--nlanes];
     return;
   }
-  printf("registered\t%d\t%llu\n", pid, cg);
+  printf("registered\t%d\t%llu\n", pid, ns);
 }
 
 static void do_unregister(char **f, int n) {
-  unsigned long long cg = n > 1 ? strtoull(f[1], NULL, 10) : 0;
-  bpf_map__delete_elem(skel->maps.registered, &cg, sizeof cg, 0);
-  struct lane *l = lane_of(cg);
+  unsigned long long ns = n > 1 ? strtoull(f[1], NULL, 10) : 0;
+  bpf_map__delete_elem(skel->maps.registered, &ns, sizeof ns, 0);
+  struct lane *l = lane_of(ns);
   if (l) {
     lane_free(l);
     *l = lanes[--nlanes];
   }
-  printf("unregistered\t%llu\n", cg);
+  printf("unregistered\t%llu\n", ns);
 }
 
 // Every key of a map of run_keys, gathered before any is deleted.

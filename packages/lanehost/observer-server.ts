@@ -19,7 +19,7 @@ import {
   encodeLoaderCommand,
   HELD_PER_LANE,
   heldNotices,
-  type LaneCgroup,
+  type LaneNamespace,
   type LoaderCommand,
   noticeOf,
   type ObserverCall,
@@ -66,19 +66,19 @@ const send = (c: LoaderCommand) =>
 
 interface Connection {
   update: ((n: ObserverNotice) => void) | null
-  readonly lanes: Set<LaneCgroup>
+  readonly lanes: Set<LaneNamespace>
 }
 const connections = new Map<ConnectionId, Connection>()
-const owners = new Map<LaneCgroup, ConnectionId>()
+const owners = new Map<LaneNamespace, ConnectionId>()
 const held = new Map<
-  LaneCgroup,
+  LaneNamespace,
   { notices: ObserverNotice[]; lost: Map<string, number> }
 >()
 const registering = new Map<
   number,
-  ((answer: { lane: LaneCgroup } | { why: string }) => void)[]
+  ((answer: { lane: LaneNamespace } | { why: string }) => void)[]
 >()
-const unregistering = new Map<LaneCgroup, (() => void)[]>()
+const unregistering = new Map<LaneNamespace, (() => void)[]>()
 const flushing = new Map<string, () => void>()
 let nextFlush = 0
 let quietSince = Date.now()
@@ -104,7 +104,7 @@ function route(notice: ObserverNotice) {
 }
 
 /** A lane's held notices, to the connection that now owns it, once it has subscribed. */
-function release(lane: LaneCgroup) {
+function release(lane: LaneNamespace) {
   const h = held.get(lane)
   const to = owners.get(lane)
   const update = to === undefined ? null : connections.get(to)?.update
@@ -167,7 +167,7 @@ async function answer(
   if (conn === undefined) throw new Error("the connection has closed")
   switch (call.kind) {
     case "register": {
-      const got = await new Promise<{ lane: LaneCgroup } | { why: string }>(
+      const got = await new Promise<{ lane: LaneNamespace } | { why: string }>(
         resolve => {
           queued(registering, call.pid, resolve)
           send(call)

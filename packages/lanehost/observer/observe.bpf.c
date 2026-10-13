@@ -3,10 +3,10 @@
 // which run; the loader (`observe.c`) names releases and reads remote
 // stamps, and lanehost's machine role routes (packages/lanehost/TECHNICAL.md).
 //
-// - A run begins where an untagged task in a registered cgroup execs with
-//   `PINETRIE_RUN=<n>` in its environment. Its tag is the run and that
-//   cgroup, its lane: every task it starts inherits it, whatever cgroup the
-//   task moves to, and a tagged task never takes another.
+// - A run begins where an untagged task in a registered PID namespace execs
+//   with `PINETRIE_RUN=<n>` in its environment. Its tag is the run and that
+//   namespace, its lane: every task it starts inherits it, whatever namespace
+//   its children enter, and a tagged task never takes another.
 // - An event the ring has no room for, or a task or written file the maps
 //   cannot hold, is counted against its run (`lost_by_run`): never dropped
 //   silently.
@@ -44,7 +44,7 @@ struct {
   __uint(max_entries, 64 << 20);
 } events SEC(".maps");
 
-// Cgroups a host registered: only there can a run begin.
+// PID namespaces a host registered: only there can a run begin.
 struct {
   __uint(type, BPF_MAP_TYPE_HASH);
   __uint(max_entries, 1 << 14);
@@ -163,6 +163,16 @@ static __always_inline void live_add(struct run_key *run, s64 d) {
 }
 
 static __always_inline u32 current_tid(void) { return (u32)bpf_get_current_pid_tgid(); }
+
+static __always_inline u64 pid_namespace_of(struct task_struct *task) {
+  struct pid *pid = BPF_CORE_READ(task, thread_pid);
+  u32 level = BPF_CORE_READ(pid, level);
+  if (level > 32) return 0;
+  struct upid *upid = (struct upid *)((char *)pid + bpf_core_field_offset(struct pid, numbers) +
+                                      (u64)level * sizeof(struct upid));
+  struct pid_namespace *ns = BPF_CORE_READ(upid, ns);
+  return (u64)BPF_CORE_READ(ns, ns.inum);
+}
 
 static __always_inline struct tag *current_tag(void) {
   u32 tid = current_tid();
@@ -412,8 +422,8 @@ int BPF_PROG(on_exec, struct task_struct *p, pid_t old_pid, struct linux_binprm 
     }
   }
   if (bpf_map_lookup_elem(&tags, &tid)) return 0;
-  u64 cgroup = bpf_get_current_cgroup_id();
-  if (!bpf_map_lookup_elem(&registered, &cgroup)) return 0;
+  u64 pid_namespace = pid_namespace_of(p);
+  if (!pid_namespace || !bpf_map_lookup_elem(&registered, &pid_namespace)) return 0;
   struct mm_struct *mm = BPF_CORE_READ(p, mm);
   struct envscan s = {
       .at = BPF_CORE_READ(mm, env_start),
@@ -421,7 +431,7 @@ int BPF_PROG(on_exec, struct task_struct *p, pid_t old_pid, struct linux_binprm 
   };
   bpf_loop(ENV_STEPS, env_step, &s, 0);
   if (!s.run) return 0;
-  struct tag t = {.run = {.lane = cgroup, .run = s.run}, .first = 1};
+  struct tag t = {.run = {.lane = pid_namespace, .run = s.run}, .first = 1};
   if (bpf_map_update_elem(&tags, &tid, &t, BPF_NOEXIST)) {
     count_lost(&t.run);
     return 0;

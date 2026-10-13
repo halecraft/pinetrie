@@ -5,8 +5,8 @@
 import { createHash } from "node:crypto"
 import { decodeRunEvent, type RunEvent } from "@pinetrie/core"
 
-/** A lane, as the observer knows it: its cgroup's id, in decimal. */
-export type LaneCgroup = string
+/** A lane, as the observer knows it: its PID namespace's inode, in decimal. */
+export type LaneNamespace = string
 
 /** A release's inode as the kernel held it at the release, and as the loader's lstat read it. */
 export interface ReleaseInodes {
@@ -19,7 +19,7 @@ export type LoaderLine =
   | { readonly kind: "ready" }
   | {
       readonly kind: "event"
-      readonly lane: LaneCgroup
+      readonly lane: LaneNamespace
       /** The run's number, as the helper gave it. */
       readonly run: string
       /** Only on a release under a remote directory that the loader lstat'ed. */
@@ -29,10 +29,10 @@ export type LoaderLine =
   | {
       readonly kind: "registered"
       readonly pid: number
-      readonly lane: LaneCgroup
+      readonly lane: LaneNamespace
     }
   | { readonly kind: "refused"; readonly pid: number; readonly why: string }
-  | { readonly kind: "unregistered"; readonly lane: LaneCgroup }
+  | { readonly kind: "unregistered"; readonly lane: LaneNamespace }
   | { readonly kind: "flushed"; readonly token: string }
 
 const DECIMAL = /^\d+$/
@@ -96,7 +96,7 @@ export type LoaderCommand =
       /** Its directories whose stamps only a fresh `lstat` reads: the Mac's, over virtiofs. */
       readonly remote: readonly string[]
     }
-  | { readonly kind: "unregister"; readonly lane: LaneCgroup }
+  | { readonly kind: "unregister"; readonly lane: LaneNamespace }
   | { readonly kind: "flush"; readonly token: string }
 
 /** A command's line, without its newline. */
@@ -113,7 +113,7 @@ export function encodeLoaderCommand(c: LoaderCommand): string {
 
 /** The machine role's calls, from a host, over `@pinetrie/channel`. */
 export type ObserverCall =
-  /** The lane whose first process is `pid`: a run may begin in its cgroup. Its result is the lane. */
+  /** The lane whose first process is `pid`: a run may begin in its PID namespace. Its result is the lane. */
   | Extract<LoaderCommand, { kind: "register" }>
   | Extract<LoaderCommand, { kind: "unregister" }>
   /** Its updates are the notices of this connection's lanes; it answers only when the connection ends. */
@@ -133,7 +133,7 @@ export interface ObserverHello {
 
 /** A run's event, for the host that registered its lane. */
 export interface ObserverNotice {
-  readonly lane: LaneCgroup
+  readonly lane: LaneNamespace
   readonly run: string
   readonly event: RunEvent
 }
@@ -182,7 +182,7 @@ export type Route =
  * so has one whose connection has not subscribed yet.
  */
 export const routeEvent = (
-  owners: ReadonlyMap<LaneCgroup, ConnectionId>,
+  owners: ReadonlyMap<LaneNamespace, ConnectionId>,
   subscribed: ReadonlySet<ConnectionId>,
   notice: ObserverNotice,
 ): Route => {
@@ -212,7 +212,7 @@ export const planHeld = (
  * losses as one `lost` before its end, the end last.
  */
 export function heldNotices(input: {
-  readonly lane: LaneCgroup
+  readonly lane: LaneNamespace
   readonly held: readonly ObserverNotice[]
   readonly lost: ReadonlyMap<string, number>
   readonly at: number
@@ -243,6 +243,45 @@ export const planIdle = (input: {
     : "stay"
 
 /** What decides where a host's lanes are observed. */
+export type RegistrationOwner =
+  | { readonly kind: "unowned" }
+  | { readonly kind: "owned"; readonly connection: ConnectionId }
+
+export type RegistrationPlan =
+  | { readonly kind: "install" }
+  | { readonly kind: "refresh" }
+  | { readonly kind: "refuse"; readonly why: string }
+
+/** Whether a connection may install, refresh or reclaim a namespace registration. */
+export const planRegistration = (
+  owner: RegistrationOwner,
+  connection: ConnectionId,
+): RegistrationPlan =>
+  owner.kind === "unowned"
+    ? { kind: "install" }
+    : owner.connection === connection
+      ? { kind: "refresh" }
+      : { kind: "refuse", why: "another live host owns this lane namespace" }
+
+/** The one outer-visible process whose NSpid vector ends with the inner locator. */
+export function translatedPid(
+  candidates: readonly {
+    readonly pid: number
+    readonly nspid: readonly number[]
+  }[],
+  innerPid: number,
+): { readonly pid: number; readonly nspid: readonly number[] } | null {
+  const matches = candidates.filter(c => c.nspid.at(-1) === innerPid)
+  return matches.length === 1 ? (matches[0] ?? null) : null
+}
+
+/** Whether the candidate is strictly below the forwarding namespace. */
+export const isStrictDescendant = (
+  candidate: LaneNamespace,
+  parents: readonly LaneNamespace[],
+  forwarding: LaneNamespace,
+): boolean => candidate !== forwarding && parents.includes(forwarding)
+
 export interface ObserverFacts {
   /** Docker runs rootless: nothing it starts can load a BPF program. */
   readonly rootless: boolean

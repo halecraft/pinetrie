@@ -225,7 +225,7 @@ export const scenario: Scenario = {
         e.run === "21" &&
         e.event.kind === "call" &&
         e.event.op === "release" &&
-        e.event.path === "/w/remote/b.txt",
+        e.event.path === "/w/r21-b.txt",
     )
     check(
       "a remote directory's release carries the loader's lstat, then the kernel's stamp, and its read the lstat's; another lane's carries neither",
