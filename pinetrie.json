@@ -1,1 +1,7 @@
-{ "publish": { "catchUp": true }, "lanes": { "nested": true } }
+{
+  "publish": { "catchUp": true },
+  "lanes": {
+    "nested": true,
+    "shared": [".plans"]
+  }
+}
