@@ -1,5 +1,5 @@
 // channel/serve — the server's side of a held channel, over its own stdin and
-// stdout. Calls are answered concurrently: pi runs a turn's tool calls in
+// stdout, or over one connection of a server that holds many. Calls are answered concurrently: pi runs a turn's tool calls in
 // parallel. The client closes the channel by ending stdin; killing the
 // `exec` process does not reach the server.
 
@@ -18,16 +18,21 @@ const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
 /**
- * Serve `handle` on stdin and stdout, then say `hello`. A handler that throws
- * answers `{ thrown }` with its message.
+ * Serve `handle` on stdin and stdout, or on one connection of a server that
+ * holds many (`io`), then say `hello`. A handler that throws answers
+ * `{ thrown }` with its message.
  */
 export function serve<Hello, Call, Update, Result>(
   hello: Hello,
   handle: (call: Call, context: ServeContext<Update>) => Promise<Result>,
+  io: {
+    readonly input: NodeJS.ReadableStream
+    readonly output: NodeJS.WritableStream
+  } = { input: process.stdin, output: process.stdout },
 ): void {
   const running = new Map<number, AbortController>()
   const send = (reply: Reply<Hello, Update, Result>) =>
-    process.stdout.write(`${encode(reply)}\n`)
+    io.output.write(`${encode(reply)}\n`)
 
   async function answer(id: number, call: Call, updates: boolean) {
     const control = new AbortController()
@@ -46,7 +51,7 @@ export function serve<Hello, Call, Update, Result>(
   }
 
   readline
-    .createInterface({ input: process.stdin })
+    .createInterface({ input: io.input })
     .on("line", line => {
       const request = decode<Request<Call>>(line)
       if ("abort" in request) running.get(request.abort)?.abort()

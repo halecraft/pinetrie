@@ -1,0 +1,455 @@
+// observe: loads observe.bpf.c, and turns its ring into lines on stdout,
+// answering commands on stdin. Static, so it runs on any machine of its
+// architecture. It decides nothing: lanehost's machine role reads its lines
+// (packages/lanehost/observer.ts) and routes them.
+//
+//   observe [ring KiB]
+//
+// stdin, one command a line, fields tab-separated, paths escaped as core's
+// codec escapes them (`\\`, `\t`, `\n`):
+//   register <pid> [<remote dir>]...   the lane whose first process is <pid>:
+//                                      its cgroup is read from /proc, and a
+//                                      run may begin there
+//   unregister <cgroup>
+//   flush <token>
+// stdout, one a line:
+//   ready                              every program is attached
+//   ev <lane> <run> <inodes> <event>   <event> is core's line (`encodeRunEvent`)
+//   registered <pid> <cgroup>  |  refused <pid> <why>
+//   unregistered <cgroup>
+//   flushed <token>                    after every event before the flush
+// <inodes> is `-`, or `<kernel>/<lstat>` on a release under a remote
+// directory, whose call carries the lstat's stamp and, after it, the
+// kernel's: the reader compares them. A remote directory's files are
+// lstat'ed through the lane's first process's root as their event is read:
+// over virtiofs only a fresh stat reads the Mac's stamp, where the guest's
+// inode holds its own clock's.
+//
+// A failure to load prints `observe: <step>: <reason>` on stderr and exits 1.
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/epoll.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+#include <bpf/bpf.h>
+#include <bpf/libbpf.h>
+#include "observe.h"
+#include "observe.skel.h"
+
+#define O_ACCMODE_ 3
+#define MAX_LANES 1024
+#define MAX_REMOTE 32
+
+static struct observe_bpf *skel;
+
+struct lane {
+  unsigned long long cgroup;
+  int pid;
+  int nremote;
+  char *remote[MAX_REMOTE];
+  size_t remote_len[MAX_REMOTE];
+};
+static struct lane lanes[MAX_LANES];
+static int nlanes;
+
+static struct lane *lane_of(unsigned long long cgroup) {
+  for (int i = 0; i < nlanes; i++)
+    if (lanes[i].cgroup == cgroup) return &lanes[i];
+  return NULL;
+}
+
+static void lane_free(struct lane *l) {
+  for (int i = 0; i < l->nremote; i++) free(l->remote[i]);
+  l->nremote = 0;
+}
+
+static unsigned long long now_us(void) {
+  struct timespec t;
+  clock_gettime(CLOCK_MONOTONIC, &t);
+  return (unsigned long long)t.tv_sec * 1000000ULL + (unsigned long long)t.tv_nsec / 1000ULL;
+}
+
+static void put_escaped(const char *s) {
+  for (; *s; s++) {
+    if (*s == '\\') fputs("\\\\", stdout);
+    else if (*s == '\t') fputs("\\t", stdout);
+    else if (*s == '\n') fputs("\\n", stdout);
+    else putchar(*s);
+  }
+}
+
+static size_t unescape(char *s) {
+  size_t o = 0;
+  for (size_t i = 0; s[i]; i++) {
+    if (s[i] == '\\' && s[i + 1]) {
+      i++;
+      s[o++] = s[i] == 't' ? '\t' : s[i] == 'n' ? '\n' : s[i];
+    } else s[o++] = s[i];
+  }
+  s[o] = 0;
+  return o;
+}
+
+// A path as its components say: leaf first, each ending in a NUL.
+static void path_string(const struct pathbuf *p, char *out, size_t cap) {
+  out[0] = 0;
+  if (p->n == 0) return;
+  if (p->abs) {
+    snprintf(out, cap, "%.*s", (int)p->len, p->buf);
+    return;
+  }
+  const char *at[MAXC + 1];
+  unsigned n = 0, off = 0;
+  while (n < p->n && n <= MAXC && off < p->len && off < sizeof p->buf) {
+    at[n++] = &p->buf[off];
+    off += (unsigned)strnlen(&p->buf[off], sizeof p->buf - off) + 1;
+  }
+  size_t used = 0;
+  for (int i = (int)n - 1; i >= 0 && used < cap; i--)
+    used += (size_t)snprintf(out + used, cap - used, "/%s", at[i]);
+}
+
+static const char KIND_LETTERS[] = {'-', 'f', 'd', 'l', 'o'};
+static char letter(unsigned kind) { return kind < sizeof KIND_LETTERS ? KIND_LETTERS[kind] : 'o'; }
+
+static int under(const char *path, const char *dir, size_t len) {
+  return strncmp(path, dir, len) == 0 && (path[len] == '/' || path[len] == 0);
+}
+
+static int is_remote(const struct lane *l, const char *path) {
+  if (!l) return 0;
+  for (int i = 0; i < l->nremote; i++)
+    if (under(path, l->remote[i], l->remote_len[i])) return 1;
+  return 0;
+}
+
+// The file at `path` in the lane, through its first process's root. 0 when it is a regular file.
+static int lane_lstat(const struct lane *l, const char *path, struct stat *st) {
+  char full[PATHMAX + 64];
+  snprintf(full, sizeof full, "/proc/%d/root%s", l->pid, path);
+  return lstat(full, st) == 0 && S_ISREG(st->st_mode) ? 0 : -1;
+}
+
+// Each written file's path, by its struct file, from its open to its release.
+#define SLOTS (1 << 18)
+static struct {
+  unsigned long long fid;
+  char *path;
+} table[SLOTS];
+static void remember(unsigned long long fid, char *path) {
+  for (unsigned i = (unsigned)(fid >> 6) & (SLOTS - 1), k = 0; k < SLOTS; i = (i + 1) & (SLOTS - 1), k++)
+    if (table[i].fid == 0 || table[i].fid == fid) {
+      free(table[i].path);
+      table[i].fid = fid;
+      table[i].path = path;
+      return;
+    }
+  free(path);
+}
+static char *forget(unsigned long long fid) {
+  for (unsigned i = (unsigned)(fid >> 6) & (SLOTS - 1), k = 0; k < SLOTS; i = (i + 1) & (SLOTS - 1), k++) {
+    if (table[i].fid == 0) return NULL;
+    if (table[i].fid != fid) continue;
+    char *p = table[i].path;
+    table[i].fid = 0;
+    table[i].path = NULL;
+    // The rest of the cluster is placed again, so lookups past this slot still find theirs.
+    for (unsigned j = (i + 1) & (SLOTS - 1); table[j].fid; j = (j + 1) & (SLOTS - 1)) {
+      unsigned long long f = table[j].fid;
+      char *q = table[j].path;
+      table[j].fid = 0;
+      table[j].path = NULL;
+      remember(f, q);
+    }
+    return p;
+  }
+  return NULL;
+}
+
+static void head(const struct run_key *r, const char *inodes) {
+  printf("ev\t%llu\t%llu\t%s\t", (unsigned long long)r->lane, (unsigned long long)r->run, inodes);
+}
+
+static void lost_line(const struct run_key *r, unsigned long long count) {
+  head(r, "-");
+  printf("lost\t%llu\t%llu\n", now_us(), count);
+}
+
+// The run's losses so far, sent and reset.
+static void send_lost(const struct run_key *r) {
+  unsigned long long n = 0;
+  if (bpf_map__lookup_and_delete_elem(skel->maps.lost_by_run, r, sizeof *r, &n, sizeof n, 0) == 0 && n > 0)
+    lost_line(r, n);
+}
+
+static void stamp_of(char *out, size_t cap, long long size, long long sec, unsigned nsec) {
+  snprintf(out, cap, "%lld:%lld", size, sec * 1000000000LL + (long long)nsec);
+}
+
+static const char *OPS[] = {"?", "open", "release", "unlink", "mkdir", "rename", "symlink", "link"};
+
+static int on_event(void *ctx, void *data, size_t len) {
+  (void)ctx;
+  static struct event ev;
+  static char pa[PATHMAX + NAMEMAX + 8], pb[PATHMAX + NAMEMAX + 8];
+  if (len < offsetof(struct event, a) + offsetof(struct pathbuf, buf)) return 0;
+  memset(&ev, 0, sizeof ev);
+  memcpy(&ev, data, len < sizeof ev ? len : sizeof ev);
+  const struct event *e = &ev;
+  unsigned long long at = e->ts / 1000ULL;
+  if (e->kind == EV_EXIT) {
+    head(&e->run, "-");
+    printf("exit\t%llu\t%u\n", at, e->status);
+    return 0;
+  }
+  if (e->kind == EV_END) {
+    send_lost(&e->run);
+    head(&e->run, "-");
+    printf("end\t%llu\n", at);
+    return 0;
+  }
+  if (e->kind < EV_OPEN || e->kind > EV_LINK) return 0;
+  // A path cut short would name another file: the run is incomplete instead.
+  if (e->a.cut || e->b.cut) {
+    lost_line(&e->run, 1);
+    return 0;
+  }
+  path_string(&e->a, pa, sizeof pa);
+  path_string(&e->b, pb, sizeof pb);
+  const struct lane *l = lane_of(e->run.lane);
+  char stamp[64] = "", kernel[64] = "", inodes[64] = "-";
+  if (e->size >= 0 && e->before == PK_FILE) stamp_of(stamp, sizeof stamp, e->size, e->ctime_sec, e->ctime_nsec);
+  if (e->kind == EV_OPEN && e->fid && (e->flags & O_ACCMODE_) != 0) remember(e->fid, strdup(pa));
+  if (e->kind == EV_RELEASE) {
+    char *path = forget(e->fid);
+    // A release the loader cannot name could be a shared file's version: the run is incomplete.
+    if (!path) {
+      lost_line(&e->run, 1);
+      return 0;
+    }
+    snprintf(pa, sizeof pa, "%s", path);
+    free(path);
+  }
+  if ((e->kind == EV_OPEN || e->kind == EV_RELEASE) && is_remote(l, pa)) {
+    struct stat st;
+    int ok = lane_lstat(l, pa, &st) == 0;
+    if (e->kind == EV_RELEASE) {
+      snprintf(kernel, sizeof kernel, "%s", stamp);
+      if (ok && kernel[0]) snprintf(inodes, sizeof inodes, "%llu/%llu", (unsigned long long)e->ino, (unsigned long long)st.st_ino);
+      else kernel[0] = 0;
+    }
+    // An open that made the file found none: it has no stamp, as on any disk.
+    if (ok && stamp[0])
+      stamp_of(stamp, sizeof stamp, (long long)st.st_size, (long long)st.st_ctim.tv_sec, (unsigned)st.st_ctim.tv_nsec);
+    else stamp[0] = 0;
+  }
+  head(&e->run, inodes);
+  printf("%s\t%llu\t%u\t%x\t%c\t", OPS[e->kind], at, e->pid, e->flags, letter(e->before));
+  put_escaped(pa);
+  printf("\t%c\t", e->b.n ? letter(e->before2) : '-');
+  put_escaped(pb);
+  printf("\t%s", stamp);
+  if (kernel[0]) printf("\t%s", kernel);
+  putchar('\n');
+  return 0;
+}
+
+// The cgroup a process is in, as its id (the cgroup directory's inode).
+static int cgroup_of(int pid, unsigned long long *id, char *why, size_t cap) {
+  char p[64], line[PATHMAX];
+  snprintf(p, sizeof p, "/proc/%d/cgroup", pid);
+  FILE *f = fopen(p, "re");
+  if (!f) {
+    snprintf(why, cap, "no process %d: %s", pid, strerror(errno));
+    return -1;
+  }
+  int found = 0;
+  while (fgets(line, sizeof line, f))
+    if (strncmp(line, "0::", 3) == 0) {
+      line[strcspn(line, "\n")] = 0;
+      found = 1;
+      break;
+    }
+  fclose(f);
+  if (!found) {
+    snprintf(why, cap, "process %d is in no cgroup v2", pid);
+    return -1;
+  }
+  char dir[PATHMAX + 32];
+  snprintf(dir, sizeof dir, "/sys/fs/cgroup%s", line + 3);
+  struct stat st;
+  if (stat(dir, &st) != 0) {
+    snprintf(why, cap, "%s: %s", dir, strerror(errno));
+    return -1;
+  }
+  *id = (unsigned long long)st.st_ino;
+  return 0;
+}
+
+static void do_register(char **f, int n) {
+  int pid = n > 1 ? atoi(f[1]) : 0;
+  char why[PATHMAX + 128];
+  unsigned long long cg;
+  if (pid <= 0) {
+    printf("refused\t%d\tnot a process id\n", pid);
+    return;
+  }
+  if (cgroup_of(pid, &cg, why, sizeof why) != 0) {
+    printf("refused\t%d\t", pid);
+    put_escaped(why);
+    putchar('\n');
+    return;
+  }
+  struct lane *l = lane_of(cg);
+  if (!l) {
+    if (nlanes == MAX_LANES) {
+      printf("refused\t%d\tthe observer holds %d lanes already\n", pid, MAX_LANES);
+      return;
+    }
+    l = &lanes[nlanes++];
+  }
+  lane_free(l);
+  l->cgroup = cg;
+  l->pid = pid;
+  for (int i = 2; i < n && l->nremote < MAX_REMOTE; i++) {
+    size_t len = unescape(f[i]);
+    while (len > 1 && f[i][len - 1] == '/') f[i][--len] = 0;
+    l->remote[l->nremote] = strdup(f[i]);
+    l->remote_len[l->nremote] = len;
+    l->nremote++;
+  }
+  unsigned char one = 1;
+  if (bpf_map__update_elem(skel->maps.registered, &cg, sizeof cg, &one, sizeof one, 0) != 0) {
+    printf("refused\t%d\tthe observer's map of lanes is full\n", pid);
+    lane_free(l);
+    *l = lanes[--nlanes];
+    return;
+  }
+  printf("registered\t%d\t%llu\n", pid, cg);
+}
+
+static void do_unregister(char **f, int n) {
+  unsigned long long cg = n > 1 ? strtoull(f[1], NULL, 10) : 0;
+  bpf_map__delete_elem(skel->maps.registered, &cg, sizeof cg, 0);
+  struct lane *l = lane_of(cg);
+  if (l) {
+    lane_free(l);
+    *l = lanes[--nlanes];
+  }
+  printf("unregistered\t%llu\n", cg);
+}
+
+// Every key of a map of run_keys, gathered before any is deleted.
+static int run_keys(struct bpf_map *m, struct run_key *out, int cap) {
+  int n = 0;
+  struct run_key key, *prev = NULL;
+  while (n < cap && bpf_map__get_next_key(m, prev, &key, sizeof key) == 0) {
+    out[n++] = key;
+    prev = &out[n - 1];
+  }
+  return n;
+}
+
+static struct rb_keys {
+  struct run_key k[1 << 16];
+} keys;
+
+static void do_flush(struct ring_buffer *rb, char **f, int n) {
+  ring_buffer__consume(rb);
+  int m = run_keys(skel->maps.lost_by_run, keys.k, 1 << 16);
+  for (int i = 0; i < m; i++) send_lost(&keys.k[i]);
+  // Ends the ring had no room for, after their runs' losses.
+  m = run_keys(skel->maps.ended, keys.k, 1 << 16);
+  for (int i = 0; i < m; i++) {
+    unsigned long long ts = 0;
+    if (bpf_map__lookup_and_delete_elem(skel->maps.ended, &keys.k[i], sizeof keys.k[i], &ts, sizeof ts, 0) != 0)
+      continue;
+    send_lost(&keys.k[i]);
+    head(&keys.k[i], "-");
+    printf("end\t%llu\n", ts / 1000ULL);
+  }
+  printf("flushed\t%s\n", n > 1 ? f[1] : "");
+}
+
+static void command(struct ring_buffer *rb, char *line) {
+  char *f[MAX_REMOTE + 3];
+  int n = 0;
+  for (char *s = line; n < MAX_REMOTE + 3;) {
+    f[n++] = s;
+    char *tab = strchr(s, '\t');
+    if (!tab) break;
+    *tab = 0;
+    s = tab + 1;
+  }
+  if (strcmp(f[0], "register") == 0) do_register(f, n);
+  else if (strcmp(f[0], "unregister") == 0) do_unregister(f, n);
+  else if (strcmp(f[0], "flush") == 0) do_flush(rb, f, n);
+  else if (f[0][0]) fprintf(stderr, "observe: unknown command %s\n", f[0]);
+}
+
+static int fail(const char *step, int err) {
+  fprintf(stderr, "observe: %s: %s\n", step, strerror(err < 0 ? -err : err));
+  return 1;
+}
+
+int main(int argc, char **argv) {
+  unsigned ring_kib = argc > 1 ? (unsigned)atoi(argv[1]) : 64 << 10;
+  signal(SIGPIPE, SIG_IGN);
+  skel = observe_bpf__open();
+  if (!skel) return fail("open", errno);
+  bpf_map__set_max_entries(skel->maps.events, ring_kib << 10);
+  int err = observe_bpf__load(skel);
+  if (err) return fail("load", err);
+  err = observe_bpf__attach(skel);
+  if (err) return fail("attach", err);
+  struct ring_buffer *rb = ring_buffer__new(bpf_map__fd(skel->maps.events), on_event, NULL, NULL);
+  if (!rb) return fail("ring", errno);
+  int ep = epoll_create1(EPOLL_CLOEXEC);
+  struct epoll_event in = {.events = EPOLLIN, .data.fd = 0};
+  struct epoll_event ring = {.events = EPOLLIN, .data.fd = -1};
+  if (ep < 0 || epoll_ctl(ep, EPOLL_CTL_ADD, 0, &in) != 0 ||
+      epoll_ctl(ep, EPOLL_CTL_ADD, ring_buffer__epoll_fd(rb), &ring) != 0)
+    return fail("epoll", errno);
+  printf("ready\n");
+  fflush(stdout);
+  static char buf[1 << 20];
+  size_t used = 0;
+  for (;;) {
+    struct epoll_event got[2];
+    int n = epoll_wait(ep, got, 2, 100);
+    if (n < 0) {
+      if (errno == EINTR) continue;
+      return fail("epoll", errno);
+    }
+    // Commands first: a flush must drain the ring itself, not find it drained.
+    for (int i = 0; i < n; i++) {
+      if (got[i].data.fd != 0) continue;
+      ssize_t r = read(0, buf + used, sizeof buf - used - 1);
+      // The machine role ends stdin to stop it.
+      if (r <= 0) {
+        fflush(stdout);
+        return 0;
+      }
+      used += (size_t)r;
+      buf[used] = 0;
+      char *start = buf, *nl;
+      while ((nl = memchr(start, '\n', used - (size_t)(start - buf)))) {
+        *nl = 0;
+        command(rb, start);
+        start = nl + 1;
+      }
+      used -= (size_t)(start - buf);
+      memmove(buf, start, used);
+      if (used == sizeof buf - 1) used = 0;
+    }
+    ring_buffer__consume(rb);
+    fflush(stdout);
+  }
+}

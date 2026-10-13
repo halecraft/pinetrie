@@ -3,7 +3,7 @@
   "arch": "aarch64",
   "packages": {
     "alpine-base": "3.23.6-r0",
-    "linux-virt": "6.18.55-r0",
+    "linux-virt": "6.18.56-r0",
     "docker-engine": "29.5.2-r0",
     "btrfs-progs": "6.17.1-r0",
     "iproute2": "6.17.0-r0",

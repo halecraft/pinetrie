@@ -10,6 +10,7 @@
     "e2e:live": "PINETRIE_LIVE=1 PINETRIE_SCENARIO=live node e2e/e2e.ts",
     "e2e:browser": "node e2e/browser.ts",
     "e2e:lanes": "node e2e/lanes.ts",
+    "e2e:observer": "node e2e/observer.ts",
     "vm:build": "node scripts/vm-build.ts"
   },
   "dependencies": {

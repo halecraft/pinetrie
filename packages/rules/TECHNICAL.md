@@ -1204,6 +1204,21 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     prompt's newest revision is what came before it. A record from before
     paths decodes with none. An ask's file count is the union of its turns'
     paths (`workStats`), so it is what its review lists.
+  - **A lane's runs are folded on the host** (`runs.ts`, ADR-0135), from
+    core's `RunEvent`s, whatever observes the lane:
+    - **An event is an attempt:** whether a path is there is read at each
+      drain (`present`, from the lane), never inferred, so a temporary file
+      renamed away, or a call that failed, reports nothing.
+    - **A path's first event decides whether it was there before the
+      run,** so a write is created or not, and a read counts only of what
+      was there before the run wrote it.
+    - **A drain flushes first:** `drainLane` takes a `Flushed` (core), which
+      only a `RunSource`'s flush makes, so no drain folds without the
+      barrier.
+    - **A run with a loss** carries `observed: lost`, and is no recipe
+      (`CompleteRun`, `disk.ts`).
+    - **A remote release whose stamp was raced** (`raced`) is a contested
+      version (`planSharedLineages`).
   - A turn's record says what it did to its disk beyond its commit
     (`disk`, `TurnDisk`, ADR-0135), from its runs (`disk.ts`):
     - **Asking and classing cannot drift apart.** `writesToClass` names

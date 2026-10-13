@@ -3,7 +3,7 @@
 - **Status:** Accepted (Duane, 2026-10-12)
 - **Area:** `packages/lanes/TECHNICAL.md`, `docs/01-architecture.md`
 - **Evidence:** S146, S147, S148, S155, S156, S157, S158, S159, S160, S161,
-  S162, S169, S170, S171, S172, S173
+  S162, S169, S170, S171, S172, S173, S175
 - **Supersedes:**
   - ADR-0131: derived state is learned from what each tool call's commands
     read and wrote, not declared (`lanes.install`, `installWhen` and
@@ -23,6 +23,11 @@
     longer current is shown as concurrent. The directory stays live, with no
     history, and is never branched.
 - **Revised:**
+  - 2026-10-13 (S170, S171, S172, S173, S175): the eBPF observer replaces the
+    supervisor: one per machine, in lanehost's machine role, stopping no call.
+    EINTR, the cost and a listener's not nesting leave the risks. A lane's own
+    lanes cannot be observed yet: under its rootless Docker an inner lane
+    shares its outer lane's cgroup (S175).
   - 2026-10-12 (S172): a version two lanes' turns both claim is contested, and
     flagged concurrent.
   - 2026-10-12 (S172): an eBPF observer was measured, as an alternative to the
@@ -125,17 +130,23 @@ The spikes behind this decision:
     offer like any change.
   - A folder without a `.gitignore` treats everything as source until one
     is written.
-- **Every tool call runs under a supervisor.**
-  - The supervisor is a child subreaper. It installs a seccomp filter that
-    sends each open, rename, unlink, mkdir, link and symlink to it, and
-    every process the call starts inherits the filter (S158).
+- **Every tool call is a run, which one observer per machine sees.**
+  - An eBPF program, loaded by lanehost's machine role outside every lane,
+    tags a run where its first process execs with its number in its
+    environment, in a cgroup a host registered; every task it starts
+    inherits the tag, and keeps it, whatever it execs or wherever it moves
+    (S172). It reports each open, rename, unlink, mkdir, link and symlink,
+    and each written file's last release, and stops none of them.
   - A write is attributed to the call whose process tree made it, however
     and whenever that process runs. A write nothing attributes is treated
     as a tool's write: source, or local where `.gitignore` ignores it.
   - Stat and access calls are not watched, for their cost (up to 2.7×,
     S158). Directory listings on the path to each input stand in for them.
-  - The supervisor's listener must never stop. If it does, its call hangs,
-    and if its descriptor closes, its processes' file calls fail (S158).
+  - An event the observer had no room for is counted against its run, and
+    a run with a loss is no recipe (S172). Its container holds `CAP_BPF`,
+    `CAP_PERFMON` and `CAP_SYS_PTRACE`, under Docker's own seccomp
+    profile (S173); where none can load it (rootless Docker, a kernel
+    before 5.17 or without BTF), the host refuses lanes and says why.
 - **A recipe is a recorded run, not a declaration.**
   - Any tool call whose commands made derived files is one.
   - **Its key** is a hash of:
@@ -206,8 +217,8 @@ The spikes behind this decision:
     agent knew of the file, by any tool, in this turn or an earlier one;
     with no read, the version current when the file was opened. An append
     is based on the version it appended to: it loses nothing. The
-    supervisor sees the open and the release (`close`, `dup3`, `exit_group`
-    or `execve`; S161), and the read and write tools are stamped alike.
+    observer sees the open and the last release, whoever lets the file go
+    (S172), and the read and write tools are stamped alike.
   - **A version is the file's stamp: its size and ctime,** read with one
     `stat`, so no file is read or hashed (S162). No program can set ctime,
     so a tool that restores an mtime still changes the stamp, and so does a
@@ -226,7 +237,9 @@ The spikes behind this decision:
     never sees the one it replaced. Both writes, and any write based on
     the contested version, are flagged concurrent, and the version keeps
     its first writer. A program outside pine·trie that writes in that
-    window is not caught: it claims no version.
+    window is not caught: it claims no version. A release whose size or
+    inode, read then, is not the kernel's at the release is raced, and its
+    version contested as a claimed one is.
   - **A turn's record names the versions it read and wrote.**
   - **Versions order by their ctime, not by when they are learnt.** ctime
     is the host's clock for a lane's write and for yours alike, on the Mac
@@ -309,30 +322,19 @@ The spikes behind this decision:
     work checked out and stale outputs deleted;
   - reading `pinetrie.json` once at startup.
 - **Risks:**
-  - The supervisor sits on every file call's path.
-  - setuid programs cannot gain privilege inside a tool call
-    (`no_new_privs`). Lanes run as root; an image that relies on `sudo`
-    would notice.
-  - io_uring's opens bypass seccomp. Docker's default profile refuses
-    io_uring, and the nested lanes' profile is the default with namespace
-    calls added (S172).
-  - A watched call can be cut short with EINTR, which it never returns
-    unsupervised, when a signal its program handles without `SA_RESTART`
-    arrives before the supervisor has received the call (S170). `bash`
-    restarts; `dash`, Debian's `/bin/sh`, does not. It is seccomp's user
-    notification itself, so no listener removes it; a supervisor that is
-    the call's tracer (`SECCOMP_RET_TRACE`) ends it at about a listener's
-    cost, but then `strace` and `gdb` cannot run in a lane (S171).
-  - An eBPF observer, loaded from outside the lane, attributes as the
-    supervisor does without stopping any call, at 1.7× a run's time where
-    the supervisor costs 7.4× (S172). Over virtiofs it reads a release's
-    stamp with its own `lstat`, tens of µs after the release. Its
-    container needs `CAP_BPF`, `CAP_PERFMON` and `CAP_SYS_PTRACE`, under
-    Docker's own seccomp profile (S173).
-  - A listener cannot nest: a process under one is refused another
-    (EBUSY), so `supervise` under `supervise` exits 126 (S171). A lane's
-    tool call cannot run the supervisor's own tests, and an inner Docker
-    started from a tool call would refuse every inner lane's.
+  - Over virtiofs a shared file's stamp is the observer's own `lstat`,
+    median 16.7 µs after the release or the open (S172): another writer's
+    version can land in that window. One that changes the size or the
+    inode is caught as raced; a program outside pine·trie that writes in
+    it, with the same size, is not.
+  - An open that finds nothing is seen at its lookup's return, a probe
+    every open on the machine passes through; its cost outside a run is
+    not yet measured on the Mac.
+  - A lane's own lanes cannot be observed: under its rootless Docker an
+    inner lane shares its outer lane's cgroup, so by cgroup its runs are
+    the outer lane's (S175), and a host there refuses lanes. A lane's
+    identity would have to be what sets them apart, its first process's
+    pid namespace.
 - **Left open:**
   - states moving between machines. Between lane VMs, `btrfs send` (S146,
     S148) is where to start; the boundary with the Mac is a separate

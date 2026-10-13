@@ -124,7 +124,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the turn's runs are never drained",
     file: "apps/pinetrie/host/work/disk.ts",
-    from: "  const drained = await drainLaneRuns(channel, supervisorSource(channel))\n",
+    from: "  const drained = await drainLaneRuns(channel, runs)\n",
     to: "  const drained = { runs: [], toolWrites: [], toolShared: [] }\n",
     suite: "lanes",
     scenario: "recipe",
@@ -578,17 +578,7 @@ export const mutations: readonly Mutation[] = [
     from: '      ["HOME", LANE_HOME],\n',
     to: "",
     command: unit,
-    expect:
-      "its home on its disk, its observation's variables, and the shared directories",
-  },
-  {
-    name: "a lane's observation is not passed on",
-    file: "packages/lanes/plan.ts",
-    from: "      ...Object.entries(spec.observation),\n",
-    to: "",
-    command: unit,
-    expect:
-      "its home on its disk, its observation's variables, and the shared directories",
+    expect: "its home on its disk, and the shared directories",
   },
   {
     name: "an image's tag ignores the files its build copies in",
@@ -601,7 +591,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a tool call's command runs bare",
     file: "packages/pi/lane-helper.ts",
-    from: "    args[0] = observation.launch(run, command)\n",
+    from: "    args[1] = launchOptions(run, args[1] as object | undefined)\n",
     to: "",
     suite: "lanes",
     scenario: "images",
@@ -681,8 +671,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the lane runtime leaves rg behind",
     file: "packages/core/index.ts",
-    from: 'export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd", "supervise"] as const',
-    to: 'export const RUNTIME_PROGRAMS = ["jj", "fd", "sd", "supervise"] as const',
+    from: 'export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const',
+    to: 'export const RUNTIME_PROGRAMS = ["jj", "fd", "sd"] as const',
     suite: "lanes",
     scenario: "images",
     expect:

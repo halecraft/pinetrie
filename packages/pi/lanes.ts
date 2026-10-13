@@ -88,12 +88,10 @@ export interface LaneFacts {
 /**
  * What each program the runtime carries for `bash` is preferred over. Keyed
  * by `RuntimeProgram`, so a program added to the runtime fails to type-check
- * until it says what it replaces. jj and the supervisor replace nothing the
- * agent would run.
+ * until it says what it replaces. jj replaces nothing the agent would run.
  */
-const PREFERRED_OVER: Readonly<
-  Record<Exclude<RuntimeProgram, "jj" | "supervise">, string>
-> = { rg: "grep", fd: "find", sd: "sed" }
+const PREFERRED_OVER: Readonly<Record<Exclude<RuntimeProgram, "jj">, string>> =
+  { rg: "grep", fd: "find", sd: "sed" }
 
 /** `a`, `a and b`, `a, b and c`. */
 const listed = (words: readonly string[]): string =>

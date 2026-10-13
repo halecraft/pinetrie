@@ -87,7 +87,6 @@ const spec: LaneSpec = {
   attached: NOTHING_ATTACHED,
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "2G",
-  observation: { PINETRIE_OBSERVE: "o" },
 }
 
 describe("planMounts: every host path a lane sees, in one list", () => {
@@ -245,7 +244,7 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
     expect(attached.env.SSH_AUTH_SOCK).toBe("/run/a.sock")
     expect(attached.env.JJ_USER).toBe("agent")
   })
-  test("its home on its disk, its observation's variables, and the shared directories", () => {
+  test("its home on its disk, and the shared directories", () => {
     const sharing = planShape(
       {
         ...spec,
@@ -264,7 +263,6 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
     )
     expect(sharing.env).toMatchObject({
       HOME: "/workspace/.pinetrie-lane/home",
-      PINETRIE_OBSERVE: "o",
       PINETRIE_SHARED: "/workspace/.plans\n/workspace/notes/shared",
     })
   })

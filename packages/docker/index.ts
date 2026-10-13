@@ -2,7 +2,7 @@
 // through the lane VM's launcher, and for Linux.
 
 export { projectDisks, ROOTLESS_UID } from "@pinetrie/lanehost"
-export { gatherDockerHost } from "./facts.ts"
+export { dockerRootless, gatherDockerHost } from "./facts.ts"
 export {
   type DockerHostFacts,
   type DockerRefusal,

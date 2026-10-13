@@ -25,6 +25,11 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
 | `send-stream.ts` | btrfs's send stream read as one change per path, pure |
 | `walk.ts` | two trees' entries compared, pure; and the walk that reads them |
 | `lanehost.Containerfile` | a role's image: Alpine, `btrfs-progs`, `iptables` |
+| `observer/` | the observer: its BPF program (`observe.bpf.c`), the kernel's structs it reads (`kernel.h`), the event both sides share (`observe.h`), the loader (`observe.c`), their Containerfile, and the suite's guest (`suite/`) |
+| `observer.ts` | the machine role: the loader's lines and commands, and every decision of the role's, pure |
+| `observer-server.ts` | the machine role's process: the loader held, each host's connection served |
+| `observer-connect.ts` | one host's channel, joined to the role's socket |
+| `observer-client.ts` | the host's side: one channel, a lane's notices gathered for its `RunSource` |
 
 ## Roles
 
@@ -43,6 +48,58 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
   lane's), where no capability reaches the host's user namespace (S148).
 - **A call of a module another role serves is refused** (`answer`), so a
   role's process never does another role's work, whatever it is sent.
+
+## The machine role (`observer*.ts`, `observer/`)
+
+The observer that attributes a lane's file calls to its runs (ADR-0135).
+It belongs to the machine, not to a project: one container serves every
+host, whatever their projects.
+
+- **The kernel side decides only which task is in which run**
+  (`observe.bpf.c`):
+  - A run begins where an untagged task, in a cgroup a host registered,
+    execs with `PINETRIE_RUN=<n>` in its environment, read by a
+    `bpf_loop` over the strings. Its tag is the run and that cgroup, its
+    lane; every task it starts takes it (`task_newtask`, which io_uring's
+    workers pass too), whatever it execs or wherever it moves, and a
+    tagged task never takes another.
+  - A path is walked from its dentry through each mount to the task's
+    root, in a `bpf_loop` callback: as an inline loop its branches pass
+    the verifier's limit.
+  - What was at a path before is read in the kernel: an open's from
+    `FMODE_CREATED`, a path call's from its dentry's inode. An open whose
+    lookup finds nothing never reaches `security_file_open`: it is seen at
+    `do_filp_open`'s return, its name joined to the caller's directory.
+  - A run ends when its last task has exited and its last written file
+    been let go of (`live` counts both): an exit releases its files after
+    its tracepoint.
+  - Nothing is lost silently: an event the ring has no room for, a task or
+    a written file the maps cannot hold, is counted against its run. An
+    end is never lost: `ended` keeps it for the next flush.
+  - Its types are `kernel.h`'s, relocated by name from the running
+    kernel's BTF (CO-RE), so it needs no `vmlinux.h`: Linux 5.17 or later
+    (`bpf_loop`), with BTF and kprobes. No fentry: the VM's kernel has no
+    `FUNCTION_TRACER`.
+- **The loader holds no decision** (`observe.c`, static, the BPF object in
+  its skeleton): it drains the ring to stdout as `ev <lane> <run>
+  <inodes> <core's event line>`, and answers `register`, `unregister` and
+  `flush` on stdin. It reads a lane's cgroup from its first process, and
+  `lstat`s a file under the lane's remote directories through that
+  process's root as its event is read: over virtiofs only a fresh stat
+  reads the Mac's stamp. A path cut short, or a release it cannot name, is
+  a loss. A flush drains the ring itself, after any command before it.
+- **The role's decisions are `observer.ts`'s, pure:** where a notice goes
+  (`routeEvent`), what a lane with no host may hold (`planHeld`), what its
+  next host is sent first (`heldNotices`), when the role exits
+  (`planIdle`, 60 s after its last connection), whether a remote release
+  was raced (`isRaced`: its size or inode, never its ctime), how a host's
+  lanes are observed (`planObserver`), and the role's version
+  (`observerVersion`, a hash of its sources: its image's tag and its
+  container's name).
+- **A host gone keeps its lanes' runs:** their notices are held until a
+  connection registers the lane again, as a host does after it restarts.
+- **Under rootless Docker nothing can load it,** and a lane's own lanes
+  share its cgroup (S175), so a host there refuses lanes.
 
 ## Calls name names, never paths
 
@@ -143,5 +200,11 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
 - `grants.test.ts`: `planGrant`'s input, and its refusals.
 - `send-stream.test.ts`: S148's recorded streams (`fixtures/`), each kind
   of change, names with a newline and a space.
+- `observer.test.ts`: the loader's lines, every decision of the machine
+  role's, and its server against a stand-in loader
+  (`fixtures/stand-in-observe.mjs`).
+- The observer's kernel side and loader are checked by `e2e:observer`, in
+  a QEMU guest on the lane VM's own kernel
+  (`apps/pinetrie/e2e/TECHNICAL.md`).
 - `walk.test.ts`: `compareTrees`. `disks.test.ts` walks S148's turn
   between two real snapshots, and checks it says what the stream says.

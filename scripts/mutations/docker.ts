@@ -259,8 +259,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a host whose Docker does not answer is given lanes",
     file: "apps/pinetrie/host/work/runtime.ts",
-    from: "  if (refusal !== null) return refusedWith(dockerWords(refusal))\n  const runtime = dockerRuntime({ target, lanesDir, root, log })\n  log(",
-    to: "  const runtime = dockerRuntime({ target, lanesDir, root, log })\n  log(",
+    from: "  if (refusal !== null) return refusedWith(dockerWords(refusal))\n  const observed = planObserver({",
+    to: "  const observed = planObserver({",
     command: unit("apps/pinetrie/host/work/runtime.test.ts"),
     expect: "a Docker that does not answer, in the runtime's words",
   },

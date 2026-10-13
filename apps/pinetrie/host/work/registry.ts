@@ -16,18 +16,28 @@ import { type LaneChannel, laneRunner, openChannel } from "@pinetrie/pi"
 import { readLaneRecords } from "@pinetrie/reads"
 import type { SessionDocHandle } from "@pinetrie/schema"
 
-/** A lane's channel: pi's helper in its container, over the runtime's `exec -i`. */
+/**
+ * A lane's channel: pi's helper in its container, over the runtime's `exec
+ * -i`, and its runs observed. Every container start opens it before any
+ * tool runs, so the lane is registered with the observer each time.
+ */
 export const openLinkOf =
   (runtime: LaneRuntime): OpenLink<LaneChannel> =>
   async container => {
     const channel = openChannel(helperCommand(runtime, container))
-    await channel.ready
+    const { shared } = await channel.ready
+    const runs = await runtime.observe(container, shared).catch(error => {
+      channel.close()
+      throw error
+    })
     const { run, bytes } = laneRunner(channel)
     return {
       channel,
+      runs,
       run,
       bytes,
       async close() {
+        await runs.close().catch(() => {})
         channel.close()
         await channel.closed
       },

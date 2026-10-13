@@ -98,8 +98,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 ## The disk model (ADR-0135)
 
 - **A path is source, derived or local, from `.gitignore` and what the
-  turn's commands did.** Every tool call's command runs under the
-  supervisor (The channel into a lane); a turn's end classes what its runs
+  turn's commands did.** Every tool call's command is a run, which the
+  machine's observer sees (The channel into a lane); a turn's end classes what its runs
   and the write tools wrote, and keeps each run that made derived files as
   a recipe in the disk's registry (`.pinetrie-lane/recipes.json`). The
   rules are `@pinetrie/rules`' (`packages/rules/TECHNICAL.md`); the steps
@@ -237,7 +237,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   runtime is copied out of pine·trie's default image into
   `.pinetrie/runtime/<image tag>/`: Node, the libraries `ldd` lists for it,
   glibc's loader, and in `bin/` static builds of core's `RUNTIME_PROGRAMS`
-  (jj, rg, fd, sd, supervise). So the helper runs on any image, musl or glibc, with or
+  (jj, rg, fd, sd). So the helper runs on any image, musl or glibc, with or
   without Node (S44), and every lane has those programs (ADR-0064). Only
   `bin/` (`RUNTIME_BIN`) goes on a lane's `PATH`, after the image's own;
   pine·trie's Node needs its loader.
@@ -247,39 +247,16 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   list and fails naming one the image lacks, so the host stops at startup.
   `ensureRuntime` keeps a runtime only when its `bin/` holds every program
   (`runtimeComplete`), not only jj. sd 1.1.0 reports itself as 1.0.0.
-- **The supervisor is built in the image, not downloaded**
-  (`image/supervise.c`): a static musl build in the default Containerfile's
-  first stage, for aarch64 alone, as the image is. It names aarch64's system
-  calls and does not compile for another architecture. The image's tag
-  covers its source as well as the Containerfile (`Containerfile.sources`),
-  so a change to the C rebuilds the image.
-- **Every tool call's command runs under the supervisor (ADR-0135).** The
-  helper's `exec` wraps it (`superviseCommand`), as the planned shape tells
-  it (`SUPERVISE_ENV`, `SHARED_ENV`); the host's own `run` calls never are.
-  The supervisor runs the command with the shell pi would, behind a seccomp
-  user-notification filter that every process it starts inherits, and
-  reports each open, rename, unlink, mkdir, link and symlink under
-  `/workspace` to the helper's socket in `/run/pinetrie` (S158). The helper
-  folds them into run records (`packages/pi/TECHNICAL.md`). Its rules:
-  - **The listener is a process of its own**, in its own process group, and
-    the subreaper of everything the command starts. pi aborts a command by
-    killing its process group: a listener in it would die with it, and every
-    file call of a daemon the command left would then fail. The command
-    rejoins the caller's group, so an abort still ends it.
-  - **The listener never stops answering.** A call it does not answer waits
-    forever. It continues past `EINTR` and `ENOENT` (a caller that died),
-    and when the helper's socket breaks or stalls for 5 s, it writes to
-    `.pinetrie-lane/runs/<run>.log`, which the helper reads at its next drain.
-  - **The caller returns when the command's shell exits**, as before; the
-    listener stays until every descendant has exited, reporting a daemon's
-    writes to later drains.
-  - **`no_new_privs` applies to every tool call:** seccomp's filter needs it.
-    `sudo` in a tool call fails, nested lanes included; the inner Docker is
-    started by the container's command, not a tool call.
-  - **Under a shared directory, it also reports where a write is let go of**
-    (`close`, `dup3` over it, `exit_group`, `execve`), with the file's stamp
-    (S161, S162). A shell's redirection to fd 1 is let go of only by `dup3`
-    or the exit.
+- **Every tool call's command is a run (ADR-0135).** The helper launches
+  it with its number in `PINETRIE_RUN` (`packages/pi/TECHNICAL.md`); the
+  host's own `run` calls never are runs. The machine's observer, outside
+  every lane (`packages/lanehost/TECHNICAL.md`, The machine role), tags the
+  run as its first process execs in the lane's cgroup, which the host
+  registered as the link opened (`LaneRuntime.observe`), and reports each
+  open, rename, unlink, mkdir, link and symlink of its processes, and each
+  written file's last release, to the host, never through the lane. A
+  lane's shape carries nothing for it but `SHARED_ENV`, by which the helper
+  stamps its tools' shared accesses.
 - **A project image must still supply** a POSIX `sh` (pi's `bash` falls back
   to `sh -c`) and git 2.41 or later. Git launches its own helper programs, so
   it cannot be carried in from outside the image. `checkImage` refuses an
@@ -371,7 +348,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   accepted work, so they cannot come from it.
 - **A shared file has a lineage of versions (ADR-0135).** Every write into a
   shared directory is attributed and numbered: a run's, from the
-  supervisor's opens and releases; a read or write tool's, from the stamps
+  observer's opens and releases; a read or write tool's, from the stamps
   the helper takes; yours, from the host's watcher. A version is a stamp,
   size and ctime, which a lane and the host read alike (S169), never a
   hash. A write based on a version another write replaced is concurrent.

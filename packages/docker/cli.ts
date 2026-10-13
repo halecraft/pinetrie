@@ -41,6 +41,40 @@ export async function buildImage(
 }
 
 /**
+ * Build the machine role's image (the observer Containerfile's last stage),
+ * its runtime and pine·trie's packages given as named contexts: it mounts
+ * nothing from a host.
+ */
+export async function buildObserverImage(
+  target: Pick<DockerTarget, "socket">,
+  plan: {
+    readonly file: string
+    readonly tag: string
+    /** The lane runtime, on the host. */
+    readonly runtime: string
+    /** pine·trie's `packages/`, on the host. */
+    readonly packages: string
+  },
+): Promise<void> {
+  const ran = await docker(target, [
+    "buildx",
+    "build",
+    "--load",
+    "-t",
+    plan.tag,
+    "--build-context",
+    `runtime=${plan.runtime}`,
+    "--build-context",
+    `install=${plan.packages}`,
+    "-f",
+    plan.file,
+    path.dirname(plan.file),
+  ])
+  if (!ran.ok)
+    throw new Error(`building ${plan.tag} failed: ${buildError(ran.stderr)}`)
+}
+
+/**
  * A failed build's cause: buildx's last `ERROR` line, else its last line.
  * Its first line only names the builder.
  */

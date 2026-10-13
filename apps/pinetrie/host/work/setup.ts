@@ -34,13 +34,12 @@ import {
   planMounts,
   prepareImages,
   projectContainerfile,
-  RUNTIME_BIN,
   readConfigFile,
   refreshBase,
   repoConfig,
   revsetName,
 } from "@pinetrie/lanes"
-import { type PiSetup, supervisionEnv } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import { type RepoOwner, renameAccepted, startRepoOwner } from "@pinetrie/repo"
 import { decodeOwner } from "@pinetrie/rules"
 import { type Basics, failed, slow } from "../basics.ts"
@@ -246,7 +245,6 @@ export async function startSetup(input: {
       attached: ssh.attachedFor(lane),
       identity: r.identity,
       memory: LANE_MEMORY,
-      observation: supervisionEnv(RUNTIME_BIN),
     }
   }
 

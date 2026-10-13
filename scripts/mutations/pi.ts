@@ -755,8 +755,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a write tool's shared write is not stamped",
     file: "packages/pi/lane-helper.ts",
-    from: "  if (!isUnderAny(p, sharedInside)) return method.apply(env, [...args, signal])\n",
-    to: "  return method.apply(env, [...args, signal])\n",
+    from: "    if (!isUnderAny(p, sharedInside))\n      return method.apply(env, [...args, signal])\n",
+    to: "    return method.apply(env, [...args, signal])\n",
     command: unit,
     expect:
       "a write tool's write into a shared directory is stamped before and after, as one write",
@@ -780,12 +780,12 @@ export const mutations: readonly Mutation[] = [
       "says what is made is the agent's to make, and to keep out of the repo",
   },
   {
-    name: "the supervised command is not quoted",
-    file: "packages/pi/supervisor.ts",
-    from: "    .map(shellWord)\n",
-    to: "    .map(String)\n",
+    name: "a run's number is not in its command's environment",
+    file: "packages/pi/observer.ts",
+    from: "  return { ...options, env: { ...given?.env, [RUN_ENV]: run } }\n",
+    to: "  return { ...options, env: { ...given?.env } }\n",
     command: unit,
-    expect: "the inner shell gets the command byte for byte",
+    expect: "an exec is a run, launched with its number in its environment",
   },
   {
     name: "the write tools' paths are not recorded",
@@ -803,15 +803,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "hashes: each file's sha256, null where none, a new one after a rewrite",
-  },
-  {
-    name: "a daemon's connection keeps the helper from exiting",
-    file: "packages/pi/supervisor.ts",
-    from: "    socket.unref()\n",
-    to: "",
-    command: unit,
-    expect:
-      "the helper exits when its channel closes, though a daemon still reports to it",
   },
   {
     name: "a lane command's input is dropped",

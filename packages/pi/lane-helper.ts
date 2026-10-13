@@ -5,16 +5,15 @@
 // `<runtime loader> … node /pinetrie/packages/pi/lane-helper.ts`. It serves
 // `lane-protocol.ts`'s calls over `@pinetrie/channel`:
 // - pi's own `NodeExecutionEnv`, so pi's tools run in the lane unchanged.
-//   Every `exec` is a run, launched as its lane's observation says
-//   (`supervisor.ts`); its events reach the host by the lane's `RunSource`;
+//   Every `exec` is a run, launched with its number in its environment
+//   (`observer.ts`); its events reach the host from the machine's observer;
 // - `run` calls, the host's own jj and git, with no shell (`runCommand`),
 //   never runs: they are pine·trie's, not a tool call's;
 // - `runs`, what this helper knows of its runs since the last drain: each
 //   launched, with its command; the write tools' paths, and
 //   the read and write tools' accesses of shared files (`LaneDrain`);
-//   `present`, which paths exist, for the host's fold; `events`, the
-//   supervisor's, gathered here; `hashes`, cached by stamp; and
-//   `checkRecipes`.
+//   `present`, which paths exist, for the host's fold; `hashes`, cached by
+//   stamp; and `checkRecipes`.
 // Calls are handled concurrently: pi runs a turn's tool calls in parallel
 // (`toolExecution` defaults to `"parallel"`). `{ abort }` cancels one.
 //
@@ -24,7 +23,7 @@
 // process does not reach the guest.
 
 import { createHash } from "node:crypto"
-import { createReadStream, existsSync, lstatSync, mkdirSync } from "node:fs"
+import { createReadStream, lstatSync, mkdirSync } from "node:fs"
 import { lstat } from "node:fs/promises"
 import path from "node:path"
 import {
@@ -40,7 +39,6 @@ import {
   type LaneDrain,
   type Recipe,
   type RecipeCheck,
-  type RunNotice,
   SHARED_ENV,
   type SharedAccess,
   type Stamp,
@@ -54,11 +52,7 @@ import {
   type LaneCall,
   type LaneHello,
 } from "./lane-protocol.ts"
-import {
-  SUPERVISE_ENV,
-  type SupervisorObservation,
-  startSupervision,
-} from "./supervisor.ts"
+import { launchOptions } from "./observer.ts"
 
 const cwd = process.env.PINETRIE_WORKSPACE_ROOT ?? WORKSPACE_ROOT
 const env = new NodeExecutionEnv({ cwd })
@@ -89,22 +83,13 @@ let toolPid = 0
 /** The kernel's monotonic clock in µs, as a run's events': libuv reads CLOCK_MONOTONIC. */
 const monotonicUs = () => Number(process.hrtime.bigint() / 1000n)
 
-const superviseBin = process.env[SUPERVISE_ENV]
-const observation: SupervisorObservation | null =
-  superviseBin === undefined
-    ? null
-    : await startSupervision({
-        supervise: superviseBin,
-        root: cwd,
-        shared,
-        // The shell pi's own `exec` picks.
-        shell: existsSync("/bin/bash") ? "/bin/bash" : "sh",
-        runsDir: path.join(cwd, ".pinetrie-lane", "runs"),
-      })
-
-let runCount = 0
-const runId = () =>
-  `${process.pid.toString(36)}-${Date.now().toString(36)}-${(runCount++).toString(36)}`
+/**
+ * Each run's number: this helper's own count, from a start no earlier
+ * helper of the lane reached, since a daemon of an earlier helper's run
+ * may still report under its number. Within a safe integer for 280 years.
+ */
+let nextRun = Date.now() * 1024
+const runId = () => String(nextRun++)
 
 const isPresent = (p: string): boolean => {
   try {
@@ -127,9 +112,6 @@ function drain(): LaneDrain {
     toolShared: toolShared.splice(0),
   }
 }
-
-/** The supervisor's events since the last take; none without it. */
-const events = (): readonly RunNotice[] => observation?.take() ?? []
 
 /**
  * A file's stamp, in core's form (`statStamp`), as a run's events carry it:
@@ -232,75 +214,77 @@ const fileAccess = (method: EnvMethod, args: readonly unknown[]) => {
   return access === null || p === null ? null : { kind: access.kind, path: p }
 }
 
-serve<LaneHello, LaneCall, unknown, unknown>({ cwd }, async (call, context) => {
-  if ("run" in call)
-    return runCommand(call.run, {
-      cwd: call.cwd ?? cwd,
-      bytes: call.bytes,
-      signal: context.signal,
-      ...(call.stdin == null ? {} : { stdin: call.stdin }),
-    })
-  if ("runs" in call) return drain()
-  if ("present" in call) return call.present.filter(isPresent)
-  if ("events" in call) return events()
-  if ("hashes" in call) return hashes(call.hashes)
-  if ("checkRecipes" in call) return checkRecipes(call.checkRecipes)
-  if (!isEnvMethod(call.method))
-    throw new Error(`${call.method} does not cross into a lane`)
-  const args = [...call.args]
-  const { update } = context
-  const method = env[call.method] as (...a: unknown[]) => Promise<unknown>
-  const signal = withAbortSignal(context.signal, BACKGROUND_CONTEXT)
-  if (call.method === "exec") {
-    if (update !== undefined)
-      args[1] = { ...((args[1] as object | undefined) ?? {}), onUpdate: update }
-    if (observation === null) return method.apply(env, [...args, signal])
-    const run = runId()
-    const command = String(args[0])
-    launched.push({ run, command })
-    args[0] = observation.launch(run, command)
+serve<LaneHello, LaneCall, unknown, unknown>(
+  { cwd, shared },
+  async (call, context) => {
+    if ("run" in call)
+      return runCommand(call.run, {
+        cwd: call.cwd ?? cwd,
+        bytes: call.bytes,
+        signal: context.signal,
+        ...(call.stdin == null ? {} : { stdin: call.stdin }),
+      })
+    if ("runs" in call) return drain()
+    if ("present" in call) return call.present.filter(isPresent)
+    if ("hashes" in call) return hashes(call.hashes)
+    if ("checkRecipes" in call) return checkRecipes(call.checkRecipes)
+    if (!isEnvMethod(call.method))
+      throw new Error(`${call.method} does not cross into a lane`)
+    const args = [...call.args]
+    const { update } = context
+    const method = env[call.method] as (...a: unknown[]) => Promise<unknown>
+    const signal = withAbortSignal(context.signal, BACKGROUND_CONTEXT)
+    if (call.method === "exec") {
+      if (update !== undefined)
+        args[1] = {
+          ...((args[1] as object | undefined) ?? {}),
+          onUpdate: update,
+        }
+      const run = runId()
+      launched.push({ run, command: String(args[0]) })
+      args[1] = launchOptions(run, args[1] as object | undefined)
+      return method.apply(env, [...args, signal])
+    }
+    const touched = fileAccess(call.method, args)
+    if (touched === null) return method.apply(env, [...args, signal])
+    const { kind, path: p } = touched
+    if (kind !== "read") toolWrites.add(p)
+    if (!isUnderAny(p, sharedInside))
+      return method.apply(env, [...args, signal])
+    const pid = --toolPid
+    const before = await fileStamp(p)
+    const at = monotonicUs()
+    if (kind === "read") {
+      // A read of a shared file: what the agent knows of it, which its later
+      // writes are based on, as a run's open is.
+      toolShared.push({
+        path: p,
+        kind: "open",
+        writable: false,
+        append: false,
+        at,
+        pid,
+        stamp: before,
+      })
+      return method.apply(env, [...args, signal])
+    }
+    // A write: its stamp before and after, as a run's open and release would
+    // carry them.
+    const append = kind === "append"
     const result = await method.apply(env, [...args, signal])
-    await observation.exited(run)
+    const after = await fileStamp(p)
+    toolShared.push(
+      { path: p, kind: "open", writable: true, append, at, pid, stamp: before },
+      {
+        path: p,
+        kind: "release",
+        writable: true,
+        append,
+        at: monotonicUs(),
+        pid,
+        left: { kind: "stamp", stamp: after },
+      },
+    )
     return result
-  }
-  const touched = fileAccess(call.method, args)
-  if (touched === null) return method.apply(env, [...args, signal])
-  const { kind, path: p } = touched
-  if (kind !== "read") toolWrites.add(p)
-  if (!isUnderAny(p, sharedInside)) return method.apply(env, [...args, signal])
-  const pid = --toolPid
-  const before = await fileStamp(p)
-  const at = monotonicUs()
-  if (kind === "read") {
-    // A read of a shared file: what the agent knows of it, which its later
-    // writes are based on, as a run's open is.
-    toolShared.push({
-      path: p,
-      kind: "open",
-      writable: false,
-      append: false,
-      at,
-      pid,
-      stamp: before,
-    })
-    return method.apply(env, [...args, signal])
-  }
-  // A write: its stamp before and after, as a run's open and release would
-  // carry them.
-  const append = kind === "append"
-  const result = await method.apply(env, [...args, signal])
-  const after = await fileStamp(p)
-  toolShared.push(
-    { path: p, kind: "open", writable: true, append, at, pid, stamp: before },
-    {
-      path: p,
-      kind: "release",
-      writable: true,
-      append,
-      at: monotonicUs(),
-      pid,
-      left: { kind: "stamp", stamp: after },
-    },
-  )
-  return result
-})
+  },
+)

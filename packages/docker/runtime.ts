@@ -9,6 +9,15 @@ import {
   LANEHOST_CONTAINERFILE,
   type LanehostChannel,
   lanehostClient,
+  MACHINE_SOCKET,
+  OBSERVER_CONNECT,
+  OBSERVER_CONTAINERFILE,
+  OBSERVER_LOADER,
+  OBSERVER_SERVER,
+  type ObserverChannel,
+  observerClient,
+  observerSources,
+  observerVersion,
   projectDisks,
   type Role,
   SERVER,
@@ -25,6 +34,7 @@ import {
 } from "@pinetrie/lanes"
 import {
   apiMessage,
+  containerPid,
   createNetwork,
   imageEnv,
   imageExists,
@@ -38,19 +48,27 @@ import {
   startContainer,
   stopContainer,
 } from "./api.ts"
-import { buildImage, dockerArgv, runInImage } from "./cli.ts"
+import {
+  buildImage,
+  buildObserverImage,
+  dockerArgv,
+  runInImage,
+} from "./cli.ts"
 import { dockerRootless, hostPathExists } from "./facts.ts"
 import {
   type ContainerSpec,
   imagePathOf,
   labelled,
   lanehostContainer,
+  observerContainer,
+  observerImage,
   PROJECT_LABEL,
   planProjectSweep,
   planSlotSweep,
   projectKey,
   projectNetwork,
   renderHelper,
+  renderObserver,
   renderRun,
   SLOT_LABEL,
 } from "./plan.ts"
@@ -201,6 +219,57 @@ export function dockerRuntime(input: {
     ...(input.log === undefined ? {} : { log: input.log }),
   })
 
+  const version = observerSources().then(observerVersion)
+  /**
+   * A channel to the machine's observer: its image built and its container
+   * made, by this host or joined when another host of its version made it
+   * first. A container whose server is exiting, idle, refuses the
+   * connection, and the next call makes it again.
+   */
+  async function openObserver(): Promise<ObserverChannel> {
+    if (serving === null)
+      throw new Error(
+        "the observer cannot start yet: setup has not named pine·trie's install and the lane runtime",
+      )
+    const v = await version
+    const name = observerContainer(v)
+    const tag = observerImage(v)
+    if (!(await imageExists(target, tag)))
+      await buildObserverImage(target, {
+        file: OBSERVER_CONTAINERFILE,
+        tag,
+        runtime: serving.runtime,
+        packages: `${serving.install}/packages`,
+      })
+    if ((await inspectContainer(target, name)).state !== "running") {
+      const made = await runContainer(
+        target,
+        renderObserver({
+          version: v,
+          cmd: [
+            ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_SERVER}`),
+            MACHINE_SOCKET,
+            OBSERVER_LOADER,
+            v,
+          ],
+        }),
+      )
+      if (
+        made.status >= 300 &&
+        (await inspectContainer(target, name)).state !== "running"
+      )
+        throw new Error(`docker run ${name} failed: ${apiMessage(made)}`)
+    }
+    return openChannel(
+      execArgv(name, [
+        ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_CONNECT}`),
+        MACHINE_SOCKET,
+      ]),
+      "the machine's observer",
+    )
+  }
+  const observer = observerClient({ open: openObserver })
+
   /** The project's lanes' network, labelled for the sweep; made once per VM. */
   let network: Promise<void> | null = null
   const projectNetworkReady = (): Promise<void> => {
@@ -267,6 +336,15 @@ export function dockerRuntime(input: {
         throw new Error(`docker run ${spec.name} failed: ${apiMessage(made)}`)
     },
     containerFacts: name => inspectContainer(target, name),
+    observe: (container, shared) =>
+      observer.observe({
+        pid: async () => {
+          const pid = await containerPid(target, container)
+          if (pid === null) throw new Error(`${container} is not running`)
+          return pid
+        },
+        remote: target.remoteHostPaths ? shared : [],
+      }),
     async start(name) {
       await startContainer(target, name)
     },
@@ -308,6 +386,7 @@ export function dockerRuntime(input: {
     },
     vmRestarted() {
       lanehost.reset()
+      observer.reset()
       built = null
       network = null
     },

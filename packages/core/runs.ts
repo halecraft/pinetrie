@@ -240,6 +240,12 @@ export interface RunSource {
   flush(): Promise<Flushed>
 }
 
+/** A lane being observed: its runs' source, until it is closed. */
+export interface LaneObservation extends RunSource {
+  /** Stop observing it: no run begins in it after. */
+  close(): Promise<void>
+}
+
 /** A file or directory a run left in place. */
 export interface RunWrite {
   readonly path: string
@@ -433,7 +439,7 @@ export function wideningWords(w: ConfigWidening): string {
   }
 }
 
-/** Who made a version of a shared file: a lane's turn, or something no lane supervised (you). */
+/** Who made a version of a shared file: a lane's turn, or something no lane observed (you). */
 export type SharedWriter =
   | { readonly kind: "lane"; readonly lane: ThreadId; readonly entry: EntryId }
   | { readonly kind: "outside" }

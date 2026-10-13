@@ -52,14 +52,13 @@ export type LaneCall =
   | { readonly runs: true }
   /** Which of these paths, relative to the helper's directory, exist: a `string[]`. */
   | { readonly present: readonly string[] }
-  /** The supervisor's events gathered since the last call: `RunNotice[]`. */
-  | { readonly events: true }
   /** Content hashes of paths relative to the helper's directory: a `FileHashes`. */
   | { readonly hashes: readonly string[] }
   /** Whether each recipe's key still holds on the disk: a `RecipeCheck` each. */
   | { readonly checkRecipes: readonly Recipe[] }
 
-/** The helper's hello: its directory. */
+/** The helper's hello: its directory, and its shared directories, absolute, as the host registers the lane with them. */
 export interface LaneHello {
   readonly cwd: string
+  readonly shared: readonly string[]
 }

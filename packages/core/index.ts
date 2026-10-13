@@ -984,7 +984,7 @@ export const SHARED_ENV = "PINETRIE_SHARED"
  * `PATH` whatever the image. Each must be a static build in pinetrie's default
  * image, which the runtime is copied out of.
  */
-export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd", "supervise"] as const
+export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const
 export type RuntimeProgram = (typeof RUNTIME_PROGRAMS)[number]
 
 /** `s` as one POSIX shell word. */

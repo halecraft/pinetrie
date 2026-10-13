@@ -15,6 +15,7 @@
 // one and wraps it as runners.
 
 import path from "node:path"
+import type { RunSource } from "@pinetrie/core"
 import type { Runners } from "./execute.ts"
 import { type LaneOwner, laneContainer, PINETRIE_MOUNT } from "./plan.ts"
 import type { BytesRunner, Runner } from "./run.ts"
@@ -39,6 +40,8 @@ export const helperCommand = (
 /** An open channel into a lane, as runners; `channel` is the host's own. */
 export interface LaneLink<C> {
   readonly channel: C
+  /** Its runs' events, from the machine's observer: registered as the link opened. */
+  readonly runs: RunSource
   readonly run: Runner
   readonly bytes: BytesRunner
   /** Close the channel and wait for the helper to exit. */

@@ -1,9 +1,9 @@
 // pi/lane-runs — a lane's runs, drained on the host: its `RunSource`'s
 // notices up to a flush, folded with what its helper knows (each run it
-// launched, each exit; `@pinetrie/rules`' fold), then drained into records
-// once the lane has said which of the changed paths exist.
+// launched; `@pinetrie/rules`' fold), then drained into records once the
+// lane has said which of the changed paths exist.
 
-import { flushed, type LaneRuns, type RunSource } from "@pinetrie/core"
+import type { LaneRuns, RunSource } from "@pinetrie/core"
 import {
   dirtyPaths,
   drainLane,
@@ -14,11 +14,6 @@ import type { LaneChannel } from "./lane-env.ts"
 
 /** Each lane's traces, by its channel: a run outlives no helper. */
 const traces = new WeakMap<LaneChannel, ReadonlyMap<string, RunTrace>>()
-
-/** The supervisor's source: its events, gathered in the lane by its helper. */
-export const supervisorSource = (channel: LaneChannel): RunSource => ({
-  flush: async () => flushed(await channel.events()),
-})
 
 /**
  * Everything the lane's runs and tools did since the last drain. One drain

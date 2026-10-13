@@ -54,7 +54,7 @@ export interface CommandMutation extends MutationBase {
 }
 
 /** The end-to-end suites, each a directory of scenarios. */
-export type Suite = "host" | "live" | "browser" | "lanes"
+export type Suite = "host" | "live" | "browser" | "lanes" | "observer"
 
 /** A mutation one scenario of a suite catches, at one check. */
 export interface SuiteMutation extends MutationBase {
@@ -80,6 +80,10 @@ export const SUITES: Readonly<
   lanes: {
     command: ["pnpm", "run", "e2e:lanes"],
     dir: "apps/pinetrie/e2e/lanes",
+  },
+  observer: {
+    command: ["pnpm", "run", "e2e:observer"],
+    dir: "apps/pinetrie/e2e/observer",
   },
 }
 

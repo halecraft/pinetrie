@@ -134,6 +134,15 @@ export function createBody(
         CgroupPermissions: "rwm",
       })),
       ...(unconfined ? { MaskedPaths: [], ReadonlyPaths: [] } : {}),
+      ...(spec.machine === null
+        ? {}
+        : {
+            PidMode: "host",
+            CgroupnsMode: "host",
+            ReadonlyRootfs: true,
+            AutoRemove: true,
+            Tmpfs: Object.fromEntries(spec.machine.tmpfs.map(t => [t, ""])),
+          }),
     },
   }
 }
@@ -194,6 +203,25 @@ export async function inspectContainer(
     }
   } catch {
     return { state: "missing", label: null }
+  }
+}
+
+/**
+ * A running container's first process, in the pid namespace of Docker's
+ * machine; null when it is not running.
+ */
+export async function containerPid(
+  target: Pick<DockerTarget, "socket">,
+  name: string,
+): Promise<number | null> {
+  const answered = await request(target, "GET", `/containers/${at(name)}/json`)
+  if (!ok(answered)) return null
+  try {
+    const pid = (JSON.parse(answered.body) as { State?: { Pid?: unknown } })
+      .State?.Pid
+    return typeof pid === "number" && pid > 0 ? pid : null
+  } catch {
+    return null
   }
 }
 

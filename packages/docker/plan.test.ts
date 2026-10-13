@@ -46,7 +46,6 @@ const spec: LaneSpec = {
   }),
   grants: { nested: false, hostPorts: [], env: [] },
   attached: NOTHING_ATTACHED,
-  observation: {},
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "4G",
 }
@@ -59,6 +58,7 @@ const mac: DockerTarget = {
   labels: { "pinetrie.slot": "3" },
   hostSocket: "/run/pinetrie/ssh-3.sock",
   hostAddress: "192.168.127.254",
+  remoteHostPaths: true,
 }
 const render = (shape: ContainerShape, target = mac) =>
   renderRun(shape, {
@@ -185,6 +185,7 @@ describe("renderRun: a lane's shape as a container", () => {
       labels: {},
       hostSocket: null,
       hostAddress: null,
+      remoteHostPaths: false,
     }
     const made = render(shapes[1] as ContainerShape, linux)
     expect(made.mounts).toContainEqual({

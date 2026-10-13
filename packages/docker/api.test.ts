@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 import { createBody, memoryBytes } from "./api.ts"
-import type { ContainerSpec } from "./plan.ts"
+import { type ContainerSpec, renderObserver } from "./plan.ts"
 
 const spec: ContainerSpec = {
   name: "pinetrie-t-1",
@@ -20,6 +20,7 @@ const spec: ContainerSpec = {
   capAdd: [],
   securityOpt: ["no-new-privileges"],
   devices: [],
+  machine: null,
 }
 
 describe("createBody: a spec as the API's create", () => {
@@ -67,4 +68,32 @@ test("memoryBytes reads -m as the CLI does: units of 1024", () => {
   expect(memoryBytes("256m")).toBe(256 * 1024 ** 2)
   expect(memoryBytes("1g")).toBe(1024 ** 3)
   expect(() => memoryBytes("lots")).toThrow("not an amount of memory")
+})
+
+test("the machine role's container is made with its grant and nothing more", () => {
+  const body = createBody(
+    renderObserver({ version: "abc", cmd: ["serve"] }),
+    () => "",
+  )
+  expect(body).toEqual({
+    Image: "pinetrie-observer:abc",
+    Cmd: ["serve"],
+    Env: [],
+    Labels: {},
+    HostConfig: {
+      Init: true,
+      NetworkMode: "none",
+      Memory: 512 * 1024 ** 2,
+      Mounts: [],
+      CapAdd: ["BPF", "PERFMON", "SYS_PTRACE"],
+      CapDrop: ["ALL"],
+      SecurityOpt: ["no-new-privileges"],
+      Devices: [],
+      PidMode: "host",
+      CgroupnsMode: "host",
+      ReadonlyRootfs: true,
+      AutoRemove: true,
+      Tmpfs: { "/run": "" },
+    },
+  })
 })

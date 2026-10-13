@@ -6,6 +6,7 @@ The end-to-end suites, each a directory of scenarios:
 |---|---|---|---|
 | `host` | `e2e.ts` | `host/*.scenario.ts` | `pnpm run e2e`; `e2e:live` runs `live` alone |
 | `lanes` | `lanes.ts` | `lanes/*.scenario.ts` | `pnpm run e2e:lanes` |
+| `observer` | `observer.ts` | `observer/*.scenario.ts` | `pnpm run e2e:observer` |
 | `browser` | `browser.ts` | `browser/*.scenario.ts` | `pnpm run e2e:browser` |
 
 They share `checks.ts` (recording a check, and stopping at one),
@@ -25,6 +26,19 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
 `browser/page.ts`.
 
 ## Scenarios
+
+- **The observer's suite boots a QEMU guest on the lane VM's own kernel**
+  (`observer/support.ts`): the VM image's `Image` (`buildVmImage`), and an
+  initramfs of busybox, the loader and the workloads, built by the observer
+  Containerfile's `suite` stage in the suites' Docker. QEMU emulates (a lane
+  has no KVM): a run takes about 35 s, and its timings mean nothing. It
+  needs `qemu-system-aarch64` and an arm64 Docker, and caches the VM image
+  under `node_modules/.cache`. Its guest (`packages/lanehost/observer/suite/init`)
+  runs each case as a numbered run in a lane's cgroup and prints what the
+  loader said; the scenario checks it, decoding with lanehost's codec.
+- **In a lane, a host refuses lanes:** its Docker is rootless, and nothing
+  forwards the observer to a nested lane yet, so the scenarios with tools,
+  and all of `e2e:lanes`, skip there with the host's words.
 
 - **A host reads the suites' user config, not the person's.**
   `startSuiteHost` (`harness.ts`) and `LaneHosts` pass `SUITE_CONFIG`,

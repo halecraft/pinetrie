@@ -2,7 +2,8 @@
 // suites holds at most ⌊√n⌋ tests, where n is the layer below it.
 //
 //   L1 unit          Vitest's `test()`s, beside the code
-//   L2 acceptance   the host's and the lanes' scenarios (`e2e`, `e2e:lanes`)
+//   L2 acceptance   the host's, the lanes' and the observer's scenarios
+//                   (`e2e`, `e2e:lanes`, `e2e:observer`)
 //   L3 browser       the browser's scenarios (`e2e:browser`)
 //
 // A test above L1 is a scenario (`apps/pinetrie/e2e/scenario.ts`): one run
@@ -20,7 +21,7 @@ import { scenarioNames } from "../apps/pinetrie/e2e/scenario.ts"
 export interface LayerCounts {
   /** Static `test(`/`it(` calls in Vitest's include globs: `test.each` counts once. */
   readonly unit: number
-  /** `host/*.scenario.ts` and `lanes/*.scenario.ts`. */
+  /** `host/*.scenario.ts`, `lanes/*.scenario.ts` and `observer/*.scenario.ts`. */
   readonly acceptance: number
   /** `browser/*.scenario.ts`. */
   readonly browser: number
@@ -73,7 +74,8 @@ export async function countLayers(root: string): Promise<LayerCounts> {
     unit,
     acceptance:
       scenarioNames(path.join(e2e, "host")).length +
-      scenarioNames(path.join(e2e, "lanes")).length,
+      scenarioNames(path.join(e2e, "lanes")).length +
+      scenarioNames(path.join(e2e, "observer")).length,
     browser: scenarioNames(path.join(e2e, "browser")).length,
   }
 }
@@ -127,7 +129,7 @@ export function fixedWaitBreaches(
 /** Each scenario's fixed waits, by path from `root`. */
 export function countFixedWaits(root: string): Record<string, number> {
   const counts: Record<string, number> = {}
-  for (const suite of ["host", "lanes", "browser"]) {
+  for (const suite of ["host", "lanes", "observer", "browser"]) {
     const dir = path.join("apps/pinetrie/e2e", suite)
     for (const name of scenarioNames(path.join(root, dir))) {
       const file = path.join(dir, `${name}.scenario.ts`)

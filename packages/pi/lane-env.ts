@@ -14,13 +14,7 @@
 
 import { type ExecutionEnv, FileError } from "@earendil-works/pi-agent-core"
 import { openChannel as open, type RunResult } from "@pinetrie/channel"
-import type {
-  FileHashes,
-  LaneDrain,
-  Recipe,
-  RecipeCheck,
-  RunNotice,
-} from "@pinetrie/core"
+import type { FileHashes, LaneDrain, Recipe, RecipeCheck } from "@pinetrie/core"
 import {
   type EnvMethod,
   isEnvMethod,
@@ -41,8 +35,8 @@ const toolCall: unique symbol = Symbol("toolCall")
 
 /** One open channel to a lane's helper. */
 export interface LaneChannel {
-  /** The helper's directory, once it has said it is ready. */
-  readonly ready: Promise<{ readonly cwd: string }>
+  /** The helper's hello, once it has said it is ready. */
+  readonly ready: Promise<LaneHello>
   [toolCall](
     method: EnvMethod,
     args: readonly unknown[],
@@ -59,8 +53,6 @@ export interface LaneChannel {
   runs(): Promise<LaneDrain>
   /** Which of `paths`, relative to the lane's directory, exist. */
   present(paths: readonly string[]): Promise<readonly string[]>
-  /** The supervisor's events, gathered in the lane since the last call. */
-  events(): Promise<readonly RunNotice[]>
   /** sha256 of each path, relative to the lane's directory. */
   hashes(paths: readonly string[]): Promise<FileHashes>
   /** Whether each recipe's key, but its image, still holds on the disk. */
@@ -96,8 +88,6 @@ export function openChannel(argv: readonly string[]): LaneChannel {
     runs: () => channel.call({ runs: true }) as Promise<LaneDrain>,
     present: paths =>
       channel.call({ present: paths }) as Promise<readonly string[]>,
-    events: () =>
-      channel.call({ events: true }) as Promise<readonly RunNotice[]>,
     hashes: paths => channel.call({ hashes: paths }) as Promise<FileHashes>,
     checkRecipes: recipes =>
       channel.call({ checkRecipes: recipes }) as Promise<

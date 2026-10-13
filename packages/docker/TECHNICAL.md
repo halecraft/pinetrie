@@ -112,12 +112,8 @@ declares it (`workspace.test.ts`).
 
 `renderRun` never passes `--privileged`, `--cap-add` or a Docker socket
 (ADR-0130): a lane with the VM's socket reads every lane's disk (S125).
-Every lane but a nested one runs with `no-new-privileges`, and every tool
-call's processes run with `no_new_privs` in any lane, nested ones included:
-the supervisor's seccomp filter needs it (`packages/lanes/TECHNICAL.md`,
-The channel into a lane). So `sudo` fails in a tool call. A nested lane's
-inner Docker is started by the container's command, not by a tool call, so
-its `newuidmap` keeps the capabilities it needs. Under Docker's
+Every lane but a nested one runs with `no-new-privileges`. A nested
+lane's inner Docker keeps setuid, which its `newuidmap` needs. Under Docker's
 default seccomp profile a lane cannot open a vsock socket (S128), so it
 never reaches the VM's Docker or the launcher's ports.
 
@@ -189,3 +185,26 @@ measured. Its checks:
   project's;
 - costs: `docker run -d` under 150 ms, a snapshot under 50 ms, a cold VM's
   Docker answering under 2 s; the launcher's open files in the detail.
+
+## The machine role's container
+
+- **One per machine and version, for every project and host**
+  (`renderObserver`): `pinetrie-observer-<version>`, from the image of the
+  same tag, which `buildObserverImage` builds from the observer
+  Containerfile's last stage with the lane runtime and pine·trie's packages
+  as named contexts, so it mounts nothing from a host. It carries no
+  project or slot label, so no sweep takes it.
+- **Its grant is `OBSERVER_GRANT`, and nothing more:** `CAP_BPF`,
+  `CAP_PERFMON` and `CAP_SYS_PTRACE`, Docker's own seccomp profile, the
+  host's pid and cgroup namespaces, a read-only root with a tmpfs at
+  `/run`, no network, removed when it exits (`ContainerSpec.machine`). A
+  test checks its body exactly (`api.test.ts`).
+- **Made or joined by name** (`openObserver`, `runtime.ts`): a failed
+  `docker run` is fine when the container now runs, another host having
+  made it. Each host's channel is a `docker exec -i` of its connect script.
+  A new lease closes the channel; the next lane's start opens it again and
+  registers every lane again.
+- **A lane is registered by its first process** (`containerPid`, the pid
+  in Docker's machine's namespace), with its shared directories as remote
+  where host paths reach the machine over virtiofs
+  (`DockerTarget.remoteHostPaths`, the Mac).

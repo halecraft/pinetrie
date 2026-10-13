@@ -481,13 +481,17 @@ item 18, and in `lanes.test.ts` against the harness.
   lane's `runs`, or `hashes` of paths. Bytes and errors cross as the
   channel's wire carries them, at any depth, since `NodeExecutionEnv` never
   throws: its errors are values inside results (S44 item 5).
-- **A lane's runs** (`runs.ts`, ADR-0135): each `exec` runs under the
-  supervisor the lane's shape names (`SUPERVISE_ENV`;
-  `packages/lanes/TECHNICAL.md`, The channel into a lane), and the helper
-  folds what it reports into a trace per run (`foldRunEvents`). A drain
-  (`runs`) returns, per run with news since the last, a `RunRecord`: its
-  reads, writes (created or not), deletions, failed lookups and shared
-  accesses, with the write tools' paths beside them (`ToolWrites`). Its rules:
+- **A lane's runs** (ADR-0135): each `exec` is a run, launched with its
+  number in `PINETRIE_RUN` (`observer.ts`, `launchOptions`): pi spawns the
+  shell with `options.env` last, so the variable is the run's whatever the
+  caller gave. The machine's observer sees it begin there and sends its
+  events to the host, never through the helper; the host folds them
+  (`@pinetrie/rules`, `drainLaneRuns` in `lane-runs.ts`). The helper's
+  `runs` says only what it launched and its tools' part (`LaneDrain`), and
+  `present` which changed paths exist now. A drain is a `RunRecord` per run
+  with news since the last: its reads, writes (created or not), deletions,
+  failed lookups and shared accesses, with the write tools' paths beside
+  them (`ToolWrites`). Its rules:
   - **Tool writes are the agent's alone.** Every environment method says
     in one table keyed by `EnvMethod` whether it reads, writes or appends
     to a file, and which (`FILE_ACCESS`), so a method added must say; a
@@ -499,36 +503,36 @@ item 18, and in `lanes.test.ts` against the harness.
     of the lane's `pinetrie.json`, the host's note (`configWritten`) is
     added to the reply. Wrapped, not replaced, so the tool list and the
     prompt stay pi's.
-  - **One stamp, in the supervisor's form:** size and ctime, the inode
-    left out, since on the Mac a lane and the host see different inodes
-    (S169). Core makes it from a stat in one place (`statStamp`), for the
-    helper and the host's watcher, and a supervised test proves the
-    helper's equals the supervisor's.
+  - **One stamp, in the observer's form:** size and ctime, the inode left
+    out, since on the Mac a lane and the host see different inodes (S169).
+    Core makes it from a stat in one place (`statStamp`), for the helper
+    and the host's watcher; the observer suite checks the loader's equals a
+    `stat`.
   - **The read and write tools' shared accesses** (`toolShared`): a read
     tool's read of a shared file is an open for reading with its stamp,
     what the agent then knows of it; a write tool's write, its
     stamps before and after, an append marked so.
-  - **The supervisor sees a call before it happens,** not whether it
+  - **The observer sees a call as it is made,** not whether it
     succeeded. So whether a written path is there is read at the drain, not
     inferred: a temporary file renamed away reports nothing.
   - **A path's first event decides whether it was there before the run,**
     so a write is created or not, and a read counts only of what was there
     before the run wrote it: a run's own output is never its input.
-  - **A drain is synchronous,** from reading the logs to the last `lstat`, so
-    no line is folded between a trace's paths being read and its drain.
-  - **`exec` returns once the run's exit is folded**, or after 2 s, so a
-    drain right after it sees the exit.
+  - **A drain flushes first:** its `RunSource`'s flush answers once every
+    event of a call that already returned has arrived, so the exit of a
+    command whose `exec` returned is in it.
   - **A daemon's run stays open** (`alive`) and reports again at later
-    drains, until its last process exits. Its connection to the helper's
-    socket is unref'd: held, it kept the helper from exiting when the host
-    closed the channel, and a lane's stop after its run waited forever.
+    drains, until its last task has exited and its last written file has
+    been let go of.
+  - **A run's number is the helper's count from `Date.now() × 1024`**, so a
+    daemon of an earlier helper's run never shares a later run's.
   - **`hashes`** are sha256, cached by each file's stamp (inode, size,
     ctime), which every change of content changes (S162).
   - **`checkRecipes`** answers, per recipe, the first fact of its key that
     changed (`checkRecipe`): an input's hash, a failed lookup now found, a
     shared file's stamp. Its image is the host's to compare.
-  - Without `SUPERVISE_ENV`, as in tests on the host, commands run bare and
-    no run is recorded.
+  - Outside a lane, as in tests on the host, nothing observes: the drain's
+    source gives no events, and no run reports a path.
 - **The helper runs on the lane runtime's Node through its own loader**, so
   `process.execPath` is the loader: nothing in it may re-execute that
   (S44 item 2).

@@ -18,6 +18,7 @@
     "e2e:live": "pnpm --filter @pinetrie/app run e2e:live",
     "e2e:browser": "pnpm --filter @pinetrie/app run e2e:browser",
     "e2e:lanes": "pnpm --filter @pinetrie/app run e2e:lanes",
+    "e2e:observer": "pnpm --filter @pinetrie/app run e2e:observer",
     "vm:build": "pnpm --filter @pinetrie/app run vm:build",
     "build": "pnpm --filter @pinetrie/web run build",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm test && pnpm run proofs:unit && pnpm run conformance && pnpm run e2e && pnpm run e2e:lanes",

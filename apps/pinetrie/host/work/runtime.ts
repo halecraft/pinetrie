@@ -9,6 +9,7 @@ import path from "node:path"
 import { errorText, type ProjectRecord } from "@pinetrie/core"
 import {
   type DockerTarget,
+  dockerRootless,
   dockerRuntime,
   dockerWords,
   gatherDockerHost,
@@ -17,6 +18,7 @@ import {
   SLOT_LABEL,
   sweepSlot,
 } from "@pinetrie/docker"
+import { OBSERVER_SOCKET, planObserver } from "@pinetrie/lanehost"
 import {
   type LaneRuntime,
   type Mount,
@@ -188,9 +190,21 @@ async function hostDockerFound(
     labels: {},
     hostSocket,
     hostAddress: null,
+    remoteHostPaths: false,
   }
   const refusal = planDockerHost(await gatherDockerHost(target, lanesDir))
   if (refusal !== null) return refusedWith(dockerWords(refusal))
+  const observed = planObserver({
+    rootless: await dockerRootless(target),
+    forwarded: existsSync(OBSERVER_SOCKET),
+  })
+  if (observed.kind === "refused") return refusedWith(observed.why)
+  // Nothing serves the forwarded observer yet: by cgroup, an inner lane is
+  // its outer lane.
+  if (observed.kind === "forwarded")
+    return refusedWith(
+      "a lane's own lanes cannot be observed yet: under its rootless Docker an inner lane shares its outer lane's cgroup",
+    )
   const runtime = dockerRuntime({ target, lanesDir, root, log })
   log(`[host] lanes run on Docker, their disks in ${lanesDir}`)
   return {
@@ -254,6 +268,7 @@ async function vmFound(
       return `/run/pinetrie/ssh-${current.slot}.sock`
     },
     hostAddress: GVPROXY_HOST_ADDRESS,
+    remoteHostPaths: true,
   }
   const refusal = planDockerHost(await gatherDockerHost(target, null))
   if (refusal !== null) {

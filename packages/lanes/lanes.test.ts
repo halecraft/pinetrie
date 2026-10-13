@@ -8,7 +8,7 @@ import {
 } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { entryId, snapshotId, threadIdFor } from "@pinetrie/core"
+import { entryId, flushed, snapshotId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   bookmarkOf,
@@ -58,6 +58,7 @@ function recordingRuntime(seen: string[]): LaneRuntime {
     readLaneFile: no,
     runSpec: no,
     containerFacts: no,
+    observe: no,
     start: no,
     stop: no,
     remove: no,
@@ -317,6 +318,7 @@ describe("laneHandle.start", () => {
     }
     const handle = laneHandle(runtime, "pinetrie-t-1", async () => ({
       channel: null,
+      runs: { flush: async () => flushed([]) },
       run: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
       bytes: async () => ({
         ok: true,

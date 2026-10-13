@@ -1,7 +1,7 @@
 // lanes/runtime-port — what a runtime does for lanes. Planners return
 // values (`ContainerShape`, `DiskOp`); a runtime turns them into commands. The host picks the runtime and hands it in.
 
-import type { DiskDiff, SnapshotId } from "@pinetrie/core"
+import type { DiskDiff, LaneObservation, SnapshotId } from "@pinetrie/core"
 import type { ContainerShape, ImagePlan, LaneOwner } from "./plan.ts"
 import type { Ran } from "./run.ts"
 
@@ -57,6 +57,16 @@ export interface LaneRuntime {
   /** Make the container from `shape`, labelled with its spec hash, and start it. */
   run(shape: ContainerShape): Promise<void>
   containerFacts(container: string): Promise<ContainerFacts>
+  /**
+   * The running container's runs, observed from now: its first process
+   * registered with the machine's observer, `shared` its shared
+   * directories as the lane sees them. Throws, saying why, where nothing
+   * can observe lanes.
+   */
+  observe(
+    container: string,
+    shared: readonly string[],
+  ): Promise<LaneObservation>
   start(container: string): Promise<void>
   /** Stop it; its disk stays as it is. */
   stop(container: string): Promise<void>

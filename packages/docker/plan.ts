@@ -99,6 +99,12 @@ export interface ContainerSpec {
   /** `seccomp=<path>` names a profile on the host, read when the container is made. */
   readonly securityOpt: readonly string[]
   readonly devices: readonly string[]
+  /**
+   * The machine's own pid and cgroup namespaces, a read-only root with a
+   * tmpfs at each of `tmpfs`, and removal when it stops: the machine role's
+   * alone (`renderObserver`). Null for every other container.
+   */
+  readonly machine: { readonly tmpfs: readonly string[] } | null
 }
 
 /** A host mount as Docker's machine sees it. */
@@ -178,6 +184,7 @@ export function renderRun(
       ? [`seccomp=${input.seccomp}`, "systempaths=unconfined"]
       : ["no-new-privileges"],
     devices: nested ? ["/dev/net/tun"] : [],
+    machine: null,
   }
 }
 
@@ -255,6 +262,57 @@ export function renderHelper(
     capAdd: spec.caps.keep === "default" ? [] : spec.caps.add,
     securityOpt: ["no-new-privileges"],
     devices: [],
+    machine: null,
+  }
+}
+
+/** The machine role's container and image, by its version. */
+export const observerContainer = (version: string): string =>
+  `pinetrie-observer-${version}`
+export const observerImage = (version: string): string =>
+  `pinetrie-observer:${version}`
+
+/**
+ * What the machine role's container is granted, and nothing more: loading
+ * and reading BPF programs (`BPF`, `PERFMON`) and an lstat through a lane's
+ * first process's root (`SYS_PTRACE`), under Docker's own seccomp
+ * profile; the machine's pids and cgroups, which the loader reads; no
+ * network, no lanes directory, a read-only root.
+ */
+export const OBSERVER_GRANT = {
+  capAdd: ["BPF", "PERFMON", "SYS_PTRACE"],
+  network: "none",
+  // The kernel's ring of 64 MiB is charged to it.
+  memory: "512m",
+  tmpfs: ["/run"],
+} as const
+
+/**
+ * The machine role's container: the observer for every project and host on
+ * the machine, so it carries no project's or slot's label, and no sweep
+ * takes it. It removes itself when its server exits, once idle.
+ */
+export function renderObserver(input: {
+  readonly version: string
+  /** Its server's command, on the runtime copied into its image. */
+  readonly cmd: readonly string[]
+}): ContainerSpec {
+  return {
+    name: observerContainer(input.version),
+    hostname: null,
+    image: observerImage(input.version),
+    cmd: input.cmd,
+    workingDir: null,
+    env: [],
+    labels: {},
+    mounts: [],
+    network: OBSERVER_GRANT.network,
+    memory: OBSERVER_GRANT.memory,
+    capDrop: ["ALL"],
+    capAdd: OBSERVER_GRANT.capAdd,
+    securityOpt: ["no-new-privileges"],
+    devices: [],
+    machine: { tmpfs: OBSERVER_GRANT.tmpfs },
   }
 }
 

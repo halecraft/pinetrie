@@ -173,8 +173,6 @@ export interface LaneSpec<L extends LaneOwner = ThreadId> {
   readonly attached: LaneAttached
   readonly identity: { readonly name: string; readonly email: string }
   readonly memory: string
-  /** How the lane's tool calls are observed: its variables, carried unread. */
-  readonly observation: Readonly<Record<string, string>>
 }
 
 /**
@@ -326,7 +324,6 @@ export function planShape(
       ["JJ_EMAIL", spec.identity.email],
       ["JJ_CONFIG", LANE_JJ_CONFIG],
       ["HOME", LANE_HOME],
-      ...Object.entries(spec.observation),
       // The helper stamps its tools' accesses under the shared directories.
       [
         SHARED_ENV,

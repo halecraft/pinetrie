@@ -20,7 +20,7 @@ import {
   type LaneHandle,
   REGISTRY_FILE,
 } from "@pinetrie/lanes"
-import { drainLaneRuns, type LaneChannel, supervisorSource } from "@pinetrie/pi"
+import { drainLaneRuns, type LaneChannel } from "@pinetrie/pi"
 import {
   type ClassedWrites,
   decodeRegistry,
@@ -127,8 +127,8 @@ export async function classifyWritesOnQueue(input: {
   readonly touched: readonly SharedAccess[]
 }> {
   const { handle, shared } = input
-  const { channel } = await handle.link()
-  const drained = await drainLaneRuns(channel, supervisorSource(channel))
+  const { channel, runs } = await handle.link()
+  const drained = await drainLaneRuns(channel, runs)
   const touched = sharedAccesses(drained)
   const registry = await readRegistry(channel)
   const toClass = writesToClass({

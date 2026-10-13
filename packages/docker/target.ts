@@ -20,4 +20,10 @@ export interface DockerTarget {
    * null where there is none (Linux).
    */
   readonly hostAddress: string | null
+  /**
+   * Host paths reach Docker's machine over virtiofs (the Mac's lane VM),
+   * where only a fresh lstat reads a file's stamp as the host's: the
+   * observer reads a shared directory's that way.
+   */
+  readonly remoteHostPaths: boolean
 }
