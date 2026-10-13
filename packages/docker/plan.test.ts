@@ -346,18 +346,23 @@ test("parseMountinfo: the mount holding the directory, by its longest point", ()
 })
 
 describe("the sweeps", () => {
-  const c = (name: string, labels: Record<string, string>): Listed => ({
-    name,
-    labels,
-  })
-  test("a slot's sweep takes every container labelled with it, and no other", () => {
+  const c = (
+    name: string,
+    labels: Record<string, string>,
+    binds: readonly string[] = [],
+  ): Listed => ({ name, labels, binds })
+  test("a slot's sweep takes every container with a bind into it, whatever its labels", () => {
     expect(
-      planSlotSweep(3, [
-        c("a", { "pinetrie.slot": "3" }),
-        c("b", { "pinetrie.slot": "13" }),
-        c("pinetrie-disks", {}),
+      planSlotSweep("/mnt/host-shares/3/", [
+        c("a", { "pinetrie.slot": "3" }, ["/mnt/host-shares/3/abc"]),
+        c("extra", { "pinetrie.slot": "1" }, [
+          "/lanes/k/t",
+          "/mnt/host-shares/3/def",
+        ]),
+        c("b", { "pinetrie.slot": "13" }, ["/mnt/host-shares/13/abc"]),
+        c("labelled-only", { "pinetrie.slot": "3" }),
       ]),
-    ).toEqual(["a"])
+    ).toEqual(["a", "extra"])
   })
   test("the startup sweep takes the containers and disks of projects whose root is gone", () => {
     expect(

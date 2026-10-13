@@ -84,6 +84,18 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   replacement kept, with nothing in the guest's log (S130). Share devices
   are apart: filling or emptying one leaves the others' binds working
   (S131). A slot empties when its lease's connection ends.
+- **Extra slots, for what a host's slot lacks** (ADR-0141). When accepted
+  work names a directory no slot of the host holds, or wants read-write
+  one held read-only, the host leases one more slot (`leaseExtra`: a
+  second connection, `agent` null, never starting or retiring a VM) and
+  fills it with those directories alone (`planWidening`). Its own slot
+  always holds lanehost's running roles, so it is never refilled; nor is
+  an extra slot, and a later widening takes another. A directory is then
+  in at most two of a host's slots, one read-only and one read-write, and
+  lanes bind the read-write one (`sharePaths`). The extras last until the
+  host's next lease, which fills one slot with everything. A read-only
+  entry beside a read-write one of the same directory still refuses
+  writes, in its slot or another (S187).
 - **The limit:** 16 slots by default, `lanes.vm.slots` in the user config,
   at most 20: a VM boots with 20 share devices beside its others, and not
   24 (S131). It applies when the VM next starts. The 17th lease is refused,
@@ -163,9 +175,12 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
 `control.sock` answers), plans (`planVm`: join, start, or a refusal worded
 by `vmWords`), then starts the launcher if need be, takes a slot, and waits
 for Docker's `/_ping`. Its `Lease` is the slot, the Docker socket, `fill`
-(once, through `planShares`) and `close`. `planShares` names each entry by
-a hash of its source, so a directory has one name whatever else is shared;
-one source given twice is one entry, read-write if either is.
+(once, through `planShares`, answering the `Fill` it made) and `close`.
+`planShares` names each entry by a hash of its source, so a directory has
+one name whatever else is shared; one source given twice is one entry,
+read-write if either is. Where a source is in the VM is `sharePaths` over
+every `Fill` of the lease, and `slotRoot` is where a slot's entries are,
+for the sweep of what binds into it.
 
 ## Gotchas
 
@@ -179,10 +194,15 @@ one source given twice is one entry, read-write if either is.
   in a shared directory or any read-write share: 11 to 20 of 100 kept,
   the lane's all kept, nothing torn. Lanes of one host appending through
   their slot keep every line (S141).
-- **One Mac directory in two slots at once** loses both sides' appends,
-  tears lines, and can refuse a create through one slot of a file just
-  made through the other (S141). Nothing prevents it: two hosts sharing
-  one read-write directory would meet it.
+- **One Mac directory read-write in two slots at once** loses both sides'
+  appends, tears lines, and can refuse a create through one slot of a file
+  just made through the other (S141). A host never does it to itself
+  (`planWidening`); two hosts sharing one read-write directory would meet
+  it.
+- **One directory seen through two entries lags by about 1 s** for a
+  rename, an append or a delete made through the other, in one slot or two
+  (S178, S187): the guest caches each entry's names and sizes apart. One
+  entry bound twice shows every change at once.
 - **The VM's `T+` clock is the guest's uptime,** not the Mac's: they differ
   by the launcher's own start and the first ping, 0.15–0.5 s (S128).
 - **`setShare:` is not in the public headers:** the launcher calls it by

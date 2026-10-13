@@ -15,6 +15,9 @@
   - ADR-0104: accepted work, WIPs and publish are per branched source.
   - ADR-0105: a thread has an offer in each source it changed.
 - **Amended by:**
+  - ADR-0141: what its deferred bullet weighed now holds for what accepted
+    work adds. Registering a source while the host runs stays deferred, as do
+    your config's own shared directories: the user config is read at startup.
   - ADR-0142: a folder no repo tracks may be branched too, as a folder
     project. Live and read-only remain the modes for a folder that is not the
     project.

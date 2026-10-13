@@ -86,14 +86,23 @@ declares it (`workspace.test.ts`).
 - **`lanes.hostPorts`** in a project's `pinetrie.json` lists ports of the
   Mac's loopback its lanes may reach, at `gvproxy`'s host address
   (`192.168.127.254`). The host writes them into the VM's firewall at its
-  start (`grantHostPorts`): a chain per project (`PT-<key>`), jumped to
+  start, and again each time accepted work changes them (ADR-0141), before
+  the new config is in force (`grantHostPorts`): a chain per project
+  (`PT-<key>`), jumped to
   from `DOCKER-USER` for the project's subnet, above the init's fence,
   replacing its earlier rules. Lanehost's privileged role writes them, on
   the VM's own network with `NET_ADMIN` (`packages/lanehost/grants.ts`): the
   host, which holds Docker's socket, may; a lane never can. A lane is told
   the address and ports (`PINETRIE_HOST`,
-  `PINETRIE_HOST_PORTS`). The host's own port is refused: on loopback it
-  takes no key (`planHostPortGrant`).
+  `PINETRIE_HOST_PORTS`), which a running lane keeps as it started. The
+  host's own port is refused: on loopback it takes no key
+  (`planShareAndGrant`, in the host's `work/runtime.ts`).
+- **A port taken out of the grant does not end a connection open on it**
+  (S189): what the lane sends on it stops within 40 ms, and new
+  connections are refused, but the fence matches only the lane's packets
+  to the Mac's loopback, so the Mac's side goes on reaching the lane, and
+  the connection carries on, losing nothing, if the port is granted
+  again. It lasts until the lane's TCP gives up its retries.
 - **On Linux the grant applies to nothing:** a lane reaches the host's
   services bound to all interfaces at Docker's bridge gateway, and never
   its loopback. The host says so once.
@@ -119,10 +128,13 @@ never reaches the VM's Docker or the launcher's ports.
 
 ## The sweeps
 
-- **Before a slot is filled:** every container labelled with it
-  (`sweepSlot`). They belong to a host that died holding the slot, and
-  filling it would cut their mounts, or show them the new host's
-  directories (S130).
+- **Before a slot is filled:** every container of any project with a bind
+  into it (`sweepSlot`, given the slot's root in the VM: Docker knows no
+  slot layout). They belong to a host that died holding the slot, its own
+  or an extra one, and filling it would cut their mounts, or show them the
+  new host's directories (S130). Read from each container's binds
+  (`Mounts`), not a label: a container's labels name only its host's first
+  slot, and `SLOT_LABEL` serves to name lanehost's containers.
 - **At startup, once the slot is filled:** the containers and disks of every
   project whose root is gone (`sweepProjects`), as the suites' throwaway
   projects are.

@@ -425,22 +425,25 @@ export function dockerWords(r: DockerRefusal): string {
   }
 }
 
-/** A container as `docker ps` lists it: its name and labels. */
+/** A container as `docker ps` lists it: its name, labels and bind sources. */
 export interface Listed {
   readonly name: string
   readonly labels: Readonly<Record<string, string>>
+  readonly binds: readonly string[]
 }
 
 /**
- * Before a slot is filled: every container labelled with it. They belong to
- * a host that died holding the slot, and filling it would cut their mounts
- * or show them the new host's directories.
+ * Before a slot is filled: every container with a bind under `root`, the
+ * slot's place in Docker's machine. They belong to a host that died holding
+ * the slot, its own or an extra one, and filling it would cut their mounts or
+ * show them the new host's directories. Read from the binds, not a label: a
+ * container's labels say only the slot its host held first.
  */
 export const planSlotSweep = (
-  slot: number,
+  root: string,
   containers: readonly Listed[],
 ): readonly string[] =>
-  containers.filter(c => c.labels[SLOT_LABEL] === String(slot)).map(c => c.name)
+  containers.filter(c => c.binds.some(b => b.startsWith(root))).map(c => c.name)
 
 /**
  * At startup: the containers and disks of every project whose root is gone,

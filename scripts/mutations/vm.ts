@@ -6,6 +6,22 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/vm"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a directory held read-only stays so when wanted read-write",
+    file: "packages/vm/plan.ts",
+    from: "        !held.some(h => h.source === w.source && (w.readOnly || !h.readOnly)),",
+    to: "        !held.some(h => h.source === w.source),",
+    command: unit,
+    expect: "a directory held read-only, now wanted read-write",
+  },
+  {
+    name: "a source in two fills is taken from the newest",
+    file: "packages/vm/plan.ts",
+    from: "      if (held === undefined || (held.entry.readOnly && !entry.readOnly))",
+    to: "      if (true)",
+    command: unit,
+    expect: "a source in two fills is taken from the one holding it read-write",
+  },
+  {
     name: "the image's key ignores its scripts",
     file: "packages/vm/plan.ts",
     from: "  for (const name of IMAGE_FILES) hash.update(",

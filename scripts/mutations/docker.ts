@@ -57,8 +57,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "(Mac) the slot shares every directory read-write",
     file: "packages/vm/plan.ts",
-    from: "    .map(([source, ro]) => ({ name: nameOf(source), source, readOnly: ro }))",
-    to: "    .map(([source]) => ({ name: nameOf(source), source, readOnly: false }))",
+    from: "    .map(([source, ro]) => ({ name: entryName(source), source, readOnly: ro }))",
+    to: "    .map(([source]) => ({ name: entryName(source), source, readOnly: false }))",
     suite: "lanes",
     scenario: "contract",
     expect:
@@ -185,11 +185,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a slot's sweep takes containers of other slots",
     file: plan,
-    from: "c.labels[SLOT_LABEL] === String(slot)",
-    to: "c.labels[SLOT_LABEL] !== undefined",
+    from: ".filter(c => c.binds.some(b => b.startsWith(root)))",
+    to: ".filter(c => c.binds.length > 0)",
     command: unit("packages/docker"),
     expect:
-      "a slot's sweep takes every container labelled with it, and no other",
+      "a slot's sweep takes every container with a bind into it, whatever its labels",
   },
   {
     name: "the startup sweep takes a live project's containers",
@@ -320,10 +320,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane is granted the host's own port",
     file: "apps/pinetrie/host/work/runtime.ts",
-    from: "  return { grant: ports.filter(p => p !== ownPort), refused }",
-    to: "  return { grant: ports, refused }",
+    from: "    grant: changed ? wanted.hostPorts.filter(p => p !== ownPort) : null,",
+    to: "    grant: changed ? wanted.hostPorts : null,",
     command: unit("apps/pinetrie/host/work/runtime.test.ts"),
-    expect: "planHostPortGrant: the granted ports, but the host's own",
+    expect: "the host's own port is never granted, and is said with why",
   },
   {
     name: "lanehost's privileged role writes the lanes directory",

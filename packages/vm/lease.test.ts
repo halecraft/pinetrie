@@ -8,7 +8,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { createInterface } from "node:readline"
 import { afterEach, expect, test } from "vitest"
-import { connect, leaseOn } from "./lease.ts"
+import { connect, leaseExtra, leaseOn } from "./lease.ts"
 import {
   decodeToLauncher,
   encode,
@@ -88,11 +88,12 @@ test("a lease: a slot, then one fill with the slot's entries, then the end frees
   if (socket === null) throw new Error("no stand-in")
   const lease = await leaseOn(socket, { agent: "/a.sock", log })
   expect(lease.slot).toBe(2)
-  const { pathOf } = await lease.fill([
+  const filled = await lease.fill([
     { source: "/p", readOnly: true },
     { source: "/p/.plans", readOnly: false },
   ])
-  expect(pathOf("/p")).toMatch(/^\/mnt\/host-shares\/2\/[0-9a-f]{16}$/)
+  expect(filled.slot).toBe(2)
+  expect(filled.entries.map(e => e.source).sort()).toEqual(["/p", "/p/.plans"])
   await expect(lease.fill([])).rejects.toThrow("a slot is filled once")
   expect(l.seen[0]).toEqual({ kind: "lease", agent: "/a.sock" })
   expect(l.seen[1]).toMatchObject({ kind: "fill" })
@@ -168,4 +169,40 @@ test("a launcher that never answers fails the lease in time, naming what it wait
   await expect(
     leaseOn(socket, { agent: null, log, replyMs: 100 }),
   ).rejects.toThrow("did not answer a lease in 0.1 s")
+})
+
+test("an extra lease: another slot of the same launcher, filled with only what it is given", async () => {
+  let next = 0
+  const l = await standIn(m =>
+    m.kind === "lease" ? slotReply(next++) : { kind: "filled" },
+  )
+  const socket = await connect(l.control)
+  if (socket === null) throw new Error("no stand-in")
+  const host = await leaseOn(socket, { agent: "/a.sock", log })
+  await host.fill([{ source: "/p", readOnly: true }])
+  const stateDir = path.dirname(l.control)
+  const extra = await leaseExtra({ stateDir, host, log })
+  expect(extra.slot).toBe(1)
+  const filled = await extra.fill([{ source: "/p/docs", readOnly: false }])
+  expect(filled).toMatchObject({ slot: 1 })
+  expect(filled.entries.map(e => [e.source, e.readOnly])).toEqual([
+    ["/p/docs", false],
+  ])
+  expect(l.seen[2]).toEqual({ kind: "lease", agent: null })
+  await extra.close()
+  await host.close()
+})
+
+test("an extra lease is refused once the host's lease has ended", async () => {
+  const l = await standIn(m =>
+    m.kind === "lease" ? slotReply(0) : { kind: "filled" },
+  )
+  await expect(
+    leaseExtra({
+      stateDir: path.dirname(l.control),
+      host: { ended: Promise.resolve() },
+      log,
+    }),
+  ).rejects.toThrow("this host's lease on the lane VM has ended")
+  expect(l.seen).toEqual([])
 })

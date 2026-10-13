@@ -1,7 +1,7 @@
 # S140 — A host's slot can be refilled once none of its lanes runs, and a new source then reaches every lane; a second slot beside it shares files at once but loses appends
 
 - **Status:** Answered
-- **Led to:** ADR-0118
+- **Led to:** ADR-0118, ADR-0141
 
 Follows S130 and S131. For ADR-0118.
 

@@ -2,13 +2,18 @@ import { execFileSync } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { planShares } from "@pinetrie/vm"
 import { describe, expect, test } from "vitest"
 import {
   BUILDER_WORDS,
   findProject,
+  NO_SHARES,
   planBuilder,
-  planHostPortGrant,
   planRuntime,
+  planShareAndGrant,
+  type Shares,
+  sharesWords,
+  type Wanted,
 } from "./runtime.ts"
 
 describe("planBuilder: the first Docker found builds the VM's image", () => {
@@ -117,15 +122,122 @@ describe.skipIf(process.platform === "darwin")(
   },
 )
 
-test("planHostPortGrant: the granted ports, but the host's own, refused with why", () => {
-  expect(planHostPortGrant([3000, 7391], 7391)).toEqual({
-    grant: [3000],
-    refused: [
-      "lanes.hostPorts 7391 is not granted: it is this pine·trie host's own port, which takes no key on loopback",
-    ],
+describe("planShareAndGrant: what lanes may mount and reach, shared and granted", () => {
+  const mount = (source: string, readonly = true) => ({
+    source,
+    target: `/in${source}`,
+    readonly,
   })
-  expect(planHostPortGrant([3000, 7391], null)).toEqual({
-    grant: [3000, 7391],
-    refused: [],
+  const wanted: Wanted = {
+    mounts: [mount("/p"), mount("/p/.plans", false)],
+    hostPorts: [3000],
+  }
+  /** What the host holds after the plan for `w` was carried out. */
+  const after = (w: Wanted, granted: readonly number[] = []): Shares => ({
+    ...NO_SHARES,
+    fills: [
+      {
+        slot: 0,
+        entries: planShares(
+          w.mounts.map(m => ({ source: m.source, readOnly: m.readonly })),
+        ),
+      },
+    ],
+    granted,
+  })
+  test("first, the host's own slot, with every directory", () => {
+    expect(planShareAndGrant(NO_SHARES, wanted, null, true)).toEqual({
+      fill: {
+        into: "host",
+        dirs: [
+          { source: "/p", readOnly: true },
+          { source: "/p/.plans", readOnly: false },
+        ],
+      },
+      grant: [3000],
+      words: [],
+    })
+  })
+  test("unchanged, nothing: no slot, no grant, no words", () => {
+    expect(
+      planShareAndGrant(after(wanted, [3000]), wanted, null, true),
+    ).toEqual({ fill: null, grant: null, words: [] })
+  })
+  test("a new directory goes in an extra slot, alone", () => {
+    const more = {
+      ...wanted,
+      mounts: [...wanted.mounts, mount("/p/docs", false)],
+    }
+    expect(
+      planShareAndGrant(after(wanted, [3000]), more, null, true).fill,
+    ).toEqual({
+      into: "extra",
+      dirs: [{ source: "/p/docs", readOnly: false }],
+    })
+  })
+  test("a widening refused is not asked again until what is new changes", () => {
+    const more = {
+      ...wanted,
+      mounts: [...wanted.mounts, mount("/p/docs", false)],
+    }
+    const refused: Shares = {
+      ...after(wanted, [3000]),
+      refused: { dirs: [{ source: "/p/docs", readOnly: false }], why: "full" },
+    }
+    expect(planShareAndGrant(refused, more, null, true).fill).toBeNull()
+    const other = {
+      ...more,
+      mounts: [...more.mounts, mount("/p/notes", false)],
+    }
+    const fill = planShareAndGrant(refused, other, null, true).fill
+    expect(fill?.into).toBe("extra")
+    expect(fill?.dirs.map(d => d.source).sort()).toEqual([
+      "/p/docs",
+      "/p/notes",
+    ])
+  })
+  test("ports are written when they changed, and on a lease with none written", () => {
+    const held = after(wanted, [3000])
+    expect(
+      planShareAndGrant(
+        held,
+        { ...wanted, hostPorts: [3000, 5432] },
+        null,
+        true,
+      ).grant,
+    ).toEqual([3000, 5432])
+    expect(
+      planShareAndGrant(held, { ...wanted, hostPorts: [] }, null, true).grant,
+    ).toEqual([])
+    expect(
+      planShareAndGrant({ ...held, granted: null }, wanted, null, true).grant,
+    ).toEqual([3000])
+  })
+  test("the host's own port is never granted, and is said with why", () => {
+    const plan = planShareAndGrant(
+      after(wanted, [3000]),
+      { ...wanted, hostPorts: [3000, 7391] },
+      7391,
+      true,
+    )
+    expect(plan.grant).toEqual([3000])
+    expect(plan.words.map(sharesWords)).toEqual([
+      "lanes.hostPorts 7391 is not granted: it is this pine·trie host's own port, which takes no key on loopback",
+    ])
+  })
+  test("on Linux nothing is shared or granted, and the ports are said once", () => {
+    expect(planShareAndGrant(NO_SHARES, wanted, null, false)).toEqual({
+      fill: null,
+      grant: null,
+      words: [{ kind: "linux-ports" }],
+    })
+    expect(
+      planShareAndGrant(
+        { ...NO_SHARES, toldLinuxPorts: true },
+        wanted,
+        null,
+        false,
+      ).words,
+    ).toEqual([])
   })
 })

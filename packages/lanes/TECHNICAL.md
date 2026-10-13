@@ -320,6 +320,13 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 - **Ownership and visibility.** The lane runs as root, but what it writes
   there arrives on the host owned by you. Changes are visible at once
   between the host and every lane (S45 items 2 and 3).
+- **On the Mac, the working copy's read-only view of a shared directory
+  lags** (`/mnt/host-working-copy/.plans` beside `/workspace/.plans`): a
+  rename, an append or a delete made through one shows through the other
+  about 1 s late, since the VM sees them as two entries (S178, S187). New
+  files and rewrites show at once. A lane made before a directory it reads
+  read-only was widened to read-write reads it so, with the same lag,
+  until its next start.
 - **Two levels, merged:** the user's lane config
   (`$XDG_CONFIG_HOME/pinetrie/config.json`, only its `lanes.shared`), then the
   project's `pinetrie.json` as accepted work holds it, narrowed per lane
@@ -396,13 +403,15 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   ignore file's directory, links, grants, shared directories and granted
   host paths, in a `ContainerShape`. A runtime renders each, and does not
   know what a mount is for.
-- **On the Mac, a host's slot holds every directory any of its lanes
+- **On the Mac, a host's slots hold every directory any of its lanes
   mounts** (`slotMounts`): the base lane's mounts, every shared directory
   accepted work and your config allow, and what ssh attaches. The base
   lane's spec carries no shared directory, so they are added there: a lane
-  mounting one the slot lacks cannot be made. The slot is filled once per
-  lease, so a shared directory accepted work adds later reaches lanes at
-  the host's next start.
+  mounting one no slot holds cannot be made. A slot is filled once, so
+  what accepted work adds later goes in a slot of its own before the new
+  config is in force, and reaches lanes at their next start (ADR-0141).
+  Your config's own shared directories are read at startup, and change
+  with a restart.
 - **A handle's link is opened again after it fails or its helper exits**
   (`laneHandle`): it never keeps a dead channel, so the next call after a
   helper dies opens a new one.

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest"
 import {
+  type Fill,
   IMAGE_FILES,
   type ImageSources,
   imageDir,
@@ -9,6 +10,10 @@ import {
   planShares,
   planVm,
   planVmVersion,
+  planWidening,
+  type ShareDir,
+  sharePaths,
+  slotRoot,
   staleVmWords,
   type VmFacts,
   vmMemory,
@@ -76,26 +81,19 @@ test("vmMemory: a quarter of the Mac's, between 4 and 16 GiB", () => {
   expect(vmMemory(128 * GiB)).toBe(16 * GiB)
 })
 
-describe("planShares: a slot's entries, and where each source is in the VM", () => {
+describe("planShares: a slot's entries", () => {
   const dirs = [
     { source: "/p", readOnly: true },
     { source: "/p/.plans", readOnly: false },
     { source: "/opt/pinetrie", readOnly: true },
   ]
   test("named by a hash of the source, the same whatever the order", () => {
-    const a = planShares(3, dirs)
-    const b = planShares(3, [...dirs].reverse())
-    expect(a.entries).toEqual(b.entries)
-    for (const e of a.entries) expect(e.name).toMatch(/^[0-9a-f]{16}$/)
-    expect(a.pathOf("/p")).toBe(
-      `/mnt/host-shares/3/${a.entries.find(e => e.source === "/p")?.name}`,
-    )
-    expect(planShares(5, dirs).pathOf("/p")).toBe(
-      a.pathOf("/p").replace("/3/", "/5/"),
-    )
+    const a = planShares(dirs)
+    expect(a).toEqual(planShares([...dirs].reverse()))
+    for (const e of a) expect(e.name).toMatch(/^[0-9a-f]{16}$/)
   })
   test("one entry per source, read-write if either is", () => {
-    const { entries } = planShares(0, [
+    const entries = planShares([
       { source: "/x", readOnly: true },
       { source: "/x", readOnly: false },
       { source: "/y", readOnly: true },
@@ -105,16 +103,78 @@ describe("planShares: a slot's entries, and where each source is in the VM", () 
       ["/y", true],
     ])
     expect(
-      planShares(0, [
+      planShares([
         { source: "/x", readOnly: false },
         { source: "/x", readOnly: true },
-      ]).entries.map(e => e.readOnly),
+      ]).map(e => e.readOnly),
     ).toEqual([false])
   })
-  test("a path that is not a source is never mapped", () => {
-    expect(() => planShares(0, dirs).pathOf("/etc")).toThrow(
-      "/etc is not shared into slot 0",
-    )
+})
+
+describe("sharePaths: where each source is in the VM, across a host's fills", () => {
+  const fill = (slot: number, dirs: readonly ShareDir[]): Fill => ({
+    slot,
+    entries: planShares(dirs),
+  })
+  const name = (source: string) =>
+    planShares([{ source, readOnly: true }])[0]?.name
+  test("a source is at its slot's root, under its entry's name", () => {
+    const at = sharePaths([fill(3, [{ source: "/p", readOnly: true }])])
+    expect(at("/p")).toBe(`/mnt/host-shares/3/${name("/p")}`)
+    expect(slotRoot(3)).toBe("/mnt/host-shares/3/")
+  })
+  test("a source in two fills is taken from the one holding it read-write", () => {
+    const ro = fill(1, [{ source: "/g", readOnly: true }])
+    const rw = fill(4, [{ source: "/g", readOnly: false }])
+    expect(sharePaths([ro, rw])("/g")).toBe(`/mnt/host-shares/4/${name("/g")}`)
+    expect(sharePaths([rw, ro])("/g")).toBe(`/mnt/host-shares/4/${name("/g")}`)
+  })
+  test("a path no fill holds is never mapped", () => {
+    expect(() =>
+      sharePaths([fill(0, [{ source: "/p", readOnly: true }])])("/etc"),
+    ).toThrow("/etc is not shared into this host's slots")
+  })
+})
+
+describe("planWidening: what a new slot must share", () => {
+  const fills: Fill[] = [
+    {
+      slot: 0,
+      entries: planShares([
+        { source: "/p", readOnly: true },
+        { source: "/p/.plans", readOnly: false },
+        { source: "/g", readOnly: true },
+      ]),
+    },
+  ]
+  test("nothing, when every wanted directory is held as wanted", () => {
+    expect(
+      planWidening(fills, [
+        { source: "/p", readOnly: true },
+        { source: "/p/.plans", readOnly: false },
+      ]),
+    ).toEqual([])
+  })
+  test("a directory no fill holds", () => {
+    expect(
+      planWidening(fills, [
+        { source: "/p", readOnly: true },
+        { source: "/p/docs", readOnly: false },
+      ]),
+    ).toEqual([{ source: "/p/docs", readOnly: false }])
+  })
+  test("a directory held read-only, now wanted read-write", () => {
+    expect(planWidening(fills, [{ source: "/g", readOnly: false }])).toEqual([
+      { source: "/g", readOnly: false },
+    ])
+  })
+  test("a directory held read-write, wanted read-only: nothing", () => {
+    expect(
+      planWidening(fills, [{ source: "/p/.plans", readOnly: true }]),
+    ).toEqual([])
+  })
+  test("a directory no longer wanted: nothing", () => {
+    expect(planWidening(fills, [])).toEqual([])
   })
 })
 

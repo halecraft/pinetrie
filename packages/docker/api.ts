@@ -263,15 +263,24 @@ export async function listLabelled(
     "GET",
     `/containers/json?all=true&filters=${filters}`,
   )
-  if (!ok(answered)) return []
+  return ok(answered) ? parseListed(answered.body) : []
+}
+
+/** The API's container list as `Listed`; an answer that is not one lists nothing. */
+export function parseListed(body: string): readonly Listed[] {
   try {
-    const rows = JSON.parse(answered.body) as {
+    const rows = JSON.parse(body) as {
       Names?: string[]
       Labels?: Record<string, string> | null
+      Mounts?: { Source?: string }[] | null
     }[]
     return rows.flatMap(r => {
       const name = r.Names?.[0]?.replace(/^\//, "")
-      return name === undefined ? [] : [{ name, labels: r.Labels ?? {} }]
+      if (name === undefined) return []
+      const binds = (r.Mounts ?? []).flatMap(m =>
+        typeof m.Source === "string" ? [m.Source] : [],
+      )
+      return [{ name, labels: r.Labels ?? {}, binds }]
     })
   } catch {
     return []

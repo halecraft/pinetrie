@@ -21,11 +21,13 @@ export { buildLauncher, gatherLauncher, launcherName } from "./launcher.ts"
 export {
   type Lease,
   launcherWords,
+  leaseExtra,
   leaseVm,
   VmRefused,
   vmProblem,
 } from "./lease.ts"
 export {
+  type Fill,
   GVPROXY_HOST_ADDRESS,
   IMAGE_FILES,
   IMAGE_OUTPUTS,
@@ -37,7 +39,11 @@ export {
   planShares,
   planVm,
   planVmVersion,
+  planWidening,
   SHARES_ROOT,
+  type ShareDir,
+  sharePaths,
+  slotRoot,
   staleVmWords,
   type VmFacts,
   type VmPlan,

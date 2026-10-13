@@ -220,10 +220,9 @@ const sharedMounts = (shared: readonly SharedDir[]): readonly Mount[] =>
 
 /**
  * Every host directory a lane of this host may mount, as the Mac's lane VM
- * shares them into its slot once, at its lease: the base lane's mounts,
- * which carry no shared directory, every shared directory any lane may
- * mount, and what a lane's ssh attaches. A lane that mounts one left out
- * cannot be made.
+ * shares them into its slots: the base lane's mounts, which carry no shared
+ * directory, every shared directory any lane may mount, and what a lane's
+ * ssh attaches. A lane that mounts one left out cannot be made.
  */
 export const slotMounts = (input: {
   readonly base: readonly Mount[]

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { createBody, memoryBytes } from "./api.ts"
+import { createBody, memoryBytes, parseListed } from "./api.ts"
 import { type ContainerSpec, renderObserver } from "./plan.ts"
 
 const spec: ContainerSpec = {
@@ -94,5 +94,32 @@ test("the machine role's container is made with its grant and nothing more", () 
       AutoRemove: true,
       Tmpfs: { "/run": "" },
     },
+  })
+})
+
+describe("parseListed: the API's container list", () => {
+  test("each container's name, labels and bind sources", () => {
+    const body = JSON.stringify([
+      {
+        Names: ["/pinetrie-t-1"],
+        Labels: { "pinetrie.project": "k" },
+        Mounts: [
+          { Type: "bind", Source: "/mnt/host-shares/2/abc", Destination: "/h" },
+          { Type: "bind", Source: "/l/t", Destination: "/workspace" },
+        ],
+      },
+      { Names: ["/bare"], Labels: null, Mounts: null },
+    ])
+    expect(parseListed(body)).toEqual([
+      {
+        name: "pinetrie-t-1",
+        labels: { "pinetrie.project": "k" },
+        binds: ["/mnt/host-shares/2/abc", "/l/t"],
+      },
+      { name: "bare", labels: {}, binds: [] },
+    ])
+  })
+  test("an answer that is not a list lists nothing", () => {
+    expect(parseListed("not json")).toEqual([])
   })
 })

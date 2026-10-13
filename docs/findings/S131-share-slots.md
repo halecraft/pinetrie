@@ -1,7 +1,7 @@
 # S131 — Share devices are apart: replacing one leaves bind mounts into the others working; a VM boots with 20 of them, and they cost almost nothing
 
 - **Status:** Answered
-- **Led to:** ADR-0103, ADR-0118, ADR-0130
+- **Led to:** ADR-0103, ADR-0118, ADR-0130, ADR-0141
 
 Follows S130.
 

@@ -88,8 +88,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "your home directory is a lane's working copy",
     file: "apps/pinetrie/host/work/setup.ts",
-    from: "        hostWorkingCopy: root,",
-    to: "        hostWorkingCopy: homedir(),",
+    from: "      hostWorkingCopy: root,",
+    to: "      hostWorkingCopy: homedir(),",
     suite: "lanes",
     scenario: "main",
     expect:
@@ -98,8 +98,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "no lane mounts the shared directories",
     file: "apps/pinetrie/host/work/setup.ts",
-    from: "        shared: own === null ? [] : configs.laneShared(own),",
-    to: "        shared: [],",
+    from: "        own === null ? [] : configs.laneShared(own),",
+    to: "        [],",
     suite: "lanes",
     scenario: "shared",
     expect: "another lane reads it",

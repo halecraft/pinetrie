@@ -5,6 +5,39 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "accepted work's config read again is in force before it is shared",
+    file: "apps/pinetrie/host/work/config.ts",
+    from: "    readAccepted,\n    takeAccepted(next) {",
+    to: "    readAccepted: async () => {\n      accepted = await readAccepted()\n      return accepted\n    },\n    takeAccepted(next) {",
+    command: unit,
+    expect:
+      "accepted work's config read again is not in force until it is taken",
+  },
+  {
+    name: "an extra slot is leased whatever was given",
+    file: "apps/pinetrie/host/work/runtime.ts",
+    from: "      : widening.length > 0 &&",
+    to: "      : true &&",
+    command: unit,
+    expect: "unchanged, nothing: no slot, no grant, no words",
+  },
+  {
+    name: "a widening refused is asked again at once",
+    file: "apps/pinetrie/host/work/runtime.ts",
+    from: "          !(shares.refused !== null && sameDirs(shares.refused.dirs, widening))",
+    to: "          true",
+    command: unit,
+    expect: "a widening refused is not asked again until what is new changes",
+  },
+  {
+    name: "the ports are granted whatever was granted before",
+    file: "apps/pinetrie/host/work/runtime.ts",
+    from: "    shares.granted === null ||",
+    to: "    true ||",
+    command: unit,
+    expect: "unchanged, nothing: no slot, no grant, no words",
+  },
+  {
     name: "a thread opened before its lane draws no banner",
     file: "apps/pinetrie/host/names.ts",
     from: '        if (plan.kind === "known") deps.onNamed(lane)\n',

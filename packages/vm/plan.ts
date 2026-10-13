@@ -2,6 +2,7 @@
 
 import { createHash } from "node:crypto"
 import path from "node:path"
+import type { ShareEntry } from "./protocol.ts"
 
 /** The files in `image/` the build reads. Each is part of the image's identity. */
 export const IMAGE_FILES = [
@@ -85,40 +86,77 @@ export const GVPROXY_HOST_ADDRESS = "192.168.127.254"
 /** Where a slot's directories are in the VM. */
 export const SHARES_ROOT = "/mnt/host-shares"
 
+/** A host directory lanes may mount, and whether they may write it. */
+export interface ShareDir {
+  readonly source: string
+  readonly readOnly: boolean
+}
+
+/** One slot's share, as it was filled. */
+export interface Fill {
+  readonly slot: number
+  readonly entries: readonly ShareEntry[]
+}
+
+const entryName = (source: string) =>
+  createHash("sha256").update(source).digest("hex").slice(0, 16)
+
 /**
- * A slot's share entries, and where each host path is in the VM. Each entry
- * is named by a hash of its source, so a directory has one name whatever else
- * is shared; one source given twice is one entry, read-write if either is.
- * `pathOf` throws for a path that is not a source: a lane binding outside its
- * host's slot would see nothing the host gave it.
+ * A slot's share entries. Each entry is named by a hash of its source, so a
+ * directory has one name whatever else is shared; one source given twice is
+ * one entry, read-write if either is.
  */
-export function planShares(
-  slot: number,
-  dirs: readonly { readonly source: string; readonly readOnly: boolean }[],
-): {
-  readonly entries: readonly {
-    readonly name: string
-    readonly source: string
-    readonly readOnly: boolean
-  }[]
-  readonly pathOf: (source: string) => string
-} {
+export function planShares(dirs: readonly ShareDir[]): readonly ShareEntry[] {
   const readOnly = new Map<string, boolean>()
   for (const d of dirs)
     readOnly.set(d.source, (readOnly.get(d.source) ?? true) && d.readOnly)
-  const nameOf = (source: string) =>
-    createHash("sha256").update(source).digest("hex").slice(0, 16)
-  const entries = [...readOnly]
-    .map(([source, ro]) => ({ name: nameOf(source), source, readOnly: ro }))
+  return [...readOnly]
+    .map(([source, ro]) => ({ name: entryName(source), source, readOnly: ro }))
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
-  return {
-    entries,
-    pathOf: source => {
-      if (!readOnly.has(source))
-        throw new Error(`${source} is not shared into slot ${slot}`)
-      return `${SHARES_ROOT}/${slot}/${nameOf(source)}`
-    },
+}
+
+/** Where a slot's entries are in the VM, for the sweep of its binds. */
+export const slotRoot = (slot: number): string => `${SHARES_ROOT}/${slot}/`
+
+/**
+ * Where each source is in the VM, across a host's fills: the fill that holds
+ * it read-write if there is one. `planWidening` keeps a source in at most two
+ * fills, one read-only and one read-write. Throws for a path no fill holds: a
+ * lane binding outside its host's slots would see nothing the host gave it.
+ */
+export function sharePaths(fills: readonly Fill[]): (source: string) => string {
+  const at = new Map<string, { slot: number; entry: ShareEntry }>()
+  for (const fill of fills)
+    for (const entry of fill.entries) {
+      const held = at.get(entry.source)
+      if (held === undefined || (held.entry.readOnly && !entry.readOnly))
+        at.set(entry.source, { slot: fill.slot, entry })
+    }
+  return source => {
+    const held = at.get(source)
+    if (held === undefined)
+      throw new Error(`${source} is not shared into this host's slots`)
+    return `${slotRoot(held.slot)}${held.entry.name}`
   }
+}
+
+/**
+ * The directories a new slot must share for `wanted`: those no fill holds,
+ * and those wanted read-write that no fill holds read-write. A read-only
+ * entry is never replaced: refilling a slot cuts every bind into it, and one
+ * directory read-write in two slots loses appends.
+ */
+export function planWidening(
+  fills: readonly Fill[],
+  wanted: readonly ShareDir[],
+): readonly ShareDir[] {
+  const held = fills.flatMap(f => f.entries)
+  return planShares(wanted)
+    .filter(
+      w =>
+        !held.some(h => h.source === w.source && (w.readOnly || !h.readOnly)),
+    )
+    .map(({ source, readOnly }) => ({ source, readOnly }))
 }
 
 /** What decides whether a host starts the VM, joins it, or cannot. */

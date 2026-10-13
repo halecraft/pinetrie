@@ -56,8 +56,14 @@ export interface AcceptedLanes {
 export interface LaneConfigs {
   /** Accepted work's now. */
   accepted(): AcceptedLanes
-  /** Read accepted work's again, after it moved; says what changed. */
-  refreshAccepted(): Promise<void>
+  /**
+   * Accepted work's, read again after it moved, not yet in force: what its
+   * lanes may mount is shared before any lane can read it. Not pure: it
+   * prepares the shared directories (`prepareShared`).
+   */
+  readAccepted(): Promise<AcceptedLanes>
+  /** Put `next` in force; says what changed, and tells `onShared`'s listeners. */
+  takeAccepted(next: AcceptedLanes): void
   /** Called with the shared directories each time accepted work's change them. */
   onShared(listener: (shared: readonly SharedDir[]) => void): void
   /**
@@ -143,8 +149,8 @@ export async function startLaneConfigs(input: {
 
   return {
     accepted: () => accepted,
-    async refreshAccepted() {
-      const next = await readAccepted()
+    readAccepted,
+    takeAccepted(next) {
       const before = describe(accepted).join("\n")
       const sharedBefore = accepted.shared.map(d => d.path).join("\n")
       accepted = next

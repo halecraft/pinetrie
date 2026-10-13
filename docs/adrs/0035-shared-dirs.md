@@ -17,6 +17,8 @@
   - ADR-0140: the user config's `lanes.ssh` sets the person's own identity
     (`personal`, `hosts`, `approvalSeconds`), and its `owner` names who
     approves.
+  - ADR-0141: on the Mac, a shared directory accepted work adds while the host
+    runs reaches lanes at their next start, as on Linux.
 
 **Context.** ADR-0034 gives each lane its own disk, and a branch clones it.
 That is right for a project's files, and wrong for the person's own working

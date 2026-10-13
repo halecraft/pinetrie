@@ -15,6 +15,9 @@
   - ADR-0135: a change to `pinetrie.json` that widens what a lane may do or
     share takes effect only from accepted work; a lane's own copy can only
     narrow it.
+  - ADR-0141: a change to what lanes mount or reach no longer means restarting
+    the host. What accepted work adds goes in an extra slot of the lane VM,
+    and its ports are written again; the host's own slot is still filled once.
 
 Restates ADR-0103 as amended by ADR-0118 and its revisions of 2026-10-07;
 decides nothing new. ADR-0103's changes to ADR-0034, ADR-0035 and ADR-0046

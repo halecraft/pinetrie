@@ -1,7 +1,7 @@
 # S141 — Lanes appending to one file through one slot keep every line; the Mac and a lane appending at once lose most of the Mac's; two slots lose both and refuse creates
 
 - **Status:** Answered
-- **Led to:** ADR-0116, ADR-0118
+- **Led to:** ADR-0116, ADR-0118, ADR-0141
 
 Follows S140.
 

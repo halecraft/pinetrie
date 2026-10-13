@@ -38,6 +38,7 @@ import {
   refreshBase,
   repoConfig,
   revsetName,
+  type SharedDir,
   slotMounts,
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
@@ -46,9 +47,13 @@ import { decodeOwner } from "@pinetrie/rules"
 import { type Basics, failed, slow } from "../basics.ts"
 import type { Records } from "../records.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
-import { type LaneConfigs, startLaneConfigs } from "./config.ts"
+import {
+  type AcceptedLanes,
+  type LaneConfigs,
+  startLaneConfigs,
+} from "./config.ts"
 import { openLinkOf } from "./registry.ts"
-import type { Found } from "./runtime.ts"
+import type { Found, Wanted } from "./runtime.ts"
 import { type LaneSsh, type PersonalSshPlaces, startLaneSsh } from "./ssh.ts"
 
 /** A running lane's memory ceiling. */
@@ -148,7 +153,7 @@ export async function startSetup(input: {
   const { basics, keeper, found } = input
   const { log } = basics
   if (found === null) return null
-  const { runtime } = found
+  const { runtime, shareAndGrant } = found
   const { root } = found.project
   const project: ProjectRecord = {
     root,
@@ -216,6 +221,38 @@ export async function startSetup(input: {
     log(`[host] ${r.path} is not readable in lanes: ${r.reason}`)
   const hostPaths = hostMounts.mounts
 
+  // The runtime's and the ignore file's directories are parameters, not
+  // derived from the project root: a project's may lie outside it.
+  const mountsFor = (
+    r: Ready,
+    grants: readonly Mount[],
+    shared: readonly SharedDir[],
+    withHostPaths: boolean,
+  ): readonly Mount[] =>
+    planMounts({
+      hostWorkingCopy: root,
+      pinetrie: PINETRIE_INSTALL,
+      runtime: r.runtime,
+      ignoreDir: pinetrieDir(root).laneGit,
+      links: r.links,
+      grants,
+      shared,
+      hostPaths: withHostPaths ? hostPaths : [],
+    })
+
+  /**
+   * What lanes of this host may mount and reach under `accepted`: on the Mac
+   * every directory is shared into a slot before any lane names it.
+   */
+  const wantedFor = (r: Ready, accepted: AcceptedLanes): Wanted => ({
+    mounts: slotMounts({
+      base: mountsFor(r, accepted.authority.grants.mounts, [], true),
+      shared: accepted.shared,
+      attached: ssh.mounts,
+    }),
+    hostPorts: accepted.authority.grants.hostPorts,
+  })
+
   const specOf = <L extends LaneOwner>(
     lane: L,
     r: Ready,
@@ -228,16 +265,12 @@ export async function startSetup(input: {
       lane,
       image: r.image,
       imagePath: r.imagePath,
-      mounts: planMounts({
-        hostWorkingCopy: root,
-        pinetrie: PINETRIE_INSTALL,
-        runtime: r.runtime,
-        ignoreDir: pinetrieDir(root).laneGit,
-        links: r.links,
-        grants: grants.mounts,
-        shared: own === null ? [] : configs.laneShared(own),
-        hostPaths: base ? [] : hostPaths,
-      }),
+      mounts: mountsFor(
+        r,
+        grants.mounts,
+        own === null ? [] : configs.laneShared(own),
+        !base,
+      ),
       grants: {
         nested: grants.nested,
         hostPorts: grants.hostPorts,
@@ -266,8 +299,14 @@ export async function startSetup(input: {
       log(
         `[host] the base snapshot is at accepted work (${commit.slice(0, 8)})`,
       )
-      // Accepted work moved: what it grants may have.
-      await configs.refreshAccepted()
+      // Accepted work moved: what it grants may have. Shared before it is in
+      // force, so no lane names a directory no slot holds; a failed share is
+      // said, and lanes naming what it lacks say why they cannot start.
+      const next = await configs.readAccepted()
+      await shareAndGrant(wantedFor(r, next)).catch(error =>
+        log(`[host] ${errorText(error)}`),
+      )
+      configs.takeAccepted(next)
     }
   }
 
@@ -285,18 +324,7 @@ export async function startSetup(input: {
       at: root,
       runtime,
       runtimeReady: found.ready,
-      // On the Mac, the slot shares every directory a lane mounts, once: a
-      // shared directory accepted work adds later reaches lanes at the next
-      // start, as a port does.
-      mountsOf: r =>
-        slotMounts({
-          base: specOf(BASE_LANE, r).mounts,
-          shared: configs.accepted().shared,
-          attached: ssh.mounts,
-        }),
-      // The VM is told once: a port accepted work grants later reaches it
-      // at the next start.
-      hostPorts: configs.accepted().authority.grants.hostPorts,
+      wanted: r => wantedFor(r, configs.accepted()),
       refreshBaseNow,
       log,
     }),
@@ -363,10 +391,8 @@ async function prepare(input: {
   readonly at: string
   readonly runtime: LaneRuntime
   readonly runtimeReady: Found["ready"]
-  /** Every host path a lane of this host mounts. */
-  readonly mountsOf: (r: Ready) => readonly Mount[]
-  /** The ports of the Mac's loopback the project grants its lanes. */
-  readonly hostPorts: readonly number[]
+  /** Every host path a lane of this host mounts, and the ports it reaches. */
+  readonly wanted: (r: Ready) => Wanted
   readonly refreshBaseNow: (r: Ready) => Promise<void>
   readonly log: (m: string) => void
 }): Promise<Ready> {
@@ -401,8 +427,7 @@ async function prepare(input: {
   }
   await input.runtimeReady({
     defaultImage: runtimeFrom,
-    mounts: input.mountsOf(result),
-    hostPorts: input.hostPorts,
+    ...input.wanted(result),
   })
   await input.refreshBaseNow(result)
   log("[host] lanes of their own are ready")

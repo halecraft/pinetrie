@@ -72,7 +72,6 @@ import {
   renderHelper,
   renderObserver,
   renderRun,
-  SLOT_LABEL,
 } from "./plan.ts"
 import { NESTED_PROFILE } from "./seccomp-nested.ts"
 import type { DockerTarget } from "./target.ts"
@@ -415,17 +414,15 @@ export function dockerRuntime(input: {
 }
 
 /**
- * Before a slot is filled: remove every container labelled with it, left by
- * a host that died holding it. Returns their names.
+ * Before a slot is filled: remove every container of any project with a bind
+ * under `root`, the slot's place in Docker's machine, left by a host that died
+ * holding it. Returns their names.
  */
 export async function sweepSlot(
   target: DockerTarget,
-  slot: number,
+  root: string,
 ): Promise<readonly string[]> {
-  const names = planSlotSweep(
-    slot,
-    await listLabelled(target, `${SLOT_LABEL}=${slot}`),
-  )
+  const names = planSlotSweep(root, await listLabelled(target, PROJECT_LABEL))
   for (const name of names) await removeContainer(target, name)
   return names
 }

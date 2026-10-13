@@ -383,15 +383,26 @@ any refresh they queued.
     full VM). Without tools a host starts on any folder.
   - **On the Mac the host takes a lease** on a slot of the user's lane VM
     (`leaseVm`), starting the VM if need be, then removes every container
-    labelled with its slot (`sweepSlot`): a host that died holding the slot
-    left them (S130). The slot is filled once setup knows every directory a lane
-    mounts (`Found.ready`, before the base's refresh, the first lane), and
-    never replaced while the host runs: a changed grant or shared directory
-    takes a restart, as ADR-0035 has it.
+    with a bind into its slot (`sweepSlot`): a host that died holding the
+    slot left them (S130). The slot is filled once setup knows every
+    directory a lane mounts (`Found.ready`, before the base's refresh, the
+    first lane), and never replaced while the host runs.
+  - **What accepted work adds while the host runs** (ADR-0141) is shared
+    and granted before it is in force: `refreshBaseNow` in `setup.ts` reads
+    accepted work's config (`readAccepted`), hands what lanes may then mount
+    and reach to `Found.shareAndGrant`, then puts it in force
+    (`takeAccepted`). The decision is a value (`planShareAndGrant`): the
+    host's slot first; then a directory no slot holds as wanted goes in an
+    extra slot, swept first; ports are written when they changed. Nothing
+    changed, nothing is done: in a project whose accepted work moves often
+    this path runs often. A widening the VM has no slot for is said once,
+    and not asked again while the same directories are what is new; a lane
+    naming one fails with those words.
   - **Docker's startup sweep** (`sweepProjects`, after the fill) removes the
     containers and disks of every project whose folder is gone.
   - **The lease is kept** (`keepLease`): if the VM stops under the host, it
-    leases again, sweeps and fills the slot, and writes the grant again.
+    leases again, sweeps its slot, drops the extra ones, and shares and
+    grants the last of what it was given, as on its first lease.
     After an update, a host holding the only lease on an out-of-date VM
     replaces it (`planVmVersion`).
 
@@ -923,7 +934,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | module | owns |
 |---|---|
 | `setup.ts` | `Setup`, all of it or none: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once accepted work's names are read, before anything else reads your repo), the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, ADR-0036), and the base snapshot's refreshes. The project is found before it (`findProject`), since pi's setup loads from its root |
-| `config.ts` | `pinetrie.json`'s `lanes` as a fact of a state (ADR-0135): accepted work's copy read from its commit at startup and when the base moves (`refreshAccepted`), its shared directories prepared again; a lane's own copy and the copy it started on, read from your repo before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook). A lane with no commit in your repo yet runs with accepted work's |
+| `config.ts` | `pinetrie.json`'s `lanes` as a fact of a state (ADR-0135): accepted work's copy read from its commit at startup and when the base moves (`readAccepted`), its shared directories prepared again, and put in force (`takeAccepted`) once what it names is shared; a lane's own copy and the copy it started on, read from your repo before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook). A lane with no commit in your repo yet runs with accepted work's |
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
 | `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
