@@ -37,6 +37,8 @@ export function serve<Hello, Call, Update, Result>(
   // the write's EPIPE would end every other call the server holds.
   io.output.on("error", () => {})
 
+  io.output.on("error", () => {})
+
   async function answer(id: number, call: Call, updates: boolean) {
     const control = new AbortController()
     running.set(id, control)
