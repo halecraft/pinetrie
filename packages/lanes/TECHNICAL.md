@@ -128,9 +128,6 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   made on a dependency layer, whose outputs no registry names) is not
   copied: the next starts empty, `git init` and `jj git init --colocate`
   first.
-- **pre-layers:** a refresh deletes the dependency layers bases were once
-  made on (`deps-<key>`, `planLeftoverLayers`). Remove once no host has
-  one.
 
 ## Forks
 

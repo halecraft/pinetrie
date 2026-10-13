@@ -37,7 +37,6 @@ export type {
   LanehostHello,
   LanehostResult,
   ProjectListed,
-  SnapshotListed,
 } from "./protocol.ts"
 export {
   isRole,

@@ -85,9 +85,6 @@ describe.skipIf(!onBtrfs)(
         op: { kind: "delete", lane: "r" },
       })
       expect(await isSubvolume(disks.lane("r"))).toBe(false)
-      const listed = await answer({ kind: "snapshots", project: KEY }, serving)
-      expect(listed.map(s => s.id)).toEqual(["s"])
-      expect(listed[0]?.made).toBeGreaterThan(0)
     })
     test("a snapshot is read-only; a restore of it is writable; a delete takes it", async () => {
       await disk({

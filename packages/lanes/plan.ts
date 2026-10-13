@@ -24,7 +24,6 @@ import {
   SHARED_ENV,
   type SnapshotId,
   shellWord,
-  snapshotId,
   type ThreadId,
   type ThreadName,
   WORKSPACE_ROOT,
@@ -1447,15 +1446,6 @@ export const isBaseCurrent = (
  */
 export const isCopyableBase = (base: BaseFacts | null): base is BaseFacts =>
   base !== null && base.format === BASE_FORMAT
-
-/**
- * pre-layers: the dependency layers bases were once made on (`deps-<key>`),
- * which nothing reads now. Remove once no host has one.
- */
-export const planLeftoverLayers = (
-  snapshots: readonly { readonly id: string }[],
-): readonly SnapshotId[] =>
-  snapshots.filter(s => s.id.startsWith("deps-")).map(s => snapshotId(s.id))
 
 /** A project's root for lanes, or why its folder cannot have them. */
 export type ProjectRoot = { readonly ok: string } | { readonly refused: string }

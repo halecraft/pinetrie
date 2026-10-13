@@ -44,7 +44,6 @@ import {
   planHostMounts,
   planImages,
   planJoins,
-  planLeftoverLayers,
   planLinks,
   planMerge,
   planMounts,
@@ -862,11 +861,6 @@ describe("the base: the base before it, checked out at accepted work", () => {
     expect(written).toContain(
       JSON.stringify({ commits: [C1], format: BASE_FORMAT }),
     )
-  })
-  test("planLeftoverLayers: the dependency layers, and nothing else", () => {
-    expect(
-      planLeftoverLayers([{ id: "deps-a" }, { id: "base" }, { id: "t-1-e1" }]),
-    ).toEqual([snapshotId("deps-a")])
   })
 })
 

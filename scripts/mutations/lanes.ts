@@ -661,14 +661,6 @@ export const mutations: readonly Mutation[] = [
       "every repo in the lane ignores what the ignore file lists, through git's own variables",
   },
   {
-    name: "every snapshot is a leftover layer",
-    file: "packages/lanes/plan.ts",
-    from: '  snapshots.filter(s => s.id.startsWith("deps-")).map(s => snapshotId(s.id))\n',
-    to: "  snapshots.map(s => snapshotId(s.id))\n",
-    command: unit,
-    expect: "planLeftoverLayers: the dependency layers, and nothing else",
-  },
-  {
     name: "a lane's own copy turns a grant on",
     file: "packages/lanes/plan.ts",
     from: "      ssh: a.ssh && (!b.ssh || o.ssh),\n",

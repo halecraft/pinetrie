@@ -46,10 +46,6 @@ export interface LaneRuntime {
   snapshotExists(id: SnapshotId): Promise<boolean>
   /** What differs between two snapshots, both of this project's. */
   diff(from: SnapshotId, to: SnapshotId): Promise<DiskDiff>
-  /** This project's snapshots, each with when it was made (ms since the epoch). */
-  snapshots(): Promise<
-    readonly { readonly id: string; readonly made: number }[]
-  >
   /** A file of pine·trie's own (`.pinetrie-lane/<file>`) in a snapshot; null when absent. */
   readLaneFile(snapshot: SnapshotId, file: string): Promise<string | null>
   /** The container's spec as the runtime makes it, without its label: pure. Its hash is its spec label. */

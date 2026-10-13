@@ -201,7 +201,6 @@ host, whatever their projects.
   bring one back.
 - **A subvolume is told by its root's inode, 256** (`isSubvolume`):
   `btrfs subvolume show` needs `CAP_SYS_ADMIN` (S125).
-- **A snapshot's time is its birth time** (`statx`), which btrfs keeps.
 
 ## Diffs (`diff.ts`)
 

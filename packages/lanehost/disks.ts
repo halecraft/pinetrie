@@ -23,7 +23,7 @@ import {
   LANE_FILES,
   type ProjectDisks,
 } from "./layout.ts"
-import type { DiskCall, SnapshotListed } from "./protocol.ts"
+import type { DiskCall } from "./protocol.ts"
 
 /** The rootless user, who owns a nested lane's inner lanes' disk. */
 export const ROOTLESS_UID = 1000
@@ -262,22 +262,6 @@ export async function executeDiskSteps(
       }
     }
   }
-}
-
-/** A project's snapshots, each with when it was made; none in the making. */
-export async function listSnapshots(
-  disks: ProjectDisks,
-): Promise<readonly SnapshotListed[]> {
-  const entries = await readdir(disks.snapshots).catch(() => [] as string[])
-  const out: SnapshotListed[] = []
-  for (const id of entries.sort()) {
-    if (!isDiskName(id)) continue
-    const at = disks.snapshot(id)
-    if (!(await isSubvolume(at))) continue
-    const s = await stat(at)
-    out.push({ id, made: s.birthtimeMs > 0 ? s.birthtimeMs : s.mtimeMs })
-  }
-  return out
 }
 
 /**

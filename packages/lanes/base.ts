@@ -33,7 +33,6 @@ import {
   planBaseCheckout,
   planBaseFacts,
   planDisk,
-  planLeftoverLayers,
   planSnapshot,
   type RepoConfig,
   revsetName,
@@ -80,7 +79,7 @@ async function inScratch<C, T>(
  * Make the base snapshot at `yours`: the base before it restored (none, or
  * one made another way, gives an empty disk), `yours` checked out on it, its
  * facts written, then snapshotted. Does nothing when the base already holds
- * them. Dependency layers a base was once made on go.
+ * them.
  */
 export async function refreshBase<C>(
   input: Scratch<C> & { readonly yours: readonly CommitId[] },
@@ -101,9 +100,6 @@ export async function refreshBase<C>(
       runners,
     )
   })
-  const leftovers = planLeftoverLayers(await runtime.snapshots())
-  if (leftovers.length > 0)
-    await runtime.disk({ kind: "deleteSnapshots", ids: leftovers })
   return true
 }
 

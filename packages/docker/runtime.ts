@@ -330,7 +330,6 @@ export function dockerRuntime(input: {
     snapshotExists: id =>
       lanehost.call({ kind: "snapshotExists", project: key, snapshot: id }),
     diff: (from, to) => lanehost.call({ kind: "diff", project: key, from, to }),
-    snapshots: () => lanehost.call({ kind: "snapshots", project: key }),
     readLaneFile: (snapshot, file) =>
       lanehost.call({ kind: "read", project: key, snapshot, file }),
     runSpec,

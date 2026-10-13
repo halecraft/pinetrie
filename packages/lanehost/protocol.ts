@@ -39,7 +39,6 @@ export type LanehostCall =
       readonly lane: string
     }
   /** A project's snapshots, each with when it was made. */
-  | { readonly kind: "snapshots"; readonly project: string }
   /** A file of pine·trie's (`.pinetrie-lane/<file>`) inside a snapshot; null when absent. */
   | {
       readonly kind: "read"
@@ -63,12 +62,6 @@ export type LanehostCall =
       readonly to: string
     }
 
-/** A snapshot, and when it was made (ms since the epoch). */
-export interface SnapshotListed {
-  readonly id: string
-  readonly made: number
-}
-
 /** A project in the lanes directory; its root is null when none was recorded. */
 export interface ProjectListed {
   readonly key: string
@@ -81,7 +74,6 @@ export interface LanehostResults {
   readonly diskExists: boolean
   readonly snapshotExists: boolean
   readonly nestedDisk: null
-  readonly snapshots: readonly SnapshotListed[]
   readonly read: string | null
   readonly record: null
   readonly projects: readonly ProjectListed[]

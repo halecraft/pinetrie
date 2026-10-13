@@ -54,7 +54,6 @@ function recordingRuntime(seen: string[]): LaneRuntime {
     diskExists: no,
     snapshotExists: no,
     diff: no,
-    snapshots: no,
     readLaneFile: no,
     runSpec: no,
     containerFacts: no,

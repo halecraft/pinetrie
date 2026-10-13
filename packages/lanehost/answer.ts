@@ -6,7 +6,6 @@ import { diffBySend, diffByWalk } from "./diff.ts"
 import {
   executeDiskSteps,
   isSubvolume,
-  listSnapshots,
   planDisk,
   planNestedDisk,
   readLaneFile,
@@ -69,8 +68,6 @@ async function answerAny(
         planNestedDisk(call.lane, disksOf(serving, call.project)),
       )
       return null
-    case "snapshots":
-      return listSnapshots(disksOf(serving, call.project))
     case "read":
       return readLaneFile(
         disksOf(serving, call.project),
