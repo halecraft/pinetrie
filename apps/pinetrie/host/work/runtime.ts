@@ -6,7 +6,7 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
-import { errorText, type ProjectRecord } from "@pinetrie/core"
+import { errorText, OBSERVER_SOCKET, type ProjectRecord } from "@pinetrie/core"
 import {
   type DockerTarget,
   dockerRootless,
@@ -18,7 +18,7 @@ import {
   SLOT_LABEL,
   sweepSlot,
 } from "@pinetrie/docker"
-import { OBSERVER_SOCKET, planObserver } from "@pinetrie/lanehost"
+import { planObserver } from "@pinetrie/lanehost"
 import {
   type LaneRuntime,
   type Mount,
@@ -199,13 +199,13 @@ async function hostDockerFound(
     forwarded: existsSync(OBSERVER_SOCKET),
   })
   if (observed.kind === "refused") return refusedWith(observed.why)
-  // Nothing serves the forwarded observer yet: by cgroup, an inner lane is
-  // its outer lane.
-  if (observed.kind === "forwarded")
-    return refusedWith(
-      "a lane's own lanes cannot be observed yet: under its rootless Docker an inner lane shares its outer lane's cgroup",
-    )
-  const runtime = dockerRuntime({ target, lanesDir, root, log })
+  const runtime = dockerRuntime({
+    target,
+    lanesDir,
+    root,
+    log,
+    observer: observed.kind,
+  })
   log(`[host] lanes run on Docker, their disks in ${lanesDir}`)
   return {
     kind: "found",

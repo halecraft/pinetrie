@@ -1,19 +1,51 @@
 #!/usr/bin/env node
 // A stand-in for the observer's loader (`observer/observe.c`), for the
-// machine role's server test: it answers each command as the loader does, and
-// a registered lane's run 1 exits, as a run left by the lane's last host
-// would, before the answer.
+// machine role's server test: it answers each command as the loader does,
+// from a fixed table of processes. The machine's namespace is 1. Lane 40's
+// first process is 4; inside it, lane 50's is 5, pid 7 in lane 40; lane 45,
+// a sibling of 40, holds process 6, pid 7 in it too; process 3 is in the
+// machine's own namespace. Lane 40's run 1, and lane 50's run 2, exit
+// before the lane's first install, as a run left by its last host would.
 import readline from "node:readline"
+
+const PROCESSES = [
+  { pid: 3, nspid: [3], namespaces: ["1"] },
+  { pid: 4, nspid: [4, 1], namespaces: ["40", "1"] },
+  { pid: 5, nspid: [5, 7, 1], namespaces: ["50", "40", "1"] },
+  { pid: 6, nspid: [6, 7], namespaces: ["45", "1"] },
+]
+const held = new Map()
+const installed = new Set()
+
+const offer = (token, p) => {
+  held.set(`${token}/${p.pid}`, p)
+  console.log(
+    `candidate\t${token}\t${p.pid}\t${p.nspid.join(",")}\t${p.namespaces.join(",")}`,
+  )
+}
 
 console.log("ready")
 readline.createInterface({ input: process.stdin }).on("line", line => {
-  const [word, arg = ""] = line.split("\t")
-  if (word === "register") {
-    const pid = Number(arg)
-    if (pid <= 0) return console.log(`refused\t${arg}\tnot a process id`)
+  const [word, a = "", b = "", c = ""] = line.split("\t")
+  if (word === "open") {
+    for (const p of PROCESSES) if (String(p.pid) === b) offer(a, p)
+    console.log(`looked\t${a}\tcomplete`)
+  } else if (word === "find") {
+    for (const p of PROCESSES) if (String(p.nspid[Number(b)]) === c) offer(a, p)
+    console.log(`looked\t${a}\tcomplete`)
+  } else if (word === "install") {
+    const p = held.get(`${a}/${b}`)
+    for (const k of [...held.keys()]) if (k.startsWith(`${a}/`)) held.delete(k)
+    if (p === undefined) return console.log(`refused\t${a}\tno such candidate`)
+    const lane = p.namespaces[0]
     // Before the answer, so the server holds it until the lane is its host's.
-    console.log(`ev\t${pid * 10}\t1\t-\texit\t1\t0`)
-    console.log(`registered\t${pid}\t${pid * 10}`)
-  } else if (word === "unregister") console.log(`unregistered\t${arg}`)
-  else if (word === "flush") console.log(`flushed\t${arg}`)
+    const run = { 40: "1", 50: "2" }[lane]
+    if (run !== undefined && !installed.has(lane))
+      console.log(`ev\t${lane}\t${run}\t-\texit\t1\t0`)
+    installed.add(lane)
+    console.log(`registered\t${a}\t${lane}`)
+  } else if (word === "drop") {
+    for (const k of [...held.keys()]) if (k.startsWith(`${a}/`)) held.delete(k)
+  } else if (word === "unregister") console.log(`unregistered\t${a}`)
+  else if (word === "flush") console.log(`flushed\t${a}`)
 })

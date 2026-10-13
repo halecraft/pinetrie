@@ -14,6 +14,7 @@ import path from "node:path"
 import readline from "node:readline"
 import { serve } from "@pinetrie/channel"
 import {
+  type Candidate,
   type ConnectionId,
   decodeLoaderLine,
   encodeLoaderCommand,
@@ -27,6 +28,10 @@ import {
   type ObserverNotice,
   planHeld,
   planIdle,
+  planLookup,
+  planRegister,
+  planUnregister,
+  type Registration,
   routeEvent,
 } from "./observer.ts"
 
@@ -66,21 +71,26 @@ const send = (c: LoaderCommand) =>
 
 interface Connection {
   update: ((n: ObserverNotice) => void) | null
-  readonly lanes: Set<LaneNamespace>
 }
 const connections = new Map<ConnectionId, Connection>()
-const owners = new Map<LaneNamespace, ConnectionId>()
+/** Every lane the loader holds registered, pinned, owned or not. */
+const registrations = new Map<LaneNamespace, Registration>()
 const held = new Map<
   LaneNamespace,
   { notices: ObserverNotice[]; lost: Map<string, number> }
 >()
-const registering = new Map<
-  number,
-  ((answer: { lane: LaneNamespace } | { why: string }) => void)[]
+interface Lookup {
+  readonly candidates: Candidate[]
+  readonly done: (cut: boolean) => void
+}
+const lookups = new Map<string, Lookup>()
+const installing = new Map<
+  string,
+  (answer: { lane: LaneNamespace } | { why: string }) => void
 >()
 const unregistering = new Map<LaneNamespace, (() => void)[]>()
 const flushing = new Map<string, () => void>()
-let nextFlush = 0
+let nextToken = 0
 let quietSince = Date.now()
 
 const subscribed = () =>
@@ -88,7 +98,7 @@ const subscribed = () =>
 const monotonicUs = () => Number(process.hrtime.bigint() / 1000n)
 
 function route(notice: ObserverNotice) {
-  const r = routeEvent(owners, subscribed(), notice)
+  const r = routeEvent(registrations, subscribed(), notice)
   if (r.kind === "send") {
     connections.get(r.to)?.update?.(notice)
     return
@@ -106,8 +116,8 @@ function route(notice: ObserverNotice) {
 /** A lane's held notices, to the connection that now owns it, once it has subscribed. */
 function release(lane: LaneNamespace) {
   const h = held.get(lane)
-  const to = owners.get(lane)
-  const update = to === undefined ? null : connections.get(to)?.update
+  const to = registrations.get(lane)?.owner
+  const update = to == null ? null : connections.get(to)?.update
   if (h === undefined || update == null) return
   held.delete(lane)
   for (const n of heldNotices({
@@ -136,11 +146,22 @@ readline.createInterface({ input: loader.stdout }).on("line", text => {
     case "event":
       route(noticeOf(line))
       return
+    case "candidate": {
+      const { kind: _, token, ...candidate } = line
+      lookups.get(token)?.candidates.push(candidate)
+      return
+    }
+    case "looked":
+      lookups.get(line.token)?.done(line.cut)
+      lookups.delete(line.token)
+      return
     case "registered":
-      take(registering, line.pid)?.({ lane: line.lane })
+      installing.get(line.token)?.({ lane: line.lane })
+      installing.delete(line.token)
       return
     case "refused":
-      take(registering, line.pid)?.({ why: line.why })
+      installing.get(line.token)?.({ why: line.why })
+      installing.delete(line.token)
       return
     case "unregistered":
       take(unregistering, line.lane)?.()
@@ -155,6 +176,49 @@ readline.createInterface({ input: loader.stdout }).on("line", text => {
 const queued = <K, V>(m: Map<K, V[]>, k: K, v: V) =>
   m.set(k, [...(m.get(k) ?? []), v])
 
+/**
+ * One registration at a time: each is planned against the registrations
+ * as the one before left them, so two cannot both install one namespace.
+ */
+let registering: Promise<unknown> = Promise.resolve()
+
+async function register(
+  id: ConnectionId,
+  call: Extract<ObserverCall, { kind: "register" }>,
+): Promise<LaneNamespace> {
+  const token = String(nextToken++)
+  const lookup = planLookup(call.origin, registrations, token)
+  if (lookup.kind === "refuse") throw new Error(lookup.why)
+  const candidates: Candidate[] = []
+  const cut = await new Promise<boolean>(done => {
+    lookups.set(token, { candidates, done })
+    send(lookup)
+  })
+  const plan = planRegister({
+    origin: call.origin,
+    candidates,
+    cut,
+    registrations,
+    connection: id,
+  })
+  if (plan.kind === "refuse") {
+    send({ kind: "drop", token })
+    throw new Error(plan.why)
+  }
+  const got = await new Promise<{ lane: LaneNamespace } | { why: string }>(
+    resolve => {
+      installing.set(token, resolve)
+      send({ kind: "install", token, pid: plan.pid, remote: call.remote })
+    },
+  )
+  if ("why" in got) throw new Error(got.why)
+  // The connection closed while the loader installed it: pinned, unowned.
+  const owner = connections.has(id) ? id : null
+  registrations.set(got.lane, { ...plan.registration, owner })
+  release(got.lane)
+  return got.lane
+}
+
 async function answer(
   id: ConnectionId,
   call: ObserverCall,
@@ -167,31 +231,27 @@ async function answer(
   if (conn === undefined) throw new Error("the connection has closed")
   switch (call.kind) {
     case "register": {
-      const got = await new Promise<{ lane: LaneNamespace } | { why: string }>(
-        resolve => {
-          queued(registering, call.pid, resolve)
-          send(call)
-        },
-      )
-      if ("why" in got) throw new Error(got.why)
-      owners.set(got.lane, id)
-      conn.lanes.add(got.lane)
-      release(got.lane)
-      return got.lane
+      const next = registering.then(() => register(id, call))
+      registering = next.catch(() => {})
+      return next
     }
     case "unregister": {
+      const plan = planUnregister(registrations.get(call.lane), id)
+      if (typeof plan !== "string") throw new Error(plan.why)
+      if (plan === "gone") return null
       await new Promise<void>(resolve => {
         queued(unregistering, call.lane, resolve)
         send(call)
       })
-      if (owners.get(call.lane) === id) owners.delete(call.lane)
-      conn.lanes.delete(call.lane)
+      // Its owner gets its notices until the loader has let it go.
+      registrations.delete(call.lane)
+      held.delete(call.lane)
       return null
     }
     case "subscribe": {
       if (update === undefined) throw new Error("subscribe asks for updates")
       conn.update = update
-      for (const lane of conn.lanes) release(lane)
+      for (const [lane, r] of registrations) if (r.owner === id) release(lane)
       await new Promise<void>(resolve =>
         signal.addEventListener("abort", () => resolve(), { once: true }),
       )
@@ -199,7 +259,7 @@ async function answer(
       return null
     }
     case "flush": {
-      const token = String(nextFlush++)
+      const token = String(nextToken++)
       await new Promise<void>(resolve => {
         flushing.set(token, resolve)
         send({ kind: "flush", token })
@@ -209,22 +269,29 @@ async function answer(
   }
 }
 
+/**
+ * A connection gone: its lanes stay registered and pinned, their notices
+ * held, until a connection reclaims them (a host restarting), one
+ * unregisters them, or the role exits.
+ */
+function disconnect(id: ConnectionId) {
+  if (!connections.delete(id)) return
+  for (const [lane, r] of registrations)
+    if (r.owner === id) registrations.set(lane, { ...r, owner: null })
+  if (connections.size === 0) quietSince = Date.now()
+}
+
 mkdirSync(path.dirname(socketPath), { recursive: true })
 rmSync(socketPath, { force: true })
 let nextConnection = 0
 net
   .createServer(socket => {
     const id = nextConnection++
-    connections.set(id, { update: null, lanes: new Set() })
-    // A host gone keeps its lanes' runs: their notices are held for the
-    // host that registers them again, as one does after it restarts.
-    socket.on("close", () => {
-      const conn = connections.get(id)
-      connections.delete(id)
-      for (const lane of conn?.lanes ?? [])
-        if (owners.get(lane) === id) owners.delete(lane)
-      if (connections.size === 0) quietSince = Date.now()
-    })
+    connections.set(id, { update: null })
+    // At the end of its input, before the host sees its side close: a host
+    // that opens a new connection once the old one closed reclaims its lanes.
+    socket.on("end", () => disconnect(id))
+    socket.on("close", () => disconnect(id))
     socket.on("error", () => {})
     void started.then(loaded =>
       serve<ObserverHello, ObserverCall, ObserverNotice, unknown>(

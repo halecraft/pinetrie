@@ -1,8 +1,8 @@
 #!/bin/sh
 # The observer suite's guest: PID 1 of a QEMU machine booted on the lane
 # VM's kernel. It runs the loader as lanehost's machine role would, then
-# each case as a numbered run in a lane's cgroup, and prints what the loader
-# said and what the cases left between markers on the console, for
+# each case as a numbered run in a lane's PID namespace, and prints what the
+# loader said and what the cases left between markers on the console, for
 # apps/pinetrie/e2e/observer to check. It decides nothing.
 export PATH=/bin
 mount -t devtmpfs dev /dev
@@ -22,24 +22,46 @@ say() { (IFS="$T"; printf '%s\n' "$*") >> $E; }
 # Progress on the console, for a guest that never finishes.
 step() { echo "--- $*"; }
 
-for c in a b free; do mkdir /sys/fs/cgroup/$c; done
-# A lane's first process, in its cgroup, as a container's is.
+# Only a run moves here: every lane stays in the root cgroup, as under a
+# nested lane's rootless Docker.
+mkdir /sys/fs/cgroup/moved
+# <pid>: its PID namespace's inode.
+nsof() { readlink /proc/$1/ns/pid | tr -dc 0-9; }
+# <pid> [<level>]: its NSpid, comma-separated, or its pid at one level.
+nspid() {
+  v=$(grep '^NSpid:' /proc/$1/status | cut -f2- | tr '\t' ,)
+  if [ -n "$2" ]; then echo "$v" | cut -d, -f$(($2 + 1)); else echo "$v"; fi
+}
+# [<pid>]: a lane's first process, in a PID namespace of its own (below
+# <pid>'s, else the guest's), as a container's is. Prints its pid here. It
+# holds no loader's commands open: the loader stops when they end.
 first() {
-  # Its output is not the caller's: a command substitution would wait for it.
-  sh -c "echo \$\$ > /sys/fs/cgroup/$1/cgroup.procs; exec sleep 100000" > /dev/null 2>&1 &
-  echo $!
+  if [ -n "$1" ]; then
+    nsenter -t "$1" -p -- unshare -p -f sleep 100000 > /dev/null 2>&1 3>&- &
+  else
+    unshare -p -f sleep 100000 > /dev/null 2>&1 3>&- &
+  fi
+  u=$!
+  for i in $(seq 100); do
+    c=$(cat /proc/$u/task/*/children 2> /dev/null | tr -d ' ')
+    # nsenter forks unshare, which forks the first process.
+    [ -n "$1" ] && [ -n "$c" ] && c=$(cat /proc/$c/task/*/children 2> /dev/null | tr -d ' ')
+    [ -n "$c" ] && break
+    sleep 0.05
+  done
+  echo $c
 }
-# <cgroup> <run> <command>...: the command, as run <run>, begun in <cgroup>.
+# <first pid> <run> <command>...: the command, as run <run>, begun in that lane.
 inrun() {
-  cg=$1 r=$2
+  f=$1 r=$2
   shift 2
-  sh -c "echo \$\$ > /sys/fs/cgroup/$cg/cgroup.procs; exec env PINETRIE_RUN=$r \"\$@\"" inrun "$@" 3>&-
+  nsenter -t $f -p -- env PINETRIE_RUN=$r "$@" 3>&-
 }
-# <cgroup> <command>...: the command in <cgroup>, in no run.
+# <first pid> <command>...: the command in that lane, in no run.
 outside() {
-  cg=$1
+  f=$1
   shift
-  sh -c "echo \$\$ > /sys/fs/cgroup/$cg/cgroup.procs; exec \"\$@\"" outside "$@" 3>&-
+  nsenter -t $f -p -- "$@" 3>&-
 }
 
 # <ring KiB> <events file>: a loader, its commands on fd 3.
@@ -69,71 +91,109 @@ answer() {
     sleep 0.1
   done
   say no-answer "$1"
+  step "no answer: $1"
 }
 flush() {
   printf 'flush\t%s\n' "$1" >&3
   answer "flushed$T$1\$" "$2"
 }
+# <events file> <token> <pid> [<remote dir>]: the lane whose first process is
+# <pid> registered, as the machine role registers a direct host's.
+register() {
+  printf 'open\t%s\t%s\n' $2 $3 >&3
+  answer "looked$T$2$T" $1
+  printf 'install\t%s\t%s%s\n' $2 $3 "${4:+$T$4}" >&3
+  answer "registered$T$2$T" $1
+}
+# <events file> <token>: the lane token registered.
+laneof() { grep "^registered$T$2$T" $1 | cut -f3; }
 
-PA=$(first a)
-PB=$(first b)
-say lane a $PA
-say lane b $PB
+PA=$(first)
+PB=$(first)
+PF=$(first)
+say lane a $PA $(nsof $PA)
+say lane b $PB $(nsof $PB)
 
 EV=/tmp/ev.tsv
 if start 65536 $EV; then
-  printf 'register\t%s\t/w/remote\n' $PA >&3
-  answer "registered$T$PA$T" $EV
-  # Both cgroup fixtures are in the guest's one PID namespace.
+  register $EV a $PA /w/remote
+  register $EV b $PB
   step registered
 
-  mkdir -p /w/r1 /w/r2 /w/r34 /w/r5 /w/r6 /w/r7 /w/r10 /w/r11 /w/r13 /w/r14 /w/r16 /w/r17 /w/r22
+  # A namespace held registered keeps its number after its processes exit;
+  # let go, the kernel gives the number to the next namespace made.
+  PP=$(first)
+  register $EV p $PP
+  NP=$(nsof $PP)
+  kill -9 $PP
+  while kill -0 $PP 2> /dev/null; do sleep 0.05; done
+  sleep 1
+  PQ=$(first)
+  NQ=$(nsof $PQ)
+  printf 'unregister\t%s\n' $NP >&3
+  answer "unregistered$T$NP\$" $EV
+  sleep 1
+  PR=$(first)
+  say pin $NP $NQ $(nsof $PR)
+  kill -9 $PQ $PR
+
+  mkdir -p /w/r1 /w/r2 /w/r34 /w/r5 /w/r6 /w/r7 /w/r10 /w/r11 /w/r13 /w/r14 /w/r16 /w/r17 /w/r22 /w/r23
   cd /w/r1
-  inrun a 1 sh -c 'echo a > a.txt; mkdir d; mv a.txt d/b; ln -s target s; ln d/b hard; rm hard; rm d/b; rmdir d; cat missing.txt 2> /dev/null; echo x > final.txt; exit 3'
+  inrun $PA 1 sh -c 'echo a > a.txt; mkdir d; mv a.txt d/b; ln -s target s; ln d/b hard; rm hard; rm d/b; rmdir d; cat missing.txt 2> /dev/null; echo x > final.txt; exit 3'
   say exit 1 $?
   say stamp $(work stamp /w/r1/final.txt)
-  inrun a 18 sh -c 'kill -9 $$'
+  inrun $PA 18 sh -c 'kill -9 $$'
   say exit 18 $?
   cd /
-  inrun a 2 sh -c '(setsid sh -c "sleep 1; echo late > /w/r2/daemon.txt" > /dev/null 2>&1 &); exit 0'
+  inrun $PA 2 sh -c '(setsid sh -c "sleep 1; echo late > /w/r2/daemon.txt" > /dev/null 2>&1 &); exit 0'
   sleep 3
   step concurrent
-  inrun a 3 sh -c 'for i in $(seq 200); do echo 3 > /w/r34/p3-$i; done' &
+  inrun $PA 3 sh -c 'for i in $(seq 200); do echo 3 > /w/r34/p3-$i; done' &
   p3=$!
-  inrun a 4 sh -c 'for i in $(seq 200); do echo 4 > /w/r34/p4-$i; done' &
+  inrun $PA 4 sh -c 'for i in $(seq 200); do echo 4 > /w/r34/p4-$i; done' &
   p4=$!
   wait $p3 $p4
   sleep 1
-  inrun a 5 work threads /w/r5 16
-  inrun a 6 env -i /bin/work threads /w/r6 2
-  inrun a 7 work mmap /w/r7/m.bin
+  inrun $PA 5 work threads /w/r5 16
+  inrun $PA 6 env -i /bin/work threads /w/r6 2
+  inrun $PA 7 work mmap /w/r7/m.bin
   say stamp $(work stamp /w/r7/m.bin)
-  inrun a 10 work uring /w/r10/u.txt
+  inrun $PA 10 work uring /w/r10/u.txt
   say exit 10 $?
-  outside a sh -c 'echo u > /w/r13/untagged.txt'
-  printf 'unregister\t%s\n' "$(grep "^registered$T$PA$T" $EV | cut -f3)" >&3
-  inrun free 19 sh -c 'echo f > /w/r13/free.txt'
-  printf 'register\t%s\t/w/remote\n' $PA >&3
-  answer "registered$T$PA$T" $EV
-  inrun a 14 env PINETRIE_RUN=15 sh -c 'echo n > /w/r14/n.txt'
-  inrun a 16 sh -c 'echo $$ > /sys/fs/cgroup/b/cgroup.procs; echo m > /w/r16/m.txt'
-  inrun a 11 unshare -Urpf sh -c 'echo ns > /w/r11/ns.txt'
+  outside $PA sh -c 'echo u > /w/r13/untagged.txt'
+  inrun $PF 19 sh -c 'echo f > /w/r13/free.txt'
+  inrun $PA 14 env PINETRIE_RUN=15 sh -c 'echo n > /w/r14/n.txt'
+  inrun $PA 16 sh -c 'echo $$ > /sys/fs/cgroup/moved/cgroup.procs; echo m > /w/r16/m.txt'
+  inrun $PA 11 unshare -Urpf sh -c 'echo ns > /w/r11/ns.txt'
   say exit 11 $?
-  inrun a 20 sh -c 'echo r > /w/remote/r.txt; cat /w/remote/r.txt > /dev/null'
+  inrun $PA 20 sh -c 'echo r > /w/remote/r.txt; cat /w/remote/r.txt > /dev/null'
   say stamp $(work stamp /w/remote/r.txt)
-  inrun b 21 sh -c 'echo r > /w/r21-b.txt'
+  inrun $PB 21 sh -c 'echo r > /w/r21-b.txt'
+
+  step nested
+  # A lane inside lane a, found as a forwarded registration is: by its pid
+  # in a's namespace, at a's level, every candidate's parents read.
+  PI=$(first $PA)
+  say inner $PI $(nspid $PI) $(nsof $PI) $(nsof $PA) $(nsof 1)
+  printf 'find\tn\t1\t%s\n' $(nspid $PI 1) >&3
+  answer "looked${T}n$T" $EV
+  printf 'install\tn\t%s\n' $PI >&3
+  answer "registered${T}n$T" $EV
+  inrun $PI 23 sh -c 'echo i > /w/r23/i.txt'
+  inrun $PA 24 sh -c 'echo o > /w/r23/o.txt'
+
   step flush
   # The loader stopped while the run writes, then sent the flush before it
   # reads on: the run's events are all still in the ring when it answers.
   kill -STOP $op
-  inrun a 17 sh -c 'for i in $(seq 100); do echo $i > /w/r17/f$i; done'
+  inrun $PA 17 sh -c 'for i in $(seq 100); do echo $i > /w/r17/f$i; done'
   printf 'flush\tt17\n' >&3
   kill -CONT $op
   answer "flushed${T}t17\$" $EV
-  CGB=$(grep "^registered$T$PA$T" $EV | tail -1 | cut -f3)
-  printf 'unregister\t%s\n' "$CGB" >&3
-  answer "unregistered$T$CGB\$" $EV
-  inrun b 22 sh -c 'echo z > /w/r22/z.txt'
+  NA=$(laneof $EV a)
+  printf 'unregister\t%s\n' $NA >&3
+  answer "unregistered$T$NA\$" $EV
+  inrun $PA 22 sh -c 'echo z > /w/r22/z.txt'
   flush end $EV
   stop
 fi
@@ -142,14 +202,13 @@ fi
 FL=/tmp/flood.tsv
 N=20000
 if start 16 $FL; then
-  printf 'register\t%s\n' $PA >&3
-  answer "registered$T$PA$T" $FL
+  register $FL a $PA
   step flood
   mkdir -p /w/flood
   echo x > /w/flood/f
   floods=""
   for r in 101 102 103 104; do
-    inrun a $r work opens /w/flood/f $N &
+    inrun $PA $r work opens /w/flood/f $N &
     floods="$floods $!"
   done
   wait $floods

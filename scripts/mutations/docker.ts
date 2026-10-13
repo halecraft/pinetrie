@@ -15,6 +15,15 @@ const launcher = "packages/vm/launcher/launcher.swift"
 const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a lane shares the machine's PID namespace",
+    file: "packages/docker/plan.ts",
+    from: '    devices: nested ? ["/dev/net/tun"] : [],\n    machine: null,\n',
+    to: '    devices: nested ? ["/dev/net/tun"] : [],\n    machine: { tmpfs: [] },\n',
+    command: ["pnpm", "exec", "vitest", "run", "packages/docker/plan.test.ts"],
+    expect:
+      "every shape keeps a PID namespace of its own: the observer's lane is it",
+  },
   // ── the lanes suite, proven in a lane ──
   {
     name: "lanes share the network of the machine Docker runs on",

@@ -6,9 +6,9 @@ import { PINETRIE_MOUNT } from "@pinetrie/lanes"
 import { readRevisions } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
 import { rootRecordsOf, START_AGENT } from "../harness.ts"
-import type { LaneHosts } from "../lane-hosts.ts"
+import type { LaneHosts, SectionHost } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
-import { imageHost } from "./support.ts"
+import { cli, imageHost } from "./support.ts"
 
 export const scenario: Scenario = {
   lanes: true,
@@ -132,6 +132,43 @@ async function imagesSection(
       launched.includes("PYTHON"),
       `${launched.slice(0, 90)}`,
     )
+    // A second project's host, its lane running while the first's does:
+    // one observer, the machine's, serves both. Under a lane's rootless
+    // Docker there is none here: both are observed through the lane's helper.
+    const other = await lanes.sectionHost({ files: { "other.txt": "o\n" } })
+    try {
+      const made = (host: SectionHost, dir: string) => {
+        host.script.use([
+          {
+            tool: "bash",
+            args: { command: `mkdir -p ${dir} && cat *.txt > ${dir}/a` },
+          },
+          { text: "done" },
+        ])
+        return host.user.chat(`make ${dir}`, ROOT, START_AGENT)
+      }
+      await Promise.all([made(pinetrie, "first"), made(other, "second")])
+      const observers = cli(["ps", "--format", "{{.Names}}"])
+        .split("\n")
+        .filter(n => n.startsWith("pinetrie-observer-"))
+      const attributed = (host: SectionHost, dir: string) =>
+        [...rootRecordsOf(host.host, readRevisions).values()].some(
+          r => r.disk?.unignored.includes(dir) === true,
+        )
+      check(
+        "two projects' lanes are observed by at most one observer, the machine's, each run attributed",
+        observers.length <= 1 &&
+          attributed(pinetrie, "first") &&
+          attributed(other, "second"),
+        JSON.stringify({
+          observers,
+          first: attributed(pinetrie, "first"),
+          second: attributed(other, "second"),
+        }),
+      )
+    } finally {
+      await other.close()
+    }
   } finally {
     await pinetrie.close()
   }

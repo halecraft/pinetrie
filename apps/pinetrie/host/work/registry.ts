@@ -12,14 +12,21 @@ import {
   type OpenLink,
   type Runner,
 } from "@pinetrie/lanes"
-import { type LaneChannel, laneRunner, openChannel } from "@pinetrie/pi"
+import {
+  type LaneChannel,
+  laneRunner,
+  openChannel,
+  relayObserver,
+} from "@pinetrie/pi"
 import { readLaneRecords } from "@pinetrie/reads"
 import type { SessionDocHandle } from "@pinetrie/schema"
 
 /**
  * A lane's channel: pi's helper in its container, over the runtime's `exec
  * -i`, and its runs observed. Every container start opens it before any
- * tool runs, so the lane is registered with the observer each time.
+ * tool runs, so the lane is registered with the observer each time. The
+ * helper serves the observer to a host inside the lane, relayed by this
+ * one, while the channel is open.
  */
 export const openLinkOf =
   (runtime: LaneRuntime): OpenLink<LaneChannel> =>
@@ -30,6 +37,7 @@ export const openLinkOf =
       channel.close()
       throw error
     })
+    const stopRelay = relayObserver(channel, () => runs.relay())
     const { run, bytes } = laneRunner(channel)
     return {
       channel,
@@ -37,6 +45,7 @@ export const openLinkOf =
       run,
       bytes,
       async close() {
+        stopRelay()
         await runs.close().catch(() => {})
         channel.close()
         await channel.closed

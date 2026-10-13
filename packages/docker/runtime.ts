@@ -5,7 +5,9 @@
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { openChannel } from "@pinetrie/channel"
+import { OBSERVER_SOCKET } from "@pinetrie/core"
 import {
+  connectObserver,
   LANEHOST_CONTAINERFILE,
   type LanehostChannel,
   lanehostClient,
@@ -147,6 +149,11 @@ export function dockerRuntime(input: {
   readonly root: string
   /** Where each call to lanehost is logged; none in the suites' own runtimes. */
   readonly log?: (line: string) => void
+  /**
+   * Where lanes are observed: the machine role's container, made or joined
+   * here, or, for a host inside a lane, its helper's socket (`planObserver`).
+   */
+  readonly observer?: "container" | "forwarded"
 }): DockerRuntime {
   const { target, lanesDir, root } = input
   const key = projectKey(root)
@@ -268,7 +275,12 @@ export function dockerRuntime(input: {
       "the machine's observer",
     )
   }
-  const observer = observerClient({ open: openObserver })
+  const observer = observerClient({
+    open:
+      input.observer === "forwarded"
+        ? async () => connectObserver(OBSERVER_SOCKET)
+        : openObserver,
+  })
 
   /** The project's lanes' network, labelled for the sweep; made once per VM. */
   let network: Promise<void> | null = null

@@ -196,7 +196,8 @@ measured. Its checks:
   project or slot label, so no sweep takes it.
 - **Its grant is `OBSERVER_GRANT`, and nothing more:** `CAP_BPF`,
   `CAP_PERFMON` and `CAP_SYS_PTRACE`, Docker's own seccomp profile, the
-  host's pid and cgroup namespaces, a read-only root with a tmpfs at
+  host's pid namespace (its own cgroup namespace: nothing it does reads
+  cgroups), a read-only root with a tmpfs at
   `/run`, no network, removed when it exits (`ContainerSpec.machine`). A
   test checks its body exactly (`api.test.ts`).
 - **Made or joined by name** (`openObserver`, `runtime.ts`): a failed
@@ -207,4 +208,11 @@ measured. Its checks:
 - **A lane is registered by its first process** (`containerPid`, the pid
   in Docker's machine's namespace), with its shared directories as remote
   where host paths reach the machine over virtiofs
-  (`DockerTarget.remoteHostPaths`, the Mac).
+  (`DockerTarget.remoteHostPaths`, the Mac). Its PID namespace is the
+  observer's lane, so a lane's container always has one of its own:
+  `renderRun` sets no `PidMode`, and a test says so.
+- **Under rootless Docker in a lane, the observer is the lane helper's**
+  (`dockerRuntime`'s `observer: "forwarded"`): a host there opens each
+  channel by running `observer-connect.ts` on its own Node against core's
+  `OBSERVER_SOCKET`, and makes no container. Its registrations are as a
+  direct host's; the host outside makes them forwarded.

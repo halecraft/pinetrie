@@ -7,17 +7,34 @@
 //
 // stdin, one command a line, fields tab-separated, paths escaped as core's
 // codec escapes them (`\\`, `\t`, `\n`):
-//   register <pid> [<remote dir>]...   the lane whose first process is <pid>:
-//                                      its PID namespace is opened from /proc, and a
-//                                      run may begin there
+//   open <token> <pid>                 process <pid> as a candidate
+//   find <token> <level> <pid>         every process that is <pid> at PID
+//                                      namespace level <level> (the loader's
+//                                      own is 0) as a candidate
+//   install <token> <pid> [<remote dir>]...
+//                                      candidate <pid> of <token> registered:
+//                                      a run may begin in its namespace; the
+//                                      token's other candidates let go
+//   drop <token>                       every candidate of <token> let go
 //   unregister <namespace>
 //   flush <token>
 // stdout, one a line:
 //   ready                              every program is attached
 //   ev <lane> <run> <inodes> <event>   <event> is core's line (`encodeRunEvent`)
-//   registered <pid> <namespace>  |  refused <pid> <why>
+//   candidate <token> <pid> <nspid> <namespaces>
+//                                      <nspid>: its NSpid, comma-separated;
+//                                      <namespaces>: its PID namespace's inode,
+//                                      then each parent's by NS_GET_PARENT up
+//                                      to the loader's own
+//   looked <token> complete|cut        after the token's candidates; cut when
+//                                      no more could be held
+//   registered <token> <namespace>  |  refused <token> <why>
 //   unregistered <namespace>
 //   flushed <token>                    after every event before the flush
+// A candidate's namespace is held open from its lookup until it is installed
+// or dropped, and a lane's until it is unregistered, so its inode cannot be
+// another namespace's: what was checked is what is registered. Which
+// candidate is a lane's, and whether it may be, is the machine role's to say.
 // <inodes> is `-`, or `<kernel>/<lstat>` on a release under a remote
 // directory, whose call carries the lstat's stamp and, after it, the
 // kernel's: the reader compares them. A remote directory's files are
@@ -27,6 +44,7 @@
 //
 // A failure to load prints `observe: <step>: <reason>` on stderr and exits 1.
 #define _GNU_SOURCE
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -35,6 +53,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <sys/ioctl.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -46,6 +66,10 @@
 #define O_ACCMODE_ 3
 #define MAX_LANES 1024
 #define MAX_REMOTE 32
+#define MAX_CANDIDATES 4096
+// PID namespaces nest at most 32 deep, below the initial one.
+#define MAX_LEVELS 33
+#define NS_GET_PARENT_ 0xb702
 
 static struct observe_bpf *skel;
 
@@ -264,46 +288,164 @@ static int on_event(void *ctx, void *data, size_t len) {
   return 0;
 }
 
-// A process's PID namespace, held open so its inode cannot be reused.
-static int namespace_of(int pid, int *fd, unsigned long long *id, char *why, size_t cap) {
-  char path[64];
-  snprintf(path, sizeof path, "/proc/%d/ns/pid", pid);
-  *fd = open(path, O_RDONLY | O_CLOEXEC);
-  if (*fd < 0) {
-    snprintf(why, cap, "%s: %s", path, strerror(errno));
-    return -1;
+// A process found by a lookup: its PID namespace held open until it is
+// installed or dropped.
+struct candidate {
+  char token[32];
+  int pid;
+  int namespace_fd;
+  unsigned long long namespace;
+};
+static struct candidate candidates[MAX_CANDIDATES];
+static int ncandidates;
+
+static void drop_token(const char *token) {
+  for (int i = 0; i < ncandidates;) {
+    if (strcmp(candidates[i].token, token) != 0) {
+      i++;
+      continue;
+    }
+    if (candidates[i].namespace_fd >= 0) close(candidates[i].namespace_fd);
+    candidates[i] = candidates[--ncandidates];
   }
-  struct stat st;
-  if (fstat(*fd, &st) != 0) {
-    snprintf(why, cap, "%s: %s", path, strerror(errno));
-    close(*fd);
-    *fd = -1;
-    return -1;
-  }
-  *id = (unsigned long long)st.st_ino;
-  return 0;
 }
 
-static void do_register(char **f, int n) {
-  int pid = n > 1 ? atoi(f[1]) : 0;
-  char why[PATHMAX + 128];
-  unsigned long long ns;
-  int ns_fd = -1;
-  if (pid <= 0) {
-    printf("refused\t%d\tnot a process id\n", pid);
+// NSpid, read through the process's /proc directory: its levels, or -1.
+static int nspid_of(int dir, long *out, int cap) {
+  int fd = openat(dir, "status", O_RDONLY | O_CLOEXEC);
+  if (fd < 0) return -1;
+  static char buf[16384];
+  ssize_t r = read(fd, buf, sizeof buf - 1);
+  close(fd);
+  if (r <= 0) return -1;
+  buf[r] = 0;
+  char *at = strstr(buf, "\nNSpid:");
+  if (!at) return -1;
+  at += 7;
+  int n = 0;
+  while (n < cap) {
+    char *end;
+    long v = strtol(at, &end, 10);
+    if (end == at) break;
+    out[n++] = v;
+    at = end;
+  }
+  return n;
+}
+
+// The namespace `fd` holds, then each parent NS_GET_PARENT gives: it refuses
+// the loader's own namespace's parent, so the last is the loader's.
+static int namespaces_of(int fd, unsigned long long *out, int cap) {
+  int n = 0, at = fd;
+  while (n < cap) {
+    struct stat st;
+    if (fstat(at, &st) != 0) break;
+    out[n++] = (unsigned long long)st.st_ino;
+    int parent = ioctl(at, NS_GET_PARENT_);
+    if (at != fd) close(at);
+    at = parent;
+    if (at < 0) break;
+  }
+  if (at >= 0 && at != fd) close(at);
+  return n;
+}
+
+// Process <pid> as a candidate of <token>, when <level> < 0 or its pid at
+// <level> is <want>. Its status and namespace are read through one /proc
+// directory, so both are the one process's even if its pid is reused.
+static void consider(const char *token, int pid, int level, long want, int *cut) {
+  char path[64];
+  snprintf(path, sizeof path, "/proc/%d", pid);
+  int dir = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+  if (dir < 0) return;
+  long nspid[MAX_LEVELS];
+  int n = nspid_of(dir, nspid, MAX_LEVELS);
+  if (n <= 0 || (level >= 0 && (level >= n || nspid[level] != want))) {
+    close(dir);
     return;
   }
-  if (namespace_of(pid, &ns_fd, &ns, why, sizeof why) != 0) {
-    printf("refused\t%d\t", pid);
-    put_escaped(why);
-    putchar('\n');
+  int fd = openat(dir, "ns/pid", O_RDONLY | O_CLOEXEC);
+  close(dir);
+  if (fd < 0) return;
+  if (ncandidates == MAX_CANDIDATES) {
+    close(fd);
+    *cut = 1;
     return;
   }
+  unsigned long long ns[MAX_LEVELS];
+  int m = namespaces_of(fd, ns, MAX_LEVELS);
+  if (m <= 0) {
+    close(fd);
+    return;
+  }
+  struct candidate *c = &candidates[ncandidates++];
+  snprintf(c->token, sizeof c->token, "%s", token);
+  c->pid = pid;
+  c->namespace_fd = fd;
+  c->namespace = ns[0];
+  printf("candidate\t%s\t%d\t", token, pid);
+  for (int i = 0; i < n; i++) printf(i ? ",%ld" : "%ld", nspid[i]);
+  putchar('\t');
+  for (int i = 0; i < m; i++) printf(i ? ",%llu" : "%llu", ns[i]);
+  putchar('\n');
+}
+
+static void do_open(char **f, int n) {
+  int cut = 0;
+  const char *token = n > 1 ? f[1] : "";
+  int pid = n > 2 ? atoi(f[2]) : 0;
+  if (pid > 0) consider(token, pid, -1, 0, &cut);
+  printf("looked\t%s\t%s\n", token, cut ? "cut" : "complete");
+}
+
+static void do_find(char **f, int n) {
+  int cut = 0;
+  const char *token = n > 1 ? f[1] : "";
+  int level = n > 2 ? atoi(f[2]) : -1;
+  long want = n > 3 ? atol(f[3]) : 0;
+  DIR *proc = level >= 0 && want > 0 ? opendir("/proc") : NULL;
+  for (struct dirent *d; proc && (d = readdir(proc));) {
+    char *end;
+    long pid = strtol(d->d_name, &end, 10);
+    if (*end == 0 && pid > 0) consider(token, (int)pid, level, want, &cut);
+  }
+  if (proc) closedir(proc);
+  printf("looked\t%s\t%s\n", token, cut ? "cut" : "complete");
+}
+
+static void refused(const char *token, const char *why) {
+  printf("refused\t%s\t", token);
+  put_escaped(why);
+  putchar('\n');
+}
+
+// A candidate made a lane, or the lane its namespace is already refreshed:
+// its first pid and remote directories replaced, its descriptor the new one.
+static void do_install(char **f, int n) {
+  const char *token = n > 1 ? f[1] : "";
+  int pid = n > 2 ? atoi(f[2]) : 0;
+  struct candidate *c = NULL;
+  for (int i = 0; i < ncandidates && !c; i++)
+    if (strcmp(candidates[i].token, token) == 0 && candidates[i].pid == pid) c = &candidates[i];
+  if (!c) {
+    refused(token, "no such candidate");
+    return;
+  }
+  unsigned long long ns = c->namespace;
+  int fd = c->namespace_fd;
+  c->namespace_fd = -1;
+  drop_token(token);
   struct lane *l = lane_of(ns);
   if (!l) {
     if (nlanes == MAX_LANES) {
-      printf("refused\t%d\tthe observer holds %d lanes already\n", pid, MAX_LANES);
-      close(ns_fd);
+      close(fd);
+      refused(token, "the observer holds as many lanes as it can");
+      return;
+    }
+    unsigned char one = 1;
+    if (bpf_map__update_elem(skel->maps.registered, &ns, sizeof ns, &one, sizeof one, 0) != 0) {
+      close(fd);
+      refused(token, "the observer's map of lanes is full");
       return;
     }
     l = &lanes[nlanes++];
@@ -312,24 +454,19 @@ static void do_register(char **f, int n) {
   }
   lane_free(l);
   l->namespace = ns;
-  l->namespace_fd = ns_fd;
+  l->namespace_fd = fd;
   l->pid = pid;
-  for (int i = 2; i < n && l->nremote < MAX_REMOTE; i++) {
+  for (int i = 3; i < n && l->nremote < MAX_REMOTE; i++) {
     size_t len = unescape(f[i]);
     while (len > 1 && f[i][len - 1] == '/') f[i][--len] = 0;
     l->remote[l->nremote] = strdup(f[i]);
     l->remote_len[l->nremote] = len;
     l->nremote++;
   }
-  unsigned char one = 1;
-  if (bpf_map__update_elem(skel->maps.registered, &ns, sizeof ns, &one, sizeof one, 0) != 0) {
-    printf("refused\t%d\tthe observer's map of lanes is full\n", pid);
-    lane_free(l);
-    *l = lanes[--nlanes];
-    return;
-  }
-  printf("registered\t%d\t%llu\n", pid, ns);
+  printf("registered\t%s\t%llu\n", token, ns);
 }
+
+static void do_drop(char **f, int n) { drop_token(n > 1 ? f[1] : ""); }
 
 static void do_unregister(char **f, int n) {
   unsigned long long ns = n > 1 ? strtoull(f[1], NULL, 10) : 0;
@@ -384,7 +521,10 @@ static void command(struct ring_buffer *rb, char *line) {
     *tab = 0;
     s = tab + 1;
   }
-  if (strcmp(f[0], "register") == 0) do_register(f, n);
+  if (strcmp(f[0], "open") == 0) do_open(f, n);
+  else if (strcmp(f[0], "find") == 0) do_find(f, n);
+  else if (strcmp(f[0], "install") == 0) do_install(f, n);
+  else if (strcmp(f[0], "drop") == 0) do_drop(f, n);
   else if (strcmp(f[0], "unregister") == 0) do_unregister(f, n);
   else if (strcmp(f[0], "flush") == 0) do_flush(rb, f, n);
   else if (f[0][0]) fprintf(stderr, "observe: unknown command %s\n", f[0]);
@@ -398,6 +538,12 @@ static int fail(const char *step, int err) {
 int main(int argc, char **argv) {
   unsigned ring_kib = argc > 1 ? (unsigned)atoi(argv[1]) : 64 << 10;
   signal(SIGPIPE, SIG_IGN);
+  // Each lane and each candidate holds a descriptor.
+  struct rlimit nofile;
+  if (getrlimit(RLIMIT_NOFILE, &nofile) == 0) {
+    nofile.rlim_cur = nofile.rlim_max;
+    setrlimit(RLIMIT_NOFILE, &nofile);
+  }
   skel = observe_bpf__open();
   if (!skel) return fail("open", errno);
   bpf_map__set_max_entries(skel->maps.events, ring_kib << 10);

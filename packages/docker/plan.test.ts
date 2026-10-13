@@ -8,6 +8,7 @@ import {
   planShape,
 } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
+import { createBody } from "./api.ts"
 import { buildError } from "./cli.ts"
 import {
   type DockerHostFacts,
@@ -86,6 +87,15 @@ const shapes: readonly ContainerShape[] = [
 ]
 
 describe("renderRun: a lane's shape as a container", () => {
+  test("every shape keeps a PID namespace of its own: the observer's lane is it", () => {
+    for (const shape of shapes) {
+      const host = createBody(render(shape), () => "").HostConfig as Record<
+        string,
+        unknown
+      >
+      expect(host.PidMode).toBeUndefined()
+    }
+  })
   test("no shape gets a capability, or a Docker socket", () => {
     for (const shape of shapes) {
       const made = render(shape)

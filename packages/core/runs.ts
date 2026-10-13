@@ -240,10 +240,34 @@ export interface RunSource {
   flush(): Promise<Flushed>
 }
 
+/** Where a lane's helper serves the machine's observer to a host inside the lane. */
+export const OBSERVER_SOCKET = "/run/pinetrie/observer.sock"
+
+/**
+ * A connection of the observer, opened for a host inside a lane through
+ * the lane's helper. Its calls and updates are the observer's own, opaque
+ * here: they come from inside the lane, and the observer's adapter checks
+ * each one.
+ */
+export interface ObserverRelay {
+  readonly hello: unknown
+  call(
+    body: unknown,
+    signal: AbortSignal,
+    onUpdate: (update: unknown) => void,
+  ): Promise<unknown>
+  close(): void
+}
+
 /** A lane being observed: its runs' source, until it is closed. */
 export interface LaneObservation extends RunSource {
   /** Stop observing it: no run begins in it after. */
   close(): Promise<void>
+  /**
+   * A connection for the host inside this lane, if one runs: it observes
+   * only lanes below this one.
+   */
+  relay(): Promise<ObserverRelay>
 }
 
 /** A file or directory a run left in place. */

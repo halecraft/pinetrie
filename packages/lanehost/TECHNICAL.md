@@ -57,12 +57,16 @@ host, whatever their projects.
 
 - **The kernel side decides only which task is in which run**
   (`observe.bpf.c`):
-  - A run begins where an untagged task, in a cgroup a host registered,
-    execs with `PINETRIE_RUN=<n>` in its environment, read by a
-    `bpf_loop` over the strings. Its tag is the run and that cgroup, its
-    lane; every task it starts takes it (`task_newtask`, which io_uring's
-    workers pass too), whatever it execs or wherever it moves, and a
-    tagged task never takes another.
+  - A run begins where an untagged task, in a PID namespace a host
+    registered, execs with `PINETRIE_RUN=<n>` in its environment, read by
+    a `bpf_loop` over the strings. Its tag is the run and that namespace,
+    its lane; every task it starts takes it (`task_newtask`, which
+    io_uring's workers pass too), whatever it execs, wherever it moves or
+    whatever namespace it enters, and a tagged task never takes another.
+  - A task's namespace is `thread_pid`'s `numbers[level].ns`, its inode
+    the lane. `numbers` is a flexible array: its stride is the running
+    kernel's `struct upid` (`bpf_core_type_size`), never `kernel.h`'s,
+    which declares only the field it reads.
   - A path is walked from its dentry through each mount to the task's
     root, in a `bpf_loop` callback: as an inline loop its branches pass
     the verifier's limit.
@@ -82,12 +86,25 @@ host, whatever their projects.
     `FUNCTION_TRACER`.
 - **The loader holds no decision** (`observe.c`, static, the BPF object in
   its skeleton): it drains the ring to stdout as `ev <lane> <run>
-  <inodes> <core's event line>`, and answers `register`, `unregister` and
-  `flush` on stdin. It reads a lane's cgroup from its first process, and
-  `lstat`s a file under the lane's remote directories through that
-  process's root as its event is read: over virtiofs only a fresh stat
-  reads the Mac's stamp. A path cut short, or a release it cannot name, is
-  a loss. A flush drains the ring itself, after any command before it.
+  <inodes> <core's event line>`, gathers facts, and carries out commands.
+  - `open` and `find` gather candidates: a process by its pid, or every
+    process whose pid at a namespace level is the one given, each with its
+    `NSpid` and its namespace's chain of parents by `NS_GET_PARENT` (which
+    refuses above the loader's own namespace, so the chain ends there).
+    Status and namespace are read through one `/proc/<pid>` directory, so
+    a pid reused between them cannot mix two processes.
+  - A candidate's namespace is held open from its lookup until `install`
+    or `drop`, and a lane's until `unregister`: what was checked is what is
+    registered, and its inode names no other namespace while held. Each
+    holds a descriptor, so the loader raises its limit to the hard one.
+  - `install` makes a lane of a candidate, or refreshes the lane its
+    namespace is already: the kernel's map entry first, for a new lane,
+    so a refusal leaves nothing behind. `unregister` deletes both.
+  - It `lstat`s a file under the lane's remote directories through its
+    first process's root as its event is read: over virtiofs only a fresh
+    stat reads the Mac's stamp. A path cut short, or a release it cannot
+    name, is a loss. A flush drains the ring itself, after any command
+    before it.
 - **The role's decisions are `observer.ts`'s, pure:** where a notice goes
   (`routeEvent`), what a lane with no host may hold (`planHeld`), what its
   next host is sent first (`heldNotices`), when the role exits
@@ -95,11 +112,48 @@ host, whatever their projects.
   was raced (`isRaced`: its size or inode, never its ctime), how a host's
   lanes are observed (`planObserver`), and the role's version
   (`observerVersion`, a hash of its sources: its image's tag and its
-  container's name).
-- **A host gone keeps its lanes' runs:** their notices are held until a
-  connection registers the lane again, as a host does after it restarts.
-- **Under rootless Docker nothing can load it,** and a lane's own lanes
-  share its cgroup (S175), so a host there refuses lanes.
+  container's name). Registration is gathered, planned, then executed:
+  `planLookup` says which candidates to gather, `planRegister` which one
+  to install, or why none.
+- **A registration names its origin; a connection never implies one.**
+  - Direct: the lane's first pid in the machine's namespace, from a host
+    whose Docker is the machine's. The candidate must be below the
+    observer's own namespace: a lane's container never shares it
+    (`renderRun` sets no `PidMode`).
+  - Forwarded: the pid as the `forwarding` lane sees it, and `within`, the
+    lane whose host relayed it, which that host sets whatever the call
+    said (`relayedCall`). Both must be registered, `forwarding` being
+    `within` or below it. The one candidate in `forwarding`'s namespace at
+    its level with that pid is taken (`translatedCandidate`), none or
+    several refused, and only in a namespace strictly below `forwarding`
+    (`isStrictDescendant`): never it, a sibling or an unrelated one.
+- **A registration belongs to its connection** (`planOwnership`): one
+  nobody holds is installed; its live owner refreshes its first pid and
+  remote directories, by the same origin; one whose connection closed is
+  reclaimed by whoever registers it next. Another live connection's is
+  refused, whatever the origins. Only its owner unregisters it
+  (`planUnregister`). Registrations are planned one at a time, so two
+  cannot both install one namespace.
+- **A host gone keeps its lanes' runs:** a connection's end leaves its
+  lanes registered and pinned, their notices held until a connection
+  reclaims them, as a host does after it restarts, one unregisters them,
+  or the role exits idle. The held-notice bound turns excess into losses;
+  it removes nothing. A connection's end is taken at its input's end,
+  before the host sees its side close, and a host waits for its old
+  channel to close before opening the next, so its reclaim never finds
+  its own old connection live.
+- **A host keeps notices that come before its registration's answer**
+  (`observer-client.ts`): the role sends a reclaimed lane's held notices
+  as it registers it, before the answer names the namespace, so a notice
+  of a namespace no lane holds yet waits for the lane that registers it.
+- **A host inside a lane is served through the lane's helper**
+  (`packages/pi/TECHNICAL.md`), relayed by the host outside it: each
+  connection it opens is a connection of its own to the role (the lane
+  observation's `relay`, `observer-client.ts`), so the role owns and
+  routes the inner host's lanes by it. Its notices go only to it.
+- **Under rootless Docker nothing can load it:** a host there is observed
+  through its lane's helper when the socket is there (`planObserver`),
+  and refuses lanes when it is not.
 
 ## Calls name names, never paths
 

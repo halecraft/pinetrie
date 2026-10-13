@@ -34,11 +34,19 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   has no KVM): a run takes about 35 s, and its timings mean nothing. It
   needs `qemu-system-aarch64` and an arm64 Docker, and caches the VM image
   under `node_modules/.cache`. Its guest (`packages/lanehost/observer/suite/init`)
-  runs each case as a numbered run in a lane's cgroup and prints what the
-  loader said; the scenario checks it, decoding with lanehost's codec.
-- **In a lane, a host refuses lanes:** its Docker is rootless, and nothing
-  forwards the observer to a nested lane yet, so the scenarios with tools,
-  and all of `e2e:lanes`, skip there with the host's words.
+  runs each case as a numbered run in a lane's PID namespace, each lane
+  its own namespace, all in one cgroup, one lane inside another, and prints
+  what the loader said; the scenario checks it, decoding with lanehost's
+  codec. The guest's background processes close the loader's command
+  pipe, or the loader never sees its end.
+- **The guest checks the kernel and the loader, not the policy:** which
+  candidate a registration takes, ancestry, ownership and lifecycle are
+  the machine role's planners', proved by unit tests.
+- **In a lane, a host is observed through its helper:** the host outside
+  relays the observer, so `e2e:lanes` runs in a lane once that host runs
+  this code. A host outside that relays nothing leaves no socket, and the
+  inner host refuses lanes: the scenarios with tools, and all of
+  `e2e:lanes`, skip with its words.
 
 - **A host reads the suites' user config, not the person's.**
   `startSuiteHost` (`harness.ts`) and `LaneHosts` pass `SUITE_CONFIG`,

@@ -7,6 +7,13 @@ const bpf = "packages/lanehost/observer/observe.bpf.c"
 const loader = "packages/lanehost/observer/observe.c"
 const kernel = { suite: "observer", scenario: "kernel" } as const
 const policy = "packages/lanehost/observer.ts"
+const relay = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "apps/pinetrie/host/work/relay.test.ts",
+]
 const unit = [
   "pnpm",
   "exec",
@@ -104,11 +111,56 @@ export const mutations: readonly Mutation[] = [
   },
   {
     ...kernel,
-    name: "a run begins in any cgroup",
+    name: "a run begins in any PID namespace",
     file: bpf,
-    from: "  if (!bpf_map_lookup_elem(&registered, &cgroup)) return 0;\n",
-    to: "",
-    expect: "an exec in a cgroup no host registered begins no run",
+    from: "  if (!pid_namespace || !bpf_map_lookup_elem(&registered, &pid_namespace)) return 0;\n",
+    to: "  if (!pid_namespace) return 0;\n",
+    expect: "an exec in a PID namespace no host registered begins no run",
+  },
+  {
+    ...kernel,
+    name: "a PID namespace is read at the header's stride, not the kernel's",
+    file: bpf,
+    from: "(u64)level * bpf_core_type_size(struct upid));\n",
+    to: "(u64)level * sizeof(struct upid));\n",
+    expect:
+      "each lane is its first process's PID namespace, apart from a sibling's in the same cgroup",
+  },
+  {
+    ...kernel,
+    name: "an event's lane is the PID namespace its task is in now",
+    file: bpf,
+    from: "  e->run = *run;\n",
+    to: "  e->run = *run;\n  e->run.lane = pid_namespace_of((struct task_struct *)bpf_get_current_task());\n",
+    expect:
+      "a run's events go to the lane it began in after its process enters a PID namespace of its own",
+  },
+  {
+    ...kernel,
+    name: "a run begins only in a namespace one level below the machine's",
+    file: bpf,
+    from: "  if (level > 32) return 0;\n",
+    to: "  if (level > 1) return 0;\n",
+    expect:
+      "a lane registered below another begins its own runs, apart from its parent's",
+  },
+  {
+    ...kernel,
+    name: "a registered lane's namespace is let go once installed",
+    file: loader,
+    from: "  l->namespace_fd = fd;\n",
+    to: "  l->namespace_fd = -1;\n  close(fd);\n",
+    expect:
+      "a namespace held registered keeps its number after its processes exit, and gives it up once let go",
+  },
+  {
+    ...kernel,
+    name: "a candidate's parents are not asked of the kernel",
+    file: loader,
+    from: "    int parent = ioctl(at, NS_GET_PARENT_);\n",
+    to: "    int parent = -1;\n",
+    expect:
+      "a lookup at a lane's level finds a process below it by its pid there, with its NSpid and each parent by NS_GET_PARENT",
   },
   {
     ...kernel,
@@ -149,7 +201,7 @@ export const mutations: readonly Mutation[] = [
     ...kernel,
     name: "an unregistered lane stays in the kernel's map",
     file: loader,
-    from: "  bpf_map__delete_elem(skel->maps.registered, &cg, sizeof cg, 0);\n",
+    from: "  bpf_map__delete_elem(skel->maps.registered, &ns, sizeof ns, 0);\n",
     to: "",
     expect: "an unregistered lane begins no new run",
   },
@@ -181,8 +233,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a notice goes to its lane's connection before it subscribes",
     file: policy,
-    from: "  return to !== undefined && subscribed.has(to)\n",
-    to: "  return to !== undefined\n",
+    from: "  return to != null && subscribed.has(to)\n",
+    to: "  return to != null\n",
     command: unit,
     expect: "a notice of a lane no subscribed connection holds is held",
   },
@@ -232,10 +284,145 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's held notices are never sent once it is registered",
     file: "packages/lanehost/observer-server.ts",
-    from: "      conn.lanes.add(got.lane)\n      release(got.lane)\n",
-    to: "      conn.lanes.add(got.lane)\n",
+    from: "  registrations.set(got.lane, { ...plan.registration, owner })\n  release(got.lane)\n",
+    to: "  registrations.set(got.lane, { ...plan.registration, owner })\n",
     command: unit,
     expect: "a host's lane's notices reach it, and a flush answers after them",
+  },
+  {
+    name: "a closed connection keeps owning its lanes",
+    file: "packages/lanehost/observer-server.ts",
+    from: "    if (r.owner === id) registrations.set(lane, { ...r, owner: null })\n",
+    to: "",
+    command: unit,
+    expect:
+      "a forwarded host registers only below its lane, and no host takes another live one's lane",
+  },
+  {
+    name: "translation takes the pid at any namespace of the level",
+    file: policy,
+    from: "      namespaceAtLevel(c, forwarding.level) === forwarding.namespace &&\n",
+    to: "",
+    command: unit,
+    expect:
+      "translation takes the one process with the pid in the forwarding lane's namespace",
+  },
+  {
+    name: "translation takes the first of several",
+    file: policy,
+    from: "  return matches.length === 1 ? (matches[0] ?? null) : null\n}\n\n/** What a registration does",
+    to: "  return matches[0] ?? null\n}\n\n/** What a registration does",
+    command: unit,
+    expect:
+      "translation takes the one process with the pid in the forwarding lane's namespace",
+  },
+  {
+    name: "a namespace descends from itself",
+    file: policy,
+    from: "): boolean => namespaces.indexOf(ancestor) >= 1\n",
+    to: "): boolean => namespaces.indexOf(ancestor) >= 0\n",
+    command: unit,
+    expect: "ancestry is strict and reaches the forwarding namespace",
+  },
+  {
+    name: "a forwarded registration may be the forwarding lane itself",
+    file: policy,
+    from: "    if (!isStrictDescendant(found.namespaces, origin.forwarding))\n",
+    to: "    if (false)\n",
+    command: unit,
+    expect:
+      "a forwarded registration is strictly below its forwarding lane, never it, a sibling or another",
+  },
+  {
+    name: "a forwarding lane outside the relaying one is looked up",
+    file: policy,
+    from: "    origin.forwarding !== origin.within &&\n    !isStrictDescendant(forwarding.namespaces, origin.within)\n",
+    to: "    false\n",
+    command: unit,
+    expect:
+      "a forwarded lookup needs its lanes registered, the forwarding one within the relaying one",
+  },
+  {
+    name: "a live host's lane is taken by another",
+    file: policy,
+    from: "  if (existing.owner !== connection)\n    return refuse(",
+    to: "  if (false)\n    return refuse(",
+    command: unit,
+    expect:
+      "a live owner refreshes, a closed one's is reclaimed, another live one's is refused",
+  },
+  {
+    name: "a closed host's lane is never reclaimed",
+    file: policy,
+    from: '  if (existing.owner === null) return "reclaim"\n',
+    to: '  if (existing.owner === null) return refuse("held")\n',
+    command: unit,
+    expect:
+      "a live owner refreshes, a closed one's is reclaimed, another live one's is refused",
+  },
+  {
+    name: "a refresh may change its origin",
+    file: policy,
+    from: "  return sameOrigin(existing.origin, origin)\n",
+    to: "  return true\n",
+    command: unit,
+    expect:
+      "a live owner refreshes, a closed one's is reclaimed, another live one's is refused",
+  },
+  {
+    name: "a direct registration may share the observer's namespace",
+    file: policy,
+    from: "    if (found.namespaces.length < 2)\n",
+    to: "    if (found.namespaces.length < 1)\n",
+    command: unit,
+    expect:
+      "a direct registration is its own process, in a namespace below the observer's",
+  },
+  {
+    name: "any host unregisters a lane",
+    file: policy,
+    from: '    : existing.owner === connection\n      ? "unregister"\n',
+    to: '    : true\n      ? "unregister"\n',
+    command: unit,
+    expect: "only a lane's owner unregisters it",
+  },
+  {
+    name: "a relayed registration keeps the relaying lane it claimed",
+    file: policy,
+    from: "          forwarding,\n          within: lane,\n",
+    to: "          forwarding,\n          within: String(origin.within ?? lane),\n",
+    command: unit,
+    expect:
+      "a relayed registration is forwarded within the relaying lane, whatever it claimed",
+  },
+  {
+    suite: "lanes",
+    scenario: "images",
+    name: "each project's host makes an observer of its own",
+    file: "packages/docker/runtime.ts",
+    from: "    const v = await version\n",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "    const v = `${await version}-${key}`\n",
+    expect:
+      "two projects' lanes are observed by at most one observer, the machine's, each run attributed",
+  },
+  {
+    name: "a lane's notices before its registration's answer are dropped",
+    file: "packages/lanehost/observer-client.ts",
+    from: "    lane.notices.unshift(...(unclaimed.get(namespace) ?? []))\n",
+    to: "",
+    command: relay,
+    expect:
+      "a host inside a lane registers its lane below the lane, and receives only its own runs",
+  },
+  {
+    name: "a relayed call goes to the role as the lane sent it",
+    file: "packages/lanehost/observer-client.ts",
+    from: "              c.call(relayedCall(body, held.namespace), signal, onUpdate),\n",
+    to: "              c.call(body as ObserverCall, signal, onUpdate),\n",
+    command: relay,
+    expect:
+      "a host inside a lane registers its lane below the lane, and receives only its own runs",
   },
   {
     name: "the machine role's container keeps the network",

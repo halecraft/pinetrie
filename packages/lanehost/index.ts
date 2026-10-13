@@ -22,7 +22,6 @@ export {
   type LoaderCommand,
   type LoaderLine,
   MACHINE_SOCKET,
-  OBSERVER_SOCKET,
   type ObserverCall,
   type ObserverFacts,
   type ObserverHello,
@@ -65,6 +64,7 @@ export const LANEHOST_CONTAINERFILE = path.join(
 )
 
 export {
+  connectObserver,
   type ObserverChannel,
   type ObserverClient,
   observerClient,

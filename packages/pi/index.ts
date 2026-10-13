@@ -27,7 +27,7 @@ export {
 } from "./lane-env.ts"
 export { drainLaneRuns } from "./lane-runs.ts"
 export type { LaneAccess, LaneHooks } from "./lanes.ts"
-export { RUN_ENV } from "./observer.ts"
+export { RUN_ENV, relayObserver, serveRelay } from "./observer.ts"
 export { loadPiSetup, type PiSetup } from "./pi-setup.ts"
 export { createScribe, type Scribe } from "./scribe.ts"
 export {

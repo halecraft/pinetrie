@@ -1,6 +1,7 @@
 # S176 — Can a PID namespace identify a lane in the kernel and authorize nested registration?
 
 - **Status:** Answered
+- **Led to:** ADR-0135
 
 **Question.** Can pine·trie replace a lane's cgroup identity with the PID namespace of its first process, so nested lanes remain distinct under rootless Docker while a host can register only lanes below its own namespace?
 
@@ -30,6 +31,20 @@ Measured on 2026-10-13 in a pine·trie lane, on Linux 6.18.55 and its rootless D
 4. **`NSpid` translates an inner PID uniquely.** The rootless Docker daemon reported its inner container's first process as PID 1. In the outer lane's `/proc`, exactly one status file had `NSpid: 1293 1`, and Docker reported outer PID 1293 for that container. Scanning for the complete suffix supplied by the inner host identifies one outer-visible process. Matching only the final PID is insufficient when descendant namespaces exist; the translation must match the caller's known namespace chain or reject ambiguity.
 
 The kill criterion does not fire. A PID namespace can identify a lane in the kernel and authorize nested registration. The implementation must pin every registered namespace, validate strict ancestry for forwarded registration, reject ambiguous `NSpid` translations, and define when the machine role drops registrations left by a host that never returns.
+
+**Later, in the observer suite (2026-10-13).** Answer 1 measured lanes at
+the guest's top level, where `pid.level` is 0. One level down, the
+product's read gave the parent's namespace: the stride between
+`numbers[]` entries was the local header's `sizeof(struct upid)`, which
+declares only `ns`, not the kernel's. It is `bpf_core_type_size(struct
+upid)`, relocated from the running kernel's BTF. The suite now registers
+each lane in a PID namespace of its own, one inside another, and checks
+each run's lane against `/proc/<pid>/ns/pid`. It also measured answers 2
+to 4 in the guest: a registered namespace kept its number after its last
+process exited while a new one got the next; let go, its number went to
+the next namespace made. A lookup at lane `a`'s level found the inner
+lane's first process by its pid there (`NSpid` `536,51,1`), with
+namespaces `4026532083,4026532080,4026531836` by `NS_GET_PARENT`.
 
 ## Evidence kept
 

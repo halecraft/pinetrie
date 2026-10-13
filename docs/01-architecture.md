@@ -224,7 +224,9 @@ ADR-0135 has pine·trie learn a lane's disk by watching it rather than from
 what a project declares. Every tool call's command is a run, and one
 observer per machine, an eBPF program lanehost's machine role loads outside
 every lane, reports each file its processes name, daemons included, and
-stops none of their calls.
+stops none of their calls. A lane is its first process's PID namespace;
+a host inside a lane is served the observer through that lane's helper,
+relayed by the host outside, and registers only lanes below its own.
 From those runs and `.gitignore`, each path is source, derived or local. A
 recipe is a recorded run, and a disk made for a new state (an update's
 merge, a container on another image) loses the outputs whose recipe no

@@ -788,6 +788,24 @@ export const mutations: readonly Mutation[] = [
     expect: "an exec is a run, launched with its number in its environment",
   },
   {
+    name: "the helper never says an inner host's connection ended",
+    file: "packages/pi/observer.ts",
+    from: "      request({ connection, closed: true })\n",
+    to: "",
+    command: unit,
+    expect:
+      "the inner host's calls and updates cross the relay, and its end closes the outer connection",
+  },
+  {
+    name: "a relayed call's updates are not sent back",
+    file: "packages/pi/observer.ts",
+    from: "          reply({ connection, call, update }),\n",
+    to: "          undefined,\n",
+    command: unit,
+    expect:
+      "the inner host's calls and updates cross the relay, and its end closes the outer connection",
+  },
+  {
     name: "the write tools' paths are not recorded",
     file: "packages/pi/lane-helper.ts",
     from: '  if (kind !== "read") toolWrites.add(p)\n',

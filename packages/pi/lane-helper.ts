@@ -14,6 +14,8 @@
 //   the read and write tools' accesses of shared files (`LaneDrain`);
 //   `present`, which paths exist, for the host's fold; `hashes`, cached by
 //   stamp; and `checkRecipes`.
+// - `observerRelay`: the machine's observer served at `OBSERVER_SOCKET` to a
+//   host inside the lane while the host relays it (`observer.ts`).
 // Calls are handled concurrently: pi runs a turn's tool calls in parallel
 // (`toolExecution` defaults to `"parallel"`). `{ abort }` cancels one.
 //
@@ -37,6 +39,7 @@ import {
   isUnderAny,
   LANE_HOME,
   type LaneDrain,
+  OBSERVER_SOCKET,
   type Recipe,
   type RecipeCheck,
   SHARED_ENV,
@@ -51,8 +54,9 @@ import {
   isEnvMethod,
   type LaneCall,
   type LaneHello,
+  type RelayReply,
 } from "./lane-protocol.ts"
-import { launchOptions } from "./observer.ts"
+import { launchOptions, serveRelay } from "./observer.ts"
 
 const cwd = process.env.PINETRIE_WORKSPACE_ROOT ?? WORKSPACE_ROOT
 const env = new NodeExecutionEnv({ cwd })
@@ -214,9 +218,34 @@ const fileAccess = (method: EnvMethod, args: readonly unknown[]) => {
   return access === null || p === null ? null : { kind: access.kind, path: p }
 }
 
+/** The host's answers to the relay it holds open, if it does. */
+let relayReply: ((reply: RelayReply) => void) | null = null
+
+/** The observer relayed until the host aborts the call; one relay at a time. */
+async function relay(context: {
+  readonly signal: AbortSignal
+  readonly update: ((update: unknown) => void) | undefined
+}): Promise<null> {
+  const { update, signal } = context
+  if (update === undefined) throw new Error("observerRelay asks for updates")
+  const reply = serveRelay({ socket: OBSERVER_SOCKET, request: update, signal })
+  relayReply = reply
+  await new Promise<void>(resolve =>
+    signal.addEventListener("abort", () => resolve(), { once: true }),
+  )
+  if (relayReply === reply) relayReply = null
+  return null
+}
+
 serve<LaneHello, LaneCall, unknown, unknown>(
   { cwd, shared },
   async (call, context) => {
+    // Before any await: the host's answers to one call arrive in order.
+    if ("observerReply" in call) {
+      relayReply?.(call.observerReply)
+      return null
+    }
+    if ("observerRelay" in call) return relay(context)
     if ("run" in call)
       return runCommand(call.run, {
         cwd: call.cwd ?? cwd,

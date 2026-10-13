@@ -56,6 +56,47 @@ export type LaneCall =
   | { readonly hashes: readonly string[] }
   /** Whether each recipe's key still holds on the disk: a `RecipeCheck` each. */
   | { readonly checkRecipes: readonly Recipe[] }
+  /**
+   * Serve the machine's observer to a host inside the lane, at
+   * `OBSERVER_SOCKET`, until aborted: its updates are `RelayRequest`s, each
+   * answered by an `observerReply` call.
+   */
+  | { readonly observerRelay: true }
+  | { readonly observerReply: RelayReply }
+
+/**
+ * What the helper asks of its host for a connection of the observer's
+ * socket: open it, carry one of its calls, abort one, or end it. Calls and
+ * their values are the observer's own, unread here.
+ */
+export type RelayRequest =
+  | { readonly connection: number; readonly open: true }
+  | {
+      readonly connection: number
+      readonly call: number
+      readonly body: unknown
+    }
+  | { readonly connection: number; readonly abort: number }
+  | { readonly connection: number; readonly closed: true }
+
+/** The host's answer to a `RelayRequest`. */
+export type RelayReply =
+  | { readonly connection: number; readonly hello: unknown }
+  | {
+      readonly connection: number
+      readonly call: number
+      readonly update: unknown
+    }
+  | {
+      readonly connection: number
+      readonly call: number
+      readonly result: unknown
+    }
+  | {
+      readonly connection: number
+      readonly call: number
+      readonly thrown: string
+    }
 
 /** The helper's hello: its directory, and its shared directories, absolute, as the host registers the lane with them. */
 export interface LaneHello {

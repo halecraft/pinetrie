@@ -3,7 +3,7 @@
 - **Status:** Accepted (Duane, 2026-10-12)
 - **Area:** `packages/lanes/TECHNICAL.md`, `docs/01-architecture.md`
 - **Evidence:** S146, S147, S148, S155, S156, S157, S158, S159, S160, S161,
-  S162, S169, S170, S171, S172, S173, S175
+  S162, S169, S170, S171, S172, S173, S175, S176, S177
 - **Supersedes:**
   - ADR-0131: derived state is learned from what each tool call's commands
     read and wrote, not declared (`lanes.install`, `installWhen` and
@@ -23,6 +23,12 @@
     longer current is shown as concurrent. The directory stays live, with no
     history, and is never branched.
 - **Revised:**
+  - 2026-10-13 (S177): under the observer a run sees no EINTR, `dash`'s loop
+    never fails, and `strace` traces a run's command.
+  - 2026-10-13 (S175, S176): a lane is its first process's PID namespace, not
+    its cgroup, held open by the observer while registered. A host inside a
+    lane is served the observer through that lane's helper, and registers only
+    lanes strictly below its own.
   - 2026-10-13 (S170, S171, S172, S173, S175): the eBPF observer replaces the
     supervisor: one per machine, in lanehost's machine role, stopping no call.
     EINTR, the cost and a listener's not nesting leave the risks. A lane's own
@@ -133,10 +139,25 @@ The spikes behind this decision:
 - **Every tool call is a run, which one observer per machine sees.**
   - An eBPF program, loaded by lanehost's machine role outside every lane,
     tags a run where its first process execs with its number in its
-    environment, in a cgroup a host registered; every task it starts
-    inherits the tag, and keeps it, whatever it execs or wherever it moves
-    (S172). It reports each open, rename, unlink, mkdir, link and symlink,
-    and each written file's last release, and stops none of them.
+    environment, in a PID namespace a host registered; every task it starts
+    inherits the tag, and keeps it, whatever it execs, wherever it moves,
+    whatever namespace it enters (S172, S176). It reports each open, rename,
+    unlink, mkdir, link and symlink, and each written file's last release,
+    and stops none of them.
+  - A lane is its first process's PID namespace: under a lane's rootless
+    Docker its own lanes share its cgroup, and only their namespaces set
+    them apart (S175). The observer holds each registered namespace open,
+    so its number names no other while registered (S176).
+  - A host inside a lane reaches the observer through the lane's helper,
+    relayed by the host outside it, and each of its registrations is
+    forwarded: its first process named by its pid in that lane, found from
+    every process's `NSpid` and taken only when exactly one matches, and
+    accepted only in a namespace strictly below the lane's, by the parents
+    the kernel gives (`NS_GET_PARENT`, S176). A lane only ever receives its
+    own processes' records.
+  - A lane's registration belongs to the connection that made it: another
+    live host cannot take it, and a host that reconnects reclaims it.
+    Until then it stays registered, its records held.
   - A write is attributed to the call whose process tree made it, however
     and whenever that process runs. A write nothing attributes is treated
     as a tool's write: source, or local where `.gitignore` ignores it.
@@ -330,11 +351,16 @@ The spikes behind this decision:
   - An open that finds nothing is seen at its lookup's return, a probe
     every open on the machine passes through; its cost outside a run is
     not yet measured on the Mac.
-  - A lane's own lanes cannot be observed: under its rootless Docker an
-    inner lane shares its outer lane's cgroup, so by cgroup its runs are
-    the outer lane's (S175), and a host there refuses lanes. A lane's
-    identity would have to be what sets them apart, its first process's
-    pid namespace.
+  - A lane's registration pins a namespace in the observer: one whose
+    host never returns stays registered until the observer exits idle,
+    and its records are held, up to a bound and then counted as losses.
+  - A forwarded host speaks the outer host's version of the observer's
+    calls, through its helper: a host inside a lane of another version
+    may not be understood.
+  - The first pid of a lane is read through `/proc`; a pid reused after
+    the lane's first process exits could give a remote file's `lstat`
+    another process's root. Only remote directories (the Mac's) are
+    `lstat`ed, and a host inside a lane, on Linux, names none.
 - **Left open:**
   - states moving between machines. Between lane VMs, `btrfs send` (S146,
     S148) is where to start; the boundary with the Mac is a separate

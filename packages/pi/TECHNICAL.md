@@ -533,6 +533,22 @@ item 18, and in `lanes.test.ts` against the harness.
     shared file's stamp. Its image is the host's to compare.
   - Outside a lane, as in tests on the host, nothing observes: the drain's
     source gives no events, and no run reports a path.
+- **The observer, relayed to a host inside the lane** (`observer.ts`):
+  while the host holds an `observerRelay` call open, the helper serves
+  core's `OBSERVER_SOCKET` (`serveRelay`). Each connection of it is a
+  channel of the observer's own calls, which the helper neither reads nor
+  checks: it asks the host for each (the call's updates, `RelayRequest`)
+  and returns the host's answers (`observerReply`, `RelayReply`). The
+  host's side (`relayObserver`) makes each connection a relay of the
+  lane's observation, which decides what its calls may do.
+  - **The socket exists only while a host relays,** so a host inside the
+    lane plans its observer from whether it is there.
+  - **The host's answers to one call arrive in order:** the helper takes
+    an `observerReply` before its handler's first `await`, and a channel's
+    calls are read in the order they were sent.
+  - **The helper is in the lane,** so nothing it sends is trusted: the
+    outer host, not the helper, says which lane a registration is forwarded
+    within.
 - **The helper runs on the lane runtime's Node through its own loader**, so
   `process.execPath` is the loader: nothing in it may re-execute that
   (S44 item 2).

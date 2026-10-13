@@ -251,7 +251,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   it with its number in `PINETRIE_RUN` (`packages/pi/TECHNICAL.md`); the
   host's own `run` calls never are runs. The machine's observer, outside
   every lane (`packages/lanehost/TECHNICAL.md`, The machine role), tags the
-  run as its first process execs in the lane's cgroup, which the host
+  run as its first process execs in the lane's PID namespace, which the host
   registered as the link opened (`LaneRuntime.observe`), and reports each
   open, rename, unlink, mkdir, link and symlink of its processes, and each
   written file's last release, to the host, never through the lane. A

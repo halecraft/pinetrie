@@ -1,10 +1,6 @@
-import { spawn } from "node:child_process"
-import { mkdtempSync } from "node:fs"
-import { tmpdir } from "node:os"
-import path from "node:path"
-import { openChannel } from "@pinetrie/channel"
 import { encodeRunEvent, type RunEvent, stamp } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { standInRole } from "./fixtures.ts"
 import {
   decodeLoaderLine,
   encodeLoaderCommand,
@@ -13,6 +9,7 @@ import {
   IDLE_MS,
   isRaced,
   isStrictDescendant,
+  type LaneNamespace,
   loaderRefusal,
   noticeOf,
   type ObserverCall,
@@ -21,11 +18,18 @@ import {
   observerVersion,
   planHeld,
   planIdle,
+  planLookup,
   planObserver,
-  planRegistration,
+  planOwnership,
+  planRegister,
+  planUnregister,
+  type Registration,
+  type RegistrationOrigin,
+  relayedCall,
   routeEvent,
-  translatedPid,
+  translatedCandidate,
 } from "./observer.ts"
+import { connectObserver } from "./observer-client.ts"
 
 const release = (s: string, raced: string | null): RunEvent => ({
   kind: "call",
@@ -59,29 +63,51 @@ describe("the loader's lines", () => {
     })
   })
   test("each answer is read, and any other line is none", () => {
-    expect(decodeLoaderLine("registered\t369\t21")).toEqual({
+    expect(decodeLoaderLine("registered\t4\t21")).toEqual({
       kind: "registered",
-      pid: 369,
+      token: "4",
       lane: "21",
     })
-    expect(
-      decodeLoaderLine("refused\t3\tno process 3: No such\\tfile"),
-    ).toEqual({ kind: "refused", pid: 3, why: "no process 3: No such\tfile" })
+    expect(decodeLoaderLine("refused\t3\tno such\\tcandidate")).toEqual({
+      kind: "refused",
+      token: "3",
+      why: "no such\tcandidate",
+    })
     expect(decodeLoaderLine("flushed\t7")).toEqual({
       kind: "flushed",
       token: "7",
     })
+    expect(decodeLoaderLine("looked\t7\tcut")).toEqual({
+      kind: "looked",
+      token: "7",
+      cut: true,
+    })
     expect(decodeLoaderLine("ev\t21\tx\t-\tend\t1")).toBeNull()
+    expect(decodeLoaderLine("looked\t7\tsome")).toBeNull()
     expect(decodeLoaderLine("hello")).toBeNull()
   })
-  test("a register names the first process and each remote directory, escaped", () => {
+  test("a candidate is its pid, its NSpid and its namespaces, its own first", () => {
+    expect(decodeLoaderLine("candidate\t2\t900\t900,12,1\t30,20,10")).toEqual({
+      kind: "candidate",
+      token: "2",
+      pid: 900,
+      nspid: [900, 12, 1],
+      namespaces: ["30", "20", "10"],
+    })
+    expect(decodeLoaderLine("candidate\t2\t900\t900,x\t30")).toBeNull()
+  })
+  test("an install names its candidate and each remote directory, escaped", () => {
     expect(
       encodeLoaderCommand({
-        kind: "register",
+        kind: "install",
+        token: "3",
         pid: 12,
         remote: ["/workspace/.plans", "/a\tb"],
       }),
-    ).toBe("register\t12\t/workspace/.plans\t/a\\tb")
+    ).toBe("install\t3\t12\t/workspace/.plans\t/a\\tb")
+    expect(
+      encodeLoaderCommand({ kind: "find", token: "3", level: 1, pid: 7 }),
+    ).toBe("find\t3\t1\t7")
   })
 })
 
@@ -112,7 +138,7 @@ describe("a remote release", () => {
 })
 
 describe("routing", () => {
-  const owners = new Map([["21", 1]])
+  const owners = new Map([["21", { owner: 1 }]])
   test("a notice goes to the subscribed connection that registered its lane", () => {
     expect(
       routeEvent(owners, new Set([1]), notice("21", { kind: "end", at: 1 })),
@@ -122,6 +148,9 @@ describe("routing", () => {
     const end = notice("21", { kind: "end", at: 1 })
     expect(routeEvent(owners, new Set(), end)).toEqual({ kind: "hold" })
     expect(routeEvent(new Map(), new Set([1]), end)).toEqual({ kind: "hold" })
+    expect(
+      routeEvent(new Map([["21", { owner: null }]]), new Set([1]), end),
+    ).toEqual({ kind: "hold" })
   })
   test("a lane holds up to its bound, then counts each loss; an end is always kept", () => {
     const open = notice("21", release("1:1", null))
@@ -153,33 +182,200 @@ describe("routing", () => {
   })
 })
 
+// The machine's namespace is 10. Lane 20 (first process 200, pid 1 in it)
+// is registered directly; inside it, lane 30's first process is 300 here
+// and 7 in lane 20. Lane 25 is lane 20's sibling, whose process 250 is 7
+// in it too.
+const lane20: Registration = {
+  namespaces: ["20", "10"],
+  origin: { kind: "direct" },
+  owner: 1,
+}
+const candidate = (
+  pid: number,
+  nspid: number[],
+  namespaces: LaneNamespace[],
+) => ({ pid, nspid, namespaces })
+const first20 = candidate(200, [200, 1], ["20", "10"])
+const first30 = candidate(300, [300, 7, 1], ["30", "20", "10"])
+const sibling = candidate(250, [250, 7], ["25", "10"])
+const forwarded = (
+  pid: number,
+  forwarding = "20",
+  within = "20",
+): RegistrationOrigin => ({ kind: "forwarded", pid, forwarding, within })
+const registered = (
+  entries: Record<string, Registration>,
+): ReadonlyMap<LaneNamespace, Registration> => new Map(Object.entries(entries))
+
 describe("namespace registration", () => {
-  test("translation requires one outer process for the inner pid", () => {
-    const candidates = [
-      { pid: 41, nspid: [41, 7] },
-      { pid: 42, nspid: [42, 8] },
-    ]
-    expect(translatedPid(candidates, 7)).toEqual(candidates[0])
-    expect(translatedPid(candidates, 9)).toBeNull()
+  test("a direct registration looks up its pid; a forwarded one its pid at its forwarding lane's level", () => {
+    const r = registered({ "20": lane20 })
+    expect(planLookup({ kind: "direct", pid: 200 }, r, "1")).toEqual({
+      kind: "open",
+      token: "1",
+      pid: 200,
+    })
+    expect(planLookup(forwarded(7), r, "2")).toEqual({
+      kind: "find",
+      token: "2",
+      level: 1,
+      pid: 7,
+    })
+    expect(planLookup({ kind: "direct", pid: 0 }, r, "3").kind).toBe("refuse")
+  })
+  test("a forwarded lookup needs its lanes registered, the forwarding one within the relaying one", () => {
+    const lane30: Registration = {
+      namespaces: ["30", "20", "10"],
+      origin: { kind: "forwarded", forwarding: "20" },
+      owner: 2,
+    }
+    const lane25: Registration = { ...lane20, namespaces: ["25", "10"] }
+    const r = registered({ "20": lane20, "30": lane30, "25": lane25 })
+    expect(planLookup(forwarded(7, "20", "40"), r, "1").kind).toBe("refuse")
+    expect(planLookup(forwarded(7, "40", "20"), r, "1").kind).toBe("refuse")
+    expect(planLookup(forwarded(3, "30", "20"), r, "1")).toEqual({
+      kind: "find",
+      token: "1",
+      level: 2,
+      pid: 3,
+    })
+    expect(planLookup(forwarded(3, "25", "20"), r, "1").kind).toBe("refuse")
+    expect(planLookup(forwarded(3, "20", "30"), r, "1").kind).toBe("refuse")
+  })
+  test("translation takes the one process with the pid in the forwarding lane's namespace", () => {
+    const at20 = { namespace: "20", level: 1 }
+    expect(translatedCandidate([first30, sibling], at20, 7)).toEqual(first30)
+    expect(translatedCandidate([sibling], at20, 7)).toBeNull()
+    expect(translatedCandidate([first30], at20, 8)).toBeNull()
     expect(
-      translatedPid([...candidates, { pid: 43, nspid: [43, 7] }], 7),
+      translatedCandidate([first30, { ...first30, pid: 301 }], at20, 7),
+    ).toBeNull()
+    expect(
+      translatedCandidate([{ ...first30, nspid: [300, 7] }], at20, 7),
     ).toBeNull()
   })
   test("ancestry is strict and reaches the forwarding namespace", () => {
-    expect(isStrictDescendant("30", ["20", "10"], "20")).toBe(true)
-    expect(isStrictDescendant("20", ["10"], "20")).toBe(false)
-    expect(isStrictDescendant("30", ["10"], "20")).toBe(false)
+    expect(isStrictDescendant(["30", "20", "10"], "20")).toBe(true)
+    expect(isStrictDescendant(["20", "10"], "20")).toBe(false)
+    expect(isStrictDescendant(["25", "10"], "20")).toBe(false)
   })
-  test("only an unowned namespace or its live owner may register it", () => {
-    expect(planRegistration({ kind: "unowned" }, 2)).toEqual({
+  test("a live owner refreshes, a closed one's is reclaimed, another live one's is refused", () => {
+    const direct = { kind: "direct" } as const
+    expect(planOwnership(undefined, 2, direct)).toBe("install")
+    expect(planOwnership(lane20, 1, direct)).toBe("refresh")
+    expect(planOwnership({ ...lane20, owner: null }, 2, direct)).toBe("reclaim")
+    expect(planOwnership(lane20, 2, direct)).toMatchObject({ kind: "refuse" })
+    expect(
+      planOwnership(lane20, 2, { kind: "forwarded", forwarding: "20" }),
+    ).toMatchObject({ kind: "refuse" })
+    expect(
+      planOwnership(lane20, 1, { kind: "forwarded", forwarding: "20" }),
+    ).toMatchObject({ kind: "refuse" })
+  })
+  test("a direct registration is its own process, in a namespace below the observer's", () => {
+    const plan = (pid: number, candidates = [first20]) =>
+      planRegister({
+        origin: { kind: "direct", pid },
+        candidates,
+        cut: false,
+        registrations: new Map(),
+        connection: 1,
+      })
+    expect(plan(200)).toEqual({
       kind: "install",
+      pid: 200,
+      lane: "20",
+      registration: lane20,
+      ownership: "install",
     })
-    expect(planRegistration({ kind: "owned", connection: 2 }, 2)).toEqual({
-      kind: "refresh",
+    expect(plan(201).kind).toBe("refuse")
+    expect(plan(5, [candidate(5, [5], ["10"])]).kind).toBe("refuse")
+  })
+  test("a forwarded registration is strictly below its forwarding lane, never it, a sibling or another", () => {
+    const plan = (
+      candidates: readonly ReturnType<typeof candidate>[],
+      pid = 7,
+      cut = false,
+    ) =>
+      planRegister({
+        origin: forwarded(pid),
+        candidates,
+        cut,
+        registrations: registered({ "20": lane20 }),
+        connection: 2,
+      })
+    expect(plan([first30, sibling])).toMatchObject({
+      kind: "install",
+      pid: 300,
+      lane: "30",
+      registration: {
+        origin: { kind: "forwarded", forwarding: "20" },
+        owner: 2,
+      },
     })
-    expect(planRegistration({ kind: "owned", connection: 1 }, 2).kind).toBe(
-      "refuse",
-    )
+    expect(plan([sibling]).kind).toBe("refuse")
+    // Lane 20 itself, though no live host holds it.
+    expect(
+      planRegister({
+        origin: forwarded(1),
+        candidates: [first20, sibling],
+        cut: false,
+        registrations: registered({ "20": { ...lane20, owner: null } }),
+        connection: 2,
+      }).kind,
+    ).toBe("refuse")
+    expect(plan([first30], 7, true).kind).toBe("refuse")
+  })
+  test("a forwarded registration of a namespace another live host holds is refused", () => {
+    expect(
+      planRegister({
+        origin: forwarded(7),
+        candidates: [first30],
+        cut: false,
+        registrations: registered({
+          "20": lane20,
+          "30": { ...lane20, namespaces: ["30", "20", "10"] },
+        }),
+        connection: 2,
+      }).kind,
+    ).toBe("refuse")
+  })
+  test("only a lane's owner unregisters it", () => {
+    expect(planUnregister(lane20, 1)).toBe("unregister")
+    expect(planUnregister(lane20, 2)).toMatchObject({ kind: "refuse" })
+    expect(planUnregister({ ...lane20, owner: null }, 2)).toMatchObject({
+      kind: "refuse",
+    })
+    expect(planUnregister(undefined, 2)).toBe("gone")
+  })
+  test("a relayed registration is forwarded within the relaying lane, whatever it claimed", () => {
+    expect(
+      relayedCall(
+        { kind: "register", origin: { kind: "direct", pid: 7 }, remote: [] },
+        "20",
+      ),
+    ).toEqual({ kind: "register", origin: forwarded(7), remote: [] })
+    expect(
+      relayedCall(
+        {
+          kind: "register",
+          origin: forwarded(3, "30", "99"),
+          remote: [],
+        },
+        "20",
+      ),
+    ).toEqual({ kind: "register", origin: forwarded(3, "30"), remote: [] })
+    expect(relayedCall({ kind: "flush", extra: 1 }, "20")).toEqual({
+      kind: "flush",
+    })
+    expect(() => relayedCall({ kind: "grant" }, "20")).toThrow()
+    expect(() =>
+      relayedCall(
+        { kind: "register", origin: { kind: "direct", pid: 7 }, remote: [] },
+        null,
+      ),
+    ).toThrow()
   })
 })
 
@@ -227,32 +423,16 @@ describe("the role's life", () => {
 })
 
 describe("the machine role's server, with a stand-in loader", () => {
-  const server = path.join(import.meta.dirname, "observer-server.ts")
-  const connect = path.join(import.meta.dirname, "observer-connect.ts")
-  const loader = path.join(import.meta.dirname, "fixtures/stand-in-observe.mjs")
+  const direct = (pid: number): ObserverCall => ({
+    kind: "register",
+    origin: { kind: "direct", pid },
+    remote: [],
+  })
 
   test("a host's lane's notices reach it, and a flush answers after them", async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "observer-"))
-    const socket = path.join(dir, "observer.sock")
-    const role = spawn("node", [server, socket, loader, "v1"], {
-      stdio: "inherit",
-    })
+    const role = await standInRole()
     try {
-      const open = () =>
-        openChannel<ObserverHello, ObserverCall, ObserverNotice, unknown>(
-          ["node", connect, socket],
-          "the machine role",
-        )
-      let channel = open()
-      for (let i = 0; i < 50; i++) {
-        const ready = await channel.ready.then(
-          () => true,
-          () => false,
-        )
-        if (ready) break
-        await new Promise(r => setTimeout(r, 100))
-        channel = open()
-      }
+      const channel = connectObserver(role.socket)
       expect(await channel.ready).toEqual({
         version: "v1",
         loader: { kind: "ready" },
@@ -262,20 +442,58 @@ describe("the machine role's server, with a stand-in loader", () => {
       channel
         .call({ kind: "subscribe" }, undefined, n => got.push(n))
         .catch(() => {})
-      expect(await channel.call({ kind: "register", pid: 4, remote: [] })).toBe(
-        "40",
-      )
+      expect(await channel.call(direct(4))).toBe("40")
       await channel.call({ kind: "flush" })
       expect(got.map(n => [n.lane, n.run, n.event.kind])).toEqual([
         ["40", "1", "exit"],
       ])
-      await expect(
-        channel.call({ kind: "register", pid: 0, remote: [] }),
-      ).rejects.toThrow("not a process id")
+      await expect(channel.call(direct(0))).rejects.toThrow("not a process id")
+      await expect(channel.call(direct(3))).rejects.toThrow(
+        "observer's own PID namespace",
+      )
       channel.close()
       await channel.closed
     } finally {
-      role.kill()
+      role.close()
+    }
+  })
+
+  test("a forwarded host registers only below its lane, and no host takes another live one's lane", async () => {
+    const role = await standInRole()
+    try {
+      const outer = connectObserver(role.socket)
+      const inner = connectObserver(role.socket)
+      expect(await outer.call(direct(4))).toBe("40")
+      expect(
+        await inner.call({
+          kind: "register",
+          origin: { kind: "forwarded", pid: 7, forwarding: "40", within: "40" },
+          remote: [],
+        }),
+      ).toBe("50")
+      await expect(
+        inner.call({
+          kind: "register",
+          origin: { kind: "forwarded", pid: 1, forwarding: "40", within: "40" },
+          remote: [],
+        }),
+      ).rejects.toThrow("forwarding lane's own namespace")
+      await expect(inner.call(direct(4))).rejects.toThrow("another live host")
+      await expect(
+        inner.call({ kind: "unregister", lane: "40" }),
+      ).rejects.toThrow("only the host that registered")
+      // The same host's again is a refresh.
+      expect(await outer.call(direct(4))).toBe("40")
+      outer.close()
+      await outer.closed
+      const again = connectObserver(role.socket)
+      expect(await again.call(direct(4))).toBe("40")
+      expect(await inner.call({ kind: "unregister", lane: "50" })).toBeNull()
+      again.close()
+      inner.close()
+      await Promise.all([again.closed, inner.closed])
+    } finally {
+      role.close()
     }
   })
 })

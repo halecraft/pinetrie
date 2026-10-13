@@ -20,6 +20,8 @@ import {
   isEnvMethod,
   type LaneCall,
   type LaneHello,
+  type RelayReply,
+  type RelayRequest,
 } from "./lane-protocol.ts"
 
 type Context = { readonly abortSignal: AbortSignal | undefined }
@@ -58,6 +60,15 @@ export interface LaneChannel {
   /** Whether each recipe's key, but its image, still holds on the disk. */
   checkRecipes(recipes: readonly Recipe[]): Promise<readonly RecipeCheck[]>
   /**
+   * Serve the observer to a host inside the lane until `signal` aborts:
+   * each request is answered by `observerReply` (`relayObserver`).
+   */
+  observerRelay(
+    signal: AbortSignal,
+    onRequest: (request: RelayRequest) => void,
+  ): Promise<void>
+  observerReply(reply: RelayReply): Promise<void>
+  /**
    * End the helper's input: it finishes and exits. Never a signal: killing
    * the `exec` process does not reach the helper.
    */
@@ -93,6 +104,14 @@ export function openChannel(argv: readonly string[]): LaneChannel {
       channel.call({ checkRecipes: recipes }) as Promise<
         readonly RecipeCheck[]
       >,
+    observerRelay: async (signal, onRequest) => {
+      await channel.call({ observerRelay: true }, signal, update =>
+        onRequest(update as RelayRequest),
+      )
+    },
+    observerReply: async reply => {
+      await channel.call({ observerReply: reply })
+    },
     close: channel.close,
   }
 }

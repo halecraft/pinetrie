@@ -168,8 +168,9 @@ static __always_inline u64 pid_namespace_of(struct task_struct *task) {
   struct pid *pid = BPF_CORE_READ(task, thread_pid);
   u32 level = BPF_CORE_READ(pid, level);
   if (level > 32) return 0;
+  // The kernel's stride, not this header's: its upid holds more than ns.
   struct upid *upid = (struct upid *)((char *)pid + bpf_core_field_offset(struct pid, numbers) +
-                                      (u64)level * sizeof(struct upid));
+                                      (u64)level * bpf_core_type_size(struct upid));
   struct pid_namespace *ns = BPF_CORE_READ(upid, ns);
   return (u64)BPF_CORE_READ(ns, ns.inum);
 }

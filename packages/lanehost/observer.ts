@@ -3,7 +3,7 @@
 // decision about them, each a planner the server executes.
 
 import { createHash } from "node:crypto"
-import { decodeRunEvent, type RunEvent } from "@pinetrie/core"
+import { decodeRunEvent, OBSERVER_SOCKET, type RunEvent } from "@pinetrie/core"
 
 /** A lane, as the observer knows it: its PID namespace's inode, in decimal. */
 export type LaneNamespace = string
@@ -12,6 +12,22 @@ export type LaneNamespace = string
 export interface ReleaseInodes {
   readonly kernel: number
   readonly lstat: number
+}
+
+/**
+ * A process the loader found for a registration, as the kernel says: what
+ * a planner chooses from, never what a caller claimed.
+ */
+export interface Candidate {
+  /** Its pid in the observer's namespace, the machine's. */
+  readonly pid: number
+  /** `NSpid`: its pid at each level, the observer's namespace first. */
+  readonly nspid: readonly number[]
+  /**
+   * Its PID namespace, then each parent by `NS_GET_PARENT`, up to the
+   * observer's own: as long as `nspid`, the other way round.
+   */
+  readonly namespaces: readonly LaneNamespace[]
 }
 
 /** One line of the loader's stdout. */
@@ -26,16 +42,20 @@ export type LoaderLine =
       readonly inodes: ReleaseInodes | null
       readonly event: RunEvent
     }
+  | ({ readonly kind: "candidate"; readonly token: string } & Candidate)
+  /** Every candidate of a lookup is out; `cut` when the loader could hold no more. */
+  | { readonly kind: "looked"; readonly token: string; readonly cut: boolean }
   | {
       readonly kind: "registered"
-      readonly pid: number
+      readonly token: string
       readonly lane: LaneNamespace
     }
-  | { readonly kind: "refused"; readonly pid: number; readonly why: string }
+  | { readonly kind: "refused"; readonly token: string; readonly why: string }
   | { readonly kind: "unregistered"; readonly lane: LaneNamespace }
   | { readonly kind: "flushed"; readonly token: string }
 
 const DECIMAL = /^\d+$/
+const DECIMALS = /^\d+(,\d+)*$/
 
 const escaped = (s: string): string =>
   s.replace(/[\\\t\n]/g, c =>
@@ -55,7 +75,7 @@ const inodesField = (s: string): ReleaseInodes | null | undefined => {
 /** A line the loader writes, or null for any other. */
 export function decodeLoaderLine(line: string): LoaderLine | null {
   const f = line.split("\t")
-  const [word, a = "", b = ""] = f
+  const [word, a = "", b = "", c = "", d = ""] = f
   switch (word) {
     case "ready":
       return f.length === 1 ? { kind: "ready" } : null
@@ -68,13 +88,28 @@ export function decodeLoaderLine(line: string): LoaderLine | null {
         ? null
         : { kind: "event", lane: a, run: b, inodes, event }
     }
+    case "candidate": {
+      if (f.length !== 5 || !DECIMAL.test(b) || !DECIMALS.test(c)) return null
+      if (!DECIMALS.test(d)) return null
+      return {
+        kind: "candidate",
+        token: a,
+        pid: Number(b),
+        nspid: c.split(",").map(Number),
+        namespaces: d.split(","),
+      }
+    }
+    case "looked":
+      return f.length === 3 && (b === "complete" || b === "cut")
+        ? { kind: "looked", token: a, cut: b === "cut" }
+        : null
     case "registered":
-      return f.length === 3 && DECIMAL.test(a) && DECIMAL.test(b)
-        ? { kind: "registered", pid: Number(a), lane: b }
+      return f.length === 3 && DECIMAL.test(b)
+        ? { kind: "registered", token: a, lane: b }
         : null
     case "refused":
-      return f.length === 3 && DECIMAL.test(a)
-        ? { kind: "refused", pid: Number(a), why: unescaped(b) }
+      return f.length === 3
+        ? { kind: "refused", token: a, why: unescaped(b) }
         : null
     case "unregistered":
       return f.length === 2 && DECIMAL.test(a)
@@ -89,21 +124,45 @@ export function decodeLoaderLine(line: string): LoaderLine | null {
 
 /** A command to the loader, as one line. */
 export type LoaderCommand =
+  /** The process `pid` of the machine's namespace: its facts, held as a candidate. */
+  | { readonly kind: "open"; readonly token: string; readonly pid: number }
+  /**
+   * Every process whose pid at namespace level `level` is `pid`: their
+   * facts, each held as a candidate. A locator only: the planner checks
+   * which namespace each is in.
+   */
   | {
-      readonly kind: "register"
-      /** The lane's first process, in the machine's pid namespace. */
+      readonly kind: "find"
+      readonly token: string
+      readonly level: number
+      readonly pid: number
+    }
+  /** The candidate `pid` of lookup `token` registered, its namespace held open; the rest let go. */
+  | {
+      readonly kind: "install"
+      readonly token: string
       readonly pid: number
       /** Its directories whose stamps only a fresh `lstat` reads: the Mac's, over virtiofs. */
       readonly remote: readonly string[]
     }
+  /** Every candidate of lookup `token` let go: it was refused. */
+  | { readonly kind: "drop"; readonly token: string }
   | { readonly kind: "unregister"; readonly lane: LaneNamespace }
   | { readonly kind: "flush"; readonly token: string }
 
 /** A command's line, without its newline. */
 export function encodeLoaderCommand(c: LoaderCommand): string {
   switch (c.kind) {
-    case "register":
-      return ["register", String(c.pid), ...c.remote.map(escaped)].join("\t")
+    case "open":
+      return `open\t${c.token}\t${c.pid}`
+    case "find":
+      return `find\t${c.token}\t${c.level}\t${c.pid}`
+    case "install":
+      return ["install", c.token, String(c.pid), ...c.remote.map(escaped)].join(
+        "\t",
+      )
+    case "drop":
+      return `drop\t${c.token}`
     case "unregister":
       return `unregister\t${c.lane}`
     case "flush":
@@ -111,10 +170,36 @@ export function encodeLoaderCommand(c: LoaderCommand): string {
   }
 }
 
+/**
+ * Where a registration's first process is named. Said by the call, never
+ * read from the connection it came on.
+ */
+export type RegistrationOrigin =
+  /** By a host whose Docker is the machine's: its pid in the machine's namespace. */
+  | { readonly kind: "direct"; readonly pid: number }
+  /**
+   * By a host inside a lane, through the hosts outside it: its pid as the
+   * `forwarding` lane's namespace sees it. `within` is the lane whose host
+   * relayed the call, set by that host, never by the lane: `forwarding` is
+   * it, or a lane registered below it.
+   */
+  | {
+      readonly kind: "forwarded"
+      readonly pid: number
+      readonly forwarding: LaneNamespace
+      readonly within: LaneNamespace
+    }
+
 /** The machine role's calls, from a host, over `@pinetrie/channel`. */
 export type ObserverCall =
-  /** The lane whose first process is `pid`: a run may begin in its PID namespace. Its result is the lane. */
-  | Extract<LoaderCommand, { kind: "register" }>
+  /** A lane: a run may begin in its first process's PID namespace. Its result is the lane. */
+  | {
+      readonly kind: "register"
+      readonly origin: RegistrationOrigin
+      /** Its directories whose stamps only a fresh `lstat` reads: the Mac's, over virtiofs. */
+      readonly remote: readonly string[]
+    }
+  /** Only by the connection that registered the lane. */
   | Extract<LoaderCommand, { kind: "unregister" }>
   /** Its updates are the notices of this connection's lanes; it answers only when the connection ends. */
   | { readonly kind: "subscribe" }
@@ -182,12 +267,12 @@ export type Route =
  * so has one whose connection has not subscribed yet.
  */
 export const routeEvent = (
-  owners: ReadonlyMap<LaneNamespace, ConnectionId>,
+  registrations: ReadonlyMap<LaneNamespace, Pick<Registration, "owner">>,
   subscribed: ReadonlySet<ConnectionId>,
   notice: ObserverNotice,
 ): Route => {
-  const to = owners.get(notice.lane)
-  return to !== undefined && subscribed.has(to)
+  const to = registrations.get(notice.lane)?.owner
+  return to != null && subscribed.has(to)
     ? { kind: "send", to }
     : { kind: "hold" }
 }
@@ -242,50 +327,267 @@ export const planIdle = (input: {
     ? "exit"
     : "stay"
 
-/** What decides where a host's lanes are observed. */
-export type RegistrationOwner =
-  | { readonly kind: "unowned" }
-  | { readonly kind: "owned"; readonly connection: ConnectionId }
+/** A lane the machine role holds registered, its namespace pinned by the loader. */
+export interface Registration {
+  /** Its namespace, then each parent up to the observer's, from its candidate. */
+  readonly namespaces: readonly LaneNamespace[]
+  /** A forwarded one keeps the lane it was found below. */
+  readonly origin:
+    | { readonly kind: "direct" }
+    | { readonly kind: "forwarded"; readonly forwarding: LaneNamespace }
+  /**
+   * The connection that registered it; null once that connection closed,
+   * until another reclaims it: it stays pinned, its notices held.
+   */
+  readonly owner: ConnectionId | null
+}
 
-export type RegistrationPlan =
-  | { readonly kind: "install" }
-  | { readonly kind: "refresh" }
-  | { readonly kind: "refuse"; readonly why: string }
+export type Refusal = { readonly kind: "refuse"; readonly why: string }
 
-/** Whether a connection may install, refresh or reclaim a namespace registration. */
-export const planRegistration = (
-  owner: RegistrationOwner,
-  connection: ConnectionId,
-): RegistrationPlan =>
-  owner.kind === "unowned"
-    ? { kind: "install" }
-    : owner.connection === connection
-      ? { kind: "refresh" }
-      : { kind: "refuse", why: "another live host owns this lane namespace" }
+const refuse = (why: string): Refusal => ({ kind: "refuse", why })
 
-/** The one outer-visible process whose NSpid vector ends with the inner locator. */
-export function translatedPid(
-  candidates: readonly {
-    readonly pid: number
-    readonly nspid: readonly number[]
-  }[],
-  innerPid: number,
-): { readonly pid: number; readonly nspid: readonly number[] } | null {
-  const matches = candidates.filter(c => c.nspid.at(-1) === innerPid)
+/**
+ * How a registration's candidates are looked up: a direct one by its pid
+ * in the machine's namespace; a forwarded one by its pid at its forwarding
+ * lane's level, which must be registered, and be `within` or below it.
+ */
+export function planLookup(
+  origin: RegistrationOrigin,
+  registrations: ReadonlyMap<LaneNamespace, Registration>,
+  token: string,
+): Extract<LoaderCommand, { kind: "open" | "find" }> | Refusal {
+  if (!Number.isSafeInteger(origin.pid) || origin.pid <= 0)
+    return refuse(`${origin.pid} is not a process id`)
+  if (origin.kind === "direct") return { kind: "open", token, pid: origin.pid }
+  const within = registrations.get(origin.within)
+  const forwarding = registrations.get(origin.forwarding)
+  if (within === undefined || forwarding === undefined)
+    return refuse(
+      "the lane forwarding this registration is not registered with the observer",
+    )
+  if (
+    origin.forwarding !== origin.within &&
+    !isStrictDescendant(forwarding.namespaces, origin.within)
+  )
+    return refuse(
+      "the forwarding lane is not the lane whose host relayed it, nor one below it",
+    )
+  return {
+    kind: "find",
+    token,
+    level: forwarding.namespaces.length - 1,
+    pid: origin.pid,
+  }
+}
+
+/** Whether `namespaces` (a candidate's, its own first) reach `ancestor` after at least one parent. */
+export const isStrictDescendant = (
+  namespaces: readonly LaneNamespace[],
+  ancestor: LaneNamespace,
+): boolean => namespaces.indexOf(ancestor) >= 1
+
+/** The namespace at `level` of a candidate, the observer's being 0. */
+const namespaceAtLevel = (c: Candidate, level: number): LaneNamespace | null =>
+  c.namespaces[c.namespaces.length - 1 - level] ?? null
+
+/**
+ * The one process a forwarded pid names: in `forwarding`'s namespace,
+ * whose level it is, with that pid there. Null for none or more than one.
+ */
+export function translatedCandidate(
+  candidates: readonly Candidate[],
+  forwarding: { readonly namespace: LaneNamespace; readonly level: number },
+  pid: number,
+): Candidate | null {
+  const matches = candidates.filter(
+    c =>
+      c.nspid.length === c.namespaces.length &&
+      namespaceAtLevel(c, forwarding.level) === forwarding.namespace &&
+      c.nspid[forwarding.level] === pid,
+  )
   return matches.length === 1 ? (matches[0] ?? null) : null
 }
 
-/** Whether the candidate is strictly below the forwarding namespace. */
-export const isStrictDescendant = (
-  candidate: LaneNamespace,
-  parents: readonly LaneNamespace[],
-  forwarding: LaneNamespace,
-): boolean => candidate !== forwarding && parents.includes(forwarding)
+/** What a registration does to the namespace's registration as it stands. */
+export type Ownership = "install" | "refresh" | "reclaim"
+
+const sameOrigin = (a: Registration["origin"], b: Registration["origin"]) =>
+  a.kind === b.kind &&
+  (a.kind === "direct" ||
+    (b.kind === "forwarded" && a.forwarding === b.forwarding))
+
+/**
+ * Whether `connection` may register a namespace: one nobody holds is
+ * installed; its live owner refreshes it (its first pid and remote
+ * directories), by the same origin; one whose owner closed is reclaimed.
+ * Another live connection's is refused, whatever the origins.
+ */
+export function planOwnership(
+  existing: Registration | undefined,
+  connection: ConnectionId,
+  origin: Registration["origin"],
+): Ownership | Refusal {
+  if (existing === undefined) return "install"
+  if (existing.owner === null) return "reclaim"
+  if (existing.owner !== connection)
+    return refuse("another live host has registered this lane's namespace")
+  return sameOrigin(existing.origin, origin)
+    ? "refresh"
+    : refuse(
+        "this host registered this lane's namespace already, by another origin",
+      )
+}
+
+/** What a registration installs: which candidate, as what, over what stood. */
+export interface Install {
+  readonly kind: "install"
+  readonly pid: number
+  readonly lane: LaneNamespace
+  readonly registration: Registration
+  readonly ownership: Ownership
+}
+
+/**
+ * A registration planned from the loader's candidates. A direct one is
+ * the process its pid names, in a namespace below the observer's: a lane's
+ * container never shares the machine's. A forwarded one is the one
+ * process its pid names at its forwarding lane's level, in a namespace
+ * strictly below that lane's. Either then passes `planOwnership`.
+ */
+export function planRegister(input: {
+  readonly origin: RegistrationOrigin
+  readonly candidates: readonly Candidate[]
+  /** The loader could hold no more candidates: the lookup is not whole. */
+  readonly cut: boolean
+  readonly registrations: ReadonlyMap<LaneNamespace, Registration>
+  readonly connection: ConnectionId
+}): Install | Refusal {
+  const { origin, registrations, connection } = input
+  if (input.cut)
+    return refuse("the observer could not hold every process the pid names")
+  let found: Candidate | null
+  let kind: Registration["origin"]
+  if (origin.kind === "direct") {
+    const named = input.candidates.filter(c => c.pid === origin.pid)
+    found = named.length === 1 ? (named[0] ?? null) : null
+    if (found === null) return refuse(`no process ${origin.pid}`)
+    if (found.namespaces.length < 2)
+      return refuse(
+        `process ${origin.pid} is in the observer's own PID namespace, not a lane's`,
+      )
+    kind = { kind: "direct" }
+  } else {
+    const forwarding = registrations.get(origin.forwarding)
+    if (forwarding === undefined)
+      return refuse(
+        "the lane forwarding this registration is not registered with the observer",
+      )
+    found = translatedCandidate(
+      input.candidates,
+      {
+        namespace: origin.forwarding,
+        level: forwarding.namespaces.length - 1,
+      },
+      origin.pid,
+    )
+    if (found === null)
+      return refuse(
+        `no one process is ${origin.pid} in the forwarding lane's namespace`,
+      )
+    if (!isStrictDescendant(found.namespaces, origin.forwarding))
+      return refuse(
+        `process ${origin.pid} is in the forwarding lane's own namespace, not one below it`,
+      )
+    kind = { kind: "forwarded", forwarding: origin.forwarding }
+  }
+  const lane = found.namespaces[0] ?? ""
+  const ownership = planOwnership(registrations.get(lane), connection, kind)
+  if (typeof ownership !== "string") return ownership
+  return {
+    kind: "install",
+    pid: found.pid,
+    lane,
+    registration: {
+      namespaces: found.namespaces,
+      origin: kind,
+      owner: connection,
+    },
+    ownership,
+  }
+}
+
+/**
+ * Whether `connection` may unregister a lane: only its owner, so no host
+ * ends another's observation. One not registered is already gone.
+ */
+export const planUnregister = (
+  existing: Registration | undefined,
+  connection: ConnectionId,
+): "unregister" | "gone" | Refusal =>
+  existing === undefined
+    ? "gone"
+    : existing.owner === connection
+      ? "unregister"
+      : refuse("only the host that registered a lane unregisters it")
+
+/**
+ * A lane host's call, relayed for the host inside it: every registration
+ * is forwarded, `within` the relaying lane, whatever the call claimed. The
+ * call comes from inside a lane, so its shape is checked here.
+ */
+export function relayedCall(
+  body: unknown,
+  lane: LaneNamespace | null,
+): ObserverCall {
+  const call = body as Partial<Record<string, unknown>> | null
+  switch (call?.kind) {
+    case "subscribe":
+    case "flush":
+      return { kind: call.kind }
+    case "unregister":
+      if (typeof call.lane !== "string" || !DECIMAL.test(call.lane)) break
+      return { kind: "unregister", lane: call.lane }
+    case "register": {
+      const origin = call.origin as Partial<Record<string, unknown>> | null
+      const remote = call.remote
+      if (
+        typeof origin?.pid !== "number" ||
+        !Array.isArray(remote) ||
+        !remote.every(r => typeof r === "string")
+      )
+        break
+      if (lane === null)
+        throw new Error(
+          "this lane is not registered with the observer yet: its own lanes cannot be",
+        )
+      const forwarding =
+        origin.kind === "forwarded" &&
+        typeof origin.forwarding === "string" &&
+        DECIMAL.test(origin.forwarding)
+          ? origin.forwarding
+          : origin.kind === "direct"
+            ? lane
+            : null
+      if (forwarding === null) break
+      return {
+        kind: "register",
+        origin: {
+          kind: "forwarded",
+          pid: origin.pid,
+          forwarding,
+          within: lane,
+        },
+        remote,
+      }
+    }
+  }
+  throw new Error("not a call of the observer's")
+}
 
 export interface ObserverFacts {
   /** Docker runs rootless: nothing it starts can load a BPF program. */
   readonly rootless: boolean
-  /** The host runs in a pine·trie lane whose helper forwards the machine role (`OBSERVER_SOCKET`). */
+  /** The host runs in a pine·trie lane whose helper serves the machine role (core's `OBSERVER_SOCKET`). */
   readonly forwarded: boolean
 }
 
@@ -307,7 +609,7 @@ export const planObserver = (facts: ObserverFacts): ObserverPlan =>
       ? { kind: "forwarded" }
       : {
           kind: "refused",
-          why: "rootless Docker cannot load the observer that attributes a lane's file calls, and this host is in no pine·trie lane whose host could",
+          why: `rootless Docker cannot load the observer that attributes a lane's file calls, and no pine·trie host outside relays it here (${OBSERVER_SOCKET})`,
         }
 
 /** Why lanes are refused, from the machine role's hello; null when its loader is ready. */
@@ -318,8 +620,6 @@ export const loaderRefusal = (hello: ObserverHello): string | null =>
 
 /** The machine role's socket, in its container: each host's channel is one connection. */
 export const MACHINE_SOCKET = "/run/observer/observer.sock"
-/** Where a lane's helper serves the machine role's calls, forwarded to its host. */
-export const OBSERVER_SOCKET = "/run/pinetrie/observer.sock"
 
 /**
  * The machine role's version: a hash of every source its image is made

@@ -1,8 +1,10 @@
 // e2e/observer/kernel — the observer's kernel side and its loader on the
 // lane VM's own kernel, in a QEMU guest: each case of the guest's `init`
 // (`packages/lanehost/observer/suite/init`) is a numbered run begun in a
-// lane's cgroup, as a helper's tool call is, and its events are read with
-// lanehost's codec of the loader's lines, whose events are core's.
+// lane's PID namespace, as a helper's tool call is, and its events are read
+// with lanehost's codec of the loader's lines, whose events are core's.
+// Which candidate a registration takes, and whether it may, is the machine
+// role's policy: its unit tests prove it, not this suite.
 
 import type { CallOp, PathKind, RunEvent } from "@pinetrie/core"
 import type { LoaderLine } from "@pinetrie/lanehost"
@@ -48,14 +50,14 @@ export const scenario: Scenario = {
       guest.expect.find(
         e => e[0] === key && rest.every((r, i) => e[i + 1] === r),
       )
-    const laneOf = (name: string): string | undefined => {
-      const pid = said("lane", name)?.[2]
+    const laneOf = (token: string): string | undefined => {
       const r = guest.events.find(
-        l => l.kind === "registered" && String(l.pid) === pid,
+        l => l.kind === "registered" && l.token === token,
       )
       return r?.kind === "registered" ? r.lane : undefined
     }
     const laneA = laneOf("a")
+    const laneB = laneOf("b")
     const failed = said("loader-failed")
     const ready =
       guest.events.some(l => l.kind === "ready") && laneA !== undefined
@@ -185,7 +187,7 @@ export const scenario: Scenario = {
       JSON.stringify(r13),
     )
     check(
-      "an exec in a cgroup no host registered begins no run",
+      "an exec in a PID namespace no host registered begins no run",
       events.every(e => e.run !== "19") &&
         !r13.some(
           e => e.event.kind === "call" && e.event.path === "/w/r13/free.txt",
@@ -204,6 +206,67 @@ export const scenario: Scenario = {
       "a run's events go to the lane it began in after its process moves to another cgroup",
       moved.length > 0 && moved.every(e => e.lane === laneA && e.run === "16"),
       JSON.stringify({ laneA, moved }),
+    )
+    const nested = events.filter(
+      e => e.event.kind === "call" && e.event.path === "/w/r11/ns.txt",
+    )
+    check(
+      "a run's events go to the lane it began in after its process enters a PID namespace of its own",
+      nested.length > 0 && nested.every(e => e.lane === laneA),
+      JSON.stringify({ laneA, nested }),
+    )
+    const laneOfRun = (run: string) =>
+      new Set(events.filter(e => e.run === run).map(e => e.lane))
+    check(
+      "each lane is its first process's PID namespace, apart from a sibling's in the same cgroup",
+      laneA === said("lane", "a")?.[3] &&
+        laneB === said("lane", "b")?.[3] &&
+        laneA !== laneB &&
+        [...laneOfRun("1")].join() === laneA &&
+        [...laneOfRun("21")].join() === laneB,
+      JSON.stringify({
+        laneA,
+        laneB,
+        said: [said("lane", "a"), said("lane", "b")],
+        one: [...laneOfRun("1")],
+        twentyOne: [...laneOfRun("21")],
+      }),
+    )
+    const [, pinned, after, reused] = said("pin") ?? []
+    check(
+      "a namespace held registered keeps its number after its processes exit, and gives it up once let go",
+      pinned !== undefined &&
+        after !== pinned &&
+        reused === pinned &&
+        laneOf("p") === pinned,
+      JSON.stringify({ pinned, after, reused, registered: laneOf("p") }),
+    )
+    const [, innerPid, innerNspid, innerNs, outerNs, rootNs] =
+      said("inner") ?? []
+    const found = guest.events.find(
+      l =>
+        l.kind === "candidate" && l.token === "n" && String(l.pid) === innerPid,
+    )
+    check(
+      "a lookup at a lane's level finds a process below it by its pid there, with its NSpid and each parent by NS_GET_PARENT",
+      found?.kind === "candidate" &&
+        found.nspid.join() === innerNspid &&
+        found.namespaces.join() === [innerNs, outerNs, rootNs].join() &&
+        outerNs === laneA,
+      JSON.stringify({ found, inner: said("inner") }),
+    )
+    check(
+      "a lane registered below another begins its own runs, apart from its parent's",
+      laneOf("n") === innerNs &&
+        [...laneOfRun("23")].join() === innerNs &&
+        [...laneOfRun("24")].join() === laneA &&
+        created("23", "/w/r23/i.txt") === 1,
+      JSON.stringify({
+        registered: laneOf("n"),
+        innerNs,
+        inner: [...laneOfRun("23")],
+        outer: [...laneOfRun("24")],
+      }),
     )
     const r20 = events.filter(e => e.run === "20" && e.event.kind === "call")
     const remoteRelease = r20.find(
