@@ -1,0 +1,12 @@
+start, before anything changes:                            work 
+a state made after the start appears:                      conflicts start state-1 state-2 
+start, moved by renaming its link:                         changed 
+a conflict's versions appear:                              base ours theirs 
+write into a state:                                        exit 1 sh: can't create /pinetrie-states/state-2/file.txt: Read-only file system 
+write a conflict version:                                  exit 1 sh: can't create /pinetrie-states/conflicts/notes.md/base: Read-only file system 
+make a file beside them:                                   exit 1 touch: /pinetrie-states/new: Read-only file system 
+move the start link:                                       exit 1 ln: /pinetrie-states/start: File exists 
+remount read-write:                                        exit 1 mount: permission denied (are you root?) 
+a symlink in a state, absolute, resolves in the lane:      changed 
+a symlink in a state, climbing out, resolves in the lane:  /etc/hostname 95ac466ae47a 
+what the lane reads of the mount (mountinfo):                /projects/dff06c0e66d017b0/lanes/t-01a13634-1a0c-70bb-bd05-bf0f366c1bc3/sandbox/s186/states /pinetrie-states ro,relatime 

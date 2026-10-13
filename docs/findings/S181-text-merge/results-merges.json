@@ -1,0 +1,74 @@
+{
+  "merges": 385,
+  "skippedWithSeveralBases": 0,
+  "tally": {
+    "paths": 1976,
+    "binary": 2,
+    "bothClean": 1328,
+    "bothConflict": 640,
+    "cleanSameBytes": 1328,
+    "cleanDifferentBytes": 0,
+    "onlyGitClean": 3,
+    "onlyJsClean": 3
+  },
+  "msPerPath": {
+    "gitMergeFile": 3.34,
+    "nodeDiff3": 49.44
+  },
+  "disagreements": [
+    {
+      "merge": "7bdb9692b336",
+      "path": "packages/interface/board-view.ts",
+      "kind": "git clean, js conflict",
+      "base": "39016b36b4066388d5612361e39e3ea3000e22e1",
+      "o": "5898031077b964772836d1f48aed519f7265c429",
+      "a": "61e209af8591dd7b9c6df4bbcb87d91bd159ce07",
+      "b": "7713ca83b1452f42356581e5e5489319761be9c5"
+    },
+    {
+      "merge": "8eb794fb5e80",
+      "path": "scripts/mutations/rules.ts",
+      "kind": "git clean, js conflict",
+      "base": "30061fc67b398e625fcb7582914cd54ea2533b8e",
+      "o": "4f8d5fdb755a57295c6cf5d465395a6c487a44b6",
+      "a": "09240ae40ced5a9f6705bec9ac84d8c38949742e",
+      "b": "6ad7d09ba49050cba0d92617050cf957794f8f2d"
+    },
+    {
+      "merge": "28174d2c1b2f",
+      "path": "packages/marginalia/archive.ts",
+      "kind": "git clean, js conflict",
+      "base": "127d8fadaae57605fe3f199530f24434f358484a",
+      "o": "f33a54026a92e85c25c03a6bdb5fdafc5e0e6698",
+      "a": "32fd38fb69cd8465c1f65d2d388555e83ee65bf7",
+      "b": "98dcea7a86603cf468f9b8b6f51d034cfeb7cd39"
+    },
+    {
+      "merge": "cc0e4f806be8",
+      "path": "packages/client/TECHNICAL.md",
+      "kind": "js clean, git conflict",
+      "base": "9fac89c17343743fcc12b8a38c42d45b85dba4d6",
+      "o": "509116a89959f6686e7c20ba130d7a6890fa0623",
+      "a": "5d402dfefe46cbc1e64af2f1a28f999079314123",
+      "b": "c032d6c41585fc134c3183060fe1086884724db5"
+    },
+    {
+      "merge": "f97fb21fb971",
+      "path": "packages/client/composer.tsx",
+      "kind": "js clean, git conflict",
+      "base": "474794bcfa8f998bd9d37526df10e4377fb6f1a6",
+      "o": "3606635b3e3291eab04245a69977f6f1ea3e036d",
+      "a": "58bfad8cbb5603f7f9462dfa16bf354ef65be88e",
+      "b": "29ab2ebb48dfdb157379efa74c1668155206d233"
+    },
+    {
+      "merge": "b91a4a8c0a07",
+      "path": "scripts/mutations/client.ts",
+      "kind": "js clean, git conflict",
+      "base": "56e7ea191aa696f8e498a5bc6b38e0936476d690",
+      "o": "a53419e8f6fb16fc702dddd1463761ce3a588270",
+      "a": "e51582f75dc061c07cb4aa4e69e1a5bfb986091e",
+      "b": "b0bc2a37cbeb2cfcc75facaa81e42c5904da4ef5"
+    }
+  ]
+}

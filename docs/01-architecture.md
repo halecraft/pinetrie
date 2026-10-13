@@ -237,8 +237,10 @@ work's `pinetrie.json`, less what the lane's own copy gives up: only an
 acceptance widens them. A shared file has a lineage of versions, each a stamp of its
 size and ctime, which the host and a lane read alike: every write, a
 lane's or yours (seen by the host's watcher), is one, and a write based on
-a version another replaced is flagged concurrent. A project without a VCS
-is a later step.
+a version another replaced is flagged concurrent. A folder with no jj
+repo is refused today; ADR-0142, proposed, would serve it as a folder
+project whose folder is its accepted work, with merge bases from a graph
+of states pine·trie keeps.
 
 Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`
 stands for "absent"; the codec decodes commands into an `Intent` union and

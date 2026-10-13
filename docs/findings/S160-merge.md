@@ -3,7 +3,7 @@
 Numbered S156 until 2026-10-11, when two files held that number.
 
 - **Status:** Answered
-- **Led to:** ADR-0135
+- **Led to:** ADR-0135, ADR-0142
 
 **Question.** In pine·trie's model, offer, accept and catch up are merges of
 states. The plan is a merge of pine·trie's own, path by path, under these

@@ -17,6 +17,8 @@
   - ADR-0099: a publish moves `main` alone when `offers.catchUp` is off, on
     any host, not because the host admits others.
   - ADR-0102: "your files" is "the working copy".
+  - ADR-0142: a folder project has no publish. An accept writes into the
+    folder, which is where publishing would have put the work.
 
 **Context.** The header's **◆ project** menu (ADR-0061) had grown confusing
 (Duane, 2026-10-04):

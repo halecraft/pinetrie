@@ -1,6 +1,7 @@
 # S150 — FSEvents drops events in a burst but says so, and names a renamed directory without its contents; APFS ignores case and Unicode form on lookup, as documented; modification times do not repeat; a stat walk of 100,000 files takes 0.3 s, and SHA-256 hashes at 2.8 GB/s
 
 - **Status:** Answered (questions 1–4; 5 and 6 not run)
+- **Led to:** ADR-0142
 
 **Question.** S149 set out twelve rules for syncing a person's folder with
 their thread, read from Mutagen and Syncthing. Some of them rest on beliefs
@@ -55,7 +56,7 @@ about the Mac that only the Mac can answer:
   rule 6's quiet window is set from the measurements, not borrowed.
 
 **Throw away.** One probe, kept as the record of what ran:
-`docs/findings/archive/S150-mac-folder/probe.mjs`. It installs `@parcel/watcher`
+`docs/findings/S150-mac-folder/probe.mjs`. It installs `@parcel/watcher`
 2.6.0 and `hash-wasm` 4.12.0 into a temporary prefix, outside the repo and
 its lockfile. It writes `results-<mode>-<platform>-<time>.json` beside
 itself. It was checked on Linux, in a lane, against the inotify backend.
@@ -64,13 +65,13 @@ itself. It was checked on Linux, in a lane, against the inotify backend.
 
 ```sh
 # 1–4: about two to five minutes; works in a hidden folder under $HOME
-node docs/findings/archive/S150-mac-folder/probe.mjs auto
+node docs/findings/S150-mac-folder/probe.mjs auto
 
 # 5: once per app. It copies the document into a fresh folder under $HOME
 # and guides a save, a replace while the app is open, then a second save.
-node docs/findings/archive/S150-mac-folder/probe.mjs app ~/path/to/some.psd
-node docs/findings/archive/S150-mac-folder/probe.mjs app ~/path/to/some.blend
-node docs/findings/archive/S150-mac-folder/probe.mjs app ~/path/to/some.md
+node docs/findings/S150-mac-folder/probe.mjs app ~/path/to/some.psd
+node docs/findings/S150-mac-folder/probe.mjs app ~/path/to/some.blend
+node docs/findings/S150-mac-folder/probe.mjs app ~/path/to/some.md
 
 # 6, optional: in Documents, on a file iCloud has evicted
 ls -lO ~/Documents/<file>
@@ -84,7 +85,7 @@ The options are `--dir` (where to work; `$HOME` by default), `--files`
 Measured on duane's Mac: an M3 Max, macOS 26.7.1, Node 24.19, run under
 `$HOME` on the internal APFS volume (case-insensitive, not encrypted). Run
 with the defaults: 10,000 files, a tree of 100,000, and 2 GB to hash. The
-output is `docs/findings/archive/S150-mac-folder/results-auto-darwin-2026-10-11T00-56-34-683Z.json`.
+output is `docs/findings/S150-mac-folder/results-auto-darwin-2026-10-11T00-56-34-683Z.json`.
 
 1. **FSEvents drops events in a burst, and says so. A renamed directory
    is named, but its contents are not.** The kill criterion holds in part:

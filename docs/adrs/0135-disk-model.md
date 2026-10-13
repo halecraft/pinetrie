@@ -53,6 +53,10 @@
     on the Mac and on Linux; so the host's watcher puts your writes on a
     file's lineage as they are made. A lane's write is based on what that lane
     last read, across tool calls and turns, not on what its own call read.
+- **Amended by:**
+  - ADR-0142: settles its second step. A folder project's accepted work is the
+    folder, merge bases come from a graph of states pine·trie keeps, and
+    conflicts are records whose versions a lane reads read-only.
 
 **Context.** pine·trie leans on jj for what a project's state is, and on
 jj's ignore rules for which files belong to it. Five problems follow:

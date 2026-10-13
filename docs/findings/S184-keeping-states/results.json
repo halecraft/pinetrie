@@ -1,0 +1,23 @@
+{
+  "entries": 44309,
+  "saves": 200,
+  "firstSnapshotMs": 7,
+  "firstSnapshotBytes": 32768,
+  "meanSnapshotMs": 2,
+  "meanBytesPerSmallSave": 34665,
+  "meanBytesPerDocumentSave": 36044,
+  "allKeptBytes": 1074069504,
+  "walkAdjacent": {
+    "changes": 2,
+    "ms": 4717
+  },
+  "walkApart": {
+    "changes": 2,
+    "ms": 4551
+  },
+  "deleteAllButEndsMs": 528,
+  "bytesFreed": 98304,
+  "bytesFreedAfter20s": 968654848,
+  "walkOnlyMsPerTree": 2150,
+  "compareTreesMs": 14
+}

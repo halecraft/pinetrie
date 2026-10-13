@@ -1,7 +1,7 @@
 # S169 — The host and a lane see a shared file with the same size and ctime (on the Mac, not the same inode); ctime is the host's clock for both, so it orders every write on one timeline; and the host's watcher saw every lane write with the stamp the lane recorded, on the Mac and on Linux
 
 - **Status:** Answered
-- **Led to:** ADR-0135
+- **Led to:** ADR-0135, ADR-0142
 
 **Question.** A shared file's line of versions (ADR-0135) learns a lane's
 writes from the lane's supervisor, each version a stamp (inode, size,

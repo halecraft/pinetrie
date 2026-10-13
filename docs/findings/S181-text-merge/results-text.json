@@ -1,0 +1,44 @@
+{
+  "files": 8,
+  "differ": 3,
+  "differByExtension": {
+    ".csv": {
+      "files": 1,
+      "nul": 0,
+      "notUtf8": 1,
+      "differ": 1
+    },
+    ".txt": {
+      "files": 2,
+      "nul": 1,
+      "notUtf8": 2,
+      "differ": 1
+    },
+    ".bin": {
+      "files": 1,
+      "nul": 0,
+      "notUtf8": 1,
+      "differ": 1
+    }
+  },
+  "differSample": [
+    {
+      "path": "/tmp/s181/designer/excel-cp1252.csv",
+      "size": 29,
+      "nul": false,
+      "utf8": false
+    },
+    {
+      "path": "/tmp/s181/designer/latin1-notes.txt",
+      "size": 20,
+      "nul": false,
+      "utf8": false
+    },
+    {
+      "path": "/tmp/s181/designer/tiny.bin",
+      "size": 3,
+      "nul": false,
+      "utf8": false
+    }
+  ]
+}

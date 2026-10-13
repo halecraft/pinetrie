@@ -1,0 +1,57 @@
+[
+  {
+    "flow": "A",
+    "story": "accepted, then the lane changes the accepted line again; its catch-up",
+    "bases": 1,
+    "graph": "right",
+    "linear base, no accept as a merge": "conflict ['f.txt']"
+  },
+  {
+    "flow": "B",
+    "story": "accepted, then you change the accepted line; the lane goes on elsewhere and catches up",
+    "bases": 1,
+    "graph": "right",
+    "linear base, no accept as a merge": "conflict ['f.txt']"
+  },
+  {
+    "flow": "C",
+    "story": "accepted twice, then the lane changes its own accepted line again",
+    "bases": 1,
+    "graph": "right",
+    "linear base, no accept as a merge": "conflict ['f.txt']"
+  },
+  {
+    "flow": "D",
+    "story": "a branch caught up with its parent; both accepted; the branch changes its line again",
+    "bases": 1,
+    "graph": "right",
+    "linear base, no accept as a merge": "conflict ['f.txt']"
+  },
+  {
+    "flow": "E",
+    "story": "criss-cross: an offer shown before the lane's catch-up is accepted after it",
+    "bases": 2,
+    "graph": "conflict ['f.txt'] (recursive), inner conflicts ['f.txt']",
+    "base 1 alone": "right",
+    "base 2 alone": "conflict ['f.txt']",
+    "linear base, no accept as a merge": "conflict ['f.txt']"
+  },
+  {
+    "flow": "E2",
+    "story": "criss-cross as E, the two changes far apart",
+    "bases": 2,
+    "graph": "right (recursive)",
+    "base 1 alone": "conflict ['f.txt']",
+    "base 2 alone": "right",
+    "linear base, no accept as a merge": "conflict ['f.txt']"
+  },
+  {
+    "flow": "E3",
+    "story": "criss-cross as E2; then you change another line, and the lane catches up",
+    "bases": 2,
+    "graph": "right (recursive)",
+    "base 1 alone": "right",
+    "base 2 alone": "right",
+    "linear base, no accept as a merge": "right"
+  }
+]

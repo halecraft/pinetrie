@@ -14,6 +14,10 @@
   - ADR-0100: accepted work is a branched source's.
   - ADR-0104: accepted work, WIPs and publish are per branched source.
   - ADR-0105: a thread has an offer in each source it changed.
+- **Amended by:**
+  - ADR-0142: a folder no repo tracks may be branched too, as a folder
+    project. Live and read-only remain the modes for a folder that is not the
+    project.
 
 **Context.**
 

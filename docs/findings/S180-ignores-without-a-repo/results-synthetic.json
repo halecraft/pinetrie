@@ -1,0 +1,169 @@
+{
+  "corpus": "synthetic",
+  "files": 46,
+  "referenceIgnored": 28,
+  "referenceMs": 2,
+  "referenceIgnoredSample": [
+    "#hash.txt",
+    ".env",
+    ".env.local",
+    "a.log",
+    "a/deep/b/c/gen",
+    "a/deep/gen",
+    "anchored.txt",
+    "build/keep.txt",
+    "build/x",
+    "cache1/x",
+    "deep/x/gen/file",
+    "dist",
+    "docs/a/b/c.tmp",
+    "docs/c.tmp",
+    "foo.a",
+    "foo.o",
+    "node_modules/p/i.js",
+    "spaced name.txt",
+    "sub/anchored-sub.txt",
+    "sub/build/y",
+    "sub/inner/.gitignore",
+    "sub/inner/a.txt",
+    "sub/inner/d/e.txt",
+    "sub/local.txt",
+    "sub/node_modules/q",
+    "sub/only-root-sub.txt",
+    "trailing.txt",
+    "x/dist/y"
+  ],
+  "methods": [
+    {
+      "method": "check-ignore --no-index, own GIT_DIR",
+      "ms": 2,
+      "ignored": 28,
+      "agrees": true,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    },
+    {
+      "method": "ls-files -o, own GIT_DIR",
+      "ms": 2,
+      "ignored": 28,
+      "agrees": true,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    },
+    {
+      "method": "rg as search.ts runs it",
+      "ms": 5,
+      "ignored": 2,
+      "agrees": false,
+      "ignoredButSource": [
+        "link-to-log",
+        "link-to-normal"
+      ],
+      "ignoredButSourceCount": 2,
+      "sourceButNotIgnored": [
+        "#hash.txt",
+        ".env",
+        ".env.local",
+        "a.log",
+        "a/deep/b/c/gen",
+        "a/deep/gen",
+        "anchored.txt",
+        "build/keep.txt",
+        "build/x",
+        "cache1/x",
+        "deep/x/gen/file",
+        "dist",
+        "docs/a/b/c.tmp",
+        "docs/c.tmp",
+        "foo.a",
+        "foo.o",
+        "node_modules/p/i.js",
+        "spaced name.txt",
+        "sub/anchored-sub.txt",
+        "sub/build/y"
+      ],
+      "sourceButNotIgnoredCount": 28
+    },
+    {
+      "method": "rg --no-require-git",
+      "ms": 4,
+      "ignored": 30,
+      "agrees": false,
+      "ignoredButSource": [
+        "link-to-log",
+        "link-to-normal"
+      ],
+      "ignoredButSourceCount": 2,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    },
+    {
+      "method": "rg --no-require-git, no global/exclude/parent/dot",
+      "ms": 5,
+      "ignored": 30,
+      "agrees": false,
+      "ignoredButSource": [
+        "link-to-log",
+        "link-to-normal"
+      ],
+      "ignoredButSourceCount": 2,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    },
+    {
+      "method": "fd as search.ts runs it",
+      "ms": 5,
+      "ignored": 0,
+      "agrees": false,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [
+        "#hash.txt",
+        ".env",
+        ".env.local",
+        "a.log",
+        "a/deep/b/c/gen",
+        "a/deep/gen",
+        "anchored.txt",
+        "build/keep.txt",
+        "build/x",
+        "cache1/x",
+        "deep/x/gen/file",
+        "dist",
+        "docs/a/b/c.tmp",
+        "docs/c.tmp",
+        "foo.a",
+        "foo.o",
+        "node_modules/p/i.js",
+        "spaced name.txt",
+        "sub/anchored-sub.txt",
+        "sub/build/y"
+      ],
+      "sourceButNotIgnoredCount": 28
+    },
+    {
+      "method": "fd --no-require-git",
+      "ms": 4,
+      "ignored": 28,
+      "agrees": true,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    },
+    {
+      "method": "npm ignore, walked",
+      "ms": 3,
+      "ignored": 28,
+      "agrees": true,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    }
+  ]
+}

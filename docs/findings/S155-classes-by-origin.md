@@ -3,7 +3,7 @@
 Numbered S151 until 2026-10-11, when two files held that number.
 
 - **Status:** Answered
-- **Led to:** ADR-0135
+- **Led to:** ADR-0135, ADR-0142
 
 **Question.** pine·trie's model gives each path in a state a class:
 - **source:** authored;

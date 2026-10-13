@@ -17,6 +17,9 @@
     lane runtime; it never works directly.
   - ADR-0090: "your files" is "the working copy".
   - ADR-0099: "your files" is "the working copy".
+- **Amended by:**
+  - ADR-0142: the host no longer refuses a folder with no jj or git repo. It
+    serves the folder as a folder project.
 
 **Context.** An agent had two places to work: a lane of its own (ADR-0034),
 or directly in a directory, by default the host's working copy.

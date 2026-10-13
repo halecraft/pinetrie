@@ -11,6 +11,9 @@
     lane runtime; it never works directly.
   - ADR-0118: the host serves sources, not one project, and keeps its session
     outside them.
+  - ADR-0142: a folder project's session, snapshots' records and runtime are
+    kept outside it, in ADR-0118's session directory. Nothing of pine·trie's
+    is written into the folder.
 
 **Context.** `pnpm host` served pine·trie's own repo, found from where
 `server.ts` sits, and kept its session in that repo's `.pinetrie/pinetrie.db`.

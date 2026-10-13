@@ -1,7 +1,7 @@
 # S162 — A shared file's version can be its stamp (inode, size, ctime): every change of content changed it, forged mtimes included, and a line built on stamps decides races as one built on hashes does
 
 - **Status:** Answered
-- **Led to:** ADR-0135
+- **Led to:** ADR-0135, ADR-0142
 
 **Question.** ADR-0135 (proposed) gives a write to a shared directory a
 version, so that a write based on a version that is no longer current

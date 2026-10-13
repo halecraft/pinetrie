@@ -1,0 +1,7 @@
+{"threeClonesMs": 62, "cloneOfOneGiBMs": 4, "bytesAddedByTheClone": 0}
+[{"path":"big-copy.bin","change":"added","kind":"file"},{"path":"big.bin","change":"changed","kind":"file"},{"path":"diff.txt","change":"changed","kind":"file"},{"path":"mid.bin","change":"changed","kind":"file"},{"path":"same.txt","change":"changed","kind":"file"}]
+{"a": "s1/same.txt", "b": "s2/same.txt", "extents": 1, "inline": true, "sameExtents": false, "fiemapMs": 0.371, "equalByReading": true, "readMs": 0.1}
+{"a": "s1/diff.txt", "b": "s2/diff.txt", "extents": 1, "inline": true, "sameExtents": false, "fiemapMs": 0.385, "equalByReading": false, "readMs": 0.1}
+{"a": "s1/mid.bin", "b": "s2/mid.bin", "extents": 1, "inline": false, "sameExtents": false, "fiemapMs": 0.235, "equalByReading": false, "readMs": 0.3}
+{"a": "s1/big.bin", "b": "s2/big.bin", "extents": 4, "inline": false, "sameExtents": true, "fiemapMs": 0.248, "equalByReading": true, "readMs": 511.3}
+{"a": "o1/same.txt", "b": "s2/same.txt", "extents": 1, "inline": true, "sameExtents": false, "fiemapMs": 0.316, "equalByReading": true, "readMs": 0.1}

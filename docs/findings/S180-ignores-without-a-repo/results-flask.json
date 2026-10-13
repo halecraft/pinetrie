@@ -1,0 +1,130 @@
+{
+  "corpus": "flask",
+  "files": 1256,
+  "referenceIgnored": 1020,
+  "referenceMs": 4,
+  "methods": [
+    {
+      "method": "check-ignore --no-index, own GIT_DIR",
+      "ms": 5,
+      "ignored": 1020,
+      "agrees": true,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    },
+    {
+      "method": "ls-files -o, own GIT_DIR",
+      "ms": 4,
+      "ignored": 1020,
+      "agrees": true,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    },
+    {
+      "method": "rg as search.ts runs it",
+      "ms": 7,
+      "ignored": 4,
+      "agrees": false,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [
+        ".pytest_cache/.gitignore",
+        ".pytest_cache/CACHEDIR.TAG",
+        ".pytest_cache/README.md",
+        ".pytest_cache/v/cache/nodeids",
+        ".venv/.gitignore",
+        ".venv/.lock",
+        ".venv/CACHEDIR.TAG",
+        ".venv/bin/activate",
+        ".venv/bin/activate.bat",
+        ".venv/bin/activate.csh",
+        ".venv/bin/activate.fish",
+        ".venv/bin/activate.nu",
+        ".venv/bin/activate.ps1",
+        ".venv/bin/activate.xsh",
+        ".venv/bin/activate_this.py",
+        ".venv/bin/deactivate.bat",
+        ".venv/bin/flask",
+        ".venv/bin/py.test",
+        ".venv/bin/pydoc.bat",
+        ".venv/bin/pygmentize"
+      ],
+      "sourceButNotIgnoredCount": 1016
+    },
+    {
+      "method": "rg --no-require-git",
+      "ms": 6,
+      "ignored": 1020,
+      "agrees": true,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    },
+    {
+      "method": "rg --no-require-git, no global/exclude/parent/dot",
+      "ms": 6,
+      "ignored": 1020,
+      "agrees": true,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    },
+    {
+      "method": "fd as search.ts runs it",
+      "ms": 13,
+      "ignored": 0,
+      "agrees": false,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [
+        ".pytest_cache/.gitignore",
+        ".pytest_cache/CACHEDIR.TAG",
+        ".pytest_cache/README.md",
+        ".pytest_cache/v/cache/nodeids",
+        ".venv/.gitignore",
+        ".venv/.lock",
+        ".venv/CACHEDIR.TAG",
+        ".venv/bin/activate",
+        ".venv/bin/activate.bat",
+        ".venv/bin/activate.csh",
+        ".venv/bin/activate.fish",
+        ".venv/bin/activate.nu",
+        ".venv/bin/activate.ps1",
+        ".venv/bin/activate.xsh",
+        ".venv/bin/activate_this.py",
+        ".venv/bin/deactivate.bat",
+        ".venv/bin/flask",
+        ".venv/bin/py.test",
+        ".venv/bin/pydoc.bat",
+        ".venv/bin/pygmentize"
+      ],
+      "sourceButNotIgnoredCount": 1020
+    },
+    {
+      "method": "fd --no-require-git",
+      "ms": 7,
+      "ignored": 1020,
+      "agrees": true,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    },
+    {
+      "method": "npm ignore, walked",
+      "ms": 4,
+      "ignored": 1020,
+      "agrees": true,
+      "ignoredButSource": [],
+      "ignoredButSourceCount": 0,
+      "sourceButNotIgnored": [],
+      "sourceButNotIgnoredCount": 0
+    }
+  ]
+}

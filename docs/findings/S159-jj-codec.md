@@ -3,7 +3,7 @@
 Numbered S155 until 2026-10-11, when two files held that number.
 
 - **Status:** Answered
-- **Led to:** ADR-0135
+- **Led to:** ADR-0135, ADR-0142
 
 **Question.** In pine·trie's model, jj is a codec. It maps a state's source
 class to commits and back, for projects that want git remotes. A state's

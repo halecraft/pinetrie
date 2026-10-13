@@ -1,0 +1,18 @@
+{
+  "statWalkFirstS": 2.123,
+  "statWalkAgainS": 1.599,
+  "files": 49801,
+  "bytes": 7721332902,
+  "fullCopyS": 32.824,
+  "fullCopyMBps": 235.2,
+  "vmFindsChangesS": 1.598,
+  "vmFoundChanged": 0,
+  "told1FilesS": 0.001,
+  "told100FilesS": 0.052,
+  "told1000FilesS": 0.444,
+  "largest5": {
+    "bytes": 2852360192,
+    "s": 2.058,
+    "MBps": 1386.0
+  }
+}

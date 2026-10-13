@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // S150's probe: what a person's folder on the Mac does, for syncing it with a
-// thread (docs/findings/archive/S150-mac-folder.md). Disposable.
+// thread (docs/findings/S150-mac-folder.md). Disposable.
 //
 //   node probe.mjs auto [--dir D] [--files N] [--tree N] [--big MB]
 //   node probe.mjs app <document> [--dir D]
