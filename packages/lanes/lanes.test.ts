@@ -327,6 +327,7 @@ describe("laneHandle.start", () => {
         stderr: "",
       }),
       close: async () => {},
+      closed: new Promise<void>(() => {}),
     }))
     return { seen, handle }
   }
@@ -338,5 +339,41 @@ describe("laneHandle.start", () => {
     await known.handle.start("running")
     await known.handle.start("stopped")
     expect(known.seen).toEqual(["start pinetrie-t-1"])
+  })
+})
+
+describe("laneHandle.link", () => {
+  const link = (closed: Promise<void>) => ({
+    channel: null,
+    runs: { flush: async () => flushed([]) },
+    run: async () => ({ ok: true as const, code: 0, stdout: "", stderr: "" }),
+    bytes: async () => ({
+      ok: true as const,
+      code: 0,
+      stdout: new Uint8Array(),
+      stderr: "",
+    }),
+    close: async () => {},
+    closed,
+  })
+  test("a link that failed to open, or whose helper exited, is opened again", async () => {
+    let opens = 0
+    let exit: () => void = () => {}
+    const handle = laneHandle(
+      recordingRuntime([]),
+      "pinetrie-t-1",
+      async () => {
+        opens++
+        if (opens === 1) throw new Error("no helper")
+        return link(new Promise<void>(r => (exit = r)))
+      },
+    )
+    await expect(handle.link()).rejects.toThrow("no helper")
+    const second = await handle.link()
+    expect(await handle.link()).toBe(second)
+    exit()
+    await new Promise(r => setTimeout(r, 0))
+    expect(await handle.link()).not.toBe(second)
+    expect(opens).toBe(3)
   })
 })

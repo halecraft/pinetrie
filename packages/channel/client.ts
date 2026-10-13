@@ -60,7 +60,16 @@ export function openChannel<Hello, Call, Update, Result>(
   ready.catch(() => {})
 
   readline.createInterface({ input: child.stdout }).on("line", line => {
-    const reply = decode<Reply<Hello, Update, Result>>(line)
+    // A line that is no reply is the runtime's, not the server's (`docker
+    // exec` of a container that stopped says so on stdout): kept with
+    // stderr, for the failure it comes before, never a crash of the host.
+    let reply: Reply<Hello, Update, Result>
+    try {
+      reply = decode<Reply<Hello, Update, Result>>(line)
+    } catch {
+      stderr = `${stderr}${line}\n`.slice(-4000)
+      return
+    }
     if ("ready" in reply) return onReady(reply.hello)
     const waiting = pending.get(reply.id)
     if (waiting === undefined) return

@@ -44,6 +44,7 @@ export const openLinkOf =
       runs,
       run,
       bytes,
+      closed: channel.closed,
       async close() {
         stopRelay()
         await runs.close().catch(() => {})

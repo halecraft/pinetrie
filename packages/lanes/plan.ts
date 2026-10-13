@@ -206,14 +206,35 @@ export function planMounts(parts: {
     at(parts.ignoreDir, IGNORE_MOUNT),
     ...parts.links,
     ...parts.grants,
-    ...parts.shared.map(d => ({
-      source: d.source,
-      target: path.posix.join(WORKSPACE_ROOT, d.path),
-      readonly: false,
-    })),
+    ...sharedMounts(parts.shared),
     ...parts.hostPaths.map(p => at(p, hostPathInLane(p))),
   ]
 }
+
+/** Shared directories, read-write at their place in `/workspace`. */
+const sharedMounts = (shared: readonly SharedDir[]): readonly Mount[] =>
+  shared.map(d => ({
+    source: d.source,
+    target: path.posix.join(WORKSPACE_ROOT, d.path),
+    readonly: false,
+  }))
+
+/**
+ * Every host directory a lane of this host may mount, as the Mac's lane VM
+ * shares them into its slot once, at its lease: the base lane's mounts,
+ * which carry no shared directory, every shared directory any lane may
+ * mount, and what a lane's ssh attaches. A lane that mounts one left out
+ * cannot be made.
+ */
+export const slotMounts = (input: {
+  readonly base: readonly Mount[]
+  readonly shared: readonly SharedDir[]
+  readonly attached: readonly Mount[]
+}): readonly Mount[] => [
+  ...input.base,
+  ...sharedMounts(input.shared),
+  ...input.attached,
+]
 
 /**
  * Which host paths a lane is granted, read-only: the roots a

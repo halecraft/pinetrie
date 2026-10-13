@@ -33,6 +33,9 @@ export function serve<Hello, Call, Update, Result>(
   const running = new Map<number, AbortController>()
   const send = (reply: Reply<Hello, Update, Result>) =>
     io.output.write(`${encode(reply)}\n`)
+  // A client gone mid-reply (its `exec` ended) has no one to tell: unhandled,
+  // the write's EPIPE would end every other call the server holds.
+  io.output.on("error", () => {})
 
   async function answer(id: number, call: Call, updates: boolean) {
     const control = new AbortController()

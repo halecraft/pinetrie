@@ -38,6 +38,7 @@ import {
   refreshBase,
   repoConfig,
   revsetName,
+  slotMounts,
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
 import { type RepoOwner, renameAccepted, startRepoOwner } from "@pinetrie/repo"
@@ -284,9 +285,15 @@ export async function startSetup(input: {
       at: root,
       runtime,
       runtimeReady: found.ready,
-      // The base lane's, and what lanes holding an ssh identity attach: on
-      // the Mac, the slot shares every directory a lane mounts.
-      mountsOf: r => [...specOf(BASE_LANE, r).mounts, ...ssh.mounts],
+      // On the Mac, the slot shares every directory a lane mounts, once: a
+      // shared directory accepted work adds later reaches lanes at the next
+      // start, as a port does.
+      mountsOf: r =>
+        slotMounts({
+          base: specOf(BASE_LANE, r).mounts,
+          shared: configs.accepted().shared,
+          attached: ssh.mounts,
+        }),
       // The VM is told once: a port accepted work grants later reaches it
       // at the next start.
       hostPorts: configs.accepted().authority.grants.hostPorts,

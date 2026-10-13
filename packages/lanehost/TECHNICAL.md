@@ -146,6 +146,9 @@ host, whatever their projects.
   (`observer-client.ts`): the role sends a reclaimed lane's held notices
   as it registers it, before the answer names the namespace, so a notice
   of a namespace no lane holds yet waits for the lane that registers it.
+- **A connection waits up to 15 s for the role's socket** (`observer-connect.ts`):
+  a role's container just made makes it once Node has started, some
+  hundreds of ms after `docker run` returns.
 - **A host inside a lane is served through the lane's helper**
   (`packages/pi/TECHNICAL.md`), relayed by the host outside it: each
   connection it opens is a connection of its own to the role (the lane

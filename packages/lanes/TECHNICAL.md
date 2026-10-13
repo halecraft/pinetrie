@@ -399,6 +399,16 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   ignore file's directory, links, grants, shared directories and granted
   host paths, in a `ContainerShape`. A runtime renders each, and does not
   know what a mount is for.
+- **On the Mac, a host's slot holds every directory any of its lanes
+  mounts** (`slotMounts`): the base lane's mounts, every shared directory
+  accepted work and your config allow, and what ssh attaches. The base
+  lane's spec carries no shared directory, so they are added there: a lane
+  mounting one the slot lacks cannot be made. The slot is filled once per
+  lease, so a shared directory accepted work adds later reaches lanes at
+  the host's next start.
+- **A handle's link is opened again after it fails or its helper exits**
+  (`laneHandle`): it never keeps a dead channel, so the next call after a
+  helper dies opens a new one.
 - **Any path can be mounted:** Docker's API takes each mount as JSON, so a
   path with a comma and a colon, which the CLI's `--mount` and `-v` could
   not both name (S46 item 4), is no trouble.

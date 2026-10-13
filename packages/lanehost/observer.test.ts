@@ -1,3 +1,8 @@
+import { mkdtempSync } from "node:fs"
+import net from "node:net"
+import { tmpdir } from "node:os"
+import path from "node:path"
+import { serve } from "@pinetrie/channel"
 import { encodeRunEvent, type RunEvent, stamp } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { standInRole } from "./fixtures.ts"
@@ -496,4 +501,25 @@ describe("the machine role's server, with a stand-in loader", () => {
       role.close()
     }
   })
+})
+
+test("a connection waits for a socket made after it starts", async () => {
+  const socket = path.join(
+    mkdtempSync(path.join(tmpdir(), "observer-")),
+    "late.sock",
+  )
+  const channel = connectObserver(socket)
+  await new Promise(r => setTimeout(r, 500))
+  const server = net
+    .createServer(s =>
+      serve({ late: true }, async () => null, { input: s, output: s }),
+    )
+    .listen(socket)
+  try {
+    expect(await channel.ready).toEqual({ late: true })
+    channel.close()
+    await channel.closed
+  } finally {
+    server.close()
+  }
 })

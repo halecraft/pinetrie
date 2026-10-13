@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process"
 import path from "node:path"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { type Channel, openChannel } from "./client.ts"
@@ -77,6 +78,20 @@ describe("a held channel", () => {
     })) as RunResult
     expect([ran.code, ran.stdout]).toEqual([0, new Uint8Array([104, 105])])
   })
+  test("a command that exits before reading its input leaves the server answering", async () => {
+    const ran = (await channel.call({
+      run: ["true"],
+      stdin: "x".repeat(8 << 20),
+    })) as RunResult
+    expect(ran.code).toBe(0)
+    expect(await channel.call({ echo: "still here" })).toBe("still here")
+  })
+  test("a line on stdout that is no reply is passed over", async () => {
+    expect(await channel.call({ noise: "container x is not running" })).toBe(
+      "said",
+    )
+    expect(await channel.call({ echo: 1 })).toBe(1)
+  })
   test("a server that exits fails every waiting call with its stderr", async () => {
     const own = open()
     await own.ready
@@ -89,4 +104,19 @@ describe("a held channel", () => {
     await own.closed
     await expect(own.call({ echo: 1 })).rejects.toThrow("exited")
   })
+})
+
+test("a server whose client stopped reading outlives the write it cannot make", async () => {
+  const child = spawn(process.execPath, [SERVER], {
+    stdio: ["pipe", "pipe", "inherit"],
+  })
+  await new Promise(resolve => child.stdout.once("data", resolve))
+  child.stdout.destroy()
+  child.stdin.write(
+    `${JSON.stringify({ id: 1, call: { echo: 1 }, updates: false })}\n`,
+  )
+  await new Promise(r => setTimeout(r, 300))
+  child.stdin.end()
+  const code = await new Promise(resolve => child.on("exit", resolve))
+  expect(code).toBe(0)
 })

@@ -30,9 +30,15 @@ read-only, on the lane runtime's Node.
 - **A server that exits fails every waiting call** with the tail of its
   stderr, and every later call at once.
 - **Calls are answered concurrently,** each with its own `AbortSignal`.
+- **Neither side dies of the other's going.** The server ignores an error
+  writing to a client gone; the client passes over a line on stdout that
+  is no reply (`docker exec` of a stopped container says so there),
+  keeping it with stderr for the failure it precedes.
 
 ## `runCommand` (`run.ts`)
 
 The server's side of running a command for its client: `execFile` with no
 shell, stdout as text or bytes, killed by an abort. It never throws: a
-program that cannot start is code -1, with why in stderr.
+program that cannot start is code -1, with why in stderr. A command that
+exits before reading all its input leaves the server running: the write's
+EPIPE is ignored, and its exit says what happened.

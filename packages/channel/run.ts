@@ -48,6 +48,9 @@ export function runCommand(
         })
       },
     )
+    // A command that exits before reading all its input: the write's EPIPE
+    // would end the server and every call it holds; the exit says enough.
+    child.stdin?.on("error", () => {})
     if (options.stdin !== undefined) child.stdin?.end(options.stdin)
   })
 }

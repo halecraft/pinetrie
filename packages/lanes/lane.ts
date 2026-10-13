@@ -46,6 +46,8 @@ export interface LaneLink<C> {
   readonly bytes: BytesRunner
   /** Close the channel and wait for the helper to exit. */
   close(): Promise<void>
+  /** Settles when the helper has exited, closed or not. */
+  readonly closed: Promise<void>
 }
 
 /** Opens a channel into a running container. */
@@ -123,12 +125,17 @@ export function laneHandle<C>(
   open: OpenLink<C>,
 ): LaneHandle<C> {
   let link: Promise<LaneLink<C>> | null = null
+  // A link that failed to open, or whose helper has since exited, is
+  // dropped: the next call opens another rather than failing for good.
   const opened = () => {
-    link ??= open(container)
-    link.catch(() => {
-      link = null
-    })
-    return link
+    if (link !== null) return link
+    const opening = open(container)
+    link = opening
+    const drop = () => {
+      if (link === opening) link = null
+    }
+    opening.then(l => l.closed.then(drop), drop)
+    return opening
   }
   return {
     container,

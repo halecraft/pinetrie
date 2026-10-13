@@ -8,8 +8,9 @@ export type TestCall =
   | { readonly wait: number }
   | { readonly updates: number }
   | { readonly throws: string }
-  | { readonly run: readonly string[] }
+  | { readonly run: readonly string[]; readonly stdin?: string }
   | { readonly exit: string }
+  | { readonly noise: string }
 
 serve<{ readonly pid: number }, TestCall, number, unknown>(
   { pid: process.pid },
@@ -30,8 +31,17 @@ serve<{ readonly pid: number }, TestCall, number, unknown>(
       return "done"
     }
     if ("throws" in call) throw new Error(call.throws)
+    if ("noise" in call) {
+      process.stdout.write(`${call.noise}\n`)
+      return "said"
+    }
     if ("run" in call)
-      return runCommand(call.run, { cwd: "/", bytes: true, signal })
+      return runCommand(call.run, {
+        cwd: "/",
+        bytes: true,
+        signal,
+        ...(call.stdin === undefined ? {} : { stdin: call.stdin }),
+      })
     process.stderr.write(call.exit)
     process.exit(3)
   },

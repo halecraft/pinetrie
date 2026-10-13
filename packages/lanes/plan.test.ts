@@ -58,6 +58,7 @@ import {
   planTurnCommit,
   repoConfig,
   type Step,
+  slotMounts,
   specHash,
   specHashOf,
 } from "./index.ts"
@@ -123,6 +124,17 @@ describe("planMounts: every host path a lane sees, in one list", () => {
       target: "/mnt/host/Users/ada/skills",
       readonly: true,
     })
+  })
+})
+
+describe("slotMounts: what a host shares into its slot of the lane VM", () => {
+  test("every directory a lane mounts, its shared directories with the base's", () => {
+    const shared = [{ path: ".plans", source: "/p/.plans" }]
+    const attached = [{ source: "/s/ssh", target: "/run/ssh", readonly: true }]
+    const slot = slotMounts({ base: planMounts(parts), shared, attached })
+    const sources = new Set(slot.map(m => m.source))
+    for (const m of [...planMounts({ ...parts, shared }), ...attached])
+      expect(sources).toContain(m.source)
   })
 })
 

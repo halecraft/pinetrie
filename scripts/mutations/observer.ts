@@ -425,6 +425,14 @@ export const mutations: readonly Mutation[] = [
       "a host inside a lane registers its lane below the lane, and receives only its own runs",
   },
   {
+    name: "a connection gives up on a socket not there yet",
+    file: "packages/lanehost/observer-connect.ts",
+    from: "    if (!connected && missing && Date.now() - since < WAIT_MS) {\n",
+    to: "    if (false) {\n",
+    command: unit,
+    expect: "a connection waits for a socket made after it starts",
+  },
+  {
     name: "the machine role's container keeps the network",
     file: "packages/docker/plan.ts",
     from: '  network: "none",\n  // The kernel',

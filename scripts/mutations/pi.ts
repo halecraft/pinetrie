@@ -42,6 +42,33 @@ export const mutations: readonly Mutation[] = [
     expect: "a lane of its own is told it is in a lane, and of its browser",
   },
   {
+    name: "a line that is no reply ends the channel",
+    file: "packages/channel/client.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    } catch {\n      stderr = `${stderr}${line}\\n`.slice(-4000)\n      return\n    }\n",
+    to: "    } catch {\n      child.stdin.end()\n      return\n    }\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/channel"],
+    expect: "a line on stdout that is no reply is passed over",
+  },
+  {
+    name: "a command's unread input ends its server",
+    file: "packages/channel/run.ts",
+    from: '    child.stdin?.on("error", () => {})\n',
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "packages/channel"],
+    expect:
+      "a command that exits before reading its input leaves the server answering",
+  },
+  {
+    name: "a reply to a client gone ends its server",
+    file: "packages/channel/serve.ts",
+    from: '  io.output.on("error", () => {})\n',
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "packages/channel"],
+    expect:
+      "a server whose client stopped reading outlives the write it cannot make",
+  },
+  {
     name: "an abort is sent before the request it aborts",
     file: "packages/channel/client.ts",
     from: "      write({ id, call: body, updates: onUpdate !== undefined })\n      if (signal?.aborted) write({ abort: id })",

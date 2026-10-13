@@ -8,6 +8,24 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a link whose helper exited is kept",
+    file: "packages/lanes/lane.ts",
+    from: "    opening.then(l => l.closed.then(drop), drop)\n",
+    to: "    opening.then(() => {}, drop)\n",
+    command: unit,
+    expect:
+      "a link that failed to open, or whose helper exited, is opened again",
+  },
+  {
+    name: "a slot leaves out the shared directories",
+    file: "packages/lanes/plan.ts",
+    from: "  ...sharedMounts(input.shared),\n  ...input.attached,\n",
+    to: "  ...input.attached,\n",
+    command: unit,
+    expect:
+      "every directory a lane mounts, its shared directories with the base's",
+  },
+  {
     name: "a new directory's entries keep its orphan name",
     file: "packages/lanehost/send-stream.ts",
     from: "          moveUnder(path, to)\n",
@@ -392,8 +410,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "shared directories are mounted read-only",
     file: plan,
-    from: "      readonly: false,",
-    to: "      readonly: true,",
+    from: "    readonly: false,\n  }))",
+    to: "    readonly: true,\n  }))",
     suite: "lanes",
     scenario: "shared",
     expect: "a plan a lane writes is in your working copy at once, and yours",
