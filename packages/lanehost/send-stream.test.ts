@@ -5,15 +5,11 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
-import { foldSendStream, readSendStream } from "./send-stream.ts"
+import { sendFold, sendReader, streamChanges } from "./send-stream.ts"
 
 const stream = (name: string) =>
-  foldSendStream(
-    readSendStream(
-      readFileSync(
-        path.join(import.meta.dirname, "fixtures", `${name}.stream`),
-      ),
-    ),
+  streamChanges(
+    readFileSync(path.join(import.meta.dirname, "fixtures", `${name}.stream`)),
   )
 const at = (name: string) =>
   Object.fromEntries(stream(name).map(c => [c.path, `${c.change} ${c.kind}`]))
@@ -66,7 +62,7 @@ describe("a send stream folded into one change per path", () => {
     expect(at("whole")).toHaveProperty("d/sub/b", "added file")
   })
   test("bytes that are not a stream are refused", () => {
-    expect(() => readSendStream(new Uint8Array([1, 2, 3]))).toThrow(
+    expect(() => streamChanges(new Uint8Array([1, 2, 3]))).toThrow(
       "not a btrfs send stream",
     )
   })
@@ -114,19 +110,17 @@ const MKDIR = 4
 const RENAME = 9
 
 test("a new directory filled under its orphan name, then renamed into place, takes what is under it", () => {
-  const changes = foldSendStream(
-    readSendStream(
-      streamOf([
-        [MKDIR, "o10-5-0"],
-        [MKFILE, "o11-5-0"],
-        [RENAME, "o11-5-0", "o10-5-0/98a1"],
-        [MKDIR, "o12-5-0"],
-        [RENAME, "o12-5-0", "o10-5-0/sub"],
-        [MKFILE, "o13-5-0"],
-        [RENAME, "o13-5-0", "o10-5-0/sub/g"],
-        [RENAME, "o10-5-0", ".git/objects/98"],
-      ]),
-    ),
+  const changes = streamChanges(
+    streamOf([
+      [MKDIR, "o10-5-0"],
+      [MKFILE, "o11-5-0"],
+      [RENAME, "o11-5-0", "o10-5-0/98a1"],
+      [MKDIR, "o12-5-0"],
+      [RENAME, "o12-5-0", "o10-5-0/sub"],
+      [MKFILE, "o13-5-0"],
+      [RENAME, "o13-5-0", "o10-5-0/sub/g"],
+      [RENAME, "o10-5-0", ".git/objects/98"],
+    ]),
   )
   expect(changes.map(c => `${c.path} ${c.change} ${c.kind}`)).toEqual([
     ".git/objects/98 added dir",
@@ -138,14 +132,72 @@ test("a new directory filled under its orphan name, then renamed into place, tak
 
 test("a path left under an orphan name is refused, never reported as the turn's", () => {
   expect(() =>
-    foldSendStream(
-      readSendStream(
-        streamOf([
-          [MKDIR, "o10-5-0"],
-          [MKFILE, "o11-5-0"],
-          [RENAME, "o11-5-0", "o10-5-0/x"],
-        ]),
-      ),
+    streamChanges(
+      streamOf([
+        [MKDIR, "o10-5-0"],
+        [MKFILE, "o11-5-0"],
+        [RENAME, "o11-5-0", "o10-5-0/x"],
+      ]),
     ),
   ).toThrow("left an orphan unresolved: o10-5-0")
 })
+
+describe("a send stream read as it arrives", () => {
+  const recorded = new Uint8Array(
+    readFileSync(path.join(import.meta.dirname, "fixtures", "turn.stream")),
+  )
+  /** The changes of `bytes` fed in pieces cut at `cuts`. */
+  const inPieces = (bytes: Uint8Array, cuts: readonly number[]) => {
+    const reader = sendReader()
+    const fold = sendFold()
+    let from = 0
+    for (const to of [...cuts, bytes.byteLength]) {
+      for (const c of reader.feed(bytes.subarray(from, to))) fold.add(c)
+      from = to
+    }
+    reader.end()
+    return fold.changes()
+  }
+  const sized = (size: number) =>
+    Array.from(
+      { length: Math.floor((recorded.byteLength - 1) / size) },
+      (_, i) => (i + 1) * size,
+    )
+
+  test("fed in pieces, it folds as the whole stream does", () => {
+    const whole = streamChanges(recorded)
+    for (let cut = 1; cut < recorded.byteLength; cut++)
+      expect(inPieces(recorded, [cut])).toEqual(whole)
+    for (const size of [1, 7, 4096])
+      expect(inPieces(recorded, sized(size))).toEqual(whole)
+  })
+  test("a stream cut short throws at its end, however it was split", () => {
+    const cut = recorded.subarray(0, recorded.byteLength - 3)
+    expect(() => streamChanges(cut)).toThrow("a send stream cut short")
+    expect(() => inPieces(cut, [20, 21])).toThrow("a send stream cut short")
+  })
+})
+
+test("tens of thousands of new directories, filled under their orphan names, fold in linear time", () => {
+  const dirs = 15_000
+  const commands: [number, string, string?][] = []
+  for (let d = 0; d < dirs; d++) {
+    const dir = `o${d + 1}-7-0`
+    commands.push([MKDIR, dir])
+    for (const f of ["a", "b"]) {
+      const file = `o${d + 1}-7-${f === "a" ? 1 : 2}`
+      commands.push([MKFILE, file], [RENAME, file, `${dir}/${f}`])
+    }
+    commands.push([RENAME, dir, `node_modules/p${d}`])
+  }
+  const started = performance.now()
+  const changes = streamChanges(streamOf(commands))
+  expect(performance.now() - started).toBeLessThan(5_000)
+  expect(changes).toHaveLength(dirs * 3)
+  expect(changes.some(c => c.path.startsWith("o"))).toBe(false)
+  expect(changes).toContainEqual({
+    path: "node_modules/p9/b",
+    change: "added",
+    kind: "file",
+  })
+}, 30_000)

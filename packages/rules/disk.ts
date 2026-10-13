@@ -43,16 +43,20 @@ const parentOf = (p: string): string | null => {
   return slash < 0 ? null : p.slice(0, slash)
 }
 
+/** The directories above `p`, nearest first. */
+function* ancestors(p: string): Generator<string> {
+  for (let up = parentOf(p); up !== null; up = parentOf(up)) yield up
+}
+
+const hasAncestorIn = (p: string, set: ReadonlySet<string>): boolean => {
+  for (const up of ancestors(p)) if (set.has(up)) return true
+  return false
+}
+
 /** `paths` with none under another, sorted. */
 export function topmost(paths: Iterable<string>): string[] {
   const all = new Set(paths)
-  return [...all]
-    .filter(p => {
-      for (let up = parentOf(p); up !== null; up = parentOf(up))
-        if (all.has(up)) return false
-      return true
-    })
-    .sort()
+  return [...all].filter(p => !hasAncestorIn(p, all)).sort()
 }
 
 const listed = (paths: readonly string[]): ListedPaths => ({
@@ -85,13 +89,38 @@ function pathsToCheck(input: {
 }): string[] {
   const all = new Set<string>(input.toolWrites)
   for (const run of input.runs) {
-    for (const w of run.writes)
-      for (let p: string | null = w.path; p !== null; p = parentOf(p))
-        all.add(p)
+    for (const w of run.writes) {
+      all.add(w.path)
+      for (const up of ancestors(w.path)) all.add(up)
+    }
     for (const p of run.reads) all.add(p)
     for (const p of run.missing) all.add(p)
   }
   return [...all].filter(p => !isSkipped(p, input.shared)).sort()
+}
+
+/** What to ask `git check-ignore`, then its answer read back for the paths. */
+export interface IgnoreQuery {
+  /** Each path, or the first symlink on its way; no repeats, none beyond a symlink. */
+  readonly asked: readonly string[]
+  /** The paths ignored, given which of `asked` are. */
+  ignored(answer: ReadonlySet<string>): ReadonlySet<string>
+}
+
+/**
+ * The `.gitignore` question for `paths`. Git refuses a whole batch over one
+ * path beyond a symlink, and sees a symlink as one entry: a path through
+ * one stands as the first symlink on its way does.
+ */
+export function ignoreQuery(
+  paths: readonly string[],
+  firstSymlinks: Readonly<Record<string, string>>,
+): IgnoreQuery {
+  const askedFor = (p: string) => firstSymlinks[p] ?? p
+  return {
+    asked: [...new Set(paths.map(askedFor))].sort(),
+    ignored: answer => new Set(paths.filter(p => answer.has(askedFor(p)))),
+  }
 }
 
 /** A run that made derived files, before its inputs are hashed. */
@@ -465,15 +494,20 @@ export function unattributed(
   diff: DiskDiff,
   shared: readonly string[],
 ): string[] {
-  const written = [...writes.classes.keys()]
+  // Sets, not a scan of every write for each path: a `pnpm install` turn
+  // writes tens of thousands of paths, and its diff names as many, on the
+  // host's main thread.
+  const written = new Set(writes.classes.keys())
+  const aboveWritten = new Set<string>()
+  for (const w of written) for (const up of ancestors(w)) aboveWritten.add(up)
   return diff.changes
     .map(c => c.path)
     .filter(
       p =>
         !isSkipped(p, shared) &&
-        !written.some(
-          w => w === p || w.startsWith(`${p}/`) || p.startsWith(`${w}/`),
-        ),
+        !written.has(p) &&
+        !aboveWritten.has(p) &&
+        !hasAncestorIn(p, written),
     )
 }
 

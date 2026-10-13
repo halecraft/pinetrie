@@ -5,6 +5,34 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a turn's disk ──
+  {
+    name: "ignoreQuery asks git about the paths beyond a symlink",
+    file: "packages/rules/disk.ts",
+    from: "  const askedFor = (p: string) => firstSymlinks[p] ?? p\n",
+    to: "  const askedFor = (p: string) => p\n",
+    command: unit,
+    expect:
+      "a path beyond a symlink asks the symlink, once, and stands as it does",
+  },
+  {
+    name: "a diff path under a written directory is unattributed",
+    file: "packages/rules/disk.ts",
+    from: "        !aboveWritten.has(p) &&\n        !hasAncestorIn(p, written),\n",
+    to: "        !aboveWritten.has(p),\n",
+    command: unit,
+    expect:
+      "a path is attributed when written, above a write, or under a written directory",
+  },
+  {
+    name: "unattributed scans every write for each path",
+    file: "packages/rules/disk.ts",
+    from: "        !written.has(p) &&\n",
+    to: "        ![...written].some(w => w === p) &&\n",
+    command: unit,
+    expect:
+      "tens of thousands of writes against as many changes take linear time",
+  },
   // ── a lane's runs, folded ──
   {
     name: "a release whose kernel stamp disagreed is not raced",
@@ -282,8 +310,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a path above a write is never asked about",
     file: "packages/rules/disk.ts",
-    from: "      for (let p: string | null = w.path; p !== null; p = parentOf(p))\n        all.add(p)\n",
-    to: "      all.add(w.path)\n",
+    from: "      for (const up of ancestors(w.path)) all.add(up)\n",
+    to: "",
     command: unit,
     expect:
       "a file added to an ignored directory that was there is under its topmost ignored directory",

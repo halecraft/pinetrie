@@ -57,6 +57,10 @@ export interface LaneChannel {
   present(paths: readonly string[]): Promise<readonly string[]>
   /** sha256 of each path, relative to the lane's directory. */
   hashes(paths: readonly string[]): Promise<FileHashes>
+  /** Each of `paths` beyond a symlink, and the first symlink on its way. */
+  firstSymlinks(
+    paths: readonly string[],
+  ): Promise<Readonly<Record<string, string>>>
   /** Whether each recipe's key, but its image, still holds on the disk. */
   checkRecipes(recipes: readonly Recipe[]): Promise<readonly RecipeCheck[]>
   /**
@@ -100,6 +104,10 @@ export function openChannel(argv: readonly string[]): LaneChannel {
     present: paths =>
       channel.call({ present: paths }) as Promise<readonly string[]>,
     hashes: paths => channel.call({ hashes: paths }) as Promise<FileHashes>,
+    firstSymlinks: paths =>
+      channel.call({ firstSymlinks: paths }) as Promise<
+        Readonly<Record<string, string>>
+      >,
     checkRecipes: recipes =>
       channel.call({ checkRecipes: recipes }) as Promise<
         readonly RecipeCheck[]

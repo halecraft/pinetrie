@@ -2,11 +2,18 @@
 
 - **Status:** Accepted (Duane, 2026-10-10)
 - **Area:** `packages/docker/TECHNICAL.md`, `packages/lanes/TECHNICAL.md`
-- **Evidence:** S146, S147, S148
+- **Evidence:** S146, S147, S148, S179
 - **Amends:**
   - ADR-0130: the disks helper, its shell scripts and the firewall's throwaway
     container are replaced by lanehost's roles, each a container the host
     reaches over one held `docker exec -i`.
+- **Revised:**
+  - 2026-10-13 (S179): a diff's send stream is folded as it arrives, in time
+    linear in the stream, never held: a `pnpm install`'s, held and folded by a
+    scan per rename, ran for minutes on the privileged role's one thread and
+    past its 256 MB, stalling every lane. A drop deletes the subvolumes inside
+    a disk first, deepest first, each made writable: btrfs refuses a subvolume
+    that holds others, and `rm -rf` stops at a read-only one.
 
 **Context.** Everything the host did to lanes' disks outside a lane was
 shell kept in TypeScript strings (`planDiskCommand`), sent one at a time by

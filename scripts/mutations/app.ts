@@ -7,6 +7,15 @@ import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "an archive's teardown stops at a lane it cannot remove",
+    file: "apps/pinetrie/host/work/archive.ts",
+    from: '        await removeLane(runtime, lane).catch(\n          failed(basics, "removing an archived lane", lane),\n        )\n',
+    to: "        await removeLane(runtime, lane)\n",
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host/work"],
+    expect:
+      "a lane whose removal fails leaves the other lanes removed and the snapshots deleted",
+  },
+  {
     name: "an ask of an archived member opens its root first",
     file: "apps/pinetrie/host/relays.ts",
     from: '    if (away !== null) return { kind: "refused", why: away }\n',

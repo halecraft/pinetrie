@@ -181,10 +181,24 @@ host, whatever their projects.
   replaced at each refresh. A move over an existing snapshot fails
   (ENOTEMPTY, S148), so the order is drop, then move.
 - **A drop deletes whatever is there:** a subvolume by btrfs, made writable
-  first, since a read-only one is refused until then (S148); anything else,
-  or a subvolume btrfs refuses, by `rm -rf`. An inner Docker makes
-  subvolumes inside a nested lane's disk, and `rmdir` of an empty subvolume
-  is a delete with `user_subvol_rm_allowed`.
+  first, since a read-only one is refused until then (S148); anything else
+  by `rm -rf`. An inner Docker makes subvolumes inside a nested lane's disk,
+  and `rmdir` of an empty subvolume is a delete with
+  `user_subvol_rm_allowed`.
+- **A subvolume that holds others is refused whole, and `rm -rf` stops at
+  a read-only one** (EROFS, S179): an inner lanehost's snapshots in a
+  nested disk, or a subvolume an agent made in its lane. So where the
+  first delete fails, `drop` finds the subvolumes under the path, by inode
+  256, through no symlink and across device changes (each subvolume is a
+  device of its own), and deletes them deepest first
+  (`subvolumesDeepestFirst`), each made writable, before the path itself.
+  The search keeps only directories that are subvolumes: a nested disk
+  holds an inner Docker's data root, and the role has 256 MB.
+  `btrfs subvolume delete --recursive` would do it in one call, but needs
+  `CAP_SYS_ADMIN` to search the tree (S179).
+- **A subvolume inside a lane is an empty directory in that lane's
+  snapshots:** a snapshot stops at a subvolume's edge, so a restore does not
+  bring one back.
 - **A subvolume is told by its root's inode, 256** (`isSubvolume`):
   `btrfs subvolume show` needs `CAP_SYS_ADMIN` (S125).
 - **A snapshot's time is its birth time** (`statx`), which btrfs keeps.
@@ -203,6 +217,19 @@ host, whatever their projects.
 - **The stream is read as bytes** (`send-stream.ts`), never as
   `receive --dump`'s text, which writes a newline in a name as `\n`: a
   lane controls its file names.
+- **The stream is folded as it arrives, never held** (`diff.ts`,
+  `streamCommand`): `sendReader` keeps only the command a chunk ends
+  inside, and `sendFold` takes each command as it comes. A `pnpm install`
+  of 42,631 entries is a 43 MB stream of 276k commands: held whole, with
+  its command list, it is more than the privileged role's 256 MB, which the
+  kernel then kills, and with it every lane's next diff (S179). The
+  changes themselves are about 17 MB.
+- **The fold is linear in the stream:** a new directory is filled under its
+  orphan name and renamed into place, and what is under it moves with it.
+  `sendFold` keeps the changed paths under each orphan name, so a rename
+  moves only those. A scan of every change at each rename took 39 s on that
+  stream, with the role's one thread blocked, and every lane's turn behind
+  it (S179).
 - **What the stream says, folded per path:**
   - a deleted directory is renamed to an orphan (`o<ino>-<gen>-<idx>`),
     its subdirectories to orphans of their own, then each entry unlinked
@@ -248,15 +275,19 @@ host, whatever their projects.
 
 ## Tests
 
-- `server.test.ts`: the names and their refusals, `planDisk`'s steps, the
-  roles, `readLaneFile` against a symlink out of its snapshot.
-- `disks.test.ts`: the disks role against real btrfs, without privilege.
-  It runs in a pine·trie lane, whose `/workspace` is the VM's btrfs, and
-  skips, saying why, where its directory is not on btrfs.
+- `server.test.ts`: the names and their refusals, `planDisk`'s steps,
+  `subvolumesDeepestFirst`, the roles, `readLaneFile` against a symlink out
+  of its snapshot.
+- `disks.test.ts`: the disks role against real btrfs, without privilege,
+  a delete of disks holding read-only subvolumes among it. It runs in a
+  pine·trie lane, whose `/workspace` is the VM's btrfs, and skips, saying
+  why, where its directory is not on btrfs.
 - `client.test.ts`: one channel per role, reopened after it ends.
 - `grants.test.ts`: `planGrant`'s input, and its refusals.
 - `send-stream.test.ts`: S148's recorded streams (`fixtures/`), each kind
-  of change, names with a newline and a space.
+  of change, names with a newline and a space; the recorded stream fed in
+  pieces, cut at every byte, folds as the whole; a stream cut short throws
+  at its end; 15,000 new directories fold in linear time.
 - `observer.test.ts`: the loader's lines, every decision of the machine
   role's, and its server against a stand-in loader
   (`fixtures/stand-in-observe.mjs`).

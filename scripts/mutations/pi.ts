@@ -4,6 +4,15 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "firstSymlinks names the last symlink on a path's way",
+    file: "packages/pi/lane-helper.ts",
+    from: "        out[p] = dir\n        break\n",
+    to: "        out[p] = dir\n",
+    command: unit,
+    expect:
+      "firstSymlinks names the first symlink on a path's way, and nothing else",
+  },
   // ── agents talking ──
   {
     name: "a spent budget does not stop the run",

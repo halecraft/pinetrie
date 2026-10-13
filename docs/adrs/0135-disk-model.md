@@ -3,7 +3,7 @@
 - **Status:** Accepted (Duane, 2026-10-12)
 - **Area:** `packages/lanes/TECHNICAL.md`, `docs/01-architecture.md`
 - **Evidence:** S146, S147, S148, S155, S156, S157, S158, S159, S160, S161,
-  S162, S169, S170, S171, S172, S173, S175, S176, S177
+  S162, S169, S170, S171, S172, S173, S175, S176, S177, S179
 - **Supersedes:**
   - ADR-0131: derived state is learned from what each tool call's commands
     read and wrote, not declared (`lanes.install`, `installWhen` and
@@ -23,6 +23,10 @@
     longer current is shown as concurrent. The directory stays live, with no
     history, and is never branched.
 - **Revised:**
+  - 2026-10-13 (S179): a path through a symlink stands, for `.gitignore`, as
+    the first symlink on its way, which is what git is asked about: git
+    refuses a whole batch over one path beyond a symlink, and a run's failed
+    lookup can name one.
   - 2026-10-13 (S177): under the observer a run sees no EINTR, `dash`'s loop
     never fails, and `strace` traces a run's command.
   - 2026-10-13 (S175, S176): a lane is its first process's PID namespace, not

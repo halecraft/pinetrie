@@ -478,7 +478,7 @@ item 18, and in `lanes.test.ts` against the harness.
 - **The protocol** (`lane-protocol.ts`) is the calls alone: an environment
   method and its arguments, a `run` (with its input, for the host's own
   commands that take more than a command line holds), a drain of the
-  lane's `runs`, or `hashes` of paths. Bytes and errors cross as the
+  lane's `runs`, or `hashes`, `present` or `firstSymlinks` of paths. Bytes and errors cross as the
   channel's wire carries them, at any depth, since `NodeExecutionEnv` never
   throws: its errors are values inside results (S44 item 5).
 - **A lane's runs** (ADR-0135): each `exec` is a run, launched with its
@@ -531,6 +531,11 @@ item 18, and in `lanes.test.ts` against the harness.
   - **`checkRecipes`** answers, per recipe, the first fact of its key that
     changed (`checkRecipe`): an input's hash, a failed lookup now found, a
     shared file's stamp. Its image is the host's to compare.
+  - **`firstSymlinks`** answers, for each path that runs through a
+    symlink, the first symlink on its way, for `git check-ignore`, which
+    refuses a batch over one path beyond a symlink (S179). A path that is
+    itself a symlink is left out, a missing directory ends the search, and
+    each directory is `lstat`ed once per call.
   - Outside a lane, as in tests on the host, nothing observes: the drain's
     source gives no events, and no run reports a path.
 - **The observer, relayed to a host inside the lane** (`observer.ts`):

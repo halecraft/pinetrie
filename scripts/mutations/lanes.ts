@@ -34,6 +34,23 @@ export const mutations: readonly Mutation[] = [
     expect: "a new directory filled under its orphan name",
   },
   {
+    name: "a send stream's rename scans every change",
+    file: "packages/lanehost/send-stream.ts",
+    from: "    const paths = under.get(from)\n",
+    to: '    const paths = new Set([...changes.keys()].filter(p => p.startsWith(from + "/")))\n',
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
+    expect:
+      "tens of thousands of new directories, filled under their orphan names, fold in linear time",
+  },
+  {
+    name: "a send stream's reader drops the command a chunk ends inside",
+    file: "packages/lanehost/send-stream.ts",
+    from: "      rest = ended ? new Uint8Array(0) : bytes.slice(at)\n",
+    to: "      rest = new Uint8Array(0)\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
+    expect: "fed in pieces, it folds as the whole stream does",
+  },
+  {
     name: "a send stream's orphan stands for nothing",
     file: "packages/lanehost/send-stream.ts",
     from: "        } else if (ORPHAN.test(pathTo)) orphans.set(pathTo, resolve(path))\n",
@@ -128,6 +145,15 @@ export const mutations: readonly Mutation[] = [
     scenario: "shared",
     expect:
       "two lanes write one shared file: the write over the other's is flagged concurrent, the other is not",
+  },
+  {
+    name: "the host asks git about paths beyond a symlink",
+    file: "apps/pinetrie/host/work/disk.ts",
+    from: "  const query = ignoreQuery(paths, await channel.firstSymlinks(paths))\n",
+    to: "  const query = ignoreQuery(paths, {})\n",
+    suite: "lanes",
+    scenario: "recipe",
+    expect: "a turn whose run writes and looks through a symlink is classed",
   },
   {
     name: "a run's ignored writes are all local",

@@ -3,7 +3,12 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
-import { planDisk, planNestedDisk, readLaneFile } from "./disks.ts"
+import {
+  planDisk,
+  planNestedDisk,
+  readLaneFile,
+  subvolumesDeepestFirst,
+} from "./disks.ts"
 import { isDiskName, isProjectKey, projectDisks } from "./layout.ts"
 import { planProjectRemoval } from "./projects.ts"
 import { planRoles } from "./roles.ts"
@@ -100,6 +105,21 @@ describe("planDisk: each disk operation as steps", () => {
       path: disks.nested("l"),
       uid: 1000,
     })
+  })
+  test("subvolumesDeepestFirst puts each subvolume before every one above it", () => {
+    expect(
+      subvolumesDeepestFirst([
+        "/n/projects/p/lanes/a",
+        "/n/docker/x",
+        "/n/projects/p/lanes/a/inner/deep",
+        "/n/projects/p/snapshots/base",
+      ]),
+    ).toEqual([
+      "/n/projects/p/lanes/a/inner/deep",
+      "/n/projects/p/lanes/a",
+      "/n/projects/p/snapshots/base",
+      "/n/docker/x",
+    ])
   })
   test("a project's removal drops each disk it holds", () => {
     expect(

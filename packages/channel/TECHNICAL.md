@@ -42,3 +42,11 @@ shell, stdout as text or bytes, killed by an abort. It never throws: a
 program that cannot start is code -1, with why in stderr. A command that
 exits before reading all its input leaves the server running: the write's
 EPIPE is ignored, and its exit says what happened.
+
+## `streamCommand` (`run.ts`)
+
+`runCommand` for output too large to hold: each stdout chunk goes to
+`onStdout` as it arrives, and none is kept (lanehost's send stream). It
+ends as `runCommand` does: it never throws, a program that cannot start is
+code -1, and an abort kills it. A reader that throws kills the command, and
+its message is the failure. stderr keeps its last 4,000 characters.

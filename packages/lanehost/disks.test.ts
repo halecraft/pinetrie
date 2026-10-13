@@ -15,12 +15,13 @@ import {
   writeFile,
 } from "node:fs/promises"
 import path from "node:path"
+import { runCommand } from "@pinetrie/channel"
 import { afterAll, describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
 import { isSubvolume } from "./disks.ts"
 import { projectDisks } from "./layout.ts"
 import type { LanehostCall } from "./protocol.ts"
-import { foldSendStream, readSendStream } from "./send-stream.ts"
+import { streamChanges } from "./send-stream.ts"
 import { servingFrom } from "./serving.ts"
 
 const BTRFS_MAGIC = 0x9123683e
@@ -155,16 +156,60 @@ describe.skipIf(!onBtrfs)(
         { kind: "diff", project: KEY, from: "a", to: "b" },
         servingFrom(["disks", HERE, '{"rootless":true}']),
       )
-      const sent = foldSendStream(
-        readSendStream(
-          readFileSync(
-            path.join(import.meta.dirname, "fixtures", "turn.stream"),
-          ),
-        ),
+      const sent = streamChanges(
+        readFileSync(path.join(import.meta.dirname, "fixtures", "turn.stream")),
       )
       expect(walked.changes.map(c => `${c.path} ${c.change}`)).toEqual(
         sent.map(c => `${c.path} ${c.change}`),
       )
+    })
+    test("a lane's delete takes a nested disk holding read-only snapshots, and a lane disk holding one", async () => {
+      const btrfs = async (...args: string[]) => {
+        const ran = await runCommand(["btrfs", "-q", ...args], {
+          cwd: "/",
+          bytes: false,
+          signal: new AbortController().signal,
+        })
+        if (ran.code !== 0)
+          throw new Error(`btrfs ${args.join(" ")}: ${ran.stderr}`)
+      }
+      await disk({
+        kind: "disk",
+        project: KEY,
+        op: { kind: "create", lane: "n" },
+      })
+      await disk({ kind: "nestedDisk", project: KEY, lane: "n" })
+      // As an inner lanehost leaves them: a lane, and a read-only snapshot
+      // of it, two levels down.
+      const inner = path.join(disks.nested("n"), "projects/p")
+      await mkdir(path.join(inner, "lanes"), { recursive: true })
+      await mkdir(path.join(inner, "snapshots"), { recursive: true })
+      await btrfs("subvolume", "create", path.join(inner, "lanes/a"))
+      await mkdir(path.join(inner, "lanes/a/.git"))
+      await writeFile(path.join(inner, "lanes/a/.git/HEAD"), "ref\n")
+      await btrfs(
+        "subvolume",
+        "snapshot",
+        "-r",
+        path.join(inner, "lanes/a"),
+        path.join(inner, "snapshots/base"),
+      )
+      // As an agent may make one in its own lane.
+      await btrfs("subvolume", "create", path.join(disks.lane("n"), "s"))
+      await btrfs(
+        "subvolume",
+        "snapshot",
+        "-r",
+        path.join(disks.lane("n"), "s"),
+        path.join(disks.lane("n"), "s-ro"),
+      )
+      await disk({
+        kind: "disk",
+        project: KEY,
+        op: { kind: "delete", lane: "n" },
+      })
+      expect(await isSubvolume(disks.lane("n"))).toBe(false)
+      expect(await isSubvolume(disks.nested("n"))).toBe(false)
     })
     test("a project's record and listing, and its removal", async () => {
       await answer(

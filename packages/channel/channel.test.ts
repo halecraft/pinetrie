@@ -2,7 +2,7 @@ import { spawn } from "node:child_process"
 import path from "node:path"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { type Channel, openChannel } from "./client.ts"
-import type { RunResult } from "./run.ts"
+import { type RunResult, streamCommand } from "./run.ts"
 import type { TestCall } from "./test-server.ts"
 
 const SERVER = path.join(import.meta.dirname, "test-server.ts")
@@ -119,4 +119,35 @@ test("a server whose client stopped reading outlives the write it cannot make", 
   child.stdin.end()
   const code = await new Promise(resolve => child.on("exit", resolve))
   expect(code).toBe(0)
+})
+
+describe("a streamed command", () => {
+  const signal = () => new AbortController().signal
+  test("hands over its stdout in chunks, keeping none, and its exit code", async () => {
+    const chunks: Uint8Array[] = []
+    const ran = await streamCommand(
+      ["sh", "-c", "printf abc; printf oops >&2; exit 3"],
+      { cwd: "/", signal: signal(), onStdout: c => chunks.push(c) },
+    )
+    expect(Buffer.concat(chunks).toString()).toBe("abc")
+    expect(ran).toEqual({ code: 3, stderr: "oops" })
+  })
+  test("a program that cannot start is code -1", async () => {
+    const ran = await streamCommand(["no-such-program-here"], {
+      cwd: "/",
+      signal: signal(),
+      onStdout: () => {},
+    })
+    expect(ran.code).toBe(-1)
+  })
+  test("a reader that throws kills it, and its message is the failure", async () => {
+    const ran = await streamCommand(["sh", "-c", "yes"], {
+      cwd: "/",
+      signal: signal(),
+      onStdout: () => {
+        throw new Error("not a stream")
+      },
+    })
+    expect(ran).toEqual({ code: -1, stderr: "not a stream" })
+  })
 })

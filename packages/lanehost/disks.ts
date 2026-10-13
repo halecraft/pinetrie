@@ -1,8 +1,9 @@
 // lanehost/disks — a project's disks as btrfs subvolumes, on a filesystem
 // mounted with `user_subvol_rm_allowed`, so none of it needs a capability.
-// Each operation is planned as `DiskStep`s, then carried out by `executeDiskSteps`. Snapshots are read-only, as `btrfs send`
-// needs: a restore is a writable snapshot of one, and a delete makes one
-// writable first.
+// Each operation is planned as `DiskStep`s, then carried out by
+// `executeDiskSteps`. Snapshots are read-only, as `btrfs send` needs: a
+// restore is a writable snapshot of one, and a delete makes one writable
+// first.
 
 import {
   lstat,
@@ -41,10 +42,10 @@ export type DiskStep =
     }
   /**
    * Delete what is at `path`, if anything: a subvolume by btrfs, made
-   * writable first (a read-only one is refused otherwise); anything
-   * else, or a subvolume btrfs refuses, by `rm -rf`. An inner Docker makes
-   * subvolumes inside a nested lane's disk, and `rmdir` of an empty
-   * subvolume is a delete with `user_subvol_rm_allowed`.
+   * writable first (a read-only one is refused otherwise); anything else by
+   * `rm -rf`. Where btrfs refuses, the subvolumes inside go first, deepest
+   * first: an inner Docker or lanehost makes them in a nested lane's disk,
+   * an agent in its lane.
    */
   | { readonly kind: "drop"; readonly path: string }
   | { readonly kind: "move"; readonly from: string; readonly to: string }
@@ -162,21 +163,59 @@ const exists = (at: string) =>
     () => false,
   )
 
+/** Make a read-only subvolume writable, then delete it; false where btrfs refuses. */
+async function deleteSubvolume(at: string): Promise<boolean> {
+  // A read-only subvolume is deleted only once it is writable again.
+  await runCommand(["btrfs", "property", "set", at, "ro", "false"], {
+    cwd: "/",
+    bytes: false,
+    signal: new AbortController().signal,
+  })
+  return btrfs(["subvolume", "delete", at]).then(
+    () => true,
+    () => false,
+  )
+}
+
+/**
+ * The subvolumes under `root`, not `root` itself: a directory whose inode
+ * is 256. Never through a symlink, and never stopping where the device
+ * changes, as each subvolume is a device of its own. Only directories are
+ * kept: a nested disk holds an inner Docker's data root.
+ */
+async function subvolumesUnder(root: string): Promise<string[]> {
+  const found: string[] = []
+  const pending = [root]
+  for (let dir = pending.pop(); dir !== undefined; dir = pending.pop()) {
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
+    for (const e of entries) {
+      if (!e.isDirectory()) continue
+      const at = path.join(dir, e.name)
+      if (await isSubvolume(at)) found.push(at)
+      pending.push(at)
+    }
+  }
+  return found
+}
+
+/** Subvolumes in the order they can be deleted: each before every one above it. */
+export const subvolumesDeepestFirst = (
+  found: readonly string[],
+): readonly string[] =>
+  [...found].sort(
+    (a, b) => b.split("/").length - a.split("/").length || (a < b ? -1 : 1),
+  )
+
 async function drop(at: string): Promise<void> {
   if (!(await exists(at))) return
-  if (await isSubvolume(at)) {
-    // A read-only subvolume is deleted only once it is writable again.
-    await runCommand(["btrfs", "property", "set", at, "ro", "false"], {
-      cwd: "/",
-      bytes: false,
-      signal: new AbortController().signal,
-    })
-    const deleted = await btrfs(["subvolume", "delete", at]).then(
-      () => true,
-      () => false,
-    )
-    if (deleted) return
-  }
+  const subvolume = await isSubvolume(at)
+  if (subvolume && (await deleteSubvolume(at))) return
+  // btrfs refuses a subvolume that holds others, and `rm -rf` stops at a
+  // read-only one (EROFS): an inner lanehost's snapshots, or one an agent
+  // made in its lane. So those go first, each its own delete.
+  for (const inner of subvolumesDeepestFirst(await subvolumesUnder(at)))
+    await deleteSubvolume(inner)
+  if (subvolume && (await deleteSubvolume(at))) return
   await rm(at, { recursive: true, force: true })
 }
 

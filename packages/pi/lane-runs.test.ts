@@ -9,6 +9,7 @@ import {
   readFile,
   realpath,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -147,6 +148,25 @@ describe("the helper", () => {
     await writeFile(path.join(h.dir, "h.txt"), "two")
     expect(await h.channel.hashes(["h.txt"])).toEqual({
       "h.txt": sha256("two"),
+    })
+  })
+  test("firstSymlinks names the first symlink on a path's way, and nothing else", async () => {
+    await mkdir(path.join(h.dir, "real/inner"), { recursive: true })
+    await symlink("real", path.join(h.dir, "link"))
+    await symlink("../real", path.join(h.dir, "real/back"))
+    expect(
+      await h.channel.firstSymlinks([
+        "link/inner/x.json",
+        "link/back/inner/q",
+        "real/back/inner/y",
+        "link",
+        "real/inner/z",
+        "gone/link/w",
+      ]),
+    ).toEqual({
+      "link/inner/x.json": "link",
+      "link/back/inner/q": "link",
+      "real/back/inner/y": "real/back",
     })
   })
   test("checkRecipes: a recipe holds until an input changes or a lookup is found", async () => {

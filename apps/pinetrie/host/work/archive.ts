@@ -1,6 +1,7 @@
 // host/work/archive — what an archive or a restore does to its lanes, off the
 // documents' keeper: carries out `planArchive`'s teardown, deciding nothing.
-// Lanes forgotten and their containers and disks removed; their refs in your
+// Lanes forgotten and their containers and disks removed, a lane whose
+// removal fails reported and passed; their refs in your
 // repo moved by an owner command, which marks each lane's offer (withdrawn, or
 // built again); the snapshots no one will branch from deleted in the
 // background.
@@ -30,9 +31,13 @@ export function createArchive(deps: {
   const { basics, offers, runtime, registry, keeper } = deps
   return {
     async teardown({ forget, refs, snapshots }) {
+      // One lane's disk that will not go is waste; a teardown stopped there
+      // would strand every lane after it, its history and its snapshots.
       for (const lane of forget) {
         await registry.forget(lane)
-        await removeLane(runtime, lane)
+        await removeLane(runtime, lane).catch(
+          failed(basics, "removing an archived lane", lane),
+        )
       }
       if (offers !== null && refs.length > 0)
         await offers

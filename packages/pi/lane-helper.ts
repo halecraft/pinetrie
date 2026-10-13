@@ -13,7 +13,7 @@
 //   launched, with its command; the write tools' paths, and
 //   the read and write tools' accesses of shared files (`LaneDrain`);
 //   `present`, which paths exist, for the host's fold; `hashes`, cached by
-//   stamp; and `checkRecipes`.
+//   stamp; `checkRecipes`; and `firstSymlinks`, for `git check-ignore`.
 // - `observerRelay`: the machine's observer served at `OBSERVER_SOCKET` to a
 //   host inside the lane while the host relays it (`observer.ts`).
 // Calls are handled concurrently: pi runs a turn's tool calls in parallel
@@ -102,6 +102,44 @@ const isPresent = (p: string): boolean => {
   } catch {
     return false
   }
+}
+
+/**
+ * Each of `paths` that runs through a symlink, and the first symlink on its
+ * way: `git check-ignore` refuses a whole batch over one path beyond a
+ * symlink, and can be asked about the symlink instead. A path that is
+ * itself a symlink is left out, and a missing directory ends the search.
+ */
+async function firstSymlinks(
+  paths: readonly string[],
+): Promise<Record<string, string>> {
+  /** Per directory, within one call: a turn's paths share theirs. */
+  type Kind = "link" | "other" | "missing"
+  const kinds = new Map<string, Promise<Kind>>()
+  const dirKind = (dir: string): Promise<Kind> => {
+    const known = kinds.get(dir)
+    if (known !== undefined) return known
+    const kind = lstat(path.join(cwd, dir)).then(
+      (st): Kind => (st.isSymbolicLink() ? "link" : "other"),
+      (): Kind => "missing",
+    )
+    kinds.set(dir, kind)
+    return kind
+  }
+  const out: Record<string, string> = {}
+  for (const p of paths) {
+    const segments = p.split("/")
+    for (let i = 1; i < segments.length; i++) {
+      const dir = segments.slice(0, i).join("/")
+      const kind = await dirKind(dir)
+      if (kind === "missing") break
+      if (kind === "link") {
+        out[p] = dir
+        break
+      }
+    }
+  }
+  return out
 }
 
 /** Everything this helper knows of its runs and tools since the last drain. */
@@ -256,6 +294,7 @@ serve<LaneHello, LaneCall, unknown, unknown>(
     if ("runs" in call) return drain()
     if ("present" in call) return call.present.filter(isPresent)
     if ("hashes" in call) return hashes(call.hashes)
+    if ("firstSymlinks" in call) return firstSymlinks(call.firstSymlinks)
     if ("checkRecipes" in call) return checkRecipes(call.checkRecipes)
     if (!isEnvMethod(call.method))
       throw new Error(`${call.method} does not cross into a lane`)

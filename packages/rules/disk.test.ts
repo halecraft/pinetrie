@@ -10,6 +10,7 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   decodeRegistry,
+  ignoreQuery,
   nextRegistry,
   planStaleOutputs,
   registryAfter,
@@ -399,6 +400,87 @@ describe("nextRegistry", () => {
     })
     expect(after).toEqual(EMPTY_REGISTRY)
   })
+})
+
+describe("ignoreQuery", () => {
+  const links = {
+    "node_modules/.pnpm/a/node_modules/b/lib/p.json":
+      "node_modules/.pnpm/a/node_modules/b",
+    "node_modules/.pnpm/a/node_modules/b/index.js":
+      "node_modules/.pnpm/a/node_modules/b",
+  }
+  const query = ignoreQuery(
+    [...Object.keys(links), "src/a.ts", "dist/x.js"],
+    links,
+  )
+  test("a path beyond a symlink asks the symlink, once, and stands as it does", () => {
+    expect(query.asked).toEqual([
+      "dist/x.js",
+      "node_modules/.pnpm/a/node_modules/b",
+      "src/a.ts",
+    ])
+    expect(
+      [
+        ...query.ignored(
+          new Set(["node_modules/.pnpm/a/node_modules/b", "dist/x.js"]),
+        ),
+      ].sort(),
+    ).toEqual([
+      "dist/x.js",
+      "node_modules/.pnpm/a/node_modules/b/index.js",
+      "node_modules/.pnpm/a/node_modules/b/lib/p.json",
+    ])
+  })
+})
+
+describe("unattributed", () => {
+  const written = (...paths: string[]) => ({
+    classes: new Map(paths.map(p => [p, "local" as const])),
+    made: [],
+    roots: new Map(),
+    gone: [],
+    unignored: [],
+    leftovers: [],
+  })
+  const diffOf = (...paths: string[]) => ({
+    changes: paths.map(path => ({
+      path,
+      change: "added" as const,
+      kind: "file" as const,
+    })),
+  })
+
+  test("a path is attributed when written, above a write, or under a written directory", () => {
+    expect(
+      unattributed(
+        written("dist", "src/a.ts", "out/x"),
+        diffOf(
+          "dist/app.js",
+          "src",
+          "src/a.ts",
+          "out/x",
+          "out/y",
+          ".plans/p.md",
+          "log",
+        ),
+        [".plans"],
+      ),
+    ).toEqual(["out/y", "log"])
+  })
+  test("tens of thousands of writes against as many changes take linear time", () => {
+    const paths = Array.from(
+      { length: 50_000 },
+      (_, i) => `node_modules/.pnpm/p${i % 500}/f${i}`,
+    )
+    const started = performance.now()
+    const rest = unattributed(
+      written(...[...paths].reverse()),
+      diffOf(...paths, "stray"),
+      [],
+    )
+    expect(performance.now() - started).toBeLessThan(2_000)
+    expect(rest).toEqual(["stray"])
+  }, 60_000)
 })
 
 describe("the turn's record", () => {

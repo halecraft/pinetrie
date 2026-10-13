@@ -480,7 +480,10 @@ rejects `shutdown()`.
   `planArchive`s the crossing first. A refusal is a card move's,
   `unmoved`, saying where the card is and who put it there. An undo of
   moves whose step crossed the archive's edge is refused `archived`
-  (`crossesArchive`), before Kyneta reverts anything. **A change to the states** (`handleWorkflow`) is one
+  (`crossesArchive`), before Kyneta reverts anything. The crossing's
+  teardown (`work/archive.ts`) reports a lane whose removal fails and goes
+  on: one disk left behind is waste, while a teardown stopped there would
+  leave every lane after it, its history and its snapshots. **A change to the states** (`handleWorkflow`) is one
   keeper step, `planWorkflowEdit` over the workflow and the board.
 - **A message sent from a card spends it** (ADR-0048): `sendChat` names the
   card's other writers as contributors, through the card port, and spends
@@ -957,7 +960,10 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   is queued and awaited; the rest is one step, not awaited, so the next
   tool call waits for all of it and the next request for none:
   1. the turn's runs drained from the helper, the paths they name checked
-     with `git check-ignore --no-index -z --stdin` in the lane, classed,
+     with `git check-ignore --no-index -z --stdin` in the lane, each path
+     through a symlink asked about as the first symlink on its way
+     (`firstSymlinks`, then `ignoreQuery`): git refuses the whole batch
+     over one path beyond a symlink. Then classed,
      the new recipes' inputs and roots' `CACHEDIR.TAG` hashed, and the
      registry written (ADR-0135). Each ask is a two-step value from
      `@pinetrie/rules` (`writesToClass`, `registryAfter`): the paths to ask

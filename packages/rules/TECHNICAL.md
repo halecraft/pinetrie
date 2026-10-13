@@ -1227,6 +1227,15 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
       `classify` throws on a path it never named. `registryAfter` names the
       paths to hash (new recipes' inputs, new roots' `CACHEDIR.TAG`), and
       its `next` throws on an answer short of one.
+    - **A path through a symlink stands as the first symlink on its way**
+      (`ignoreQuery`, S179). `git check-ignore` refuses a whole batch over
+      one path beyond a symlink, and a failed lookup is reported by the
+      name the process gave, which can run through one: pnpm's
+      `node_modules/.pnpm/*/node_modules/<dep>` are symlinks. Git sees a
+      symlink as one entry, so what lies beyond it shares its standing. The
+      host gathers the symlinks from the lane (`firstSymlinks`), asks git
+      about `asked`, and `ignored` reads the answer back for the paths, so
+      `classify` is still answered for exactly the paths it named.
     - **`classifyWrites` classes each path a run or a write tool wrote.** Not
       ignored is source. Ignored and written by a run that read source,
       unless the run read it before writing it (an edit in place), is
@@ -1258,6 +1267,15 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
       that the commit left out (jj's size limit). A path in the turn's
       whole-disk diff that no run or tool wrote is local when ignored
       (`unattributed`); else it is source, and in the commit.
+    - **`unattributed` is linear:** a `pnpm install` turn writes tens of
+      thousands of paths, its diff names as many, and it runs on the host's
+      main thread. A scan of every write for each path took 44 s there
+      (S179); two sets made once, the written paths and every directory
+      above one, and a walk up each path's parents, take milliseconds.
+    - **A known limit:** a run's write named through a symlink is classed
+      by that name, while the diff names the real path, which
+      `unattributed` cannot match to it: the real path may be listed local
+      as well. Matching them would mean resolving links.
     - A prompt's record, an update's and a record from before have none:
       the old `ignored` and `recipe` fields decode unread.
     - **What a turn did to shared files** (`disk.shared`, `shared.ts`):

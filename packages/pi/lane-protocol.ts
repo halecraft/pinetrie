@@ -54,6 +54,11 @@ export type LaneCall =
   | { readonly present: readonly string[] }
   /** Content hashes of paths relative to the helper's directory: a `FileHashes`. */
   | { readonly hashes: readonly string[] }
+  /**
+   * Of these paths, relative to the helper's directory, each that runs
+   * through a symlink, and the first symlink on its way: a record.
+   */
+  | { readonly firstSymlinks: readonly string[] }
   /** Whether each recipe's key still holds on the disk: a `RecipeCheck` each. */
   | { readonly checkRecipes: readonly Recipe[] }
   /**

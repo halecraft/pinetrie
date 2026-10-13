@@ -24,6 +24,7 @@ import { drainLaneRuns, type LaneChannel } from "@pinetrie/pi"
 import {
   type ClassedWrites,
   decodeRegistry,
+  ignoreQuery,
   planStaleOutputs,
   registryAfter,
   turnDisk,
@@ -35,7 +36,9 @@ const REGISTRY = `${LANE_CONFIG_DIR}/${REGISTRY_FILE}`
 
 /**
  * Of `paths`, those the lane's `.gitignore` files and its ignore file
- * ignore. On `--stdin`: a turn can name more paths than a command line
+ * ignore. A path through a symlink is asked about as the first symlink on
+ * its way (`ignoreQuery`): git fails a whole batch over one path beyond a
+ * symlink. On `--stdin`: a turn can name more paths than a command line
  * holds.
  */
 async function checkIgnored(
@@ -43,19 +46,22 @@ async function checkIgnored(
   paths: readonly string[],
 ): Promise<ReadonlySet<string>> {
   if (paths.length === 0) return new Set()
+  const query = ignoreQuery(paths, await channel.firstSymlinks(paths))
   const ran = await channel.run(
     ["git", "check-ignore", "--no-index", "-z", "--stdin"],
     false,
     undefined,
-    `${paths.join("\0")}\0`,
+    `${query.asked.join("\0")}\0`,
   )
   // 1: none is ignored.
   if (ran.code !== 0 && ran.code !== 1)
     throw new Error(`git check-ignore failed: ${ran.stderr}`)
-  return new Set(
-    String(ran.stdout)
-      .split("\0")
-      .filter(p => p !== ""),
+  return query.ignored(
+    new Set(
+      String(ran.stdout)
+        .split("\0")
+        .filter(p => p !== ""),
+    ),
   )
 }
 

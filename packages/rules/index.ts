@@ -250,6 +250,8 @@ export {
 export {
   type ClassedWrites,
   decodeRegistry,
+  type IgnoreQuery,
+  ignoreQuery,
   planStaleOutputs,
   type RegistryToKey,
   registryAfter,
