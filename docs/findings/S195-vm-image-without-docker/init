@@ -1,0 +1,26 @@
+#!/bin/sh
+# S195 probe's PID 1: network, build.sh, the tar raw to /dev/vda, power off.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts /tmp && mount -t devpts devpts /dev/pts
+t0=$(cut -d' ' -f1 /proc/uptime)
+echo "[s195] up at $t0 s; date $(date -u)"
+for m in failover net_failover virtio_net virtio_blk rng-core virtio-rng af_packet; do insmod /m/$m.ko || echo "[s195] insmod $m failed"; done
+ip link set lo up
+ip link set eth0 up
+udhcpc -i eth0 -q -n -t 10 || echo "[s195] no DHCP"
+ip -4 addr show eth0 | grep inet
+echo "[s195] net at $(cut -d' ' -f1 /proc/uptime) s"
+mkdir -p /out
+if sh /src/build.sh /src /out; then
+  echo "[s195] built at $(cut -d' ' -f1 /proc/uptime) s"
+  tar -C /out -cf /dev/vda SHA256SUMS Image stage1.cpio system.erofs && sync
+  echo "[s195] tar written: $?"
+  cat /out/SHA256SUMS
+else
+  echo "[s195] build.sh failed: $?"
+fi
+echo "[s195] done at $(cut -d' ' -f1 /proc/uptime) s"
+poweroff -f

@@ -18,6 +18,9 @@
   - ADR-0141: a change to what lanes mount or reach no longer means restarting
     the host. What accepted work adds goes in an extra slot of the lane VM,
     and its ports are written again; the host's own slot is still filled once.
+  - ADR-0147: the VM's image is built on the Mac in a VM of pine·trie's own,
+    from `linux-virt` and Alpine's minirootfs pinned by SHA-256, not in a
+    Docker; a host that finds it missing builds it.
 
 Restates ADR-0103 as amended by ADR-0118 and its revisions of 2026-10-07;
 decides nothing new. ADR-0103's changes to ADR-0034, ADR-0035 and ADR-0046
