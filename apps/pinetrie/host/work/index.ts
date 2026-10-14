@@ -1,13 +1,13 @@
 // host/work — lanes' containers and disks, as the host carries them out.
 //
-// The decisions are pure and live in `@pinetrie/core`, `@pinetrie/rules`,
-// `@pinetrie/lanes` and `@pinetrie/repo`; these modules gather what they need, call them, and
-// execute. What is not in the
-// document, in jj, or on a lane's disk is held here: what startup found
-// (`Setup`), each lane's handle (`LaneRegistry`), and each coordination set in
-// the module that writes it (`turns`' pending records, `update`'s guidance
-// flag). Your repo is its owner's (`Setup.owner`, `@pinetrie/repo`); offers are
-// `host/offers/`'s, and accepted work `line.ts`'s.
+// The decisions are pure and live in `@pinetrie/core`, `@pinetrie/rules` and
+// `@pinetrie/lanes`; these modules gather what they need, call them, and
+// execute. What is not in the document, in a lane's history, or on a lane's
+// disk is held here: what startup found (`Setup`), each lane's handle
+// (`LaneRegistry`), and each coordination set in the module that writes it
+// (`turns`' pending records, `update`'s guidance flag). Accepted work, offers
+// and each lane's history are the project's adapter's (`adapter.ts`), which
+// `host/project.ts` chooses by the project's kind: nothing here names one.
 
 import {
   PROJECT_CONFIG_FILE,
@@ -17,37 +17,22 @@ import {
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
-
-import { readRunning } from "@pinetrie/reads"
-import type { RepoOwner } from "@pinetrie/repo"
 import { refusedAnswer } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
-import { type Offers, startOffers } from "../offers/index.ts"
 import type { Records } from "../records.ts"
-import { type AcceptedWork, createAcceptedWork } from "./accepted.ts"
+import type { ProjectAdapter, Splits, StartedProject } from "./adapter.ts"
 import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes, recordLane } from "./create.ts"
-import { createFetches } from "./fetch.ts"
+import type { Destination } from "./destination.ts"
 import { createRegistry } from "./registry.ts"
 import type { Found } from "./runtime.ts"
 import { startSetup } from "./setup.ts"
 import { createSharedLineages } from "./shared.ts"
 import { startSharedWatch } from "./shared-watch.ts"
-import { createSplits, type Splits } from "./split.ts"
 import type { PersonalSshPlaces } from "./ssh.ts"
 import { createTurns } from "./turns.ts"
 import { createUpdates, type Updates } from "./update.ts"
-
-/**
- * Your repo as lane work keeps it, all of it or none: its one writer, which
- * shutdown closes, accepted work in it, and each lane's offer there.
- */
-export interface YourRepo {
-  readonly owner: RepoOwner
-  readonly accepted: AcceptedWork
-  readonly offers: Offers
-}
 
 /**
  * What the host needs of lane work. Each member is declared, with its doc,
@@ -65,11 +50,11 @@ export type LaneWork = Pick<
     readonly project: ProjectRecord | null
     /** pi's hooks lane work answers; `askSplit` is the documents' (`host/split-call.ts`). */
     readonly hooks: Omit<LaneHooks, "askSplit" | "ask" | "leave">
-    /** Your repo, as lane work keeps it; null for a host without tools. */
-    readonly repo: YourRepo | null
+    /** Accepted work and offers, as the project keeps them; null for a host without tools. */
+    readonly destination: Destination | null
     /**
      * Settles when every lane's queued steps, fetches and the base snapshot's
-     * refresh have, and the owner of your repo has nothing queued, including
+     * refresh have, and the destination has nothing queued, including
      * records they write when they finish.
      */
     quiet(): Promise<void>
@@ -87,6 +72,8 @@ export async function startLaneWork(input: {
   readonly basics: Basics
   /** What `findProject` found; null with no tools. */
   readonly found: Found | null
+  /** The project's adapter (`host/project.ts`); null with no tools. */
+  readonly adapter: ProjectAdapter | null
   /** The user's config, as read at startup: its file, for logs. */
   readonly userConfig: { readonly file: string; readonly json: unknown }
   /** Where lane work writes its records. */
@@ -110,6 +97,7 @@ export async function startLaneWork(input: {
   const setup = await startSetup({
     basics,
     found: input.found,
+    adapter: input.adapter,
     userConfig: input.userConfig,
     setup: input.piSetup,
     keeper,
@@ -134,47 +122,36 @@ export async function startLaneWork(input: {
         ),
     }
   const baseListeners: ((lane: ThreadId) => void)[] = []
-  const { owner, runtime } = setup
-  const registry = createRegistry({ session, runtime })
-  const { repoConfig } = setup.lanes
-  /** Accepted work in your repo. */
-  const accepted = createAcceptedWork({
-    owner,
-    basics,
-    repoConfig,
-    writeValues: writes => input.records.writeValues(writes),
+  const { opened, runtime } = setup
+  // The registry asks for a lane's history only from `withHistory`, after
+  // startup: `started` is made by then.
+  const registry = createRegistry({
+    session,
+    runtime,
+    history: (lane, runners) => started.history(lane, runners),
   })
-  // The base snapshot follows accepted work, however it moved: setup, an
-  // accept, a publish, or jj outside pine·trie.
-  owner.onMoved(moved => {
-    if (moved.acceptedMoved) setup.refreshBaseSoon()
-  })
-  /** Each lane's offer in your repo. */
-  const offers = startOffers({
-    owner,
-    repoConfig,
+  // The adapter's fetches start a container only from a queued step, after
+  // startup: `containers` is made by then.
+  const started: StartedProject = opened.start({
     basics,
     records: input.records,
     piSetup: input.piSetup,
-    running: lane => readRunning(basics.live, lane),
+    keeper,
+    registry,
+    startContainer: (lane, h) => containers.startContainer(lane, h),
+    beforeRun: lane => containers.beforeRun(lane),
+    acceptedMoved: () => setup.refreshBaseSoon(),
     baseChanged: lane => {
       for (const listener of baseListeners) listener(lane)
     },
-    acceptedWork: accepted,
   })
+  const { destination, splits } = started
   const containers = createContainers({
     basics,
     setup,
     registry,
     keeper,
-    offers,
-  })
-  const { fetchLane } = createFetches({
-    basics,
-    owner,
-    registry,
-    keeper,
-    startContainer: containers.startContainer,
+    offers: destination.offers,
   })
   const sharedLineages = createSharedLineages({
     basics,
@@ -198,7 +175,6 @@ export async function startLaneWork(input: {
     registry,
     keeper,
     records: input.records,
-    fetchLane,
     shared: sharedLineages,
   })
   const newLanes = createNewLanes({
@@ -209,26 +185,24 @@ export async function startLaneWork(input: {
     records: input.records,
     ensureNames: input.ensureNames,
     pendingRecords: turns.pendingRecords,
+    destination,
   })
   const updates = createUpdates({
     basics,
     setup,
+    destination,
     registry,
     piSetup: input.piSetup,
     containers,
-    fetchLane,
     writeRevision: turns.writeRevision,
   })
-  const splits = createSplits({
+  const archive = createArchive({
     basics,
-    owner,
+    destination,
+    runtime,
     registry,
-    offers,
-    piSetup: input.piSetup,
-    beforeRun: containers.beforeRun,
-    fetchLane,
+    keeper,
   })
-  const archive = createArchive({ basics, offers, runtime, registry, keeper })
 
   return {
     project: setup.project,
@@ -256,11 +230,11 @@ export async function startLaneWork(input: {
     prepareUpdate: updates.prepareUpdate,
     prepareSplit: splits.prepareSplit,
     splitEnded: splits.splitEnded,
-    repo: { offers, accepted, owner },
+    destination,
     teardown: archive.teardown,
     async quiet() {
       await keeper.idle()
-      await owner.idle()
+      await destination.quiet()
     },
     async close() {
       await sharedWatch.close()
@@ -274,7 +248,7 @@ export async function startLaneWork(input: {
   }
 }
 
-/** Lane work of a host with no tools: no project, no lanes, no repo; its lanes are recorded all the same. */
+/** Lane work of a host with no tools: no project, no lanes, no destination; its lanes are recorded all the same. */
 const NO_LANES: LaneWork = {
   project: null,
   access: () => {
@@ -296,7 +270,7 @@ const NO_LANES: LaneWork = {
   }),
   prepareSplit: async () => ({ refused: "the lane has no copy of its own" }),
   splitEnded: async () => null,
-  repo: null,
+  destination: null,
   teardown: async () => {},
   quiet: async () => {},
   close: async () => {},

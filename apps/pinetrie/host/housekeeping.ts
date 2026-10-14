@@ -191,7 +191,7 @@ export async function sweepHolds(input: {
 export async function sweepTrash(input: {
   readonly basics: Pick<Basics, "session" | "places" | "docs" | "log" | "now">
   readonly cards: Pick<CardPort, "destroy">
-  readonly work: Pick<LaneWork, "teardown" | "repo">
+  readonly work: Pick<LaneWork, "teardown" | "destination">
 }): Promise<void> {
   const { session, places, docs, log, now } = input.basics
   // gather
@@ -201,7 +201,7 @@ export async function sweepTrash(input: {
   if (swept.cards.length === 0) return
   const records = readLaneRecords(session)
   const own =
-    input.work.repo === null
+    input.work.destination === null
       ? []
       : swept.threads.filter(t => records.get(t)?.ownCopy === true)
   const threads = readThreads(session)

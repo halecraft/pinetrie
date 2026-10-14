@@ -1,8 +1,8 @@
 // host/work/config — `pinetrie.json`'s `lanes` key as a fact of a state:
-// accepted work's copy, read from its commit at startup and each
-// time accepted work moves; and each lane's own copy, read from its newest
-// commit in your repo before its container starts, beside the copy it started
-// on. A lane runs with accepted work's, less what its own copy dropped from
+// accepted work's copy, read at accepted work (`Destination.fileAt`) at
+// startup and each time accepted work moves; and each lane's own copy, read
+// at its newest point in the destination before its container starts,
+// beside the copy it started on. A lane runs with accepted work's, less what its own copy dropped from
 // that start (`effectiveLaneConfig`), so a lane can give up a grant at once,
 // and gains one only through acceptance.
 // Your repo's names (`accepted`, `wip`, `publish`) are not read here: they
@@ -14,37 +14,40 @@ import {
   PROJECT_CONFIG_FILE,
   type ThreadId,
 } from "@pinetrie/core"
+import type { Point } from "@pinetrie/lanes"
 import {
-  commitsOf,
   configChangeNote,
   decodeLaneConfig,
   effectiveLaneConfig,
   type LaneAuthority,
   type LaneConfig,
-  laneBase,
-  laneTipName,
+  NO_GRANTS,
   normalShared,
-  prepareShared,
-  type RepoConfig,
-  type Runner,
-  readAuthority,
-  revsetName,
   type SharedDir,
 } from "@pinetrie/lanes"
-import type { RepoOwner } from "@pinetrie/repo"
 import { brokenConfigLine } from "../startup-lines.ts"
+import type { OpenProject } from "./adapter.ts"
 
-/** `pinetrie.json` at `rev`, decoded; one that is not JSON is logged, and grants nothing. */
-async function authorityLogged(
-  jj: Runner,
-  rev: string,
+/**
+ * `pinetrie.json`'s grants and shared directories as read: none when the
+ * file is not there; one that is not JSON grants nothing too, and is logged.
+ */
+function authorityLogged(
+  read: { readonly at: string; readonly text: string | null },
   root: string,
   log: (m: string) => void,
-): Promise<LaneAuthority> {
-  const read = await readAuthority(jj, rev, root)
-  if (read.broken !== null)
-    log(brokenConfigLine(`${PROJECT_CONFIG_FILE} at ${rev}`, read.broken))
-  return read.authority
+): LaneAuthority {
+  let json: unknown = null
+  if (read.text !== null)
+    try {
+      json = JSON.parse(read.text)
+    } catch (error) {
+      log(
+        brokenConfigLine(`${PROJECT_CONFIG_FILE} at ${read.at}`, String(error)),
+      )
+    }
+  const { grants, shared } = decodeLaneConfig(json, root)
+  return { grants, shared }
 }
 
 /** Accepted work's lane config, and the shared directories it and your config make. */
@@ -85,15 +88,18 @@ export interface LaneConfigs {
 
 export async function startLaneConfigs(input: {
   readonly root: string
-  readonly owner: RepoOwner
-  readonly repoConfig: RepoConfig
+  readonly project: Pick<OpenProject, "fileAt" | "prepareShared">
   /** Your config's `lanes`, read at startup: its shared directories always apply. */
   readonly user: LaneConfig
   readonly userFile: string
   readonly log: (m: string) => void
 }): Promise<LaneConfigs> {
-  const { root, owner, user, log } = input
-  const acceptedRev = `present(${revsetName(input.repoConfig.acceptedBookmark)})`
+  const { root, project, user, log } = input
+  /** `pinetrie.json` at `point`, decoded; null when the point is not there. */
+  const authorityAt = async (point: Point): Promise<LaneAuthority | null> => {
+    const read = await project.fileAt(point, PROJECT_CONFIG_FILE)
+    return read.kind === "no-point" ? null : authorityLogged(read, root, log)
+  }
   /**
    * Each lane's own copy as last read, and its base's: the copy it started
    * on. Null when it has no commit in your repo yet.
@@ -104,10 +110,12 @@ export async function startLaneConfigs(input: {
   >()
 
   async function readAccepted(): Promise<AcceptedLanes> {
-    const authority = await owner.read(({ jj }) =>
-      authorityLogged(jj, acceptedRev, root, log),
-    )
-    const sharing = await prepareShared(root, {
+    // Accepted work is always a point: none there grants nothing.
+    const authority = (await authorityAt({ kind: "accepted" })) ?? {
+      grants: NO_GRANTS,
+      shared: [],
+    }
+    const sharing = await project.prepareShared({
       user: user.shared,
       project: authority.shared,
     })
@@ -163,19 +171,12 @@ export async function startLaneConfigs(input: {
       sharedListeners.push(listener)
     },
     async readLane(lane) {
-      const copies = await owner.read(async ({ jj }) => {
-        const tip = laneTipName(lane)
-        const [at] = await commitsOf(jj, `present(${tip})`)
-        if (at === undefined) return null
-        const started = await laneBase(jj, tip, input.repoConfig)
-        const own = await authorityLogged(jj, at, root, log)
-        // A lane with no base to compare with has given up nothing.
-        const base =
-          started === null
-            ? own
-            : await authorityLogged(jj, started.start, root, log)
-        return { base, own }
-      })
+      const own = await authorityAt({ kind: "tip", lane })
+      // A lane with no base to compare with has given up nothing.
+      const copies =
+        own === null
+          ? null
+          : { base: (await authorityAt({ kind: "start", lane })) ?? own, own }
       lanes.set(lane, copies)
       return effectiveLaneConfig(accepted.authority, copies)
     },

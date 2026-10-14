@@ -9,7 +9,7 @@ export default defineConfig({
     // workspace.test.ts checks the manifests that make package boundaries hold
     // by resolution; scripts/*.test.ts covers the root's own tools.
     include: [
-      "packages/*/*.test.ts",
+      "packages/*/**/*.test.ts",
       "apps/*/*.test.ts",
       "apps/*/host/**/*.test.ts",
       "apps/*/e2e/*.test.ts",

@@ -1,5 +1,5 @@
 // offer — what the host decides about a lane's offer in your repo, over the
-// facts `@pinetrie/repo` gathers.
+// facts `@pinetrie/jj` gathers.
 
 import {
   type CommitId,

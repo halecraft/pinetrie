@@ -155,7 +155,7 @@ async function dockerContract(
   ownForInnerLanes(probe)
   ownForInnerLanes(path.join(projA, ".plans"))
   const a = await findProject({
-    dir: projA,
+    root: projA,
     machine,
     // No lane here holds an ssh identity: nothing listens there.
     hostSocket: path.join(projA, ".no-ssh.sock"),
@@ -464,7 +464,7 @@ async function dockerContract(
       { source: projB, target: "/mnt/host-working-copy", readonly: true },
     ] as const
     const b = await findProject({
-      dir: projB,
+      root: projB,
       machine,
       hostSocket: path.join(projB, ".no-ssh.sock"),
       log,

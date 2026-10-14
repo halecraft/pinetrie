@@ -59,10 +59,10 @@ export async function startHttp(input: {
   readonly serverTransport: WebsocketServerTransport
   readonly blobs: BlobStore
   /** Your repo, whose offers a review reads; null for a host without tools. */
-  readonly repo: LaneWork["repo"]
+  readonly destination: LaneWork["destination"]
   readonly log: (message: string) => void
 }): Promise<RunningHttp> {
-  const { port, bind, key, serverTransport, blobs, repo } = input
+  const { port, bind, key, serverTransport, blobs, destination } = input
 
   const wss = new WebSocketServer({ noServer: true })
   wss.on("connection", ws => {
@@ -131,9 +131,9 @@ export async function startHttp(input: {
    */
   async function serveOfferRead(ask: OfferAsk, res: ServerResponse) {
     const answer =
-      repo === null
+      destination === null
         ? ({ kind: "refused", status: 404, reason: "no offers here" } as const)
-        : await repo.offers.read(ask)
+        : await destination.offers.read(ask)
     send(res, offerResponse(answer))
   }
 

@@ -1,20 +1,15 @@
-import { DEFAULT_REPO, decodeLaneConfig, type Ran } from "@pinetrie/lanes"
-import type { RepoOwner } from "@pinetrie/repo"
+import { decodeLaneConfig } from "@pinetrie/lanes"
 import { expect, test } from "vitest"
-import { record } from "../fakes.ts"
 import { startLaneConfigs } from "./config.ts"
-
-const ok = (stdout: string): Ran => ({ ok: true, code: 0, stdout, stderr: "" })
 
 test("accepted work's config read again is not in force until it is taken", async () => {
   let file = JSON.stringify({ lanes: {} })
-  const owner = record<RepoOwner>({
-    read: go => go({ jj: async () => ok(file), git: async () => ok("") }),
-  })
   const configs = await startLaneConfigs({
     root: "/p",
-    owner: owner.port,
-    repoConfig: DEFAULT_REPO,
+    project: {
+      fileAt: async () => ({ kind: "read", at: "accepted", text: file }),
+      prepareShared: async () => ({ shared: [], refused: [] }),
+    },
     user: decodeLaneConfig({}, "/p"),
     userFile: "config.json",
     log: () => {},

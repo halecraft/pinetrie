@@ -1,7 +1,7 @@
 # ADR-0076 — The project is published to main; the project menu says only what applies where the host runs
 
 - **Status:** Accepted (Duane, 2026-10-05)
-- **Area:** `packages/repo/TECHNICAL.md`, `packages/rules/TECHNICAL.md`
+- **Area:** `packages/jj/TECHNICAL.md`, `packages/rules/TECHNICAL.md`
 - **Amends:**
   - ADR-0060: the host also moves the publish bookmark (`main`) forward to the
     line, as itself, on anyone's command; never your `@`.

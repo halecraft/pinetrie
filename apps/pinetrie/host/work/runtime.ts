@@ -23,8 +23,6 @@ import {
   createQueue,
   type LaneRuntime,
   machineConfig,
-  planRoot,
-  prepareProjectDir,
   type WrittenMachine,
 } from "@pinetrie/lanes"
 import {
@@ -106,13 +104,12 @@ export function planRuntime(f: RuntimeFacts): RuntimePlan {
 /**
  * Find the project in `dir`, and the runtime its lanes run on: Docker, in
  * the lane VM on the Mac and the host's own on Linux. Null with no tools
- * (`dir` null). Refused, with its words, where lanes cannot run: a folder
- * with no jj repo, or a runtime that cannot run them. Read before pi's
+ * (`root` null). Refused, with its words, where a runtime cannot run lanes. Read before pi's
  * setup, which loads from its root.
  */
 export async function findProject(input: {
-  /** The project's folder, whose root is found from it; null with no tools. */
-  readonly dir: string | null
+  /** The project's root, its adapter chosen (`host/project.ts`); null with no tools. */
+  readonly root: string | null
   /** The port this host listens on, refused to lanes; null when it is not known yet. */
   readonly ownPort?: number | null
   /** The user config's `lanes.vm.slots`, as written. */
@@ -125,9 +122,9 @@ export async function findProject(input: {
   readonly hostSocket: string
   readonly log: (line: string) => void
 }): Promise<Found | Refused | null> {
-  if (input.dir === null) return null
+  if (input.root === null) return null
   return runtimeFound(
-    input.dir,
+    input.root,
     input.machine,
     input.hostSocket,
     input.log,
@@ -138,7 +135,7 @@ export async function findProject(input: {
 const refusedWith = (words: string): Refused => ({ kind: "refused", words })
 
 async function runtimeFound(
-  dir: string,
+  root: string,
   written: WrittenMachine,
   hostSocket: string,
   log: (line: string) => void,
@@ -152,9 +149,7 @@ async function runtimeFound(
     nestedMount: existsSync(NESTED_MOUNT),
     stateHome: env.XDG_STATE_HOME ?? path.join(homedir(), ".local", "state"),
   })
-  const root = planRoot(await prepareProjectDir(dir))
-  if ("refused" in root) return refusedWith(root.refused)
-  const project = { root: root.ok }
+  const project = { root }
   return planned.kind === "docker-vm"
     ? vmFound(
         project,

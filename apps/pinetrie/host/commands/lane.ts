@@ -55,7 +55,7 @@ export interface LaneDeps {
   readonly basics: Basics
   readonly agent: Pick<Agent, "lane">
   readonly records: Pick<Records, "writeValues">
-  readonly work: Pick<LaneWork, "repo">
+  readonly work: Pick<LaneWork, "destination">
   readonly start: Runs["start"]
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
   readonly cancel: Runs["cancel"]
@@ -253,8 +253,8 @@ export async function actOnOffer(
 ): Promise<Outcome> {
   const { lane, action, to, seen } = intent
   const { work } = deps
-  if (work.repo === null) return NO_REPO
-  const done = await work.repo.offers.act(lane, action, by, to, seen)
+  if (work.destination === null) return NO_REPO
+  const done = await work.destination.offers.act(lane, action, by, to, seen)
   if (done.kind === "refused")
     return {
       kind: "refused",
@@ -315,9 +315,9 @@ export async function actOnAccepted(
   deps: Pick<LaneDeps, "work">,
   action: AcceptedAction,
 ): Promise<Outcome> {
-  const { repo } = deps.work
-  if (repo === null) return NO_REPO
-  const refused = await repo.accepted.act(action)
+  const { destination } = deps.work
+  if (destination === null) return NO_REPO
+  const refused = await destination.accepted.act(action)
   return refused === null
     ? { kind: "accepted-moved" }
     : { kind: "refused", ...refused }

@@ -36,7 +36,6 @@ export {
   catchUpAnswer,
   catchUpRefusal,
   planCatchUpCall,
-  planCopyReady,
   planSplitCall,
   refusedAnswer,
   SPLIT_QUEUED,

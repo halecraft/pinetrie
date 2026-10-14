@@ -30,10 +30,9 @@ import {
   threadRow,
   writeDirectory,
 } from "../fakes.ts"
-import type { Offers } from "../offers/index.ts"
 import { applyPlaceSteps } from "../places.ts"
 import { createProvenance } from "../provenance.ts"
-import type { YourRepo } from "../work/index.ts"
+import type { Destination, OfferActs } from "../work/destination.ts"
 import { type CommandDeps, createCommands, placeOfCommand } from "./index.ts"
 
 const TEST_THREAD = threadIdFor("e")
@@ -164,13 +163,11 @@ test.each([
 })
 
 test("a chat completes while an acceptance is held open on your repo's owner", async () => {
-  const held = Promise.withResolvers<Awaited<ReturnType<Offers["act"]>>>()
+  const held = Promise.withResolvers<Awaited<ReturnType<OfferActs["act"]>>>()
   const { commands, replies, sender, chat } = setUp({
-    repo: {
-      owner: record<YourRepo["owner"]>().port,
-      accepted: record<YourRepo["accepted"]>().port,
-      offers: record<Offers>({ act: () => held.promise }).port,
-    },
+    destination: record<Destination>({
+      offers: record<OfferActs>({ act: () => held.promise }).port,
+    }).port,
   })
   const acceptance = commands.handle(sender, ALICE, {
     id: "t-1",
@@ -195,7 +192,7 @@ test("a chat completes while an acceptance is held open on your repo's owner", a
 test("a move into Done holds the keeper only for its place and its unload: a command waits on neither its teardown, and one into the root is refused meanwhile; its reply comes after it all", async () => {
   const teardown = Promise.withResolvers<void>()
   const { b, commands, replies, sender, chat } = setUp({
-    repo: null,
+    destination: null,
     teardown: () => teardown.promise,
   })
   const archive = commands.handle(sender, ALICE, {

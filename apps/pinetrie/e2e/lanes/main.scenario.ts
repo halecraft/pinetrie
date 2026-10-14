@@ -19,7 +19,8 @@ import {
   rootOf,
   type ThreadId,
 } from "@pinetrie/core"
-import { DEFAULT_REPO, laneBase, type Runner, run } from "@pinetrie/lanes"
+import { DEFAULT_REPO, laneBase, startOfOffer } from "@pinetrie/jj"
+import { type Runner, run } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import {
   readAccepted,
@@ -29,7 +30,6 @@ import {
   readProject,
   readRevisions,
 } from "@pinetrie/reads"
-import { startOfOffer } from "@pinetrie/repo"
 import { deleteRecord, OFFER } from "@pinetrie/rules"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"

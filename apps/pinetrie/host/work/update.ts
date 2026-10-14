@@ -1,13 +1,15 @@
 // host/work/update — a thread's base, or the thread it branched from, merged
 // into its lane, when the host pops a queued card with a command or its agent
 // calls `catch_up`, and whether its agent may ask about a conflict. One step on
-// the lane's queue gathers, plans and merges; then `planSettle` decides what
-// the thread gets, and `applySettle` writes it.
+// the lane's queue (`withHistory`) gathers, plans and merges; then
+// `planSettle` decides what the thread gets, and `applySettle` writes it and
+// fires what the merge's adapter does after it (`MergeDone.follow`).
 
 import {
   type BaseMerge,
   type CatchUpCommand,
   type CommitId,
+  type CopyRefusal,
   type EntryId,
   ERR,
   entryOfMessage,
@@ -23,20 +25,12 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import {
-  bookmarkName,
-  bookmarkOf,
-  bookmarkRevset,
-  commitTurn,
-  conflictsIn,
-  copyFacts,
+  type Edits,
   executeOrThrow,
-  laneBase,
+  type Follow,
+  type LaneHistory,
   type Merged,
-  type MergePlan,
-  mergeUpdate,
-  planMerge,
   planSnapshot,
-  type Runner,
   type TouchedRevision,
 } from "@pinetrie/lanes"
 import { LAND_BUDGET, type PiSetup, type ThreadLaneHandle } from "@pinetrie/pi"
@@ -49,7 +43,6 @@ import {
   readRunning,
   readTreeIndex,
 } from "@pinetrie/reads"
-import { beginFacts, type RepoOwner, readWipState } from "@pinetrie/repo"
 import {
   catchUpAnswer,
   catchUpName,
@@ -65,7 +58,6 @@ import {
   type PromptBudget,
   parentNow,
   planCatchUpCall,
-  planCopyReady,
   planParentUpdate,
   planResolution,
   planUpdateFrom,
@@ -78,8 +70,8 @@ import {
 import { readLaneTip } from "@pinetrie/schema"
 import { type Basics, failed } from "../basics.ts"
 import type { Containers } from "./containers.ts"
+import type { Destination } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
-import type { Fetches } from "./fetch.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
@@ -123,7 +115,7 @@ export function planCatchUp(
   | { readonly kind: "refused"; readonly reason: string }
   | {
       readonly kind: "merge"
-      readonly plan: MergePlan
+      readonly from: BaseMerge
       readonly floor: Floor
     } {
   const found = resolutionFloor({
@@ -135,7 +127,7 @@ export function planCatchUp(
       kind: "refused",
       reason: unfittableWords(found.tokens, found.budget),
     }
-  return { kind: "merge", plan: planMerge(from), floor: found.floor }
+  return { kind: "merge", from, floor: found.floor }
 }
 
 /**
@@ -196,33 +188,25 @@ export type SettleFacts =
       readonly floor: Floor
     })
 
-/**
- * What the thread gets after a merge. `fetch`, when not null, fetches the
- * lane into your repo, excluding those of its commits your repo may have.
- */
+/** What the thread gets after a merge. */
 export type Settle =
   | {
       readonly kind: "clean"
       readonly message: UpdateMessage
       readonly merge: CommitId
-      readonly fetch: readonly CommitId[] | null
     }
-  | { readonly kind: "nothing"; readonly fetch: readonly CommitId[] | null }
-  | {
-      readonly kind: "conflicted"
-      readonly message: LandMessage
-      readonly fetch: readonly CommitId[] | null
-    }
+  | { readonly kind: "nothing" }
+  | { readonly kind: "conflicted"; readonly message: LandMessage }
 
 const touching = (revisions: readonly TouchedRevision[], path: string) =>
   revisions.filter(r => r.paths.includes(path)).map(r => r.description)
 
 /**
- * What a merge comes to. Clean: the update, written in the thread, and the
- * merge fetched. Nothing: a mark naming accepted work, when one was made,
- * fetched. Conflicted: the resolution's prompt, within the floor's budget, each
- * file with why each side changed it, and the card's text after; nothing is
- * fetched: the resolution's turns fetch the lane as they commit.
+ * What a merge comes to. Clean: the update, written in the thread. Nothing:
+ * nothing for the thread. Conflicted: the resolution's prompt, within the
+ * floor's budget, each file with why each side changed it, and the card's
+ * text after. What the merge's adapter does after it is its own
+ * (`MergeDone.follow`).
  */
 export function planSettle(
   facts: SettleFacts,
@@ -238,10 +222,7 @@ export function planSettle(
   const caughtUp = mergedFrom(from)
   switch (facts.kind) {
     case "nothing":
-      return {
-        kind: "nothing",
-        fetch: facts.mark === null ? null : [facts.ours],
-      }
+      return { kind: "nothing" }
     case "clean":
       return {
         kind: "clean",
@@ -257,7 +238,6 @@ export function planSettle(
           ctx.now,
         ),
         merge: facts.merge,
-        fetch: [facts.ours, facts.from],
       }
     case "conflicted":
       return {
@@ -286,30 +266,30 @@ export function planSettle(
           details: { lane, yours: [facts.from], by },
           timestamp: ctx.now,
         }),
-        fetch: null,
       }
   }
 }
 
 /**
  * A settle's writes, in order: a clean update as a fact in the thread, then
- * its revision (so a branch below it starts with the merged files); then the
- * fetch into your repo.
+ * its revision (so a branch below it starts with the merged files, and its
+ * snapshot step is queued); then what follows the merge (`follow`), for jj
+ * the fetch into your repo, which so runs after the snapshot.
  */
 export async function applySettle(
   ports: {
     readonly append: ThreadLaneHandle["append"]
     readonly recordUpdate: (entry: EntryId, merge: CommitId) => Promise<void>
-    readonly fetchLane: (have: readonly CommitId[]) => void
   },
   settle: Settle,
+  follow: Follow,
 ): Promise<Prepared> {
   if (settle.kind === "clean") {
     const appended = await ports.append(settle.message)
     if (appended.kind === "appended")
       await ports.recordUpdate(appended.id, settle.merge)
   }
-  if (settle.fetch !== null) ports.fetchLane(settle.fetch)
+  follow?.()
   switch (settle.kind) {
     case "clean":
       return { kind: "clean" }
@@ -328,8 +308,8 @@ export interface Updates {
    * there; with `catch-up-with-parent`, the newest commit of the thread it
    * branched from. Clean: the update is appended to the thread, through
    * `handle`. Conflicted: the land message for the resolution run, with
-   * `intent` (the card's text) after the conflicts. Nothing new: nothing to do,
-   * but a move to accepted work is fetched. Refused, with the lane untouched,
+   * `intent` (the card's text) after the conflicts. Nothing new: nothing to do
+   * but what the merge's adapter does after a move to accepted work. Refused, with the lane untouched,
    * when even the smallest resolution prompt would not fit. The lane is stopped
    * after, unless a run follows (`follows`).
    */
@@ -348,8 +328,8 @@ export interface Updates {
    */
   catchUpInRun(lane: ThreadId, from: "base" | "parent"): Promise<ToolAnswer>
   /**
-   * pi's hook: the lane's agent asked about a conflict. Taken while jj finds a
-   * conflict in the lane's copy, in any run: read on the lane's queue, never
+   * pi's hook: the lane's agent asked about a conflict. Taken while its history
+   * finds a conflict in the lane's copy, in any run: read on the lane's queue, never
    * from a revision record, which can be late. A lane with no copy of its own
    * has nothing to ask about.
    */
@@ -358,16 +338,15 @@ export interface Updates {
 
 export function createUpdates(deps: {
   readonly basics: Basics
-  readonly setup: Pick<Setup, "root" | "owner" | "lanes" | "ready">
+  readonly setup: Pick<Setup, "ready">
+  readonly destination: Pick<Destination, "baseNow">
   readonly registry: LaneRegistry
   readonly piSetup: Pick<PiSetup, "skill">
   readonly containers: Pick<Containers, "beforeRun" | "runEnded">
-  readonly fetchLane: Fetches["fetchLane"]
   readonly writeRevision: Turns["writeRevision"]
 }): Updates {
-  const { basics, setup, registry, containers } = deps
+  const { basics, setup, registry, containers, destination } = deps
   const { docs } = basics
-  const { repoConfig } = setup.lanes
 
   /**
    * The update's entry recorded as a revision, the merge its commit, with a
@@ -404,18 +383,18 @@ export function createUpdates(deps: {
     })
   }
 
-  /** Anything edited in the lane since its last run, committed as a turn. */
-  async function commitEdits(lane: ThreadId, jj: Runner): Promise<void> {
-    // The lane's own root's document.
+  /**
+   * What anything edited in the lane since its last run is committed as: a
+   * turn of the lane's tip, read from its own root's document.
+   */
+  async function editsOf(lane: ThreadId): Promise<Edits | null> {
     const doc = await docs.laneDoc(lane)
     const tip = doc === null ? null : readLaneTip(doc, lane)
-    if (doc === null || tip === null) return
-    await commitTurn(jj, {
+    if (doc === null || tip === null) return null
+    return {
       title: "edits between runs",
       entry: turnEntry(readTreeIndex(doc), tip),
-      lane,
-      bookmark: await bookmarkOf(jj, lane),
-    })
+    }
   }
 
   /**
@@ -444,47 +423,50 @@ export function createUpdates(deps: {
   /**
    * One step on the lane's queue, so nothing changes the lane between what
    * is read and what is merged: what the command merges (the lane's base
-   * from its own history, accepted work and the WIP from your repo, a pinned
-   * read; or the parent, from the document), the plan with the floor its
+   * from its own history, accepted work and the WIP from the destination; or
+   * the parent, from the document), the plan with the floor its
    * resolution's prompt must fit (`planCatchUp`), and, unless it is refused
    * or has nothing to merge, the edits committed and the merge.
    */
   const updateOnQueue = (
     lane: ThreadId,
-    owner: RepoOwner,
     command: CatchUpCommand,
     resolution: Parameters<typeof planCatchUp>[1],
-  ) => {
-    const handle = registry.handleOf(lane)
-    const jj = registry.laneJjOf(lane)
-    return handle.queue.enqueue(
-      async (): Promise<
+  ) =>
+    registry.withHistory(
+      lane,
+      async (
+        h,
+        handle,
+      ): Promise<
         | Prepared
         | {
             readonly kind: "merged"
             readonly from: BaseMerge
             readonly facts: SettleFacts
+            readonly follow: Follow
           }
         | {
             /** The copy cannot take a merge: each caller words it its own way. */
             readonly kind: "copy"
-            readonly why: Exclude<ReturnType<typeof planCopyReady>, "ready">
+            readonly why: CopyRefusal
           }
       > => {
-        // A merge lands at the lane's bookmark: a working copy off its line (a
-        // split's stack) would be left beside it.
-        const ready = planCopyReady(await copyFacts(jj, lane))
-        if (ready !== "ready") return { kind: "copy", why: ready }
+        const ready = await h.readyToMerge()
+        if (typeof ready === "string") return { kind: "copy", why: ready }
         const from =
           command === "catch-up-with-parent"
             ? await parentOf(lane).then(p => planParentUpdate(p.now, p.running))
-            : await baseUpdate(command === "continue-on-accepted")
+            : await baseUpdate(h, command === "continue-on-accepted")
         if (typeof from === "string") return refused(updateRefusal(from))
         if (from.kind === "nothing") return { kind: "nothing" }
         const catchUp = planCatchUp(from, resolution)
         if (catchUp.kind === "refused") return refused(catchUp.reason)
-        await commitEdits(lane, jj)
-        const merged = await mergeUpdate(jj, handle.runners, lane, catchUp.plan)
+        const { follow, ...merged } = await h.merge(
+          ready,
+          catchUp.from,
+          await editsOf(lane),
+        )
         // The merge may have changed what a recipe read: its outputs go
         // before anything snapshots the disk, a catch_up's turn included.
         await removeStaleOutputs(handle, (await setup.ready).image).catch(
@@ -495,34 +477,21 @@ export function createUpdates(deps: {
           merged.kind === "conflicted"
             ? { ...merged, floor: catchUp.floor }
             : merged
-        return { kind: "merged", from, facts }
+        return { kind: "merged", from, facts, follow }
       },
     )
 
-    /** What catching up with the base merges (`planUpdateFrom`). */
-    async function baseUpdate(toAccepted: boolean) {
-      const base = await laneBase(
-        jj,
-        bookmarkRevset(bookmarkName(lane)),
-        repoConfig,
-      )
-      // Your repo, pinned to the head its owner last observed.
-      const { state, begin } = await owner.read(async ({ jj: yours }) => ({
-        state: await readWipState(yours, repoConfig, base),
-        begin: await beginFacts(
-          yours,
-          repoConfig,
-          base?.base.kind === "wip" ? base.base.bookmark : null,
-        ),
-      }))
-      return planUpdateFrom({
-        base,
-        state,
-        toAccepted,
-        acceptedCommit: begin.acceptedCommit,
-        wipNow: begin.wip,
-      })
-    }
+  /** What catching up with the base merges (`planUpdateFrom`). */
+  async function baseUpdate(h: LaneHistory, toAccepted: boolean) {
+    const base = await h.base()
+    const now = await destination.baseNow(base)
+    return planUpdateFrom({
+      base,
+      state: now.state,
+      toAccepted,
+      acceptedCommit: now.acceptedCommit,
+      wipNow: now.wipNow,
+    })
   }
 
   /** What a resolution's prompt must fit, read before a merge. */
@@ -537,15 +506,11 @@ export function createUpdates(deps: {
   return {
     async askedAboutConflict(lane) {
       if (!registry.isOwn(lane)) return false
-      const jj = registry.laneJjOf(lane)
-      const conflicts = await registry
-        .handleOf(lane)
-        .queue.enqueue(() => conflictsIn(jj))
+      const conflicts = await registry.withHistory(lane, h => h.conflicts())
       return conflicts.length > 0
     },
 
     async catchUpInRun(lane, from) {
-      const { owner } = setup
       const doc = await docs.laneDoc(lane)
       // Who the update is by: the person behind the run.
       const by = doc === null ? null : readRunAuthor(doc, docs.session, lane)
@@ -574,7 +539,6 @@ export function createUpdates(deps: {
       // execute
       const done = await updateOnQueue(
         lane,
-        owner,
         call.command,
         await resolutionOf(""),
       )
@@ -588,7 +552,7 @@ export function createUpdates(deps: {
         index: readTreeIndex(doc),
         now: basics.now(),
       })
-      if (settle.fetch !== null) void deps.fetchLane(lane, settle.fetch)
+      done.follow?.()
       return catchUpAnswer(
         settle.kind === "clean"
           ? { kind: "clean", message: settle.message, merged: settle.merge }
@@ -598,7 +562,6 @@ export function createUpdates(deps: {
 
     async prepareUpdate(handle, by, intent, command, follows) {
       const lane = handle.name
-      const { owner } = setup
       if (!registry.isOwn(lane))
         return refused("the lane has no copy of its own")
       return withLaneStarted(
@@ -611,13 +574,12 @@ export function createUpdates(deps: {
           // Read before the merge: the floor its prompt must fit needs it.
           const done = await updateOnQueue(
             lane,
-            owner,
             command,
             await resolutionOf(intent),
           )
           if (done.kind === "copy") return refused(catchUpRefusal(done.why))
           if (done.kind !== "merged") return done
-          const { from, facts } = done
+          const { from, facts, follow } = done
           const doc = await docs.laneDoc(lane)
           const settle = planSettle(facts, {
             lane,
@@ -630,9 +592,9 @@ export function createUpdates(deps: {
             {
               append: message => handle.append(message),
               recordUpdate: (entry, merge) => recordUpdate(lane, entry, merge),
-              fetchLane: have => void deps.fetchLane(lane, have),
             },
             settle,
+            follow,
           )
         },
       )

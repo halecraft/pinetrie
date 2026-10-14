@@ -176,26 +176,6 @@ export const mutations: readonly Mutation[] = [
       "a directory a run made from source that .gitignore misses is named in the turn's record",
   },
   {
-    name: "a fork's inherited history is not made immutable",
-    file: "packages/lanes/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "${WORKSPACE_ROOT} ${immutable} >",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "${WORKSPACE_ROOT} none\\\\(\\\\) >",
-    suite: "lanes",
-    scenario: "main",
-    expect: "rewriting an inherited commit in a fork is refused",
-  },
-  {
-    name: "a fork works on its parent's working-copy change",
-    file: "packages/lanes/plan.ts",
-    from: '            inLane("jj", "new", ...start.commits),\n',
-    to: "",
-    suite: "lanes",
-    scenario: "main",
-    expect: "your repo holds every lane's commits with no divergent change",
-  },
-  {
     name: "a lane mounts no host path",
     file: "packages/lanes/plan.ts",
     from: "    ...parts.hostPaths.map(p => at(p, hostPathInLane(p))),\n",
@@ -226,119 +206,14 @@ export const mutations: readonly Mutation[] = [
       "after a restart, an existing lane has the newly shared directory, with its disk as it was",
   },
   {
-    name: "pre-rename: the old config folder moves after the bookmarks",
-    file: plan,
-    from: "  return [\n    ...folder,\n    ...renames,\n",
-    to: "  return [\n    ...renames,\n    ...folder,\n",
-    command: unit,
-    expect:
-      "the config folder moves, first; the lane's bookmarks are renamed; fetched ones are deleted; another lane's stay",
-  },
-  {
     name: "pre-rename: a fork keeps the old config folder",
     file: plan,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "    laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),\n    ...base,\n",
-    to: "    ...base,\n",
-    command: ["pnpm", "exec", "vitest", "run", "packages/repo/repo.test.ts"],
-    expect:
-      "a fork of a disk holding the old config folder commits nothing of it",
-  },
-  {
-    name: "pre-rename: the lane's old bookmarks are not renamed",
-    file: plan,
-    from: "    .filter(([old]) => has.has(old))\n",
-    to: "    .filter(() => false)\n",
-    command: ["pnpm", "exec", "vitest", "run", "packages/repo/repo.test.ts"],
-    expect:
-      "the old names on a disk: no bookmark, until planOldNamesOnDisk renames them",
-  },
-  {
-    name: "an accepted-offer commit naming no source the lane holds is joined",
-    file: plan,
-    from: "    return ours.length === 0\n      ? []",
-    to: "    return false\n      ? []",
+    from: "  laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),\n  ...input.setup.steps,\n",
+    to: "  ...input.setup.steps,\n",
     command: unit,
     expect:
-      "an accepted-offer commit whose sources the lane lacks is not joined",
-  },
-  {
-    name: "an accepted-offer commit is joined only when the lane holds every source it names",
-    file: plan,
-    from: "    return ours.length === 0\n      ? []",
-    to: "    return ours.length < sources.length\n      ? []",
-    command: unit,
-    expect: "a squash naming one source held and one not is joined",
-  },
-  {
-    name: "an acceptance finds no destination below the offer",
-    file: "packages/repo/offer-gather.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "          `present(${revsetName(bookmark)}) & ::parents(${bottom.commit})`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: "          `present(${revsetName(bookmark)}) & ${bottom.commit}::`,",
-    suite: "lanes",
-    scenario: "main",
-    expect:
-      "accepting the offer moves accepted work to it, on your landed commit; your working copy is untouched",
-  },
-  {
-    name: "the user's line name wins over the project's",
-    file: "packages/lanes/plan.ts",
-    from: "    const value = project[key] ?? user[key]",
-    to: "    const value = user[key] ?? project[key]",
-    command: unit,
-    expect: "the project's name wins over the user's",
-  },
-  {
-    name: "publishing catches the working copy up unless told not to",
-    file: plan,
-    from: "  publishCatchesUp: false,\n}",
-    to: "  publishCatchesUp: true,\n}",
-    command: unit,
-    expect: "catching up is off unless set, and the project's setting wins",
-  },
-  {
-    name: "the user's catchUp wins over the project's",
-    file: plan,
-    from: "  const flag = project.catchUp ?? user.catchUp",
-    to: "  const flag = user.catchUp ?? project.catchUp",
-    command: unit,
-    expect: "catching up is off unless set, and the project's setting wins",
-  },
-  {
-    name: "a catchUp that is not a boolean turns catching up on",
-    file: plan,
-    from: "  else if (flag !== null)\n    refused.push(",
-    to: "  else if (flag !== null)\n    catchUp = true, refused.push(",
-    command: unit,
-    expect: "a catchUp that is not true or false falls back to off, saying why",
-  },
-  {
-    name: "a config's offers goes unsaid",
-    file: plan,
-    from: '    ...(project.offers ? ["pinetrie.json"] : []),\n',
-    to: "",
-    command: unit,
-    expect:
-      "a config that still has offers is named, and nothing of it is read",
-  },
-  {
-    name: "a bookmark name may hold ..",
-    file: "packages/lanes/plan.ts",
-    from: '  !name.includes("..") &&',
-    to: "",
-    command: unit,
-    expect: "isBookmarkName: git's rules",
-  },
-  {
-    name: "planBundle drops the ^<have> exclusion",
-    file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "    ...input.have.map(c => `^${c}`),",
-    to: "",
-    command: unit,
-    expect: "planBundle: the lane's bookmark, excluding what your repo has",
+      "planFork: the restore, the container, the old config folder gone, then the adapter's setup",
   },
   {
     name: "a turn's snapshot is taken before sync",
@@ -349,32 +224,12 @@ export const mutations: readonly Mutation[] = [
     expect: "sync comes before the snapshot",
   },
   {
-    name: "fetchById fetches with no destination ref",
-    file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  const refs = commits.map((c, i) => `+${c}:${FETCHED_REF}/${i}`).join(" ")',
-    to: '  const refs = commits.join(" ")',
-    command: unit,
-    expect: "fetchById: skipped when every commit is on the disk",
-  },
-  {
     name: "a lane gets a variable no grant names",
     file: plan,
     from: "  const passed = spec.grants.env.flatMap(name => {",
     to: "  const passed = Object.keys(env).flatMap(name => {",
     command: unit,
     expect: "never your home directory, and no variable no grant names",
-  },
-  {
-    name: "a lane's scratch repo breaks",
-    file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  `[[--scope]]\\n--when.repositories = ["${repo}"]\\n[--scope.revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: '  `[revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
-    suite: "lanes",
-    scenario: "main",
-    expect: "a jj repo outside the lane's own works in the lane",
   },
   {
     name: "the lane's queue lets a tool run before the turn's snapshot finishes",
@@ -460,14 +315,6 @@ export const mutations: readonly Mutation[] = [
       "created when missing; excluded in your repo unless already ignored",
   },
   {
-    name: "a fork's copy is a child of your @ itself",
-    file: plan,
-    from: '  inLane("jj", "new", on),',
-    to: '  inLane("jj", "new", wip.commit),',
-    command: unit,
-    expect: "planForkSetup: a WIP's copy on accepted commit under it",
-  },
-  {
     name: "the image ignores pinetrie's Playwright version",
     file: plan,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
@@ -485,39 +332,6 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "images",
     expect: "on the default image, pinetrie's Playwright launches Chromium",
-  },
-  {
-    name: "an agent's own commit is not adopted",
-    file: plan,
-    from: '  return facts.parentDescends\n    ? { kind: "adopt", commit: parent }\n    : { kind: "none" }',
-    to: '  return { kind: "none" }',
-    command: unit,
-    expect: "a commit the agent made on the bookmark is adopted",
-  },
-  {
-    name: "an agent's own commit is not adopted, in a real lane",
-    file: plan,
-    from: '  return facts.parentDescends\n    ? { kind: "adopt", commit: parent }\n    : { kind: "none" }',
-    to: '  return { kind: "none" }',
-    suite: "lanes",
-    scenario: "main",
-    expect: "a commit the agent made itself reaches its thread's offer",
-  },
-  {
-    name: "a commit on another line is adopted",
-    file: plan,
-    from: '  return facts.parentDescends\n    ? { kind: "adopt", commit: parent }\n    : { kind: "none" }',
-    to: '  return { kind: "adopt", commit: parent }',
-    command: unit,
-    expect: "nothing, when @- is on another line",
-  },
-  {
-    name: "a merge is adopted",
-    file: plan,
-    from: '  if (parent === undefined || others.length > 0) return { kind: "none" }',
-    to: '  if (parent === undefined) return { kind: "none" }',
-    command: unit,
-    expect: "nothing, when @- is a merge",
   },
   {
     name: "the lane note is not where the prompt says",
@@ -575,30 +389,6 @@ export const mutations: readonly Mutation[] = [
     scenario: "main",
     expect:
       "a card that brings the thread up to date writes the update in the thread, then sends its text",
-  },
-  {
-    name: "a turn's paths are read from the process's directory",
-    file: "packages/lanes/revisions.ts",
-    from: "export const PATH_LINE = 'json(path) ++ \"\\\\n\"'",
-    to: "export const PATH_LINE = 'json(display_diff_path) ++ \"\\\\n\"'",
-    command: unit,
-    expect: "changedPaths: each path as it is named",
-  },
-  {
-    name: "a WIP's copy fetches the lane's own copy too",
-    file: plan,
-    from: "    steps: [fetchById([from.commit]), ...planWipCopy(from, from.on)],",
-    to: "    steps: [fetchById([from.commit, from.on]), ...planWipCopy(from, from.on)],",
-    command: unit,
-    expect: "a WIP's copy fetches only the WIP's commit",
-  },
-  {
-    name: "accepted work's merge names no base",
-    file: plan,
-    from: '      message: baseMessage("catch up: accepted work", {',
-    to: '      message: ((title: string, _: unknown) => title)("catch up: accepted work", {',
-    command: unit,
-    expect: "accepted work's merge names its base",
   },
   {
     name: "execute skips the runtime's disk operations",
@@ -731,7 +521,7 @@ export const mutations: readonly Mutation[] = [
     to: "    false ||\n",
     command: unit,
     expect:
-      "planProjectDir: jj's root, else git's, else the folder; never missing, your home directory or /",
+      "planProjectDir: jj's root, a jj project; else git's, else the folder, a folder project; never missing, your home directory or /",
   },
   {
     name: "a missing folder can be a project",
@@ -740,16 +530,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (false)\n",
     command: unit,
     expect:
-      "planProjectDir: jj's root, else git's, else the folder; never missing, your home directory or /",
-  },
-  {
-    name: "a project's repo is not told to ignore .pinetrie/",
-    file: "packages/lanes/host.ts",
-    from: "  return (await excludeInYours(planned.root, [EXCLUDE_LINE]))\n",
-    to: "  return true\n",
-    command: unit,
-    expect:
-      "prepareProjectDir: .pinetrie/ excluded once; a non-colocated repo refused; a plain folder untouched",
+      "planProjectDir: jj's root, a jj project; else git's, else the folder, a folder project; never missing, your home directory or /",
   },
   {
     name: "a broken config file reads as missing",
@@ -785,5 +566,29 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "every repo in the lane ignores what the ignore file lists, through git's own variables",
+  },
+  // ── lanes runs no jj ──
+  {
+    name: "a fork's lane steps run jj",
+    file: plan,
+    from: "  ...input.setup.steps,\n]",
+    to: '  ...input.setup.steps,\n  inLane("jj", "new"),\n]',
+    command: unit,
+    expect: "@pinetrie/lanes names jj as a command nowhere but its image check",
+  },
+  // tsc names no failing check: with typecheck clean, any error is the mutant's.
+  {
+    name: "a base's checkout is a fork's setup",
+    file: "packages/lanes/history-port.ts",
+    from: "  readonly [baseCheckoutBrand]: true\n",
+    to: "  readonly [forkSetupBrand]: true\n",
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "a merge takes any copy's facts",
+    file: "packages/lanes/history-port.ts",
+    from: "    ready: ReadyCopy,\n",
+    to: "    ready: { readonly parents: readonly CommitId[] },\n",
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
 ]

@@ -1,6 +1,7 @@
 // host/work/turns — each turn of a lane of its own, recorded: its revision
-// committed on the lane's queue, its disk classed and snapshotted
-// (`disk.ts`), its history fetched into your repo.
+// committed on the lane's queue (`LaneHistory.recordTurn`), its disk classed
+// and snapshotted (`disk.ts`), then what its adapter does after a turn
+// (`TurnMade.follow`).
 
 import {
   type CommitId,
@@ -21,21 +22,13 @@ import {
 } from "@pinetrie/core"
 import { callLabel } from "@pinetrie/interface"
 import type { Keeper } from "@pinetrie/keeper"
-import {
-  bookmarkOf,
-  changedPaths,
-  commitTurn,
-  conflictedFilesAt,
-  executeOrThrow,
-  planSnapshot,
-} from "@pinetrie/lanes"
+import { executeOrThrow, type Follow, planSnapshot } from "@pinetrie/lanes"
 import type { LaneHooks } from "@pinetrie/pi"
 import { readRevisions, readTreeIndex } from "@pinetrie/reads"
 import { planTurnRecord, REVISION, setRecord } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
 import { classifyWritesOnQueue, diskOfTurn } from "./disk.ts"
-import type { Fetches } from "./fetch.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { SharedLineages } from "./shared.ts"
@@ -52,6 +45,18 @@ export function titleOf(index: TreeIndex, entry: EntryId): string {
   if (text !== "") return text
   const call = toolCallsOf(index.entries[entry]?.message)[0]
   return call === undefined ? "turn" : callLabel(call, "cut")
+}
+
+/**
+ * A turn's end, queued: its snapshot step, then what follows its commit,
+ * fired once the step is queued, so the work behind it (for jj, the fetch
+ * into your repo) runs after the snapshot, never before it on the lane's
+ * queue.
+ */
+export function queueTurnEnd<T>(queueSnapshot: () => T, follow: Follow): T {
+  const ended = queueSnapshot()
+  follow?.()
+  return ended
 }
 
 export interface Turns {
@@ -79,7 +84,6 @@ export function createTurns(deps: {
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
   readonly records: Pick<Records, "writeValues">
-  readonly fetchLane: Fetches["fetchLane"]
   readonly shared: SharedLineages
 }): Turns {
   const { basics, registry, keeper } = deps
@@ -145,7 +149,6 @@ export function createTurns(deps: {
           return
         }
         const handle = registry.handleOf(lane)
-        const jj = registry.laneJjOf(lane)
         // The commit is queued, so it never overlaps the last turn's
         // snapshot, and awaited, so the next request sees it.
         const {
@@ -153,34 +156,10 @@ export function createTurns(deps: {
           newest,
           paths: changed,
           conflicts,
-        } = await handle.queue.enqueue(async () => {
-          const before = await bookmarkOf(jj, lane)
-          const made = await commitTurn(jj, {
-            title: titleOf(readTreeIndex(doc), entry),
-            entry,
-            lane,
-            bookmark: before,
-          })
-          // An adopted turn may be several of the agent's commits: its
-          // paths run from the bookmark before it.
-          const changed =
-            made.commit === null
-              ? []
-              : await changedPaths(jj, before, made.commit)
-          // The files conflicted in the commit its record names: its own, else
-          // the bookmark's, which a branch from it clones.
-          const named = made.commit ?? before
-          const conflicts =
-            made.conflicted && named !== null
-              ? await conflictedFilesAt(jj, named)
-              : []
-          return {
-            committed: made.commit,
-            newest: before,
-            paths: changed,
-            conflicts,
-          }
-        })
+          follow,
+        } = await registry.withHistory(lane, h =>
+          h.recordTurn({ title: titleOf(readTreeIndex(doc), entry), entry }),
+        )
         const planned = planTurnRecord({
           entry,
           lane,
@@ -208,46 +187,54 @@ export function createTurns(deps: {
         // next request does not: the turn's classes and the registry they
         // leave, the snapshot, then its diff, read while the container
         // still runs.
-        const ended = handle.queue
-          .enqueue(async () => {
-            const classed = await classifyWritesOnQueue({
-              handle,
-              changed,
-              shared,
-              image: (await deps.setup.ready).image,
-            }).catch(error => {
-              failed(basics, "classing the turn's writes", lane)(error)
-              return null
-            })
-            await executeOrThrow(
-              planSnapshot({ lane, snapshot: snapshotId(entry) }),
-              handle.runners,
-            )
-            const disk =
-              classed === null
-                ? null
-                : await diskOfTurn({
-                    handle,
-                    writes: classed.writes,
-                    diff:
-                      previous === null
-                        ? null
-                        : await handle.runners.runtime.diff(
-                            previous.snapshot,
-                            snapshotId(entry),
-                          ),
-                    shared,
-                  }).catch(error => {
-                    failed(basics, "the turn's diff", lane)(error)
-                    return null
-                  })
-            return { snapped: true, disk, touched: classed?.touched ?? null }
-          })
-          .catch(error => {
-            failed(basics, "the snapshot", lane)(error)
-            last.delete(lane)
-            return { snapped: false, disk: null, touched: null }
-          })
+        const ended = queueTurnEnd(
+          () =>
+            handle.queue
+              .enqueue(async () => {
+                const classed = await classifyWritesOnQueue({
+                  handle,
+                  changed,
+                  shared,
+                  image: (await deps.setup.ready).image,
+                }).catch(error => {
+                  failed(basics, "classing the turn's writes", lane)(error)
+                  return null
+                })
+                await executeOrThrow(
+                  planSnapshot({ lane, snapshot: snapshotId(entry) }),
+                  handle.runners,
+                )
+                const disk =
+                  classed === null
+                    ? null
+                    : await diskOfTurn({
+                        handle,
+                        writes: classed.writes,
+                        diff:
+                          previous === null
+                            ? null
+                            : await handle.runners.runtime.diff(
+                                previous.snapshot,
+                                snapshotId(entry),
+                              ),
+                        shared,
+                      }).catch(error => {
+                        failed(basics, "the turn's diff", lane)(error)
+                        return null
+                      })
+                return {
+                  snapped: true,
+                  disk,
+                  touched: classed?.touched ?? null,
+                }
+              })
+              .catch(error => {
+                failed(basics, "the snapshot", lane)(error)
+                last.delete(lane)
+                return { snapped: false, disk: null, touched: null }
+              }),
+          follow,
+        )
         const recorded = keeper.track(
           ended
             .then(async ({ snapped, disk, touched }) => {
@@ -275,8 +262,6 @@ export function createTurns(deps: {
         )
         recording.add(recorded)
         void recorded.finally(() => recording.delete(recorded))
-        // Queued now, straight after the snapshot, while the lane runs.
-        if (committed !== null) void deps.fetchLane(lane, [newest])
       } catch (error) {
         // A missing revision only coarsens branching: the run goes on.
         failed(basics, "recording a turn", lane)(error)

@@ -3,7 +3,7 @@ import { readTreeIndex } from "@pinetrie/reads"
 import { newRootDoc, writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { row } from "../fakes.ts"
-import { titleOf } from "./turns.ts"
+import { queueTurnEnd, titleOf } from "./turns.ts"
 
 test("a turn's title is its message's first line, else its first call in words, else turn", () => {
   const doc = newRootDoc()
@@ -20,4 +20,18 @@ test("a turn's title is its message's first line, else its first call in words, 
   expect(titleOf(index, entryId("e1"))).toBe("fix it")
   expect(titleOf(index, entryId("e2"))).toBe("shell ls -la")
   expect(titleOf(index, entryId("e3"))).toBe("turn")
+})
+
+test("what follows a turn's commit is fired once its snapshot step is queued", () => {
+  const seen: string[] = []
+  const ended = queueTurnEnd(
+    () => {
+      seen.push("snapshot queued")
+      return "ended"
+    },
+    () => seen.push("follow"),
+  )
+  expect(ended).toBe("ended")
+  expect(seen).toEqual(["snapshot queued", "follow"])
+  expect(queueTurnEnd(() => "ended", null)).toBe("ended")
 })

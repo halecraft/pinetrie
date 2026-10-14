@@ -11,10 +11,10 @@ modules decide, and the host writes.
 The package was `@pinetrie/marginalia` (`packages/marginalia/`) until it was
 renamed; the ADRs and findings use that name.
 
-Where a rule lives, as `@pinetrie/core` and `@pinetrie/repo` state it too:
+Where a rule lives, as `@pinetrie/core` and `@pinetrie/jj` state it too:
 
 > Core holds the vocabulary (ids, intents, every record's type) and the
-> reads of the tree. A format or type that `lanes` or `repo` must read,
+> reads of the tree. A format or type that `lanes` or `jj` must read,
 > write or name lives in core too, since neither can declare
 > `@pinetrie/rules`. What a stored shape says, and how the host changes it,
 > is `@pinetrie/rules`', whoever reads it. One client's own in-flight state
@@ -26,7 +26,7 @@ Where a rule lives, as `@pinetrie/core` and `@pinetrie/repo` state it too:
 So `planStop` is here beside `STOP`, and `agentByDefault` beside
 `addressChat`; `address`, `parseMentions` and `moveOf`, which know no
 record, are core's; the trailer format and the offer's facts and decisions
-are core's (`trailers.ts`, `offers.ts`), since `@pinetrie/repo` reads them.
+are core's (`trailers.ts`, `offers.ts`), since `@pinetrie/jj` reads them.
 
 ## Where things are
 
@@ -1382,11 +1382,11 @@ A record written before accepted work was named (ADR-0100) holds
 own, null too.
 
 What the host decides about it is `offer.ts`'s, from the facts
-`@pinetrie/repo` gathers, as decisions typed in `@pinetrie/core`
-(`core/offers.ts`): `@pinetrie/repo` turns each into jj steps
+`@pinetrie/jj` gathers, as decisions typed in `@pinetrie/core`
+(`core/offers.ts`): `@pinetrie/jj` turns each into jj steps
 (`offerEffects` and the rest), and the host connects the two, deciding
 nothing itself. Where an offer starts (`startOfOffer`, `offerStart`) is
-`@pinetrie/repo`'s. What the page reads is `offer-view.ts`, the review's wire
+`@pinetrie/jj`'s. What the page reads is `offer-view.ts`, the review's wire
 `review.ts`, the commit-message format `@pinetrie/core`'s `trailers.ts`
 (`withTrailers`, `withoutTrailers`, `wipDescription`, `isWipLine`), and the
 commit-message request `request.ts` (`describeRequest`).
@@ -1550,14 +1550,14 @@ commit-message request `request.ts` (`describeRequest`).
 
 - **`planAcceptedRecord`** is accepted work's record from what the host read
   (`AcceptedFacts`), beside what setting accepted work up would write to your
-  repo's config, which `@pinetrie/repo` words (`setupProposal`: jj's config
+  repo's config, which `@pinetrie/jj` words (`setupProposal`: jj's config
   text), and `publish.catchUp` from accepted work's config (ADR-0099).
 - **`planAcceptedAction`** decides a setup or publish from the record read in
   its own step (`AcceptedDecision`): setup writes exactly the heads and log the
   record proposed, the text you were shown; a publish (`PublishDecision`,
   ADR-0090) says whether the working copy catches up first (`catchUp`) and whether
   your commits move with accepted work (`accept`), both false with
-  `publish.catchUp` off. `@pinetrie/repo` turns it into steps (`planSetup`,
+  `publish.catchUp` off. `@pinetrie/jj` turns it into steps (`planSetup`,
   `planPublishCatchUp`, `planPublishMove`).
 - **`planPublishFinish` is a publish's second round** (ADR-0090): from the
   record read again after the catch-up, the move, or the catch-up's
@@ -1568,7 +1568,7 @@ commit-message request `request.ts` (`describeRequest`).
   record: the conflicts the catch-up would have left, since the revert took
   them away, so `acceptedRefusal`'s "your commits have conflicts" would be
   untrue. It lives here, not beside the steps,
-  because `@pinetrie/repo` does not import this package.
+  because `@pinetrie/jj` does not import this package.
 - **`effectiveBase`**, **`catchUpOf`** and **`parentNow`** are in `base.ts`,
   with the `pinetrie.base` record; **`catchUpName`** (accepted work is
   "accepted work", ADR-0090) and **`baseMovedOn`** (a base that moved,
@@ -1600,7 +1600,7 @@ commit-message request `request.ts` (`describeRequest`).
   host checks it before the lane is created, so a refused send creates
   nothing.
 - **What became of a WIP base** (`ok`, `landed` or `gone`, S77 item 2) is
-  read in `@pinetrie/repo` (`wipState`, `readWipState`), since the gather
+  read in `@pinetrie/jj` (`wipState`, `readWipState`), since the gather
   needs it to know where an offer sits. **`planUpdateFrom`** then says what
   bringing a thread up to date merges, from the lane's `LaneBase`: the base
   the thread follows by `effectiveBase`, the rule the
@@ -1787,8 +1787,9 @@ the tip it must match, and the bookmark to leave on it.
   anything is queued: a lane of its own, the only call in its turn (a
   sibling's edit would leave the copy, S103), and new
   work (`brings`, or `unknown`, which the merge's own read decides). The
-  parent only when it is ahead and idle. `planCopyReady` refuses a working
-  copy off its lane's line (`off-line`), and a repo with no bookmark of the
+  parent only when it is ahead and idle. `planCopyReady` (`@pinetrie/core`,
+  the one maker of the `ReadyCopy` a merge takes) refuses a working copy
+  off its lane's line (`off-line`), and a repo with no bookmark of the
   lane's (`no-bookmark`), for every catch-up. The two are worded apart: the
   missing bookmark was the rename's, not a split's (S114). Each refusal
   says what to do (`catchUpRefusal`); `catchUpAnswer` is the tool's result,

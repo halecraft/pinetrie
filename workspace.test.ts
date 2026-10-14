@@ -172,8 +172,8 @@ test("only the app declares a runtime: it is the one place that picks one", () =
   assert.deepEqual(declaring, ["apps/pinetrie"])
 })
 
-test("repo declares only core, keeper and lanes: it runs jj and git on your repo, never pi or the document", () => {
-  assert.deepEqual(deps(read("packages/repo")).sort(), [
+test("jj declares only core, keeper and lanes: it runs jj and git on your repo, never pi or the document", () => {
+  assert.deepEqual(deps(read("packages/jj")).sort(), [
     "@pinetrie/core",
     "@pinetrie/keeper",
     "@pinetrie/lanes",
@@ -214,7 +214,7 @@ test("the page declares no server package and no app", () => {
     "@pinetrie/app",
     "@pinetrie/pi",
     "@pinetrie/lanes",
-    "@pinetrie/repo",
+    "@pinetrie/jj",
   ]) {
     assert.ok(
       !web.includes(forbidden),

@@ -930,6 +930,41 @@ export interface CopyFacts {
   readonly descends: boolean
 }
 
+declare const readyCopyBrand: unique symbol
+/**
+ * A copy found ready to take a merge (`planCopyReady`, its one maker): a
+ * merge takes one, so none merges a copy nobody checked.
+ */
+export type ReadyCopy = CopyFacts & { readonly [readyCopyBrand]: true }
+
+/** Why a copy cannot take a merge: off its line, or with no bookmark. */
+export type CopyRefusal = "off-line" | "no-bookmark"
+
+/**
+ * Whether the lane's copy may take a merge: `@` on the thread's
+ * own line, its one parent the lane's bookmark or the agent's own commit on
+ * it (`planTurnCommit`'s rule). Otherwise the merge would land beside where
+ * the agent works, as while a split's stack is the working copy. A repo
+ * with no bookmark of the lane's has no line to be on, and is refused as
+ * that, not as off it: a split is not the cause. Conflicts do not
+ * refuse it: catching up is how a conflict the copy came with is settled.
+ */
+export const planCopyReady = (copy: CopyFacts): ReadyCopy | CopyRefusal => {
+  if (copy.bookmark === null) return "no-bookmark"
+  const [parent, ...more] = copy.parents
+  return parent !== undefined &&
+    more.length === 0 &&
+    (parent === copy.bookmark || copy.descends)
+    ? (copy as ReadyCopy)
+    : "off-line"
+}
+
+/**
+ * What a project's folder is to lanes: a jj workspace, whose repo is
+ * accepted work, or any other folder (a git repo included).
+ */
+export type ProjectKind = "jj" | "folder"
+
 /** What a catch-up merges from: the thread's base, or the thread it branched from. */
 export type CatchUpFrom = ThreadBase | ParentThread
 

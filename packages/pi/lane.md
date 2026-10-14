@@ -38,18 +38,18 @@ changes pine·trie can keep this note true. You can skip them.
 - After each of your messages whose tool calls changed tracked files,
   pine·trie runs `jj commit` in `/workspace`. The revision is titled with the
   message's first line, and carries `Pinetrie-Entry` and `Pinetrie-Lane`
-  trailers. <!-- packages/lanes/revisions.ts commitTurn -->
+  trailers. <!-- packages/jj/lane/revisions.ts commitTurn -->
 - So after a turn, `jj st` shows an empty working copy. Your work is below
   it:
   - `jj log -r 'immutable_heads()..'` lists your revisions;
   - `jj diff --from 'heads(immutable())'` shows all of it as one diff.
 - Revisions from before this thread began are immutable here: jj refuses to
-  rewrite them. <!-- packages/lanes/plan.ts forkConfig -->
+  rewrite them. <!-- packages/jj/lane/plan.ts forkConfig -->
 - You need not commit. If you do, with jj or git, on top of your work, your
   commit is the turn's revision: pine·trie moves the lane's bookmark to it, and
   the person's copy of your work and any branch from that message hold it.
   It keeps your description.
-  <!-- packages/lanes/plan.ts planTurnCommit -->
+  <!-- packages/jj/lane/plan.ts planTurnCommit -->
 - Don't rewrite revisions you or pine·trie already made (`squash`, `rebase`,
   `abandon`, `describe` of an earlier one) unless a pine·trie message asks you
   to. pine·trie records each turn by the commit id of its revision, and a
@@ -81,7 +81,7 @@ changes pine·trie can keep this note true. You can skip them.
 - Your work reaches the person as one commit on their accepted work, where
   finished work goes (`pinetrie-accepted`, unless they named it otherwise),
   or on the WIP bookmark this thread started from, bookmarked
-  `pinetrie-offer/<thread name>`: the offer. They accept it when they choose. <!-- packages/lanes/plan.ts offerBookmark -->
+  `pinetrie-offer/<thread name>`: the offer. They accept it when they choose. <!-- packages/jj/lane/names.ts offerBookmark -->
 - This thread started from accepted work, or from a copy of that WIP: the
   commit in your history whose message carries `Pinetrie-Base`. Leave it as it
   is. <!-- packages/core/trailers.ts baseMessage -->
@@ -171,7 +171,7 @@ changes pine·trie can keep this note true. You can skip them.
   base into `/workspace`: accepted work's newest commit, or a fresh
   copy of the WIP it started from. A note tells you what changed. What they
   want done with it comes after, as their message.
-  <!-- packages/lanes/merge.ts mergeBase -->
+  <!-- packages/jj/lane/merge.ts mergeBase -->
 - If the merge conflicts, a pine·trie message asks you to resolve it. Then
   use `ask_about_conflict` when the two sides of a conflict meant different
   things. You always have the tool, but it asks only while this copy has a

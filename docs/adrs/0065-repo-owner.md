@@ -1,7 +1,7 @@
 # ADR-0065 — One owner for your repo
 
 - **Status:** Accepted
-- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/repo/TECHNICAL.md`
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/jj/TECHNICAL.md`
 - **Evidence:** S87, S89
 - **Amends:**
   - ADR-0034: a lane's bundle is imported into your repo by its owner, as the

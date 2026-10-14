@@ -29,7 +29,7 @@
 // a host with tools that cannot run its lanes prints why and exits 1.
 // The first SIGINT or SIGTERM shuts the host down; a second ends the process.
 import path from "node:path"
-import { prepareProjectDir } from "@pinetrie/lanes"
+import { prepareProjectDir } from "@pinetrie/jj"
 import { HostRefused, startHost } from "./index.ts"
 import {
   planInvocation,

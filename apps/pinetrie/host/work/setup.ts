@@ -1,6 +1,7 @@
 // host/work/setup — what the host finds for lanes at startup, fixed after it:
-// the project, the lane configs and shared directories, the images, runtime
-// and grants, and the base snapshot every fork of your `@-` starts from.
+// the project, opened through its adapter, the lane configs and shared
+// directories, the images, runtime and grants, and the base snapshot every
+// fork of accepted work starts from.
 
 import { stat } from "node:fs/promises"
 import { createRequire } from "node:module"
@@ -9,7 +10,6 @@ import path from "node:path"
 import {
   errorText,
   isThreadId,
-  PRODUCT_NAME,
   PROJECT_CONFIG_FILE,
   type ProjectRecord,
 } from "@pinetrie/core"
@@ -17,12 +17,10 @@ import { createKeeper, type Keeper } from "@pinetrie/keeper"
 import {
   BASE_LANE,
   checkImage,
-  commitsOf,
   configJson,
   decodeLaneConfig,
   ensureRuntime,
   gatherLinks,
-  jjIn,
   type LaneOwner,
   type LaneRuntime,
   type LaneSpec,
@@ -36,17 +34,15 @@ import {
   projectContainerfile,
   readConfigFile,
   refreshBase,
-  repoConfig,
-  revsetName,
   type SharedDir,
   slotMounts,
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
-import { type RepoOwner, renameAccepted, startRepoOwner } from "@pinetrie/repo"
 import { decodeOwner } from "@pinetrie/rules"
-import { type Basics, failed, slow } from "../basics.ts"
+import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
+import type { OpenProject, ProjectAdapter } from "./adapter.ts"
 import {
   type AcceptedLanes,
   type LaneConfigs,
@@ -82,7 +78,7 @@ export interface Ready {
   readonly identity: { readonly name: string; readonly email: string }
 }
 
-/** Your repo's names and your config's `lanes`, read at startup. */
+/** The names your config and the project's `pinetrie.json` give, and your config's `lanes`, read at startup. */
 export type PreparedLanes = Awaited<ReturnType<typeof prepareLanes>>
 
 /**
@@ -97,8 +93,8 @@ export interface Setup {
   readonly ssh: LaneSsh
   /** The project's root. */
   readonly root: string
-  /** The one writer of your repo. */
-  readonly owner: RepoOwner
+  /** The project, opened through its adapter. */
+  readonly opened: OpenProject
   /** What lanes run on. */
   readonly runtime: LaneRuntime
   readonly lanes: PreparedLanes
@@ -139,6 +135,8 @@ export async function startSetup(input: {
   readonly basics: Basics
   /** What `findProject` found; null with no tools. */
   readonly found: Found | null
+  /** The project's adapter, with `found`. */
+  readonly adapter: ProjectAdapter | null
   /** The user's config, as read at startup: its file, for logs. */
   readonly userConfig: { readonly file: string; readonly json: unknown }
   /** The commands pi loaded, whose roots lanes are granted. */
@@ -153,7 +151,7 @@ export async function startSetup(input: {
 }): Promise<Setup | null> {
   const { basics, keeper, found } = input
   const { log } = basics
-  if (found === null) return null
+  if (found === null || input.adapter === null) return null
   const { runtime, shareAndGrant } = found
   const { root } = found.project
   const project: ProjectRecord = {
@@ -166,29 +164,13 @@ export async function startSetup(input: {
 
   // Before the rest, since a run's prompt names the shared directories.
   const lanes = await prepareLanes(root, input.userConfig, log)
-  // Made here, from the project root and accepted work's names, before anything
-  // else reads your repo: the reads below, lane work's and the offers'.
-  const owner = startRepoOwner({
-    root,
-    repoConfig: lanes.repoConfig,
-    onError: failed(basics, "your repo"),
-    onSlow: slow(basics, "your repo"),
-  })
-  // pre-accepted: the owner's first command, before its first observation.
-  // Delete with `renameAccepted`.
-  await owner
-    .command(ops => renameAccepted(ops, lanes.repoConfig.acceptedBookmark))
-    .then(
-      lines => {
-        for (const line of lines) log(`[host] ${line}`)
-      },
-      failed(basics, "renaming accepted work's bookmark"),
-    )
+  // Before anything else reads the project: the reads below, lane work's
+  // and the offers'.
+  const opened = await input.adapter.open({ written: lanes.written, basics })
   // Before anything mounts a shared directory or grants a lane anything.
   const configs = await startLaneConfigs({
     root,
-    owner,
-    repoConfig: lanes.repoConfig,
+    project: opened,
     user: lanes.user,
     userFile: input.userConfig.file,
     log,
@@ -289,13 +271,14 @@ export async function startSetup(input: {
    * work is set up.
    */
   async function refreshBaseNow(r: Ready) {
-    const acceptedBookmark = revsetName(lanes.repoConfig.acceptedBookmark)
-    const yours = await owner.read(({ jj }) =>
-      commitsOf(jj, `present(${acceptedBookmark})`),
-    )
+    const yours = await opened.acceptedNow()
     const [commit] = yours
     if (commit === undefined) return
-    const made = await refreshBase({ ...scratchOf(r), yours })
+    const made = await refreshBase({
+      ...scratchOf(r),
+      yours,
+      checkout: fresh => opened.baseSteps({ yours, fresh }),
+    })
     if (made) {
       log(
         `[host] the base snapshot is at accepted work (${commit.slice(0, 8)})`,
@@ -326,6 +309,7 @@ export async function startSetup(input: {
       runtime,
       runtimeReady: found.ready,
       wanted: r => wantedFor(r, configs.accepted()),
+      identity: () => opened.identity(),
       refreshBaseNow,
       log,
     }),
@@ -349,7 +333,7 @@ export async function startSetup(input: {
     project,
     ssh,
     root,
-    owner,
+    opened,
     runtime,
     lanes,
     configs,
@@ -363,9 +347,10 @@ export async function startSetup(input: {
 }
 
 /**
- * Your repo's names, from your config and your working copy's
- * `pinetrie.json`, read once: they find accepted work, so they cannot come
- * from it. And your config's `lanes`, whose shared directories always apply.
+ * Your repo's names as your config and your working copy's `pinetrie.json`
+ * write them, read once: they find accepted work, so they cannot come from
+ * it; the adapter decides them. And your config's `lanes`, whose shared
+ * directories always apply.
  */
 async function prepareLanes(
   at: string,
@@ -378,9 +363,7 @@ async function prepareLanes(
     log(brokenConfigLine(PROJECT_CONFIG_FILE, read.reason))
   const config = decodeLaneConfig(configJson(read), at)
   const user = decodeLaneConfig(userConfig.json, at)
-  const { repoConfig: names, refused } = repoConfig(user.repo, config.repo)
-  for (const r of refused) log(`[host] ${r}`)
-  return { repoConfig: names, user }
+  return { written: { user: user.repo, project: config.repo }, user }
 }
 
 /**
@@ -394,6 +377,8 @@ async function prepare(input: {
   readonly runtimeReady: Found["ready"]
   /** Every host path a lane of this host mounts, and the ports it reaches. */
   readonly wanted: (r: Ready) => Wanted
+  /** The identity lanes commit as (`OpenProject.identity`). */
+  readonly identity: () => Promise<Ready["identity"]>
   readonly refreshBaseNow: (r: Ready) => Promise<void>
   readonly log: (m: string) => void
 }): Promise<Ready> {
@@ -411,20 +396,12 @@ async function prepare(input: {
     pinetrieDir(at).runtime,
     runtimeFrom,
   )
-  // Your jj config, not your repo: asked from its root, as startup asks.
-  const config = async (key: string, fallback: string) => {
-    const ran = await jjIn(at, ["config", "get", key])
-    return ran.ok && ran.stdout.trim() !== "" ? ran.stdout.trim() : fallback
-  }
   const result: Ready = {
     image: lane,
     imagePath: await runtime.imagePath(lane),
     runtime: programs,
     links: planLinks(at, await gatherLinks(at)),
-    identity: {
-      name: await config("user.name", `${PRODUCT_NAME} agent`),
-      email: await config("user.email", "agent@pinetrie.invalid"),
-    },
+    identity: await input.identity(),
   }
   await input.runtimeReady({
     defaultImage: runtimeFrom,

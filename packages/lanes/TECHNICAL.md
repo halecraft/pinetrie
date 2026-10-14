@@ -1,23 +1,26 @@
 # `@pinetrie/lanes`: technical notes
 
 This package's one job is what a lane is and what runs in it: the
-container's shape, mounts, grants, lane config, jj and git in a lane, forks,
-turns, bundles, the base, the queue and the handle (ADR-0032 to ADR-0034).
-It defines the `LaneRuntime` port and implements no runtime (ADR-0130):
-`@pinetrie/docker` does, and the app composes it
-(`apps/pinetrie/host/work/runtime.ts`). Every lane has its own copy: none
-works directly in a directory (ADR-0102). Your repo is `@pinetrie/repo`'s
-(`packages/repo/TECHNICAL.md`), which builds on this package: what a lane
-also runs, through a `Runner` it is given, is here (`laneBase`,
-`REVISION_READ`, `commitsOf`), and so are the names both sides use
-(`bookmarkName`, `laneTipName`, `offerBookmark`, `DEFAULT_REPO`). This
-package never imports `@pinetrie/repo`. It declares only `@pinetrie/core`
-(`workspace.test.ts`), and the client may not depend on it. It never imports
-pi (ADR-0003): the channel into a lane is `packages/pi`'s, and the host hands
-it in as an `OpenLink`.
+container's shape, mounts, grants, lane config, disks, forks, snapshots, the
+base, the queue and the handle (ADR-0032 to ADR-0034). It defines two kinds
+of port and implements neither: the `LaneRuntime` (ADR-0130), which
+`@pinetrie/docker` implements and the app composes
+(`apps/pinetrie/host/work/runtime.ts`); and what a kind of project gives
+lanes (ADR-0142), a lane's history (`LaneHistory`, The ports), which
+`@pinetrie/jj` implements. Every lane has its own copy: none works directly
+in a directory (ADR-0102).
 
-The evidence is in `docs/findings/`: S36 for the jj rules, S39 to S44 for
-containers, disks and the helper, S122 to S131 for Docker and the lane VM.
+**This package runs no jj** (`boundary.test.ts`): a lane's history, your
+repo and every jj name are `@pinetrie/jj`'s (`packages/jj/TECHNICAL.md`),
+which builds on this package. The one exception is the image check's `jj
+--version`, which asks the host's jj its version and runs jj on no repo.
+This package never imports `@pinetrie/jj`. It declares only
+`@pinetrie/core` (`workspace.test.ts`), and the client may not depend on
+it. It never imports pi (ADR-0003): the channel into a lane is
+`packages/pi`'s, and the host hands it in as an `OpenLink`.
+
+The evidence is in `docs/findings/`: S39 to S44 for containers, disks and
+the helper, S122 to S131 for Docker and the lane VM.
 
 ## The runtime port (`runtime-port.ts`)
 
@@ -31,7 +34,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   list of `Step`s: a `LaneStep` (a command in the lane, through its channel)
   or a `RuntimeOp` (a `DiskOp`, or a container made from a shape), carried
   out by `execute` through `Runners.runtime`. A list of lane steps alone
-  needs no runtime, so `@pinetrie/repo` never has one.
+  needs no runtime, so `@pinetrie/jj` never has one.
 - **What any runtime must do:**
   - a snapshot that holds what the lane wrote, after the `sync` before it
     (`planSnapshot`), and a restore from it into a new disk;
@@ -45,6 +48,35 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 - **Who implements it:** `@pinetrie/docker` (`dockerRuntime`, the Mac's lane
   VM and Linux), the one implementation.
 
+## The ports (`history-port.ts`, ADR-0142)
+
+- **A lane's history is reached only on its queue.** `LaneHistory` is what
+  a lane's copy records and merges: a turn (`commit`, `recordTurn`), its
+  base (`base`), a catch-up (`readyToMerge`, `merge`), its conflicts, and
+  what a restored disk needs (`afterRestore`). The host hands it out only
+  through its registry's `withHistory`, which queues the caller's function
+  on the lane's queue (The queue): no module holds one outside a queued
+  step, so every change to a lane's history runs there by construction. A
+  step already on the queue is handed the history, never asks for one.
+- **A merge takes a copy found ready** (`ReadyCopy`, `@pinetrie/core`):
+  `planCopyReady` is its one maker, so no caller merges a copy nobody
+  checked.
+- **A fork and the base are planned with the adapter's steps.** `planFork`
+  takes a `ForkSetup` and `refreshBase` a `BaseCheckout`, each a branded
+  wrapper of `LaneStep`s that only its own maker wraps
+  (`history-port.test.ts` holds that neither takes the other).
+- **What follows a move is the adapter's, fired by the caller**
+  (`Follow`): `recordTurn` and `merge` hand it back, and the caller fires it
+  after the snapshot step it queues next, so its work (for jj, the fetch
+  into your repo) never delays the snapshot or the next tool call. Firing
+  it is a caller's obligation, held by a unit test at each call site.
+- **A point is where the destination reads a file** (`Point`, `FileAt`):
+  accepted work, a lane's newest commit, or its start.
+- **The port suite** (`testing/history-suite.ts`, exported as
+  `@pinetrie/lanes/testing`) states what any adapter's history must do;
+  `test` and `expect` are passed in, so this package depends on no test
+  runner. Each adapter runs it against a rig of its own.
+
 ## Where things are
 
 - `plan.ts`: every decision, pure. It covers the container's arguments,
@@ -52,32 +84,28 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   their tags (`planImages`), and what the host finds at startup.
 - `execute.ts`: runs a list of `LaneStep`s in order, on the host or in the
   lane.
-- `run.ts`, `bookmarks.ts`, `revisions.ts`, `merge.ts`: jj and git as
-  `Runner`s, and the jj logic over them. `revisions.ts` holds the reader
-  of an accepted-offer commit's row (`ACCEPTED_OFFER_COMMIT_ROW`,
-  `parseAcceptedOfferCommits`), which your repo's reads use too.
-  `planJoins` (`plan.ts`) decides which accepted-offer commits an update
-  joins.
-- `host.ts`: startup facts, lane configs and shared directories. Its reads
-  of your repo (`jjIn`, git from its root) are the one exception to "only
-  `@pinetrie/repo` runs jj on your repo": they only read, at startup, before
-  the owner of your repo starts. Its one write there is a file, the exclude
-  file, which a non-colocated jj repo lacks: such a folder is refused
-  (S108). `prepareProjectDir` adds `/.pinetrie/` to it, once from `server.ts`
-  before the store opens and again in `prepareContainerHost`, which then writes
-  nothing (ADR-0086); `prepareShared` adds shared directories.
-- `planProjectDir` (`plan.ts`) decides a project's root from `RootFacts`,
-  or refuses the folder (`ProjectDirRefusal`, worded by `projectDirWords`);
-  `planRoot` only maps its result for a runtime's startup planner
-  (`planContainerHost`). `pinetrieDir` is the layout
-  of `.pinetrie/`: the store, snapshots, the runtime and `lane-git`.
+- `run.ts`: commands as `Runner`s, on the host or in a lane.
+- `history-port.ts`: the ports a kind of project implements (The ports).
+- `host.ts`: what the host reads of its own machine at startup: config
+  files (`readConfigFile`, `userConfigFile`) and the links under your
+  working copy's `node_modules` (`gatherLinks`). Your repo's startup reads
+  and writes are `@pinetrie/jj`'s (`startup.ts`).
+- `planProjectDir` (`plan.ts`) decides a project's root and its kind from
+  `RootFacts`: a jj workspace is `jj`, any other folder (a git repo
+  included) `folder`; or it refuses the folder (`ProjectDirRefusal`, worded
+  by `projectDirWords`). The kind is that one fact, read once, where the
+  host chooses the project's adapter (`apps/pinetrie/host/project.ts`).
+  `folderRefusal` words why a folder has no lanes yet. `planShared` and `sharedCandidates` decide the shared
+  directories, which `@pinetrie/jj`'s `prepareShared` carries out.
+  `pinetrieDir` is the layout of `.pinetrie/`: the store, snapshots, the
+  runtime and `lane-git`.
 - `image.ts`, `runtime.ts`: the image and the lane runtime. `image.ts`
   gathers what `planImages` needs and builds what it plans.
 - `runtime-port.ts`: `LaneRuntime`, every call the host makes to a
   runtime, and `DiskOp`. This package implements no runtime: Docker's is
   `@pinetrie/docker`'s (`dockerRuntime`).
-  `lane.ts`: the container, the queue, and the handle. `base.ts`: the base snapshot, and a lane's base as its
-  history names it (`laneBase`), read from the lane's repo or yours.
+  `lane.ts`: the container, the queue, and the handle. `base.ts`: the
+  base snapshot (`refreshBase`).
 
 ## Disks and snapshots
 
@@ -120,26 +148,25 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   store (S148).
 - **The base is the base before it, checked out at accepted work**
   (`refreshBase`): the base snapshot restored, accepted work's commits
-  fetched and checked out on it (`planBaseCheckout`), its facts written
+  fetched and checked out on it (the adapter's `BaseCheckout`), its facts written
   (`base.json`: its commits and `BASE_FORMAT`), then snapshotted. A refresh
   does nothing when the base holds the same commits, made the way bases
   are now (`isBaseCurrent`). It runs no command, so it holds nothing
   derived. A base made another way (`isCopyableBase`: one from before was
   made on a dependency layer, whose outputs no registry names) is not
-  copied: the next starts empty, `git init` and `jj git init --colocate`
-  first.
+  copied: the next starts empty, and the adapter's checkout is told so
+  (`fresh`).
 
 ## Forks
 
-- **A fork with no revision above it starts from its thread's base**
-  (`planForkSetup`, ADR-0104): on accepted work, an empty commit on accepted work's
-  commit (`planAcceptedStart`); on a WIP, a copy of the WIP made in the lane
-  (`planWipCopy`): a commit on accepted commit under the WIP, with the WIP's
-  files restored. Never the WIP's own commits: the lane's tip, a remote
-  bookmark and immutable in your repo, would make them immutable too (S48
-  item 11), and your WIP would freeze. Either commit carries
-  `Pinetrie-Base: <bookmark>@<commit>` (`baseMessage`), the lane's ledger of
-  its base.
+- **A fork is its disk cloned from its fork point's snapshot, then the
+  adapter's setup** (`planFork`): the steps a `ForkSetup` holds, which only
+  the adapter's `LaneHistory.forkSteps` makes. Between them, one step
+  removes `/workspace/.pineta-lane` (`OLD_LANE_CONFIG_DIR`, tagged
+  `pre-rename:`): a snapshot of a lane made before the rename holds that
+  folder, `laneIgnores` does not list it, and the adapter's first command
+  could snapshot it into the working copy the clone carries. jj's setup is
+  `packages/jj/TECHNICAL.md`'s (A lane's repo).
 - **The base snapshot is made in a scratch lane that is no thread's**
   (`BASE_LANE`, a `BaseLane`): a container, a disk and snapshots are named by
   a `LaneOwner`, a thread's id or the base's, while a bookmark, a remote and
@@ -148,76 +175,6 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 - **The base snapshot is accepted work's commit** (`refreshBase`), and
   refreshes after an acceptance or a land. A fork from it first waits for a
   refresh (`baseAtAccepted`): accepted work may have been set up or moved since.
-- **`jj new` runs first in a fork** (`planForkSetup`), after one step that
-  removes `/workspace/.pineta-lane` (`OLD_LANE_CONFIG_DIR`, tagged
-  `pre-rename:`). A snapshot of a lane made before the rename holds that
-  folder, `laneIgnores` does not list it, and `jj new` would snapshot it
-  into the working copy the clone carries. A clone carries its
-  parent's working-copy change. Without `jj new`, the fork's first turn reuses
-  that change's id, and your repo sees a divergent change (S42 item 2).
-  `repo.test.ts` (`@pinetrie/repo`) forks a lane's repo and checks that your repo has no
-  `divergent()`. Its mutation drops `jj new`.
-- **Inherited history is immutable in the fork.** Its config is a file on its
-  own disk (`JJ_CONFIG=/workspace/.pinetrie-lane/jj.toml`), so forks of forks
-  inherit it. It sets `immutable_heads()` to
-  `builtin_immutable_heads() | <fork commit>` (`forkConfig`). A parent's fork
-  point is an ancestor of its child's, so nothing needs reading from the lane.
-  jj's `--repo` config lives in the home directory, which in a lane is the
-  container's own and not on its disk.
-- **That setting applies to `/workspace` only.** `JJ_CONFIG` reaches every
-  jj command in the container, and a repo that lacks the fork commit fails
-  every command under it (S50). So `forkConfig` writes it in a
-  `[[--scope]]` with `--when.repositories = ["/workspace"]`. jj matches the
-  repo and every path under it, so a repo nested inside `/workspace` still
-  gets it. A lane made before the scope keeps its unscoped file: only a
-  fork's setup writes it.
-- **A base with several parents** (your `@` is a merge) is committed once,
-  empty, so the lane's bookmark names one commit.
-
-## Moving commits
-
-- **By commit id, into a lane**: `fetchById` fetches from `/mnt/host-working-copy` only when
-  the disk lacks the commit, and puts the commit on a branch
-  (`refs/heads/pinetrie/fetched/<i>`). jj imports only branches, remote branches
-  and tags, so it does not see a commit fetched with no ref (S44 item 7).
-  When your `@-` was rewritten, that branch moves sideways, and the import
-  (`--ignore-working-copy`) abandons the commit it named and rebases its
-  descendants. On a base copied from the one before, the working-copy
-  commit is one of them, so the working copy goes stale: `planBaseCheckout`
-  runs `jj workspace update-stale` before `jj new`, which does nothing when
-  it is fresh (S74).
-  It fetches every commit it names when the disk lacks any, and git skips a
-  wanted commit the disk already holds, so naming one of the lane's own is
-  harmless, though a caller names only what the lane may lack (S83).
-- **By bundle, into your repo** (`planBundle` here, `planImport` in
-  `@pinetrie/repo`): `git bundle create -` in the lane, written to a host file
-  through the channel as bytes, then, in your repo, `git fetch <file>
-  +refs/heads/pinetrie/<lane>:refs/remotes/pinetrie-<lane>/tip`.
-  The bundle excludes what your repo has (`^<have>`). A bundle of the whole
-  history is 1.1 MB and 253 ms on pine·trie's repo, against 8 KB and 29 ms for
-  one commit (S43 item 8).
-- **In your repo a lane's history is a remote bookmark**, `tip@pinetrie-<lane>`
-  (ADR-0105). jj imports a ref under `refs/remotes/` with no git remote
-  configured, keeps its commits out of your default log, and treats them,
-  and their ancestors, as immutable with its builtin config (S48 items 11 and
-  19). `laneRefSteps` (`@pinetrie/repo`) is the one writer of the ref besides
-  the fetch: archiving deletes it, restoring writes it back. In the lane's
-  own repo the bookmark stays a local `pinetrie/<lane>`; `laneTipIn`
-  (`@pinetrie/repo`) reads the one in yours, `bookmarkOf` the lane's.
-- **Every fetch into a colocated repo ends with
-  `jj --ignore-working-copy git import`**, in your repo as the host
-  (`planImport`). A jj command run with
-  `--ignore-working-copy` imports no git refs. A plain `jj git import`
-  snapshots the working copy as well, recording your uncommitted edits into
-  `@`: 107 ms against 12–47 ms (S44 item 8).
-- **A fresh disk's checkout is `git init` and `jj git init --colocate`,**
-  then a fetch by id (`planBaseCheckout`). `jj git clone` refuses a directory that is not empty, and a
-  fresh volume holds `lost+found` (S44 item 6). A clone would also fetch every
-  bookmark and check out nothing (S43 item 5).
-- **`PINETRIE_GIT=1`** is set on every host command `run` starts. A git shim
-  that refuses git writes in a jj repo when an agent is driving lets it
-  through. The agent's own commands run through pi's environment, never
-  through `run`, so they never carry it.
 
 ## The channel into a lane
 
@@ -333,8 +290,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   (A lane's config, below). `planShared` refuses:
   - absolute paths, and paths that leave the project;
   - anything in `.git`, `.jj`, `.pinetrie` or `node_modules`;
-  - a path holding files jj tracks. Checked with `jj file list`, not git's
-    index, which can lag in a colocated repo.
+  - a path holding files the project tracks. jj's adapter gathers it
+    (`@pinetrie/jj`'s `prepareShared`, with `jj file list`).
 
   Each refusal is logged with its reason, and the rest still apply.
   Both files are read with `readConfigFile`: a missing file is empty, and
@@ -431,7 +388,9 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 
 - **One serial queue per lane** (`createQueue`) carries everything that
   changes a lane's disk from outside a tool: the start, a fork's setup, each
-  turn's commit and snapshot, the bundle, the stop and trim. A tool's gate is
+  turn's commit and snapshot, the bundle, the stop and trim. Whatever
+  reaches the lane's history does so through `withHistory` (The ports),
+  which queues it. A tool's gate is
   the queue's tail, so a snapshot cannot overlap the next turn's writes. A
   failed start or fork (`fatal`) breaks the gate, so tools fail with its
   error, until the lane is started again.
@@ -441,163 +400,27 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   only a call that starts after: one already running would write while jj
   checks out the merge, which is why `catch_up` must be alone in its
   batch.
-- **The bundle is made on the lane's queue; the owner of your repo imports
-  it** (`@pinetrie/repo`'s `importLane`, a command), which tools never wait
+- **jj's bundle is made on the lane's queue; the owner of your repo imports
+  it** (`@pinetrie/jj`'s `importLane`, a command), which tools never wait
   on. The owner observes the import, and the moved ref marks the lane's
-  offer for a refresh (`host/offers/`).
-
-## Running jj and git (`run.ts`)
-
-- **Every jj command takes `-R <root>`**: `laneJj(runner)` with `-R
-  /workspace` in a lane, and `@pinetrie/repo`'s runners on your repo. A jj
-  command run from the wrong directory acts on whatever repo surrounds it
-  (S36 item 28). `jjIn` alone runs from a directory: to ask where a repo is,
-  and for the startup reads above.
-- **A path argument is read from the process's directory, not `-R`'s.** Name
-  files with the `root:"…"` fileset, as `revisionsIn` and `conflictContent`
-  do.
-- **One bookmark in a revset is `bookmarkRevset(name)`**: `bookmarks(exact:…)`
-  with the name quoted (`revsetName`), so a name is never parsed as a
-  revset.
-- **The host's trailers** (`Pinetrie-Thread`, `Pinetrie-Lane`, `Pinetrie-Entry`,
-  `Pinetrie-Base` and an offer's ledger) are written and read in one file,
-  core's `trailers.ts`: a turn's message (`revisionMessage`,
-  `entryOfMessage`), a base's (`baseMessage`, `parseBase`, `baseOf`), an
-  offer's, and the revset that finds commits by one (`trailerRevset`, here
-  in `newestBase`). A format lanes or repo must read or write lives in
-  core.
-  - **The readers also read `Pineta-*`** (`READ`, `pre-rename:`): commits
-    made before the rename are immutable. Writers write `Pinetrie-*` only.
-  - **A base is read by kind, never by accepted work's bookmark**
-    (`baseOf`, ADR-0100): a name with the WIP prefix is that WIP, any other
-    is accepted work. New bases write `accepted@<commit>`; one written as
-    `pinetrie-onto@` or `pineta-onto@` reads as accepted work too, with no
-    special case, and so would one under any later name of the bookmark.
-    `planLaneRead` and `laneBase` take the kind from it.
-- **Decide from exit status, never from printed text.** Output a program
-  reads comes from a `-T` template. `execFile` reads all of it: jj exits 3 on
-  a broken pipe.
-- **`JJ_EDITOR=false`** (`NO_EDITOR`, from core) makes a command that wants
-  an editor fail at once rather than hang (S36 items 13, 21). A lane's
-  container sets the same variables.
-
-## Revisions and updates (`revisions.ts`, `merge.ts`)
-
-- **`commitTurn`** snapshots, reads `@`'s `empty` and its parents in one
-  `jj log`, and decides with `planTurnCommit`:
-  - `@` has changes: `jj commit` with the title and two trailers,
-    `Pinetrie-Entry` and `Pinetrie-Lane`, then the lane's bookmark moves there;
-  - `@` is empty and its one parent descends from the bookmark: the agent
-    committed in the turn, with jj or git, and that commit is the turn's
-    revision. The bookmark moves to it, untouched, without trailers (S56).
-    Without this, the offer lacked the commit, and a branch at the turn ran
-    `jj new` on the bookmark's commit and lost its files;
-  - otherwise null. A parent on another line (a split's stack, built on the
-    offer's start) or a merge is never adopted.
-
-  The caller passes the bookmark it read (`turnDone` also records it as the
-  prompt's `newest`). The ancestry query (`isAncestor`) runs only when `@`
-  is empty and its one parent is not the bookmark: most turns change
-  nothing, and cost no extra command. The same `jj log` reads `@`'s and
-  each parent's `conflict`, so `commitTurn` also says whether the turn's
-  commit, or the bookmark when it has none, is conflicted; only then does
-  `turnDone` list the files (`conflictedFilesAt`) into the record, which a
-  branch's warning reads (ADR-0072).
-- **`copyFacts`** (ADR-0080) reads where the working copy sits against the
-  lane's bookmark, after a snapshot: `@`'s parents, the bookmark, and
-  whether the one parent descends from it (`isAncestor`, asked only when it
-  is not the bookmark). Every catch-up checks it before it merges
-  (`planCopyReady`, `@pinetrie/rules`): a split's stack as the working copy is
-  off the lane's line.
-- **`commitToBookmark`** is the one tail of every commit the host makes in
-  a lane: `jj commit`, read `@-`, move the lane's bookmark. `commitTurn`,
-  `mergeBase` and the mark of a move to accepted work all end with it.
-- **`changedPaths`** is a turn's paths, from the bookmark before it to its
-  commit, made or adopted, which its revision records (ADR-0106): `jj diff
-  -T PATH_LINE`, `json(path)` a line, which is from the repo's root
-  whatever the process's directory, and quotes any character (S70). An
-  update's changed files use it too. **Not git:** git reads a conflicted jj
-  commit as every side's whole tree under `.jjconflict-base-<n>/` and
-  `.jjconflict-side-<n>/`, plus `JJ-CONFLICT-README`, so a turn that
-  resolved one file in a repo of 694 counted 2084 (S99).
-- **`conflictedFilesAt(jj, rev)`** is the one read of a commit's conflicted
-  files (`jj file list -T 'if(conflict, …)'`), in a lane and in your repo;
-  it throws, and a caller that reads none on failure says so at the call.
-  `conflictsIn` snapshots the lane first, then reads `@`.
-- **An update merges the thread's base** (`mergeBase`, ADR-0104): the
-  line's commit, or a fresh copy of the WIP (`planWipCopy`) made on the
-  lane's previous copy, so conflicts the lane already resolved do not come
-  back. Or the newest commit of the thread it branched from (`planMerge`'s
-  `parent`, ADR-0072), merged as accepted work's commit is but with no
-  `Pinetrie-Base`: ancestry says what the lane holds of it. Accepted work's merge carries `Pinetrie-Base`, a WIP's copy its own, and
-  `newestBase` reads the newest one in a lane's history: its base, and
-  where its offers start. `laneBase` reads it in the lane's own repo too
-  (`bookmarkRevset`), where a lane with none is null: that repo has no
-  line bookmark to find a start on.
-- **An accepted-offer commit the lane holds is joined to its source
-  first** (`planJoins`, `mergeBase`, S102, ADR-0079). An accepted-offer
-  commit is a copy of a lane's work on accepted work, naming the commit it
-  copies (`Pinetrie-Source`). Merged as history says, its base is that
-  commit's `Pinetrie-Start`, from before that work, so the work came in
-  twice: any edit accepted work made to it since conflicted. So a join, a commit
-  merging the source with the accepted-offer commit (the same changes,
-  so clean), goes first, and the update merges the lane, the last join and
-  the base in one commit.
-  - **Which accepted-offer commits:** those in `::<from> ~ ::<ours>` (`ACCEPTED_OFFER_COMMIT_ROW`, one `jj
-    log`) naming any source the lane holds, a squash's included (S77 item
-    6), read with `present()`.
-  - **The order:** oldest first, each join on the last, so a later one's
-    base holds the earlier ones.
-  - **A conflicted join is abandoned:** an acceptance of an offer you edited where
-    the lane wrote, merged as before.
-  - **A join carries no trailer:** bases and accepted-offer commits are
-    found by theirs.
-  - **The update's titles and a conflict's `theirs` leave the accepted-offer commits out**
-    (`withoutAcceptedOfferCommits`), and keep accepted work's commits under them.
-  - **A WIP's copy has no accepted-offer commit in its history,** so a WIP thread joins
-    nothing.
-  - **The host's forecast starts from the same sources** (`catchUpFiles`,
-    `@pinetrie/repo`): it diffs from the offer's start, which holds them,
-    not from the base's start (S102 item 11).
-- **`mergeUpdate` is an update's whole run in a lane** after its edits,
-  on the lane's queue: `planMerge`'s steps (a fetch of accepted work's commit,
-  or of the WIP's commit and its copy), the merge, a mark naming accepted work
-  when a thread moves there with nothing to merge, then what the merge left:
-  its files and the titles of what came in (`titlesOf`, one log), or each
-  conflicted file's content and the revisions on each side that touched
-  them. A WIP's copy fetches only the WIP's commit: its parent is the
-  lane's own.
-- **`revisionsIn` reads a side of a merge in one `jj log`**: the range's
-  revisions that touched any of the files, each with those it touched, from
-  `self.diff("<fileset>").files()` as JSON per line (S83). A side needs no
-  `fork_point`: `fork_point(a | b)..b` is `a..b`, even with several fork
-  points (S83).
-- **The merge is committed at once,** even with nothing to resolve.
-  Otherwise an empty merge stays the lane's working copy, which every snapshot
-  rewrites. A mutation shows `repo.test.ts` fails without it.
-- **Conflicts** are read with `conflictedFilesAt`, and a conflicted file's
-  content with `jj file show`: the host cannot read a lane's disk.
-- **A file both sides hold alike is merged as it is** (`heldAlike`): jj
-  keeps a conflict when the merge's base is itself conflicted, as when a
-  branch cloned at a conflicted catch-up and its parent resolved it alike
-  (S99). `mergeUpdate` restores such files from the side merged in into the
-  merge (`jj restore --into`, the bookmark following), then reads the
-  conflicts again. With a clean base jj already takes them.
-- **A clean update's changed files come from `changedPaths`**, the turn's
-  read.
+  offer for a refresh (`apps/pinetrie/host/jj/offers/`).
 
 ## Tests
 
-- **`plan.test.ts`**: the planners. Your repo's are `@pinetrie/repo`'s.
+- **`plan.test.ts`**: the planners. jj's are `@pinetrie/jj`'s.
+- **`boundary.test.ts`**: the package names jj as a command nowhere but its
+  image check, and exports none of jj's names.
+- **`history-port.test.ts`**: the brands, by type: a merge takes only a
+  `ReadyCopy`, `planFork` only a `ForkSetup`, `refreshBase` only a
+  `BaseCheckout`.
 - **`lane.test.ts`**: the queue, and that each file a lane is pointed at
   inside pine·trie's mount (`HELPER`, `LANE_NOTE`) exists in the install.
 - **`runtime.test.ts`**: `runtimeComplete`, and that `EXTRACT` copies every
   program in `RUNTIME_PROGRAMS`.
-- **`lanes.test.ts`**: the executor, the trailers' round trip, and
-  `changedPaths` against git. A lane's whole life against jj and git, in
-  throwaway repos, is `packages/repo/repo.test.ts`: every such test fetches
-  into your repo, so it needs `@pinetrie/repo`, which this package may not
-  import.
+- **`lanes.test.ts`**: the executor, the helper's command, config files
+  and the handle. A lane's whole life against jj and git, in throwaway
+  repos, is `packages/jj/repo.test.ts`, and the port suite against jj is
+  `packages/jj/lane/history.test.ts`.
 - **`e2e:lanes`** (`apps/pinetrie/e2e/lanes.ts`): the same in real containers,
   with a repo in a fork's `/tmp` for the config's scope, an agent's own
   `jj commit` reaching its offer and a branch, and the contract
@@ -616,7 +439,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   reports SKIP with the host's own reason (`runtimeProblem`).
   Its hosts pass their own `userConfig`, so the person's own lane config
   never applies. Each
-  suite-level mutation in `scripts/mutations/lanes.ts`, `repo.ts` and
+  suite-level mutation in `scripts/mutations/lanes.ts`, `jj.ts` and
   `docker.ts`, among others, runs only the scenario its check is in, and
   stops at that check. Each on `plan.ts` proves a fact about a real lane
   that a unit test cannot: `sync`, a

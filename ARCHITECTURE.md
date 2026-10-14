@@ -38,7 +38,8 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `protocol` | the wire contract |
 | `rules` | each stored shape and the pure rules about it |
 | `reads` | document reads shared by host and client |
-| `lanes` | what a lane is and what runs in it: its container's shape, mounts, grants, jj and git, forks, turns and bundles; it defines the `LaneRuntime` port and implements no runtime |
+| `lanes` | what a lane is and what runs in it: its container's shape, mounts, grants, disks, forks and snapshots; it defines the `LaneRuntime` port and a kind of project's ports (`LaneHistory`), implements neither, and runs no jj |
+| `jj` | jj's adapter: your repo as the host reads and writes it (its one owner, offers, accepted work and lanes' refs in it), each lane's own repo as a `LaneHistory`, your repo at startup, and every jj name |
 | `docker` | running lanes on Docker: the `LaneRuntime` over the docker CLI, btrfs disks in a helper container, Docker's startup refusals, lanes inside a lane |
 | `vm` | a Linux machine on the Mac: the image's build, the launcher, a host's lease on a slot; it knows nothing of lanes |
 | `session` | one client's connection to a host, its own documents and what it has in flight |

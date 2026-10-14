@@ -247,7 +247,7 @@ export type UpdateRefusal =
 export function planUpdateFrom(input: {
   /** The lane's base, from its own history; null for a lane with none, on accepted work. */
   readonly base: LaneBase | null
-  /** `wipState` of a WIP base (`@pinetrie/repo`); "ok" for accepted work. */
+  /** `wipState` of a WIP base (`@pinetrie/jj`); "ok" for accepted work. */
   readonly state: BaseRecord["state"]
   /** "continue on accepted work": the thread moves to accepted work, whatever its base. */
   readonly toAccepted: boolean

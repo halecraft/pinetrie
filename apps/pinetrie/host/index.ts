@@ -24,6 +24,7 @@ import {
   type ThreadId,
   threadEnd,
 } from "@pinetrie/core"
+import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
 import {
   configJson,
@@ -130,6 +131,7 @@ import { createMoveHistories } from "./move-history.ts"
 import { createNames } from "./names.ts"
 import { createPinned } from "./pinned.ts"
 import { hostPolicy, resolveDoc, SCHEMA_OF } from "./policy.ts"
+import { projectAdapter } from "./project.ts"
 import { createProvenance } from "./provenance.ts"
 import {
   chatOfPoppedQueuedCard,
@@ -289,9 +291,17 @@ export async function startHost({
   // The host's ssh socket's directory, named before the runtime is found:
   // the Mac's lease names the socket, which listens once lane work starts.
   const sshDir = await prepareSshDir()
+  const projectDir = toolsIn === null ? null : await prepareProjectDir(toolsIn)
+  // Chosen once, by the project's kind: a folder lanes cannot serve is
+  // refused before any runtime is asked.
+  const chosen = projectDir === null ? null : projectAdapter(projectDir)
+  if (chosen !== null && "refused" in chosen) {
+    await rm(sshDir, { recursive: true, force: true })
+    throw new HostRefused(chosen.refused)
+  }
   const found = await findProject({
     hostSocket: hostSocketIn(sshDir),
-    dir: toolsIn,
+    root: chosen?.root ?? null,
     // A port of 0 is chosen when the host listens, after this.
     ownPort: port === 0 ? null : port,
     machine: decodeLaneConfig(userJson, toolsIn ?? "/").machine,
@@ -506,6 +516,7 @@ export async function startHost({
   const work = await startLaneWork({
     basics,
     found,
+    adapter: chosen?.adapter ?? null,
     userConfig: { file: userConfig, json: userJson },
     sshDir,
     personalSsh: ssh,
@@ -765,7 +776,7 @@ export async function startHost({
     tools: toolsIn !== null,
     serverTransport,
     blobs,
-    repo: work.repo,
+    destination: work.destination,
     log,
   })
 
@@ -778,7 +789,7 @@ export async function startHost({
           return
         case "close":
           keeper.close()
-          work.repo?.owner.close()
+          work.destination?.close()
           return
         case "quiet":
           // Queued steps, a compaction among them, finish their writes.

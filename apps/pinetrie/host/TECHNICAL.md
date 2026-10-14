@@ -40,8 +40,9 @@ wires them.
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47) |
-| `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034) |
-| `offers/` | each lane's offer in your repo (ADR-0105), on the owner of your repo (§ Offers), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands are `work/accepted.ts`'s |
+| `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034), through the project's adapter, whose kind it never names (ADR-0142) |
+| `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default); a folder is refused (`folderRefusal`), before any runtime is asked |
+| `jj/` | jj's adapter (`startJjProject`, § jj's adapter): each lane's offer in your repo (ADR-0105), on the owner of your repo (§ Offers), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands (`jj/accepted.ts`); each lane's fetch into your repo (`jj/fetch.ts`); splits (`jj/split.ts`) |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
 | `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the user config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024) |
@@ -329,17 +330,19 @@ any refresh they queued.
   user config is read with `readConfigFile` (`@pinetrie/lanes`): missing or
   broken, its decoders get null and decode it as empty, as ADR-0071 says.
 - **The project folder is prepared before `startHost`** (`server.ts`):
-  `prepareProjectDir` (`@pinetrie/lanes`) finds its root and adds `/.pinetrie/`
-  to its repo's exclude file, so the store, opened first in `startHost`, is
-  never taken into your `@` (S108). A suite skips this: it gives its own
-  store, and `findProject` runs `prepareProjectDir` again for lanes, which
-  writes nothing the second time.
+  `prepareProjectDir` (`@pinetrie/jj`) finds its root and its kind, and adds
+  `/.pinetrie/` to a jj or git repo's exclude file, so the store, opened
+  first in `startHost`, is never taken into your `@` (S108). A suite skips
+  this: it gives its own store, and `startHost` runs `prepareProjectDir`
+  again with tools on, which writes nothing the second time, and hands the
+  `ProjectDir` to `findProject` and to the adapter's choice
+  (`project.ts`).
 - **The project is apart from tools** (`StartHostOptions.project`). pi's
   settings and `AGENTS.md` load from it with tools off too, on any folder;
   lane work starts only with tools on. `startSetup` returns a whole `Setup`
   (project, runtime, your repo's owner, the lanes' configs, `ready`) or,
   without tools, null, and lane work is then `NO_LANES`: it records each
-  lane and its name, and its `repo` (`YourRepo`: the owner, accepted work
+  lane and its name, and its `destination` (`Destination`: accepted work
   and the offers, all or none) is null. Nothing
   asks a lane's access then.
 - **Commands are taken only after `recover`.** `Control.listen` is made
@@ -374,10 +377,11 @@ any refresh they queued.
 - **The runtime is Docker** (`work/runtime.ts`, ADR-0130): the lane VM's on
   the Mac and the host's own on Linux (`planRuntime`).
   - **A host with tools that cannot run lanes does not start** (ADR-0102):
-    `findProject` returns the refusal as a value, worded with its fix, and
-    `startHost` throws it as `HostRefused`; `server.ts` prints it and exits
-    1. The refusals: a folder with no jj repo (`planRoot`), and the
-    runtime's: no docker CLI or daemon, no buildx, a lanes directory not on
+    `projectAdapter` (`project.ts`) and `findProject` return the refusal as
+    a value, worded with its fix, and `startHost` throws it as
+    `HostRefused`; `server.ts` prints it and exits 1. The refusals: a folder
+    with no jj repo (`folderRefusal`, asked first, before any runtime), and
+    the runtime's: no docker CLI or daemon, no buildx, a lanes directory not on
     btrfs with `user_subvol_rm_allowed` (Linux), and on the Mac the VM's
     (no image, no Xcode tools, not Apple silicon or older than macOS 13, a
     full VM). Without tools a host starts on any folder.
@@ -944,24 +948,29 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 ## Lane work (`work/`)
 
-`work/index.ts` builds each piece in order and returns `LaneWork`:
+`work/index.ts` builds each piece in order, with the project's adapter
+(`adapter.ts`), and returns `LaneWork`. No file under `work/`, tests
+included, imports `@pinetrie/jj` or `../jj/` (`work/boundary.test.ts`):
+accepted work is reached through `Destination` (`destination.ts`), and a
+lane's history through `LaneHistory` (`@pinetrie/lanes`), both the
+adapter's.
 
 | module | owns |
 |---|---|
-| `setup.ts` | `Setup`, all of it or none: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once accepted work's names are read, before anything else reads your repo), the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, ADR-0036), and the base snapshot's refreshes. The project is found before it (`findProject`), since pi's setup loads from its root |
-| `config.ts` | `pinetrie.json`'s `lanes` as a fact of a state (ADR-0135): accepted work's copy read from its commit at startup and when the base moves (`readAccepted`), its shared directories prepared again, and put in force (`takeAccepted`) once what it names is shared; a lane's own copy and the copy it started on, read from your repo before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook). A lane with no commit in your repo yet runs with accepted work's |
+| `adapter.ts` | `ProjectAdapter`: opened by setup where it reads your repo's names, before anything else reads the project (`OpenProject`: `fileAt`, `prepareShared`, `identity`, `acceptedNow`, `baseSteps`), then started once lane work has its registry (`StartedProject`: the `Destination`, each lane's `history`, and `Splits`). The registry and the containers it is started with are bound late: neither is asked for before startup ends |
+| `destination.ts` | `Destination`: accepted work and offers as any kind has them: a file at a point (`fileAt`), where a new lane begins (`begin`), what a catch-up's base is now (`baseNow`), an archive's lanes moved (`lanesMoved`), the offers' acts (`OfferActs`), setup and publish (`AcceptedActs`), `quiet` and `close` |
+| `setup.ts` | `Setup`, all of it or none: the project, opened through its adapter (`Setup.opened`, once your config's and `pinetrie.json`'s names are read, before anything else reads the project), lane configs and shared directories, the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, ADR-0036), and the base snapshot's refreshes. The project is found before it (`findProject`), since pi's setup loads from its root |
+| `config.ts` | `pinetrie.json`'s `lanes` as a fact of a state (ADR-0135): accepted work's copy read at accepted work (`Destination.fileAt`) at startup and when the base moves (`readAccepted`), its shared directories prepared again, and put in force (`takeAccepted`) once what it names is shared; a lane's own copy and the copy it started on, read at its tip and its start before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook). A lane with no commit in your repo yet runs with accepted work's |
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
 | `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
-| `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
-| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, `planOldNamesOnDisk`, `pre-rename:`, since a snapshot made before the rename holds the old names (S114); every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
-| `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
-| `turns.ts` | pi's `turnDone`: the turn's revision, its classes and snapshot (`disk.ts`), its whole-disk diff, and its fetch; the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
+| `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history and the handle |
+| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
+| `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`), its fork (`forkFacts` waits for `pendingRecords`) |
-| `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks jj for conflicts in the lane's copy |
-| `split.ts` | a split's prompt, and its end (`finishSplit`, which moves the lane back to its tip even when a step before it throws: left on the stack, the lane refuses every catch-up) |
-| `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
+| `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`, which fires the merge's `follow` after `recordUpdate`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
+| `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper; its lanes' history moved in the destination (`lanesMoved`) |
 | `shares.ts` | what lanes may mount and reach, shared into the lane VM's slots and granted: the decision (`planShareAndGrant`) and, on the Mac, its state behind one queue (`createShares`: a share, a new lease's reset, the extra slots' close) |
-| `runtime.ts` | the composition root, the one place that picks the runtime: gathers, plans (`planRuntime`, `planBuilder` for `pnpm vm:build`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
+| `runtime.ts` | the one place that picks the runtime, from the project as startup found it (`ProjectDir`): gathers, plans (`planRuntime`, `planBuilder` for `pnpm vm:build`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
 | `ssh.ts` | lanes' ssh (ADR-0140): what the host reads of the person's and the service folder's ssh files, the lanes' files, the service agent and the host's socket (`@pinetrie/ssh`), what each lane is given (`attachedFor`, `holdsFor`), and the owner's answers, which it follows in `pinetrie.access` |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed
@@ -973,16 +982,17 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   adds. A second instance would have its own set, and the fork would wait
   on the empty one.
 - **The queues a lane's work crosses:** its own `LaneQueue` (the start, a
-  fork, each turn's commit and snapshot, the bundle, the stop and trim); the
-  owner of your repo, for the import (a command, queued as the bundle is
+  fork, each turn's commit and snapshot, the bundle, the stop and trim),
+  every step that reaches the lane's history through `withHistory`; the
+  owner of your repo, for jj's import (a command, queued as the bundle is
   made, so a lane's imports keep their order: the fetch forces its ref, and
   an older bundle imported after a newer one would move it back); and the
-  base snapshot's keeper. Every read of your repo from lane work (an
-  update's line and WIP, a new lane's begin, the base
-  snapshot's line, a split's stack) is a pinned read (`owner.read`), which
-  writes nothing (S87) and waits on no queue. A fetch's bundle needs the
-  lane running, about 30 ms (S43), so a container stopped since is started
-  for it, then stopped.
+  base snapshot's keeper. Every read of the destination from lane work (an
+  update's base now, a new lane's begin, the base snapshot's accepted
+  work, a file at a point) is, in jj's adapter, a pinned read
+  (`owner.read`), which writes nothing (S87) and waits on no queue. A
+  fetch's bundle needs the lane running, about 30 ms (S43), so a container
+  stopped since is started for it, then stopped.
 - **A turn's end is one queued step** (`turns.ts`, `disk.ts`). The commit
   is queued and awaited; the rest is one step, not awaited, so the next
   tool call waits for all of it and the next request for none:
@@ -1006,7 +1016,10 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
      step because a lane's container stops after its run, and the check
      runs in the lane.
   The record is written after it. A fork waits for pending records, so a
-  branch at a turn waits for its classes and diff.
+  branch at a turn waits for its classes and diff. What follows the turn's
+  commit (`TurnMade.follow`, for jj its fetch into your repo) is fired once
+  this step is queued (`queueTurnEnd`), so its work runs behind the
+  snapshot, never before it.
 - **Every run starts on a disk whose recipes hold** (`disk.ts`,
   `removeStaleOutputs`, ADR-0135): at every container start
   (`startContainer`), so no way of making a disk need remember it; and
@@ -1017,8 +1030,10 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   failure is reported and the step goes on: a stale output is a rebuild
   the agent misses, not a broken lane.
 - **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
-  the lane's base from its own history, accepted work and the WIP from your
-  repo (pinned), `planUpdateFrom`, the edits committed and `mergeUpdate`
+  the copy found ready (`readyToMerge`, whose `ReadyCopy` alone `merge`
+  takes), the lane's base from its own history, accepted work and the WIP
+  from the destination (`baseNow`), `planUpdateFrom`, then `merge`: the
+  edits committed and, for jj, `mergeUpdate`
   (which first joins each accepted-offer commit the lane holds to its source, ADR-0079), so nothing
   changes the lane between what is read and what is merged. Before the
   merge, `planCatchUp` settles the floor a resolution's prompt must fit
@@ -1027,11 +1042,12 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   with the lane untouched, since a merge left without a prompt is one no
   later catch-up merges again (S106). Then
   `planSettle`, pure, decides what the thread gets, the land message
-  included, and `applySettle` writes it. `Settle.fetch` alone decides
-  what is fetched: a clean merge, and a move to accepted work with nothing to
-  merge, whose mark your repo would otherwise learn of only at a later
-  fetch. Its list is `fetchLane`'s `have`: commits your repo may hold,
-  which the bundle leaves out.
+  included, and `applySettle` writes it, then fires what follows the merge
+  (`MergeDone.follow`): the adapter's own, which lane work never reads. For
+  jj, `planFetch` decides what is fetched: a clean merge, and a move to
+  accepted work with nothing to merge, whose mark your repo would otherwise
+  learn of only at a later fetch (`packages/jj/TECHNICAL.md`, A lane's
+  repo).
 - **A catch-up with the thread a thread branched from** (ADR-0072) is the
   same step: the card's command picks the rule. Its facts come from the
   lane's root document, not your repo (`parentNow`, with whether the
@@ -1085,10 +1101,26 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   folder and agent, and the harness gives every suite host an empty one
   and none (`suiteSshPlaces`).
 
-## Offers (`offers/`)
+## jj's adapter (`jj/`)
 
-- **Every offer step runs on the owner of your repo** (`@pinetrie/repo`,
-  `packages/repo/TECHNICAL.md`, ADR-0065), since a take once waited behind
+- **`startJjProject` takes a jj project alone** (`JjProjectDir`,
+  `Extract<ProjectDir, { kind: "jj" }>`, `project.test.ts`). Opened, it
+  decides your repo's names (`repoConfig`), starts the owner of your repo,
+  renames accepted work's old bookmark (`pre-accepted:`), and reads files at
+  a point (`fileAt`, `@pinetrie/jj`). Started, it makes accepted work
+  (`jj/accepted.ts`), the offers (`jj/offers/`), the fetches (`jj/fetch.ts`)
+  and the splits (`jj/split.ts`), and each lane's history (`historyOf`),
+  whose `follow` is the lane's fetch into your repo.
+- **A lane's fetch reaches the lane through `withHistory`** (`jj/fetch.ts`),
+  as anything on a lane's history does, and its import is the owner's.
+- **A split's prompt, and its end** (`jj/split.ts`, `finishSplit`, which
+  moves the lane back to its tip even when a step before it throws: left on
+  the stack, the lane refuses every catch-up).
+
+## Offers (`jj/offers/`)
+
+- **Every offer step runs on the owner of your repo** (`@pinetrie/jj`,
+  `packages/jj/TECHNICAL.md`, ADR-0065), since a take once waited behind
   every refresh queued before it (S89). An offer action, a `line`
   command, a split's span and its end, and moving lanes' refs are owner
   commands; a refresh is upkeep, `later("refresh:<lane>")`, and accepted work's
@@ -1123,16 +1155,16 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   repo run at the head the owner last observed (`owner.read`). An offer
   acceptance gathers in its own command, unpinned, so it acts on the repo as it is.
 - **The host decides nothing and runs no jj on an offer.** Each step is a
-  gather (`@pinetrie/repo`: `gatherRefresh`, `gatherOffer`, `gatherOfferAcceptance`,
+  gather (`@pinetrie/jj`: `gatherRefresh`, `gatherOffer`, `gatherOfferAcceptance`,
   `gatherStack`, `gatherDescribe`), a decision (`@pinetrie/rules`: `planRefresh`,
   `planOfferAcceptance`, `planRebuild`, `planStackEnded`, `planDescribeSettle`),
-  a translation into steps (`@pinetrie/repo`: `offerEffects`, `offerAcceptanceEffects`,
+  a translation into steps (`@pinetrie/jj`: `offerEffects`, `offerAcceptanceEffects`,
   `rebuildEffects`, `describeEffects`), and `executeOffer` (`execute.ts`),
   which carries out every action over ports: the lane's base record first,
   when it differs from the page's, then the steps, then what comes after
   (`OfferEffects.after`). So the rules are tested as values in the two
   packages, what the host writes is tested over `record<T>()`, and
-  `packages/repo/repo.test.ts` proves the reads and steps against real jj.
+  `packages/jj/repo.test.ts` proves the reads and steps against real jj.
 - **What only the documents know is read here, first** (`state.ts`,
   `OfferDocs`): the thread's name, whether its root is archived (from its
   board place, `readArchived`, never from the lane's tip being missing: a tip missing
@@ -1175,10 +1207,10 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   at or below the offer's bottom's parent, read in the same command
   (`gatherOfferAcceptance`). jj's
   refusal of a backwards move is the second guard (S77 item 1).
-- **Setup and publish** (`work/accepted.ts`, created by `startLaneWork` beside
+- **Setup and publish** (`jj/accepted.ts`, created by the adapter's start beside
   the offers, which rewrite its record when the owner observes accepted work or
   your `@` move): decided by `@pinetrie/rules` (`planAcceptedAction`), its steps
-  `@pinetrie/repo`'s. `setup` creates accepted work's bookmark at your `@-` and
+  `@pinetrie/jj`'s. `setup` creates accepted work's bookmark at your `@-` and
   writes `immutable_heads()` and `revsets.log` to the repo's config, the
   text the publish button's setup showed (`planSetup`). A publish
   (ADR-0076, ADR-0090) is two rounds of gather, plan and execute in one command: the
@@ -1192,12 +1224,12 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   step's `git`). Setup and publish are anyone's, on any host: what a
   publish does is `publish.catchUp` (`RepoConfig`, carried on the record),
   never the bind or the invite key (ADR-0099).
-- **The base snapshot follows accepted work** (`work/index.ts`): the owner's
-  `Moved.onto` refreshes it (`refreshBaseSoon`), so setup, an accept, an
+- **The base snapshot follows accepted work** (`jj/index.ts`): the owner's
+  `Moved.onto` refreshes it (`acceptedMoved`, then `refreshBaseSoon`), so setup, an accept, an
   accepting publish and a move made in jj outside pine·trie all reach it
   by one path. An acceptance into a WIP does not, since the snapshot is
   accepted work's.
-- **Shutdown closes the owner** (`LaneWork.repo.owner`, the `close` step): it
+- **Shutdown closes the owner** (`LaneWork.destination.close`, the `close` step): it
   refuses every step from then on and stops its watch; `quiet` waits for
   what it holds (`LaneWork.quiet`).
 

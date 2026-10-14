@@ -1,16 +1,17 @@
 // host/work/registry — each lane's handle while the host may run it: its
-// queue, and its channel once open. Only this module touches the handles.
+// queue, and its channel once open; and each lane's history, reached only on
+// its queue (`withHistory`). Only this module touches the handles.
 
 import type { LaneRecord, ThreadId } from "@pinetrie/core"
 import {
   helperCommand,
   type LaneHandle,
+  type LaneHistory,
+  type LaneRunners,
   type LaneRuntime,
   laneContainer,
   laneHandle,
-  laneJj,
   type OpenLink,
-  type Runner,
 } from "@pinetrie/lanes"
 import {
   type LaneChannel,
@@ -64,8 +65,18 @@ export const openLinkOf =
 
 export interface LaneRegistry {
   handleOf(lane: ThreadId): LaneHandle<LaneChannel>
-  /** The lane's own jj, through its channel. */
-  laneJjOf(lane: ThreadId): Runner
+  /**
+   * `f`, queued on the lane's queue after everything before it, with the
+   * lane's history and its handle: the one way to the history, so nothing
+   * changes it off the queue. With `fatal`, a failure breaks the queue
+   * (`LaneQueue.enqueue`). Never called from a step already on the queue,
+   * which would wait on itself: such a step is handed the history.
+   */
+  withHistory<T>(
+    lane: ThreadId,
+    f: (h: LaneHistory, handle: LaneHandle<LaneChannel>) => Promise<T>,
+    options?: { readonly fatal?: boolean },
+  ): Promise<T>
   recordOf(lane: ThreadId): LaneRecord | undefined
   /** A lane that has its own container here. */
   isOwn(lane: ThreadId): boolean
@@ -79,6 +90,8 @@ export function createRegistry(input: {
   readonly session: SessionDocHandle
   /** What lanes run on. */
   readonly runtime: LaneRuntime
+  /** The adapter's history of a lane, over its runners. */
+  readonly history: (lane: ThreadId, runners: LaneRunners) => LaneHistory
 }): LaneRegistry {
   const { runtime } = input
   const handles = new Map<ThreadId, LaneHandle<LaneChannel>>()
@@ -94,7 +107,13 @@ export function createRegistry(input: {
   }
   return {
     handleOf,
-    laneJjOf: lane => laneJj(handleOf(lane).runners.lane),
+    withHistory(lane, f, options) {
+      const handle = handleOf(lane)
+      return handle.queue.enqueue(
+        () => f(input.history(lane, handle.runners), handle),
+        options,
+      )
+    },
     recordOf,
     isOwn: lane => recordOf(lane)?.ownCopy === true,
     async forget(lane) {

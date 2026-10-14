@@ -122,7 +122,7 @@ packages/lanes/        @pinetrie/lanes        what a lane is and runs; the LaneR
 packages/docker/       @pinetrie/docker       lanes on Docker, on btrfs subvolumes (ADR-0130)
 packages/vm/           @pinetrie/vm           the Mac's lane VM: image, launcher, a host's lease on a slot (ADR-0130)
 packages/keeper/       @pinetrie/keeper       declares NOTHING; one step at a time on a resource
-packages/repo/         @pinetrie/repo         your repo: reads, steps, the owner (ADR-0038, 0060, 0065)
+packages/jj/         @pinetrie/jj         your repo: reads, steps, the owner (ADR-0038, 0060, 0065)
 packages/session/      @pinetrie/session      one client's connection to a host; no React
 packages/shell/        @pinetrie/shell        unbash only; shell source as structure (ADR-0114)
 packages/interface/    @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
@@ -152,8 +152,8 @@ it, and the ADR says why. Every decision in force is in `docs/adrs/`, and
 | Only `packages/pi` imports pi. | ADR-0003 | `AGENTS.md`, `packages/pi/TECHNICAL.md` |
 | The host is the only writer of the session's documents; clients send commands. A lane belongs to its thread, and is never moved. | ADR-0120, ADR-0023 | `ARCHITECTURE.md`, `packages/schema/TECHNICAL.md` |
 | Everything unsent is a card, and a card's place has one owner at a time: the host, or a person's inventory. | ADR-0048, ADR-0059 | `packages/schema/TECHNICAL.md` |
-| One owner writes your repo, and the host never touches the working copy or `@` except in a publish with `publish.catchUp` on, as you. An acceptance is a forward bookmark move. | ADR-0065, ADR-0104 | `docs/the-jujutsu-repo.md`, `packages/repo/TECHNICAL.md` |
-| What the host cannot tell, it does not act on: an unknown answer never builds an offer. | ADR-0067 | `packages/repo/TECHNICAL.md` |
+| One owner writes your repo, and the host never touches the working copy or `@` except in a publish with `publish.catchUp` on, as you. An acceptance is a forward bookmark move. | ADR-0065, ADR-0104 | `docs/the-jujutsu-repo.md`, `packages/jj/TECHNICAL.md` |
+| What the host cannot tell, it does not act on: an unknown answer never builds an offer. | ADR-0067 | `packages/jj/TECHNICAL.md` |
 | Every thread's agent works in a lane of its own; nothing works directly in a directory. | ADR-0102, ADR-0130 | `ARCHITECTURE.md`, `packages/lanes/TECHNICAL.md` |
 | What a person sees and does is decided in `@pinetrie/interface`, with no DOM and no React. | ADR-0093 | `packages/interface/TECHNICAL.md` |
 | One word per concept: accepted work, accept, offer, WIP, publish, catch up. | ADR-0100 | `docs/glossary.md` |

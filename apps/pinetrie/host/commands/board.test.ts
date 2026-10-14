@@ -48,7 +48,7 @@ function setUp() {
   putValue(b, setRecord(WORKFLOW, WORKFLOW_NOW))
   const records = record<BoardDeps["records"]>({ writeValues: async () => {} })
   const work = record<BoardDeps["work"]>({
-    repo: null,
+    destination: null,
     teardown: async () => {},
   })
   const moves = record<BoardDeps["moves"]>({

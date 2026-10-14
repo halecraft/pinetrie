@@ -7,7 +7,6 @@ import {
   type CardRecord,
   type CatchUpCommand,
   type CommitId,
-  type CopyFacts,
   commandOf,
   type MoveRefusal,
   makeCard,
@@ -102,27 +101,6 @@ export function planCatchUpCall(input: {
   return input.base.kind === "brings" || input.base.kind === "unknown"
     ? { kind: "merge", command: "bring-up-to-date" }
     : refused("nothing-new")
-}
-
-/**
- * Whether the lane's copy may take a merge: `@` on the thread's
- * own line, its one parent the lane's bookmark or the agent's own commit on
- * it (`planTurnCommit`'s rule). Otherwise the merge would land beside where
- * the agent works, as while a split's stack is the working copy. A repo
- * with no bookmark of the lane's has no line to be on, and is refused as
- * that, not as off it: a split is not the cause. Conflicts do not
- * refuse it: catching up is how a conflict the copy came with is settled.
- */
-export const planCopyReady = (
-  copy: CopyFacts,
-): "ready" | "off-line" | "no-bookmark" => {
-  if (copy.bookmark === null) return "no-bookmark"
-  const [parent, ...more] = copy.parents
-  return parent !== undefined &&
-    more.length === 0 &&
-    (parent === copy.bookmark || copy.descends)
-    ? "ready"
-    : "off-line"
 }
 
 /**

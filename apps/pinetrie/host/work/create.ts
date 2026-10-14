@@ -14,17 +14,16 @@ import {
 import type { Keeper } from "@pinetrie/keeper"
 import { executeOrThrow, planFork, removeLane } from "@pinetrie/lanes"
 import { type RootView, readRevisions, readTreeIndex } from "@pinetrie/reads"
-import { beginFacts, type RepoOwner } from "@pinetrie/repo"
 import {
   FILES_LOST,
   type ForkBegin,
   forkPoint,
   LANE,
-  planBegin,
   setRecord,
 } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
+import type { Destination } from "./destination.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
@@ -110,45 +109,34 @@ export function createNewLanes(deps: {
   readonly records: Pick<Records, "writeValues">
   readonly ensureNames: () => Promise<void>
   readonly pendingRecords: Turns["pendingRecords"]
+  readonly destination: Pick<Destination, "begin">
 }): NewLanes {
-  const { basics, setup, registry, keeper } = deps
-
-  const { repoConfig } = setup.lanes
-
-  /** Where agent work begins for `base`, read from your repo at the head its owner last observed. */
-  async function beginAt(owner: RepoOwner, base: string | null) {
-    return planBegin({
-      base,
-      wipPrefix: repoConfig.wipPrefix,
-      facts: await owner.read(({ jj }) => beginFacts(jj, repoConfig, base)),
-    })
-  }
+  const { basics, setup, registry, keeper, destination } = deps
 
   return {
     async checkBegin(view, at, base) {
-      const { owner } = setup
       const { doc } = view
       const above = nearestRevision(readTreeIndex(doc), readRevisions(doc), at)
       if (above.commit !== null) return null
-      const begin = await beginAt(owner, base)
+      const begin = await destination.begin(base)
       return typeof begin === "string" ? begin : null
     },
 
     async prepareLane(view, lane, at, by, base) {
       const { doc } = view
       await recordLane(deps, view, lane, true, by)
-      const { owner, runtime, ready } = setup
-      const handle = registry.handleOf(lane)
+      const { runtime, ready } = setup
       void keeper.track(
-        handle.queue
-          .enqueue(
-            async () => {
+        registry
+          .withHistory(
+            lane,
+            async (h, handle) => {
               const r = await ready
               const facts = await forkFacts({
                 pendingRecords: deps.pendingRecords,
                 nearest: () =>
                   nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
-                begin: () => beginAt(owner, base),
+                begin: () => destination.begin(base),
                 exists: id => runtime.snapshotExists(id),
               })
               if (typeof facts === "string")
@@ -166,6 +154,7 @@ export function createNewLanes(deps: {
                   point,
                   spec: setup.specOf(lane, r),
                   env: process.env,
+                  setup: h.forkSteps(point.start),
                 }),
                 handle.runners,
               )

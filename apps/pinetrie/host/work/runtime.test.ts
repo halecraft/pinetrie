@@ -76,18 +76,11 @@ describe.skipIf(process.platform === "darwin")(
     }
     const find = (dir: string) =>
       findProject({
-        dir,
+        root: dir,
         machine: { slots: null },
         hostSocket: path.join(dir, ".no-ssh.sock"),
         log: () => {},
       })
-    test("a folder with no jj repo, with how to make one", () =>
-      inRepo(["git", "init"], async dir => {
-        expect(await find(dir)).toEqual({
-          kind: "refused",
-          words: `${dir} has no jj repo: \`jj git init --colocate\` makes one, and gives its threads' agents their lanes`,
-        })
-      }))
     test("a Docker that does not answer, in the runtime's words", () =>
       inRepo(["jj", "git", "init", "--colocate"], async dir => {
         const saved = process.env.DOCKER_HOST
@@ -106,7 +99,7 @@ describe.skipIf(process.platform === "darwin")(
     test("no tools: nothing to find", async () => {
       expect(
         await findProject({
-          dir: null,
+          root: null,
           machine: { slots: null },
           hostSocket: "/no-ssh.sock",
           log: () => {},

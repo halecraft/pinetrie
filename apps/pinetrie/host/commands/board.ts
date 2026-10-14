@@ -60,7 +60,7 @@ export interface BoardDeps {
     "session" | "docs" | "live" | "places" | "now" | "newId"
   >
   readonly records: Pick<Records, "writeValues">
-  readonly work: Pick<LaneWork, "teardown" | "repo">
+  readonly work: Pick<LaneWork, "teardown" | "destination">
   readonly keeper: Pick<HostKeeper, "run" | "track">
   /** Which queued cards are blank: they leave a lane idle. */
   readonly cards: Pick<CardPort, "blankQueued">
@@ -174,7 +174,7 @@ async function planCrossing(
     trees.push(index)
     lanes.push(...readLanes({ doc, live }, index, cards, holds, blank))
     for (const [entry, r] of readRevisions(doc)) revisions.set(entry, r)
-    if (deps.work.repo !== null)
+    if (deps.work.destination !== null)
       for (const lane of threads) {
         const r = records.get(lane)
         if (r?.root === root && r.ownCopy)

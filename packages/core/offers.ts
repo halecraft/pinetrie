@@ -1,5 +1,5 @@
 // core/offers — an offer and accepted work in your repo: the facts
-// `@pinetrie/repo` reads, and the decisions it carries out, which
+// `@pinetrie/jj` reads, and the decisions it carries out, which
 // `@pinetrie/rules` returns from those facts.
 
 import type {
@@ -15,7 +15,7 @@ import type {
 
 /**
  * What a revision's evolog says since the host's newest version of it
- * (`readOffer` in `@pinetrie/repo` reads it, `revisionEdited` in
+ * (`readOffer` in `@pinetrie/jj` reads it, `revisionEdited` in
  * `@pinetrie/rules` decides from it): whether the walk back reached a version
  * the host made, and whether a version an operation not the host's made on the
  * way changed it. Read from the repo, never from a record the host kept, which
@@ -53,7 +53,7 @@ export interface OfferSeen {
 }
 
 /**
- * An offer as your repo holds it now (`readOffer` in `@pinetrie/repo`): all
+ * An offer as your repo holds it now (`readOffer` in `@pinetrie/jj`): all
  * the host decides an offer from. Facts only; what they mean is decided in
  * `@pinetrie/rules` (`planRefresh`, `offerEdited`, `offerMoved`) and
  * `isWipLine` (`trailers.ts`). A divergent offer is only its change ids: the repair needs
@@ -131,7 +131,7 @@ export const changesOf = (offer: OfferInRepo): readonly string[] =>
 /** An offer as your repo holds it, not divergent. */
 export type OfferNow = Extract<OfferInRepo, { readonly kind: "offer" }>
 
-// ── where an offer sits (the gathers in `@pinetrie/repo`) ───────────────────
+// ── where an offer sits (the gathers in `@pinetrie/jj`) ───────────────────
 
 /** A place an offer can be built on: a target, and a known start. */
 export interface Placed {
@@ -139,7 +139,7 @@ export interface Placed {
   /** The lane's tip in your repo. */
   readonly tip: CommitId
   readonly base: LaneBase
-  /** A WIP base's state (`wipState`, `@pinetrie/repo`); "ok" for accepted work. */
+  /** A WIP base's state (`wipState`, `@pinetrie/jj`); "ok" for accepted work. */
   readonly state: "ok" | "landed"
   /** Where the offer sits: accepted work's commit, or the WIP bookmark's. */
   readonly target: CommitId
@@ -215,7 +215,7 @@ export interface StackFacts {
   readonly differing: readonly string[]
 }
 
-// ── what `@pinetrie/rules` decides, and `@pinetrie/repo` carries out ──────────
+// ── what `@pinetrie/rules` decides, and `@pinetrie/jj` carries out ──────────
 
 /**
  * An offer built anew at `place` from `sources`, after abandoning `changes`:
@@ -291,7 +291,7 @@ export interface DescribeDecision {
 
 /**
  * What the host reads of accepted work, each time it looks (`acceptedFacts` in
- * `@pinetrie/repo`): its commit, the WIPs above it and your work against it,
+ * `@pinetrie/jj`): its commit, the WIPs above it and your work against it,
  * as its record holds them, and your repo's `immutable_heads()` and
  * `revsets.log` as jj resolves them (null for jj's own).
  */

@@ -1,7 +1,7 @@
 # ADR-0067 — What the host cannot tell, it does not act on
 
 - **Status:** Accepted
-- **Area:** `packages/rules/TECHNICAL.md`, `packages/repo/TECHNICAL.md`
+- **Area:** `packages/rules/TECHNICAL.md`, `packages/jj/TECHNICAL.md`
 - **Evidence:** S89, S97
 - **Amends:**
   - ADR-0038: an offer is built only from work known to change a file, from a

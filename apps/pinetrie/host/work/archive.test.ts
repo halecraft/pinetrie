@@ -26,7 +26,7 @@ test("a lane whose removal fails leaves the other lanes removed and the snapshot
   const b = basics()
   await createArchive({
     basics: b,
-    offers: null,
+    destination: null,
     runtime,
     registry,
     keeper,

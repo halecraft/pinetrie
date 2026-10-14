@@ -16,7 +16,6 @@ import {
   type Floor,
   type ParentNow,
   planCatchUpCall,
-  planCopyReady,
   planResolution,
   planSplitCall,
   resolutionFloor,
@@ -115,38 +114,6 @@ describe("planCatchUpCall", () => {
     expect(catchUpRefusal({ reason: "set up accepted work first" })).toBe(
       "Not caught up: set up accepted work first.",
     )
-  })
-})
-
-describe("planCopyReady", () => {
-  test.each([
-    [
-      "on the bookmark",
-      { parents: [B], bookmark: B, descends: false },
-      "ready",
-    ],
-    [
-      "on the agent's own commit on it",
-      { parents: [C], bookmark: B, descends: true },
-      "ready",
-    ],
-    [
-      "on another line: a split's stack",
-      { parents: [C], bookmark: B, descends: false },
-      "off-line",
-    ],
-    [
-      "on two parents",
-      { parents: [B, C], bookmark: B, descends: false },
-      "off-line",
-    ],
-    [
-      "with no bookmark: refused as that, not as off accepted work",
-      { parents: [B], bookmark: null, descends: false },
-      "no-bookmark",
-    ],
-  ] as const)("%s", (_, copy, ready) => {
-    expect(planCopyReady(copy)).toBe(ready)
   })
 })
 

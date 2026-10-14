@@ -1,7 +1,7 @@
 # ADR-0105 — A thread's work reaches your repo as an offer: one commit, or a stack, on its base, that you review and accept
 
 - **Status:** Accepted
-- **Area:** `docs/the-jujutsu-repo.md`, `packages/repo/TECHNICAL.md`
+- **Area:** `docs/the-jujutsu-repo.md`, `packages/jj/TECHNICAL.md`
 - **Evidence:** S48, S49, S51, S57, S72, S73, S87, S89, S97, S103, S104
 - **Supersedes:**
   - ADR-0038: restated whole, with ADR-0039, ADR-0040, ADR-0047, ADR-0055,

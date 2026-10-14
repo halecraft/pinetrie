@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Area:** `docs/01-architecture.md`, `docs/glossary.md`,
-  `packages/lanes/TECHNICAL.md`, `packages/repo/TECHNICAL.md`,
+  `packages/lanes/TECHNICAL.md`, `packages/jj/TECHNICAL.md`,
   `apps/pinetrie/host/TECHNICAL.md`
 - **Evidence:** S149, S150, S155, S159, S160, S162, S169, S180, S181, S182,
   S183, S184, S185, S186

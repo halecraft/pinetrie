@@ -60,7 +60,7 @@ export async function runtimeProblem(): Promise<string | null> {
   const dir = committedProject("pinetrie-runtime-", { "README.md": "probe\n" })
   try {
     const found = await findProject({
-      dir,
+      root: dir,
       machine: { slots: null },
       // Nothing listens there: this probe makes no lane.
       hostSocket: path.join(dir, ".no-ssh.sock"),

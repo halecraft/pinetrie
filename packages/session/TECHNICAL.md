@@ -13,10 +13,10 @@ value specific to one of the two is the `WebSocket` constructor, which the
 caller passes.
 
 Where a rule lives, as `packages/rules/TECHNICAL.md` and
-`packages/repo/TECHNICAL.md` state it too:
+`packages/jj/TECHNICAL.md` state it too:
 
 > Core holds the vocabulary (ids, intents, every record's type) and the
-> reads of the tree. A format or type that `lanes` or `repo` must read,
+> reads of the tree. A format or type that `lanes` or `jj` must read,
 > write or name lives in core too, since neither can declare
 > `@pinetrie/rules`. What a stored shape says, and how the host changes it,
 > is `@pinetrie/rules`', whoever reads it. One client's own in-flight state

@@ -7,8 +7,8 @@ loads it in the browser (`paths.ts` compares paths as strings for that
 reason). Everything here is a *plan* in gather, plan, execute: a decision is
 a value, and the host performs it, as pi's own lane loop does.
 
-The rule core, `@pinetrie/rules` and `@pinetrie/repo` keep: a format or type
-that `lanes` or `repo` must read, write or name lives in core, since neither
+The rule core, `@pinetrie/rules` and `@pinetrie/jj` keep: a format or type
+that `lanes` or `jj` must read, write or name lives in core, since neither
 can declare `@pinetrie/rules`. What a stored shape says, and how the host
 changes it, is `@pinetrie/rules`', whoever reads it. Core also holds the few
 pure helpers several packages share (`paths.ts`, `errorText`), since every

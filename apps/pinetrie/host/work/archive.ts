@@ -1,16 +1,15 @@
 // host/work/archive — what an archive or a restore does to its lanes, off the
 // documents' keeper: carries out `planArchive`'s teardown, deciding nothing.
 // Lanes forgotten and their containers and disks removed, a lane whose
-// removal fails reported and passed; their refs in your
-// repo moved by an owner command, which marks each lane's offer (withdrawn, or
-// built again); the snapshots no one will branch from deleted in the
-// background.
+// removal fails reported and passed; their history in the destination moved
+// (`lanesMoved`), which follows each lane's offer (withdrawn, or built
+// again); the snapshots no one will branch from deleted in the background.
 
 import type { Keeper } from "@pinetrie/keeper"
 import { type LaneRuntime, removeLane } from "@pinetrie/lanes"
 import type { ArchiveTeardown } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
-import type { Offers } from "../offers/index.ts"
+import type { Destination } from "./destination.ts"
 import type { LaneRegistry } from "./registry.ts"
 
 export interface Archive {
@@ -20,15 +19,15 @@ export interface Archive {
 
 export function createArchive(deps: {
   readonly basics: Basics
-  /** Your repo's offers when lanes have their own copies, else null. */
-  readonly offers: Pick<Offers, "moveLanes"> | null
+  /** Where lanes' work goes when lanes have their own copies, else null. */
+  readonly destination: Pick<Destination, "lanesMoved"> | null
   /** What lanes run on. */
   readonly runtime: LaneRuntime
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
 }): Archive {
-  const { basics, offers, runtime, registry, keeper } = deps
+  const { basics, destination, runtime, registry, keeper } = deps
   return {
     async teardown({ forget, refs, snapshots }) {
       // One lane's disk that will not go is waste; a teardown stopped there
@@ -39,9 +38,9 @@ export function createArchive(deps: {
           failed(basics, "removing an archived lane", lane),
         )
       }
-      if (offers !== null && refs.length > 0)
-        await offers
-          .moveLanes(refs)
+      if (destination !== null && refs.length > 0)
+        await destination
+          .lanesMoved(refs)
           .catch(failed(basics, "moving archived or restored lanes' history"))
       if (snapshots.length > 0)
         void keeper.track(

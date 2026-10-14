@@ -4,19 +4,14 @@ import {
   commitId,
   entryId,
   NOBODY,
+  planCopyReady,
   revisionMessage,
   type ThreadName,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import {
-  createQueue,
-  DEFAULT_REPO,
-  decodeLaneConfig,
-  planMerge,
-} from "@pinetrie/lanes"
+import { createQueue, type LaneHistory } from "@pinetrie/lanes"
 import { readTreeIndex } from "@pinetrie/reads"
-import type { RepoOwner } from "@pinetrie/repo"
 import {
   ACCEPTED as ACCEPTED_RECORD,
   BASE,
@@ -30,6 +25,7 @@ import {
 import { newRootDoc, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { basics, putLane, putValue, record, row } from "../fakes.ts"
+import type { LaneRegistry } from "./registry.ts"
 import type { Ready } from "./setup.ts"
 import {
   applySettle,
@@ -42,10 +38,22 @@ import {
   withLaneStarted,
 } from "./update.ts"
 
-/** A project's lane configs: none of its own. */
-const LANES = {
-  repoConfig: DEFAULT_REPO,
-  user: decodeLaneConfig({}, "/p"),
+/**
+ * A registry whose lanes are their own or not, each step run on one queue
+ * with `history`: a stand-in for the adapter's.
+ */
+const registryWith = (history: LaneHistory, own = true) => {
+  const queue = createQueue()
+  return record<Parameters<typeof createUpdates>[0]["registry"]>({
+    isOwn: () => own,
+    withHistory: (_lane, f) =>
+      queue.enqueue(() =>
+        f(
+          history,
+          {} as Parameters<Parameters<LaneRegistry["withHistory"]>[1]>[1],
+        ),
+      ),
+  }).port
 }
 
 const LANE = threadIdFor("0123456789abcdef")
@@ -132,14 +140,14 @@ describe("planCatchUp: whether a catch-up may merge", () => {
       expect(planned.reason).toContain("resolve-conflicts skill")
     }
   })
-  test("with room, it merges as `planMerge` says, and the prompt names whose work comes in", () => {
+  test("with room, it merges what it was given, and the prompt names whose work comes in", () => {
     const planned = planCatchUp(parentFrom, {
       budget: budgetOf(1_000),
       skill: null,
       intent: "",
     })
     if (planned.kind !== "merge") throw new Error("refused")
-    expect(planned.plan).toEqual(planMerge(parentFrom))
+    expect(planned.from).toEqual(parentFrom)
     expect(planned.floor.content).toContain(
       "The work of the thread this one branched from (amber-fox) was merged",
     )
@@ -154,7 +162,7 @@ describe("planSettle: what a merge comes to", () => {
     index: readTreeIndex(newRootDoc()),
     now: 7,
   }
-  test("clean: the update in the thread, naming its base, and the lane fetched", () => {
+  test("clean: the update in the thread, naming its base", () => {
     const facts = {
       kind: "clean",
       from: ACCEPTED,
@@ -177,7 +185,6 @@ describe("planSettle: what a merge comes to", () => {
         7,
       ),
       merge: MERGE,
-      fetch: [OURS, ACCEPTED],
     })
     const wip: BaseMerge = {
       kind: "wip",
@@ -200,13 +207,13 @@ describe("planSettle: what a merge comes to", () => {
       ),
     })
   })
-  test("a move to accepted work is fetched; nothing else is", () => {
+  test("nothing merged: nothing for the thread, with a mark or without", () => {
     expect(
       planSettle({ kind: "nothing", ours: OURS, mark: MERGE }, ctx),
-    ).toEqual({ kind: "nothing", fetch: [OURS] })
+    ).toEqual({ kind: "nothing" })
     expect(
       planSettle({ kind: "nothing", ours: OURS, mark: null }, ctx),
-    ).toEqual({ kind: "nothing", fetch: null })
+    ).toEqual({ kind: "nothing" })
   })
   test("conflicted: each file's reasons are the revisions that touched it, ours attributed; the land message ends with the card's text", () => {
     const doc = newRootDoc()
@@ -240,7 +247,6 @@ describe("planSettle: what a merge comes to", () => {
       { ...ctx, index: readTreeIndex(doc) },
     )
     if (settled.kind !== "conflicted") throw new Error("not conflicted")
-    expect(settled.fetch).toBeNull()
     expect(settled.message.details).toMatchObject({
       lane: LANE,
       yours: [ACCEPTED],
@@ -307,10 +313,10 @@ describe("applySettle: a settle's writes", () => {
       recordUpdate: async (entry, merge) => {
         calls.push(`record ${entry} ${merge}`)
       },
-      fetchLane: have => {
-        calls.push(`fetch ${have.join(",")}`)
-      },
     })
+  const follow = (calls: string[]) => () => {
+    calls.push("follow")
+  }
   const clean: Settle = {
     kind: "clean",
     message: encodeUpdate(
@@ -325,30 +331,28 @@ describe("applySettle: a settle's writes", () => {
       1,
     ),
     merge: MERGE,
-    fetch: [OURS, ACCEPTED],
   }
-  test("a clean update appends its entry, records its revision, then fetches the lane, in that order", async () => {
+  test("a clean update appends its entry, records its revision, then fires what follows the merge, in that order", async () => {
     const calls: string[] = []
     const p = ports(calls)
-    expect(await applySettle(p.port, clean)).toEqual({ kind: "clean" })
+    expect(await applySettle(p.port, clean, follow(calls))).toEqual({
+      kind: "clean",
+    })
     expect(calls).toEqual([
       "append pinetrie.update",
       "record e-9 33330000",
-      `fetch ${OURS},${ACCEPTED}`,
+      "follow",
     ])
   })
-  test("an entry not appended records no revision, and the lane is still fetched", async () => {
+  test("an entry not appended records no revision, and what follows the merge is still fired", async () => {
     const calls: string[] = []
-    await applySettle(ports(calls, false).port, clean)
-    expect(calls).toEqual([
-      "append pinetrie.update",
-      `fetch ${OURS},${ACCEPTED}`,
-    ])
+    await applySettle(ports(calls, false).port, clean, follow(calls))
+    expect(calls).toEqual(["append pinetrie.update", "follow"])
   })
-  test("nothing with no fetch writes nothing", async () => {
+  test("nothing, with nothing to follow, writes nothing", async () => {
     const calls: string[] = []
     expect(
-      await applySettle(ports(calls).port, { kind: "nothing", fetch: null }),
+      await applySettle(ports(calls).port, { kind: "nothing" }, null),
     ).toEqual({ kind: "nothing" })
     expect(calls).toEqual([])
   })
@@ -414,8 +418,8 @@ describe("withLaneStarted: the lane an update starts", () => {
 
 describe("askedAboutConflict", () => {
   /**
-   * Updates whose lane jj answers with `conflicted` files, the lane its own
-   * or not, its run prompted by `role`.
+   * Updates whose lane's history answers with `conflicted` files, the lane
+   * its own or not, its run prompted by `role`.
    */
   const updatesWith = (
     conflicted: readonly string[],
@@ -425,37 +429,22 @@ describe("askedAboutConflict", () => {
     const b = basics()
     writeEntry(b.root, row("p-1", null, { role, content: "go" }))
     writeLaneTip(b.root, LANE, entryId("p-1"))
-    const asked: string[][] = []
-    const jj = async (argv: readonly string[]) => {
-      asked.push([...argv])
-      return {
-        ok: true,
-        code: 0,
-        stdout:
-          argv[0] === "file" ? conflicted.map(f => `${f}\n`).join("") : "",
-        stderr: "",
-      }
-    }
+    const asked: string[] = []
+    const history = record<LaneHistory>({
+      conflicts: async () => {
+        asked.push("conflicts")
+        return conflicted
+      },
+    }).port
     const updates = createUpdates({
       basics: b,
-      setup: {
-        root: "/p",
-        owner: record<RepoOwner>().port,
-        lanes: LANES,
-        ready: Promise.resolve({ image: "img" } as Ready),
-      },
-      registry: record<Parameters<typeof createUpdates>[0]["registry"]>({
-        isOwn: () => own,
-        laneJjOf: () => jj,
-        handleOf: () =>
-          ({ queue: createQueue() }) as unknown as ReturnType<
-            Parameters<typeof createUpdates>[0]["registry"]["handleOf"]
-          >,
-      }).port,
+      setup: { ready: Promise.resolve({ image: "img" } as Ready) },
+      destination:
+        record<Parameters<typeof createUpdates>[0]["destination"]>().port,
+      registry: registryWith(history, own),
       piSetup: record<Parameters<typeof createUpdates>[0]["piSetup"]>().port,
       containers:
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
-      fetchLane: async () => {},
       writeRevision: async () => {},
     })
     return { updates, asked }
@@ -481,8 +470,8 @@ describe("askedAboutConflict", () => {
 describe("catchUpInRun", () => {
   /**
    * A lane of its own whose turn is `calls` calls of `catch_up`, its base
-   * moved with files to bring, and a jj that answers `@`'s parents as
-   * `parents`, the bookmark as `b`, and nothing descending.
+   * moved with files to bring, and a history whose copy has `parents` as
+   * `@`'s parents, the bookmark `b`, and nothing descending.
    */
   const inRun = (calls: number, parents: string) => {
     const b = basics()
@@ -538,31 +527,31 @@ describe("catchUpInRun", () => {
       }),
     )
     const asked: string[] = []
-    const jj = async (argv: readonly string[]) => {
-      asked.push(argv.join(" "))
-      const out = argv.includes("@")
-        ? parents
-        : argv.some(a => a.includes("present("))
-          ? "b\n"
-          : ""
-      return { ok: true, code: 0, stdout: out, stderr: "" }
-    }
+    const b0 = commitId("b")
+    const history = record<LaneHistory>({
+      readyToMerge: async () => {
+        asked.push("readyToMerge")
+        return planCopyReady({
+          parents: [commitId(parents)],
+          bookmark: b0,
+          descends: false,
+        })
+      },
+      commit: async () => {
+        asked.push("commit")
+        return { commit: null, conflicted: false }
+      },
+      merge: async () => {
+        asked.push("merge")
+        throw new Error("merged")
+      },
+    }).port
     const updates = createUpdates({
       basics: b,
-      setup: {
-        root: "/p",
-        owner: record<RepoOwner>().port,
-        lanes: LANES,
-        ready: Promise.resolve({ image: "img" } as Ready),
-      },
-      registry: record<Parameters<typeof createUpdates>[0]["registry"]>({
-        isOwn: () => true,
-        laneJjOf: () => jj,
-        handleOf: () =>
-          ({ queue: createQueue() }) as unknown as ReturnType<
-            Parameters<typeof createUpdates>[0]["registry"]["handleOf"]
-          >,
-      }).port,
+      setup: { ready: Promise.resolve({ image: "img" } as Ready) },
+      destination:
+        record<Parameters<typeof createUpdates>[0]["destination"]>().port,
+      registry: registryWith(history),
       // The skill is read before the merge, for the floor.
       piSetup: record<Parameters<typeof createUpdates>[0]["piSetup"]>({
         skill: async () => null,
@@ -570,14 +559,13 @@ describe("catchUpInRun", () => {
       // Neither starts nor stops the lane: the port throws if asked.
       containers:
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
-      fetchLane: async () => {},
       writeRevision: async () => {},
     })
     return { updates, asked }
   }
 
   test("a call beside another in its turn is refused before anything is queued", async () => {
-    const { updates, asked } = inRun(2, "b\n")
+    const { updates, asked } = inRun(2, "b")
     expect(await updates.catchUpInRun(LANE, "base")).toMatchObject({
       isError: true,
       text: catchUpRefusal("alone"),
@@ -586,13 +574,11 @@ describe("catchUpInRun", () => {
   })
 
   test("a copy off its own line is refused before any edit is committed or merged, and the lane is neither started nor stopped", async () => {
-    const { updates, asked } = inRun(1, "x\n")
+    const { updates, asked } = inRun(1, "x")
     expect(await updates.catchUpInRun(LANE, "base")).toMatchObject({
       isError: true,
       text: catchUpRefusal("off-line"),
     })
-    expect(asked.some(a => a.startsWith("commit") || a.startsWith("new"))).toBe(
-      false,
-    )
+    expect(asked).toEqual(["readyToMerge"])
   })
 })

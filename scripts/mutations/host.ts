@@ -135,7 +135,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a move jj refuses after a publish's catch-up leaves it",
-    file: "apps/pinetrie/host/work/accepted.ts",
+    file: "apps/pinetrie/host/jj/accepted.ts",
     from: "      if (op !== null) await ops.execute(planCatchUpUndo(op))\n",
     to: "",
     command: unit,
@@ -143,7 +143,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a publish's refused second round reverts nothing",
-    file: "apps/pinetrie/host/work/accepted.ts",
+    file: "apps/pinetrie/host/jj/accepted.ts",
     from: "      await ops.execute(planCatchUpUndo(finish.op))\n",
     to: "",
     command: unit,
@@ -235,15 +235,15 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy off its line takes the merge",
     file: "apps/pinetrie/host/work/update.ts",
-    from: '        if (ready !== "ready") return { kind: "copy", why: ready }',
-    to: '        if (ready !== "ready" && false) return { kind: "copy", why: ready }',
+    from: '        if (typeof ready === "string") return { kind: "copy", why: ready }',
+    to: '        if (typeof ready === "string" && false) return { kind: "copy", why: ready }',
     command: unit,
     expect:
       "a copy off its own line is refused before any edit is committed or merged",
   },
   {
     name: "a split's end that throws leaves the lane on the stack",
-    file: "apps/pinetrie/host/work/split.ts",
+    file: "apps/pinetrie/host/jj/split.ts",
     from: "  } finally {\n    await ports.backToTip(lane)\n  }\n",
     to: "  } finally {\n  }\n  await ports.backToTip(lane)\n",
     command: unit,
@@ -380,7 +380,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "accepted work's preview runs no git",
-    file: "packages/repo/owner.ts",
+    file: "packages/jj/owner.ts",
     from: "      kept = await readShared(op, runnerFor(root, { at: op }), git, repoConfig)",
     to: '      kept = await readShared(op, runnerFor(root, { at: op }), async () => ({ ok: false, code: 1, stdout: "", stderr: "" }), repoConfig)',
     suite: "lanes",
@@ -390,7 +390,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "restoring does not refresh its lanes",
-    file: "apps/pinetrie/host/offers/index.ts",
+    file: "apps/pinetrie/host/jj/offers/index.ts",
     from: "      for (const { lane } of updates) touch(lane)\n",
     to: "",
     suite: "lanes",
@@ -399,7 +399,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an observed move refreshes no offer",
-    file: "apps/pinetrie/host/offers/index.ts",
+    file: "apps/pinetrie/host/jj/offers/index.ts",
     from: "    for (const lane of planned.lanes) touch(lane)\n",
     to: "",
     suite: "lanes",
@@ -409,7 +409,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a plan with no steps reads the offer again",
-    file: "apps/pinetrie/host/offers/execute.ts",
+    file: "apps/pinetrie/host/jj/offers/execute.ts",
     from: "        effects.steps.length === 0 ? before : await ports.read(after.place),",
     to: "        await ports.read(after.place),",
     command: unit,
@@ -893,7 +893,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a split's stack is never fetched",
-    file: "apps/pinetrie/host/work/split.ts",
+    file: "apps/pinetrie/host/jj/split.ts",
     from: "  await ports.fetchLane(lane, [stack.tip, ...stack.start], true)\n",
     to: "",
     command: unit,
@@ -933,7 +933,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the executor keeps a withdrawn offer's record",
-    file: "apps/pinetrie/host/offers/execute.ts",
+    file: "apps/pinetrie/host/jj/offers/execute.ts",
     from: "      await ports.remove()\n",
     to: "",
     command: unit,
@@ -941,7 +941,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a followed offer is recorded with its old commits",
-    file: "apps/pinetrie/host/offers/execute.ts",
+    file: "apps/pinetrie/host/jj/offers/execute.ts",
     from: "        effects.steps.length === 0 ? before : await ports.read(after.place),",
     to: "        before,",
     command: unit,
@@ -1250,14 +1250,6 @@ export const mutations: readonly Mutation[] = [
       "with a run to follow, the lane is never stopped, whatever the update comes to",
   },
   {
-    name: "a move to accepted work is not fetched",
-    file: "apps/pinetrie/host/work/update.ts",
-    from: "        fetch: facts.mark === null ? null : [facts.ours],",
-    to: "        fetch: null,",
-    command: unit,
-    expect: "a move to accepted work is fetched",
-  },
-  {
     name: "a file's reasons are every revision on its side",
     file: "apps/pinetrie/host/work/update.ts",
     from: "  revisions.filter(r => r.paths.includes(path)).map(r => r.description)",
@@ -1275,7 +1267,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a split starts its lane before reading its skill",
-    file: "apps/pinetrie/host/work/split.ts",
+    file: "apps/pinetrie/host/jj/split.ts",
     from: '      const skill = await deps.piSetup.skill("pinetrie:skill:offer-stack")\n      // Last: nothing between the lane\'s start and its run can fail.\n      deps.beforeRun(lane)',
     to: '      deps.beforeRun(lane)\n      const skill = await deps.piSetup.skill("pinetrie:skill:offer-stack")',
     command: unit,
@@ -1354,7 +1346,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "your @ moving marks every lane",
-    file: "apps/pinetrie/host/offers/marks.ts",
+    file: "apps/pinetrie/host/jj/offers/marks.ts",
     from: "  const every = moved.all\n",
     to: "  const every = moved.all || moved.yours\n",
     command: unit,
@@ -1371,7 +1363,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a move of main refreshes nothing",
-    file: "apps/pinetrie/host/offers/marks.ts",
+    file: "apps/pinetrie/host/jj/offers/marks.ts",
     from: "    accepted: every || moved.published,",
     to: "    accepted: every,",
     command: unit,
@@ -1379,7 +1371,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "your @ moving rewrites nothing",
-    file: "apps/pinetrie/host/offers/marks.ts",
+    file: "apps/pinetrie/host/jj/offers/marks.ts",
     from: "    shared: !every && moved.yours,",
     to: "    shared: false,",
     command: unit,
@@ -1387,7 +1379,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a moved offer bookmark marks no lane",
-    file: "apps/pinetrie/host/offers/marks.ts",
+    file: "apps/pinetrie/host/jj/offers/marks.ts",
     from: "      const lane = byName.get(name)",
     to: "      const lane = undefined",
     command: unit,
@@ -1395,7 +1387,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "everything moving marks only the open records",
-    file: "apps/pinetrie/host/offers/marks.ts",
+    file: "apps/pinetrie/host/jj/offers/marks.ts",
     from: "          ...[...input.names.keys()].filter(l => !input.archived.has(l)),\n",
     to: "",
     command: unit,
@@ -1404,7 +1396,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "everything moving marks archived lanes",
-    file: "apps/pinetrie/host/offers/marks.ts",
+    file: "apps/pinetrie/host/jj/offers/marks.ts",
     from: "          ...[...input.names.keys()].filter(l => !input.archived.has(l)),\n",
     to: "          ...input.names.keys(),\n",
     command: unit,
@@ -1413,7 +1405,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an archived lane's offer bookmark marks nothing",
-    file: "apps/pinetrie/host/offers/marks.ts",
+    file: "apps/pinetrie/host/jj/offers/marks.ts",
     from: "      return lane === undefined ? [] : [lane]",
     to: "      return lane === undefined || input.archived.has(lane) ? [] : [lane]",
     command: unit,
@@ -1422,7 +1414,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the lane's base record is never written",
-    file: "apps/pinetrie/host/offers/state.ts",
+    file: "apps/pinetrie/host/jj/offers/state.ts",
     from: "      await writeValues(writes)\n",
     to: "",
     command: unit,
@@ -1430,7 +1422,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the base record leaves out the untraced accepted-offer commits",
-    file: "packages/repo/offer-gather.ts",
+    file: "packages/jj/offer-gather.ts",
     from: '  untraced:\n    input.start.kind === "untraced" ? input.start.acceptedOfferCommits : [],\n',
     to: "  untraced: [],\n",
     command: unit,
@@ -1439,7 +1431,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the base record leaves out what catching up changes",
-    file: "packages/repo/offer-gather.ts",
+    file: "packages/jj/offer-gather.ts",
     from: "  catchUp: input.catchUp,\n",
     to: "  catchUp: null,\n",
     command: unit,
@@ -1448,7 +1440,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fetch is never imported",
-    file: "apps/pinetrie/host/work/fetch.ts",
+    file: "apps/pinetrie/host/jj/fetch.ts",
     from: "              await yours.importLane(lane, made.bundle, stack)\n",
     to: "",
     command: unit,
@@ -1764,7 +1756,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an unchanged base is announced",
-    file: "apps/pinetrie/host/offers/state.ts",
+    file: "apps/pinetrie/host/jj/offers/state.ts",
     from: "      if (writes.length === 0) return\n      await writeValues(writes)\n",
     to: "      input.baseChanged(next.lane)\n      if (writes.length === 0) return\n      await writeValues(writes)\n",
     command: unit,
@@ -2106,5 +2098,48 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a file under a shared directory, from the disk's root; none outside",
+  },
+  // ── lane work through the adapter's ports ──
+  {
+    name: "lane work imports jj's adapter",
+    file: "apps/pinetrie/host/work/turns.ts",
+    from: 'import { callLabel } from "@pinetrie/interface"\n',
+    to: 'import { callLabel } from "@pinetrie/interface"\nimport { bookmarkOf } from "@pinetrie/jj"\nvoid bookmarkOf\n',
+    command: unit,
+    expect: "no file of lane work, tests included, imports jj's adapter",
+  },
+  {
+    name: "what follows a turn's commit is never fired",
+    file: "apps/pinetrie/host/work/turns.ts",
+    from: "  follow?.()\n  return ended\n",
+    to: "  return ended\n",
+    command: unit,
+    expect:
+      "what follows a turn's commit is fired once its snapshot step is queued",
+  },
+  {
+    name: "what follows a merge is never fired",
+    file: "apps/pinetrie/host/work/update.ts",
+    from: "  follow?.()\n  switch (settle.kind) {",
+    to: "  switch (settle.kind) {",
+    command: unit,
+    expect:
+      "a clean update appends its entry, records its revision, then fires what follows the merge",
+  },
+  {
+    name: "jj's adapter starts on a folder",
+    file: "apps/pinetrie/host/jj/index.ts",
+    from: "export function startJjProject(dir: JjProjectDir): ProjectAdapter {",
+    to: 'export function startJjProject(\n  dir: JjProjectDir | { readonly kind: "folder"; readonly root: string },\n): ProjectAdapter {',
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "a folder with no jj repo is given lanes",
+    file: "apps/pinetrie/host/project.ts",
+    from: '    case "folder":\n      return { refused: folderRefusal(dir.root) }\n',
+    to: '    case "folder":\n      return { adapter: startJjProject(dir as never), root: dir.root }\n',
+    command: unit,
+    expect:
+      "a folder project is refused, with how to make it a jj one; a jj project gets jj's adapter",
   },
 ]

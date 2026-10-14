@@ -1,7 +1,7 @@
 # ADR-0104 — Offers are accepted onto accepted work by a forward bookmark move; the repo is the ledger
 
 - **Status:** Accepted
-- **Area:** `docs/the-jujutsu-repo.md`, `packages/repo/TECHNICAL.md`
+- **Area:** `docs/the-jujutsu-repo.md`, `packages/jj/TECHNICAL.md`
 - **Evidence:** S48, S51, S72, S73, S74, S77, S78, S80, S81, S87, S89, S97,
   S99, S102, S103, S111, S121
 - **Supersedes:**

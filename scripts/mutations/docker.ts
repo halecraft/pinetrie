@@ -284,14 +284,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a Docker that does not answer, in the runtime's words",
   },
   {
-    name: "a folder with no jj repo is given lanes",
-    file: "packages/lanes/plan.ts",
-    from: '  if (d.repo !== "jj")\n    return {',
-    to: "  if (false)\n    return {",
-    command: unit("apps/pinetrie/host/work/runtime.test.ts"),
-    expect: "a folder with no jj repo, with how to make one",
-  },
-  {
     name: "lanes share Docker's default network, whatever their project",
     file: plan,
     from: "    network: projectNetwork(input.project),",

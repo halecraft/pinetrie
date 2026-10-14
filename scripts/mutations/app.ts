@@ -145,8 +145,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a turn's commits are not fetched into your repo",
     file: "apps/pinetrie/host/work/turns.ts",
-    from: "        if (committed !== null) void deps.fetchLane(lane, [newest])",
-    to: "        if (false) void deps.fetchLane(lane, [newest])",
+    from: "  follow?.()\n  return ended\n",
+    to: "  return ended\n",
     suite: "lanes",
     scenario: "main",
     expect:

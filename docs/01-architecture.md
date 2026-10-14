@@ -125,7 +125,7 @@ packages/     libraries; their boundaries are enforced by resolution
   lanes/         @pinetrie/lanes        a lane's container and disk, and jj and git in it (TECHNICAL.md)
   lanehost/      @pinetrie/lanehost     the lanes' machine: disks, diffs, grants, by role (TECHNICAL.md)
   keeper/        @pinetrie/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
-  repo/          @pinetrie/repo         your repo: reads, steps, the owner; offers, accepted work, lanes' refs (TECHNICAL.md)
+  repo/          @pinetrie/jj         your repo: reads, steps, the owner; offers, accepted work, lanes' refs (TECHNICAL.md)
   session/       @pinetrie/session      one client's connection to a host; no React (TECHNICAL.md)
   shell/         @pinetrie/shell        unbash only; shell source as structure (TECHNICAL.md)
   interface/     @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
@@ -212,8 +212,8 @@ not a way to answer two people at once (ADR-0019). Threads run concurrently. Dec
 `planArchive` and the rest in `@pinetrie/rules`, over facts read by `@pinetrie/reads`);
 the host gathers, plans and executes each command in one serial step. A
 decision that acts on your repo (an offer, accepted work) is a value typed in
-`@pinetrie/core`, decided by `@pinetrie/rules` from facts `@pinetrie/repo`
-reads, and carried out by `@pinetrie/repo`'s steps: the two packages never
+`@pinetrie/core`, decided by `@pinetrie/rules` from facts `@pinetrie/jj`
+reads, and carried out by `@pinetrie/jj`'s steps: the two packages never
 import each other, and the host only connects them.
 
 ADR-0119, accepted and not yet built, keeps a thread, its lane and the host the lane runs
@@ -240,7 +240,12 @@ lane's or yours (seen by the host's watcher), is one, and a write based on
 a version another replaced is flagged concurrent. A folder with no jj
 repo is refused today; ADR-0142, proposed, would serve it as a folder
 project whose folder is its accepted work, with merge bases from a graph
-of states pine·trie keeps.
+of states pine·trie keeps. Its first step is built: lane work reaches a
+lane's history and accepted work only through two ports (`LaneHistory`,
+reached on the lane's queue alone, and `Destination`), whose one adapter
+is jj's (`@pinetrie/jj`, wired in `apps/pinetrie/host/jj/`), chosen once by
+the project's kind (`host/project.ts`); `@pinetrie/lanes` runs no jj. The
+folder's adapter is not built.
 
 Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`
 stands for "absent"; the codec decodes commands into an `Intent` union and

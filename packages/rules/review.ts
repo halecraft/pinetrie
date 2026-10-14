@@ -53,7 +53,7 @@ export const decodeRevisionReview = (
 
 /**
  * The version of what `/offer/` answers: `REVISION_READ` (`@pinetrie/lanes`)
- * and the range read (`@pinetrie/repo`), `decodeRevisionReview`, `fileDiff`'s
+ * and the range read (`@pinetrie/jj`), `decodeRevisionReview`, `fileDiff`'s
  * flags, and the URLs' spans. Every answer is cached as immutable under a URL holding it,
  * so a change to any of them bumps it, or pages keep the old shape.
  */

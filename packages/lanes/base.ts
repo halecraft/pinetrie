@@ -8,19 +8,11 @@
 // its own. It is made in a scratch lane (`BASE_LANE`), then snapshotted as a
 // turn is, so a fork never reads one half-written. The base says what it
 // holds inside itself (`.pinetrie-lane/base.json`).
-//
-// Also a lane's base as its history names it (`laneBase`), read the same way
-// from the lane's own repo and from yours.
 
-import {
-  BASE_SNAPSHOT,
-  type CommitId,
-  type LaneBase,
-  type SnapshotId,
-} from "@pinetrie/core"
+import { BASE_SNAPSHOT, type CommitId, type SnapshotId } from "@pinetrie/core"
 import { executeOrThrow, type Runners } from "./execute.ts"
+import type { BaseCheckout } from "./history-port.ts"
 import { laneHandle, type OpenLink, removeLane } from "./lane.ts"
-import { newestBase } from "./merge.ts"
 import {
   BASE_FILE,
   BASE_LANE,
@@ -30,15 +22,10 @@ import {
   type LaneSpec,
   laneContainer,
   parseBaseFacts,
-  planBaseCheckout,
   planBaseFacts,
   planDisk,
   planSnapshot,
-  type RepoConfig,
-  revsetName,
 } from "./plan.ts"
-import { commitsOf } from "./revisions.ts"
-import type { Runner } from "./run.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
 
 /** What building in the scratch lane takes. */
@@ -82,7 +69,11 @@ async function inScratch<C, T>(
  * them.
  */
 export async function refreshBase<C>(
-  input: Scratch<C> & { readonly yours: readonly CommitId[] },
+  input: Scratch<C> & {
+    readonly yours: readonly CommitId[]
+    /** The adapter's checkout of `yours`, on a fresh disk or on the base before. */
+    readonly checkout: (fresh: boolean) => BaseCheckout
+  },
 ): Promise<boolean> {
   const { runtime, yours } = input
   const base = parseBaseFacts(
@@ -93,7 +84,7 @@ export async function refreshBase<C>(
   await inScratch(input, from, async runners => {
     await executeOrThrow(
       [
-        ...planBaseCheckout({ yours, fresh: from === null }),
+        ...input.checkout(from === null).steps,
         planBaseFacts(yours),
         ...planSnapshot({ lane: BASE_LANE, snapshot: BASE_SNAPSHOT }),
       ],
@@ -101,39 +92,4 @@ export async function refreshBase<C>(
     )
   })
   return true
-}
-
-/**
- * A lane's base, from the newest `Pinetrie-Base` in the history of `tip`, a
- * revset: the lane's tip in your repo, or its bookmark in its own repo. A
- * lane with none (one from before accepted work) is on accepted work, from the newest
- * accepted commit in its history; null when there is none. In the lane's own
- * repo such a lane is always null: that repo has no line bookmark.
- */
-export async function laneBase(
-  jj: Runner,
-  tip: string,
-  repoConfig: RepoConfig,
-): Promise<LaneBase | null> {
-  const newest = await newestBase(jj, tip, repoConfig.wipPrefix)
-  if (newest === null) {
-    const [start] = await commitsOf(
-      jj,
-      `latest(heads(::(${tip}) & ::present(${revsetName(repoConfig.acceptedBookmark)})))`,
-    )
-    return start === undefined
-      ? null
-      : { base: { kind: "accepted" }, start, source: start }
-  }
-  return newest.kind === "accepted"
-    ? {
-        base: { kind: "accepted" },
-        start: newest.commit,
-        source: newest.commit,
-      }
-    : {
-        base: { kind: "wip", bookmark: newest.bookmark },
-        start: newest.at,
-        source: newest.commit,
-      }
 }

@@ -12,11 +12,10 @@ import {
   executeOrThrow,
   KILL_SSH,
   LANE_NOTE,
-  oldNamesOnDisk,
+  type LaneHistory,
   PINETRIE_MOUNT,
   planContainer,
   planDisk,
-  planOldNamesOnDisk,
   planShape,
   planStart,
   planStartFrom,
@@ -26,7 +25,7 @@ import {
 import type { LaneAccess } from "@pinetrie/pi"
 import { readLaneSnapshots, readRunning, readThreadName } from "@pinetrie/reads"
 import { type Basics, failed } from "../basics.ts"
-import type { Offers } from "../offers/index.ts"
+import type { OfferActs } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
@@ -45,9 +44,11 @@ export interface Containers {
    * Start a lane's container, as `planContainer` decides. A container made
    * from another spec (image, mounts, grants) is recreated on the same
    * volume. A missing one starts from what `planStartFrom` decides; a disk
-   * restored from a snapshot then gets the names the host reads now.
+   * restored from a snapshot then gets what its history needs
+   * (`LaneHistory.afterRestore`). Run from a step on the lane's queue, which
+   * holds `h`.
    */
-  startContainer(lane: ThreadId): Promise<void>
+  startContainer(lane: ThreadId, h: LaneHistory): Promise<void>
   /** Stop every running lane's container. */
   close(): Promise<void>
 }
@@ -58,7 +59,7 @@ export function createContainers(deps: {
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
-  readonly offers: Offers
+  readonly offers: Pick<OfferActs, "runEnded">
 }): Containers {
   const { basics, setup, registry, keeper, offers } = deps
   const { session, docs, log } = basics
@@ -90,7 +91,7 @@ export function createContainers(deps: {
     return null
   }
 
-  async function startContainer(lane: ThreadId): Promise<void> {
+  async function startContainer(lane: ThreadId, h: LaneHistory): Promise<void> {
     const { ready, runtime } = setup
     const r = await ready
     const handle = registry.handleOf(lane)
@@ -120,13 +121,7 @@ export function createContainers(deps: {
             planDisk({ spec, env: process.env, from: from.from }),
             handle.runners,
           )
-          // pre-rename: a snapshot of a lane made before the rename holds the
-          // old names. A volume needs no such step: the one-off migration
-          // renamed those.
-          await executeOrThrow(
-            planOldNamesOnDisk(await oldNamesOnDisk(handle.runners.lane), lane),
-            handle.runners,
-          )
+          await h.afterRestore()
           break
         case "retired":
           throw new Error(RETIRED)
@@ -171,11 +166,10 @@ export function createContainers(deps: {
 
     beforeRun(lane) {
       if (!registry.isOwn(lane)) return
-      const handle = registry.handleOf(lane)
-      handle.queue.reset()
+      registry.handleOf(lane).queue.reset()
       void keeper.track(
-        handle.queue
-          .enqueue(() => startContainer(lane), { fatal: true })
+        registry
+          .withHistory(lane, h => startContainer(lane, h), { fatal: true })
           .catch(error =>
             log(
               `[host] ${readThreadName(session, lane)} cannot start: ${errorText(error)}`,
