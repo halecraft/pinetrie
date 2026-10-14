@@ -797,8 +797,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a task's drag lands nowhere in the sidebar",
     file: "packages/web/use-drag.ts",
-    from: "        const lands = rootLanding(under, y)",
-    to: '        const lands = under?.closest("#sidebar") ? null : rootLanding(under, y)',
+    from: "        const lands = rootLanding(under, y, p.moving)",
+    to: '        const lands = under?.closest("#sidebar") ? null : rootLanding(under, y, p.moving)',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a task dragged over another's middle in the sidebar opens nothing, and drops above or below it",
+  },
+  {
+    name: "a task's landing measures the row it drags",
+    file: "packages/web/use-drag.ts",
+    from: "      .filter(zone => zone !== dragged)",
+    to: "      .filter(() => true)",
     suite: "browser",
     scenario: "page",
     expect:

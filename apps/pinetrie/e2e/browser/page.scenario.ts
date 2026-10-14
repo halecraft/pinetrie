@@ -1734,7 +1734,9 @@ async function run(check: Checks["check"]): Promise<void> {
       // the other's middle past the hold that opens a task for a card's drag,
       // it shows no ring and opens nothing; released past that middle, it
       // lands on the other side. The other is never the task you are on, so
-      // opening it would show.
+      // opening it would show. It is pressed off its centre, on the side away
+      // from where it goes: the dragged row's own box follows the pointer,
+      // and measured among the places it would shift its landing by one.
       {
         const order = await page.$$eval("#sidebar .open-root", ts =>
           ts.map(t => t.getAttribute("data-task") ?? ""),
@@ -1758,7 +1760,7 @@ async function run(check: Checks["check"]): Promise<void> {
           const x = over.x + over.width / 3
           await page.mouse.move(
             from.x + from.width / 3,
-            from.y + from.height / 2,
+            from.y + from.height * (down ? 0.2 : 0.8),
           )
           await page.mouse.down()
           await page.mouse.move(x, over.y + over.height / 2, { steps: 8 })

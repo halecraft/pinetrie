@@ -513,6 +513,12 @@ set `data-card-drag`.
   at `pointerdown` it falls before anything is seen to move. Columns still
   springing back from a cancel are reset before they are measured, or a
   quick second drag reads a column where it was drawn, not where it is.
+- **A task's landing leaves the dragged item out of the places it
+  measures.** Each frame reads the zones' boxes, and the dragged item's
+  box carries its translate: its centre follows the pointer, offset by
+  where it was pressed, and counted among the others it moved every
+  landing past it by one, so a row pressed below its centre could never
+  reach the top. Left out, the gap it leaves lands on its home.
 - **A dragged column only translates.** No scale, rotation or shadow on
   it: on a slow machine a long column so drawn cost frames (S153). The lift
   is on its header (`--lean`, a shadow), and off the strip the column is

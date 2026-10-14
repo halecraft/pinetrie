@@ -78,14 +78,20 @@ function placesOf(group: Element | null): {
 function rootLanding(
   under: Element | null,
   y: number,
+  dragged: HTMLElement,
 ): { readonly el: HTMLElement; readonly target: RootTarget } | null {
   const places = placesOf(under?.closest(ROOT_GROUP_ZONE) ?? null)
   if (places === null) return null
+  // The dragged item's box carries its translate, so its centre follows the
+  // pointer and would shift every landing past it by one. Left out, the gap
+  // it leaves lands just after it: its home, where a drop moves nothing.
   const el = landingIn(
-    places.items.map(zone => {
-      const box = zone.getBoundingClientRect()
-      return { zone, mid: box.top + box.height / 2 }
-    }),
+    places.items
+      .filter(zone => zone !== dragged)
+      .map(zone => {
+        const box = zone.getBoundingClientRect()
+        return { zone, mid: box.top + box.height / 2 }
+      }),
     places.end,
     y,
   )
@@ -203,7 +209,7 @@ export function useDrag(input: {
     const gather = (p: Press): { at: DragAt; el: HTMLElement | null } => {
       const under = document.elementFromPoint(x, y)
       if (p.source.kind === "task") {
-        const lands = rootLanding(under, y)
+        const lands = rootLanding(under, y, p.moving)
         const over: TaskOver =
           lands === null
             ? { kind: "none" }
