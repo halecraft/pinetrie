@@ -183,6 +183,15 @@ export const mutations: readonly Mutation[] = [
     expect: "each refusal in order",
   },
   {
+    name: "an observer that never started blocks its name",
+    file: plan,
+    from: '  state === "running" ? "join" : state === "missing" ? "make" : "replace"',
+    to: '  state === "running" ? "join" : "make"',
+    command: unit("packages/docker"),
+    expect:
+      "the observer is joined running, made missing, and replaced when there but not running",
+  },
+  {
     name: "a slot's sweep takes containers of other slots",
     file: plan,
     from: ".filter(c => c.binds.some(b => b.startsWith(root)))",

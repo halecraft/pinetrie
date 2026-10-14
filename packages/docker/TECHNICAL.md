@@ -214,7 +214,13 @@ measured. Its checks:
   test checks its body exactly (`api.test.ts`).
 - **Made or joined by name** (`openObserver`, `runtime.ts`): a failed
   `docker run` is fine when the container now runs, another host having
-  made it. Each host's channel is a `docker exec -i` of its connect script.
+  made it. One of its name that is there but not running is removed first
+  (`planObserverContainer`): a create whose start never came (its host
+  stopped between the two calls) leaves the container created, which
+  removal on exit never takes, and every later run of the name failed as a
+  conflict until it was removed by hand. A start that fails does not: Docker
+  removes the container then (measured with Docker 29.8). Each host's
+  channel is a `docker exec -i` of its connect script.
   A new lease closes the channel; the next lane's start opens it again and
   registers every lane again.
 - **A lane is registered by its first process** (`containerPid`, the pid

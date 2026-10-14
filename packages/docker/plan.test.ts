@@ -22,6 +22,7 @@ import {
   NESTED_MOUNT,
   parseMountinfo,
   planDockerHost,
+  planObserverContainer,
   planProjectSweep,
   planSlotSweep,
   projectKey,
@@ -419,4 +420,10 @@ describe("a project's grant of the host's ports", () => {
     const linux: DockerTarget = { ...mac, hostAddress: null }
     expect(render(granted, linux).env.join(" ")).not.toContain("PINETRIE_HOST")
   })
+})
+
+test("the observer is joined running, made missing, and replaced when there but not running", () => {
+  expect(planObserverContainer("running")).toBe("join")
+  expect(planObserverContainer("missing")).toBe("make")
+  expect(planObserverContainer("stopped")).toBe("replace")
 })

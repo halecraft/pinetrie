@@ -65,6 +65,7 @@ import {
   observerContainer,
   observerImage,
   PROJECT_LABEL,
+  planObserverContainer,
   planProjectSweep,
   planSlotSweep,
   projectKey,
@@ -247,7 +248,11 @@ export function dockerRuntime(input: {
         runtime: serving.runtime,
         packages: `${serving.install}/packages`,
       })
-    if ((await inspectContainer(target, name)).state !== "running") {
+    const decided = planObserverContainer(
+      (await inspectContainer(target, name)).state,
+    )
+    if (decided !== "join") {
+      if (decided === "replace") await removeContainer(target, name)
       const made = await runContainer(
         target,
         renderObserver({
