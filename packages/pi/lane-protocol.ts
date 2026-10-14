@@ -103,8 +103,11 @@ export type RelayReply =
       readonly thrown: string
     }
 
-/** The helper's hello: its directory, and its shared directories, absolute, as the host registers the lane with them. */
+/** The helper's hello: its directory, and its shared directories. */
 export interface LaneHello {
   readonly cwd: string
+  /** Absolute, as the host registers the lane with them. */
   readonly shared: readonly string[]
+  /** Those under `cwd`, relative to it: what the host's fold of its runs counts as shared. */
+  readonly sharedInside: readonly string[]
 }

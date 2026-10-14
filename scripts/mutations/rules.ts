@@ -53,10 +53,35 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a launched run's command is dropped",
     file: "packages/rules/runs.ts",
-    from: "    next.set(l.run, next.get(l.run) ?? start(l.run, l.command))\n",
-    to: "    next.set(l.run, next.get(l.run) ?? start(l.run, null))\n",
+    from: "        : { ...t, command: l.command },\n",
+    to: "        : t,\n",
     command: unit,
     expect: "a launched run carries its command, its notices and its exit",
+  },
+  {
+    name: "a batch forgets its runs' earlier traces",
+    file: "packages/rules/runs.ts",
+    from: "          next.get(run) ?? newRunTrace({ id: run, command: null }),\n",
+    to: "          newRunTrace({ id: run, command: null }),\n",
+    command: unit,
+    expect:
+      "a sequence folded in batches gives the traces of it folded at once",
+  },
+  {
+    name: "runs drain in the order their events came",
+    file: "packages/rules/runs.ts",
+    from: "  for (const id of [...traces.keys()].sort(byRunNumber)) {\n",
+    to: "  for (const id of traces.keys()) {\n",
+    command: unit,
+    expect: "runs drain in launch order, whatever order their events came in",
+  },
+  {
+    name: "run numbers are compared as strings",
+    file: "packages/rules/runs.ts",
+    from: "  for (const id of [...traces.keys()].sort(byRunNumber)) {\n",
+    to: "  for (const id of [...traces.keys()].sort()) {\n",
+    command: unit,
+    expect: "runs drain in launch order, whatever order their events came in",
   },
   {
     name: "an ended run's trace is kept",

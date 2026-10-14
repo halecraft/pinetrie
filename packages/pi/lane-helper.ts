@@ -147,8 +147,6 @@ function drain(): LaneDrain {
   const writes = [...toolWrites].sort()
   toolWrites.clear()
   return {
-    root: cwd,
-    shared: sharedInside,
     launched: launched.splice(0),
     toolWrites: writes,
     toolShared: toolShared.splice(0),
@@ -276,7 +274,7 @@ async function relay(context: {
 }
 
 serve<LaneHello, LaneCall, unknown, unknown>(
-  { cwd, shared },
+  { cwd, shared, sharedInside },
   async (call, context) => {
     // Before any await: the host's answers to one call arrive in order.
     if ("observerReply" in call) {

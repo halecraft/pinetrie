@@ -18,7 +18,6 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core/harness/contex
 import {
   type DiskPath,
   diskPath,
-  flushed,
   type LaneRuns,
   type RunSource,
   type SharedAccess,
@@ -61,7 +60,9 @@ const close = async (h: { dir: string; channel: LaneChannel }) => {
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex")
 
 /** No events: the observer is the machine's. */
-const unobserved: RunSource = { flush: async () => flushed([]) }
+const unobserved: RunSource = {
+  drain: async drain => (await drain(new Map())).result,
+}
 
 /** The lane's runs since the last drain, folded as the host folds them. */
 const drained = (channel: LaneChannel): Promise<LaneRuns> =>

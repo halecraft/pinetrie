@@ -326,8 +326,9 @@ export function dockerRuntime(input: {
         throw new Error(`docker run ${spec.name} failed: ${apiMessage(made)}`)
     },
     containerFacts: name => inspectContainer(target, name),
-    observe: (container, shared) =>
+    observe: (container, shared, fold) =>
       observer.observe({
+        fold,
         pid: async () => {
           const pid = await containerPid(target, container)
           if (pid === null) throw new Error(`${container} is not running`)

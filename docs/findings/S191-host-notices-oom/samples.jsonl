@@ -1,0 +1,253 @@
+{"t":1.461,"project":"/private/var/folders/qt/q18y1fc93xz4_km__pwqpx_40000gn/T/pinetrie-s191-MlzWXw","files":1873}
+{"t":3.19,"log":"[host] config      /var/folders/qt/q18y1fc93xz4_km__pwqpx_40000gn/T/pinetrie-suite-config-mxRSnZ/config.json"}
+{"t":3.19,"log":"[vm] asking the lane VM's launcher for a slot"}
+{"t":3.191,"log":"[vm] this host has slot 0 of the lane VM"}
+{"t":3.191,"log":"[host] opened 0 of 0 roots"}
+{"t":3.191,"log":"[host] each thread's agent works in its own container, on a disk cloned from its fork point; your working copy is /mnt/host-working-copy there, read-only"}
+{"t":3.191,"log":"[host] agent ready — model faux/faux-1; tools on, in /private/var/folders/qt/q18y1fc93xz4_km__pwqpx_40000gn/T/pinetrie-s191-MlzWXw"}
+{"t":3.191,"log":"[host] 821.test starts wakeful-whistle"}
+{"t":3.191,"heapMB":54,"rssMB":540,"call":null}
+{"t":4.19,"heapMB":54,"rssMB":609,"call":null}
+{"t":5.191,"log":"[host] removed 2 containers left in slot 0 by a host that stopped holding it"}
+{"t":5.191,"heapMB":52,"rssMB":794,"call":null}
+{"t":6.192,"log":"[lanehost] privileged grant 206.0 ms"}
+{"t":6.192,"log":"[lanehost] disks record 191.4 ms"}
+{"t":6.192,"log":"[lanehost] disks projects 1.3 ms"}
+{"t":6.192,"log":"[lanehost] privileged grant 11.3 ms"}
+{"t":6.192,"log":"[lanehost] disks removeProject 91.8 ms"}
+{"t":6.192,"log":"[host] removed the lanes of 1 projects whose folders are gone"}
+{"t":6.192,"log":"[lanehost] disks read 0.8 ms"}
+{"t":6.193,"log":"[lanehost] disks disk delete 0.6 ms"}
+{"t":6.193,"log":"[lanehost] disks disk create 1.6 ms"}
+{"t":6.193,"heapMB":52,"rssMB":393,"call":null}
+{"t":7.193,"heapMB":52,"rssMB":393,"call":null}
+{"t":8.192,"heapMB":52,"rssMB":393,"call":null}
+{"t":9.191,"log":"[lanehost] disks disk snapshot 5.4 ms"}
+{"t":9.192,"log":"[lanehost] disks disk delete 5.7 ms"}
+{"t":9.192,"log":"[host] the base snapshot is at accepted work (d693b7a5)"}
+{"t":9.192,"log":"[vm] asking the lane VM's launcher for a slot"}
+{"t":9.192,"log":"[vm] this host has slot 1 of the lane VM"}
+{"t":9.192,"log":"[host] shared with lanes from their next start, through slot 1 of the lane VM: /private/var/folders/qt/q18y1fc93xz4_km__pwqpx_40000gn/T/pinetrie-s191-MlzWXw/.plans, /private/var/folders/qt/q18y1fc93xz4_km__pwqpx_40000gn/T/pinetrie-s191-MlzWXw/sandbox"}
+{"t":9.192,"log":"[host] .plans/ is shared read-write with every lane (pinetrie.json)"}
+{"t":9.192,"log":"[host] sandbox/ is shared read-write with every lane (pinetrie.json)"}
+{"t":9.192,"log":"[host] lanes of their own are ready"}
+{"t":9.192,"log":"[lanehost] disks read 1.3 ms"}
+{"t":9.192,"log":"[lanehost] disks read 0.9 ms"}
+{"t":9.192,"log":"[lanehost] disks disk delete 0.5 ms"}
+{"t":9.192,"log":"[lanehost] disks disk restore 5.9 ms"}
+{"t":9.192,"log":"[lanehost] disks nestedDisk 2.0 ms"}
+{"t":9.193,"heapMB":52,"rssMB":393,"call":null}
+{"t":10.203,"log":"[lanehost] disks disk snapshot 5.8 ms"}
+{"t":10.203,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":11.204,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":12.205,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":13.21,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":14.203,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":15.207,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":16.214,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":17.204,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":18.208,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":19.212,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":20.208,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":21.21,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":22.212,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":23.208,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":24.214,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":25.212,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":26.213,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":27.223,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":28.221,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":29.215,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":30.214,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":31.22,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":32.223,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":33.217,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":34.218,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":35.22,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":36.217,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":37.219,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":38.224,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":39.221,"heapMB":53,"rssMB":393,"call":"baseline"}
+{"t":40.21,"log":"[lanehost] disks disk snapshot 4.7 ms"}
+{"t":40.21,"log":"[lanehost] privileged diff 2.8 ms"}
+{"t":40.21,"heapMB":68,"rssMB":401,"call":"calibrate"}
+{"t":41.211,"heapMB":89,"rssMB":425,"call":"calibrate"}
+{"t":42.213,"heapMB":109,"rssMB":486,"call":"calibrate"}
+{"t":43.216,"heapMB":130,"rssMB":507,"call":"calibrate"}
+{"t":44.221,"heapMB":150,"rssMB":528,"call":"calibrate"}
+{"t":45.223,"heapMB":171,"rssMB":550,"call":"calibrate"}
+{"t":46.22,"heapMB":192,"rssMB":572,"call":"calibrate"}
+{"t":47.224,"heapMB":215,"rssMB":594,"call":"calibrate"}
+{"t":48.226,"heapMB":235,"rssMB":615,"call":"calibrate"}
+{"t":49.227,"heapMB":256,"rssMB":637,"call":"calibrate"}
+{"t":50.23,"heapMB":279,"rssMB":661,"call":"calibrate"}
+{"t":51.23,"heapMB":300,"rssMB":682,"call":"calibrate"}
+{"t":52.235,"heapMB":320,"rssMB":703,"call":"calibrate"}
+{"t":53.242,"heapMB":341,"rssMB":724,"call":"calibrate"}
+{"t":54.239,"heapMB":361,"rssMB":745,"call":"calibrate"}
+{"t":55.24,"heapMB":382,"rssMB":766,"call":"calibrate"}
+{"t":56.239,"heapMB":407,"rssMB":792,"call":"calibrate"}
+{"t":57.245,"heapMB":427,"rssMB":813,"call":"calibrate"}
+{"t":58.244,"heapMB":448,"rssMB":834,"call":"calibrate"}
+{"t":59.258,"heapMB":469,"rssMB":855,"call":"calibrate"}
+{"t":60.25,"heapMB":490,"rssMB":877,"call":"calibrate"}
+{"t":61.258,"heapMB":510,"rssMB":898,"call":"calibrate"}
+{"t":62.262,"heapMB":532,"rssMB":920,"call":"calibrate"}
+{"t":63.256,"heapMB":560,"rssMB":949,"call":"calibrate"}
+{"t":64.352,"heapMB":54,"rssMB":962,"call":"calibrate"}
+{"t":65.349,"log":"[lanehost] disks disk snapshot 6.8 ms"}
+{"t":65.349,"log":"[lanehost] privileged diff 2.1 ms"}
+{"t":65.35,"heapMB":55,"rssMB":963,"call":"install"}
+{"t":66.351,"heapMB":66,"rssMB":964,"call":"install"}
+{"t":67.351,"heapMB":81,"rssMB":966,"call":"install"}
+{"t":68.349,"heapMB":88,"rssMB":967,"call":"install"}
+{"t":69.352,"heapMB":96,"rssMB":967,"call":"install"}
+{"t":70.355,"heapMB":103,"rssMB":968,"call":"install"}
+{"t":71.497,"heapMB":128,"rssMB":1005,"call":"install"}
+{"t":72.495,"heapMB":63,"rssMB":1005,"call":"mutate"}
+{"t":73.498,"log":"[lanehost] disks disk snapshot 4.5 ms"}
+{"t":73.498,"heapMB":63,"rssMB":1005,"call":"mutate"}
+{"t":74.496,"log":"[lanehost] privileged diff 1592.4 ms"}
+{"t":74.496,"heapMB":54,"rssMB":1004,"call":"mutate"}
+{"t":75.496,"heapMB":58,"rssMB":1004,"call":"mutate"}
+{"t":76.494,"heapMB":63,"rssMB":1004,"call":"mutate"}
+{"t":77.498,"heapMB":69,"rssMB":1004,"call":"mutate"}
+{"t":78.496,"heapMB":74,"rssMB":1005,"call":"mutate"}
+{"t":79.499,"heapMB":80,"rssMB":1005,"call":"mutate"}
+{"t":80.497,"heapMB":85,"rssMB":1005,"call":"mutate"}
+{"t":81.5,"heapMB":90,"rssMB":1006,"call":"mutate"}
+{"t":82.499,"heapMB":94,"rssMB":1006,"call":"mutate"}
+{"t":83.499,"heapMB":99,"rssMB":1006,"call":"mutate"}
+{"t":84.502,"heapMB":103,"rssMB":1006,"call":"mutate"}
+{"t":85.498,"heapMB":109,"rssMB":1006,"call":"mutate"}
+{"t":86.503,"heapMB":113,"rssMB":1006,"call":"mutate"}
+{"t":87.501,"heapMB":117,"rssMB":1006,"call":"mutate"}
+{"t":88.5,"heapMB":121,"rssMB":1006,"call":"mutate"}
+{"t":89.502,"heapMB":125,"rssMB":1006,"call":"mutate"}
+{"t":90.514,"heapMB":131,"rssMB":1007,"call":"mutate"}
+{"t":91.502,"heapMB":135,"rssMB":1007,"call":"mutate"}
+{"t":92.501,"heapMB":139,"rssMB":1007,"call":"mutate"}
+{"t":93.505,"heapMB":144,"rssMB":1007,"call":"mutate"}
+{"t":94.502,"heapMB":148,"rssMB":1007,"call":"mutate"}
+{"t":95.503,"heapMB":153,"rssMB":1007,"call":"mutate"}
+{"t":96.506,"heapMB":157,"rssMB":1007,"call":"mutate"}
+{"t":97.505,"heapMB":162,"rssMB":1007,"call":"mutate"}
+{"t":98.504,"heapMB":166,"rssMB":1007,"call":"mutate"}
+{"t":99.506,"heapMB":173,"rssMB":1009,"call":"mutate"}
+{"t":100.503,"heapMB":177,"rssMB":1009,"call":"mutate"}
+{"t":101.507,"heapMB":182,"rssMB":1009,"call":"mutate"}
+{"t":102.504,"heapMB":190,"rssMB":1009,"call":"mutate"}
+{"t":103.505,"heapMB":194,"rssMB":1009,"call":"mutate"}
+{"t":104.506,"heapMB":201,"rssMB":1009,"call":"mutate"}
+{"t":105.51,"heapMB":208,"rssMB":1009,"call":"mutate"}
+{"t":106.509,"heapMB":213,"rssMB":1009,"call":"mutate"}
+{"t":107.506,"heapMB":219,"rssMB":1009,"call":"mutate"}
+{"t":108.531,"heapMB":226,"rssMB":1011,"call":"mutate"}
+{"t":109.51,"heapMB":231,"rssMB":1011,"call":"mutate"}
+{"t":110.508,"heapMB":236,"rssMB":1011,"call":"mutate"}
+{"t":111.51,"heapMB":240,"rssMB":1011,"call":"mutate"}
+{"t":112.508,"heapMB":244,"rssMB":1011,"call":"mutate"}
+{"t":113.509,"heapMB":248,"rssMB":1011,"call":"mutate"}
+{"t":114.513,"heapMB":253,"rssMB":1011,"call":"mutate"}
+{"t":115.512,"heapMB":257,"rssMB":990,"call":"mutate"}
+{"t":116.513,"heapMB":261,"rssMB":990,"call":"mutate"}
+{"t":117.509,"heapMB":265,"rssMB":990,"call":"mutate"}
+{"t":118.509,"heapMB":269,"rssMB":990,"call":"mutate"}
+{"t":119.513,"heapMB":274,"rssMB":991,"call":"mutate"}
+{"t":120.514,"heapMB":278,"rssMB":991,"call":"mutate"}
+{"t":121.512,"heapMB":283,"rssMB":991,"call":"mutate"}
+{"t":122.514,"heapMB":287,"rssMB":991,"call":"mutate"}
+{"t":123.517,"heapMB":291,"rssMB":991,"call":"mutate"}
+{"t":124.518,"heapMB":295,"rssMB":991,"call":"mutate"}
+{"t":125.515,"heapMB":299,"rssMB":991,"call":"mutate"}
+{"t":126.515,"heapMB":304,"rssMB":991,"call":"mutate"}
+{"t":127.516,"heapMB":308,"rssMB":991,"call":"mutate"}
+{"t":128.523,"heapMB":315,"rssMB":994,"call":"mutate"}
+{"t":129.518,"heapMB":320,"rssMB":994,"call":"mutate"}
+{"t":130.517,"heapMB":324,"rssMB":994,"call":"mutate"}
+{"t":131.518,"heapMB":328,"rssMB":994,"call":"mutate"}
+{"t":132.517,"heapMB":332,"rssMB":994,"call":"mutate"}
+{"t":133.52,"heapMB":336,"rssMB":994,"call":"mutate"}
+{"t":134.519,"heapMB":340,"rssMB":994,"call":"mutate"}
+{"t":135.52,"heapMB":345,"rssMB":994,"call":"mutate"}
+{"t":136.519,"heapMB":349,"rssMB":994,"call":"mutate"}
+{"t":137.519,"heapMB":354,"rssMB":994,"call":"mutate"}
+{"t":138.52,"heapMB":358,"rssMB":994,"call":"mutate"}
+{"t":139.524,"heapMB":363,"rssMB":994,"call":"mutate"}
+{"t":140.52,"heapMB":367,"rssMB":994,"call":"mutate"}
+{"t":141.52,"heapMB":371,"rssMB":994,"call":"mutate"}
+{"t":142.523,"heapMB":376,"rssMB":994,"call":"mutate"}
+{"t":143.522,"heapMB":380,"rssMB":994,"call":"mutate"}
+{"t":144.523,"heapMB":384,"rssMB":994,"call":"mutate"}
+{"t":145.521,"heapMB":389,"rssMB":994,"call":"mutate"}
+{"t":146.525,"heapMB":393,"rssMB":994,"call":"mutate"}
+{"t":147.521,"heapMB":398,"rssMB":994,"call":"mutate"}
+{"t":148.522,"heapMB":402,"rssMB":994,"call":"mutate"}
+{"t":149.522,"heapMB":407,"rssMB":994,"call":"mutate"}
+{"t":150.525,"heapMB":411,"rssMB":994,"call":"mutate"}
+{"t":151.526,"heapMB":420,"rssMB":995,"call":"mutate"}
+{"t":152.526,"heapMB":423,"rssMB":995,"call":"mutate"}
+{"t":153.524,"heapMB":430,"rssMB":995,"call":"mutate"}
+{"t":154.585,"heapMB":442,"rssMB":1000,"call":"mutate"}
+{"t":155.526,"heapMB":447,"rssMB":1000,"call":"mutate"}
+{"t":156.528,"heapMB":452,"rssMB":1000,"call":"mutate"}
+{"t":157.527,"heapMB":457,"rssMB":1000,"call":"mutate"}
+{"t":158.531,"heapMB":461,"rssMB":1000,"call":"mutate"}
+{"t":159.531,"heapMB":465,"rssMB":1000,"call":"mutate"}
+{"t":160.537,"heapMB":469,"rssMB":1000,"call":"mutate"}
+{"t":161.531,"heapMB":473,"rssMB":1000,"call":"mutate"}
+{"t":162.53,"heapMB":478,"rssMB":1000,"call":"mutate"}
+{"t":163.532,"heapMB":481,"rssMB":1000,"call":"mutate"}
+{"t":164.533,"heapMB":485,"rssMB":1000,"call":"mutate"}
+{"t":165.53,"heapMB":490,"rssMB":1000,"call":"mutate"}
+{"t":166.534,"heapMB":494,"rssMB":1000,"call":"mutate"}
+{"t":167.532,"heapMB":499,"rssMB":1000,"call":"mutate"}
+{"t":168.534,"heapMB":503,"rssMB":1000,"call":"mutate"}
+{"t":169.536,"heapMB":507,"rssMB":1000,"call":"mutate"}
+{"t":170.536,"heapMB":510,"rssMB":1000,"call":"mutate"}
+{"t":171.533,"heapMB":515,"rssMB":1000,"call":"mutate"}
+{"t":172.537,"heapMB":518,"rssMB":1000,"call":"mutate"}
+{"t":173.537,"heapMB":522,"rssMB":1000,"call":"mutate"}
+{"t":174.536,"heapMB":526,"rssMB":1000,"call":"mutate"}
+{"t":175.535,"heapMB":530,"rssMB":1000,"call":"mutate"}
+{"t":176.537,"heapMB":534,"rssMB":1000,"call":"mutate"}
+{"t":177.557,"heapMB":539,"rssMB":1000,"call":"mutate"}
+{"t":178.537,"heapMB":543,"rssMB":1000,"call":"mutate"}
+{"t":179.538,"heapMB":547,"rssMB":1000,"call":"mutate"}
+{"t":180.537,"heapMB":551,"rssMB":1000,"call":"mutate"}
+{"t":181.535,"heapMB":556,"rssMB":1000,"call":"mutate"}
+{"t":182.546,"heapMB":560,"rssMB":1000,"call":"mutate"}
+{"t":183.536,"heapMB":565,"rssMB":1000,"call":"mutate"}
+{"t":184.538,"heapMB":569,"rssMB":1004,"call":"mutate"}
+{"t":185.537,"heapMB":574,"rssMB":1005,"call":"mutate"}
+{"t":186.538,"heapMB":578,"rssMB":1009,"call":"mutate"}
+{"t":187.539,"heapMB":582,"rssMB":1014,"call":"mutate"}
+{"t":188.54,"heapMB":587,"rssMB":1018,"call":"mutate"}
+{"t":189.54,"heapMB":591,"rssMB":1022,"call":"mutate"}
+{"t":190.542,"heapMB":595,"rssMB":1027,"call":"mutate"}
+{"t":191.539,"heapMB":600,"rssMB":1028,"call":"mutate"}
+{"t":192.541,"heapMB":604,"rssMB":1032,"call":"mutate"}
+{"t":193.542,"heapMB":609,"rssMB":1034,"call":"mutate"}
+{"t":194.551,"heapMB":614,"rssMB":1038,"call":"mutate"}
+{"t":195.543,"heapMB":618,"rssMB":1043,"call":"mutate"}
+{"t":196.543,"heapMB":623,"rssMB":1047,"call":"mutate"}
+{"t":198.796,"heapMB":630,"rssMB":1082,"call":null}
+{"t":199.776,"log":"[lanehost] disks disk snapshot 6.6 ms"}
+{"t":199.777,"log":"[lanehost] privileged diff 22.9 ms"}
+{"t":199.779,"log":"[host] run 99b24aeb done"}
+{"t":199.78,"heapMB":55,"rssMB":1067,"call":null}
+{"t":200.775,"heapMB":54,"rssMB":1067,"call":null}
+{"t":201.771,"heapMB":54,"rssMB":1067,"call":null}
+{"t":202.775,"heapMB":54,"rssMB":1067,"call":null}
+{"t":203.775,"heapMB":54,"rssMB":1067,"call":null}
+{"t":204.776,"heapMB":54,"rssMB":1067,"call":null}
+{"t":205.776,"heapMB":54,"rssMB":1068,"call":null}
+{"t":206.766,"heapMB":54,"rssMB":1068,"call":null}
+{"t":207.768,"heapMB":54,"rssMB":1068,"call":null}
+{"t":208.782,"heapMB":54,"rssMB":1068,"call":null}
+{"t":209.781,"heapMB":54,"rssMB":1068,"call":null}
+{"t":210.779,"heapMB":54,"rssMB":1068,"call":null}
+{"t":211.782,"heapMB":54,"rssMB":1068,"call":null}
+{"t":212.785,"heapMB":54,"rssMB":1068,"call":null}
+{"t":213.786,"heapMB":54,"rssMB":1068,"call":null}
+{"t":214.061,"results":["(no output)","calibrated\n","╰──────────────────────────────────────────────────────────────────────────────╯\n\nDone in 5.3s using pnpm v10.18.0\n","\n  KILLED    a lane read in a batch takes every base for a WIP's\n\n=== mutations: 1 killed, 0 not ===\n\n  KILLED    a stale base working copy is not recovered\n\n=== mutations: 1 killed, 0 not ===\n\n  KILLED    a turn that changed nothing is committed\n\n=== mutations: 1 killed, 0 not ===\n"]}

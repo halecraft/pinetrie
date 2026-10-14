@@ -1221,9 +1221,31 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     - **A path's first event decides whether it was there before the
       run,** so a write is created or not, and a read counts only of what
       was there before the run wrote it.
-    - **A drain flushes first:** `drainLane` takes a `Flushed` (core), which
-      only a `RunSource`'s flush makes, so no drain folds without the
-      barrier.
+    - **Events are folded as they arrive, in batches** (ADR-0145), by
+      `laneFold`, which the lane's `RunSource` applies
+      (`packages/lanehost/TECHNICAL.md`).
+      - Their source holds traces, never events, so a lane's runs cost
+        the paths they touched inside the lane, not how often they
+        touched them.
+      - **A change to `foldRunEvents` must keep it a left fold:** a
+        sequence folded batch by batch gives the traces of it folded at
+        once. A test holds it to that over random splits.
+      - The fold holds the lane's directory and shared directories
+        (`LanePlaces`), from the helper's hello. A trace does not carry
+        them.
+      - It copies a trace's maps once per call, so it is never called per
+        event.
+      - A trace's `accesses` is the exception: a log of every open and
+        release under a shared directory, which `sharedTouches` reads in
+        time order.
+    - **A drain is given the traces only after a flush:** `drainLane` runs
+      inside the `RunSource`'s `drain`, whose callback is the only way to
+      the traces. `tracesWithCommands` gives each launched run its
+      command, which comes from the helper at the drain, not with the
+      events.
+    - **A drain's runs are in launch order** (by run number: by length,
+      then as strings), whatever order their events came in. A turn's
+      classes let the last run that wrote a path decide (`disk.ts`).
     - **A run with a loss** carries `observed: lost`, and is no recipe
       (`CompleteRun`, `disk.ts`).
     - **A remote release whose stamp was raced** (`raced`) is a contested

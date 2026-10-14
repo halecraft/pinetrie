@@ -221,23 +221,71 @@ export function decodeRunNotice(line: string): RunNotice | null {
   return event === null ? null : { run: line.slice(0, tab), event }
 }
 
-declare const flushedBrand: unique symbol
-/**
- * A lane's notices up to a flush: everything its processes did before it
- * was asked. Made only by a `RunSource`'s flush, so no drain folds without
- * one.
- */
-export type Flushed = readonly RunNotice[] & {
-  readonly [flushedBrand]: true
+/** What a run did to one path, since it first named it. */
+export interface PathTrace {
+  /** Something was at the path when the run first named it. */
+  readonly before: boolean
+  readonly wrote: boolean
+  /** Read while it held what was there before the run. */
+  readonly read: boolean
+  /** Looked for while missing, before the run made it. */
+  readonly missed: boolean
+  readonly dir: boolean
+  /** Reported written at an earlier drain: gone now, it is a deletion. */
+  readonly reportedWrite: boolean
+  readonly reportedRead: boolean
+  readonly reportedMissing: boolean
 }
-/** For a `RunSource` only: what its flush delivered. */
-export const flushed = (notices: readonly RunNotice[]): Flushed =>
-  notices as Flushed
 
-/** Where a lane's run events come from, on the host. */
+/**
+ * A run as folded so far, its paths relative to the lane's directory.
+ * Folded by `@pinetrie/rules`, which holds the lane's directory and shared
+ * directories in its fold.
+ */
+export interface RunTrace {
+  readonly id: string
+  readonly command: string | null
+  readonly exit: number | null
+  readonly ended: boolean
+  /** Events the observer lost, in all: the run is incomplete for good. */
+  readonly lost: number
+  readonly paths: ReadonlyMap<string, PathTrace>
+  /** Paths changed since the last drain. */
+  readonly dirty: ReadonlySet<string>
+  /** Shared accesses since the last drain. */
+  readonly accesses: readonly SharedAccess[]
+  /** Anything to report at the next drain, the exit and the end included. */
+  readonly changed: boolean
+}
+
+/** A lane's runs, folded: each run's trace, by its number. */
+export type RunTraces = ReadonlyMap<string, RunTrace>
+
+/**
+ * `traces` with `batch` folded in, in order; `traces` is left as it was.
+ * The batch is the fold's: nothing writes it after the call.
+ */
+export type FoldNotices = (
+  traces: RunTraces,
+  batch: readonly RunNotice[],
+) => RunTraces
+
+/** What a drain leaves: the traces to hold on to, and its answer. */
+export interface Drained<T> {
+  readonly traces: RunTraces
+  readonly result: T
+}
+
+/** Where a lane's runs come from, on the host: folded as their events arrive. */
 export interface RunSource {
-  /** Every notice since the last flush, once all before this call has arrived. */
-  flush(): Promise<Flushed>
+  /**
+   * Once every event of a call that already returned has arrived, `drain`
+   * is given the lane's traces, and the traces it returns are held in
+   * their place. Events that arrive while it runs are folded onto those.
+   * A `drain` that throws leaves the traces as it was given them. Drains
+   * run one after another, in call order.
+   */
+  drain<T>(drain: (traces: RunTraces) => Promise<Drained<T>>): Promise<T>
 }
 
 /** Where a lane's helper serves the machine's observer to a host inside the lane. */
@@ -349,13 +397,9 @@ export type ToolWrites = readonly string[]
 /**
  * What a lane's helper knows of its runs since the last drain: each run it
  * launched with its command, and its tools' writes and shared accesses.
- * The runs' events come from the lane's `RunSource`.
+ * What the runs did comes from the lane's `RunSource`.
  */
 export interface LaneDrain {
-  /** The lane's directory, absolute: its runs' paths are under it. */
-  readonly root: string
-  /** Shared directories, relative to `root`. */
-  readonly shared: readonly string[]
   readonly launched: readonly {
     readonly run: string
     readonly command: string

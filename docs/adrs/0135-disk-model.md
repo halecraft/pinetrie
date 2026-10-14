@@ -57,6 +57,9 @@
   - ADR-0142: settles its second step. A folder project's accepted work is the
     folder, merge bases come from a graph of states pine·trie keeps, and
     conflicts are records whose versions a lane reads read-only.
+  - ADR-0145: a run's events are folded on the host as they arrive, not
+    gathered until the turn's drain; a flush is still the barrier before a
+    drain reads them.
 
 **Context.** pine·trie leans on jj for what a project's state is, and on
 jj's ignore rules for which files belong to it. Five problems follow:

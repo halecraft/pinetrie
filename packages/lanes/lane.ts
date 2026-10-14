@@ -40,7 +40,7 @@ export const helperCommand = (
 /** An open channel into a lane, as runners; `channel` is the host's own. */
 export interface LaneLink<C> {
   readonly channel: C
-  /** Its runs' events, from the machine's observer: registered as the link opened. */
+  /** Its runs, folded as the machine's observer reports them: registered as the link opened. */
   readonly runs: RunSource
   readonly run: Runner
   readonly bytes: BytesRunner

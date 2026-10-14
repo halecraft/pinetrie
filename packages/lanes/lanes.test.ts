@@ -8,7 +8,12 @@ import {
 } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { entryId, flushed, snapshotId, threadIdFor } from "@pinetrie/core"
+import {
+  entryId,
+  type RunSource,
+  snapshotId,
+  threadIdFor,
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   bookmarkOf,
@@ -31,6 +36,11 @@ import {
   runtimeNode,
   type Step,
 } from "./index.ts"
+
+/** A lane no observer sees: no run did anything. */
+const unobserved: RunSource = {
+  drain: async drain => (await drain(new Map())).result,
+}
 
 // What a lane runs against jj itself, in throwaway repos, with your repo in
 // it, is `@pinetrie/repo`'s `repo.test.ts`: every such test fetches into your
@@ -317,7 +327,7 @@ describe("laneHandle.start", () => {
     }
     const handle = laneHandle(runtime, "pinetrie-t-1", async () => ({
       channel: null,
-      runs: { flush: async () => flushed([]) },
+      runs: unobserved,
       run: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
       bytes: async () => ({
         ok: true,
@@ -344,7 +354,7 @@ describe("laneHandle.start", () => {
 describe("laneHandle.link", () => {
   const link = (closed: Promise<void>) => ({
     channel: null,
-    runs: { flush: async () => flushed([]) },
+    runs: unobserved,
     run: async () => ({ ok: true as const, code: 0, stdout: "", stderr: "" }),
     bytes: async () => ({
       ok: true as const,

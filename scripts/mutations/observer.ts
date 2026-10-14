@@ -21,6 +21,16 @@ const unit = [
   "run",
   "packages/lanehost/observer.test.ts",
 ]
+const gathering = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "packages/lanehost/gathered.test.ts",
+  "packages/lanehost/observer-client.test.ts",
+]
+const gathered = "packages/lanehost/gathered.ts"
+const client = "packages/lanehost/observer-client.ts"
 
 export const mutations: readonly Mutation[] = [
   {
@@ -409,11 +419,65 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's notices before its registration's answer are dropped",
     file: "packages/lanehost/observer-client.ts",
-    from: "    lane.notices.unshift(...(unclaimed.get(namespace) ?? []))\n",
+    from: "    for (const n of unclaimed.get(namespace) ?? []) take(lane, n)\n",
     to: "",
     command: relay,
     expect:
       "a host inside a lane registers its lane below the lane, and receives only its own runs",
+  },
+  {
+    name: "a lane's notices wait for the drain",
+    file: gathered,
+    from: "  !g.draining && length >= Math.max(MIN_BATCH, g.size)\n",
+    to: "  false\n",
+    command: gathering,
+    expect:
+      "a lane's notices are folded in batches as they arrive, never held whole",
+  },
+  {
+    name: "a batch is emptied in place",
+    file: client,
+    from: "  lane.gathered = foldedWith(lane.gathered, lane.batch, lane.fold)\n  lane.batch = []\n",
+    to: "  lane.gathered = foldedWith(lane.gathered, lane.batch, lane.fold)\n  lane.batch.length = 0\n",
+    command: gathering,
+    expect:
+      "a lane's notices are folded in batches as they arrive, never held whole",
+  },
+  {
+    name: "a drain's late events are dropped",
+    file: gathered,
+    from: "    late,\n    fold,\n  )\n",
+    to: "    [],\n    fold,\n  )\n",
+    command: gathering,
+    expect:
+      "notices that arrive during a drain are folded onto what it returns",
+  },
+  {
+    name: "a failed drain drops its traces",
+    file: gathered,
+    from: "      traces: next ?? g.traces,\n      size: tracesSize(next ?? g.traces),\n",
+    to: "      traces: next ?? new Map(),\n      size: tracesSize(next ?? new Map()),\n",
+    command: gathering,
+    expect:
+      "a drain that throws leaves the traces it was given, with what arrived since",
+  },
+  {
+    name: "a reclaimed lane's held notices go first",
+    file: client,
+    from: "    for (const n of unclaimed.get(namespace) ?? []) take(lane, n)\n",
+    to: "    lane.batch.unshift(...(unclaimed.get(namespace) ?? []))\n",
+    command: gathering,
+    expect:
+      "a reclaimed lane's held notices are folded after what it already holds",
+  },
+  {
+    name: "a drain starts before the last has ended",
+    file: client,
+    from: "          const drained = held.draining.then(async () => {\n",
+    to: "          const drained = Promise.resolve().then(async () => {\n",
+    command: gathering,
+    expect:
+      "drains run one after another, each given what the one before returned",
   },
   {
     name: "a relayed call goes to the role as the lane sent it",

@@ -5,10 +5,18 @@
 
 import { existsSync } from "node:fs"
 import path from "node:path"
+import type { LaneObservation } from "@pinetrie/core"
 import { connectObserver, observerClient } from "@pinetrie/lanehost"
 import { standInRole } from "@pinetrie/lanehost/fixtures"
 import { type LaneChannel, relayObserver, serveRelay } from "@pinetrie/pi"
+import { laneFold } from "@pinetrie/rules"
 import { expect, test } from "vitest"
+
+/** No lane directory: the stand-in's runs are told apart by their numbers alone. */
+const fold = laneFold({ root: "/", shared: [] })
+/** The runs a lane's source holds, by number. */
+const runsIn = (lane: { drain: LaneObservation["drain"] }) =>
+  lane.drain(async traces => ({ traces, result: [...traces.keys()] }))
 
 const until = async (ok: () => boolean) => {
   for (let i = 0; i < 100 && !ok(); i++)
@@ -24,7 +32,7 @@ test("a host inside a lane registers its lane below the lane, and receives only 
     const outer = observerClient({
       open: async () => connectObserver(role.socket),
     })
-    const lane = await outer.observe({ pid: async () => 4, remote: [] })
+    const lane = await outer.observe({ pid: async () => 4, remote: [], fold })
 
     let answer:
       | ((r: Parameters<LaneChannel["observerReply"]>[0]) => void)
@@ -42,12 +50,12 @@ test("a host inside a lane registers its lane below the lane, and receives only 
     await until(() => existsSync(helper))
 
     const inner = observerClient({ open: async () => connectObserver(helper) })
-    const below = await inner.observe({ pid: async () => 7, remote: [] })
-    expect((await below.flush()).map(n => n.run)).toEqual(["2"])
-    expect((await lane.flush()).map(n => n.run)).toEqual(["1"])
+    const below = await inner.observe({ pid: async () => 7, remote: [], fold })
+    expect(await runsIn(below)).toEqual(["2"])
+    expect(await runsIn(lane)).toEqual(["1"])
     // Lane 40's own first process is pid 1 there: the lane itself, refused.
     await expect(
-      inner.observe({ pid: async () => 1, remote: [] }),
+      inner.observe({ pid: async () => 1, remote: [], fold }),
     ).rejects.toThrow("forwarding lane's own namespace")
 
     await below.close()

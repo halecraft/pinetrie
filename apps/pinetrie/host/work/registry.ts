@@ -19,24 +19,32 @@ import {
   relayObserver,
 } from "@pinetrie/pi"
 import { readLaneRecords } from "@pinetrie/reads"
+import { laneFold } from "@pinetrie/rules"
 import type { SessionDocHandle } from "@pinetrie/schema"
 
 /**
  * A lane's channel: pi's helper in its container, over the runtime's `exec
- * -i`, and its runs observed. Every container start opens it before any
- * tool runs, so the lane is registered with the observer each time. The
- * helper serves the observer to a host inside the lane, relayed by this
- * one, while the channel is open.
+ * -i`, and its runs observed, folded by the places the helper's hello
+ * names. Every container start opens it before any tool runs, so the lane
+ * is registered with the observer each time. The helper serves the
+ * observer to a host inside the lane, relayed by this one, while the
+ * channel is open.
  */
 export const openLinkOf =
   (runtime: LaneRuntime): OpenLink<LaneChannel> =>
   async container => {
     const channel = openChannel(helperCommand(runtime, container))
-    const { shared } = await channel.ready
-    const runs = await runtime.observe(container, shared).catch(error => {
-      channel.close()
-      throw error
-    })
+    const hello = await channel.ready
+    const runs = await runtime
+      .observe(
+        container,
+        hello.shared,
+        laneFold({ root: hello.cwd, shared: hello.sharedInside }),
+      )
+      .catch(error => {
+        channel.close()
+        throw error
+      })
     const stopRelay = relayObserver(channel, () => runs.relay())
     const { run, bytes } = laneRunner(channel)
     return {

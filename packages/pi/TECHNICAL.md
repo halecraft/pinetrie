@@ -485,10 +485,13 @@ item 18, and in `lanes.test.ts` against the harness.
   number in `PINETRIE_RUN` (`observer.ts`, `launchOptions`): pi spawns the
   shell with `options.env` last, so the variable is the run's whatever the
   caller gave. The machine's observer sees it begin there and sends its
-  events to the host, never through the helper; the host folds them
-  (`@pinetrie/rules`, `drainLaneRuns` in `lane-runs.ts`). The helper's
-  `runs` says only what it launched and its tools' part (`LaneDrain`), and
-  `present` which changed paths exist now. A drain is a `RunRecord` per run
+  events to the host, never through the helper; the host folds them as
+  they arrive (`laneFold`, `@pinetrie/rules`, ADR-0145), by the lane's
+  directory and the shared directories under it, which the helper's hello
+  names (`sharedInside`). A drain (`drainLaneRuns` in `lane-runs.ts`) takes
+  those traces. The helper's `runs` says only what it launched and its
+  tools' part (`LaneDrain`), and `present` which changed paths exist
+  now. A drain is a `RunRecord` per run
   with news since the last: its reads, writes (created or not), deletions,
   failed lookups and shared accesses, with the write tools' paths beside
   them (`ToolWrites`). Its rules:
@@ -518,9 +521,13 @@ item 18, and in `lanes.test.ts` against the harness.
   - **A path's first event decides whether it was there before the run,**
     so a write is created or not, and a read counts only of what was there
     before the run wrote it: a run's own output is never its input.
-  - **A drain flushes first:** its `RunSource`'s flush answers once every
-    event of a call that already returned has arrived, so the exit of a
-    command whose `exec` returned is in it.
+  - **A drain flushes first:** it runs inside its `RunSource`'s `drain`,
+    which calls it once every event of a call that already returned has
+    arrived and been folded, so the exit of a command whose `exec`
+    returned is in it.
+  - **A drain that throws leaves its runs to the next.** The traces stay
+    with the source. The helper's launched commands it had already taken
+    are lost, so those runs record none.
   - **A daemon's run stays open** (`alive`) and reports again at later
     drains, until its last task has exited and its last written file has
     been let go of.
@@ -537,7 +544,7 @@ item 18, and in `lanes.test.ts` against the harness.
     itself a symlink is left out, a missing directory ends the search, and
     each directory is `lstat`ed once per call.
   - Outside a lane, as in tests on the host, nothing observes: the drain's
-    source gives no events, and no run reports a path.
+    source gives no traces, and no run reports a path.
 - **The observer, relayed to a host inside the lane** (`observer.ts`):
   while the host holds an `observerRelay` call open, the helper serves
   core's `OBSERVER_SOCKET` (`serveRelay`). Each connection of it is a

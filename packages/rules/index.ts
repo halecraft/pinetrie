@@ -525,12 +525,9 @@ export {
   checkRecipe,
   dirtyPaths,
   drainLane,
-  drainRun,
-  foldLaneDrain,
-  foldRunEvents,
-  newRunTrace,
-  type PathTrace,
-  type RunTrace,
+  type LanePlaces,
+  laneFold,
+  tracesWithCommands,
 } from "./runs.ts"
 export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
 export {

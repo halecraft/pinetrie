@@ -11,18 +11,20 @@
 import path from "node:path"
 import {
   type FileHashes,
-  type Flushed,
+  type FoldNotices,
   type LaneDrain,
   type LaneRuns,
   OPEN_FLAGS,
   type PathKind,
+  type PathTrace,
   type Recipe,
   type RecipeCheck,
   type ReleaseStamp,
   type RunEvent,
   type RunRecord,
+  type RunTrace,
+  type RunTraces,
   type RunWrite,
-  type SharedAccess,
   type Stamp,
 } from "@pinetrie/core"
 
@@ -32,48 +34,17 @@ const releaseStamp = (e: Extract<RunEvent, { kind: "call" }>): ReleaseStamp =>
     ? { kind: "raced", stamp: e.stamp, kernel: e.raced }
     : { kind: "stamp", stamp: e.stamp }
 
-/** What a run did to one path, since it first named it. */
-export interface PathTrace {
-  /** Something was at the path when the run first named it. */
-  readonly before: boolean
-  readonly wrote: boolean
-  /** Read while it held what was there before the run. */
-  readonly read: boolean
-  /** Looked for while missing, before the run made it. */
-  readonly missed: boolean
-  readonly dir: boolean
-  /** Reported written at an earlier drain: gone now, it is a deletion. */
-  readonly reportedWrite: boolean
-  readonly reportedRead: boolean
-  readonly reportedMissing: boolean
-}
-
-/** A run as folded so far: its paths relative to `root`. */
-export interface RunTrace {
-  readonly id: string
-  readonly command: string | null
+/** Where a lane's runs' paths are: what a fold needs besides the events. */
+export interface LanePlaces {
   /** The lane's directory, absolute. */
   readonly root: string
   /** Shared directories, relative to `root`. */
   readonly shared: readonly string[]
-  readonly exit: number | null
-  readonly ended: boolean
-  /** Events the observer lost, in all: the run is incomplete for good. */
-  readonly lost: number
-  readonly paths: ReadonlyMap<string, PathTrace>
-  /** Paths changed since the last drain. */
-  readonly dirty: ReadonlySet<string>
-  /** Shared accesses since the last drain. */
-  readonly accesses: readonly SharedAccess[]
-  /** Anything to report at the next drain, the exit and the end included. */
-  readonly changed: boolean
 }
 
 export const newRunTrace = (input: {
   readonly id: string
   readonly command: string | null
-  readonly root: string
-  readonly shared: readonly string[]
 }): RunTrace => ({
   ...input,
   exit: null,
@@ -115,6 +86,7 @@ const isUnder = (p: string, roots: readonly string[]): boolean =>
  * so fold a batch at a time.
  */
 export function foldRunEvents(
+  lane: LanePlaces,
   trace: RunTrace,
   events: readonly RunEvent[],
 ): RunTrace {
@@ -155,11 +127,11 @@ export function foldRunEvents(
       changed = true
       continue
     }
-    const p = inside(trace.root, e.path)
-    const p2 = inside(trace.root, e.path2)
+    const p = inside(lane.root, e.path)
+    const p2 = inside(lane.root, e.path2)
     if (
       p !== null &&
-      isUnder(p, trace.shared) &&
+      isUnder(p, lane.shared) &&
       (e.op === "open" || e.op === "release")
     ) {
       const fields = {
@@ -298,49 +270,86 @@ export function drainRun(
 }
 
 /**
- * A lane's traces with a drain folded in: the runs its helper launched,
- * then the source's notices up to its flush. A notice of a run the host
- * never saw launched (an earlier helper's) starts a trace with no command.
+ * The fold of a lane's notices, as its source applies it batch by batch.
+ * `foldRunEvents` is a left fold, so a batch folded onto the traces of the
+ * ones before it gives the traces of all of them folded at once. A run
+ * not seen before (an earlier helper's, or one whose launch the next drain
+ * names) starts with no command.
  */
-export function foldLaneDrain(
-  traces: ReadonlyMap<string, RunTrace>,
-  input: { readonly drain: LaneDrain; readonly notices: Flushed },
-): Map<string, RunTrace> {
-  const next = new Map(traces)
-  const { root, shared } = input.drain
-  const start = (run: string, command: string | null) =>
-    newRunTrace({ id: run, command, root, shared })
-  for (const l of input.drain.launched)
-    next.set(l.run, next.get(l.run) ?? start(l.run, l.command))
-  const byRun = new Map<string, RunEvent[]>()
-  for (const n of input.notices) {
-    const list = byRun.get(n.run) ?? []
-    list.push(n.event)
-    byRun.set(n.run, list)
+export const laneFold =
+  (lane: LanePlaces): FoldNotices =>
+  (traces, batch) => {
+    const byRun = new Map<string, RunEvent[]>()
+    for (const n of batch) {
+      const list = byRun.get(n.run)
+      if (list === undefined) byRun.set(n.run, [n.event])
+      else list.push(n.event)
+    }
+    if (byRun.size === 0) return traces
+    const next = new Map(traces)
+    for (const [run, events] of byRun)
+      next.set(
+        run,
+        foldRunEvents(
+          lane,
+          next.get(run) ?? newRunTrace({ id: run, command: null }),
+          events,
+        ),
+      )
+    return next
   }
-  for (const [run, events] of byRun)
-    next.set(run, foldRunEvents(next.get(run) ?? start(run, null), events))
+
+/**
+ * `traces` with each run the helper launched given its command, and a
+ * trace started for one with no events yet. A run it never launched keeps
+ * none.
+ */
+export function tracesWithCommands(
+  traces: RunTraces,
+  launched: LaneDrain["launched"],
+): RunTraces {
+  if (launched.length === 0) return traces
+  const next = new Map(traces)
+  for (const l of launched) {
+    const t = next.get(l.run)
+    next.set(
+      l.run,
+      t === undefined
+        ? newRunTrace({ id: l.run, command: l.command })
+        : { ...t, command: l.command },
+    )
+  }
   return next
 }
 
+/**
+ * Run numbers in launch order: the helper counts them up from
+ * `Date.now() × 1024`, so a longer number is later, and among numbers of
+ * one length the string order is the numeric one.
+ */
+const byRunNumber = (a: string, b: string): number =>
+  a.length - b.length || (a < b ? -1 : a > b ? 1 : 0)
+
 /** The paths whose presence the next drain needs: every trace's changed ones. */
-export const dirtyPaths = (
-  traces: ReadonlyMap<string, RunTrace>,
-): readonly string[] =>
+export const dirtyPaths = (traces: RunTraces): readonly string[] =>
   [...new Set([...traces.values()].flatMap(t => [...t.dirty]))].sort()
 
 /**
  * A lane's runs drained, given which of `dirtyPaths` are there now, with
  * its tools' part; and the traces to fold on into, each ended run gone.
+ * Its runs are in launch order whatever order their events came in:
+ * classing a turn's writes lets the last run that wrote a path decide.
  */
 export function drainLane(
-  traces: ReadonlyMap<string, RunTrace>,
+  traces: RunTraces,
   present: ReadonlySet<string>,
-  drain: LaneDrain,
-): { readonly runs: LaneRuns; readonly traces: Map<string, RunTrace> } {
+  drain: Pick<LaneDrain, "toolWrites" | "toolShared">,
+): { readonly runs: LaneRuns; readonly traces: RunTraces } {
   const runs: RunRecord[] = []
   const next = new Map<string, RunTrace>()
-  for (const [id, trace] of traces) {
+  for (const id of [...traces.keys()].sort(byRunNumber)) {
+    const trace = traces.get(id)
+    if (trace === undefined) continue
     const { record, trace: after } = drainRun(trace, present)
     if (record !== null) runs.push(record)
     if (!after.ended) next.set(id, after)

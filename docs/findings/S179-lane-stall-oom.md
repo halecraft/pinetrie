@@ -1,7 +1,7 @@
 # S179 — A `pnpm install` turn's diff takes 39 s and about 600 MB to fold, so lanehost's privileged role stalls every lane and is killed at its 256 MB limit; one path through a symlink fails a turn's `check-ignore`; and dropping a nested lane's disk fails on its read-only inner snapshots
 
 - **Status:** Answered
-- **Led to:** ADR-0129, ADR-0135
+- **Led to:** ADR-0129, ADR-0135, ADR-0145
 
 **Question.** On 2026-10-13 the Mac's host showed two errors. One was
 `classing the turn's writes failed: git check-ignore failed: fatal:

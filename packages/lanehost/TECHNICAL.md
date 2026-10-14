@@ -29,7 +29,8 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
 | `observer.ts` | the machine role: the loader's lines and commands, and every decision of the role's, pure |
 | `observer-server.ts` | the machine role's process: the loader held, each host's connection served |
 | `observer-connect.ts` | one host's channel, joined to the role's socket |
-| `observer-client.ts` | the host's side: one channel, a lane's notices gathered for its `RunSource` |
+| `observer-client.ts` | the host's side: one channel, a lane's runs folded as their notices arrive, for its `RunSource` |
+| `gathered.ts` | what the host holds of a lane's runs between drains, and when a batch of notices is folded, pure |
 
 ## Roles
 
@@ -146,6 +147,37 @@ host, whatever their projects.
   (`observer-client.ts`): the role sends a reclaimed lane's held notices
   as it registers it, before the answer names the namespace, so a notice
   of a namespace no lane holds yet waits for the lane that registers it.
+  - The lane then takes them **after** what it already holds: they are
+    what the role held since the lane's last channel closed.
+  - Each waiting notice is pushed onto its namespace's list in place, and
+    each notice finds its lane by a map of namespaces. The role sends up
+    to `HELD_PER_LANE` (100,000) on a reclaim, so a copy per notice would
+    be quadratic.
+- **A host holds a lane's runs folded, never its notices**
+  (`observer-client.ts`, `gathered.ts`, ADR-0145).
+  - The client is given a fold (`FoldNotices`, core), a step over a batch.
+    The host supplies `@pinetrie/rules`' (`laneFold`), and lanehost
+    imports no rules.
+  - **What it holds per lane:** the traces, in `gathered.ts`'s state, a
+    value; and one batch of notices not folded yet, which the client alone
+    writes. Held notices grew the host's heap 4.66 MB/s under `pnpm
+    mutate`, which killed it at 4 GB (S191).
+  - **When a batch is folded:** once it holds `max(MIN_BATCH, size)`
+    notices, `size` being what the traces hold. A fold copies the traces it
+    touches, so each notice costs constant work on average. A fold per
+    notice would be quadratic.
+  - **A batch handed to the fold is replaced, never emptied in place:**
+    the array is the fold's from then.
+  - **A drain is the source's own** (`RunSource.drain`):
+    1. it flushes, so every notice before it is folded into what the
+       drain's callback is given;
+    2. nothing is folded while the callback runs, and what arrives waits
+       in the batch;
+    3. after the callback, the client reads the lane's state afresh, since
+       notices kept arriving, and folds that batch onto what the callback
+       returned. A callback that threw leaves the traces it was given.
+
+    Drains run one after another, in call order.
 - **A connection waits up to 15 s for the role's socket** (`observer-connect.ts`):
   a role's container just made makes it once Node has started, some
   hundreds of ms after `docker run` returns.
