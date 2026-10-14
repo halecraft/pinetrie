@@ -16,20 +16,24 @@
 //                    and Docker must run lanes: the lane VM on the Mac
 //   PINETRIE_STORE     the SQLite file the session and pasted images are kept in
 //                    (default .pinetrie/pinetrie.db in the project's root)
-//   PINETRIE_PROVIDER, PINETRIE_MODEL
-//                    override the model; by default, the default in pi's
-//                    settings (the project's .pi/settings.json over
-//                    ~/.pi/agent/settings.json), with the providers your pi
-//                    extensions register
+//   PINETRIE_MODEL     the model, as provider/id, over every config file's
+//                    `model` (the config's env layer)
+//   XDG_CONFIG_HOME, XDG_DATA_HOME, XDG_CONFIG_DIRS
+//                    where pine·trie's config, credentials and the
+//                    machine's file are (`@pinetrie/config`'s places)
 //
-// As it starts, the host prints the project, the store, the user config it
-// read, and where its model came from.
+// As it starts, the host prints the project, the store, each config file it
+// read and what it refused, and where its model came from, or why it has
+// none and where the setup page is.
 //
 // A refused folder or argument prints why and exits 2, before anything opens;
 // a host with tools that cannot run its lanes prints why and exits 1.
 // The first SIGINT or SIGTERM shuts the host down; a second ends the process.
+import { homedir } from "node:os"
 import path from "node:path"
+import { configPlaces } from "@pinetrie/config"
 import { prepareProjectDir } from "@pinetrie/jj"
+import { bindAgentDir } from "@pinetrie/pi"
 import { HostRefused, startHost } from "./index.ts"
 import {
   planInvocation,
@@ -41,6 +45,7 @@ import {
   listeningLine,
   openLine,
   projectLine,
+  setupLine,
   storeLine,
 } from "./startup-lines.ts"
 
@@ -62,17 +67,15 @@ const { root } = prepared
 const store = storeChoice(root, env)
 console.log(projectLine(root))
 console.log(storeLine(store))
+const places = configPlaces(env, homedir(), path.basename(root))
 const host = await startHost({
   port: Number.parseInt(env.PINETRIE_PORT ?? "7391", 10),
   bind: env.PINETRIE_BIND ?? "127.0.0.1",
   ...(env.PINETRIE_KEY === undefined ? {} : { key: env.PINETRIE_KEY }),
-  model: {
-    kind: "configured",
-    ...(env.PINETRIE_PROVIDER === undefined
-      ? {}
-      : { provider: env.PINETRIE_PROVIDER }),
-    ...(env.PINETRIE_MODEL === undefined ? {} : { model: env.PINETRIE_MODEL }),
-  },
+  model: { kind: "configured" },
+  places,
+  // Before pi loads anything: an extension finds its own config through it.
+  binding: bindAgentDir(places.dirs.config),
   project: { dir: root, tools: env.PINETRIE_TOOLS !== "0" },
   store: store.file,
 }).catch(error => {
@@ -85,6 +88,7 @@ const host = await startHost({
 })
 
 console.log(listeningLine(host.httpUrl))
+if (host.model.kind === "none") console.log(setupLine(host.httpUrl))
 for (const invite of host.invites) console.log(openLine(invite))
 
 const signals = ["SIGINT", "SIGTERM"] as const

@@ -1,42 +1,10 @@
-// lanes/host — what the host reads of its own machine at startup: config
-// files (`readConfigFile`, `userConfigFile`) and the links under your
-// working copy's `node_modules` (`gatherLinks`). Your repo's own reads and
-// writes at startup are `@pinetrie/jj`'s (`startup.ts`).
+// lanes/host — what the host reads of its own machine at startup: the links
+// under your working copy's `node_modules` (`gatherLinks`). Your repo's own
+// reads and writes at startup are `@pinetrie/jj`'s (`startup.ts`).
 
-import { readdir, readFile, readlink } from "node:fs/promises"
-import { homedir } from "node:os"
+import { readdir, readlink } from "node:fs/promises"
 import path from "node:path"
-import { errorText } from "@pinetrie/core"
-import { type ConfigRead, type Link, PROJECT_DIR } from "./plan.ts"
-/** Read a JSON config file. Only a file that does not exist is `missing`. */
-export async function readConfigFile(file: string): Promise<ConfigRead> {
-  let text: string
-  try {
-    text = await readFile(file, "utf8")
-  } catch (error) {
-    return isMissing(error)
-      ? { kind: "missing" }
-      : { kind: "broken", reason: errorText(error) }
-  }
-  try {
-    return { kind: "read", json: JSON.parse(text) as unknown }
-  } catch (error) {
-    return { kind: "broken", reason: errorText(error) }
-  }
-}
-
-const isMissing = (error: unknown): boolean =>
-  error instanceof Error && "code" in error && error.code === "ENOENT"
-
-/** The user's lane config file: `$XDG_CONFIG_HOME/pinetrie/config.json`. */
-export const userConfigFile = (
-  env: Readonly<Record<string, string | undefined>> = process.env,
-): string =>
-  path.join(
-    env.XDG_CONFIG_HOME ?? path.join(homedir(), ".config"),
-    "pinetrie",
-    "config.json",
-  )
+import { type Link, PROJECT_DIR } from "./plan.ts"
 
 /** Every `node_modules` directory up to three levels down, never inside another. */
 async function findNodeModules(root: string): Promise<string[]> {

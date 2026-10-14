@@ -11,7 +11,6 @@ import {
   BASE_LANE,
   configChangeNote,
   configWidenings,
-  decodeLaneConfig,
   effectiveLaneConfig,
   imageRefusal,
   isBaseCurrent,
@@ -21,7 +20,6 @@ import {
   laneContainer,
   laneGitConfig,
   laneIgnores,
-  machineConfig,
   NO_GRANTS,
   NOTHING_ATTACHED,
   parseBaseFacts,
@@ -122,7 +120,10 @@ describe("slotMounts: what a host shares into its slot of the lane VM", () => {
 
 describe("planHostMounts: granted host paths, and the ones never mounted", () => {
   const home = "/Users/ada"
-  const agentDir = "/Users/ada/.pi/agent"
+  const own = [
+    "/Users/ada/.config/pinetrie",
+    "/Users/ada/.local/share/pinetrie",
+  ]
   test("nested roots collapse into the outermost", () => {
     expect(
       planHostMounts({
@@ -132,33 +133,35 @@ describe("planHostMounts: granted host paths, and the ones never mounted", () =>
           "/opt/x",
         ],
         home,
-        agentDir,
+        own,
       }),
     ).toEqual({ mounts: ["/Users/ada/ai/duane", "/opt/x"], refused: [] })
   })
-  test("never your home directory, / or pi's agent directory; a package inside the agent directory is fine", () => {
+  test("never your home directory, / or pine·trie's own directories; a folder inside one is fine", () => {
     const planned = planHostMounts({
       roots: [
         "/",
         "/Users",
         "/Users/ada",
-        "/Users/ada/.pi",
-        "/Users/ada/.pi/agent/npm/node_modules/pi-subagents",
+        "/Users/ada/.config",
+        "/Users/ada/.local/share/pinetrie",
+        "/Users/ada/.config/pinetrie/skills/plan",
         "/x/a,b:c",
       ],
       home,
-      agentDir,
+      own,
     })
     // Docker's API takes any path: a comma and a colon are no trouble.
     expect(planned.mounts).toEqual([
-      "/Users/ada/.pi/agent/npm/node_modules/pi-subagents",
+      "/Users/ada/.config/pinetrie/skills/plan",
       "/x/a,b:c",
     ])
     expect(planned.refused.map(r => `${r.path}: ${r.reason}`)).toEqual([
       "/: it is the file system's root",
       "/Users: it is, or holds, your home directory",
       "/Users/ada: it is, or holds, your home directory",
-      "/Users/ada/.pi: it is, or holds, pi's agent directory",
+      "/Users/ada/.config: it is, or holds, one of pine·trie's own directories",
+      "/Users/ada/.local/share/pinetrie: it is, or holds, one of pine·trie's own directories",
     ])
   })
 })
@@ -282,156 +285,15 @@ test("specHashOf: the hash of the runtime's spec, changed when it changes", () =
   ).not.toBe(specHashOf(runtime, shape))
 })
 
-describe("machineConfig: the VM's slots, a bad value refused", () => {
-  test("default: 16 slots", () => {
-    expect(machineConfig({ slots: null })).toEqual({
-      machine: { slots: 16 },
-      refused: [],
-    })
-  })
-  test("what the user wrote, when it can be used", () => {
-    expect(machineConfig({ slots: 20 }).machine).toEqual({ slots: 20 })
-  })
-  test("more than 20 slots, refused with why; the default holds", () => {
-    const { machine, refused } = machineConfig({ slots: 24 })
-    expect(machine).toEqual({ slots: 16 })
-    expect(refused).toEqual([
-      "lanes.vm.slots 24 is not a whole number from 1 to 20: a VM boots with at most 20 share devices beside its others; using 16",
-    ])
-    expect(machineConfig({ slots: 2.5 }).refused).toHaveLength(1)
-    expect(machineConfig({ slots: 0 }).refused).toHaveLength(1)
-  })
-})
-
-describe("decodeLaneConfig: grants and shared directories, total", () => {
-  test("nothing, or anything malformed, grants and shares nothing", () => {
-    for (const json of [undefined, {}, { lanes: 3 }])
-      expect(decodeLaneConfig(json, "/p")).toEqual({
-        grants: NO_GRANTS,
-        shared: [],
-        repo: {
-          acceptedBookmark: null,
-          wipPrefix: null,
-          publish: null,
-          catchUp: null,
-          offers: false,
-        },
-        machine: { slots: null },
-      })
-    expect(
-      decodeLaneConfig(
-        {
-          lanes: {
-            ssh: "yes",
-            nested: "yes",
-            env: ["OK_1", 4, "no-dash", "A=B"],
-            mounts: [{ source: "d" }, { source: "d", target: "rel" }],
-            shared: [".plans", 3, null],
-          },
-        },
-        "/p",
-      ),
-    ).toEqual({
-      grants: {
-        ssh: false,
-        nested: false,
-        hostPorts: [],
-        env: ["OK_1"],
-        mounts: [],
-      },
-      shared: [".plans"],
-      repo: {
-        acceptedBookmark: null,
-        wipPrefix: null,
-        publish: null,
-        catchUp: null,
-        offers: false,
-      },
-      machine: { slots: null },
-    })
-  })
-  test("lanes.hostPorts: whole ports from 1 to 65535, once each, in order", () => {
-    const ports = (v: unknown) =>
-      decodeLaneConfig({ lanes: { hostPorts: v } }, "/p").grants.hostPorts
-    expect(ports([5432, 3000, 3000, 0, 70000, 2.5, "80"])).toEqual([3000, 5432])
-    expect(ports("5432")).toEqual([])
-    expect(ports(undefined)).toEqual([])
-  })
-  test("lanes.nested grants lanes inside a lane, only when true", () => {
-    const nested = (v: unknown) =>
-      decodeLaneConfig({ lanes: { nested: v } }, "/p").grants.nested
-    expect(nested(true)).toBe(true)
-    expect(nested("true")).toBe(false)
-    expect(nested(undefined)).toBe(false)
-  })
-  test("lanes.vm.slots: the machine's setting, as written", () => {
-    const machine = (lanes: unknown) =>
-      decodeLaneConfig({ lanes }, "/p").machine
-    expect(machine({ vm: { slots: 4 } })).toEqual({ slots: 4 })
-    expect(machine({ vm: { slots: "4" } })).toEqual({
-      slots: { invalid: '"4"' },
-    })
-  })
-  test("accepted, wip and publish: how pine·trie uses your repo, as written", () => {
-    expect(
-      decodeLaneConfig(
-        {
-          accepted: { bookmark: "trunk" },
-          wip: { prefix: 3 },
-          publish: { bookmark: "master" },
-        },
-        "/p",
-      ).repo,
-    ).toEqual({
-      acceptedBookmark: "trunk",
-      wipPrefix: null,
-      publish: "master",
-      catchUp: null,
-      offers: false,
-    })
-    expect(decodeLaneConfig({ offers: { onto: "trunk" } }, "/p").repo).toEqual({
-      acceptedBookmark: null,
-      wipPrefix: null,
-      publish: null,
-      catchUp: null,
-      offers: true,
-    })
-  })
-  test("publish.catchUp: a boolean, else the text written", () => {
-    const flag = (catchUp: unknown) =>
-      decodeLaneConfig({ publish: { catchUp } }, "/p").repo.catchUp
-    expect(flag(true)).toBe(true)
-    expect(flag(false)).toBe(false)
-    expect(flag(undefined)).toBeNull()
-    expect(flag("yes")).toEqual({ invalid: '"yes"' })
-    expect(flag(null)).toEqual({ invalid: "null" })
-  })
-  test("mount sources are relative to the project", () => {
-    expect(
-      decodeLaneConfig(
-        { lanes: { ssh: true, mounts: [{ source: "../d", target: "/d" }] } },
-        "/p/app",
-      ).grants,
-    ).toEqual({
-      ssh: true,
-      nested: false,
-      hostPorts: [],
-      env: [],
-      mounts: [{ source: "/p/d", target: "/d", readonly: true }],
-    })
-  })
-})
-
 describe("planShared: which shared directories apply, and what the host does for them", () => {
   const none = new Set<string>()
   const facts = {
-    user: [".plans", "notes/"],
-    project: [".plans", "shared/data"],
+    entries: [".plans", "notes/", ".plans", "shared/data"],
     exists: new Set([".plans"]),
     tracked: none,
     ignored: new Set([".plans"]),
   }
-  test("the user's, then the project's, normalized, each once", () => {
+  test("in order, normalized, each once", () => {
     expect(planShared(facts).shared).toEqual([".plans", "notes", "shared/data"])
   })
   test("created when missing; excluded in your repo unless already ignored", () => {
@@ -442,7 +304,7 @@ describe("planShared: which shared directories apply, and what the host does for
   test("refused, with a reason: absolute, leaving the project, in a repo's or pinetrie's own, tracked", () => {
     const planned = planShared({
       ...facts,
-      user: [
+      entries: [
         "/abs",
         "../out",
         ".",
@@ -452,7 +314,6 @@ describe("planShared: which shared directories apply, and what the host does for
         "node_modules/y",
         "docs",
       ],
-      project: [],
       tracked: new Set(["docs"]),
     })
     expect(planned.shared).toEqual([])

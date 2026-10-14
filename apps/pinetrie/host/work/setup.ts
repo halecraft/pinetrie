@@ -7,18 +7,17 @@ import { stat } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import path from "node:path"
+import { type ConfigPlaces, ownDirs, type StartLayers } from "@pinetrie/config"
 import {
   errorText,
   isThreadId,
-  PROJECT_CONFIG_FILE,
+  isWithin,
   type ProjectRecord,
 } from "@pinetrie/core"
 import { createKeeper, type Keeper } from "@pinetrie/keeper"
 import {
   BASE_LANE,
   checkImage,
-  configJson,
-  decodeLaneConfig,
   ensureRuntime,
   gatherLinks,
   type LaneOwner,
@@ -32,16 +31,21 @@ import {
   planMounts,
   prepareImages,
   projectContainerfile,
-  readConfigFile,
   refreshBase,
   type SharedDir,
   slotMounts,
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
-import { decodeOwner } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
-import { brokenConfigLine } from "../startup-lines.ts"
+import {
+  folderCopy,
+  type HostReport,
+  type HostSettings,
+  repoNames,
+  settleHost,
+  sshChoice,
+} from "../settings.ts"
 import type { OpenProject, ProjectAdapter } from "./adapter.ts"
 import {
   type AcceptedLanes,
@@ -78,9 +82,6 @@ export interface Ready {
   readonly identity: { readonly name: string; readonly email: string }
 }
 
-/** The names your config and the project's `pinetrie.json` give, and your config's `lanes`, read at startup. */
-export type PreparedLanes = Awaited<ReturnType<typeof prepareLanes>>
-
 /**
  * What a host with tools found for its lanes, all of it or none
  * (`startSetup` returns null without tools): a host with tools has a
@@ -97,7 +98,6 @@ export interface Setup {
   readonly opened: OpenProject
   /** What lanes run on. */
   readonly runtime: LaneRuntime
-  readonly lanes: PreparedLanes
   /** Each lane's grants and shared directories, as facts of states. */
   readonly configs: LaneConfigs
   /**
@@ -131,16 +131,64 @@ export interface Setup {
   baseAtAccepted(): Promise<void>
 }
 
-export async function startSetup(input: {
+/**
+ * The project, opened, and the config settled with its copies: before pi's
+ * setup, which reads `model`, `skills` and `prompts` from accepted work's
+ * copy. Lane work starts from it.
+ */
+export interface OpenedProject {
+  readonly found: Found
+  readonly root: string
+  readonly opened: OpenProject
+  /** Each copy of `pinetrie.json` as a fact of a state, from accepted work's. */
+  readonly configs: LaneConfigs
+}
+
+/**
+ * Gather, settle, then act: the working copy's `pinetrie.json`, settled with
+ * the start layers for your repo's names alone; the project opened with
+ * them; then accepted work's copy, read through it (`startLaneConfigs`).
+ * Null without tools.
+ */
+export async function openProject(input: {
   readonly basics: Basics
   /** What `findProject` found; null with no tools. */
   readonly found: Found | null
   /** The project's adapter, with `found`. */
   readonly adapter: ProjectAdapter | null
-  /** The user's config, as read at startup: its file, for logs. */
-  readonly userConfig: { readonly file: string; readonly json: unknown }
+  readonly start: StartLayers<HostSettings>
+}): Promise<OpenedProject | null> {
+  const { basics, found } = input
+  if (found === null || input.adapter === null) return null
+  const { root } = found.project
+  // Your repo's names find accepted work, so they come from the working
+  // copy's file, read once, at startup.
+  const working = await folderCopy(root, "working")
+  const names = repoNames(settleHost(input.start, { working }).settled)
+  // Before anything else reads the project: the reads below, lane work's
+  // and the offers'.
+  const opened = await input.adapter.open({ names, basics })
+  // Before anything mounts a shared directory or grants a lane anything.
+  const configs = await startLaneConfigs({
+    root,
+    project: opened,
+    start: input.start,
+    working,
+    log: basics.log,
+  })
+  return { found, root, opened, configs }
+}
+
+export async function startSetup(input: {
+  readonly basics: Basics
+  /** The project, opened (`openProject`); null with no tools. */
+  readonly project: OpenedProject | null
+  /** Accepted work's settled config: the owner, and `lanes.ssh`. */
+  readonly report: HostReport | null
+  /** pine·trie's own directories, which no lane may mount; and the config directory's `ssh/`. */
+  readonly places: ConfigPlaces
   /** The commands pi loaded, whose roots lanes are granted. */
-  readonly setup: Pick<PiSetup, "commands" | "agentDir">
+  readonly setup: Pick<PiSetup, "commands">
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
   /** Where lane work writes its records: lanes' ssh writes each lane's access. */
@@ -149,40 +197,27 @@ export async function startSetup(input: {
   readonly sshDir: string
   readonly personalSsh: PersonalSshPlaces
 }): Promise<Setup | null> {
-  const { basics, keeper, found } = input
+  const { basics, keeper } = input
   const { log } = basics
-  if (found === null || input.adapter === null) return null
+  if (input.project === null || input.report === null) return null
+  const { found, root, opened, configs } = input.project
   const { runtime, shareAndGrant } = found
-  const { root } = found.project
   const project: ProjectRecord = {
     root,
-    owner: decodeOwner(input.userConfig.json),
+    owner: input.report.settled.owner.value,
   }
   log(
     "[host] each thread's agent works in its own container, on a disk cloned from its fork point; your working copy is /mnt/host-working-copy there, read-only",
   )
 
-  // Before the rest, since a run's prompt names the shared directories.
-  const lanes = await prepareLanes(root, input.userConfig, log)
-  // Before anything else reads the project: the reads below, lane work's
-  // and the offers'.
-  const opened = await input.adapter.open({ written: lanes.written, basics })
-  // Before anything mounts a shared directory or grants a lane anything.
-  const configs = await startLaneConfigs({
-    root,
-    project: opened,
-    user: lanes.user,
-    userFile: input.userConfig.file,
-    log,
-  })
   // Before any lane is made: every lane's shape names what it attaches. The
   // project's grant is accepted work's now, and each lane's own as it runs.
   const ssh = await startLaneSsh({
     basics,
     records: input.records,
     root,
-    userConfig: input.userConfig,
-    projectGrant: configs.accepted().authority.grants.ssh,
+    choice: sshChoice(input.report),
+    serviceDir: path.join(input.places.dirs.config, "ssh"),
     laneGrant: lane => configs.laneConfig(lane).grants.ssh,
     owner: project.owner,
     personal: input.personalSsh,
@@ -196,9 +231,13 @@ export async function startSetup(input: {
   )
 
   const hostMounts = planHostMounts({
-    roots: input.setup.commands().map(c => c.root),
+    // A project's own skills are in each lane's copy: never mounted from here.
+    roots: input.setup
+      .commands()
+      .map(c => c.root)
+      .filter(r => !isWithin(r, root)),
     home: homedir(),
-    agentDir: input.setup.agentDir(),
+    own: ownDirs(input.places),
   })
   for (const r of hostMounts.refused)
     log(`[host] ${r.path} is not readable in lanes: ${r.reason}`)
@@ -335,7 +374,6 @@ export async function startSetup(input: {
     root,
     opened,
     runtime,
-    lanes,
     configs,
     defaultImage,
     ready,
@@ -344,26 +382,6 @@ export async function startSetup(input: {
     refreshBaseSoon,
     baseAtAccepted,
   }
-}
-
-/**
- * Your repo's names as your config and your working copy's `pinetrie.json`
- * write them, read once: they find accepted work, so they cannot come from
- * it; the adapter decides them. And your config's `lanes`, whose shared
- * directories always apply.
- */
-async function prepareLanes(
-  at: string,
-  userConfig: { readonly file: string; readonly json: unknown },
-  log: (m: string) => void,
-) {
-  // A missing pinetrie.json is the usual case, and goes unsaid.
-  const read = await readConfigFile(path.join(at, PROJECT_CONFIG_FILE))
-  if (read.kind === "broken")
-    log(brokenConfigLine(PROJECT_CONFIG_FILE, read.reason))
-  const config = decodeLaneConfig(configJson(read), at)
-  const user = decodeLaneConfig(userConfig.json, at)
-  return { written: { user: user.repo, project: config.repo }, user }
 }
 
 /**

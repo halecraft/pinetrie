@@ -17,22 +17,23 @@ import {
 import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import {
+  type ConfigPlaces,
+  configPlaces,
+  readStartLayers,
+} from "@pinetrie/config"
+import {
   atEntry,
   type BlobStore,
   type CardId,
   isTextCardId,
+  type ModelLine,
   type ThreadId,
   threadEnd,
 } from "@pinetrie/core"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
 import {
-  configJson,
-  decodeLaneConfig,
-  readConfigFile,
-  userConfigFile,
-} from "@pinetrie/lanes"
-import {
+  type AgentDirBinding,
   createAgent,
   createScribe,
   loadPiSetup,
@@ -56,20 +57,18 @@ import {
   readPlaces,
   readRoots,
   readRunning,
+  readSetup,
   readThreadName,
   readThreads,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
-  decodeAgentsConfig,
-  decodeCommandRenames,
-  decodeDigestConfig,
-  decodeIconConfig,
-  decodeTitleConfig,
   displayName,
   encodeFact,
   type QueuedText,
   rootsHeld,
+  SETUP,
+  setIfChanged,
 } from "@pinetrie/rules"
 import {
   cardDocId,
@@ -143,16 +142,27 @@ import { createRecords, type Records } from "./records.ts"
 import { createRelays, type Relays } from "./relays.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
+import {
+  folderReport,
+  type HostReport,
+  iconSettings,
+  listedFolders,
+  SETTINGS,
+  settleHost,
+  titleSettings,
+} from "./settings.ts"
 import { createSettle } from "./settle.ts"
+import { planSetupRecord } from "./setup-record.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { createSplitCall } from "./split-call.ts"
 import { recover } from "./startup.ts"
-import { agentReadyLine, configLine } from "./startup-lines.ts"
+import { agentReadyLine, reportLines } from "./startup-lines.ts"
 import { openStore } from "./store.ts"
 import { tasksNow } from "./tasks.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
 import { findProject } from "./work/runtime.ts"
+import { openProject } from "./work/setup.ts"
 import { type PersonalSshPlaces, prepareSshDir } from "./work/ssh.ts"
 
 /** How long an image nothing shows is kept, from its upload or last touch: for one pasted and not yet sent. */
@@ -167,10 +177,15 @@ export interface StartHostOptions {
    * there is none, since only this machine can connect.
    */
   readonly key?: string
-  /** No default: a suite that forgot one must not spend the person's models. */
-  readonly model: ModelChoice
   /**
-   * The project: where pi's settings and `AGENTS.md` load from, and, with
+   * No default: a suite that forgot one must not spend the person's models.
+   * `configured` is the model the config settles.
+   */
+  readonly model:
+    | { readonly kind: "configured" }
+    | Exclude<ModelChoice, { readonly kind: "configured" }>
+  /**
+   * The project: where `AGENTS.md` loads from, and, with
    * `tools`, where the agent reads, writes and runs commands, each lane in its
    * own container, on its own disk. Absent or null: no project, and no tools.
    * With tools, a folder with no jj repo, or a runtime that cannot run lanes,
@@ -178,22 +193,21 @@ export interface StartHostOptions {
    */
   readonly project?: { readonly dir: string; readonly tools: boolean } | null
   /**
-   * The user's lane config, by default `$XDG_CONFIG_HOME/pinetrie/config.json`.
-   * A suite passes its own file rather than move `XDG_CONFIG_HOME`, which git
-   * and jj read too.
+   * Where each config layer's file is, and pine·trie's own directories; by
+   * default from the XDG variables. A suite passes its own rather than move
+   * `XDG_CONFIG_HOME`, which git and jj read too.
    */
-  readonly userConfig?: string
+  readonly places?: ConfigPlaces
+  /** The variables the config's `env` layer reads; by default the process's. */
+  readonly env?: Readonly<Record<string, string | undefined>>
+  /** pi's agent directory, bound to `places`' config directory for this process (`bindAgentDir`). */
+  readonly binding: AgentDirBinding
   /**
    * The person's ssh files (`~/.ssh`: its `config` and `known_hosts`) and
    * agent (`SSH_AUTH_SOCK`), which lanes' ssh reads. A suite passes its own,
    * so no suite reads the person's.
    */
   readonly ssh?: PersonalSshPlaces
-  /**
-   * pi's agent directory, by default pi's own. With a scripted or named model,
-   * skills and prompts load only from one given here: a suite's fixture.
-   */
-  readonly agentDir?: string
   /**
    * Where the session is kept: a SQLite file; a Kyneta store a caller made, as
    * a suite does to read it while the host runs; or, absent or null, a store in
@@ -224,6 +238,10 @@ export interface RunningHost {
   readonly port: number
   readonly httpUrl: string
   readonly wsUrl: string
+  /** The run's model, or why there is none. */
+  readonly model: ModelLine
+  /** What the host read of its config, settled. */
+  readonly config: HostReport
   /** The session's records, as the host holds them: for the suites to read. */
   readonly session: SessionDocHandle
   /** Every document, each root's among them (`docs.ts`): for the suites. */
@@ -265,12 +283,17 @@ export async function startHost({
   key: givenKey,
   model,
   project = null,
-  userConfig = userConfigFile(),
+  env = process.env,
+  places: where = configPlaces(
+    env,
+    homedir(),
+    project === null ? null : path.basename(project.dir),
+  ),
+  binding,
   ssh = {
     dir: path.join(homedir(), ".ssh"),
     agent: process.env.SSH_AUTH_SOCK ?? null,
   },
-  agentDir,
   store: storeFile = null,
   blobs: givenBlobs,
   now = Date.now,
@@ -280,12 +303,9 @@ export async function startHost({
   const key = isLoopback(bind) ? null : (givenKey ?? newKey())
   const toolsIn = project?.tools === true ? project.dir : null
 
-  // The user config, read once: its shared directories, its renames for command
-  // packages and where threads' icons come from. Missing or broken decodes as
-  // empty, and the log says which.
-  const userRead = await readConfigFile(userConfig)
-  log(configLine(userConfig, userRead))
-  const userJson = configJson(userRead)
+  // The config layers that do not change while the host runs, read once.
+  // The project's copies are read once the project is open (`openProject`).
+  const start = await readStartLayers(SETTINGS, where, env)
   // The project, before anything opens, so a refusal leaves nothing to close,
   // and before pi's setup, which loads from its root.
   // The host's ssh socket's directory, named before the runtime is found:
@@ -304,7 +324,8 @@ export async function startHost({
     root: chosen?.root ?? null,
     // A port of 0 is chosen when the host listens, after this.
     ownPort: port === 0 ? null : port,
-    machine: decodeLaneConfig(userJson, toolsIn ?? "/").machine,
+    // Only the machine's and your own file may set it: no project's copy.
+    slots: settleHost(start, {}).settled["lanes.vm.slots"].value,
     log,
   })
   if (found?.kind === "refused") {
@@ -403,7 +424,7 @@ export async function startHost({
   // The host writes its own records; every module that writes one takes this.
   const records = createRecords(docs)
 
-  // --- pi: the scribe and the person's pi setup -----------------------------
+  // --- pi: the scribe and the model setup --------------------------------
   // A thread's appends go through the scribe, which holds each root's one pi
   // session; the agent, made last, builds its harnesses over them.
   const scribe = createScribe({ documents: docs, replicaId: newId(), blobs })
@@ -416,17 +437,57 @@ export async function startHost({
     for (const task of tasks) await histories.unloadTask(task)
   })
   const projectRoot = found?.project.root ?? project?.dir ?? null
-  const iconConfig = decodeIconConfig(userJson)
+  // The project, opened, and the config settled with accepted work's copy:
+  // before pi's setup, which reads `model`, `skills` and `prompts` from it.
+  // A host without lane work reads its folder's file as every copy.
+  const openedProject = await openProject({
+    basics,
+    found,
+    adapter: chosen?.adapter ?? null,
+    start,
+  })
+  const report: HostReport =
+    openedProject === null
+      ? await folderReport(start, project?.dir ?? null)
+      : openedProject.configs.accepted().report
+  for (const line of reportLines(report)) log(line)
+  const { settled } = report
+  const iconConfig = iconSettings(settled)
   const draws = iconConfig.source === "drawn"
-  const titleConfig = decodeTitleConfig(userJson)
+  const titleConfig = titleSettings(settled)
+  const accepted =
+    openedProject === null ? null : openedProject.configs.accepted().copy.values
+  const listRoot = projectRoot ?? process.cwd()
   const piSetup = await loadPiSetup({
-    model,
-    commandRenames: decodeCommandRenames(userJson),
+    model:
+      model.kind === "configured"
+        ? { kind: "configured", model: settled.model.value }
+        : model,
+    places: {
+      configDir: where.dirs.config,
+      credentials: where.credentials,
+      models: where.models,
+    },
+    binding,
+    lists: {
+      packages: settled.packages.value,
+      skills: listedFolders(start, accepted, "skills", listRoot),
+      prompts: listedFolders(start, accepted, "prompts", listRoot),
+    },
+    commandRenames: settled["commands.names"].value,
     titleModel: titleConfig.model,
     ...(iconConfig.source === "drawn" ? { banner: iconConfig.model } : {}),
-    ...(agentDir === undefined ? {} : { agentDir }),
     ...(projectRoot === null ? {} : { project: projectRoot }),
   })
+  for (const p of piSetup.refusedPackages)
+    log(`[host] ${p} is not a folder: the package is not loaded`)
+  const setupRecordNow = (r: HostReport) =>
+    planSetupRecord({
+      report: r,
+      model: piSetup.model,
+      origins: model.kind === "configured" ? r.settled.model.origins : null,
+      setup: piSetup,
+    })
   if (titleConfig.model !== null && !piSetup.titleModelFound)
     log(
       `[host] titles name ${titleConfig.model.provider}/${titleConfig.model.model}, which pi does not have: titles use the run's model`,
@@ -467,7 +528,7 @@ export async function startHost({
     piSetup,
     draws,
   })
-  // Each run's verdict, and each ask's digest unless the user config turns
+  // Each run's verdict, and each ask's digest unless the config turns
   // digests off. What agents talking spend. Its drain and the relays are made
   // after the agent, whose hooks call them: bound late.
   let queueDrainLate: (lane: ThreadId) => void = () => {}
@@ -475,7 +536,7 @@ export async function startHost({
     basics,
     keeper,
     records,
-    limit: decodeAgentsConfig(userJson),
+    limit: settled["agents.budget"].value,
     drain: lane => queueDrainLate(lane),
   })
   const digests = createDigests({
@@ -484,12 +545,12 @@ export async function startHost({
     presence,
     records,
     piSetup,
-    enabled: decodeDigestConfig(userJson),
+    enabled: settled["digests.enabled"].value,
     spent: (ask, tokens) => budgets.spendFor(ask, tokens),
   })
   const digestFailed = (lane: ThreadId) =>
     failed(basics, "summarizing its ask", lane)
-  // Each root's title, unasked as its first lane starts unless the user config
+  // Each root's title, unasked as its first lane starts unless the config
   // turns that off, or when a person asks.
   const titles = createTitles({
     basics,
@@ -515,9 +576,9 @@ export async function startHost({
   // --- where lanes work -----------------------------------------------------
   const work = await startLaneWork({
     basics,
-    found,
-    adapter: chosen?.adapter ?? null,
-    userConfig: { file: userConfig, json: userJson },
+    project: openedProject,
+    report: openedProject === null ? null : report,
+    places: where,
     sshDir,
     personalSsh: ssh,
     records,
@@ -568,8 +629,8 @@ export async function startHost({
   })
   log(
     agentReadyLine({
-      label: piSetup.modelLabel,
-      origin: piSetup.modelOrigin,
+      model: piSetup.model,
+      origins: model.kind === "configured" ? settled.model.origins : null,
       tools: toolsIn === null ? null : (projectRoot ?? toolsIn),
     }),
   )
@@ -757,7 +818,23 @@ export async function startHost({
     provenance,
     ensureNames: names.ensure,
     icons: { source: iconConfig.source },
+    setup: setupRecordNow(report),
   })
+  // Accepted work moved: what its copy of the config refused, and what it
+  // settles, may have too.
+  openedProject?.configs.onTaken(next =>
+    keeper
+      .run(() =>
+        records.writeValues(
+          setIfChanged(
+            SETUP,
+            setupRecordNow(next.report),
+            readSetup(session) ?? undefined,
+          ),
+        ),
+      )
+      .catch(failed(basics, "the setup record")),
+  )
   await sweepHistories({ basics, store, histories, startup: true })
   await sweepHolds({ basics, records })
   await sweepTrash({ basics, cards: cardPort, work })
@@ -826,6 +903,8 @@ export async function startHost({
     port: server.port,
     httpUrl: server.httpUrl,
     wsUrl: server.wsUrl,
+    model: piSetup.model,
+    config: report,
     session,
     docs,
     live,

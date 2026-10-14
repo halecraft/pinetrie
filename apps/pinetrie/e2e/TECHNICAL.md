@@ -48,14 +48,21 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   inner host refuses lanes: the scenarios with tools, and all of
   `e2e:lanes`, skip with its words.
 
-- **A host reads the suites' user config, not the person's.**
-  `startSuiteHost` (`harness.ts`) and `LaneHosts` pass `SUITE_CONFIG`,
-  which turns the automatic title off (ADR-0074), unless a scenario names
-  its own file; one that writes its own spreads `SUITE_CONFIG` into it.
-  `startHost` without a `userConfig` would read
-  `~/.config/pinetrie/config.json`. Nor the person's ssh: every suite host
-  gets an empty `~/.ssh` and no agent (`suiteSshPlaces`), unless a scenario
-  passes its own, as `lanes/ssh` does (ADR-0140).
+- **A host reads the suites' places, not the person's** (ADR-0146).
+  `startSuiteHost` (`harness.ts`) and `LaneHosts` pass `suitePlaces()`: one
+  config directory and one data directory per suite process, no system
+  file, an empty environment, and `SUITE_CONFIG` as the user's
+  `pinetrie.json`, which turns the automatic title off (ADR-0074). A
+  scenario that needs its own writes it through `suitePlaces({ user })`,
+  spreading `SUITE_CONFIG` into it, and the fixture packages
+  (`FIXTURE_PACKAGES`) are listed that way. pi's agent directory is bound
+  once per process to the suite's config directory (`suiteBinding`), so
+  every host in the process agrees. `e2e:live` alone passes the person's
+  real data directory, so its named model finds the credential `pnpm
+  sign-in cerebras` stored, or `CEREBRAS_API_KEY`. Nor the person's ssh:
+  every suite host gets an empty `~/.ssh` and no agent (`suiteSshPlaces`),
+  unless a scenario passes its own, as `lanes/ssh` does (ADR-0140), with a
+  config directory of its own for its service keys.
 - **Lanes run on Docker** (ADR-0130): on the Mac against the lane VM, on
   Linux against the host's Docker, and inside a pine·trie lane granted
   `lanes.nested` against the lane's rootless Docker, its lanes in

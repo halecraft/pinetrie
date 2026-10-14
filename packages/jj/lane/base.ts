@@ -1,10 +1,10 @@
 // jj/lane/base — a lane's base as its history names it, read the same way
 // from the lane's own repo and from yours.
 
-import type { LaneBase } from "@pinetrie/core"
+import type { LaneBase, RepoConfig } from "@pinetrie/core"
 import type { Runner } from "@pinetrie/lanes"
 import { newestBase } from "./merge.ts"
-import { type RepoConfig, revsetName } from "./names.ts"
+import { revsetName } from "./names.ts"
 import { commitsOf } from "./revisions.ts"
 
 /**

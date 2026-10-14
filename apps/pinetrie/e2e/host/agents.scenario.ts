@@ -2,9 +2,6 @@
 // thread's agent, and its answer waking the asker; then its task archived,
 // which refuses the next ask; then a budget spent, which wakes nobody.
 
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import path from "node:path"
 import {
   messageText,
   projectTranscript,
@@ -27,6 +24,7 @@ import {
   boardStateOf,
   START_AGENT,
   SUITE_CONFIG,
+  suitePlaces,
   taskHolding,
   treeOf,
 } from "../harness.ts"
@@ -46,15 +44,9 @@ const replies = (last: string): string =>
       ? "A-NOTED"
       : "ok"
 
-/** A config file: the suite's, with a budget for agents talking. */
-function configWith(budget: number): string {
-  const file = path.join(
-    mkdtempSync(path.join(tmpdir(), "pinetrie-agents-config-")),
-    "config.json",
-  )
-  writeFileSync(file, JSON.stringify({ ...SUITE_CONFIG, agents: { budget } }))
-  return file
-}
+/** The suite's places, with a budget for agents talking. */
+const placesWith = (budget: number) =>
+  suitePlaces({ user: { ...SUITE_CONFIG, agents: { budget } } })
 
 /**
  * Two agent threads, A and B, each started at the root, so each is a task
@@ -91,7 +83,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const section = await lanes.sectionHost({
       files: { "a.txt": "a\n" },
       model: { kind: "scripted", script },
-      userConfig: configWith(1_000_000),
+      places: placesWith(1_000_000),
     })
     const { user, idle, host, close } = section
     try {
@@ -180,7 +172,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const section = await lanes.sectionHost({
       files: { "a.txt": "a\n" },
       model: { kind: "scripted", script },
-      userConfig: configWith(1),
+      places: placesWith(1),
     })
     const { user, idle, host, close } = section
     try {

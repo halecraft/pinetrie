@@ -108,6 +108,7 @@ import {
   searchOn,
   searchReducer,
   searchTexts,
+  setupView,
   shownWidth,
   sidebarView,
   spotFor,
@@ -198,6 +199,7 @@ import {
   ReviewPrefsContext,
 } from "./review-prefs.ts"
 import { SearchBar, SearchToggle } from "./search-bar.tsx"
+import { SetupPage } from "./setup-page.tsx"
 import { Sidebar } from "./sidebar.tsx"
 import { SignalMark } from "./signal-mark.tsx"
 import { Strip } from "./strip.tsx"
@@ -1791,6 +1793,11 @@ export function App({
                   session.request({ kind: "picture", sha256 })
                 }
                 writer={session.writer}
+              />
+            )}
+            {page === "setup" && (
+              <SetupPage
+                view={setupView(workFacts.setup, workFacts.commands)}
               />
             )}
           </Page>

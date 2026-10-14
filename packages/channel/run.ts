@@ -87,6 +87,10 @@ export function streamCommand(
       } catch (error) {
         failed = error instanceof Error ? error.message : String(error)
         child.kill()
+        // A shell that does not exec its last command leaves that command
+        // holding the pipe after the kill: `close` waits for the pipe, so it
+        // is let go here, and the command meets a broken pipe.
+        child.stdout.destroy()
       }
     })
     child.stderr.setEncoding("utf8")

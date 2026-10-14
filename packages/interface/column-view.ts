@@ -28,6 +28,7 @@ import {
   pinnedInView,
   promptOf,
   type RevisionRecord,
+  type SetupRecord,
   type TaskId,
   type TaskPinnedView,
   type TextPlace,
@@ -113,6 +114,8 @@ export interface WorkFacts {
   readonly filesLost: ReadonlyMap<ThreadId, FilesLostRecord>
   /** Each budget for agents talking, by the message that set it. */
   readonly budgets: ReadonlyMap<EntryId, BudgetRecord>
+  /** What the host read of its config; null before a host wrote it. */
+  readonly setup: SetupRecord | null
 }
 
 /**

@@ -13,6 +13,7 @@ import {
   type OfferRevision,
   offerLedger,
   PROJECT_CONFIG_FILE,
+  type RepoConfig,
   type RevisionFacts,
   type StartRead,
   sourcesOf,
@@ -25,22 +26,18 @@ import {
 import {
   configWidenings,
   describeFailure,
+  type LaneAuthority,
   lines,
   type Runner,
 } from "@pinetrie/lanes"
-import {
-  bookmarkRevset,
-  laneTipName,
-  offerBookmark,
-  type RepoConfig,
-} from "./lane/names.ts"
+import { bookmarkRevset, laneTipName, offerBookmark } from "./lane/names.ts"
 import {
   ACCEPTED_OFFER_COMMIT_ROW,
   commitsOf,
   conflictedFilesAt,
+  fileText,
   parseAcceptedOfferCommits,
   REVISION_READ,
-  readAuthority,
 } from "./lane/revisions.ts"
 import {
   acceptedOfferCommitsRevset,
@@ -412,6 +409,8 @@ function gitDiffCounts(
 export async function revisionRead(
   jj: Runner,
   span: DiffSpan,
+  /** What a copy of `pinetrie.json` lets lanes do and share: the host's table decides it. */
+  decodeAuthority: (text: string | null) => LaneAuthority,
 ): Promise<unknown> {
   const read = await spanFiles(jj, span)
   if (read === null) return null
@@ -427,8 +426,8 @@ export async function revisionRead(
     widenings: touched
       ? // A widening names a mount by its target: the root does not matter.
         configWidenings(
-          (await readAuthority(jj, from, "/")).authority,
-          (await readAuthority(jj, to, "/")).authority,
+          decodeAuthority(await fileText(jj, from, PROJECT_CONFIG_FILE)),
+          decodeAuthority(await fileText(jj, to, PROJECT_CONFIG_FILE)),
         )
       : [],
   }

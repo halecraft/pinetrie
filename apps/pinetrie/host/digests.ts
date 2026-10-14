@@ -1,6 +1,6 @@
 // host/digests — each long ask's digest, and each run's verdict. A digest is
 // asked as its run goes, while someone reads it, at most once a `DIGEST_EVERY`,
-// unless the user config turns digests off. At a run's end one request asks for
+// unless the config turns digests off. At a run's end one request asks for
 // the verdict and the final digest together, digests on or off. `planDigest`,
 // `planRunEnded`, `digestToWrite` and `runEndedToWrite` decide, and `digestOf`
 // and `endReplyOf` read the reply; this carries them out, outside the queue
@@ -87,7 +87,7 @@ export function createDigests(deps: {
   readonly records: Pick<Records, "writeValues">
   /** The model a digest is asked of, and its skill. */
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
-  /** The user config's `digests` (`decodeDigestConfig`): off, a run's end asks for its verdict alone. */
+  /** The settled `digests.enabled`: off, a run's end asks for its verdict alone. */
   readonly enabled: boolean
   /**
    * Tokens a request for `ask`'s run spent: its budget counts them, when

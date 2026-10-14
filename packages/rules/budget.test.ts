@@ -3,8 +3,6 @@ import { describe, expect, test } from "vitest"
 import {
   addedTokens,
   type BudgetRecord,
-  DEFAULT_BUDGET,
-  decodeAgentsConfig,
   mayRequest,
   planSpend,
 } from "./budget.ts"
@@ -43,10 +41,5 @@ describe("a budget for agents talking", () => {
     expect(mayRequest(budget)).toBe(true)
     expect(mayRequest({ ...budget, over: true })).toBe(false)
     expect(mayRequest(undefined)).toBe(true)
-  })
-  test("the user config's budget, or the default", () => {
-    expect(decodeAgentsConfig({ agents: { budget: 50_000 } })).toBe(50_000)
-    expect(decodeAgentsConfig({ agents: { budget: -1 } })).toBe(DEFAULT_BUDGET)
-    expect(decodeAgentsConfig(null)).toBe(DEFAULT_BUDGET)
   })
 })

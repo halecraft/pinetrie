@@ -13,6 +13,7 @@ export type AccountItem =
       readonly open: boolean
     }
   | { readonly kind: "profile" }
+  | { readonly kind: "setup" }
   | { readonly kind: "signOut" }
 
 export interface AccountView {
@@ -29,6 +30,7 @@ export function accountView(input: {
 }): AccountView {
   const always: readonly AccountItem[] = [
     { kind: "profile" },
+    { kind: "setup" },
     { kind: "signOut" },
   ]
   if (!input.folded) return { items: always, badge: null }
@@ -58,6 +60,11 @@ export function accountWords(item: AccountItem): ControlWords {
         : { label: "Inventory", title: inventoryWords(item.count).label }
     case "profile":
       return { label: "Profile", title: "your name and picture" }
+    case "setup":
+      return {
+        label: "Setup",
+        title: "the host's model, sign-in and config files",
+      }
     case "signOut":
       return {
         label: "Sign in as someone else",

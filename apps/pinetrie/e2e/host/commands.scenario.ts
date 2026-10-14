@@ -5,7 +5,14 @@ import { ROOT } from "@pinetrie/core"
 import { readCommands } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
-import { entriesOf, START_CHAT, waitFor } from "../harness.ts"
+import {
+  entriesOf,
+  FIXTURE_PACKAGES,
+  START_CHAT,
+  SUITE_CONFIG,
+  suitePlaces,
+  waitFor,
+} from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -17,10 +24,6 @@ export const scenario: Scenario = {
 async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   // A fixture pi directory whose settings list two packages.
   {
-    const fixtures = path.join(
-      import.meta.dirname,
-      "../../../../packages/pi/fixtures",
-    )
     const {
       host: ch,
       user: cu,
@@ -29,7 +32,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       close,
     } = await lanes.sectionHost({
       files: { "a.txt": "a\n" },
-      agentDir: path.join(fixtures, "pi-agent"),
+      places: suitePlaces({
+        user: { ...SUITE_CONFIG, packages: FIXTURE_PACKAGES },
+      }),
     })
     await cu.request({ kind: "name", name: "Uma" })
     await waitFor(() => readCommands(ch.session).length > 0, 10_000)
@@ -61,7 +66,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     )
     await cidle()
     // As the lane reads it, under /mnt/host.
-    const hello = `/mnt/host${path.join(fixtures, "fixture-pkg", "skills", "hello")}`
+    const [fixturePkg] = FIXTURE_PACKAGES
+    const hello = `/mnt/host${path.join(fixturePkg ?? "", "skills", "hello")}`
     const typed = Object.values(entriesOf(ch))
       .map(
         r =>

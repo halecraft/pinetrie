@@ -1,17 +1,28 @@
 // host/startup-lines — the words of the lines a starting host logs about what
-// it serves and what it read: the project, the store, the user config (and a
-// project's broken `pinetrie.json`), the model, and where to open the host.
+// it serves and what it read: the project, the store, each config file and
+// what it refused, the model, and where to open the host. Config words are
+// `@pinetrie/interface`'s, shared with the setup page.
 // A line about the session's state stays beside what computes it, such as
 // `rootsOpenedWords` in `docs.ts`.
 
-import type { ConfigRead } from "@pinetrie/lanes"
-import type { FieldSource, ModelOrigin } from "@pinetrie/pi"
+import type {
+  ConfigFileState,
+  ConfigOrigin,
+  ConfigRefusal,
+  ModelLine,
+} from "@pinetrie/core"
+import {
+  fileStateWords,
+  noModelWords,
+  originWords,
+  refusalWords,
+} from "@pinetrie/interface"
+
 import type {
   DroppedIdentity,
   PersonalOff,
   ServiceKeyCheck,
   ServiceKeyRefusal,
-  SshSettingRefusal,
   SshSettings,
 } from "@pinetrie/ssh"
 import type { StoreChoice } from "./invocation.ts"
@@ -30,63 +41,42 @@ export const storeLine = (store: StoreChoice): string =>
       : store.file,
   )
 
-const brokenWords = (file: string, reason: string): string =>
-  `${file} is broken, so none of it applies: ${reason}`
-
-/** The user config: read, missing or broken. */
-export function configLine(file: string, read: ConfigRead): string {
-  switch (read.kind) {
-    case "read":
-      return line("config", file)
-    case "missing":
-      return line("config", `${file} (none)`)
-    case "broken":
-      return line("config", brokenWords(file, read.reason))
-  }
+/** What the host read of its config: a line per layer's file, then one per refusal. */
+export function reportLines(report: {
+  readonly files: readonly {
+    readonly file: string
+    readonly state: ConfigFileState
+  }[]
+  readonly refusals: readonly ConfigRefusal[]
+}): readonly string[] {
+  return [
+    ...report.files.map(f => line("config", fileStateWords(f.file, f.state))),
+    ...report.refusals.map(r => `[host] ${refusalWords(r)}`),
+  ]
 }
-
-/** A project's config file that exists but could not be read or parsed. */
-export const brokenConfigLine = (file: string, reason: string): string =>
-  `[host] ${brokenWords(file, reason)}`
-
-// `server.ts` is the only caller that overrides a configured model, from
-// these variables.
-const OVERRIDES = {
-  provider: "PINETRIE_PROVIDER",
-  model: "PINETRIE_MODEL",
-} as const
 
 /**
- * Where a configured model's provider and model came from; null for a named
- * or scripted model, which only the suites run.
+ * The agent's model and where it came from (`origins` null for a named or
+ * scripted model, which only the suites run), or why there is none; and its
+ * tools.
  */
-export function originWords(origin: ModelOrigin): string | null {
-  if (origin.kind !== "configured") return null
-  const { provider, model } = origin
-  if (provider.kind === "override" && model.kind === "override")
-    return `${OVERRIDES.provider}, ${OVERRIDES.model}`
-  if (
-    provider.kind === "settings" &&
-    model.kind === "settings" &&
-    provider.file === model.file
-  )
-    return `from ${provider.file}`
-  const say = (field: "provider" | "model", from: FieldSource) =>
-    from.kind === "override" ? OVERRIDES[field] : `${field} from ${from.file}`
-  return `${say("provider", provider)}; ${say("model", model)}`
-}
-
 export function agentReadyLine(agent: {
-  readonly label: string
-  readonly origin: ModelOrigin
+  readonly model: ModelLine
+  readonly origins: readonly ConfigOrigin[] | null
   /** The directory tools work in; null with tools off. */
   readonly tools: string | null
 }): string {
-  const origin = originWords(agent.origin)
-  const model = origin === null ? agent.label : `${agent.label} (${origin})`
+  const { model, origins } = agent
+  const which =
+    model.kind === "none"
+      ? `no model: ${noModelWords(model.why, model.named)}`
+      : `model ${model.label}${origins === null ? "" : ` (${originWords(origins)})`}`
   const tools = agent.tools === null ? "off" : `on, in ${agent.tools}`
-  return `[host] agent ready — model ${model}; tools ${tools}`
+  return `[host] agent ready — ${which}; tools ${tools}`
 }
+
+/** Where the setup page is, said when the host has no model. */
+export const setupLine = (url: string): string => line("setup", `${url}#setup`)
 
 export const listeningLine = (url: string): string => line("listening", url)
 
@@ -96,6 +86,7 @@ const PERSONAL_OFF: Readonly<Record<PersonalOff, string | null>> = {
   // Neither config asked for it: nothing to say.
   "not-granted": null,
   declined: "your ssh identity: declined in your config",
+  forbidden: "your ssh identity: off, since the machine's config forbids it",
   "invalid-hosts":
     "your ssh identity: off, since lanes.ssh.hosts is not a list of host patterns",
   "no-owner":
@@ -121,7 +112,6 @@ const DROPPED: Readonly<Record<DroppedIdentity["why"], string>> = {
 /** What a starting host says of lanes' ssh: what they hold, and each thing it refused. */
 export function sshLines(facts: {
   readonly settings: SshSettings
-  readonly refusedSettings: readonly SshSettingRefusal[]
   readonly checks: readonly ServiceKeyCheck[]
   readonly failed: readonly { readonly name: string; readonly said: string }[]
   /** The service identities the agent holds. */
@@ -129,8 +119,6 @@ export function sshLines(facts: {
   readonly dropped: readonly DroppedIdentity[]
   readonly hasSsh: boolean
   readonly hasAgent: boolean
-  /** The user config's file, which the settings are in. */
-  readonly file: string
 }): readonly string[] {
   const { personal, approvalSeconds } = facts.settings
   const holds = [
@@ -145,9 +133,6 @@ export function sshLines(facts: {
   ]
   const off = personal.kind === "off" ? PERSONAL_OFF[personal.why] : null
   return [
-    ...facts.refusedSettings.map(
-      r => `[host] ${r.setting} in ${facts.file} is not taken: ${r.written}`,
-    ),
     ...(holds.length === 0 ? [] : [`[host] lanes' ssh: ${holds.join(", ")}`]),
     ...(off === null ? [] : [`[host] ${off}`]),
     ...facts.checks.flatMap(c =>

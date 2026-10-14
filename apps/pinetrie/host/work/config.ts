@@ -1,58 +1,53 @@
-// host/work/config — `pinetrie.json`'s `lanes` key as a fact of a state:
-// accepted work's copy, read at accepted work (`Destination.fileAt`) at
-// startup and each time accepted work moves; and each lane's own copy, read
-// at its newest point in the destination before its container starts,
-// beside the copy it started on. A lane runs with accepted work's, less what its own copy dropped from
-// that start (`effectiveLaneConfig`), so a lane can give up a grant at once,
-// and gains one only through acceptance.
-// Your repo's names (`accepted`, `wip`, `publish`) are not read here: they
-// find accepted work, so they come from your config and your working copy's
-// `pinetrie.json`, at startup.
+// host/work/config — `pinetrie.json` as a fact of a state: accepted work's
+// copy, read at accepted work (`Destination.fileAt`) at startup and each time
+// accepted work moves; and each lane's own copy, read at its newest point in
+// the destination before its container starts, beside the copy it started
+// on. A lane runs with accepted work's grants, less what its own copy dropped
+// from that start (`effectiveLaneConfig`), so a lane can give up a grant at
+// once, and gains one only through acceptance. Each copy is decoded by the
+// host's table (`settings.ts`), and every setting is settled with the layers
+// read at startup.
+// Your repo's names (`accepted`, `wip`, `publish`) are read from the working
+// copy's file, at startup: they find accepted work, so they cannot come from
+// it (`openProject`).
 
+import {
+  type DecodedProject,
+  decodeProject,
+  projectCopy,
+  type StartLayers,
+} from "@pinetrie/config"
 import {
   PRODUCT_NAME,
   PROJECT_CONFIG_FILE,
   type ThreadId,
 } from "@pinetrie/core"
-import type { Point } from "@pinetrie/lanes"
+import { refusalWords } from "@pinetrie/interface"
 import {
   configChangeNote,
-  decodeLaneConfig,
   effectiveLaneConfig,
   type LaneAuthority,
-  type LaneConfig,
-  NO_GRANTS,
   normalShared,
+  type Point,
   type SharedDir,
 } from "@pinetrie/lanes"
-import { brokenConfigLine } from "../startup-lines.ts"
+import {
+  decodeAuthority,
+  type HostReport,
+  type HostSettings,
+  laneAuthority,
+  laneCopy,
+  SETTINGS,
+  settleHost,
+} from "../settings.ts"
 import type { OpenProject } from "./adapter.ts"
 
-/**
- * `pinetrie.json`'s grants and shared directories as read: none when the
- * file is not there; one that is not JSON grants nothing too, and is logged.
- */
-function authorityLogged(
-  read: { readonly at: string; readonly text: string | null },
-  root: string,
-  log: (m: string) => void,
-): LaneAuthority {
-  let json: unknown = null
-  if (read.text !== null)
-    try {
-      json = JSON.parse(read.text)
-    } catch (error) {
-      log(
-        brokenConfigLine(`${PROJECT_CONFIG_FILE} at ${read.at}`, String(error)),
-      )
-    }
-  const { grants, shared } = decodeLaneConfig(json, root)
-  return { grants, shared }
-}
-
-/** Accepted work's lane config, and the shared directories it and your config make. */
+/** Accepted work's copy of `pinetrie.json`, settled with the start layers. */
 export interface AcceptedLanes {
+  readonly copy: DecodedProject<HostSettings, "accepted">
   readonly authority: LaneAuthority
+  /** Every setting, with accepted work's copy as each lane's before it gives anything up. */
+  readonly report: HostReport
   readonly shared: readonly SharedDir[]
 }
 
@@ -69,6 +64,8 @@ export interface LaneConfigs {
   takeAccepted(next: AcceptedLanes): void
   /** Called with the shared directories each time accepted work's change them. */
   onShared(listener: (shared: readonly SharedDir[]) => void): void
+  /** Called with accepted work's config each time it is taken. */
+  onTaken(listener: (next: AcceptedLanes) => void): void
   /**
    * Read `lane`'s own copy from its newest commit in your repo, and keep
    * the config it runs with. A lane with none there yet runs with accepted
@@ -80,25 +77,38 @@ export interface LaneConfigs {
   /** The shared directories `lane` mounts: yours always, the project's as its config allows. */
   laneShared(lane: ThreadId): readonly SharedDir[]
   /**
-   * What a lane's agent is told of the `pinetrie.json` it just wrote,
-   * given the file's text (null when there is none): `configChangeNote`.
+   * What a lane's agent is told of the `pinetrie.json` it just wrote, given
+   * the file's text (null when there is none): what it changes
+   * (`configChangeNote`), and each key not taken.
    */
   configNote(text: string | null): string | null
 }
 
+/** `pinetrie.json` at accepted work, as its point is named in a refusal. */
+const ACCEPTED_FILE = `${PROJECT_CONFIG_FILE} at accepted work`
+
 export async function startLaneConfigs(input: {
   readonly root: string
   readonly project: Pick<OpenProject, "fileAt" | "prepareShared">
-  /** Your config's `lanes`, read at startup: its shared directories always apply. */
-  readonly user: LaneConfig
-  readonly userFile: string
+  /** The layers read once, at startup. */
+  readonly start: StartLayers<HostSettings>
+  /** The working copy's `pinetrie.json`, read at startup. */
+  readonly working: DecodedProject<HostSettings, "working">
   readonly log: (m: string) => void
 }): Promise<LaneConfigs> {
-  const { root, project, user, log } = input
-  /** `pinetrie.json` at `point`, decoded; null when the point is not there. */
-  const authorityAt = async (point: Point): Promise<LaneAuthority | null> => {
+  const { root, project, start, working, log } = input
+  /** `pinetrie.json`'s text at `point`; null when the point is not there. */
+  const textAt = async (
+    point: Point,
+  ): Promise<{ readonly text: string | null } | null> => {
     const read = await project.fileAt(point, PROJECT_CONFIG_FILE)
-    return read.kind === "no-point" ? null : authorityLogged(read, root, log)
+    return read.kind === "no-point" ? null : { text: read.text }
+  }
+  const authorityAt = async (point: Point): Promise<LaneAuthority | null> => {
+    const read = await textAt(point)
+    return read === null
+      ? null
+      : decodeAuthority(root, PROJECT_CONFIG_FILE, read.text).authority
   }
   /**
    * Each lane's own copy as last read, and its base's: the copy it started
@@ -109,22 +119,47 @@ export async function startLaneConfigs(input: {
     { readonly base: LaneAuthority; readonly own: LaneAuthority } | null
   >()
 
+  const settledFor = (
+    copy: DecodedProject<HostSettings, "accepted">,
+    authority: LaneAuthority,
+  ): HostReport =>
+    settleHost(start, { working, accepted: copy, lane: laneCopy(authority) })
+
   async function readAccepted(): Promise<AcceptedLanes> {
     // Accepted work is always a point: none there grants nothing.
-    const authority = (await authorityAt({ kind: "accepted" })) ?? {
-      grants: NO_GRANTS,
-      shared: [],
-    }
-    const sharing = await project.prepareShared({
-      user: user.shared,
-      project: authority.shared,
-    })
+    const read = await textAt({ kind: "accepted" })
+    const text = read?.text ?? null
+    const copy = decodeProject(
+      SETTINGS,
+      projectCopy(
+        "accepted",
+        ACCEPTED_FILE,
+        text === null ? { kind: "missing" } : { kind: "text", text },
+      ),
+    )
+    const authority = laneAuthority(copy.values, root)
+    const report = settledFor(copy, authority)
+    const sharing = await project.prepareShared(
+      report.settled["lanes.shared"].value,
+    )
     for (const r of sharing.refused)
       log(`[host] ${r.path} is not shared: ${r.reason}`)
-    return { authority, shared: sharing.shared }
+    return { copy, authority, report, shared: sharing.shared }
   }
 
-  /** What accepted work grants, said once per change. */
+  /** The person's own shared directories, and the file each is in. */
+  const personal = (): ReadonlyMap<string, string> =>
+    new Map(
+      [start.user, start.local].flatMap(layer =>
+        layer === null
+          ? []
+          : (layer.values["lanes.shared"] ?? []).map(
+              p => [normalShared(p), layer.file] as const,
+            ),
+      ),
+    )
+
+  /** What accepted work grants, and what its copy refused, said once per change. */
   const describe = (a: AcceptedLanes): string[] => {
     const { grants } = a.authority
     const on = [
@@ -132,12 +167,12 @@ export async function startLaneConfigs(input: {
       ...grants.env.map(e => `$${e}`),
       ...grants.mounts.map(m => m.source),
     ].filter(g => g !== null)
+    const yours = personal()
     return [
+      ...a.copy.refusals.map(r => `[host] ${refusalWords(r)}`),
       ...(on.length > 0 ? [`[host] lanes are granted: ${on.join(", ")}`] : []),
       ...a.shared.map(d => {
-        const from = user.shared.some(p => normalShared(p) === d.path)
-          ? input.userFile
-          : PROJECT_CONFIG_FILE
+        const from = yours.get(d.path) ?? PROJECT_CONFIG_FILE
         return `[host] ${d.path}/ is shared read-write with every lane (${from})`
       }),
     ]
@@ -145,13 +180,16 @@ export async function startLaneConfigs(input: {
 
   let accepted = await readAccepted()
   const sharedListeners: ((shared: readonly SharedDir[]) => void)[] = []
+  const takenListeners: ((next: AcceptedLanes) => void)[] = []
   for (const line of describe(accepted)) log(line)
 
-  const allowed = (a: LaneAuthority) => {
-    const paths = new Set([
-      ...a.shared.map(normalShared),
-      ...user.shared.map(normalShared),
-    ])
+  /** Accepted work's shared directories that `authority`'s lane mounts. */
+  const allowed = (authority: LaneAuthority) => {
+    const paths = new Set(
+      settledFor(accepted.copy, authority).settled["lanes.shared"].value.map(
+        normalShared,
+      ),
+    )
     return accepted.shared.filter(d => paths.has(d.path))
   }
 
@@ -166,6 +204,10 @@ export async function startLaneConfigs(input: {
         for (const line of describe(next)) log(line)
       if (next.shared.map(d => d.path).join("\n") !== sharedBefore)
         for (const listener of sharedListeners) listener(next.shared)
+      for (const listener of takenListeners) listener(next)
+    },
+    onTaken(listener) {
+      takenListeners.push(listener)
     },
     onShared(listener) {
       sharedListeners.push(listener)
@@ -183,14 +225,15 @@ export async function startLaneConfigs(input: {
     laneConfig: lane =>
       effectiveLaneConfig(accepted.authority, lanes.get(lane) ?? null),
     configNote(text) {
-      let json: unknown = null
-      try {
-        json = text === null ? null : JSON.parse(text)
-      } catch {
-        return `${PRODUCT_NAME}: ${PROJECT_CONFIG_FILE} is not JSON: this lane keeps what accepted work's grants until it is.`
-      }
-      const { grants, shared } = decodeLaneConfig(json, root)
-      return configChangeNote(accepted.authority, { grants, shared })
+      const written = decodeAuthority(root, PROJECT_CONFIG_FILE, text)
+      const notTaken = written.refusals.map(
+        r => `${PRODUCT_NAME}: ${refusalWords(r)}.`,
+      )
+      const change = written.refusals.some(r => r.why === "broken")
+        ? `${PRODUCT_NAME}: this lane keeps what accepted work's grants until ${PROJECT_CONFIG_FILE} can be read.`
+        : configChangeNote(accepted.authority, written.authority)
+      const lines = [...notTaken, ...(change === null ? [] : [change])]
+      return lines.length === 0 ? null : lines.join("\n")
     },
     laneShared: lane =>
       allowed(effectiveLaneConfig(accepted.authority, lanes.get(lane) ?? null)),

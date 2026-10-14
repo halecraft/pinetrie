@@ -19,11 +19,16 @@ export {
   planLaneSsh,
 } from "./lane-files.ts"
 export { laneToken } from "./names.ts"
+export type { HostPatterns } from "./patterns.ts"
 export { runProgram, startServiceAgent } from "./programs.ts"
 export {
-  decodeSshSettings,
+  DEFAULT_APPROVAL_SECONDS,
+  MAX_APPROVAL_SECONDS,
+  MIN_APPROVAL_SECONDS,
+  type PersonalChoice,
   type PersonalOff,
-  type SshSettingRefusal,
+  parseHostPatterns,
   type SshSettings,
   settingsOnHost,
+  sshSettings,
 } from "./settings.ts"

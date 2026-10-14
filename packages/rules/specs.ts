@@ -20,6 +20,7 @@ import { QUEUE_HOLD } from "./queue-hold.ts"
 import type { RecordSpec } from "./records.ts"
 import { ROOT } from "./roots.ts"
 import { SEAT } from "./seat.ts"
+import { SETUP } from "./setup.ts"
 import { SHARED_LINEAGE } from "./shared.ts"
 import { THREAD } from "./thread.ts"
 import { VERDICT } from "./verdict.ts"
@@ -56,6 +57,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   REVISION,
   ROOT,
   SEAT,
+  SETUP,
   SHARED_LINEAGE,
   TRACE,
   VERDICT,

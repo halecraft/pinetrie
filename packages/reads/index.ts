@@ -48,6 +48,7 @@ import {
   type RootId,
   type RootRecord,
   type SeatRecord,
+  type SetupRecord,
   type Sha256,
   type SharedLineage,
   type SnapshotId,
@@ -106,6 +107,8 @@ import {
   recordsIn,
   renderableMessage,
   SEAT,
+  SETUP,
+  SETUP_KEY,
   SHARED_LINEAGE,
   THREAD,
   TRACE,
@@ -759,6 +762,10 @@ export const readThreadName = (doc: SessionDocHandle, lane: ThreadId): string =>
 /** What the host found where it runs (`pinetrie.project`); null with no tools. */
 export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>
   readRecords(doc, PROJECT).get(PROJECT_KEY) ?? null
+
+/** What the host read of its config (`pinetrie.setup`); null before a host wrote it. */
+export const readSetup = (doc: SessionDocHandle): SetupRecord | null =>
+  readRecords(doc, SETUP).get(SETUP_KEY) ?? null
 
 /** The host's icon source (`pinetrie.icons`); null before a host wrote it. */
 export const readIcons = (doc: SessionDocHandle): IconsRecord | null =>

@@ -9,6 +9,7 @@ import type {
   AcceptedAction,
   AcceptedRecord,
   PublishDecision,
+  RepoConfig,
   ValueWrite,
 } from "@pinetrie/core"
 import {
@@ -16,7 +17,6 @@ import {
   planPublishCatchUp,
   planPublishMove,
   planSetup,
-  type RepoConfig,
   type RepoOps,
   type RepoOwner,
   setupProposal,

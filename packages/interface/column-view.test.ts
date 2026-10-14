@@ -188,6 +188,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   bases: new Map(),
   forks: new Map(),
   filesLost: new Map(),
+  setup: null,
   budgets: new Map(),
   ...over,
 })

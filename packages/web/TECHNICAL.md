@@ -1404,8 +1404,11 @@ the email is the only thing pine·trie chooses.
 
 ## Pages (`page.tsx`, `use-page.ts`, ADR-0098)
 
-A page covers the stage: the profile is the first. Which page, and how
-leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
+A page covers the stage: the profile, and the setup page
+(`setup-page.tsx`, ADR-0146), which draws `setupView` from the account
+menu's **Setup**. Which page, and how leaving treats the history, are
+`page.ts`'s (`@pinetrie/interface`). The composer's "See Setup" link is a
+plain `#setup` anchor: `usePage` hears the hash change.
 
 - **The page is in the URL's hash** (`#profile`). `usePage` reads it with
   `useSyncExternalStore`, hearing `popstate` (Back and Forward) and

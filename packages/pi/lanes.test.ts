@@ -33,6 +33,7 @@ import {
   type LaneFacts,
   laneGuidelines,
   NO_CONFLICTS,
+  skillsInLane,
   systemPromptFor,
   toolContextOf,
 } from "./lanes.ts"
@@ -752,4 +753,26 @@ describe("lanes in a harness", () => {
     ])
     await agent.close()
   })
+})
+
+test("a lane reads a project's skill in its own copy, a granted one under /mnt/host, and no other", () => {
+  const skill = (dir: string) => ({
+    name: path.basename(dir),
+    filePath: `${dir}/SKILL.md`,
+    baseDir: dir,
+  })
+  expect(
+    skillsInLane(
+      [
+        skill("/proj/skills/mine"),
+        skill("/ai/duane/skills/plan"),
+        skill("/elsewhere/x"),
+      ],
+      ["/ai/duane"],
+      "/proj",
+    ).map(s => s.filePath),
+  ).toEqual([
+    "/workspace/skills/mine/SKILL.md",
+    "/mnt/host/ai/duane/skills/plan/SKILL.md",
+  ])
 })

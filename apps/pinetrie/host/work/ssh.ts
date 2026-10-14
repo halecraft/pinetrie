@@ -47,7 +47,6 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import {
-  decodeSshSettings,
   HOP_AGENT_SOCKET,
   identityPaths,
   inlineIncludes,
@@ -61,6 +60,7 @@ import {
   type SshSettings,
   serviceKeyCheck,
   settingsOnHost,
+  sshSettings,
   startServiceAgent,
   startSshHost,
   TOKEN_ENV,
@@ -190,10 +190,11 @@ export async function startLaneSsh(input: {
   readonly basics: Pick<Basics, "session" | "log" | "now">
   readonly records: Pick<Records, "writeValues">
   readonly root: string
-  readonly userConfig: { readonly file: string; readonly json: unknown }
-  /** Whether accepted work's `pinetrie.json` grants lanes your identity. */
-  readonly projectGrant: boolean
-  /** Whether a lane's own config keeps that grant (`effectiveLaneConfig`). */
+  /** `lanes.ssh`'s settled values, under accepted work's grant (`sshChoice`). */
+  readonly choice: Parameters<typeof sshSettings>[0]
+  /** The service identities' folder: `ssh/` in pine·trie's config directory. */
+  readonly serviceDir: string
+  /** Whether a lane's own config keeps the project's grant (`effectiveLaneConfig`). */
   readonly laneGrant: (lane: ThreadId) => boolean
   readonly owner: WriterId | null
   readonly personal: PersonalSshPlaces
@@ -204,15 +205,14 @@ export async function startLaneSsh(input: {
   const { log } = basics
 
   // --- gather -------------------------------------------------------------
-  const decoded = decodeSshSettings(input.userConfig.json, input.projectGrant)
-  const settings: SshSettings = settingsOnHost(decoded.settings, {
+  const settings: SshSettings = settingsOnHost(sshSettings(input.choice), {
     owner: input.owner !== null,
     agent: places.agent !== null,
   })
   const { personal: personalSsh } = settings
   const personalOn = personalSsh.kind === "on"
   const home = path.dirname(places.dir)
-  const serviceDir = path.join(path.dirname(input.userConfig.file), "ssh")
+  const { serviceDir } = input
   const keyFiles = await serviceKeyFiles(serviceDir)
   const serviceConfigFile = path.join(serviceDir, "config")
   const personalConfigFile = path.join(places.dir, "config")
@@ -251,14 +251,12 @@ export async function startLaneSsh(input: {
   const added: readonly UsableServiceKey[] = serviceAgent?.added ?? []
   for (const line of sshLines({
     settings,
-    refusedSettings: decoded.refused,
     checks,
     failed: serviceAgent?.failed ?? [],
     added: added.map(k => k.name),
     dropped: files.dropped,
     hasSsh,
     hasAgent: serviceAgent !== null,
-    file: input.userConfig.file,
   }))
     log(line)
   if (!personalOn && added.length === 0) {

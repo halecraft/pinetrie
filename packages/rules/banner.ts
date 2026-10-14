@@ -14,7 +14,7 @@ import {
   threadNameParts,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { type ModelRef, modelRef, recordOf } from "./config.ts"
+import type { ModelRef } from "./config.ts"
 import { decodeAt, fixedKey, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
@@ -51,18 +51,14 @@ export const DEFAULT_ICON_MODEL: ModelRef = {
   model: "recraft/recraft-v4.1-flash",
 }
 
-/**
- * The user config's `icons`: `source` is `built-in` unless it names
- * `drawn` or `none`. A drawn `model` is `provider/id` (`modelRef`), and a
- * missing or malformed one takes the default.
- */
-export function decodeIconConfig(json: unknown): IconConfig {
-  const icons = recordOf(recordOf(json)?.icons)
-  const source = ICON_SOURCES.find(s => s === icons?.source) ?? "built-in"
-  return source === "drawn"
-    ? { source, model: modelRef(icons?.model) ?? DEFAULT_ICON_MODEL }
+/** Where icons come from: a drawn one's model is the configured one, else the default. */
+export const iconConfig = (
+  source: IconSource,
+  model: ModelRef | null,
+): IconConfig =>
+  source === "drawn"
+    ? { source, model: model ?? DEFAULT_ICON_MODEL }
     : { source }
-}
 
 /** The one `pinetrie.icons` value's key. */
 export const ICONS_KEY = "icons"

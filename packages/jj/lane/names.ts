@@ -2,7 +2,7 @@
 // each lane's bookmark, its history and stack as remote bookmarks in your
 // repo, offers' bookmarks, and your repo's own names (`RepoConfig`).
 
-import type { ThreadId, ThreadName } from "@pinetrie/core"
+import type { RepoConfig, ThreadId, ThreadName } from "@pinetrie/core"
 
 /** The branch a commit fetched by id is put on, so jj sees it. */
 export const FETCHED_REF = "refs/heads/pinetrie/fetched"
@@ -49,18 +49,6 @@ export const offerBookmark = (name: ThreadName): string =>
   `${OFFER_PREFIX}${name}`
 /** Every offer's bookmark, as a revset. */
 export const OFFER_BOOKMARKS = `bookmarks(glob:${revsetName(`${OFFER_PREFIX}*`)})`
-
-/**
- * How pine·trie uses your repo: accepted work's bookmark, the WIP bookmarks'
- * prefix, the bookmark publishing moves to accepted work, and whether a
- * publish catches the working copy up and accepts your commits first.
- */
-export interface RepoConfig {
-  readonly acceptedBookmark: string
-  readonly wipPrefix: string
-  readonly publish: string
-  readonly publishCatchesUp: boolean
-}
 
 export const DEFAULT_REPO: RepoConfig = {
   acceptedBookmark: "pinetrie-accepted",

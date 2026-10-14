@@ -1,8 +1,5 @@
 // e2e/host/banners — an image behind each thread's column header.
 
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import path from "node:path"
 import { type ImageRef, messageText, ROOT } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { readBanners, readPlaces } from "@pinetrie/reads"
@@ -16,6 +13,7 @@ import {
   START_AGENT,
   SUITE_CONFIG,
   suiteClock,
+  suitePlaces,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -30,18 +28,10 @@ export const scenario: Scenario = {
 }
 
 async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
-  // Turned on by the user config. A scripted model draws a fixed image; the
+  // Turned on by the suite's config. A scripted model draws a fixed image; the
   // host's clock is moved past the grace, so the sweep's handling of banners
   // shows.
   {
-    const userConfig = path.join(
-      mkdtempSync(path.join(tmpdir(), "pinetrie-banner-config-")),
-      "config.json",
-    )
-    writeFileSync(
-      userConfig,
-      JSON.stringify({ ...SUITE_CONFIG, icons: { source: "drawn" } }),
-    )
     const script = scriptedModel({ answer: { text: "noted" } })
     const clock = suiteClock()
     const {
@@ -52,7 +42,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     } = await lanes.sectionHost({
       files: { "a.txt": "a\n" },
       model: { kind: "scripted", script },
-      userConfig,
+      places: suitePlaces({
+        user: { ...SUITE_CONFIG, icons: { source: "drawn" } },
+      }),
       now: clock.now,
     })
     await bu.request({ kind: "name", name: "Bea" })

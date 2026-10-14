@@ -23,6 +23,7 @@ import {
   type LaneBase,
   NO_EDITOR,
   type OfferSource,
+  type RepoConfig,
   type ThreadId,
   type ThreadName,
   threadIdFor,
@@ -34,11 +35,13 @@ import {
   hostBytesRunner,
   hostRunner,
   LANE_JJ_CONFIG,
+  type LaneAuthority,
   type LaneRunners,
   type LaneStep,
   laneIgnores,
   laneShell,
   lines,
+  NO_GRANTS,
   OLD_LANE_CONFIG_DIR,
   type Runner,
   run,
@@ -62,7 +65,6 @@ import {
   bookmarkRevset,
   DEFAULT_REPO,
   offerBookmark,
-  type RepoConfig,
   revsetName,
   stackBookmark,
 } from "./lane/names.ts"
@@ -235,6 +237,21 @@ const laneJjAt =
     run("jj", ["-R", dir, "--no-pager", "--color=never", ...args], {
       env: { ...NO_EDITOR, JJ_CONFIG: config },
     })
+
+/**
+ * What a copy of `pinetrie.json` grants, as far as these tests write one: its
+ * personal ssh. The host's table decodes the rest.
+ */
+const sshAuthority = (text: string | null): LaneAuthority => ({
+  grants: {
+    ...NO_GRANTS,
+    ssh:
+      text !== null &&
+      (JSON.parse(text) as { lanes?: { ssh?: { personal?: boolean } } }).lanes
+        ?.ssh?.personal === true,
+  },
+  shared: [],
+})
 
 describe("a lane's repo, with jj", () => {
   let top = ""
@@ -858,7 +875,7 @@ describe("a lane's repo, with jj", () => {
     await edit(
       laneDir,
       "pinetrie.json",
-      JSON.stringify({ lanes: { ssh: true } }),
+      JSON.stringify({ lanes: { ssh: { personal: true } } }),
     )
     await run("mv", [
       path.join(laneDir, "base.txt"),
@@ -876,7 +893,7 @@ describe("a lane's repo, with jj", () => {
     if (w === undefined || change === undefined) throw new Error("no offer")
 
     const span = { kind: "revision", commit: w } as const
-    const read = await revisionRead(ops, span)
+    const read = await revisionRead(ops, span, sshAuthority)
     expect(read).toEqual({
       description: "feat: lane\n\nwhy\n",
       files: expect.arrayContaining([
@@ -933,7 +950,7 @@ describe("a lane's repo, with jj", () => {
       [...((r as { files: { path: string }[] } | null)?.files ?? [])].sort(
         (a, b) => a.path.localeCompare(b.path),
       )
-    const ranged = await revisionRead(ops, range)
+    const ranged = await revisionRead(ops, range, sshAuthority)
     expect(ranged).toMatchObject({
       description: "",
       widenings: [{ kind: "ssh" }],
@@ -959,15 +976,20 @@ describe("a lane's repo, with jj", () => {
     if (now === undefined) throw new Error("no commit")
     expect(now.commit).not.toBe(w)
     expect(
-      await revisionRead(ops, { kind: "revision", commit: now.commit }),
+      await revisionRead(
+        ops,
+        { kind: "revision", commit: now.commit },
+        sshAuthority,
+      ),
     ).toMatchObject({
       description: "feat: as I want it\n",
     })
     expect(
-      await revisionRead(ops, {
-        kind: "revision",
-        commit: commitId("1".repeat(40)),
-      }),
+      await revisionRead(
+        ops,
+        { kind: "revision", commit: commitId("1".repeat(40)) },
+        sshAuthority,
+      ),
     ).toBeNull()
   }, 60_000)
 

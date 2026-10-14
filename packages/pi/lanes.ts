@@ -13,8 +13,8 @@ import {
   FIND_TOOL,
   GREP_TOOL,
   HOST_WORKING_COPY,
-  hostPathInLane,
   isWithin,
+  laneSkillPath,
   PRODUCT_NAME,
   type RuntimeProgram,
   type ThreadId,
@@ -223,20 +223,24 @@ export function toolContextOf(
 }
 
 /**
- * The skills a lane of its own can read, at the paths it reads them: those
+ * The skills a lane of its own can read, at the paths it reads them
+ * (`laneSkillPath`): those inside the project, in its own copy, and those
  * under a host path it has mounted, at `/mnt/host` and their path.
  */
-function skillsInLane<S extends { filePath: string; baseDir: string }>(
+export function skillsInLane<S extends { filePath: string; baseDir: string }>(
   skills: readonly S[] | undefined,
   hostPaths: readonly string[],
+  project: string | null,
 ): S[] {
-  const mounted = (p: string) => hostPaths.some(r => isWithin(p, r))
+  const readable = (p: string) =>
+    (project !== null && isWithin(p, project)) ||
+    hostPaths.some(r => isWithin(p, r))
   return (skills ?? [])
-    .filter(s => mounted(s.filePath))
+    .filter(s => readable(s.filePath))
     .map(s => ({
       ...s,
-      filePath: hostPathInLane(s.filePath),
-      baseDir: hostPathInLane(s.baseDir),
+      filePath: laneSkillPath(s.filePath, project),
+      baseDir: laneSkillPath(s.baseDir, project),
     }))
 }
 
@@ -249,6 +253,8 @@ export const systemPromptFor =
   (
     setup: Pick<ModelSetup, "contextFiles" | "skills">,
     selectedTools: readonly string[],
+    /** The project's root: its own skills are read in a lane's copy. */
+    project: string | null = null,
   ) =>
   (toolContext: ToolContext): string =>
     buildSystemPrompt({
@@ -258,7 +264,7 @@ export const systemPromptFor =
       skills:
         toolContext.lane === null
           ? setup.skills
-          : skillsInLane(setup.skills, toolContext.lane.hostPaths),
+          : skillsInLane(setup.skills, toolContext.lane.hostPaths, project),
       promptGuidelines:
         toolContext.lane === null
           ? [...CONTEXT_RULES, AGENTS_RULE]

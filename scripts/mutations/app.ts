@@ -2654,4 +2654,13 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect: "a fold turns the column's name onto its strip's, in its colour",
   },
+  {
+    name: "the host publishes a model it does not have",
+    file: "apps/pinetrie/host/index.ts",
+    from: "      report: r,\n      model: piSetup.model,\n",
+    to: '      report: r,\n      model: { kind: "model", label: "none" },\n',
+    suite: "host",
+    scenario: "chat",
+    expect: "a host with no model starts, and its setup record says why",
+  },
 ]

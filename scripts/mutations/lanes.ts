@@ -533,14 +533,6 @@ export const mutations: readonly Mutation[] = [
       "planProjectDir: jj's root, a jj project; else git's, else the folder, a folder project; never missing, your home directory or /",
   },
   {
-    name: "a broken config file reads as missing",
-    file: "packages/lanes/host.ts",
-    from: "    return isMissing(error)\n",
-    to: "    return true\n",
-    command: unit,
-    expect: "readConfigFile",
-  },
-  {
     name: "the inner Docker's PATH has no /usr/sbin",
     file: "packages/lanes/image/Containerfile",
     from: "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin dockerd-rootless.sh",

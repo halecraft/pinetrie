@@ -174,6 +174,7 @@ describe("planSend: what the send does, as the host will decide", () => {
       agents: [],
       reader: READER,
       command: null,
+      noModel: null,
       ...over,
     })
   test("a card's command, and whether it has text to send after", () => {
@@ -197,6 +198,7 @@ describe("planSend: what the send does, as the host will decide", () => {
       agentByDefault: false,
       agentNames: new Map(),
       command: null,
+      noModel: null,
     })
     expect(plan("@ada hi").to).toEqual({
       compels: NOBODY,
@@ -277,6 +279,39 @@ describe("planSend: what the send does, as the host will decide", () => {
   })
 })
 
+describe("a send with no model", () => {
+  const plan = (text: string) =>
+    planSend({
+      text,
+      unstarted: false,
+      lane: { kind: "none" },
+      asksAgent: false,
+      participants: ["Ada"],
+      agents: [],
+      reader: READER,
+      command: null,
+      noModel: "no config names one",
+    })
+  test("a send that asks the agent is refused, pointing at the setup page", () => {
+    expect(
+      sendButton(plan("@agent hi"), { uploading: false, sending: false }),
+    ).toEqual({
+      label: "no model",
+      title: "No model: no config names one",
+      disabled: true,
+      setup: true,
+    })
+  })
+  test("a send to people needs no model", () => {
+    expect(
+      sendButton(plan("hi Ada"), { uploading: false, sending: false }),
+    ).toMatchObject({
+      disabled: false,
+      setup: false,
+    })
+  })
+})
+
 describe("sendButton: the plan in words, and whether it can be pressed", () => {
   const sent = (to: Recipients, mode: ComposerMode = "reply"): SendPlan => ({
     mode,
@@ -287,6 +322,7 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
     hold: "keep",
     agentByDefault: false,
     command: null,
+    noModel: null,
   })
   const IDLE = { uploading: false, sending: false }
   const people = (...names: string[]): Recipients => ({
@@ -375,7 +411,12 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
       false,
     ],
   ] as const)("%s", (_, plan, busy, label, title, disabled) => {
-    expect(sendButton(plan, busy)).toEqual({ label, title, disabled })
+    expect(sendButton(plan, busy)).toEqual({
+      label,
+      title,
+      disabled,
+      setup: false,
+    })
   })
 
   test("placeholderWords says whether a message naming no one asks the agent", () => {

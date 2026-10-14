@@ -151,6 +151,7 @@ While the page syncs, "syncing…" leads its right end.
   badge and **Inventory** with its count (**Close inventory** while the
   panel is open); choosing **Inbox** shows the inbox's sections in the same
   menu, under **← back**. Then **Profile**, which opens your profile page
+  (Pages, below), **Setup**, which opens what the host read of its config
   (Pages, below), and **Sign in as someone else**, which forgets who this
   device says you are and asks again (ADR-0037).
 - **Your inbox** (ADR-0030, ADR-0077, ADR-0091), beside you: one menu of
@@ -258,6 +259,29 @@ nothing; Ctrl+Shift+L still folds the sidebar.
   - **Your name**, and the handle it gives you as you type it, sent on
     Enter or **save**, which says **saved** once it is; a name no mention
     could reach is refused before it is sent.
+- **Setup** (ADR-0146), from the same menu, under **Profile**: what the
+  host read of its config, the same for everyone, with nothing secret in
+  it.
+  - **Model**: the model and where it came from ("from
+    ~/.config/pinetrie/pinetrie.json", "from $PINETRIE_MODEL"), or, in
+    amber, why there is none and what to do ("no config names one: set
+    model, as provider/id"; "… has no credential: pnpm sign-in anthropic").
+  - **Sign in**: each provider with a credential and where it is
+    ("signed in (auth.json)", "from an environment variable"), never the
+    credential, and the `pnpm sign-in <provider>` line.
+  - **Config files**: each layer's file, "(none)" when it is missing, and
+    what it refused, in amber: a key no setting has, a key that layer may
+    not set, a value that is not taken.
+  - **Settings**: every setting with its value and where it came from;
+    hovering one says what it is. A setting added later shows here with
+    no page of its own.
+  - **Skills, prompts and packages**: a listed package that is not a
+    folder, then every command.
+  - **Context files**: the files the model is given, `AGENTS.md` and the
+    like: pine·trie's own and those inside the project.
+- **A send that needs a model the host has not** is refused in the
+  composer: the button reads **no model**, its title why, and **See Setup**
+  beside it opens the page. A send to people needs no model, and is sent.
 
 ### The board: where everyone's work stands (ADR-0122)
 
@@ -666,7 +690,7 @@ the tree.
   Coming back, a dashed line, "since you were here", marks the first
   message after it. It takes no room.
 - **A summary, unless digests are off** (`{ "digests": { "enabled": false } }` in
-  `~/.config/pinetrie/config.json`, ADR-0071): a model's two or three sentences on an
+  your `pinetrie.json`, ADR-0071, ADR-0146): a model's two or three sentences on an
   ask's work, under its digest line, set apart from the agent's words. It is
   refreshed at most once a minute while someone reads the running thread,
   written once more when its run ends, and read by no agent.

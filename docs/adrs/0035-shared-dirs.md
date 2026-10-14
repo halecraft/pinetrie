@@ -19,6 +19,9 @@
     approves.
   - ADR-0141: on the Mac, a shared directory accepted work adds while the host
     runs reaches lanes at their next start, as on Linux.
+  - ADR-0146: the two levels become layers, combined by each setting's
+    declared rule. `lanes.shared` joins the user's and the project's lists, as
+    before. The user's file is `pinetrie.json`, not `config.json`.
 
 **Context.** ADR-0034 gives each lane its own disk, and a branch clones it.
 That is right for a project's files, and wrong for the person's own working

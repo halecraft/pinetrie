@@ -20,6 +20,7 @@ import {
   PROJECT,
   pendingVerdict,
   SEAT,
+  SETUP,
   setRecord,
   VERDICT,
 } from "@pinetrie/rules"
@@ -61,6 +62,15 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
   ...ports(fakePi()),
   work: record<StartupDeps["work"]>({ project: null }).port,
   icons: { source: "built-in" },
+  setup: {
+    files: [],
+    refusals: [],
+    model: { kind: "none", why: "unset", named: null },
+    credentials: [],
+    settings: [],
+    refusedPackages: [],
+    contextFiles: [],
+  },
   ensureNames: async () => {},
   keeper: createKeeper(),
   start: () => runId("r-1"),
@@ -180,7 +190,7 @@ test("recover deletes the records of a type no spec declares, in the session and
   ])
 })
 
-test("recover writes the project and icon records only when they changed, in one write", async () => {
+test("recover writes the project, icon and setup records only when they changed, in one write", async () => {
   const project: ProjectRecord = { root: "/repo", owner: null }
   const run = async (b: ReturnType<typeof basics>) => {
     const agent = fakePi()
@@ -202,11 +212,13 @@ test("recover writes the project and icon records only when they changed, in one
     )
   }
   const fresh = await run(basics())
-  expect(fresh.map(c => (c.args[0] as unknown[]).length)).toEqual([3])
+  expect(fresh.map(c => (c.args[0] as unknown[]).length)).toEqual([4])
   expect(writesOf(fresh).map(w => w.namespace)).toContain("pinetrie.icons")
+  expect(writesOf(fresh).map(w => w.namespace)).toContain("pinetrie.setup")
   const b = basics()
   putValue(b, setRecord(PROJECT, project))
   putValue(b, setRecord(ICONS, { source: "built-in" }))
+  putValue(b, setRecord(SETUP, deps().setup))
   const again = await run(b)
   expect(writesOf(again).map(w => w.namespace)).toEqual(["pinetrie.commands"])
 })

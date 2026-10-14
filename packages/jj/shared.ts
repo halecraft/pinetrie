@@ -5,13 +5,14 @@
 import {
   type AcceptedFacts,
   type CommitId,
+  type RepoConfig,
   sourcesOf,
   type ThreadId,
   untracedLanes,
 } from "@pinetrie/core"
 import { describeFailure, lines, type Runner } from "@pinetrie/lanes"
 import { acceptedFacts } from "./accepted.ts"
-import { type RepoConfig, revsetName } from "./lane/names.ts"
+import { revsetName } from "./lane/names.ts"
 import {
   ACCEPTED_OFFER_COMMIT_ROW,
   parseAcceptedOfferCommits,

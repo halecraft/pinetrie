@@ -1,0 +1,86 @@
+{
+  "variant": "today",
+  "getAgentDir": "/home/.pi/agent",
+  "markers": [],
+  "extensions": [
+    "/tmp/s193/node_modules/@gotgenes/pi-anthropic-auth/src/index.ts"
+  ],
+  "extensionErrors": [],
+  "providerRegistrations": ["anthropic", "pi-home-shaped"],
+  "skills": [
+    "proj-pi-skill /home/proj/.pi/skills/proj-pi-skill/SKILL.md (auto/project/top-level /home/proj/.pi)",
+    "proj-agents-skill /home/proj/.agents/skills/proj-agents-skill/SKILL.md (auto/project/top-level /home/proj/.agents)",
+    "pi-listed-skill /home/.pi/agent/listed-skills/pi-listed-skill/SKILL.md (local/user/top-level -)",
+    "pi-home-skill /home/.pi/agent/skills/pi-home-skill/SKILL.md (auto/user/top-level /home/.pi/agent)",
+    "home-agents-skill /home/.agents/skills/home-agents-skill/SKILL.md (auto/user/top-level /home/.agents)",
+    "our-skill /home/.config/pinetrie/skills/our-skill/SKILL.md (local/temporary/top-level /home/.config/pinetrie/skills/our-skill)"
+  ],
+  "prompts": [
+    "proj-pi-prompt /home/proj/.pi/prompts/proj-pi-prompt.md (auto/project/top-level /home/proj/.pi)",
+    "pi-home-prompt /home/.pi/agent/prompts/pi-home-prompt.md (auto/user/top-level /home/.pi/agent)"
+  ],
+  "contextFiles": [
+    "/home/.pi/agent/AGENTS.md",
+    "/home/AGENTS.md",
+    "/home/proj/AGENTS.md"
+  ],
+  "systemPrompt": "sentinel project SYSTEM\n",
+  "appendSystemPrompt": ["sentinel project APPEND\n"],
+  "providers": ["pi-home-provider"],
+  "anthropicAuth": {
+    "type": "api_key",
+    "source": "stored credential"
+  },
+  "shaped": {
+    "model": "claude-sonnet-4-5",
+    "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"probe\"}}",
+    "requests": [
+      {
+        "url": "https://api.anthropic.com/v1/messages?beta=true",
+        "headers": {
+          "accept": "application/json",
+          "anthropic-dangerous-direct-browser-access": "true",
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+          "user-agent": "pi (linux 6.18.56-0-virt; arm64)",
+          "x-api-key": "PI-HOME-KEY",
+          "x-stainless-arch": "arm64",
+          "x-stainless-lang": "js",
+          "x-stainless-os": "Linux",
+          "x-stainless-package-version": "0.124.0",
+          "x-stainless-retry-count": "0",
+          "x-stainless-runtime": "node",
+          "x-stainless-runtime-version": "v24.21.0",
+          "x-stainless-timeout": "600"
+        },
+        "system": ["You are a probe."]
+      }
+    ]
+  },
+  "bare": {
+    "model": "claude-sonnet-4-5",
+    "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"probe\"}}",
+    "requests": [
+      {
+        "url": "https://api.anthropic.com/v1/messages?beta=true",
+        "headers": {
+          "accept": "application/json",
+          "anthropic-dangerous-direct-browser-access": "true",
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+          "user-agent": "pi (linux 6.18.56-0-virt; arm64)",
+          "x-api-key": "PI-HOME-KEY",
+          "x-stainless-arch": "arm64",
+          "x-stainless-lang": "js",
+          "x-stainless-os": "Linux",
+          "x-stainless-package-version": "0.124.0",
+          "x-stainless-retry-count": "0",
+          "x-stainless-runtime": "node",
+          "x-stainless-runtime-version": "v24.21.0",
+          "x-stainless-timeout": "600"
+        },
+        "system": ["You are a probe."]
+      }
+    ]
+  }
+}

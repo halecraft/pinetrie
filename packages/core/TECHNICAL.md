@@ -108,7 +108,16 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   `Noun` (the lists are `as const`), so a built-in icon's URL
   (`builtInIconUrl`, interface) can only be built for a noun on the list.
 - The icon sources are `ICON_SOURCES`; `IconSource`, the published record's
-  schema and the user config's decoder are all built from it.
+  schema and the `icons.source` setting's kind are all built from it.
+- What config is, as every package that speaks of it names it: its layers
+  (`ConfigLayer`), a file's state, a refusal and an origin, and the
+  published setup record (`SetupRecord`, ADR-0146). Deciding them is
+  `@pinetrie/config`'s. Each closed set (`CONFIG_FILE_STATES`,
+  `REFUSAL_REASONS`, `NO_MODEL_REASONS`) is a list its type and the record's
+  schema are both built from, as the icon sources are. `ModelLine` is the
+  model as pi's setup states it; `SetupModel` is the same with its origins.
+- Where a lane reads a skill (`laneSkillPath`): a project's in its own
+  copy, any other at `/mnt/host` and its host path.
 - A turn that changes files is a revision (ADR-0032), on a lane's own disk
   (ADR-0034), whose snapshots `RevisionRecord` names; every thread's agent
   works in a copy of its own (ADR-0102). A conflict is resolved by the agent

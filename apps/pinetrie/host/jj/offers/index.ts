@@ -13,18 +13,19 @@
 // waiting. The reads a page asks for (`read`) are pinned reads, which wait on
 // nothing.
 
-import type {
-  CommitId,
-  ErrCode,
-  OfferFact,
-  OfferSeen,
-  ThreadId,
-  WriterId,
+import {
+  type CommitId,
+  type ErrCode,
+  type OfferFact,
+  type OfferSeen,
+  PROJECT_CONFIG_FILE,
+  type RepoConfig,
+  type ThreadId,
+  type WriterId,
 } from "@pinetrie/core"
 import {
   fileDiff,
   laneRefSteps,
-  type RepoConfig,
   type RepoOwner,
   revisionRead,
 } from "@pinetrie/jj"
@@ -42,6 +43,7 @@ import {
 } from "@pinetrie/rules"
 import { type Basics, failed } from "../../basics.ts"
 import type { Records } from "../../records.ts"
+import { decodeAuthority } from "../../settings.ts"
 import type { AcceptedWork } from "../accepted.ts"
 import { act } from "./act.ts"
 import { describe } from "./describe.ts"
@@ -217,7 +219,15 @@ export function startOffers(input: {
           return read
         case "review":
           return answerReview(
-            await owner.read(ops => revisionRead(ops.jj, read.span)),
+            await owner.read(ops =>
+              // A widening names a mount by its target: the root does not matter.
+              revisionRead(
+                ops.jj,
+                read.span,
+                text =>
+                  decodeAuthority("/", PROJECT_CONFIG_FILE, text).authority,
+              ),
+            ),
           )
         case "diff":
           return answerDiff(

@@ -52,15 +52,15 @@ export const mutations: readonly Mutation[] = [
     from: "        : isWithin(input.home, root)",
     to: "        : false",
     command: vitest("packages/lanes"),
-    expect: "never your home directory, / or pi's agent directory",
+    expect: "never your home directory, / or pine·trie's own directories",
   },
   {
     name: "commands pi dropped for their names are not gathered",
     file: "packages/pi/commands.ts",
-    from: "  for (const s of lostSkills) if (s !== null) await skill(s, true)\n",
+    from: "  for (const s of lostSkills) if (s !== null) await skill(s)\n",
     to: "",
     command: vitest("packages/pi/config.test.ts"),
-    expect: "the ones it dropped for their names included",
+    expect: "the ones pi dropped for their names included",
   },
   {
     name: "completion matches only the package",

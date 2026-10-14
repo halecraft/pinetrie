@@ -46,6 +46,5 @@ export {
   type JjProjectDir,
   prepareProjectDir,
   prepareShared,
-  repoConfig,
 } from "./startup.ts"
 export type { RepoStep } from "./step.ts"

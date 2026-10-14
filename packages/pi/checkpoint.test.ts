@@ -13,7 +13,6 @@ import {
   sealCheckpoint,
   unsealCheckpoint,
 } from "./checkpoint.ts"
-import { pickModel } from "./config.ts"
 import { KynetaStorage } from "./storage.ts"
 
 const output = (text: string) => ({
@@ -74,43 +73,4 @@ describe("KynetaStorage: a growing checkpoint is stored as text edits", () => {
     await session.deleteValue(at, BACKGROUND_CONTEXT)
     expect(doc.checkpointText.at(key ?? "")).toBeUndefined()
   })
-})
-
-test("pickModel: per field, the override, else the project's settings, else the global settings, each named as the source", () => {
-  const global = {
-    file: "/g/settings.json",
-    provider: "anthropic",
-    model: "claude-opus-5-5",
-  }
-  const project = { file: "/p/.pi/settings.json", model: "claude-fable-5-1" }
-  const fromGlobal = { kind: "settings", file: global.file }
-  expect(pickModel({ global, project: { file: project.file } }, {})).toEqual({
-    provider: "anthropic",
-    model: "claude-opus-5-5",
-    origin: { kind: "configured", provider: fromGlobal, model: fromGlobal },
-  })
-  expect(pickModel({ global, project }, {})).toEqual({
-    provider: "anthropic",
-    model: "claude-fable-5-1",
-    origin: {
-      kind: "configured",
-      provider: fromGlobal,
-      model: { kind: "settings", file: project.file },
-    },
-  })
-  expect(pickModel({ global, project }, { model: "claude-x" })).toEqual({
-    provider: "anthropic",
-    model: "claude-x",
-    origin: {
-      kind: "configured",
-      provider: fromGlobal,
-      model: { kind: "override" },
-    },
-  })
-  expect(
-    pickModel(
-      { global: { file: global.file }, project: { file: project.file } },
-      { provider: "cerebras" },
-    ),
-  ).toBeUndefined()
 })

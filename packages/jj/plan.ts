@@ -9,6 +9,7 @@ import {
   type LaneBase,
   type OfferSource,
   type PublishMove,
+  type RepoConfig,
   type ThreadId,
   type ThreadName,
   trailerRevset,
@@ -19,7 +20,6 @@ import {
   laneTipRef,
   OFFER_BOOKMARKS,
   offerBookmark,
-  type RepoConfig,
   revsetName,
   stackBookmark,
 } from "./lane/names.ts"

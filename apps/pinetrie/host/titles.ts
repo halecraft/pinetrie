@@ -61,7 +61,7 @@ export interface Titles {
 export function createTitles(deps: {
   readonly basics: Pick<Basics, "session" | "places" | "docs" | "log" | "now">
   readonly keeper: Pick<Keeper, "run" | "track">
-  /** The user config's `titles.enabled`: whether a task is titled unasked. */
+  /** The settled `titles.enabled`: whether a task is titled unasked. */
   readonly enabled: boolean
   readonly records: Pick<Records, "writeValues">
   /** The title model, and its skill. */

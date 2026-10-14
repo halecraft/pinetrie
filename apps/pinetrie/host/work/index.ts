@@ -9,6 +9,7 @@
 // and each lane's history are the project's adapter's (`adapter.ts`), which
 // `host/project.ts` chooses by the project's kind: nothing here names one.
 
+import type { ConfigPlaces } from "@pinetrie/config"
 import {
   PROJECT_CONFIG_FILE,
   type ProjectRecord,
@@ -20,14 +21,14 @@ import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { refusedAnswer } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
-import type { ProjectAdapter, Splits, StartedProject } from "./adapter.ts"
+import type { HostReport } from "../settings.ts"
+import type { Splits, StartedProject } from "./adapter.ts"
 import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes, recordLane } from "./create.ts"
 import type { Destination } from "./destination.ts"
 import { createRegistry } from "./registry.ts"
-import type { Found } from "./runtime.ts"
-import { startSetup } from "./setup.ts"
+import { type OpenedProject, startSetup } from "./setup.ts"
 import { createSharedLineages } from "./shared.ts"
 import { startSharedWatch } from "./shared-watch.ts"
 import type { PersonalSshPlaces } from "./ssh.ts"
@@ -70,19 +71,16 @@ export type LaneWork = Pick<
  */
 export async function startLaneWork(input: {
   readonly basics: Basics
-  /** What `findProject` found; null with no tools. */
-  readonly found: Found | null
-  /** The project's adapter (`host/project.ts`); null with no tools. */
-  readonly adapter: ProjectAdapter | null
-  /** The user's config, as read at startup: its file, for logs. */
-  readonly userConfig: { readonly file: string; readonly json: unknown }
+  /** The project, opened (`openProject`); null with no tools. */
+  readonly project: OpenedProject | null
+  /** Accepted work's settled config; null with no tools. */
+  readonly report: HostReport | null
+  /** pine·trie's own directories, which no lane may mount. */
+  readonly places: ConfigPlaces
   /** Where lane work writes its records. */
   readonly records: Pick<Records, "writeValues">
-  /** The person's pi setup: the commands' roots lanes are granted, the skills updates and splits ask for, and descriptions. */
-  readonly piSetup: Pick<
-    PiSetup,
-    "commands" | "agentDir" | "skill" | "complete"
-  >
+  /** The model setup: the commands' roots lanes are granted, the skills updates and splits ask for, and descriptions. */
+  readonly piSetup: Pick<PiSetup, "commands" | "skill" | "complete">
   /** Name every lane that has none (`host/names.ts`): a new lane, before its first run. */
   readonly ensureNames: () => Promise<void>
   /** The directory of the host's ssh socket, which the runtime mounts. */
@@ -96,9 +94,9 @@ export async function startLaneWork(input: {
   const keeper = createKeeper()
   const setup = await startSetup({
     basics,
-    found: input.found,
-    adapter: input.adapter,
-    userConfig: input.userConfig,
+    project: input.project,
+    report: input.report,
+    places: input.places,
     setup: input.piSetup,
     keeper,
     records: input.records,
@@ -240,7 +238,7 @@ export async function startLaneWork(input: {
       await sharedWatch.close()
       await containers.close()
       // After the lanes stop: on the Mac, the lease ends and the slot empties.
-      await input.found?.close()
+      await input.project?.found.close()
     },
     onBaseChanged(listener) {
       baseListeners.push(listener)

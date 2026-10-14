@@ -14,6 +14,7 @@ import type {
   OfferPlace,
   OfferSource,
   RefreshFacts,
+  RepoConfig,
   StackFacts,
   StartRead,
   ThreadId,
@@ -24,7 +25,7 @@ import { lines, type Runner } from "@pinetrie/lanes"
 import { readWipState } from "./accepted.ts"
 import { type CatchUpTarget, readCatchUp } from "./catch-up.ts"
 import { laneBase } from "./lane/base.ts"
-import { type RepoConfig, revsetName } from "./lane/names.ts"
+import { revsetName } from "./lane/names.ts"
 import { commitsOf, titlesOf } from "./lane/revisions.ts"
 import { gatherLane } from "./lane-read.ts"
 import {

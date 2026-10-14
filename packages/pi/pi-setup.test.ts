@@ -1,11 +1,11 @@
-// The person's pi setup, loaded with no document.
+// The model setup, loaded with no document.
 
 import { expect, test } from "vitest"
-import { loadPiSetup } from "./pi-setup.ts"
 import { SCRIPTED_DESCRIPTION, scriptedModel } from "./scripted.ts"
+import { loadTestSetup } from "./start-pi.ts"
 
 test("a setup answers with no documents", async () => {
-  const setup = await loadPiSetup({
+  const setup = await loadTestSetup({
     model: { kind: "scripted", script: scriptedModel() },
   })
   expect((await setup.complete({ system: "s", user: "u" })).text).toBe(

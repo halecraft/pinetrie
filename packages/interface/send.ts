@@ -11,6 +11,7 @@ import {
   parseMentions,
   type QueueHoldChange,
   type Recipients,
+  type SetupRecord,
   sendWaits,
   type TaskId,
   type ThreadId,
@@ -26,6 +27,7 @@ import {
 } from "@pinetrie/rules"
 import type { ChatHow } from "@pinetrie/session"
 import type { Prefill } from "./columns.ts"
+import { noModelWords } from "./setup-words.ts"
 
 /** What every send from one column carries, whichever card it is sent from. */
 export type ColumnHow = Pick<ChatHow, "base" | "root" | "pinned"> & {
@@ -176,7 +178,19 @@ export interface SendPlan {
   readonly agentByDefault: boolean
   /** Other threads' agents a mention may reach, by thread, their names: the button names them. */
   readonly agentNames: ReadonlyMap<ThreadId, string>
+  /**
+   * Why the host has no model, when this send would ask an agent: it is then
+   * refused here, before it is sent (a run's refusal cannot reach its
+   * author). Null when the send asks no agent, or the host has a model.
+   */
+  readonly noModel: string | null
 }
+
+/** Why the host has no model, in the setup page's words; null when it has one or has not said. */
+export const noModelLine = (setup: SetupRecord | null): string | null =>
+  setup?.model.kind === "none"
+    ? noModelWords(setup.model.why, setup.model.named)
+    : null
 
 /**
  * What a composer's next send does, decided as the host will decide it: who
@@ -202,6 +216,8 @@ export function planSend(input: {
   readonly reader: Reader
   /** The card's command, or null. */
   readonly command: CardCommand | null
+  /** Why the host has no model (`noModelLine`); null when it has one. */
+  readonly noModel: string | null
 }): SendPlan {
   const { unstarted, lane } = input
   const how = {
@@ -235,6 +251,7 @@ export function planSend(input: {
       input.command === null
         ? null
         : { command: input.command, text: input.text.trim() !== "" },
+    noModel: compelled || input.command !== null ? input.noModel : null,
   }
 }
 
@@ -253,7 +270,15 @@ export interface ButtonWords {
 
 export interface SendButton extends ButtonWords {
   readonly disabled: boolean
+  /** The send needs a model the host has not: the setup page says why. */
+  readonly setup: boolean
 }
+
+/** The button's label while a send that asks an agent has no model to ask. */
+export const NO_MODEL_LABEL = "no model"
+
+/** The link beside it, to the setup page. */
+export const SEE_SETUP = "See Setup"
 
 /** The button's label while an image uploads: a send then would lack its markdown. */
 export const UPLOADING = "uploading image…"
@@ -263,6 +288,13 @@ export const UPLOADING = "uploading image…"
  * be pressed while an image uploads or a send is in flight.
  */
 export function sendButton(plan: SendPlan, busy: EditorBusy): SendButton {
+  if (plan.noModel !== null)
+    return {
+      label: NO_MODEL_LABEL,
+      title: `No model: ${plan.noModel}`,
+      disabled: true,
+      setup: true,
+    }
   const words = busy.uploading
     ? { label: UPLOADING, title: null }
     : plan.command !== null
@@ -270,7 +302,7 @@ export function sendButton(plan: SendPlan, busy: EditorBusy): SendButton {
       : plan.mode === "queue"
         ? queueWords(plan.queue)
         : recipientWords(plan.to, plan.agentNames)
-  return { ...words, disabled: busy.uploading || busy.sending }
+  return { ...words, disabled: busy.uploading || busy.sending, setup: false }
 }
 
 /**

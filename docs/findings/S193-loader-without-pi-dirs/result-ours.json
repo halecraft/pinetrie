@@ -1,0 +1,92 @@
+{
+  "variant": "ours",
+  "getAgentDir": "/home/.pi/agent",
+  "markers": [],
+  "extensions": [
+    "/tmp/s193/node_modules/@gotgenes/pi-anthropic-auth/src/index.ts"
+  ],
+  "extensionErrors": [],
+  "providerRegistrations": ["anthropic", "pi-home-shaped"],
+  "skills": [
+    "our-skill /home/.config/pinetrie/skills/our-skill/SKILL.md (auto/user/top-level /home/.config/pinetrie)",
+    "proj-skill /home/proj/skills/proj-skill/SKILL.md (local/temporary/top-level /home/proj/skills/proj-skill)"
+  ],
+  "prompts": [
+    "our-prompt /home/.config/pinetrie/prompts/our-prompt.md (auto/user/top-level /home/.config/pinetrie)"
+  ],
+  "contextFiles": [
+    "/home/.config/pinetrie/AGENTS.md",
+    "/home/AGENTS.md",
+    "/home/proj/AGENTS.md"
+  ],
+  "systemPrompt": "sentinel project SYSTEM\n",
+  "appendSystemPrompt": ["sentinel project APPEND\n"],
+  "providers": ["our-provider"],
+  "anthropicAuth": {
+    "source": "OAuth",
+    "type": "oauth"
+  },
+  "shaped": {
+    "model": "claude-sonnet-4-5",
+    "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"probe\"}}",
+    "requests": [
+      {
+        "url": "https://api.anthropic.com/v1/messages?beta=true",
+        "headers": {
+          "accept": "application/json",
+          "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
+          "anthropic-dangerous-direct-browser-access": "true",
+          "anthropic-version": "2023-06-01",
+          "authorization": "Bearer sk-ant-oat01-OURS",
+          "content-type": "application/json",
+          "user-agent": "claude-cli/2.1.280",
+          "x-app": "cli",
+          "x-stainless-arch": "arm64",
+          "x-stainless-lang": "js",
+          "x-stainless-os": "Linux",
+          "x-stainless-package-version": "0.124.0",
+          "x-stainless-retry-count": "0",
+          "x-stainless-runtime": "node",
+          "x-stainless-runtime-version": "v24.21.0",
+          "x-stainless-timeout": "600"
+        },
+        "system": [
+          "x-anthropic-billing-header: cc_version=2.1.280.d7b; cc_entrypoint=sdk-cli; cch=8f434;",
+          "You are Claude Code, Anthropic's official CLI for Claude.",
+          "You are a probe."
+        ]
+      }
+    ]
+  },
+  "bare": {
+    "model": "claude-sonnet-4-5",
+    "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"probe\"}}",
+    "requests": [
+      {
+        "url": "https://api.anthropic.com/v1/messages?beta=true",
+        "headers": {
+          "accept": "application/json",
+          "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
+          "anthropic-dangerous-direct-browser-access": "true",
+          "anthropic-version": "2023-06-01",
+          "authorization": "Bearer sk-ant-oat01-OURS",
+          "content-type": "application/json",
+          "user-agent": "claude-cli/2.1.280",
+          "x-app": "cli",
+          "x-stainless-arch": "arm64",
+          "x-stainless-lang": "js",
+          "x-stainless-os": "Linux",
+          "x-stainless-package-version": "0.124.0",
+          "x-stainless-retry-count": "0",
+          "x-stainless-runtime": "node",
+          "x-stainless-runtime-version": "v24.21.0",
+          "x-stainless-timeout": "600"
+        },
+        "system": [
+          "You are Claude Code, Anthropic's official CLI for Claude.",
+          "You are a probe."
+        ]
+      }
+    ]
+  }
+}

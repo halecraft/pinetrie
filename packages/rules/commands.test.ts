@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest"
 import {
-  decodeCommandRenames,
   expandSkill,
   type GatheredCommand,
   labelCommands,
@@ -185,14 +184,4 @@ test("expandSkill: pi's block, byte for byte, then the arguments", () => {
   ).toBe(
     '<skill name="p" location="/f">\nReferences are relative to /d.\n\nb\n</skill>',
   )
-})
-
-test("decodeCommandRenames: commands.names, total", () => {
-  expect(decodeCommandRenames(null)).toEqual({})
-  expect(decodeCommandRenames({ commands: { names: 3 } })).toEqual({})
-  expect(
-    decodeCommandRenames({
-      commands: { names: { "/p": "pstack", "/q": "has space", "/r": 4 } },
-    }),
-  ).toEqual({ "/p": "pstack" })
 })

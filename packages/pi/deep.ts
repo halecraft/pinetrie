@@ -16,8 +16,11 @@
 // `@earendil-works/pi-coding-agent`'s root ALSO cannot be imported here: it
 // pulls in dist/experimental/server.js, which requires `@earendil-works/pi-server`,
 // a package the install does not ship. So `ModelRuntime`, and the pieces that
-// load a person's pi setup (`SettingsManager`, `CONFIG_DIR_NAME`,
+// load skills, prompts, extensions and context files (`SettingsManager`,
 // `DefaultResourceLoader`, `buildSystemPrompt`), come from their files.
+// `openLoader` and `openRuntime` are the only ways out for the first three,
+// so the options that keep pi out of its own directories cannot be varied
+// elsewhere.
 //
 // TYPING NOTE: the runtime import is a URL, which carries no types — but the
 // matching `.d.ts` files DO exist on disk. `typeof import(...)` recovers pi's
@@ -38,8 +41,6 @@ type ModelRuntimeModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js")
 type SettingsModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js")
-type PiConfigModule =
-  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/config.js")
 type ResourceLoaderModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js")
 type SystemPromptModule =
@@ -69,9 +70,6 @@ const modelRuntime = (await deep(
 const settings = (await deep(
   "@earendil-works/pi-coding-agent/dist/core/settings-manager.js",
 )) as SettingsModule
-const piConfig = (await deep(
-  "@earendil-works/pi-coding-agent/dist/config.js",
-)) as PiConfigModule
 const resourceLoader = (await deep(
   "@earendil-works/pi-coding-agent/dist/core/resource-loader.js",
 )) as ResourceLoaderModule
@@ -102,9 +100,57 @@ export const {
 } = promptTemplates
 export const { detectSupportedImageMimeType } = mime
 export const { resizeImage, formatDimensionNote } = imageResize
-export const { SettingsManager } = settings
-export const { CONFIG_DIR_NAME } = piConfig
-export const { DefaultResourceLoader } = resourceLoader
 export const { buildSystemPrompt } = systemPrompt
 export const { createAgentHarness } = runtime
-export const { ModelRuntime } = modelRuntime
+
+/** What `openLoader` is given: every option it may vary, decided by `planModelSetup`. */
+export interface LoaderOptions {
+  readonly cwd: string
+  /** pine·trie's config directory, standing in pi's agent directory. */
+  readonly agentDir: string
+  readonly extensionPaths: readonly string[]
+  readonly skillPaths: readonly string[]
+  readonly promptPaths: readonly string[]
+  /** Whether a context file pi found is one the model is given. */
+  readonly keepContextFile: (file: string) => boolean
+}
+
+/**
+ * pi's resource loader, kept out of pi's directories:
+ * settings in memory, the project untrusted (so its `.pi/` and `.agents/`
+ * are neither listed nor read), pi's own discovery off, and only the paths
+ * given. The classes stay here, so no module builds a loader otherwise.
+ */
+export async function openLoader(options: LoaderOptions) {
+  const settingsManager = settings.SettingsManager.inMemory({})
+  settingsManager.setProjectTrusted(false)
+  const loader = new resourceLoader.DefaultResourceLoader({
+    cwd: options.cwd,
+    agentDir: options.agentDir,
+    settingsManager,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    additionalExtensionPaths: [...options.extensionPaths],
+    additionalSkillPaths: [...options.skillPaths],
+    additionalPromptTemplatePaths: [...options.promptPaths],
+    agentsFilesOverride: base => ({
+      agentsFiles: base.agentsFiles.filter(f =>
+        options.keepContextFile(f.path),
+      ),
+    }),
+  })
+  await loader.reload()
+  return loader
+}
+
+/** pi's model runtime over pine·trie's credentials and custom providers. */
+export const openRuntime = (paths: {
+  readonly authPath: string
+  readonly modelsPath: string
+}) =>
+  modelRuntime.ModelRuntime.create({
+    authPath: paths.authPath,
+    modelsPath: paths.modelsPath,
+  })

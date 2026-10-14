@@ -594,11 +594,14 @@ export {
   type ColumnHow,
   type ComposerMode,
   forkWords,
+  NO_MODEL_LABEL,
+  noModelLine,
   placeholderWords,
   planSend,
   queueWords,
   type Reader,
   recipientWords,
+  SEE_SETUP,
   sendable,
   sendButton,
   settleSend,
@@ -606,6 +609,16 @@ export {
   startWords,
   UPLOADING,
 } from "./send.ts"
+export { type SetupView, setupView } from "./setup-view.ts"
+export {
+  credentialWords,
+  fileStateWords,
+  layerWords,
+  noModelWords,
+  originWords,
+  refusalWords,
+  setupPageWords,
+} from "./setup-words.ts"
 export {
   dropsWords,
   type ItemIcon,

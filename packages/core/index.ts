@@ -19,6 +19,7 @@ import {
 import type { Sha256 } from "./images.ts"
 import type { OfferLedger, OfferSeen, WorkChanges } from "./offers.ts"
 import type { Paste, Replacing } from "./paste.ts"
+import { isWithin } from "./paths.ts"
 import type {
   CanvasKey,
   CardWidth,
@@ -104,6 +105,8 @@ export const ERR = {
   UNKNOWN_TARGET: "unknown_target",
   /** pi refused for a reason with no more specific code here. */
   REFUSED: "refused",
+  /** A run on a host with no model: the setup page says why. */
+  NO_MODEL: "no_model",
   /**
    * The root is no entry: a `reply` or `queue` has nothing to continue.
    * Only a `branch` starts a thread at it.
@@ -965,6 +968,67 @@ export const planCopyReady = (copy: CopyFacts): ReadyCopy | CopyRefusal => {
  */
 export type ProjectKind = "jj" | "folder"
 
+/**
+ * Where a setting can be written, broadest first: the machine's file, the
+ * person's, the project's `pinetrie.json`, the person's for one project,
+ * and the environment.
+ */
+export type ConfigLayer = "system" | "user" | "project" | "local" | "env"
+
+export const CONFIG_LAYERS: readonly ConfigLayer[] = [
+  "system",
+  "user",
+  "project",
+  "local",
+  "env",
+]
+
+/**
+ * How pine·trie uses your repo: accepted work's bookmark, the WIP bookmarks'
+ * prefix, the bookmark publishing moves to accepted work, and whether a
+ * publish catches the working copy up and accepts your commits first.
+ */
+export interface RepoConfig {
+  readonly acceptedBookmark: string
+  readonly wipPrefix: string
+  readonly publish: string
+  readonly publishCatchesUp: boolean
+}
+
+/** A layer's file: read, absent, or refused whole. */
+export const CONFIG_FILE_STATES = ["read", "missing", "broken"] as const
+export type ConfigFileState = (typeof CONFIG_FILE_STATES)[number]
+
+/** Why a key a file wrote was not taken. */
+export const REFUSAL_REASONS = [
+  "unknown",
+  "not-here",
+  "malformed",
+  "broken",
+] as const
+
+/** A key a layer's file wrote that was not taken, and why. */
+export interface ConfigRefusal {
+  readonly layer: ConfigLayer
+  /** The file, or for `env` the variable. */
+  readonly file: string
+  /** The dotted key; empty for a file refused whole. */
+  readonly key: string
+  readonly why: (typeof REFUSAL_REASONS)[number]
+  /** What the setting's kind said, or why the file could not be read or parsed. */
+  readonly detail: string
+}
+
+/** Where a settled value came from. */
+export type ConfigOrigin =
+  | { readonly kind: "fallback" }
+  | {
+      readonly kind: "file"
+      readonly layer: ConfigLayer
+      readonly file: string
+    }
+  | { readonly kind: "env"; readonly name: string }
+
 /** What a catch-up merges from: the thread's base, or the thread it branched from. */
 export type CatchUpFrom = ThreadBase | ParentThread
 
@@ -1036,6 +1100,16 @@ export const HOST_MOUNT = "/mnt/host"
 /** A host path, as a lane of its own sees it. */
 export const hostPathInLane = (hostPath: string): string =>
   `${HOST_MOUNT}${hostPath}`
+
+/**
+ * Where a lane reads a skill's file: in its own copy of the project for one
+ * inside `project`, else at its host path under `HOST_MOUNT`. A project's
+ * skills are never mounted from the host: the lane has them already.
+ */
+export const laneSkillPath = (file: string, project: string | null): string =>
+  project !== null && isWithin(file, project)
+    ? `${WORKSPACE_ROOT}${file.slice(project.replace(/\/$/, "").length)}`
+    : hostPathInLane(file)
 
 /** A command runs a pi skill or expands a pi prompt template. */
 export type CommandKind = "skill" | "prompt"
@@ -1211,7 +1285,7 @@ export interface RevisionRecord {
 export interface ProjectRecord {
   readonly root: string
   /**
-   * Whom the host's user config names its owner (`owner`): who answers when
+   * Whom the host's config names its owner (`owner`): who answers when
    * a lane asks for their ssh identity. Null with none.
    */
   readonly owner: WriterId | null
@@ -1398,7 +1472,7 @@ export interface BannerRecord {
   readonly at: number
 }
 
-/** Where threads' icons come from: the user config's `icons.source`. */
+/** Where threads' icons come from: the config's `icons.source`. */
 export const ICON_SOURCES = ["built-in", "drawn", "none"] as const
 export type IconSource = (typeof ICON_SOURCES)[number]
 
@@ -1409,6 +1483,67 @@ export type IconSource = (typeof ICON_SOURCES)[number]
  */
 export interface IconsRecord {
   readonly source: IconSource
+}
+
+/** The run's model, as the setup page says it: its `provider/id` and where it came from, or why there is none. */
+export type SetupModel =
+  | (Extract<ModelLine, { readonly kind: "model" }> & {
+      /** Where the config named it; empty for a suite's named or scripted model. */
+      readonly origins: readonly ConfigOrigin[]
+    })
+  | Extract<ModelLine, { readonly kind: "none" }>
+
+/**
+ * Why a host has no model: no config names one, the one named is not among
+ * pi's models nor `models.json`'s, or its provider has no credential.
+ */
+export const NO_MODEL_REASONS = ["unset", "not-found", "no-credential"] as const
+export type NoModel = (typeof NO_MODEL_REASONS)[number]
+
+/** The run's model as the host says it: its `provider/id`, or why there is none. */
+export type ModelLine =
+  | { readonly kind: "model"; readonly label: string }
+  | {
+      readonly kind: "none"
+      readonly why: NoModel
+      /** The `provider/id` the config named; null when it named none. */
+      readonly named: string | null
+    }
+
+/** A provider with a credential, and where pi found it; never the credential. */
+export interface SetupCredential {
+  readonly provider: string
+  /** pi's word for the source: `stored` (auth.json), `environment`, `models_json_key`, … */
+  readonly source: string
+}
+
+/** One setting as settled, for the setup page: nothing in config is secret. */
+export interface SetupSetting {
+  readonly key: string
+  readonly describe: string
+  /** The value, as JSON text. */
+  readonly value: string
+  readonly origins: readonly ConfigOrigin[]
+}
+
+/**
+ * What the host read of its config and what its model setup loaded,
+ * published for the setup page as the one `pinetrie.setup` value. Only what
+ * no other record holds: the commands are `pinetrie.commands`'.
+ */
+export interface SetupRecord {
+  readonly files: readonly {
+    readonly layer: ConfigLayer
+    readonly file: string
+    readonly state: ConfigFileState
+  }[]
+  readonly refusals: readonly ConfigRefusal[]
+  readonly model: SetupModel
+  readonly credentials: readonly SetupCredential[]
+  readonly settings: readonly SetupSetting[]
+  /** Listed packages that are not folders, never loaded. */
+  readonly refusedPackages: readonly string[]
+  readonly contextFiles: readonly string[]
 }
 
 /**

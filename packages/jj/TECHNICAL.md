@@ -82,8 +82,12 @@ translates to.
   `prepareShared` is the shell around `planShared`: jj, not git's index,
   says what is tracked (in a colocated repo the index can lag), it adds
   unignored shared directories to the exclude file, and writes the lanes'
-  ignore file. `repoConfig` decides your repo's names from what your config
-  and the project's `pinetrie.json` wrote.
+  ignore file. It takes one list, the settled `lanes.shared`. Your repo's
+  names (`RepoConfig`, in core, so the host's adapter and this package share
+  one shape) are the host's settled values; `isBookmarkName` is
+  the parser their kinds wrap. `revisionRead` compares two copies of
+  `pinetrie.json` with the host's decoder (`decodeAuthority`), since jj
+  declares no config.
 - `lane/`: a lane's own repo. `history.ts` (`historyOf`, the
   `LaneHistory`), `fetch-plan.ts` (`planFetch`: which commits a move's fetch
   into your repo may leave out), `plan.ts` (a fork's setup, the base's

@@ -19,12 +19,7 @@ import {
   sweepSlot,
 } from "@pinetrie/docker"
 import { planObserver } from "@pinetrie/lanehost"
-import {
-  createQueue,
-  type LaneRuntime,
-  machineConfig,
-  type WrittenMachine,
-} from "@pinetrie/lanes"
+import { createQueue, type LaneRuntime } from "@pinetrie/lanes"
 import {
   GVPROXY_HOST_ADDRESS,
   keepLease,
@@ -112,8 +107,8 @@ export async function findProject(input: {
   readonly root: string | null
   /** The port this host listens on, refused to lanes; null when it is not known yet. */
   readonly ownPort?: number | null
-  /** The user config's `lanes.vm.slots`, as written. */
-  readonly machine: WrittenMachine
+  /** How many folders the lane VM shares: `lanes.vm.slots`, settled. */
+  readonly slots: number
   /**
    * The host's ssh socket, mounted in every lane that holds an identity. It
    * need not listen yet: Docker binds it as a lane is made, and the launcher
@@ -125,7 +120,7 @@ export async function findProject(input: {
   if (input.root === null) return null
   return runtimeFound(
     input.root,
-    input.machine,
+    input.slots,
     input.hostSocket,
     input.log,
     input.ownPort ?? null,
@@ -136,13 +131,11 @@ const refusedWith = (words: string): Refused => ({ kind: "refused", words })
 
 async function runtimeFound(
   root: string,
-  written: WrittenMachine,
+  slots: number,
   hostSocket: string,
   log: (line: string) => void,
   ownPort: number | null,
 ): Promise<Found | Refused> {
-  const { machine, refused } = machineConfig(written)
-  for (const r of refused) log(`[host] ${r}`)
   const env = process.env
   const planned = planRuntime({
     platform: process.platform,
@@ -151,14 +144,7 @@ async function runtimeFound(
   })
   const project = { root }
   return planned.kind === "docker-vm"
-    ? vmFound(
-        project,
-        planned.lanesDir,
-        machine.slots,
-        hostSocket,
-        log,
-        ownPort,
-      )
+    ? vmFound(project, planned.lanesDir, slots, hostSocket, log, ownPort)
     : hostDockerFound(project, planned.lanesDir, hostSocket, log)
 }
 

@@ -17,12 +17,7 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import {
-  isMainThread,
-  parentPort,
-  Worker,
-  workerData,
-} from "node:worker_threads"
+import { isMainThread, Worker, workerData } from "node:worker_threads"
 
 const STAGE = ".pinetrie-stage-"
 const ASIDE = ".pinetrie-aside-"

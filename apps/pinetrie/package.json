@@ -11,7 +11,9 @@
     "e2e:browser": "node e2e/browser.ts",
     "e2e:lanes": "node e2e/lanes.ts",
     "e2e:observer": "node e2e/observer.ts",
-    "vm:build": "node scripts/vm-build.ts"
+    "vm:build": "node scripts/vm-build.ts",
+    "sign-in": "node scripts/sign-in.ts in",
+    "sign-out": "node scripts/sign-in.ts out"
   },
   "dependencies": {
     "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
@@ -20,6 +22,7 @@
     "@kyneta/sqlite-store": "link:../../../kyneta/workspace/pineta/packages/exchange/stores/sqlite",
     "@kyneta/websocket-transport": "link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket",
     "@parcel/watcher": "2.6.0",
+    "@pinetrie/config": "workspace:*",
     "@pinetrie/core": "workspace:*",
     "@pinetrie/docker": "workspace:*",
     "@pinetrie/interface": "workspace:*",

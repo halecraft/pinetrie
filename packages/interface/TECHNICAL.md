@@ -1439,6 +1439,25 @@ composer*).
   and refuses the send if one is no longer stored (`image_missing`), which
   `settleSend` returns to the box.
 
+## The setup page (`setup-view.ts`, `setup-words.ts`, ADR-0146)
+
+- **`setupView` decides the page** from the host's `pinetrie.setup` record
+  and the commands it published: the model or why there is none, who is
+  signed in, each config file and what it refused, every setting, the
+  refused packages and commands, and the context files. Null before a host
+  wrote its record.
+- **Every setting is listed generically**, its key, value, origin and what
+  it is (`describe`), so a setting the host adds shows with no page code.
+- **`setup-words.ts` is the one wording** of a layer, a file's state, a
+  refusal, an origin and why there is no model: the host's startup lines
+  (`apps/pinetrie/host/startup-lines.ts`) import the same functions, so the
+  terminal and the page never word one fact two ways.
+- **A send that needs a model the host has not** is refused before it is
+  sent (`planSend`'s `noModel`, from `noModelLine`): the button reads "no
+  model", its title why, and `setup` asks for the link to the page. A send
+  that asks no agent ignores it. A run refused at the host could not reach
+  its author, since the host answers `started` before pi admits the run.
+
 ## A person's picture (`picture-crop.ts`, ADR-0098)
 
 - **The crop is a value** (`Crop`: a zoom and the square's centre, in the

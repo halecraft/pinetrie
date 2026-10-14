@@ -122,6 +122,7 @@ packages/lanes/        @pinetrie/lanes        what a lane is and runs; the LaneR
 packages/docker/       @pinetrie/docker       lanes on Docker, on btrfs subvolumes (ADR-0130)
 packages/vm/           @pinetrie/vm           the Mac's lane VM: image, launcher, a host's lease on a slot (ADR-0130)
 packages/keeper/       @pinetrie/keeper       declares NOTHING; one step at a time on a resource
+packages/config/       @pinetrie/config       core only; settings declared with their rules, layers decoded, one settle (ADR-0146)
 packages/jj/         @pinetrie/jj         your repo: reads, steps, the owner (ADR-0038, 0060, 0065)
 packages/session/      @pinetrie/session      one client's connection to a host; no React
 packages/shell/        @pinetrie/shell        unbash only; shell source as structure (ADR-0114)
@@ -296,17 +297,77 @@ a host-written `pinetrie.mark` value keyed by the entry, set from the tab's
 label everywhere it is named, the Archive search included. ADR-0028's
 descriptions, section headers and boundaries are still to do.
 
+**Your config** (ADR-0146). pine·trie reads only its own files, each a
+`pinetrie.json`, from the broadest to the most specific:
+- the machine's, the first `pinetrie/pinetrie.json` under `$XDG_CONFIG_DIRS`
+  (by default `/etc/xdg`);
+- yours, `$XDG_CONFIG_HOME/pinetrie/pinetrie.json` (`~/.config/pinetrie/`);
+- the project's `pinetrie.json`, as accepted work holds it (your repo's
+  names are read from the working copy, since they find accepted work);
+- yours for one project, `$XDG_CONFIG_HOME/pinetrie/sessions/<folder>/pinetrie.json`;
+- the environment: `PINETRIE_MODEL`.
+
+Each setting says which of them may set it and how they combine: most
+take the most specific, a list adds every one's, and a machine's file can
+narrow some for everyone. A project may never list packages or providers,
+which run code or send keys. A key no setting has, one a file may not set,
+or a value that is not taken is refused, named in the host's startup lines
+and on the setup page (your avatar's menu, **Setup**). Nothing of `~/.pi`,
+nor a project's `.pi/`, is read; an `AGENTS.md` above the project is not a
+context file.
+
+```json
+{
+  "model": "anthropic/claude-opus-5-5",
+  "packages": ["/Users/you/.local/share/ai/duane", "/Users/you/.local/share/ai/npm/node_modules/@gotgenes/pi-anthropic-auth"],
+  "skills": ["/Users/you/skills"]
+}
+```
+
+- **Sign in** on the host's machine: `pnpm sign-in anthropic` (a
+  subscription, in a browser: paste the code, or the URL you land on, when
+  the redirect cannot reach this machine), `pnpm sign-in openai` (an API
+  key, hidden as you type), `pnpm sign-in` to list providers, `pnpm
+  sign-out <provider>`. Credentials go in
+  `$XDG_DATA_HOME/pinetrie/auth.json`, written only by sign-in. A key in a
+  provider's environment variable works too.
+- **`packages`** lists pi packages by folder: their skills and prompts are
+  commands, and their extensions' providers apply (a Claude subscription
+  needs `pi-anthropic-auth`'s). Nothing is installed: a package that is not
+  a folder is refused. **`skills`** and **`prompts`** list folders of
+  loose ones; `skills/` and `prompts/` beside your `pinetrie.json` load
+  too, as does `AGENTS.md` there.
+- **Custom providers** are pi's `models.json`, beside your `pinetrie.json`.
+- **With no model**, the host starts, says why, and a send to the agent is
+  refused in the composer, pointing at the setup page.
+
+Coming from pi, one line of `~/.pi/agent/settings.json` at a time:
+- rename `~/.config/pinetrie/config.json` to `pinetrie.json`;
+- `defaultProvider` and `defaultModel` become `"model": "provider/id"`;
+- a local path in pi's `packages` is listed as it is in `packages`;
+- an `npm:` package is installed into a folder of yours (`npm install
+  --prefix ~/.local/share/ai/npm --legacy-peer-deps <name>`; pi's loader
+  resolves its pi imports to pine·trie's own) and listed by path. One that
+  only adds tools (`pi-mcp-adapter`) gives pine·trie nothing;
+- `enabledModels`, `retry`, `theme` and `tuiMode` are pi's alone;
+- copy `~/.pi/agent/models.json` beside `pinetrie.json` for custom
+  providers;
+- skills or prompts in `~/.pi/agent/skills`, `~/.pi/agent/prompts` or
+  `~/.agents/skills`: list the folder, or move them beside `pinetrie.json`;
+- `pnpm sign-in <provider>` for each provider you use.
+
 **A lane can ssh where its host can** (ADR-0140). Your own identity is
 your agent's keys; lanes use it once you approve each lane, in its
 column's header. Turn it on for every project, and say who approves, in
-`~/.config/pinetrie/config.json`:
+your `pinetrie.json`:
 
 ```json
 { "owner": "you@example.com", "lanes": { "ssh": { "personal": true, "hosts": ["pop", "*.lan"], "approvalSeconds": 120 } } }
 ```
 
 `hosts` and `approvalSeconds` are optional; a project grants it with
-`lanes.ssh: true`, and `false` in yours declines it. Service identities
+`lanes.ssh.personal: true`, `false` in yours declines it, and `false` in the
+machine's forbids it. Service identities
 are key pairs in `~/.config/pinetrie/ssh/`, with an optional ssh `config`
 beside them naming their hosts (a relative `IdentityFile` means that
 folder); every lane uses them unasked. The host reads your `~/.ssh/config`
@@ -314,8 +375,7 @@ for names, so `ssh pop` works in a lane.
 
 **Every thread has an icon** (ADR-0143), in place of the ✦ before its
 name: in its header, its details, its folded strip, its card and the folded
-list. Where it comes from is `icons.source` in
-`~/.config/pinetrie/config.json`:
+list. Where it comes from is `icons.source` in your `pinetrie.json`:
 
 ```json
 { "icons": { "source": "built-in" } }
@@ -327,7 +387,8 @@ list. Where it comes from is `icons.source` in
   sprite of the thread's name's noun, one of 256 shipped with the page
   (`packages/web/public/noun-icons/`, made in S188 and S190). No key, no
   request.
-- **`drawn`** (ADR-0050, ADR-0053): pi's OpenRouter key draws one from the
+- **`drawn`** (ADR-0050, ADR-0053): your OpenRouter key (`pnpm sign-in
+  openrouter`, or `OPENROUTER_API_KEY`) draws one from the
   name. A thread is named as its column first wants an agent, before its
   first message (ADR-0057), and its name then fills the `column-banner`
   skill, a prompt you can replace with your own; `model` names the image
@@ -467,7 +528,7 @@ context.**
 ### Running pine·trie
 
 - `pnpm run host` starts the development host on pine·trie's own repo:
-  loopback, your pi settings' model, the session in `.pinetrie/pinetrie.db`.
+  loopback, your config's model, the session in `.pinetrie/pinetrie.db`.
   `pnpm run host <folder>` serves another project instead, at that folder's
   jj or git root (ADR-0086). A relative folder is read from pine·trie's root,
   not the shell's directory. Each project keeps its own session in its
@@ -500,16 +561,17 @@ context.**
   name is how you are shown, renamed on your profile page, from the menu
   your avatar at the footer's left opens. **Sign in as someone else** there
   forgets the email on that browser.
-- **Your pi skills and prompts are commands** (ADR-0036):
-  `/<package>:skill:<name>` for a skill, `/<package>:<name>` for a prompt
-  template. For example `/duane:skill:plan` or `/duane:comments`. Typing `/`
-  and part of a name offers them. The package's name is its
+- **The skills and prompts your config lists are commands** (ADR-0036,
+  ADR-0146): `/<package>:skill:<name>` for a skill, `/<package>:<name>` for
+  a prompt template. For example `/duane:skill:plan` or `/duane:comments`.
+  Typing `/` and part of a name offers them. A listed package's name is its
   `.claude-plugin/plugin.json` name, else its package name without the
-  scope. `commands.names` in `~/.config/pinetrie/config.json` renames one, keyed
-  by the path or source in pi's `packages` setting. Their files are readable
-  in every thread's lane, read-only.
+  scope; a loose folder's is the file that listed it (`user`, `project`).
+  `commands.names` in your `pinetrie.json` renames one, keyed by the
+  package's path as listed. Their files are readable in every thread's
+  lane, read-only; a project's own, in the lane's copy of it.
 - **Sharing a directory with every thread** (ADR-0035), e.g. your plans:
-  list it in `~/.config/pinetrie/config.json` as
+  list it in your `pinetrie.json` as
   `{ "lanes": { "shared": [".plans"] } }`, and ignore it in
   `~/.config/git/ignore`. Every thread's agent then reads and writes
   `/workspace/.plans`, which is your `.plans`, live, and never part of a
@@ -554,7 +616,7 @@ context.**
   work a headline and a few points while someone reads the running thread,
   at most once a minute, and once more when its run ends. An ask of one or
   two agent messages gets none. `{ "digests": { "enabled": false } }` in
-  `~/.config/pinetrie/config.json` turns them off. Replace the `ask-digest`
+  your `pinetrie.json` turns them off. Replace the `ask-digest`
   skill to change what it asks; yours must still ask for a headline line
   and `- ` points, or `nothing to add`, since a reply in another shape is
   logged and dropped. With digests on or off, each run's end also asks
@@ -567,7 +629,7 @@ context.**
   prints an invite link per network address, with its key; `PINETRIE_KEY` fixes
   the key. Everyone with the link gets in, and with tools on, can run commands
   on this machine as you. Use a trusted network or a tunnel.
-- `PINETRIE_PROVIDER` / `PINETRIE_MODEL` override the model. A root schema change
+- `PINETRIE_MODEL` (`provider/id`) overrides the model. A root schema change
   cannot open an existing store: move the project's `.pinetrie/pinetrie.db` aside.
 
 ## 7. Working agreements

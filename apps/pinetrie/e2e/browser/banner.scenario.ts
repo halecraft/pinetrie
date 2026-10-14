@@ -1,15 +1,13 @@
 // e2e/browser/banner — a thread's banner in its column's header, drawn
 // before its first message.
 
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import path from "node:path"
 import { errorText } from "@pinetrie/core"
 import type { Checks } from "../checks.ts"
 import {
   SUITE_CONFIG,
   startSuiteHost,
   suiteModel,
+  suitePlaces,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -24,17 +22,11 @@ async function run(check: Checks["check"]): Promise<void> {
   const browser = await launchBrowser()
   try {
     {
-      const config = path.join(
-        mkdtempSync(path.join(tmpdir(), "pinetrie-browser-banner-")),
-        "config.json",
-      )
-      writeFileSync(
-        config,
-        JSON.stringify({ ...SUITE_CONFIG, icons: { source: "drawn" } }),
-      )
       const bannerHost = await startSuiteHost({
         model: { kind: "scripted", script: suiteModel() },
-        userConfig: config,
+        places: suitePlaces({
+          user: { ...SUITE_CONFIG, icons: { source: "drawn" } },
+        }),
         log: () => {},
       })
       const bp = await (await browser.newContext()).newPage()

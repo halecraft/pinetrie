@@ -17,7 +17,7 @@ then:
 | facade | made by | what it is | it needs |
 |---|---|---|---|
 | `Scribe` | `createScribe` (`scribe.ts`) | a thread's appends into its root: `appendToTree`; and every session's end: `release`, `close`. The host writes its own records (ADR-0095) | a root's document, a replica id, the image store |
-| `PiSetup` | `loadPiSetup` (`pi-setup.ts`) | the person's pi setup, loaded: `complete`, `skill`, `commands`, `refusedCommands`, `expand`, `canDrawBanners`, `drawBanner`, `agentDir`, the model's label and origin | the model choice, the project's root, the user config; no document |
+| `PiSetup` | `loadPiSetup` (`pi-setup.ts`) | the model setup from pine·trie's config, loaded: `complete`, `skill`, `commands`, `refusedCommands`, `expand`, `canDrawBanners`, `drawBanner`, the model or why there is none, the credentials' sources, the refused packages, the context files | the model choice, pine·trie's places and the agent-directory binding, the listed packages, skills and prompts, the project's root; no document |
 | `Agent` | `createAgent` (`agent.ts`) | the agent at work in threads' lanes: `createThreadLane`, `lane`, `interrupted`, `close` | the scribe, the setup, lane work's `access` and `hooks`, `set_banner`'s asks |
 
 Only the agent needs the host, since pi's tools call lane work, so the host
@@ -79,7 +79,9 @@ itself (ADR-0095).
 | `commands.ts` | the commands pi loaded, and a command's file as the model reads it (`CommandFiles`) |
 | `banner.ts` | `set_banner`, and drawing a banner (`Banners`) |
 | `config.ts` | the model, its setup (`loadModelSetup`), and `complete` |
-| `pi-setup.ts` | the person's pi setup, loaded (`PiSetup`) |
+| `pi-setup.ts` | the model setup, loaded (`PiSetup`) |
+| `agent-dir.ts` | pi's agent directory bound to pine·trie's config directory, once per process (`bindAgentDir`) |
+| `auth.ts` | signing in and out (`providerAuth`), the sign-in argument's plan (`planSignIn`), and a notice's terminal words |
 | `scribe.ts` | a thread's appends and every session's life (`Scribe`) |
 | `inside.ts` | a facade's inside, reachable only in this package (`sealed`) |
 
@@ -359,15 +361,55 @@ never cuts the newest, so a prompt within it is kept whole (S106).
   harness reads `options.compaction ?? DEFAULT_COMPACTION_SETTINGS`, never a
   person's `settings.json`.
 
-### Models, tools and the prompt (`config.ts`, S23)
+### Models, tools and the prompt (`config.ts`, ADR-0146, S193, S194)
+
+pine·trie reads nothing of pi's directories. What the host's config settled
+is given to pi's code, kept out of `~/.pi` and a project's `.pi/`:
+- **`planModelSetup` is the plan, pure:** `auth.json` and `models.json` from
+  pine·trie's places; the loader's agent directory is pine·trie's config
+  directory; its extension paths are the listed packages, its skill paths
+  the listed skill folders, then `skills/` in the config directory, then
+  pine·trie's own; its prompt paths the listed prompt folders, then
+  `prompts/`. A listed folder that does not exist is left out, and a
+  package that is not a folder is refused (`refusedPackages`), so pi never
+  installs anything. Context files are filtered by `isOwnContextFile`:
+  pine·trie's own `AGENTS.md` and those inside the project. pi walks up to
+  `/`, and an `AGENTS.md` in the home directory would otherwise reach the
+  model.
+- **`deep.ts` exports `openLoader` and `openRuntime`, not pi's classes,**
+  so no module builds a loader with other options. `openLoader` makes
+  settings in memory, marks the project untrusted (so pi neither lists a
+  project's `.pi/` and `.agents/` nor reads its `SYSTEM.md`), turns pi's
+  own discovery off (`noExtensions`, `noSkills`, `noPromptTemplates`,
+  `noThemes`), and gives only the plan's paths. A listed package's skills
+  and prompts load through its extension path, under `noSkills` too.
+- **`bindAgentDir` binds pi's agent directory** (`PI_CODING_AGENT_DIR`)
+  to pine·trie's config directory, once per process; binding another
+  throws. pi's `getAgentDir()` reads the variable at each call and ignores
+  the loader's directory, and an extension finds its own config through it:
+  `pi-anthropic-auth` reads `~/.pi` unbound. `loadModelSetup` and
+  `providerAuth` take the binding, so neither runs unbound. Gotcha: an
+  extension's own config is one per process, so a suite process binds its
+  one config directory, and a unit test file binds one folder.
+- **Only provider registrations are applied,** as before: an extension's
+  tools, commands, handlers and UI hooks are pi's coding agent's, and
+  pine·trie emits none of its events. A Claude subscription works only
+  through `pi-anthropic-auth`'s provider (S23); listed by path, it carries
+  the token from pine·trie's `auth.json` with its billing header (S194). A
+  package installed anywhere loads against pine·trie's own pi: pi's
+  extension loader aliases `@earendil-works/*` to the host's copy.
 
 `ModelChoice` is one of three:
-- **`configured`:** the person's pi setup. `SettingsManager` and
-  `DefaultResourceLoader` load it as pi does, and only the extensions'
-  provider registrations are applied to `ModelRuntime`. Commands, tools,
-  handlers and UI hooks are pi's coding agent's, and pine·trie emits none of its
-  events. A Claude subscription token works only through `pi-anthropic-auth`'s
-  provider: without it, Anthropic refuses (S23).
+- **`configured`:** the model the host's config settled, or null.
+  `modelState` decides from the facts the executor gathers: none named
+  (`unset`), not among pi's models nor `models.json`'s (`not-found`), or
+  no credential for its provider (`no-credential`, from
+  `getProviderAuthStatus`, which reads pi's snapshot and runs no key
+  command). `ModelSetup.model` is that `ModelState`, never a null: every
+  consumer asks. With none, `createAgent` builds the harness on
+  `NO_MODEL_STAND_IN`, never asked, and refuses every run with
+  `ERR.NO_MODEL`; titles, digests, verdicts and commit messages skip their
+  request (`complete` with no model answers as a failed one).
 - **`named`:** `models.json` and `auth.json` only, for `e2e:live`'s one real
   run (ADR-0041).
 - **`scripted`:** pi-ai's faux provider (`scripted.ts`), for repeatable suites.
@@ -397,21 +439,17 @@ never cuts the newest, so a prompt within it is kept whole (S106).
     the same tick (S52 item 6).
   - Its handles never leave this package.
 
-Loading runs every package's factory, so side effects happen (`pi-subagents`
-logs a warning). `pickModel` is the pure choice, field by field: the
-override's, else the project's `.pi/settings.json`, else the global
-`settings.json` in the agent directory, as pi's own merge orders them. It
-returns where each field came from (`ModelOrigin`), which the setup exposes as
-`PiSetup.modelOrigin` for the host's startup line; a named or scripted model's origin
-is its kind. With tools (`CreateAgentOptions.tools`), pi-agent-core's
-`read`, `write`, `edit` and `bash`, and pine·trie's `grep` and `find`, run in
-each lane's own directory (below).
-Settings, context files and skills load from `PiSetupOptions.project`,
-with tools on or off (ADR-0086); with none, from the process's working
-directory. The system prompt
-is pi's `buildSystemPrompt`, with the loader's context files (the repo's
-`AGENTS.md`) and skills: the section layout `pi-anthropic-auth` shapes. Its
-`cwd` is the lane's directory.
+Loading runs every listed package's factory, so its side effects happen
+(`pi-subagents` logs a warning). Every choice loads the listed packages,
+skills and prompts; with none listed, a scripted or named model loads
+nothing of pi's, and only pine·trie's own skills are commands. With tools
+(`CreateAgentOptions.tools`), pi-agent-core's `read`, `write`, `edit` and
+`bash`, and pine·trie's `grep` and `find`, run in each lane's own directory
+(below). Context files load from `PiSetupOptions.project`, with tools on or
+off (ADR-0086); with none, from the process's working directory. The system
+prompt is pi's `buildSystemPrompt`, with the loader's context files and
+skills: the section layout `pi-anthropic-auth` shapes. Its `cwd` is the
+lane's directory.
 
 `ThreadLaneHandle.abort()` is pi's `lane.abort`: a running tool is aborted and
 its result recorded as aborted, and the lane takes its next message (S22).
@@ -645,7 +683,7 @@ item 18, and in `lanes.test.ts` against the harness.
 - **`set_banner`** (`banner.ts`, ADR-0050, ADR-0143) is registered and
   active whenever the host has tools: `bannerAsks` is part of
   `CreateAgentOptions.tools`, so an agent with tools always has it. The host
-  answers each ask under the user config's icon source: a pasted image is
+  answers each ask under the config's icon source: a pasted image is
   set under any, and a new drawing refused (`off`) unless the source is
   `drawn`, which the tool's answer names. The tool reads its arguments
   (`parseBannerArgs`: an image that names no pasted image is refused, not
@@ -700,13 +738,19 @@ item 18, and in `lanes.test.ts` against the harness.
   - pi keeps one of each name and records the loser's file in a `collision`
     diagnostic;
   - `gatherCommands` loads each loser again, with `loadSkillsFromDir` or
-    `loadPromptTemplates`, and finds its package root above it.
-  - A label's sources, `.claude-plugin/plugin.json` and `package.json`, are
-    read from the package root pi records (`sourceInfo.baseDir`).
-  - A skill under pine·trie's own skills directory is `pinetrie`.
+    `loadPromptTemplates`.
+  - **A command is labelled by what pine·trie listed** (`commandOrigin`),
+    never by pi's record of it: pi records a listed package's skills as
+    `cli`/`temporary` with no root (S193). A file under a listed package is
+    that package's: its path is the command's source, and its
+    `.claude-plugin/plugin.json`, else `package.json`, gives the label. A
+    file in a listed folder of skills or prompts is labelled by the layer
+    that listed it (`user`, `project`, …). A skill under pine·trie's own
+    skills directory is `pinetrie`.
   - The model's own skill list keeps pi's precedence: one per name.
-- **`loadPiSetup` labels them** with the user config's renames
-  (`commandRenames`) through `labelCommands` (`@pinetrie/rules`). `commands()` is
+- **`loadPiSetup` labels them** with `commands.names` (`commandRenames`,
+  keyed by a listed package's path) through `labelCommands`
+  (`@pinetrie/rules`). `commands()` is
   the list, `refusedCommands()` what clashed, and `skill(name)` takes a
   qualified name: a conflicted update asks for
   `pinetrie:skill:resolve-conflicts`.
@@ -722,15 +766,29 @@ item 18, and in `lanes.test.ts` against the harness.
     `dirnameEnvPath`; it is not the one;
   - a template becomes its text with pi's `substituteArgs` and
     `parseCommandArgs`;
-  - with `inLane`, a skill's file and directory are written at `/mnt/host`
-    and their host path.
-- **A lane of its own's system prompt** lists only the skills under a host
-  path it has mounted, at `/mnt/host` and their path (`skillsInLane`).
-  `LaneAccess` carries those host paths.
-- **Suites never read your pi configuration.** A scripted or named model
-  loads skills and prompts only when `agentDir` is given. Suites give
-  `fixtures/pi-agent`, whose settings list two fixture packages, each with a
-  skill `hello`.
+  - with `inLane`, a skill's file and directory are written where the lane
+    reads them (`laneSkillPath`, core): in its own copy for a project's
+    skill, else at `/mnt/host` and their host path.
+- **A lane of its own's system prompt** lists only the skills it can read
+  (`skillsInLane`): a project's, at `/workspace` and their path in the
+  project, and those under a host path it has mounted, at `/mnt/host` and
+  their path. `LaneAccess` carries those host paths. A project's skills are
+  never mounted from the host: the lane has them already.
+- **Suites never read your config.** They list `fixtures/fixture-pkg` and
+  `fixtures/other-pkg`, each with a skill `hello`, in their own user
+  `pinetrie.json`'s `packages`.
+
+### Sign-in (`auth.ts`)
+
+`providerAuth` opens pi's runtime over pine·trie's `auth.json`, with the
+providers the listed packages register, and makes the credentials' folder
+private (0700); pi writes `auth.json` itself, 0600. `providers()` lists
+each provider's methods and where its credential is, never the credential.
+`signIn` runs pi's `login` with pine·trie's own interaction shape, so no pi
+type crosses: a prompt asks for text, a secret, a pasted code or a choice;
+a notice gives a sign-in URL, a device code, information or progress.
+`planSignIn` reads `pnpm sign-in`'s arguments, pure; the script
+(`apps/pinetrie/scripts/sign-in.ts`) is only the terminal.
 
 ### pi's checkpoints, stored as text (`checkpoint.ts`)
 
@@ -811,8 +869,8 @@ a counter.
 
 Reaches pi entry points that are absent from its `exports` map, by relative path
 into `node_modules`: `createAgentHarness`, `addUsage`/`emptyUsage`,
-`ModelRuntime`, and, for the person's pi setup, `SettingsManager`,
-`DefaultResourceLoader` and `buildSystemPrompt`. For commands:
+`ModelRuntime`, `SettingsManager` and `DefaultResourceLoader` (only
+through `openRuntime` and `openLoader`), and `buildSystemPrompt`. For commands:
 `loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`
 and `parseCommandArgs`. For images (ADR-0042):
 `detectSupportedImageMimeType`, `resizeImage` and `formatDimensionNote`. Those paths are depth-sensitive: they broke when this
@@ -866,7 +924,7 @@ no tools and no session: nothing enters the tree or a lane's context. It
 writes an offer's commit message (`describeRequest`) and an ask's digest
 (`digestRequest`, the `ask-digest` skill) on `describeModel`, and a root's
 title (`titleRequest`, the `tab-title` skill, `purpose: "title"`) on the
-model `titleModelOf` chose at load: `PiSetupOptions.titleModel` when pi
+model `titleModel` chose at load: `PiSetupOptions.titleModel` when pi
 has it (`titleModelFound` says whether), else `describeModel`, and always
 `describeModel` for a scripted model; the host
 builds each request and this package only carries it out. A failed request

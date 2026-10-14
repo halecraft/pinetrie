@@ -55,7 +55,7 @@ export interface GatheredCommand {
   readonly dir: string
   /** The directory mounted for it in lanes: its package's root, else `dir`. */
   readonly root: string
-  /** pi's `source` for where it came from: what a rename is keyed by. */
+  /** Where it came from: a listed package's path, a listing layer, or `pinetrie`. What a rename is keyed by. */
   readonly source: string
   /** What its label may come from, most preferred first. */
   readonly names: {
@@ -65,7 +65,7 @@ export interface GatheredCommand {
     readonly plugin: string | null
     /** `package.json`'s `name`, scope included. */
     readonly packageName: string | null
-    /** pi's scope for a loose skill or template: "user" or "project". */
+    /** The layer that listed a loose skill's or template's folder: "user", "project", … */
     readonly scope: string
   }
 }
@@ -104,9 +104,10 @@ export const qualified = (
 
 /**
  * Every command under its package's label, and what is refused.
- * - A label is the user config's rename (keyed by pi's `source`), else
- *   `pinetrie` for pinetrie's own, else `plugin.json`'s name, else the package
- *   name without its scope, else pi's scope.
+ * - A label is `commands.names`' rename (keyed by the command's source: a
+ *   listed package's path), else `pinetrie` for pinetrie's own, else
+ *   `plugin.json`'s name, else the package name without its scope, else the
+ *   layer that listed its folder.
  * - Two sources with one label are refused together: a person renames one,
  *   rather than load order choosing.
  * - Two commands with one qualified name within a source are refused too.
@@ -205,24 +206,6 @@ export const expandSkill = (input: {
   return input.args === "" ? block : `${block}\n\n${input.args}`
 }
 
-/** The user config's `commands.names`: pi's `source` → a label. Total. */
-export function decodeCommandRenames(
-  json: unknown,
-): Readonly<Record<string, string>> {
-  const commands =
-    typeof json === "object" && json !== null && !Array.isArray(json)
-      ? (json as Record<string, unknown>).commands
-      : undefined
-  const names =
-    typeof commands === "object" && commands !== null
-      ? (commands as Record<string, unknown>).names
-      : undefined
-  if (typeof names !== "object" || names === null || Array.isArray(names))
-    return {}
-  return Object.fromEntries(
-    Object.entries(names).filter(
-      (e): e is [string, string] =>
-        typeof e[1] === "string" && /^[A-Za-z0-9._-]+$/.test(e[1]),
-    ),
-  )
-}
+/** Whether `label` can label a package's commands: `commands.names`' values. */
+export const isCommandLabel = (label: string): boolean =>
+  /^[A-Za-z0-9._-]+$/.test(label)

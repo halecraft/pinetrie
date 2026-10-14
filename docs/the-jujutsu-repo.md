@@ -30,8 +30,9 @@ are in the page's titles.
 | `tip@pinetrie-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's, and abandons its offer; restoring brings both back. |
 
 The names `pinetrie-accepted`, `main` and `wip/` are the defaults. A project
-sets its own in `pinetrie.json`, or a person in
-`$XDG_CONFIG_HOME/pinetrie/config.json`; the project's wins.
+sets its own in `pinetrie.json` (read from the working copy, since the names
+find accepted work), or a person in `$XDG_CONFIG_HOME/pinetrie/pinetrie.json`;
+the project's wins, and your file for the project beats both (ADR-0146).
 `publish.catchUp` (default `false`) makes a publish catch the working copy up and
 accept your commits first (ADR-0099):
 

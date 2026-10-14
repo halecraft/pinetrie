@@ -53,6 +53,9 @@ importers:
       '@parcel/watcher':
         specifier: 2.6.0
         version: 2.6.0
+      '@pinetrie/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@pinetrie/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -116,6 +119,12 @@ importers:
         version: 8.18.1
 
   packages/channel: {}
+
+  packages/config:
+    dependencies:
+      '@pinetrie/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/core: {}
 

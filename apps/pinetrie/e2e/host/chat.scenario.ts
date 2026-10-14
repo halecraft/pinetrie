@@ -4,10 +4,11 @@
 // a message joins, who it is for, and when a lane is busy are decided by
 // pure functions and unit-tested (`@pinetrie/rules`' `chat.test.ts`,
 // `@pinetrie/core`, the host's `commands/chat.test.ts`, `queue.test.ts`).
+// Last, a host whose config names no model starts, and says why.
 
 import { subscribe } from "@kyneta/schema"
 import { type EntryId, projectTranscript, ROOT } from "@pinetrie/core"
-import { readPlaces } from "@pinetrie/reads"
+import { readPlaces, readSetup } from "@pinetrie/reads"
 import { readStreams } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
@@ -100,6 +101,20 @@ async function run(check: Checks["check"]): Promise<void> {
           given.includes("Bob: one"),
       )
       await Promise.all([client.close(), alice.close(), bob.close()])
+    },
+  )
+
+  // A host whose config names no model: it starts all the same, and its
+  // setup record says why it has none, for the page and the composer.
+  await withHost(
+    { model: { kind: "configured" }, log: () => {} },
+    async host => {
+      await waitFor(() => readSetup(host.session) !== null, 10_000)
+      const model = readSetup(host.session)?.model
+      check(
+        "a host with no model starts, and its setup record says why",
+        model?.kind === "none" && model.why === "unset",
+      )
     },
   )
 }

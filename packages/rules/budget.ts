@@ -3,7 +3,6 @@
 
 import type { EntryId, ThreadId, ValueWrite, WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
-import { recordOf } from "./config.ts"
 import { decodeAt, entryKey } from "./decode.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 
@@ -48,19 +47,8 @@ export const BUDGET: RecordSpec<BudgetRecord, EntryId, "session"> = {
     })),
 }
 
-/** The budget a person's message sets when the user config names none. */
+/** The budget a person's message sets when no config names one. */
 export const DEFAULT_BUDGET = 200_000
-
-/**
- * The user config's budget for agents talking (`{ "agents": { "budget":
- * 200000 } }`): a positive whole number of tokens, else the default. Total.
- */
-export function decodeAgentsConfig(json: unknown): number {
-  const budget = recordOf(recordOf(json)?.agents)?.budget
-  return typeof budget === "number" && Number.isInteger(budget) && budget > 0
-    ? budget
-    : DEFAULT_BUDGET
-}
 
 export const newBudget = (input: {
   readonly message: EntryId

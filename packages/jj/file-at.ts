@@ -1,9 +1,10 @@
 // jj/file-at — a file at a point of your repo: accepted work, a lane's tip
 // (its history's remote bookmark), or the start its base names there.
 
+import type { RepoConfig } from "@pinetrie/core"
 import type { FileAt, Point, Runner } from "@pinetrie/lanes"
 import { laneBase } from "./lane/base.ts"
-import { laneTipName, type RepoConfig, revsetName } from "./lane/names.ts"
+import { laneTipName, revsetName } from "./lane/names.ts"
 import { commitsOf, fileText } from "./lane/revisions.ts"
 
 /** `path` at `point` of the repo `jj` reads. */

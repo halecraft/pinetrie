@@ -5,14 +5,27 @@ export {
   createAgent,
   newId,
 } from "./agent.ts"
+export { type AgentDirBinding, bindAgentDir } from "./agent-dir.ts"
+export {
+  type ProviderAuth,
+  planSignIn,
+  providerAuth,
+  type SignInInteraction,
+  type SignInMethod,
+  type SignInNotice,
+  type SignInPrompt,
+  type SignInProvider,
+  signInNoticeLines,
+} from "./auth.ts"
 export type { Drawn } from "./banner.ts"
 export { LAND_BUDGET } from "./compaction.ts"
 export {
   type Completed,
-  type FieldSource,
+  type ListedFolder,
   type ModelChoice,
-  type ModelOrigin,
-  pickModel,
+  type ModelPlaces,
+  NO_RESOURCES,
+  type ResourceLists,
 } from "./config.ts"
 export {
   type PreparedImage,

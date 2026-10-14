@@ -43,10 +43,13 @@ import {
 } from "../gate.ts"
 import {
   committedProject,
+  FIXTURE_PACKAGES,
   idleNow,
   join,
   lanesOf,
+  SUITE_CONFIG,
   setUpAccepted,
+  suitePlaces,
   taskHolding,
   treeOf,
   waitFor,
@@ -516,11 +519,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       const toolHost = await lanes.startHost({
         model: { kind: "scripted", script },
         project: { dir: work, tools: true },
-        // A fixture pi directory, for commands.
-        agentDir: path.join(
-          import.meta.dirname,
-          "../../../../packages/pi/fixtures/pi-agent",
-        ),
+        // Fixture pi packages, for commands.
+        places: suitePlaces({
+          user: { ...SUITE_CONFIG, packages: FIXTURE_PACKAGES },
+        }),
         log: () => {},
       })
       // A new thread of its own starts at accepted work.

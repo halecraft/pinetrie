@@ -98,7 +98,7 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   host's next lease, which fills one slot with everything. A read-only
   entry beside a read-write one of the same directory still refuses
   writes, in its slot or another (S187).
-- **The limit:** 16 slots by default, `lanes.vm.slots` in the user config,
+- **The limit:** 16 slots by default, `lanes.vm.slots` in your or the machine's config,
   at most 20: a VM boots with 20 share devices beside its others, and not
   24 (S131). It applies when the VM next starts. The 17th lease is refused,
   naming the limit and the key.

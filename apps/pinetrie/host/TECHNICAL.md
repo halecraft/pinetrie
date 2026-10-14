@@ -11,7 +11,9 @@ wires them.
 | module | owns |
 |---|---|
 | `server.ts`, `invocation.ts` | `pnpm host [folder]` (ADR-0086): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it), `refusalText` (a refusal's words); `server.ts` carries them out. A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm run host:react-dev` serves React's development build, for its warnings and render timeline (S59) |
-| `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the store, the user config, the agent's model and where it came from, the URL and invites |
+| `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model |
+| `settings.ts` | every setting the host reads, declared once (`SETTINGS`, ADR-0146) with the layers that may set it and how they combine; the project's copies as values (`laneAuthority`, `decodeAuthority`, `laneCopy`), `settleHost`, `folderReport` for a host without lane work, and the settled values as the deciding packages take them (`repoNames`, `iconSettings`, `titleSettings`, `sshChoice`, `listedFolders`) |
+| `setup-record.ts` | `planSetupRecord`: the `pinetrie.setup` value, from the config's report and what the model setup loaded |
 | `index.ts` | `startHost`: the store and the check of its schemas (`migrations/`), the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents and the records, then pi's scribe and setup, lane work and the agent, in that order (§ Startup), then the wiring below |
 | `basics.ts` | `Basics` (the session, `pinetrie:live`, the documents, the places, log, ids, clock) and how a failure is logged (`failed`, which words the error with core's `errorText`) |
 | `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`). A removed card's record goes before its text, which its caller destroys after: a client destroys its copy of a text only once it has seen both go (S64) |
@@ -45,7 +47,7 @@ wires them.
 | `jj/` | jj's adapter (`startJjProject`, § jj's adapter): each lane's offer in your repo (ADR-0105), on the owner of your repo (§ Offers), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands (`jj/accepted.ts`); each lane's fetch into your repo (`jj/fetch.ts`); splits (`jj/split.ts`) |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
-| `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the user config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024) |
+| `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024) |
 | `relays.ts` | another thread's agent asked, and its answer (ADR-0128): `ask` and `leave` (the tools' hooks), `relayChat` (a person's chat that asks or invites), `relayCard` (an ask card popped), `ended` (a relayed run's answer, then the round) |
 | `budgets.ts` | what agents talking spend (ADR-0128): the budget a run spends, read from its prompt (`promptBudget`), counted per request, written when it goes over and at a run's end, and the gate before each request |
 | `outside.ts` | `requestOutside`: a model request outside a keeper, its answer written in a step of its own |
@@ -321,14 +323,31 @@ too), and last `settle` for the lanes with cards queued:
 its compaction is `later`, so it runs after every write above, and after
 any refresh they queued.
 
+- **A starting host reads its config before anything opens** (ADR-0146,
+  `@pinetrie/config`). `startHost` takes `places` (each layer's file and
+  pine·trie's own directories; by default from the XDG variables), `env`
+  and `binding`, the proof that pi's agent directory is pine·trie's
+  (`bindAgentDir`, which `server.ts` calls once per process). It reads the
+  start layers (system, user, local, env) once; `lanes.vm.slots` settles
+  from them alone, for `findProject`. Then `openProject` (`work/setup.ts`)
+  gathers, settles and acts: the working copy's `pinetrie.json`, settled for
+  your repo's names alone, opens the project with them; accepted work's
+  copy is then read through it (`startLaneConfigs`) and settled with the
+  rest. That report is logged (`reportLines`), feeds pi's setup (`model`,
+  `packages`, `skills`, `prompts`), and is published as the setup record
+  (`recover`, and again whenever accepted work's config is taken). A host
+  without lane work reads its folder's `pinetrie.json` as every copy
+  (`folderReport`). A later acceptance that changes `model`, `skills` or
+  `prompts` takes effect at the next start; grants follow accepted work as
+  ever.
 - **A starting host says what it read** (`startup-lines.ts`). `server.ts`
-  logs the project and the store, `startHost` the user config (with
-  `(none)` when missing, or why it is broken), then the roots it opened,
-  then `agent ready` with the model and where each of its fields came from
-  (`PiSetup.modelOrigin`: `PINETRIE_PROVIDER`/`PINETRIE_MODEL`, or the pi
-  settings file that named it), and `server.ts` the URL and invites. The
-  user config is read with `readConfigFile` (`@pinetrie/lanes`): missing or
-  broken, its decoders get null and decode it as empty, as ADR-0071 says.
+  logs the project and the store, `startHost` each config file (with
+  `(none)` when missing, `(not read)` when broken) and each refusal, then
+  the roots it opened, then `agent ready` with the model and where it came
+  from (a file, or `$PINETRIE_MODEL`), or `no model:` and why; and
+  `server.ts` the URL and invites, then, with no model, the setup page's
+  URL. Every config word is `@pinetrie/interface`'s, which the setup page
+  says too.
 - **The project folder is prepared before `startHost`** (`server.ts`):
   `prepareProjectDir` (`@pinetrie/jj`) finds its root and its kind, and adds
   `/.pinetrie/` to a jj or git repo's exclude file, so the store, opened
@@ -337,8 +356,8 @@ any refresh they queued.
   again with tools on, which writes nothing the second time, and hands the
   `ProjectDir` to `findProject` and to the adapter's choice
   (`project.ts`).
-- **The project is apart from tools** (`StartHostOptions.project`). pi's
-  settings and `AGENTS.md` load from it with tools off too, on any folder;
+- **The project is apart from tools** (`StartHostOptions.project`). Its
+  `AGENTS.md` loads from it with tools off too, on any folder;
   lane work starts only with tools on. `startSetup` returns a whole `Setup`
   (project, runtime, your repo's owner, the lanes' configs, `ready`) or,
   without tools, null, and lane work is then `NO_LANES`: it records each
@@ -797,7 +816,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 ## Digests and verdicts (`digests.ts`, ADR-0106, ADR-0077)
 
-- **Always made.** The user config's `digests` (`enabled`) turns off live
+- **Always made.** The config's `digests` (`enabled`) turns off live
   digests and the final digest; a run's end still asks for its verdict.
 - **A run's end is one request** (`planRunEnded`): a failed or stopped run's
   verdict is written from its facts and only a due digest is asked for; an
@@ -882,7 +901,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 ## Banners (`banners.ts`, ADR-0050, ADR-0053, ADR-0143)
 
 - **Banners are made under every icon source.** `createBanners` takes
-  `draws`, whether the user config's `icons.source` is `drawn`, and passes
+  `draws`, whether the config's `icons.source` is `drawn`, and passes
   it to both decisions: `bannerDue` draws nothing unless it draws, and
   `planAsk` sets a pasted image under any source but refuses a new drawing
   (`off`) unless it draws. The module holds no condition of its own, and
@@ -959,8 +978,8 @@ adapter's.
 |---|---|
 | `adapter.ts` | `ProjectAdapter`: opened by setup where it reads your repo's names, before anything else reads the project (`OpenProject`: `fileAt`, `prepareShared`, `identity`, `acceptedNow`, `baseSteps`), then started once lane work has its registry (`StartedProject`: the `Destination`, each lane's `history`, and `Splits`). The registry and the containers it is started with are bound late: neither is asked for before startup ends |
 | `destination.ts` | `Destination`: accepted work and offers as any kind has them: a file at a point (`fileAt`), where a new lane begins (`begin`), what a catch-up's base is now (`baseNow`), an archive's lanes moved (`lanesMoved`), the offers' acts (`OfferActs`), setup and publish (`AcceptedActs`), `quiet` and `close` |
-| `setup.ts` | `Setup`, all of it or none: the project, opened through its adapter (`Setup.opened`, once your config's and `pinetrie.json`'s names are read, before anything else reads the project), lane configs and shared directories, the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, ADR-0036), and the base snapshot's refreshes. The project is found before it (`findProject`), since pi's setup loads from its root |
-| `config.ts` | `pinetrie.json`'s `lanes` as a fact of a state (ADR-0135): accepted work's copy read at accepted work (`Destination.fileAt`) at startup and when the base moves (`readAccepted`), its shared directories prepared again, and put in force (`takeAccepted`) once what it names is shared; a lane's own copy and the copy it started on, read at its tip and its start before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook). A lane with no commit in your repo yet runs with accepted work's |
+| `setup.ts` | `openProject`: the project opened through its adapter, with your repo's names settled from your files and the working copy's `pinetrie.json`, before anything else reads it, and its lane configs, before pi's setup. `Setup`, all of it or none: the opened project, the lanes' ssh, the shared directories, the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, none inside the project and none holding pine·trie's own directories, ADR-0036), and the base snapshot's refreshes |
+| `config.ts` | `pinetrie.json` as a fact of a state (ADR-0135, ADR-0146): accepted work's copy read at accepted work (`Destination.fileAt`) at startup and when the base moves (`readAccepted`), decoded by the host's table and settled with the start layers, its shared directories (the settled `lanes.shared`) prepared again, and put in force (`takeAccepted`, `onTaken`) once what it names is shared; a lane's own copy and the copy it started on, read at its tip and its start before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook): what it changes, and each key not taken. A lane with no commit in your repo yet runs with accepted work's |
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
 | `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history and the handle |
@@ -971,7 +990,7 @@ adapter's.
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper; its lanes' history moved in the destination (`lanesMoved`) |
 | `shares.ts` | what lanes may mount and reach, shared into the lane VM's slots and granted: the decision (`planShareAndGrant`) and, on the Mac, its state behind one queue (`createShares`: a share, a new lease's reset, the extra slots' close) |
 | `runtime.ts` | the one place that picks the runtime, from the project as startup found it (`ProjectDir`): gathers, plans (`planRuntime`, `planBuilder` for `pnpm vm:build`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
-| `ssh.ts` | lanes' ssh (ADR-0140): what the host reads of the person's and the service folder's ssh files, the lanes' files, the service agent and the host's socket (`@pinetrie/ssh`), what each lane is given (`attachedFor`, `holdsFor`), and the owner's answers, which it follows in `pinetrie.access` |
+| `ssh.ts` | lanes' ssh (ADR-0140): what the host reads of the person's and the service folder's (`ssh/` in pine·trie's config directory) ssh files, from `lanes.ssh` as settled (`sshChoice`), the lanes' files, the service agent and the host's socket (`@pinetrie/ssh`), what each lane is given (`attachedFor`, `holdsFor`), and the owner's answers, which it follows in `pinetrie.access` |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed
   after it. Each lane's handle is the registry's. Each coordination set is
@@ -1082,7 +1101,7 @@ adapter's.
   any lane is made. Docker binds it as a lane is made, and the launcher
   connects to it for each of a lane's connections.
 - **A lane is given ssh only if it holds an identity:** a usable service
-  key, or the person's own, which the user config grants, or the project
+  key, or the person's own, which your config grants, or the project
   does and the lane's own config keeps (`laneMayAsk`). Its agent is told
   the same (`holdsFor`).
 - **The record is the one truth.** The relay asks `mayUsePersonal`: an
@@ -1105,7 +1124,8 @@ adapter's.
 
 - **`startJjProject` takes a jj project alone** (`JjProjectDir`,
   `Extract<ProjectDir, { kind: "jj" }>`, `project.test.ts`). Opened, it
-  decides your repo's names (`repoConfig`), starts the owner of your repo,
+  takes your repo's names as settled (`repoNames`, from your files and the
+  working copy's `pinetrie.json`), starts the owner of your repo,
   renames accepted work's old bookmark (`pre-accepted:`), and reads files at
   a point (`fileAt`, `@pinetrie/jj`). Started, it makes accepted work
   (`jj/accepted.ts`), the offers (`jj/offers/`), the fetches (`jj/fetch.ts`)

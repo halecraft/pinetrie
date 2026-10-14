@@ -35,7 +35,8 @@ import {
   join,
   lanesOf,
   setUpAccepted,
-  suiteConfigFile,
+  suiteBinding,
+  suitePlaces,
   suiteSshPlaces,
   treeOf,
   waitFor,
@@ -61,7 +62,7 @@ export async function runtimeProblem(): Promise<string | null> {
   try {
     const found = await findProject({
       root: dir,
-      machine: { slots: null },
+      slots: 16,
       // Nothing listens there: this probe makes no lane.
       hostSocket: path.join(dir, ".no-ssh.sock"),
       log: () => {},
@@ -103,7 +104,7 @@ async function macDockerProblem(): Promise<string | null> {
  * given; and a list its log lines are pushed to.
  */
 export type SectionInput = Partial<
-  Omit<StartHostOptions, "project" | "log">
+  Omit<StartHostOptions, "project" | "log" | "binding">
 > & {
   readonly files?: Readonly<Record<string, string | Uint8Array>>
   readonly dir?: string
@@ -115,10 +116,10 @@ export type SectionHost = Awaited<ReturnType<typeof sectionHost>>
 /** What a scenario that declares `lanes: true` is given. */
 export interface LaneHosts {
   /**
-   * `startHost` with `SUITE_CONFIG` unless the scenario names its own file;
-   * a runtime that cannot run lanes stops it.
+   * `startHost` with the suite's places and binding unless the scenario
+   * gives its own places; a runtime that cannot run lanes stops it.
    */
-  startHost(options: StartHostOptions): Promise<RunningHost>
+  startHost(options: Omit<StartHostOptions, "binding">): Promise<RunningHost>
   /** A host of a section's own, with accepted work set up (`sectionHost`). */
   sectionHost(input?: SectionInput): Promise<SectionHost>
 }
@@ -128,10 +129,14 @@ export const laneHosts: LaneHosts = {
   sectionHost: input => sectionHost(input ?? {}),
 }
 
-const startLaneHost = (options: StartHostOptions): Promise<RunningHost> =>
+const startLaneHost = (
+  options: Omit<StartHostOptions, "binding">,
+): Promise<RunningHost> =>
   startHost({
-    userConfig: suiteConfigFile(),
+    places: suitePlaces(),
     ssh: suiteSshPlaces(),
+    binding: suiteBinding(),
+    env: {},
     ...options,
   })
 

@@ -11,8 +11,6 @@ import {
   bannerDue,
   bannerPrompt,
   bannerStillWanted,
-  DEFAULT_ICON_MODEL,
-  decodeIconConfig,
   planAsk,
   recordsOf,
   setRecord,
@@ -23,53 +21,6 @@ const A = "a".repeat(64) as Sha256
 const B = "b".repeat(64) as Sha256
 const NAME = "vernal-crane" as ThreadName
 const banner: BannerRecord = { lane: LANE, sha: A, at: 1 }
-
-describe("decodeIconConfig: icons' source, built-in unless named, total", () => {
-  test.each<[string, unknown]>([
-    ["no config", null],
-    ["no icons", {}],
-    ["no source", { icons: {} }],
-    ["an unknown source", { icons: { source: "drawing" } }],
-    ["icons not an object", { icons: "drawn" }],
-    ["the old banner setting", { banner: { enabled: true } }],
-  ])("%s: built-in", (_, json) => {
-    expect(decodeIconConfig(json)).toEqual({ source: "built-in" })
-  })
-  test("none", () => {
-    expect(decodeIconConfig({ icons: { source: "none" } })).toEqual({
-      source: "none",
-    })
-  })
-  test("drawn, with the default model", () => {
-    expect(decodeIconConfig({ icons: { source: "drawn" } })).toEqual({
-      source: "drawn",
-      model: DEFAULT_ICON_MODEL,
-    })
-  })
-  test("a drawn model is split at its first slash", () => {
-    expect(
-      decodeIconConfig({
-        icons: {
-          source: "drawn",
-          model: "openrouter/google/gemini-3.1-flash-image",
-        },
-      }),
-    ).toEqual({
-      source: "drawn",
-      model: {
-        provider: "openrouter",
-        model: "google/gemini-3.1-flash-image",
-      },
-    })
-  })
-  test("a malformed model takes the default", () => {
-    for (const model of ["no-slash", "/lead", "trail/", 3])
-      expect(decodeIconConfig({ icons: { source: "drawn", model } })).toEqual({
-        source: "drawn",
-        model: DEFAULT_ICON_MODEL,
-      })
-  })
-})
 
 test("bannerDue: only while drawing, for a thread with none, and none being made", () => {
   expect(bannerDue(undefined, false, true)).toBe(true)

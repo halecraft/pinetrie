@@ -24,6 +24,7 @@ import {
   rootRecordsOf,
   START_AGENT,
   SUITE_CONFIG,
+  suitePlaces,
   waitFor,
 } from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
@@ -46,14 +47,9 @@ async function sharedSection(
     realpathSync(mkdtempSync(path.join(tmpdir(), "pinetrie-store-"))),
     "pinetrie.db",
   )
-  const userConfig = path.join(path.dirname(store), "config.json")
-  writeFileSync(
-    userConfig,
-    JSON.stringify({
-      ...SUITE_CONFIG,
-      lanes: { shared: [".plans", ".jj/x"] },
-    }),
-  )
+  const places = suitePlaces({
+    user: { ...SUITE_CONFIG, lanes: { shared: [".plans", ".jj/x"] } },
+  })
   let h = await lanes.sectionHost({
     files: {
       "shared.txt": "one\n",
@@ -61,7 +57,7 @@ async function sharedSection(
       "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
     },
     store,
-    userConfig,
+    places,
     logs,
   })
   const { dir } = h
@@ -241,7 +237,7 @@ async function sharedSection(
     await h.user.actOnAccepted("publish")
     await h.idle()
     await h.close(true)
-    h = await lanes.sectionHost({ dir, store, userConfig, logs })
+    h = await lanes.sectionHost({ dir, store, places, logs })
     h.script.use([
       {
         tool: "bash",

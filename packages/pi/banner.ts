@@ -73,7 +73,7 @@ export function bannerAnswerText(answer: BannerAnswer): string {
       return answer.reason === "not_stored"
         ? "That image is not stored: ask the person to paste it again."
         : answer.reason === "off"
-          ? 'New banners are drawn only when "icons": { "source": "drawn" } is in ~/.config/pinetrie/config.json: paste an image to set one now.'
+          ? 'New banners are drawn only when "icons": { "source": "drawn" } is in your pinetrie.json: paste an image to set one now.'
           : "This call has no thread to set a banner on."
   }
 }

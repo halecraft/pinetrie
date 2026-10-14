@@ -8,9 +8,10 @@ import {
   type CommitId,
   commitId,
   type LaneBase,
+  type RepoConfig,
 } from "@pinetrie/core"
 import { lines, type Runner } from "@pinetrie/lanes"
-import { type RepoConfig, revsetName } from "./lane/names.ts"
+import { revsetName } from "./lane/names.ts"
 import { commitsOf, conflictedFilesAt } from "./lane/revisions.ts"
 import { changeOf } from "./offer.ts"
 

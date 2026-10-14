@@ -77,6 +77,7 @@ import {
   NEW_PIN,
   NEW_PIN_TITLE,
   newPinAt,
+  noModelLine,
   noticeKey,
   noticeWords,
   opens,
@@ -1062,6 +1063,7 @@ export function Column(p: ColumnProps) {
                         card={pinned.find(c => c.id === pinShown)}
                         catchUps={catchUps}
                         commands={[]}
+                        noModel={noModelLine(p.work.setup)}
                         unstarted={false}
                         how={how}
                         lane={lane}
@@ -1263,6 +1265,7 @@ export function Column(p: ColumnProps) {
                     forkConflicts: forkConflicts.length,
                   }}
                   commands={p.work.commands}
+                  noModel={noModelLine(p.work.setup)}
                   at={at}
                   how={how}
                   unstarted={unstarted}

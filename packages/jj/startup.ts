@@ -1,6 +1,6 @@
 // jj/startup — your repo as the host finds it at startup, before its owner
-// starts: where the project's root is, `.pinetrie/` and the shared
-// directories excluded in it, and your repo's names from the configs.
+// starts: where the project's root is, and `.pinetrie/` and the shared
+// directories excluded in it.
 //
 // Only jj can say where a jj repo is: a secondary workspace's `.jj/repo` is a
 // file, and from a jj workspace nested in another repo, git names the outer
@@ -26,9 +26,7 @@ import {
   run,
   type SharedDir,
   sharedCandidates,
-  type WrittenRepo,
 } from "@pinetrie/lanes"
-import { DEFAULT_REPO, isBookmarkName, type RepoConfig } from "./lane/names.ts"
 import { jjIn } from "./lane/run.ts"
 
 /** A project whose folder is a jj workspace: the only kind jj's adapter starts on. */
@@ -100,10 +98,7 @@ async function excludeInYours(
  */
 export async function prepareShared(
   root: string,
-  entries: {
-    readonly user: readonly string[]
-    readonly project: readonly string[]
-  },
+  entries: readonly string[],
 ): Promise<{
   readonly shared: readonly SharedDir[]
   readonly refused: readonly {
@@ -137,7 +132,7 @@ export async function prepareShared(
     if ((await git(["check-ignore", "-q", "--no-index", `${p}/`])).ok)
       ignored.add(p)
   }
-  const planned = planShared({ ...entries, exists, tracked, ignored })
+  const planned = planShared({ entries, exists, tracked, ignored })
   for (const p of planned.create)
     await mkdir(path.join(root, p), { recursive: true })
   if (planned.exclude.length > 0)
@@ -155,60 +150,5 @@ export async function prepareShared(
   return {
     shared: planned.shared.map(p => ({ path: p, source: path.join(root, p) })),
     refused: planned.refused,
-  }
-}
-
-/** Each written value's key in the config, as a refusal names it. */
-const KEYS = {
-  acceptedBookmark: "accepted.bookmark",
-  wipPrefix: "wip.prefix",
-  publish: "publish.bookmark",
-} as const
-
-/**
- * How pine·trie uses your repo, from the user's config and the project's: the
- * project's value wins, since the bookmarks belong to the repo. A name that
- * is not a bookmark, or a `publish.catchUp` that is not a boolean, falls back
- * to the default, with why; a config's `offers`, which is no longer read, is
- * named too. The WIP prefix is checked as the start of a name (`<prefix>x`).
- */
-export function repoConfig(
-  user: WrittenRepo,
-  project: WrittenRepo,
-): { readonly repoConfig: RepoConfig; readonly refused: readonly string[] } {
-  const refused: string[] = [
-    ...(user.offers ? ["your config"] : []),
-    ...(project.offers ? ["pinetrie.json"] : []),
-  ].map(
-    file =>
-      `${file}: offers is no longer read; use accepted.bookmark, wip.prefix, publish.bookmark and publish.catchUp`,
-  )
-  const pick = (
-    key: keyof typeof KEYS,
-    valid: (v: string) => boolean,
-  ): string => {
-    const value = project[key] ?? user[key]
-    if (value === null) return DEFAULT_REPO[key]
-    if (valid(value)) return value
-    refused.push(
-      `${KEYS[key]} "${value}" is not a bookmark name; using "${DEFAULT_REPO[key]}"`,
-    )
-    return DEFAULT_REPO[key]
-  }
-  const flag = project.catchUp ?? user.catchUp
-  let catchUp = DEFAULT_REPO.publishCatchesUp
-  if (typeof flag === "boolean") catchUp = flag
-  else if (flag !== null)
-    refused.push(
-      `publish.catchUp ${flag.invalid} is not true or false; using ${DEFAULT_REPO.publishCatchesUp}`,
-    )
-  return {
-    repoConfig: {
-      acceptedBookmark: pick("acceptedBookmark", isBookmarkName),
-      wipPrefix: pick("wipPrefix", v => isBookmarkName(`${v}x`)),
-      publish: pick("publish", isBookmarkName),
-      publishCatchesUp: catchUp,
-    },
-    refused,
   }
 }

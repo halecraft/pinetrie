@@ -3,7 +3,12 @@
 import path from "node:path"
 import { atEntry, entryId, ROOT } from "@pinetrie/core"
 import type { Checks } from "../checks.ts"
-import { START_AGENT } from "../harness.ts"
+import {
+  FIXTURE_PACKAGES,
+  START_AGENT,
+  SUITE_CONFIG,
+  suitePlaces,
+} from "../harness.ts"
 import { inLane, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -21,9 +26,13 @@ async function commandsSection(
     import.meta.dirname,
     "../../../../packages/pi/fixtures",
   )
-  const agentDir = path.join(fixtures, "pi-agent")
   const hello = path.join(fixtures, "fixture-pkg", "skills", "hello")
-  const h = await lanes.sectionHost({ files: { "a.txt": "a\n" }, agentDir })
+  const h = await lanes.sectionHost({
+    files: { "a.txt": "a\n" },
+    places: suitePlaces({
+      user: { ...SUITE_CONFIG, packages: FIXTURE_PACKAGES },
+    }),
+  })
   try {
     let told = ""
     let system = ""

@@ -63,10 +63,10 @@ export {
   bannerPrompt,
   bannerStillWanted,
   DEFAULT_ICON_MODEL,
-  decodeIconConfig,
   ICONS,
   ICONS_KEY,
   type IconConfig,
+  iconConfig,
   planAsk,
 } from "./banner.ts"
 export {
@@ -128,7 +128,6 @@ export {
   BUDGET,
   type BudgetRecord,
   DEFAULT_BUDGET,
-  decodeAgentsConfig,
   mayRequest,
   newBudget,
   planSpend,
@@ -217,14 +216,14 @@ export {
   COMMANDS,
   COMMANDS_KEY,
   type CommandSource,
-  decodeCommandRenames,
   expandSkill,
   type GatheredCommand,
+  isCommandLabel,
   labelCommands,
   parseCommand,
   resolveCommand,
 } from "./commands.ts"
-export { decodeOwner, type ModelRef } from "./config.ts"
+export { type ModelRef, modelRef } from "./config.ts"
 export {
   CONTEXT,
   CONTEXT_KINDS,
@@ -239,7 +238,6 @@ export {
   type AskLines,
   askLines,
   DIGEST,
-  decodeDigestConfig,
   digestOf,
   digestRequest,
   digestText,
@@ -529,6 +527,7 @@ export {
   tracesWithCommands,
 } from "./runs.ts"
 export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
+export { SETUP, SETUP_KEY } from "./setup.ts"
 export {
   laneReads,
   planSharedLineages,
@@ -594,9 +593,9 @@ export {
 } from "./task-pinned.ts"
 export { THREAD } from "./thread.ts"
 export {
-  decodeTitleConfig,
   planTitling,
   TITLE_REQUEST_HEAD,
+  type TitleConfig,
   type TitleTrigger,
   titleOf,
   titleRequest,

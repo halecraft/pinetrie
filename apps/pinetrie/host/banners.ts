@@ -1,5 +1,5 @@
 // host/banners — each thread's banner: drawn as the thread is named, and again
-// at a run's end if that failed, while the user config's icons are `drawn`;
+// at a run's end if that failed, while the config's icons are `drawn`;
 // or set when the person asks through `set_banner`. `bannerDue` and `planAsk`
 // decide; this carries them out.
 
@@ -43,7 +43,7 @@ export function createBanners(deps: {
   readonly records: Pick<Records, "writeValues">
   /** The image model, and the banner's skill. */
   readonly piSetup: Pick<PiSetup, "canDrawBanners" | "drawBanner" | "skill">
-  /** Whether icons are drawn: the user config's `icons.source` is `drawn`. */
+  /** Whether icons are drawn: the settled `icons.source` is `drawn`. */
   readonly draws: boolean
 }): Banners {
   const { basics, keeper, blobs, draws } = deps

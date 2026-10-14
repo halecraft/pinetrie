@@ -16,7 +16,6 @@ import {
 import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
-  decodeTitleConfig,
   planTitling,
   titleOf,
   titleRequest,
@@ -67,23 +66,6 @@ const lane = (l: typeof L1, root = R): LaneRecord => ({
   ownCopy: false,
   by: ADA,
   createdAt: 0,
-})
-
-describe("decodeTitleConfig: titles, on unless enabled is false, total", () => {
-  test("on, with the run's model, unless turned off", () => {
-    for (const json of [null, {}, { titles: 3 }, { titles: { enabled: 1 } }])
-      expect(decodeTitleConfig(json)).toEqual({ enabled: true, model: null })
-    expect(decodeTitleConfig({ titles: { enabled: false } }).enabled).toBe(
-      false,
-    )
-  })
-  test("a model is provider/id; a malformed one is the run's", () => {
-    expect(
-      decodeTitleConfig({ titles: { model: "anthropic/claude-haiku-4-5" } })
-        .model,
-    ).toEqual({ provider: "anthropic", model: "claude-haiku-4-5" })
-    expect(decodeTitleConfig({ titles: { model: "haiku" } }).model).toBeNull()
-  })
 })
 
 describe("planTitling", () => {

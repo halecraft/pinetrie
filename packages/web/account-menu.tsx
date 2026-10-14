@@ -99,6 +99,12 @@ export function AccountMenu({
           label: words.label,
           onChoose: () => onIntent({ kind: "page", to: "profile" }),
         }
+      case "setup":
+        return {
+          ...base,
+          label: words.label,
+          onChoose: () => onIntent({ kind: "page", to: "setup" }),
+        }
       case "signOut":
         return {
           ...base,
@@ -173,5 +179,6 @@ const CLASS: Readonly<Record<AccountItem["kind"], string>> = {
   inbox: "account-inbox",
   inventory: "account-inventory",
   profile: "account-profile",
+  setup: "account-setup",
   signOut: "not-you",
 }

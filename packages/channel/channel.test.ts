@@ -141,7 +141,9 @@ describe("a streamed command", () => {
     expect(ran.code).toBe(-1)
   })
   test("a reader that throws kills it, and its message is the failure", async () => {
-    const ran = await streamCommand(["sh", "-c", "yes"], {
+    // `; true` keeps the shell from exec'ing `yes`, as any shell may not, so
+    // `yes` outlives the kill holding the pipe.
+    const ran = await streamCommand(["sh", "-c", "yes; true"], {
       cwd: "/",
       signal: signal(),
       onStdout: () => {

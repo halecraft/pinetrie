@@ -19,7 +19,13 @@ import { runtimeNode } from "@pinetrie/lanes"
 import { readAccess } from "@pinetrie/reads"
 import { HOP_IN_LANE } from "../../host/work/ssh.ts"
 import type { Checks } from "../checks.ts"
-import { join, START_AGENT, SUITE_CONFIG, waitFor } from "../harness.ts"
+import {
+  join,
+  START_AGENT,
+  SUITE_CONFIG,
+  suitePlaces,
+  waitFor,
+} from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 import { cli, container, runtimeCli } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
@@ -73,8 +79,8 @@ function keyPair(file: string, comment: string): string {
 }
 
 async function sshSection(check: Checks["check"], lanes: LaneHosts) {
-  // The user config's folder: the owner, and a service key with a config
-  // naming the host's banner server.
+  // pine·trie's config folder of the scenario's own: a service key with a
+  // config naming the host's banner server; the owner is in the user file.
   const conf = mkdtempSync(path.join(tmpdir(), "pinetrie-ssh-conf-"))
   const serviceDir = path.join(conf, "ssh")
   mkdirSync(serviceDir)
@@ -93,15 +99,14 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
     path.join(serviceDir, "config"),
     `Host banner\n  HostName 127.0.0.1\n  Port ${port}\n`,
   )
-  const configFile = path.join(conf, "config.json")
-  writeFileSync(
-    configFile,
-    JSON.stringify({
+  const suite = suitePlaces({
+    user: {
       ...SUITE_CONFIG,
       owner: OWNER,
       lanes: { ssh: { personal: true } },
-    }),
-  )
+    },
+  })
+  const places = { ...suite, dirs: { ...suite.dirs, config: conf } }
   // The person's own: an empty ~/.ssh, and an agent of the scenario's with one key.
   const home = mkdtempSync(path.join(tmpdir(), "pinetrie-ssh-home-"))
   mkdirSync(path.join(home, ".ssh"))
@@ -120,7 +125,7 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
 
   const h = await lanes.sectionHost({
     files: { "a.txt": "a\n" },
-    userConfig: configFile,
+    places,
     ssh: { dir: path.join(home, ".ssh"), agent: agentSocket },
   })
   const owner = await join(h.host, "owner", "ssh")

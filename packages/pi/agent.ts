@@ -31,6 +31,7 @@ import {
 } from "@pinetrie/rules"
 import { type RootDocHandle, readLaneTip } from "@pinetrie/schema"
 import { PINETRIE_COMPACTION } from "./compaction.ts"
+import { NO_MODEL_STAND_IN } from "./config.ts"
 import { createAgentHarness } from "./deep.ts"
 import {
   type LaneAccess,
@@ -60,6 +61,7 @@ const NO_BLOBS: Pick<BlobStore, "get"> = { get: () => undefined }
 
 /** A lane no root holds: every write to it is refused. */
 const UNKNOWN_LANE: LaneRefusal = { kind: "refused", code: ERR.UNKNOWN_TARGET }
+const NO_MODEL: LaneRefusal = { kind: "refused", code: ERR.NO_MODEL }
 
 /** A peer id, from the generator pi uses for entries. */
 export const newId = (): string => uuidv7()
@@ -181,7 +183,10 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   const { documents, tools } = options
   const { setup, project } = setupInside.open(options.setup)
   const inside = scribeInside.open(options.scribe)
-  const resolved = setup.model
+  const resolved =
+    setup.model.kind === "model" ? setup.model.model : NO_MODEL_STAND_IN
+  /** Every run is refused on a host with no model: the harness's is a stand-in. */
+  const noModel = setup.model.kind === "none"
   const assembled =
     tools === null
       ? { registered: [], files: [] }
@@ -196,7 +201,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   // refused (`toolContextOf`).
   const accessFor = (lane: ThreadId | undefined): LaneAccess | null =>
     tools === null || lane === undefined ? null : tools.access(lane)
-  const systemPrompt = systemPromptFor(setup, assembled.files)
+  const systemPrompt = systemPromptFor(setup, assembled.files, project)
   // Each lane's last request's prefix, in memory: a restart starts fresh.
   const prefixes = new Map<string, string>()
 
@@ -347,9 +352,16 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     return {
       name,
       append: message => on(h => h.append(message), UNKNOWN_LANE),
-      run: (message, before) => on(h => h.run(message, before), UNKNOWN_LANE),
-      steer: message => on(h => h.steer(message), UNKNOWN_LANE),
-      resume: () => on(h => h.resume(), UNKNOWN_LANE),
+      run: (message, before) =>
+        noModel
+          ? Promise.resolve(NO_MODEL)
+          : on(h => h.run(message, before), UNKNOWN_LANE),
+      steer: message =>
+        noModel
+          ? Promise.resolve(NO_MODEL)
+          : on(h => h.steer(message), UNKNOWN_LANE),
+      resume: () =>
+        noModel ? Promise.resolve(NO_MODEL) : on(h => h.resume(), UNKNOWN_LANE),
       abort: () => on(h => h.abort(), undefined),
     }
   }

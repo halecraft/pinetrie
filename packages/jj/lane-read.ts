@@ -12,6 +12,7 @@ import {
   type OfferInRepo,
   type OfferRevision,
   offerLedger,
+  type RepoConfig,
   type StartRead,
   type ThreadId,
   type ThreadName,
@@ -24,7 +25,6 @@ import {
   bookmarkRevset,
   laneTipName,
   offerBookmark,
-  type RepoConfig,
   revsetName,
 } from "./lane/names.ts"
 import { conflictedFilesAt } from "./lane/revisions.ts"

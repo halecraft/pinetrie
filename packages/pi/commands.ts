@@ -7,9 +7,14 @@
 // by file. What a command's label may come from is read from its package's
 // root: Claude's `.claude-plugin/plugin.json`, and `package.json`.
 
-import { readFile, stat } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import path from "node:path"
-import { type CommandRef, hostPathInLane } from "@pinetrie/core"
+import {
+  type CommandRef,
+  type ConfigLayer,
+  isWithin,
+  laneSkillPath,
+} from "@pinetrie/core"
 import {
   type CommandSource,
   expandSkill,
@@ -17,15 +22,15 @@ import {
   resolveCommand,
 } from "@pinetrie/rules"
 import {
-  type DefaultResourceLoader,
   loadPromptTemplates,
   loadSkillsFromDir,
+  type openLoader,
   parseCommandArgs,
   substituteArgs,
 } from "./deep.ts"
 import { sha256Of } from "./images.ts"
 
-type Loader = InstanceType<typeof DefaultResourceLoader>
+type Loader = Awaited<ReturnType<typeof openLoader>>
 type Skill = ReturnType<Loader["getSkills"]>["skills"][number]
 type Template = ReturnType<Loader["getPrompts"]>["prompts"][number]
 type Diagnostic = ReturnType<Loader["getSkills"]>["diagnostics"][number]
@@ -41,26 +46,56 @@ const readJsonName = async (file: string): Promise<string | null> => {
   }
 }
 
-const exists = (p: string) =>
-  stat(p).then(
-    () => true,
-    () => false,
-  )
-
-/** The nearest directory at or above `file` holding a `package.json`, or null. */
-async function packageRootOf(file: string): Promise<string | null> {
-  for (let dir = path.dirname(file); ; dir = path.dirname(dir)) {
-    if (await exists(path.join(dir, "package.json"))) return dir
-    if (path.dirname(dir) === dir) return null
-  }
+/** What the config listed for pi's loader: package folders, and folders of skills or prompts with the layer that listed each. */
+export interface Listing {
+  readonly packages: readonly string[]
+  readonly loose: readonly {
+    readonly path: string
+    readonly layer: ConfigLayer
+  }[]
 }
 
 /** What a skill or template came from, as a command needs it. */
 interface Origin {
+  /** The listed package's path as written, else the listing layer, else `pinetrie`. */
   readonly source: string
   readonly scope: string
   /** Its package's root, when it came from a package. */
   readonly root: string | null
+}
+
+/** The longest of `roots` that holds `file`. */
+const holding = (roots: readonly string[], file: string): string | null =>
+  roots
+    .filter(r => isWithin(file, r))
+    .reduce<string | null>(
+      (best, r) => (best === null || r.length > best.length ? r : best),
+      null,
+    )
+
+/**
+ * Where `file` came from: a listed package, whose path is its source and
+ * root; pine·trie's own skills; or a listed folder, labelled by the layer
+ * that listed it. Read from what pine·trie listed, never from pi's record of
+ * it: pi records a package's skills with no root, and an added path's as
+ * `temporary`.
+ */
+export function commandOrigin(
+  file: string,
+  listing: Listing,
+  pinetrieSkills: string,
+): Origin {
+  if (pinetrieSkills !== "" && isWithin(file, pinetrieSkills))
+    return { source: "pinetrie", scope: "pinetrie", root: null }
+  const pkg = holding(listing.packages, file)
+  if (pkg !== null) return { source: pkg, scope: "user", root: pkg }
+  const folder = holding(
+    listing.loose.map(f => f.path),
+    file,
+  )
+  const layer =
+    listing.loose.find(f => f.path === folder)?.layer ?? ("user" as const)
+  return { source: layer, scope: layer, root: null }
 }
 
 async function namesOf(
@@ -84,17 +119,6 @@ async function namesOf(
   }
 }
 
-const originOf = (info: {
-  readonly source: string
-  readonly scope: string
-  readonly origin: string
-  readonly baseDir?: string
-}): Origin => ({
-  source: info.source,
-  scope: info.scope,
-  root: info.origin === "package" ? (info.baseDir ?? null) : null,
-})
-
 /** A skill pi dropped for its name, loaded again from its own directory. */
 async function loserSkill(d: Diagnostic): Promise<Skill | null> {
   const file = d.collision?.loserPath
@@ -111,13 +135,13 @@ async function loserSkill(d: Diagnostic): Promise<Skill | null> {
 }
 
 /** A template pi dropped for its name, loaded again from its file. */
-function loserTemplate(d: Diagnostic, cwd: string, agentDir: string) {
+function loserTemplate(d: Diagnostic, cwd: string, configDir: string) {
   const file = d.collision?.loserPath
   if (file === undefined) return null
   return (
     loadPromptTemplates({
       cwd,
-      agentDir,
+      agentDir: configDir,
       promptPaths: [file],
       includeDefaults: false,
     }).templates.find(t => t.filePath === file) ?? null
@@ -148,13 +172,13 @@ export function pinetrieCommands(pinetrieSkills: string): GatheredCommand[] {
 
 /**
  * Every skill and prompt template the loader found, the ones it dropped for
- * their names included, as commands to be labelled. A dropped one's source
- * is its diagnostic's `loserSource`, else it is taken as the user's; its
- * package root is the nearest `package.json` above it.
+ * their names included, as commands to be labelled, each by where pine·trie
+ * listed it (`commandOrigin`).
  */
 export async function gatherCommands(
   loader: Loader,
-  where: { readonly cwd: string; readonly agentDir: string },
+  where: { readonly cwd: string; readonly configDir: string },
+  listing: Listing,
   pinetrieSkills: string,
 ): Promise<GatheredCommand[]> {
   const skills = loader.getSkills()
@@ -166,24 +190,11 @@ export async function gatherCommands(
   )
   const lostTemplates = prompts.diagnostics
     .filter(d => d.collision?.resourceType === "prompt")
-    .map(d => loserTemplate(d, where.cwd, where.agentDir))
-
-  const originFor = async (
-    info: Skill["sourceInfo"],
-    file: string,
-    lost: boolean,
-  ): Promise<Origin> =>
-    lost
-      ? {
-          source: info.source,
-          scope: info.scope,
-          root: await packageRootOf(file),
-        }
-      : originOf(info)
+    .map(d => loserTemplate(d, where.cwd, where.configDir))
 
   const out: GatheredCommand[] = []
-  const skill = async (s: Skill, lost: boolean) => {
-    const origin = await originFor(s.sourceInfo, s.filePath, lost)
+  const skill = async (s: Skill) => {
+    const origin = commandOrigin(s.filePath, listing, pinetrieSkills)
     out.push({
       kind: "skill",
       name: s.name,
@@ -196,8 +207,8 @@ export async function gatherCommands(
       names: await namesOf(s.filePath, origin, pinetrieSkills),
     })
   }
-  const template = async (t: Template, lost: boolean) => {
-    const origin = await originFor(t.sourceInfo, t.filePath, lost)
+  const template = async (t: Template) => {
+    const origin = commandOrigin(t.filePath, listing, pinetrieSkills)
     const dir = path.dirname(t.filePath)
     out.push({
       kind: "prompt",
@@ -211,10 +222,10 @@ export async function gatherCommands(
       names: await namesOf(t.filePath, origin, pinetrieSkills),
     })
   }
-  for (const s of skills.skills) await skill(s, false)
-  for (const s of lostSkills) if (s !== null) await skill(s, true)
-  for (const t of prompts.prompts) await template(t, false)
-  for (const t of lostTemplates) if (t !== null) await template(t, true)
+  for (const s of skills.skills) await skill(s)
+  for (const s of lostSkills) if (s !== null) await skill(s)
+  for (const t of prompts.prompts) await template(t)
+  for (const t of lostTemplates) if (t !== null) await template(t)
   return out
 }
 
@@ -240,15 +251,17 @@ export const skillOf = (file: string, text: string) => ({
 /**
  * A command's text as the model reads it: a skill's block (pi's format), or
  * a template with its arguments. `inLane`: the thread works in its own copy,
- * so a skill's paths are the lane's (`/mnt/host`).
+ * so a skill's paths are the lane's (`laneSkillPath`: in its copy of
+ * `project`, else under `/mnt/host`).
  */
 export function expandCommand(
   command: CommandSource,
   text: string,
   args: string,
   inLane: boolean,
+  project: string | null = null,
 ): CommandRef {
-  const where = (p: string) => (inLane ? hostPathInLane(p) : p)
+  const where = (p: string) => (inLane ? laneSkillPath(p, project) : p)
   // pi's name for it: the last part of the qualified name.
   const name = command.name.split(":").at(-1) ?? command.name
   const expanded =
@@ -294,14 +307,17 @@ export interface CommandFiles {
 const readText = (file: string): Promise<string | null> =>
   readFile(file, "utf8").catch(() => null)
 
-/** The labelled commands, and each one's file read when it is asked for. */
-export function commandFiles(labelled: {
-  readonly commands: readonly CommandSource[]
-  readonly refused: readonly {
-    readonly name: string
-    readonly reason: string
-  }[]
-}): CommandFiles {
+/** The labelled commands, and each one's file read when it is asked for; `project` places a skill in a lane (`laneSkillPath`). */
+export function commandFiles(
+  labelled: {
+    readonly commands: readonly CommandSource[]
+    readonly refused: readonly {
+      readonly name: string
+      readonly reason: string
+    }[]
+  },
+  project: string | null = null,
+): CommandFiles {
   return {
     commands: () => labelled.commands,
     refusedCommands: () => labelled.refused,
@@ -313,7 +329,9 @@ export function commandFiles(labelled: {
     },
     async expand(command, args, inLane) {
       const text = await readText(command.file)
-      return text === null ? null : expandCommand(command, text, args, inLane)
+      return text === null
+        ? null
+        : expandCommand(command, text, args, inLane, project)
     },
   }
 }

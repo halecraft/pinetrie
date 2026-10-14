@@ -7,6 +7,8 @@
 - **Amended by:**
   - ADR-0075: only a long ask is digested, so a short one costs no request.
   - ADR-0077: a short ask's end costs a request again, for its verdict alone.
+  - ADR-0146: digests are a setting in any layer's `pinetrie.json`, on unless
+    the most specific layer that sets it turns it off.
 
 **Context.** ADR-0056 made each ask's digest opt-in: only
 `{ "digests": { "enabled": true } }` in `~/.config/pinetrie/config.json` turned

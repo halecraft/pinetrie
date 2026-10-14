@@ -60,6 +60,7 @@ import {
   readRevisions,
   readRunningLanes,
   readSeats,
+  readSetup,
   readThreads,
   readTraces,
   readVerdicts,
@@ -196,6 +197,7 @@ function readFacts(view: HeldView): SessionFacts {
       bases: readBases(doc),
       filesLost: readFilesLost(doc),
       budgets: readBudgets(doc),
+      setup: readSetup(doc),
     },
   }
 }

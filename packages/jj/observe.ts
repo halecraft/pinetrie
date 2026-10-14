@@ -1,18 +1,18 @@
 // What an outside change moved in your repo: the fingerprint read at one
 // operation, and what moved between two. The owner reads and acts.
 
-import type { ThreadName } from "@pinetrie/core"
 import {
   type CommitId,
   commitId,
   isThreadId,
+  type RepoConfig,
   type ThreadId,
+  type ThreadName,
 } from "@pinetrie/core"
 import {
   LANE_REMOTE_PREFIX,
   OFFER_BOOKMARKS,
   OFFER_PREFIX,
-  type RepoConfig,
   revsetName,
 } from "./lane/names.ts"
 

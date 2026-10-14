@@ -12,6 +12,11 @@
   - ADR-0035: the user config's `lanes.ssh` sets the person's own identity
     (`personal`, `hosts`, `approvalSeconds`), and its `owner` names who
     approves.
+- **Amended by:**
+  - ADR-0146: `owner` and `lanes.ssh` are settings with declared layers. That
+    the user's choice beats the project's is the setting's declared order, and
+    a system file may forbid personal ssh. `lanes.ssh` has one shape in every
+    layer: a project grants with `lanes.ssh.personal: true`.
 
 **Context.**
 

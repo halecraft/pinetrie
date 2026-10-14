@@ -7,7 +7,12 @@
 // planned here (`planFetch`), for the caller to fire after the step it
 // queues next.
 
-import { type CommitId, planCopyReady, type ThreadId } from "@pinetrie/core"
+import {
+  type CommitId,
+  planCopyReady,
+  type RepoConfig,
+  type ThreadId,
+} from "@pinetrie/core"
 import {
   type Edits,
   executeOrThrow,
@@ -20,7 +25,7 @@ import { laneBase } from "./base.ts"
 import { bookmarkOf } from "./bookmarks.ts"
 import { type LaneMove, planFetch } from "./fetch-plan.ts"
 import { conflictsIn, mergeUpdate } from "./merge.ts"
-import { bookmarkName, bookmarkRevset, type RepoConfig } from "./names.ts"
+import { bookmarkName, bookmarkRevset } from "./names.ts"
 import { planForkSetup, planMerge, planOldNamesOnDisk } from "./plan.ts"
 import {
   changedPaths,

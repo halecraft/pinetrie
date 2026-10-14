@@ -197,7 +197,7 @@ word alone.)
 
 ## Where these are configured
 
-`pinetrie.json` in the project, or `$XDG_CONFIG_HOME/pinetrie/config.json`;
+`pinetrie.json` in the project, or `$XDG_CONFIG_HOME/pinetrie/pinetrie.json`;
 the project's value wins (`docs/the-jujutsu-repo.md`):
 
 ```json

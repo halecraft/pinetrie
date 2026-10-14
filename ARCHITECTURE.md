@@ -34,7 +34,8 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 |---|---|
 | `core` | pure types and decisions; depends on nothing |
 | `schema` | the document's shape |
-| `pi` | the only package that imports pi: the scribe, the person's pi setup, and the agent |
+| `pi` | the only package that imports pi: the scribe, the model setup from pine·trie's config, sign-in, and the agent |
+| `config` | pine·trie's config: settings declared with their rules, each layer's file decoded against them, and one pure settle; it declares only `core`, and only the app declares it (ADR-0146) |
 | `protocol` | the wire contract |
 | `rules` | each stored shape and the pure rules about it |
 | `reads` | document reads shared by host and client |

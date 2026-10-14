@@ -5,6 +5,7 @@ import {
   isTextCard,
   type RootId,
   SESSION_TARGET,
+  type SetupRecord,
   type ThreadId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
@@ -15,6 +16,7 @@ import {
   readProject,
   readRecords,
   readSeats,
+  readSetup,
   readThreadName,
   readVerdicts,
   readWorkflow,
@@ -34,6 +36,7 @@ import {
   planUndeclaredSweep,
   planWorkflowSeed,
   SEAT,
+  SETUP,
   type StoredRecords,
   setIfChanged,
   setRecord,
@@ -67,8 +70,10 @@ export interface StartupDeps {
   /** The commands pi loaded, written as a record, and those it refused, logged. */
   readonly piSetup: Pick<PiSetup, "commands" | "refusedCommands">
   readonly work: Pick<LaneWork, "project">
-  /** Where icons come from, as the user config chose: published for the page. */
+  /** Where icons come from, as the config chose: published for the page. */
   readonly icons: IconsRecord
+  /** What the host read of its config: published for the setup page. */
+  readonly setup: SetupRecord
   /** Name every lane that has none. */
   readonly ensureNames: () => Promise<void>
   readonly keeper: Keeper
@@ -160,6 +165,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
       readRecords(doc, COMMANDS).get(COMMANDS_KEY),
     ),
     ...setIfChanged(ICONS, deps.icons, readIcons(doc) ?? undefined),
+    ...setIfChanged(SETUP, deps.setup, readSetup(doc) ?? undefined),
   ]
   if (changed.length > 0) await keeper.run(() => records.writeValues(changed))
   for (const r of piSetup.refusedCommands())

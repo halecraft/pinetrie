@@ -18,7 +18,6 @@ import {
 } from "./digest.ts"
 import {
   DIGEST,
-  decodeDigestConfig,
   digestOf,
   digestRequest,
   digestText,
@@ -212,14 +211,6 @@ test("the record round-trips; a malformed one, or one stored as text, is dropped
       { key: "p-2", value: null },
     ]),
   ]).toEqual([[P, r]])
-})
-
-test("decodeDigestConfig: on unless enabled is false", () => {
-  expect(decodeDigestConfig({ digests: { enabled: false } })).toBe(false)
-  expect(decodeDigestConfig({ digests: { enabled: true } })).toBe(true)
-  expect(decodeDigestConfig({ digests: { enabled: "no" } })).toBe(true)
-  expect(decodeDigestConfig({ digests: {} })).toBe(true)
-  expect(decodeDigestConfig(null)).toBe(true)
 })
 
 test("digestRequest: the ask always, the newest work that fits, the last word, and the summary so far", () => {

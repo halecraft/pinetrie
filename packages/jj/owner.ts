@@ -5,10 +5,10 @@
 import { type FSWatcher, watch } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import type { ThreadId } from "@pinetrie/core"
+import type { RepoConfig, ThreadId } from "@pinetrie/core"
 import { createKeeper, type SlowStep } from "@pinetrie/keeper"
 import type { Runner } from "@pinetrie/lanes"
-import type { RepoConfig } from "./lane/names.ts"
+
 import {
   type Fingerprint,
   fingerprintRead,

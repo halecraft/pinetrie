@@ -1322,6 +1322,37 @@ async function run(check: Checks["check"]): Promise<void> {
         `scrollTop ${scrolled} → ${stayed}, covered ${covered}, left ${left}`,
       )
 
+      // ── the setup page, from the menu: each config file the host read ──
+      const setupText = (await chooseFromMenu(
+        page,
+        "#bottom .me-trigger",
+        ".account-setup",
+      ))
+        ? await page
+            .waitForSelector('.page[data-page="setup"] .setup-files', {
+              timeout: 15_000,
+            })
+            .then(n => n.textContent())
+            .catch(() => null)
+        : null
+      check(
+        "the setup page names each config file the host read",
+        setupText !== null &&
+          host.config.files.length > 0 &&
+          host.config.files.every(f => setupText.includes(f.file)),
+        setupText ?? "no setup page",
+      )
+      await page.goBack()
+      await page
+        .waitForFunction(
+          () => document.querySelector(".page") === null,
+          undefined,
+          {
+            timeout: 10_000,
+          },
+        )
+        .catch(() => {})
+
       // ── your profile: a rename shows, and the name each message was sent ──
       // under stays; this device keeps the name you go by.
       const profileSeen = await openProfile(page)

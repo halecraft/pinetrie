@@ -188,15 +188,15 @@ export const slotMounts = (input: {
 /**
  * Which host paths a lane is granted, read-only: the roots a
  * command's files live in. Nested roots collapse into the outermost. A root
- * that is, or contains, your home directory, `/` or pi's agent directory
- * (which holds `auth.json`) is refused, as is one Docker cannot mount.
- * A root inside the agent directory, such as a package it installed, is not
- * refused: it lies inside it, and does not contain it.
+ * that is, or holds, your home directory, `/` or one of pine·trie's own
+ * directories (`own`: credentials, service keys, sessions) is refused. A
+ * root inside one of those, such as a skill folder in pine·trie's config,
+ * is not: it lies inside, and does not hold it.
  */
 export function planHostMounts(input: {
   readonly roots: readonly string[]
   readonly home: string
-  readonly agentDir: string
+  readonly own: readonly string[]
 }): {
   readonly mounts: readonly string[]
   readonly refused: readonly {
@@ -212,8 +212,8 @@ export function planHostMounts(input: {
         ? "it is the file system's root"
         : isWithin(input.home, root)
           ? "it is, or holds, your home directory"
-          : isWithin(input.agentDir, root)
-            ? "it is, or holds, pi's agent directory"
+          : input.own.some(d => isWithin(d, root))
+            ? "it is, or holds, one of pine·trie's own directories"
             : null
     if (reason === null) allowed.push(root)
     else refused.push({ path: root, reason })
@@ -360,72 +360,43 @@ export const laneIgnores = (shared: readonly string[]): string =>
 
 const isRecord = (v: unknown): v is Readonly<Record<string, unknown>> =>
   typeof v === "object" && v !== null && !Array.isArray(v)
-const strings = (v: unknown): string[] =>
-  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
 
-/**
- * A JSON config file as read: the user config or a project's `pinetrie.json`.
- * `broken` is a file that exists but could not be read or parsed.
- */
-export type ConfigRead =
-  | { readonly kind: "read"; readonly json: unknown }
-  | { readonly kind: "missing" }
-  | { readonly kind: "broken"; readonly reason: string }
-
-/** What a config's decoder is given: its JSON, else null, which decodes as empty. */
-export const configJson = (read: ConfigRead): unknown =>
-  read.kind === "read" ? read.json : null
-
-/** A `lanes` key: the project's `pinetrie.json`, or the user's config. */
-export interface LaneConfig {
-  readonly grants: LaneGrants
-  /** Relative paths, as written; `planShared` decides which apply. */
-  readonly shared: readonly string[]
-  /** How pine·trie uses your repo, as written (`repoConfig` decides). */
-  readonly repo: WrittenRepo
-  /** The machine's lane settings, as written; only the user's apply (`machineConfig`). */
-  readonly machine: WrittenMachine
+/** A grant's mount as written: its source relative to the project's root. */
+export interface WrittenMount {
+  readonly source: string
+  readonly target: string
 }
 
-/** `lanes.vm.slots` as written: null where absent. */
-export interface WrittenMachine {
-  readonly slots: number | { readonly invalid: string } | null
-}
+/** A grant's mount: a non-empty source, and an absolute target. Null for anything else. */
+export const parseMount = (v: unknown): WrittenMount | null =>
+  isRecord(v) &&
+  typeof v.source === "string" &&
+  typeof v.target === "string" &&
+  v.source !== "" &&
+  path.posix.isAbsolute(v.target)
+    ? { source: v.source, target: v.target }
+    : null
 
-const NO_MACHINE: WrittenMachine = { slots: null }
+/** A port of the Mac's loopback: a whole number from 1 to 65535. Null for anything else. */
+export const parsePort = (v: unknown): number | null =>
+  typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 65535
+    ? v
+    : null
 
-/**
- * The `accepted`, `wip` and `publish` keys' values, as written:
- * null where absent. `offers` says the config still has the key they
- * replaced, which is not read.
- */
-export interface WrittenRepo {
-  readonly acceptedBookmark: string | null
-  readonly wipPrefix: string | null
-  readonly publish: string | null
-  readonly catchUp: WrittenFlag
-  readonly offers: boolean
-}
-
-/**
- * A boolean config value as written: null where absent, and a non-boolean as
- * its JSON text, for the refusal that names it.
- */
-export type WrittenFlag = boolean | { readonly invalid: string } | null
-
-const writtenFlag = (v: unknown): WrittenFlag =>
-  v === undefined
-    ? null
-    : typeof v === "boolean"
-      ? v
-      : { invalid: JSON.stringify(v) ?? String(v) }
+/** Whether `name` can name an environment variable. */
+export const isEnvName = (name: string): boolean =>
+  /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)
 
 /**
  * What a `pinetrie.json` decides of a lane: its grants and its shared
  * directories. A fact of a state: accepted work's copy, less what the
  * lane's own gave up (`effectiveLaneConfig`).
  */
-export type LaneAuthority = Pick<LaneConfig, "grants" | "shared">
+export interface LaneAuthority {
+  readonly grants: LaneGrants
+  /** Relative paths, as written; `planShared` decides which apply. */
+  readonly shared: readonly string[]
+}
 
 const sameMount = (a: Mount, b: Mount): boolean =>
   a.source === b.source && a.target === b.target && a.readonly === b.readonly
@@ -518,133 +489,24 @@ export function configChangeNote(
   return lines.length === 0 ? null : lines.join("\n")
 }
 
-/**
- * A parsed lane config, total: anything missing or malformed grants and
- * shares nothing.
- * A grant's mount source is relative to the project's root, and its target
- * must be absolute.
- */
-export function decodeLaneConfig(json: unknown, root: string): LaneConfig {
-  const lanes = isRecord(json) ? json.lanes : undefined
-  const key = (name: string): Record<string, unknown> => {
-    const value = isRecord(json) ? json[name] : undefined
-    return isRecord(value) ? value : {}
-  }
-  const named = (v: unknown) => (typeof v === "string" ? v : null)
-  const publish = key("publish")
-  const repo: WrittenRepo = {
-    acceptedBookmark: named(key("accepted").bookmark),
-    wipPrefix: named(key("wip").prefix),
-    publish: named(publish.bookmark),
-    catchUp: writtenFlag(publish.catchUp),
-    offers: isRecord(json) && json.offers !== undefined,
-  }
-  if (!isRecord(lanes))
-    return {
-      grants: NO_GRANTS,
-      shared: [],
-      repo,
-      machine: NO_MACHINE,
-    }
-  const invalid = (v: unknown) => ({ invalid: JSON.stringify(v) ?? String(v) })
-  const vm = isRecord(lanes.vm) ? lanes.vm : {}
-  const machine: WrittenMachine = {
-    slots:
-      vm.slots === undefined
-        ? null
-        : typeof vm.slots === "number"
-          ? vm.slots
-          : invalid(vm.slots),
-  }
-  const mounts = Array.isArray(lanes.mounts)
-    ? lanes.mounts.flatMap(m =>
-        isRecord(m) &&
-        typeof m.source === "string" &&
-        typeof m.target === "string" &&
-        m.source !== "" &&
-        path.posix.isAbsolute(m.target)
-          ? [
-              {
-                source: path.resolve(root, m.source),
-                target: m.target,
-                readonly: true,
-              },
-            ]
-          : [],
-      )
-    : []
-  return {
-    grants: {
-      ssh: lanes.ssh === true,
-      nested: lanes.nested === true,
-      hostPorts: Array.isArray(lanes.hostPorts)
-        ? [
-            ...new Set(
-              lanes.hostPorts.filter(
-                (p): p is number => Number.isInteger(p) && p >= 1 && p <= 65535,
-              ),
-            ),
-          ].sort((a, b) => a - b)
-        : [],
-      env: strings(lanes.env).filter(n => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n)),
-      mounts,
-    },
-    shared: strings(lanes.shared),
-    repo,
-    machine,
-  }
-}
-
-/** The slots a lane VM boots with when the user config names none. */
+/** The slots a lane VM boots with when no config names any. */
 export const DEFAULT_VM_SLOTS = 16
 /** A VM boots with 20 share devices alongside its others, and not 24. */
 export const MAX_VM_SLOTS = 20
-
-/** This machine's lane settings, from the user's config; each bad value refused, naming why. */
-export interface MachineConfig {
-  readonly slots: number
-}
-
-/**
- * The VM's slots, from the user's config only: a person's machine setting,
- * not a project's. A value that cannot be used is refused, with why, and
- * the default holds.
- */
-export function machineConfig(user: WrittenMachine): {
-  readonly machine: MachineConfig
-  readonly refused: readonly string[]
-} {
-  const refused: string[] = []
-  let slots = DEFAULT_VM_SLOTS
-  const n = user.slots
-  if (
-    typeof n === "number" &&
-    Number.isInteger(n) &&
-    n >= 1 &&
-    n <= MAX_VM_SLOTS
-  )
-    slots = n
-  else if (n !== null)
-    refused.push(
-      `lanes.vm.slots ${typeof n === "number" ? n : n.invalid} is not a whole number from 1 to ${MAX_VM_SLOTS}: a VM boots with at most ${MAX_VM_SLOTS} share devices beside its others; using ${DEFAULT_VM_SLOTS}`,
-    )
-  return { machine: { slots }, refused }
-}
 
 /** Where a shared directory may never be: repos, pine·trie's own, dependencies. */
 const NEVER_SHARED = [".git", ".jj", PROJECT_DIR, "node_modules"]
 
 /**
- * Which shared directories apply, and what to do for them on the host. The
- * user's entries come first, then the project's, normalized and without
- * duplicates. Refused: absolute paths, paths that leave the project, those
+ * Which shared directories apply, and what to do for them on the host, from
+ * the settled list (the person's entries first, as the join puts them),
+ * normalized and without duplicates. Refused: absolute paths, paths that leave the project, those
  * in `.git`, `.jj`, `.pinetrie` or `node_modules`, and those holding files jj
  * tracks. A missing directory is created; one your repo does not already
  * ignore is added to its exclude file.
  */
 export function planShared(facts: {
-  readonly user: readonly string[]
-  readonly project: readonly string[]
+  readonly entries: readonly string[]
   /** Normalized paths that exist. */
   readonly exists: ReadonlySet<string>
   /** Normalized paths holding files jj tracks. */
@@ -660,7 +522,7 @@ export function planShared(facts: {
   readonly create: readonly string[]
   readonly exclude: readonly string[]
 } {
-  const { candidates, refused } = sharedCandidates(facts)
+  const { candidates, refused } = sharedCandidates(facts.entries)
   const shared = candidates.filter(p => !facts.tracked.has(p))
   return {
     shared,
@@ -676,14 +538,11 @@ export function planShared(facts: {
 }
 
 /**
- * The entries whose paths may be shared, normalized and each once, the user's
- * first; and those refused by their path alone. What they hold is for
- * `planShared` to judge, from what the host gathers of these candidates.
+ * The entries whose paths may be shared, normalized and each once, in order;
+ * and those refused by their path alone. What they hold is for `planShared`
+ * to judge, from what the host gathers of these candidates.
  */
-export function sharedCandidates(entries: {
-  readonly user: readonly string[]
-  readonly project: readonly string[]
-}): {
+export function sharedCandidates(entries: readonly string[]): {
   readonly candidates: readonly string[]
   readonly refused: readonly {
     readonly path: string
@@ -692,7 +551,7 @@ export function sharedCandidates(entries: {
 } {
   const candidates: string[] = []
   const refused: { path: string; reason: string }[] = []
-  for (const given of [...entries.user, ...entries.project]) {
+  for (const given of entries) {
     const reason = sharedRefusal(given)
     if (reason !== null) refused.push({ path: given, reason })
     else if (!candidates.includes(normalShared(given)))

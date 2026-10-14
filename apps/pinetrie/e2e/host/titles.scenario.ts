@@ -1,15 +1,18 @@
 // e2e/host/titles — a root titled by a model: unasked as its first
 // lane starts, and again when a person asks (Auto-update title).
 
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import path from "node:path"
 import { ROOT } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { readMarks, readRoots } from "@pinetrie/reads"
 import { TITLE_REQUEST_HEAD } from "@pinetrie/rules"
 import type { Checks } from "../checks.ts"
-import { at, START_AGENT, taskHolding, waitFor } from "../harness.ts"
+import {
+  at,
+  START_AGENT,
+  suitePlaces,
+  taskHolding,
+  waitFor,
+} from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 import { idOfIn } from "./support.ts"
@@ -21,11 +24,7 @@ export const scenario: Scenario = {
 
 async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   // An empty config: titles are on by default.
-  const userConfig = path.join(
-    mkdtempSync(path.join(tmpdir(), "pinetrie-titles-config-")),
-    "config.json",
-  )
-  writeFileSync(userConfig, "{}")
+  const places = suitePlaces({ user: {} })
   // A title names the newest subject its request shows; anything else asked
   // outside a thread is a commit message.
   const script = scriptedModel({
@@ -46,7 +45,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   } = await lanes.sectionHost({
     files: { "a.txt": "a\n" },
     model: { kind: "scripted", script },
-    userConfig,
+    places,
   })
   const record = () => [...readRoots(th.session).values()][0]
   // The root's task's title: the one task the scenario opens.

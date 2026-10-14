@@ -14,6 +14,8 @@
     "conformance": "pnpm --filter @pinetrie/conformance run conformance",
     "host": "pnpm --filter @pinetrie/app run host",
     "host:react-dev": "pnpm --filter @pinetrie/app run host:react-dev",
+    "sign-in": "pnpm --filter @pinetrie/app run sign-in",
+    "sign-out": "pnpm --filter @pinetrie/app run sign-out",
     "e2e": "pnpm --filter @pinetrie/app run e2e",
     "e2e:live": "pnpm --filter @pinetrie/app run e2e:live",
     "e2e:browser": "pnpm --filter @pinetrie/app run e2e:browser",

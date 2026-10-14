@@ -180,6 +180,17 @@ test("jj declares only core, keeper and lanes: it runs jj and git on your repo, 
   ])
 })
 
+test("config declares only core: it decodes files and settles values, and knows no setting", () => {
+  assert.deepEqual(deps(read("packages/config")), ["@pinetrie/core"])
+})
+
+test("only the app declares config: one table, declared in one place", () => {
+  const declaring = WORKSPACE.filter(dir =>
+    allDeps(read(dir)).includes("@pinetrie/config"),
+  ).sort()
+  assert.deepEqual(declaring, ["apps/pinetrie"])
+})
+
 test("keeper declares nothing", () => {
   assert.deepEqual(allDeps(read("packages/keeper")), [])
 })

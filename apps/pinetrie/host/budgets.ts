@@ -101,7 +101,7 @@ export function createBudgets(deps: {
   >
   readonly keeper: Pick<HostKeeper, "run">
   readonly records: Pick<Records, "writeValues">
-  /** The user config's budget (`decodeAgentsConfig`). */
+  /** The settled `agents.budget`. */
   readonly limit: number
   /** Ask for a lane's drain: a fact queued on an idle lane is appended so. */
   readonly drain: (lane: ThreadId) => void

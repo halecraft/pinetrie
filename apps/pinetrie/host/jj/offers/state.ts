@@ -11,12 +11,13 @@ import {
   firstPromptOf,
   type OfferRecord,
   projectTranscript,
+  type RepoConfig,
   type ThreadId,
   type ThreadName,
   type ValueWrite,
   wipDescription,
 } from "@pinetrie/core"
-import type { OfferInput, RepoConfig, RepoOwner } from "@pinetrie/jj"
+import type { OfferInput, RepoOwner } from "@pinetrie/jj"
 import type { PiSetup } from "@pinetrie/pi"
 import {
   readArchived,

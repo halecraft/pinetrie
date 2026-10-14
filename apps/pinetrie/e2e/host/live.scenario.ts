@@ -2,9 +2,8 @@
 // scenario runs on a scripted model, so its steps are repeatable, cost nothing
 // and need no key.
 
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import path from "node:path"
+import { homedir } from "node:os"
+import { configPlaces } from "@pinetrie/config"
 import { type ImageRef, projectTranscript, ROOT } from "@pinetrie/core"
 import { readBanners } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
@@ -15,6 +14,7 @@ import {
   START_AGENT,
   SUITE_CONFIG,
   startSuiteHost,
+  suitePlaces,
   tipIn,
   treeOf,
   waitFor,
@@ -33,7 +33,18 @@ export const scenario: Scenario = {
 }
 
 const PROMPT = "Say exactly: PINETRIE-OK"
-/** The suites' own real model: never the person's pi setup, which costs them. */
+/**
+ * The places of a live host: the suite's, but the person's own data
+ * directory, for the credential `pnpm sign-in cerebras` stored (or
+ * `CEREBRAS_API_KEY`). Nothing else of the person's is read.
+ */
+const livePlaces = (user?: Readonly<Record<string, unknown>>) =>
+  suitePlaces({
+    ...(user === undefined ? {} : { user }),
+    data: configPlaces(process.env, homedir(), null).dirs.data,
+  })
+
+/** The suites' own real model, named: never the person's configured one, which costs them. */
 const LIVE_MODEL = {
   kind: "named",
   provider: "cerebras",
@@ -45,6 +56,8 @@ async function run(check: Checks["check"]): Promise<void> {
   const live = await startSuiteHost({
     port: 0,
     model: LIVE_MODEL,
+    places: livePlaces(),
+    env: process.env,
     log: () => {},
   })
   const asker = await join(live, "asker", "live")
@@ -91,19 +104,12 @@ async function run(check: Checks["check"]): Promise<void> {
 
   // A banner drawn by the real image model: a square icon, as the request's
   // `aspect_ratio` of 1:1 asks.
-  const bannerConfig = path.join(
-    mkdtempSync(path.join(tmpdir(), "pinetrie-live-banner-")),
-    "config.json",
-  )
-  writeFileSync(
-    bannerConfig,
-    JSON.stringify({ ...SUITE_CONFIG, icons: { source: "drawn" } }),
-  )
   const bannerLog: string[] = []
   const drawing = await startSuiteHost({
     port: 0,
     model: LIVE_MODEL,
-    userConfig: bannerConfig,
+    places: livePlaces({ ...SUITE_CONFIG, icons: { source: "drawn" } }),
+    env: process.env,
     log: line => bannerLog.push(line),
   })
   const painter = await join(drawing, "painter", "live")

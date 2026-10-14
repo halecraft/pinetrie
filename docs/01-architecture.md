@@ -249,6 +249,18 @@ two ports (`LaneHistory`, reached on the lane's queue alone, and
 (`host/project.ts`); `@pinetrie/lanes` runs no jj. The folder's adapter is
 not built.
 
+pine·trie reads only its own config (ADR-0146): five layers (system, user,
+project, local, env), each a `pinetrie.json` but the last, and every setting
+declared once, in the host's table (`apps/pinetrie/host/settings.ts`), with
+the layers that may set it and how they combine. `@pinetrie/config` decodes
+each layer's file against those declarations and settles them, purely: a
+limit can only narrow, a key a layer may not set is refused, and every
+refusal reaches both the startup lines and the setup page. Nothing of
+`~/.pi` or a project's `.pi/` is read: pi's own code loads the model setup
+from pine·trie's config, with pi's agent directory bound to pine·trie's.
+Credentials are state, in `$XDG_DATA_HOME/pinetrie/auth.json`, written only
+by `pnpm sign-in`.
+
 Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`
 stands for "absent"; the codec decodes commands into an `Intent` union and
 replies into an `Outcome` union, and nothing past it sees `""`. Likewise pi's

@@ -36,8 +36,9 @@ follow this list. A name only this package uses is imported from its module.
 - `records.ts`, `specs.ts`, `decode.ts`: `RecordSpec`, the writes it builds
   and every spec (`RECORD_SPECS`); the
   total decoders and key readers every module uses.
-- `config.ts`: reading the user config. `request.ts`: what fits a model
-  request's budget.
+- `config.ts`: `modelRef`, the parser a model setting's kind wraps; the
+  config's files are `@pinetrie/config`'s, and the host declares every
+  setting. `request.ts`: what fits a model request's budget.
 - `chat.ts`, `participant.ts`, `images.ts`, `commands.ts`: a person's
   message, who is in the session, the images a message shows, and `/`
   commands (`pinetrie.commands`).
@@ -300,9 +301,11 @@ are the only code that builds or reads the shape.
   reads the first word: two `:`-separated parts is a prompt, three with
   `skill` in the middle a skill; anything else is text, `/etc/hosts`
   included.
-- **`labelCommands`** gives each package its label: the user config's rename
-  (keyed by pi's `source`), else `pinetrie`, else `plugin.json`'s name, else
-  the unscoped package name, else pi's scope. Two sources with one label are
+- **`labelCommands`** gives each package its label: `commands.names`' rename
+  (keyed by the command's source: a listed package's path), else
+  `pinetrie`, else `plugin.json`'s name, else the unscoped package name,
+  else the layer that listed its folder. `isCommandLabel` is what a rename
+  may be. Two sources with one label are
   refused together, as are two commands with one full name in one package.
 - **`expandSkill`** is pi's block, byte for byte. **`resolveCommand`** is an
   exact match.
@@ -1087,8 +1090,8 @@ Ada"). It is a prompt, so its run is an ask of its own (`PROMPT_ROLES`).
 # Digests (`digest.ts`, ADR-0106, ADR-0075)
 
 A model's headline and few points for a long ask's work, unless
-`{ "digests": { "enabled": false } }` is in the user config
-(`decodeDigestConfig`, ADR-0071). A host-written `pinetrie.digest` value keyed
+`{ "digests": { "enabled": false } }` is in the config (`digests.enabled`,
+ADR-0071, settled by the host's table). A host-written `pinetrie.digest` value keyed
 by the ask's prompt, `{ headline, points, at, final }`, replaced whole each
 time: a value, not a text, since nothing accumulates (ADR-0014). A null
 headline is a digest with nothing to draw. No agent reads it.
@@ -1149,13 +1152,24 @@ How a thread's last run ended, for the people who follow it.
   `digestToWrite` decides a final one, none for a failed request.
 - **`pendingVerdict`** is what a run's end writes before it closes the run.
 
-# The user config (`config.ts`)
+# A model setting (`config.ts`)
 
-Every setting's decoder (`decodeIconConfig`, `decodeDigestConfig`,
-`decodeTitleConfig`) reads through `recordOf`, and a model setting through
-`modelRef`: `provider/id`, split at its first `/`, since an OpenRouter id
-holds one. Each decoder is total: a missing or malformed setting takes its
-default.
+`modelRef` reads `provider/id`, split at its first `/`, since an OpenRouter
+id holds one. It is the parser the host's model settings wrap (`model`,
+`titles.model`, `icons.model`); a value it refuses is a refusal the host and
+the setup page name.
+
+# The setup record (`setup.ts`, ADR-0146)
+
+| record | namespace | key | written |
+|---|---|---|---|
+| what the host read of its config and what its model setup loaded, for the setup page | `pinetrie.setup` | `setup` (`SETUP_KEY`) | at host start, and when accepted work's config changes it |
+
+It holds only what no other record publishes: each layer's file and state,
+every refusal, every setting with its value as JSON text and its origins,
+the model or why there is none, the providers with a credential and where
+it is (never the credential), the refused packages and the context files.
+The commands are `pinetrie.commands`'.
 
 # Titles (`title.ts`, ADR-0074)
 
@@ -1163,8 +1177,9 @@ A model's few words for a task, written as its mark (`MARK`, ADR-0116),
 so Rename edits it and every place a title shows reads it. Titling still
 reads a root's tree: Phase 2 holds one root a task.
 
-- **`decodeTitleConfig`**: on unless `enabled` is `false`, as digests are;
-  `model` is `modelRef`, or null for the run's.
+- **`TitleConfig`**: `titles.enabled` (on unless a layer turns it off, as
+  digests are) and `titles.model` (null for the run's), as the host settles
+  them.
 - **`planTitling` is the decision and the request's lines.** Unasked (a
   lane just created, `trigger.kind` `lane`): only for the root's first lane
   (no other lane record names the root), with titles on, the task unmarked
@@ -1643,12 +1658,11 @@ commit-message request `request.ts` (`describeRequest`).
 | a thread's banner, drawn or pasted: the image's hash (ADR-0050, ADR-0053) | `pinetrie.banner` | the lane | when a banner is made or set |
 | where icons come from, for the page (ADR-0143) | `pinetrie.icons` | `icons` (`ICONS_KEY`) | at host start, when changed |
 
-- **`decodeIconConfig`** reads the user config's `icons`: `source` is one
-  of `ICON_SOURCES` (core), and a missing, malformed or unknown one is
-  `built-in`; `IconsRecordSchema` takes the same list, so the config and
-  the published record cannot accept different sources. A drawn `model` is `provider/id`, split at its
-  first `/`, since OpenRouter's ids hold one; a missing or malformed one
-  takes `DEFAULT_ICON_MODEL`. The old `banner` key is not read.
+- **`iconConfig`** builds the host's icon source from the settled
+  `icons.source` (one of `ICON_SOURCES`, core; `built-in` when no layer
+  sets it) and `icons.model`: a drawn icon's model is the one set, else
+  `DEFAULT_ICON_MODEL`. `IconsRecordSchema` takes the same list, so the
+  config and the published record cannot accept different sources.
 - **Both decisions take whether the host draws** (the source is `drawn`),
   and have no outcome in common. `bannerDue`: a thread just named, or at its
   run's end, gets a drawn one only while the host draws, and when it has
@@ -1898,8 +1912,8 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
   `planSpend` counts, and returns the record to write only when a spend crosses the
   limit, or at a run's end, so a session write is not made for every model
   request: the host counts what runs spend live (`budgets.ts`). `mayRequest`
-  reads it. The user config's
-  `agents.budget` is `decodeAgentsConfig`'s.
+  reads it. `agents.budget` is the host's setting, limited by a system
+  file.
 - **Facts**: `dismissed` and `left` (a member gone, read by `threadMembers`),
   `unanswered`, `round` (what the round told the people) and
   `budget-spent`; a stop the budget made names it (`StopFact.budget`) and

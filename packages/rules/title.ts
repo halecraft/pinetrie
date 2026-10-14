@@ -17,7 +17,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
-import { type ModelRef, modelRef, recordOf } from "./config.ts"
+import type { ModelRef } from "./config.ts"
 import {
   bareLine,
   fitNewest,
@@ -29,23 +29,11 @@ import {
 
 // ── the setting ───────────────────────────────────────────────────────────
 
-interface TitleConfig {
+export interface TitleConfig {
   /** Whether a root is titled unasked. Auto-update title works either way. */
   readonly enabled: boolean
   /** The model titles are asked of; null for the run's. */
   readonly model: ModelRef | null
-}
-
-/**
- * The user config's `titles`: on unless `enabled` is `false`, and `model` is
- * `provider/id` (`modelRef`). Total: a malformed model is the run's.
- */
-export function decodeTitleConfig(json: unknown): TitleConfig {
-  const titles = recordOf(recordOf(json)?.titles)
-  return {
-    enabled: titles?.enabled !== false,
-    model: modelRef(titles?.model) ?? null,
-  }
 }
 
 // ── the decision ──────────────────────────────────────────────────────────

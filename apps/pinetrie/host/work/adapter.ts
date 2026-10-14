@@ -8,14 +8,19 @@
 // started once lane work has its registry, which the adapter's own parts
 // (fetches, splits) run on.
 
-import type { CommitId, EntryId, ThreadId, WriterId } from "@pinetrie/core"
+import type {
+  CommitId,
+  EntryId,
+  RepoConfig,
+  ThreadId,
+  WriterId,
+} from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import type {
   BaseCheckout,
   LaneHistory,
   LaneRunners,
   SharedDir,
-  WrittenRepo,
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
 import type { StackMessage } from "@pinetrie/rules"
@@ -27,14 +32,11 @@ import type { LaneRegistry } from "./registry.ts"
 /** A kind of project's adapter, before startup opens it. */
 export interface ProjectAdapter {
   /**
-   * Open the project, with the names your config and the project's
-   * `pinetrie.json` wrote: before anything else reads it.
+   * Open the project, with your repo's names as settled from your config
+   * and the working copy's `pinetrie.json`: before anything else reads it.
    */
   open(input: {
-    readonly written: {
-      readonly user: WrittenRepo
-      readonly project: WrittenRepo
-    }
+    readonly names: RepoConfig
     readonly basics: Basics
   }): Promise<OpenProject>
 }
@@ -56,10 +58,7 @@ export interface OpenProject {
    * The shared directories that apply, prepared: made where missing, kept out
    * of what the project tracks, and named in the lanes' ignore file.
    */
-  prepareShared(entries: {
-    readonly user: readonly string[]
-    readonly project: readonly string[]
-  }): Promise<SharedPrepared>
+  prepareShared(entries: readonly string[]): Promise<SharedPrepared>
   /** The identity lanes commit as: yours, else pine·trie's agent's. */
   identity(): Promise<{ readonly name: string; readonly email: string }>
   /** Accepted work's commits now: none before it is set up. */

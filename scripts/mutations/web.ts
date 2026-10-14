@@ -333,4 +333,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "only its door touches 'HTML drag and drop'",
   },
+  {
+    name: "the menu's Setup opens the profile",
+    file: "packages/web/account-menu.tsx",
+    from: '          onChoose: () => onIntent({ kind: "page", to: "setup" }),\n',
+    to: '          onChoose: () => onIntent({ kind: "page", to: "profile" }),\n',
+    suite: "browser",
+    scenario: "page",
+    expect: "the setup page names each config file the host read",
+  },
 ]

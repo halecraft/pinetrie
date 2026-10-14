@@ -45,6 +45,8 @@ export function Composer(p: {
   how: ColumnHow
   unstarted: boolean
   commands: readonly CommandSummary[]
+  /** Why the host has no model (`noModelLine`); null when it has one. */
+  noModel: string | null
   participants: readonly string[]
   /** Other threads' agents a mention may reach. */
   agents: readonly AgentCandidate[]
@@ -88,6 +90,7 @@ export function Composer(p: {
         how={p.how}
         card={p.card}
         commands={p.commands}
+        noModel={p.noModel}
         unstarted={p.unstarted}
         lane={p.lane}
         onBranchInstead={p.onBranchInstead}

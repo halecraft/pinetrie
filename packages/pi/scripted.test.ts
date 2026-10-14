@@ -3,22 +3,40 @@
 import path from "node:path"
 import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pinetrie/rules"
 import { expect, test, vi } from "vitest"
-import { loadModelSetup } from "./config.ts"
+import { bindAgentDir } from "./agent-dir.ts"
+import { loadModelSetup, NO_RESOURCES } from "./config.ts"
 import {
   SCRIPTED_DESCRIPTION,
   SCRIPTED_VERDICT,
   type ScriptedModel,
   scriptedModel,
 } from "./scripted.ts"
+import { testPlaces } from "./start-pi.ts"
 
-const cwd = path.join(import.meta.dirname, "fixtures", "pi-agent")
+const cwd = path.join(import.meta.dirname, "fixtures")
+const where = () => {
+  const places = testPlaces()
+  return {
+    cwd,
+    places,
+    binding: bindAgentDir(places.configDir),
+    lists: NO_RESOURCES,
+    skillsDir: path.join(import.meta.dirname, "skills"),
+  }
+}
+
+/** The scripted run's model: a scripted setup always has one. */
+const runModel = (setup: Awaited<ReturnType<typeof loadModelSetup>>) => {
+  if (setup.model.kind !== "model") throw new Error("no model")
+  return setup.model.model
+}
 const ANSWER = { text: "the answer" }
 
 async function asker(script: ScriptedModel) {
-  const setup = await loadModelSetup({ kind: "scripted", script }, { cwd })
+  const setup = await loadModelSetup({ kind: "scripted", script }, where())
   return (prompt: string, signal?: AbortSignal) =>
     setup.models.completeSimple(
-      setup.model,
+      runModel(setup),
       {
         systemPrompt: "answer",
         messages: [{ role: "user", content: prompt, timestamp: 0 }],
@@ -29,9 +47,9 @@ async function asker(script: ScriptedModel) {
 
 /** A request's stream, and every event it has given so far. */
 async function streamer(script: ScriptedModel) {
-  const setup = await loadModelSetup({ kind: "scripted", script }, { cwd })
+  const setup = await loadModelSetup({ kind: "scripted", script }, where())
   return (prompt: string) => {
-    const stream = setup.models.streamSimple(setup.model, {
+    const stream = setup.models.streamSimple(runModel(setup), {
       systemPrompt: "answer",
       messages: [{ role: "user", content: prompt, timestamp: 0 }],
     })
@@ -173,11 +191,13 @@ test("a scripted tool step's call carries its arguments", async () => {
 test("a run's end is answered with a verdict line, first, so the suites' threads are done", async () => {
   const setup = await loadModelSetup(
     { kind: "scripted", script: scriptedModel() },
-    { cwd },
+    where(),
   )
+  const describeModel = setup.describeModel
+  if (describeModel === null) throw new Error("no describe model")
   const describe = async (user: string) =>
     textOf(
-      await setup.models.completeSimple(setup.describeModel, {
+      await setup.models.completeSimple(describeModel, {
         systemPrompt: "summarize",
         messages: [{ role: "user", content: user, timestamp: 0 }],
       }),

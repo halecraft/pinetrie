@@ -22,7 +22,6 @@ import {
   prepareShared,
   readWipState,
   renameAccepted,
-  repoConfig,
   revsetName,
   startRepoOwner,
 } from "@pinetrie/jj"
@@ -40,13 +39,8 @@ import { createSplits } from "./split.ts"
 export function startJjProject(dir: JjProjectDir): ProjectAdapter {
   const { root } = dir
   return {
-    async open({ written, basics }) {
+    async open({ names, basics }) {
       const { log } = basics
-      const { repoConfig: names, refused } = repoConfig(
-        written.user,
-        written.project,
-      )
-      for (const r of refused) log(`[host] ${r}`)
       // Made here, from the project root and accepted work's names, before
       // anything else reads your repo: the reads below, lane work's and the
       // offers'.

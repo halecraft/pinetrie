@@ -17,7 +17,6 @@ import {
   planAccessTimeout,
   planAccessUse,
 } from "./access.ts"
-import { decodeOwner } from "./config.ts"
 
 const LANE = threadIdFor("t-1")
 const DUANE = writerId("duane@x.io")
@@ -144,10 +143,4 @@ describe("planAccessChange", () => {
   test("asking changes nothing that waits", () => {
     expect(planAccessChange(null, STATES.waiting)).toBeNull()
   })
-})
-
-test("the owner is an email in the user config, as its writer", () => {
-  expect(decodeOwner({ owner: "Duane@X.io" })).toBe(DUANE)
-  expect(decodeOwner({ owner: "not an email" })).toBeNull()
-  expect(decodeOwner({})).toBeNull()
 })

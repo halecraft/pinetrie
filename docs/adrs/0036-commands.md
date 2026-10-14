@@ -10,6 +10,10 @@
     and is not typed (`bring-up-to-date` first). Typed commands stay as
     decided here.
   - ADR-0102: no branch works directly.
+  - ADR-0146: skills and prompts come from pine·trie's config, not pi's. The
+    mount guard refuses pine·trie's config and data directories, not pi's
+    agent directory. A project's own skills are read in a lane's copy of the
+    project, not mounted from the host.
 
 **Context.** pine·trie loads your pi configuration (ADR-0022, S23), and pi's
 loader finds your skills and prompt templates: yours, the project's, and

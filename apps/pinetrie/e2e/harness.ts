@@ -13,6 +13,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { NotAWriterError } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
+import type { ConfigPlaces } from "@pinetrie/config"
 import {
   type ArchivedTask,
   atEntry,
@@ -34,7 +35,7 @@ import {
   threadAt,
   type WorkflowStateId,
 } from "@pinetrie/core"
-import { scriptedModel } from "@pinetrie/pi"
+import { type AgentDirBinding, bindAgentDir, scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readAccepted,
@@ -368,7 +369,7 @@ export const suiteModel = () =>
   scriptedModel({ tokensPerSecond: 400, answer: { text: SUITE_REPLY } })
 
 /**
- * The suites' user config: titles off, so a tab keeps its first line and no
+ * The suites' own `pinetrie.json`: titles off, so a tab keeps its first line and no
  * request is made that a scenario did not ask for. A scenario
  * that writes a config of its own spreads this into it.
  */
@@ -376,16 +377,58 @@ export const SUITE_CONFIG = {
   titles: { enabled: false },
 } as const
 
-let suiteConfig: string | undefined
+/** pine·trie's fixture pi packages: each has a skill `hello`, under its own label. */
+export const FIXTURE_PACKAGES: readonly string[] = [
+  "fixture-pkg",
+  "other-pkg",
+].map(p => path.join(import.meta.dirname, "../../../packages/pi/fixtures", p))
 
-/** `SUITE_CONFIG` in a file, written once per process. */
-export function suiteConfigFile(): string {
-  if (suiteConfig === undefined) {
-    const dir = mkdtempSync(path.join(tmpdir(), "pinetrie-suite-config-"))
-    suiteConfig = path.join(dir, "config.json")
-    writeFileSync(suiteConfig, JSON.stringify(SUITE_CONFIG))
+let suiteDirs: { readonly config: string; readonly data: string } | undefined
+
+/** This process's config and data directories, made once. */
+const suiteDirsNow = () => {
+  suiteDirs ??= {
+    config: mkdtempSync(path.join(tmpdir(), "pinetrie-suite-config-")),
+    data: mkdtempSync(path.join(tmpdir(), "pinetrie-suite-data-")),
   }
-  return suiteConfig
+  return suiteDirs
+}
+
+/**
+ * pi's agent directory, bound once per suite process to its config
+ * directory: every host in the process agrees, since a second directory
+ * throws (`bindAgentDir`).
+ */
+export const suiteBinding = (): AgentDirBinding =>
+  bindAgentDir(suiteDirsNow().config)
+
+/**
+ * The places a suite's host reads: this process's own config and data
+ * directories, no system file, and `user` (by default `SUITE_CONFIG`) as the
+ * user's `pinetrie.json`, written beside them. `data` is the person's own
+ * data directory only for `e2e:live`, whose real model needs a credential.
+ */
+export function suitePlaces(
+  options: {
+    readonly user?: Readonly<Record<string, unknown>>
+    readonly data?: string
+  } = {},
+): ConfigPlaces {
+  const dirs = suiteDirsNow()
+  const user = path.join(
+    mkdtempSync(path.join(dirs.config, "user-")),
+    "pinetrie.json",
+  )
+  writeFileSync(user, JSON.stringify(options.user ?? SUITE_CONFIG))
+  const data = options.data ?? dirs.data
+  return {
+    dirs: { config: dirs.config, data },
+    systemCandidates: [],
+    user,
+    local: null,
+    credentials: path.join(data, "auth.json"),
+    models: path.join(dirs.config, "models.json"),
+  }
 }
 
 let suiteSsh: { readonly dir: string; readonly agent: null } | undefined
@@ -411,20 +454,23 @@ export function suiteSshPlaces(): {
  * anywhere. A host with tools comes only from `LaneHosts`
  * (`lane-hosts.ts`), given to a scenario that declares `lanes: true`.
  */
-export type SuiteHostOptions = Omit<StartHostOptions, "project"> & {
+export type SuiteHostOptions = Omit<StartHostOptions, "project" | "binding"> & {
   readonly project?: { readonly dir: string; readonly tools: false } | null
 }
 
 /**
- * `startHost` with `SUITE_CONFIG` unless the scenario names its own file,
- * so no suite reads the person's `~/.config/pinetrie/config.json`.
+ * `startHost` with the suite's places (`SUITE_CONFIG` unless the scenario
+ * gives its own) and binding, so no suite reads the person's config or
+ * credentials.
  */
 export const startSuiteHost = (
   options: SuiteHostOptions,
 ): Promise<RunningHost> =>
   startHost({
-    userConfig: suiteConfigFile(),
+    places: suitePlaces(),
     ssh: suiteSshPlaces(),
+    binding: suiteBinding(),
+    env: {},
     ...options,
   })
 

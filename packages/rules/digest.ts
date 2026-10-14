@@ -11,7 +11,6 @@ import {
   type TreeIndex,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { recordOf } from "./config.ts"
 import { decodeAt, entryKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 import {
@@ -99,10 +98,6 @@ export const digestText = (body: DigestBody): string =>
     : [body.headline, pointsText(body.points)].filter(t => t !== "").join("\n")
 
 // ── the setting ───────────────────────────────────────────────────────────
-
-/** The user config's `digests`: on unless `enabled` is `false`. Total. */
-export const decodeDigestConfig = (json: unknown): boolean =>
-  recordOf(recordOf(json)?.digests)?.enabled !== false
 
 // ── the decision ──────────────────────────────────────────────────────────
 

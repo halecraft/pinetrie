@@ -987,7 +987,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "recover writes the project and icon records only when they changed",
+      "recover writes the project, icon and setup records only when they changed",
   },
   {
     name: "two runs' ends make two banners",
@@ -1686,23 +1686,45 @@ export const mutations: readonly Mutation[] = [
   },
   // ── what a starting host logs ──
   {
-    name: "a missing user config is worded as read",
-    file: "apps/pinetrie/host/startup-lines.ts",
+    name: "a missing config file is worded as read",
+    file: "packages/interface/setup-words.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '      return line("config", `${file} (none)`)',
-    to: '      return line("config", file)',
+    from: "      return `${file} (none)`",
+    to: "      return file",
     command: unit,
-    expect: "configLine",
+    expect: "reportLines",
   },
   {
-    name: "an overridden model is credited to its settings file",
-    file: "apps/pinetrie/host/startup-lines.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '    from.kind === "override" ? OVERRIDES[field] : `${field} from ${from.file}`',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "    `${field} from settings`",
+    name: "a model from PINETRIE_MODEL is credited to a file",
+    file: "packages/interface/setup-words.ts",
+    from: "        ? `$${o.name}`\n",
+    to: '        ? "a file"\n',
     command: unit,
-    expect: "agentReadyLine",
+    expect: "a model from PINETRIE_MODEL names the variable",
+  },
+  {
+    name: "your config's bookmark wins over the project's working copy",
+    file: "apps/pinetrie/host/settings.ts",
+    from: '    fallback: DEFAULT_REPO.acceptedBookmark,\n    describe: "accepted work\'s bookmark",\n    order: ["user", { project: "working" }, "local"],',
+    to: '    fallback: DEFAULT_REPO.acceptedBookmark,\n    describe: "accepted work\'s bookmark",\n    order: [{ project: "working" }, "user", "local"],',
+    command: unit,
+    expect: "the project's working copy beats the person's",
+  },
+  {
+    name: "a project's grant overrides the person declining it",
+    file: "apps/pinetrie/host/settings.ts",
+    from: '      order: [{ project: "lane" }, "user", "local"],\n    }),\n    ["system"],\n  ),\n  "lanes.ssh.hosts"',
+    to: '      order: ["user", "local", { project: "lane" }],\n    }),\n    ["system"],\n  ),\n  "lanes.ssh.hosts"',
+    command: unit,
+    expect: "the person's false beats a project's grant",
+  },
+  {
+    name: "icons are off when no config names a source",
+    file: "apps/pinetrie/host/settings.ts",
+    from: '    fallback: "built-in",',
+    to: '    fallback: "none",',
+    command: unit,
+    expect: "nothing set: built-in icons, titles and digests on",
   },
   // ── queue control ──
   {
@@ -2141,5 +2163,22 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a folder project is refused, with how to make it a jj one; a jj project gets jj's adapter",
+  },
+  {
+    name: "recover never writes the setup record",
+    file: "apps/pinetrie/host/startup.ts",
+    from: "    ...setIfChanged(SETUP, deps.setup, readSetup(doc) ?? undefined),\n",
+    to: "",
+    command: unit,
+    expect:
+      "recover writes the project, icon and setup records only when they changed",
+  },
+  {
+    name: "the setup record drops the refusals",
+    file: "apps/pinetrie/host/setup-record.ts",
+    from: "    refusals: report.refusals,\n",
+    to: "    refusals: [],\n",
+    command: unit,
+    expect: "the setup record carries every refusal",
   },
 ]

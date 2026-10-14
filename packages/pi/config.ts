@@ -1,13 +1,16 @@
 // pi/config — which model answers, and what its system prompt knows.
 //
-// A person's pi setup is loaded as pi loads it: `SettingsManager` and
-// `DefaultResourceLoader` over `~/.pi/agent`, then the extensions' provider
-// registrations applied to a `ModelRuntime`. Only providers: an extension's
-// tools, commands, handlers and UI hooks belong to pi's coding agent, and
-// pinetrie emits none of its events. A Claude subscription token, for one, works
-// only through the provider `pi-anthropic-auth` registers.
+// Everything is pine·trie's: the model the host's config settled, credentials
+// in its `auth.json`, custom providers in its `models.json`, and the skills,
+// prompts and packages its config lists. pi's code loads them, kept out of
+// pi's own directories: `planModelSetup` decides every option as a
+// value, and `openLoader` and `openRuntime` (`deep.ts`) carry it out. Only an
+// extension's provider registrations are applied: its tools, commands,
+// handlers and UI hooks belong to pi's coding agent, and pine·trie emits none
+// of its events. A Claude subscription works only through the provider
+// `pi-anthropic-auth` registers.
 
-import { homedir } from "node:os"
+import { stat } from "node:fs/promises"
 import path from "node:path"
 import {
   createImagesModels,
@@ -17,14 +20,15 @@ import {
   type ImagesModels,
 } from "@earendil-works/pi-ai"
 import { openrouterImagesProvider } from "@earendil-works/pi-ai/providers/openrouter-images"
-import type { GatheredCommand } from "@pinetrie/rules"
-import { gatherCommands, pinetrieCommands } from "./commands.ts"
+import { type ConfigLayer, isWithin, type NoModel } from "@pinetrie/core"
+import type { GatheredCommand, ModelRef } from "@pinetrie/rules"
+import type { AgentDirBinding } from "./agent-dir.ts"
+import { gatherCommands, type Listing, pinetrieCommands } from "./commands.ts"
 import {
   type buildSystemPrompt,
-  CONFIG_DIR_NAME,
-  DefaultResourceLoader,
-  ModelRuntime,
-  SettingsManager,
+  type LoaderOptions,
+  openLoader,
+  openRuntime,
 } from "./deep.ts"
 import {
   describeFauxOf,
@@ -34,16 +38,9 @@ import {
 } from "./scripted.ts"
 
 export type ModelChoice =
-  /**
-   * The person's pi setup: the default model in pi's settings, the project's
-   * file over the global one, and the extensions' providers.
-   */
-  | {
-      readonly kind: "configured"
-      readonly provider?: string
-      readonly model?: string
-    }
-  /** models.json and auth.json only; no extensions. For suites that call a real model. */
+  /** The model the host's config settled; null when nothing names one. */
+  | { readonly kind: "configured"; readonly model: ModelRef | null }
+  /** A model named outright, with no packages' providers. For suites that call a real model. */
   | {
       readonly kind: "named"
       readonly provider: string
@@ -52,83 +49,162 @@ export type ModelChoice =
   /** pi's faux provider, scripted by a suite. */
   | { readonly kind: "scripted"; readonly script: ScriptedModel }
 
-/** Where one field of a configured model came from. */
-export type FieldSource =
-  | { readonly kind: "override" }
-  | { readonly kind: "settings"; readonly file: string }
-
-/** Where the model a host runs came from. */
-export type ModelOrigin =
-  | {
-      readonly kind: "configured"
-      readonly provider: FieldSource
-      readonly model: FieldSource
-    }
-  | { readonly kind: "named" }
-  | { readonly kind: "scripted" }
-
-/** One of pi's settings files, and the default model it names. */
-export interface SettingsLayer {
-  readonly file: string
-  readonly provider?: string
-  readonly model?: string
+/** Where pine·trie keeps what pi's code reads. */
+export interface ModelPlaces {
+  /** pine·trie's config directory: `AGENTS.md`, `skills/`, `prompts/`, an extension's own config. */
+  readonly configDir: string
+  /** `auth.json`, written only by pine·trie's sign-in. */
+  readonly credentials: string
+  /** Custom providers, in pi's `models.json` format. */
+  readonly models: string
 }
+
+/** A folder of skills or prompts the config lists, and the layer that listed it. */
+export interface ListedFolder {
+  readonly path: string
+  readonly layer: ConfigLayer
+}
+
+/** What the host's config lists for pi's loader. */
+export interface ResourceLists {
+  /** pi packages, by folder: absolute. */
+  readonly packages: readonly string[]
+  readonly skills: readonly ListedFolder[]
+  readonly prompts: readonly ListedFolder[]
+}
+
+export const NO_RESOURCES: ResourceLists = {
+  packages: [],
+  skills: [],
+  prompts: [],
+}
+
+export type ModelState<M> =
+  | { readonly kind: "model"; readonly model: M }
+  | {
+      readonly kind: "none"
+      readonly why: NoModel
+      readonly named: ModelRef | null
+    }
 
 /**
- * The model to use, field by field: the override's, else the project
- * settings', else the global settings', as pi merges them. Undefined when no
- * source names a provider, or none names a model.
+ * Whether the named model answers: unset, not found, or found with no
+ * credential for its provider.
  */
-export function pickModel(
-  settings: { readonly global: SettingsLayer; readonly project: SettingsLayer },
-  override: { readonly provider?: string; readonly model?: string },
-):
-  | {
-      readonly provider: string
-      readonly model: string
-      readonly origin: ModelOrigin
-    }
-  | undefined {
-  const pick = (field: "provider" | "model") => {
-    const given = override[field]
-    if (given !== undefined)
-      return { value: given, from: { kind: "override" } as const }
-    const layer = [settings.project, settings.global].find(
-      l => l[field] !== undefined,
-    )
-    const value = layer?.[field]
-    return layer === undefined || value === undefined
-      ? undefined
-      : { value, from: { kind: "settings", file: layer.file } as const }
-  }
-  const provider = pick("provider")
-  const model = pick("model")
-  return provider === undefined || model === undefined
-    ? undefined
-    : {
-        provider: provider.value,
-        model: model.value,
-        origin: {
-          kind: "configured",
-          provider: provider.from,
-          model: model.from,
-        },
-      }
+export function modelState<M>(input: {
+  readonly named: ModelRef | null
+  readonly found: M | undefined
+  readonly credential: boolean
+}): ModelState<M> {
+  const { named, found, credential } = input
+  if (named === null) return { kind: "none", why: "unset", named }
+  if (found === undefined) return { kind: "none", why: "not-found", named }
+  if (!credential) return { kind: "none", why: "no-credential", named }
+  return { kind: "model", model: found }
 }
 
-export const DEFAULT_AGENT_DIR = path.join(homedir(), ".pi", "agent")
+/** What `planModelSetup` decides: every path pi's code is given. */
+export interface ModelSetupPlan {
+  readonly runtime: { readonly authPath: string; readonly modelsPath: string }
+  /** Null when there is nothing to load: no package, skill or prompt listed. */
+  readonly loader: LoaderOptions | null
+  readonly listing: Listing
+  /** Listed packages that are not folders: never given to pi, which would install them. */
+  readonly refused: readonly string[]
+}
 
-const openRuntime = (agentDir: string) =>
-  ModelRuntime.create({
-    authPath: path.join(agentDir, "auth.json"),
-    modelsPath: path.join(agentDir, "models.json"),
-  })
+/** A context file the model is given: pine·trie's own, or one inside the project. */
+export const isOwnContextFile = (
+  file: string,
+  project: string,
+  configDir: string,
+): boolean =>
+  path.dirname(file) === configDir || isWithin(path.dirname(file), project)
+
+/**
+ * Every path pi's code is given. A listed folder that does not exist is
+ * left out (a package is also refused, with its path), and `configDir`'s
+ * `skills/` and `prompts/` come after the listed ones, as the person's.
+ */
+export function planModelSetup(input: {
+  readonly places: ModelPlaces
+  readonly lists: ResourceLists
+  readonly project: string
+  /** pine·trie's own skills: after every other, so pi keeps a person's first. */
+  readonly pinetrieSkills: string
+  /** Whether `pinetrie.json`'s skills and prompts load at all: a suite's scripted model without lists loads nothing. */
+  readonly loads: boolean
+  readonly exists: (p: string) => boolean
+}): ModelSetupPlan {
+  const { places, lists, project, exists } = input
+  const own = (dir: string): ListedFolder[] => {
+    const p = path.join(places.configDir, dir)
+    return exists(p) ? [{ path: p, layer: "user" }] : []
+  }
+  const skills = [...lists.skills.filter(f => exists(f.path)), ...own("skills")]
+  const prompts = [
+    ...lists.prompts.filter(f => exists(f.path)),
+    ...own("prompts"),
+  ]
+  const packages = lists.packages.filter(exists)
+  const loads =
+    input.loads || packages.length + skills.length + prompts.length > 0
+  return {
+    runtime: { authPath: places.credentials, modelsPath: places.models },
+    loader: loads
+      ? {
+          cwd: project,
+          agentDir: places.configDir,
+          extensionPaths: packages,
+          skillPaths: [...skills.map(f => f.path), input.pinetrieSkills],
+          promptPaths: prompts.map(f => f.path),
+          keepContextFile: file =>
+            isOwnContextFile(file, project, places.configDir),
+        }
+      : null,
+    listing: { packages, loose: [...skills, ...prompts] },
+    refused: lists.packages.filter(p => !exists(p)),
+  }
+}
 
 type Runtime = Awaited<ReturnType<typeof openRuntime>>
+
+/**
+ * The listed packages' provider registrations, applied to `models`. Only
+ * providers: an extension's tools, commands, handlers and UI hooks belong to
+ * pi's coding agent, and pine·trie emits none of its events.
+ */
+export function registerProviders(
+  models: Runtime,
+  loader: Awaited<ReturnType<typeof openLoader>>,
+): void {
+  const { runtime } = loader.getExtensions()
+  for (const { name, config } of runtime.pendingProviderRegistrations)
+    models.registerProvider(name, config)
+  for (const { provider } of runtime.pendingNativeProviderRegistrations)
+    models.registerNativeProvider(provider)
+}
 type Models = Runtime | ReturnType<typeof createModels>
-type Model = NonNullable<ReturnType<Models["getModel"]>>
+export type Model = NonNullable<ReturnType<Models["getModel"]>>
 
 type PromptInput = Parameters<typeof buildSystemPrompt>[0]
+
+/**
+ * What a harness holds on a host with no model. Never asked: every run is
+ * refused before it reaches pi.
+ */
+export const NO_MODEL_STAND_IN = {
+  id: "none",
+  name: "none",
+  api: "openai-completions",
+  provider: "none",
+  baseUrl: "http://127.0.0.1:9",
+  reasoning: false,
+  input: ["text"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 1,
+  maxTokens: 1,
+} as Model
 
 /** Where banners are drawn: pi-ai's image registry, and a key for it. */
 export interface ImagesSetup {
@@ -169,7 +245,7 @@ export function imageModelFor(
   }
 }
 
-/** OpenRouter's image models, keyed as the person's pi keys OpenRouter. */
+/** OpenRouter's image models, keyed by pine·trie's credential for OpenRouter. */
 function openRouterImages(models: Runtime): ImagesSetup {
   const images = createImagesModels()
   images.setProvider(openrouterImagesProvider())
@@ -192,70 +268,102 @@ function openRouterImages(models: Runtime): ImagesSetup {
  */
 export interface ModelSetup {
   readonly models: Models
-  readonly model: Model
-  readonly origin: ModelOrigin
+  /** The run's model, or why there is none: every run is then refused. */
+  readonly model: ModelState<Model>
   /**
    * The model a commit message is asked of: the run's, except for a scripted
    * model, whose describe requests have a provider of their own so they never
-   * take a reply from the run's script.
+   * take a reply from the run's script. Null with no model.
    */
-  readonly describeModel: Model
+  readonly describeModel: Model | null
   /** Context files for the system prompt, such as the repo's `AGENTS.md`. */
   readonly contextFiles: PromptInput["contextFiles"]
   readonly skills: PromptInput["skills"]
   /** Every skill and prompt template pi loaded, as commands. */
   readonly commands: readonly GatheredCommand[]
   readonly images: ImagesSetup
+  /** Listed packages that are not folders, refused before pi saw them. */
+  readonly refusedPackages: readonly string[]
+  /** Each provider with a credential, and where pi found it; never the credential. */
+  readonly credentials: readonly {
+    readonly provider: string
+    readonly source: string
+  }[]
 }
+
+/**
+ * Each provider whose credential pi has, from its snapshot: no key is
+ * resolved and no key command runs.
+ */
+const credentialsIn = (models: Runtime): ModelSetup["credentials"] =>
+  models.getProviders().flatMap(p => {
+    const status = models.getProviderAuthStatus(p.id)
+    return status.configured
+      ? [{ provider: p.id, source: status.source ?? "configured" }]
+      : []
+  })
+
+const exists = (p: string) =>
+  stat(p).then(
+    () => true,
+    () => false,
+  )
 
 export async function loadModelSetup(
   choice: ModelChoice,
   where: {
     readonly cwd: string
-    /**
-     * pi's agent directory. A scripted or named model loads skills and
-     * prompts from it only when it is given: a suite points it at a fixture,
-     * and never reads the person's own.
-     */
-    readonly agentDir?: string
+    readonly places: ModelPlaces
+    /** pi's agent directory is pine·trie's for this process. */
+    readonly binding: AgentDirBinding
+    readonly lists: ResourceLists
     /**
      * pinetrie's own skills. pi keeps one skill per name for the model, and
      * these come after yours and the repo's; as commands, each is reachable
      * under its own package.
      */
-    readonly skillsDir?: string
+    readonly skillsDir: string
   },
 ): Promise<ModelSetup> {
-  const agentDir = where.agentDir ?? DEFAULT_AGENT_DIR
-  const load = async () => {
-    const settingsManager = SettingsManager.create(where.cwd, agentDir)
-    const loader = new DefaultResourceLoader({
-      cwd: where.cwd,
-      agentDir,
-      settingsManager,
-      ...(where.skillsDir === undefined
-        ? {}
-        : { additionalSkillPaths: [where.skillsDir] }),
-    })
-    await loader.reload()
-    const resources = {
-      contextFiles: loader.getAgentsFiles().agentsFiles,
-      skills: loader.getSkills().skills,
-      commands: await gatherCommands(
-        loader,
-        { cwd: where.cwd, agentDir },
-        where.skillsDir ?? "",
-      ),
-    }
-    return { settingsManager, loader, resources }
-  }
-  // Loading nothing of pi's still leaves pinetrie's own skills as commands.
-  const none = {
-    contextFiles: [],
-    skills: [],
-    commands:
-      where.skillsDir === undefined ? [] : pinetrieCommands(where.skillsDir),
-  }
+  // --- gather -------------------------------------------------------------
+  const listed = [
+    ...where.lists.packages,
+    ...where.lists.skills.map(f => f.path),
+    ...where.lists.prompts.map(f => f.path),
+    path.join(where.places.configDir, "skills"),
+    path.join(where.places.configDir, "prompts"),
+  ]
+  const found = new Set<string>()
+  for (const p of listed) if (await exists(p)) found.add(p)
+  // --- plan ---------------------------------------------------------------
+  const plan = planModelSetup({
+    places: where.places,
+    lists: where.lists,
+    project: where.cwd,
+    pinetrieSkills: where.skillsDir,
+    loads: choice.kind === "configured",
+    exists: p => found.has(p),
+  })
+  // --- execute ------------------------------------------------------------
+  const loader = plan.loader === null ? null : await openLoader(plan.loader)
+  const resources =
+    loader === null
+      ? {
+          contextFiles: [],
+          skills: [],
+          commands: pinetrieCommands(where.skillsDir),
+        }
+      : {
+          contextFiles: loader.getAgentsFiles().agentsFiles,
+          skills: loader.getSkills().skills,
+          commands: await gatherCommands(
+            loader,
+            { cwd: where.cwd, configDir: where.places.configDir },
+            plan.listing,
+            where.skillsDir,
+          ),
+        }
+  const refusedPackages = plan.refused
   switch (choice.kind) {
     case "scripted": {
       const faux = fauxOf(choice.script)
@@ -263,102 +371,76 @@ export async function loadModelSetup(
       const models = createModels()
       models.setProvider(faux.provider)
       models.setProvider(describe.provider)
-      const resources =
-        where.agentDir === undefined ? none : (await load()).resources
       const drawn = scriptedImages()
       const images = createImagesModels()
       images.setProvider(drawn.provider)
       return {
         models,
-        model: faux.getModel(),
-        origin: { kind: "scripted" },
+        model: { kind: "model", model: faux.getModel() },
         describeModel: describe.getModel(),
         images: {
           models: images,
           model: () => drawn.model,
           apiKey: async () => "scripted",
         },
+        refusedPackages,
+        credentials: [],
         ...resources,
       }
     }
     case "named": {
-      const models = await openRuntime(agentDir)
-      const resources =
-        where.agentDir === undefined ? none : (await load()).resources
-      const model = found(models, choice)
+      const models = await openRuntime(plan.runtime)
+      const model = models.getModel(choice.provider, choice.model)
+      if (model === undefined)
+        throw new Error(`model not found: ${choice.provider}/${choice.model}`)
       return {
         models,
-        model,
-        origin: { kind: "named" },
+        model: { kind: "model", model },
         describeModel: model,
         images: openRouterImages(models),
+        refusedPackages,
+        credentials: credentialsIn(models),
         ...resources,
       }
     }
     case "configured": {
-      const { settingsManager, loader, resources } = await load()
-      const models = await openRuntime(agentDir)
-      const { runtime } = loader.getExtensions()
-      for (const { name, config } of runtime.pendingProviderRegistrations)
-        models.registerProvider(name, config)
-      for (const { provider } of runtime.pendingNativeProviderRegistrations)
-        models.registerNativeProvider(provider)
-      const global = settingsManager.getGlobalSettings()
-      const project = settingsManager.getProjectSettings()
-      // The files `SettingsManager.create` reads.
-      const picked = pickModel(
-        {
-          global: {
-            file: path.join(agentDir, "settings.json"),
-            provider: global.defaultProvider,
-            model: global.defaultModel,
-          },
-          project: {
-            file: path.join(where.cwd, CONFIG_DIR_NAME, "settings.json"),
-            provider: project.defaultProvider,
-            model: project.defaultModel,
-          },
-        },
-        choice,
-      )
-      if (picked === undefined)
-        throw new Error(
-          "no model: set defaultProvider and defaultModel in pi's settings, or PINETRIE_PROVIDER and PINETRIE_MODEL",
-        )
-      const model = found(models, picked)
+      const models = await openRuntime(plan.runtime)
+      if (loader !== null) registerProviders(models, loader)
+      const named = choice.model
+      const state = modelState({
+        named,
+        found:
+          named === null
+            ? undefined
+            : models.getModel(named.provider, named.model),
+        credential:
+          named !== null &&
+          models.getProviderAuthStatus(named.provider).configured,
+      })
       return {
         models,
-        model,
-        origin: picked.origin,
-        describeModel: model,
+        model: state,
+        describeModel: state.kind === "model" ? state.model : null,
         images: openRouterImages(models),
+        refusedPackages,
+        credentials: credentialsIn(models),
         ...resources,
       }
     }
   }
 }
 
-function found(
-  models: Runtime,
-  named: { readonly provider: string; readonly model: string },
-): Model {
-  const model = models.getModel(named.provider, named.model)
-  if (model === undefined)
-    throw new Error(`model not found: ${named.provider}/${named.model}`)
-  return model
-}
-
 /**
- * The model a root's title is asked of: `named`, unless it is
- * null, the model is scripted (whose describe provider answers every request
- * outside a thread), or pi has no such model. `found` is false only for
- * the last, which the host logs.
+ * The model a root's title is asked of: `named`, unless it is null, the
+ * model is scripted (whose describe provider answers every request outside a
+ * thread), or pi has no such model. `found` is false only for the last,
+ * which the host logs. Null with no model at all.
  */
-export function titleModelOf(
+export function titleModel(
   setup: Pick<ModelSetup, "models" | "describeModel">,
   named: { readonly provider: string; readonly model: string } | null,
   scripted: boolean,
-): { readonly model: Model; readonly found: boolean } {
+): { readonly model: Model | null; readonly found: boolean } {
   if (named === null || scripted)
     return { model: setup.describeModel, found: true }
   const model = setup.models.getModel(named.provider, named.model)
@@ -384,9 +466,11 @@ export interface Completed {
  */
 export async function complete(
   setup: Pick<ModelSetup, "models">,
-  model: Model,
+  model: Model | null,
   request: { readonly system: string; readonly user: string },
 ): Promise<Completed> {
+  // With no model there is nothing to ask: as a request that failed.
+  if (model === null) return { text: null, tokens: 0 }
   try {
     const reply = await setup.models.completeSimple(model, {
       systemPrompt: request.system,

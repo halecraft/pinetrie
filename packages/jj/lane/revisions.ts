@@ -11,15 +11,12 @@ import {
   type CopyFacts,
   commitId,
   type EntryId,
-  PROJECT_CONFIG_FILE,
   revisionMessage,
   type ThreadId,
 } from "@pinetrie/core"
 import {
-  decodeLaneConfig,
   describeFailure,
   LANE_CONFIG_DIR,
-  type LaneAuthority,
   lines,
   OLD_LANE_CONFIG_DIR,
   type Runner,
@@ -312,30 +309,4 @@ export async function fileText(
     `root:${JSON.stringify(path)}`,
   ])
   return shown.ok ? shown.stdout : null
-}
-
-/**
- * `pinetrie.json`'s grants and shared directories at `rev` of the repo `jj`
- * reads; none when it has no such file. One that is not JSON grants nothing
- * too, and `broken` says why.
- */
-export async function readAuthority(
-  jj: Runner,
-  rev: string,
-  root: string,
-): Promise<{
-  readonly authority: LaneAuthority
-  readonly broken: string | null
-}> {
-  const text = await fileText(jj, rev, PROJECT_CONFIG_FILE)
-  let json: unknown = null
-  let broken: string | null = null
-  if (text !== null)
-    try {
-      json = JSON.parse(text)
-    } catch (error) {
-      broken = String(error)
-    }
-  const { grants, shared } = decodeLaneConfig(json, root)
-  return { authority: { grants, shared }, broken }
 }

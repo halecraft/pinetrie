@@ -77,7 +77,7 @@ describe.skipIf(process.platform === "darwin")(
     const find = (dir: string) =>
       findProject({
         root: dir,
-        machine: { slots: null },
+        slots: 16,
         hostSocket: path.join(dir, ".no-ssh.sock"),
         log: () => {},
       })
@@ -100,7 +100,7 @@ describe.skipIf(process.platform === "darwin")(
       expect(
         await findProject({
           root: null,
-          machine: { slots: null },
+          slots: 16,
           hostSocket: "/no-ssh.sock",
           log: () => {},
         }),

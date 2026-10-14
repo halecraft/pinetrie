@@ -58,6 +58,7 @@ import {
   queueWords,
   type Reader,
   type ReadOnly,
+  SEE_SETUP,
   type Selection,
   sendable,
   sendButton,
@@ -159,6 +160,8 @@ export function CardEditor(p: {
   unstarted: boolean
   /** The commands the host's pi loaded, for completion. */
   commands: readonly CommandSummary[]
+  /** Why the host has no model (`noModelLine`); null when it has one. */
+  noModel: string | null
   /** Everyone who can be mentioned, as shown. */
   participants: readonly string[]
   /** Other threads' agents a mention may reach. */
@@ -235,6 +238,7 @@ export function CardEditor(p: {
     agents: p.agents,
     reader: p.reader,
     command,
+    noModel: p.noModel,
   })
   const button = sendButton(plan, {
     uploading: uploading > 0,
@@ -544,6 +548,11 @@ export function CardEditor(p: {
                 >
                   {button.label}
                 </button>
+                {button.setup && (
+                  <a className="composer-setup" href="#setup">
+                    {SEE_SETUP}
+                  </a>
+                )}
               </div>
             )}
             <span className="status">{status}</span>

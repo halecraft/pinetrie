@@ -86,9 +86,9 @@ the helper, S122 to S131 for Docker and the lane VM.
   lane.
 - `run.ts`: commands as `Runner`s, on the host or in a lane.
 - `history-port.ts`: the ports a kind of project implements (The ports).
-- `host.ts`: what the host reads of its own machine at startup: config
-  files (`readConfigFile`, `userConfigFile`) and the links under your
-  working copy's `node_modules` (`gatherLinks`). Your repo's startup reads
+- `host.ts`: what the host reads of its own machine at startup: the links
+  under your working copy's `node_modules` (`gatherLinks`). Config files are
+  `@pinetrie/config`'s. Your repo's startup reads
   and writes are `@pinetrie/jj`'s (`startup.ts`).
 - `planProjectDir` (`plan.ts`) decides a project's root and its kind from
   `RootFacts`: a jj workspace is `jj`, any other folder (a git repo
@@ -284,19 +284,18 @@ the helper, S122 to S131 for Docker and the lane VM.
   files and rewrites show at once. A lane made before a directory it reads
   read-only was widened to read-write reads it so, with the same lag,
   until its next start.
-- **Two levels, merged:** the user's lane config
-  (`$XDG_CONFIG_HOME/pinetrie/config.json`, only its `lanes.shared`), then the
-  project's `pinetrie.json` as accepted work holds it, narrowed per lane
-  (A lane's config, below). `planShared` refuses:
+- **One settled list** (ADR-0146): `lanes.shared` joins your file's
+  entries, the project's `pinetrie.json` as accepted work holds it (narrowed
+  per lane, A lane's config, below) and your file for the project, in that
+  order, each once. `planShared` takes that list and refuses:
   - absolute paths, and paths that leave the project;
   - anything in `.git`, `.jj`, `.pinetrie` or `node_modules`;
   - a path holding files the project tracks. jj's adapter gathers it
     (`@pinetrie/jj`'s `prepareShared`, with `jj file list`).
 
   Each refusal is logged with its reason, and the rest still apply.
-  Both files are read with `readConfigFile`: a missing file is empty, and
-  so is one that cannot be read or parsed (`broken`), which the host logs
-  with its reason.
+  A config file that cannot be read or parsed is refused whole, and the
+  host says why (`@pinetrie/config`).
 - **A lane's config is a fact of a state (ADR-0135).** `lanes` in
   `pinetrie.json` decides what a lane may do (`LaneAuthority`: its grants
   and shared directories). A lane runs with accepted work's, less what its
@@ -343,7 +342,7 @@ the helper, S122 to S131 for Docker and the lane VM.
   (`@pinetrie/ssh`, `apps/pinetrie/host/work/ssh.ts`); this package never
   imports it.
 - **`LaneGrants.ssh` is only a grant:** the project lets lanes ask for their
-  owner's ssh identity (`lanes.ssh: true`). It rides the grants' model
+  owner's ssh identity (`lanes.ssh.personal: true`). It rides the grants' model
   (`effectiveLaneConfig`): a lane can give it up, and only acceptance
   widens it. What it means is the host's.
 - **`pinetrieDir`'s `laneSsh` and `sshSecret`** are the files every lane
@@ -378,9 +377,12 @@ the helper, S122 to S131 for Docker and the lane VM.
 - **Granted host paths** (`planHostMounts`) are the roots of the commands pi
   loaded, read-only at `/mnt/host` and their host path (`hostPathInLane`), so
   none can shadow a directory of the image's (S46). Nested roots collapse. A
-  root that is, or holds, your home directory, `/` or pi's agent directory
-  (`auth.json`) is refused. A package inside the agent directory is
-  allowed: it lies inside, and does not hold it.
+  root that is, or holds, your home directory, `/` or one of pine·trie's own
+  directories (`own`: the config and data directories, which hold
+  credentials, service keys and sessions) is refused. A folder inside one,
+  such as a skill folder in the config directory, is allowed: it lies
+  inside, and does not hold it. A project's own skills are not a host path:
+  a lane reads them in its own copy.
 - **A change to them recreates lanes:** they are in the container's spec,
   and so in its hash.
 

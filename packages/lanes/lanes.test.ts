@@ -1,10 +1,6 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import path from "node:path"
 import { type RunSource, snapshotId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { execute } from "./execute.ts"
-import { readConfigFile } from "./host.ts"
 import { HELPER, helperCommand, laneHandle } from "./lane.ts"
 import type { Step } from "./plan.ts"
 import type { Ran, Runner } from "./run.ts"
@@ -93,31 +89,6 @@ test("helperCommand: the runtime's exec of the helper on the lane runtime's Node
     "pinetrie-t-1",
     ...runtimeNode(HELPER),
   ])
-})
-
-test("readConfigFile: a file read, a missing one, and one that cannot be read or parsed", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "pinetrie-config-"))
-  try {
-    const at = (name: string) => path.join(dir, name)
-    await writeFile(at("good.json"), '{ "digests": { "enabled": false } }')
-    await writeFile(at("bad.json"), "{ bad")
-    await mkdir(at("folder.json"))
-    expect(await readConfigFile(at("good.json"))).toEqual({
-      kind: "read",
-      json: { digests: { enabled: false } },
-    })
-    expect(await readConfigFile(at("none.json"))).toEqual({ kind: "missing" })
-    expect(await readConfigFile(at("bad.json"))).toEqual({
-      kind: "broken",
-      reason: expect.stringContaining("JSON"),
-    })
-    expect(await readConfigFile(at("folder.json"))).toEqual({
-      kind: "broken",
-      reason: expect.stringContaining("EISDIR"),
-    })
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
 })
 
 describe("laneHandle.start", () => {

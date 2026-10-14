@@ -16,7 +16,7 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
 
 | module | holds |
 |---|---|
-| `settings.ts` | `lanes.ssh` from the user config and the project's, decided together (`decodeSshSettings`), and what the host adds (`settingsOnHost`) |
+| `settings.ts` | `lanes.ssh` as the host's config settled it, decided (`sshSettings`); host patterns as written (`parseHostPatterns`); and what the host adds (`settingsOnHost`) |
 | `patterns.ts` | ssh's host patterns (`isHostAllowed`), as OpenSSH's `match_pattern_list` |
 | `names.ts` | what a lane hands the host, branded once checked: `SshName`, `SshPort`, `LaneToken` |
 | `hop-line.ts` | the first line of a hop's connection, decoded only through a token that checks |
@@ -34,12 +34,15 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
 
 ## Rules
 
-- **Personal identity:** the project grants it (`lanes.ssh: true`), or the
-  user config does (`lanes.ssh: true`, or `lanes.ssh.personal: true`). The
-  keys are the person's, so only the user config declines it (`false` for
-  either, whatever the project grants), narrows it (`hosts`) or sets the
-  wait (`approvalSeconds`, 10 to 600, else 120 and a refusal). Malformed
-  `hosts` turn it off rather than widening it to every host.
+- **Personal identity:** `lanes.ssh.personal`, one shape in every layer.
+  The host's table settles it (ADR-0146): the project grants it, and your
+  own file or your file for the project grants or declines it, after the
+  project's, so your choice wins; a system file's `false` forbids it. This
+  package takes the settled value and who decided it (`PersonalChoice`): a
+  person's grant reaches every lane, a project's only the lanes that keep
+  it. Your files alone narrow it (`hosts`) or set the wait
+  (`approvalSeconds`, 10 to 600, else 120 and a refusal). Refused `hosts`
+  turn it off rather than widening it to every host.
 - **A token carries its lane:** `<lane, base64url>.<HMAC-SHA256, hex>`. The
   host keeps no table of tokens: `tokenLane` reads the lane back and
   compares the MAC in constant time. A lane is only ever known through a

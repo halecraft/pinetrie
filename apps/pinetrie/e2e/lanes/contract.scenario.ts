@@ -144,7 +144,7 @@ async function dockerContract(
     logs.push(l)
     if (process.env.PINETRIE_E2E_LOG === "1") console.log(l)
   }
-  const machine = { slots: null } as const
+  const slots = 16
   const projA = committedProject("pinetrie-contract-a-", { "README.md": "a\n" })
   const projB = committedProject("pinetrie-contract-b-", { "README.md": "b\n" })
   mkdirSync(path.join(projA, ".plans"))
@@ -156,7 +156,7 @@ async function dockerContract(
   ownForInnerLanes(path.join(projA, ".plans"))
   const a = await findProject({
     root: projA,
-    machine,
+    slots,
     // No lane here holds an ssh identity: nothing listens there.
     hostSocket: path.join(projA, ".no-ssh.sock"),
     log,
@@ -465,7 +465,7 @@ async function dockerContract(
     ] as const
     const b = await findProject({
       root: projB,
-      machine,
+      slots,
       hostSocket: path.join(projB, ".no-ssh.sock"),
       log,
     })
