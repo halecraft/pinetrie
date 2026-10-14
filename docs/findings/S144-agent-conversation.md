@@ -1,7 +1,7 @@
 # S144 — One agent can read another thread at each request, but what it reads should be copied into its own thread; a token budget can stop a run before its next request; lanes run at once and an ask need not wait
 
 - **Status:** Answered
-- **Led to:** ADR-0128
+- **Led to:** ADR-0128, ADR-0144
 
 **Question.** Before deciding how agents in different threads talk
 (ADR-0128), what does pi do for each part of it?

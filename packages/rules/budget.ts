@@ -69,6 +69,34 @@ export const newBudget = (input: {
   readonly limit: number
 }): ValueWrite => setRecord(BUDGET, { ...input, spent: 0, over: false })
 
+/** One model request's tokens, as the provider reported them. */
+export interface RequestTokens {
+  /** What the request sent: input, cached or not. */
+  readonly context: number
+  /** What the model wrote, thinking included. */
+  readonly output: number
+}
+
+/**
+ * The tokens a run's request adds to the talk: its output, and the context
+ * new since the run's previous request (tool results, a steered message).
+ * Context a request only re-reads is not counted: every request re-reads
+ * its lane's whole thread, so counting that spent a budget on a thread's
+ * size before an asked agent could answer. A run's first request adds its
+ * output alone: its prompt is an ask or an answer, already counted as the
+ * output of the agent that wrote it. A compaction shrinks the context, and
+ * adds nothing.
+ */
+export function addedTokens(
+  previous: RequestTokens | null,
+  now: RequestTokens,
+): number {
+  if (previous === null) return now.output
+  return (
+    now.output + Math.max(0, now.context - previous.context - previous.output)
+  )
+}
+
 /** What one spend does: the new count, and the record to write when it went over. */
 export interface Spend {
   readonly spent: number

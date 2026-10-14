@@ -836,8 +836,9 @@ conformance stayed green, which is why they ran first.
   runs (S85); adding them changed every lane's prefix once.
 - **`AGENTS_RULE`** (`@pinetrie/rules`) is in every thread's `<rules>`,
   after the context rules.
-- **`onUsage`** is pi's `usage` event, per request and per lane: its
-  `totalTokens`, input, output and cache alike.
+- **`onUsage`** is pi's `usage` event, per request and per lane, as a
+  `RequestTokens`: its context (input, cache reads and cache writes) and
+  its output. What a budget spends of it is the host's (`addedTokens`).
 - **`mayRequest`** is asked in a `before_request` hook; false aborts the
   run before the request is sent. The hook awaits the held lane, which
   resolves at once, and does not await the abort: the hook runs inside the

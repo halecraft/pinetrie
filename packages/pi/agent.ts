@@ -26,6 +26,7 @@ import {
   type BannerAnswer,
   type BannerAsk,
   chatImageShas,
+  type RequestTokens,
   withChatImages,
 } from "@pinetrie/rules"
 import { type RootDocHandle, readLaneTip } from "@pinetrie/schema"
@@ -103,10 +104,10 @@ export interface CreateAgentOptions {
    */
   readonly onPrefixChange?: (lane: ThreadId) => void
   /**
-   * Each model request's tokens, pi's `totalTokens`, per lane: what a budget
-   * for agents talking spends.
+   * Each model request's tokens, per lane: what a budget for agents talking
+   * spends from (`addedTokens`).
    */
-  readonly onUsage?: (lane: ThreadId, tokens: number) => void
+  readonly onUsage?: (lane: ThreadId, tokens: RequestTokens) => void
   /**
    * Asked before each model request of a lane's run; false aborts the run
    * before the request is sent, so a spent budget overruns by at most the
@@ -265,8 +266,12 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       onUsage === undefined
         ? () => undefined
         : harness.events.on("usage", event => {
-            if (isThreadId(event.lane))
-              onUsage(event.lane, event.row.usage.totalTokens)
+            if (!isThreadId(event.lane)) return
+            const { input, cacheRead, cacheWrite, output } = event.row.usage
+            onUsage(event.lane, {
+              context: input + cacheRead + cacheWrite,
+              output,
+            })
           })
     // A compaction keeps the context the model last read in view: the
     // newest entry of each kind summarised is carried into pi's

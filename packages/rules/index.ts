@@ -125,6 +125,7 @@ export {
   type WorkflowPlan,
 } from "./board.ts"
 export {
+  addedTokens,
   BUDGET,
   type BudgetRecord,
   DEFAULT_BUDGET,
@@ -132,6 +133,7 @@ export {
   mayRequest,
   newBudget,
   planSpend,
+  type RequestTokens,
   type Spend,
 } from "./budget.ts"
 export {

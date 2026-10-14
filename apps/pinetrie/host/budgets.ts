@@ -1,8 +1,10 @@
 // host/budgets — what agents talking spend. The budget a run spends is read
 // from its prompt, never kept beside it: a relay's or an answer's names it, and
 // a person's message is its own. A run spends from it only when an agent
-// started it: an agent's ask, or an answer that woke its asker. Its count is
-// kept here while runs go on, and written to the budget's record when it
+// started it: an agent's ask, or an answer that woke its asker. A request
+// spends what it adds to the talk (`addedTokens`), so each spending run's last
+// request is kept here, in memory, until its end: a run resumed after a
+// restart counts its first request's output alone. Its count is kept here while runs go on, and written to the budget's record when it
 // crosses the limit and at each run's end, so a session write is not made for
 // every model request.
 
@@ -22,6 +24,7 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
+  addedTokens,
   BUDGET,
   type BudgetRecord,
   decodeAnswer,
@@ -33,6 +36,7 @@ import {
   planSpend,
   planStop,
   promptAuthor,
+  type RequestTokens,
   setRecord,
 } from "@pinetrie/rules"
 import type { Basics, HostKeeper } from "./basics.ts"
@@ -78,8 +82,8 @@ export interface Budgets {
   ): Promise<BudgetRecord>
   /** Whether `key`'s budget is spent. */
   spent(key: EntryId): boolean
-  /** A model request of `lane`'s run spent `tokens` (pi's usage). */
-  onUsage(lane: ThreadId, tokens: number): void
+  /** A model request of `lane`'s run was answered, with `tokens`. */
+  onUsage(lane: ThreadId, tokens: RequestTokens): void
   /** A request outside the thread for `prompt`'s run spent `tokens`: its verdict or digest. */
   spendFor(prompt: EntryId, tokens: number): void
   /** A request agents talking made outside every run spent `tokens` from `key`: the round's. */
@@ -108,21 +112,29 @@ export function createBudgets(deps: {
   // Each run's budget, by its prompt, once seen: its end and its requests
   // outside the thread find it here.
   const byPrompt = new Map<EntryId, RunBudget>()
+  // Each spending run's last request, by its prompt; dropped at its end.
+  const lastRequest = new Map<EntryId, RequestTokens>()
 
   const record = (key: EntryId): BudgetRecord | undefined =>
     readRecords(session, BUDGET).get(key)
   const countOf = (r: BudgetRecord): number => counts.get(r.message) ?? r.spent
 
-  function runBudget(lane: ThreadId): RunBudget | null {
+  /** `lane`'s run: its prompt, and the budget it names. */
+  function runOf(
+    lane: ThreadId,
+  ): { readonly prompt: EntryId; readonly budget: RunBudget } | null {
     const doc = docs.docOfLane(lane)
     const prompt = doc === null ? null : readPromptMessage(doc, lane)
     if (prompt === null) return null
     const known = byPrompt.get(prompt.id)
-    if (known !== undefined) return known
+    if (known !== undefined) return { prompt: prompt.id, budget: known }
     const budget = promptBudget(prompt.id, prompt.message)
     byPrompt.set(prompt.id, budget)
-    return budget
+    return { prompt: prompt.id, budget }
   }
+
+  const runBudget = (lane: ThreadId): RunBudget | null =>
+    runOf(lane)?.budget ?? null
 
   /** The record crossed its limit: written, and its thread told. */
   function wentOver(over: BudgetRecord): void {
@@ -210,8 +222,11 @@ export function createBudgets(deps: {
     },
     spent: key => record(key)?.over === true,
     onUsage(lane, tokens) {
-      const budget = runBudget(lane)
-      if (budget !== null) spend(budget, tokens)
+      const run = runOf(lane)
+      if (run === null || !run.budget.spends) return
+      const previous = lastRequest.get(run.prompt) ?? null
+      lastRequest.set(run.prompt, tokens)
+      spend(run.budget, addedTokens(previous, tokens))
     },
     spendFor(prompt, tokens) {
       const budget = byPrompt.get(prompt)
@@ -231,6 +246,7 @@ export function createBudgets(deps: {
       return false
     },
     async runEnded(prompt) {
+      if (prompt !== null) lastRequest.delete(prompt)
       const budget = prompt === null ? null : byPrompt.get(prompt)
       if (budget === null || budget === undefined || !budget.spends) return
       const r = record(budget.key)

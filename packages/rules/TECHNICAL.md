@@ -1868,8 +1868,11 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
   nobody moves it, but it may be reordered. The drain carries it as a relay
   (`planCarry`).
 - **A budget** (`BUDGET`, keyed by the person's message that set it) holds
-  its limit, its count as of the last write, and `over`. `planSpend`
-  counts, and returns the record to write only when a spend crosses the
+  its limit, its count as of the last write, and `over`. A run's request
+  spends what it adds to the talk (`addedTokens`): its output, and the
+  context new since the run's previous request; never the context it
+  re-reads, which is the whole thread at every request (ADR-0144).
+  `planSpend` counts, and returns the record to write only when a spend crosses the
   limit, or at a run's end, so a session write is not made for every model
   request: the host counts what runs spend live (`budgets.ts`). `mayRequest`
   reads it. The user config's

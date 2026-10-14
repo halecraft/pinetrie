@@ -28,6 +28,7 @@ import {
   encodeRelayMessage,
   LANE,
   PINNED_TYPE,
+  type RequestTokens,
   recordsIn,
   setRecord,
 } from "@pinetrie/rules"
@@ -487,7 +488,7 @@ describe("agents talking", () => {
 
   test("each request's tokens are told, by lane", async () => {
     const script = scriptedModel({ answer: { text: "ok" } })
-    const told: [string, number][] = []
+    const told: [string, RequestTokens][] = []
     const { agent, lane } = await laneOver(script, {
       onUsage: (l, tokens) => told.push([l, tokens]),
     })
@@ -495,7 +496,8 @@ describe("agents talking", () => {
     await agent.close()
     expect(told.length).toBe(1)
     expect(told[0]?.[0]).toBe(lane)
-    expect(told[0]?.[1]).toBeGreaterThan(0)
+    expect(told[0]?.[1].context).toBeGreaterThan(0)
+    expect(told[0]?.[1].output).toBeGreaterThan(0)
   })
 
   test("a spent budget stops the run before its request is sent", async () => {

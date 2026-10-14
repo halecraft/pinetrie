@@ -865,7 +865,10 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   relay's or an answer's names it, a person's message is its own, and only
   a run an agent started spends. Its count is kept in memory and written
   when it crosses the limit (with a `budget-spent` fact in the thread that
-  set it) and at a run's end. `mayRequest`, pi's gate, queues the stop's
+  set it) and at a run's end. A request spends what it adds
+  (`addedTokens`), measured against the run's last request, kept in
+  memory by its prompt until the run ends, so a run resumed after a
+  restart counts only its first request's output. `mayRequest`, pi's gate, queues the stop's
   fact itself, synchronously, while the lane still runs, so the run's end
   appends it.
 - **Stop reaches the runs a thread asked for** (`handleStop`): every
