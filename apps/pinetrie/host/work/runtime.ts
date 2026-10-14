@@ -20,6 +20,7 @@ import {
 } from "@pinetrie/docker"
 import { planObserver } from "@pinetrie/lanehost"
 import {
+  createQueue,
   type LaneRuntime,
   type Mount,
   machineConfig,
@@ -325,11 +326,13 @@ async function hostDockerFound(
   })
   log(`[host] lanes run on Docker, their disks in ${lanesDir}`)
   let shares = NO_SHARES
-  const shareAndGrant = oneAtATime(async (wanted: Wanted) => {
-    const plan = planShareAndGrant(shares, wanted, null, false)
-    if (plan.words.length > 0) shares = { ...shares, toldLinuxPorts: true }
-    for (const w of plan.words) log(`[host] ${sharesWords(w)}`)
-  })
+  const queue = createQueue()
+  const shareAndGrant = (wanted: Wanted) =>
+    queue.enqueue(async () => {
+      const plan = planShareAndGrant(shares, wanted, null, false)
+      if (plan.words.length > 0) shares = { ...shares, toldLinuxPorts: true }
+      for (const w of plan.words) log(`[host] ${sharesWords(w)}`)
+    })
   return {
     kind: "found",
     project,
@@ -341,16 +344,6 @@ async function hostDockerFound(
     },
     shareAndGrant,
     close: async () => {},
-  }
-}
-
-/** `run`, one call at a time, each after the last settles. */
-function oneAtATime<A>(run: (a: A) => Promise<void>): (a: A) => Promise<void> {
-  let last: Promise<void> = Promise.resolve()
-  return a => {
-    const next = last.then(() => run(a))
-    last = next.catch(() => {})
-    return next
   }
 }
 
@@ -433,7 +426,7 @@ async function vmFound(
   ): Promise<Fill | { readonly why: string }> {
     let extra: Lease | null = null
     try {
-      extra = await leaseExtra({ stateDir, host: current, log })
+      extra = await leaseExtra({ stateDir, log })
       await sweep(extra.slot)
       const fill = await extra.fill(dirs)
       extras = [...extras, extra]
@@ -444,7 +437,8 @@ async function vmFound(
     }
   }
 
-  const shareAndGrant = oneAtATime(async (wanted: Wanted) => {
+  /** Shares and grants `wanted`; only ever run in `queue`. */
+  async function shareNow(wanted: Wanted): Promise<void> {
     given = wanted
     const plan = planShareAndGrant(shares, wanted, ownPort, true)
     if (plan.fill?.into === "host") {
@@ -476,7 +470,14 @@ async function vmFound(
           `[host] lanes may reach these ports of your Mac's loopback, at ${GVPROXY_HOST_ADDRESS}: ${plan.grant.join(", ")}`,
         )
     }
-  })
+  }
+  // One task at a time, a new lease's reset among them: a share still
+  // running when the VM stopped writes its result before the reset drops
+  // it, never into the new lease's state, whose host slot would then stay
+  // unfilled.
+  const queue = createQueue()
+  const shareAndGrant = (wanted: Wanted) =>
+    queue.enqueue(() => shareNow(wanted))
 
   const kept = keepLease({
     first,
@@ -484,16 +485,17 @@ async function vmFound(
     // A new VM: its slot swept, and everything given shared and granted
     // again, as on the first lease. Each lane is made again at its next
     // start.
-    async settle(next) {
-      current = next
-      const old = extras
-      extras = []
-      shares = NO_SHARES
-      runtime.vmRestarted()
-      for (const e of old) await e.close().catch(() => {})
-      await sweep(next.slot)
-      if (given !== null) await shareAndGrant(given)
-    },
+    settle: next =>
+      queue.enqueue(async () => {
+        current = next
+        const old = extras
+        extras = []
+        shares = NO_SHARES
+        runtime.vmRestarted()
+        for (const e of old) await e.close().catch(() => {})
+        await sweep(next.slot)
+        if (given !== null) await shareNow(given)
+      }),
     log,
   })
   return {

@@ -40,7 +40,6 @@ export {
   planVm,
   planVmVersion,
   planWidening,
-  SHARES_ROOT,
   type ShareDir,
   sharePaths,
   slotRoot,

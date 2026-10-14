@@ -425,18 +425,6 @@ export function dockerWords(r: DockerRefusal): string {
   }
 }
 
-/**
- * The machine's observer, by the state of a container of its name: running,
- * join it; missing, make it; there but not running, remove it and make it.
- * A container created and never started (its host stopped between the
- * create and the start) stays under its name, removal on exit
- * notwithstanding, and refuses every later run of that name as a conflict.
- */
-export const planObserverContainer = (
-  state: "running" | "stopped" | "missing",
-): "join" | "make" | "replace" =>
-  state === "running" ? "join" : state === "missing" ? "make" : "replace"
-
 /** A container as `docker ps` lists it: its name, labels and bind sources. */
 export interface Listed {
   readonly name: string

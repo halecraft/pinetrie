@@ -162,23 +162,16 @@ export async function leaseVm(input: LeaseInput): Promise<Lease> {
 }
 
 /**
- * One more slot of the VM `host` holds a lease on, for directories its slot
- * lacks. Never starts, builds or retires a VM: with `host`'s lease held, the
- * launcher refuses to retire the VM, so this joins the same one. It bridges
- * no ssh socket; lanes keep the host slot's.
+ * One more slot of the running VM, for directories a host's slot lacks.
+ * Never starts, builds or retires a VM: while the host's own lease is held,
+ * the launcher refuses to retire the VM, so this joins the same one; a
+ * caller whose lease ended drops what this gives it. It bridges no ssh
+ * socket; lanes keep the host slot's.
  */
 export async function leaseExtra(input: {
   readonly stateDir: string
-  readonly host: { readonly ended: Promise<void> }
   readonly log: (line: string) => void
 }): Promise<Lease> {
-  let ended = false
-  void input.host.ended.then(() => {
-    ended = true
-  })
-  // Lets the `then` above run if the host's lease has ended already.
-  await Promise.resolve()
-  if (ended) throw new Error("this host's lease on the lane VM has ended")
   const socket = await connect(path.join(input.stateDir, "control.sock"))
   if (socket === null) throw new Error("the lane VM's launcher is gone")
   return leaseOn(socket, { agent: null, log: input.log })

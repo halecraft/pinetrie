@@ -212,13 +212,13 @@ measured. Its checks:
   cgroups), a read-only root with a tmpfs at
   `/run`, no network, removed when it exits (`ContainerSpec.machine`). A
   test checks its body exactly (`api.test.ts`).
-- **Made or joined by name** (`openObserver`, `runtime.ts`): a failed
-  `docker run` is fine when the container now runs, another host having
-  made it. One of its name that is there but not running is removed first
-  (`planObserverContainer`): a create whose start never came (its host
-  stopped between the two calls) leaves the container created, which
-  removal on exit never takes, and every later run of the name failed as a
-  conflict until it was removed by hand. A start that fails does not: Docker
+- **Made or joined by name, as a lane's container is** (`openObserver`,
+  through `ensureContainer`, `runtime.ts`): every host of a version
+  renders the same spec, so each joins the one running, and a failed
+  `docker run` is fine when another host made it with that spec. One
+  created and never started (its host stopped between the create and the
+  start) is started: removal on exit never takes it, and a create of its
+  name would fail as a conflict. A start that fails leaves nothing: Docker
   removes the container then (measured with Docker 29.8). Each host's
   channel is a `docker exec -i` of its connect script.
   A new lease closes the channel; the next lane's start opens it again and

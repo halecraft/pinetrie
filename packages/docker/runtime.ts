@@ -65,7 +65,6 @@ import {
   observerContainer,
   observerImage,
   PROJECT_LABEL,
-  planObserverContainer,
   planProjectSweep,
   planSlotSweep,
   projectKey,
@@ -248,29 +247,20 @@ export function dockerRuntime(input: {
         runtime: serving.runtime,
         packages: `${serving.install}/packages`,
       })
-    const decided = planObserverContainer(
-      (await inspectContainer(target, name)).state,
+    // Every host of a version renders the same spec, so each joins the one
+    // running, starts one created and never started, and makes one missing.
+    await ensureContainer(
+      target,
+      renderObserver({
+        version: v,
+        cmd: [
+          ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_SERVER}`),
+          MACHINE_SOCKET,
+          OBSERVER_LOADER,
+          v,
+        ],
+      }),
     )
-    if (decided !== "join") {
-      if (decided === "replace") await removeContainer(target, name)
-      const made = await runContainer(
-        target,
-        renderObserver({
-          version: v,
-          cmd: [
-            ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_SERVER}`),
-            MACHINE_SOCKET,
-            OBSERVER_LOADER,
-            v,
-          ],
-        }),
-      )
-      if (
-        made.status >= 300 &&
-        (await inspectContainer(target, name)).state !== "running"
-      )
-        throw new Error(`docker run ${name} failed: ${apiMessage(made)}`)
-    }
     return openChannel(
       execArgv(name, [
         ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_CONNECT}`),

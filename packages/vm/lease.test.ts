@@ -181,7 +181,7 @@ test("an extra lease: another slot of the same launcher, filled with only what i
   const host = await leaseOn(socket, { agent: "/a.sock", log })
   await host.fill([{ source: "/p", readOnly: true }])
   const stateDir = path.dirname(l.control)
-  const extra = await leaseExtra({ stateDir, host, log })
+  const extra = await leaseExtra({ stateDir, log })
   expect(extra.slot).toBe(1)
   const filled = await extra.fill([{ source: "/p/docs", readOnly: false }])
   expect(filled).toMatchObject({ slot: 1 })
@@ -191,18 +191,4 @@ test("an extra lease: another slot of the same launcher, filled with only what i
   expect(l.seen[2]).toEqual({ kind: "lease", agent: null })
   await extra.close()
   await host.close()
-})
-
-test("an extra lease is refused once the host's lease has ended", async () => {
-  const l = await standIn(m =>
-    m.kind === "lease" ? slotReply(0) : { kind: "filled" },
-  )
-  await expect(
-    leaseExtra({
-      stateDir: path.dirname(l.control),
-      host: { ended: Promise.resolve() },
-      log,
-    }),
-  ).rejects.toThrow("this host's lease on the lane VM has ended")
-  expect(l.seen).toEqual([])
 })
