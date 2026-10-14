@@ -1,12 +1,12 @@
 import { execFileSync } from "node:child_process"
-import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { describe, expect, test } from "vitest"
-import { buildVmImage, planBuild, type Ran, readImageSources } from "./build.ts"
-import { IMAGE_FILES, IMAGE_OUTPUTS, imageDir, imageKey } from "./plan.ts"
+import { afterEach, describe, expect, test } from "vitest"
+import { installImage } from "./build.ts"
+import { sha256Hex } from "./pinned.ts"
+import { type BuilderPins, IMAGE_OUTPUTS } from "./plan.ts"
 
 const imageFile = (name: string) =>
   readFileSync(path.join(import.meta.dirname, "image", name), "utf8")
@@ -117,101 +117,92 @@ describe("the clock", () => {
   })
 })
 
-test("planBuild: Alpine at the manifest's branch, each source an argument, the outputs a tar on stdout", async () => {
-  const sources = await readImageSources()
-  const { image, argv } = planBuild(sources)
-  expect(image).toBe("docker.io/library/alpine:3.23")
-  expect(argv.slice(0, 2)).toEqual(["sh", "-c"])
-  expect(argv[2]).toContain("sh /src/build.sh /src /out >&2")
-  expect(argv[2]).toContain(
-    `tar -C /out -cf - SHA256SUMS ${IMAGE_OUTPUTS.join(" ")}`,
-  )
-  const pairs = argv.slice(4)
-  expect(pairs.length).toBe(IMAGE_FILES.length * 2)
-  for (const [i, name] of IMAGE_FILES.entries()) {
-    expect(pairs[i * 2]).toBe(name)
-    expect(Buffer.from(pairs[i * 2 + 1] ?? "", "base64").toString()).toBe(
-      sources[name],
-    )
+describe("the builder's pins", () => {
+  const manifest = JSON.parse(imageFile("manifest.json")) as {
+    alpine: string
+    arch: string
+    packages: Record<string, string>
   }
+  const pins = JSON.parse(
+    readFileSync(
+      path.join(import.meta.dirname, "builder", "pins.json"),
+      "utf8",
+    ),
+  ) as BuilderPins
+  test("the builder boots the kernel the image ships, on the manifest's root", () => {
+    expect(pins.kernel.version).toBe(manifest.packages["linux-virt"])
+    expect(pins.root.version).toBe(
+      manifest.packages["alpine-base"]?.replace(/-r\d+$/, ""),
+    )
+  })
+  test("each pin's URL names its version, the manifest's branch and arch", () => {
+    for (const pin of [pins.kernel, pins.root]) {
+      expect(pin.url).toContain(`/v${manifest.alpine}/`)
+      expect(pin.url).toContain(manifest.arch)
+      expect(pin.url).toContain(pin.version)
+      expect(pin.sha256).toMatch(/^[0-9a-f]{64}$/)
+    }
+  })
+  test("the builder's init parses, and writes to its one disk", () => {
+    const init = path.join(import.meta.dirname, "builder", "init")
+    execFileSync("sh", ["-n", init])
+    expect(readFileSync(init, "utf8")).toContain("-cf /dev/vda")
+  })
 })
 
-describe("buildVmImage", () => {
-  /** A build that writes `outputs` as a tar, with their sums, or bad ones. */
-  async function fakeBuild(bad: boolean): Promise<Ran> {
-    const dir = await mkdtemp(path.join(tmpdir(), "pinetrie-vm-out-"))
+describe("installImage", () => {
+  /** A directory of outputs with their sums, or with sums that do not hold. */
+  async function outputs(root: string, name: string, bad = false) {
+    const dir = path.join(root, name)
+    await mkdir(dir, { recursive: true })
     const lines: string[] = []
-    for (const name of IMAGE_OUTPUTS) {
-      await writeFile(path.join(dir, name), name)
-      const hash = createHash("sha256")
-        .update(bad ? "x" : name)
-        .digest("hex")
-      lines.push(`${hash}  ${name}`)
+    for (const o of IMAGE_OUTPUTS) {
+      await writeFile(path.join(dir, o), `${name}:${o}`)
+      lines.push(`${sha256Hex(bad ? "x" : `${name}:${o}`)}  ${o}`)
     }
     await writeFile(path.join(dir, "SHA256SUMS"), `${lines.join("\n")}\n`)
-    const stdout = execFileSync("tar", ["-C", dir, "-cf", "-", "."])
-    await rm(dir, { recursive: true })
-    return { ok: true, code: 0, stdout, stderr: "[vm-build] built\n" }
+    return dir
+  }
+  const dirs: string[] = []
+  afterEach(async () => {
+    for (const d of dirs.splice(0))
+      await rm(d, { recursive: true, force: true })
+  })
+  const temp = async () => {
+    const d = await mkdtemp(path.join(tmpdir(), "pinetrie-install-"))
+    dirs.push(d)
+    return d
   }
 
-  test("builds once into the key's directory, then uses what is there", async () => {
-    const stateDir = await mkdtemp(path.join(tmpdir(), "pinetrie-vm-"))
-    try {
-      let runs = 0
-      const run = async () => {
-        runs += 1
-        return fakeBuild(false)
-      }
-      const logged: string[] = []
-      const first = await buildVmImage({
-        stateDir,
-        run,
-        log: l => logged.push(l),
-      })
-      const key = imageKey(await readImageSources())
-      expect(first).toEqual({ dir: imageDir(stateDir, key), built: true })
-      expect(logged).toContain("[vm-build] built")
-      expect(
-        await buildVmImage({ stateDir, run, log: () => {} }),
-      ).toMatchObject({ built: false })
-      expect(runs).toBe(1)
-      expect(await readdir(path.join(stateDir, "images"))).toEqual([key])
-    } finally {
-      await rm(stateDir, { recursive: true, force: true })
-    }
+  test("an image whose files do not match its sums is refused", async () => {
+    const root = await temp()
+    const from = await outputs(root, "new", true)
+    await expect(
+      installImage(from, path.join(root, "key"), false),
+    ).rejects.toThrow("does not match SHA256SUMS")
+    expect(existsSync(path.join(root, "key"))).toBe(false)
   })
-
-  test("an image whose files do not match its sums is refused, and nothing is left", async () => {
-    const stateDir = await mkdtemp(path.join(tmpdir(), "pinetrie-vm-"))
-    try {
-      await mkdir(path.join(stateDir, "images"), { recursive: true })
-      await expect(
-        buildVmImage({ stateDir, run: () => fakeBuild(true), log: () => {} }),
-      ).rejects.toThrow("does not match SHA256SUMS")
-      expect(await readdir(path.join(stateDir, "images"))).toEqual([])
-      expect(existsSync(path.join(stateDir, "images"))).toBe(true)
-    } finally {
-      await rm(stateDir, { recursive: true, force: true })
-    }
+  test("a whole image already there is kept, and the build discarded", async () => {
+    const root = await temp()
+    const there = await outputs(root, "key")
+    const from = await outputs(root, "new")
+    expect(await installImage(from, there, false)).toBe(false)
+    expect(readFileSync(path.join(there, "Image"), "utf8")).toBe("key:Image")
   })
-
-  test("a failed build says so", async () => {
-    const stateDir = await mkdtemp(path.join(tmpdir(), "pinetrie-vm-"))
-    try {
-      await expect(
-        buildVmImage({
-          stateDir,
-          run: async () => ({
-            ok: false,
-            code: 1,
-            stdout: new Uint8Array(),
-            stderr: "[vm-build] Alpine 3.23 no longer has: x=1-r0",
-          }),
-          log: () => {},
-        }),
-      ).rejects.toThrow("the VM image's build failed (exit 1)")
-    } finally {
-      await rm(stateDir, { recursive: true, force: true })
-    }
+  test("an image that is not whole is replaced", async () => {
+    const root = await temp()
+    const there = await outputs(root, "key")
+    await rm(path.join(there, "Image"))
+    const from = await outputs(root, "new")
+    expect(await installImage(from, there, false)).toBe(true)
+    expect(readFileSync(path.join(there, "Image"), "utf8")).toBe("new:Image")
+  })
+  test("a forced build replaces a whole image", async () => {
+    const root = await temp()
+    const there = await outputs(root, "key")
+    const from = await outputs(root, "new")
+    expect(await installImage(from, there, true)).toBe(true)
+    expect(readFileSync(path.join(there, "Image"), "utf8")).toBe("new:Image")
+    expect(await readdir(root)).toEqual(["key"])
   })
 })

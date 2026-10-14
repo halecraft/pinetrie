@@ -46,7 +46,7 @@ export type LauncherRefusal =
 export interface VmIdentity {
   /** The image's key: its directory's name (`imageKey`). */
   readonly image: string | null
-  /** The launcher binary's name (`launcherName`). */
+  /** The launcher binary's name (`binaryName`). */
   readonly launcher: string | null
   /** Leases held, this one included. */
   readonly leases: number | null

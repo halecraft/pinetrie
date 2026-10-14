@@ -342,4 +342,21 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect: "the setup page names each config file the host read",
   },
+  {
+    name: "the build bundles the linked checkout's React too",
+    file: "packages/web/vite.config.ts",
+    from: '  resolve: { dedupe: ["react", "react-dom"] },\n',
+    to: "",
+    command: unit,
+    expect: "the built page holds one React",
+  },
+  {
+    name: "a stamp keeps an input's mode but not its content",
+    file: "packages/web/stamp.ts",
+    from: "    if (hashFile(file) !== hash) return false\n",
+    to: "",
+    command: unit,
+    expect:
+      "a stamp is fresh until an input changes, goes, or the mode differs",
+  },
 ]

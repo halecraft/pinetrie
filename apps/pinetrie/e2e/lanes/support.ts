@@ -3,6 +3,9 @@
 // host with lanes, and a lane's shell, are `lane-hosts.ts`'s.
 
 import { execFileSync } from "node:child_process"
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync } from "node:fs"
+import { homedir } from "node:os"
+import path from "node:path"
 import {
   type CardCommand,
   type CardId,
@@ -12,6 +15,7 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import type { SessionClient } from "@pinetrie/session"
+import { vmStateDir } from "@pinetrie/vm"
 import { composeAt, queueCard } from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 
@@ -101,3 +105,43 @@ export const imageHost = (lanes: LaneHosts, containerfile: string) =>
       "notes.txt": "the secret word is MANGO\n",
     },
   })
+
+/**
+ * A lane VM of a scenario's own on the Mac: a state directory under `/tmp/`
+ * whose `share`d entries (`images`, `bin`, `builder`) are the person's, so
+ * what is built there is kept, and the rest its own. `data` names a data
+ * disk of the person's state kept between runs, so a cold start formats it
+ * only the first time and Docker keeps what it pulled; without it the VM
+ * formats a fresh one. Its launcher stops 2 s after its last lease. Null
+ * off the Mac. Returns how to put the environment back.
+ */
+export function ownVm(input: {
+  readonly share: readonly ("images" | "bin" | "builder")[]
+  readonly data?: string
+}): { readonly state: string; restore(): void } | null {
+  if (process.platform !== "darwin") return null
+  const real = vmStateDir(process.env, homedir())
+  const state = realpathSync(mkdtempSync("/tmp/pc-"))
+  const vm = path.join(state, "pinetrie", "vm")
+  mkdirSync(vm, { recursive: true })
+  for (const d of input.share) {
+    mkdirSync(path.join(real, d), { recursive: true })
+    symlinkSync(path.join(real, d), path.join(vm, d))
+  }
+  if (input.data !== undefined)
+    symlinkSync(path.join(real, input.data), path.join(vm, "data.img"))
+  const saved = {
+    XDG_STATE_HOME: process.env.XDG_STATE_HOME,
+    LAUNCHER_IDLE_SECONDS: process.env.LAUNCHER_IDLE_SECONDS,
+  }
+  process.env.XDG_STATE_HOME = state
+  process.env.LAUNCHER_IDLE_SECONDS = "2"
+  return {
+    state,
+    restore() {
+      for (const [k, v] of Object.entries(saved))
+        if (v === undefined) delete process.env[k]
+        else process.env[k] = v
+    },
+  }
+}

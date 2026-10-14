@@ -1,5 +1,6 @@
-// host/invocation — `pnpm host [folder]`: which project a host serves, where
-// its session is kept, and the words for a refusal.
+// host/invocation — `pnpm dev [folder]` and `pnpm serve [folder]`: which
+// project a host serves, where its session is kept, and the words for a
+// refusal.
 
 import path from "node:path"
 import { PRODUCT_NAME } from "@pinetrie/core"
@@ -59,16 +60,20 @@ export function storeChoice(
     : { file: given, from: "PINETRIE_STORE" }
 }
 
-const USAGE = `usage: pnpm host [folder]  (a relative folder is read from ${PRODUCT_NAME}'s root)`
+/** The command that starts a host: through Vite, or serving the built page. */
+export type HostCommand = "dev" | "serve"
 
-/** A refusal's words, with the usage line. */
-export function refusalText(r: Refusal): string {
+const usage = (command: HostCommand) =>
+  `usage: pnpm ${command} [folder]  (a relative folder is read from ${PRODUCT_NAME}'s root)`
+
+/** A refusal's words, with `command`'s usage line. */
+export function refusalText(r: Refusal, command: HostCommand): string {
   switch (r.kind) {
     case "flag":
-      return `${r.arg}: the host takes no options; its settings are PINETRIE_* variables\n${USAGE}`
+      return `${r.arg}: the host takes no options; its settings are PINETRIE_* variables\n${usage(command)}`
     case "extra":
-      return `one folder, not ${r.args.length}: ${r.args.join(" ")}\n${USAGE}`
+      return `one folder, not ${r.args.length}: ${r.args.join(" ")}\n${usage(command)}`
     case "project":
-      return `${projectDirWords(r.refusal)}\n${USAGE}`
+      return `${projectDirWords(r.refusal)}\n${usage(command)}`
   }
 }

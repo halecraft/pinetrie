@@ -27,8 +27,11 @@ test("a flag, or a second folder, is refused", () => {
     kind: "refused",
     refusal: { kind: "extra", args: ["/a", "/b"] },
   })
-  expect(refusalText({ kind: "extra", args: ["/a", "/b"] })).toContain(
-    "usage: pnpm host [folder]",
+  expect(refusalText({ kind: "extra", args: ["/a", "/b"] }, "dev")).toContain(
+    "usage: pnpm dev [folder]",
+  )
+  expect(refusalText({ kind: "flag", arg: "--port" }, "serve")).toContain(
+    "usage: pnpm serve [folder]",
   )
 })
 

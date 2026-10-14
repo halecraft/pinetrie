@@ -2162,7 +2162,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a host leaves Vite open as it stops",
     file: "apps/pinetrie/host/http.ts",
-    from: "      await vite.close()\n",
+    from: "      await vite?.close()\n",
     to: "",
     suite: "browser",
     scenario: "banner",

@@ -1,7 +1,8 @@
 // host/routes — what the host does with a request or an upgrade, pure:
 // admission first (admission.ts), then which requests it answers itself, an
-// image blob or a read of an offer. Everything else is Vite's. `http.ts`
-// carries each plan out.
+// image blob or a read of an offer. Everything else is the page's: Vite's,
+// or a file of the built page (`planPageRequest`). `http.ts` carries each
+// plan out.
 
 import { isSha256, type Sha256 } from "@pinetrie/core"
 import { type OfferAsk, parseOfferPath } from "@pinetrie/rules"
@@ -18,7 +19,7 @@ export type Route =
  * What a request is for. `GET /blob/<anything>` is a blob's, with a null hash
  * when it names none: a 404. Anything under `/offer/` that `parseOfferPath`
  * does not accept, or that is not a `GET`, is `bad`: a 400. Neither reaches
- * Vite, whose fallback would answer `index.html`.
+ * the page: Vite's fallback would answer `index.html`.
  */
 export function route(method: string | undefined, url: URL): Route {
   const { pathname } = url
@@ -36,7 +37,7 @@ export function route(method: string | undefined, url: URL): Route {
 /**
  * A request: refused, redirected without the key it carried (the cookie a
  * link sets keeps it), or routed. Admission comes first: nothing reaches
- * Vite, the blobs or an offer's reads without it.
+ * the page, the blobs or an offer's reads without it.
  */
 export function planRequest(
   facts: RequestFacts,
@@ -55,15 +56,71 @@ export function planRequest(
 
 /**
  * An upgrade: refused, the Exchange's websocket (`/ws`), or handed to Vite's
- * HMR listener. A WebSocket is exempt from the same-origin policy, so the
- * `Origin` check in `admits` is what keeps another page off the socket.
+ * HMR listener where Vite serves the page (`hmr`); a built page has none. A
+ * WebSocket is exempt from the same-origin policy, so the `Origin` check in
+ * `admits` is what keeps another page off the socket.
  */
 export function planUpgrade(
   facts: RequestFacts,
   key: string | null,
+  hmr: boolean,
 ): "refuse" | "exchange" | "vite" {
   if (admits(facts, key).kind === "refuse") return "refuse"
-  return new URL(facts.url, "http://host").pathname === "/ws"
-    ? "exchange"
-    : "vite"
+  if (new URL(facts.url, "http://host").pathname === "/ws") return "exchange"
+  return hmr ? "vite" : "refuse"
+}
+
+const CONTENT_TYPES: Readonly<Record<string, string>> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".wasm": "application/wasm",
+  ".json": "application/json",
+}
+
+/** What answers a request for the built page: a file of `dist/`, with its headers, or a 404. */
+export type PageAnswer =
+  | {
+      readonly kind: "file"
+      /** Relative to `dist/`. */
+      readonly file: string
+      readonly headers: Readonly<Record<string, string>>
+    }
+  | { readonly kind: "missing" }
+
+/**
+ * A request for the built page. `/` is `index.html`, never cached, so a
+ * rebuild is seen at the next load; `assets/` holds files named by their
+ * hash, cached for good. Nothing falls back to `index.html`: the page
+ * routes by its URL's hash.
+ */
+export function planPageRequest(
+  pathname: string,
+  files: ReadonlySet<string>,
+): PageAnswer {
+  let file: string
+  try {
+    file =
+      pathname === "/" ? "index.html" : decodeURIComponent(pathname.slice(1))
+  } catch {
+    return { kind: "missing" }
+  }
+  // Only a name in the set is served, so `..` reaches nothing outside `dist/`.
+  if (!files.has(file)) return { kind: "missing" }
+  const type =
+    CONTENT_TYPES[file.slice(file.lastIndexOf("."))] ??
+    "application/octet-stream"
+  const cache =
+    file === "index.html"
+      ? "no-cache"
+      : file.startsWith("assets/")
+        ? "public, max-age=31536000, immutable"
+        : "no-cache"
+  return {
+    kind: "file",
+    file,
+    headers: { "content-type": type, "cache-control": cache },
+  }
 }

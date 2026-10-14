@@ -13,10 +13,9 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs"
-import { homedir, tmpdir } from "node:os"
+import { tmpdir } from "node:os"
 import path from "node:path"
 import {
   type SnapshotId,
@@ -39,14 +38,14 @@ import {
   RUNTIME_MOUNT,
   run,
 } from "@pinetrie/lanes"
-import { GVPROXY_HOST_ADDRESS, vmStateDir } from "@pinetrie/vm"
+import { GVPROXY_HOST_ADDRESS } from "@pinetrie/vm"
 import { findProject } from "../../host/work/runtime.ts"
 import { playwrightVersion } from "../../host/work/setup.ts"
 import type { Checks } from "../checks.ts"
 import { committedProject, waitFor } from "../harness.ts"
 import { ownForInnerLanes } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
-import { cli, dockerDisks, inDisks, sh } from "./support.ts"
+import { cli, dockerDisks, inDisks, ownVm, sh } from "./support.ts"
 
 export const scenario: Scenario = {
   lanes: true,
@@ -68,40 +67,6 @@ while (!fs.existsSync("/probe/stop")) {
   if (n % 10 === 0) fs.writeFileSync("/probe/written", String(n))
 }
 `
-
-/**
- * A VM of the contract's own on the Mac: a state directory sharing the
- * built images and launchers, and a data disk of its own kept between runs
- * (`contract-data.img`), so a cold start formats it only the first time and
- * Docker keeps what it pulled. Its launcher stops 2 s after its last lease.
- * Returns how to put the environment back.
- */
-function ownVm(): { readonly state: string; restore(): void } | null {
-  if (process.platform !== "darwin") return null
-  const real = vmStateDir(process.env, homedir())
-  const state = realpathSync(mkdtempSync("/tmp/pc-"))
-  const vm = path.join(state, "pinetrie", "vm")
-  mkdirSync(vm, { recursive: true })
-  for (const d of ["images", "bin"]) {
-    mkdirSync(path.join(real, d), { recursive: true })
-    symlinkSync(path.join(real, d), path.join(vm, d))
-  }
-  symlinkSync(path.join(real, "contract-data.img"), path.join(vm, "data.img"))
-  const saved = {
-    XDG_STATE_HOME: process.env.XDG_STATE_HOME,
-    LAUNCHER_IDLE_SECONDS: process.env.LAUNCHER_IDLE_SECONDS,
-  }
-  process.env.XDG_STATE_HOME = state
-  process.env.LAUNCHER_IDLE_SECONDS = "2"
-  return {
-    state,
-    restore() {
-      for (const [k, v] of Object.entries(saved))
-        if (v === undefined) delete process.env[k]
-        else process.env[k] = v
-    },
-  }
-}
 
 const median = (xs: readonly number[]) =>
   [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0
@@ -135,7 +100,10 @@ async function dockerContract(
   check: Checks["check"],
   skip: Checks["skip"],
 ): Promise<void> {
-  const own = ownVm()
+  const own = ownVm({
+    share: ["images", "bin", "builder"],
+    data: "contract-data.img",
+  })
   const onMac = process.platform === "darwin"
   const closedPort = await loopbackServer("closed")
   const grantedPort = await loopbackServer("granted")

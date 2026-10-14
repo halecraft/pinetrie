@@ -1,5 +1,5 @@
 // e2e/observer/support — the observer suite's guest: a QEMU machine booted
-// on the lane VM's own kernel, with an initramfs of busybox, the loader and
+// on the lane VM's own kernel (the pinned `linux-virt`, unpacked), with an initramfs of busybox, the loader and
 // the workloads (`packages/lanehost/observer/suite`), built by the observer's
 // Containerfile in the suites' Docker. QEMU emulates (a lane has no KVM),
 // so its timings mean nothing.
@@ -12,14 +12,13 @@ import {
   type LoaderLine,
   OBSERVER_CONTAINERFILE,
 } from "@pinetrie/lanehost"
-import { hostBytesRunner } from "@pinetrie/lanes"
-import { buildVmImage } from "@pinetrie/vm"
+import { pinnedKernel, readBuilderPins } from "@pinetrie/vm"
 import { cli, runtimeCli } from "../lane-runtime.ts"
 
 const QEMU = "qemu-system-aarch64"
 /** The guest's whole run, emulated: about 35 s on an M-series lane. */
 const GUEST_TIMEOUT_MS = 15 * 60_000
-/** Kept across runs: the VM image takes minutes to build. */
+/** Kept across runs: the guest's image, and the kernel's package (39 MB). */
 const CACHE = path.join(
   import.meta.dirname,
   "../../../../node_modules/.cache/pinetrie-observer-suite",
@@ -98,14 +97,9 @@ export async function bootGuest(log: (line: string) => void): Promise<Guest> {
       },
     ),
   )
-  const vm = await buildVmImage({
-    stateDir: CACHE,
-    run: (image, argv) =>
-      hostBytesRunner()([...runtimeCli(), "run", "--rm", image, ...argv]),
-    log,
-  })
+  const kernel = await pinnedKernel(CACHE, (await readBuilderPins()).kernel)
   const out = path.join(CACHE, "console.txt")
-  log(`booting ${QEMU} on ${vm.dir}/Image`)
+  log(`booting ${QEMU} on ${kernel}`)
   await new Promise<void>((resolve, reject) =>
     execFile(
       QEMU,
@@ -119,7 +113,7 @@ export async function bootGuest(log: (line: string) => void): Promise<Guest> {
         "-m",
         "1536",
         "-kernel",
-        path.join(vm.dir, "Image"),
+        kernel,
         "-initrd",
         initramfs,
         "-append",

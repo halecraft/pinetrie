@@ -181,42 +181,70 @@ export function planWidening(
     .map(({ source, readOnly }) => ({ source, readOnly }))
 }
 
+/** Where the lane VM cannot run: no image is built or booted there. */
+export type VmHostRefusal = "not-mac" | "not-apple-silicon" | "old-macos"
+
+/** Why this machine cannot run the lane VM at all, or null. */
+export function vmHostRefusal(f: {
+  readonly platform: NodeJS.Platform
+  readonly arch: string
+  /** Darwin's major version (`os.release()`): 22 is macOS 13. */
+  readonly darwin: number
+}): VmHostRefusal | null {
+  if (f.platform !== "darwin") return "not-mac"
+  if (f.arch !== "arm64") return "not-apple-silicon"
+  if (f.darwin < 22) return "old-macos"
+  return null
+}
+
+/** Whether one of the Mac's binaries is built, can be, or cannot without Xcode's tools. */
+export type BinaryState = "built" | "buildable" | "no-swiftc"
+
 /** What decides whether a host starts the VM, joins it, or cannot. */
 export interface VmFacts {
   readonly platform: NodeJS.Platform
   readonly arch: string
-  /** Darwin's major version (`os.release()`): 22 is macOS 13. */
   readonly darwin: number
   /** The launcher's control.sock answers: the VM runs. */
   readonly answering: boolean
   /** The image for the current sources is built and whole. */
   readonly image: boolean
-  /** The launcher for the current source is built, or `swiftc` can build it. */
-  readonly launcher: "built" | "buildable" | "no-swiftc"
+  readonly launcher: BinaryState
+  /** The image's builder: it is needed only when the image is not built. */
+  readonly builder: BinaryState
 }
 
-export type VmRefusal =
-  | "not-mac"
-  | "not-apple-silicon"
-  | "old-macos"
-  | "no-image"
-  | "no-swiftc"
+export type VmRefusal = VmHostRefusal | "no-swiftc"
 
 export type VmPlan =
   | { readonly kind: "join" }
-  | { readonly kind: "start" }
+  /** Start the VM, building its image first when it is not built. */
+  | { readonly kind: "start"; readonly buildImage: boolean }
   | { readonly kind: "refused"; readonly refusal: VmRefusal }
 
-/** Join a running VM; else start one, when everything it takes is here. */
+/**
+ * Why this host could not start the current VM, or null: it needs the
+ * launcher, and the image or what builds it. A host that finds an older VM
+ * running replaces it only when this is null.
+ */
+export function vmStartRefusal(
+  f: Omit<VmFacts, "answering">,
+): VmRefusal | null {
+  const host = vmHostRefusal(f)
+  if (host !== null) return host
+  if (f.launcher === "no-swiftc") return "no-swiftc"
+  if (!f.image && f.builder === "no-swiftc") return "no-swiftc"
+  return null
+}
+
+/** Join a running VM; else start one, building what it lacks, when everything that takes is here. */
 export function planVm(f: VmFacts): VmPlan {
-  const refused = (refusal: VmRefusal): VmPlan => ({ kind: "refused", refusal })
-  if (f.platform !== "darwin") return refused("not-mac")
-  if (f.arch !== "arm64") return refused("not-apple-silicon")
-  if (f.darwin < 22) return refused("old-macos")
+  const host = vmHostRefusal(f)
+  if (host !== null) return { kind: "refused", refusal: host }
   if (f.answering) return { kind: "join" }
-  if (!f.image) return refused("no-image")
-  if (f.launcher === "no-swiftc") return refused("no-swiftc")
-  return { kind: "start" }
+  const refusal = vmStartRefusal(f)
+  if (refusal !== null) return { kind: "refused", refusal }
+  return { kind: "start", buildImage: !f.image }
 }
 
 /** Why the lane VM cannot start, with what would let it. */
@@ -228,10 +256,78 @@ export function vmWords(r: VmRefusal): string {
       return "the lane VM needs a Mac with Apple silicon"
     case "old-macos":
       return "the lane VM needs macOS 13 or later"
-    case "no-image":
-      return "the lane VM's image is not built for this version: run `pnpm vm:build`"
     case "no-swiftc":
-      return "the lane VM's launcher is built with Xcode's command line tools, which are not installed: `xcode-select --install`"
+      return "the lane VM's launcher and image builder are built with Xcode's command line tools, which are not installed: `xcode-select --install`"
+  }
+}
+
+/** What decides whether `pnpm vm:build` and `pnpm build` build the image. */
+export interface VmBuildFacts {
+  readonly host: VmHostRefusal | null
+  /** The image for the current sources is built and whole. */
+  readonly image: boolean
+  readonly builder: BinaryState
+  /** `--force`: build even when the image is whole. */
+  readonly force: boolean
+}
+
+export type VmBuildPlan =
+  | { readonly kind: "present" }
+  | { readonly kind: "build" }
+  /** This machine runs no lane VM, so needs no image. */
+  | { readonly kind: "not-needed"; readonly why: VmHostRefusal }
+  | {
+      readonly kind: "refused"
+      readonly why:
+        | { readonly kind: "no-swiftc" }
+        | { readonly kind: "forced"; readonly host: VmHostRefusal }
+    }
+
+/** Whether to build the lane VM's image here. */
+export function planVmBuild(f: VmBuildFacts): VmBuildPlan {
+  if (f.host !== null)
+    return f.force
+      ? { kind: "refused", why: { kind: "forced", host: f.host } }
+      : { kind: "not-needed", why: f.host }
+  if (f.image && !f.force) return { kind: "present" }
+  if (f.builder === "no-swiftc")
+    return { kind: "refused", why: { kind: "no-swiftc" } }
+  return { kind: "build" }
+}
+
+/** What a build must do before its 20 s: each worded in `vmBuildWords`. */
+export interface VmBuildFirst {
+  readonly compile: boolean
+  readonly fetch: boolean
+}
+
+/**
+ * A build's plan in words: why nothing is built, why it cannot be, or what
+ * is about to happen. `present` is worded by its caller, which names the
+ * image's directory.
+ */
+export function vmBuildWords(
+  plan: Exclude<VmBuildPlan, { kind: "present" }>,
+  first: VmBuildFirst,
+): string {
+  switch (plan.kind) {
+    case "not-needed":
+      return `nothing to build here: ${vmWords(plan.why)}, so no image is needed (\`pnpm vm:build --force\` builds one anyway, on a Mac with Apple silicon for now)`
+    case "refused":
+      return plan.why.kind === "no-swiftc"
+        ? vmWords("no-swiftc")
+        : `the lane VM's image is built only on a Mac with Apple silicon, for now: ${vmWords(plan.why.host)}`
+    case "build": {
+      const before = [
+        ...(first.compile ? ["compiling its builder"] : []),
+        ...(first.fetch
+          ? ["fetching Alpine's kernel and root, 43 MB, once"]
+          : []),
+      ]
+      return before.length === 0
+        ? "building the lane VM's image (about 20 s)"
+        : `building the lane VM's image: ${before.join(" and ")}, then about 20 s`
+    }
   }
 }
 
@@ -273,3 +369,144 @@ export const OLD_LAUNCHER_WORDS =
 /** A host joining an out-of-date VM, in its log. */
 export const staleVmWords = (leases: number, image: string): string =>
   `the lane VM runs an older image or launcher, and ${leases - 1} other ${leases === 2 ? "host holds a lease" : "hosts hold leases"} on it: this host joins it, and the VM is replaced with ${image} when the last of them stops`
+
+/** What a build does with `images/<key>.lock`. */
+export type LockStep = "take" | "wait" | "break"
+
+/**
+ * One build at a time per image: take a lock no one holds, wait on one a
+ * live process holds, break one whose holder is gone. A lock is a file
+ * holding its holder's PID, since Node has no `flock`.
+ */
+export function planLock(f: {
+  readonly holder: number | null
+  readonly alive: boolean
+}): LockStep {
+  if (f.holder === null) return "take"
+  return f.alive ? "wait" : "break"
+}
+
+/** An entry of `images/`, `bin/` or `builder/`, and the process it belongs to, if any. */
+export interface PruneEntry {
+  readonly path: string
+  /** The PID in a `.tmp-<pid>` name or a lock file; null for anything else. */
+  readonly owner: number | null
+}
+
+/**
+ * The entries to remove after a build: what is not current and that no
+ * running launcher names, and what a dead process left half-written.
+ * Running launchers are matched by each argument's last path component,
+ * since one may run from another state directory over the same `images/`
+ * and `bin/` (the contract scenario's).
+ */
+export function planPrune(f: {
+  readonly entries: readonly PruneEntry[]
+  /** The names of the current image, binaries and pins. */
+  readonly current: ReadonlySet<string>
+  /** Every running launcher's command line. */
+  readonly running: readonly string[]
+  readonly alive: (pid: number) => boolean
+}): readonly string[] {
+  const named = new Set(
+    f.running.flatMap(c => c.split(/\s+/).map(a => path.basename(a))),
+  )
+  return f.entries
+    .filter(e => {
+      if (e.owner !== null) return !f.alive(e.owner)
+      const name = path.basename(e.path)
+      return !f.current.has(name) && !named.has(name)
+    })
+    .map(e => e.path)
+}
+
+/** What `builder/pins.json` holds: the builder's kernel and root, and the modules it loads. */
+export interface BuilderPins {
+  readonly kernel: {
+    readonly version: string
+    readonly url: string
+    readonly sha256: string
+  }
+  readonly root: {
+    readonly version: string
+    readonly url: string
+    readonly sha256: string
+  }
+  /** Paths under the kernel's `lib/modules/<kver>/kernel/`, in load order. */
+  readonly modules: readonly string[]
+}
+
+/** `linux-virt`'s modules directory for its package version: `6.18.56-r0` is `6.18.56-0-virt`. */
+export function kernelRelease(version: string): string {
+  const m = /^(.+)-r(\d+)$/.exec(version)
+  if (m === null)
+    throw new Error(`linux-virt's version ${version} has no -r release`)
+  return `${m[1]}-${m[2]}-virt`
+}
+
+/** Everything a build's executor does, as paths and arguments. */
+export interface VmBuildRun {
+  readonly pinsDir: string
+  readonly image: string
+  readonly lock: string
+  readonly scratch: string
+  /** What goes into the initrd beside the root: `m/`, `init`, `src/`. */
+  readonly initrdDir: string
+  readonly initrd: string
+  readonly modules: readonly { readonly entry: string; readonly as: string }[]
+  /** `m/order`: the modules' file names, one a line, in load order. */
+  readonly order: string
+  readonly disk: { readonly path: string; readonly bytes: number }
+  readonly out: string
+  /** The builder binary's arguments after its path. */
+  readonly builderArgs: readonly string[]
+}
+
+/** The builder's memory and its disk: a build fits in 1 GiB, and its outputs are about 140 MB. */
+const BUILD_MEMORY = 1024 ** 3
+const BUILD_DISK = 1024 ** 3
+
+/** A build of the image `key`, from `pins`, as values. */
+export function planVmBuildRun(f: {
+  readonly stateDir: string
+  readonly key: string
+  readonly pins: BuilderPins
+  readonly pid: number
+  readonly cpus: number
+  /** The builder's kernel, unpacked (`pinnedKernel`). */
+  readonly kernel: string
+}): VmBuildRun {
+  const image = imageDir(f.stateDir, f.key)
+  const scratch = `${image}.tmp-${f.pid}`
+  const release = kernelRelease(f.pins.kernel.version)
+  const modules = f.pins.modules.map(m => ({
+    entry: `lib/modules/${release}/kernel/${m}`,
+    as: path.basename(m).replace(/\.gz$/, ""),
+  }))
+  const initrd = path.join(scratch, "initrd.cpio")
+  const disk = path.join(scratch, "out.img")
+  return {
+    pinsDir: path.join(f.stateDir, "builder"),
+    image,
+    lock: `${image}.lock`,
+    scratch,
+    initrdDir: path.join(scratch, "initrd"),
+    initrd,
+    modules,
+    order: `${modules.map(m => m.as).join("\n")}\n`,
+    disk: { path: disk, bytes: BUILD_DISK },
+    out: path.join(scratch, "out"),
+    builderArgs: [
+      f.kernel,
+      initrd,
+      disk,
+      String(BUILD_MEMORY),
+      String(f.cpus),
+      "-",
+    ],
+  }
+}
+
+/** A line of the builder's console worth a person's log: the build's own and the builder's. */
+export const isBuildLogLine = (line: string): boolean =>
+  /^\[(vm-build|builder)\]/.test(line)

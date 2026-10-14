@@ -1,0 +1,21 @@
+{
+  "kernel": {
+    "version": "6.18.56-r0",
+    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/linux-virt-6.18.56-r0.apk",
+    "sha256": "1cb07a2d56c685194cadde1c2f436a71eb4fd1aeab9458c4bf249e2b467f5bdb"
+  },
+  "root": {
+    "version": "3.23.6",
+    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/aarch64/alpine-minirootfs-3.23.6-aarch64.tar.gz",
+    "sha256": "b17a57958e29735ff0e6e64254d958e65903687a70ca30cc430b33a965ad49d7"
+  },
+  "modules": [
+    "net/core/failover.ko.gz",
+    "drivers/net/net_failover.ko.gz",
+    "drivers/net/virtio_net.ko.gz",
+    "drivers/block/virtio_blk.ko.gz",
+    "drivers/char/hw_random/rng-core.ko.gz",
+    "drivers/char/hw_random/virtio-rng.ko.gz",
+    "net/packet/af_packet.ko.gz"
+  ]
+}

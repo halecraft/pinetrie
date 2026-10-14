@@ -3,31 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
-import {
-  BUILDER_WORDS,
-  findProject,
-  planBuilder,
-  planRuntime,
-} from "./runtime.ts"
-
-describe("planBuilder: the first Docker found builds the VM's image", () => {
-  test("the VM's own Docker first", () => {
-    expect(planBuilder({ vmDocker: true, hostDocker: true })).toEqual({
-      kind: "docker-vm",
-    })
-  })
-  test("else a Docker on this machine, whatever its platform", () => {
-    expect(planBuilder({ vmDocker: false, hostDocker: true })).toEqual({
-      kind: "docker-host",
-    })
-  })
-  test("none: worded with what would let it", () => {
-    expect(planBuilder({ vmDocker: false, hostDocker: false })).toEqual({
-      kind: "none",
-    })
-    expect(BUILDER_WORDS).toContain("docker version")
-  })
-})
+import { findProject, planRuntime } from "./runtime.ts"
 
 describe("planRuntime: Docker, in the VM on the Mac and the host's own on Linux", () => {
   const facts = {

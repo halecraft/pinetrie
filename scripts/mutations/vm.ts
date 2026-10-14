@@ -1,5 +1,6 @@
 // Mutations for @pinetrie/vm. Run: pnpm mutate scripts/mutations/vm.ts
-// Unit tests only: the image's build and boot are checked on the Mac.
+// Unit tests, but for the image's build in a VM, which the lanes suite
+// checks on the Mac.
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/vm"]
@@ -59,7 +60,7 @@ export const mutations: readonly Mutation[] = [
     name: "a build is renamed into place unchecked",
     file: "packages/vm/build.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "    if (refused !== null) throw new Error(`the built VM image: ${refused}`)\n",
+    from: "  if (refused !== null) throw new Error(`the built VM image: ${refused}`)\n",
     to: "",
     command: unit,
     expect: "an image whose files do not match its sums is refused",
@@ -79,34 +80,6 @@ export const mutations: readonly Mutation[] = [
     to: '    "@pinetrie/core": "workspace:*",\n    "@pinetrie/lanes": "workspace:*"\n',
     command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
     expect: "vm declares only core: it knows nothing of lanes",
-  },
-  {
-    name: "the image is built in the machine's Docker though the VM's runs",
-    file: "apps/pinetrie/host/work/runtime.ts",
-    from: '  if (f.vmDocker) return { kind: "docker-vm" }\n',
-    to: "",
-    command: [
-      "pnpm",
-      "exec",
-      "vitest",
-      "run",
-      "apps/pinetrie/host/work/runtime.test.ts",
-    ],
-    expect: "the VM's own Docker first",
-  },
-  {
-    name: "a Docker on the Mac is not asked",
-    file: "apps/pinetrie/host/work/runtime.ts",
-    from: '  if (f.hostDocker) return { kind: "docker-host" }\n',
-    to: "",
-    command: [
-      "pnpm",
-      "exec",
-      "vitest",
-      "run",
-      "apps/pinetrie/host/work/runtime.test.ts",
-    ],
-    expect: "else a Docker on this machine, whatever its platform",
   },
   {
     name: "a source given read-only and read-write is shared read-only",
@@ -166,8 +139,8 @@ export const mutations: readonly Mutation[] = [
     expect: "Docker reaches the Mac only behind the lanes' fence",
   },
   {
-    name: "gvproxy is kept whatever its hash",
-    file: "packages/vm/gvproxy.ts",
+    name: "a pinned file is kept whatever its hash",
+    file: "packages/vm/pinned.ts",
     from: "  if (got !== pin.sha256)\n",
     to: "  if (false)\n",
     command: unit,
@@ -252,5 +225,106 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "the init starts the clock on the RTC, which build.sh installs",
+  },
+  {
+    name: "a lease refuses a missing image it could build",
+    file: "packages/vm/plan.ts",
+    from: '  return { kind: "start", buildImage: !f.image }\n',
+    to: '  if (!f.image) return { kind: "refused", refusal: "no-swiftc" }\n  return { kind: "start", buildImage: false }\n',
+    command: unit,
+    expect: "a missing image is built before the VM starts",
+  },
+  {
+    name: "vm:build builds where no lane VM runs",
+    file: "packages/vm/plan.ts",
+    from: "  if (f.host !== null)\n    return f.force",
+    to: "  if (false)\n    return f.force",
+    command: unit,
+    expect: "where no lane VM runs, nothing is needed, and forcing is refused",
+  },
+  {
+    name: "the builder boots a kernel the manifest does not name",
+    file: "packages/vm/builder/pins.json",
+    from: '    "version": "6.18.56-r0",',
+    to: '    "version": "6.18.52-r0",',
+    command: unit,
+    expect:
+      "the builder boots the kernel the image ships, on the manifest's root",
+  },
+  {
+    name: "a pax header's path is ignored",
+    file: "packages/vm/apk.ts",
+    from: "      paxPath ??\n",
+    to: "      null ??\n",
+    command: unit,
+    expect: "a pax header's path names the entry after it",
+  },
+  {
+    name: "a whole image is replaced by a build",
+    file: "packages/vm/build.ts",
+    from: "  if (there && (await checkImageDir(image)) === null && !force) return false\n",
+    to: "",
+    command: unit,
+    expect: "a whole image already there is kept, and the build discarded",
+  },
+  {
+    name: "pruning removes what a running launcher names",
+    file: "packages/vm/plan.ts",
+    from: "      return !f.current.has(name) && !named.has(name)\n",
+    to: "      return !f.current.has(name)\n",
+    command: unit,
+    expect: "what a running launcher names stays, from any state directory",
+  },
+  {
+    name: "a build takes a lock a live process holds",
+    file: "packages/vm/plan.ts",
+    from: '  return f.alive ? "wait" : "break"\n',
+    to: '  return "break"\n',
+    command: unit,
+    expect:
+      "planLock: take a free lock, wait on a live holder, break a dead one's",
+  },
+  {
+    name: "a kept pinned copy is used whatever its hash",
+    file: "packages/vm/pinned.ts",
+    from: "  if (have !== null && sha256Hex(have) === pin.sha256) return file\n",
+    to: "  if (have !== null) return file\n",
+    command: unit,
+    expect: "a kept copy whose hash differs is fetched again",
+  },
+  {
+    name: "a missing image with no builder is started",
+    file: "packages/vm/plan.ts",
+    from: '  if (!f.image && f.builder === "no-swiftc") return "no-swiftc"\n',
+    to: "",
+    command: unit,
+    expect: "a missing image with no way to build its builder is refused",
+  },
+  {
+    name: "the builder loads no af_packet, so DHCP has no socket",
+    file: "packages/vm/builder/pins.json",
+    from: '    "drivers/char/hw_random/virtio-rng.ko.gz",\n    "net/packet/af_packet.ko.gz"\n',
+    to: '    "drivers/char/hw_random/virtio-rng.ko.gz"\n',
+    suite: "lanes",
+    scenario: "vm-image",
+    expect: "the Mac builds the lane VM's image with no Docker engine",
+  },
+  {
+    name: "a lease boots an image the build did not install",
+    file: "packages/vm/build.ts",
+    from: '      await mkdir(run.out)\n      await exec("tar", ["-xf", run.disk.path, "-C", run.out])\n',
+    to: "      await mkdir(run.out)\n",
+    suite: "lanes",
+    scenario: "vm-image",
+    expect: "the Mac builds the lane VM's image with no Docker engine",
+  },
+  {
+    name: "the built image's Docker never reaches the Mac",
+    file: "packages/vm/image/init",
+    from: "socat -t 3600 VSOCK-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock &\n",
+    to: "",
+    suite: "lanes",
+    scenario: "vm-image",
+    expect: "a lease boots the image it built",
   },
 ]

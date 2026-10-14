@@ -2,15 +2,16 @@
 // gvproxy, at the release `launcher/gvproxy.json` pins, fetched once into
 // `<state dir>/bin/` and checked against its SHA-256 before it is used.
 
-import { createHash } from "node:crypto"
-import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { chmod, readFile } from "node:fs/promises"
 import path from "node:path"
+import {
+  ensurePinned,
+  type FetchBytes,
+  fetchBytes,
+  type Pin,
+} from "./pinned.ts"
 
-export interface GvproxyPin {
-  readonly version: string
-  readonly url: string
-  readonly sha256: string
-}
+export type GvproxyPin = Pin
 
 const PIN_FILE = path.join(import.meta.dirname, "launcher", "gvproxy.json")
 
@@ -25,41 +26,13 @@ export const gvproxyPath = (stateDir: string, pin: GvproxyPin): string =>
     `gvproxy-${pin.version}-${pin.sha256.slice(0, 12)}`,
   )
 
-const sha256Of = (bytes: Uint8Array) =>
-  createHash("sha256").update(bytes).digest("hex")
-
-/**
- * `pin`'s gvproxy under `stateDir`, fetched unless a copy whose hash is the
- * pin's is there. A fetch whose hash differs is refused, naming both.
- */
+/** `pin`'s gvproxy under `stateDir`, executable. */
 export async function ensureGvproxy(
   stateDir: string,
   pin: GvproxyPin,
-  fetchBytes: (url: string) => Promise<Uint8Array> = defaultFetch,
+  fetch: FetchBytes = fetchBytes,
 ): Promise<string> {
-  const binary = gvproxyPath(stateDir, pin)
-  const have = await readFile(binary).catch(() => null)
-  if (have !== null && sha256Of(have) === pin.sha256) return binary
-  const bytes = await fetchBytes(pin.url)
-  const got = sha256Of(bytes)
-  if (got !== pin.sha256)
-    throw new Error(
-      `gvproxy from ${pin.url} has SHA-256 ${got}, not the pinned ${pin.sha256}`,
-    )
-  await mkdir(path.dirname(binary), { recursive: true })
-  const scratch = `${binary}.tmp-${process.pid}`
-  try {
-    await writeFile(scratch, bytes)
-    await chmod(scratch, 0o755)
-    await rename(scratch, binary)
-  } finally {
-    await rm(scratch, { force: true })
-  }
+  const binary = await ensurePinned(gvproxyPath(stateDir, pin), pin, fetch)
+  await chmod(binary, 0o755)
   return binary
-}
-
-async function defaultFetch(url: string): Promise<Uint8Array> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`fetching ${url}: HTTP ${res.status}`)
-  return new Uint8Array(await res.arrayBuffer())
 }

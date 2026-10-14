@@ -1,60 +1,87 @@
-// pnpm vm:build — the lane VM's image, built in the first Linux runtime
-// found (`planBuilder`), into `$XDG_STATE_HOME/pinetrie/vm/images/<key>/`.
+// pnpm vm:build [--force] — the lane VM's image, built on the Mac in a VM of
+// its own into `$XDG_STATE_HOME/pinetrie/vm/images/<key>/`. Elsewhere no
+// lane VM runs, and it says so. Exits 0 when the image is there or not
+// needed, 1 when it cannot be built.
 
-import { existsSync } from "node:fs"
 import { readFile, stat } from "node:fs/promises"
-import { homedir } from "node:os"
+import os, { homedir } from "node:os"
 import path from "node:path"
-import { hostBytesRunner, run } from "@pinetrie/lanes"
-import { buildVmImage, IMAGE_OUTPUTS, vmStateDir } from "@pinetrie/vm"
 import {
-  BUILDER_WORDS,
-  type Builder,
-  planBuilder,
-} from "../host/work/runtime.ts"
+  BUILDER,
+  buildVmImageInVm,
+  checkImageDir,
+  gatherBinary,
+  gatherBuildFirst,
+  IMAGE_OUTPUTS,
+  imageDir,
+  imageKey,
+  planVmBuild,
+  pruneVmState,
+  readImageSources,
+  vmBuildWords,
+  vmHostRefusal,
+  vmStateDir,
+} from "@pinetrie/vm"
+
+const args = process.argv.slice(2)
+const unknown = args.filter(a => a !== "--force")
+if (unknown.length > 0) {
+  console.error(
+    `[vm:build] ${unknown.join(" ")}: usage: pnpm vm:build [--force]`,
+  )
+  process.exit(2)
+}
 
 const stateDir = vmStateDir(process.env, homedir())
-const vmSocket = path.join(stateDir, "docker.sock")
-
-const answers = async (program: string, args: readonly string[]) =>
-  (await run(program, args)).ok
-
-const builder = planBuilder({
-  vmDocker:
-    existsSync(vmSocket) &&
-    (await answers("docker", ["-H", `unix://${vmSocket}`, "version"])),
-  hostDocker: await answers("docker", ["version"]),
+const image = imageDir(stateDir, imageKey(await readImageSources()))
+const plan = planVmBuild({
+  host: vmHostRefusal({
+    platform: process.platform,
+    arch: process.arch,
+    darwin: Number(os.release().split(".")[0]),
+  }),
+  image: (await checkImageDir(image)) === null,
+  builder: (await gatherBinary(stateDir, BUILDER)).state,
+  force: args.includes("--force"),
 })
 
-/** The CLI and its leading arguments that run a throwaway container. */
-function runner(b: Exclude<Builder, { kind: "none" }>): readonly string[] {
-  switch (b.kind) {
-    case "docker-vm":
-      return ["docker", "-H", `unix://${vmSocket}`, "run", "--rm"]
-    case "docker-host":
-      return ["docker", "run", "--rm"]
-  }
+if (plan.kind === "present") {
+  console.log(`[vm:build] already built: ${image}`)
+  process.exit(0)
 }
-
-if (builder.kind === "none") {
-  console.error(`[vm:build] ${BUILDER_WORDS}`)
+const first =
+  plan.kind === "build"
+    ? await gatherBuildFirst(stateDir)
+    : { compile: false, fetch: false }
+const words = `[vm:build] ${vmBuildWords(plan, first)}`
+if (plan.kind === "not-needed") {
+  console.log(words)
+  process.exit(0)
+}
+if (plan.kind === "refused") {
+  console.error(words)
   process.exit(1)
 }
-const cli = runner(builder)
-console.log(`[vm:build] building with ${builder.kind}`)
+
+console.log(words)
 const started = Date.now()
-const { dir, built } = await buildVmImage({
+const { dir, built } = await buildVmImageInVm({
   stateDir,
-  run: (image, argv) => hostBytesRunner()([...cli, image, ...argv]),
-  log: line => console.log(`[vm:build] ${line}`),
+  force: args.includes("--force"),
+  log: line => console.log(line),
 })
 console.log(
   built
     ? `[vm:build] built in ${((Date.now() - started) / 1000).toFixed(1)} s: ${dir}`
-    : `[vm:build] already built: ${dir}`,
+    : `[vm:build] built meanwhile by another process: ${dir}`,
 )
 for (const name of IMAGE_OUTPUTS) {
   const { size } = await stat(path.join(dir, name))
   console.log(`  ${name}: ${(size / 1e6).toFixed(1)} MB`)
 }
 process.stdout.write(await readFile(path.join(dir, "SHA256SUMS"), "utf8"))
+const pruned = await pruneVmState(stateDir)
+if (pruned.length > 0)
+  console.log(
+    `[vm:build] removed ${pruned.length} older images, binaries and downloads`,
+  )

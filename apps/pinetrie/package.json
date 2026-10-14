@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "host": "NODE_ENV=production node host/server.ts",
-    "host:react-dev": "NODE_ENV=development node host/server.ts",
+    "dev": "NODE_ENV=production node host/dev.ts",
+    "dev:react": "NODE_ENV=development node host/dev.ts",
+    "serve": "NODE_ENV=production node host/serve.ts",
+    "build": "node scripts/build.ts",
     "e2e": "node e2e/e2e.ts",
     "e2e:live": "PINETRIE_LIVE=1 PINETRIE_SCENARIO=live node e2e/e2e.ts",
     "e2e:browser": "node e2e/browser.ts",

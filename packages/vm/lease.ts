@@ -11,9 +11,13 @@ import net from "node:net"
 import os from "node:os"
 import path from "node:path"
 import { createInterface } from "node:readline"
-import { checkImageDir, readImageSources } from "./build.ts"
+import {
+  buildVmImageInVm,
+  checkImageDir,
+  gatherBuildFirst,
+  readImageSources,
+} from "./build.ts"
 import { ensureGvproxy, readGvproxyPin } from "./gvproxy.ts"
-import { buildLauncher, gatherLauncher } from "./launcher.ts"
 import {
   type Fill,
   imageDir,
@@ -25,7 +29,9 @@ import {
   type ShareDir,
   staleVmWords,
   type VmRefusal,
+  vmBuildWords,
   vmMemory,
+  vmStartRefusal,
   vmWords,
 } from "./plan.ts"
 import {
@@ -35,6 +41,8 @@ import {
   type LauncherRefusal,
   type VmIdentity,
 } from "./protocol.ts"
+import { pruneVmState } from "./prune.ts"
+import { BUILDER, buildBinary, gatherBinary, LAUNCHER } from "./swift.ts"
 
 export interface Lease {
   readonly slot: number
@@ -155,6 +163,12 @@ export async function leaseVm(input: LeaseInput): Promise<Lease> {
     )
     return lease
   }
+  // Built while the old VM still runs, so its lanes stop only for the swap.
+  if (
+    (await checkImageDir(path.join(input.stateDir, "images", want.image))) !==
+    null
+  )
+    await buildImage(input)
   input.log("[vm] replacing the lane VM, which runs an older image or launcher")
   await lease.retire()
   const control = path.join(input.stateDir, "control.sock")
@@ -223,15 +237,17 @@ async function leaseOnce(input: LeaseInput): Promise<{
   const { stateDir } = input
   await mkdir(stateDir, { recursive: true })
   const control = path.join(stateDir, "control.sock")
-  const { first, image, launcher, planned } = await gatherVm(stateDir)
+  const { first, image, launcher, planned, startRefusal } =
+    await gatherVm(stateDir)
   // execute
   if (planned.kind === "refused") throw refusedBy(planned.refusal)
   let socket = first
   let started: number | null = null
   if (planned.kind === "start") {
+    if (planned.buildImage) await buildImage(input)
     if (launcher.state === "buildable") {
       input.log("[vm] building the lane VM's launcher")
-      await buildLauncher(launcher.binary)
+      await buildBinary(launcher.binary, LAUNCHER)
     }
     // The VM's network stack: fetched and checked once, then kept.
     const gvproxy = await ensureGvproxy(stateDir, await readGvproxyPin())
@@ -260,38 +276,56 @@ async function leaseOnce(input: LeaseInput): Promise<{
     input.log(
       `[vm] Docker answered ${Date.now() - started} ms after the launcher started`,
     )
-  const imageMissing = await checkImageDir(image)
   return {
     lease,
     want: {
       image: path.basename(image),
       launcher: path.basename(launcher.binary),
     },
-    canStart:
-      imageMissing !== null
-        ? vmWords("no-image")
-        : launcher.state === "no-swiftc"
-          ? vmWords("no-swiftc")
-          : null,
+    canStart: startRefusal === null ? null : vmWords(startRefusal),
   }
 }
 
 const refusedBy = (r: VmRefusal) => new VmRefused(vmWords(r))
 
+/** Build the current image, saying first what that takes, then prune what it replaced. */
+async function buildImage(input: LeaseInput): Promise<void> {
+  const { stateDir } = input
+  input.log(
+    `[vm] ${vmBuildWords({ kind: "build" }, await gatherBuildFirst(stateDir))}`,
+  )
+  await buildVmImageInVm({
+    stateDir,
+    force: false,
+    log: l => input.log(`[vm] ${l}`),
+  })
+  await pruneVmState(stateDir)
+}
+
 /** What decides whether a host starts the VM, joins it, or cannot: gathered, then planned. */
 async function gatherVm(stateDir: string) {
   const image = imageDir(stateDir, imageKey(await readImageSources()))
   const first = await connect(path.join(stateDir, "control.sock"))
-  const launcher = await gatherLauncher(stateDir)
-  const planned = planVm({
+  const [launcher, builder] = await Promise.all([
+    gatherBinary(stateDir, LAUNCHER),
+    gatherBinary(stateDir, BUILDER),
+  ])
+  const facts = {
     platform: process.platform,
     arch: process.arch,
     darwin: Number(os.release().split(".")[0]),
     answering: first !== null,
     image: (await checkImageDir(image)) === null,
     launcher: launcher.state,
-  })
-  return { first, image, launcher, planned }
+    builder: builder.state,
+  }
+  return {
+    first,
+    image,
+    launcher,
+    planned: planVm(facts),
+    startRefusal: vmStartRefusal(facts),
+  }
 }
 
 /**

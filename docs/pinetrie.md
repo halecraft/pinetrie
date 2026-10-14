@@ -527,9 +527,12 @@ context.**
 
 ### Running pine·trie
 
-- `pnpm run host` starts the development host on pine·trie's own repo:
-  loopback, your config's model, the session in `.pinetrie/pinetrie.db`.
-  `pnpm run host <folder>` serves another project instead, at that folder's
+- `pnpm dev` starts a host on pine·trie's own repo, its page through
+  Vite: loopback, your config's model, the session in
+  `.pinetrie/pinetrie.db`. `pnpm build` then `pnpm serve` runs one that
+  serves the built page, with no Vite (ADR-0148); `serve` rebuilds a page
+  whose code changed since its build, and says so.
+  `pnpm dev <folder>` (or `pnpm serve <folder>`) serves another project instead, at that folder's
   jj or git root (ADR-0086). A relative folder is read from pine·trie's root,
   not the shell's directory. Each project keeps its own session in its
   root's `.pinetrie/`, which the host adds to the repo's exclude file before
@@ -542,14 +545,19 @@ context.**
   `/mnt/host-working-copy`, read-only, and nothing else of your machine unless
   accepted work's `pinetrie.json` grants it: a grant you add applies once you
   commit and publish it, and a thread's own copy can only give grants up. Your working copy is yours, so hot reload stays on. It needs a
-  jj repo and Docker (ADR-0102, ADR-0130): the lane VM on the Mac (`pnpm
-  vm:build` once, in any Docker on the Mac), on Linux Docker with a btrfs lanes directory; without
-  them the host says what is missing and does not start. Restart the host
+  jj repo and Docker (ADR-0102, ADR-0130): the lane VM on the Mac, on Linux
+  Docker with a btrfs lanes directory; without them the host says what is
+  missing and does not start. On the Mac the host builds the lane VM's
+  image when it has none, in a VM of its own: about 20 s, and 43 MB
+  fetched once (ADR-0147). It needs Xcode's command line tools, and the
+  Docker CLI with buildx for lane images, but no Docker engine. `pnpm
+  vm:build` builds it ahead (`--force` again); on Linux it says no image
+  is needed. Restart the host
   to pick up changes to host code.
-- **`pnpm run host` serves React's production build** through Vite's dev
+- **`pnpm dev` serves React's production build** through Vite's dev
   server (`NODE_ENV=production`): hot reload stays, as a full page reload,
   and a long thread stays quick to type in (S59).
-  `pnpm run host:react-dev` serves React's development build: its warnings,
+  `pnpm dev:react` serves React's development build: its warnings,
   its render timeline and Fast Refresh, for work on the client's renders. The
   suites start their own host with development React.
 - **A thread's container stops when its run ends**, and starts again at the

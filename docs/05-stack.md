@@ -21,7 +21,7 @@ rather than re-invent:
 | Format + lint | **Biome** — `lineWidth 80`, `indentWidth 2`, spaces |
 | Tests | **Vitest** — `include: ["src/**/*.test.ts"]` |
 | UI | **React + `@kyneta/react`** (`todo-react`, `bumper-cars`, `prisma-counter`) |
-| Dev server | **Vite in middleware mode**, sharing one `node:http` server with `ws` |
+| Dev server | **Vite in middleware mode**, sharing one `node:http` server with `ws`, for `pnpm dev`; `pnpm serve` sends Vite's build from the same server, with no Vite (ADR-0148) |
 | TS on Node | **`tsx`** to run the server (`dev: "tsx src/server.ts"`) |
 | Verification | a `verify` cascade — "simple, fast problems first, then cascade to more severe" |
 

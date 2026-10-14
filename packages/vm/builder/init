@@ -1,0 +1,31 @@
+#!/bin/sh
+# PID 1 of the VM that builds the lane VM's image: the network, then
+# build.sh, then its outputs as a tar written raw to the one disk, then power
+# off. Every line goes to the console, which the Mac logs.
+#
+# The disk is /dev/vda: it is the only one. Writing to a disk that is not
+# there makes a plain file in devtmpfs and succeeds.
+# The modules are loaded with insmod, in /m/order's order, dependencies
+# first: they are uncompressed, and busybox's modprobe cannot read the
+# kernel's .ko.gz.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts /tmp && mount -t devpts devpts /dev/pts
+say() { echo "[builder] $*"; }
+for m in $(cat /m/order); do insmod "/m/$m" || say "insmod $m failed"; done
+ip link set lo up
+ip link set eth0 up
+udhcpc -i eth0 -q -n -t 10 || say "no address from DHCP"
+mkdir -p /out
+if sh /src/build.sh /src /out; then
+  if tar -C /out -cf /dev/vda SHA256SUMS Image stage1.cpio system.erofs && sync; then
+    say "built"
+  else
+    say "the outputs could not be written to /dev/vda"
+  fi
+else
+  say "build.sh failed"
+fi
+poweroff -f

@@ -128,6 +128,7 @@ import {
 } from "./migrations/index.ts"
 import { createMoveHistories } from "./move-history.ts"
 import { createNames } from "./names.ts"
+import type { PageSource } from "./page.ts"
 import { createPinned } from "./pinned.ts"
 import { hostPolicy, resolveDoc, SCHEMA_OF } from "./policy.ts"
 import { projectAdapter } from "./project.ts"
@@ -216,6 +217,8 @@ export interface StartHostOptions {
    * is also what trims the session's in-memory op log.
    */
   readonly store?: string | Store | null
+  /** Where the page comes from: Vite unless given (`pnpm serve` gives the built page). */
+  readonly page?: PageSource
   /**
    * The images, for a caller that gives a `Store` it made: pass the `blobs`
    * `openStore` gave with it, so a restart keeps them. A store given as a file
@@ -295,6 +298,7 @@ export async function startHost({
     agent: process.env.SSH_AUTH_SOCK ?? null,
   },
   store: storeFile = null,
+  page = { kind: "vite" },
   blobs: givenBlobs,
   now = Date.now,
   presenceDecay = PRESENCE_DECAY,
@@ -854,6 +858,7 @@ export async function startHost({
     serverTransport,
     blobs,
     destination: work.destination,
+    page,
     log,
   })
 

@@ -10,7 +10,8 @@ wires them.
 
 | module | owns |
 |---|---|
-| `server.ts`, `invocation.ts` | `pnpm host [folder]` (ADR-0086): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it), `refusalText` (a refusal's words); `server.ts` carries them out. A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm run host:react-dev` serves React's development build, for its warnings and render timeline (S59) |
+| `dev.ts`, `serve.ts`, `server.ts`, `invocation.ts` | `pnpm dev [folder]` and `pnpm serve [folder]` (ADR-0086, ADR-0148), each a few lines over `runHost` (`server.ts`): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it), `refusalText` (a refusal's words, with its command's usage). A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm dev:react` serves React's development build, for its warnings and render timeline (S59) |
+| `page.ts` | the page a host serves (ADR-0148): Vite under `pnpm dev`, else the built page in the page's `dist/`, which `pnpm serve` rebuilds first when its stamp no longer matches its inputs (`ensurePage`), and whose files it reads once at start (`readBuiltPage`); where the page's package is (`pageDir`) |
 | `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model |
 | `settings.ts` | every setting the host reads, declared once (`SETTINGS`, ADR-0146) with the layers that may set it and how they combine; the project's copies as values (`laneAuthority`, `decodeAuthority`, `laneCopy`), `settleHost`, `folderReport` for a host without lane work, and the settled values as the deciding packages take them (`repoNames`, `iconSettings`, `titleSettings`, `sshChoice`, `listedFolders`) |
 | `setup-record.ts` | `planSetupRecord`: the `pinetrie.setup` value, from the config's report and what the model setup loaded |
@@ -38,7 +39,7 @@ wires them.
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat (ADR-0007), and who its writer is: the principal its connection named, an email, so no command field can claim to be someone else (ADR-0037). The host is no writer: writers are the connected clients, and own no lanes, which belong to threads (ADR-0120) |
 | `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0122), `mark` (ADR-0045, ADR-0116), `lane` (stop, carry on, hold or release a queue, offer: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent, a paste, a thread's copy: ADR-0059, ADR-0066, ADR-0132); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
-| `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
+| `http.ts` | the HTTP server: admission, the page (Vite or the built one), the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47) |
@@ -394,7 +395,9 @@ any refresh they queued.
   only once both exist.
 
 - **The runtime is Docker** (`work/runtime.ts`, ADR-0130): the lane VM's on
-  the Mac and the host's own on Linux (`planRuntime`).
+  the Mac and the host's own on Linux (`planRuntime`). On the Mac, a host
+  whose lane VM image is missing builds it as it leases (ADR-0147,
+  `packages/vm/TECHNICAL.md`), saying so first; it takes about 20 s.
   - **A host with tools that cannot run lanes does not start** (ADR-0102):
     `projectAdapter` (`project.ts`) and `findProject` return the refusal as
     a value, worded with its fix, and `startHost` throws it as
@@ -441,7 +444,7 @@ rejects `shutdown()`.
 - **`shutdown()` runs once.** A later call returns the first call's
   promise, so a second signal, a scenario's `finally` and `withHost` never
   close anything twice.
-- **`server` stops accepting, then closes Vite and every socket.**
+- **`server` stops accepting, then closes Vite (under `pnpm dev`) and every socket.**
   `httpServer.close` calls back only when every socket has ended, upgraded
   ones included, and neither `wss.close()` nor `closeAllConnections()`
   closes an upgraded socket. Vite's HMR socket kept a host with a page open
@@ -450,7 +453,8 @@ rejects `shutdown()`.
   that reconnected after the `exchange` step was accepted again), cuts any
   request in flight, then waits. Accepting must stop before Vite closes: a
   page retries Vite's socket once a second, and once Vite's `upgrade`
-  listener is gone, the `"vite"` route leaves that socket open.
+  listener is gone, the `"vite"` route leaves that socket open. A host
+  serving the built page has no Vite to close.
 - **Only the first signal shuts down** (`server.ts`). It takes the SIGINT
   and SIGTERM listeners off, so a second Ctrl-C gets Node's default action
   and ends the process, even while `shutdown()` hangs.
@@ -953,8 +957,15 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 ## HTTP
 
 - **Admission comes first**, for a request and for an upgrade. Nothing
-  reaches Vite, the blobs, an offer's reads or the Exchange without it.
-- **Vite's HMR socket shares the host's port, behind admission.** Vite's
+  reaches the page, the blobs, an offer's reads or the Exchange without it.
+- **The built page is sent by `planPageRequest`** (`routes.ts`), over the
+  set of files `dist/` held at start: `/` is `index.html`, `no-cache`, so a
+  rebuild is seen at the next load; `assets/` files, named by their hash,
+  are `immutable`; nothing falls back to `index.html` (the page routes by
+  its URL's hash), and only a name in the set is read, so no path leaves
+  `dist/`. The stamp, which names this machine's paths, is not in the set.
+  There is no HMR: an upgrade but `/ws` is refused (`planUpgrade`).
+- **Under `pnpm dev`, Vite's HMR socket shares the host's port, behind admission.** Vite's
   listener sits on `viteUpgrades`, a server that never binds, and `http.ts`
   passes it each admitted upgrade that is not `/ws`. `hmr: false` does not
   stop `/@vite/client` from connecting, and without `hmr.server` Vite
@@ -989,7 +1000,7 @@ adapter's.
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`, which fires the merge's `follow` after `recordUpdate`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper; its lanes' history moved in the destination (`lanesMoved`) |
 | `shares.ts` | what lanes may mount and reach, shared into the lane VM's slots and granted: the decision (`planShareAndGrant`) and, on the Mac, its state behind one queue (`createShares`: a share, a new lease's reset, the extra slots' close) |
-| `runtime.ts` | the one place that picks the runtime, from the project as startup found it (`ProjectDir`): gathers, plans (`planRuntime`, `planBuilder` for `pnpm vm:build`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
+| `runtime.ts` | the one place that picks the runtime, from the project as startup found it (`ProjectDir`): gathers, plans (`planRuntime`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
 | `ssh.ts` | lanes' ssh (ADR-0140): what the host reads of the person's and the service folder's (`ssh/` in pine·trie's config directory) ssh files, from `lanes.ssh` as settled (`sshChoice`), the lanes' files, the service agent and the host's socket (`@pinetrie/ssh`), what each lane is given (`attachedFor`, `holdsFor`), and the owner's answers, which it follows in `pinetrie.access` |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed

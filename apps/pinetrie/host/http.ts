@@ -1,9 +1,10 @@
-// host/http — the host's one HTTP server: the Exchange's websocket, Vite, the
-// blobs and an offer's reads. It carries out `planRequest` and `planUpgrade`
-// (routes.ts), which admit first.
+// host/http — the host's one HTTP server: the Exchange's websocket, the page
+// (Vite, or its build), the blobs and an offer's reads. It carries out
+// `planRequest`, `planUpgrade` and `planPageRequest` (routes.ts), which
+// admit first.
 
+import { readFile } from "node:fs/promises"
 import http, { type IncomingMessage, type ServerResponse } from "node:http"
-import { createRequire } from "node:module"
 import { networkInterfaces } from "node:os"
 import path from "node:path"
 import {
@@ -23,6 +24,7 @@ import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
 import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"
 import { MAX_UPLOAD_BYTES, planUploadHeaders } from "./blobs.ts"
+import { type PageSource, pageDir } from "./page.ts"
 import {
   blobResponse,
   type HttpAnswer,
@@ -30,7 +32,7 @@ import {
   uploaded,
   uploadRefusal,
 } from "./responses.ts"
-import { planRequest, planUpgrade } from "./routes.ts"
+import { planPageRequest, planRequest, planUpgrade } from "./routes.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export interface RunningHttp {
@@ -39,8 +41,8 @@ export interface RunningHttp {
   readonly wsUrl: string
   readonly invites: readonly string[]
   /**
-   * Stop accepting, close Vite and every socket and request still open, then
-   * wait for the HTTP server to close.
+   * Stop accepting, close Vite (where it serves the page) and every socket
+   * and request still open, then wait for the HTTP server to close.
    */
   close(): Promise<void>
 }
@@ -60,9 +62,11 @@ export async function startHttp(input: {
   readonly blobs: BlobStore
   /** Your repo, whose offers a review reads; null for a host without tools. */
   readonly destination: LaneWork["destination"]
+  /** Where the page comes from: Vite, or the built page in `dist/`. */
+  readonly page: PageSource
   readonly log: (message: string) => void
 }): Promise<RunningHttp> {
-  const { port, bind, key, serverTransport, blobs, destination } = input
+  const { port, bind, key, serverTransport, blobs, destination, page } = input
 
   const wss = new WebSocketServer({ noServer: true })
   wss.on("connection", ws => {
@@ -78,24 +82,44 @@ export async function startHttp(input: {
   // Vite opens port 24678 and its client connects there.
   const viteUpgrades = http.createServer()
 
-  // Vite serves the client: index.html, module transforms, wasm, HMR. One
-  // node:http server is shared, so there is a single port and a single origin.
-  // Locate the client through module RESOLUTION, not a relative path: it is a
-  // package this app depends on, and where it sits on disk is its business.
-  const clientDir = path.dirname(
-    createRequire(import.meta.url).resolve("@pinetrie/web/package.json"),
-  )
-  const vite = await createViteServer({
-    root: clientDir,
-    configFile: path.join(clientDir, "vite.config.ts"),
-    server: {
-      middlewareMode: true,
-      hmr: { server: viteUpgrades },
-      // Admission decides which `Host` gets in (admission.ts): off loopback,
-      // any name with the key, such as a tunnel's.
-      allowedHosts: true,
-    },
-  })
+  // Vite serves the page under `pnpm dev`: index.html, module transforms,
+  // wasm, HMR. One node:http server is shared, so there is a single port and
+  // a single origin. A built page has no Vite.
+  const vite =
+    page.kind === "vite"
+      ? await createViteServer({
+          root: pageDir(),
+          configFile: path.join(pageDir(), "vite.config.ts"),
+          server: {
+            middlewareMode: true,
+            hmr: { server: viteUpgrades },
+            // Admission decides which `Host` gets in (admission.ts): off
+            // loopback, any name with the key, such as a tunnel's.
+            allowedHosts: true,
+          },
+        })
+      : null
+
+  /** A file of the built page, or a 404 (`planPageRequest`). */
+  async function serveBuilt(
+    built: Extract<PageSource, { kind: "built" }>,
+    req: IncomingMessage,
+    res: ServerResponse,
+  ) {
+    const answer = planPageRequest(
+      new URL(req.url ?? "/", "http://host").pathname,
+      built.files,
+    )
+    if (answer.kind === "missing") {
+      res.writeHead(404).end()
+      return
+    }
+    const body = await readFile(path.join(built.dir, answer.file)).catch(
+      () => null,
+    )
+    if (body === null) res.writeHead(404).end()
+    else res.writeHead(200, answer.headers).end(body)
+  }
   // Each request carries out its plan (`planRequest`), which admits first.
   httpServer.on("request", (req, res) => {
     const to = planRequest(requestFacts(req), key, req.method)
@@ -121,7 +145,8 @@ export async function startHttp(input: {
         res.writeHead(400).end()
         return
       case "other":
-        vite.middlewares(req, res)
+        if (vite !== null) vite.middlewares(req, res)
+        else if (page.kind === "built") void serveBuilt(page, req, res)
     }
   })
 
@@ -194,9 +219,10 @@ export async function startHttp(input: {
   }
 
   // ROUTE the upgrade: the Exchange's socket is `/ws`, and any other admitted
-  // upgrade goes on to Vite's HMR listener, on `viteUpgrades`.
+  // upgrade goes on to Vite's HMR listener, on `viteUpgrades`, where Vite
+  // serves the page.
   httpServer.on("upgrade", (req, socket, head) => {
-    switch (planUpgrade(requestFacts(req), key)) {
+    switch (planUpgrade(requestFacts(req), key, vite !== null)) {
       case "refuse":
         socket.end("HTTP/1.1 403 Forbidden\r\n\r\n")
         return
@@ -224,7 +250,7 @@ export async function startHttp(input: {
             `port ${port} is already in use — most likely a host left running.\n` +
               `  find it : lsof -ti :${port}\n` +
               `  stop it : lsof -ti :${port} | xargs kill\n` +
-              `  or pick another port: PINETRIE_PORT=7392 npm run host  (PINETRIE_PORT=0 = any free port)`,
+              `  or pick another port: PINETRIE_PORT=7392 pnpm dev  (PINETRIE_PORT=0 = any free port)`,
           ),
         )
         return
@@ -259,13 +285,13 @@ export async function startHttp(input: {
     async close() {
       // `close` stops accepting at once, but calls back only when every socket
       // has ended, upgraded ones too, which `closeAllConnections` does not
-      // reach. Accepting stops before Vite closes: a page retries Vite's
-      // socket, and once Vite's listener is gone that upgrade would be left
-      // open.
+      // reach. Accepting stops before Vite (where there is one) closes: a
+      // page retries Vite's socket, and once Vite's listener is gone that
+      // upgrade would be left open.
       const closed = new Promise<void>(resolve => {
         httpServer.close(() => resolve())
       })
-      await vite.close()
+      await vite?.close()
       try {
         wss.close()
       } catch {}

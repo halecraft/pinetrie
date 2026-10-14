@@ -11,6 +11,25 @@ in the browser what the interface encodes (`tab-state.ts`,
 `storage-keys.ts`). A module named here that is not in this directory, such
 as `layout.ts` or `viewport.ts`, is the interface's.
 
+## The build (`vite.config.ts`, `stamp.ts`)
+
+The page is served through Vite by `pnpm dev`, and as Vite's build by
+`pnpm serve` (ADR-0148).
+
+- **React and React DOM are deduplicated** (`resolve.dedupe`). The linked
+  Kyneta checkout resolves its own React, a different version: without
+  this the build bundles two, and the page fails on its first hook, after
+  the join form draws (S196). Vite's dev server hides it, so a test builds
+  the page and counts one React by its chunks' module paths
+  (`stamp.test.ts`).
+- **A build writes its stamp,** `dist/inputs.json`: the SHA-256 of each
+  file it read, `vite.config.ts` and each file under `public/` (which Vite
+  copies without reading), and its mode. A host serving the build rebuilds
+  when any differs or is gone (`isStampFresh`): content, not mtimes, since
+  a jj checkout rewrites mtimes. Hashing every input takes about 28 ms
+  (S196). A new file nothing imports yet cannot change the page until an
+  import of it changes a listed file.
+
 ## Renders (S54, S59)
 
 A render of `App` redraws no message whose content did not change, and a
@@ -114,8 +133,8 @@ about 55 ms (S59).
   is drawn bound at once. It returns the same state when nothing moves, so
   the effect that stores it settles after one pass.
 - **The browser suite counts renders** from React's development build, which
-  `startHost` serves with `NODE_ENV` unset, as `pnpm run host:react-dev`
-  does (`pnpm run host` serves production React): React measures every
+  `startHost` serves with `NODE_ENV` unset, as `pnpm dev:react` does
+  (`pnpm dev` and `pnpm serve` serve production React): React measures every
   render whose props its diff finds changed on its "Components ⚛" track,
   with that diff (`componentRenders` in `apps/pinetrie/e2e/browser/page.ts`).
   A production build records none, and every count would pass, so the suite

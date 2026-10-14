@@ -304,34 +304,3 @@ const sweptLog = (keys: readonly string[], log: (line: string) => void) => {
       `[host] removed the lanes of ${keys.length} projects whose folders are gone`,
     )
 }
-
-/** What decides where the VM's image is built. */
-export interface BuilderFacts {
-  /** The VM's Docker answers, through the launcher's `docker.sock`. */
-  readonly vmDocker: boolean
-  /** A Docker on this machine answers (`docker version`): any vendor's. */
-  readonly hostDocker: boolean
-}
-
-/** Where the VM's image is built: the first Docker found. */
-export type Builder =
-  | { readonly kind: "docker-vm" }
-  | { readonly kind: "docker-host" }
-  | { readonly kind: "none" }
-
-/**
- * The VM's own Docker if it runs; else a Docker on this machine, on any
- * platform: the one way to build a Mac's first image, or a new one while
- * its VM is stopped, since the VM starts only from the current image
- * (`planVm`'s `no-image`). The build runs one throwaway container with no
- * mount, so any Docker does (`packages/vm/build.ts`).
- */
-export function planBuilder(f: BuilderFacts): Builder {
-  if (f.vmDocker) return { kind: "docker-vm" }
-  if (f.hostDocker) return { kind: "docker-host" }
-  return { kind: "none" }
-}
-
-/** Why the image cannot be built here, worded with what would let it. */
-export const BUILDER_WORDS =
-  "no Docker to build the lane VM's image in: start a Docker on this machine (`docker version` answers), or the lane VM if it has an image"

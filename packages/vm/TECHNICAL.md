@@ -18,12 +18,6 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   three scripts, since a script's change makes another image too. A build
   lands in `$XDG_STATE_HOME/pinetrie/vm/images/<key>/`, unpacked into a
   temporary directory and checked against its `SHA256SUMS` first.
-- **The build needs no mount** (`planBuild`): the sources go in as base64
-  arguments, and the outputs come out as a tar on stdout. So it runs alike
-  in any Docker: `pnpm vm:build` picks the VM's own if it runs, else one on
-  this machine, of any vendor (`planBuilder`). A Mac's first image, or a
-  new one while its VM is stopped, needs one there: the VM starts only from
-  the current image (`planVm`).
 - **Never run another distribution's `depmod`** on the modules: Debian's
   kmod has no zlib, skips `.ko.gz`, and writes an empty index (S128).
   `build.sh` keeps Alpine's own `modules.dep` and indexes, and checks each
@@ -54,14 +48,77 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
 - **Built in this lane, measured:** 15 s in an Alpine 3.23 chroot; `Image`
   34.6 MB, `stage1.cpio` 1.6 MB, `system.erofs` 102.3 MB.
 
+## The image's build (`builder/`, `build.ts`)
+
+The Mac builds the image in a one-shot VM of its own, with no Docker
+(ADR-0147, S195). Nowhere else runs a lane VM, so nowhere else builds one.
+
+- **Who builds:** a lease whose image is missing (`planVm`'s `start` with
+  `buildImage`), before it starts the VM; a host replacing an older VM
+  builds first, while the old one still runs. And `pnpm vm:build`
+  (`planVmBuild`: `present`, `build`, `not-needed` or `refused`;
+  `--force` rebuilds), which `pnpm build` runs too. Where the lane VM
+  cannot run (`vmHostRefusal`: not a Mac, no Apple silicon, macOS before
+  13) nothing is built, and `vmBuildWords` says why and names `--force`,
+  which is refused there for now (S197).
+- **What boots the build is pinned** (`builder/pins.json`): the
+  `linux-virt` apk the manifest names, so the builder boots the very
+  kernel the image ships, and Alpine's minirootfs for `alpine-base`'s
+  version, each by SHA-256 (a test holds the versions to the manifest's).
+  Fetched once into `builder/` (`ensurePinned`, `pinned.ts`, as gvproxy
+  is). Alpine keeps only each package's latest version: when it drops one,
+  the fetch's 404 names it, and the manifest and `pins.json` move together.
+- **The builder's files are not in `imageKey`:** they change how an image
+  is built, not what it holds, so no running VM goes stale for them.
+- **The kernel is unpacked in Node** (`apk.ts`): `gunzipSync` reads an apk's
+  three gzip streams as one tar, a pax `path` names the entry after it,
+  and `zbootImage` takes the `Image` out of the EFI zboot. `build.sh` does
+  the same in the guest, in shell, on purpose: the image's build stays
+  self-contained, and `imageKey` covers it. The observer suite boots the
+  same kernel (`pinnedKernel`).
+- **The initrd is three things concatenated,** made with what macOS ships:
+  the minirootfs as newc cpio (`bsdtar ... @tarball`, keeping root's
+  ownership without unpacking), then `m/` (the seven modules, gunzipped,
+  and `m/order`), `init` and `src/` (the image's sources) with uid and gid
+  0. Later entries win.
+- **The guest (`builder/init`):** `insmod`s `m/order` in its order
+  (busybox cannot read `.ko.gz`); DHCP; `build.sh`; the outputs as a tar
+  written raw to `/dev/vda`; `[builder] built`; power off. The run is a
+  value (`planVmBuildRun`); `buildVmImageInVm` carries it out, logging the
+  console's `[vm-build]` and `[builder]` lines, and reads the disk back
+  with `tar`.
+- **The machine (`builder/builder.swift`):** built and signed as the
+  launcher is (`SwiftBinary`, `swift.ts`), a binary of its own so a change
+  to it retires no running VM. The kernel and initrd, 1 GiB, every CPU,
+  Virtualization's NAT, entropy, the console on stdout, and a sparse 1 GiB
+  file as its one disk. NAT, not gvproxy: a build lasts 20 s, and NAT's
+  fragility (S135) matters to a VM that runs for hours.
+- **One build per image at a time:** `images/<key>.lock`, created `wx` and
+  holding the PID (`planLock`): a live holder is waited on, a dead one's
+  lock broken. Node has no `flock`.
+- **Installing never removes a whole image** (`installImage`): a build
+  that finds one in place discards its own, since a launcher may be
+  starting from it. One that is not whole is replaced; `--force` replaces
+  either.
+- **After a build, what no longer serves goes** (`planPrune`, `prune.ts`):
+  images, launchers, builders and pins that are not current and that no
+  running launcher names in its arguments, matched by name, since the
+  contract scenario runs a launcher from another state directory over the
+  same `images/` and `bin/`; and the `.tmp-`, `.old-` and lock files of
+  processes gone. Without `ps`'s listing nothing is removed.
+- **Measured:** 20 s on an M3 Max, 21 s with the builder's compile and the
+  pins' first fetch (43 MB); a lease from no image to Docker answering,
+  27 s.
+
 ## The launcher (`launcher/launcher.swift`)
 
 - **One per user,** in `$XDG_STATE_HOME/pinetrie/vm/`: an exclusive `flock`
   on `launcher.lock`, so a second exits at once and its host joins the
   first. A host that finds no `control.sock` answering starts one, detached,
   its output in `launcher.log`.
-- **Built on demand** (`launcher.ts`): `xcrun swiftc -swift-version 5 -O`,
-  signed ad hoc with `com.apple.security.virtualization`, into
+- **Built on demand** (`swift.ts`, as the builder is):
+  `xcrun swiftc -swift-version 5 -O`, signed ad hoc with
+  `com.apple.security.virtualization`, into
   `bin/launcher-<hash of the source and entitlements>`. Without Xcode's
   command line tools the lease is refused, naming `xcode-select --install`.
 - **The machine:** `VZLinuxBootLoader` with `Image`, `stage1.cpio` and
@@ -127,7 +184,8 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   - **`-ssh-port -1`:** by default `gvproxy` forwards the Mac's
     `127.0.0.1:2222` to the VM's port 22.
   - **Pinned:** `launcher/gvproxy.json` names the release and its SHA-256;
-    `ensureGvproxy` fetches it once into `bin/`, refusing another hash.
+    `ensureGvproxy` fetches it once into `bin/` (`ensurePinned`), refusing
+    another hash.
   - **Its API** (`gv-api.sock`) is on the Mac's side only, for the host.
 - **The lanes' fence** (`init`): `gvproxy`'s network holds the Mac's
   loopback (`.254`) and its API on the gateway (`.1:80`), which opens ports
@@ -154,8 +212,8 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   sends `retire`: the launcher syncs, stops the VM and exits, and the host
   starts the current one. With other hosts' leases on it, the host joins it
   and logs so, and the VM is replaced when the last of them stops. A host
-  that cannot start the current VM (no image, no Xcode tools) joins the old
-  one and says what is missing. Without this, a host after an update joined
+  that cannot start the current VM (no Xcode tools, `vmStartRefusal`) joins
+  the old one and says what is missing; a missing image is built first. Without this, a host after an update joined
   the VM left running by the last one, for up to its 10 idle minutes.
 - **A launcher older than the VM's identity** sends a `slot` without it:
   read with a null identity (`VmIdentity`), joined, and the log says how to
@@ -213,7 +271,9 @@ sweep of what binds into it.
 
 ## Tests
 
-`plan.test.ts`, `protocol.test.ts`, `build.test.ts` and `lease.test.ts`,
-whose lease runs against a stand-in launcher; mutations in
-`scripts/mutations/vm.ts`. The real launcher and VM are checked by the
-`contract` scenario under Docker (`packages/docker/TECHNICAL.md`).
+`plan.test.ts`, `protocol.test.ts`, `build.test.ts`, `apk.test.ts`,
+`pinned.test.ts` and `lease.test.ts`, whose lease runs against a stand-in
+launcher; mutations in `scripts/mutations/vm.ts`. The real launcher and VM
+are checked by the `contract` scenario under Docker
+(`packages/docker/TECHNICAL.md`), and the image's build in a VM by the
+lanes suite's `vm-image` scenario, on the Mac.
