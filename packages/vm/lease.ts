@@ -42,9 +42,14 @@ export interface Lease {
   readonly docker: string
   /**
    * Share these directories in the slot, once per lease: refilling a slot
-   * cuts every bind into it. Resolves when filled, with what was shared.
+   * cuts every bind into it. `sweep` runs first, with the slot: it removes
+   * what a host that died holding the slot left bound into it, which the
+   * fill would give the new directories. Resolves when filled.
    */
-  fill(dirs: readonly ShareDir[]): Promise<Fill>
+  fill(
+    dirs: readonly ShareDir[],
+    sweep: (slot: number) => Promise<void>,
+  ): Promise<Fill>
   /** What the VM was started from, and how many leases it holds. */
   readonly identity: VmIdentity
   /**
@@ -161,20 +166,38 @@ export async function leaseVm(input: LeaseInput): Promise<Lease> {
   return (await leaseOnce(input)).lease
 }
 
+/** A slot leased and filled for directories a host's own slot lacks. */
+export interface ExtraLease {
+  readonly fill: Fill
+  /** Ends the lease; the slot empties. */
+  close(): Promise<void>
+}
+
 /**
- * One more slot of the running VM, for directories a host's slot lacks.
- * Never starts, builds or retires a VM: while the host's own lease is held,
- * the launcher refuses to retire the VM, so this joins the same one; a
- * caller whose lease ended drops what this gives it. It bridges no ssh
- * socket; lanes keep the host slot's.
+ * One more slot of the running VM, leased, swept and filled with `dirs`
+ * alone, or none. Never starts, builds or retires a VM: while the host's
+ * own lease is held, the launcher refuses to retire the VM, so this joins
+ * the same one; a caller whose lease ended drops what this gives it. It
+ * bridges no ssh socket; lanes keep the host slot's.
  */
 export async function leaseExtra(input: {
   readonly stateDir: string
+  readonly dirs: readonly ShareDir[]
+  readonly sweep: (slot: number) => Promise<void>
   readonly log: (line: string) => void
-}): Promise<Lease> {
+}): Promise<ExtraLease> {
   const socket = await connect(path.join(input.stateDir, "control.sock"))
   if (socket === null) throw new Error("the lane VM's launcher is gone")
-  return leaseOn(socket, { agent: null, log: input.log })
+  const lease = await leaseOn(socket, { agent: null, log: input.log })
+  try {
+    return {
+      fill: await lease.fill(input.dirs, input.sweep),
+      close: lease.close,
+    }
+  } catch (error) {
+    await lease.close().catch(() => {})
+    throw error
+  }
 }
 
 interface LeaseInput {
@@ -377,9 +400,10 @@ export async function leaseOn(
       }
       await closed
     },
-    async fill(dirs) {
+    async fill(dirs, sweep) {
       if (filled) throw new Error("a slot is filled once")
       filled = true
+      await sweep(slot.slot)
       const entries = planShares(dirs)
       socket.write(encode({ kind: "fill", entries }))
       const m = await reply("a fill", 30_000)

@@ -382,18 +382,20 @@ any refresh they queued.
     (no image, no Xcode tools, not Apple silicon or older than macOS 13, a
     full VM). Without tools a host starts on any folder.
   - **On the Mac the host takes a lease** on a slot of the user's lane VM
-    (`leaseVm`), starting the VM if need be, then removes every container
-    with a bind into its slot (`sweepSlot`): a host that died holding the
-    slot left them (S130). The slot is filled once setup knows every
-    directory a lane mounts (`Found.ready`, before the base's refresh, the
-    first lane), and never replaced while the host runs.
+    (`leaseVm`), starting the VM if need be. The slot is filled once setup
+    knows every directory a lane mounts (`Found.ready`, before the base's
+    refresh, the first lane), and never replaced while the host runs. The
+    fill first removes every container with a bind into the slot
+    (`sweepSlot`): a host that died holding it left them (S130).
   - **What accepted work adds while the host runs** (ADR-0141) is shared
     and granted before it is in force: `refreshBaseNow` in `setup.ts` reads
     accepted work's config (`readAccepted`), hands what lanes may then mount
     and reach to `Found.shareAndGrant`, then puts it in force
-    (`takeAccepted`). The decision is a value (`planShareAndGrant`): the
-    host's slot first; then a directory no slot holds as wanted goes in an
-    extra slot, swept first; ports are written when they changed. Nothing
+    (`takeAccepted`). The decision is a value (`planShareAndGrant`,
+    `shares.ts`): the host's slot first; then a directory no slot holds as
+    wanted goes in an extra slot, swept first; ports are written when they
+    changed. The state it reads is `createShares`', changed only in one
+    queue, a new lease's reset among its tasks. Nothing
     changed, nothing is done: in a project whose accepted work moves often
     this path runs often. A widening the VM has no slot for is said once,
     and not asked again while the same directories are what is new; a lane
@@ -945,6 +947,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks jj for conflicts in the lane's copy |
 | `split.ts` | a split's prompt, and its end (`finishSplit`, which moves the lane back to its tip even when a step before it throws: left on the stack, the lane refuses every catch-up) |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
+| `shares.ts` | what lanes may mount and reach, shared into the lane VM's slots and granted: the decision (`planShareAndGrant`) and, on the Mac, its state behind one queue (`createShares`: a share, a new lease's reset, the extra slots' close) |
 | `runtime.ts` | the composition root, the one place that picks the runtime: gathers, plans (`planRuntime`, `planBuilder` for `pnpm vm:build`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
 | `ssh.ts` | lanes' ssh (ADR-0140): what the host reads of the person's and the service folder's ssh files, the lanes' files, the service agent and the host's socket (`@pinetrie/ssh`), what each lane is given (`attachedFor`, `holdsFor`), and the owner's answers, which it follows in `pinetrie.access` |
 

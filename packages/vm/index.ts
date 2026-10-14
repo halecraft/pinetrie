@@ -19,6 +19,7 @@ export {
 export { type Endable, type Kept, keepLease } from "./keep.ts"
 export { buildLauncher, gatherLauncher, launcherName } from "./launcher.ts"
 export {
+  type ExtraLease,
   type Lease,
   launcherWords,
   leaseExtra,
@@ -29,19 +30,23 @@ export {
 export {
   type Fill,
   GVPROXY_HOST_ADDRESS,
+  type Held,
+  type Holdings,
+  holdFill,
   IMAGE_FILES,
   IMAGE_OUTPUTS,
   type ImageSources,
   imageDir,
   imageKey,
   imageRefusal,
+  NOTHING_HELD,
   parseSums,
   planShares,
   planVm,
   planVmVersion,
   planWidening,
   type ShareDir,
-  sharePaths,
+  sharePath,
   slotRoot,
   staleVmWords,
   type VmFacts,

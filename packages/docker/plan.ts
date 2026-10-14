@@ -8,6 +8,9 @@
 import { createHash } from "node:crypto"
 import { WORKSPACE_ROOT } from "@pinetrie/core"
 import {
+  MACHINE_SOCKET,
+  OBSERVER_LOADER,
+  OBSERVER_SERVER,
   type ProjectDisks,
   ROLES,
   ROOTLESS_UID,
@@ -18,6 +21,7 @@ import {
   type Mount,
   PINETRIE_MOUNT,
   RUNTIME_MOUNT,
+  runtimeNode,
   SPEC_LABEL,
 } from "@pinetrie/lanes"
 import type { DockerTarget } from "./target.ts"
@@ -290,18 +294,22 @@ export const OBSERVER_GRANT = {
 /**
  * The machine role's container: the observer for every project and host on
  * the machine, so it carries no project's or slot's label, and no sweep
- * takes it. It removes itself when its server exits, once idle.
+ * takes it. It removes itself when its server exits, once idle. Its spec is
+ * the version's alone, so every host of a version renders the same one and
+ * joins the container another made.
  */
-export function renderObserver(input: {
-  readonly version: string
-  /** Its server's command, on the runtime copied into its image. */
-  readonly cmd: readonly string[]
-}): ContainerSpec {
+export function renderObserver(version: string): ContainerSpec {
   return {
-    name: observerContainer(input.version),
+    name: observerContainer(version),
     hostname: null,
-    image: observerImage(input.version),
-    cmd: input.cmd,
+    image: observerImage(version),
+    // Its server, on the runtime copied into its image.
+    cmd: [
+      ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_SERVER}`),
+      MACHINE_SOCKET,
+      OBSERVER_LOADER,
+      version,
+    ],
     workingDir: null,
     env: [],
     labels: {},

@@ -319,10 +319,10 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane is granted the host's own port",
-    file: "apps/pinetrie/host/work/runtime.ts",
+    file: "apps/pinetrie/host/work/shares.ts",
     from: "    grant: changed ? wanted.hostPorts.filter(p => p !== ownPort) : null,",
     to: "    grant: changed ? wanted.hostPorts : null,",
-    command: unit("apps/pinetrie/host/work/runtime.test.ts"),
+    command: unit("apps/pinetrie/host/work/shares.test.ts"),
     expect: "the host's own port is never granted, and is said with why",
   },
   {

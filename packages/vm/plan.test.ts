@@ -1,18 +1,20 @@
 import { describe, expect, test } from "vitest"
 import {
   type Fill,
+  holdFill,
   IMAGE_FILES,
   type ImageSources,
   imageDir,
   imageKey,
   imageRefusal,
+  NOTHING_HELD,
   parseSums,
   planShares,
   planVm,
   planVmVersion,
   planWidening,
   type ShareDir,
-  sharePaths,
+  sharePath,
   slotRoot,
   staleVmWords,
   type VmFacts,
@@ -111,7 +113,7 @@ describe("planShares: a slot's entries", () => {
   })
 })
 
-describe("sharePaths: where each source is in the VM, across a host's fills", () => {
+describe("holdings: which slots hold each source, and where it is in the VM", () => {
   const fill = (slot: number, dirs: readonly ShareDir[]): Fill => ({
     slot,
     entries: planShares(dirs),
@@ -119,37 +121,54 @@ describe("sharePaths: where each source is in the VM, across a host's fills", ()
   const name = (source: string) =>
     planShares([{ source, readOnly: true }])[0]?.name
   test("a source is at its slot's root, under its entry's name", () => {
-    const at = sharePaths([fill(3, [{ source: "/p", readOnly: true }])])
-    expect(at("/p")).toBe(`/mnt/host-shares/3/${name("/p")}`)
+    const held = holdFill(
+      NOTHING_HELD,
+      fill(3, [{ source: "/p", readOnly: true }]),
+    )
+    expect(sharePath(held, "/p")).toBe(`/mnt/host-shares/3/${name("/p")}`)
     expect(slotRoot(3)).toBe("/mnt/host-shares/3/")
   })
-  test("a source in two fills is taken from the one holding it read-write", () => {
+  test("a source in two slots is taken from the one holding it read-write", () => {
     const ro = fill(1, [{ source: "/g", readOnly: true }])
     const rw = fill(4, [{ source: "/g", readOnly: false }])
-    expect(sharePaths([ro, rw])("/g")).toBe(`/mnt/host-shares/4/${name("/g")}`)
-    expect(sharePaths([rw, ro])("/g")).toBe(`/mnt/host-shares/4/${name("/g")}`)
+    for (const order of [
+      [ro, rw],
+      [rw, ro],
+    ])
+      expect(sharePath(order.reduce(holdFill, NOTHING_HELD), "/g")).toBe(
+        `/mnt/host-shares/4/${name("/g")}`,
+      )
   })
-  test("a path no fill holds is never mapped", () => {
-    expect(() =>
-      sharePaths([fill(0, [{ source: "/p", readOnly: true }])])("/etc"),
-    ).toThrow("/etc is not shared into this host's slots")
+  test("a second slot of one kind is never recorded: the first keeps the source", () => {
+    const held = [
+      fill(1, [{ source: "/g", readOnly: false }]),
+      fill(2, [{ source: "/g", readOnly: false }]),
+    ].reduce(holdFill, NOTHING_HELD)
+    expect(held.get("/g")).toEqual({ readOnly: null, readWrite: 1 })
+  })
+  test("a path no slot holds is never mapped", () => {
+    const held = holdFill(
+      NOTHING_HELD,
+      fill(0, [{ source: "/p", readOnly: true }]),
+    )
+    expect(() => sharePath(held, "/etc")).toThrow(
+      "/etc is not shared into this host's slots",
+    )
   })
 })
 
 describe("planWidening: what a new slot must share", () => {
-  const fills: Fill[] = [
-    {
-      slot: 0,
-      entries: planShares([
-        { source: "/p", readOnly: true },
-        { source: "/p/.plans", readOnly: false },
-        { source: "/g", readOnly: true },
-      ]),
-    },
-  ]
+  const held = holdFill(NOTHING_HELD, {
+    slot: 0,
+    entries: planShares([
+      { source: "/p", readOnly: true },
+      { source: "/p/.plans", readOnly: false },
+      { source: "/g", readOnly: true },
+    ]),
+  })
   test("nothing, when every wanted directory is held as wanted", () => {
     expect(
-      planWidening(fills, [
+      planWidening(held, [
         { source: "/p", readOnly: true },
         { source: "/p/.plans", readOnly: false },
       ]),
@@ -157,24 +176,24 @@ describe("planWidening: what a new slot must share", () => {
   })
   test("a directory no fill holds", () => {
     expect(
-      planWidening(fills, [
+      planWidening(held, [
         { source: "/p", readOnly: true },
         { source: "/p/docs", readOnly: false },
       ]),
     ).toEqual([{ source: "/p/docs", readOnly: false }])
   })
   test("a directory held read-only, now wanted read-write", () => {
-    expect(planWidening(fills, [{ source: "/g", readOnly: false }])).toEqual([
+    expect(planWidening(held, [{ source: "/g", readOnly: false }])).toEqual([
       { source: "/g", readOnly: false },
     ])
   })
   test("a directory held read-write, wanted read-only: nothing", () => {
     expect(
-      planWidening(fills, [{ source: "/p/.plans", readOnly: true }]),
+      planWidening(held, [{ source: "/p/.plans", readOnly: true }]),
     ).toEqual([])
   })
   test("a directory no longer wanted: nothing", () => {
-    expect(planWidening(fills, [])).toEqual([])
+    expect(planWidening(held, [])).toEqual([])
   })
 })
 

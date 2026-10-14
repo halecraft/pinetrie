@@ -14,8 +14,6 @@ import {
   MACHINE_SOCKET,
   OBSERVER_CONNECT,
   OBSERVER_CONTAINERFILE,
-  OBSERVER_LOADER,
-  OBSERVER_SERVER,
   type ObserverChannel,
   observerClient,
   observerSources,
@@ -247,20 +245,7 @@ export function dockerRuntime(input: {
         runtime: serving.runtime,
         packages: `${serving.install}/packages`,
       })
-    // Every host of a version renders the same spec, so each joins the one
-    // running, starts one created and never started, and makes one missing.
-    await ensureContainer(
-      target,
-      renderObserver({
-        version: v,
-        cmd: [
-          ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_SERVER}`),
-          MACHINE_SOCKET,
-          OBSERVER_LOADER,
-          v,
-        ],
-      }),
-    )
+    await ensureContainer(target, renderObserver(v))
     return openChannel(
       execArgv(name, [
         ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_CONNECT}`),
@@ -414,7 +399,7 @@ export function dockerRuntime(input: {
  * holding it. Returns their names.
  */
 export async function sweepSlot(
-  target: DockerTarget,
+  target: Pick<DockerTarget, "socket">,
   root: string,
 ): Promise<readonly string[]> {
   const names = planSlotSweep(root, await listLabelled(target, PROJECT_LABEL))

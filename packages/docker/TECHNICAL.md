@@ -96,7 +96,7 @@ declares it (`workspace.test.ts`).
   the address and ports (`PINETRIE_HOST`,
   `PINETRIE_HOST_PORTS`), which a running lane keeps as it started. The
   host's own port is refused: on loopback it takes no key
-  (`planShareAndGrant`, in the host's `work/runtime.ts`).
+  (`planShareAndGrant`, in the host's `work/shares.ts`).
 - **A port taken out of the grant does not end a connection open on it**
   (S189): what the lane sends on it stops within 40 ms, and new
   connections are refused, but the fence matches only the lane's packets
@@ -204,8 +204,9 @@ measured. Its checks:
   (`renderObserver`): `pinetrie-observer-<version>`, from the image of the
   same tag, which `buildObserverImage` builds from the observer
   Containerfile's last stage with the lane runtime and pine·trie's packages
-  as named contexts, so it mounts nothing from a host. It carries no
-  project or slot label, so no sweep takes it.
+  as named contexts, so it mounts nothing from a host. Its spec is its
+  version's alone, so every host of a version renders the same one. It
+  carries no project or slot label, so no sweep takes it.
 - **Its grant is `OBSERVER_GRANT`, and nothing more:** `CAP_BPF`,
   `CAP_PERFMON` and `CAP_SYS_PTRACE`, Docker's own seccomp profile, the
   host's pid namespace (its own cgroup namespace: nothing it does reads

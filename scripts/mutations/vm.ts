@@ -6,20 +6,37 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/vm"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a slot is filled unswept",
+    file: "packages/vm/lease.ts",
+    from: "      await sweep(slot.slot)\n",
+    to: "",
+    command: unit,
+    expect: "a lease: a slot, swept then filled once with its entries",
+  },
+  {
     name: "a directory held read-only stays so when wanted read-write",
     file: "packages/vm/plan.ts",
-    from: "        !held.some(h => h.source === w.source && (w.readOnly || !h.readOnly)),",
-    to: "        !held.some(h => h.source === w.source),",
+    from: "      return h === undefined || (!w.readOnly && h.readWrite === null)",
+    to: "      return h === undefined",
     command: unit,
     expect: "a directory held read-only, now wanted read-write",
   },
   {
-    name: "a source in two fills is taken from the newest",
+    name: "a source in two slots is taken from the read-only one",
     file: "packages/vm/plan.ts",
-    from: "      if (held === undefined || (held.entry.readOnly && !entry.readOnly))",
-    to: "      if (true)",
+    from: "  const slot = h?.readWrite ?? h?.readOnly ?? null",
+    to: "  const slot = h?.readOnly ?? h?.readWrite ?? null",
     command: unit,
-    expect: "a source in two fills is taken from the one holding it read-write",
+    expect: "a source in two slots is taken from the one holding it read-write",
+  },
+  {
+    name: "a second slot of one kind replaces the first",
+    file: "packages/vm/plan.ts",
+    from: "        : { ...was, readWrite: was.readWrite ?? fill.slot },",
+    to: "        : { ...was, readWrite: fill.slot },",
+    command: unit,
+    expect:
+      "a second slot of one kind is never recorded: the first keeps the source",
   },
   {
     name: "the image's key ignores its scripts",
@@ -121,7 +138,7 @@ export const mutations: readonly Mutation[] = [
     from: '      if (filled) throw new Error("a slot is filled once")\n',
     to: "",
     command: unit,
-    expect: "a lease: a slot, then one fill with the slot's entries",
+    expect: "a lease: a slot, swept then filled once with its entries",
   },
   {
     name: "a launcher's message of an unknown kind is read as one it knows",

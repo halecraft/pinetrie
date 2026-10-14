@@ -53,7 +53,8 @@ import {
   startLaneConfigs,
 } from "./config.ts"
 import { openLinkOf } from "./registry.ts"
-import type { Found, Wanted } from "./runtime.ts"
+import type { Found } from "./runtime.ts"
+import type { Wanted } from "./shares.ts"
 import { type LaneSsh, type PersonalSshPlaces, startLaneSsh } from "./ssh.ts"
 
 /** A running lane's memory ceiling. */

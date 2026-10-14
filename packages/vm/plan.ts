@@ -118,44 +118,66 @@ export function planShares(dirs: readonly ShareDir[]): readonly ShareEntry[] {
 /** Where a slot's entries are in the VM, for the sweep of its binds. */
 export const slotRoot = (slot: number): string => `${SHARES_ROOT}/${slot}/`
 
-/**
- * Where each source is in the VM, across a host's fills: the fill that holds
- * it read-write if there is one. `planWidening` keeps a source in at most two
- * fills, one read-only and one read-write. Throws for a path no fill holds: a
- * lane binding outside its host's slots would see nothing the host gave it.
- */
-export function sharePaths(fills: readonly Fill[]): (source: string) => string {
-  const at = new Map<string, { slot: number; entry: ShareEntry }>()
-  for (const fill of fills)
-    for (const entry of fill.entries) {
-      const held = at.get(entry.source)
-      if (held === undefined || (held.entry.readOnly && !entry.readOnly))
-        at.set(entry.source, { slot: fill.slot, entry })
-    }
-  return source => {
-    const held = at.get(source)
-    if (held === undefined)
-      throw new Error(`${source} is not shared into this host's slots`)
-    return `${slotRoot(held.slot)}${held.entry.name}`
-  }
+/** The slots of a host that hold one source: at most one of each kind. */
+export interface Held {
+  readonly readOnly: number | null
+  readonly readWrite: number | null
 }
 
 /**
- * The directories a new slot must share for `wanted`: those no fill holds,
- * and those wanted read-write that no fill holds read-write. A read-only
- * entry is never replaced: refilling a slot cuts every bind into it, and one
- * directory read-write in two slots loses appends.
+ * Every source a host's slots hold, by kind. One slot per kind is all it can
+ * record, so a source is never in two slots read-write, which loses appends
+ * and refuses creates.
+ */
+export type Holdings = ReadonlyMap<string, Held>
+
+export const NOTHING_HELD: Holdings = new Map()
+
+/**
+ * `held` with `fill`'s entries. A kind a source is held in already keeps its
+ * first slot: `planWidening` never asks for it again.
+ */
+export function holdFill(held: Holdings, fill: Fill): Holdings {
+  const next = new Map(held)
+  for (const e of fill.entries) {
+    const was = next.get(e.source) ?? { readOnly: null, readWrite: null }
+    next.set(
+      e.source,
+      e.readOnly
+        ? { ...was, readOnly: was.readOnly ?? fill.slot }
+        : { ...was, readWrite: was.readWrite ?? fill.slot },
+    )
+  }
+  return next
+}
+
+/**
+ * Where a source is in the VM: its read-write entry if a slot holds one,
+ * else its read-only one. Throws for a path no slot holds: a lane binding
+ * outside its host's slots would see nothing the host gave it.
+ */
+export function sharePath(held: Holdings, source: string): string {
+  const h = held.get(source)
+  const slot = h?.readWrite ?? h?.readOnly ?? null
+  if (slot === null)
+    throw new Error(`${source} is not shared into this host's slots`)
+  return `${slotRoot(slot)}${entryName(source)}`
+}
+
+/**
+ * The directories a new slot must share for `wanted`: those no slot holds,
+ * and those wanted read-write that no slot holds read-write. A read-only
+ * entry is never replaced: refilling a slot cuts every bind into it.
  */
 export function planWidening(
-  fills: readonly Fill[],
+  held: Holdings,
   wanted: readonly ShareDir[],
 ): readonly ShareDir[] {
-  const held = fills.flatMap(f => f.entries)
   return planShares(wanted)
-    .filter(
-      w =>
-        !held.some(h => h.source === w.source && (w.readOnly || !h.readOnly)),
-    )
+    .filter(w => {
+      const h = held.get(w.source)
+      return h === undefined || (!w.readOnly && h.readWrite === null)
+    })
     .map(({ source, readOnly }) => ({ source, readOnly }))
 }
 

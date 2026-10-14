@@ -78,21 +78,23 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   directions end, so `docker run -i` sees its input end and keeps its
   output (S128). vfkit's bridge drops the half-close (S126).
 - **Slots, one per host.** A host's directories are one
-  `VZMultipleDirectoryShare` in its slot, filled once after the host has
-  swept the slot's old containers, and never replaced while it runs:
+  `VZMultipleDirectoryShare` in its slot, filled once, and never replaced
+  while it runs:
   replacing a share cuts every bind mount into it, even to an entry the
   replacement kept, with nothing in the guest's log (S130). Share devices
   are apart: filling or emptying one leaves the others' binds working
   (S131). A slot empties when its lease's connection ends.
 - **Extra slots, for what a host's slot lacks** (ADR-0141). When accepted
   work names a directory no slot of the host holds, or wants read-write
-  one held read-only, the host leases one more slot (`leaseExtra`: a
-  second connection, `agent` null, never starting or retiring a VM) and
-  fills it with those directories alone (`planWidening`). Its own slot
+  one held read-only, the host leases one more slot and fills it with
+  those directories alone (`leaseExtra`: a second connection, `agent`
+  null, never starting or retiring a VM; leased and filled in one call, so
+  no extra slot is ever empty or filled twice; `planWidening`). Its own slot
   always holds lanehost's running roles, so it is never refilled; nor is
   an extra slot, and a later widening takes another. A directory is then
-  in at most two of a host's slots, one read-only and one read-write, and
-  lanes bind the read-write one (`sharePaths`). The extras last until the
+  in at most two of a host's slots, one read-only and one read-write: a
+  host's `Holdings` record one slot per kind for each source, and no more
+  (`holdFill`). Lanes bind the read-write one (`sharePath`). The extras last until the
   host's next lease, which fills one slot with everything. A read-only
   entry beside a read-write one of the same directory still refuses
   writes, in its slot or another (S187).
@@ -175,12 +177,13 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
 `control.sock` answers), plans (`planVm`: join, start, or a refusal worded
 by `vmWords`), then starts the launcher if need be, takes a slot, and waits
 for Docker's `/_ping`. Its `Lease` is the slot, the Docker socket, `fill`
-(once, through `planShares`, answering the `Fill` it made) and `close`.
-`planShares` names each entry by a hash of its source, so a directory has
-one name whatever else is shared; one source given twice is one entry,
-read-write if either is. Where a source is in the VM is `sharePaths` over
-every `Fill` of the lease, and `slotRoot` is where a slot's entries are,
-for the sweep of what binds into it.
+and `close`. `fill` takes the slot's sweep and runs it first, so no slot is
+filled with a dead host's containers still bound into it; then it shares
+the directories (`planShares`), once per lease, answering the `Fill` it
+made. `planShares` names each entry by a hash of its source, so a directory
+has one name whatever else is shared; one source given twice is one entry,
+read-write if either is. `slotRoot` is where a slot's entries are, for the
+sweep of what binds into it.
 
 ## Gotchas
 

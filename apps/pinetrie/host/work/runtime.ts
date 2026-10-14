@@ -22,26 +22,27 @@ import { planObserver } from "@pinetrie/lanehost"
 import {
   createQueue,
   type LaneRuntime,
-  type Mount,
   machineConfig,
   planRoot,
   prepareProjectDir,
   type WrittenMachine,
 } from "@pinetrie/lanes"
 import {
-  type Fill,
   GVPROXY_HOST_ADDRESS,
   keepLease,
-  type Lease,
   leaseExtra,
   leaseVm,
-  planShares,
-  planWidening,
-  type ShareDir,
-  sharePaths,
   slotRoot,
   vmStateDir,
 } from "@pinetrie/vm"
+import {
+  createShares,
+  type HostShares,
+  NO_SHARES,
+  planShareAndGrant,
+  sharesWords,
+  type Wanted,
+} from "./shares.ts"
 
 /** What the host found where it runs: the project, and the runtime its lanes run on. */
 export interface Found {
@@ -70,131 +71,6 @@ export interface Found {
 export interface Refused {
   readonly kind: "refused"
   readonly words: string
-}
-
-/** What lanes of this host may mount, and the ports of the Mac's loopback they may reach. */
-export interface Wanted {
-  readonly mounts: readonly Mount[]
-  readonly hostPorts: readonly number[]
-}
-
-/** What the host has shared and granted on its lease (on Linux, only what it said). */
-export interface Shares {
-  /** Every slot filled on this lease, the host's first. */
-  readonly fills: readonly Fill[]
-  /**
-   * The ports of the last grant written, as accepted work named them (the
-   * host's own included, which is never written); null when none was
-   * written on this lease.
-   */
-  readonly granted: readonly number[] | null
-  /** The directories a widening got no slot for, and why: not asked again while they are what is new. */
-  readonly refused: {
-    readonly dirs: readonly ShareDir[]
-    readonly why: string
-  } | null
-  /** On Linux, whether the host has said its ports apply to nothing. */
-  readonly toldLinuxPorts: boolean
-}
-
-export const NO_SHARES: Shares = {
-  fills: [],
-  granted: null,
-  refused: null,
-  toldLinuxPorts: false,
-}
-
-/** What `shareAndGrant` says, worded by `sharesWords`. */
-export type SharesWords =
-  | {
-      readonly kind: "widened"
-      readonly slot: number
-      readonly dirs: readonly string[]
-    }
-  | {
-      readonly kind: "no-slot"
-      readonly dirs: readonly string[]
-      readonly why: string
-    }
-  | { readonly kind: "own-port"; readonly port: number }
-  | { readonly kind: "linux-ports" }
-
-export function sharesWords(w: SharesWords): string {
-  switch (w.kind) {
-    case "widened":
-      return `shared with lanes from their next start, through slot ${w.slot} of the lane VM: ${w.dirs.join(", ")}`
-    case "no-slot":
-      return `not shared with lanes until this host restarts, since the lane VM gave it no slot for them (${w.why}): ${w.dirs.join(", ")}`
-    case "own-port":
-      return `lanes.hostPorts ${w.port} is not granted: it is this pine·trie host's own port, which takes no key on loopback`
-    case "linux-ports":
-      return "lanes.hostPorts applies to the Mac's lane VM: on Linux a lane reaches the host's services bound to all interfaces, at Docker's bridge gateway"
-  }
-}
-
-/** What to do for `wanted`, given what was shared and granted. */
-export interface SharesPlan {
-  /** Directories to fill a slot with: the host's own first, then a new one. */
-  readonly fill: {
-    readonly into: "host" | "extra"
-    readonly dirs: readonly ShareDir[]
-  } | null
-  /** The ports to write, replacing the last grant. */
-  readonly grant: readonly number[] | null
-  readonly words: readonly SharesWords[]
-}
-
-const sameDirs = (a: readonly ShareDir[], b: readonly ShareDir[]) =>
-  JSON.stringify(planShares(a)) === JSON.stringify(planShares(b))
-
-/**
- * On the Mac (`slots`): the host's slot is filled with every directory
- * first; after it, a directory no fill holds as wanted goes in a new slot,
- * unless the last widening was refused for the same ones. The ports are
- * written when they differ from the last grant, less the host's own: a host
- * bound to loopback takes no key, so a lane reaching it would act as a
- * person (`startHost`). On Linux nothing is shared or granted, and the host
- * says once that its ports apply to nothing.
- */
-export function planShareAndGrant(
-  shares: Shares,
-  wanted: Wanted,
-  ownPort: number | null,
-  slots: boolean,
-): SharesPlan {
-  if (!slots)
-    return {
-      fill: null,
-      grant: null,
-      words:
-        wanted.hostPorts.length > 0 && !shares.toldLinuxPorts
-          ? [{ kind: "linux-ports" }]
-          : [],
-    }
-  const dirs = wanted.mounts.map(m => ({
-    source: m.source,
-    readOnly: m.readonly,
-  }))
-  const widening = planWidening(shares.fills, dirs)
-  const fill =
-    shares.fills.length === 0
-      ? { into: "host" as const, dirs }
-      : widening.length > 0 &&
-          !(shares.refused !== null && sameDirs(shares.refused.dirs, widening))
-        ? { into: "extra" as const, dirs: widening }
-        : null
-  const changed =
-    shares.granted === null ||
-    wanted.hostPorts.join(",") !== shares.granted.join(",")
-  return {
-    fill,
-    grant: changed ? wanted.hostPorts.filter(p => p !== ownPort) : null,
-    words: changed
-      ? wanted.hostPorts
-          .filter(p => p === ownPort)
-          .map(port => ({ kind: "own-port" as const, port }))
-      : [],
-  }
 }
 
 /** What decides which runtime lanes run on. */
@@ -370,36 +246,30 @@ async function vmFound(
   )
   if ("words" in leased) return leased
   const first = leased
-  /** The lease held now: a new one after the VM stopped under this host. */
-  let current = first
-  /** The slots leased after the host's for directories its slot lacked. */
-  let extras: Lease[] = []
-  let shares = NO_SHARES
-  /** What lanes were last to mount and reach, replayed on a new lease. */
-  let given: Wanted | null = null
-  // What follows the slot is read through `current` and `shares`, each time
-  // a lane is made, so a lane made after a new lease is on the new slot.
+  /** A slot's containers left by a host that died holding it. */
+  const sweep = async (slot: number) => {
+    const left = await sweepSlot({ socket: first.docker }, slotRoot(slot))
+    if (left.length > 0)
+      log(
+        `[host] removed ${left.length} containers left in slot ${slot} by a host that stopped holding it`,
+      )
+  }
+  // Read by the target each time a lane is made, so a lane made after a
+  // new lease is on the new slots. Assigned before the runtime makes any.
+  let shares: HostShares | null = null
+  const sharesNow = (): HostShares => {
+    if (shares === null)
+      throw new Error("this host's slot in the lane VM is not filled yet")
+    return shares
+  }
   const target: DockerTarget = {
     socket: first.docker,
-    pathOf: source => {
-      if (shares.fills.length === 0)
-        throw new Error("this host's slot in the lane VM is not filled yet")
-      try {
-        return sharePaths(shares.fills)(source)
-      } catch (error) {
-        const { refused } = shares
-        if (refused?.dirs.some(d => d.source === source))
-          throw new Error(
-            sharesWords({ kind: "no-slot", dirs: [source], why: refused.why }),
-          )
-        throw error
-      }
-    },
+    pathOf: source => sharesNow().pathOf(source),
     get labels() {
-      return { [SLOT_LABEL]: String(current.slot) }
+      return { [SLOT_LABEL]: String(shares?.slot() ?? first.slot) }
     },
     get hostSocket() {
-      return `/run/pinetrie/ssh-${current.slot}.sock`
+      return `/run/pinetrie/ssh-${shares?.slot() ?? first.slot}.sock`
     },
     hostAddress: GVPROXY_HOST_ADDRESS,
     remoteHostPaths: true,
@@ -409,107 +279,39 @@ async function vmFound(
     await first.close()
     return refusedWith(dockerWords(refusal))
   }
-  /** A slot's containers left by a host that died holding it. */
-  const sweep = async (slot: number) => {
-    const left = await sweepSlot(target, slotRoot(slot))
-    if (left.length > 0)
-      log(
-        `[host] removed ${left.length} containers left in slot ${slot} by a host that stopped holding it`,
-      )
-  }
-  await sweep(first.slot)
   const runtime = dockerRuntime({ target, lanesDir, root, log })
-
-  /** A new slot for `dirs`, swept first; why, when there is none. */
-  async function widen(
-    dirs: readonly ShareDir[],
-  ): Promise<Fill | { readonly why: string }> {
-    let extra: Lease | null = null
-    try {
-      extra = await leaseExtra({ stateDir, log })
-      await sweep(extra.slot)
-      const fill = await extra.fill(dirs)
-      extras = [...extras, extra]
-      return fill
-    } catch (error) {
-      await extra?.close().catch(() => {})
-      return { why: errorText(error) }
-    }
-  }
-
-  /** Shares and grants `wanted`; only ever run in `queue`. */
-  async function shareNow(wanted: Wanted): Promise<void> {
-    given = wanted
-    const plan = planShareAndGrant(shares, wanted, ownPort, true)
-    if (plan.fill?.into === "host") {
-      const fill = await current.fill(plan.fill.dirs)
-      shares = { ...shares, fills: [fill] }
-    } else if (plan.fill?.into === "extra") {
-      const dirs = plan.fill.dirs
-      const got = await widen(dirs)
-      const names = dirs.map(d => d.source)
-      if ("why" in got) {
-        shares = { ...shares, refused: { dirs, why: got.why } }
-        log(
-          `[host] ${sharesWords({ kind: "no-slot", dirs: names, why: got.why })}`,
-        )
-      } else {
-        shares = { ...shares, fills: [...shares.fills, got], refused: null }
-        log(
-          `[host] ${sharesWords({ kind: "widened", slot: got.slot, dirs: names })}`,
-        )
-      }
-    }
-    for (const w of plan.words) log(`[host] ${sharesWords(w)}`)
-    if (plan.grant !== null) {
-      // The grant replaces whatever a host of this project wrote before.
-      await runtime.grantHostPorts(plan.grant)
-      shares = { ...shares, granted: wanted.hostPorts }
-      if (plan.grant.length > 0)
-        log(
-          `[host] lanes may reach these ports of your Mac's loopback, at ${GVPROXY_HOST_ADDRESS}: ${plan.grant.join(", ")}`,
-        )
-    }
-  }
-  // One task at a time, a new lease's reset among them: a share still
-  // running when the VM stopped writes its result before the reset drops
-  // it, never into the new lease's state, whose host slot would then stay
-  // unfilled.
-  const queue = createQueue()
-  const shareAndGrant = (wanted: Wanted) =>
-    queue.enqueue(() => shareNow(wanted))
-
+  const held = createShares({
+    lease: first,
+    ownPort,
+    sweep,
+    extra: dirs => leaseExtra({ stateDir, dirs, sweep, log }),
+    grant: async ports => {
+      await runtime.grantHostPorts(ports)
+    },
+    relet: () => runtime.vmRestarted(),
+    log,
+  })
+  shares = held
   const kept = keepLease({
     first,
     lease: leaseNow,
-    // A new VM: its slot swept, and everything given shared and granted
-    // again, as on the first lease. Each lane is made again at its next
-    // start.
-    settle: next =>
-      queue.enqueue(async () => {
-        current = next
-        const old = extras
-        extras = []
-        shares = NO_SHARES
-        runtime.vmRestarted()
-        for (const e of old) await e.close().catch(() => {})
-        await sweep(next.slot)
-        if (given !== null) await shareNow(given)
-      }),
+    // A new VM: everything given shared and granted again, as on the first
+    // lease. Each lane is made again at its next start.
+    settle: next => held.relet(next),
     log,
   })
   return {
     kind: "found",
     project,
     runtime,
-    async ready({ mounts, hostPorts }) {
-      runtime.serveFrom(mounts)
-      await shareAndGrant({ mounts, hostPorts })
+    async ready(wanted) {
+      runtime.serveFrom(wanted.mounts)
+      await held.share(wanted)
       sweptLog(await runtime.sweepProjects(), log)
     },
-    shareAndGrant,
+    shareAndGrant: held.share,
     async close() {
-      for (const e of extras) await e.close().catch(() => {})
+      await held.close()
       await kept.close()
     },
   }
