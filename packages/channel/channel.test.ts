@@ -63,14 +63,14 @@ describe("a held channel", () => {
     waiting.abort()
     await expect(call).rejects.toThrow("aborted")
     const running = new AbortController()
-    const started = Date.now()
     const ran = channel.call(
       { run: ["sleep", "10"] },
       running.signal,
     ) as Promise<RunResult>
-    setTimeout(() => running.abort(), 50)
+    // The server spawns the command before it reads the abort, which the
+    // client writes after the request.
+    running.abort()
     expect((await ran).code).not.toBe(0)
-    expect(Date.now() - started).toBeLessThan(5000)
   })
   test("a command's stdout comes back as bytes", async () => {
     const ran = (await channel.call({

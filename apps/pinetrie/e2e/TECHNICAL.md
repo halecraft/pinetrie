@@ -226,6 +226,13 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
     process whose death a check reads, or a Kyneta bug. A deadline on a wait
     for a state is no fixed wait: bound it with `waitFor`, not a
     `setTimeout`.
+- **A check reads a state, a count or a result, never a duration**
+  (ADR-0152), in a scenario as in a unit test. What a limit on time stood
+  for is modelled instead: a configuration as a planned value, a
+  complexity as counted steps (`collectionSteps`,
+  `@pinetrie/core/fixtures`), a kill as the call's result. A cost worth
+  knowing is a spike's measurement. `budget.test.ts` fails on a clock
+  reading subtracted in any test or scenario.
 - **A browser check stays only while it proves what only a browser shows:**
   focus and the caret, geometry, CSS, scrolling, render counts, a real
   Kyneta round trip, the device's storage. A rule decided in a pure

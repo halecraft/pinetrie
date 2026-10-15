@@ -334,7 +334,8 @@ out, every call checked and planned into paths first (`planApply`,
   `sendFold` keeps the changed paths under each orphan name, so a rename
   moves only those. A scan of every change at each rename took 39 s on that
   stream, with the role's one thread blocked, and every lane's turn behind
-  it (S179).
+  it (S179). A test counts its collection steps over 1,000 new directories
+  (`collectionSteps`).
 - **What the stream says, folded per path:**
   - a deleted directory is renamed to an orphan (`o<ino>-<gen>-<idx>`),
     its subdirectories to orphans of their own, then each entry unlinked
@@ -397,7 +398,8 @@ out, every call checked and planned into paths first (`planApply`,
 - `send-stream.test.ts`: S148's recorded streams (`fixtures/`), each kind
   of change, names with a newline and a space; the recorded stream fed in
   pieces, cut at every byte, folds as the whole; a stream cut short throws
-  at its end; 15,000 new directories fold in linear time.
+  at its end; 1,000 new directories fold in a bounded number of steps per
+  command.
 - `observer.test.ts`: the loader's lines, every decision of the machine
   role's, and its server against a stand-in loader
   (`fixtures/stand-in-observe.mjs`).

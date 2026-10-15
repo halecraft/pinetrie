@@ -13,6 +13,9 @@
 //
 // A scenario's fixed waits are its other cost: each is paid in full on every
 // run, and guesses when a state comes. `FIXED_WAITS` lists the few left.
+//
+// And no test or scenario reads a duration: its verdict would hang on the
+// machine's load. A clock reading subtracted is refused everywhere.
 
 import { globSync, readFileSync } from "node:fs"
 import path from "node:path"
@@ -44,39 +47,57 @@ export function budgetBreaches(c: LayerCounts): readonly string[] {
   ]
 }
 
-/** A `test(`, `it(` or `test.each(…)(` at a statement's start. */
-const UNIT_TEST = /^\s*(?:test|it)(?:\.each\(.*\))?\(/gm
-
 /**
- * Count the layers in the repository at `root`. The unit globs are
- * `vitest.config.mjs`'s own `test.include`, so the count follows the config.
+ * The unit test files, by path from `root`: `vitest.config.mjs`'s own
+ * `test.include`, so the list follows the config.
  */
-export async function countLayers(root: string): Promise<LayerCounts> {
+export async function unitTestFiles(root: string): Promise<readonly string[]> {
   const config = (await import(path.join(root, "vitest.config.mjs"))) as {
     default: {
       test: { include: readonly string[]; exclude: readonly string[] }
     }
   }
   const { include } = config.default.test
-  const files = new Set(
-    include.flatMap(glob =>
-      globSync(glob, { cwd: root }).filter(f => !f.includes("node_modules")),
+  return [
+    ...new Set(
+      include.flatMap(glob =>
+        globSync(glob, { cwd: root }).filter(f => !f.includes("node_modules")),
+      ),
     ),
-  )
-  const unit = [...files].reduce(
+  ]
+}
+
+/** The suites, by their directory under `apps/pinetrie/e2e`. */
+const SUITES = ["host", "lanes", "observer", "browser"] as const
+
+/** Every suite's scenario files, by path from `root`. */
+export const scenarioFiles = (root: string): readonly string[] =>
+  SUITES.flatMap(suite => {
+    const dir = path.join("apps/pinetrie/e2e", suite)
+    return scenarioNames(path.join(root, dir)).map(name =>
+      path.join(dir, `${name}.scenario.ts`),
+    )
+  })
+
+/** A `test(`, `it(` or `test.each(…)(` at a statement's start. */
+const UNIT_TEST = /^\s*(?:test|it)(?:\.each\(.*\))?\(/gm
+
+/** Count the layers in the repository at `root`. */
+export async function countLayers(root: string): Promise<LayerCounts> {
+  const files = await unitTestFiles(root)
+  const unit = files.reduce(
     (n, f) =>
       n +
       (readFileSync(path.join(root, f), "utf8").match(UNIT_TEST) ?? []).length,
     0,
   )
-  const e2e = path.join(root, "apps/pinetrie/e2e")
+  const browser = scenarioFiles(root).filter(f =>
+    f.startsWith("apps/pinetrie/e2e/browser/"),
+  ).length
   return {
     unit,
-    acceptance:
-      scenarioNames(path.join(e2e, "host")).length +
-      scenarioNames(path.join(e2e, "lanes")).length +
-      scenarioNames(path.join(e2e, "observer")).length,
-    browser: scenarioNames(path.join(e2e, "browser")).length,
+    acceptance: scenarioFiles(root).length - browser,
+    browser,
   }
 }
 
@@ -129,13 +150,39 @@ export function fixedWaitBreaches(
 /** Each scenario's fixed waits, by path from `root`. */
 export function countFixedWaits(root: string): Record<string, number> {
   const counts: Record<string, number> = {}
-  for (const suite of ["host", "lanes", "observer", "browser"]) {
-    const dir = path.join("apps/pinetrie/e2e", suite)
-    for (const name of scenarioNames(path.join(root, dir))) {
-      const file = path.join(dir, `${name}.scenario.ts`)
-      const n = fixedWaitsIn(readFileSync(path.join(root, file), "utf8"))
-      if (n > 0) counts[file] = n
-    }
+  for (const file of scenarioFiles(root)) {
+    const n = fixedWaitsIn(readFileSync(path.join(root, file), "utf8"))
+    if (n > 0) counts[file] = n
   }
   return counts
 }
+
+/** `Date.now()` or `performance.now()`, then a minus: a duration read. */
+const ELAPSED = /\b(?:Date|performance)\.now\(\)\s*-/g
+
+/** The durations a source reads from a clock. */
+export const elapsedReadingsIn = (source: string): number =>
+  (source.match(ELAPSED) ?? []).length
+
+/** The durations each test and scenario reads, by path from `root`; only files that read one. */
+export async function countElapsedReadings(
+  root: string,
+): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {}
+  for (const file of [...(await unitTestFiles(root)), ...scenarioFiles(root)]) {
+    const n = elapsedReadingsIn(readFileSync(path.join(root, file), "utf8"))
+    if (n > 0) counts[file] = n
+  }
+  return counts
+}
+
+/** Each file that reads a duration, worded; no file may. */
+export const elapsedBreaches = (
+  counts: Readonly<Record<string, number>>,
+): readonly string[] =>
+  Object.keys(counts)
+    .sort()
+    .map(
+      file =>
+        `${file} reads elapsed time from a clock: a check reads a state, a count or a result, never a duration`,
+    )

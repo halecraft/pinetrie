@@ -177,8 +177,7 @@ never reaches the VM's Docker or the launcher's ports.
 `scripts/mutations/docker.ts`.
 On the Mac it runs a VM of its own, from this checkout's launcher (built
 again for a mutated one) and the built image, in a throwaway state
-directory, so the person's hosts are untouched and its cold start is
-measured. Its checks:
+directory, so the person's hosts are untouched. Its checks:
 - twenty snapshots taken while a lane writes each hold every record written
   before them;
 - a diff between two snapshots of a lane reports a file it deleted, and one
@@ -195,8 +194,6 @@ measured. Its checks:
 - (Mac) a lane cannot reach the Mac's loopback, nor `gvproxy`'s API;
 - (Mac) a port the project grants answers its lanes, and not another
   project's;
-- costs: `docker run -d` under 150 ms, a snapshot under 50 ms, a cold VM's
-  Docker answering under 2 s; the launcher's open files in the detail.
 
 ## The machine role's container
 

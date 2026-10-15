@@ -7,6 +7,7 @@ import {
   type RunRecord,
   stamp,
 } from "@pinetrie/core"
+import { collectionSteps } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   decodeRegistry,
@@ -467,20 +468,22 @@ describe("unattributed", () => {
       ),
     ).toEqual(["out/y", "log"])
   })
-  test("tens of thousands of writes against as many changes take linear time", () => {
+  test("unattributed takes a bounded number of steps per write", () => {
+    const n = 1_000
     const paths = Array.from(
-      { length: 50_000 },
-      (_, i) => `node_modules/.pnpm/p${i % 500}/f${i}`,
+      { length: n },
+      (_, i) => `node_modules/.pnpm/p${i % 50}/f${i}`,
     )
-    const started = performance.now()
-    const rest = unattributed(
-      written(...[...paths].reverse()),
-      diffOf(...paths, "stray"),
-      [],
+    const { result, steps } = collectionSteps(() =>
+      unattributed(
+        written(...[...paths].reverse()),
+        diffOf(...paths, "stray"),
+        [],
+      ),
     )
-    expect(performance.now() - started).toBeLessThan(2_000)
-    expect(rest).toEqual(["stray"])
-  }, 60_000)
+    expect(result).toEqual(["stray"])
+    expect(steps).toBeLessThanOrEqual(4 * n)
+  })
 })
 
 describe("the turn's record", () => {

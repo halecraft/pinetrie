@@ -10,6 +10,7 @@ import {
   imageRefusal,
   isBuildLogLine,
   kernelRelease,
+  launcherArgs,
   NOTHING_HELD,
   parseSums,
   planLock,
@@ -92,6 +93,29 @@ test("vmMemory: a quarter of the Mac's, between 4 and 16 GiB", () => {
   expect(vmMemory(32 * GiB)).toBe(8 * GiB)
   expect(vmMemory(8 * GiB)).toBe(4 * GiB)
   expect(vmMemory(128 * GiB)).toBe(16 * GiB)
+})
+
+test("launcherArgs: the disks flush with fsync and cache their reads, after the slots, a quarter of the Mac's memory, the CPUs and gvproxy", () => {
+  const GiB = 1024 ** 3
+  expect(
+    launcherArgs({
+      stateDir: "/state",
+      image: "/state/images/key",
+      slots: 16,
+      macMemory: 32 * GiB,
+      cpus: 12,
+      gvproxy: "/state/bin/gvproxy-x",
+    }),
+  ).toEqual([
+    "/state",
+    "/state/images/key",
+    "16",
+    String(8 * GiB),
+    "12",
+    "/state/bin/gvproxy-x",
+    "fsync",
+    "cached",
+  ])
 })
 
 describe("planShares: a slot's entries", () => {

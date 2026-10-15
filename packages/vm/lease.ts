@@ -17,11 +17,12 @@ import {
   gatherBuildFirst,
   readImageSources,
 } from "./build.ts"
-import { ensureGvproxy, readGvproxyPin } from "./gvproxy.ts"
+import { ensureGvproxy, gvproxyPath, readGvproxyPin } from "./gvproxy.ts"
 import {
   type Fill,
   imageDir,
   imageKey,
+  launcherArgs,
   OLD_LAUNCHER_WORDS,
   planShares,
   planVm,
@@ -30,7 +31,6 @@ import {
   staleVmWords,
   type VmRefusal,
   vmBuildWords,
-  vmMemory,
   vmStartRefusal,
   vmWords,
 } from "./plan.ts"
@@ -239,32 +239,34 @@ async function leaseOnce(input: LeaseInput): Promise<{
   const control = path.join(stateDir, "control.sock")
   const { first, image, launcher, planned, startRefusal } =
     await gatherVm(stateDir)
-  // execute
   if (planned.kind === "refused") throw refusedBy(planned.refusal)
   let socket = first
   let started: number | null = null
   if (planned.kind === "start") {
+    // gather and plan what the launcher is started with
+    const pin = await readGvproxyPin()
+    const argv = launcherArgs({
+      stateDir,
+      image,
+      slots: input.slots,
+      macMemory: os.totalmem(),
+      cpus: os.availableParallelism(),
+      gvproxy: gvproxyPath(stateDir, pin),
+    })
+    // execute
     if (planned.buildImage) await buildImage(input)
     if (launcher.state === "buildable") {
       input.log("[vm] building the lane VM's launcher")
       await buildBinary(launcher.binary, LAUNCHER)
     }
     // The VM's network stack: fetched and checked once, then kept.
-    const gvproxy = await ensureGvproxy(stateDir, await readGvproxyPin())
+    await ensureGvproxy(stateDir, pin)
     const out = openSync(path.join(stateDir, "launcher.log"), "a")
     started = Date.now()
-    spawn(
-      launcher.binary,
-      [
-        stateDir,
-        image,
-        String(input.slots),
-        String(vmMemory(os.totalmem())),
-        String(os.availableParallelism()),
-        gvproxy,
-      ],
-      { detached: true, stdio: ["ignore", out, out] },
-    ).unref()
+    spawn(launcher.binary, argv, {
+      detached: true,
+      stdio: ["ignore", out, out],
+    }).unref()
     input.log("[vm] starting the lane VM")
     socket = await until("the lane VM's launcher answering", 30_000, () =>
       connect(control),

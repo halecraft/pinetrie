@@ -65,7 +65,7 @@ export const mutations: readonly Mutation[] = [
     to: '    const paths = new Set([...changes.keys()].filter(p => p.startsWith(from + "/")))\n',
     command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
     expect:
-      "tens of thousands of new directories, filled under their orphan names, fold in linear time",
+      "a thousand new directories, filled under their orphan names, fold in a bounded number of steps per command",
   },
   {
     name: "a send stream's reader drops the command a chunk ends inside",

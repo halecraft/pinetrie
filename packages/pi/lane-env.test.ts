@@ -106,14 +106,19 @@ describe("laneEnv: pi's tools, answered by the helper", () => {
 
   test("parallel calls are answered concurrently", async () => {
     const env = laneEnv(dir, ready)
-    const started = Date.now()
+    // Each waits until all eight have begun: answered in turn, the first
+    // never ends.
+    const met = await mkdtemp(path.join(dir, "barrier-"))
     const results = await Promise.all(
       Array.from({ length: 8 }, (_, i) =>
-        env.exec(`sleep 0.3; echo ${i}`, undefined, BACKGROUND_CONTEXT),
+        env.exec(
+          `touch '${met}/${i}'; until [ "$(ls '${met}' | wc -l)" -eq 8 ]; do sleep 0.01; done; echo ${i}`,
+          undefined,
+          BACKGROUND_CONTEXT,
+        ),
       ),
     )
     expect(results.every(r => r.ok && r.value.exitCode === 0)).toBe(true)
-    expect(Date.now() - started).toBeLessThan(1500)
   })
 
   test("an abort kills the command and its children", async () => {
@@ -138,14 +143,12 @@ describe("laneEnv: pi's tools, answered by the helper", () => {
     const control = new AbortController()
     control.abort()
     const env = laneEnv(dir, ready)
-    const started = Date.now()
     const result = await env.exec(
-      "sleep 2; echo ran",
+      "echo ran",
       undefined,
       withAbortSignal(control.signal, BACKGROUND_CONTEXT),
     )
     expect(result.ok ? "ran" : result.error.code).toBe("aborted")
-    expect(Date.now() - started).toBeLessThan(1500)
   })
 
   test("a timeout kills a backgrounded grandchild", async () => {

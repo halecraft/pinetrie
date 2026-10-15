@@ -1,6 +1,7 @@
 // core/fixtures — test support: entries and trees, their ids minted with
-// `entryId`. Core's tests use it, and other packages' tests as
-// `@pinetrie/core/fixtures`; production code never imports it.
+// `entryId`, and a count of a function's collection steps. Core's tests use
+// it, and other packages' tests as `@pinetrie/core/fixtures`; production code
+// never imports it.
 
 import { makeCard, NO_CONTENT, type TaskCard } from "./cards.ts"
 import {
@@ -142,4 +143,59 @@ export const withThreads = (
     return own
   }
   return entriesOf(list.map(e => ({ ...e, thread: threadOf(e) })))
+}
+
+type Patched = Record<PropertyKey, unknown>
+
+/**
+ * `f`'s result, and how many steps every Map and Set iteration took while it
+ * ran: spread, `for … of`, `keys`, `values`, `entries`, `forEach`, and
+ * `new Set(iterable)`. A linear fold takes a few per item; one that scans a
+ * collection per item takes its square.
+ *
+ * It wraps both prototypes' iterators until `f` returns, so `f` must be
+ * synchronous: nothing else may run while they are wrapped, and a test that
+ * counts must not be `test.concurrent`. Lookups (`get`, `has`, `set`,
+ * `delete`) are not counted.
+ */
+export function collectionSteps<T>(f: () => T): {
+  readonly result: T
+  readonly steps: number
+} {
+  let steps = 0
+  const saved: (readonly [Patched, PropertyKey, unknown])[] = []
+  for (const proto of [Map.prototype, Set.prototype] as unknown as Patched[]) {
+    for (const key of ["keys", "values", "entries", Symbol.iterator]) {
+      const own = proto[key] as (this: unknown) => Iterator<unknown>
+      saved.push([proto, key, own])
+      proto[key] = function* (this: unknown) {
+        for (const v of { [Symbol.iterator]: () => own.call(this) }) {
+          steps++
+          yield v
+        }
+      }
+    }
+    const forEach = proto.forEach as (
+      this: unknown,
+      each: (...a: unknown[]) => void,
+      self?: unknown,
+    ) => void
+    saved.push([proto, "forEach", forEach])
+    proto.forEach = function (
+      this: unknown,
+      each: (...a: unknown[]) => void,
+      self?: unknown,
+    ) {
+      forEach.call(this, (...a: unknown[]) => {
+        steps++
+        each.apply(self, a)
+      })
+    }
+  }
+  try {
+    const result = f()
+    return { result, steps }
+  } finally {
+    for (const [proto, key, own] of saved) proto[key] = own
+  }
 }

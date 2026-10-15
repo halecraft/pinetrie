@@ -8,6 +8,9 @@
   - ADR-0041: a check that needs a run in progress holds its reply
     (`ScriptedModel.hold`), which can also release it a text delta at a time;
     `pause` is gone.
+- **Amended by:**
+  - ADR-0152: the rule extends from waits to verdicts, in unit tests as well
+    as suites: no check compares a duration with a limit.
 
 **Context.**
 

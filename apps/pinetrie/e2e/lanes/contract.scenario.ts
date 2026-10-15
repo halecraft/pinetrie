@@ -1,9 +1,9 @@
 // e2e/lanes/contract — what the Docker runtime must hold that no unit test can
 // show: snapshots under writes, the working copy read-only on the Mac's side, a
-// half-close through the launcher, no vsock from a lane, two hosts' slots
-// apart, and what a lane's start and a snapshot cost. On the Mac it runs a VM
-// of its own, from this checkout's launcher and the built image, so a change to
-// the launcher is what runs, and the person's hosts are untouched.
+// half-close through the launcher, no vsock from a lane, and two hosts' slots
+// apart. On the Mac it runs a VM of its own, from this checkout's launcher and
+// the built image, so a change to the launcher is what runs, and the person's
+// hosts are untouched.
 
 import { execFile, spawn } from "node:child_process"
 import {
@@ -68,9 +68,6 @@ while (!fs.existsSync("/probe/stop")) {
   if (n % 10 === 0) fs.writeFileSync("/probe/written", String(n))
 }
 `
-
-const median = (xs: readonly number[]) =>
-  [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0
 
 /**
  * A server on the Mac's loopback, answering `mac <name>`, in a process of its
@@ -137,9 +134,6 @@ async function dockerContract(
   if (a?.kind !== "found")
     throw new Error(`no Docker runtime: ${a === null ? "no project" : a.words}`)
   const { runtime } = a
-  const cold = /Docker answered (\d+) ms after the launcher started/.exec(
-    logs.join("\n"),
-  )?.[1]
   const lanes: ThreadId[] = []
   const snapshots: SnapshotId[] = []
   /** A lane of host A's, on a new disk, with the working copy, a shared directory and the probe. */
@@ -163,7 +157,6 @@ async function dockerContract(
     lanes.push(name)
     laneRuntimes.set(name, on)
     await on.disk({ kind: "create", lane: name })
-    const started = Date.now()
     await on.run({
       name: laneContainer(name),
       lane: name,
@@ -177,10 +170,8 @@ async function dockerContract(
       hostPorts: [],
       states: false,
     })
-    runMs.push(Date.now() - started)
     return name
   }
-  const runMs: number[] = []
   const laneRuntimes = new Map<ThreadId, LaneRuntime>()
   const exec = (name: ThreadId, script: string) => {
     const on = laneRuntimes.get(name) ?? runtime
@@ -281,17 +272,8 @@ async function dockerContract(
           : "0",
       )
     await waitFor(() => written() >= 100, 30_000)
-    const snapMs: number[] = []
-    const timed: typeof runtime = {
-      ...runtime,
-      disk: async op => {
-        const t = Date.now()
-        await runtime.disk(op)
-        snapMs.push(Date.now() - t)
-      },
-    }
     const runners = {
-      runtime: timed,
+      runtime,
       lane: (argv: readonly string[]) => {
         const [p = "docker", ...rest] = runtime.execArgv(
           laneContainer(writerLane),
@@ -486,33 +468,6 @@ async function dockerContract(
       after.stdout.includes("a\nok") &&
         existsSync(path.join(projA, ".plans", "after.md")),
       after.stdout.trim().replace(/\n/g, " ") + after.stderr.trim(),
-    )
-
-    // ── costs ──
-    await lane(ALPINE_IMAGE)
-    const runCost = median(runMs.slice(1))
-    const snapCost = median(snapMs)
-    // A first boot formats the data disk: not the cold start lanes see.
-    const formatted =
-      own !== null &&
-      (
-        await quietSh(
-          `grep -c 'data disk formatted' '${path.join(own.state, "pinetrie", "vm", "console.log")}' || true`,
-        )
-      ).trim() !== "0"
-    const coldMs = cold === undefined || formatted ? null : Number(cold)
-    const files =
-      own === null
-        ? "n/a"
-        : (
-            await quietSh(
-              `lsof -p "$(pgrep -f 'launcher-.* ${own.state}' | head -1)" 2>/dev/null | wc -l`,
-            )
-          ).trim()
-    check(
-      "a lane's docker run -d takes under 150 ms, a snapshot under 50 ms, and a cold VM answers in under 2 s",
-      runCost < 150 && snapCost < 50 && (coldMs === null || coldMs < 2000),
-      `run -d ${runCost} ms, snapshot ${snapCost} ms, cold start ${formatted ? `${cold} ms, not held: the data disk's first format` : coldMs === null ? "n/a" : `${coldMs} ms on a formatted data disk`}, the launcher's open files ${files}`,
     )
 
     // ── the VM stops under a running host: it leases again ──

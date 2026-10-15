@@ -16,6 +16,12 @@ pure helpers several packages share (`paths.ts`, `errorText`), since every
 package that uses one already depends on core. `index.ts` re-exports every
 module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
 
+- **`collectionSteps` (`fixtures.ts`) wraps globals:** the iterators of
+  `Map.prototype` and `Set.prototype`, while the function it counts runs.
+  That function must be synchronous, and its test must not be
+  `test.concurrent`. It counts iteration (spread, `for … of`, `forEach`,
+  `new Set(iterable)`), not `get`, `has`, `set` or `delete` (S214).
+
 ## Paths as strings (`paths.ts`)
 
 - **`isWithin` resolves nothing:** its arguments must be normalized

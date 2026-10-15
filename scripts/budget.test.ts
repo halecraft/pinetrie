@@ -2,8 +2,11 @@ import path from "node:path"
 import { expect, test } from "vitest"
 import {
   budgetBreaches,
+  countElapsedReadings,
   countFixedWaits,
   countLayers,
+  elapsedBreaches,
+  elapsedReadingsIn,
   fixedWaitBreaches,
   fixedWaitsIn,
 } from "./budget.ts"
@@ -48,4 +51,21 @@ test("a scenario with more fixed waits than its entry, or fewer, breaks the list
 test("each scenario holds exactly the fixed waits FIXED_WAITS allows it", () => {
   const root = path.join(import.meta.dirname, "..")
   expect(fixedWaitBreaches(countFixedWaits(root))).toEqual([])
+})
+
+// Built from variables, so this file holds no reading of its own.
+const clock = "Date"
+const perf = "performance"
+test.each([
+  [`expect(${clock}.now() - started).toBeLessThan(1500)`, 1],
+  [`const took = ${perf}.now() - t`, 1],
+  [`while (!ready() && ${clock}.now() < until)`, 0],
+  [`tick(doc, ${clock}.now() + 500)`, 0],
+])("elapsedReadingsIn(%j) is %d", (source, n) => {
+  expect(elapsedReadingsIn(source)).toBe(n)
+})
+
+test("no test or scenario reads elapsed time from a clock", async () => {
+  const root = path.join(import.meta.dirname, "..")
+  expect(elapsedBreaches(await countElapsedReadings(root))).toEqual([])
 })

@@ -1420,7 +1420,9 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
       thousands of paths, its diff names as many, and it runs on the host's
       main thread. A scan of every write for each path took 44 s there
       (S179); two sets made once, the written paths and every directory
-      above one, and a walk up each path's parents, take milliseconds.
+      above one, and a walk up each path's parents, take milliseconds. A
+      test counts its collection steps at 1,000 writes
+      (`collectionSteps`).
     - **A known limit:** a run's write named through a symlink is classed
       by that name, while the diff names the real path, which
       `unattributed` cannot match to it: the real path may be listed local

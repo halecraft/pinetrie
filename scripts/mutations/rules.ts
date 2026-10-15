@@ -106,8 +106,7 @@ export const mutations: readonly Mutation[] = [
     from: "        !written.has(p) &&\n",
     to: "        ![...written].some(w => w === p) &&\n",
     command: unit,
-    expect:
-      "tens of thousands of writes against as many changes take linear time",
+    expect: "unattributed takes a bounded number of steps per write",
   },
   // ── a lane's runs, folded ──
   {

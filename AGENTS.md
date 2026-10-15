@@ -51,6 +51,10 @@ spent spikes: history, which search skips unless you name the folder.
   decisions it rests on. `scripts/record.test.ts` fails on any id in
   code, naming its file.
 - A test's title states one behaviour, briefly.
+- A check never judges elapsed time. Model what it guards as a value (a
+  planned configuration, steps counted, a result or a state); a cost worth
+  knowing is a spike's measurement. `scripts/budget.test.ts` fails on a
+  clock reading subtracted in a test or scenario.
 - A `TECHNICAL.md` states rules, invariants and gotchas, and names the
   module they live in; a function's name in its prose goes stale on the
   next rename.

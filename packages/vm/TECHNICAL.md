@@ -129,7 +129,10 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   (`vmMemory`), and it has every CPU.
 - **Disks are attached with synchronization `fsync`, caching `cached`.**
   Apple's defaults, `full` and `automatic`, made every `docker run` about
-  500 ms (S129).
+  500 ms (S129). The host decides them (`LAUNCHER_DISKS`, `plan.ts`) and
+  passes them as the launcher's last two arguments; `launcherArgs` plans
+  the whole argv from facts the lease gathers on a start, the VM's memory
+  among them, and a unit test reads it (ADR-0152).
 - **The bridge:** `docker.sock` to vsock 2375. Each direction's end becomes
   a `shutdown(SHUT_WR)` of the other side, and a pair closes when both
   directions end, so `docker run -i` sees its input end and keeps its
@@ -271,9 +274,9 @@ sweep of what binds into it.
 
 ## Tests
 
-`plan.test.ts`, `protocol.test.ts`, `build.test.ts`, `apk.test.ts`,
-`pinned.test.ts` and `lease.test.ts`, whose lease runs against a stand-in
-launcher; mutations in `scripts/mutations/vm.ts`. The real launcher and VM
+`plan.test.ts` (among them the launcher's argv and its disk modes),
+`protocol.test.ts`, `build.test.ts`, `apk.test.ts`, `pinned.test.ts` and
+`lease.test.ts`, whose lease runs against a stand-in launcher; mutations in `scripts/mutations/vm.ts`. The real launcher and VM
 are checked by the `contract` scenario under Docker
 (`packages/docker/TECHNICAL.md`), and the image's build in a VM by the
 lanes suite's `vm-image` scenario, on the Mac.

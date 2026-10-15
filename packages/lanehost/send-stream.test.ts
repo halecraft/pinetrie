@@ -4,6 +4,7 @@
 
 import { readFileSync } from "node:fs"
 import path from "node:path"
+import { collectionSteps } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { sendFold, sendReader, streamChanges } from "./send-stream.ts"
 
@@ -178,8 +179,8 @@ describe("a send stream read as it arrives", () => {
   })
 })
 
-test("tens of thousands of new directories, filled under their orphan names, fold in linear time", () => {
-  const dirs = 15_000
+test("a thousand new directories, filled under their orphan names, fold in a bounded number of steps per command", () => {
+  const dirs = 1_000
   const commands: [number, string, string?][] = []
   for (let d = 0; d < dirs; d++) {
     const dir = `o${d + 1}-7-0`
@@ -190,9 +191,11 @@ test("tens of thousands of new directories, filled under their orphan names, fol
     }
     commands.push([RENAME, dir, `node_modules/p${d}`])
   }
-  const started = performance.now()
-  const changes = streamChanges(streamOf(commands))
-  expect(performance.now() - started).toBeLessThan(5_000)
+  const stream = streamOf(commands)
+  const { result: changes, steps } = collectionSteps(() =>
+    streamChanges(stream),
+  )
+  expect(steps).toBeLessThanOrEqual(2 * commands.length)
   expect(changes).toHaveLength(dirs * 3)
   expect(changes.some(c => c.path.startsWith("o"))).toBe(false)
   expect(changes).toContainEqual({
@@ -200,4 +203,4 @@ test("tens of thousands of new directories, filled under their orphan names, fol
     change: "added",
     kind: "file",
   })
-}, 30_000)
+})

@@ -168,21 +168,20 @@ describe("readPinned: what a run reads of its pinned cards", () => {
   })
 })
 
-test("waitFor: an aborted signal ends the wait at once, whatever is left", async () => {
+test("waitFor: an aborted signal hands whenHolds a signal already aborted", async () => {
   const stop = new AbortController()
   stop.abort()
-  const started = Date.now()
+  const given: boolean[] = []
   await waitFor(
     {
-      whenHolds: (_, __, giveUp) =>
-        new Promise(resolve => {
-          if (giveUp?.aborted === true) resolve()
-          giveUp?.addEventListener("abort", () => resolve())
-        }),
+      whenHolds: (_, __, giveUp) => {
+        given.push(giveUp?.aborted === true)
+        return Promise.resolve()
+      },
     },
     [{ id: cardIdFor("c1"), seen: "v-1" }],
     60_000,
     stop.signal,
   )
-  expect(Date.now() - started).toBeLessThan(1_000)
+  expect(given).toEqual([true])
 })

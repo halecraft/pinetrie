@@ -1732,6 +1732,15 @@ export const mutations: readonly Mutation[] = [
     expect: "it waits for each pinned card as the sender had it",
   },
   {
+    name: "the wait ignores its caller's signal",
+    file: "apps/pinetrie/host/pinned.ts",
+    from: "  const giveUp = AbortSignal.any([signal, AbortSignal.timeout(ms)])",
+    to: "  const giveUp = AbortSignal.timeout(ms)",
+    command: unit,
+    expect:
+      "waitFor: an aborted signal hands whenHolds a signal already aborted",
+  },
+  {
     name: "the wait never gives up",
     file: "apps/pinetrie/host/pinned.ts",
     from: "  const giveUp = AbortSignal.any([signal, AbortSignal.timeout(ms)])",

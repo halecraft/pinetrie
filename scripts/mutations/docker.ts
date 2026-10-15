@@ -5,9 +5,9 @@
 //
 // On the Mac the scenario boots a VM of its own from this checkout's
 // launcher, so a mutation of `launcher.swift` is what runs (it is built
-// again, about 30 s). Two only bite on one platform, and say so: the
-// working copy is held by the Mac's share flag there, and by the lane's
-// read-only bind on Linux.
+// again, about 30 s). A mutation named (Mac) or (Linux) bites only on that
+// platform: the working copy, for one, is held by the Mac's share flag
+// there, and by the lane's read-only bind on Linux.
 import type { Mutation } from "../mutate.ts"
 
 const plan = "packages/docker/plan.ts"
@@ -129,16 +129,6 @@ export const mutations: readonly Mutation[] = [
     scenario: "contract",
     expect:
       "a second host started and stopped beside the first leaves the first's lane reading its working copy and writing its shared directory",
-  },
-  {
-    name: "(Mac) the data disk is attached with Apple's full synchronization",
-    file: launcher,
-    from: "    url: url(dataPath), readOnly: false, cachingMode: .cached, synchronizationMode: .fsync)\n",
-    to: "    url: url(dataPath), readOnly: false, cachingMode: .cached, synchronizationMode: .full)\n",
-    suite: "lanes",
-    scenario: "contract",
-    expect:
-      "a lane's docker run -d takes under 150 ms, a snapshot under 50 ms, and a cold VM answers in under 2 s",
   },
   // ── unit checks, in seconds ──
   {

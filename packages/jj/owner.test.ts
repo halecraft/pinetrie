@@ -61,8 +61,8 @@ function own(dir: string, backstopMs = 60_000) {
 }
 
 const waitFor = async (pred: () => boolean, ms = 5_000) => {
-  const t0 = Date.now()
-  while (!pred() && Date.now() - t0 < ms)
+  const until = Date.now() + ms
+  while (!pred() && Date.now() < until)
     await new Promise(r => setTimeout(r, 10))
   return pred()
 }

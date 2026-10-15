@@ -103,6 +103,22 @@ export const mutations: readonly Mutation[] = [
       "a server whose client stopped reading outlives the write it cannot make",
   },
   {
+    name: "an abort does not reach the command it runs",
+    file: "packages/channel/run.ts",
+    from: '        encoding: options.bytes ? "buffer" : "utf8",\n        signal: options.signal,\n',
+    to: '        encoding: options.bytes ? "buffer" : "utf8",\n',
+    command: ["pnpm", "exec", "vitest", "run", "packages/channel"],
+    expect: "an abort ends a call, and kills a command it runs",
+  },
+  {
+    name: "the server answers one call at a time",
+    file: "packages/channel/serve.ts",
+    from: "      else void answer(request.id, request.call, request.updates)\n",
+    to: "      else {\n        const g = globalThis as { queue?: Promise<void> }\n        g.queue = (g.queue ?? Promise.resolve()).then(() =>\n          answer(request.id, request.call, request.updates),\n        )\n      }\n",
+    command: unit,
+    expect: "parallel calls are answered concurrently",
+  },
+  {
     name: "an abort is sent before the request it aborts",
     file: "packages/channel/client.ts",
     from: "      write({ id, call: body, updates: onUpdate !== undefined })\n      if (signal?.aborted) write({ abort: id })",

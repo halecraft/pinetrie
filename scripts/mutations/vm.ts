@@ -7,6 +7,15 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/vm"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the launcher's disks take Apple's full synchronization",
+    file: "packages/vm/plan.ts",
+    from: '  synchronization: "fsync",\n',
+    to: '  synchronization: "full",\n',
+    command: unit,
+    expect:
+      "launcherArgs: the disks flush with fsync and cache their reads, after the slots, a quarter of the Mac's memory, the CPUs and gvproxy",
+  },
+  {
     name: "a slot is filled unswept",
     file: "packages/vm/lease.ts",
     from: "      await sweep(slot.slot)\n",

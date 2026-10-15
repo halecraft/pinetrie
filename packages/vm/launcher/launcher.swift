@@ -43,17 +43,34 @@ setvbuf(stdout, nil, _IOLBF, 0)
 func log(_ s: String) { print("launcher: \(s)") }
 
 let args = CommandLine.arguments
-guard args.count == 7, let slotCount = Int(args[3]), let memoryBytes = UInt64(args[4]),
+guard args.count == 9, let slotCount = Int(args[3]), let memoryBytes = UInt64(args[4]),
   let cpus = Int(args[5])
 else {
   FileHandle.standardError.write(
-    "usage: launcher <state dir> <image dir> <slots> <memory bytes> <cpus> <gvproxy>\n".data(
-      using: .utf8)!)
+    "usage: launcher <state dir> <image dir> <slots> <memory bytes> <cpus> <gvproxy> <synchronization> <caching>\n"
+      .data(using: .utf8)!)
   exit(2)
 }
 let state = args[1]
 let image = args[2]
 let gvproxyBinary = args[6]
+/// The disks' modes are the host's choice (`LAUNCHER_DISKS`, `packages/vm/plan.ts`).
+let syncMode: VZDiskImageSynchronizationMode
+switch args[7] {
+case "fsync": syncMode = .fsync
+case "full": syncMode = .full
+default:
+  log("synchronization must be fsync or full: \(args[7])")
+  exit(2)
+}
+let cachingMode: VZDiskImageCachingMode
+switch args[8] {
+case "cached": cachingMode = .cached
+case "automatic": cachingMode = .automatic
+default:
+  log("caching must be cached or automatic: \(args[8])")
+  exit(2)
+}
 /// Under 1 GiB is a caller's mistake: Docker and lanes do not fit, and
 /// Virtualization's floor (4 MiB) would boot a VM that fails to start.
 guard memoryBytes >= 1 << 30 else {
@@ -105,14 +122,12 @@ boot.initialRamdiskURL = url("\(image)/stage1.cpio")
 boot.commandLine = "console=hvc0 quiet lane.slots=\(slotCount)"
 config.bootLoader = boot
 
-// fsync and cached: Apple's defaults, full and automatic, made every
-// `docker run` about 500 ms (S129).
 do {
   let system = try VZDiskImageStorageDeviceAttachment(
-    url: url("\(image)/system.erofs"), readOnly: true, cachingMode: .cached,
-    synchronizationMode: .fsync)
+    url: url("\(image)/system.erofs"), readOnly: true, cachingMode: cachingMode,
+    synchronizationMode: syncMode)
   let data = try VZDiskImageStorageDeviceAttachment(
-    url: url(dataPath), readOnly: false, cachingMode: .cached, synchronizationMode: .fsync)
+    url: url(dataPath), readOnly: false, cachingMode: cachingMode, synchronizationMode: syncMode)
   config.storageDevices = [
     VZVirtioBlockDeviceConfiguration(attachment: system),
     VZVirtioBlockDeviceConfiguration(attachment: data),

@@ -39,6 +39,10 @@ export {
   imageDir,
   imageKey,
   imageRefusal,
+  LAUNCHER_DISKS,
+  type LauncherDisks,
+  type LauncherFacts,
+  launcherArgs,
   NOTHING_HELD,
   parseSums,
   planShares,
@@ -59,7 +63,6 @@ export {
   type VmVersion,
   vmBuildWords,
   vmHostRefusal,
-  vmMemory,
   vmStateDir,
   vmWords,
 } from "./plan.ts"

@@ -80,6 +80,49 @@ const GiB = 1024 ** 3
 export const vmMemory = (macMemory: number): number =>
   Math.min(16 * GiB, Math.max(4 * GiB, Math.floor(macMemory / 4)))
 
+/**
+ * How the launcher attaches the VM's disks, in Virtualization's names: ours,
+ * or Apple's defaults.
+ */
+export interface LauncherDisks {
+  readonly synchronization: "fsync" | "full"
+  readonly caching: "cached" | "automatic"
+}
+
+/**
+ * Apple's defaults, `full` and `automatic`, make every flush the guest asks
+ * for an `F_FULLFSYNC` on the Mac, and every `docker run` about 500 ms.
+ */
+export const LAUNCHER_DISKS: LauncherDisks = {
+  synchronization: "fsync",
+  caching: "cached",
+}
+
+/** What the launcher's argv is made from, gathered before it starts. */
+export interface LauncherFacts {
+  readonly stateDir: string
+  /** The image's directory (`imageDir`). */
+  readonly image: string
+  readonly slots: number
+  /** The Mac's memory in bytes; the VM takes `vmMemory` of it. */
+  readonly macMemory: number
+  readonly cpus: number
+  /** gvproxy's binary, where `ensureGvproxy` puts it. */
+  readonly gvproxy: string
+}
+
+/** The launcher's argv after its binary, in the order `launcher.swift` reads it. */
+export const launcherArgs = (f: LauncherFacts): readonly string[] => [
+  f.stateDir,
+  f.image,
+  String(f.slots),
+  String(vmMemory(f.macMemory)),
+  String(f.cpus),
+  f.gvproxy,
+  LAUNCHER_DISKS.synchronization,
+  LAUNCHER_DISKS.caching,
+]
+
 /** gvproxy's address for the Mac's loopback, in the VM's network. */
 export const GVPROXY_HOST_ADDRESS = "192.168.127.254"
 

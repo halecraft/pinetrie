@@ -1,5 +1,5 @@
 // The lease's client against a stand-in launcher speaking the protocol: the
-// real launcher is checked on the Mac (`packages/vm/launcher/prove.sh`).
+// real launcher is checked on the Mac by the lanes suite's `contract` scenario.
 
 import { mkdtemp, rm } from "node:fs/promises"
 import http from "node:http"
