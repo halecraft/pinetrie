@@ -4280,4 +4280,21 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "each config file, what it refused",
   },
+  {
+    name: "a column of another kind is writable",
+    file: "packages/interface/foreign-column.ts",
+    from: "  return input.foreign === null\n    ? null\n",
+    to: "  return true\n    ? null\n",
+    command: unit,
+    expect: "is read-only, saying why, after a hold and a task's archive",
+  },
+  {
+    name: "a branch's column is read as its own thread, not its source",
+    file: "packages/interface/foreign-column.ts",
+    from: "  const at: readonly RunAt[] =\n    unstarted === undefined\n",
+    to: "  const at: readonly RunAt[] =\n    true\n",
+    command: unit,
+    expect:
+      "its lane's, or the lane a first send there clones; none of the project's kind, or with no project",
+  },
 ]

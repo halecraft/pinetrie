@@ -9,12 +9,14 @@ import type {
   CommitId,
   ErrCode,
   LaneBase,
+  LaneRecord,
   OfferFact,
   OfferSeen,
+  PointId,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
-import type { FileAt, Point } from "@pinetrie/lanes"
+import type { FileAt, ReadSite } from "@pinetrie/lanes"
 import type {
   ArchiveTeardown,
   ForkBegin,
@@ -26,8 +28,8 @@ import type {
 export interface BaseNow {
   /** What became of a WIP base; "ok" for accepted work. */
   readonly state: BaseRecord["state"]
-  /** Accepted work's commit; null before it is set up. */
-  readonly acceptedCommit: CommitId | null
+  /** Accepted work's state; null before it is set up. */
+  readonly acceptedPoint: PointId | null
   /** For a WIP base: its commit now, and accepted work's commit under it. */
   readonly wipNow: {
     readonly commit: CommitId
@@ -70,12 +72,15 @@ export interface AcceptedActs {
 }
 
 export interface Destination {
-  /** `path` at `point`, read at the head the destination last observed. */
-  fileAt(point: Point, path: string): Promise<FileAt>
+  /** `path` at `site`, read at the head the destination last observed. */
+  fileAt(site: ReadSite, path: string): Promise<FileAt>
   /** Where a new lane begins for `base` (a WIP's name, null for accepted work), or why it cannot. */
   begin(base: string | null): Promise<ForkBegin | ErrCode>
-  /** What a lane on `base` would catch up with, read at once. */
-  baseNow(base: LaneBase | null): Promise<BaseNow>
+  /**
+   * What `lane`, on `base`, would catch up with, read at once: refused
+   * (thrown) for a lane whose history is not the destination's kind.
+   */
+  baseNow(lane: LaneRecord, base: LaneBase | null): Promise<BaseNow>
   /** An archive's or a restore's lanes: their history set or dropped, their offers followed. */
   lanesMoved(refs: ArchiveTeardown["refs"]): Promise<void>
   readonly offers: OfferActs

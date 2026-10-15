@@ -58,7 +58,7 @@ describe("workStats", () => {
     {
       entry: entryId(entry),
       lane: threadIdFor("x"),
-      commit: null,
+      point: null,
       snapshot: null,
       paths,
       conflicts: [],

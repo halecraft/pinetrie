@@ -24,7 +24,7 @@ import {
   executeOrThrow,
   type LaneRunners,
   lines,
-  type Merged,
+  type MergedOf,
   type Runner,
   type TouchedRevision,
 } from "@pinetrie/lanes"
@@ -346,7 +346,7 @@ export async function mergeUpdate(
   runners: LaneRunners,
   lane: ThreadId,
   plan: MergePlan,
-): Promise<Merged> {
+): Promise<MergedOf<CommitId>> {
   await executeOrThrow(plan.steps, runners)
   const [from] =
     plan.source === "copy" ? await commitsOf(jj, "@-") : [plan.source]

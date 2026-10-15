@@ -791,7 +791,9 @@ export function worksOwn(
   },
 ): boolean {
   if (send.lane.kind === "lane" && send.mode !== "branch")
-    return readLaneRecords(session).get(send.lane.name)?.ownCopy === true
+    return (
+      (readLaneRecords(session).get(send.lane.name)?.history ?? null) !== null
+    )
   return readProject(session) !== null
 }
 

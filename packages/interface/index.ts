@@ -323,6 +323,11 @@ export {
   initialFollow,
   type SeenEnd,
 } from "./follow.ts"
+export {
+  columnForeign,
+  columnReadOnly,
+  foreignWords,
+} from "./foreign-column.ts"
 export { gridKeyAct } from "./grid-keys.ts"
 export type { GridView } from "./grid-view.ts"
 export {

@@ -11,8 +11,11 @@
 
 import type { ConfigPlaces } from "@pinetrie/config"
 import {
+  type ForeignLane,
   PROJECT_CONFIG_FILE,
   type ProjectRecord,
+  proveRunnable,
+  type RunnableLane,
   type ThreadId,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
@@ -61,6 +64,11 @@ export type LaneWork = Pick<
     quiet(): Promise<void>
     /** `listener` hears each lane whose base record changed. */
     onBaseChanged(listener: (lane: ThreadId) => void): void
+    /**
+     * `lane` proven to be one a run may start on (`proveRunnable`), or why
+     * not: what every run's start must hold (`Runs.start`).
+     */
+    runnable(lane: ThreadId): RunnableLane | ForeignLane
   }
 
 /**
@@ -115,7 +123,7 @@ export async function startLaneWork(input: {
           },
           view,
           lane,
-          false,
+          null,
           by,
         ),
     }
@@ -243,6 +251,7 @@ export async function startLaneWork(input: {
     onBaseChanged(listener) {
       baseListeners.push(listener)
     },
+    runnable: lane => proveRunnable(lane, registry.recordOf(lane), opened.kind),
   }
 }
 
@@ -273,4 +282,6 @@ const NO_LANES: LaneWork = {
   quiet: async () => {},
   close: async () => {},
   onBaseChanged: () => {},
+  // Every lane runs with no tools here, whatever its history.
+  runnable: lane => proveRunnable(lane, undefined, null),
 }

@@ -203,7 +203,7 @@ export async function sweepTrash(input: {
   const own =
     input.work.destination === null
       ? []
-      : swept.threads.filter(t => records.get(t)?.ownCopy === true)
+      : swept.threads.filter(t => (records.get(t)?.history ?? null) !== null)
   const threads = readThreads(session)
   const revisions = new Map<EntryId, RevisionRecord>()
   const trees = []

@@ -692,20 +692,20 @@ export const mutations: readonly Mutation[] = [
       "blankQueued: a queued message with no command and no text, as its queuer had it",
   },
   {
-    name: "a lane with no copy of its own is stored with one",
+    name: "a lane with no copy of its own decodes as a jj lane",
     file: "packages/rules/work.ts",
-    from: '    work: ownCopy ? { kind: "own" } : null,',
-    to: '    work: { kind: "own" },',
+    from: "            history: r.history,",
+    to: '            history: r.history ?? "jj",',
     command: unit,
     expect:
-      "a lane's copy of its own is stored as its work, as records from when a lane could work directly hold it",
+      "a lane's history round-trips as its kind, or null for no copy of its own",
   },
   // ── the lanes suite, proven in a lane ──
   {
     name: "a fork at a turn starts from the base snapshot",
     file: "packages/rules/work.ts",
-    from: '        snapshot: above.snapshot ?? BASE_SNAPSHOT,\n        start: { kind: "commits"',
-    to: '        snapshot: BASE_SNAPSHOT,\n        start: { kind: "commits"',
+    from: '        snapshot: above.snapshot ?? BASE_SNAPSHOT,\n        start: { kind: "recorded"',
+    to: '        snapshot: BASE_SNAPSHOT,\n        start: { kind: "recorded"',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -1002,7 +1002,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a catch-up's merge is not read",
     file: "packages/rules/chat.ts",
-    from: "    return { merged: details.merged.map(c => commitId(c as string)) }",
+    from: "    return { merged: details.merged.map(c => pointId(c as string)) }",
     to: "    return undefined",
     command: unit,
     expect: "a catch_up result carries the commits it merged",
@@ -1357,8 +1357,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup drains nothing",
     file: "packages/rules/startup.ts",
-    from: "  return { resume, drain, unclassified }",
-    to: "  return { resume, drain: [], unclassified }",
+    from: "  return { resume, kept, drain, unclassified }",
+    to: "  return { resume, kept, drain: [], unclassified }",
     command: unit,
     expect: "every lane with queued cards drains",
   },
@@ -1413,7 +1413,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "forkPoint starts every fork from your @",
     file: "packages/rules/work.ts",
-    from: '        start: { kind: "commits", commits: [above.commit] },',
+    from: '        start: { kind: "recorded", points: [above.point] },',
     to: '        start: { kind: "copy", ...input.yours },',
     command: unit,
     expect: "from a turn: its snapshot and the commit above",
@@ -1685,7 +1685,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup drains an interrupted lane",
     file: "packages/rules/startup.ts",
-    from: "    .filter(lane => !resume.includes(lane))",
+    from: "    .filter(lane => !resumed.has(lane))",
     to: "    .filter(lane => lane !== undefined)",
     command: unit,
     expect: "an interrupted lane is resumed, and not drained",
@@ -1968,8 +1968,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a range across two lanes is read",
     file: "packages/rules/review.ts",
-    from: "      if (f.lane === t.lane && f.commit !== null && t.commit !== null)",
-    to: "      if (f.commit !== null && t.commit !== null)",
+    from: "      if (f.lane === t.lane && f.point !== null && t.point !== null)",
+    to: "      if (f.point !== null && t.point !== null)",
     command: unit,
     expect: "a range only between two commits one lane's turns recorded",
   },
@@ -2717,7 +2717,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup leaves a verdict pending",
     file: "packages/rules/startup.ts",
-    from: '    .filter(v => v.verdict.kind === "pending" && !resume.includes(v.lane))',
+    from: '    .filter(v => v.verdict.kind === "pending" && !resumed.has(v.lane))',
     to: "    .filter(() => false)",
     command: unit,
     expect: "a pending verdict is unclassified, unless its lane is resumed",
@@ -3847,5 +3847,66 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a new task: its card at the end of the board's first state, first on its canvas, in one step",
+  },
+  {
+    name: "a WIP's commit is compared with the lane's start, not its source",
+    file: "packages/rules/base.ts",
+    from: "  return pointFromCommit(wipNow.commit) === base.source\n",
+    to: "  return pointFromCommit(wipNow.commit) === base.start\n",
+    command: unit,
+    expect:
+      "a WIP thread merges a fresh copy of its WIP; nothing when it has not moved",
+  },
+  {
+    name: "base news compares what the thread was told with no base state",
+    file: "packages/rules/behind.ts",
+    from: "  const to = pointFromCommit(now.move.to)\n",
+    to: "  const to = pointFromCommit(now.move.from)\n",
+    command: unit,
+    expect: "nothing: a commit it was told of",
+  },
+  {
+    name: "startup resumes a lane of another kind",
+    file: "packages/rules/startup.ts",
+    from: '      input.interrupted.flatMap(l => (typeof l === "object" ? [] : [l])),\n',
+    to: '      input.interrupted.flatMap(l => (typeof l === "object" ? [l.lane as never] : [l])),\n',
+    command: unit,
+    expect:
+      "planStartup: a lane of another kind stays interrupted, and is drained as any other",
+  },
+  {
+    name: "a send at an entry is never checked for its source's kind",
+    file: "packages/rules/held.ts",
+    from: '    if (history !== kind) return { kind: "foreign", lane: a.starts, history }\n',
+    to: "",
+    command: unit,
+    expect:
+      "foreignIn: a run on a lane of another kind, a thread's own or the one a send at an entry clones",
+  },
+  {
+    name: "a thread of another kind is asked all the same",
+    file: "packages/rules/relay.ts",
+    from: "  if (input.toForeign !== null)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "a thread whose lane keeps a history of another kind cannot be asked, and is told why",
+  },
+  {
+    name: "a fork clones a disk of another kind than its record's",
+    file: "packages/rules/work.ts",
+    from: "  if (history !== input.lane.history)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect: "a disk of another kind than the new lane's record is refused",
+  },
+  {
+    name: "a kept snapshot's disk is read as the project's kind",
+    file: "packages/rules/work.ts",
+    from: "  return input.lanes.get(snapshotLane)?.history ?? input.kind\n",
+    to: "  return input.kind\n",
+    command: unit,
+    expect:
+      "a kept snapshot's lane's; the base's, or a lost snapshot's, the project's",
   },
 ]

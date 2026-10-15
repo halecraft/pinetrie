@@ -17,6 +17,7 @@ import {
   type CommitId,
   HOST_WORKING_COPY,
   NO_EDITOR,
+  pointFromCommit,
   threadIdFor,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
@@ -32,6 +33,7 @@ import {
 import { type HistoryRig, historySuite } from "@pinetrie/lanes/testing"
 import { afterAll, beforeAll, expect, test } from "vitest"
 import { fileAt } from "../file-at.ts"
+import { jjLaneFor } from "../fixtures.ts"
 import { planImport } from "../plan.ts"
 import { executeRepo, hostJj } from "../run.ts"
 import { historyOf } from "./history.ts"
@@ -122,7 +124,7 @@ async function makeRig(): Promise<HistoryRig> {
       ])
       const [commit] = await commitsOf(yours, "@-")
       if (commit === undefined) throw new Error("nothing accepted")
-      return commit
+      return pointFromCommit(commit)
     },
 
     async lane() {
@@ -137,7 +139,10 @@ async function makeRig(): Promise<HistoryRig> {
       if (accepted === undefined) throw new Error("no accepted work")
       const steps: LaneStep[] = [
         ...planBaseCheckout({ yours: [accepted], fresh: true }),
-        ...planForkSetup(lane, { kind: "accepted", commit: accepted }),
+        ...planForkSetup(jjLaneFor(lane), {
+          kind: "accepted",
+          point: pointFromCommit(accepted),
+        }),
       ]
       await executeOrThrow(steps, runners)
       const fetched: unknown[] = []
@@ -177,7 +182,7 @@ async function makeRig(): Promise<HistoryRig> {
         )
       }
       const history = historyOf({
-        lane,
+        lane: jjLaneFor(lane),
         runners,
         repoConfig: DEFAULT_REPO,
         fetch,

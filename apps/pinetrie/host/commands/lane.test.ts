@@ -30,6 +30,7 @@ import {
   NO_BLANK_CARDS,
   putLane,
   putValue,
+  RUNS_ANY,
   record,
   row,
 } from "../fakes.ts"
@@ -213,7 +214,7 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
   const b = basics()
   const lane = threadIdFor("0123456789abcdef")
   applyWrites(b, [
-    setRecord(PROJECT, { root: "/p", owner: ada }),
+    setRecord(PROJECT, { root: "/p", kind: "jj", owner: ada }),
     setRecord(ACCESS, {
       ...accessOf(lane),
       personal: { kind: "waiting", host: "pop", since: 1 },
@@ -321,7 +322,11 @@ function stopped() {
 test("carrying on a stopped lane starts a run whose prompt is the carry-on message", async () => {
   const { b, lane, started, start } = stopped()
   expect(
-    await handleCarryOn({ basics: b, start, cards: NO_BLANK_CARDS }, lane, ada),
+    await handleCarryOn(
+      { basics: b, start, cards: NO_BLANK_CARDS, work: RUNS_ANY },
+      lane,
+      ada,
+    ),
   ).toEqual({
     kind: "started",
     runId: runId("r-2"),
@@ -346,7 +351,11 @@ test("a carry-on the rule refuses is answered with its refusal, and starts nothi
   const { b, lane, started, start } = stopped()
   beginRun(b.live, lane, runId("r-1"))
   expect(
-    await handleCarryOn({ basics: b, start, cards: NO_BLANK_CARDS }, lane, ada),
+    await handleCarryOn(
+      { basics: b, start, cards: NO_BLANK_CARDS, work: RUNS_ANY },
+      lane,
+      ada,
+    ),
   ).toEqual({
     kind: "refused",
     code: "busy",
@@ -354,7 +363,7 @@ test("a carry-on the rule refuses is answered with its refusal, and starts nothi
   })
   expect(
     await handleCarryOn(
-      { basics: b, start, cards: NO_BLANK_CARDS },
+      { basics: b, start, cards: NO_BLANK_CARDS, work: RUNS_ANY },
       threadIdFor("fedcba9876543210"),
       ada,
     ),

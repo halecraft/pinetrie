@@ -7,9 +7,9 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core"
 import {
-  commitId,
   type EntryId,
   messageText,
+  pointId,
   ROOT,
   THE_AGENT,
   type ThreadId,
@@ -670,7 +670,7 @@ describe("lanes in a harness", () => {
     const news = encodeBehind(
       {
         from: { kind: "accepted" },
-        to: commitId("l2"),
+        to: pointId("l2"),
         files: ["a.ts"],
         overlap: [],
         conflicts: [],

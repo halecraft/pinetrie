@@ -17,9 +17,9 @@ import {
   atEntry,
   type CardId,
   type CatchUpFrom,
-  type CommitId,
   type EntryId,
   type HeardDetails,
+  type PointId,
   type Position,
   type RelayDetails,
   type SendAt,
@@ -51,12 +51,12 @@ export interface MessagePart {
 
 /**
  * What a thread is told when its base has new work: a behind entry's details,
- * decoded. `to` is the base's commit it was told of, so it is told once per
- * commit.
+ * decoded. `to` is the base's state it was told of, so it is told once per
+ * state.
  */
 export interface BehindView {
   readonly from: CatchUpFrom
-  readonly to: CommitId
+  readonly to: PointId
   /** The files catching up would change. */
   readonly files: readonly string[]
   /** Those of `files` this thread's work changes too. */
@@ -156,10 +156,10 @@ export interface AgentMessageLike {
   /** Role `canvas` only: the task's cards a run was told of. */
   readonly canvas?: CanvasView
   /**
-   * Roles `update` and `land`, and a `catch_up` tool result: the commits merged
+   * Roles `update` and `land`, and a `catch_up` tool result: the states merged
    * into the lane.
    */
-  readonly merged?: readonly CommitId[]
+  readonly merged?: readonly PointId[]
   /** An `ask_about_conflict` tool result the host took: the agent asked. */
   readonly asked?: true
   /** Role `behind` only: the base's new work the thread was told of. */
@@ -227,8 +227,8 @@ export interface TranscriptMessage {
   readonly images?: readonly ImageRef[]
   /** Role `assistant` only: the tools it called, each with its result once known. */
   readonly toolCalls?: readonly ToolCall[]
-  /** Roles `update` and `land` only: the commits merged into the lane. */
-  readonly merged?: readonly CommitId[]
+  /** Roles `update` and `land` only: the states merged into the lane. */
+  readonly merged?: readonly PointId[]
   /** Roles `relay`, `answer` and `heard` only: the thread it came from. */
   readonly from?: ThreadId
 }
@@ -608,7 +608,7 @@ export const canvasInView = (
   )
 
 /**
- * The base commits the thread at `tip` last heard of or merged: a behind
+ * The base states the thread at `tip` last heard of or merged: a behind
  * entry's `to`, or what an update, a resolution or a `catch_up` merged, the
  * newest on the path. Null with none, or past a compaction: a fact pi
  * summarised away is told again.
@@ -616,7 +616,7 @@ export const canvasInView = (
 export const baseKnown = (
   index: TreeIndex,
   tip: EntryId | null,
-): readonly CommitId[] | null =>
+): readonly PointId[] | null =>
   newestOnPath(
     index,
     tip,

@@ -93,7 +93,10 @@ translates to.
   into your repo may leave out), `plan.ts` (a fork's setup, the base's
   checkout, a merge's steps and joins, a turn's commit, a bundle, the
   `pre-rename:` renames), `revisions.ts`, `merge.ts`, `bookmarks.ts`,
-  `base.ts` (`laneBase`), `names.ts` and `run.ts` (`laneJj`, `jjIn`).
+  `base.ts` (`laneBase`), `names.ts`, `run.ts` (`laneJj`, `jjIn`) and
+  `points.ts` (a lane proven jj, and the one way from a point to a commit).
+- `fixtures.ts`: what the tests share: a lane's record proven jj
+  (`jjLaneFor`).
 
 ## The owner (`owner.ts`, ADR-0065)
 
@@ -345,7 +348,7 @@ update's merge will change.**
   its own `accepted.bookmark` is left alone. Delete it once Duane's repo has
   passed it.
 - **A source accepted below the base's source is not part of the start**
-  (S81). `LaneBase.source` is the commit of yours the lane merged whole:
+  (S81). A base's `source` (`CommitBase`) is the commit of yours the lane merged whole:
   the one its `Pinetrie-Base` names (the WIP's commit, never the copy, which
   descends from no accepted-offer commit), else `start`. An offer keeps the diff from
   its start's merge to the tip, so a start the target holds as another
@@ -470,6 +473,24 @@ What jj's adapter does in a lane's own repo: `historyOf` (`lane/history.ts`)
 is its `LaneHistory`, over the lane's runners, and its pure planners are
 `lane/plan.ts`'s. `@pinetrie/lanes` runs no jj: it plans a fork and the base
 with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
+
+- **A point becomes a commit only in a lane proven jj** (`lane/points.ts`,
+  ADR-0150). `proveJjLane` is the one maker of a `JjLane` (its brand is
+  unexported); `commitFromPoint` takes one, so a point from a port or from
+  storage is read as a commit only where the lane it belongs to keeps a jj
+  history. A commit becomes a point freely (`pointFromCommit`, core).
+  `historyOf` takes a `JjLane`, proved once by the host's adapter when the
+  registry asks for the history, and its planners (`planForkSetup`,
+  `planMerge`) convert inside.
+- **Reads of your repo stay in commits.** `laneBase`, the offers' gathers,
+  `catch-up.ts` and `fileAt` read `CommitBase` (`LaneBaseOf<CommitId>`);
+  `commitTurn` and `mergeUpdate` answer `TurnCommittedOf<CommitId>` and
+  `MergedOf<CommitId>`. `historyOf` converts at the port (`baseFromCommits`,
+  `turnFromCommits`, `mergedFromCommits`); the host's adapter converts a
+  base a port carried back with its lane's proof (`baseInCommits`), and a
+  review's range with the lane `planOfferRead` named (`CommitSpan`).
+  WIPs, offers and accepted work's own records are jj's alone, and stay
+  `CommitId` throughout.
 
 - **Every method is gather, a pure planner, then execute.** The planners
   are unit-tested (`lane/plan.test.ts`, `lane/fetch-plan.test.ts`); the

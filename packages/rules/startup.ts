@@ -1,6 +1,12 @@
 // startup — what a starting host does with the lanes it finds.
 
-import type { CardRecord, ThreadId, VerdictRecord } from "@pinetrie/core"
+import type {
+  CardRecord,
+  ForeignLane,
+  RunnableLane,
+  ThreadId,
+  VerdictRecord,
+} from "@pinetrie/core"
 import { queuedOn } from "./queue.ts"
 
 /**
@@ -9,28 +15,39 @@ import { queuedOn } from "./queue.ts"
  * drains it. Every other lane with cards queued for it is drained, since no
  * run's end will. A verdict left pending lost its request with the last host,
  * and is `unclassified`, unless its lane is resumed, whose run's end writes
- * another. What does not survive a process (runs, streams) is cleared first
- * (`planClear`, `live.ts`).
+ * another. A lane of another kind is not resumed: its run stays interrupted,
+ * and resumes once the project is its kind again. What does not survive a
+ * process (runs, streams) is cleared first (`planClear`, `live.ts`).
  */
 export function planStartup(input: {
   readonly cards: readonly CardRecord[]
-  /** Lanes a crash interrupted, as pi reports them. */
-  readonly interrupted: readonly ThreadId[]
+  /** Lanes a crash interrupted, as pi reports them, each proven runnable or not. */
+  readonly interrupted: readonly (RunnableLane | ForeignLane)[]
   readonly verdicts: readonly VerdictRecord[]
 }): {
-  readonly resume: readonly ThreadId[]
+  readonly resume: readonly RunnableLane[]
+  /** Interrupted lanes of another kind, left as they are. */
+  readonly kept: readonly ForeignLane[]
   readonly drain: readonly ThreadId[]
   readonly unclassified: readonly VerdictRecord[]
 } {
-  const resume = [...new Set(input.interrupted)]
+  const resume = [
+    ...new Set(
+      input.interrupted.flatMap(l => (typeof l === "object" ? [] : [l])),
+    ),
+  ]
+  const kept = input.interrupted.flatMap(l =>
+    typeof l === "object" ? [l] : [],
+  )
   const lanes = new Set<ThreadId>()
   for (const c of input.cards)
     if (c.place.kind === "queued") lanes.add(c.place.thread)
+  const resumed = new Set<ThreadId>(resume)
   const drain = [...lanes]
     .filter(lane => queuedOn(input.cards, lane).length > 0)
-    .filter(lane => !resume.includes(lane))
+    .filter(lane => !resumed.has(lane))
   const unclassified = input.verdicts
-    .filter(v => v.verdict.kind === "pending" && !resume.includes(v.lane))
+    .filter(v => v.verdict.kind === "pending" && !resumed.has(v.lane))
     .map(v => ({ ...v, verdict: { kind: "unclassified" } as const }))
-  return { resume, drain, unclassified }
+  return { resume, kept, drain, unclassified }
 }

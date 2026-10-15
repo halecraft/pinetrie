@@ -9,15 +9,17 @@
 // (fetches, splits) run on.
 
 import type {
-  CommitId,
   EntryId,
+  ForeignLane,
+  OwnLane,
+  ProjectKind,
   RepoConfig,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import type {
-  BaseCheckout,
+  AcceptedNow,
   LaneHistory,
   LaneRunners,
   SharedDir,
@@ -31,6 +33,8 @@ import type { LaneRegistry } from "./registry.ts"
 
 /** A kind of project's adapter, before startup opens it. */
 export interface ProjectAdapter {
+  /** What its folder is: what every lane it makes keeps its history in. */
+  readonly kind: ProjectKind
   /**
    * Open the project, with your repo's names as settled from your config
    * and the working copy's `pinetrie.json`: before anything else reads it.
@@ -52,6 +56,8 @@ export interface SharedPrepared {
 
 /** The project as startup reads it, before lane work starts. */
 export interface OpenProject {
+  /** The adapter's kind (`ProjectAdapter.kind`). */
+  readonly kind: ProjectKind
   /** `Destination.fileAt`, before the destination is whole. */
   readonly fileAt: Destination["fileAt"]
   /**
@@ -61,13 +67,8 @@ export interface OpenProject {
   prepareShared(entries: readonly string[]): Promise<SharedPrepared>
   /** The identity lanes commit as: yours, else pine·trie's agent's. */
   identity(): Promise<{ readonly name: string; readonly email: string }>
-  /** Accepted work's commits now: none before it is set up. */
-  acceptedNow(): Promise<readonly CommitId[]>
-  /** The base's checkout of `yours`, on a fresh disk or on the base before. */
-  baseSteps(input: {
-    readonly yours: readonly CommitId[]
-    readonly fresh: boolean
-  }): BaseCheckout
+  /** Accepted work now, and its checkout on the base's disk (`AcceptedNow`). */
+  acceptedNow(): Promise<AcceptedNow>
   /** Lane work's parts in, the adapter's whole parts out. */
   start(parts: ProjectParts): StartedProject
 }
@@ -106,7 +107,10 @@ export interface Splits {
 /** The adapter, started. */
 export interface StartedProject {
   readonly destination: Destination
-  /** `lane`'s history over its runners; only `withHistory` asks for one. */
-  history(lane: ThreadId, runners: LaneRunners): LaneHistory
+  /**
+   * `lane`'s history over its runners, or why its history is not this
+   * kind's; only `withHistory` asks for one.
+   */
+  history(lane: OwnLane, runners: LaneRunners): LaneHistory | ForeignLane
   readonly splits: Splits
 }

@@ -1,9 +1,4 @@
-import {
-  BASE_SNAPSHOT,
-  commitId,
-  snapshotId,
-  threadIdFor,
-} from "@pinetrie/core"
+import { BASE_SNAPSHOT, pointId, snapshotId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { forkSetup } from "./history-port.ts"
 import {
@@ -44,8 +39,8 @@ import {
 } from "./plan.ts"
 
 const LANE = threadIdFor("1")
-const C1 = commitId("c1")
-const C2 = commitId("c2")
+const C1 = pointId("c1")
+const C2 = pointId("c2")
 const HOME = "/Users/ada"
 
 const parts = {
@@ -359,7 +354,7 @@ const argvs = (steps: readonly (LaneStep | Step)[]) =>
 
 test("planFork: the restore, the container, the old config folder gone, then the adapter's setup", () => {
   const steps = planFork({
-    point: { snapshot: snapshotId("e1") },
+    source: { snapshot: snapshotId("e1") },
     spec,
     env: {},
     setup: forkSetup([{ in: "lane", argv: ["setup"] }]),
@@ -396,8 +391,8 @@ test("planSnapshot: sync comes before the snapshot", () => {
 })
 
 describe("the base: the base before it, checked out at accepted work", () => {
-  test("isBaseCurrent: the same commits, made the way bases are now", () => {
-    const base = { commits: [C1], format: BASE_FORMAT }
+  test("isBaseCurrent: the same states, made the way bases are now", () => {
+    const base = { points: [C1], format: BASE_FORMAT }
     expect(isBaseCurrent(base, [C1])).toBe(true)
     expect(isBaseCurrent(base, [C2])).toBe(false)
     expect(isBaseCurrent({ ...base, format: BASE_FORMAT - 1 }, [C1])).toBe(
@@ -406,7 +401,7 @@ describe("the base: the base before it, checked out at accepted work", () => {
     expect(isBaseCurrent(null, [C1])).toBe(false)
   })
   test("isCopyableBase: a base made the way they are now; one from before was made on a layer", () => {
-    expect(isCopyableBase({ commits: [C1], format: BASE_FORMAT })).toBe(true)
+    expect(isCopyableBase({ points: [C1], format: BASE_FORMAT })).toBe(true)
     expect(
       isCopyableBase(
         parseBaseFacts(JSON.stringify({ commits: [C1], key: "k" })),
@@ -414,7 +409,7 @@ describe("the base: the base before it, checked out at accepted work", () => {
     ).toBe(false)
     expect(isCopyableBase(null)).toBe(false)
   })
-  test("planBaseFacts: its commits and its format, read back", () => {
+  test("planBaseFacts: its states and its format, read back", () => {
     const [written] = argvs([planBaseFacts([C1])])
     expect(written).toContain(
       JSON.stringify({ commits: [C1], format: BASE_FORMAT }),
@@ -542,7 +537,7 @@ test("imageRefusal: git 2.41 or later, named when missing or old", () => {
 
 test("the base's scratch lane is no thread's: nothing that takes a thread takes it", () => {
   const setup = planFork({
-    point: { snapshot: snapshotId("e1") },
+    source: { snapshot: snapshotId("e1") },
     // @ts-expect-error: a fork is a thread's lane's
     spec: { ...spec, lane: BASE_LANE },
     env: {},

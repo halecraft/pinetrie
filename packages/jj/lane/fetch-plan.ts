@@ -2,17 +2,17 @@
 // after a move that needs the lane fetched into it.
 
 import type { CommitId } from "@pinetrie/core"
-import type { Merged, TurnCommitted } from "@pinetrie/lanes"
+import type { MergedOf, TurnCommittedOf } from "@pinetrie/lanes"
 
 /** A move of the lane's bookmark: a turn's revision, or a merge's result. */
 export type LaneMove =
   | {
       readonly kind: "turn"
-      readonly made: TurnCommitted
+      readonly made: TurnCommittedOf<CommitId>
       /** The lane's bookmark before the turn. */
       readonly before: CommitId | null
     }
-  | { readonly kind: "merge"; readonly merged: Merged }
+  | { readonly kind: "merge"; readonly merged: MergedOf<CommitId> }
 
 /**
  * The fetch a move needs: the commits a bundle may leave out when your repo
@@ -23,7 +23,7 @@ export type LaneMove =
  */
 export function planFetch(move: LaneMove): readonly (CommitId | null)[] | null {
   if (move.kind === "turn")
-    return move.made.commit === null ? null : [move.before]
+    return move.made.point === null ? null : [move.before]
   const { merged } = move
   switch (merged.kind) {
     case "nothing":

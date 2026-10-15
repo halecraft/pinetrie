@@ -19,6 +19,7 @@ import {
   placeTask,
   putTask,
   putValue,
+  RUNS_ANY,
   record,
   TASK_ID,
 } from "./fakes.ts"
@@ -89,6 +90,7 @@ function setUp() {
     start: () => {
       throw new Error("no run starts")
     },
+    runnable: RUNS_ANY.runnable,
     budgets,
     piSetup: record<Pick<PiSetup, "complete" | "skill">>().port,
     drain: () => {},

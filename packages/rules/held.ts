@@ -1,15 +1,24 @@
 // held — a thread taken into an inventory, or trashed: no agent and no runner
 // there.
 
-import type {
-  CardRecord,
-  EntryId,
-  Intent,
-  RootId,
-  ThreadFork,
-  ThreadId,
-  WriterId,
+import {
+  type Above,
+  type CardRecord,
+  type EntryId,
+  ERR,
+  type ForeignLane,
+  type Intent,
+  type LaneRecord,
+  type ProjectKind,
+  proveRunnable,
+  type Refusal,
+  type RootId,
+  refused,
+  type ThreadFork,
+  type ThreadId,
+  type WriterId,
 } from "@pinetrie/core"
+import { sourceHistory } from "./work.ts"
 
 /**
  * Where a thread's card leaves it to run: free on a canvas (or with no
@@ -44,6 +53,19 @@ export const TRASHED_WORDS = "restore it first"
 export const holdingWords = (
   holding: Exclude<ThreadHolding, { readonly kind: "free" }>,
 ): string => (holding.kind === "held" ? HELD_WORDS : TRASHED_WORDS)
+
+/**
+ * Why a lane of the other kind is refused, as the host says it: its work
+ * was made when the project was another kind, and is kept as it was.
+ */
+export const foreignLaneWords = (lane: ForeignLane): string =>
+  lane.history === "jj"
+    ? "this thread's work was made when the project had a jj repo"
+    : "this thread's work was made when the project had no jj repo"
+
+/** A run, a catch-up or an offer action refused on a lane of another kind. */
+export const foreignRefusal = (lane: ForeignLane): Refusal =>
+  refused(ERR.FOREIGN_LANE, foreignLaneWords(lane))
 
 /** A queued card's pop: the drain's, which runs its thread's next send. */
 export interface QueuePop {
@@ -128,31 +150,76 @@ export function runsIn(command: Intent | QueuePop): readonly RunAt[] {
 }
 
 /**
- * The first thread among `at` someone holds in their inventory, or that is
- * trashed, and how; null when none is. An entry's thread is `threadAt`'s,
- * from its root's tree; but a copy's first send, at its record's fork
- * (`forkOf`), runs in the copy, whose copier was shown the entries it
- * forks from.
+ * The thread each place in `at` is in, whose holder a command there answers
+ * to. An entry's thread is `threadAt`'s, from its root's tree; but a copy's
+ * first send, at its record's fork (`forkOf`), runs in the copy, whose
+ * copier was shown the entries it forks from. An entry no tree holds is in
+ * none.
  */
-export function heldIn(
+export function threadsOf(
   at: readonly RunAt[],
-  cards: readonly CardRecord[],
   threadAt: (root: RootId, entry: EntryId) => ThreadId | null,
   forkOf: ReadonlyMap<ThreadId, ThreadFork>,
-): {
-  readonly thread: ThreadId
-  readonly holding: Exclude<ThreadHolding, { readonly kind: "free" }>
-} | null {
-  for (const a of at) {
+): readonly ThreadId[] {
+  return at.flatMap(a => {
     const thread =
       a.kind === "thread"
         ? a.thread
         : forkOf.get(a.starts)?.at === a.entry
           ? a.starts
           : threadAt(a.root, a.entry)
-    if (thread === null) continue
+    return thread === null ? [] : [thread]
+  })
+}
+
+/**
+ * The first of `threads` someone holds in their inventory, or that is
+ * trashed, and how; null when none is.
+ */
+export function heldIn(
+  threads: readonly ThreadId[],
+  cards: readonly CardRecord[],
+): {
+  readonly thread: ThreadId
+  readonly holding: Exclude<ThreadHolding, { readonly kind: "free" }>
+} | null {
+  for (const thread of threads) {
     const holding = holdingOf(cards, thread)
     if (holding.kind !== "free") return { thread, holding }
+  }
+  return null
+}
+
+/**
+ * The first place among `at` a run would start on a lane of another kind
+ * than the project's, and why; null when none would. A thread runs on its
+ * own lane (`proveRunnable`). A send at an entry makes a lane that clones
+ * the disk there (`sourceHistory`, its snapshot taken as kept: a lost one
+ * clones the base, of the project's kind), so a copy's first send is
+ * checked against the lane it copies, not the copy. A host with no tools
+ * (`kind` null) runs every lane without them, and refuses none.
+ */
+export function foreignIn(
+  at: readonly RunAt[],
+  facts: {
+    readonly lanes: ReadonlyMap<ThreadId, LaneRecord>
+    readonly kind: ProjectKind | null
+    /** What is above an entry, from its root's tree and records; null for a root not read. */
+    readonly aboveAt: (root: RootId, entry: EntryId) => Above | null
+  },
+): ForeignLane | null {
+  const { lanes, kind } = facts
+  if (kind === null) return null
+  for (const a of at) {
+    if (a.kind === "thread") {
+      const runnable = proveRunnable(a.thread, lanes.get(a.thread), kind)
+      if (typeof runnable === "object") return runnable
+      continue
+    }
+    const above = facts.aboveAt(a.root, a.entry)
+    if (above === null) continue
+    const history = sourceHistory({ above, kept: true, lanes, kind })
+    if (history !== kind) return { kind: "foreign", lane: a.starts, history }
   }
   return null
 }

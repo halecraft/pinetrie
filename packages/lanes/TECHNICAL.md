@@ -48,8 +48,21 @@ the helper, S122 to S131 for Docker and the lane VM.
 - **Who implements it:** `@pinetrie/docker` (`dockerRuntime`, the Mac's lane
   VM and Linux), the one implementation.
 
-## The ports (`history-port.ts`, ADR-0142)
+## The ports (`history-port.ts`, ADR-0142, ADR-0150)
 
+- **A lane's history has one kind, on its record** (`LaneRecord.history`,
+  `@pinetrie/core`): its disk holds a jj repo or it does not, from the
+  moment it is made. A new lane takes the kind of the disk it clones
+  (`sourceHistory`, `@pinetrie/rules`): a lane's snapshot gives that
+  lane's, the base snapshot the project's. The host hands an adapter a
+  lane's record, and the adapter proves it of its own kind before it reads
+  any of the lane's states, or refuses it as a whole (`ForeignLane`).
+- **The ports name states by `PointId`** (`@pinetrie/core`): opaque
+  strings, a jj commit's id or a folder's snapshot's, read by the kind of
+  the lane they are read in. Nothing in this package converts one; it
+  passes them through. Where an adapter reads in its own terms, the shape
+  is generic once (`TurnCommittedOf<P>`, `MergedOf<P>`, core's
+  `LaneBaseOf<P>`), the port's the `PointId` form.
 - **A lane's history is reached only on its queue.** `LaneHistory` is what
   a lane's copy records and merges: a turn (`commit`, `recordTurn`), its
   base (`base`), a catch-up (`readyToMerge`, `merge`), its conflicts, and
@@ -70,8 +83,8 @@ the helper, S122 to S131 for Docker and the lane VM.
   after the snapshot step it queues next, so its work (for jj, the fetch
   into your repo) never delays the snapshot or the next tool call. Firing
   it is a caller's obligation, held by a unit test at each call site.
-- **A point is where the destination reads a file** (`Point`, `FileAt`):
-  accepted work, a lane's newest commit, or its start.
+- **A site is where the destination reads a file** (`ReadSite`, `FileAt`):
+  accepted work, a lane's newest state, or its start.
 - **The port suite** (`testing/history-suite.ts`, exported as
   `@pinetrie/lanes/testing`) states what any adapter's history must do;
   `test` and `expect` are passed in, so this package depends on no test
@@ -159,8 +172,8 @@ the helper, S122 to S131 for Docker and the lane VM.
 
 ## Forks
 
-- **A fork is its disk cloned from its fork point's snapshot, then the
-  adapter's setup** (`planFork`): the steps a `ForkSetup` holds, which only
+- **A fork is its disk cloned from its source's snapshot, then the
+  adapter's setup** (`planFork`, from `forkSource`): the steps a `ForkSetup` holds, which only
   the adapter's `LaneHistory.forkSteps` makes. Between them, one step
   removes `/workspace/.pineta-lane` (`OLD_LANE_CONFIG_DIR`, tagged
   `pre-rename:`): a snapshot of a lane made before the rename holds that
@@ -172,8 +185,12 @@ the helper, S122 to S131 for Docker and the lane VM.
   a `LaneOwner`, a thread's id or the base's, while a bookmark, a remote and
   a stack take a `ThreadId` alone, so the base cannot be given one
   (ADR-0117).
-- **The base snapshot is accepted work's commit** (`refreshBase`), and
-  refreshes after an acceptance or a land. A fork from it first waits for a
+- **The base snapshot is accepted work's state** (`refreshBase`), and
+  refreshes after an acceptance or a land. The adapter reads accepted work
+  with its checkout bound to that read (`AcceptedNow`): `refreshBase` uses
+  it in the step that read it and keeps it for nothing, so no state is
+  ever turned back into the adapter's terms. `base.json` keeps its field
+  name, `commits`, holding the same strings. A fork from it first waits for a
   refresh (`baseAtAccepted`): accepted work may have been set up or moved since.
 
 ## The channel into a lane

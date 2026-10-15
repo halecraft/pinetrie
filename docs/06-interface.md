@@ -337,6 +337,13 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   is read-only, with **Restore** in its composer's place, which moves it to
   the first open state; it leaves the sidebar when you switch away unless you
   restore it.
+- **A thread whose lane keeps a history of another kind is read-only**
+  (ADR-0150): made when the project had no jj repo, or the reverse, it
+  stays as it was. Its column says "made when the project had no jj repo:
+  nothing runs here now" (or "had a jj repo") in its composer's place, and
+  a branch or a copy from it says the same before its first send. The host
+  refuses the same: a message, a carry-on, a catch-up, an offer action
+  that asks its agent, another thread's ask, and a crash's resume.
 - **Anyone edits the states**: a state's name is a button that turns into a
   field (Enter or leaving it saves; Escape keeps the old name); its `⋯`
   moves it left or right, adds a state left or right of it (a name field

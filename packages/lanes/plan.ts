@@ -9,16 +9,16 @@
 import { createHash } from "node:crypto"
 import path from "node:path"
 import {
-  type CommitId,
   type ConfigWidening,
-  commitId,
   HOST_WORKING_COPY,
   hostPathInLane,
   isWithin,
   LANE_HOME,
   NO_EDITOR,
+  type PointId,
   PRODUCT_NAME,
   type ProjectKind,
+  pointId,
   SHARED_ENV,
   type SnapshotId,
   shellWord,
@@ -705,16 +705,16 @@ export const planDisk = (input: {
  */
 export const OLD_LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pineta-lane`
 /**
- * A fork: its disk cloned from the fork point's snapshot, then the adapter's
+ * A fork: its disk cloned from its source's snapshot, then the adapter's
  * setup (`ForkSetup`).
  */
 export const planFork = (input: {
-  readonly point: { readonly snapshot: SnapshotId }
+  readonly source: { readonly snapshot: SnapshotId }
   readonly spec: LaneSpec
   readonly env: Readonly<Record<string, string | undefined>>
   readonly setup: ForkSetup
 }): Step[] => [
-  ...planDisk({ ...input, from: input.point.snapshot }),
+  ...planDisk({ ...input, from: input.source.snapshot }),
   // pre-rename: before any command of the adapter's, which could snapshot
   // it into the working copy the clone carries (`OLD_LANE_CONFIG_DIR`).
   laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),
@@ -742,9 +742,9 @@ export const BASE_FORMAT = 3
 /** The files of pine·trie's own a disk holds about itself, under `.pinetrie-lane/`. */
 export const BASE_FILE = "base.json"
 
-/** What the base disk is: accepted work's commits, made by `format`'s steps. */
+/** What the base disk is: accepted work's states, made by `format`'s steps. */
 export interface BaseFacts {
-  readonly commits: readonly CommitId[]
+  readonly points: readonly PointId[]
   readonly format: number
 }
 
@@ -759,7 +759,7 @@ export function parseBaseFacts(text: string | null): BaseFacts | null {
     )
       return null
     return {
-      commits: raw.commits.map(c => commitId(String(c))),
+      points: raw.commits.map(c => pointId(String(c))),
       format: typeof raw.format === "number" ? raw.format : 0,
     }
   } catch {
@@ -776,18 +776,22 @@ const writeLaneFile = (file: string, value: unknown): LaneStep =>
 /** The disk's registry of derived files, under `.pinetrie-lane/`. */
 export const REGISTRY_FILE = "recipes.json"
 
-/** The base's facts at `commits`, written on its disk before it is snapshotted. */
-export const planBaseFacts = (commits: readonly CommitId[]): LaneStep =>
-  writeLaneFile(BASE_FILE, { commits, format: BASE_FORMAT })
+/**
+ * The base's facts at `points`, written on its disk before it is
+ * snapshotted. The file's field stays `commits`: a disk's file is read by
+ * its format, and the strings are the same.
+ */
+export const planBaseFacts = (points: readonly PointId[]): LaneStep =>
+  writeLaneFile(BASE_FILE, { commits: points, format: BASE_FORMAT })
 
-/** Whether the base disk holds `yours`, made the way it is now: then a refresh does nothing. */
+/** Whether the base disk holds `accepted`, made the way it is now: then a refresh does nothing. */
 export const isBaseCurrent = (
   base: BaseFacts | null,
-  yours: readonly CommitId[],
+  accepted: readonly PointId[],
 ): boolean =>
   isCopyableBase(base) &&
-  base.commits.length === yours.length &&
-  base.commits.every((c, i) => c === yours[i])
+  base.points.length === accepted.length &&
+  base.points.every((p, i) => p === accepted[i])
 
 /**
  * Whether a base is one the next is copied from. One made by other steps

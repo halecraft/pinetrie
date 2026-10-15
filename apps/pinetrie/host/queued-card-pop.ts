@@ -40,6 +40,7 @@ import {
   type CarryPlan,
   displayName,
   encodeFact,
+  foreignLaneWords,
   heldIn,
   isQueuedText,
   planCarry,
@@ -50,7 +51,6 @@ import {
   type QueuedMessage,
   type QueuedText,
   queuedOn,
-  runsIn,
   wordsOf,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
@@ -174,7 +174,7 @@ export interface QueuedCardPopDeps {
   readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds" | "destroy">
   /** Where a fact is appended. */
   readonly agent: Pick<Agent, "lane">
-  readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit">
+  readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit" | "runnable">
   readonly start: Runs["start"]
   /** Send a popped card's text as its queuer's message, through `sendChat`. */
   readonly send: (popped: PoppedMessage) => Promise<Outcome>
@@ -239,13 +239,11 @@ export async function drain(
       lane,
       {
         running: readRunning(deps.basics.live, lane),
+        // A pop runs in its own thread: held, it has no runner, and a lane
+        // of another kind runs nothing. The dispatcher's gate refuses both.
         away:
-          heldIn(
-            runsIn({ kind: "pop", thread: lane }),
-            readPlaces(places),
-            () => null,
-            new Map(),
-          ) !== null,
+          heldIn([lane], readPlaces(places)) !== null ||
+          typeof deps.work.runnable(lane) === "object",
         held: readQueueHolds(deps.basics.session).has(lane),
         typing: readTypingIn(deps.presence),
       },
@@ -376,8 +374,13 @@ async function catchUpThenSend(
     return "next"
   }
   if (prepared.kind === "conflicted") {
+    const runnable = deps.work.runnable(lane)
+    if (typeof runnable === "object") {
+      await unsent(deps, card, foreignLaneWords(runnable))
+      return "next"
+    }
     await deps.texts.destroy(card.id)
-    deps.start(lane, {
+    deps.start(runnable, {
       kind: "prompt",
       message: prepared.message,
       pinnedSeen: [],
@@ -414,8 +417,13 @@ async function splitThen(
     await unsent(deps, card, message.refused)
     return "next"
   }
+  const runnable = deps.work.runnable(lane)
+  if (typeof runnable === "object") {
+    await unsent(deps, card, foreignLaneWords(runnable))
+    return "next"
+  }
   await deps.texts.destroy(card.id)
-  deps.start(lane, { kind: "prompt", message, pinnedSeen: [] })
+  deps.start(runnable, { kind: "prompt", message, pinnedSeen: [] })
   return "ran"
 }
 

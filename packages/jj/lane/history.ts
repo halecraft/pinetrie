@@ -10,8 +10,8 @@
 import {
   type CommitId,
   planCopyReady,
+  pointFromCommit,
   type RepoConfig,
-  type ThreadId,
 } from "@pinetrie/core"
 import {
   type Edits,
@@ -19,7 +19,7 @@ import {
   forkSetup,
   type LaneHistory,
   type LaneRunners,
-  type TurnCommitted,
+  type TurnCommittedOf,
 } from "@pinetrie/lanes"
 import { laneBase } from "./base.ts"
 import { bookmarkOf } from "./bookmarks.ts"
@@ -27,6 +27,12 @@ import { type LaneMove, planFetch } from "./fetch-plan.ts"
 import { conflictsIn, mergeUpdate } from "./merge.ts"
 import { bookmarkName, bookmarkRevset } from "./names.ts"
 import { planForkSetup, planMerge, planOldNamesOnDisk } from "./plan.ts"
+import {
+  baseFromCommits,
+  type JjLane,
+  mergedFromCommits,
+  turnFromCommits,
+} from "./points.ts"
 import {
   changedPaths,
   commitTurn,
@@ -37,17 +43,19 @@ import {
 import { laneJj } from "./run.ts"
 
 /**
- * `lane`'s history, over its runners. `fetch` schedules the lane's fetch
- * into your repo, excluding those of `have` your repo holds.
+ * `lane`'s history, over its runners: proven jj once, by its caller
+ * (`proveJjLane`), so every point it reads is a commit. `fetch` schedules
+ * the lane's fetch into your repo, excluding those of `have` your repo holds.
  */
 export function historyOf(input: {
-  readonly lane: ThreadId
+  readonly lane: JjLane
   readonly runners: LaneRunners
   /** Your repo's names: a lane's base is found by them. */
   readonly repoConfig: RepoConfig
   readonly fetch: (have: readonly (CommitId | null)[]) => void
 }): LaneHistory {
-  const { lane, runners, repoConfig } = input
+  const { runners, repoConfig } = input
+  const { lane } = input.lane
   const jj = laneJj(runners.lane)
 
   const followOf = (move: LaneMove) => {
@@ -57,40 +65,47 @@ export function historyOf(input: {
 
   async function committed(
     edits: Edits,
-  ): Promise<{ made: TurnCommitted; before: CommitId | null }> {
+  ): Promise<{ made: TurnCommittedOf<CommitId>; before: CommitId | null }> {
     const before = await bookmarkOf(jj, lane)
     const made = await commitTurn(jj, { ...edits, lane, bookmark: before })
     return { made, before }
   }
 
   return {
-    forkSteps: start => forkSetup(planForkSetup(lane, start)),
+    forkSteps: start => forkSetup(planForkSetup(input.lane, start)),
 
-    commit: async edits => (await committed(edits)).made,
+    commit: async edits => turnFromCommits((await committed(edits)).made),
 
     async recordTurn(edits) {
       const { made, before } = await committed(edits)
       // An adopted turn may be several of the agent's commits: its paths run
       // from the bookmark before it.
       const paths =
-        made.commit === null ? [] : await changedPaths(jj, before, made.commit)
+        made.point === null ? [] : await changedPaths(jj, before, made.point)
       // The files conflicted in the commit its record names: its own, else
       // the bookmark's, which a branch from it clones.
-      const named = made.commit ?? before
+      const named = made.point ?? before
       const conflicts =
         made.conflicted && named !== null
           ? await conflictedFilesAt(jj, named)
           : []
       return {
-        committed: made.commit,
-        newest: before,
+        committed: made.point === null ? null : pointFromCommit(made.point),
+        newest: before === null ? null : pointFromCommit(before),
         paths,
         conflicts,
         follow: followOf({ kind: "turn", made, before }),
       }
     },
 
-    base: () => laneBase(jj, bookmarkRevset(bookmarkName(lane)), repoConfig),
+    async base() {
+      const base = await laneBase(
+        jj,
+        bookmarkRevset(bookmarkName(lane)),
+        repoConfig,
+      )
+      return base === null ? null : baseFromCommits(base)
+    },
 
     // A merge lands at the lane's bookmark: a working copy off its line (a
     // split's stack) would be left beside it.
@@ -98,8 +113,16 @@ export function historyOf(input: {
 
     async merge(_ready, from, edits) {
       if (edits !== null) await committed(edits)
-      const merged = await mergeUpdate(jj, runners, lane, planMerge(from))
-      return { ...merged, follow: followOf({ kind: "merge", merged }) }
+      const merged = await mergeUpdate(
+        jj,
+        runners,
+        lane,
+        planMerge(input.lane, from),
+      )
+      return {
+        ...mergedFromCommits(merged),
+        follow: followOf({ kind: "merge", merged }),
+      }
     },
 
     conflicts: () => conflictsIn(jj),

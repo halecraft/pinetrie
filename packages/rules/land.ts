@@ -1,7 +1,7 @@
 // land — the prompt of a resolution run.
 
 import { type Static, Type } from "typebox"
-import { CommitSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
+import { List, PointSchema, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { leftOut } from "./request.ts"
 
@@ -9,8 +9,8 @@ export const LAND_TYPE = "pinetrie.land"
 
 const LandDetailsSchema = Type.Object({
   lane: ThreadIdSchema,
-  /** The base's commit that was merged: accepted work's, or a WIP's copy. */
-  yours: List(CommitSchema),
+  /** The state that was merged: accepted work's, a WIP's copy, or the parent's. */
+  yours: List(PointSchema),
   /** The files that conflicted when it merged. */
   files: List(Type.String()),
   /** The skill the run followed, and a hash of its content; null with none found. */

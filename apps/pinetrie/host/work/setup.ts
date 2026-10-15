@@ -204,6 +204,7 @@ export async function startSetup(input: {
   const { runtime, shareAndGrant } = found
   const project: ProjectRecord = {
     root,
+    kind: opened.kind,
     owner: input.report.settled.owner.value,
   }
   log(
@@ -310,18 +311,12 @@ export async function startSetup(input: {
    * work is set up.
    */
   async function refreshBaseNow(r: Ready) {
-    const yours = await opened.acceptedNow()
-    const [commit] = yours
-    if (commit === undefined) return
-    const made = await refreshBase({
-      ...scratchOf(r),
-      yours,
-      checkout: fresh => opened.baseSteps({ yours, fresh }),
-    })
+    const accepted = await opened.acceptedNow()
+    const [point] = accepted.points
+    if (point === undefined) return
+    const made = await refreshBase({ ...scratchOf(r), accepted })
     if (made) {
-      log(
-        `[host] the base snapshot is at accepted work (${commit.slice(0, 8)})`,
-      )
+      log(`[host] the base snapshot is at accepted work (${point.slice(0, 8)})`)
       // Accepted work moved: what it grants may have. Shared before it is in
       // force, so no lane names a directory no slot holds; a failed share is
       // said, and lanes naming what it lacks say why they cannot start.

@@ -8,7 +8,7 @@
 // next run plans from the tree alone: a steer placed counts there, and one
 // pi's abort dropped is told again.
 
-import { baseKnown, type CommitId, type ThreadId } from "@pinetrie/core"
+import { baseKnown, type PointId, type ThreadId } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
 import {
   readAccepted,
@@ -41,8 +41,8 @@ export function createBaseNews(deps: {
 }): BaseNews {
   const { basics } = deps
   const { docs, session, live } = basics
-  /** The base commit steered into each running lane, until its run ends. */
-  const told = new Map<ThreadId, CommitId>()
+  /** The base state steered into each running lane, until its run ends. */
+  const told = new Map<ThreadId, PointId>()
 
   /** Gather and plan: what `lane`'s base has for it now. */
   async function newsOf(lane: ThreadId) {

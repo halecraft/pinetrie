@@ -1,7 +1,8 @@
 // host/project — the project's adapter, chosen once, by its kind: the one
-// place that reads the kind, and the one that refuses a project lanes cannot
-// serve. Lane work takes the adapter as a value (`work/adapter.ts`). A
-// folder is refused: serving one is its adapter's to come.
+// place that chooses it, and the one that refuses a project lanes cannot
+// serve. Lane work takes the adapter as a value (`work/adapter.ts`), which
+// carries its kind: what each new lane's history is, and what a lane must
+// keep to run. A folder is refused: serving one is its adapter's to come.
 
 import { assertNever } from "@pinetrie/core"
 import {

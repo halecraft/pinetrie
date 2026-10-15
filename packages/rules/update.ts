@@ -8,14 +8,14 @@ import {
   catchUpName,
   incomingWords,
 } from "./catch-up-from.ts"
-import { CommitSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
+import { List, PointSchema, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 
 const UpdateDetailsSchema = Type.Object({
   lane: ThreadIdSchema,
   from: CatchUpFromSchema,
-  /** The commit merged: accepted work's, the WIP's copy, or the parent's newest. */
-  merged: CommitSchema,
+  /** The state merged: accepted work's, the WIP's copy, or the parent's newest. */
+  merged: PointSchema,
   /** The commits that came in, newest first: each one's first line. */
   commits: List(Type.String()),
   files: List(Type.String()),

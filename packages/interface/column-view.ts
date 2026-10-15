@@ -636,7 +636,7 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
   const project = work.project
   if (!f.writable || lane.kind !== "lane" || project === null) return NO_STRIP
   const record = work.lanes.get(lane.name)
-  if (record === undefined || !record.ownCopy) return NO_STRIP
+  if (record === undefined || record.history === null) return NO_STRIP
   const offer = offerStatus(work.offers.get(lane.name))
   const base = work.bases.get(lane.name) ?? null
   const view = offerView({

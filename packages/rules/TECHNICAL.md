@@ -891,11 +891,18 @@ trash, have no agent and no runner. Where its card leaves it is
   thread's end, a carry-on, an offer action that may ask the agent (all but
   an acceptance) and a pop run in their thread; a branch in the thread its
   fork is in, read from its root's tree; a new root in none. Exhaustive, so
-  a new kind of command does not compile until it says. `heldIn` finds
-  the first of those held or trashed (`holdingOf`); a copy's first send, at
-  its own record's fork, runs in the copy. The host refuses before every
-  command and popped card (`refuseHeld`), and the drain asks before it
-  pops (`planNextQueuedCardPop`'s `away`), so its messages wait, held. A
+  a new kind of command does not compile until it says. `threadsOf` turns
+  each into its thread, and `heldIn` finds the first of those held or
+  trashed (`holdingOf`); a copy's first send, at its own record's fork,
+  runs in the copy. `foreignIn` (ADR-0150) finds the first place a run
+  would start on a lane of another kind than the project's: a thread's own
+  lane (`proveRunnable`), or for a send at an entry the lane whose disk it
+  would clone (`sourceHistory`, its snapshot taken as kept), so a copy's
+  first send is checked against the lane it copies. The host refuses
+  before every command and popped card (`refuseWhereRuns`: held first, a
+  person's own hold being the nearer reason, then foreign, worded by
+  `foreignLaneWords`), and the drain asks before it pops
+  (`planNextQueuedCardPop`'s `away`), so its messages wait. A
   fact on top is popped there all the same: it starts no run, and a take's
   stop must be in the thread for its face to say so (ADR-0126). Refused
   with `HELD_WORDS`, "put it on a canvas first", or for a trashed thread
@@ -1204,13 +1211,14 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 
 | record | namespace | key | written |
 |---|---|---|---|
-| a lane's setting: the root it works in, and whether it has a copy of its own, stored as `work` (`{ kind: "own" }` or null), as records from when a lane could work directly hold it (ADR-0102) | `pinetrie.lane` | the lane | once, when the lane is created |
-| the commit and disk at an entry, and the paths its commit changed | `pinetrie.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
-| what the host found where it runs: its root (an older record's kind and default are not read) | `pinetrie.project` | `project` | at every start |
+| a lane's setting: the root it works in, and the kind of history its own copy keeps (`history`: `"jj"`, `"folder"`, or null for no copy of its own) (ADR-0102, ADR-0150) | `pinetrie.lane` | the lane | once, when the lane is created |
+| the state (`point`) and disk at an entry, and the paths its turn changed, written whole: every field present (`0016-revision-point` moved the older shapes) | `pinetrie.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
+| what the host found where it runs: its root, its kind (`jj` or `folder`, what a lane's history must be to run), and its owner; a record from before the kind decodes as none until the host's start rewrites it | `pinetrie.project` | `project` | at every start |
 
 - **Every run's prompt has a revision record**, so the nearest record above
-  any entry names its lane, its commit and its disk (`nearestRevision`, in
-  core, finds the nearest commit and the nearest snapshot independently).
+  any entry names its lane, its state and its disk (`nearestRevision`, in
+  core, finds the nearest state and the nearest snapshot independently,
+  each with the lane that recorded it).
   `planTurnRecord` is the rule:
   - A lane of its own records every turn that made tool calls, with its
     snapshot, because ignored files change without a commit. The commit is
@@ -1222,11 +1230,8 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     branch from it names what its disk was at.
   - A lane with no copy of its own records its prompts with neither: it
     counts as the lane above, and the walk passes it.
-  - A record from before lane containers has no `snapshot` key, which decodes
-    as null.
-  - Only a turn's own commit carries `paths` (`changedPaths`, ADR-0106): a
-    prompt's newest revision is what came before it. A record from before
-    paths decodes with none. An ask's file count is the union of its turns'
+  - Only a turn's own state carries `paths` (`changedPaths`, ADR-0106): a
+    prompt's newest is what came before it. An ask's file count is the union of its turns'
     paths (`workStats`), so it is what its review lists.
   - **A lane's runs are folded on the host** (`runs.ts`, ADR-0135), from
     core's `RunEvent`s, whatever observes the lane:
@@ -1322,8 +1327,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
       by that name, while the diff names the real path, which
       `unattributed` cannot match to it: the real path may be listed local
       as well. Matching them would mean resolving links.
-    - A prompt's record, an update's and a record from before have none:
-      the old `ignored` and `recipe` fields decode unread.
+    - A prompt's record and an update's have none.
     - **What a turn did to shared files** (`disk.shared`, `shared.ts`):
       the versions it read and wrote, each write flagged concurrent when
       another version landed after the one it was based on and before it.
@@ -1352,20 +1356,23 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
         version. It keeps its first writer, both writes are concurrent
         (the first named in `revised`), and so is any write based on it.
         One turn's writes leaving one stamp contest nothing.
-      - A record from before decodes with none.
     - **The registry** (`.pinetrie-lane/recipes.json`) decodes totally:
       a broken file is an empty registry (`decodeRegistry`). A recipe's
       outputs are `DiskPath`s (core), checked as the file is read: what
       `planStaleOutputs` deletes can never leave the disk, whoever wrote
       the file, the agent included.
-  - Every record with a commit carries that commit's `conflicts`, a
-    prompt's included, since a branch from it is cloned with them
-    (ADR-0072); `conflictsAt` (core) reads them by commit. A record from
-    before decodes with none.
-- **`forkPoint`** is where a new lane of its own starts: the nearest snapshot
-  above it, else the base snapshot; and the nearest commit, else the
-  thread's base (`planBegin`): accepted work's commit, or a WIP's copy on accepted work
-  commit under it. The start is always named: a cloned disk carries its
+  - Every record with a state carries its `conflicts`, a prompt's
+    included, since a branch from it is cloned with them (ADR-0072);
+    `conflictsAt` (core) reads them by point.
+- **`sourceHistory`** is the kind of the disk a fork clones (ADR-0150): the
+  lane's whose snapshot it is, or the project's from the base snapshot.
+  A new lane's record takes it, and the gate checks a send at an entry by
+  it (`foreignIn`).
+- **`forkSource`** is where a new lane of its own starts: the nearest snapshot
+  above it, else the base snapshot; and the nearest state, else the
+  thread's base (`planBegin`): accepted work's state, or a WIP's copy on accepted work
+  commit under it. It refuses a disk of another kind than the new lane's
+  record (`ForeignLane`). The start is always named: a cloned disk carries its
   parent's working-copy change, and the fork must leave it (S42). A snapshot
   that is gone (`kept` false, which the host asks the runtime) is read as
   missing: the fork starts from its base, and names the snapshot `lost`;
@@ -1748,9 +1755,20 @@ reads, `details` what pine·trie reads back.
   `merged` or `behind.to` no longer counts either, so a lane may hear its
   base's news once more (`baseKnown`), and a branch read its parent as
   ahead (`parentNow`) until the parent commits again.
+- **A state any kind of project has is a point; what only jj has is a
+  commit** (ADR-0150). `PointSchema` and `CommitSchema` store the same
+  bare string, so a message stored before points decodes unchanged.
+  `update`'s `merged`, `land`'s `yours`, `behind`'s `to` and a
+  `catch_up`'s `merged` are points; offers, WIPs, accepted work's and a
+  base's records (`OfferRecord`, `AcceptedRecord`, `BaseRecord`,
+  `CatchUpRead`) and the stack's message are jj's, and commits. Where a
+  jj-only fact meets the shared history, the rule converts it at that
+  site with `pointFromCommit` (`planUpdateFrom`'s WIP, `planBaseNews`'s
+  base move), so each crossing is visible; nothing here turns a point back
+  into a commit.
 - **The schema is the type.** Ids are branded schemas (`decode.ts`:
-  `ThreadIdSchema`, `WriterIdSchema`, `CommitSchema`, `ThreadNameSchema`,
-  `CardIdSchema`), whose `Static` is the brand, and `List` an array whose
+  `ThreadIdSchema`, `WriterIdSchema`, `CommitSchema`, `PointSchema`,
+  `ThreadNameSchema`, `CardIdSchema`), whose `Static` is the brand, and `List` an array whose
   `Static` is `readonly`. A lane is checked with core's `THREAD_PATTERN`, the
   pattern `isThreadId` tests, so no decoder checks a lane by hand.
 - **Every kind is held to it** (`history.test.ts`): `MESSAGE_SPECS` must

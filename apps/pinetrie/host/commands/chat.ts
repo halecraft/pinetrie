@@ -64,7 +64,7 @@ import type { Names } from "../names.ts"
 import { applyPlaceSteps } from "../places.ts"
 import type { Records } from "../records.ts"
 import { type Relays, readReachableAgents } from "../relays.ts"
-import type { Runs } from "../runs.ts"
+import { type Runs, startRun } from "../runs.ts"
 import type { Titles } from "../titles.ts"
 import type { LaneWork } from "../work/index.ts"
 
@@ -82,7 +82,7 @@ export interface ChatDeps {
   readonly piSetup: Pick<PiSetup, "commands" | "expand">
   readonly work: Pick<
     LaneWork,
-    "project" | "checkBegin" | "prepareLane" | "prepareUpdate"
+    "project" | "checkBegin" | "prepareLane" | "prepareUpdate" | "runnable"
   >
   readonly blobs: Pick<BlobStore, "ref">
   /** Who wrote in a card: its other writers are a message's contributors. */
@@ -384,14 +384,11 @@ async function catchUpFirst(
     "run",
   )
   if (prepared.kind === "conflicted")
-    return {
-      kind: "started",
-      runId: deps.start(lane, {
-        kind: "prompt",
-        message: prepared.message,
-        pinnedSeen: chat.pinned,
-      }),
-    }
+    return startRun(deps, lane, {
+      kind: "prompt",
+      message: prepared.message,
+      pinnedSeen: chat.pinned,
+    })
   if (prepared.kind === "refused")
     deps.basics.log(
       `[host] ${readThreadName(deps.basics.session, lane)}: not caught up before its run: ${prepared.reason}`,
@@ -454,14 +451,11 @@ export async function executeChat(
       return { kind: "appended", id: appended.id }
     }
     case "run":
-      return {
-        kind: "started",
-        runId: deps.start(planned.thread, {
-          kind: "prompt",
-          message: message(planned.details),
-          pinnedSeen: context.pinned,
-        }),
-      }
+      return startRun(deps, planned.thread, {
+        kind: "prompt",
+        message: message(planned.details),
+        pinnedSeen: context.pinned,
+      })
     case "createAndRun": {
       const begin = await work.checkBegin(view, planned.at, context.base)
       if (begin !== null)
@@ -504,14 +498,11 @@ export async function executeChat(
           text: planned.details.text,
         },
       })
-      return {
-        kind: "started",
-        runId: deps.start(created.lane, {
-          kind: "prompt",
-          message: message(planned.details),
-          pinnedSeen: context.pinned,
-        }),
-      }
+      return startRun(deps, created.lane, {
+        kind: "prompt",
+        message: message(planned.details),
+        pinnedSeen: context.pinned,
+      })
     }
   }
 }

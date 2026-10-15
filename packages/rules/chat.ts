@@ -8,16 +8,16 @@ import {
   CATCH_UP_TOOL,
   CONFLICT_TOOL,
   type CommandRef,
-  type CommitId,
-  commitId,
   ERR,
   IMAGE_MIMES,
   type ImageMime,
   type ImageRef,
   type Mention,
   type PlanMode,
+  type PointId,
   type Position,
   planModeOf,
+  pointId,
   type Recipients,
   type Refusal,
   type Responder,
@@ -268,13 +268,13 @@ export const decodeChat = (message: unknown): ChatDetails | undefined =>
 /**
  * What a tool result of the host's tools says as a fact, from its
  * `details`, never its text: an `ask_about_conflict` the host took, or the
- * commits a `catch_up` merged. Undefined for any other message.
+ * states a `catch_up` merged. Undefined for any other message.
  */
 function toolResultFacts(
   message: unknown,
 ):
   | { readonly asked: true }
-  | { readonly merged: readonly CommitId[] }
+  | { readonly merged: readonly PointId[] }
   | undefined {
   if (typeof message !== "object" || message === null) return undefined
   const m = message as {
@@ -294,7 +294,7 @@ function toolResultFacts(
     Array.isArray(details.merged) &&
     details.merged.every(c => typeof c === "string" && c !== "")
   )
-    return { merged: details.merged.map(c => commitId(c as string)) }
+    return { merged: details.merged.map(c => pointId(c as string)) }
   return undefined
 }
 

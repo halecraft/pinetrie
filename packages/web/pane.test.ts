@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs"
 import {
-  commitId,
   type EntryId,
   entryId,
   indexAsks,
+  pointId,
   type RevisionRecord,
   type Sha256,
   type SpineNode,
@@ -36,7 +36,7 @@ const SHA = "a".repeat(64) as Sha256
 const lane = threadIdFor("x")
 const target: ReviewTarget = {
   lane,
-  spans: [{ kind: "range", from: commitId("a0"), to: commitId("a1") }],
+  spans: [{ kind: "range", from: pointId("a0"), to: pointId("a1") }],
   conflicts: [],
   yourEdits: [],
 }
@@ -160,7 +160,7 @@ describe("askReviewTarget", () => {
     {
       entry: entryId(at),
       lane,
-      commit: commitId(commit),
+      point: pointId(commit),
       snapshot: null,
       paths: [],
       conflicts: [],

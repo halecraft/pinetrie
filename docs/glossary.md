@@ -29,6 +29,8 @@ words they were written with.
 
 | word | what it is | in code | retired |
 |---|---|---|---|
+| **lane's history** | The kind of history a lane's own copy keeps, jj's or a folder's, for its whole life: on its record, a new lane's the kind of the disk it clones. A lane of another kind than the project's is refused, whole and intact (ADR-0150). | `LaneRecord.history`, `ForeignLane`, `laneFits` | a lane's own copy (as a yes or no, `ownCopy`) |
+| **point** | A state in the project's history, a lane's or accepted work's, named by an opaque id: a jj commit's, or a folder's snapshot's, read by the kind of the lane it is read in (ADR-0150). | `PointId`, `pointFromCommit`, `commitFromPoint` | a turn's commit (as what lane work names) |
 | **source** | A path `.gitignore` does not ignore: what the project is made of, committed and offered (ADR-0135). | `PathClass` `"source"` | tracked (as a class) |
 | **derived** | An ignored path a command made from source: a lane drops it when what it was made from changes, and makes it again. | `PathClass` `"derived"`, `TurnDisk.derived` | recipe output |
 | **local** | An ignored path no command made from source, such as `.env`: it stays on its disk, and is never sent. The page counts **local files**. | `PathClass` `"local"`, `TurnDisk.local` | ignored file |

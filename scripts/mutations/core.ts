@@ -555,7 +555,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the walk stops at the first record, commit or not",
     file: "packages/core/work.ts",
-    from: "    if (commit !== null && snapshot !== null) break",
+    from: "    if (point !== null && snapshot !== null) break",
     to: "    break",
     command: unit,
     expect:
@@ -564,8 +564,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a turn with no commit hides the commit above it",
     file: "packages/core/work.ts",
-    from: "    if (commit === null && record.commit !== null) {",
-    to: "    if (snapshot === null && record.commit !== null) {",
+    from: "    if (point === null && record.point !== null) {",
+    to: "    if (snapshot === null && record.point !== null) {",
     command: unit,
     expect: "a turn that changed only ignored files",
   },
@@ -772,8 +772,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork's parent is the nearest lane, not the commit's",
     file: "packages/core/work.ts",
-    from: "      commitLane = record.lane",
-    to: "      commitLane = lane ?? record.lane",
+    from: "      pointLane = record.lane",
+    to: "      pointLane = lane ?? record.lane",
     command: unit,
     expect:
       "a lane working directly records no commit: a fork below it is cloned from the lane above",
@@ -1213,5 +1213,37 @@ export const mutations: readonly Mutation[] = [
       "packages/jj/lane/history.test.ts",
     ],
     expect: "a copy on its line is ready to merge; one off it is refused",
+  },
+  {
+    name: "laneFits lets every lane fit",
+    file: core,
+    from: "  lane.history === kind\n    ? null\n",
+    to: "  true\n    ? null\n",
+    command: unit,
+    expect:
+      "a lane of the project's kind fits; one of the other kind is foreign; one with no copy is no own lane",
+  },
+  {
+    name: "proveRunnable makes any lane runnable",
+    file: core,
+    from: "  return foreign ?? (lane as RunnableLane)\n",
+    to: "  return lane as RunnableLane\n",
+    command: unit,
+    expect:
+      "a run may start on a lane that fits, has no copy or no record, or on a host with no tools; not on a foreign lane",
+  },
+  {
+    name: "a point is any string",
+    file: core,
+    from: "export type PointId = string & { readonly [pointIdBrand]: true }",
+    to: "export type PointId = string",
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "a runnable lane is any lane",
+    file: core,
+    from: "export type RunnableLane = ThreadId & { readonly [runnableBrand]: true }",
+    to: "export type RunnableLane = ThreadId",
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
 ]

@@ -5,11 +5,11 @@
 
 import {
   atEntry,
-  commitId,
   ERR,
   entryId,
   NOBODY,
   type Position,
+  pointId,
   ROOT,
   type RootId,
   rootIdFor,
@@ -189,7 +189,7 @@ describe("a pi session per root", () => {
         setRecord(LANE, {
           lane,
           root,
-          ownCopy: false,
+          history: null,
           by: writerId("ada@x.io"),
           createdAt: 1,
         }),
@@ -317,7 +317,7 @@ describe("pinned cards: what the model reads", () => {
     const behind = encodeBehind(
       {
         from: { kind: "accepted" },
-        to: commitId("l2"),
+        to: pointId("l2"),
         files: ["a.ts"],
         overlap: [],
         conflicts: [],

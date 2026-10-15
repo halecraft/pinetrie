@@ -150,7 +150,7 @@ async function catchUpSection(
       "a catch_up mid-run merges accepted work, and a branch at its turn has accepted work's file",
       results.some(r => r.includes("landed.txt")) &&
         results.at(-1)?.trim() === "landed" &&
-        recorded?.commit !== null &&
+        recorded?.point !== null &&
         recorded !== undefined &&
         toolResults(branched).at(-1)?.trim() === "landed",
       `${JSON.stringify({ results, recorded, branched: toolResults(branched) })}`,

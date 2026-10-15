@@ -2,10 +2,10 @@
 // commit or a range. Reads only.
 
 import {
+  type CommitBase,
   type CommitId,
   commitId,
   type DiffSpan,
-  type LaneBase,
   type NonEmpty,
   nonEmpty,
   type OfferInRepo,
@@ -96,7 +96,7 @@ async function acceptedOfferCommitFacts(
   jj: Runner,
   input: {
     readonly repoConfig: RepoConfig
-    readonly base: LaneBase
+    readonly base: CommitBase
     readonly lane: ThreadId
   },
 ): Promise<{ readonly sources: CommitId[]; readonly untraced: CommitId[] }> {
@@ -131,7 +131,7 @@ export async function startOfOffer(
   jj: Runner,
   input: {
     readonly tip: CommitId
-    readonly base: LaneBase
+    readonly base: CommitBase
     readonly repoConfig: RepoConfig
     readonly lane: ThreadId
   },
@@ -398,6 +398,14 @@ function gitDiffCounts(
 }
 
 /**
+ * A span as jj reads it in your repo: an offer's revision, or a range of a
+ * lane's turns, its points read in its proven lane (`commitFromPoint`).
+ */
+export type CommitSpan =
+  | Extract<DiffSpan, { readonly kind: "revision" }>
+  | { readonly kind: "range"; readonly from: CommitId; readonly to: CommitId }
+
+/**
  * A span's review as jj prints it, parsed but unchecked: the host decodes
  * it (`answerReview`). A revision is one `REVISION_READ`, its description
  * and stats together. A range has no description: its files from
@@ -408,7 +416,7 @@ function gitDiffCounts(
  */
 export async function revisionRead(
   jj: Runner,
-  span: DiffSpan,
+  span: CommitSpan,
   /** What a copy of `pinetrie.json` lets lanes do and share: the host's table decides it. */
   decodeAuthority: (text: string | null) => LaneAuthority,
 ): Promise<unknown> {
@@ -436,7 +444,7 @@ export async function revisionRead(
 /** A span's description and files, as jj prints them; null when it fails. */
 async function spanFiles(
   jj: Runner,
-  span: DiffSpan,
+  span: CommitSpan,
 ): Promise<{
   readonly description: string
   readonly files: readonly object[]
@@ -489,7 +497,7 @@ async function spanFiles(
  */
 export async function fileDiff(
   jj: Runner,
-  span: DiffSpan,
+  span: CommitSpan,
   path: string,
 ): Promise<string | null> {
   const ran = await jj([

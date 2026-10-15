@@ -246,11 +246,15 @@ built: lane work reaches a lane's history and accepted work only through
 two ports (`LaneHistory`, reached on the lane's queue alone, and
 `Destination`), whose one adapter is jj's (`@pinetrie/jj`, wired in
 `apps/pinetrie/host/jj/`), chosen once by the project's kind
-(`host/project.ts`); `@pinetrie/lanes` runs no jj. The folder's adapter is
-not built. ADR-0150, accepted and not yet built, keeps a lane's kind of
-history on its record: a project that changes kind refuses the other
-kind's lanes, whole and intact, and every session's store moves to its
-session's directory so a change of kind loses no thread.
+(`host/project.ts`); `@pinetrie/lanes` runs no jj. ADR-0150's first step
+is built too: a lane's history has one kind, on its record, a new lane's
+the kind of the disk it clones; lane work names states by points
+(`PointId`), opaque ids that only a lane proven jj reads as commits; and
+no run starts on a lane of another kind than the project's (`Runs.start`
+takes a proof), each path that would start one refused with words. The
+folder's adapter is not built, nor ADR-0150's move of every session's
+store to its session's directory, nor the sweep of the other kind's
+destination records.
 
 pine·trie reads only its own config (ADR-0146): five layers (system, user,
 project, local, env), each a `pinetrie.json` but the last, and every setting

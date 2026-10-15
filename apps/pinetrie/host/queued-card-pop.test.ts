@@ -39,6 +39,7 @@ import {
   putTask,
   putValue,
   ROOT_ID,
+  RUNS_ANY,
   record,
 } from "./fakes.ts"
 import { applyPlaceSteps } from "./places.ts"
@@ -272,6 +273,7 @@ function setUp(
       },
     }).port,
     work: record<QueuedCardPopDeps["work"]>({
+      ...RUNS_ANY,
       prepareUpdate: async (_lane, by, intent) => {
         events.push(`update by ${by}: ${intent}`)
         return prepared
@@ -527,6 +529,21 @@ describe("drain", () => {
     expect(textsIn(b.places).map(c => c.place.kind)).toEqual(["queued"])
   })
 
+  test("pops nothing while its lane keeps a history of another kind: its cards stay queued", async () => {
+    const { b, events, deps } = setUp({ [cardIdFor("c1")]: "first" }, [])
+    queue(b.places, cardIdFor("c1"), "a")
+    const foreign: QueuedCardPopDeps = {
+      ...deps,
+      work: {
+        ...deps.work,
+        runnable: lane => ({ kind: "foreign", lane, history: "folder" }),
+      },
+    }
+    await drain(foreign, LANE)
+    expect(events).toEqual([`hydrate ${cardIdFor("c1")}`])
+    expect(textsIn(b.places).map(c => c.place.kind)).toEqual(["queued"])
+  })
+
   test("a card queued while texts load is loaded before it is popped", async () => {
     const { b, events, deps } = setUp(
       {
@@ -735,6 +752,7 @@ describe("drain: bring up to date", () => {
     const throwing: QueuedCardPopDeps = {
       ...deps,
       work: record<QueuedCardPopDeps["work"]>({
+        ...RUNS_ANY,
         prepareUpdate: async () => {
           throw new Error("jj broke")
         },

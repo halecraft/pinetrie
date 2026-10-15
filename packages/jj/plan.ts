@@ -3,10 +3,10 @@
 
 import {
   type AcceptedFacts,
+  type CommitBase,
   type CommitId,
   commitId,
   HOST_OPERATOR,
-  type LaneBase,
   type OfferSource,
   type PublishMove,
   type RepoConfig,
@@ -229,7 +229,7 @@ export function offerStart(input: {
  */
 export function acceptedOfferCommitsRevset(input: {
   readonly repoConfig: RepoConfig
-  readonly base: LaneBase
+  readonly base: CommitBase
 }): string {
   const { base } = input.base
   const heads = [

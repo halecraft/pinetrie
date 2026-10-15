@@ -51,7 +51,7 @@ presence), `readDigests` (ADR-0106), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (the project's root, written only by a host with tools).
 `worksOwn` says whether a send's thread works, or will work, in a copy of
-its own (the lane's `ownCopy`, or, for a lane to be made, whether the host
+its own (the lane's `history` is not null, or, for a lane to be made, whether the host
 has a project, ADR-0102): the host decides by it whether a sent message's
 paths are stored under `/mnt/host-working-copy`. The board's items are a
 client-only read, in `packages/interface/board-view.ts`. Live streams are read with `readStreams` in

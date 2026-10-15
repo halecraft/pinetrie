@@ -11,6 +11,7 @@ import {
   type PlanMode,
   type Position,
   parseMentions,
+  proveRunnable,
   type Responder,
   type SendAt,
   type Sha256,
@@ -526,6 +527,8 @@ test("participants: named writers and every writer in the tree, the unnamed by t
 describe("settling and starting up", () => {
   const LANE1 = threadIdFor("1")
   const LANE2 = threadIdFor("2")
+  /** A lane as a host with no tools proves it: always runnable. */
+  const runnable = (lane: typeof LANE1) => proveRunnable(lane, undefined, null)
   const queuedOn = (lane: typeof LANE1, id: string) => ({
     kind: "text" as const,
     id: textCardId(id),
@@ -553,7 +556,12 @@ describe("settling and starting up", () => {
       interrupted: [],
       verdicts: [],
     })
-    expect(plan).toEqual({ resume: [], drain: [LANE1], unclassified: [] })
+    expect(plan).toEqual({
+      resume: [],
+      kept: [],
+      drain: [LANE1],
+      unclassified: [],
+    })
   })
   test("planStartup: an interrupted lane is resumed, and not drained", () => {
     const plan = planStartup({
@@ -561,10 +569,27 @@ describe("settling and starting up", () => {
         queuedOn(LANE1, cardIdFor("c1")),
         queuedOn(LANE2, cardIdFor("c2")),
       ],
-      interrupted: [LANE1],
+      interrupted: [runnable(LANE1)],
       verdicts: [],
     })
     expect(plan).toMatchObject({ resume: [LANE1], drain: [LANE2] })
+  })
+  test("planStartup: a lane of another kind stays interrupted, and is drained as any other", () => {
+    const foreign = {
+      kind: "foreign",
+      lane: LANE2,
+      history: "folder",
+    } as const
+    const plan = planStartup({
+      cards: [queuedOn(LANE2, cardIdFor("c2"))],
+      interrupted: [runnable(LANE1), foreign],
+      verdicts: [],
+    })
+    expect(plan).toMatchObject({
+      resume: [LANE1],
+      kept: [foreign],
+      drain: [LANE2],
+    })
   })
   test("planStartup: a pending verdict is unclassified, unless its lane is resumed", () => {
     const pending = (lane: typeof LANE1) =>
@@ -575,7 +600,7 @@ describe("settling and starting up", () => {
     }
     const plan = planStartup({
       cards: [],
-      interrupted: [LANE1],
+      interrupted: [runnable(LANE1)],
       verdicts: [pending(LANE1), pending(LANE2), said],
     })
     expect(plan.unclassified).toEqual([

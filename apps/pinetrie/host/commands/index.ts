@@ -4,10 +4,12 @@
 // a board move's three parts.
 
 import {
+  atEntry,
   ERR,
   errorText,
   historyScope,
   type Intent,
+  nearestRevision,
   type RootId,
   type TaskId,
   type TreeIndex,
@@ -22,20 +24,25 @@ import {
 } from "@pinetrie/protocol/codec"
 import {
   readArchived,
+  readLaneRecords,
   readParticipantNames,
   readPlaces,
+  readRevisions,
   readRunning,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
   archivedIn,
   displayName,
+  foreignIn,
+  foreignRefusal,
   heldIn,
   holdingWords,
   PARTICIPANT,
   type QueuePop,
   runsIn,
   setRecord,
+  threadsOf,
   writesIn,
 } from "@pinetrie/rules"
 import { type Basics, failed, type HostKeeper } from "../basics.ts"
@@ -206,8 +213,8 @@ export function createCommands(deps: CommandDeps): Commands {
       writesIn(intent, tasks, readPlaces(deps.basics.places)),
     )
     if (archived !== null) return settled(archived)
-    const held = await refuseHeld(deps.basics, intent)
-    if (held !== null) return settled(held)
+    const where = await refuseWhereRuns(deps, intent)
+    if (where !== null) return settled(where)
     switch (intent.kind) {
       case "chat": {
         // The command's id is the send's id: its column finds its message by it.
@@ -323,7 +330,7 @@ export function createCommands(deps: CommandDeps): Commands {
             : [],
         ) ??
         (chat.at.kind === "queue"
-          ? await refuseHeld(deps.basics, {
+          ? await refuseWhereRuns(deps, {
               kind: "pop",
               thread: chat.at.thread,
             })
@@ -335,47 +342,74 @@ export function createCommands(deps: CommandDeps): Commands {
 }
 
 /**
+ * Where a command would run, or write a message, refused before anything
+ * runs: `runsIn` says where each kind of command runs, and a branch's fork
+ * is read from its root's tree. Refused, first, in a thread someone holds
+ * in their inventory, or one trashed (a person's own hold is the nearer
+ * reason); then where a run would start on a lane of another kind than the
+ * project's (`foreignIn`). Null when the command may go on.
+ */
+async function refuseWhereRuns(
+  deps: Pick<CommandDeps, "basics" | "work">,
+  command: Intent | QueuePop,
+): Promise<Outcome | null> {
+  const { basics } = deps
+  const at = runsIn(command)
+  if (at.length === 0) return null
+  // gather: the trees and records of the roots a branch forks in
+  const roots = new Map<
+    RootId,
+    {
+      readonly index: TreeIndex
+      readonly revisions: ReturnType<typeof readRevisions>
+    }
+  >()
+  for (const a of at)
+    if (a.kind === "entry" && !roots.has(a.root)) {
+      const doc = await basics.docs.root(a.root)
+      roots.set(a.root, {
+        index: readTreeIndex(doc),
+        revisions: readRevisions(doc),
+      })
+    }
+  // plan
+  const held = heldIn(
+    threadsOf(
+      at,
+      (root, entry) => {
+        const read = roots.get(root)
+        return read === undefined ? null : threadAt(read.index, entry)
+      },
+      tasksNow(basics).forkOf,
+    ),
+    readPlaces(basics.places),
+  )
+  if (held !== null)
+    return {
+      kind: "refused",
+      code: ERR.REFUSED,
+      message: holdingWords(held.holding),
+    }
+  const foreign = foreignIn(at, {
+    lanes: readLaneRecords(basics.session),
+    kind: deps.work.project?.kind ?? null,
+    aboveAt: (root, entry) => {
+      const read = roots.get(root)
+      return read === undefined
+        ? null
+        : nearestRevision(read.index, read.revisions, atEntry(entry))
+    },
+  })
+  return foreign === null ? null : foreignRefusal(foreign)
+}
+
+/**
  * A command that would write in an archived task, or move a card out of one, is
  * refused, naming who archived it. `sendChat`'s only callers are this
  * dispatcher and `sendPoppedQueuedCard`, both behind it, so it needs no check
  * of its own. `tasks` is the tasks the command writes in (`writesIn`), so no
  * root's document is opened to check. Null when the command may go on.
  */
-/**
- * A command that would run, or write a message, in a thread someone holds
- * in their inventory, or one trashed, is refused: `runsIn` says where each
- * kind of command runs, and a branch's fork is read from its root's tree.
- * Null when the command may go on.
- */
-async function refuseHeld(
-  basics: Pick<Basics, "places" | "docs" | "session">,
-  command: Intent | QueuePop,
-): Promise<Outcome | null> {
-  const at = runsIn(command)
-  if (at.length === 0) return null
-  // gather: the trees of the roots a branch forks in
-  const trees = new Map<RootId, TreeIndex>()
-  for (const a of at)
-    if (a.kind === "entry" && !trees.has(a.root))
-      trees.set(a.root, readTreeIndex(await basics.docs.root(a.root)))
-  const held = heldIn(
-    at,
-    readPlaces(basics.places),
-    (root, entry) => {
-      const index = trees.get(root)
-      return index === undefined ? null : threadAt(index, entry)
-    },
-    tasksNow(basics).forkOf,
-  )
-  return held === null
-    ? null
-    : {
-        kind: "refused",
-        code: ERR.REFUSED,
-        message: holdingWords(held.holding),
-      }
-}
-
 function refuseInArchive(
   basics: Pick<Basics, "session" | "places">,
   tasks: readonly TaskId[],

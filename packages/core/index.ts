@@ -182,6 +182,11 @@ export const ERR = {
   NOT_OWNER: "not_owner",
   /** An answer the lane's access does not take now: nothing waits, or it is already so. */
   NOTHING_TO_ANSWER: "nothing_to_answer",
+  /**
+   * A run, a catch-up or an offer action on a lane whose history is not the
+   * project's kind: it was made before the project changed kind.
+   */
+  FOREIGN_LANE: "foreign_lane",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -1032,22 +1037,31 @@ export type ConfigOrigin =
 /** What a catch-up merges from: the thread's base, or the thread it branched from. */
 export type CatchUpFrom = ThreadBase | ParentThread
 
-/** A lane's base, read from its history (`@pinetrie/lanes`' `laneBase`). */
-export interface LaneBase {
+/**
+ * A lane's base, read from its history: the shape once, for the states a
+ * port carries (`LaneBase`) and for the commits jj reads in your repo
+ * (`LaneBaseOf<CommitId>`).
+ */
+export interface LaneBaseOf<P extends string> {
   readonly base: ThreadBase
   /**
-   * Where the lane's own work begins: accepted commit its base names, or the
-   * WIP's copy; for a lane with no `Pinetrie-Base`, the newest accepted commit in
-   * its history.
+   * Where the lane's own work begins: the state of accepted work its base
+   * names, or the WIP's copy; for a lane with no `Pinetrie-Base`, the newest
+   * state of accepted work in its history.
    */
-  readonly start: CommitId
+  readonly start: P
   /**
-   * The commit of yours the lane holds whole since its base: the one its
+   * The state of yours the lane holds whole since its base: the one its
    * `Pinetrie-Base` names (the WIP's, for a WIP, never the copy); for a lane
    * with none, `start`.
    */
-  readonly source: CommitId
+  readonly source: P
 }
+
+/** A lane's base as the ports carry it. */
+export type LaneBase = LaneBaseOf<PointId>
+/** A lane's base as jj reads it in your repo: commits. */
+export type CommitBase = LaneBaseOf<CommitId>
 
 declare const commitIdBrand: unique symbol
 /**
@@ -1057,6 +1071,19 @@ declare const commitIdBrand: unique symbol
  */
 export type CommitId = string & { readonly [commitIdBrand]: true }
 export const commitId = (id: string): CommitId => id as CommitId
+
+declare const pointIdBrand: unique symbol
+/**
+ * A state in the project's history, opaque: a jj commit's id, or a folder's
+ * snapshot's, as the lane it is read in keeps (`LaneRecord.history`). Stored
+ * as the bare string. Only a lane proven jj reads one as a commit
+ * (`@pinetrie/jj`'s `commitFromPoint`).
+ */
+export type PointId = string & { readonly [pointIdBrand]: true }
+/** A stored string as a point: for decoders. */
+export const pointId = (id: string): PointId => id as PointId
+/** A jj commit as the point it is: every commit is a state of the history. */
+export const pointFromCommit = (c: CommitId): PointId => pointId(c)
 
 /** Where every lane of its own sees its own directory. */
 export const WORKSPACE_ROOT = "/workspace"
@@ -1210,12 +1237,58 @@ export interface LaneRecord {
   /** The root the lane works in. */
   readonly root: RootId
   /**
-   * Whether it works in a copy of its own, in its container: false for a lane a
-   * host without tools made.
+   * The kind of history its own copy keeps, in its container, for its whole
+   * life: its disk holds a jj repo or it does not. Null for a lane a host
+   * without tools made, which has no copy of its own.
    */
-  readonly ownCopy: boolean
+  readonly history: ProjectKind | null
   readonly by: WriterId
   readonly createdAt: number
+}
+
+/** A lane with a copy of its own. */
+export type OwnLane = LaneRecord & { readonly history: ProjectKind }
+
+/** The record as an `OwnLane`; null for a lane with no copy of its own. */
+export const ownLane = (record: LaneRecord): OwnLane | null =>
+  record.history === null ? null : (record as OwnLane)
+
+/**
+ * A lane whose history is not the project's kind: made before the project
+ * changed kind. Kept whole, and refused before anything runs on it.
+ */
+export interface ForeignLane {
+  readonly kind: "foreign"
+  readonly lane: ThreadId
+  readonly history: ProjectKind
+}
+
+/** Null when `lane` keeps a history of `kind`, else why it does not fit. */
+export const laneFits = (
+  lane: OwnLane,
+  kind: ProjectKind,
+): ForeignLane | null =>
+  lane.history === kind
+    ? null
+    : { kind: "foreign", lane: lane.lane, history: lane.history }
+
+declare const runnableBrand: unique symbol
+/** A lane a run may start on (`proveRunnable`, its one maker). */
+export type RunnableLane = ThreadId & { readonly [runnableBrand]: true }
+
+/**
+ * `lane` as one a run may start on, or why not. A lane with no record or no
+ * copy of its own runs with no tools, and so does every lane on a host with
+ * no tools (`kind` null); a lane with its own copy must fit `kind`.
+ */
+export function proveRunnable(
+  lane: ThreadId,
+  record: LaneRecord | undefined,
+  kind: ProjectKind | null,
+): RunnableLane | ForeignLane {
+  const own = record === undefined ? null : ownLane(record)
+  const foreign = own === null || kind === null ? null : laneFits(own, kind)
+  return foreign ?? (lane as RunnableLane)
 }
 
 /** Some of a turn's paths: the first of them, and how many more. */
@@ -1255,22 +1328,22 @@ export interface TurnDisk {
 export interface RevisionRecord {
   readonly entry: EntryId
   readonly lane: ThreadId
-  /** The turn's commit; null when nothing tracked changed, or the lane has no copy of its own. */
-  readonly commit: CommitId | null
+  /** The turn's state; null when nothing tracked changed, or the lane has no copy of its own. */
+  readonly point: PointId | null
   /**
    * The lane's whole disk at this entry; null for a lane with no copy of its
    * own, and in records written before lane containers.
    */
   readonly snapshot: SnapshotId | null
   /**
-   * The paths the turn's commit changed, from the repository's root; none for a
-   * prompt's record or a turn with no commit.
+   * The paths the turn changed, from the project's root; none for a prompt's
+   * record or a turn with no state of its own.
    */
   readonly paths: readonly string[]
-  /** The files conflicted in `commit`: what a branch from here starts with. */
+  /** The files conflicted at `point`: what a branch from here starts with. */
   readonly conflicts: readonly string[]
   /**
-   * What the turn did to its disk beyond its commit. Null for a prompt's
+   * What the turn did to its disk beyond its state. Null for a prompt's
    * record, a lane with no copy of its own, an update, and records written
    * before.
    */
@@ -1284,6 +1357,8 @@ export interface RevisionRecord {
  */
 export interface ProjectRecord {
   readonly root: string
+  /** What the project's folder was at this start: what a lane's history must be to run. */
+  readonly kind: ProjectKind
   /**
    * Whom the host's config names its owner (`owner`): who answers when
    * a lane asks for their ssh identity. Null with none.
@@ -1381,17 +1456,17 @@ export interface RevisionReview {
 }
 
 /**
- * What a review reads: one revision, the diff from its parent to it, or a
- * range, the diff from one commit to another, such as an ask's work across its
- * turns' revisions. Commit ids name their content, so a review of either never
- * changes.
+ * What a review reads: one revision of an offer, the diff from its parent to
+ * it, or a range, the diff from one state of a lane to another, such as an
+ * ask's work across its turns. Each id names its content, so a review of
+ * either never changes.
  */
 export type DiffSpan =
   | { readonly kind: "revision"; readonly commit: CommitId }
   | {
       readonly kind: "range"
-      readonly from: CommitId
-      readonly to: CommitId
+      readonly from: PointId
+      readonly to: PointId
     }
 
 /** A span as one string, for a key or a URL: `<commit>`, or `<from>..<to>`. */
@@ -1399,13 +1474,13 @@ export const spanKey = (s: DiffSpan): string =>
   s.kind === "revision" ? s.commit : `${s.from}..${s.to}`
 
 /**
- * What a fork starts on: a commit a lane recorded (a branch below agent work),
- * accepted work's commit, or a copy of a WIP bookmark made on the accepted
+ * What a fork starts on: a state a lane recorded (a branch below agent work),
+ * accepted work's state, or a copy of a WIP bookmark made on the accepted
  * commit under it, so the lane freezes nothing of yours.
  */
 export type ForkStart =
-  | { readonly kind: "commits"; readonly commits: readonly CommitId[] }
-  | { readonly kind: "accepted"; readonly commit: CommitId }
+  | { readonly kind: "recorded"; readonly points: readonly PointId[] }
+  | { readonly kind: "accepted"; readonly point: PointId }
   | {
       readonly kind: "wip"
       readonly bookmark: string
@@ -1417,13 +1492,13 @@ export type ForkStart =
 
 /**
  * What bringing a thread up to date merges into its lane: accepted work's
- * commit, or a fresh copy of a WIP; or the newest commit of the thread it
+ * state, or a fresh copy of a WIP; or the newest state of the thread it
  * branched from.
  */
 export type BaseMerge =
   | {
       readonly kind: "accepted"
-      readonly commit: CommitId
+      readonly point: PointId
       /** The thread moves to accepted work: with nothing to merge, a commit still names it. */
       readonly mark: boolean
     }
@@ -1438,13 +1513,13 @@ export type BaseMerge =
        * The lane's previous copy (`LaneBase.start`): the new copy's parent,
        * so conflicts the lane already resolved do not come back.
        */
-      readonly on: CommitId
+      readonly on: PointId
     }
   | (ParentThread & {
-      /** The parent's newest commit (`ParentNow.newest`). */
-      readonly commit: CommitId
-      /** The parent commit the lane last caught up with: where the commits that came in start. */
-      readonly caughtUpWith: CommitId
+      /** The parent's newest state (`ParentNow.newest`). */
+      readonly point: PointId
+      /** The parent's state the lane last caught up with: where what came in starts. */
+      readonly caughtUpWith: PointId
     })
 
 declare const threadNameBrand: unique symbol

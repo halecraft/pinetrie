@@ -24,13 +24,20 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import {
+  type CommitSpan,
+  commitFromPoint,
   fileDiff,
   laneRefSteps,
   type RepoOwner,
   revisionRead,
 } from "@pinetrie/jj"
 import type { PiSetup } from "@pinetrie/pi"
-import { readNames, readOffers, readRevisions } from "@pinetrie/reads"
+import {
+  readLaneRecords,
+  readNames,
+  readOffers,
+  readRevisions,
+} from "@pinetrie/reads"
 import {
   answerDiff,
   answerReview,
@@ -40,11 +47,13 @@ import {
   offerStatus,
   planOfferRead,
   planYourEdits,
+  type RecordedSpan,
 } from "@pinetrie/rules"
 import { type Basics, failed } from "../../basics.ts"
 import type { Records } from "../../records.ts"
 import { decodeAuthority } from "../../settings.ts"
 import type { AcceptedWork } from "../accepted.ts"
+import { recordedJjLane } from "../proven.ts"
 import { act } from "./act.ts"
 import { describe } from "./describe.ts"
 import { planMarks } from "./marks.ts"
@@ -201,10 +210,22 @@ export function startOffers(input: {
     stackSpan: lane => stackSpan(deps, lane),
     stackEnded: (lane, stack) => stackEnded(deps, refresh, lane, stack),
     async read(ask) {
+      /** The span in commits: a range's points read in its lane, proven jj; null when it is not. */
+      const spanInCommits = (span: RecordedSpan): CommitSpan | null => {
+        if (span.kind === "revision") return span
+        const lane = recordedJjLane(readLaneRecords(basics.session), span.lane)
+        return lane === null
+          ? null
+          : {
+              kind: "range",
+              from: commitFromPoint(lane, span.from),
+              to: commitFromPoint(lane, span.to),
+            }
+      }
       const read = planOfferRead(
         {
           offers: readOffers(basics.session),
-          // Every held root's: a range is named by two commits, in one lane.
+          // Every held root's: a range is named by two states, in one lane.
           revisions: new Map(
             basics.docs.loaded().flatMap(root => {
               const view = basics.docs.view(root)
@@ -214,16 +235,23 @@ export function startOffers(input: {
         },
         ask,
       )
+      if (read.kind === "refused") return read
+      // A range names its lane's points: read only in that lane, proven jj.
+      const span = spanInCommits(read.span)
+      if (span === null)
+        return {
+          kind: "refused",
+          status: 404,
+          reason: "no jj lane recorded both",
+        }
       switch (read.kind) {
-        case "refused":
-          return read
         case "review":
           return answerReview(
             await owner.read(ops =>
               // A widening names a mount by its target: the root does not matter.
               revisionRead(
                 ops.jj,
-                read.span,
+                span,
                 text =>
                   decodeAuthority("/", PROJECT_CONFIG_FILE, text).authority,
               ),
@@ -231,7 +259,7 @@ export function startOffers(input: {
           )
         case "diff":
           return answerDiff(
-            await owner.read(ops => fileDiff(ops.jj, read.span, read.path)),
+            await owner.read(ops => fileDiff(ops.jj, span, read.path)),
           )
       }
     },

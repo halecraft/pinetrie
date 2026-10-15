@@ -1,6 +1,6 @@
 import {
   BASE_SNAPSHOT,
-  commitId,
+  pointId,
   type SnapshotId,
   snapshotId,
 } from "@pinetrie/core"
@@ -16,14 +16,20 @@ test("forkFacts reads nothing before every pending turn record is written", asyn
     exists: async () => true,
     nearest: () => {
       read.push("nearest")
-      return { lane: null, commit: null, commitLane: null, snapshot: null }
+      return {
+        lane: null,
+        point: null,
+        pointLane: null,
+        snapshot: null,
+        snapshotLane: null,
+      }
     },
     begin: async () => {
       read.push("begin")
       return {
         kind: "accepted",
         acceptedBookmark: "pinetrie-accepted",
-        commit: commitId("aaaa0000"),
+        point: pointId("aaaa0000"),
       }
     },
   })
@@ -39,11 +45,17 @@ test("forkFacts asks whether the snapshot above is still there, and not of the b
   const facts = (snapshot: SnapshotId | null) =>
     forkFacts({
       pendingRecords: async () => {},
-      nearest: () => ({ lane: null, commit: null, commitLane: null, snapshot }),
+      nearest: () => ({
+        lane: null,
+        point: null,
+        pointLane: null,
+        snapshot,
+        snapshotLane: null,
+      }),
       begin: async () => ({
         kind: "accepted",
         acceptedBookmark: "pinetrie-accepted",
-        commit: commitId("aaaa0000"),
+        point: pointId("aaaa0000"),
       }),
       exists: async id => {
         asked.push(id)

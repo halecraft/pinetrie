@@ -6,10 +6,10 @@ import {
   CATCH_UP_TOOL,
   type CardRecord,
   type CatchUpCommand,
-  type CommitId,
   commandOf,
   type MoveRefusal,
   makeCard,
+  type PointId,
   type TextCardId,
   type ThreadId,
   type WriterId,
@@ -27,7 +27,7 @@ export interface ToolAnswer {
   readonly text: string
   readonly isError: boolean
   /** A clean or conflicted merge: what was merged, for `parentNow` and the turn's record. */
-  readonly details: { readonly merged: readonly CommitId[] } | null
+  readonly details: { readonly merged: readonly PointId[] } | null
 }
 
 /** Why `catch_up` did not merge. */
@@ -113,7 +113,7 @@ export function catchUpAnswer(
     | {
         readonly kind: "clean"
         readonly message: UpdateMessage
-        readonly merged: CommitId
+        readonly merged: PointId
       }
     | { readonly kind: "conflicted"; readonly message: LandMessage }
     | { readonly kind: "nothing" },

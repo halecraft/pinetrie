@@ -11,8 +11,10 @@ import {
   NO_CONTENT,
   NOBODY,
   type NoteColumnId,
+  proveRunnable,
   ROOT_ORIGIN,
   type RootId,
+  type RunnableLane,
   rootIdFor,
   type Target,
   type TaskId,
@@ -64,6 +66,7 @@ import {
 import type { Basics } from "./basics.ts"
 import type { HostDocuments } from "./docs.ts"
 import { applyPlaceSteps } from "./places.ts"
+import type { LaneWork } from "./work/index.ts"
 
 export interface Call {
   readonly method: string
@@ -307,7 +310,7 @@ export function putLane(
     setRecord(LANE, {
       lane,
       root: ROOT_ID,
-      ownCopy: false,
+      history: null,
       by: NOBODY_WRITER,
       createdAt: 0,
     }),
@@ -481,4 +484,20 @@ export function putTask(
   if (opened.kind !== "open") return
   applyWrites(b, opened.records)
   applyPlaceSteps(b.places, [...made, ...opened.steps])
+}
+
+/**
+ * `lane` as a run may start on it, proven as a host with no tools proves
+ * every lane (`proveRunnable`): for tests whose runs never meet a lane of
+ * another kind.
+ */
+export function runnableFor(lane: ThreadId): RunnableLane {
+  const proved = proveRunnable(lane, undefined, null)
+  if (typeof proved === "object") throw new Error("every lane runs here")
+  return proved
+}
+
+/** Lane work whose every lane may run (`runnableFor`). */
+export const RUNS_ANY: Pick<LaneWork, "runnable"> = {
+  runnable: lane => runnableFor(lane),
 }

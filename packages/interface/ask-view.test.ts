@@ -1,9 +1,9 @@
 import {
-  commitId,
   type EntryId,
   type EntryLike,
   entryId,
   indexAsks,
+  pointId,
   type RevisionRecord,
   threadIdFor,
   writerId,
@@ -176,7 +176,7 @@ describe("askView", () => {
       {
         entry: entryId(at),
         lane: threadIdFor("x"),
-        commit: commit === null ? null : commitId(commit),
+        point: commit === null ? null : pointId(commit),
         snapshot: null,
         paths,
         conflicts: [],

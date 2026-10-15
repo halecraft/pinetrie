@@ -5,10 +5,10 @@
 import type {
   AcceptedRecord,
   BaseRecord,
+  CommitBase,
   CommitId,
   ERR,
   ErrCode,
-  LaneBase,
   OfferRecord,
   ThreadName,
 } from "./index.ts"
@@ -138,7 +138,7 @@ export interface Placed {
   readonly kind: "placed"
   /** The lane's tip in your repo. */
   readonly tip: CommitId
-  readonly base: LaneBase
+  readonly base: CommitBase
   /** A WIP base's state (`wipState`, `@pinetrie/jj`); "ok" for accepted work. */
   readonly state: "ok" | "landed"
   /** Where the offer sits: accepted work's commit, or the WIP bookmark's. */
@@ -153,7 +153,7 @@ export interface Placed {
  */
 export type OfferPlace =
   /** A WIP gone without landing: nothing sits anywhere, and nothing moves. */
-  | { readonly kind: "gone"; readonly tip: CommitId; readonly base: LaneBase }
+  | { readonly kind: "gone"; readonly tip: CommitId; readonly base: CommitBase }
   /**
    * An accepted-offer commit of the lane names no source: nothing is built
    * here, but an offer that is here can be accepted, since an acceptance moves
@@ -162,7 +162,7 @@ export type OfferPlace =
   | {
       readonly kind: "untraced"
       readonly tip: CommitId
-      readonly base: LaneBase
+      readonly base: CommitBase
       readonly state: "ok" | "landed"
       readonly target: CommitId
     }

@@ -1,7 +1,7 @@
 // jj/lane/base — a lane's base as its history names it, read the same way
 // from the lane's own repo and from yours.
 
-import type { LaneBase, RepoConfig } from "@pinetrie/core"
+import type { CommitBase, RepoConfig } from "@pinetrie/core"
 import type { Runner } from "@pinetrie/lanes"
 import { newestBase } from "./merge.ts"
 import { revsetName } from "./names.ts"
@@ -18,7 +18,7 @@ export async function laneBase(
   jj: Runner,
   tip: string,
   repoConfig: RepoConfig,
-): Promise<LaneBase | null> {
+): Promise<CommitBase | null> {
   const newest = await newestBase(jj, tip, repoConfig.wipPrefix)
   if (newest === null) {
     const [start] = await commitsOf(

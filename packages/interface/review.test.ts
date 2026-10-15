@@ -1,6 +1,7 @@
 import type { ThreadName } from "@pinetrie/core"
 import {
   commitId,
+  pointFromCommit,
   type ReviewFile,
   type RevisionReview,
   threadIdFor,
@@ -112,7 +113,9 @@ describe("reviewView", () => {
   test("an ask's range, with no description, is headed by the ask", () => {
     const ask: ReviewTarget = {
       ...target,
-      spans: [{ kind: "range", from: C1, to: C2 }],
+      spans: [
+        { kind: "range", from: pointFromCommit(C1), to: pointFromCommit(C2) },
+      ],
       title: 'Ada: "Fix it"',
     }
     expect(

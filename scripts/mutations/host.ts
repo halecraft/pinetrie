@@ -1641,8 +1641,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused carry-on still starts",
     file: "apps/pinetrie/host/commands/lane.ts",
-    from: '  if (planned.kind === "refused") return planned\n  return {\n    kind: "started",',
-    to: '  return {\n    kind: "started",',
+    from: '  if (planned.kind === "refused") return planned\n  return startRun(deps, lane, {',
+    to: "  return startRun(deps, lane, {",
     command: unit,
     expect: "a carry-on the rule refuses is answered with its refusal",
   },
@@ -1993,7 +1993,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher lets a command run in a held thread",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "    const held = await refuseHeld(deps.basics, intent)\n    if (held !== null) return settled(held)\n",
+    from: "    const where = await refuseWhereRuns(deps, intent)\n    if (where !== null) return settled(where)\n",
     to: "",
     command: unit,
     expect: "nothing runs in a thread in an inventory",
@@ -2241,5 +2241,58 @@ export const mutations: readonly Mutation[] = [
     to: "    const kept = await rm(dir, { recursive: true, force: true }).then(",
     command: unit,
     expect: "a session's directories that gained a file are kept, naming it",
+  },
+  {
+    name: "a lane's record keeps its work beside its history",
+    file: "apps/pinetrie/host/migrations/0015-lane-history.ts",
+    from: "  const { work, ...rest } = contents as { readonly work: unknown }\n",
+    to: "  const { work } = contents as { readonly work: unknown }\n  const rest = contents\n",
+    command: unit,
+    expect:
+      "a lane's own copy becomes a jj history, and no copy none; a moved record is left",
+  },
+  {
+    name: "a record the rewrite leaves is written all the same",
+    file: "apps/pinetrie/host/migrations/rewrite.ts",
+    from: "    const value = rewrite(contents)\n",
+    to: "    const value = rewrite(contents) ?? (contents as object)\n",
+    command: unit,
+    expect: "no step when no record is in the old shape",
+  },
+  {
+    name: "withHistory hands the adapter a lane with no copy",
+    file: "apps/pinetrie/host/work/registry.ts",
+    from: "      const own = record === undefined ? null : ownLane(record)\n",
+    to: "      const own =\n        record === undefined ? null : (ownLane(record) ?? (record as never))\n",
+    command: unit,
+    expect:
+      "a lane with no copy of its own, or no record, is refused before the adapter is asked",
+  },
+  {
+    name: "a turn's record keeps its commit beside its point",
+    file: "apps/pinetrie/host/migrations/0016-revision-point.ts",
+    from: "  const { commit, ...rest } = contents\n",
+    to: "  const { commit } = contents\n  const rest = contents\n",
+    command: unit,
+    expect:
+      "a turn's record moves its commit to its point, and is written whole; a whole one is left",
+  },
+  {
+    name: "the gate lets a run start on a lane of another kind",
+    file: "apps/pinetrie/host/commands/index.ts",
+    from: "  return foreign === null ? null : foreignRefusal(foreign)\n",
+    to: "  return null\n",
+    command: unit,
+    expect:
+      "nothing runs on a lane of another kind than the project's; a held one is refused as held",
+  },
+  {
+    name: "the drain pops a card on a lane of another kind",
+    file: "apps/pinetrie/host/queued-card-pop.ts",
+    from: '          typeof deps.work.runnable(lane) === "object",\n',
+    to: "          false,\n",
+    command: unit,
+    expect:
+      "pops nothing while its lane keeps a history of another kind: its cards stay queued",
   },
 ]

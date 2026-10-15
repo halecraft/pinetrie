@@ -6,13 +6,13 @@ import {
   atEntry,
   type CardId,
   type CardRecord,
-  type CommitId,
   type EntryId,
   ERR,
   type Intent,
   type LaneView,
   type MoveTarget,
   nearestRevision,
+  type PointId,
   type Refusal,
   type RevisionRecord,
   type RootId,
@@ -41,7 +41,7 @@ export interface ArchiveTeardown {
   readonly forget: readonly ThreadId[]
   readonly refs: readonly {
     readonly lane: ThreadId
-    readonly commit: CommitId | null
+    readonly point: PointId | null
   }[]
   readonly snapshots: readonly SnapshotId[]
 }
@@ -126,11 +126,11 @@ function planTeardown(
     forget: [],
     refs: input.own.flatMap(({ lane, tip, index }) => {
       if (tip === null) return []
-      const { commit } = nearestRevision(index, input.revisions, {
+      const { point } = nearestRevision(index, input.revisions, {
         kind: "entry",
         id: tip,
       })
-      return commit === null ? [] : [{ lane, commit }]
+      return point === null ? [] : [{ lane, point }]
     }),
     snapshots: [],
   }
@@ -151,7 +151,7 @@ export function planLanesGone(
   const gone = new Set<string>(lanes)
   return {
     forget: lanes,
-    refs: lanes.map(lane => ({ lane, commit: null })),
+    refs: lanes.map(lane => ({ lane, point: null })),
     snapshots: planRetention({
       records: [...revisions.values()].filter(r => gone.has(r.lane)),
       archived: true,

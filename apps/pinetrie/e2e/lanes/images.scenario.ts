@@ -80,7 +80,7 @@ async function imagesSection(
     )
     check(
       "and its turn is committed and snapshotted",
-      recorded.some(r => r.commit !== null && r.snapshot !== null),
+      recorded.some(r => r.point !== null && r.snapshot !== null),
     )
   } finally {
     await alpine.close()

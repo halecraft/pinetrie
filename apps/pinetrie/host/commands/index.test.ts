@@ -12,7 +12,13 @@ import { createKeeper } from "@pinetrie/keeper"
 import type { WireCommand } from "@pinetrie/protocol/codec"
 import type { Reply } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
-import { HELD_WORDS, setRecord, WORKFLOW } from "@pinetrie/rules"
+import {
+  foreignLaneWords,
+  HELD_WORDS,
+  LANE,
+  setRecord,
+  WORKFLOW,
+} from "@pinetrie/rules"
 import { newPresenceDoc } from "@pinetrie/schema"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
@@ -349,6 +355,58 @@ test("nothing runs in a thread in an inventory", async () => {
     kind: "refused",
     code: ERR.REFUSED,
     message: HELD_WORDS,
+  })
+  expect(pi.calls).toEqual([])
+})
+
+test("nothing runs on a lane of another kind than the project's; a held one is refused as held", async () => {
+  const { b, pi, commands, replies, sender, chat } = setUp({
+    project: { root: "/p", kind: "jj", owner: null },
+  })
+  putValue(
+    b,
+    setRecord(LANE, {
+      lane: THREAD,
+      root: ROOT_ID,
+      history: "folder",
+      by: ALICE,
+      createdAt: 0,
+    }),
+  )
+  const words = foreignLaneWords({
+    kind: "foreign",
+    lane: THREAD,
+    history: "folder",
+  })
+  await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
+  const popped = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
+    text: "from the queue",
+    root: ROOT_ID,
+    at: { kind: "queue", thread: THREAD },
+    asksAgent: false,
+    mentions: [],
+    card: null,
+    pinned: [],
+    base: null,
+    state: null,
+  })
+  const taken = readPlaces(b.places).find(c => c.id === THREAD)
+  if (taken?.kind !== "thread") throw new Error("no thread card")
+  applyPlaceSteps(b.places, [
+    {
+      kind: "write",
+      record: { ...taken, place: { kind: "inventory", holder: ALICE } },
+    },
+  ])
+  await commands.handle(sender, ALICE, chat(cardIdFor("c2")))
+  expect(replies.map(r => [r.outcome, r.errorMessage])).toEqual([
+    ["refused", words],
+    ["refused", HELD_WORDS],
+  ])
+  expect(popped).toEqual({
+    kind: "refused",
+    code: ERR.FOREIGN_LANE,
+    message: words,
   })
   expect(pi.calls).toEqual([])
 })

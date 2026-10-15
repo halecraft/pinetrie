@@ -6,13 +6,14 @@ import {
   type BaseRecord,
   type BehindView,
   CATCH_UP_TOOL,
-  type CommitId,
   type OfferRecord,
+  type PointId,
+  pointFromCommit,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { catchUpOf } from "./base.ts"
 import { baseMovedOn, CatchUpFromSchema } from "./catch-up-from.ts"
-import { CommitSchema, List } from "./decode.ts"
+import { List, PointSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 
 export const BEHIND_TYPE = "pinetrie.behind"
@@ -22,7 +23,7 @@ const NAMED_FILES = 20
 
 const BehindDetailsSchema = Type.Object({
   from: CatchUpFromSchema,
-  to: CommitSchema,
+  to: PointSchema,
   files: List(Type.String()),
   overlap: List(Type.String()),
   conflicts: List(Type.String()),
@@ -85,7 +86,7 @@ export type BaseNews =
 /**
  * Whether a thread's base has news for it, and what to do with it: from the
  * lane's base record and accepted work's (`catchUpOf`), its offer, the base
- * commits it last heard of or merged (`baseKnown`), and the one the host
+ * states it last heard of or merged (`baseKnown`), and the one the host
  * told it while it runs (`told`). Only a lane of its own has a base. `unknown`
  * work never acts, nor a gone base.
  */
@@ -94,8 +95,8 @@ export function planBaseNews(input: {
   readonly base: BaseRecord | undefined
   readonly accepted: AcceptedRecord | null
   readonly offer: OfferRecord | undefined
-  readonly known: readonly CommitId[] | null
-  readonly told: CommitId | null
+  readonly known: readonly PointId[] | null
+  readonly told: PointId | null
 }): BaseNews {
   const { base } = input
   if (!input.own || base === undefined || base.state === "gone")
@@ -103,7 +104,9 @@ export function planBaseNews(input: {
   const now = catchUpOf(base, input.accepted)
   if (now.kind !== "brings") return { kind: "nothing" }
   if (base.work === "none") return { kind: "catch-up" }
-  const { to } = now.move
+  // The base records are jj's alone; what the thread was told is a state
+  // of the shared history, so the base's commit crosses as its point.
+  const to = pointFromCommit(now.move.to)
   if (
     base.work !== "some" ||
     input.known?.includes(to) === true ||

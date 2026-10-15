@@ -2,7 +2,13 @@
 // queue, and its channel once open; and each lane's history, reached only on
 // its queue (`withHistory`). Only this module touches the handles.
 
-import type { LaneRecord, ThreadId } from "@pinetrie/core"
+import {
+  type ForeignLane,
+  type LaneRecord,
+  type OwnLane,
+  ownLane,
+  type ThreadId,
+} from "@pinetrie/core"
 import {
   helperCommand,
   type LaneHandle,
@@ -19,8 +25,8 @@ import {
   openChannel,
   relayObserver,
 } from "@pinetrie/pi"
-import { readLaneRecords } from "@pinetrie/reads"
-import { laneFold } from "@pinetrie/rules"
+import { readLaneRecords, readThreadName } from "@pinetrie/reads"
+import { foreignLaneWords, laneFold } from "@pinetrie/rules"
 import type { SessionDocHandle } from "@pinetrie/schema"
 
 /**
@@ -67,14 +73,20 @@ export interface LaneRegistry {
   handleOf(lane: ThreadId): LaneHandle<LaneChannel>
   /**
    * `f`, queued on the lane's queue after everything before it, with the
-   * lane's history and its handle: the one way to the history, so nothing
+   * lane's history, its handle and its record: the one way to the history, so nothing
    * changes it off the queue. With `fatal`, a failure breaks the queue
    * (`LaneQueue.enqueue`). Never called from a step already on the queue,
-   * which would wait on itself: such a step is handed the history.
+   * which would wait on itself: such a step is handed the history. Refused,
+   * with nothing queued, for a lane with no record, no copy of its own, or
+   * a history the adapter does not keep.
    */
   withHistory<T>(
     lane: ThreadId,
-    f: (h: LaneHistory, handle: LaneHandle<LaneChannel>) => Promise<T>,
+    f: (
+      h: LaneHistory,
+      handle: LaneHandle<LaneChannel>,
+      record: OwnLane,
+    ) => Promise<T>,
     options?: { readonly fatal?: boolean },
   ): Promise<T>
   recordOf(lane: ThreadId): LaneRecord | undefined
@@ -90,8 +102,11 @@ export function createRegistry(input: {
   readonly session: SessionDocHandle
   /** What lanes run on. */
   readonly runtime: LaneRuntime
-  /** The adapter's history of a lane, over its runners. */
-  readonly history: (lane: ThreadId, runners: LaneRunners) => LaneHistory
+  /** The adapter's history of a lane, over its runners, or why it keeps none. */
+  readonly history: (
+    lane: OwnLane,
+    runners: LaneRunners,
+  ) => LaneHistory | ForeignLane
 }): LaneRegistry {
   const { runtime } = input
   const handles = new Map<ThreadId, LaneHandle<LaneChannel>>()
@@ -108,14 +123,28 @@ export function createRegistry(input: {
   return {
     handleOf,
     withHistory(lane, f, options) {
+      // Checked before anything is queued: a refusal must not break a
+      // queue `fatal` would break.
+      const record = recordOf(lane)
+      const own = record === undefined ? null : ownLane(record)
+      if (own === null) {
+        const name = readThreadName(input.session, lane)
+        return Promise.reject(
+          new Error(
+            record === undefined
+              ? `${name} has no lane record`
+              : `${name} has no copy of its own`,
+          ),
+        )
+      }
       const handle = handleOf(lane)
-      return handle.queue.enqueue(
-        () => f(input.history(lane, handle.runners), handle),
-        options,
-      )
+      const history = input.history(own, handle.runners)
+      if ("kind" in history)
+        return Promise.reject(new Error(foreignLaneWords(history)))
+      return handle.queue.enqueue(() => f(history, handle, own), options)
     },
     recordOf,
-    isOwn: lane => recordOf(lane)?.ownCopy === true,
+    isOwn: lane => (recordOf(lane)?.history ?? null) !== null,
     async forget(lane) {
       const handle = handles.get(lane)
       handles.delete(lane)

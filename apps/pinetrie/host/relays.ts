@@ -79,6 +79,7 @@ import { requestOutside } from "./outside.ts"
 import { applyPlaceSteps } from "./places.ts"
 import type { Runs } from "./runs.ts"
 import { tasksNow } from "./tasks.ts"
+import type { LaneWork } from "./work/index.ts"
 
 /** A tool's answer that is no merge: text alone. */
 const said = (text: string, isError = false): ToolAnswer => ({
@@ -131,6 +132,8 @@ export function createRelays(deps: {
   readonly agent: Pick<Agent, "lane">
   readonly scribe: Pick<Scribe, "appendToTree">
   readonly start: Runs["start"]
+  /** Whether a run may start on a lane (`LaneWork.runnable`). */
+  readonly runnable: LaneWork["runnable"]
   readonly budgets: Budgets
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
   /** Ask for a lane's drain. */
@@ -213,6 +216,9 @@ export function createRelays(deps: {
         why: { kind: "unknown", name: nameOf(fromThread) },
       }
     const from: ThreadNow = end === undefined ? now : { ...now, end }
+    // Proven once: the plan refuses a lane of another kind, and a run
+    // starts only with the proof.
+    const runnable = deps.runnable(to)
     const target = await threadNow(to)
     const planned = planRelay({
       ...reaches,
@@ -220,6 +226,7 @@ export function createRelays(deps: {
       to,
       members: threadMembers(from.index, from.end),
       toLane: target?.lane ?? { kind: "none" },
+      toForeign: typeof runnable === "object" ? runnable : null,
       path: projectTranscript(from.index, from.end),
       heard:
         target === null
@@ -244,8 +251,13 @@ export function createRelays(deps: {
       steers: false,
     })
     if (to_.kind === "run") {
+      if (typeof runnable === "object")
+        return {
+          kind: "refused",
+          why: { kind: "foreign", name: nameOf(to), lane: runnable },
+        }
       const now = basics.now()
-      deps.start(to, {
+      deps.start(runnable, {
         kind: "prompt",
         message: encodeRelayMessage(planned.relay, now),
         pinnedSeen: [],
@@ -444,14 +456,21 @@ export function createRelays(deps: {
       steers: plan.answer.wakes,
     })
     switch (to.kind) {
-      case "run":
-        deps.start(to.thread, {
-          kind: "prompt",
-          message,
-          pinnedSeen: [],
-          heard: null,
-        })
+      case "run": {
+        // An asker of another kind runs nothing: the answer waits in its
+        // thread, as one that wakes nobody does.
+        const runnable = deps.runnable(to.thread)
+        if (typeof runnable === "object")
+          await deps.agent.lane(to.thread).append(message)
+        else
+          deps.start(runnable, {
+            kind: "prompt",
+            message,
+            pinnedSeen: [],
+            heard: null,
+          })
         return
+      }
       case "steer":
         await deps.agent.lane(to.thread).steer(message)
         return

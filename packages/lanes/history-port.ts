@@ -10,26 +10,26 @@
 
 import type {
   BaseMerge,
-  CommitId,
   CopyRefusal,
   EntryId,
   ForkStart,
   LaneBase,
+  PointId,
   ReadyCopy,
   ThreadId,
 } from "@pinetrie/core"
 import type { LaneStep } from "./plan.ts"
 
-/** Where a file is read: accepted work, or a lane's newest commit or its start. */
-export type Point =
+/** Where a file is read: accepted work, or a lane's newest state or its start. */
+export type ReadSite =
   | { readonly kind: "accepted" }
   | { readonly kind: "tip"; readonly lane: ThreadId }
   | { readonly kind: "start"; readonly lane: ThreadId }
 
 /**
- * A file read at a point: its text, null when the point has no such file,
- * with the revision it was read at as the adapter names it, for a log; or
- * none, when the point is not there (a lane with no commit there yet).
+ * A file read at a site: its text, null when the site has no such file,
+ * with the state it was read at as the adapter names it, for a log; or
+ * none, when the site is not there (a lane with no state there yet).
  */
 export type FileAt =
   | {
@@ -37,7 +37,20 @@ export type FileAt =
       readonly at: string
       readonly text: string | null
     }
-  | { readonly kind: "no-point" }
+  | { readonly kind: "no-site" }
+
+/**
+ * Accepted work now, as the adapter read it: its states, and its checkout
+ * of them on the base's disk, bound to the read that made it. Used in the
+ * step that read it and never kept, since accepted work may move after; so
+ * nothing turns a state back into the adapter's own terms.
+ */
+export interface AcceptedNow {
+  /** Accepted work's states: none before it is set up. */
+  readonly points: readonly PointId[]
+  /** The checkout of `points`, on a fresh disk or on the base before. */
+  checkout(fresh: boolean): BaseCheckout
+}
 
 declare const forkSetupBrand: unique symbol
 /** The lane steps that make a cloned disk a fork, after its disk is restored. */
@@ -59,11 +72,16 @@ export interface BaseCheckout {
 export const baseCheckout = (steps: readonly LaneStep[]): BaseCheckout =>
   ({ steps }) as BaseCheckout
 
-/** A turn's revision, and whether it, or the bookmark when it has none, is conflicted. */
-export interface TurnCommitted {
-  readonly commit: CommitId | null
+/**
+ * A turn's state, and whether it, or the lane's newest when it has none, is
+ * conflicted: the shape once, for the port (`TurnCommitted`) and for what an
+ * adapter reads in its own terms (jj's commits).
+ */
+export interface TurnCommittedOf<P extends string> {
+  readonly point: P | null
   readonly conflicted: boolean
 }
+export type TurnCommitted = TurnCommittedOf<PointId>
 
 /** A revision on one side of a merge, and the files it touched of those asked about. */
 export interface TouchedRevision {
@@ -71,24 +89,27 @@ export interface TouchedRevision {
   readonly paths: readonly string[]
 }
 
-/** What an update found in the lane after its merge (`mergeUpdate`). */
-export type Merged =
+/**
+ * What an update found in the lane after its merge: the shape once, for the
+ * port (`Merged`) and for what an adapter reads in its own terms.
+ */
+export type MergedOf<P extends string> =
   /**
-   * Nothing to merge. `mark` is the commit naming accepted work, when the plan
+   * Nothing to merge. `mark` is the state naming accepted work, when the plan
    * asked for one, made on `ours`.
    */
   | {
       readonly kind: "nothing"
-      readonly ours: CommitId
-      readonly mark: CommitId | null
+      readonly ours: P
+      readonly mark: P | null
     }
   | {
       readonly kind: "clean"
-      /** The commit merged: accepted work's, or the WIP's copy. */
-      readonly from: CommitId
-      /** The lane's revision before the merge. */
-      readonly ours: CommitId
-      readonly merge: CommitId
+      /** The state merged: accepted work's, the WIP's copy, or the parent's. */
+      readonly from: P
+      /** The lane's state before the merge. */
+      readonly ours: P
+      readonly merge: P
       /** The files the merge changed under the lane. */
       readonly files: readonly string[]
       /** The titles of the commits that came in (`MergePlan.came`), without the accepted-offer commits joined. */
@@ -96,7 +117,7 @@ export type Merged =
     }
   | {
       readonly kind: "conflicted"
-      readonly from: CommitId
+      readonly from: P
       /** Each conflicted file, with jj's markers. */
       readonly contents: readonly {
         readonly path: string
@@ -109,6 +130,7 @@ export type Merged =
       readonly ours: readonly TouchedRevision[]
       readonly theirs: readonly TouchedRevision[]
     }
+export type Merged = MergedOf<PointId>
 
 /** What a change to the lane is recorded as: its title and its entry. */
 export interface Edits {
@@ -125,15 +147,15 @@ export interface Edits {
  */
 export type Follow = (() => void) | null
 
-/** A turn recorded: its revision, the bookmark before it, its paths and conflicts. */
+/** A turn recorded: its state, the lane's newest before it, its paths and conflicts. */
 export interface TurnMade {
-  /** The turn's revision; null when it has none. */
-  readonly committed: CommitId | null
-  /** The lane's newest revision before the turn. */
-  readonly newest: CommitId | null
-  /** The paths changed since `newest`; none without a revision. */
+  /** The turn's state; null when it has none. */
+  readonly committed: PointId | null
+  /** The lane's newest state before the turn. */
+  readonly newest: PointId | null
+  /** The paths changed since `newest`; none without a state of its own. */
   readonly paths: readonly string[]
-  /** The files conflicted in the turn's revision, else in `newest`. */
+  /** The files conflicted at the turn's state, else at `newest`. */
   readonly conflicts: readonly string[]
   readonly follow: Follow
 }

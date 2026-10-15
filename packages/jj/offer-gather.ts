@@ -6,8 +6,8 @@
 import type {
   BaseRecord,
   CatchUpRead,
+  CommitBase,
   CommitId,
-  LaneBase,
   OfferAcceptanceFacts,
   OfferGather,
   OfferInRepo,
@@ -73,7 +73,7 @@ export type RefreshGather =
 const baseRecord = (
   lane: ThreadId,
   input: {
-    readonly base: LaneBase
+    readonly base: CommitBase
     readonly state: BaseRecord["state"]
     readonly start: StartRead
     readonly catchUp: CatchUpRead | null
@@ -96,7 +96,7 @@ type Sited = Exclude<OfferPlace, { readonly kind: "gone" }>
 /** Where a place with a target sits, decided once. */
 const sited = (input: {
   readonly tip: CommitId
-  readonly base: LaneBase
+  readonly base: CommitBase
   readonly state: "ok" | "landed"
   readonly target: CommitId
   readonly start: StartRead
@@ -110,7 +110,7 @@ const sited = (input: {
 /** Where a place sits, from what was read: gone without a target. */
 const placeFrom = (input: {
   readonly tip: CommitId
-  readonly base: LaneBase
+  readonly base: CommitBase
   readonly state: BaseRecord["state"]
   readonly target: CommitId | null
   readonly start: StartRead

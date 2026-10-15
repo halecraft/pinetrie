@@ -7,6 +7,7 @@
 import type {
   CardId,
   EntryId,
+  ForeignLane,
   NoteColumnId,
   TaskId,
   TaskPinnedView,
@@ -21,10 +22,10 @@ import {
   type Column as ColumnSpec,
   type ColumnView,
   cardOfFace,
+  columnReadOnly,
   detailOf,
   dropProps,
   foldedView,
-  heldWords,
   type Intent,
   type NoteColumnView,
   newColumnButton,
@@ -75,6 +76,8 @@ interface Projected {
   readonly track: number
   /** Who holds the thread a branch not yet sent forks in, when someone else does. */
   readonly heldBy: WriterId | null
+  /** Why no run starts from it: its lane, or the one its first send clones, is of another kind. */
+  readonly foreign: ForeignLane | null
   /** Its matches while a search applies, else null. */
   readonly matches: ColumnMatches | null
 }
@@ -137,11 +140,12 @@ export function Strip(p: {
             ? -1
             : (positions.get(item.card) ?? -1)
         }
-        readOnly={
-          projected.heldBy === null
-            ? readOnly
-            : { label: heldWords(projected.heldBy, p.reader), action: null }
-        }
+        readOnly={columnReadOnly({
+          task: readOnly,
+          heldBy: projected.heldBy,
+          foreign: projected.foreign,
+          reader: p.reader,
+        })}
         task={task}
         track={projected.track}
         view={projected.view}

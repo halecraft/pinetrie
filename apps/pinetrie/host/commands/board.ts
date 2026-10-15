@@ -177,7 +177,7 @@ async function planCrossing(
     if (deps.work.destination !== null)
       for (const lane of threads) {
         const r = records.get(lane)
-        if (r?.root === root && r.ownCopy)
+        if (r?.root === root && r.history !== null)
           own.push({ lane, tip: readLaneTip(doc, lane), index })
       }
   }

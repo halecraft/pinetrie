@@ -833,7 +833,7 @@ export function Column(p: ColumnProps) {
   // What a lane this column's next send creates would start with.
   const above = nearestRevision(index, p.work.revisions, at)
   const forkConflicts =
-    above.commit === null ? [] : conflictsAt(p.work.revisions, above.commit)
+    above.point === null ? [] : conflictsAt(p.work.revisions, above.point)
 
   const place = composerPlace(p.column, at) ?? undefined
   // Where this composer creates your message, and the message there: what

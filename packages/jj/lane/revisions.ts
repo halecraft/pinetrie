@@ -20,7 +20,7 @@ import {
   lines,
   OLD_LANE_CONFIG_DIR,
   type Runner,
-  type TurnCommitted,
+  type TurnCommittedOf,
 } from "@pinetrie/lanes"
 import { bookmarkOf, setBookmark } from "./bookmarks.ts"
 import { type OldNamesOnDisk, planTurnCommit } from "./plan.ts"
@@ -95,7 +95,7 @@ export async function commitTurn(
     readonly lane: ThreadId
     readonly bookmark: CommitId | null
   },
-): Promise<TurnCommitted> {
+): Promise<TurnCommittedOf<CommitId>> {
   const snap = await jj(["util", "snapshot"])
   if (!snap.ok) throw new Error(describeFailure("jj util snapshot", snap))
   const at = await jj([
@@ -133,18 +133,18 @@ export async function commitTurn(
   const plan = planTurnCommit({ atEmpty, parents, bookmark, parentDescends })
   if (plan.kind === "none")
     return {
-      commit: null,
+      point: null,
       conflicted: bookmark !== null && parentFlags.get(bookmark) === true,
     }
   if (plan.kind === "adopt") {
     await setBookmark(jj, input.lane, plan.commit)
     return {
-      commit: plan.commit,
+      point: plan.commit,
       conflicted: parentFlags.get(plan.commit) === true,
     }
   }
   return {
-    commit: await commitToBookmark(jj, input.lane, revisionMessage(input)),
+    point: await commitToBookmark(jj, input.lane, revisionMessage(input)),
     conflicted: atConflict === "true",
   }
 }

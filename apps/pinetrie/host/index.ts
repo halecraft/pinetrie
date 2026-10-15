@@ -669,6 +669,7 @@ export async function startHost({
     agent,
     scribe,
     start: runs.start,
+    runnable: lane => work.runnable(lane),
     budgets,
     piSetup,
     drain: lane => queueDrain(lane),

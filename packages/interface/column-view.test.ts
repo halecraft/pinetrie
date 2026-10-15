@@ -12,6 +12,7 @@ import {
   type OfferRecord,
   type PinnedView,
   type ProjectRecord,
+  pointId,
   type RevisionRecord,
   type Sha256,
   type ThreadId,
@@ -92,7 +93,7 @@ const revisions = (
       {
         entry: entryId(id),
         lane,
-        commit: null,
+        point: null,
         snapshot: null,
         paths: [],
         conflicts: [],
@@ -173,7 +174,7 @@ describe("lanesAlong", () => {
   })
 })
 
-const PROJECT: ProjectRecord = { root: "/p", owner: null }
+const PROJECT: ProjectRecord = { root: "/p", kind: "jj", owner: null }
 const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   project: PROJECT,
   commands: [],
@@ -233,10 +234,10 @@ const laneView = (name: ThreadId, tip: string, running = false): LaneView => ({
   heldBy: null,
 })
 const onLane = (view: LaneView): ThreadLane => ({ kind: "lane", ...view })
-const record = (lane: ThreadId, ownCopy: boolean): LaneRecord => ({
+const record = (lane: ThreadId, own: boolean): LaneRecord => ({
   lane,
   root: TEST_ROOT,
-  ownCopy,
+  history: own ? "jj" : null,
   by: ADA,
   createdAt: 1,
 })
@@ -963,8 +964,8 @@ describe("offerWords", () => {
       kind: "parent",
       lane: B,
       name: "copper-owl" as ThreadName,
-      newest: commitId("p2"),
-      caughtUpWith: commitId("p1"),
+      newest: pointId("p2"),
+      caughtUpWith: pointId("p1"),
       conflicts: [],
     }
     const fromStart = {

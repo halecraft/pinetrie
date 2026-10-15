@@ -1,6 +1,6 @@
 // host/work/config — `pinetrie.json` as a fact of a state: accepted work's
 // copy, read at accepted work (`Destination.fileAt`) at startup and each time
-// accepted work moves; and each lane's own copy, read at its newest point in
+// accepted work moves; and each lane's own copy, read at its newest state in
 // the destination before its container starts, beside the copy it started
 // on. A lane runs with accepted work's grants, less what its own copy dropped
 // from that start (`effectiveLaneConfig`), so a lane can give up a grant at
@@ -28,7 +28,7 @@ import {
   effectiveLaneConfig,
   type LaneAuthority,
   normalShared,
-  type Point,
+  type ReadSite,
   type SharedDir,
 } from "@pinetrie/lanes"
 import {
@@ -84,7 +84,7 @@ export interface LaneConfigs {
   configNote(text: string | null): string | null
 }
 
-/** `pinetrie.json` at accepted work, as its point is named in a refusal. */
+/** `pinetrie.json` at accepted work, as its site is named in a refusal. */
 const ACCEPTED_FILE = `${PROJECT_CONFIG_FILE} at accepted work`
 
 export async function startLaneConfigs(input: {
@@ -97,15 +97,15 @@ export async function startLaneConfigs(input: {
   readonly log: (m: string) => void
 }): Promise<LaneConfigs> {
   const { root, project, start, working, log } = input
-  /** `pinetrie.json`'s text at `point`; null when the point is not there. */
+  /** `pinetrie.json`'s text at `site`; null when the site is not there. */
   const textAt = async (
-    point: Point,
+    site: ReadSite,
   ): Promise<{ readonly text: string | null } | null> => {
-    const read = await project.fileAt(point, PROJECT_CONFIG_FILE)
-    return read.kind === "no-point" ? null : { text: read.text }
+    const read = await project.fileAt(site, PROJECT_CONFIG_FILE)
+    return read.kind === "no-site" ? null : { text: read.text }
   }
-  const authorityAt = async (point: Point): Promise<LaneAuthority | null> => {
-    const read = await textAt(point)
+  const authorityAt = async (site: ReadSite): Promise<LaneAuthority | null> => {
+    const read = await textAt(site)
     return read === null
       ? null
       : decodeAuthority(root, PROJECT_CONFIG_FILE, read.text).authority
@@ -126,7 +126,7 @@ export async function startLaneConfigs(input: {
     settleHost(start, { working, accepted: copy, lane: laneCopy(authority) })
 
   async function readAccepted(): Promise<AcceptedLanes> {
-    // Accepted work is always a point: none there grants nothing.
+    // Accepted work is always a site: none there grants nothing.
     const read = await textAt({ kind: "accepted" })
     const text = read?.text ?? null
     const copy = decodeProject(

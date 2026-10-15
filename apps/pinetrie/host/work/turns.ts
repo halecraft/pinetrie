@@ -4,12 +4,12 @@
 // (`TurnMade.follow`).
 
 import {
-  type CommitId,
   type EntryId,
   firstLine,
   messageText,
   NO_SHARED,
   nearestRevision,
+  type PointId,
   promptOf,
   type RevisionRecord,
   type SnapshotId,
@@ -71,10 +71,10 @@ export interface Turns {
   writeRevision(record: RevisionRecord): Promise<void>
 }
 
-/** A lane's disk at a revision: its snapshot, and the commit with it. */
+/** A lane's disk at a revision: its snapshot, and the state with it. */
 interface Disk {
   readonly snapshot: SnapshotId
-  readonly commit: CommitId | null
+  readonly point: PointId | null
 }
 
 export function createTurns(deps: {
@@ -104,7 +104,7 @@ export function createTurns(deps: {
     })
     return above.snapshot === null
       ? null
-      : { snapshot: above.snapshot, commit: above.commit }
+      : { snapshot: above.snapshot, point: above.point }
   }
 
   /** A revision, in the root its lane works in. */
@@ -180,7 +180,7 @@ export function createTurns(deps: {
         if (planned.snapshot !== null)
           last.set(lane, {
             snapshot: planned.snapshot,
-            commit: planned.commit ?? newest,
+            point: planned.point ?? newest,
           })
         const shared = deps.setup.configs.laneShared(lane).map(d => d.path)
         // One queued step, so the next tool call waits for all of it and the

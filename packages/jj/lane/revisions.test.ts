@@ -107,7 +107,7 @@ test("copyFacts: on its bookmark, after a merge, on the agent's own commit, on a
         lane,
         bookmark: merge,
       }),
-    ).toEqual({ commit: null, conflicted: false })
+    ).toEqual({ point: null, conflicted: false })
     expect(await copyFacts(jj, lane)).toEqual({
       parents: [merge],
       bookmark: merge,

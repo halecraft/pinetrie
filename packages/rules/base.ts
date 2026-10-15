@@ -18,6 +18,8 @@ import {
   type LaneBase,
   nearestRevision,
   type ParentThread,
+  type PointId,
+  pointFromCommit,
   type RevisionRecord,
   type ThreadBase,
   type ThreadId,
@@ -209,10 +211,7 @@ export function planBegin(input: {
   const { base, facts } = input
   if (facts.acceptedCommit === null) return ERR.NOT_SET_UP
   if (base === null)
-    return {
-      kind: "accepted",
-      commit: facts.acceptedCommit,
-    }
+    return { kind: "accepted", point: pointFromCommit(facts.acceptedCommit) }
   if (!base.startsWith(input.wipPrefix) || facts.wip === null)
     return ERR.BAD_BASE
   return { kind: "wip", bookmark: base, ...facts.wip }
@@ -251,7 +250,8 @@ export function planUpdateFrom(input: {
   readonly state: BaseRecord["state"]
   /** "continue on accepted work": the thread moves to accepted work, whatever its base. */
   readonly toAccepted: boolean
-  readonly acceptedCommit: CommitId | null
+  /** Accepted work's state; null before it is set up. */
+  readonly acceptedPoint: PointId | null
   /** For a WIP base: its commit now and accepted commit under it (`beginFacts`). */
   readonly wipNow: {
     readonly commit: CommitId
@@ -259,7 +259,7 @@ export function planUpdateFrom(input: {
   } | null
 }): UpdateFrom | UpdateRefusal {
   const { base, state, wipNow } = input
-  if (input.acceptedCommit === null) return ERR.NOT_SET_UP
+  if (input.acceptedPoint === null) return ERR.NOT_SET_UP
   if (!input.toAccepted && state === "gone") return ERR.BASE_GONE
   const followed: ThreadBase = input.toAccepted
     ? { kind: "accepted" }
@@ -267,33 +267,35 @@ export function planUpdateFrom(input: {
   if (followed.kind === "accepted")
     return {
       kind: "accepted",
-      commit: input.acceptedCommit,
+      point: input.acceptedPoint,
       mark: input.toAccepted && base?.base.kind === "wip",
     }
   if (base === null || wipNow === null) return ERR.BASE_GONE
-  return wipNow.commit === base.source
+  // The WIP's commit is jj's alone; the lane's source is a state of the
+  // shared history, so the commit crosses as the point it is.
+  return pointFromCommit(wipNow.commit) === base.source
     ? { kind: "nothing" }
     : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.start }
 }
 
 /** The thread a lane branched from, as the document says it now (`parentNow`). */
 export interface ParentNow extends ParentThread {
-  /** Its newest commit: the nearest above its thread's end. */
-  readonly newest: CommitId
-  /** The newest of its commits this lane holds: its fork commit, or what a catch-up merged. */
-  readonly caughtUpWith: CommitId
+  /** Its newest state: the nearest above its thread's end. */
+  readonly newest: PointId
+  /** The newest of its states this lane holds: its fork state, or what a catch-up merged. */
+  readonly caughtUpWith: PointId
   /** The files conflicted in `newest` (`conflictsAt`). */
   readonly conflicts: readonly string[]
 }
 
 /**
  * The thread `lane` branched from (`forkParent`) and where both stand, read
- * from the document alone: a lane's commits only move forward along its
- * bookmark, so the parent is ahead exactly when its newest commit is not the
- * one this lane last caught up with. That is the fork commit, or the newest
- * commit of the parent's that an update or a resolution below the lane's
+ * from the document alone: a lane's states only move forward along its
+ * line, so the parent is ahead exactly when its newest state is not the
+ * one this lane last caught up with. That is the fork state, or the newest
+ * state of the parent's that an update or a resolution below the lane's
  * first prompt merged. Null for a lane that began at its base, or a parent
- * with no name or no commit yet.
+ * with no name or no state yet.
  */
 export function parentNow(input: {
   readonly index: TreeIndex
@@ -314,15 +316,15 @@ export function parentNow(input: {
     parentTip === null
       ? null
       : nearestRevision(index, revisions, { kind: "entry", id: parentTip })
-          .commit
+          .point
   if (name === undefined || newest === null) return null
   const parents = new Set(
     [...revisions.values()].flatMap(r =>
-      r.lane === fork.lane && r.commit !== null ? [r.commit] : [],
+      r.lane === fork.lane && r.point !== null ? [r.point] : [],
     ),
   )
   const first = firstPromptOf(index, revisions, input.lane, tip)
-  let caughtUpWith = fork.commit
+  let caughtUpWith = fork.point
   for (const id of ancestry(index, tip).path) {
     // An update, a resolution or a `catch_up` result says what it merged.
     const merged = index.entries[id]?.message?.merged?.find(c => parents.has(c))
@@ -343,7 +345,7 @@ export function parentNow(input: {
 }
 
 /**
- * What catching up with the parent merges: its newest commit;
+ * What catching up with the parent merges: its newest state;
  * nothing when the lane holds it; refused with no parent, or while the
  * parent's agent runs, since its copy moves with every turn.
  */
@@ -362,11 +364,11 @@ export function planParentUpdate(
     kind: "parent",
     lane: parent.lane,
     name: parent.name,
-    commit: parent.newest,
+    point: parent.newest,
     caughtUpWith: parent.caughtUpWith,
   }
 }
 
-/** The parent's newest commit is not the one the lane last caught up with (`ParentNow`). */
+/** The parent's newest state is not the one the lane last caught up with (`ParentNow`). */
 export const parentAhead = (parent: ParentNow): boolean =>
   parent.newest !== parent.caughtUpWith

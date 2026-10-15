@@ -54,14 +54,14 @@ describe("planFetch: what a move fetches into your repo", () => {
     expect(
       planFetch({
         kind: "turn",
-        made: { commit: MERGE, conflicted: false },
+        made: { point: MERGE, conflicted: false },
         before: OURS,
       }),
     ).toEqual([OURS])
     expect(
       planFetch({
         kind: "turn",
-        made: { commit: null, conflicted: false },
+        made: { point: null, conflicted: false },
         before: OURS,
       }),
     ).toBeNull()

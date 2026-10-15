@@ -9,8 +9,8 @@
 import {
   ASK_TOOL,
   CATCH_UP_TOOL,
-  type CommitId,
   LEAVE_TOOL,
+  type PointId,
   SPLIT_TOOL,
   type ThreadId,
 } from "@pinetrie/core"
@@ -32,7 +32,7 @@ const resultOf = (answer: ToolAnswer) => ({
     answer.details === null
       ? undefined
       : ({ merged: [...answer.details.merged] } as {
-          merged: CommitId[]
+          merged: PointId[]
         }),
 })
 

@@ -3,6 +3,7 @@ import {
   ERR,
   entryId,
   NOBODY,
+  pointId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -26,6 +27,7 @@ import {
   methods,
   record,
   row,
+  runnableFor,
   TASK_ID,
 } from "./fakes.ts"
 import {
@@ -125,10 +127,21 @@ function setUp(
   return { b, lane, runs, pending, ended: ended.promise }
 }
 
+test("a run starts only on a lane proven runnable", () => {
+  const { runs } = setUp()
+  // @ts-expect-error: a bare lane is no proof that a run may start there
+  const start = () => runs.start(LANE, { kind: "resume" })
+  expect(start).toBeTypeOf("function")
+})
+
 describe("a run's end", () => {
   test("when ended is called, the lane has no active run and no open stream, and it has stopped", async () => {
     const { b, lane, runs, ended } = setUp()
-    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: chat,
+      pinnedSeen: [],
+    })
     streamInto(b)({ kind: "text", lane: LANE, delta: "hello" })
     expect(readStreams(b.live).filter(s => s.lane === LANE)).toHaveLength(1)
     lane.finish({ kind: "ok" })
@@ -142,7 +155,11 @@ describe("a run's end", () => {
 
   test("its verdict is made pending while the run is still active, for the prompt it answered", async () => {
     const { b, lane, runs, pending, ended } = setUp()
-    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: chat,
+      pinnedSeen: [],
+    })
     writeEntry(
       b.root,
       row(entryId("p-1"), null, { role: "chat", content: "hi" }),
@@ -155,7 +172,11 @@ describe("a run's end", () => {
 
   test("ended is given the prompt the run answered", async () => {
     const { b, lane, runs, ended } = setUp()
-    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: chat,
+      pinnedSeen: [],
+    })
     writeEntry(
       b.root,
       row(entryId("p-1"), null, { role: "chat", content: "hi" }),
@@ -173,7 +194,11 @@ describe("a run's end", () => {
     const { b, lane, runs, ended } = setUp(fakeLane(LANE), async () => {
       throw new Error("pi is gone")
     })
-    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: chat,
+      pinnedSeen: [],
+    })
     writeEntry(
       b.root,
       row(entryId("p-1"), null, { role: "stack", content: "stack" }),
@@ -189,7 +214,11 @@ describe("a run's end", () => {
       append: async () => ({ kind: "appended", id: entryId("e-1") }),
     })
     const { runs, ended } = setUp(lane)
-    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: chat,
+      pinnedSeen: [],
+    })
     lane.finish({ kind: "refused", code: ERR.REFUSED })
     await ended
     expect(
@@ -232,7 +261,11 @@ describe("a run's pinned cards", () => {
       },
     )
     const seen = [{ id: cardIdFor("c1"), seen: "v-1" }]
-    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: seen })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: chat,
+      pinnedSeen: seen,
+    })
     lane.finish({ kind: "ok" })
     await ended
     expect(asked).toEqual([[LANE, seen]])
@@ -245,7 +278,7 @@ describe("a run's pinned cards", () => {
     const behind = encodeBehind(
       {
         from: { kind: "accepted" },
-        to: commitId("l2"),
+        to: pointId("l2"),
         files: ["a.ts"],
         overlap: [],
         conflicts: [],
@@ -267,7 +300,11 @@ describe("a run's pinned cards", () => {
       },
       async () => [canvas],
     )
-    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: chat,
+      pinnedSeen: [],
+    })
     lane.finish({ kind: "ok" })
     await ended
     expect(asked).toEqual([LANE])
@@ -298,7 +335,11 @@ describe("a run's pinned cards", () => {
       },
       timestamp: 1,
     })
-    runs.start(LANE, { kind: "prompt", message: stack, pinnedSeen: [] })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: stack,
+      pinnedSeen: [],
+    })
     lane.finish({ kind: "ok" })
     await ended
     expect(asked).toEqual([])
@@ -310,7 +351,7 @@ describe("a run's pinned cards", () => {
       read += 1
       return pinned
     })
-    runs.start(LANE, { kind: "resume" })
+    runs.start(runnableFor(LANE), { kind: "resume" })
     lane.finish({ kind: "ok" })
     await ended
     expect(read).toBe(0)
@@ -328,7 +369,11 @@ describe("a run's pinned cards", () => {
           signal.addEventListener("abort", () => resolve(pinned)),
         ),
     )
-    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: chat,
+      pinnedSeen: [],
+    })
     expect(runs.cancel(LANE)).toBe(true)
     expect((await ended).running).toBe(false)
     expect(methods(lane.calls)).toEqual(["append"])
@@ -349,7 +394,11 @@ describe("a run's pinned cards", () => {
       timestamp: 1,
     })
     const { lane, runs, ended } = setUp()
-    runs.start(LANE, { kind: "prompt", message: stack, pinnedSeen: [] })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: stack,
+      pinnedSeen: [],
+    })
     expect(runs.cancel(LANE)).toBe(false)
     lane.finish({ kind: "ok" })
     await ended
@@ -358,7 +407,11 @@ describe("a run's pinned cards", () => {
 
   test("once a chat's run has reached pi, cancel returns false, so pi's abort is used", async () => {
     const { lane, runs, ended } = setUp()
-    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: chat,
+      pinnedSeen: [],
+    })
     await untilRun(lane)
     expect(runs.cancel(LANE)).toBe(false)
     lane.finish({ kind: "ok" })
@@ -390,7 +443,11 @@ test("a run's end forgets the lane's base news as the lane stops, before ended",
     order.push(`ended ${l}`)
     ended.resolve()
   })
-  runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+  runs.start(runnableFor(LANE), {
+    kind: "prompt",
+    message: chat,
+    pinnedSeen: [],
+  })
   lane.finish({ kind: "ok" })
   await ended.promise
   expect(order).toEqual([`work ${LANE}`, `news ${LANE}`, `ended ${LANE}`])

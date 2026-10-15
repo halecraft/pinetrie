@@ -1,5 +1,5 @@
 import type { Sha256 } from "@pinetrie/core"
-import { commitId } from "@pinetrie/core"
+import { commitId, pointFromCommit, pointId } from "@pinetrie/core"
 import { diffUrl, reviewUrl } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { KEY_COOKIE, type RequestFacts } from "./admission.ts"
@@ -22,7 +22,11 @@ test("a blob's GET, with its hash or null; the upload's POST; else the page", ()
 test("an offer's read is a GET the wire accepts; anything else under /offer/ is bad", () => {
   const c = commitId("0123abcd")
   const revision = { kind: "revision", commit: c } as const
-  const range = { kind: "range", from: c, to: commitId("4567ef") } as const
+  const range = {
+    kind: "range",
+    from: pointFromCommit(c),
+    to: pointId("4567ef"),
+  } as const
   expect(at("GET", reviewUrl(revision))).toEqual({
     kind: "offer",
     ask: { kind: "review", span: revision },

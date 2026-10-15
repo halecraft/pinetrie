@@ -3,6 +3,7 @@ import {
   type CardCommand,
   commitId,
   type OfferRecord,
+  pointFromCommit,
   type ThreadName,
   threadIdFor,
 } from "@pinetrie/core"
@@ -365,8 +366,8 @@ describe("a conflict that came with the copy, and the thread it branched from", 
     kind: "parent",
     lane: P,
     name: "amber-fox" as ThreadName,
-    newest: T2,
-    caughtUpWith: TIP,
+    newest: pointFromCommit(T2),
+    caughtUpWith: pointFromCommit(TIP),
     conflicts: [],
     ...over,
   })
@@ -420,7 +421,9 @@ describe("a conflict that came with the copy, and the thread it branched from", 
     expect(view(fromStart, parent({ conflicts: ["a.txt"] })).buttons).toEqual([
       "update",
     ])
-    expect(view(fromStart, parent({ newest: TIP })).buttons).toEqual(["update"])
+    expect(
+      view(fromStart, parent({ newest: pointFromCommit(TIP) })).buttons,
+    ).toEqual(["update"])
     expect(view(fromStart, null).buttons).toEqual(["update"])
     expect(view({ ...offer, conflicts: ["a.txt"] }, parent()).buttons).toEqual([
       "update",
@@ -432,7 +435,7 @@ describe("a conflict that came with the copy, and the thread it branched from", 
       "update",
       "catch-up-parent",
     ])
-    expect(view(offer, parent({ newest: TIP })).menu).toEqual([
+    expect(view(offer, parent({ newest: pointFromCommit(TIP) })).menu).toEqual([
       "describe",
       "update",
     ])

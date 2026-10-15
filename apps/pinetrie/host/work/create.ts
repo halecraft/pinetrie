@@ -7,19 +7,27 @@ import {
   type ErrCode,
   nearestRevision,
   type Position,
+  type ProjectKind,
   type SnapshotId,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import { executeOrThrow, planFork, removeLane } from "@pinetrie/lanes"
-import { type RootView, readRevisions, readTreeIndex } from "@pinetrie/reads"
+import {
+  type RootView,
+  readLaneRecords,
+  readRevisions,
+  readTreeIndex,
+} from "@pinetrie/reads"
 import {
   FILES_LOST,
   type ForkBegin,
-  forkPoint,
+  foreignLaneWords,
+  forkSource,
   LANE,
   setRecord,
+  sourceHistory,
 } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
@@ -40,7 +48,9 @@ export async function forkFacts(ports: {
   readonly begin: () => Promise<ForkBegin | ErrCode>
   /** Whether a snapshot is still there: archiving deletes some. */
   readonly exists: (snapshot: SnapshotId) => Promise<boolean>
-}): Promise<Parameters<typeof forkPoint>[0] | ErrCode> {
+}): Promise<
+  Pick<Parameters<typeof forkSource>[0], "above" | "begin" | "kept"> | ErrCode
+> {
   await ports.pendingRecords()
   const above = ports.nearest()
   const begin = await ports.begin()
@@ -85,14 +95,15 @@ export async function recordLane(
   },
   view: Pick<RootView, "root">,
   lane: ThreadId,
-  ownCopy: boolean,
+  /** Its own copy's kind of history; null for a host without tools. */
+  history: ProjectKind | null,
   by: WriterId,
 ): Promise<void> {
   await deps.records.writeValues([
     setRecord(LANE, {
       lane,
       root: view.root,
-      ownCopy,
+      history,
       by,
       createdAt: deps.basics.now(),
     }),
@@ -117,20 +128,30 @@ export function createNewLanes(deps: {
     async checkBegin(view, at, base) {
       const { doc } = view
       const above = nearestRevision(readTreeIndex(doc), readRevisions(doc), at)
-      if (above.commit !== null) return null
+      if (above.point !== null) return null
       const begin = await destination.begin(base)
       return typeof begin === "string" ? begin : null
     },
 
     async prepareLane(view, lane, at, by, base) {
       const { doc } = view
-      await recordLane(deps, view, lane, true, by)
+      const { kind } = setup.opened
+      // The kind of the disk it will clone, read as if its snapshot is
+      // kept: a lost one falls back to the base, the project's kind, which
+      // differs only for a source of another kind, refused before a send.
+      const history = sourceHistory({
+        above: nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
+        kept: true,
+        lanes: readLaneRecords(basics.session),
+        kind,
+      })
+      await recordLane(deps, view, lane, history, by)
       const { runtime, ready } = setup
       void keeper.track(
         registry
           .withHistory(
             lane,
-            async (h, handle) => {
+            async (h, handle, record) => {
               const r = await ready
               const facts = await forkFacts({
                 pendingRecords: deps.pendingRecords,
@@ -141,20 +162,27 @@ export function createNewLanes(deps: {
               })
               if (typeof facts === "string")
                 throw new Error(`the lane cannot begin: ${facts}`)
-              const point = forkPoint(facts)
+              const source = forkSource({
+                ...facts,
+                lane: record,
+                lanes: readLaneRecords(basics.session),
+                kind,
+              })
+              if ("kind" in source) throw new Error(foreignLaneWords(source))
               // Its fork row says it began from its base.
-              if (point.lost !== null)
+              if (source.lost !== null)
                 await deps.records.writeValues([
-                  setRecord(FILES_LOST, { lane, snapshot: point.lost }),
+                  setRecord(FILES_LOST, { lane, snapshot: source.lost }),
                 ])
-              if (point.snapshot === BASE_SNAPSHOT) await setup.baseAtAccepted()
+              if (source.snapshot === BASE_SNAPSHOT)
+                await setup.baseAtAccepted()
               await removeLane(runtime, lane)
               await executeOrThrow(
                 planFork({
-                  point,
+                  source,
                   spec: setup.specOf(lane, r),
                   env: process.env,
-                  setup: h.forkSteps(point.start),
+                  setup: h.forkSteps(source.start),
                 }),
                 handle.runners,
               )

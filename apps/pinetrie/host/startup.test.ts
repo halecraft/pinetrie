@@ -27,7 +27,14 @@ import {
 import { newPlacesDoc } from "@pinetrie/schema"
 import { writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
-import { basics, putValue, ROOT_ID, record, writesOf } from "./fakes.ts"
+import {
+  basics,
+  putValue,
+  ROOT_ID,
+  RUNS_ANY,
+  record,
+  writesOf,
+} from "./fakes.ts"
 import { recover, type StartupDeps } from "./startup.ts"
 
 const TEST_THREAD = threadIdFor("e")
@@ -60,7 +67,10 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
   basics: basics(),
   roots: [ROOT_ID],
   ...ports(fakePi()),
-  work: record<StartupDeps["work"]>({ project: null }).port,
+  work: record<StartupDeps["work"]>({
+    ...RUNS_ANY,
+    project: null,
+  }).port,
   icons: { source: "built-in" },
   setup: {
     files: [],
@@ -192,14 +202,17 @@ test("recover deletes the records of a type no spec declares, in the session and
 })
 
 test("recover writes the project, icon and setup records only when they changed, in one write", async () => {
-  const project: ProjectRecord = { root: "/repo", owner: null }
+  const project: ProjectRecord = { root: "/repo", kind: "jj", owner: null }
   const run = async (b: ReturnType<typeof basics>) => {
     const agent = fakePi()
     await recover(
       deps({
         basics: b,
         ...ports(agent),
-        work: record<StartupDeps["work"]>({ project }).port,
+        work: record<StartupDeps["work"]>({
+          ...RUNS_ANY,
+          project,
+        }).port,
       }),
     )
     await new Promise(r => setTimeout(r, 0))

@@ -1,4 +1,4 @@
-// lanes/base — the base snapshot: accepted work's commits, checked out on
+// lanes/base — the base snapshot: accepted work's states, checked out on
 // the base before it.
 //
 // Root lanes fork from it as other lanes fork from a turn's snapshot. A
@@ -9,9 +9,9 @@
 // turn is, so a fork never reads one half-written. The base says what it
 // holds inside itself (`.pinetrie-lane/base.json`).
 
-import { BASE_SNAPSHOT, type CommitId, type SnapshotId } from "@pinetrie/core"
+import { BASE_SNAPSHOT, type SnapshotId } from "@pinetrie/core"
 import { executeOrThrow, type Runners } from "./execute.ts"
-import type { BaseCheckout } from "./history-port.ts"
+import type { AcceptedNow } from "./history-port.ts"
 import { laneHandle, type OpenLink, removeLane } from "./lane.ts"
 import {
   BASE_FILE,
@@ -63,29 +63,28 @@ async function inScratch<C, T>(
 }
 
 /**
- * Make the base snapshot at `yours`: the base before it restored (none, or
- * one made another way, gives an empty disk), `yours` checked out on it, its
- * facts written, then snapshotted. Does nothing when the base already holds
- * them.
+ * Make the base snapshot at `accepted`: the base before it restored (none,
+ * or one made another way, gives an empty disk), accepted work checked out
+ * on it, its facts written, then snapshotted. Does nothing when the base
+ * already holds them.
  */
 export async function refreshBase<C>(
   input: Scratch<C> & {
-    readonly yours: readonly CommitId[]
-    /** The adapter's checkout of `yours`, on a fresh disk or on the base before. */
-    readonly checkout: (fresh: boolean) => BaseCheckout
+    /** Accepted work as the adapter just read it, with its checkout. */
+    readonly accepted: AcceptedNow
   },
 ): Promise<boolean> {
-  const { runtime, yours } = input
+  const { runtime, accepted } = input
   const base = parseBaseFacts(
     await runtime.readLaneFile(BASE_SNAPSHOT, BASE_FILE),
   )
-  if (isBaseCurrent(base, yours)) return false
+  if (isBaseCurrent(base, accepted.points)) return false
   const from = isCopyableBase(base) ? BASE_SNAPSHOT : null
   await inScratch(input, from, async runners => {
     await executeOrThrow(
       [
-        ...input.checkout(from === null).steps,
-        planBaseFacts(yours),
+        ...accepted.checkout(from === null).steps,
+        planBaseFacts(accepted.points),
         ...planSnapshot({ lane: BASE_LANE, snapshot: BASE_SNAPSHOT }),
       ],
       runners,

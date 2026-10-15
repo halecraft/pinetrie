@@ -1,4 +1,4 @@
-import { commitId, threadIdFor } from "@pinetrie/core"
+import { commitId, rootIdFor, threadIdFor, writerId } from "@pinetrie/core"
 import type { RepoOwner } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
 import { createQueue, type LaneHistory, type Ran } from "@pinetrie/lanes"
@@ -37,8 +37,16 @@ function setUp(tips: readonly string[]) {
     stop: async () => {},
   } as unknown as ReturnType<LaneRegistry["handleOf"]>
   const registry = record<LaneRegistry>({
-    withHistory: (_lane, f) =>
-      handle.queue.enqueue(() => f(record<LaneHistory>().port, handle)),
+    withHistory: (lane, f) =>
+      handle.queue.enqueue(() =>
+        f(record<LaneHistory>().port, handle, {
+          lane,
+          root: rootIdFor("r"),
+          history: "jj",
+          by: writerId("ada@x.io"),
+          createdAt: 0,
+        }),
+      ),
   }).port
   const imported: string[] = []
   const owner = record<RepoOwner>({

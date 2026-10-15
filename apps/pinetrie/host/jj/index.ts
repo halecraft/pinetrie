@@ -10,9 +10,16 @@
 // Your repo has one writer, its owner: every read here is pinned to the head
 // it last observed, and waits on no write.
 
-import { PRODUCT_NAME } from "@pinetrie/core"
 import {
+  type CommitId,
+  PRODUCT_NAME,
+  pointFromCommit,
+  type ThreadId,
+} from "@pinetrie/core"
+import {
+  baseInCommits,
   beginFacts,
+  commitFromPoint,
   commitsOf,
   fileAt,
   historyOf,
@@ -20,13 +27,14 @@ import {
   jjIn,
   planBaseCheckout,
   prepareShared,
+  proveJjLane,
   readWipState,
   renameAccepted,
   revsetName,
   startRepoOwner,
 } from "@pinetrie/jj"
 import { baseCheckout } from "@pinetrie/lanes"
-import { readRunning } from "@pinetrie/reads"
+import { readLaneRecords, readRunning } from "@pinetrie/reads"
 import { planBegin } from "@pinetrie/rules"
 import { failed, slow } from "../basics.ts"
 import type { ProjectAdapter } from "../work/adapter.ts"
@@ -34,11 +42,13 @@ import type { Destination } from "../work/destination.ts"
 import { createAcceptedWork } from "./accepted.ts"
 import { createFetches } from "./fetch.ts"
 import { startOffers } from "./offers/index.ts"
+import { recordedJjLane, requireJjLane } from "./proven.ts"
 import { createSplits } from "./split.ts"
 
 export function startJjProject(dir: JjProjectDir): ProjectAdapter {
   const { root } = dir
   return {
+    kind: "jj",
     async open({ names, basics }) {
       const { log } = basics
       // Made here, from the project root and accepted work's names, before
@@ -62,10 +72,11 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
         )
       const acceptedRev = `present(${revsetName(names.acceptedBookmark)})`
 
-      const fileAtNow: Destination["fileAt"] = (point, path) =>
-        owner.read(({ jj }) => fileAt(jj, names, point, path))
+      const fileAtNow: Destination["fileAt"] = (site, path) =>
+        owner.read(({ jj }) => fileAt(jj, names, site, path))
 
       return {
+        kind: "jj",
         fileAt: fileAtNow,
         prepareShared: entries => prepareShared(root, entries),
         async identity() {
@@ -81,8 +92,14 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
             email: await config("user.email", "agent@pinetrie.invalid"),
           }
         },
-        acceptedNow: () => owner.read(({ jj }) => commitsOf(jj, acceptedRev)),
-        baseSteps: input => baseCheckout(planBaseCheckout(input)),
+        async acceptedNow() {
+          const yours = await owner.read(({ jj }) => commitsOf(jj, acceptedRev))
+          return {
+            points: yours.map(pointFromCommit),
+            checkout: (fresh: boolean) =>
+              baseCheckout(planBaseCheckout({ yours, fresh })),
+          }
+        },
 
         start(parts) {
           const { registry, keeper, piSetup } = parts
@@ -136,9 +153,11 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
                 ),
               })
             },
-            async baseNow(base) {
+            async baseNow(record, base) {
+              const lane = requireJjLane(record)
+              const commits = base === null ? null : baseInCommits(lane, base)
               const { state, begin } = await owner.read(async ({ jj }) => ({
-                state: await readWipState(jj, names, base),
+                state: await readWipState(jj, names, commits),
                 begin: await beginFacts(
                   jj,
                   names,
@@ -147,11 +166,29 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
               }))
               return {
                 state,
-                acceptedCommit: begin.acceptedCommit,
+                acceptedPoint:
+                  begin.acceptedCommit === null
+                    ? null
+                    : pointFromCommit(begin.acceptedCommit),
                 wipNow: begin.wip,
               }
             },
-            lanesMoved: refs => offers.moveLanes(refs),
+            // A lane jj cannot read has no ref in your repo to move: left.
+            lanesMoved(refs) {
+              const records = readLaneRecords(basics.session)
+              return offers.moveLanes(
+                refs.flatMap<{
+                  readonly lane: ThreadId
+                  readonly commit: CommitId | null
+                }>(({ lane, point }) => {
+                  if (point === null) return [{ lane, commit: null }]
+                  const proved = recordedJjLane(records, lane)
+                  return proved === null
+                    ? []
+                    : [{ lane, commit: commitFromPoint(proved, point) }]
+                }),
+              )
+            },
             offers,
             accepted,
             quiet: () => owner.idle(),
@@ -159,13 +196,17 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
           }
           return {
             destination,
-            history: (lane, runners) =>
-              historyOf({
-                lane,
-                runners,
-                repoConfig: names,
-                fetch: have => void fetches.fetchLane(lane, have),
-              }),
+            history(record, runners) {
+              const lane = proveJjLane(record)
+              return "kind" in lane
+                ? lane
+                : historyOf({
+                    lane,
+                    runners,
+                    repoConfig: names,
+                    fetch: have => void fetches.fetchLane(lane.lane, have),
+                  })
+            },
             splits,
           }
         },

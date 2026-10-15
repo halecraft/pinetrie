@@ -3,7 +3,6 @@ import { entriesOf, entry } from "./fixtures.ts"
 import {
   askOutcome,
   askSpan,
-  commitId,
   type EntryId,
   type EntryLike,
   entryId,
@@ -12,6 +11,7 @@ import {
   isLongAsk,
   LONG_ASK,
   lastWord,
+  pointId,
   type RevisionRecord,
   runOf,
   startsRun,
@@ -242,7 +242,7 @@ describe("askSpan", () => {
     {
       entry: entryId(entry),
       lane: threadIdFor("x"),
-      commit: commit === null ? null : commitId(commit),
+      point: commit === null ? null : pointId(commit),
       snapshot: null,
       paths: [],
       conflicts: [],

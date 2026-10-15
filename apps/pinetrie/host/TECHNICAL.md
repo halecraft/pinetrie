@@ -10,7 +10,7 @@ wires them.
 
 | module | owns |
 |---|---|
-| `dev.ts`, `serve.ts`, `server.ts`, `invocation.ts` | `pnpm dev [folder]` and `pnpm serve [folder]` (ADR-0086, ADR-0148), each a few lines over `runHost` (`server.ts`): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it; in the project's `.pinetrie/` for a jj project until ADR-0150, accepted and not yet built, moves every store to its session's directory), `refusalText` (a refusal's words, with its command's usage). A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm dev:react` serves React's development build, for its warnings and render timeline (S59) |
+| `dev.ts`, `serve.ts`, `server.ts`, `invocation.ts` | `pnpm dev [folder]` and `pnpm serve [folder]` (ADR-0086, ADR-0148), each a few lines over `runHost` (`server.ts`): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it; in the project's `.pinetrie/` for a jj project until ADR-0150's move of every store to its session's directory, not yet built), `refusalText` (a refusal's words, with its command's usage). A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm dev:react` serves React's development build, for its warnings and render timeline (S59) |
 | `page.ts` | the page a host serves (ADR-0148): Vite under `pnpm dev`, else the built page in the page's `dist/`, which `pnpm serve` rebuilds first when its stamp no longer matches its inputs (`ensurePage`), and whose files it reads once at start (`readBuiltPage`); where the page's package is (`pageDir`) |
 | `sessions.ts` | the session a host serves (`openSession`, ADR-0149): the folder's real path looked up in the registry under its lock, the registry written, the session's data directory made and its `host.pid` taken; and `renameSession`, for `pnpm session rename` (`apps/pinetrie/scripts/session.ts`) |
 | `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the session (`sessionLines`), the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model |
@@ -265,7 +265,16 @@ until the next compaction (S120), and the host compacts at startup. So
   with its history; and `0014-trash-left` (ADR-0134): each place row of the
   old trash shape (`discarded`, with `holder` and `task`) is deleted, since
   it says too little to rebuild where the card was, and is at most a week
-  old. `0003-workflow-archive` (the
+  old; and `0015-lane-history` (ADR-0150): each lane record's `work` (`{
+  kind: "own" }` or null) becomes `history` (`"jj"` or null), since every
+  project served before folder projects was jj; and `0016-revision-point`
+  (ADR-0150): each turn record's `commit` becomes `point`, the same string,
+  and the record is written whole (`snapshot`, `paths`, `conflicts`,
+  `disk` and a disk's `shared`, absent in records written before each
+  existed, become none), so `REVISION` decodes one shape. A migration that only
+  reshapes one namespace's records, record by record, is a pure rewrite
+  over `rewriteRecords` (`migrations/rewrite.ts`), which reads every
+  document the namespace lives in before it writes any. `0003-workflow-archive` (the
   workflow's `closed` state renamed `archive`), `0004-threads` (each thread
   named in its first message, ADR-0117), `0005-tasks`' records (a task per
   root, ADR-0116), `0006-note-columns` (each thread's notes moved from
@@ -501,13 +510,25 @@ rejects `shutdown()`.
   over `readArchived` and `writesIn`: a task in the archive. Only the `chat`
   command and `sendPoppedQueuedCard` call `sendChat`, both behind the
   gate, so `sendChat` has no gate of its own.
-- **So is the held gate** (`refuseHeld`, ADR-0124): `runsIn` says where
-  each command, or a popped card, runs or writes a message; a branch's fork
-  is read from its root's tree; `heldIn` finds one in someone's inventory,
-  and the command is refused "put it on a canvas first". The drain asks the
-  same before it pops (`away`), so a held thread's messages wait; a fact
-  on top is popped all the same (it starts no run), so a take's stop is in
-  the thread, and its face says it was stopped.
+- **So is the gate where a command runs** (`refuseWhereRuns`, ADR-0124,
+  ADR-0150): `runsIn` says where each command, or a popped card, runs or
+  writes a message; a branch's fork and the records above it are read from
+  its root. `heldIn` finds a thread in someone's inventory, refused "put it
+  on a canvas first"; then `foreignIn` finds a run that would start on a
+  lane of another kind than the project's (`ERR.FOREIGN_LANE`,
+  `foreignLaneWords`). The drain asks both before it pops (`away`: held,
+  or `LaneWork.runnable` refusing), so their messages wait; a fact on top
+  is popped all the same (it starts no run), so a take's stop is in the
+  thread, and its face says it was stopped.
+- **No run starts on a lane of another kind, whatever path asks**:
+  `Runs.start` takes a `RunnableLane`, which only `proveRunnable` makes,
+  through `LaneWork.runnable` (the lane's record and the adapter's kind).
+  The gates word the refusal first; every path past them must prove its
+  lane too: a chat and a carry-on (`startRun`, `runs.ts`), the drain's
+  catch-up conflict and split, a relay's delivery (`planRelay` refuses an
+  asked thread of another kind, `RelayRefusal`'s `foreign`) and its answer
+  (appended, not run, to an asker of another kind), and a crash's resume
+  (`planStartup` leaves it interrupted, logged).
 - **A take stops the run in the step that made it**: `provenance.after`,
   which every person's change to the places goes through, finds the threads
   it took into an inventory (`takenIn`) and calls the dispatcher's
@@ -1008,16 +1029,16 @@ adapter's.
 
 | module | owns |
 |---|---|
-| `adapter.ts` | `ProjectAdapter`: opened by setup where it reads your repo's names, before anything else reads the project (`OpenProject`: `fileAt`, `prepareShared`, `identity`, `acceptedNow`, `baseSteps`), then started once lane work has its registry (`StartedProject`: the `Destination`, each lane's `history`, and `Splits`). The registry and the containers it is started with are bound late: neither is asked for before startup ends |
+| `adapter.ts` | `ProjectAdapter`, which carries its `kind`: opened by setup where it reads your repo's names, before anything else reads the project (`OpenProject`: `kind`, `fileAt`, `prepareShared`, `identity`, `acceptedNow`, whose checkout is bound to its read), then started once lane work has its registry (`StartedProject`: the `Destination`, each lane's `history` from its record, refused for a lane of another kind, and `Splits`). The registry and the containers it is started with are bound late: neither is asked for before startup ends |
 | `destination.ts` | `Destination`: accepted work and offers as any kind has them: a file at a point (`fileAt`), where a new lane begins (`begin`), what a catch-up's base is now (`baseNow`), an archive's lanes moved (`lanesMoved`), the offers' acts (`OfferActs`), setup and publish (`AcceptedActs`), `quiet` and `close` |
 | `setup.ts` | `openProject`: the project opened through its adapter, with your repo's names settled from your files and the working copy's `pinetrie.json`, before anything else reads it, and its lane configs, before pi's setup. `Setup`, all of it or none: the opened project, the lanes' ssh, the shared directories, the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, none inside the project and none holding pine·trie's own directories, ADR-0036), and the base snapshot's refreshes |
 | `config.ts` | `pinetrie.json` as a fact of a state (ADR-0135, ADR-0146): accepted work's copy read at accepted work (`Destination.fileAt`) at startup and when the base moves (`readAccepted`), decoded by the host's table and settled with the start layers, its shared directories (the settled `lanes.shared`) prepared again, and put in force (`takeAccepted`, `onTaken`) once what it names is shared; a lane's own copy and the copy it started on, read at its tip and its start before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook): what it changes, and each key not taken. A lane with no commit in your repo yet runs with accepted work's |
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
 | `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
-| `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history and the handle |
+| `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history, the handle and the lane's record; refused, with nothing queued, for a lane with no record, no copy of its own, or a history the adapter does not keep |
 | `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
 | `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
-| `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`), its fork (`forkFacts` waits for `pendingRecords`) |
+| `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`, its `history` the kind of the disk it will clone, `sourceHistory`), its fork (`forkFacts` waits for `pendingRecords`; `forkSource` refuses a disk of another kind than the record's, thrown with `foreignLaneWords`) |
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`, which fires the merge's `follow` after `recordUpdate`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper; its lanes' history moved in the destination (`lanesMoved`) |
 | `shares.ts` | what lanes may mount and reach, shared into the lane VM's slots and granted: the decision (`planShareAndGrant`) and, on the Mac, its state behind one queue (`createShares`: a share, a new lease's reset, the extra slots' close) |

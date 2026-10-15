@@ -1,12 +1,14 @@
 import {
   baseMessage,
   commitId,
+  pointFromCommit,
   shellWord,
   type ThreadName,
   threadIdFor,
 } from "@pinetrie/core"
 import { BASE_LANE, type LaneStep } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
+import { jjLaneFor } from "../fixtures.ts"
 import { bookmarkName, FETCHED_REF } from "./names.ts"
 import {
   fetchById,
@@ -21,6 +23,7 @@ import {
 } from "./plan.ts"
 
 const LANE = threadIdFor("1")
+const JJ = jjLaneFor(LANE)
 const C1 = commitId("c1")
 const C2 = commitId("c2")
 
@@ -37,10 +40,12 @@ describe("immutable heads", () => {
 
 test("planForkSetup: a base with several parents is committed once, so the bookmark names one", () => {
   expect(
-    argvs(planForkSetup(LANE, { kind: "commits", commits: [C1, C2] })).slice(
-      1,
-      4,
-    ),
+    argvs(
+      planForkSetup(JJ, {
+        kind: "recorded",
+        points: [C1, C2].map(pointFromCommit),
+      }),
+    ).slice(1, 4),
   ).toEqual([
     "lane: jj new c1 c2",
     `lane: jj commit -m base: ${LANE}`,
@@ -50,9 +55,9 @@ test("planForkSetup: a base with several parents is committed once, so the bookm
 
 test("planForkSetup: on accepted work, an empty commit naming it; its id read for the config", () => {
   const steps = argvs(
-    planForkSetup(LANE, {
+    planForkSetup(JJ, {
       kind: "accepted",
-      commit: C1,
+      point: pointFromCommit(C1),
     }),
   )
   expect(steps.slice(1, 3)).toEqual([
@@ -67,7 +72,7 @@ test("planForkSetup: on accepted work, an empty commit naming it; its id read fo
 test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's own commits", () => {
   const W = commitId("w1")
   const steps = argvs(
-    planForkSetup(LANE, {
+    planForkSetup(JJ, {
       kind: "wip",
       bookmark: "wip/x",
       commit: W,
@@ -130,9 +135,9 @@ describe("planMerge: an update's steps", () => {
   const COPY = commitId("copy1")
   test("accepted work's merge names its base, and lists what came in since the lane", () => {
     expect(
-      planMerge({
+      planMerge(JJ, {
         kind: "accepted",
-        commit: C1,
+        point: pointFromCommit(C1),
         mark: true,
       }),
     ).toEqual({
@@ -147,12 +152,12 @@ describe("planMerge: an update's steps", () => {
     })
   })
   test("a WIP's copy fetches only the WIP's commit, and is made on the lane's last copy", () => {
-    const plan = planMerge({
+    const plan = planMerge(JJ, {
       kind: "wip",
       bookmark: "wip/x",
       commit: W,
       under: C2,
-      on: COPY,
+      on: pointFromCommit(COPY),
     })
     expect(argvs(plan.steps)).toEqual([
       `lane: ${fetchById([W]).argv.join(" ")}`,
@@ -169,12 +174,12 @@ describe("planMerge: an update's steps", () => {
   })
   test("the thread it branched from is merged as a commit, named, with no Pinetrie-Base", () => {
     expect(
-      planMerge({
+      planMerge(JJ, {
         kind: "parent",
         lane: threadIdFor("p"),
         name: "amber-fox" as ThreadName,
-        commit: C2,
-        caughtUpWith: C1,
+        point: pointFromCommit(C2),
+        caughtUpWith: pointFromCommit(C1),
       }),
     ).toEqual({
       steps: [fetchById([C2])],
@@ -291,7 +296,12 @@ describe("pre-rename: planOldNamesOnDisk, for a disk cloned from a snapshot take
 
 test("planForkSetup: jj new before any other jj command, then the bookmark, then the config", () => {
   expect(
-    argvs(planForkSetup(LANE, { kind: "commits", commits: [C1] })),
+    argvs(
+      planForkSetup(JJ, {
+        kind: "recorded",
+        points: [C1].map(pointFromCommit),
+      }),
+    ),
   ).toEqual([
     `lane: ${fetchById([C1]).argv.join(" ")}`,
     "lane: jj new c1",

@@ -207,8 +207,8 @@ export function lastWord(
 }
 
 /**
- * An ask's files as a span: from the commit its prompt's record names, what
- * the lane had before it (`planTurnRecord`), to the nearest commit at its
+ * An ask's files as a span: from the state its prompt's record names, what
+ * the lane had before it (`planTurnRecord`), to the nearest state at its
  * run's last entry (`nearestRevision`). Null when they are the same, or a
  * lane with no copy of its own records none.
  */
@@ -218,9 +218,9 @@ export function askSpan(
   prompt: EntryId,
   revisions: ReadonlyMap<EntryId, RevisionRecord>,
 ): DiffSpan | null {
-  const from = revisions.get(prompt)?.commit ?? null
+  const from = revisions.get(prompt)?.point ?? null
   const last = asks.last.get(prompt)
   if (from === null || last === undefined) return null
-  const to = nearestRevision(index, revisions, atEntry(last)).commit
+  const to = nearestRevision(index, revisions, atEntry(last)).point
   return to === null || to === from ? null : { kind: "range", from, to }
 }

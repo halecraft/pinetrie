@@ -2,6 +2,7 @@ import {
   type CardRecord,
   commitId,
   type OfferRecord,
+  pointFromCommit,
   rootIdFor,
   type ThreadName,
   textCardId,
@@ -37,6 +38,8 @@ function floor(): Floor {
 const LANE = threadIdFor("1")
 const ADA = writerId("ada@x.io")
 const [B, C, D] = [commitId("b"), commitId("c"), commitId("d")]
+/** `C` and `D` as the lane's states. */
+const [PC, PD] = [pointFromCommit(C), pointFromCommit(D)]
 const MOVE = {
   base: { kind: "accepted" },
   bookmark: "pinetrie-accepted",
@@ -48,8 +51,8 @@ const parent = (over: Partial<ParentNow> = {}): ParentNow => ({
   kind: "parent",
   lane: threadIdFor("p"),
   name: "amber-fox" as ThreadName,
-  newest: D,
-  caughtUpWith: C,
+  newest: PD,
+  caughtUpWith: PC,
   conflicts: [],
   ...over,
 })
@@ -98,7 +101,7 @@ describe("planCatchUpCall", () => {
     ],
     [
       "a parent not ahead",
-      { from: "parent", parent: parent({ caughtUpWith: D }) },
+      { from: "parent", parent: parent({ caughtUpWith: PD }) },
       "nothing-new",
     ],
   ] as const)("refused: %s", (_, over, why) => {
@@ -123,7 +126,7 @@ describe("catchUpAnswer", () => {
       {
         lane: LANE,
         from: { kind: "accepted" },
-        merged: C,
+        merged: PC,
         commits: ["a change"],
         files: ["a.ts"],
         by: ADA,
@@ -131,22 +134,22 @@ describe("catchUpAnswer", () => {
       1,
     )
     expect(
-      catchUpAnswer({ kind: "clean", message: update, merged: C }),
+      catchUpAnswer({ kind: "clean", message: update, merged: PC }),
     ).toEqual({
       text: update.content,
       isError: false,
-      details: { merged: [C] },
+      details: { merged: [PC] },
     })
     const land = planResolution({
       floor: floor(),
       files: [],
-      details: { lane: LANE, yours: [C], by: ADA },
+      details: { lane: LANE, yours: [PC], by: ADA },
       timestamp: 1,
     })
     expect(catchUpAnswer({ kind: "conflicted", message: land })).toEqual({
       text: land.content,
       isError: false,
-      details: { merged: [C] },
+      details: { merged: [PC] },
     })
     expect(catchUpAnswer({ kind: "nothing" })).toMatchObject({
       isError: true,

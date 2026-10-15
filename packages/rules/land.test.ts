@@ -1,4 +1,4 @@
-import { commitId, threadIdFor, writerId } from "@pinetrie/core"
+import { pointId, threadIdFor, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { planResolution, renderableMessage } from "./index.ts"
 import {
@@ -12,7 +12,7 @@ import {
 
 const LANE = threadIdFor("1")
 const ADA = writerId("ada")
-const C1 = commitId("c1")
+const C1 = pointId("c1")
 
 /** pi's estimate of a custom message (`packages/pi/compaction.ts`): a token per four characters. */
 const budgetOf = (tokens: number): PromptBudget => ({

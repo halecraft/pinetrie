@@ -1,8 +1,8 @@
 import {
   BASE_SNAPSHOT,
-  commitId,
   entryId,
   NO_SHARED,
+  pointId,
   type RevisionRecord,
   rootIdFor,
   snapshotId,
@@ -11,33 +11,34 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
-  forkPoint,
+  forkSource,
   LANE as LANE_RECORD,
   PROJECT,
   planTurnRecord,
   REVISION,
   recordsOf,
   setRecord,
+  sourceHistory,
 } from "./index.ts"
 import { planRetention, showHostWorkingCopy } from "./work.ts"
 
 const LANE = threadIdFor("1")
 const ADA = writerId("ada")
-const C1 = commitId("c1")
-const C2 = commitId("c2")
+const C1 = pointId("c1")
+const C2 = pointId("c2")
 
 describe("records: one spec each, total decoders", () => {
   const lane = {
     lane: LANE,
     root: rootIdFor("test-root"),
-    ownCopy: true,
+    history: "jj" as const,
     by: ADA,
     createdAt: 1,
   }
   const revision = {
     entry: entryId("e1"),
     lane: LANE,
-    commit: C1,
+    point: C1,
     snapshot: snapshotId("e1"),
     paths: ["a.txt", "d/c é.txt"],
     conflicts: ["b.txt"],
@@ -49,7 +50,11 @@ describe("records: one spec each, total decoders", () => {
       shared: NO_SHARED,
     },
   }
-  const project = { root: "/p", owner: writerId("duane@x.io") }
+  const project = {
+    root: "/p",
+    kind: "folder" as const,
+    owner: writerId("duane@x.io"),
+  }
   test("each record round-trips, keyed as its reader expects", () => {
     const l = setRecord(LANE_RECORD, lane)
     expect([l.namespace, l.key, LANE_RECORD.decode(l.value, l.key)]).toEqual([
@@ -64,42 +69,32 @@ describe("records: one spec each, total decoders", () => {
   })
   test("a direct lane's prompt records no commit and no disk, and that decodes", () => {
     expect(
-      REVISION.decode({ ...revision, commit: null, snapshot: null }, "e1"),
-    ).toEqual({ ...revision, commit: null, snapshot: null })
+      REVISION.decode({ ...revision, point: null, snapshot: null }, "e1"),
+    ).toEqual({ ...revision, point: null, snapshot: null })
   })
-  test("a record from before lane containers has no snapshot key: it decodes as none", () => {
-    const { snapshot: _, ...old } = revision
-    expect(REVISION.decode(old, "e1")).toEqual({ ...old, snapshot: null })
+  test("a turn's record in an older shape is dropped: its migration moved every one", () => {
+    for (const field of ["snapshot", "paths", "conflicts", "disk"] as const) {
+      const { [field]: _, ...old } = revision
+      expect(REVISION.decode(old, "e1")).toBeUndefined()
+    }
+    const { point, ...rest } = revision
+    expect(REVISION.decode({ ...rest, commit: point }, "e1")).toBeUndefined()
   })
-  test("a record from before turns classed their disk decodes with none, its old fields unread", () => {
-    const { disk: _, ...old } = revision
-    expect(
-      REVISION.decode(
-        { ...old, ignored: { paths: ["x"], more: 0 }, recipe: "ran" },
-        "e1",
-      ),
-    ).toEqual({ ...old, disk: null })
+  test("a lane's history round-trips as its kind, or null for no copy of its own", () => {
+    for (const history of ["jj", "folder", null] as const) {
+      const stored = LANE_RECORD.encode({ ...lane, history })
+      expect(stored).toMatchObject({ history })
+      expect(LANE_RECORD.decode(stored, LANE)?.history).toBe(history)
+    }
   })
-  test("a record from before conflicts were recorded decodes with none", () => {
-    const { conflicts: _, ...old } = revision
-    expect(REVISION.decode(old, "e1")).toEqual({ ...old, conflicts: [] })
-  })
-  test("a lane's copy of its own is stored as its work, as records from when a lane could work directly hold it", () => {
-    expect(LANE_RECORD.encode(lane)).toMatchObject({ work: { kind: "own" } })
-    expect(LANE_RECORD.encode({ ...lane, ownCopy: false })).toMatchObject({
-      work: null,
-    })
-    const none = LANE_RECORD.encode({ ...lane, ownCopy: false })
-    expect(LANE_RECORD.decode(none, LANE)?.ownCopy).toBe(false)
-  })
-  test("malformed values are dropped, never thrown: a lane stored as working directly among them", () => {
+  test("malformed values are dropped, never thrown: a lane of an unknown history among them", () => {
     const stored = LANE_RECORD.encode(lane) as Record<string, unknown>
     const other = threadIdFor("other")
     expect([
       ...recordsOf(LANE_RECORD, [
         {
           key: other,
-          value: { ...stored, work: { kind: "direct", dir: "/p" } },
+          value: { ...stored, history: "svn" },
         },
         { key: "main", value: stored },
         { key: other, value: 3 },
@@ -134,7 +129,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
     ).toEqual({
       entry: base.entry,
       lane: LANE,
-      commit: C1,
+      point: C1,
       snapshot: S,
       paths: [],
       conflicts: ["x.txt"],
@@ -147,14 +142,14 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
         toolCalls: true,
         committed: C2,
         merged: true,
-      })?.commit,
+      })?.point,
     ).toBe(C2)
   })
   test("a prompt always gets a record: its disk, and a commit of edits, else the newest revision", () => {
     expect(planTurnRecord({ ...base, isPrompt: true, committed: C2 })).toEqual({
       entry: base.entry,
       lane: LANE,
-      commit: C2,
+      point: C2,
       snapshot: S,
       paths: ["a.txt"],
       conflicts: ["x.txt"],
@@ -166,7 +161,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
     ).toEqual({
       entry: base.entry,
       lane: LANE,
-      commit: C1,
+      point: C1,
       snapshot: S,
       paths: [],
       // The newest revision's conflicts: a branch from the prompt clones it.
@@ -185,7 +180,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
     ).toEqual({
       entry: base.entry,
       lane: LANE,
-      commit: C2,
+      point: C2,
       snapshot: S,
       paths: ["a.txt"],
       conflicts: ["x.txt"],
@@ -201,7 +196,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
     ).toEqual({
       entry: base.entry,
       lane: LANE,
-      commit: null,
+      point: null,
       snapshot: S,
       paths: [],
       conflicts: [],
@@ -218,7 +213,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
     expect(planTurnRecord({ ...direct, isPrompt: true })).toEqual({
       entry: base.entry,
       lane: LANE,
-      commit: null,
+      point: null,
       snapshot: null,
       paths: [],
       conflicts: [],
@@ -230,30 +225,54 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
   })
 })
 
-describe("forkPoint: a snapshot to clone, and what to start on", () => {
+describe("forkSource: a snapshot to clone, and what to start on", () => {
   const S = snapshotId("e")
   const begin = {
     kind: "accepted",
     acceptedBookmark: "pinetrie-accepted",
-    commit: commitId("l1"),
+    point: pointId("l1"),
   } as const
+  const NEW = threadIdFor("new")
+  const record = (lane: typeof LANE, history: "jj" | "folder") => ({
+    lane,
+    root: rootIdFor("test-root"),
+    history,
+    by: ADA,
+    createdAt: 1,
+  })
+  const lanes = new Map([[LANE, record(LANE, "jj")]])
+  const fork = (
+    input: Pick<Parameters<typeof forkSource>[0], "above" | "begin" | "kept">,
+  ) => forkSource({ ...input, lane: record(NEW, "jj"), lanes, kind: "jj" })
   test("from a turn: its snapshot and the commit above", () => {
     expect(
-      forkPoint({
-        above: { lane: LANE, commit: C2, commitLane: LANE, snapshot: S },
+      fork({
+        above: {
+          lane: LANE,
+          point: C2,
+          pointLane: LANE,
+          snapshot: S,
+          snapshotLane: LANE,
+        },
         begin,
         kept: true,
       }),
     ).toEqual({
       snapshot: S,
-      start: { kind: "commits", commits: [C2] },
+      start: { kind: "recorded", points: [C2] },
       lost: null,
     })
   })
   test("from a turn whose snapshot is gone: the base snapshot and where agent work begins, its snapshot named lost", () => {
     expect(
-      forkPoint({
-        above: { lane: LANE, commit: C2, commitLane: LANE, snapshot: S },
+      fork({
+        above: {
+          lane: LANE,
+          point: C2,
+          pointLane: LANE,
+          snapshot: S,
+          snapshotLane: LANE,
+        },
         begin,
         kept: false,
       }),
@@ -261,25 +280,88 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
   })
   test("from a lane before lane containers: the base snapshot at its commit", () => {
     expect(
-      forkPoint({
-        above: { lane: LANE, commit: C2, commitLane: LANE, snapshot: null },
+      fork({
+        above: {
+          lane: LANE,
+          point: C2,
+          pointLane: LANE,
+          snapshot: null,
+          snapshotLane: null,
+        },
         begin,
         kept: true,
       }),
     ).toEqual({
       snapshot: BASE_SNAPSHOT,
-      start: { kind: "commits", commits: [C2] },
+      start: { kind: "recorded", points: [C2] },
       lost: null,
     })
   })
   test("from nothing: the base snapshot, and where agent work begins", () => {
     expect(
-      forkPoint({
-        above: { lane: null, commit: null, commitLane: null, snapshot: null },
+      fork({
+        above: {
+          lane: null,
+          point: null,
+          pointLane: null,
+          snapshot: null,
+          snapshotLane: null,
+        },
         begin,
         kept: true,
       }),
     ).toEqual({ snapshot: BASE_SNAPSHOT, start: begin, lost: null })
+  })
+  test("a disk of another kind than the new lane's record is refused", () => {
+    const folder = new Map([[LANE, record(LANE, "folder")]])
+    const above = {
+      lane: LANE,
+      point: C2,
+      pointLane: LANE,
+      snapshot: S,
+      snapshotLane: LANE,
+    }
+    expect(
+      forkSource({
+        above,
+        begin,
+        kept: true,
+        lane: record(NEW, "jj"),
+        lanes: folder,
+        kind: "jj",
+      }),
+    ).toEqual({ kind: "foreign", lane: NEW, history: "folder" })
+  })
+})
+
+describe("sourceHistory: the kind of the disk a fork clones", () => {
+  const S = snapshotId("e")
+  const lanes = new Map([
+    [
+      LANE,
+      {
+        lane: LANE,
+        root: rootIdFor("test-root"),
+        history: "folder" as const,
+        by: ADA,
+        createdAt: 1,
+      },
+    ],
+  ])
+  const at = (snapshot: typeof S | null) => ({
+    snapshot,
+    snapshotLane: snapshot === null ? null : LANE,
+  })
+  test("a kept snapshot's lane's; the base's, or a lost snapshot's, the project's", () => {
+    expect(sourceHistory({ above: at(S), kept: true, lanes, kind: "jj" })).toBe(
+      "folder",
+    )
+    expect(
+      sourceHistory({ above: at(null), kept: true, lanes, kind: "jj" }),
+    ).toBe("jj")
+    expect(
+      sourceHistory({ above: at(S), kept: false, lanes, kind: "jj" }),
+    ).toBe("jj")
   })
 })
 
@@ -288,7 +370,7 @@ describe("planRetention: which snapshots go", () => {
   const rec = (entry: string, lane = LANE): RevisionRecord => ({
     entry: entryId(entry),
     lane,
-    commit: null,
+    point: null,
     snapshot: snapshotId(entry),
     paths: [],
     conflicts: [],

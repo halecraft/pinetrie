@@ -10,6 +10,7 @@ import {
   type OfferRecord,
   type OfferSeen,
   type Placed,
+  pointFromCommit,
   type RefreshFacts,
   type StackFacts,
   type StartRead,
@@ -344,7 +345,7 @@ describe("the update and stack messages", () => {
   const details = {
     lane: LANE,
     from: { kind: "accepted" as const },
-    merged: COPY,
+    merged: pointFromCommit(COPY),
     commits: ["feat: yours"],
     files: ["a.txt", "c.txt"],
     by: ADA,
@@ -356,7 +357,7 @@ describe("the update and stack messages", () => {
     expect(renderableMessage(m)).toEqual({
       role: "update",
       content: "↓ caught up with accepted work: 2 files changed",
-      merged: [COPY],
+      merged: [pointFromCommit(COPY)],
     })
     expect(m.content).toContain("Accepted work was merged into this thread")
     expect(m.details).toEqual(details)
@@ -389,7 +390,7 @@ describe("the update and stack messages", () => {
     expect(renderableMessage(m)).toEqual({
       role: "update",
       content: "↓ caught up with amber-fox: 2 files changed",
-      merged: [COPY],
+      merged: [pointFromCommit(COPY)],
     })
     expect(m.content).toContain(
       "The work of the thread this one branched from (amber-fox) was merged",

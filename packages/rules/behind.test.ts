@@ -4,6 +4,8 @@ import {
   type BehindView,
   commitId,
   type OfferRecord,
+  pointFromCommit,
+  pointId,
   threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -18,6 +20,8 @@ import {
 
 const LANE = threadIdFor("1")
 const [L1, L2] = [commitId("l1"), commitId("l2")]
+/** `L2` as the state a thread was told of, or merged. */
+const P2 = pointFromCommit(L2)
 
 const line = (commit = L2): AcceptedRecord => ({
   acceptedBookmark: "pinetrie-accepted",
@@ -56,7 +60,7 @@ const offer = {
 
 const VIEW: BehindView = {
   from: { kind: "accepted" },
-  to: L2,
+  to: P2,
   files: ["a.ts", "b.ts"],
   overlap: ["a.ts"],
   conflicts: ["a.ts"],
@@ -97,9 +101,9 @@ describe("planBaseNews", () => {
     ],
     ["unknown work", { base: base({ work: "unknown" }) }],
     ["a gone base", { base: base({ state: "gone" }) }],
-    ["a commit it was told of", { known: [L2] }],
-    ["a commit it merged", { known: [commitId("x"), L2] }],
-    ["a commit it was steered", { told: L2 }],
+    ["a commit it was told of", { known: [P2] }],
+    ["a commit it merged", { known: [pointId("x"), P2] }],
+    ["a commit it was steered", { told: P2 }],
   ] as const)("nothing: %s", (_, over) => {
     expect(news(over)).toEqual({ kind: "nothing" })
   })

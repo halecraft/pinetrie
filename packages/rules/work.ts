@@ -1,18 +1,19 @@
-// work — where lanes work: each lane's setting, the commit and disk at each
+// work — where lanes work: each lane's setting, the state and disk at each
 // entry, and what the host found where it runs.
 
 import {
   type Above,
   BASE_SNAPSHOT,
-  type CommitId,
-  commitId,
   type EntryId,
+  type ForeignLane,
   type ForkStart,
   HOST_WORKING_COPY,
   isRootId,
   isThreadId,
   type LaneRecord,
-  NO_SHARED,
+  type OwnLane,
+  type PointId,
+  type ProjectKind,
   type ProjectRecord,
   type RevisionRecord,
   type SnapshotId,
@@ -23,10 +24,10 @@ import {
 import { Type } from "typebox"
 import type { ForkBegin } from "./base.ts"
 import {
-  CommitSchema,
   decodeAt,
   entryKey,
   fixedKey,
+  PointSchema,
   threadKey,
   WriterIdSchema,
 } from "./decode.ts"
@@ -35,15 +36,14 @@ import type { RecordSpec } from "./records.ts"
 /** The one `pinetrie.project` value's key: a host has one project. */
 export const PROJECT_KEY = "project"
 
-/** A lane's work as stored: its own copy, or null for none (`ownCopy`). */
-const OwnCopySchema = Type.Union([
-  Type.Object({ kind: Type.Literal("own") }),
-  Type.Null(),
+const ProjectKindSchema = Type.Union([
+  Type.Literal("jj"),
+  Type.Literal("folder"),
 ])
 
 const LaneRecordSchema = Type.Object({
   root: Type.String({ minLength: 1 }),
-  work: OwnCopySchema,
+  history: Type.Union([ProjectKindSchema, Type.Null()]),
   by: Type.String(),
   createdAt: Type.Number(),
 })
@@ -63,62 +63,49 @@ const TurnDiskSchema = Type.Object({
   local: ListedSchema,
   unignored: Type.Array(Type.String()),
   leftovers: Type.Array(Type.String()),
-  // Absent in records written before shared files had versions.
-  shared: Type.Optional(
-    Type.Object({
-      read: Type.Array(TouchSchema),
-      wrote: Type.Array(
-        Type.Object({
-          path: Type.String(),
-          version: Type.Integer({ minimum: 1 }),
-          concurrent: Type.Boolean(),
-        }),
-      ),
-    }),
-  ),
+  shared: Type.Object({
+    read: Type.Array(TouchSchema),
+    wrote: Type.Array(
+      Type.Object({
+        path: Type.String(),
+        version: Type.Integer({ minimum: 1 }),
+        concurrent: Type.Boolean(),
+      }),
+    ),
+  }),
 })
 
 const RevisionRecordSchema = Type.Object({
   lane: Type.String({ minLength: 1 }),
-  commit: Type.Union([CommitSchema, Type.Null()]),
-  // Absent in records written before lane containers.
-  snapshot: Type.Optional(
-    Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
-  ),
-  // Absent in records written before turns recorded their paths.
-  paths: Type.Optional(Type.Array(Type.String())),
-  // Absent in records written before they recorded conflicts.
-  conflicts: Type.Optional(Type.Array(Type.String())),
-  // Absent in records written before turns classed their disk.
-  disk: Type.Optional(Type.Union([TurnDiskSchema, Type.Null()])),
+  point: Type.Union([PointSchema, Type.Null()]),
+  snapshot: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  paths: Type.Array(Type.String()),
+  conflicts: Type.Array(Type.String()),
+  disk: Type.Union([TurnDiskSchema, Type.Null()]),
 })
 
 const ProjectRecordSchema = Type.Object({
   root: Type.String({ minLength: 1 }),
+  kind: ProjectKindSchema,
   owner: Type.Union([WriterIdSchema, Type.Null()]),
 })
 
 /**
  * Each lane's record, written as the lane is created: the root it works in,
- * and whether it has a copy of its own, stored as its work
- * (`{ kind: "own" }`, or null for none) as records from when a lane could work
- * directly hold it.
+ * and the kind of history its own copy keeps, null for none.
  */
 export const LANE: RecordSpec<LaneRecord, ThreadId, "session"> = {
   namespace: "pinetrie.lane",
   home: "session",
   keyOf: r => r.lane,
-  encode: ({ lane, ownCopy, ...contents }) => ({
-    ...contents,
-    work: ownCopy ? { kind: "own" } : null,
-  }),
+  encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
     decodeAt(LaneRecordSchema, contents, threadKey(key), (r, lane) =>
       isRootId(r.root)
         ? {
             lane,
             root: r.root,
-            ownCopy: r.work !== null,
+            history: r.history,
             by: r.by as WriterId,
             createdAt: r.createdAt,
           }
@@ -126,7 +113,7 @@ export const LANE: RecordSpec<LaneRecord, ThreadId, "session"> = {
     ),
 }
 
-/** The commit and disk at an entry, and its turn's paths and conflicts, at the entry. */
+/** The state and disk at an entry, and its turn's paths and conflicts, at the entry. */
 export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
   namespace: "pinetrie.revision",
   home: "root",
@@ -142,17 +129,11 @@ export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
         ? {
             entry,
             lane: r.lane,
-            commit: r.commit === null ? null : commitId(r.commit),
-            snapshot:
-              r.snapshot === undefined || r.snapshot === null
-                ? null
-                : snapshotId(r.snapshot),
-            paths: r.paths ?? [],
-            conflicts: r.conflicts ?? [],
-            disk:
-              r.disk === undefined || r.disk === null
-                ? null
-                : { ...r.disk, shared: r.disk.shared ?? NO_SHARED },
+            point: r.point,
+            snapshot: r.snapshot === null ? null : snapshotId(r.snapshot),
+            paths: r.paths,
+            conflicts: r.conflicts,
+            disk: r.disk,
           }
         : undefined,
     ),
@@ -170,7 +151,7 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
         ProjectRecordSchema,
         contents,
         fixedKey(PROJECT_KEY, key),
-        r => ({ root: r.root, owner: r.owner }),
+        r => ({ root: r.root, kind: r.kind, owner: r.owner }),
       ),
   }
 
@@ -178,15 +159,15 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
 
 /**
  * What a turn records. A lane of its own records every prompt and every turn
- * that made tool calls, since ignored files change without a commit: its
- * snapshot, and a commit when one was made. A prompt with nothing to commit
- * records the lane's newest revision, so a branch from it names the commit
- * its disk was at even after its base moved. A lane with no copy of its own
- * records its prompts only, with neither. Only a turn's own commit carries the paths
- * it changed: a prompt's newest revision is what came before it.
- * Every record with a commit carries that commit's conflicts, so a branch
+ * that made tool calls, since ignored files change without a new state: its
+ * snapshot, and a state when one was made. A prompt with nothing to record
+ * names the lane's newest state, so a branch from it names the state its
+ * disk was at even after its base moved. A lane with no copy of its own
+ * records its prompts only, with neither. Only a turn's own state carries
+ * the paths it changed: a prompt's newest state is what came before it.
+ * Every record with a state carries that state's conflicts, so a branch
  * from any of them knows its copy's. A turn whose `catch_up`
- * merged records the lane's newest revision, which the merge is,
+ * merged records the lane's newest state, which the merge is,
  * with no paths: a branch from it starts with the merged files.
  */
 export function planTurnRecord(input: {
@@ -196,19 +177,19 @@ export function planTurnRecord(input: {
   /** The message made tool calls. */
   readonly toolCalls: boolean
   readonly own: boolean
-  /** The turn's revision from `commitTurn`, made or adopted; null when it has none. */
-  readonly committed: CommitId | null
-  /** The lane's newest revision before this turn. */
-  readonly newest: CommitId | null
+  /** The turn's state (`TurnMade.committed`); null when it has none. */
+  readonly committed: PointId | null
+  /** The lane's newest state before this turn. */
+  readonly newest: PointId | null
   /** The turn's snapshot, or null when it failed. */
   readonly snapshot: SnapshotId | null
   /** The paths `committed` changed (`changedPaths`); none without one. */
   readonly paths: readonly string[]
-  /** The files conflicted in the commit the record names: `committed`, else `newest`. */
+  /** The files conflicted at the state the record names: `committed`, else `newest`. */
   readonly conflicts: readonly string[]
   /**
    * The turn merged into the lane (`turnMerged`): its `catch_up`
-   * moved the bookmark, so with no commit of its own the turn names it.
+   * moved the lane, so with no state of its own the turn names it.
    */
   readonly merged: boolean
 }): RevisionRecord | null {
@@ -218,7 +199,7 @@ export function planTurnRecord(input: {
       ? {
           entry,
           lane,
-          commit: null,
+          point: null,
           snapshot: null,
           paths: [],
           conflicts: [],
@@ -227,29 +208,60 @@ export function planTurnRecord(input: {
       : null
   if (!input.isPrompt && !input.toolCalls && input.committed === null)
     return null
-  const commit =
+  const point =
     input.committed ?? (input.isPrompt || input.merged ? input.newest : null)
   return {
     entry,
     lane,
-    commit,
+    point,
     snapshot: input.snapshot,
     paths: input.committed === null ? [] : input.paths,
-    conflicts: commit === null ? [] : input.conflicts,
+    conflicts: point === null ? [] : input.conflicts,
     // The turn's classes and diff fill it in once its snapshot is taken.
     disk: null,
   }
 }
 
 /**
- * Where a new lane of its own starts. With a revision above it: the nearest
- * snapshot above, else the base snapshot, and that revision's commit. With
- * none (a root thread, or a branch above any agent work): the base snapshot,
- * which is accepted work's, and `begin`: accepted work, or a WIP's copy.
- * Either way the fork starts on a commit of its own, because a cloned disk
- * carries its parent's working-copy change, which the fork must leave.
+ * The kind of history of the disk a fork at `above` clones: the lane's whose
+ * snapshot it is, or, from the base snapshot (none above, or one not kept),
+ * the project's. A new lane's history is this, and a send that would fork
+ * there runs on it. A snapshot is only made by a lane with a copy of its
+ * own; one whose record is missing is read as the project's.
  */
-export function forkPoint(input: {
+export function sourceHistory(input: {
+  readonly above: Pick<Above, "snapshot" | "snapshotLane">
+  /** Whether the snapshot above is still there (`forkSource`'s `kept`). */
+  readonly kept: boolean
+  readonly lanes: ReadonlyMap<ThreadId, LaneRecord>
+  readonly kind: ProjectKind
+}): ProjectKind {
+  const { snapshot, snapshotLane } = input.above
+  if (snapshot === null || snapshotLane === null || !input.kept)
+    return input.kind
+  return input.lanes.get(snapshotLane)?.history ?? input.kind
+}
+
+/** Where a fork starts: the snapshot it clones and the state it starts on. */
+export interface ForkSource {
+  readonly snapshot: SnapshotId
+  readonly start: ForkStart
+  /** The snapshot it should have cloned and could not: gone. Null when its files were kept. */
+  readonly lost: SnapshotId | null
+}
+
+/**
+ * Where `lane`, a new lane of its own, starts. With a revision above it: the
+ * nearest snapshot above, else the base snapshot, and that revision's state.
+ * With none (a root thread, or a branch above any agent work): the base
+ * snapshot, which is accepted work's, and `begin`: accepted work, or a WIP's
+ * copy. Either way the fork starts on a commit of its own, because a cloned
+ * disk carries its parent's working-copy change, which the fork must leave.
+ * Refused when the disk it would clone is not of `lane`'s kind
+ * (`sourceHistory`), as when the records above moved since `lane`'s record
+ * was written: a lane never holds a disk of another kind.
+ */
+export function forkSource(input: {
   readonly above: Above
   readonly begin: ForkBegin
   /**
@@ -258,16 +270,18 @@ export function forkPoint(input: {
    * is read as missing: the fork starts from its base.
    */
   readonly kept: boolean
-}): {
-  readonly snapshot: SnapshotId
-  readonly start: ForkStart
-  /** The snapshot it should have cloned and could not: gone. Null when its files were kept. */
-  readonly lost: SnapshotId | null
-} {
+  /** The new lane's record, its history decided when it was written. */
+  readonly lane: OwnLane
+  readonly lanes: ReadonlyMap<ThreadId, LaneRecord>
+  readonly kind: ProjectKind
+}): ForkSource | ForeignLane {
   const { above } = input
+  const history = sourceHistory(input)
+  if (history !== input.lane.history)
+    return { kind: "foreign", lane: input.lane.lane, history }
   if (above.snapshot !== null && !input.kept)
     return { snapshot: BASE_SNAPSHOT, start: input.begin, lost: above.snapshot }
-  return above.commit === null
+  return above.point === null
     ? {
         snapshot: above.snapshot ?? BASE_SNAPSHOT,
         start: input.begin,
@@ -275,7 +289,7 @@ export function forkPoint(input: {
       }
     : {
         snapshot: above.snapshot ?? BASE_SNAPSHOT,
-        start: { kind: "commits", commits: [above.commit] },
+        start: { kind: "recorded", points: [above.point] },
         lost: null,
       }
 }

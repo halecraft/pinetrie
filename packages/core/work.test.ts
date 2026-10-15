@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest"
 import { entriesOf, entry } from "./fixtures.ts"
 import {
   atEntry,
-  commitId,
   conflictsAt,
   type EntryId,
   entryId,
@@ -13,6 +12,7 @@ import {
   indexTree,
   isBusy,
   nearestRevision,
+  pointId,
   promptOf,
   type RevisionRecord,
   ROOT,
@@ -35,9 +35,9 @@ const A = threadIdFor("a")
 const B = threadIdFor("b")
 const D = threadIdFor("d")
 const E = threadIdFor("e")
-const C1 = commitId("c1")
-const C2 = commitId("c2")
-const CB = commitId("cb")
+const C1 = pointId("c1")
+const C2 = pointId("c2")
+const CB = pointId("cb")
 const SNAP1 = snapshotId("1-p1")
 const SNAP2 = snapshotId("2-m1")
 const SNAP4 = snapshotId("4-m2")
@@ -70,7 +70,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
     {
       entry: entryId("1-p1"),
       lane: A,
-      commit: C1,
+      point: C1,
       snapshot: SNAP1,
       paths: [],
       conflicts: [],
@@ -79,7 +79,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
     {
       entry: entryId("2-m1"),
       lane: A,
-      commit: C2,
+      point: C2,
       snapshot: SNAP2,
       paths: [],
       conflicts: [],
@@ -88,7 +88,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
     {
       entry: entryId("4-m2"),
       lane: A,
-      commit: null,
+      point: null,
       snapshot: SNAP4,
       paths: [],
       conflicts: [],
@@ -97,7 +97,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
     {
       entry: entryId("6-pb"),
       lane: B,
-      commit: CB,
+      point: CB,
       snapshot: SB,
       paths: [],
       conflicts: [],
@@ -106,7 +106,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
     {
       entry: entryId("8-pd"),
       lane: D,
-      commit: null,
+      point: null,
       snapshot: null,
       paths: [],
       conflicts: [],
@@ -115,7 +115,7 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
     {
       entry: entryId("b-pe"),
       lane: E,
-      commit: null,
+      point: null,
       snapshot: null,
       paths: [],
       conflicts: [],
@@ -144,49 +144,55 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
   test("an assistant message's own record gives its commit and disk", () => {
     expect(near("2-m1")).toEqual({
       lane: A,
-      commit: C2,
-      commitLane: A,
+      point: C2,
+      pointLane: A,
       snapshot: SNAP2,
+      snapshotLane: A,
     })
   })
   test("a tool result has the record above it", () => {
     expect(near("3-r1")).toEqual({
       lane: A,
-      commit: C2,
-      commitLane: A,
+      point: C2,
+      pointLane: A,
       snapshot: SNAP2,
+      snapshotLane: A,
     })
   })
   test("a turn that changed only ignored files: its disk, and the commit above", () => {
     expect(near("4-m2")).toEqual({
       lane: A,
-      commit: C2,
-      commitLane: A,
+      point: C2,
+      pointLane: A,
       snapshot: SNAP4,
+      snapshotLane: A,
     })
   })
   test("a conversation below a lane's message belongs to that lane", () => {
     expect(near("5-x1")).toEqual({
       lane: A,
-      commit: C2,
-      commitLane: A,
+      point: C2,
+      pointLane: A,
       snapshot: SNAP2,
+      snapshotLane: A,
     })
   })
   test("a person's prompt gives the disk from before the answer", () => {
     expect(near("1-p1")).toEqual({
       lane: A,
-      commit: C1,
-      commitLane: A,
+      point: C1,
+      pointLane: A,
       snapshot: SNAP1,
+      snapshotLane: A,
     })
   })
   test("a branch lane's prompt claims its own entries, never its parent's", () => {
     expect(near("7-mb")).toEqual({
       lane: B,
-      commit: CB,
-      commitLane: B,
+      point: CB,
+      pointLane: B,
       snapshot: SB,
+      snapshotLane: B,
     })
     expect(near("3-r1").lane).toBe(A)
   })
@@ -194,9 +200,10 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
     // The commit is B's: the copy a fork here clones.
     expect(near("9-md")).toEqual({
       lane: D,
-      commit: CB,
-      commitLane: B,
+      point: CB,
+      pointLane: B,
       snapshot: SB,
+      snapshotLane: B,
     })
   })
   test("a record from before lane containers has a commit and no disk", () => {
@@ -206,7 +213,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
         {
           entry: entryId("1-p1"),
           lane: A,
-          commit: C1,
+          point: C1,
           snapshot: null,
           paths: [],
           conflicts: [],
@@ -216,13 +223,20 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
     ])
     expect(nearestRevision(index, old, atEntry(entryId("3-r1")))).toEqual({
       lane: A,
-      commit: C1,
-      commitLane: A,
+      point: C1,
+      pointLane: A,
       snapshot: null,
+      snapshotLane: null,
     })
   })
   test("nothing above the root, or a conversation no run has reached", () => {
-    const none = { lane: null, commit: null, commitLane: null, snapshot: null }
+    const none = {
+      lane: null,
+      point: null,
+      pointLane: null,
+      snapshot: null,
+      snapshotLane: null,
+    }
     expect(nearestRevision(index, revisions, ROOT)).toEqual(none)
     expect(nearestRevision(index, new Map(), atEntry(entryId("5-x1")))).toEqual(
       none,
@@ -234,17 +248,17 @@ describe("forkParent and conflictsAt: what a lane's copy was cloned from", () =>
   test("a branch's parent is the lane whose commit is above its first prompt", () => {
     expect(forkParent(index, revisions, B, entryId("7-mb"))).toEqual({
       lane: A,
-      commit: C2,
+      point: C2,
     })
   })
   test("a lane working directly records no commit: a fork below it is cloned from the lane above", () => {
     expect(forkParent(index, revisions, D, entryId("a-ld"))).toEqual({
       lane: B,
-      commit: CB,
+      point: CB,
     })
     expect(forkParent(index, revisions, E, entryId("b-pe"))).toEqual({
       lane: B,
-      commit: CB,
+      point: CB,
     })
   })
   test("a lane that began at its base has none; nor a lane with no tip", () => {
@@ -252,13 +266,13 @@ describe("forkParent and conflictsAt: what a lane's copy was cloned from", () =>
     expect(forkParent(index, revisions, B, null)).toBeNull()
   })
   test("conflictsAt unions what every record naming a commit says", () => {
-    const rec = (entry: string, commit: typeof C1, conflicts: string[]) =>
+    const rec = (entry: string, point: typeof C1, conflicts: string[]) =>
       [
         entryId(entry),
         {
           entry: entryId(entry),
           lane: A,
-          commit,
+          point,
           snapshot: null,
           paths: [],
           conflicts,

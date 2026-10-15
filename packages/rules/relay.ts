@@ -5,6 +5,7 @@ import {
   type Asker,
   type Away,
   type EntryId,
+  type ForeignLane,
   firstLine,
   type HeardDetails,
   type Reach,
@@ -22,6 +23,7 @@ import {
   ThreadIdSchema,
   WriterIdSchema,
 } from "./decode.ts"
+import { foreignLaneWords } from "./held.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { reachWords } from "./reach.ts"
 import { transcriptLines } from "./request.ts"
@@ -153,6 +155,12 @@ export type RelayRefusal =
   | { readonly kind: "self" }
   | { readonly kind: "not-member"; readonly name: string }
   | { readonly kind: "no-lane"; readonly name: string }
+  /** The asked thread's lane keeps a history of the other kind: no run starts there. */
+  | {
+      readonly kind: "foreign"
+      readonly name: string
+      readonly lane: ForeignLane
+    }
   | { readonly kind: "spent" }
 
 /** A refused ask, in the words its asker reads; `nameOf` names people. */
@@ -173,6 +181,8 @@ export function relayRefusalText(
       return `${why.name} is not a member of this thread: a person invites it first, by mentioning it.`
     case "no-lane":
       return `${why.name} has no agent of its own to ask: nobody has asked an agent there yet.`
+    case "foreign":
+      return `${why.name} cannot be asked: ${foreignLaneWords(why.lane)}.`
     case "spent":
       return "The budget for agents talking is spent: a person must add more first."
   }
@@ -225,7 +235,8 @@ export function unreachableRefusal(input: {
  *
  * - Both threads must be in reach (`unreachableRefusal`), before anything else.
  * - Only a member is asked, and only a thread with a lane has an agent to
- *   ask; a spent budget asks nobody.
+ *   ask, and a run may start on it: a lane of another kind has none; a
+ *   spent budget asks nobody.
  * - What `to` has not heard is the asking thread's messages after the
  *   newest it heard (`lastHeardEntry`), or, having heard none, from the message
  *   that invited it on; never the ask itself, which the relay carries, nor
@@ -241,6 +252,8 @@ export function planRelay(input: {
   readonly toReach: Reach
   readonly members: readonly ThreadId[]
   readonly toLane: ThreadLane
+  /** Why no run starts on the asked thread's lane (`LaneWork.runnable`); null when one may. */
+  readonly toForeign: ForeignLane | null
   /** The asking thread's path, root first (`projectTranscript`). */
   readonly path: readonly TranscriptMessage[]
   /** The newest entry of `from` that `to` has heard (`lastHeardEntry`). */
@@ -263,6 +276,12 @@ export function planRelay(input: {
     return refuse({ kind: "not-member", name: input.toName })
   if (input.toLane.kind === "none")
     return refuse({ kind: "no-lane", name: input.toName })
+  if (input.toForeign !== null)
+    return refuse({
+      kind: "foreign",
+      name: input.toName,
+      lane: input.toForeign,
+    })
   if (input.spent) return refuse({ kind: "spent" })
   const at = (id: EntryId) => input.path.findIndex(m => m.id === id)
   const start =

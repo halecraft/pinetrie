@@ -518,6 +518,20 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   `canvasColumns` from `holders` (`heldByOthers`): its `UnstartedMode.held`
   names that thread and who; `projectColumns` leaves the thread's entries
   out (`hide`), and the strip draws the column read only, "Bea has it".
+- **A column of another kind is read only, saying why** (ADR-0150,
+  `foreign-column.ts`): `columnForeign` asks the rule the host's gate
+  refuses by (`foreignIn`, `@pinetrie/rules`): a bound column's lane, or
+  for a thread not yet started, the lane whose disk its first send would
+  clone, so a branch or a copy from a thread of another kind is refused on
+  the page as on the host. `columnReadOnly` decides what a thread column
+  says in place of its composer: who holds the thread a branch forks in,
+  else its task's archive, else its kind (`foreignWords`). The project's
+  kind is `ProjectRecord.kind`, written at every start.
+- **Gotcha: the page cannot see snapshots, and takes each as kept.** A
+  branch's source whose snapshot an archive deleted clones the base on the
+  host, of the project's kind; where that source's lane is of another
+  kind, the page refuses a send the host would allow. A known divergence
+  that can do no harm, not a bug.
 
 ## A fold in motion (`fold-motion.ts`, ADR-0137)
 

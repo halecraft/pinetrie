@@ -2,14 +2,14 @@
 //
 // Every run's prompt, and every assistant message of a lane of its own that
 // made tool calls, has a revision record. So one walk up from an entry finds
-// the lane it belongs to (the nearest record's), its commit (the nearest
+// the lane it belongs to (the nearest record's), its state (the nearest
 // record with one) and its disk (the nearest record with a snapshot). A lane
 // with no copy of its own records its prompts with neither: it still counts
-// as the lane above, but the walk passes it for commit and disk.
+// as the lane above, but the walk passes it for state and disk.
 
 import type {
-  CommitId,
   EntryId,
+  PointId,
   Position,
   RevisionRecord,
   SnapshotId,
@@ -17,27 +17,29 @@ import type {
 } from "./index.ts"
 import { ancestry, type TreeIndex } from "./tree.ts"
 
-/** What is above an entry: the lane it belongs to, its commit, and its disk. */
+/** What is above an entry: the lane it belongs to, its state, and its disk. */
 export interface Above {
   /** The nearest record's lane; null where no run has been. */
   readonly lane: ThreadId | null
-  /** The nearest recorded commit; null means the thread's base. */
-  readonly commit: CommitId | null
+  /** The nearest recorded state; null means the thread's base. */
+  readonly point: PointId | null
   /**
-   * The lane of the record holding `commit`: the copy a fork clones. Not
+   * The lane of the record holding `point`: the copy a fork clones. Not
    * `lane` when the nearest record's lane has no copy of its own and records none.
    */
-  readonly commitLane: ThreadId | null
+  readonly pointLane: ThreadId | null
   /** The nearest recorded snapshot; null means the base snapshot. */
   readonly snapshot: SnapshotId | null
+  /** The lane of the record holding `snapshot`: whose disk a fork clones. */
+  readonly snapshotLane: ThreadId | null
 }
 
 /**
- * The lane, commit and disk at `at`, from the revision records above it, and
- * the lane whose record holds the commit. The commit and the snapshot are
+ * The lane, state and disk at `at`, from the revision records above it, and
+ * the lane whose record holds the state. The state and the snapshot are
  * found independently: a turn that changed only
- * ignored files has a snapshot and no commit, and its tracked files are the
- * nearest commit's.
+ * ignored files has a snapshot and no state, and its tracked files are the
+ * nearest state's.
  */
 export function nearestRevision(
   index: TreeIndex,
@@ -45,34 +47,39 @@ export function nearestRevision(
   at: Position,
 ): Above {
   let lane: ThreadId | null = null
-  let commit: CommitId | null = null
-  let commitLane: ThreadId | null = null
+  let point: PointId | null = null
+  let pointLane: ThreadId | null = null
   let snapshot: SnapshotId | null = null
-  if (at.kind === "root") return { lane, commit, commitLane, snapshot }
+  let snapshotLane: ThreadId | null = null
+  if (at.kind === "root")
+    return { lane, point, pointLane, snapshot, snapshotLane }
   for (const id of ancestry(index, at.id).path) {
     const record = revisions.get(id)
     if (record === undefined) continue
     lane ??= record.lane
-    if (commit === null && record.commit !== null) {
-      commit = record.commit
-      commitLane = record.lane
+    if (point === null && record.point !== null) {
+      point = record.point
+      pointLane = record.lane
     }
-    snapshot ??= record.snapshot
-    if (commit !== null && snapshot !== null) break
+    if (snapshot === null && record.snapshot !== null) {
+      snapshot = record.snapshot
+      snapshotLane = record.lane
+    }
+    if (point !== null && snapshot !== null) break
   }
-  return { lane, commit, commitLane, snapshot }
+  return { lane, point, pointLane, snapshot, snapshotLane }
 }
 
-/** The thread a lane's copy was cloned from, and the commit it was cloned at. */
+/** The thread a lane's copy was cloned from, and the state it was cloned at. */
 export interface ForkParent {
   readonly lane: ThreadId
-  readonly commit: CommitId
+  readonly point: PointId
 }
 
 /**
- * Where `lane`, whose thread ends at `tip`, was cloned from: the nearest commit
+ * Where `lane`, whose thread ends at `tip`, was cloned from: the nearest state
  * above its first prompt, and the lane that recorded it, which is what
- * `forkPoint` clones. Null for a lane that began at its base, with no commit
+ * `forkSource` clones. Null for a lane that began at its base, with no state
  * above it.
  */
 export function forkParent(
@@ -84,23 +91,23 @@ export function forkParent(
   const first = firstPromptOf(index, revisions, lane, tip)
   const above = first === null ? null : index.parentOf(first)
   if (above === null) return null
-  const { commit, commitLane } = nearestRevision(index, revisions, {
+  const { point, pointLane } = nearestRevision(index, revisions, {
     kind: "entry",
     id: above,
   })
-  return commit === null || commitLane === null
+  return point === null || pointLane === null
     ? null
-    : { lane: commitLane, commit }
+    : { lane: pointLane, point }
 }
 
-/** The files conflicted in `commit`, as the records naming it say. */
+/** The files conflicted at `point`, as the records naming it say. */
 export function conflictsAt(
   revisions: ReadonlyMap<EntryId, RevisionRecord>,
-  commit: CommitId,
+  point: PointId,
 ): readonly string[] {
   const files = new Set<string>()
   for (const r of revisions.values())
-    if (r.commit === commit) for (const f of r.conflicts) files.add(f)
+    if (r.point === point) for (const f of r.conflicts) files.add(f)
   return [...files].sort()
 }
 

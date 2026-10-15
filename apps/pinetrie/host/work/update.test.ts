@@ -5,7 +5,9 @@ import {
   entryId,
   NOBODY,
   planCopyReady,
+  pointId,
   revisionMessage,
+  rootIdFor,
   type ThreadName,
   threadIdFor,
   writerId,
@@ -46,11 +48,18 @@ const registryWith = (history: LaneHistory, own = true) => {
   const queue = createQueue()
   return record<Parameters<typeof createUpdates>[0]["registry"]>({
     isOwn: () => own,
-    withHistory: (_lane, f) =>
+    withHistory: (lane, f) =>
       queue.enqueue(() =>
         f(
           history,
           {} as Parameters<Parameters<LaneRegistry["withHistory"]>[1]>[1],
+          {
+            lane,
+            root: rootIdFor("r"),
+            history: "jj",
+            by: writerId("ada@example.com"),
+            createdAt: 0,
+          },
         ),
       ),
   }).port
@@ -94,19 +103,19 @@ describe("reasonOf", () => {
 })
 
 const ADA = writerId("ada@example.com")
-const ACCEPTED = commitId("11110000")
-const OURS = commitId("22220000")
-const MERGE = commitId("33330000")
+const ACCEPTED = pointId("11110000")
+const OURS = pointId("22220000")
+const MERGE = pointId("33330000")
 const acceptedFrom: BaseMerge = {
   kind: "accepted",
-  commit: ACCEPTED,
+  point: ACCEPTED,
   mark: false,
 }
 const parentFrom: BaseMerge = {
   kind: "parent",
   lane: threadIdFor("p"),
   name: "amber-fox" as ThreadName,
-  commit: ACCEPTED,
+  point: ACCEPTED,
   caughtUpWith: OURS,
 }
 /** pi's estimate of a custom message: a token per four characters. */
@@ -189,8 +198,8 @@ describe("planSettle: what a merge comes to", () => {
     const wip: BaseMerge = {
       kind: "wip",
       bookmark: "wip/x",
-      commit: ACCEPTED,
-      under: OURS,
+      commit: commitId(ACCEPTED),
+      under: commitId(OURS),
       on: OURS,
     }
     expect(planSettle(facts, { ...ctx, from: wip })).toMatchObject({
@@ -539,7 +548,7 @@ describe("catchUpInRun", () => {
       },
       commit: async () => {
         asked.push("commit")
-        return { commit: null, conflicted: false }
+        return { point: null, conflicted: false }
       },
       merge: async () => {
         asked.push("merge")

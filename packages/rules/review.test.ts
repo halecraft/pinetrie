@@ -3,6 +3,7 @@ import {
   type EntryId,
   entryId,
   type OfferRecord,
+  pointId,
   type RevisionRecord,
   type ThreadId,
   threadIdFor,
@@ -100,7 +101,7 @@ describe("the review", () => {
         {
           entry: entryId(entry),
           lane,
-          commit: commitId(commit),
+          point: pointId(commit),
           snapshot: null,
           paths: [],
           conflicts: [],
@@ -121,7 +122,7 @@ describe("the review", () => {
       })
     expect(read("a1", "a2")).toEqual({
       kind: "review",
-      span: range("a1", "a2"),
+      span: { ...range("a1", "a2"), lane: LANE },
     })
     expect(read("a1", "b1")).toMatchObject({ kind: "refused", status: 404 })
     expect(read("a1", "ffff")).toMatchObject({ kind: "refused", status: 404 })
@@ -166,8 +167,8 @@ describe("the review", () => {
     const c = { kind: "revision", commit: commitId("0123abcd") } as const
     const r = {
       kind: "range",
-      from: commitId("0123abcd"),
-      to: commitId("4567ef"),
+      from: pointId("0123abcd"),
+      to: pointId("4567ef"),
     } as const
     for (const span of [c, r]) {
       expect(at(reviewUrl(span))).toEqual({ kind: "review", span })

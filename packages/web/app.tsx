@@ -50,6 +50,7 @@ import {
   claimFocus,
   clipboardCellView,
   clipFacts,
+  columnForeign,
   columnLandmarks,
   columnMatches,
   composerPlacesStore,
@@ -1010,13 +1011,14 @@ export function App({
                   path: paths[i] ?? new Set<EntryId>(),
                   track: slot.track,
                   heldBy: unstartedOf(column)?.held?.by ?? null,
+                  foreign: columnForeign(column, index, workFacts),
                   matches: search === null ? null : (matches?.[i] ?? null),
                 },
               ] as const,
             ]
       }),
     )
-  }, [view.stage, columns, views, paths, search, matches])
+  }, [view.stage, columns, views, paths, search, matches, index, workFacts])
   const offered = useMemo(
     () => offeredByTask(view.offers, workFacts.names, taskOfThread),
     [view.offers, workFacts.names, taskOfThread],

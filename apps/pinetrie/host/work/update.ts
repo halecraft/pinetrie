@@ -8,7 +8,6 @@
 import {
   type BaseMerge,
   type CatchUpCommand,
-  type CommitId,
   type CopyRefusal,
   type EntryId,
   ERR,
@@ -17,6 +16,8 @@ import {
   firstLine,
   indexTree,
   messageText,
+  type OwnLane,
+  type PointId,
   snapshotId,
   type ThreadId,
   type TreeIndex,
@@ -193,7 +194,7 @@ export type Settle =
   | {
       readonly kind: "clean"
       readonly message: UpdateMessage
-      readonly merge: CommitId
+      readonly merge: PointId
     }
   | { readonly kind: "nothing" }
   | { readonly kind: "conflicted"; readonly message: LandMessage }
@@ -279,7 +280,7 @@ export function planSettle(
 export async function applySettle(
   ports: {
     readonly append: ThreadLaneHandle["append"]
-    readonly recordUpdate: (entry: EntryId, merge: CommitId) => Promise<void>
+    readonly recordUpdate: (entry: EntryId, merge: PointId) => Promise<void>
   },
   settle: Settle,
   follow: Follow,
@@ -355,7 +356,7 @@ export function createUpdates(deps: {
   async function recordUpdate(
     lane: ThreadId,
     entry: EntryId,
-    merge: CommitId,
+    merge: PointId,
   ): Promise<void> {
     const handle = registry.handleOf(lane)
     const snapped = await handle.queue
@@ -373,7 +374,7 @@ export function createUpdates(deps: {
     await deps.writeRevision({
       entry,
       lane,
-      commit: merge,
+      point: merge,
       snapshot: snapped ? snapshotId(entry) : null,
       // The update belongs to no ask, so its files count toward none.
       paths: [],
@@ -438,6 +439,7 @@ export function createUpdates(deps: {
       async (
         h,
         handle,
+        record,
       ): Promise<
         | Prepared
         | {
@@ -457,7 +459,7 @@ export function createUpdates(deps: {
         const from =
           command === "catch-up-with-parent"
             ? await parentOf(lane).then(p => planParentUpdate(p.now, p.running))
-            : await baseUpdate(h, command === "continue-on-accepted")
+            : await baseUpdate(record, h, command === "continue-on-accepted")
         if (typeof from === "string") return refused(updateRefusal(from))
         if (from.kind === "nothing") return { kind: "nothing" }
         const catchUp = planCatchUp(from, resolution)
@@ -482,14 +484,18 @@ export function createUpdates(deps: {
     )
 
   /** What catching up with the base merges (`planUpdateFrom`). */
-  async function baseUpdate(h: LaneHistory, toAccepted: boolean) {
+  async function baseUpdate(
+    record: OwnLane,
+    h: LaneHistory,
+    toAccepted: boolean,
+  ) {
     const base = await h.base()
-    const now = await destination.baseNow(base)
+    const now = await destination.baseNow(record, base)
     return planUpdateFrom({
       base,
       state: now.state,
       toAccepted,
-      acceptedCommit: now.acceptedCommit,
+      acceptedPoint: now.acceptedPoint,
       wipNow: now.wipNow,
     })
   }

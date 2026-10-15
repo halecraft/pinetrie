@@ -122,6 +122,20 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   (ADR-0034), whose snapshots `RevisionRecord` names; every thread's agent
   works in a copy of its own (ADR-0102). A conflict is resolved by the agent
   in its lane, with a `land` prompt (ADR-0033).
+- A lane's history has one kind, on its record (`LaneRecord.history`,
+  ADR-0150): `OwnLane` is a record with one, `ownLane` its one test, and
+  `laneFits` the one rule of fit, whose refusal is a value (`ForeignLane`).
+  A run starts only on a `RunnableLane`, which only `proveRunnable` makes:
+  a lane with no record or no copy runs with no tools, as every lane does
+  on a host with no tools; a lane with its own copy must fit the
+  project's kind.
+- A state any kind of project has is a `PointId`; what only jj has is a
+  `CommitId` (ADR-0150). Both are the bare string stored; a commit becomes
+  a point freely (`pointFromCommit`), and only `@pinetrie/jj` turns a
+  point back, in a lane proven jj. A lane's base is `LaneBaseOf<P>`: the
+  ports carry `LaneBase` (points), jj's reads `CommitBase`. A review's
+  range is a lane's points; one revision is an offer's commit
+  (`DiffSpan`).
 - A turn's classes and its whole-disk diff count none of pine·trie's own
   paths (`DISK_OWN_ROOTS`, ADR-0135), but the lane's home
   (`LANE_HOME_PATH`), which tools write as they would any home.
@@ -153,8 +167,9 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
 - A thread has a name you can say, which its offer's bookmark and trailers
   carry, and its offer holds the WIP line until an agent describes it
   (ADR-0039).
-- A lane's work, its commit and its disk are read from the nearest revision
-  records above an entry (ADR-0032, ADR-0034).
+- A lane's work, its state and its disk are read from the nearest revision
+  records above an entry (ADR-0032, ADR-0034), with the lanes that recorded
+  each (`Above.pointLane`, `snapshotLane`: whose disk a fork clones).
 
 ## Streams (`live.ts`, `edits.ts`)
 

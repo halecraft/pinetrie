@@ -5,10 +5,10 @@
 import {
   baseOf,
   type CatchUpRead,
+  type CommitBase,
   type CommitId,
   commitId,
   hasTrailer,
-  type LaneBase,
   type OfferInRepo,
   type OfferRevision,
   offerLedger,
@@ -154,7 +154,7 @@ export type LanePlan =
   | {
       readonly kind: "accepted"
       readonly tip: CommitId
-      readonly base: LaneBase
+      readonly base: CommitBase
       /**
        * Where the offer starts, when no accepted source above the base
        * names more than the base's own start; else the sources to start from
@@ -204,7 +204,7 @@ export function planLaneRead(
     based === undefined
       ? null
       : baseOf(based.description, input.repoConfig.wipPrefix)
-  let base: LaneBase
+  let base: CommitBase
   if (based !== undefined && parsed !== null) {
     if (parsed.kind === "wip") return { kind: "wip" }
     base = {
@@ -293,7 +293,7 @@ function offerOf(
 /** What a refresh plans from, for a lane on accepted work, as `gatherLane` reads it. */
 export interface LaneGather {
   readonly tip: CommitId
-  readonly base: LaneBase
+  readonly base: CommitBase
   /** Where accepted work is: the offer's target. */
   readonly target: CommitId
   readonly start: StartRead

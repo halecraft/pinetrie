@@ -9,7 +9,13 @@ export { beginFacts, readWipState } from "./accepted.ts"
 export { fileAt } from "./file-at.ts"
 export * from "./lane/index.ts"
 export type { Moved } from "./observe.ts"
-export { fileDiff, readOffer, revisionRead, startOfOffer } from "./offer.ts"
+export {
+  type CommitSpan,
+  fileDiff,
+  readOffer,
+  revisionRead,
+  startOfOffer,
+} from "./offer.ts"
 export {
   gatherDescribe,
   gatherOffer,

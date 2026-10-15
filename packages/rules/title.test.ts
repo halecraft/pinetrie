@@ -63,7 +63,7 @@ const chat = indexOf(
 const lane = (l: typeof L1, root = R): LaneRecord => ({
   lane: l,
   root,
-  ownCopy: false,
+  history: null,
   by: ADA,
   createdAt: 0,
 })

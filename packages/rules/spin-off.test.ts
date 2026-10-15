@@ -286,7 +286,7 @@ describe("planLiftRoot", () => {
           {
             lane: threadIdFor("x"),
             root: THREAD,
-            work: { kind: "own" },
+            history: "jj",
             by: ADA,
             createdAt: 1,
           } as unknown as LaneRecord,

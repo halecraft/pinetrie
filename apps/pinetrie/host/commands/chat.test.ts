@@ -41,6 +41,7 @@ import {
   putTask,
   putValue,
   ROOT_ID,
+  RUNS_ANY,
   record,
   row,
   TASK_ID,
@@ -78,6 +79,7 @@ function setUp(begin: ErrCode | null = null) {
     createThreadLane: async () => ({ kind: "created", lane: LANE }),
   })
   const work = record<ChatDeps["work"]>({
+    ...RUNS_ANY,
     project: null,
     checkBegin: async () => begin,
     prepareLane: async () => {},
@@ -128,7 +130,11 @@ describe("executeChat", () => {
     expect(pi.calls.map(c => [c.method, ...c.args])).toEqual([
       ["createThreadLane", { root: ROOT_ID, at: ROOT }, LANE],
     ])
-    expect(methods(work.calls)).toEqual(["checkBegin", "prepareLane"])
+    expect(methods(work.calls)).toEqual([
+      "checkBegin",
+      "prepareLane",
+      "runnable",
+    ])
     expect(titles.calls.map(c => c.args)).toEqual([
       [
         {
@@ -230,6 +236,7 @@ describe("sendChat", () => {
       scribe: pi.port,
       piSetup: pi.port,
       work: record<ChatDeps["work"]>({
+        ...RUNS_ANY,
         project,
         checkBegin: async () => null,
         prepareLane: async () => {},
@@ -430,7 +437,7 @@ describe("sendChat", () => {
   })
 
   test("in a thread that works in its own copy, your working copy's paths are stored as the lane sees them", async () => {
-    const { started, deps } = setUp({ root: "/proj", owner: null })
+    const { started, deps } = setUp({ root: "/proj", kind: "jj", owner: null })
     await sendChat(deps, ALICE, "s-1", chat("@agent read /proj/a.txt"))
     expect(started[0]?.details.text).toBe(
       "@agent read /mnt/host-working-copy/a.txt",

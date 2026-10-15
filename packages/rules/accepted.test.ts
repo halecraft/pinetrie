@@ -1,13 +1,15 @@
 import {
   ACCEPTED_ACTIONS,
   type AcceptedRecord,
-  type CommitId,
   commitId,
   type EntryLike,
   ERR,
   entryId,
   indexTree,
   type LaneBase,
+  type PointId,
+  pointFromCommit,
+  pointId,
   type RevisionRecord,
   type ThreadName,
   threadIdFor,
@@ -342,7 +344,7 @@ describe("planBegin: accepted work, or a WIP's copy", () => {
   test("accepted work's commit by default", () => {
     expect(begin(null, { acceptedCommit: L, wip: null })).toEqual({
       kind: "accepted",
-      commit: L,
+      point: L,
     })
   })
   test("a WIP above accepted work: its copy on accepted commit under it", () => {
@@ -364,12 +366,12 @@ describe("planBegin: accepted work, or a WIP's copy", () => {
 describe("parentNow and planParentUpdate: the thread a lane branched from", () => {
   const P = threadIdFor("p")
   const L = threadIdFor("l")
-  const C = (n: number) => commitId(`c${n}`)
+  const C = (n: number) => pointId(`c${n}`)
   const node = (
     id: string,
     parentId: string | null,
     role: string,
-    merged?: CommitId[],
+    merged?: PointId[],
   ): EntryLike => ({
     id: entryId(id),
     parentId: parentId === null ? null : entryId(parentId),
@@ -394,14 +396,14 @@ describe("parentNow and planParentUpdate: the thread a lane branched from", () =
   const rec = (
     entry: string,
     lane: typeof P,
-    commit: CommitId,
+    point: PointId,
     conflicts: string[] = [],
   ): [ReturnType<typeof entryId>, RevisionRecord] => [
     entryId(entry),
     {
       entry: entryId(entry),
       lane,
-      commit,
+      point,
       snapshot: null,
       paths: [],
       conflicts,
@@ -461,7 +463,7 @@ describe("parentNow and planParentUpdate: the thread a lane branched from", () =
       kind: "parent",
       lane: P,
       name: "amber-fox",
-      commit: C(4),
+      point: C(4),
       caughtUpWith: C(2),
     })
     expect(planParentUpdate(now("4-u", "5-m"), false)).toEqual({
@@ -473,13 +475,13 @@ describe("parentNow and planParentUpdate: the thread a lane branched from", () =
 })
 
 describe("planUpdateFrom: always the base the thread follows", () => {
-  const L = commitId("l1")
+  const L = pointId("l1")
   const W = commitId("w1")
-  const COPY = commitId("c1")
+  const COPY = pointId("c1")
   const wipBase: LaneBase = {
     base: { kind: "wip", bookmark: "wip/x" },
     start: COPY,
-    source: W,
+    source: pointFromCommit(W),
   }
   const acceptedBase: LaneBase = {
     base: { kind: "accepted" },
@@ -492,13 +494,13 @@ describe("planUpdateFrom: always the base the thread follows", () => {
       base: wipBase,
       state: "ok",
       toAccepted: false,
-      acceptedCommit: L,
+      acceptedPoint: L,
       wipNow: now,
       ...over,
     })
   const line = (mark: boolean) => ({
     kind: "accepted",
-    commit: L,
+    point: L,
     mark,
   })
   test("a WIP thread merges a fresh copy of its WIP; nothing when it has not moved", () => {
@@ -528,6 +530,6 @@ describe("planUpdateFrom: always the base the thread follows", () => {
     expect(from({ state: "gone", wipNow: null, toAccepted: true })).toEqual(
       line(true),
     )
-    expect(from({ acceptedCommit: null })).toBe(ERR.NOT_SET_UP)
+    expect(from({ acceptedPoint: null })).toBe(ERR.NOT_SET_UP)
   })
 })

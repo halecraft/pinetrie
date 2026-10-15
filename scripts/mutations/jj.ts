@@ -423,8 +423,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork skips jj new",
     file: "packages/jj/lane/plan.ts",
-    from: '          inLane("jj", "new", ...start.commits),',
-    to: '          inLane("true"),',
+    from: '            inLane("jj", "new", ...recorded),',
+    to: '            inLane("true"),',
     command: repoTest,
     expect: "the whole life of a lane",
   },
@@ -898,7 +898,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork works on its parent's working-copy change",
     file: "packages/jj/lane/plan.ts",
-    from: '            inLane("jj", "new", ...start.commits),\n',
+    from: '            inLane("jj", "new", ...recorded),\n',
     to: "",
     suite: "lanes",
     scenario: "main",
@@ -1048,8 +1048,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a WIP's copy fetches the lane's own copy too",
     file: "packages/jj/lane/plan.ts",
-    from: "    steps: [fetchById([from.commit]), ...planWipCopy(from, from.on)],",
-    to: "    steps: [fetchById([from.commit, from.on]), ...planWipCopy(from, from.on)],",
+    from: "    steps: [fetchById([from.commit]), ...planWipCopy(from, commit(from.on))],",
+    to: "    steps: [\n      fetchById([from.commit, commit(from.on)]),\n      ...planWipCopy(from, commit(from.on)),\n    ],",
     command: unit,
     expect: "a WIP's copy fetches only the WIP's commit",
   },
@@ -1146,5 +1146,27 @@ export const mutations: readonly Mutation[] = [
     to: '  return (await commitsOf(jj, "@"))[0] as CommitId',
     command: portSuite,
     expect: "a turn that committed, and a clean merge, each schedule one fetch",
+  },
+  {
+    name: "proveJjLane proves any lane with a copy",
+    file: "packages/jj/lane/points.ts",
+    from: '  return laneFits(own, "jj") ?? (own as JjLane)\n',
+    to: "  return own as JjLane\n",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/jj/lane/points.test.ts",
+    ],
+    expect:
+      "a jj lane's record is proven; a folder lane's is foreign; one with no copy has none",
+  },
+  {
+    name: "a jj lane is any lane's record",
+    file: "packages/jj/lane/points.ts",
+    from: '  readonly history: "jj"\n  readonly [jjLaneBrand]: true\n',
+    to: '  readonly history: "jj"\n',
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
 ]

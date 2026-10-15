@@ -275,6 +275,9 @@ export {
   tokensWords,
 } from "./fact.ts"
 export {
+  foreignIn,
+  foreignLaneWords,
+  foreignRefusal,
   HELD_WORDS,
   heldIn,
   holdingOf,
@@ -285,6 +288,7 @@ export {
   type ThreadHolding,
   TRASHED_WORDS,
   takenIn,
+  threadsOf,
 } from "./held.ts"
 export { pastedImages, planImages } from "./images.ts"
 export {
@@ -503,6 +507,7 @@ export {
   type OfferAsk,
   parseOfferPath,
   planOfferRead,
+  type RecordedSpan,
   reviewUrl,
 } from "./review.ts"
 export {
@@ -614,10 +619,12 @@ export {
 export {
   FILES_LOST,
   type FilesLostRecord,
-  forkPoint,
+  type ForkSource,
+  forkSource,
   LANE,
   PROJECT,
   PROJECT_KEY,
   planTurnRecord,
   REVISION,
+  sourceHistory,
 } from "./work.ts"

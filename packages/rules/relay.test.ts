@@ -57,6 +57,7 @@ const relay = (over: Partial<Parameters<typeof planRelay>[0]> = {}) =>
     fromName: "sable-meadow",
     to: fox,
     toName: "amber-fox",
+    toForeign: null,
     fromReach: OPEN,
     toReach: OPEN,
     members: [fox],
@@ -117,6 +118,18 @@ describe("planRelay", () => {
     })
     expect(relay({ spent: true })).toMatchObject({ why: { kind: "spent" } })
     expect(relay({ to: here })).toMatchObject({ why: { kind: "self" } })
+  })
+  test("a thread whose lane keeps a history of another kind cannot be asked, and is told why", () => {
+    const lane = { kind: "foreign", lane: fox, history: "folder" } as const
+    const refused = relay({ toForeign: lane })
+    expect(refused).toEqual({
+      kind: "refused",
+      why: { kind: "foreign", name: "amber-fox", lane },
+    })
+    if (refused.kind !== "refused") return
+    expect(relayRefusalText(refused.why, () => "Bea")).toBe(
+      "amber-fox cannot be asked: this thread's work was made when the project had no jj repo.",
+    )
   })
 })
 

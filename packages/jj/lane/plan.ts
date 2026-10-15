@@ -8,6 +8,7 @@ import {
   type CommitId,
   type ForkStart,
   HOST_WORKING_COPY,
+  type PointId,
   shellWord,
   type ThreadId,
   WORKSPACE_ROOT,
@@ -21,6 +22,7 @@ import {
   OLD_LANE_CONFIG_DIR,
 } from "@pinetrie/lanes"
 import { bookmarkName, FETCHED_REF, stackBookmark } from "./names.ts"
+import { commitFromPoint, type JjLane } from "./points.ts"
 
 /**
  * A fork's whole jj config: in the repo at `repo`, everything at or above its
@@ -123,33 +125,39 @@ export interface MergePlan {
 }
 
 /**
- * An update's steps. A WIP's copy fetches only the WIP's commit:
- * the copy's parent is the lane's own. The thread it branched from is merged
- * as accepted work's commit is, with no `Pinetrie-Base`: it is no base, and what
- * the lane holds of it is its history.
+ * An update's steps in `lane`, whose points are commits. A WIP's copy
+ * fetches only the WIP's commit: the copy's parent is the lane's own. The
+ * thread it branched from is merged as accepted work's commit is, with no
+ * `Pinetrie-Base`: it is no base, and what the lane holds of it is its
+ * history.
  */
-export function planMerge(from: BaseMerge): MergePlan {
-  if (from.kind === "accepted")
+export function planMerge(lane: JjLane, from: BaseMerge): MergePlan {
+  const commit = (p: PointId) => commitFromPoint(lane, p)
+  if (from.kind === "accepted") {
+    const accepted = commit(from.point)
     return {
-      steps: [fetchById([from.commit])],
-      source: from.commit,
+      steps: [fetchById([accepted])],
+      source: accepted,
       message: baseMessage("catch up: accepted work", {
         kind: "accepted",
-        commit: from.commit,
+        commit: accepted,
       }),
       mark: from.mark,
-      came: { from: null, to: from.commit },
+      came: { from: null, to: accepted },
     }
-  if (from.kind === "parent")
+  }
+  if (from.kind === "parent") {
+    const newest = commit(from.point)
     return {
-      steps: [fetchById([from.commit])],
-      source: from.commit,
+      steps: [fetchById([newest])],
+      source: newest,
       message: `catch up: ${from.name}`,
       mark: false,
-      came: { from: from.caughtUpWith, to: from.commit },
+      came: { from: commit(from.caughtUpWith), to: newest },
     }
+  }
   return {
-    steps: [fetchById([from.commit]), ...planWipCopy(from, from.on)],
+    steps: [fetchById([from.commit]), ...planWipCopy(from, commit(from.on))],
     source: "copy",
     message: `update: ${from.bookmark}`,
     mark: false,
@@ -204,35 +212,40 @@ export function planJoins(
 }
 
 /**
- * The lane steps that make a disk a fork: a change of its own, before any
- * other jj command runs there, the lane's bookmark at its base, and
- * inherited history made immutable. Without it, the fork's first turn reuses
- * its parent's change id, and your repo sees a divergent change. A base with
- * several parents is committed once, empty, so the bookmark names one commit.
- * A lane starting on accepted work or a WIP's copy is based on the commit that
- * names it.
+ * The lane steps that make a disk a fork of `jj`, whose points are commits:
+ * a change of its own, before any other jj command runs there, the lane's
+ * bookmark at its base, and inherited history made immutable. Without it,
+ * the fork's first turn reuses its parent's change id, and your repo sees a
+ * divergent change. A base with several parents is committed once, empty, so
+ * the bookmark names one commit. A lane starting on accepted work or a WIP's
+ * copy is based on the commit that names it.
  */
-export function planForkSetup(lane: ThreadId, start: ForkStart): LaneStep[] {
+export function planForkSetup(jj: JjLane, start: ForkStart): LaneStep[] {
+  const { lane } = jj
+  const recorded =
+    start.kind === "recorded"
+      ? start.points.map(p => commitFromPoint(jj, p))
+      : []
   const base: LaneStep[] =
     start.kind === "accepted"
-      ? planAcceptedStart(start.commit)
+      ? planAcceptedStart(commitFromPoint(jj, start.point))
       : start.kind === "wip"
         ? [
             fetchById([start.commit, start.under]),
             ...planWipCopy(start, start.under),
           ]
         : [
-            fetchById(start.commits),
-            inLane("jj", "new", ...start.commits),
-            ...(start.commits.length > 1
+            fetchById(recorded),
+            inLane("jj", "new", ...recorded),
+            ...(recorded.length > 1
               ? [inLane("jj", "commit", "-m", `base: ${lane}`)]
               : []),
           ]
   // A start made here is known only once made: the config reads @-.
   const immutable =
-    start.kind !== "commits" || start.commits.length > 1
+    start.kind !== "recorded" || recorded.length > 1
       ? `"$(jj --ignore-working-copy log --no-graph -r @- -T commit_id)"`
-      : shellWord(start.commits[0] ?? "")
+      : shellWord(recorded[0] ?? "")
   // After `planFork`'s pre-rename removal of the old config folder.
   return [
     ...base,

@@ -251,7 +251,7 @@ async function mainSection(
       "each turn of a lane of its own records a snapshot, and your repo fetches its commits",
       ofOne.length >= 2 &&
         ofOne.every(r => r.snapshot !== null) &&
-        ofOne.some(r => r.commit !== null && r.commit === oneTip),
+        ofOne.some(r => r.point !== null && r.point === oneTip),
       `${ofOne.length} records`,
     )
     const refusal =
@@ -362,7 +362,7 @@ async function mainSection(
       tree(),
       rootRecordsOf(wh, readRevisions),
       at(setUp),
-    ).commit
+    ).point
     script.use([
       {
         tool: "bash",

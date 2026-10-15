@@ -5,9 +5,9 @@
 import {
   type AcceptedFacts,
   type BaseRecord,
+  type CommitBase,
   type CommitId,
   commitId,
-  type LaneBase,
   type RepoConfig,
 } from "@pinetrie/core"
 import { lines, type Runner } from "@pinetrie/lanes"
@@ -203,7 +203,7 @@ export async function beginFacts(
 async function wipFacts(
   jj: Runner,
   repoConfig: RepoConfig,
-  base: LaneBase | null,
+  base: CommitBase | null,
 ): Promise<{
   readonly bookmark: CommitId | null
   readonly bookmarkInAccepted: boolean
@@ -255,6 +255,6 @@ export function wipState(
 export const readWipState = async (
   jj: Runner,
   repoConfig: RepoConfig,
-  base: LaneBase | null,
+  base: CommitBase | null,
 ): Promise<BaseRecord["state"]> =>
   wipState(await wipFacts(jj, repoConfig, base))

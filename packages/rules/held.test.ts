@@ -5,19 +5,30 @@ import {
   livePlaceOf,
   NO_CONTENT,
   rootIdFor,
+  snapshotId,
   taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  foreignIn,
   heldIn,
   holdingOf,
   holdingWords,
   runsIn,
   TRASHED_WORDS,
   takenIn,
+  threadsOf,
 } from "./held.ts"
+
+/** `heldIn` over `threadsOf`: the gate's two steps, as it takes them. */
+const heldAt = (
+  at: Parameters<typeof threadsOf>[0],
+  cards: Parameters<typeof heldIn>[1],
+  threadAt: Parameters<typeof threadsOf>[1],
+  forkOf: Parameters<typeof threadsOf>[2],
+) => heldIn(threadsOf(at, threadAt, forkOf), cards)
 
 const T = threadIdFor("t")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -101,7 +112,7 @@ describe("runsIn: what each command runs or writes a message in", () => {
     ]
     const none = new Map()
     expect(
-      heldIn([{ kind: "thread", thread: T }], held, () => null, none),
+      heldAt([{ kind: "thread", thread: T }], held, () => null, none),
     ).toEqual({ thread: T, holding: { kind: "held", by: BEA } })
     const COPY = threadIdFor("copy")
     const branch = {
@@ -110,13 +121,13 @@ describe("runsIn: what each command runs or writes a message in", () => {
       entry: entryId("e"),
       starts: COPY,
     } as const
-    expect(heldIn([branch], held, () => T, none)).toEqual({
+    expect(heldAt([branch], held, () => T, none)).toEqual({
       thread: T,
       holding: { kind: "held", by: BEA },
     })
     // A copy's first send, at its record's fork, runs in the copy.
     expect(
-      heldIn(
+      heldAt(
         [branch],
         held,
         () => T,
@@ -124,9 +135,53 @@ describe("runsIn: what each command runs or writes a message in", () => {
       ),
     ).toBeNull()
     expect(
-      heldIn([{ kind: "thread", thread: T }], [], () => null, none),
+      heldAt([{ kind: "thread", thread: T }], [], () => null, none),
     ).toBeNull()
   })
+})
+
+test("foreignIn: a run on a lane of another kind, a thread's own or the one a send at an entry clones", () => {
+  const COPY = threadIdFor("copy")
+  const lane = (history: "jj" | "folder") => ({
+    lane: T,
+    root: ROOT,
+    history,
+    by: BEA,
+    createdAt: 0,
+  })
+  const above = {
+    lane: T,
+    point: null,
+    pointLane: null,
+    snapshot: snapshotId("e"),
+    snapshotLane: T,
+  }
+  const facts = (history: "jj" | "folder", kind: "jj" | null = "jj") => ({
+    lanes: new Map([[T, lane(history)]]),
+    kind,
+    aboveAt: () => above,
+  })
+  const thread = { kind: "thread", thread: T } as const
+  // A copy's first send, at the copied thread's entry: the copy's lane would
+  // clone T's disk, whatever the copy's own record.
+  const copy = {
+    kind: "entry",
+    root: ROOT,
+    entry: entryId("e"),
+    starts: COPY,
+  } as const
+  expect(foreignIn([thread], facts("folder"))).toEqual({
+    kind: "foreign",
+    lane: T,
+    history: "folder",
+  })
+  expect(foreignIn([copy], facts("folder"))).toEqual({
+    kind: "foreign",
+    lane: COPY,
+    history: "folder",
+  })
+  expect(foreignIn([thread, copy], facts("jj"))).toBeNull()
+  expect(foreignIn([thread, copy], facts("folder", null))).toBeNull()
 })
 
 test("takenIn: the threads a change puts in an inventory that were not in one", () => {
@@ -162,7 +217,7 @@ test("a trashed thread is held by nobody, but its discard stops its run and a co
   expect(holdingOf([trashed], T)).toEqual({ kind: "trashed" })
   expect(holdingOf([on], T)).toEqual({ kind: "free" })
   expect(
-    heldIn([{ kind: "thread", thread: T }], [trashed], () => null, new Map()),
+    heldAt([{ kind: "thread", thread: T }], [trashed], () => null, new Map()),
   ).toEqual({ thread: T, holding: { kind: "trashed" } })
   expect(holdingWords({ kind: "trashed" })).toBe(TRASHED_WORDS)
 })

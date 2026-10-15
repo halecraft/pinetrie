@@ -48,14 +48,14 @@ import type { CardPort } from "../cards.ts"
 import { applyPlaceSteps } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
 import type { Records } from "../records.ts"
-import type { Runs } from "../runs.ts"
+import { type Runs, startRun } from "../runs.ts"
 import type { LaneWork } from "../work/index.ts"
 
 export interface LaneDeps {
   readonly basics: Basics
   readonly agent: Pick<Agent, "lane">
   readonly records: Pick<Records, "writeValues">
-  readonly work: Pick<LaneWork, "destination">
+  readonly work: Pick<LaneWork, "destination" | "runnable">
   readonly start: Runs["start"]
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
   readonly cancel: Runs["cancel"]
@@ -210,7 +210,9 @@ export async function handleQueueHold(
  * keeper, so a second press finds the lane busy.
  */
 export async function handleCarryOn(
-  deps: Pick<LaneDeps, "basics" | "cards" | "start">,
+  deps: Pick<LaneDeps, "basics" | "cards" | "start"> & {
+    readonly work: Pick<LaneWork, "runnable">
+  },
   lane: ThreadId,
   by: WriterId,
 ): Promise<Outcome> {
@@ -225,14 +227,11 @@ export async function handleCarryOn(
     },
   )
   if (planned.kind === "refused") return planned
-  return {
-    kind: "started",
-    runId: deps.start(lane, {
-      kind: "prompt",
-      message: planned.message,
-      pinnedSeen: [],
-    }),
-  }
+  return startRun(deps, lane, {
+    kind: "prompt",
+    message: planned.message,
+    pinnedSeen: [],
+  })
 }
 
 /** An offer or accepted work's action on a host without tools: no repo to act on. */

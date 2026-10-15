@@ -123,9 +123,23 @@ export function parseOfferPath(url: URL): OfferAsk | "bad" | null {
 /** A diff past this many bytes of UTF-8 is refused, not sent. */
 export const MAX_DIFF_BYTES = 1024 * 1024
 
+/**
+ * A span found in a record: an offer's revision, or a range one lane's turns
+ * recorded, naming that lane, whose points only it can read.
+ */
+export type RecordedSpan =
+  | Extract<DiffSpan, { readonly kind: "revision" }>
+  | (Extract<DiffSpan, { readonly kind: "range" }> & {
+      readonly lane: ThreadId
+    })
+
 type OfferRead =
-  | { readonly kind: "review"; readonly span: DiffSpan }
-  | { readonly kind: "diff"; readonly span: DiffSpan; readonly path: string }
+  | { readonly kind: "review"; readonly span: RecordedSpan }
+  | {
+      readonly kind: "diff"
+      readonly span: RecordedSpan
+      readonly path: string
+    }
   | {
       readonly kind: "refused"
       readonly status: 400 | 404
@@ -139,8 +153,8 @@ const CONTROL = /[\u0000-\u001f\u007f]/
 /**
  * What a request may read, so it reaches nothing of your repo but what a thread
  * made: a revision an open offer holds now (what accepting it would bring), or
- * a range between two commits one lane's turns recorded (an ask's work). The
- * commits read are the records', never the request's strings.
+ * a range between two states one lane's turns recorded (an ask's work), with
+ * that lane. The ids read are the records', never the request's strings.
  */
 export function planOfferRead(
   facts: {
@@ -168,19 +182,19 @@ export function planOfferRead(
 function recordedSpan(
   facts: Parameters<typeof planOfferRead>[0],
   asked: AskedSpan,
-): DiffSpan | null {
+): RecordedSpan | null {
   if (asked.kind === "revision") {
     const commit = [...facts.offers.values()]
       .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))
       .find(c => c === asked.commit)
     return commit === undefined ? null : { kind: "revision", commit }
   }
-  const named = (c: string) =>
-    [...facts.revisions.values()].filter(r => r.commit === c)
+  const named = (p: string) =>
+    [...facts.revisions.values()].filter(r => r.point === p)
   for (const f of named(asked.from))
     for (const t of named(asked.to))
-      if (f.lane === t.lane && f.commit !== null && t.commit !== null)
-        return { kind: "range", from: f.commit, to: t.commit }
+      if (f.lane === t.lane && f.point !== null && t.point !== null)
+        return { kind: "range", from: f.point, to: t.point, lane: f.lane }
   return null
 }
 

@@ -4,8 +4,8 @@
 
 import type {
   CatchUpRead,
+  CommitBase,
   CommitId,
-  LaneBase,
   NonEmpty,
   StartRead,
 } from "@pinetrie/core"
@@ -48,7 +48,7 @@ export function planCatchUpRead(input: {
  * start.
  */
 export function catchUpHolds(input: {
-  readonly base: LaneBase
+  readonly base: CommitBase
   readonly start: StartRead
   readonly target: CatchUpTarget
 }): NonEmpty<CommitId> {
@@ -116,7 +116,7 @@ export async function catchUpFiles(
 export async function readCatchUp(
   jj: Runner,
   input: {
-    readonly base: LaneBase
+    readonly base: CommitBase
     readonly start: StartRead
     readonly target: CatchUpTarget
     readonly tip: CommitId

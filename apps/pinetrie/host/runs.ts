@@ -8,7 +8,9 @@
 
 import {
   type EntryId,
+  type Refusal,
   type RunId,
+  type RunnableLane,
   runId,
   type SentCard,
   type StreamEvent,
@@ -18,6 +20,7 @@ import type { Agent } from "@pinetrie/pi"
 import { readLatestPrompt } from "@pinetrie/reads"
 import {
   CHAT_TYPE,
+  foreignRefusal,
   type HeardMessage,
   type PinnedMessage,
   type PromptMessage,
@@ -69,8 +72,10 @@ export interface Runs {
   /**
    * Start one turn on a thread's lane, streaming into the document. A
    * prompt's run reads its pinned cards first, which may wait for their text.
+   * Only a lane proven runnable (`LaneWork.runnable`) starts one, so none
+   * starts on a lane of another kind, whatever path asks.
    */
-  start(lane: ThreadId, start: RunStart): RunId
+  start(lane: RunnableLane, start: RunStart): RunId
   /**
    * Stop a chat's run that has not reached pi yet: it is waiting for its
    * pinned cards' text, where pi's `abort` reaches nothing. Its message is
@@ -281,4 +286,24 @@ export function createRuns(deps: {
       ended = listener
     },
   }
+}
+
+/**
+ * A run on `lane`, proven runnable first (`LaneWork.runnable`); on a lane of
+ * another kind, the refusal instead. The gates before a run (the
+ * dispatcher's, the drain's, a relay's reach) refuse it with words first:
+ * this is what a path past them would meet.
+ */
+export function startRun(
+  deps: {
+    readonly work: Pick<LaneWork, "runnable">
+    readonly start: Runs["start"]
+  },
+  lane: ThreadId,
+  start: RunStart,
+): { readonly kind: "started"; readonly runId: RunId } | Refusal {
+  const runnable = deps.work.runnable(lane)
+  return typeof runnable === "object"
+    ? foreignRefusal(runnable)
+    : { kind: "started", runId: deps.start(runnable, start) }
 }

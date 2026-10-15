@@ -6,6 +6,7 @@ import {
   commitId,
   entryId,
   type OfferRecord,
+  pointFromCommit,
   type RootRecord,
   rootIdFor,
   SESSION_TARGET,
@@ -157,7 +158,7 @@ const SAMPLES: readonly Sample[] = [
   sample(
     "lane",
     LANE,
-    { lane: L, root: TEST_ROOT, ownCopy: true, by: ADA, createdAt: 1 },
+    { lane: L, root: TEST_ROOT, history: "jj", by: ADA, createdAt: 1 },
     "lane",
   ),
   sample(
@@ -166,7 +167,7 @@ const SAMPLES: readonly Sample[] = [
     {
       entry: E,
       lane: L,
-      commit: C,
+      point: pointFromCommit(C),
       snapshot: snapshotId("e-1"),
       paths: [],
       conflicts: [],
@@ -235,7 +236,7 @@ const SAMPLES: readonly Sample[] = [
     { message: E, thread: L, by: ADA, limit: 200, spent: 10, over: false },
     "message",
   ),
-  sample("project", PROJECT, { root: "/p", owner: ADA }, null),
+  sample("project", PROJECT, { root: "/p", kind: "jj", owner: ADA }, null),
   sample(
     "access",
     ACCESS,

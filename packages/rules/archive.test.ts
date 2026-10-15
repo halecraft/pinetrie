@@ -2,7 +2,6 @@ import {
   type ArchivedTask,
   type CardRecord,
   cardIdOfKind,
-  commitId,
   type EntryLike,
   ERR,
   entryId,
@@ -10,6 +9,7 @@ import {
   indexTree,
   type LaneView,
   NO_CONTENT,
+  pointId,
   type RevisionRecord,
   rootIdFor,
   snapshotId,
@@ -123,7 +123,7 @@ describe("planArchive", () => {
     ): RevisionRecord => ({
       entry: entryId(entry),
       lane,
-      commit: commit === null ? null : commitId(commit),
+      point: commit === null ? null : pointId(commit),
       snapshot: snapshot === null ? null : snapshotId(snapshot),
       paths: [],
       conflicts: [],
@@ -149,8 +149,8 @@ describe("planArchive", () => {
         teardown: {
           forget: [A, B],
           refs: [
-            { lane: A, commit: null },
-            { lane: B, commit: null },
+            { lane: A, point: null },
+            { lane: B, point: null },
           ],
           snapshots: ["s-a1"],
         },
@@ -178,7 +178,7 @@ describe("planArchive", () => {
       expect(plan({ crossing: "restore", own, revisions })).toMatchObject({
         teardown: {
           forget: [],
-          refs: [{ lane: A, commit: "c0000000-0000-7000-8000-00000000000a" }],
+          refs: [{ lane: A, point: "c0000000-0000-7000-8000-00000000000a" }],
           snapshots: [],
         },
         unload: [],
@@ -420,7 +420,7 @@ describe("archivedIn", () => {
 test("planLanesGone: a deleted thread's lanes forgotten, their refs deleted, no snapshot kept with no revision", () => {
   expect(planLanesGone([LANE_X], new Map(), [])).toEqual({
     forget: [LANE_X],
-    refs: [{ lane: LANE_X, commit: null }],
+    refs: [{ lane: LANE_X, point: null }],
     snapshots: [],
   })
   expect(planLanesGone([], new Map(), [])).toEqual({

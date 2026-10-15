@@ -26,6 +26,7 @@ import {
   COMMANDS,
   COMMANDS_KEY,
   deleteRecord,
+  foreignLaneWords,
   ICONS,
   PROJECT,
   planAccessRecovery,
@@ -69,7 +70,7 @@ export interface StartupDeps {
   readonly records: Pick<Records, "writeValues">
   /** The commands pi loaded, written as a record, and those it refused, logged. */
   readonly piSetup: Pick<PiSetup, "commands" | "refusedCommands">
-  readonly work: Pick<LaneWork, "project">
+  readonly work: Pick<LaneWork, "project" | "runnable">
   /** Where icons come from, as the config chose: published for the page. */
   readonly icons: IconsRecord
   /** What the host read of its config: published for the setup page. */
@@ -132,7 +133,9 @@ export async function recover(deps: StartupDeps): Promise<void> {
   await deps.ensureNames()
   const planned = planStartup({
     cards: readPlaces(places),
-    interrupted: await agent.interrupted(deps.roots),
+    interrupted: (await agent.interrupted(deps.roots)).map(l =>
+      work.runnable(l),
+    ),
     verdicts: [...readVerdicts(doc).values()],
   })
   for (const lane of planned.resume) {
@@ -140,6 +143,11 @@ export async function recover(deps: StartupDeps): Promise<void> {
       `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,
     )
     deps.start(lane, { kind: "resume" })
+  }
+  for (const foreign of planned.kept) {
+    log(
+      `[host] ${readThreadName(doc, foreign.lane)} stays interrupted: ${foreignLaneWords(foreign)}`,
+    )
   }
   const changed = [
     ...planned.unclassified.map(v => setRecord(VERDICT, v)),

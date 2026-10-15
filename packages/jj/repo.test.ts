@@ -13,6 +13,7 @@ import path from "node:path"
 import {
   baseMessage,
   type CatchUpRead,
+  type CommitBase,
   type CommitId,
   commitId,
   type EntryId,
@@ -20,9 +21,9 @@ import {
   entryOfMessage,
   firstLine,
   hasTrailer,
-  type LaneBase,
   NO_EDITOR,
   type OfferSource,
+  pointFromCommit,
   type RepoConfig,
   type ThreadId,
   type ThreadName,
@@ -50,6 +51,7 @@ import {
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { acceptedFacts } from "./accepted.ts"
 import { catchUpFiles, readCatchUp } from "./catch-up.ts"
+import { jjLaneFor } from "./fixtures.ts"
 import { laneBase } from "./lane/base.ts"
 import { bookmarkOf } from "./lane/bookmarks.ts"
 import {
@@ -136,7 +138,7 @@ const knownStart = async (
   jj: Runner,
   input: {
     readonly tip: CommitId
-    readonly base: LaneBase
+    readonly base: CommitBase
     readonly repoConfig: RepoConfig
   },
 ): Promise<readonly CommitId[]> => {
@@ -159,7 +161,7 @@ const turnOn = async (
       ...input,
       bookmark: await bookmarkOf(jj, input.lane),
     })
-  ).commit
+  ).point
 
 /** Your default `jj log`, as descriptions. */
 const defaultLog = async (jj: Runner): Promise<string> =>
@@ -321,7 +323,10 @@ describe("a lane's repo, with jj", () => {
     await inLane(laneDir, planBaseCheckout({ yours: base, fresh: true }))
     await inLane(
       laneDir,
-      planForkSetup(LANE, { kind: "commits", commits: base }),
+      planForkSetup(jjLaneFor(LANE), {
+        kind: "recorded",
+        points: base.map(pointFromCommit),
+      }),
     )
     expect(await readFile(path.join(laneDir, "shared.txt"), "utf8")).toContain(
       "two",
@@ -486,7 +491,10 @@ describe("a lane's repo, with jj", () => {
     await cp(laneDir, forkDir, { recursive: true, verbatimSymlinks: true })
     await inLane(
       forkDir,
-      planForkSetup(FORK, { kind: "commits", commits: [point] }),
+      planForkSetup(jjLaneFor(FORK), {
+        kind: "recorded",
+        points: [point].map(pointFromCommit),
+      }),
     )
     const forkJj = laneJjAt(forkDir)
     expect(await readFile(path.join(forkDir, "cache.bin"), "utf8")).toBe(
@@ -523,7 +531,7 @@ describe("a lane's repo, with jj", () => {
     await cp(laneDir, rootDir, { recursive: true, verbatimSymlinks: true })
     await inLane(
       rootDir,
-      planForkSetup(ROOT, { kind: "wip", ...(await wipNow()) }),
+      planForkSetup(jjLaneFor(ROOT), { kind: "wip", ...(await wipNow()) }),
     )
     const rootJj = laneJjAt(rootDir)
     expect(await readFile(path.join(rootDir, "yours-only.txt"), "utf8")).toBe(
@@ -603,7 +611,10 @@ describe("a lane's repo, with jj", () => {
       const forkDir = path.join(top, `self-${how}-fork`)
       await cp(laneDir, forkDir, { recursive: true, verbatimSymlinks: true })
       await inLane(
-        planForkSetup(FORK, { kind: "commits", commits: [turn ?? first] }),
+        planForkSetup(jjLaneFor(FORK), {
+          kind: "recorded",
+          points: [turn ?? first].map(pointFromCommit),
+        }),
         forkDir,
       )
       expect(await readFile(path.join(forkDir, "b.txt"), "utf8")).toBe("b\n")
@@ -631,9 +642,9 @@ describe("a lane's repo, with jj", () => {
       laneBytes: hostBytesRunner(laneDir),
     }
     const acceptedMerge = async (mark = false) =>
-      planMerge({
+      planMerge(jjLaneFor(LANE), {
         kind: "accepted",
-        commit: await acceptedNow(),
+        point: pointFromCommit(await acceptedNow()),
         mark,
       })
     const yours = async (file: string, text: string, title: string) => {
@@ -672,7 +683,10 @@ describe("a lane's repo, with jj", () => {
       runners,
     )
     await executeOrThrow(
-      planForkSetup(LANE, { kind: "commits", commits: [base] }),
+      planForkSetup(jjLaneFor(LANE), {
+        kind: "recorded",
+        points: [base].map(pointFromCommit),
+      }),
       runners,
     )
     // A lane from before accepted work has no `Pinetrie-Base`; its own repo has no
@@ -776,7 +790,13 @@ describe("a lane's repo, with jj", () => {
     const [w1] = await commitsOf(yoursJj, "@-")
     if (w1 === undefined) throw new Error("no wip")
     const wipMerge = (commit: CommitId, on: CommitId) =>
-      planMerge({ kind: "wip", bookmark: "wip/x", commit, under: line2, on })
+      planMerge(jjLaneFor(LANE), {
+        kind: "wip",
+        bookmark: "wip/x",
+        commit,
+        under: line2,
+        on: pointFromCommit(on),
+      })
     const beforeFirst = await head()
     const first = await mergeUpdate(laneJj, runners, LANE, wipMerge(w1, line2))
     expect(first).toMatchObject({
@@ -1106,9 +1126,9 @@ describe("a lane's repo, with jj", () => {
      */
     const catchUp = async (dir = laneDir, lane: ThreadId = LANE) => {
       const commit = await acceptedNow()
-      const plan = planMerge({
+      const plan = planMerge(jjLaneFor(LANE), {
         kind: "accepted",
-        commit,
+        point: pointFromCommit(commit),
         mark: false,
       })
       // The plan's fetch names your repo by its path in a lane: run it here.
@@ -1235,9 +1255,9 @@ describe("a lane's repo, with jj", () => {
     await rig.setUpAccepted()
     await rig.inLane(planBaseCheckout({ yours: base, fresh: true }))
     await rig.inLane(
-      planForkSetup(LANE, {
+      planForkSetup(jjLaneFor(LANE), {
         kind: "accepted",
-        commit: line,
+        point: pointFromCommit(line),
       }),
     )
     await rig.edit(rig.laneDir, "a.txt", "a\n")
@@ -1627,12 +1647,15 @@ describe("a lane's repo, with jj", () => {
         lane: LANE,
         bookmark: merge,
       }),
-    ).toEqual({ commit: null, conflicted: true })
+    ).toEqual({ point: null, conflicted: true })
     // The branch is cloned there, conflicted.
     const forkDir = path.join(top, "parent-fork")
     await cp(laneDir, forkDir, { recursive: true, verbatimSymlinks: true })
     await rig.inLane(
-      planForkSetup(FORK, { kind: "commits", commits: [merge] }),
+      planForkSetup(jjLaneFor(FORK), {
+        kind: "recorded",
+        points: [merge].map(pointFromCommit),
+      }),
       forkDir,
     )
     const forkJj = laneJjAt(forkDir)
@@ -1733,12 +1756,12 @@ describe("a lane's repo, with jj", () => {
     await rig.fetch([parentResolved])
     const newest = await laneTipIn(ops, LANE)
     if (newest === null) throw new Error("no parent tip")
-    const plan = planMerge({
+    const plan = planMerge(jjLaneFor(LANE), {
       kind: "parent",
       lane: LANE,
       name: NAME,
-      commit: newest,
-      caughtUpWith: merge,
+      point: pointFromCommit(newest),
+      caughtUpWith: pointFromCommit(merge),
     })
     // The plan's fetch names your repo by its path in a lane: run it here.
     await rig.inLane(plan.steps, forkDir)
@@ -2457,7 +2480,10 @@ describe("a lane's repo, with jj", () => {
         verbatimSymlinks: true,
       })
       await rig.inLane(
-        planForkSetup(FORK, { kind: "commits", commits: [t1] }),
+        planForkSetup(jjLaneFor(FORK), {
+          kind: "recorded",
+          points: [t1].map(pointFromCommit),
+        }),
         forkDir,
       )
       await rig.edit(forkDir, "k.txt", "k\n")
@@ -2589,7 +2615,7 @@ describe("a lane's repo, with jj", () => {
     if (wip === undefined) throw new Error("no wip")
     await rig.inLane(planBaseCheckout({ yours: base, fresh: true }))
     await rig.inLane(
-      planForkSetup(LANE, {
+      planForkSetup(jjLaneFor(LANE), {
         kind: "wip",
         bookmark: "wip/search",
         commit: wip,
@@ -2731,7 +2757,10 @@ describe("a lane's repo, with jj", () => {
       await inLane(
         [
           laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),
-          ...planForkSetup(FORK, { kind: "commits", commits: [first] }),
+          ...planForkSetup(jjLaneFor(FORK), {
+            kind: "recorded",
+            points: [first].map(pointFromCommit),
+          }),
         ],
         forkDir,
       )
@@ -2757,7 +2786,10 @@ describe("a lane's repo, with jj", () => {
       const onAccepted = await rig.acceptedNow()
       await inLane(planBaseCheckout({ yours: [onAccepted], fresh: true }))
       await inLane(
-        planForkSetup(LANE, { kind: "commits", commits: [onAccepted] }),
+        planForkSetup(jjLaneFor(LANE), {
+          kind: "recorded",
+          points: [onAccepted].map(pointFromCommit),
+        }),
       )
       // The base as the host wrote it before the pine·trie rename.
       await laneJj([

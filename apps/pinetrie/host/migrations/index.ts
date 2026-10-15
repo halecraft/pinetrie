@@ -16,6 +16,8 @@ import { threadOrigin } from "./0011-thread-origin.ts"
 import { unstartedThreads } from "./0012-unstarted-threads.ts"
 import { taskCards } from "./0013-task-cards.ts"
 import { trashLeft } from "./0014-trash-left.ts"
+import { laneHistory } from "./0015-lane-history.ts"
+import { revisionPoint } from "./0016-revision-point.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -72,8 +74,10 @@ export interface RecordMigration {
 
 /**
  * Every one-time record migration this build carries, oldest first:
- * 0009-card-content and 0011-thread-origin, and 0014-trash-left (a trashed card
- * records the place it left). 0003-workflow-archive, 0004-threads, 0005-tasks'
+ * 0009-card-content and 0011-thread-origin, 0014-trash-left (a trashed card
+ * records the place it left), 0015-lane-history (a lane's record names its
+ * history's kind) and 0016-revision-point (a turn's record names its point,
+ * written whole). 0003-workflow-archive, 0004-threads, 0005-tasks'
  * records, 0006-note-columns and 0007-thread-origin ran on Duane's store and
  * were deleted.
  */
@@ -81,6 +85,8 @@ export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   cardContent,
   threadOrigin,
   trashLeft,
+  laneHistory,
+  revisionPoint,
 ]
 
 /** Each stored document's id and the hash of the schema it was written under. */

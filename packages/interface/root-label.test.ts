@@ -84,7 +84,7 @@ describe("labels and summaries, from the directory", () => {
       {
         lane,
         root: rootIdFor(n),
-        ownCopy: false,
+        history: null,
         by: writerId("p-ada"),
         createdAt: 0,
       },

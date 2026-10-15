@@ -12,6 +12,7 @@ import {
   isTaskId,
   isThreadId,
   type NoteColumnId,
+  type PointId,
   type RootId,
   TASK_PATTERN,
   type TaskId,
@@ -89,6 +90,9 @@ export const fixedKey = <K extends string>(
 
 /** A commit id as stored: never empty. */
 export const CommitSchema = Type.Unsafe<CommitId>(Type.String({ minLength: 1 }))
+
+/** A point as stored: the same string a commit id was, never empty. */
+export const PointSchema = Type.Unsafe<PointId>(Type.String({ minLength: 1 }))
 
 /** An entry's id as stored: never empty. */
 export const EntryIdSchema = Type.Unsafe<EntryId>(Type.String({ minLength: 1 }))

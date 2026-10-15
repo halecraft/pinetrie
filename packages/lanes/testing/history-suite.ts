@@ -5,11 +5,11 @@
 
 import {
   type BaseMerge,
-  type CommitId,
   entryId,
+  type PointId,
   type ThreadId,
 } from "@pinetrie/core"
-import type { FileAt, LaneHistory, Point } from "../history-port.ts"
+import type { FileAt, LaneHistory, ReadSite } from "../history-port.ts"
 
 /** A lane of the rig's, started on accepted work as it was then. */
 export interface RigLane {
@@ -29,12 +29,12 @@ export interface RigLane {
 }
 
 export interface HistoryRig {
-  /** Make accepted work's next commit, with `files` written; returns it. */
-  accept(files: Readonly<Record<string, string>>): Promise<CommitId>
+  /** Make accepted work's next state, with `files` written; returns it. */
+  accept(files: Readonly<Record<string, string>>): Promise<PointId>
   /** A new lane, started on accepted work now. */
   lane(): Promise<RigLane>
-  /** `path` at `point` of the destination (`Destination.fileAt`). */
-  fileAt(point: Point, path: string): Promise<FileAt>
+  /** `path` at `site` of the destination (`Destination.fileAt`). */
+  fileAt(site: ReadSite, path: string): Promise<FileAt>
   close(): Promise<void>
 }
 
@@ -54,10 +54,10 @@ export interface SuiteRunner {
 
 const TURN = { title: "a turn", entry: entryId("e-1") }
 
-/** A catch-up with accepted work's `commit`. */
-const acceptedMerge = (commit: CommitId): BaseMerge => ({
+/** A catch-up with accepted work's `point`. */
+const acceptedMerge = (point: PointId): BaseMerge => ({
   kind: "accepted",
-  commit,
+  point,
   mark: false,
 })
 
@@ -105,7 +105,7 @@ export function historySuite(
 
   withRig("a commit with nothing changed commits nothing", async rig => {
     const lane = await rig.lane()
-    expect((await lane.withHistory(h => h.commit(TURN))).commit).toBeNull()
+    expect((await lane.withHistory(h => h.commit(TURN))).point).toBeNull()
   })
 
   withRig(
@@ -191,14 +191,14 @@ export function historySuite(
       const lane = await rig.lane()
       expect(
         await rig.fileAt({ kind: "tip", lane: lane.lane }, "a.txt"),
-      ).toEqual({ kind: "no-point" })
+      ).toEqual({ kind: "no-site" })
       await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
       const made = await lane.withHistory(h => h.recordTurn(TURN))
       made.follow?.()
       await lane.settled()
-      const text = async (point: Point) => {
-        const read = await rig.fileAt(point, "a.txt")
-        return read.kind === "read" ? read.text : "no point"
+      const text = async (site: ReadSite) => {
+        const read = await rig.fileAt(site, "a.txt")
+        return read.kind === "read" ? read.text : "no site"
       }
       expect(await text({ kind: "accepted" })).toBe("one\ntwo\nthree\n")
       expect(await text({ kind: "tip", lane: lane.lane })).toBe(
