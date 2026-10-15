@@ -26,17 +26,21 @@ import {
   type JjProjectDir,
   jjIn,
   planBaseCheckout,
+  planTidyHint,
   prepareShared,
   proveJjLane,
+  readOpLog,
   readWipState,
   renameAccepted,
   revsetName,
   startRepoOwner,
+  TIDY_DAYS,
 } from "@pinetrie/jj"
 import { baseCheckout } from "@pinetrie/lanes"
 import { readLaneRecords, readRunning } from "@pinetrie/reads"
 import { planBegin } from "@pinetrie/rules"
 import { failed, slow } from "../basics.ts"
+import { tidyWords } from "../tidy.ts"
 import type { ProjectAdapter } from "../work/adapter.ts"
 import type { Destination } from "../work/destination.ts"
 import { createAcceptedWork } from "./accepted.ts"
@@ -70,6 +74,25 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
           },
           failed(basics, "renaming accepted work's bookmark"),
         )
+      // Read beside the start, never awaited: the whole op log, once, to say
+      // when `pnpm tidy` would cut it.
+      void owner.track(
+        owner
+          .read(({ jj }) => readOpLog(jj))
+          .then(
+            facts => {
+              const hint = planTidyHint(facts, {
+                days: TIDY_DAYS,
+                now: Math.floor(basics.now() / 1000),
+              })
+              if (hint !== null)
+                log(
+                  `[host] ${tidyWords({ kind: "hint", ...hint, keep: TIDY_DAYS })}`,
+                )
+            },
+            () => {},
+          ),
+      )
       const acceptedRev = `present(${revsetName(names.acceptedBookmark)})`
 
       const fileAtNow: Destination["fileAt"] = (site, path) =>

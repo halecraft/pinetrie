@@ -19,7 +19,12 @@ import { planBundle } from "./lane/plan.ts"
 import { type JjLane, proveJjLane } from "./lane/points.ts"
 import { commitsOf } from "./lane/revisions.ts"
 import { laneTipIn, readOffer, startOfOffer } from "./offer.ts"
-import { planImport, planOffer, planOfferAcceptanceSteps } from "./plan.ts"
+import {
+  markSteps,
+  planImport,
+  planOffer,
+  planOfferAcceptanceSteps,
+} from "./plan.ts"
 import { executeRepo, hostOps } from "./run.ts"
 
 /** `lane`'s record, keeping a jj history, proven. */
@@ -113,16 +118,16 @@ export async function buildOffer(
   const base = await laneBase(ops, tip, repoConfig)
   if (base === null) throw new Error("no base")
   const target = await acceptedIn(ops, repoConfig)
-  await executeRepo(
-    yours,
-    planOffer({
+  await executeRepo(yours, [
+    ...planOffer({
       name,
       start: await knownStart(ops, { tip, base, repoConfig, lane }),
       sources: input.sources,
       target,
       nonce: `n-${Math.random().toString(36).slice(2)}`,
     }),
-  )
+    ...markSteps(offerBookmark(name)),
+  ])
   const read = await readOffer(ops, { name, target })
   if (read?.kind !== "offer") throw new Error("no offer read")
   return {

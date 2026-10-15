@@ -12,7 +12,8 @@ wires them.
 |---|---|
 | `dev.ts`, `serve.ts`, `server.ts`, `invocation.ts` | `pnpm dev [folder]` and `pnpm serve [folder]` (ADR-0086, ADR-0148), each a few lines over `runHost` (`server.ts`): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it; else the session's own, in its data directory for every kind of project, ADR-0150), `refusalText` (a refusal's words, with its command's usage). A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm dev:react` serves React's development build, for its warnings and render timeline (S59) |
 | `page.ts` | the page a host serves (ADR-0148): Vite under `pnpm dev`, else the built page in the page's `dist/`, which `pnpm serve` rebuilds first when its stamp no longer matches its inputs (`ensurePage`), and whose files it reads once at start (`readBuiltPage`); where the page's package is (`pageDir`) |
-| `sessions.ts` | the session a host serves (`openSession`, ADR-0149): the folder's real path looked up in the registry under its lock, the registry written, the session's data directory made and its `host.pid` taken; and `renameSession`, for `pnpm session rename` (`apps/pinetrie/scripts/session.ts`) |
+| `sessions.ts`; and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` | the session a host serves (`openSession`, ADR-0149): the folder's real path looked up in the registry under its lock, the registry written, the session's data directory made and its `host.pid` taken; and `renameSession`, for `pnpm session rename` (`apps/pinetrie/scripts/session.ts`); and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` |
+| `tidy.ts` | `pnpm tidy`'s shell (`apps/pinetrie/scripts/tidy.ts`, ADR-0155): `takeTidyLock`, the session store's own lock taken without waiting, so a host serving the folder refuses the tidy and a host starting during it is refused; the sizes it reports (`sizesOf`); and every line it prints, and the startup line, from values (`tidyWords`). What a tidy does is `@pinetrie/jj`'s `planTidy`. The folder is `invocation.ts`' `planTidyInvocation`, which reads one as `pnpm dev` does (`folderOf`) |
 | `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the session (`sessionLines`), the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model |
 | `settings.ts` | every setting the host reads, declared once (`SETTINGS`, ADR-0146) with the layers that may set it and how they combine; the project's copies as values (`laneAuthority`, `decodeAuthority`, `laneCopy`), `settleHost`, `folderReport` for a host without lane work, and the settled values as the deciding packages take them (`repoNames`, `iconSettings`, `titleSettings`, `sshChoice`, `listedFolders`) |
 | `setup-record.ts` | `planSetupRecord`: the `pinetrie.setup` value, from the config's report and what the model setup loaded |
@@ -1375,6 +1376,11 @@ adapter's.
   (`jj/accepted.ts`), the offers (`jj/offers/`), the fetches (`jj/fetch.ts`)
   and the splits (`jj/split.ts`), and each lane's history (`historyOf`),
   whose `follow` is the lane's fetch into your repo.
+- **A starting host says when a tidy is due** (ADR-0155): one pinned read of
+  your whole op log (`readOpLog`), tracked and never awaited, so the start
+  does not wait for it; when its oldest operation is more than twice the
+  window old (`planTidyHint`), one log line naming `pnpm tidy`
+  (`tidyWords`). A read that fails says nothing.
 - **A lane's fetch reaches the lane through `withHistory`** (`jj/fetch.ts`),
   as anything on a lane's history does, and its import is the owner's.
 - **A split's prompt, and its end** (`jj/split.ts`, `finishSplit`, which
@@ -1489,7 +1495,8 @@ adapter's.
   bookmark move, can still accept an offer you edited there.
 - **The records are written from the repo after each step**
   (`OfferRecords`): an offer's from the read made before planning when the
-  step ran no steps (the common `none` reads nothing more), else from a new
+  step ran no steps (the common `none` reads nothing more; a `mark`, which
+  moves only the host's version of the offer, reads it again), else from a new
   read; `withdraw` and `forget` remove it; an acceptance writes it marked
   accepted (`acceptedAs`; a record from before ADR-0083 says `taken`,
   read as the same).

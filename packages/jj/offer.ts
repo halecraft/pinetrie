@@ -30,7 +30,12 @@ import {
   lines,
   type Runner,
 } from "@pinetrie/lanes"
-import { bookmarkRevset, laneTipName, offerBookmark } from "./lane/names.ts"
+import {
+  bookmarkRevset,
+  hostOfferRevset,
+  laneTipName,
+  offerBookmark,
+} from "./lane/names.ts"
 import {
   ACCEPTED_OFFER_COMMIT_ROW,
   commitsOf,
@@ -45,6 +50,7 @@ import {
   type EvologEntry,
   offerStart,
   parseEvolog,
+  planSinceHost,
   walkToHost,
 } from "./plan.ts"
 
@@ -221,11 +227,11 @@ async function evologOf(
 }
 
 /**
- * One revision's facts since the host's newest version of it: the evolog
- * walked back to it (`walkToHost`), then each version of yours on the way
- * against the one before it (`sameAs`).
+ * The evolog walked back to the host's newest version of a revision
+ * (`walkToHost`), then each version of yours on the way against the one
+ * before it (`sameAs`).
  */
-export async function sinceHost(
+async function walkedSinceHost(
   jj: Runner,
   commit: CommitId,
 ): Promise<RevisionFacts> {
@@ -236,6 +242,81 @@ export async function sinceHost(
     if (!step.sameDescription || !step.sameChange) yoursChanged = true
   }
   return { reached: walk.reached, yoursChanged }
+}
+
+/**
+ * The revision of `change` in the host's version against `commit`: none
+ * found is a revision the host never made; found and changed, yours. The
+ * host's version is often hidden (your edit rewrote it), and `change_id()`
+ * names visible commits only, so its revisions are read from its `depth`
+ * nearest ancestors and matched by change id here.
+ */
+async function comparedWithHost(
+  jj: Runner,
+  input: { readonly commit: CommitId; readonly change: string },
+  host: { readonly commit: CommitId; readonly depth: number },
+): Promise<RevisionFacts> {
+  const was = lines(
+    await query(jj, [
+      "log",
+      "--no-graph",
+      "-r",
+      `ancestors(${host.commit}, ${host.depth})`,
+      "-T",
+      'commit_id ++ "\t" ++ change_id ++ "\n"',
+    ]),
+  )
+    .map(row => row.split("\t"))
+    .find(([, change]) => change === input.change)?.[0]
+  if (was === undefined) return { reached: false, yoursChanged: false }
+  const step = await sameAs(jj, commitId(was), input.commit)
+  return {
+    reached: true,
+    yoursChanged: !step.sameDescription || !step.sameChange,
+  }
+}
+
+/**
+ * One revision's facts since the host's version of it, reading only what
+ * `planSinceHost` asks for next: nothing for a marked offer, else its
+ * evolog, and a comparison with the host's version when the walk cannot
+ * reach the host.
+ */
+export async function revisionSinceHost(
+  jj: Runner,
+  revision: { readonly commit: CommitId; readonly change: string },
+  offer: {
+    readonly marked: boolean
+    readonly host: CommitId | null
+    /** How many revisions the offer has: how far below its top to look. */
+    readonly size: number
+  },
+): Promise<RevisionFacts> {
+  let walked: RevisionFacts | null = null
+  for (;;) {
+    const next = planSinceHost({ ...offer, walked })
+    switch (next.kind) {
+      case "known":
+        return next.facts
+      case "walk":
+        walked = await walkedSinceHost(jj, revision.commit)
+        break
+      case "compare":
+        return comparedWithHost(jj, revision, {
+          commit: next.host,
+          depth: offer.size,
+        })
+    }
+  }
+}
+
+/** The host's version of the offer under `bookmark`; null when it has none. */
+export async function hostVersionOf(
+  jj: Runner,
+  bookmark: string,
+): Promise<CommitId | null> {
+  const [host] = await commitsOf(jj, hostOfferRevset(bookmark))
+  return host ?? null
 }
 
 /**
@@ -290,12 +371,12 @@ export async function startConflictsOf(
 
 /**
  * An offer as your repo holds it now (`OfferInRepo`): its revisions and
- * what each one's evolog says since the host's newest version, its ledger
- * and first line, where it sits, its files and conflicts. Null when its
- * bookmark is gone (you abandoned it, or accepted it by hand). Divergent when
- * the bookmark is conflicted or a change id names two commits: then only
- * its change ids. Every read after the first names commits, so no read acts
- * on a hidden one.
+ * each one's facts since the host's version (`revisionSinceHost`), whether
+ * its top is that version, its ledger and first line, where it sits, its
+ * files and conflicts. Null when its bookmark is gone (you abandoned it, or
+ * accepted it by hand). Divergent when the bookmark is conflicted or a
+ * change id names two commits: then only its change ids. Every read after
+ * the first names commits, so no read acts on a hidden one.
  */
 export async function readOffer(
   jj: Runner,
@@ -316,9 +397,18 @@ export async function readOffer(
   )
   if (heads.length > 1 || visible.length > changes.length)
     return { kind: "divergent", changes }
+  const host = await hostVersionOf(jj, offerBookmark(input.name))
+  const marked = host === top
   const revisions: OfferRevision[] = []
   for (const r of found)
-    revisions.push({ ...r, since: await sinceHost(jj, r.commit) })
+    revisions.push({
+      ...r,
+      since: await revisionSinceHost(jj, r, {
+        marked,
+        host,
+        size: found.length,
+      }),
+    })
   const chained =
     found.at(-1)?.commit === top &&
     (
@@ -350,6 +440,7 @@ export async function readOffer(
   return {
     kind: "offer",
     bookmark: offerBookmark(input.name),
+    marked,
     revisions,
     chained,
     ledger,
@@ -513,20 +604,31 @@ export async function fileDiff(
 }
 
 /**
- * A divergent revision's commits, split into the one the host's own
- * operation made and yours: the newest evolog entry of each names the
- * operation's user. Null unless exactly one is the host's.
+ * A divergent revision's commits, split into the host's and yours. The
+ * host's is the one in its version of the offer (`host`), when that names
+ * exactly one: a race with your edit can leave the version behind both,
+ * since jj exports no conflicted bookmark for a mark to copy. Otherwise the
+ * one whose newest evolog entry names the host's operation. Null unless
+ * exactly one is the host's.
  */
 export async function hostCommitIn(
   jj: Runner,
   change: string,
+  host: CommitId | null,
 ): Promise<{ readonly hosts: CommitId; readonly yours: CommitId } | null> {
   const commits = await commitsOf(jj, `present(change_id(${change}))`)
+  const inHost =
+    host === null
+      ? []
+      : await commitsOf(jj, `present(change_id(${change})) & ::${host}`)
   const byHost: CommitId[] = []
   const byYou: CommitId[] = []
   for (const c of commits) {
-    const [newest] = await evologOf(jj, c, 1)
-    if (newest?.byHost === true) byHost.push(c)
+    const hosts =
+      inHost.length === 1
+        ? inHost[0] === c
+        : (await evologOf(jj, c, 1))[0]?.byHost === true
+    if (hosts) byHost.push(c)
     else byYou.push(c)
   }
   const [hosts] = byHost

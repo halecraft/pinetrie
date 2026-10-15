@@ -77,6 +77,7 @@ describe("planRefresh", () => {
   ): OfferInRepo => ({
     kind: "offer",
     bookmark: `pinetrie-offer/t-1`,
+    marked: true,
     revisions: [rev()],
     chained: true,
     ledger: { source: TIP, start: [BASE] },
@@ -93,12 +94,19 @@ describe("planRefresh", () => {
     tip = TIP,
     start: readonly CommitId[] | StartRead = [BASE],
     work: WorkChanges = "some",
+    hostLeft = false,
   ): RefreshFacts =>
     "kind" in start
       ? start.kind === "untraced"
-        ? { kind: "untraced", offer }
-        : { kind: "placed", place: placed(tip, start.start), work, offer }
-      : { kind: "placed", place: placed(tip, start), work, offer }
+        ? { kind: "untraced", offer, hostLeft }
+        : {
+            kind: "placed",
+            place: placed(tip, start.start),
+            work,
+            offer,
+            hostLeft,
+          }
+      : { kind: "placed", place: placed(tip, start), work, offer, hostLeft }
   const placed = (tip: CommitId, start: readonly CommitId[]): Placed => ({
     kind: "placed",
     tip,
@@ -155,27 +163,64 @@ describe("planRefresh", () => {
     expect(
       planRefresh(facts({ kind: "divergent", changes: ["ka", "kb"] })),
     ).toEqual({ kind: "repair", place: at, changes: ["ka", "kb"] })
-    expect(planRefresh({ kind: "archived", offer: read() })).toEqual({
+    expect(
+      planRefresh({ kind: "archived", offer: read(), hostLeft: false }),
+    ).toEqual({
       kind: "withdraw",
       offer: read(),
     })
   })
   test("an archived thread's offer is withdrawn, an edited one too; with none, its record is forgotten", () => {
-    expect(plan({ kind: "archived", offer: read() })).toBe("withdraw")
-    expect(plan({ kind: "archived", offer: read({ chained: false }) })).toBe(
+    expect(plan({ kind: "archived", offer: read(), hostLeft: false })).toBe(
       "withdraw",
     )
     expect(
       plan({
         kind: "archived",
-        offer: { kind: "divergent", changes: ["k"] },
+        offer: read({ chained: false }),
+        hostLeft: false,
       }),
     ).toBe("withdraw")
-    expect(plan({ kind: "archived", offer: null })).toBe("forget")
+    expect(
+      plan({
+        kind: "archived",
+        offer: { kind: "divergent", changes: ["k"] },
+        hostLeft: false,
+      }),
+    ).toBe("withdraw")
+    expect(plan({ kind: "archived", offer: null, hostLeft: false })).toBe(
+      "forget",
+    )
   })
   test("only the target moved: refresh; nothing moved: none", () => {
     expect(plan(facts(read({ onTarget: false })))).toBe("refresh")
     expect(plan(facts(read()))).toBe("none")
+  })
+  test("nothing moved, but the host's version lags: mark; an edited one is left unmarked", () => {
+    expect(plan(facts(read({ marked: false })))).toBe("mark")
+    expect(
+      plan(
+        facts(
+          read({
+            marked: false,
+            revisions: [rev({ reached: true, yoursChanged: true })],
+          }),
+        ),
+      ),
+    ).toBe("leave")
+  })
+  test("no offer and none to build: the host's version left behind is forgotten with the record", () => {
+    expect(planRefresh(facts(null, TIP, [TIP], "some", true))).toEqual({
+      kind: "forget",
+      hostLeft: true,
+    })
+    expect(planRefresh(facts(null, TIP, [TIP]))).toEqual({
+      kind: "forget",
+      hostLeft: false,
+    })
+    expect(
+      planRefresh({ kind: "archived", offer: null, hostLeft: true }),
+    ).toEqual({ kind: "forget", hostLeft: true })
   })
   test("the lane moved on: a single offer is rebuilt, a stack goes stale", () => {
     expect(plan(facts(read(), T2))).toBe("rebuild")
@@ -230,6 +275,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
   const one = {
     kind: "offer" as const,
     bookmark: "pinetrie-offer/t-1",
+    marked: true,
     revisions: [
       {
         commit: TIP,
@@ -519,6 +565,7 @@ describe("the offer's policy over a gather", () => {
   const read = (over: Partial<OfferNow> = {}): OfferNow => ({
     kind: "offer",
     bookmark: `pinetrie-offer/${NAME}`,
+    marked: true,
     revisions: [{ commit: NOW_COMMIT, change: "kxyz", since: NOT_YOURS }],
     chained: true,
     ledger: { source: TIP, start: [START] },

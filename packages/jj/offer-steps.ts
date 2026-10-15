@@ -1,6 +1,8 @@
 // A decision about an offer, from `@pinetrie/rules`, as the steps it runs on
 // your repo and what the host does after. Each decision carries the facts its
 // steps need, so each kind has one translation, and none that runs nothing.
+// Every decision that moves an offer ends with one mark (`markSteps`), so the
+// host's version follows it; every one that removes an offer forgets it.
 
 import {
   changesOf,
@@ -15,7 +17,10 @@ import {
   type ThreadId,
   type ThreadName,
 } from "@pinetrie/core"
+import { offerBookmark } from "./lane/names.ts"
 import {
+  forgetSteps,
+  markSteps,
   planAbandonOffer,
   planDescribe,
   planOffer,
@@ -85,7 +90,7 @@ const sourcesAt = (
 /**
  * An offer built anew: its old revisions abandoned (none for a build), then
  * a commit per source on its start, rebased onto its target (`planOffer`),
- * then its record.
+ * marked, then its record.
  */
 export function rebuildEffects(
   rebuild: Rebuild,
@@ -102,6 +107,7 @@ export function rebuildEffects(
         target: place.target,
         nonce: at.nonce,
       }),
+      ...markSteps(offerBookmark(rebuild.name)),
     ],
     after: { kind: "record", place },
     built: true,
@@ -117,13 +123,20 @@ export function offerEffects(
     case "untouched":
       return NOTHING
     case "forget":
-      return { steps: [], after: { kind: "remove" }, built: false }
+      return {
+        steps: decision.hostLeft ? forgetSteps(offerBookmark(at.name)) : [],
+        after: { kind: "remove" },
+        built: false,
+      }
     case "withdraw": {
       const changes = changesOf(decision.offer)
       return changes.length === 0
         ? NOTHING
         : {
-            steps: planAbandonOffer(changes),
+            steps: [
+              ...planAbandonOffer(changes),
+              ...forgetSteps(offerBookmark(at.name)),
+            ],
             after: { kind: "remove" },
             built: false,
           }
@@ -145,16 +158,19 @@ export function offerEffects(
       const [bottom] = changesOf(offer)
       if (bottom === undefined) return NOTHING
       return {
-        steps: planRebuildOffer({
-          change: bottom,
-          start: place.start,
-          tip: place.tip,
-          target: place.target,
-          description: offerMessage(at.wip, {
-            ...at,
-            ledger: { source: place.tip, start: place.start },
+        steps: [
+          ...planRebuildOffer({
+            change: bottom,
+            start: place.start,
+            tip: place.tip,
+            target: place.target,
+            description: offerMessage(at.wip, {
+              ...at,
+              ledger: { source: place.tip, start: place.start },
+            }),
           }),
-        }),
+          ...markSteps(offer.bookmark),
+        ],
         after: { kind: "record", place },
         built: true,
       }
@@ -163,11 +179,20 @@ export function offerEffects(
       const [bottom] = changesOf(decision.offer)
       if (bottom === undefined) return NOTHING
       return {
-        steps: planRefreshOffer(bottom, decision.place.target),
+        steps: [
+          ...planRefreshOffer(bottom, decision.place.target),
+          ...markSteps(decision.offer.bookmark),
+        ],
         after: { kind: "record", place: decision.place },
         built: false,
       }
     }
+    case "mark":
+      return {
+        steps: markSteps(offerBookmark(at.name)),
+        after: { kind: "record", place: decision.place },
+        built: false,
+      }
     case "none":
     case "stale":
     case "leave":
@@ -189,7 +214,7 @@ export function offerEffects(
   }
 }
 
-/** An acceptance: the destination moved forward to the offer's top, the offer's bookmark deleted, then its record marked accepted. */
+/** An acceptance: the destination moved forward to the offer's top, the offer's bookmark and its host version forgotten, then its record marked accepted. */
 export const offerAcceptanceEffects = (
   decision: Extract<OfferAcceptanceDecision, { readonly kind: "accept" }>,
 ): OfferEffects => ({
@@ -208,10 +233,13 @@ export const describeEffects = (
   text: string,
   at: OfferAt,
 ): OfferEffects => ({
-  steps: planDescribe(
-    decision.change,
-    offerMessage(text, { ...at, ledger: decision.ledger }),
-  ),
+  steps: [
+    ...planDescribe(
+      decision.change,
+      offerMessage(text, { ...at, ledger: decision.ledger }),
+    ),
+    ...markSteps(offerBookmark(decision.name)),
+  ],
   after: { kind: "record", place: decision.place },
   built: false,
 })

@@ -4,7 +4,7 @@
 // step before it has run: a commit id read before an earlier rewrite names a
 // hidden commit, and acting on it forks the change.
 
-import { hostCommitIn } from "./offer.ts"
+import { hostCommitIn, hostVersionOf } from "./offer.ts"
 import type { RepoOps } from "./owner.ts"
 import { planRepair } from "./plan.ts"
 
@@ -18,8 +18,10 @@ export async function repairOffer(
   input: { readonly bookmark: string; readonly changes: readonly string[] },
 ): Promise<void> {
   const last = input.changes.length - 1
+  // A repair moves the bookmark, never the host's version: read it once.
+  const host = await hostVersionOf(ops.jj, input.bookmark)
   for (const [i, change] of input.changes.entries()) {
-    const split = await hostCommitIn(ops.jj, change)
+    const split = await hostCommitIn(ops.jj, change, host)
     if (split === null) continue
     await ops.execute(
       planRepair({ bookmark: input.bookmark, ...split, top: i === last }),

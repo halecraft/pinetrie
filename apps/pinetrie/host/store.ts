@@ -13,7 +13,8 @@
 // open, so the host keeps its peer id across restarts; that is sound only while
 // nothing else writes the file. Kyneta's own adapters take the file's lock when
 // they wrap a connection, and so does this one: a second process, or a second
-// store in this one, is refused, and so is any reader. The Runtime closes the
+// store in this one, is refused, and so is any reader. `pnpm tidy` takes the
+// same lock (`tidy.ts`), so a host cannot start beside it. The Runtime closes the
 // store when the Exchange shuts down.
 
 import { existsSync, mkdirSync } from "node:fs"
@@ -56,7 +57,7 @@ export function openDatabase(
     db.close()
     if (!isBusyError(error)) throw error
     throw new Error(
-      `another process holds ${file}: a ${PRODUCT_NAME} store has one owner at a time`,
+      `another process holds ${file}: a ${PRODUCT_NAME} store has one owner at a time (a host, or \`pnpm tidy\`)`,
       { cause: error },
     )
   }

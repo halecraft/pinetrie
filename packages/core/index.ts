@@ -920,7 +920,8 @@ export const PRODUCT_NAME = "pine·trie"
 
 /**
  * The user every host operation on your repo carries, so the evolog says which
- * commits the host made, and a race is repaired in your favour.
+ * commits the host made where its version of an offer cannot: an offer it
+ * rewrote before marking, and a race, repaired in your favour.
  */
 export const HOST_OPERATOR = "pinetrie-host"
 

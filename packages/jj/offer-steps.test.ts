@@ -16,6 +16,8 @@ import {
   rebuildEffects,
 } from "./offer-steps.ts"
 import {
+  forgetSteps,
+  markSteps,
   planAbandonOffer,
   planDescribe,
   planOffer,
@@ -31,9 +33,11 @@ const NEW_TIP = commitId("22222222")
 const START = commitId("33333333")
 const TARGET = commitId("44444444")
 const NOT_YOURS = { reached: true, yoursChanged: false }
+const BOOKMARK = `pinetrie-offer/${NAME}`
 const OFFER: OfferNow = {
   kind: "offer",
-  bookmark: `pinetrie-offer/${NAME}`,
+  bookmark: BOOKMARK,
+  marked: true,
   revisions: [
     { commit: commitId("55555555"), change: "kxyz", since: NOT_YOURS },
   ],
@@ -62,13 +66,16 @@ describe("offerEffects: each refresh decision's steps, and what follows", () => 
   test("rebuild: planRebuildOffer's steps, its WIP line with the host's trailers and the new ledger, then a record", () => {
     const e = offerEffects({ kind: "rebuild", place: PLACE, offer: OFFER }, AT)
     expect(e).toEqual({
-      steps: planRebuildOffer({
-        change: "kxyz",
-        start: [START],
-        tip: NEW_TIP,
-        target: TARGET,
-        description: offerMessage(AT.wip, { ...TRAILERS, ledger: LEDGER }),
-      }),
+      steps: [
+        ...planRebuildOffer({
+          change: "kxyz",
+          start: [START],
+          tip: NEW_TIP,
+          target: TARGET,
+          description: offerMessage(AT.wip, { ...TRAILERS, ledger: LEDGER }),
+        }),
+        ...markSteps(BOOKMARK),
+      ],
       after: { kind: "record", place: PLACE },
       built: true,
     })
@@ -81,22 +88,34 @@ describe("offerEffects: each refresh decision's steps, and what follows", () => 
         built: false,
       })
   })
-  test("withdraw plans the abandon, then the record's removal; forget only removes it", () => {
-    expect(offerEffects({ kind: "withdraw", offer: OFFER }, AT)).toEqual({
-      steps: planAbandonOffer(["kxyz"]),
-      after: { kind: "remove" },
+  test("mark marks the offer, then records it", () => {
+    expect(offerEffects({ kind: "mark", place: PLACE }, AT)).toEqual({
+      steps: markSteps(BOOKMARK),
+      after: { kind: "record", place: PLACE },
       built: false,
     })
-    expect(offerEffects({ kind: "forget" }, AT)).toEqual({
-      steps: [],
+  })
+  test("withdraw plans the abandon and forgets the host's version, then removes the record", () => {
+    expect(offerEffects({ kind: "withdraw", offer: OFFER }, AT)).toEqual({
+      steps: [...planAbandonOffer(["kxyz"]), ...forgetSteps(BOOKMARK)],
       after: { kind: "remove" },
       built: false,
     })
   })
-  test("refresh rebases the bottom onto the target; repair names the changes; untouched does nothing", () => {
+  test("forget removes the record, and forgets the host's version only when one is left", () => {
+    expect(offerEffects({ kind: "forget", hostLeft: false }, AT)).toEqual({
+      steps: [],
+      after: { kind: "remove" },
+      built: false,
+    })
+    expect(offerEffects({ kind: "forget", hostLeft: true }, AT).steps).toEqual(
+      forgetSteps(BOOKMARK),
+    )
+  })
+  test("refresh rebases the bottom onto the target, then marks; repair names the changes; untouched does nothing", () => {
     expect(
       offerEffects({ kind: "refresh", place: PLACE, offer: OFFER }, AT).steps,
-    ).toEqual(planRefreshOffer("kxyz", TARGET))
+    ).toEqual([...planRefreshOffer("kxyz", TARGET), ...markSteps(BOOKMARK)])
     expect(
       offerEffects({ kind: "repair", place: PLACE, changes: ["ka", "kb"] }, AT)
         .after,
@@ -110,18 +129,24 @@ describe("offerEffects: each refresh decision's steps, and what follows", () => 
   test("build names the lane's tip as its one source on its WIP line, and is a rebuild with nothing to abandon", () => {
     const build = offerEffects({ kind: "build", place: PLACE }, AT)
     expect(build).toEqual({
-      steps: planOffer({
-        name: NAME,
-        start: [START],
-        sources: [
-          {
-            commit: NEW_TIP,
-            description: offerMessage(AT.wip, { ...TRAILERS, ledger: LEDGER }),
-          },
-        ],
-        target: TARGET,
-        nonce: "n1",
-      }),
+      steps: [
+        ...planOffer({
+          name: NAME,
+          start: [START],
+          sources: [
+            {
+              commit: NEW_TIP,
+              description: offerMessage(AT.wip, {
+                ...TRAILERS,
+                ledger: LEDGER,
+              }),
+            },
+          ],
+          target: TARGET,
+          nonce: "n1",
+        }),
+        ...markSteps(BOOKMARK),
+      ],
       after: { kind: "record", place: PLACE },
       built: true,
     })
@@ -143,6 +168,7 @@ describe("offerEffects: each refresh decision's steps, and what follows", () => 
       { kind: "rebuild", place: PLACE, offer: OFFER },
       { kind: "refresh", place: PLACE, offer: OFFER },
       { kind: "none", place: PLACE },
+      { kind: "mark", place: PLACE },
       { kind: "repair", place: PLACE, changes: ["k"] },
     ]
     for (const d of decisions) {
@@ -176,6 +202,7 @@ test("rebuildEffects: the old revisions abandoned, then each source on the start
       target: TARGET,
       nonce: "n2",
     }),
+    ...markSteps(BOOKMARK),
   ])
 })
 
@@ -223,10 +250,10 @@ test("offerAcceptanceEffects and describeEffects: the acceptance's bookmark move
       TRAILERS,
     ),
   ).toEqual({
-    steps: planDescribe(
-      "kxyz",
-      offerMessage("fix: it", { ...TRAILERS, ledger }),
-    ),
+    steps: [
+      ...planDescribe("kxyz", offerMessage("fix: it", { ...TRAILERS, ledger })),
+      ...markSteps(BOOKMARK),
+    ],
     after: { kind: "record", place: PLACE },
     built: false,
   })

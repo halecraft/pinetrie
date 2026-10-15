@@ -16,6 +16,7 @@ words they were written with.
 | **WIP** | A bookmark (prefix `wip/`, config `wip.prefix`) a thread may start from and be accepted into. | `wip`, `wipPrefix` | |
 | **publish** | Move `main` (config `publish.bookmark`) forward to accepted work; with `publish.catchUp` on, catch the working copy up and accept your commits below `@` first (ADR-0099). | `publish`, `publishCatchesUp` | |
 | **set up** | Create accepted work's bookmark at your `@-` and write its `immutable_heads()` and `revsets.log` to your repo's config. | `setup`, `planSetup`, `setupProposal` | |
+| **tidy** | Cut your repo's op log to a window (seven days by default) with `pnpm tidy`, while no host serves the repo; a starting host logs when one is due (ADR-0155). | `pnpm tidy`, `planTidy` | trim, prune |
 
 ## A thread's work
 

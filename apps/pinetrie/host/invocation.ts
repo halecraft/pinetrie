@@ -4,6 +4,7 @@
 
 import path from "node:path"
 import { PRODUCT_NAME } from "@pinetrie/core"
+import { TIDY_DAYS } from "@pinetrie/jj"
 import { type ProjectDirRefusal, projectDirWords } from "@pinetrie/lanes"
 
 /** Why the host does not start. */
@@ -33,11 +34,71 @@ export function planInvocation(
   const [folder, ...extra] = args
   if (extra.length > 0)
     return { kind: "refused", refusal: { kind: "extra", args } }
+  return { kind: "start", folder: folderOf(folder, base, pinetrieRoot) }
+}
+
+/**
+ * The folder a command names: pinetrie's own repo without one, else the one
+ * named, a relative one read from `base`.
+ */
+export const folderOf = (
+  arg: string | undefined,
+  base: string,
+  pinetrieRoot: string,
+): string => (arg === undefined ? pinetrieRoot : path.resolve(base, arg))
+
+/** `pnpm tidy [folder] [--days N] [--dry-run]`: what to tidy, and how. */
+export type TidyInvocation =
+  | {
+      readonly kind: "tidy"
+      readonly folder: string
+      /** The window kept: the last `days` days of operations. */
+      readonly days: number
+      /** Say what would be done, and do nothing. */
+      readonly dryRun: boolean
+    }
+  | { readonly kind: "refused"; readonly why: string }
+
+/** `pnpm tidy`'s arguments, its folder read as `planInvocation` reads one. */
+export function planTidyInvocation(
+  args: readonly string[],
+  base: string,
+  pinetrieRoot: string,
+): TidyInvocation {
+  const folders: string[] = []
+  let days = TIDY_DAYS
+  let dryRun = false
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? ""
+    if (arg === "--dry-run") dryRun = true
+    else if (arg === "--days") {
+      const n = Number(args[i + 1])
+      if (!Number.isInteger(n) || n < 1)
+        return {
+          kind: "refused",
+          why: "--days takes a whole number of days, 1 or more",
+        }
+      days = n
+      i += 1
+    } else if (arg.startsWith("-"))
+      return { kind: "refused", why: `${arg}: not an option of pnpm tidy` }
+    else folders.push(arg)
+  }
+  if (folders.length > 1)
+    return {
+      kind: "refused",
+      why: `one folder, not ${folders.length}: ${folders.join(" ")}`,
+    }
   return {
-    kind: "start",
-    folder: folder === undefined ? pinetrieRoot : path.resolve(base, folder),
+    kind: "tidy",
+    folder: folderOf(folders[0], base, pinetrieRoot),
+    days,
+    dryRun,
   }
 }
+
+/** `pnpm tidy`'s usage line. */
+export const TIDY_USAGE = `usage: pnpm tidy [folder] [--days N] [--dry-run]  (a relative folder is read from ${PRODUCT_NAME}'s root)`
 
 /** The session's SQLite file, and what named it. */
 export interface StoreChoice {

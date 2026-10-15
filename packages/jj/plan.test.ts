@@ -6,9 +6,11 @@ import { type LaneRow, planLaneRead } from "./lane-read.ts"
 import { type Fingerprint, parseFingerprint, planObserve } from "./observe.ts"
 import {
   acceptedOfferCommitsRevset,
+  forgetSteps,
   immutableHeads,
   laneRefSteps,
   logRevset,
+  markSteps,
   nonceRevset,
   offerStart,
   parseEvolog,
@@ -20,6 +22,7 @@ import {
   planPublishMove,
   planRebuildOffer,
   planSetup,
+  planSinceHost,
   walkToHost,
 } from "./plan.ts"
 import { repoCommand } from "./run.ts"
@@ -166,10 +169,28 @@ describe("offers", () => {
       ),
     ).toEqual([
       op("bookmark", "move", "pinetrie-accepted", "--to", "t"),
-      op("bookmark", "delete", "pinetrie-offer/amber-fox"),
+      ...argvs(forgetSteps("pinetrie-offer/amber-fox")),
     ])
   })
-  test("laneRefSteps: update or delete, then one import", () => {
+  test("markSteps: the host's version copied from the offer's own ref, imported, then tracked", () => {
+    expect(argvs(markSteps("pinetrie-offer/amber-fox"))).toEqual([
+      "git update-ref refs/remotes/pinetrie-host/pinetrie-offer/amber-fox refs/heads/pinetrie-offer/amber-fox",
+      op("git", "import"),
+      op(
+        "bookmark",
+        "track",
+        "pinetrie-offer/amber-fox",
+        "--remote",
+        "pinetrie-host",
+      ),
+    ])
+  })
+  test("forgetSteps: the offer's bookmark and the host's version forgotten by jj, never deleted in git", () => {
+    expect(argvs(forgetSteps("pinetrie-offer/amber-fox"))).toEqual([
+      op("bookmark", "forget", "--include-remotes", "pinetrie-offer/amber-fox"),
+    ])
+  })
+  test("laneRefSteps: a restore writes the tip and drops its park; an archive parks the tip, then removes it; one import", () => {
     expect(
       argvs(
         laneRefSteps([
@@ -179,6 +200,8 @@ describe("offers", () => {
       ),
     ).toEqual([
       `git update-ref refs/remotes/pinetrie-${LANE}/tip c1`,
+      `git update-ref -d refs/pinetrie/archived/${LANE}`,
+      `git fetch -q . +refs/remotes/pinetrie-${LANE}/tip*:refs/pinetrie/archived/${LANE}*`,
       `git update-ref -d refs/remotes/pinetrie-${LANE}/tip`,
       op("git", "import"),
     ])
@@ -278,6 +301,35 @@ describe("walkToHost", () => {
       reached: true,
       yours: [{ from: id("c1"), to: id("c2") }],
     })
+  })
+})
+
+describe("planSinceHost: what a revision's read since the host needs next", () => {
+  const HOST = commitId("h1")
+  const host = { reached: true, yoursChanged: false }
+  const unreached = { reached: false, yoursChanged: false }
+  test("a marked offer is the host's, with nothing read", () => {
+    expect(planSinceHost({ marked: true, host: HOST, walked: null })).toEqual({
+      kind: "known",
+      facts: host,
+    })
+  })
+  test("unmarked: the evolog first, then what it found once it reaches the host", () => {
+    expect(planSinceHost({ marked: false, host: HOST, walked: null })).toEqual({
+      kind: "walk",
+    })
+    const yours = { reached: true, yoursChanged: true }
+    expect(planSinceHost({ marked: false, host: HOST, walked: yours })).toEqual(
+      { kind: "known", facts: yours },
+    )
+  })
+  test("a walk that cannot reach the host compares with the host's version, or with none is what it found", () => {
+    expect(
+      planSinceHost({ marked: false, host: HOST, walked: unreached }),
+    ).toEqual({ kind: "compare", host: HOST })
+    expect(
+      planSinceHost({ marked: false, host: null, walked: unreached }),
+    ).toEqual({ kind: "known", facts: unreached })
   })
 })
 
@@ -424,6 +476,13 @@ describe("planObserve: what moved between two fingerprints", () => {
     )
     expect(read.at).toBe("c4")
   })
+  test("the host's version of an offer is not read: the offer's own bookmark moves with each mark", () => {
+    const stdout =
+      "c3\t\tpinetrie-offer/amber-fox\tpinetrie-offer/amber-fox@pinetrie-host\nc2\t\t\tpinetrie-offer/old@pinetrie-host"
+    expect(parseFingerprint("op", stdout, DEFAULT_REPO).bookmarks).toEqual(
+      new Map([["pinetrie-offer/amber-fox", "c3"]]),
+    )
+  })
   test("a conflicted bookmark is all its targets", () => {
     const read = parseFingerprint(
       "op",
@@ -441,6 +500,7 @@ describe("planLaneRead: what one lane's rows say", () => {
     parents: [],
     tip: false,
     bookmark: false,
+    host: false,
     region: false,
     base: false,
     newestAccepted: false,

@@ -159,6 +159,29 @@ export async function readRegistry(
     : decoded
 }
 
+/**
+ * The session the folder at `folder` is registered as, its data directory
+ * with it; null when no host has served it. Reads the registry, never
+ * writes it, and takes no lock: a host opening the folder meanwhile registers
+ * it, and is then refused by whatever the caller holds of the session.
+ */
+export async function sessionOfFolder(
+  dirs: PinetrieDirs,
+  folder: string,
+): Promise<
+  | { readonly name: SessionName; readonly dir: string }
+  | null
+  | { readonly refused: RegistryProblem }
+> {
+  const registry = await readRegistry(dirs.data)
+  if ("refused" in registry) return registry
+  const real = await realPath(folder)
+  const entry = registry.entries.find(e => e.path === real)
+  return entry === undefined
+    ? null
+    : { name: entry.name, dir: sessionDirs(dirs, entry.name).data }
+}
+
 /** Write the registry whole: a temporary file renamed over it, so no reader sees half. Under the lock only. */
 export async function writeRegistry(
   data: string,

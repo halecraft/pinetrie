@@ -428,7 +428,8 @@ command Line. A tab's undo stack is never stored here: the host rejects it
 
 - **The store owns its file** (S47, `apps/pinetrie/host/store.ts`): exclusive
   locking mode, taken when it opens, so a second process is refused, and so
-  is any reader. Read a running host's store through the `Store`, as the e2e
+  is any reader. `pnpm tidy` takes the same lock for its whole run
+  (`apps/pinetrie/host/tidy.ts`, ADR-0155), so no host starts beside it. Read a running host's store through the `Store`, as the e2e
   suite does. Kyneta's SQLite store issues the same seat on every open, so
   the host keeps its peer id across restarts.
 - **Images are beside the documents, not in them** (ADR-0042). The same file

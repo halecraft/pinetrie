@@ -1527,9 +1527,12 @@ commit-message request `request.ts` (`describeRequest`).
   offer: rebuilt in place, ADR-0039), `withdraw` (where it starts reached the
   tip, the lane's work changes no file, its start is untraced and the host
   made it, or the thread is archived, edited or not), `forget` (no offer and none to build: a record left from one
-  goes), `stale` (either moved under a stack), `refresh` (only
+  goes, and with `hostLeft` the host's version of an offer you deleted,
+  ADR-0154), `stale` (either moved under a stack), `refresh` (only
   the target moved), `leave` (you edited it), `repair` (a race left it
-  divergent), `none`, or `untouched`: an untraced start with an offer you
+  divergent), `mark` (unchanged and the host's, but its top is not the
+  host's version: a host step stopped before its mark, or the offer was
+  built before offers had one; ADR-0154), `none`, or `untouched`: an untraced start with an offer you
   edited, or one divergent, which nothing touches until the lane catches up
   (a gap ADR-0067's untraced start leaves). Only work known to change a file, from a known
   start, is built (ADR-0067): one built from less would be empty, or bring

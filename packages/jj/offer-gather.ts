@@ -25,10 +25,11 @@ import { lines, type Runner } from "@pinetrie/lanes"
 import { readWipState } from "./accepted.ts"
 import { type CatchUpTarget, readCatchUp } from "./catch-up.ts"
 import { laneBase } from "./lane/base.ts"
-import { revsetName } from "./lane/names.ts"
+import { offerBookmark, revsetName } from "./lane/names.ts"
 import { commitsOf, titlesOf } from "./lane/revisions.ts"
 import { gatherLane } from "./lane-read.ts"
 import {
+  hostVersionOf,
   laneTipIn,
   query,
   readOffer,
@@ -208,6 +209,26 @@ export async function gatherOffer(
 }
 
 /**
+ * The offer under `name`'s bookmark at `target`, and whether the host's
+ * version is left with no offer beside it: read only when there is none.
+ */
+async function readOfferAndHost(
+  jj: Runner,
+  name: ThreadName,
+  target: string,
+): Promise<{
+  readonly offer: OfferInRepo | null
+  readonly hostLeft: boolean
+}> {
+  const offer = await readOffer(jj, { name, target })
+  return {
+    offer,
+    hostLeft:
+      offer === null && (await hostVersionOf(jj, offerBookmark(name))) !== null,
+  }
+}
+
+/**
  * What a refresh plans from. An archived thread's offer is read against the
  * line: its lane's history is gone, and with it its base, and the thread's
  * trailer leaves a WIP's own commits out of the offer. A lane on accepted work is
@@ -223,12 +244,12 @@ export async function gatherRefresh(
   if (name === undefined) return { kind: "none" }
   if (input.archived) {
     const target = `present(${revsetName(repoConfig.acceptedBookmark)})`
-    const offer = await readOffer(jj, { name, target })
+    const { offer, hostLeft } = await readOfferAndHost(jj, name, target)
     return {
       kind: "plan",
       name,
       base: null,
-      facts: { kind: "archived", offer },
+      facts: { kind: "archived", offer, hostLeft },
     }
   }
   const gathered = await gatherLane(jj, {
@@ -240,7 +261,8 @@ export async function gatherRefresh(
   })
   if (gathered === "none") return { kind: "none" }
   if (gathered !== "wip") {
-    const { tip, base, target, start, offer, work, catchUp } = gathered
+    const { tip, base, target, start, offer, hostLeft, work, catchUp } =
+      gathered
     return {
       kind: "plan",
       name,
@@ -248,6 +270,7 @@ export async function gatherRefresh(
       facts: factsOf(sited({ tip, base, state: "ok", target, start }), {
         work,
         offer,
+        hostLeft,
       }),
     }
   }
@@ -255,18 +278,33 @@ export async function gatherRefresh(
   if (read === null) return { kind: "none" }
   const { place, base, work } = read
   if (place.kind === "gone") return { kind: "gone", base }
-  const offer = await readOffer(jj, { name, target: place.target })
-  return { kind: "plan", name, base, facts: factsOf(place, { work, offer }) }
+  const { offer, hostLeft } = await readOfferAndHost(jj, name, place.target)
+  return {
+    kind: "plan",
+    name,
+    base,
+    facts: factsOf(place, { work, offer, hostLeft }),
+  }
 }
 
 /** A refresh's facts at a place that is not gone. */
 const factsOf = (
   place: Sited,
-  read: { readonly work: WorkChanges; readonly offer: OfferInRepo | null },
+  read: {
+    readonly work: WorkChanges
+    readonly offer: OfferInRepo | null
+    readonly hostLeft: boolean
+  },
 ): RefreshFacts =>
   place.kind === "placed"
-    ? { kind: "placed", place, work: read.work, offer: read.offer }
-    : { kind: "untraced", offer: read.offer }
+    ? {
+        kind: "placed",
+        place,
+        work: read.work,
+        offer: read.offer,
+        hostLeft: read.hostLeft,
+      }
+    : { kind: "untraced", offer: read.offer, hostLeft: read.hostLeft }
 
 /**
  * What an acceptance reads besides its gather: how many of the WIP's commits land

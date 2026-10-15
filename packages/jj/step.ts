@@ -6,8 +6,9 @@ export type RepoStep =
       readonly tool: "jj"
       /**
        * `host`: `--ignore-working-copy` and `operation.username=pinetrie-host`,
-       * so it never snapshots the working copy and the evolog says the host made
-       * what it made. `you`: as you, for a step that is
+       * so it never snapshots the working copy, and the evolog says the host
+       * made what it made, where the host's version of an offer cannot.
+       * `you`: as you, for a step that is
        * your act or moves the working copy (`planPublishCatchUp`, an accepting
        * `planPublishMove`, `planCatchUpUndo`).
        */

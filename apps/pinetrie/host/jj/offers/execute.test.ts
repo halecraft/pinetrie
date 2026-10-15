@@ -18,6 +18,7 @@ const TIP = commitId("11111111")
 const offer = (commit: string): OfferNow => ({
   kind: "offer",
   bookmark: `pinetrie-offer/${NAME}`,
+  marked: true,
   revisions: [
     {
       commit: commitId(commit),

@@ -13,6 +13,8 @@
   - ADR-0142: in a folder project, accepted work is the folder, and a thread
     starts from it as it is at the thread's first message. Such a project has
     no setup and no WIPs.
+  - ADR-0154: authorship of an offer comes from the host's remote bookmark.
+    The op log no longer holds anything the host must read back.
 
 Restates ADR-0060 as amended by ADR-0061, ADR-0065, ADR-0067, ADR-0072,
 ADR-0076, ADR-0079, ADR-0080, ADR-0083, ADR-0090, ADR-0099, ADR-0100 and its

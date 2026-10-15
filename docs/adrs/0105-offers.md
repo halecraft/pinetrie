@@ -12,6 +12,9 @@
   - ADR-0118: a thread has an offer in each source it changed.
   - ADR-0142: in a folder project, an offer is a pair of states, not a commit.
     It is reviewed as files, and it has no bookmark, no evolog and no stack.
+  - ADR-0154: whether you edited an offer is read from the host's remote
+    bookmark, not from the evolog. An archived lane's tip is parked under a
+    ref of the host's, not deleted.
 
 Restates ADR-0038 as amended by ADR-0039, ADR-0040, ADR-0047, ADR-0055,
 ADR-0060, ADR-0061, ADR-0065, ADR-0067, ADR-0080, ADR-0083, ADR-0100 and

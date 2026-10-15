@@ -71,6 +71,8 @@ import {
   bookmarkName,
   bookmarkRevset,
   DEFAULT_REPO,
+  HOST_REMOTE,
+  hostOfferRef,
   offerBookmark,
   revsetName,
   stackBookmark,
@@ -98,6 +100,7 @@ import {
   changeOf,
   fileDiff,
   hostCommitIn,
+  hostVersionOf,
   laneTipIn,
   offerRevisions,
   readOffer,
@@ -113,9 +116,12 @@ import {
 } from "./offer-gather.ts"
 import { repairOffer } from "./offer-repair.ts"
 import {
+  forgetSteps,
+  IMPORT,
   immutableHeads,
   laneRefSteps,
   logRevset,
+  markSteps,
   planAbandonOffer,
   planCatchUpUndo,
   planDescribe,
@@ -129,6 +135,7 @@ import {
 } from "./plan.ts"
 import { executeRepo, hostJj, hostOps, runnerFor } from "./run.ts"
 import { readShared } from "./shared.ts"
+import { git, host } from "./step.ts"
 
 const LANE = threadIdFor("1")
 const NAME = "amber-fox" as ThreadName
@@ -1106,12 +1113,16 @@ describe("a lane's repo, with jj", () => {
         repoConfig: line,
         lane: LANE,
       })
+      const offer = await readOffer(ops, { name: NAME, target })
       expect(gathered).toEqual({
         tip,
         base,
         target,
         start,
-        offer: await readOffer(ops, { name: NAME, target }),
+        offer,
+        hostLeft:
+          offer === null &&
+          (await hostVersionOf(ops, offerBookmark(NAME))) !== null,
         work: await workChanges(ops, { start, tip }),
         catchUp: await readCatchUp(ops, {
           base,
@@ -1318,7 +1329,11 @@ describe("a lane's repo, with jj", () => {
     ])
     // Divergent: the batched read says so too.
     await agrees()
-    const split = await hostCommitIn(ops, c1)
+    const split = await hostCommitIn(
+      ops,
+      c1,
+      await hostVersionOf(ops, bookmark),
+    )
     if (split === null) throw new Error("no split")
     await repairOffer(
       { jj: ops, execute: steps => executeRepo(yoursDir, steps) },
@@ -1711,6 +1726,203 @@ describe("a lane's repo, with jj", () => {
     ).toBe("none")
   }, 60_000)
 
+  describe("the host's version of an offer", () => {
+    const BOOKMARK = offerBookmark(NAME)
+    /** The offer as `readOffer` finds it on accepted work, whole. */
+    const offerNow = async (rig: Awaited<ReturnType<typeof turnRig>>) => {
+      const read = await readOffer(rig.ops, {
+        name: NAME,
+        target: await rig.acceptedNow(),
+      })
+      if (read?.kind !== "offer") throw new Error("no offer")
+      return read
+    }
+    /** The commit tracked as the host's version, or none. */
+    const tracked = (rig: Awaited<ReturnType<typeof turnRig>>) =>
+      commitsOf(
+        rig.ops,
+        `tracked_remote_bookmarks(exact:${revsetName(BOOKMARK)}, remote=exact:${revsetName(HOST_REMOTE)})`,
+      )
+    /** Your repo's op log cut to its head, everything it held collected. */
+    const cutHistory = async (rig: Awaited<ReturnType<typeof turnRig>>) => {
+      await rig.yoursJj(["op", "abandon", "..@-"])
+      await rig.yoursJj(["util", "gc", "--expire=now"])
+    }
+    const HOST = { reached: true, yoursChanged: false }
+
+    test("an offer the host builds is its version, tracked, and reads as the host's with no evolog", async () => {
+      const rig = await turnRig("host-built")
+      await rig.offer(rig.base)
+      const read = await offerNow(rig)
+      expect(read.marked).toBe(true)
+      expect(await tracked(rig)).toEqual([read.revisions[0]?.commit])
+      expect(read.revisions.map(r => r.since)).toEqual([HOST])
+    }, 60_000)
+
+    test("you change the offer's file: it is no longer the host's version, and reads as your edit", async () => {
+      const rig = await turnRig("host-yours")
+      await rig.offer(rig.base)
+      await rig.yoursJj(["new", BOOKMARK])
+      await rig.edit(rig.yoursDir, "a.txt", "yours\n")
+      const squashed = await rig.yoursJj([
+        "squash",
+        "--ignore-immutable",
+        "--into",
+        BOOKMARK,
+      ])
+      if (!squashed.ok) throw new Error(squashed.stderr)
+      const read = await offerNow(rig)
+      expect(read.marked).toBe(false)
+      expect(read.revisions.map(r => r.since)).toEqual([
+        { reached: true, yoursChanged: true },
+      ])
+      await rig.agrees()
+    }, 60_000)
+
+    test("a host step that stopped before its mark is not your edit, even once the op log is cut", async () => {
+      const rig = await turnRig("host-unmarked")
+      await rig.offer(rig.base)
+      const [bottom] = (await offerNow(rig)).revisions
+      if (bottom === undefined) throw new Error("no offer")
+      await rig.edit(rig.yoursDir, "line.txt", "line\n")
+      await rig.yoursJj(["commit", "-m", "accepted work moves"])
+      await rig.yoursJj(["bookmark", "move", "pinetrie-accepted", "--to", "@-"])
+      // The host's rebase, without the mark that follows it.
+      await executeRepo(
+        rig.yoursDir,
+        planRefreshOffer(bottom.change, await rig.acceptedNow()),
+      )
+      const moved = await offerNow(rig)
+      expect([moved.marked, moved.revisions.map(r => r.since)]).toEqual([
+        false,
+        [HOST],
+      ])
+      await rig.agrees()
+      // One more operation, then the log cut to it: the evolog no longer
+      // reaches the host's rebase, and the host's version says it.
+      await rig.yoursJj(["new", "pinetrie-accepted"])
+      await cutHistory(rig)
+      const evolog = await rig.ops([
+        "evolog",
+        "--no-graph",
+        "-r",
+        BOOKMARK,
+        "-T",
+        'if(operation, operation.user(), "-") ++ "\\n"',
+      ])
+      expect(evolog.stdout.split("\n")[0]).toBe("-")
+      expect((await offerNow(rig)).revisions.map(r => r.since)).toEqual([HOST])
+      await executeRepo(rig.yoursDir, markSteps(BOOKMARK))
+      expect((await offerNow(rig)).marked).toBe(true)
+    }, 60_000)
+
+    test("an offer built before offers had a host version reads as the host's by its evolog, and one mark makes it the version", async () => {
+      const rig = await turnRig("host-legacy")
+      await rig.offer(rig.base)
+      // As an older host left it: the bookmark alone, with no host version.
+      await executeRepo(rig.yoursDir, [
+        host("bookmark", "untrack", BOOKMARK, "--remote", HOST_REMOTE),
+        git("update-ref", "-d", hostOfferRef(BOOKMARK)),
+        IMPORT,
+      ])
+      expect(await hostVersionOf(rig.ops, BOOKMARK)).toBeNull()
+      const read = await offerNow(rig)
+      expect([read.marked, read.revisions.map(r => r.since)]).toEqual([
+        false,
+        [HOST],
+      ])
+      await executeRepo(rig.yoursDir, markSteps(BOOKMARK))
+      expect((await offerNow(rig)).marked).toBe(true)
+      expect(await tracked(rig)).toHaveLength(1)
+    }, 60_000)
+
+    test("your edit races a host step that marked: its version names the host's commit, after the op log is cut too", async () => {
+      const rig = await turnRig("host-race")
+      await rig.offer(rig.base)
+      const [bottom] = (await offerNow(rig)).revisions
+      if (bottom === undefined) throw new Error("no offer")
+      const op = (
+        await rig.ops(["op", "log", "--no-graph", "-n", "1", "-T", "id"])
+      ).stdout.trim()
+      await executeRepo(rig.yoursDir, [
+        ...planDescribe(bottom.change, "the host's\n"),
+        ...markSteps(BOOKMARK),
+      ])
+      const marked = await hostVersionOf(rig.ops, BOOKMARK)
+      await rig.yoursJj([
+        "--at-operation",
+        op,
+        "describe",
+        "--ignore-immutable",
+        "-r",
+        bottom.change,
+        "-m",
+        "yours\n",
+      ])
+      await rig.yoursJj(["new", "pinetrie-accepted"])
+      await cutHistory(rig)
+      const split = await hostCommitIn(
+        rig.ops,
+        bottom.change,
+        await hostVersionOf(rig.ops, BOOKMARK),
+      )
+      expect(split?.hosts).toBe(marked)
+    }, 60_000)
+
+    test("you delete the offer's bookmark and build on its commit: the host's forget leaves your commits where they are", async () => {
+      const rig = await turnRig("host-forget")
+      await rig.offer(rig.base)
+      const offered = (await commitsOf(rig.ops, BOOKMARK))[0]
+      await rig.yoursJj(["bookmark", "delete", BOOKMARK])
+      await rig.yoursJj(["new", "--ignore-immutable", offered ?? ""])
+      await rig.edit(rig.yoursDir, "mine.txt", "mine\n")
+      await rig.yoursJj(["commit", "-m", "mine, on the old offer"])
+      const mine = await commitsOf(rig.ops, "@-")
+      const below = await commitsOf(rig.ops, "::@-")
+      await executeRepo(rig.yoursDir, forgetSteps(BOOKMARK))
+      expect(await hostVersionOf(rig.ops, BOOKMARK)).toBeNull()
+      expect(await commitsOf(rig.ops, "@-")).toEqual(mine)
+      expect(await commitsOf(rig.ops, "::@-")).toEqual(below)
+    }, 60_000)
+
+    test("an acceptance forgets the offer's bookmark and the host's version, and accepted work holds the commit", async () => {
+      const rig = await turnRig("host-accept")
+      const offered = await rig.offer(rig.base)
+      const [top] = offered.built.commits
+      await rig.accept(offered)
+      expect(await hostVersionOf(rig.ops, BOOKMARK)).toBeNull()
+      expect(
+        await commitsOf(rig.ops, `present(${bookmarkRevset(BOOKMARK)})`),
+      ).toEqual([])
+      expect(await rig.acceptedNow()).toBe(top)
+    }, 60_000)
+
+    test("an archived lane's history is parked: after the op log is cut and collected, its restore still finds it", async () => {
+      const rig = await turnRig("host-park")
+      await rig.fetch(rig.base)
+      const tip = await laneTipIn(rig.ops, LANE)
+      if (tip === null) throw new Error("no tip")
+      await executeRepo(
+        rig.yoursDir,
+        laneRefSteps([
+          { lane: LANE, commit: null },
+          { lane: threadIdFor("9"), commit: null },
+        ]),
+      )
+      expect(await laneTipIn(rig.ops, LANE)).toBeNull()
+      await cutHistory(rig)
+      await executeRepo(
+        rig.yoursDir,
+        laneRefSteps([{ lane: LANE, commit: tip }]),
+      )
+      expect(await laneTipIn(rig.ops, LANE)).toBe(tip)
+      const parked = await run("git", ["for-each-ref", "refs/pinetrie/"], {
+        cwd: rig.yoursDir,
+      })
+      expect(parked.stdout).toBe("")
+    }, 60_000)
+  })
+
   test("a lane's ref deleted and imported: the history under accepted work is kept", async () => {
     const { yoursDir, yoursJj, ops, edit, offer, accept, base } =
       await turnRig("refgone")
@@ -2005,7 +2217,7 @@ describe("a lane's repo, with jj", () => {
     expect(await readFile(path.join(yoursDir, "g.txt"), "utf8")).toBe("base\n")
   }, 60_000)
 
-  test("an unchanged offer's refresh reads at most 3 jj processes, and what catching up changes is read once per move", async () => {
+  test("an unchanged offer's refresh reads at most 2 jj processes, none of them its evolog, and what catching up changes is read once per move", async () => {
     const rig = await turnRig("count")
     const { ops, line, fetch, build, acceptedNow, base } = rig
     await fetch(base)
@@ -2030,8 +2242,10 @@ describe("a lane's repo, with jj", () => {
       line,
     )
     let ran = 0
+    const evologs: string[] = []
     const counted: Runner = args => {
       ran += 1
+      if (args.includes("evolog")) evologs.push(args.join(" "))
       return ops(args)
     }
     const gathered = await gatherLane(counted, {
@@ -2046,9 +2260,10 @@ describe("a lane's repo, with jj", () => {
       target: await acceptedNow(),
       work: "some",
     })
-    // One `jj log`, the revision's evolog, and whether the lane's work
-    // changes any file.
-    expect(ran).toBe(3)
+    // One `jj log`, and whether the lane's work changes any file: the
+    // offer's top is the host's version, so no evolog is read.
+    expect(ran).toBe(2)
+    expect(evologs).toEqual([])
     // Accepted work moves: what catching up changes is read once, in two diffs,
     // and kept while the lane's tip and accepted work stay where they are.
     await rig.edit(rig.yoursDir, "line.txt", "line\n")
@@ -2082,15 +2297,15 @@ describe("a lane's repo, with jj", () => {
       to: await acceptedNow(),
       files: ["line.txt"],
     })
-    expect(moved.ran).toBe(5)
-    expect((await gather(moved.read.catchUp)).ran).toBe(3)
+    expect(moved.ran).toBe(4)
+    expect((await gather(moved.read.catchUp)).ran).toBe(2)
     // Moved again: what was read at accepted work before is read again.
     await rig.edit(rig.yoursDir, "line.txt", "line, again\n")
     await rig.yoursJj(["commit", "-m", "accepted work moves again"])
     await rig.yoursJj(["bookmark", "move", line.acceptedBookmark, "--to", "@-"])
     const again = await gather(moved.read.catchUp)
     expect([again.ran, again.read.catchUp?.to]).toEqual([
-      5,
+      4,
       await acceptedNow(),
     ])
   }, 60_000)

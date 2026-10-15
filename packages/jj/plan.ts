@@ -10,12 +10,16 @@ import {
   type OfferSource,
   type PublishMove,
   type RepoConfig,
+  type RevisionFacts,
   type ThreadId,
   type ThreadName,
   trailerRevset,
 } from "@pinetrie/core"
 import {
   bookmarkName,
+  HOST_REMOTE,
+  hostOfferRef,
+  laneParkedRef,
   laneStackRef,
   laneTipRef,
   OFFER_BOOKMARKS,
@@ -171,9 +175,14 @@ export function planImport(input: {
 }
 
 /**
- * Point lanes' remote bookmarks in your repo at commits, or delete them
+ * Point lanes' remote bookmarks in your repo at commits, or remove them
  * (null), then import: the one writer of `laneTipRef` besides the fetch.
- * Archiving a root deletes its lanes' refs; restoring it writes them back.
+ * Archiving a root removes its lanes' refs, first parking them under
+ * `laneParkedRef`, so git keeps their history through a gc: a restore writes
+ * a commit of that history back. The park is a fetch from the repo itself
+ * with a pattern, which copies nothing and succeeds for a lane never
+ * fetched, where `update-ref` from a missing ref would fail. A restore
+ * removes the parked ref.
  */
 export const laneRefSteps = (
   updates: readonly {
@@ -184,13 +193,51 @@ export const laneRefSteps = (
   updates.length === 0
     ? []
     : [
-        ...updates.map(u =>
+        ...updates.flatMap(u =>
           u.commit === null
-            ? git("update-ref", "-d", laneTipRef(u.lane))
-            : git("update-ref", laneTipRef(u.lane), u.commit),
+            ? [
+                git(
+                  "fetch",
+                  "-q",
+                  ".",
+                  `+${laneTipRef(u.lane)}*:${laneParkedRef(u.lane)}*`,
+                ),
+                git("update-ref", "-d", laneTipRef(u.lane)),
+              ]
+            : [
+                git("update-ref", laneTipRef(u.lane), u.commit),
+                git("update-ref", "-d", laneParkedRef(u.lane)),
+              ],
         ),
         IMPORT,
       ]
+
+/**
+ * The host's version of the offer under `bookmark` moved to the bookmark,
+ * and tracked: copied in git from the bookmark's own ref, which jj exports
+ * after each host command, so no step names a commit id; imported, which
+ * moves a tracked bookmark with it; and tracked, which makes the tracking
+ * the first time, writes nothing after, and repairs a jj command of yours
+ * that imported the ref untracked before this import. An untracked one would
+ * make the offer an immutable head. jj exports no conflicted bookmark, so
+ * this is planned only for an offer read whole, never a divergent one.
+ */
+export const markSteps = (bookmark: string): RepoStep[] => [
+  git("update-ref", hostOfferRef(bookmark), `refs/heads/${bookmark}`),
+  IMPORT,
+  host("bookmark", "track", bookmark, "--remote", HOST_REMOTE),
+]
+
+/**
+ * The offer's bookmark and the host's version of it forgotten: the one way
+ * the host removes that ref. Deleted in git, then imported, it would make jj
+ * abandon every commit only it held, a commit of yours under an offer
+ * among them, and rebase yours off it. Forgetting abandons nothing, and is
+ * no operation when there is nothing to forget.
+ */
+export const forgetSteps = (bookmark: string): RepoStep[] => [
+  host("bookmark", "forget", "--include-remotes", bookmark),
+]
 
 /** The commits an acceptance made: its offer's trailers name a source or a thread. */
 export const ACCEPTED_OFFER_COMMITS = trailerRevset(["source", "thread"])
@@ -254,7 +301,8 @@ export interface EvologEntry {
 /**
  * The template `parseEvolog` reads: one entry a line, its fields split by
  * tabs, each predecessor as `<commit>:<change>`. An entry whose operation
- * jj no longer holds prints an empty user, which is not the host's.
+ * jj no longer holds (a tidy cut it) prints an empty user, which is not the
+ * host's, and no predecessors, so a walk stops there.
  */
 export const EVOLOG_ENTRY =
   'commit.commit_id() ++ "\t" ++ commit.change_id() ++ "\t" ++ if(operation, operation.user(), "") ++ "\t" ++ predecessors.map(|p| p.commit_id() ++ ":" ++ p.change_id()).join(",") ++ "\n"'
@@ -292,7 +340,7 @@ export function parseEvolog(stdout: string): EvologEntry[] {
  * with no such predecessor, one the read did not return, or a cycle.
  * `yours` are the versions an operation not the host's made, each with the
  * version before it: only those can be your edit. The evolog says who made
- * each version, so nothing the host remembers is needed.
+ * each version, as long as the op log still holds the operations.
  */
 export function walkToHost(
   entries: readonly EvologEntry[],
@@ -315,6 +363,36 @@ export function walkToHost(
     yours.push({ from: before.commit, to: at })
     at = before.commit
   }
+}
+
+/** What a revision's read since the host needs next, or what it found (`planSinceHost`). */
+export type SinceHostRead =
+  | { readonly kind: "known"; readonly facts: RevisionFacts }
+  /** Walk its evolog back to a version the host made (`walkToHost`). */
+  | { readonly kind: "walk" }
+  /** Compare it with the commit of its change in the host's version. */
+  | { readonly kind: "compare"; readonly host: CommitId }
+
+/**
+ * The next read of a revision since the host's version, from what is read
+ * so far. A marked offer is the host's, whole, since a commit id hashes all
+ * below it, so nothing is read. Otherwise the evolog, which also finds a
+ * host step that stopped before its mark. A walk that cannot reach the host,
+ * whose operations a tidy cut, compares with the host's version, when there
+ * is one.
+ */
+export function planSinceHost(input: {
+  readonly marked: boolean
+  readonly host: CommitId | null
+  /** What the walk found; null before it ran. */
+  readonly walked: RevisionFacts | null
+}): SinceHostRead {
+  if (input.marked)
+    return { kind: "known", facts: { reached: true, yoursChanged: false } }
+  if (input.walked === null) return { kind: "walk" }
+  if (input.walked.reached || input.host === null)
+    return { kind: "known", facts: input.walked }
+  return { kind: "compare", host: input.host }
 }
 
 /**
@@ -448,8 +526,9 @@ export const planRepair = (input: {
 
 /**
  * Accept an offer: its destination bookmark moved forward to its
- * top (`moveForward`), as the host, then the offer's bookmark deleted. Never
- * a rebase, and never your `@`.
+ * top (`moveForward`), as the host, then the offer's bookmark and the host's
+ * version of it forgotten (`forgetSteps`), once the destination holds the
+ * offer. Never a rebase, and never your `@`.
  */
 export function planOfferAcceptanceSteps(input: {
   /** The offer's bookmark, as its record holds it. */
@@ -460,6 +539,6 @@ export function planOfferAcceptanceSteps(input: {
 }): RepoStep[] {
   return [
     moveForward("host", [input.destination], input.top),
-    host("bookmark", "delete", input.bookmark),
+    ...forgetSteps(input.bookmark),
   ]
 }

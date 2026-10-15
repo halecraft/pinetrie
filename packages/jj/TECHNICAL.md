@@ -72,6 +72,10 @@ translates to.
   its read (`readCatchUp`).
 - `file-at.ts`: a file at accepted work, at a lane's tip or at its start
   (`fileAt`), the destination's read of `pinetrie.json`.
+- `tidy.ts`: `pnpm tidy`'s core (ADR-0155): your op log as facts
+  (`readOpLog`), the tidy planned from them (`planTidy`), whether a jj
+  command raced it (`isTidyRaced`), the startup line's facts
+  (`planTidyHint`), and its gather and steps' runner.
 - `startup.ts`: your repo before its owner starts. `prepareProjectDir`
   gathers the root's facts (`jj root`, else git's top level) and plans them
   (`planProjectDir`, `@pinetrie/lanes`), and writes nothing: pine·trie
@@ -109,9 +113,10 @@ everything else reads at the head it last saw.**
   `later(key)` is upkeep (`refresh:<lane>`, `line`, `observe`, `shared`), at
   most one queued per key, started only when no command waits
   (`@pinetrie/keeper`). A command waits for at most the one step running.
-- **Only the owner runs a `RepoStep`** (`RepoOps.execute`). The package
-  exports no runner: a step gets `RepoOps` (`jj` as the host, `jjAsYou`,
-  `git`, `execute`), a read gets `RepoReads`.
+- **Only the owner runs a `RepoStep`** (`RepoOps.execute`), but for a
+  tidy's (`executeTidy`), which runs while no host, and so no owner, serves
+  the repo. The package exports no other runner: a step gets `RepoOps` (`jj`
+  as the host, `jjAsYou`, `git`, `execute`), a read gets `RepoReads`.
 - **A write observes at once, inside its step**: `execute` as soon as its
   steps ran, `jjAsYou` as the step ends. A record the step writes after it
   names commits a page may read at once, and a read is pinned to the
@@ -187,16 +192,17 @@ operation is read once and kept until the head moves.**
   and the top's conflicted files when it conflicts, with the files
   conflicted where its ledger says it starts (`startConflictsOf`,
   ADR-0072): `conflictCause` reads both. An unconflicted offer pays
-  nothing. Each revision's evolog
-  (`sinceHost`) is always read, and whether the lane's work changes any
-  file (`workChanges`) unless the start is untraced. The second is asked of
+  nothing. An offer whose top is the host's version (the row's `H` flag)
+  reads nothing more about who made it; any other reads each revision's
+  evolog (`revisionSinceHost`). Whether the lane's work changes any
+  file (`workChanges`) is read unless the start is untraced. The second is asked of
   the lane's own work, never read from the offer's files: those are a diff
   against the target, empty once accepted work holds the lane's work, which
   still changes files. Read from them, such an offer was withdrawn and built
   again on every observation, without end (S89).
-- **The budget:** an unchanged offer's refresh runs at most 3 jj processes
-  (`repo.test.ts` counts 3: the read, the evolog, and `workChanges`); S89
-  measured 18 before. A lane whose base moved runs two more, once per move,
+- **The budget:** an unchanged offer's refresh runs at most 2 jj processes,
+  and no evolog (`repo.test.ts` counts 2: the read and `workChanges`);
+  S89 measured 18 before, and 3 with the evolog (ADR-0154). A lane whose base moved runs two more, once per move,
   and one more for each further head of its offer's start.
 - **One rule decides both.** `repo.test.ts` holds `gatherLane` beside the
   separate reads (`laneTipIn`, `laneBase`, `startOfOffer`, `readOffer`,
@@ -419,12 +425,19 @@ update's merge will change.**
   `planRefreshOffer`'s rebase.
 - **An acceptance is a forward bookmark move**
   (`planOfferAcceptanceSteps`, ADR-0104): `jj bookmark move <destination>
-  --to <top>` as the host, then the offer's bookmark deleted. It never
+  --to <top>` as the host, then the offer's bookmark and the host's version
+  forgotten (`forgetSteps`), once the destination holds the offer. It never
   rebases and never touches your `@`. An acceptance and a publish each move bookmarks with `moveForward`, which never
   passes `--allow-backwards`: jj refuses a move that is not forward, so a
   stale move fails rather than drops commits (S77 item 1). A colocated
   repo's git ref follows a host move made with `--ignore-working-copy`
   (`repo.test.ts`, publish).
+- **An archived lane's history is parked** (`laneRefSteps`,
+  `laneParkedRef`): before its ref is deleted, `git fetch . +<tip ref>*:<park>*`
+  copies it under `refs/pinetrie/archived/<lane>`, which jj does not import
+  and git keeps through a gc. The pattern matches nothing for a lane never
+  fetched, where an `update-ref` from a missing ref would fail. A restore
+  writes the tip ref, then deletes the park.
 - **`readOffer` reads an offer from your repo alone** (`OfferInRepo`,
   ADR-0104): nothing the host remembers is needed, so a lost record costs
   nothing. Its revisions (`offerRevisions`) are what is under the bookmark,
@@ -440,14 +453,51 @@ update's merge will change.**
   the first names commits (S48 item 2). It returns facts, and the bookmark it
   found them under; `planRefresh`, `offerEdited` and `offerMoved`
   (`@pinetrie/rules`) decide what they mean.
-- **Every revision's evolog is read, back to the host's newest version**
-  (`evologOf`, one `jj evolog -T EVOLOG_ENTRY`; `walkToHost`, pure),
-  through each version's predecessor of the same change. Each version an
-  operation not the host's made on the way is checked with `sameAs` (the
-  description and `jj interdiff`) against the one before it. A rebase jj
-  made because you reworded a commit below is your operation (S48 item 7),
-  and changes nothing, so it is not an edit. The newest entry is usually
-  the host's, so the walk usually stops at once.
+- **The host's version of each offer is a tracked remote bookmark,
+  `pinetrie-offer/<name>@pinetrie-host`** (ADR-0154, S215 items 10, 11 and
+  18; `HOST_REMOTE`, `hostOfferRef`, `hostOfferRevset`). Its top equal to the
+  bookmark's (`OfferNow.marked`) is the whole stack the host's, since a
+  commit id hashes all below it: nothing more is read. jj shows an offer
+  you changed as `pinetrie-offer/<name>*`. The ref keeps the host's
+  version through any gc, so offers depend on nothing in the op log.
+- **Every decision that moves an offer ends with one mark** (`markSteps`,
+  added once per decision in `offer-steps.ts`): `git update-ref` from the
+  offer's own `refs/heads/<bookmark>`, which jj exports after every host
+  command, so no step names a commit id; `jj git import`, which moves a
+  tracked bookmark with its remote; `jj bookmark track`, which tracks it the
+  first time, writes nothing after, and repairs a jj command of yours that
+  imported the ref first, untracked. An untracked remote bookmark is in
+  `builtin_immutable_heads()`: the WIP under the offer would become
+  immutable to you. jj exports no conflicted bookmark, so a mark is planned
+  only for an offer read whole. A new offer's bookmark is still made with
+  `bookmark set` (`planOffer`), and the mark after its describes copies it.
+- **The host's version is removed only by `forgetSteps`** (`jj bookmark
+  forget --include-remotes`): an acceptance, a withdraw, and a `forget`
+  decision with `hostLeft` (your offer bookmark gone, its version left).
+  **Never delete a remote ref of your repo in git:** the next `jj git
+  import` abandons every commit only it held and rebases what is on them.
+  Measured, it abandoned an offer you had deleted, your `@-` under your
+  commit on it, and rebased your commit onto the root (S215 item 18;
+  `repo.test.ts`, the forget). Before a rebuild nothing is forgotten: the
+  build's `bookmark set` then the mark brings a deleted bookmark and its
+  version back together, where moving the ref alone would leave the
+  bookmark conflicted.
+- **Who made a revision, when the offer is not marked**
+  (`revisionSinceHost`, its next read chosen by `planSinceHost`, pure):
+  the evolog back to the host's newest version (`evologOf`, one `jj evolog
+  -T EVOLOG_ENTRY`; `walkToHost`, pure), through each version's
+  predecessor of the same change. Each version an operation not the host's
+  made on the way is checked with `sameAs` (the description and `jj
+  interdiff`) against the one before it. A rebase jj made because you
+  reworded a commit below is your operation (S48 item 7), and changes
+  nothing, so it is not an edit. A host step that stopped before its mark
+  is found here as the host's, and the refresh's `mark` decision marks it;
+  so is an offer built before offers had a version. A walk the op log can
+  no longer finish (a tidy cut its operations: the entry prints no user and
+  no predecessors) compares the revision with the commit of its change in
+  the host's version (`comparedWithHost`), read from the version's
+  nearest ancestors and matched by change id, since the version is often
+  hidden and `change_id()` names visible commits only.
 - **A review reads by commit id** (ADR-0047): `revisionRead` runs
   `jj log -r <commit> -T REVISION_READ` and returns the parsed JSON,
   unchecked (the host decodes it), and `fileDiff` runs `jj diff --git -r
@@ -466,9 +516,38 @@ update's merge will change.**
   read fails. A range has no description. `fileDiff` reads a range with
   `--from --to`. A commit stays readable by id after it is abandoned, so a
   lane's revisions can be read after an acceptance or a split.
-- **`hostCommitIn`** splits a divergent revision's commits by the user of
-  each one's newest evolog operation (`evologOf` with a limit of 1,
-  `isHostUser`): the host's is abandoned, yours kept.
+- **`hostCommitIn`** splits a divergent revision's commits: the host's is
+  the one in the host's version, when that names exactly one, else by the
+  user of each one's newest evolog operation (`evologOf` with a limit of 1,
+  `isHostUser`). A race can leave the version behind both, since a mark
+  copies no conflicted bookmark. The host's is abandoned, yours kept, and
+  the version stays where it was, so the offer reads as yours.
+
+## A tidy of your op log (`tidy.ts`, ADR-0155, S215)
+
+- **A tidy is planned from your op log alone** (`planTidy`): the cut is the
+  newest operation older than the window; jj's root operation is never one
+  (`parseOpLog` leaves it out). Its steps run as you: `jj util snapshot`,
+  so your working copy's operation is the head; `jj op abandon ..<cut>`
+  without `--ignore-working-copy`, so jj re-points the working copy at the
+  rewritten head (with it, your next `jj` finds a stale or sibling working
+  copy, S215 item 7); `jj debug reindex`, since gc never clears
+  `.jj/repo/index`; `jj util gc` at jj's own expiry, never `--expire=now`,
+  which could delete an object a command of yours was still writing (S215
+  item 15).
+- **The whole log is read**: `jj op log --reversed -n 1` gives the newest
+  operation, since `-n` applies before the reversal. About a second for
+  63,000 operations on Linux.
+- **An abandon costs a time for each operation it keeps** (S215 item 13):
+  `expectMs` is the kept count times 6 ms, the Mac's measure.
+- **A raced tidy is counted, never timed** (`isTidyRaced`): a command that
+  loaded the head before the abandon and wrote after brings the cut chain
+  back beside its rewritten copy, so the log holds more than the kept
+  operations and the snapshot. Nothing is lost; the next tidy cuts it.
+- **It runs only while no host serves the repo:** the caller holds the
+  session store's lock (`apps/pinetrie/host/tidy.ts`); `planTidy` refuses
+  `served`, and a repo with a second workspace, which the abandon would
+  leave stale.
 
 ## A lane's repo (`lane/`)
 
@@ -788,8 +867,23 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   accepted work (S78); a branch cloned from a conflicted catch-up, whose
   offer's conflict came with its copy (S99); and a base refreshed after your
   `@-` was rewritten, not built on (S74).
+- **`tidy.test.ts`**: `planTidy`, `isTidyRaced`, `planTidyHint` and
+  `parseOpLog` as values; then real jj, on repos with operations dated
+  long ago (`debug.operation-timestamp`): the log cut to the window with
+  your working copy fresh after, and a write that loaded the head before the
+  abandon kept, the tidy read as raced.
 - **`offer-steps.test.ts`**: each decision's steps, as the planners make
-  them, and that each `after` carries the decision's place.
+  them, each that moves an offer ending in one mark, and that each `after`
+  carries the decision's place.
+- **`repo.test.ts`, the host's version of an offer**: a built offer is its
+  version, tracked, read with no evolog; your change to its file reads as
+  yours; a host rebase without its mark is the host's, by the evolog and,
+  once the op log is cut, by the version; an offer from before versions
+  reads as the host's and one mark makes it the version; the forget after
+  you deleted an offer's bookmark and built on it leaves your commits
+  where they are (the mutation that deletes the ref in git fails it); an
+  acceptance leaves neither bookmark nor version; an archived lane's
+  history survives a cut and collected op log, and restores.
 - **`lane/history.test.ts`** is the port suite
   (`@pinetrie/lanes/testing`'s `historySuite`) against `historyOf`: lanes as
   throwaway repos on the host, their runners mapping `/workspace` and

@@ -1,7 +1,8 @@
 // jj — jj's adapter: your repo (its owner, offers, accepted work), each
 // lane's own repo (`lane/`), and your repo at startup (`startup.ts`). Of
 // your repo, only what other packages use: no runner, since steps run on the
-// owner alone, and an offer is read only through a gather
+// owner alone, but for a tidy's, which runs while no host and so no owner
+// is there (`tidy.ts`); and an offer is read only through a gather
 // (`offer-gather.ts`), which picks the read path, so the separate reads and
 // the one-read path stay inside.
 
@@ -54,3 +55,15 @@ export {
   prepareShared,
 } from "./startup.ts"
 export type { RepoStep } from "./step.ts"
+export {
+  executeTidy,
+  gatherTidy,
+  isTidyRaced,
+  type OpLogFacts,
+  planTidy,
+  planTidyHint,
+  readOpLog,
+  TIDY_DAYS,
+  type TidyPlan,
+  type TidyRefusal,
+} from "./tidy.ts"

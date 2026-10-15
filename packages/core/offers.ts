@@ -14,12 +14,12 @@ import type {
 } from "./index.ts"
 
 /**
- * What a revision's evolog says since the host's newest version of it
- * (`readOffer` in `@pinetrie/jj` reads it, `revisionEdited` in
- * `@pinetrie/rules` decides from it): whether the walk back reached a version
- * the host made, and whether a version an operation not the host's made on the
- * way changed it. Read from the repo, never from a record the host kept, which
- * can be lost after its jj steps landed.
+ * A revision since the host's version of it (`readOffer` in `@pinetrie/jj`
+ * reads it, `revisionEdited` in `@pinetrie/rules` decides from it): whether
+ * the host has a version of it, and whether one not the host's changed it
+ * since. Read from the repo (the host's remote bookmark, else the evolog),
+ * never from a record the host kept, which can be lost after its jj steps
+ * landed.
  */
 export interface RevisionFacts {
   readonly reached: boolean
@@ -64,6 +64,11 @@ export type OfferInRepo =
       readonly kind: "offer"
       /** The bookmark it was found under (`offerBookmark`). */
       readonly bookmark: string
+      /**
+       * Its top is the host's version of it, `<bookmark>@pinetrie-host`: no
+       * step since the host's last one moved it.
+       */
+      readonly marked: boolean
       /** Bottom first. */
       readonly revisions: readonly OfferRevision[]
       /** Each revision's parent is the one below it: no commit of yours between. */
@@ -185,16 +190,24 @@ export interface OfferGather {
 /** What a refresh decides from (`planRefresh`). */
 export type RefreshFacts =
   /** The thread's root is archived: the offer alone, read against accepted work. */
-  | { readonly kind: "archived"; readonly offer: OfferInRepo | null }
-  /** An accepted-offer commit of the lane names no source. */
-  | { readonly kind: "untraced"; readonly offer: OfferInRepo | null }
-  | {
-      readonly kind: "placed"
-      readonly place: Placed
-      /** Whether the lane's work since its start changes any file. */
-      readonly work: WorkChanges
-      readonly offer: OfferInRepo | null
-    }
+  (
+    | { readonly kind: "archived"; readonly offer: OfferInRepo | null }
+    /** An accepted-offer commit of the lane names no source. */
+    | { readonly kind: "untraced"; readonly offer: OfferInRepo | null }
+    | {
+        readonly kind: "placed"
+        readonly place: Placed
+        /** Whether the lane's work since its start changes any file. */
+        readonly work: WorkChanges
+        readonly offer: OfferInRepo | null
+      }
+  ) & {
+    /**
+     * The host's version of the offer is still in your repo with no offer
+     * bookmark beside it: you abandoned the offer, or deleted its bookmark.
+     */
+    readonly hostLeft: boolean
+  }
 
 /** What only an acceptance reads; the rest is in its gather's place. */
 export interface OfferAcceptanceFacts {
@@ -231,8 +244,11 @@ export interface Rebuild {
 
 /** What a trigger does to a lane's offer (`planRefresh`). */
 export type RefreshDecision =
-  /** No offer, and none to build: remove a record left from one. */
-  | { readonly kind: "forget" }
+  /**
+   * No offer, and none to build: remove a record left from one, and with
+   * `hostLeft` the host's version left in your repo.
+   */
+  | { readonly kind: "forget"; readonly hostLeft: boolean }
   /** Abandon it and remove its record: archived, untraced, reached, or its work changes no file. */
   | { readonly kind: "withdraw"; readonly offer: OfferInRepo }
   /** No offer: build one from the lane's tip, from work known to change a file and a known start. */
@@ -251,6 +267,12 @@ export type RefreshDecision =
     }
   /** Nothing runs, and the record is written from the offer: unchanged, a stack the lane moved past, or yours. */
   | { readonly kind: "none" | "stale" | "leave"; readonly place: Placed }
+  /**
+   * Unchanged and the host's, but its host version lags: a host step stopped
+   * before its mark, or the offer was built before offers had one. The host's
+   * version is moved to it.
+   */
+  | { readonly kind: "mark"; readonly place: Placed }
   /** Your edit and the host's crossed: keep yours. */
   | {
       readonly kind: "repair"

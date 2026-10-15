@@ -533,6 +533,9 @@ context.**
   `~/.local/share/pinetrie/sessions/<name>/`. `pnpm build` then `pnpm serve` runs one that
   serves the built page, with no Vite (ADR-0148); `serve` rebuilds a page
   whose code changed since its build, and says so.
+  `pnpm tidy [folder]` cuts a jj repo's op log to its last seven days
+  (`--days N`, `--dry-run`), while no host serves it (ADR-0155); a starting
+  host logs when one is due.
   `pnpm dev <folder>` (or `pnpm serve <folder>`) serves another project instead, at that folder's
   jj or git root (ADR-0086). A relative folder is read from pine·trie's root,
   not the shell's directory. Each folder is a session of its own, found by

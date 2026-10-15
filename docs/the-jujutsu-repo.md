@@ -6,7 +6,8 @@ branched repo with its own accepted work and offers. This page is for someone wh
 jjui beside pine·trie. It says what pine·trie puts there, what it expects, and
 what to configure. Why each piece is shaped as it is: ADR-0105 (offers),
 ADR-0039 (thread names), ADR-0104 (accepted work and the ledger),
-ADR-0076 and ADR-0090 (publishing).
+ADR-0154 (the host's version of an offer), ADR-0155 (tidying your op
+log), ADR-0076 and ADR-0090 (publishing).
 
 Two parties act on the repo. **The host** runs its jj commands as the
 operation user `pinetrie-host@<hostname>`. **The owner** is whoever runs the
@@ -25,9 +26,10 @@ are in the page's titles.
 |---|---|---|
 | `pinetrie-accepted` | the owner's, moved by the host on an acceptance, and by a publish of the owner's commits | **Accepted work**: where finished work lands. It only moves forward. Immutable once set up. Named `pinetrie-onto` before ADR-0100; a starting host renames it, once. |
 | `pinetrie-offer/<name>` | the host's | **An offer**: a thread's work as one revision, or a stack, on the thread's base. Immutable while it sits on accepted work. `<name>` is the thread's two-word name. |
+| `pinetrie-offer/<name>@pinetrie-host` | the host's | **The host's version of an offer** (ADR-0154): a remote bookmark the offer's bookmark tracks, moved by the host after each of its steps on the offer. `pinetrie-host` is no git remote of yours: nothing fetches from it or pushes to it. While the two agree, `jj bookmark list` shows only the offer; `--all-remotes` shows both. |
 | `main` | the owner's, moved on a publish | **Where the project is published**: moved forward to `pinetrie-accepted`, with it, never anywhere else. |
 | `wip/*` | the owner's | **A work in progress** a thread may start from, chosen at its first message. Never touched by the host, except an acceptance into it. |
-| `tip@pinetrie-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's, and abandons its offer; restoring brings both back. |
+| `tip@pinetrie-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's, and abandons its offer; restoring brings both back. Until then its history is parked under the git ref `refs/pinetrie/archived/<lane>`, which jj does not show, so a gc keeps it. |
 
 The names `pinetrie-accepted`, `main` and `wip/` are the defaults. A project
 sets its own in `pinetrie.json` (read from the working copy, since the names
@@ -134,6 +136,42 @@ with pine·trie's terms joined on.
   ancestors. An offer on accepted work is an immutable commit with nothing
   mutable above it, so the default log leaves it out (S77 item 8).
 
+## Your op log
+
+Every jj command the host runs on your repo is an operation, and jj never
+removes one: in a month a busy repo gathers tens of thousands, and its
+`.jj/repo` grows past a gigabyte. Nothing the host reads depends on them
+(ADR-0154), so they can be cut. `pnpm tidy` does it, when you run it
+(ADR-0155):
+
+```
+pnpm tidy [folder] [--days N] [--dry-run]
+```
+
+- **It keeps the last `N` days, seven by default,** and cuts the rest:
+  after it, `jj undo` and `jj op restore` reach back `N` days. It says how
+  many operations it keeps and cuts, and how long it should take, before
+  it starts; `--dry-run` stops there. A folder is read as `pnpm dev` reads
+  one: pine·trie's own repo without one.
+- **It runs only while no host serves the repo,** and holds the session's
+  store while it runs, so a host cannot start beside it. A host's writes
+  during the cut would undo it. So a cron or launchd entry works only
+  while the host is stopped.
+- **It refuses a repo with a second workspace,** which the cut would leave
+  stale.
+- **Run no jj in the repo while it runs.** A command of yours that writes
+  during it loses nothing, but leaves the log holding the window twice, and
+  the tidy says so; the next tidy finishes the cut.
+- **Its steps:** `jj util snapshot`; `jj op abandon ..<the newest operation
+  older than the window>`, which re-points your working copy; `jj debug
+  reindex`, since jj's gc never clears the index; and `jj util gc` with jj's
+  own expiry, which keeps anything newer than two weeks, so what was cut
+  leaves the disk at a later tidy. On a Mac a first tidy of a month's log
+  took minutes (S215 item 12).
+- **A starting host says when one is due:** once your oldest operation is
+  more than fourteen days old, it logs "your repo's op log goes back 26 days
+  (63,162 operations); `pnpm tidy` would keep the last 7".
+
 ## jjui
 
 jjui's own `[revisions] revset`, in `~/.config/jjui/config.toml`, replaces
@@ -181,10 +219,14 @@ believes:
   make that changes nothing, and does not count it as an edit.
 - **Editing an offer makes it the owner's.** Once a version an operation
   not the host's made changes an offer (its message, or its files), the
-  host never touches that offer again. The evolog says who made each
-  version, so this holds across a host restart.
+  host never touches that offer again. jj shows such an offer as
+  `pinetrie-offer/<name>*`, and `jj bookmark list --all-remotes` says how
+  far it is from the host's version. The host's version is a ref in your
+  repo, so this holds across a host restart, and after your op log is cut.
 - **Abandoning an offer, or deleting its bookmark,** discards it: the host
-  builds a new one when the thread has work not accepted. To be rid of a
+  builds a new one when the thread has work not accepted. Until then jj
+  lists the bookmark as `(deleted)`, beside the host's version, which the
+  host forgets once there is nothing to offer. To be rid of a
   thread's offer, archive the thread: the host abandons the offer, and
   builds it again if the thread is restored.
 - **A `wip/` bookmark** is the owner's to rebase, amend or move. A thread

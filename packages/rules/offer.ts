@@ -198,11 +198,13 @@ const sameStart = (a: readonly CommitId[], b: readonly CommitId[]): boolean =>
  * untraced start withdraws an offer the host made, and touches nothing else.
  */
 export function planRefresh(facts: RefreshFacts): RefreshDecision {
-  const { offer } = facts
+  const { offer, hostLeft } = facts
   if (facts.kind === "archived")
-    return offer === null ? { kind: "forget" } : { kind: "withdraw", offer }
+    return offer === null
+      ? { kind: "forget", hostLeft }
+      : { kind: "withdraw", offer }
   if (facts.kind === "untraced") {
-    if (offer === null) return { kind: "forget" }
+    if (offer === null) return { kind: "forget", hostLeft }
     return offer.kind === "divergent" || offerEdited(offer)
       ? { kind: "untouched" }
       : { kind: "withdraw", offer }
@@ -212,7 +214,7 @@ export function planRefresh(facts: RefreshFacts): RefreshDecision {
   const reached = start.length === 1 && start[0] === tip
   if (offer === null)
     return work !== "some" || reached
-      ? { kind: "forget" }
+      ? { kind: "forget", hostLeft }
       : { kind: "build", place }
   if (offer.kind === "divergent")
     return { kind: "repair", place, changes: offer.changes }
@@ -224,9 +226,8 @@ export function planRefresh(facts: RefreshFacts): RefreshDecision {
       ? { kind: "withdraw", offer }
       : { kind: "rebuild", place, offer }
   }
-  return offer.onTarget
-    ? { kind: "none", place }
-    : { kind: "refresh", place, offer }
+  if (!offer.onTarget) return { kind: "refresh", place, offer }
+  return offer.marked ? { kind: "none", place } : { kind: "mark", place }
 }
 
 /** What a stack's check found: how many files differ from the lane's tip. */

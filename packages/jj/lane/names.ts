@@ -41,6 +41,27 @@ export const laneStackName = (lane: ThreadId): string =>
   `stack@${laneRemote(lane)}`
 
 /**
+ * Where an archived lane's refs are parked, so git keeps its history until a
+ * restore: jj imports nothing under `refs/pinetrie/`, and git keeps what any
+ * ref names.
+ */
+export const laneParkedRef = (lane: ThreadId): string =>
+  `refs/pinetrie/archived/${lane}`
+
+/**
+ * The remote the host keeps its version of each offer under, as a tracked
+ * remote bookmark. No git remote is added, so nothing fetches from it or
+ * pushes to it. It starts with `LANE_REMOTE_PREFIX`, and is no lane's.
+ */
+export const HOST_REMOTE = "pinetrie-host"
+/** Where git keeps the host's version of the offer under `bookmark`. */
+export const hostOfferRef = (bookmark: string): string =>
+  `refs/remotes/${HOST_REMOTE}/${bookmark}`
+/** The host's version of the offer under `bookmark`, as a revset: empty when there is none. */
+export const hostOfferRevset = (bookmark: string): string =>
+  `remote_bookmarks(exact:${revsetName(bookmark)}, remote=exact:${revsetName(HOST_REMOTE)})`
+
+/**
  * A lane's offer in your repo. Not under `pinetrie/`, whose bookmarks were
  * immutable when offers began.
  */

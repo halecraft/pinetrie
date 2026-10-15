@@ -286,3 +286,99 @@ test("work you landed yourself leaves the offer held: kept, with no files, and s
     base: { catchUp: { tip: work, to: yours, files: [] } },
   })
 }, 60_000)
+
+/** The commits `revset` names in your repo at `dir`. */
+const commitsAt = async (dir: string, revset: string) =>
+  lines(
+    (
+      await run(
+        "jj",
+        [
+          "-R",
+          dir,
+          "log",
+          "--no-graph",
+          "-r",
+          revset,
+          "-T",
+          'commit_id ++ "\\n"',
+        ],
+        { env: ENV },
+      )
+    ).stdout,
+  )
+/** The host's version of `name`'s offer, tracked, as a revset. */
+const tracked = (name: ThreadName) =>
+  `tracked_remote_bookmarks(exact:"${offerBookmark(name)}", remote=exact:"pinetrie-host")`
+
+test("an offer the host builds is its version, tracked, and the round after writes nothing", async () => {
+  const you = await yourRepo("marked")
+  const work = await you.commit(
+    [you.base],
+    { "a.txt": "a\n" },
+    `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
+  )
+  await you.setTip(LANE, work)
+  expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
+    files: ["a.txt"],
+  })
+  const offered = await commitsAt(you.dir, `present(${offerBookmark(THREAD)})`)
+  expect(await commitsAt(you.dir, tracked(THREAD))).toEqual(offered)
+}, 60_000)
+
+test("an offer the host built before offers had a version of the host's is marked by its refresh", async () => {
+  const you = await yourRepo("legacy")
+  const work = await you.commit(
+    [you.base],
+    { "a.txt": "a\n" },
+    `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
+  )
+  await you.setTip(LANE, work)
+  expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
+    files: ["a.txt"],
+  })
+  // As an older host left it: the bookmark, with no version of the host's.
+  await you.jj(
+    "bookmark",
+    "untrack",
+    offerBookmark(THREAD),
+    "--remote",
+    "pinetrie-host",
+  )
+  await run(
+    "git",
+    ["update-ref", "-d", `refs/remotes/pinetrie-host/${offerBookmark(THREAD)}`],
+    { cwd: you.dir },
+  )
+  await you.jj("git", "import")
+  expect(await commitsAt(you.dir, tracked(THREAD))).toEqual([])
+  expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
+    files: ["a.txt"],
+  })
+  expect(await commitsAt(you.dir, tracked(THREAD))).toEqual(
+    await commitsAt(you.dir, `present(${offerBookmark(THREAD)})`),
+  )
+}, 60_000)
+
+test("you deleted the offer's bookmark and the lane has nothing to offer: the host's version is forgotten", async () => {
+  const you = await yourRepo("left")
+  const work = await you.commit(
+    [you.base],
+    { "a.txt": "a\n" },
+    `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
+  )
+  await you.setTip(LANE, work)
+  await settles(you.dir, LANE, THREAD)
+  await you.jj("bookmark", "delete", offerBookmark(THREAD))
+  await you.setTip(LANE, you.base)
+  expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
+    files: null,
+    record: null,
+  })
+  expect(
+    await commitsAt(
+      you.dir,
+      `remote_bookmarks(exact:"${offerBookmark(THREAD)}", remote=exact:"pinetrie-host")`,
+    ),
+  ).toEqual([])
+}, 60_000)

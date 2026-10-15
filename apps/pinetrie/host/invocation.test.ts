@@ -1,5 +1,10 @@
 import { expect, test } from "vitest"
-import { planInvocation, refusalText, storeChoice } from "./invocation.ts"
+import {
+  planInvocation,
+  planTidyInvocation,
+  refusalText,
+  storeChoice,
+} from "./invocation.ts"
 
 const PINETRIE = "/src/pinetrie"
 
@@ -46,4 +51,26 @@ test("the store is PINETRIE_STORE when set, else the session's own", () => {
     file: "/tmp/s.db",
     from: "PINETRIE_STORE",
   })
+})
+
+test("pnpm tidy's arguments: a folder as the host reads one, a window, a dry run; anything else refused", () => {
+  expect(planTidyInvocation([], "/elsewhere", PINETRIE)).toEqual({
+    kind: "tidy",
+    folder: PINETRIE,
+    days: 7,
+    dryRun: false,
+  })
+  expect(
+    planTidyInvocation(
+      ["../app", "--days", "3", "--dry-run"],
+      "/src/pinetrie",
+      PINETRIE,
+    ),
+  ).toEqual({ kind: "tidy", folder: "/src/app", days: 3, dryRun: true })
+  expect(planTidyInvocation(["--days", "0"], "/b", PINETRIE).kind).toBe(
+    "refused",
+  )
+  expect(planTidyInvocation(["--days"], "/b", PINETRIE).kind).toBe("refused")
+  expect(planTidyInvocation(["--now"], "/b", PINETRIE).kind).toBe("refused")
+  expect(planTidyInvocation(["/a", "/b"], "/b", PINETRIE).kind).toBe("refused")
 })

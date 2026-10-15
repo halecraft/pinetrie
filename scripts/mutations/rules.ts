@@ -5,6 +5,14 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a refresh never marks an offer whose host version lags",
+    file: "packages/rules/offer.ts",
+    from: '  return offer.marked ? { kind: "none", place } : { kind: "mark", place }',
+    to: '  return { kind: "none", place }',
+    command: unit,
+    expect: "nothing moved, but the host's version lags: mark",
+  },
   // ── records of the project's kind ──
   {
     name: "the other kind's offers are kept at start",
@@ -1288,7 +1296,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a record left from a gone offer is kept",
     file: "packages/rules/offer.ts",
-    from: '      ? { kind: "forget" }\n      : { kind: "build", place }',
+    from: '      ? { kind: "forget", hostLeft }\n      : { kind: "build", place }',
     to: '      ? { kind: "untouched" }\n      : { kind: "build", place }',
     command: unit,
     expect:
@@ -1324,8 +1332,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archived thread's offer stays",
     file: "packages/rules/offer.ts",
-    from: '    return offer === null ? { kind: "forget" } : { kind: "withdraw", offer }',
-    to: '    return offer === null ? { kind: "forget" } : { kind: "untouched" }',
+    from: '      ? { kind: "forget", hostLeft }\n      : { kind: "withdraw", offer }',
+    to: '      ? { kind: "forget", hostLeft }\n      : { kind: "untouched" }',
     command: unit,
     expect:
       "an archived thread's offer is withdrawn, an edited one too; with none, its record is forgotten",

@@ -21,6 +21,7 @@ import {
   registryFiles,
   renameSession,
   sessionDirs,
+  sessionOfFolder,
 } from "./sessions.ts"
 
 let dir = ""
@@ -202,3 +203,14 @@ test.skipIf(process.platform !== "darwin")(
     expect(again.name).toBe(first.name)
   },
 )
+
+test("sessionOfFolder finds a registered folder, and writes nothing for one never served", async () => {
+  const served = await opened(folder("served"))
+  expect(await sessionOfFolder(dirs, folder("served"))).toEqual({
+    name: served.name,
+    dir: served.dir,
+  })
+  const before = readFileSync(registryFiles(data).registry, "utf8")
+  expect(await sessionOfFolder(dirs, folder("never"))).toBeNull()
+  expect(readFileSync(registryFiles(data).registry, "utf8")).toBe(before)
+})

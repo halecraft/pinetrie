@@ -5,6 +5,30 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "pnpm tidy takes no lock",
+    file: "apps/pinetrie/host/tidy.ts",
+    from: '    const db = openDatabase(file, { busyTimeoutMs: 0 })\n    return { kind: "held", release: () => db.close() }',
+    to: '    return { kind: "free" }',
+    command: unit,
+    expect: "the tidy reads it as served",
+  },
+  {
+    name: "pnpm tidy makes a store for a folder never served",
+    file: "apps/pinetrie/host/tidy.ts",
+    from: '  if (!existsSync(file)) return { kind: "free" }\n',
+    to: "",
+    command: unit,
+    expect: "nothing to hold, and no store is made",
+  },
+  {
+    name: "pnpm tidy takes --days 0",
+    file: "apps/pinetrie/host/invocation.ts",
+    from: "      if (!Number.isInteger(n) || n < 1)",
+    to: "      if (!Number.isInteger(n))",
+    command: unit,
+    expect: "pnpm tidy's arguments",
+  },
+  {
     name: "the sweep deletes a lane's tip",
     file: "packages/folder/live.ts",
     from: "    live.add(lane.tip).add(lane.start)\n",
@@ -1811,8 +1835,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a relative folder is read from the working directory",
     file: "apps/pinetrie/host/invocation.ts",
-    from: "    folder: folder === undefined ? pinetrieRoot : path.resolve(base, folder),",
-    to: "    folder: folder === undefined ? pinetrieRoot : path.resolve(folder),",
+    from: "): string => (arg === undefined ? pinetrieRoot : path.resolve(base, arg))",
+    to: "): string => (arg === undefined ? pinetrieRoot : path.resolve(arg))",
     command: unit,
     expect:
       "no folder serves pinetrie's repo; one folder is read from the base, never the working directory",
