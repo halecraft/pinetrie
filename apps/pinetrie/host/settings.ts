@@ -52,6 +52,7 @@ import {
 import type { ListedFolder } from "@pinetrie/pi"
 import {
   DEFAULT_BUDGET,
+  DEFAULT_QUOTE_BYTES,
   type IconConfig,
   iconConfig,
   isCommandLabel,
@@ -164,6 +165,12 @@ export const SETTINGS = defineTable({
   "digests.enabled": pick(flag(), {
     fallback: true,
     describe: "whether a model digests each long ask's work",
+    order: ["system", "user", "local"],
+  }),
+  "shares.quoteBytes": pick(count({ min: 0 }), {
+    fallback: DEFAULT_QUOTE_BYTES,
+    describe:
+      "how large a shared text file may be and still be quoted to the model, in bytes; 0 quotes none",
     order: ["system", "user", "local"],
   }),
   "agents.budget": limited(

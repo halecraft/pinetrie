@@ -137,7 +137,7 @@ import {
   typingDue,
   unsentSignals,
   unstartedOf,
-  uploadText,
+  uploadBlob,
   viewportStore,
 } from "@pinetrie/interface"
 import {
@@ -183,6 +183,7 @@ import {
 import { Board, BoardStrip } from "./board.tsx"
 import { CardHistories } from "./card-history.tsx"
 import { useClipboard } from "./clipboard.ts"
+import { useFileDropGuard } from "./file-drop.ts"
 import { type FocusContext, focusFacts } from "./focus.ts"
 import { Footer } from "./footer.tsx"
 import { threadRow } from "./inbox-menu.tsx"
@@ -1405,7 +1406,7 @@ export function App({
       })
     },
     landed,
-    uploadText,
+    uploadBlob,
     clipboardCell: setCell,
     // As typed: the box's own text undo and its binding see an insert.
     insertText: text => {
@@ -1493,6 +1494,8 @@ export function App({
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
   }, [onIntent, focusContext])
+  // A file dropped where no card takes it is refused, not opened in the tab.
+  useFileDropGuard()
   // Copy, cut and paste: decided in `@pinetrie/interface` from
   // where focus is (`clipboard.ts`); nothing here.
   useClipboard({

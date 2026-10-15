@@ -300,7 +300,6 @@ export {
   TRASHED_WORDS,
   takenIn,
 } from "./held.ts"
-export { pastedImages, planImages } from "./images.ts"
 export {
   planReorder,
   planSetCommand,
@@ -554,6 +553,27 @@ export {
   type SharedWrite,
   sharedTouches,
 } from "./shared.ts"
+export {
+  blobOfArg,
+  DEFAULT_QUOTE_BYTES,
+  fenceFor,
+  fittedLine,
+  hasLocation,
+  isUtf8Text,
+  planSaveBlob,
+  planShares,
+  type ReadableBlobs,
+  readableBlobs,
+  type SaveBlobPlan,
+  type ShareQuote,
+  type StoredShare,
+  shareMarkdown,
+  shareQuote,
+  shareQuoteMarkdown,
+  sizeWords,
+  type TextBlob,
+  textBlobs,
+} from "./shares.ts"
 export {
   type AnyRecordSpec,
   planKindSweep,

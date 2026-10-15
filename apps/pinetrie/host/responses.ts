@@ -1,8 +1,15 @@
-// host/responses — every answer the host gives over HTTP itself, pure: an image
+// host/responses — every answer the host gives over HTTP itself, pure: a
 // blob, an upload's outcome, an offer's read. `http.ts` writes each one with
 // `send`.
 
-import type { BlobRef, StoredBlob } from "@pinetrie/core"
+import {
+  type BlobKind,
+  type BlobMime,
+  type BlobRef,
+  kindOfMime,
+  OPAQUE_MIME,
+  type StoredBlob,
+} from "@pinetrie/core"
 import type { OfferAnswer } from "@pinetrie/rules"
 
 export interface HttpAnswer<
@@ -54,9 +61,28 @@ export function offerResponse(answer: OfferAnswer): HttpAnswer<string> {
   }
 }
 
+/** How each kind of blob is served, over `IMMUTABLE`'s and the base's headers. */
+const BLOB_HEADERS: Readonly<
+  Record<BlobKind, (mime: BlobMime) => Readonly<Record<string, string>>>
+> = {
+  image: mime => ({ "content-type": mime }),
+  text: () => ({ "content-type": "text/plain; charset=utf-8" }),
+  opaque: () => ({
+    "content-type": OPAQUE_MIME,
+    "content-disposition": "attachment",
+  }),
+}
+
 /**
- * `GET /blob/<sha256>`: the stored blob, or 404 for one the store lacks. A
- * quote is served as `text/markdown`, which no browser draws as HTML.
+ * Every blob's: a shared file may be HTML or SVG, and the CSP's sandbox keeps
+ * one opened on its own from running script as the page's origin.
+ */
+const BLOB_BASE = { "content-security-policy": "sandbox; default-src 'none'" }
+
+/**
+ * `GET /blob/<sha256>`: the stored blob, or 404 for one the store lacks.
+ * Text is served as plain text, never drawn as HTML; an opaque blob is a
+ * download, named by the link that asks for it.
  */
 export function blobResponse(
   blob: Pick<StoredBlob, "bytes" | "mimeType"> | undefined,
@@ -66,7 +92,8 @@ export function blobResponse(
     status: 200,
     headers: {
       ...IMMUTABLE,
-      "content-type": blob.mimeType,
+      ...BLOB_BASE,
+      ...BLOB_HEADERS[kindOfMime(blob.mimeType)](blob.mimeType),
       "content-length": blob.bytes.byteLength,
     },
     body: blob.bytes,
@@ -90,7 +117,7 @@ export const uploadRefusal = (
   body: reason,
 })
 
-/** `POST /blob` kept: the image's reference. */
+/** `POST /blob` kept: the blob's reference, as it came. */
 export const uploaded = (ref: BlobRef): HttpAnswer<string> => ({
   status: 201,
   headers: { "content-type": "application/json" },

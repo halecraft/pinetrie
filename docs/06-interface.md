@@ -986,10 +986,20 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **A root shown again draws its tool rows as they were left** (ADR-0123):
   a running command's row outlined, a row whose detail you opened or folded
   the same way.
-- **Pasting an image into a composer puts it in the message** (ADR-0042).
-  It is uploaded as it is pasted, and its markdown, `![name](/blob/…)`, goes
-  in where the cursor was; the send button reads "uploading image…" until
-  it is done. Sent, the message draws the image at its stored size, capped
+- **A file dropped on a card, pasted into its box, or chosen with "share a
+  file" is shared in the message** (ADR-0042, ADR-0151). Any file: it is
+  uploaded as it arrives, and its link goes in where the cursor was, or at
+  the end of a box without focus, staying put as others type:
+  `![name](/blob/…)` for an image, `[name](/blob/…)` for anything else. The
+  send button reads "uploading a file…" until it is done. A file dropped
+  anywhere else is refused, never opened in the tab. Sent, a link to a file
+  is a chip naming it, its format and size, warning when its bytes hold a
+  location; a click opens an image or text beside the thread, and
+  downloads anything else. The agent reads a text file quoted under the
+  message, up to `shares.quoteBytes` (32 KiB), and is told of a larger or
+  binary one, which it saves into its lane with `save_blob` to read. An
+  image too large to send whole is drawn and read as its fitted copy; the
+  pane, a download and `save_blob` give the original. Sent, the message draws the image at its stored size, capped
   at the column's width. A click opens it in the pane, fitted to its width,
   where a click on it shows its own size and **open in a new tab** shows it
   alone; Cmd- or Ctrl-click opens a new tab at once. The agent is

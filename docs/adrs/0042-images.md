@@ -10,6 +10,8 @@
   - ADR-0051: a tool's images are blobs too.
   - ADR-0098: a person's picture is a blob, and the sweep counts it as a
     reference.
+  - ADR-0151: a pasted image is one share among any files; the blob is the
+    image as it came, and the model reads its fitted copy.
 
 **Context.** A person cannot show the agent or a collaborator an image: a
 screenshot, a mockup, an error dialog. The session document is replicated

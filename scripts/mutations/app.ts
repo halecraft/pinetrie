@@ -1101,10 +1101,29 @@ export const mutations: readonly Mutation[] = [
       "moving a root to Done closes it for the window that moved it, and the page someone else is on reads it",
   },
   {
+    name: "a file dropped on a card is not taken",
+    file: "packages/web/card-frame.tsx",
+    from: "      {...(p.share === undefined ? {} : fileDropProps(p.share.onFiles))}\n",
+    to: "",
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "a file dropped on a card is shared: its link goes in the box, and sent it is a chip naming it",
+  },
+  {
+    name: "a file dropped where no card takes it is let through",
+    file: "packages/web/file-drop.ts",
+    from: "      if (e.defaultPrevented || !bringsFiles(e.dataTransfer)) return\n      e.preventDefault()\n",
+    to: "      if (e.defaultPrevented || !bringsFiles(e.dataTransfer)) return\n",
+    suite: "browser",
+    scenario: "images",
+    expect: "a file dropped where no card takes it is refused, not opened",
+  },
+  {
     name: "a paste of images keeps the browser's default",
     file: "packages/web/card-editor.tsx",
-    from: "          if (files.length === 0) return\n          e.preventDefault()",
-    to: "          if (files.length === 0) return\n          void e",
+    from: "  if (files.length === 0 || share === null) return\n  e.preventDefault()",
+    to: "  if (files.length === 0 || share === null) return\n  void e",
     suite: "browser",
     scenario: "images",
     expect:
@@ -1734,8 +1753,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an upload answers another hash",
     file: "apps/pinetrie/host/http.ts",
-    from: "      send(res, uploaded(blobs.put(prepared.image)))",
-    to: '      send(res, uploaded({ ...blobs.put(prepared.image), sha256: "0" }))',
+    from: "      send(res, uploaded(blobs.put(upload.blob, upload.fitted)))",
+    to: '      send(res, uploaded({ ...blobs.put(upload.blob, upload.fitted), sha256: "0" }))',
     suite: "host",
     scenario: "images",
     expect:

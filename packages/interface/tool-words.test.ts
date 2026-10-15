@@ -17,6 +17,7 @@ describe("toolWord", () => {
     ask: "asked",
     leave: "left",
     resolve_conflict: "resolve",
+    save_blob: "save",
   }
   test.each(TOOL_IDS)("%s reads as its word", id => {
     expect(toolWord(id)).toBe(WORDS[id])

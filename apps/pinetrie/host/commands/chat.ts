@@ -7,14 +7,16 @@ import {
   agentCandidates,
   type BlobStore,
   baseKnown,
+  blobKind,
   ERR,
   forkEntry,
-  isImageRef,
   messageText,
   planModeOf,
   ROOT_ORIGIN,
   type Send,
   type SentCard,
+  type Sha256,
+  type Share,
   type ThreadId,
   threadAt,
   threadMembers,
@@ -47,16 +49,21 @@ import {
   type Cleared,
   displayName,
   encodeChat,
+  hasLocation,
   type LinkedQuote,
   linkedQuotes,
   parseCommand,
-  pastedImages,
   planBaseNews,
   planChat,
-  planImages,
+  planShares,
   planThreadOpen,
   resolveCommand,
+  type StoredShare,
+  shareQuote,
+  shareQuoteMarkdown,
+  type TextBlob,
   type ThreadOpen,
+  textBlobs,
 } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
@@ -79,7 +86,9 @@ export interface ChatDeps {
     LaneWork,
     "project" | "checkBegin" | "prepareLane" | "prepareUpdate" | "runnable"
   >
-  readonly blobs: Pick<BlobStore, "ref">
+  readonly blobs: Pick<BlobStore, "ref" | "size" | "fitted" | "get">
+  /** The most bytes of a shared text file quoted to the model (`shares.quoteBytes`). */
+  readonly quoteBytes: number
   /** Who wrote in a card: its other writers are a message's contributors. */
   readonly cards: Pick<CardPort, "writers" | "blankQueued">
   readonly start: Runs["start"]
@@ -94,6 +103,63 @@ export interface ChatDeps {
   /** A chat that asks or invites other threads' agents is relayed. */
   readonly relays: Pick<Relays, "relayChat">
 }
+
+/**
+ * What the store holds of each blob `named`: its ref, size and fitted copy,
+ * whether an image's or an opaque file's bytes hold a location, and a text
+ * file's text. A text file is not read for a location: its words may name
+ * one without placing anyone.
+ */
+function gatherShares(
+  blobs: ChatDeps["blobs"],
+  named: readonly TextBlob[],
+): {
+  readonly stored: ReadonlyMap<Sha256, StoredShare>
+  readonly texts: ReadonlyMap<Sha256, string>
+} {
+  const stored = new Map<Sha256, StoredShare>()
+  const texts = new Map<Sha256, string>()
+  for (const { sha256 } of named) {
+    const ref = blobs.ref(sha256)
+    const size = blobs.size(sha256)
+    const bytes = blobs.get(sha256)?.bytes
+    if (ref === undefined || size === undefined || bytes === undefined) continue
+    const text = blobKind(ref) === "text"
+    if (text) texts.set(sha256, new TextDecoder().decode(bytes))
+    stored.set(sha256, {
+      ref,
+      size,
+      fitted: blobs.fitted(sha256),
+      hasLocation: !text && hasLocation(bytes),
+    })
+  }
+  return { stored, texts }
+}
+
+/** Each text or opaque share as the model reads it, under the message. */
+const shareQuotes = (
+  shared: readonly Share[],
+  texts: ReadonlyMap<Sha256, string>,
+  quoteBytes: number,
+): LinkedQuote[] =>
+  shared.flatMap(share =>
+    share.shown !== null
+      ? []
+      : [
+          {
+            kind: "share" as const,
+            label: share.name,
+            markdown: shareQuoteMarkdown(
+              share,
+              shareQuote(
+                share,
+                texts.get(share.original.sha256) ?? null,
+                quoteBytes,
+              ),
+            ),
+          },
+        ],
+  )
 
 /** What `executeChat` needs besides the decision: the facts the send was planned from. */
 export interface ChatContext {
@@ -237,23 +303,20 @@ export async function sendChat(
         : ((await deps.piSetup.expand(source, typed.args, own)) ?? {
             unreadable: typed.name,
           })
-  // gather: the store's refs of the images its text shows
-  const shas = pastedImages(chat.text)
-  const refs = new Map(
-    shas.flatMap(sha => {
-      const ref = blobs.ref(sha)
-      return ref === undefined || !isImageRef(ref) ? [] : [[sha, ref] as const]
-    }),
-  )
+  // gather: what the store holds of each blob its text shares, and the
+  // bytes of each that is not an image, for its quote
+  const named = textBlobs(chat.text)
+  const held = gatherShares(blobs, named)
 
   // gather: the thread's base, for a lane with no work of its own to catch up
   // quietly before it runs
   const lane = thread.lane.kind === "lane" ? thread.lane.name : null
   const bases = readBases(session)
 
-  // plan: a missing image refuses the send before planChat decides the rest
-  const images = planImages(shas, refs)
-  if (images.kind === "refused") return images
+  // plan: a share no longer stored refuses the send before planChat decides
+  // the rest
+  const shares = planShares(named, held.stored)
+  if (shares.kind === "refused") return shares
   const news =
     lane === null
       ? "nothing"
@@ -272,7 +335,7 @@ export async function sendChat(
     news,
     caughtUp,
     command,
-    images: images.images,
+    shares,
     hostWorkingCopy: own ? (work.project?.root ?? null) : null,
     author: writer,
     authorName: nameOf(writer),
@@ -336,11 +399,15 @@ export async function sendChat(
     )
   const start = opened?.kind === "open" ? opened : null
 
-  // gather: the past its text links to, from the root it is in
-  const quotes = linkedQuotes(chat.text, address => {
-    const message = index.entries[address.entry]?.message
-    return message === undefined ? undefined : messageText(message)
-  })
+  // gather: the past its text links to, from the root it is in; then each
+  // file it shares that the model reads as text
+  const quotes = [
+    ...linkedQuotes(chat.text, address => {
+      const message = index.entries[address.entry]?.message
+      return message === undefined ? undefined : messageText(message)
+    }),
+    ...shareQuotes(shares.shared, held.texts, deps.quoteBytes),
+  ]
   const sent = await executeChat(deps, planned, {
     view,
     writer,

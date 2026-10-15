@@ -27,6 +27,7 @@ import {
 } from "@pinetrie/rules"
 import type { ChatHow } from "@pinetrie/session"
 import type { Prefill } from "./columns.ts"
+import { UPLOADING } from "./paste.ts"
 import { noModelWords } from "./setup-words.ts"
 
 /** What every send from one column carries, whichever card it is sent from. */
@@ -280,12 +281,9 @@ export const NO_MODEL_LABEL = "no model"
 /** The link beside it, to the setup page. */
 export const SEE_SETUP = "See Setup"
 
-/** The button's label while an image uploads: a send then would lack its markdown. */
-export const UPLOADING = "uploading image…"
-
 /**
  * The send button: what `plan` will do, or that an upload is out. It cannot
- * be pressed while an image uploads or a send is in flight.
+ * be pressed while a share uploads or a send is in flight.
  */
 export function sendButton(plan: SendPlan, busy: EditorBusy): SendButton {
   if (plan.noModel !== null)

@@ -28,6 +28,8 @@ export const BANNER_TOOL = "set_banner"
 export const ASK_TOOL = "ask"
 /** Leave another thread's members. */
 export const LEAVE_TOOL = "leave"
+/** Save a file shared in the thread into the agent's lane. */
+export const SAVE_BLOB_TOOL = "save_blob"
 
 /**
  * Every tool pine·trie registers, in the order the model is given them, and
@@ -53,6 +55,7 @@ export const TOOL_IDS = [
   ASK_TOOL,
   LEAVE_TOOL,
   RESOLVE_TOOL,
+  SAVE_BLOB_TOOL,
 ] as const
 
 export type ToolId = (typeof TOOL_IDS)[number]
@@ -100,11 +103,13 @@ const SUBJECTS: Readonly<
   [ASK_TOOL]: args => field(args, "to"),
   [LEAVE_TOOL]: args => field(args, "thread"),
   [RESOLVE_TOOL]: path,
+  [SAVE_BLOB_TOOL]: path,
 }
 
 /**
  * What a call touches, whole: `bash`'s command, the path of `read`, `write`,
- * `edit` and `resolve_conflict`, the pattern of `grep` and `find` and the path they search,
+ * `edit`, `resolve_conflict` and `save_blob`, the pattern of `grep` and `find`
+ * and the path they search,
  * what `catch_up` merges from, or the thread `ask` asks and `leave` leaves.
  * Undefined for any other tool.
  */

@@ -53,8 +53,6 @@ import {
   forkWords,
   free,
   type Intent,
-  imageMarkdown,
-  insertAt,
   NEW_NOTE_PLACEHOLDER,
   NEW_NOTE_TITLE,
   NEW_PIN_PLACEHOLDER,
@@ -67,7 +65,6 @@ import {
   type Reader,
   type ReadOnly,
   SEE_SETUP,
-  type Selection,
   sendable,
   sendButton,
   settleSend,
@@ -77,7 +74,6 @@ import {
   startText,
   startWords,
   tokensOf,
-  uploadImage,
 } from "@pinetrie/interface"
 import { type QueuedText, writersOfClients } from "@pinetrie/rules"
 import { textClients } from "@pinetrie/schema"
@@ -88,6 +84,7 @@ import {
   type SessionClient,
 } from "@pinetrie/session"
 import {
+  type ClipboardEvent,
   type KeyboardEvent,
   type ReactNode,
   useEffect,
@@ -95,9 +92,10 @@ import {
   useState,
 } from "react"
 import { CardFrame } from "./card-frame.tsx"
-import { pastedImages } from "./clipboard.ts"
+import { pastedFilesOf } from "./clipboard.ts"
 import { Menu } from "./menu.tsx"
 import { useThreadStates } from "./thread-states.ts"
+import { useShareFiles } from "./use-share-files.ts"
 import { useStable } from "./use-stable.ts"
 
 /**
@@ -229,7 +227,17 @@ export function CardEditor(p: {
   )
   const detach = useRef<(() => void) | null>(null)
   const [status, setStatus] = useState("")
-  const [uploading, setUploading] = useState(0)
+  // A box is bound to its card while `detach` is set.
+  const shares = useShareFiles(
+    p.readOnly === null
+      ? {
+          box,
+          session,
+          boundTo: () =>
+            detach.current === null ? null : shownBy(current.current),
+        }
+      : null,
+  )
   const [conflict, setConflict] = useState<{
     text: string
     line: string
@@ -249,7 +257,7 @@ export function CardEditor(p: {
     noModel: p.noModel,
   })
   const button = sendButton(plan, {
-    uploading: uploading > 0,
+    uploading: shares.uploading,
     sending: state.kind === "sending",
   })
   const queue = queueWords(plan.queue)
@@ -467,39 +475,11 @@ export function CardEditor(p: {
   }
 
   const submit = async () => {
-    const message = sendable(text, prefill, uploading > 0, command)
+    const message = sendable(text, prefill, shares.uploading, command)
     const now = current.current
     if (message === null || p.readOnly !== null || now.kind === "sending")
       return
     await send(message, plan.mode, shownBy(now))
-  }
-
-  /**
-   * Upload pasted images, then put their markdown where the selection was
-   * when they were pasted, all at once and in order. A refused one is left
-   * out, and the host's reason shown.
-   */
-  const pasteImages = async (files: readonly File[], at: Selection) => {
-    setUploading(n => n + 1)
-    setStatus("uploading image…")
-    const uploads = await Promise.all(files.map(uploadImage))
-    setUploading(n => n - 1)
-    const snippets = uploads.flatMap((u, i) =>
-      u.ok ? [imageMarkdown(files[i]?.name ?? "", u.ref)] : [],
-    )
-    const refused = uploads.flatMap(u => (u.ok ? [] : [u.reason]))
-    setStatus(
-      refused.length === 0 ? "" : `image not added: ${refused.join("; ")}`,
-    )
-    const el = box.current
-    if (snippets.length === 0 || el === null) return
-    // `insertAt` decides the text, a line of its own for each image; the
-    // element is given it as one edit over the selection, as typing would.
-    const before = el.value
-    const start = Math.min(at.start, before.length)
-    const end = Math.min(Math.max(at.end, start), before.length)
-    const after = insertAt(before, at, snippets.join("\n")).text
-    write(start, end, after.slice(start, after.length - (before.length - end)))
   }
 
   const { readOnly } = p
@@ -518,6 +498,7 @@ export function CardEditor(p: {
       card={card ?? null}
       catchUps={p.catchUps}
       pinning={pins}
+      {...shareProps(shares)}
       foot={
         frame.primary !== "send" ? null : (
           <>
@@ -673,16 +654,7 @@ export function CardEditor(p: {
           if (at !== caret) setPicked(0)
           setCaret(at)
         }}
-        onPaste={e => {
-          const files = pastedImages(e)
-          if (files.length === 0) return
-          e.preventDefault()
-          const el = e.currentTarget
-          void pasteImages(files, {
-            start: el.selectionStart,
-            end: el.selectionEnd,
-          })
-        }}
+        onPaste={e => sharePasted(e, shares.share)}
         onKeyDown={e => {
           if (e.nativeEvent.isComposing) return
           if (card !== undefined && p.readOnly === null) {
@@ -775,11 +747,15 @@ export function BoundCardEditor(p: {
     const el = box.current
     return el === null ? undefined : bindText(session, card.id, el, told)
   }, [session, card.id, told])
+  const shares = useShareFiles(
+    p.readOnly ? null : { box, session, boundTo: () => card.id },
+  )
   // A read-only box moves nothing (`cardFrame`).
   const among = view.tools.length === 0 ? null : p.among
   const onAct = p.onAct ?? (() => {})
   return (
     <CardFrame
+      {...shareProps(shares)}
       card={card}
       catchUps={p.catchUps}
       foot={p.foot}
@@ -799,6 +775,7 @@ export function BoundCardEditor(p: {
         className="input"
         data-card={card.id}
         onInput={() => p.onTyping(card.id)}
+        onPaste={e => sharePasted(e, shares.share)}
         onKeyDown={e => {
           const act = cardKeyAct(
             keyOfBox(e),
@@ -819,6 +796,23 @@ export function BoundCardEditor(p: {
     </CardFrame>
   )
 }
+
+/** A paste that brings files shares them instead (`pastedFilesOf`). */
+function sharePasted(
+  e: ClipboardEvent<HTMLTextAreaElement>,
+  share: ((files: readonly File[]) => void) | null,
+): void {
+  const files = pastedFilesOf(e)
+  if (files.length === 0 || share === null) return
+  e.preventDefault()
+  share(files)
+}
+
+/** A card frame's share prop, from its box's shares: none for a read-only box. */
+const shareProps = (shares: ReturnType<typeof useShareFiles>) =>
+  shares.share === null
+    ? {}
+    : { share: { onFiles: shares.share, status: shares.status } }
 
 /** A card box's keydown, as `cardKeyAct` reads it. */
 const keyOfBox = (e: KeyboardEvent<HTMLTextAreaElement>) => ({
@@ -908,6 +902,12 @@ export function NewNoteBox(p: {
   const current = useRef(state)
   const detach = useRef<(() => void) | null>(null)
   const [text, setText] = useState("")
+  // A box is bound to its note while `detach` is set.
+  const shares = useShareFiles({
+    box,
+    session,
+    boundTo: () => (detach.current === null ? null : shownBy(current.current)),
+  })
   const step = (event: EditorEvent) => {
     const next = editorState(current.current, event, undefined)
     current.current = next.state
@@ -965,6 +965,7 @@ export function NewNoteBox(p: {
   return (
     <div className="new-note">
       <CardFrame
+        {...shareProps(shares)}
         card={null}
         catchUps={null}
         foot={null}
@@ -979,6 +980,7 @@ export function NewNoteBox(p: {
           className="input"
           data-card={shown ?? undefined}
           onBlur={() => step({ kind: "release" })}
+          onPaste={e => sharePasted(e, shares.share)}
           onInput={e => {
             const value = e.currentTarget.value
             setText(value)

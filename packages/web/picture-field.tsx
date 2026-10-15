@@ -5,14 +5,15 @@
 
 import type { Sha256, WriterId } from "@pinetrie/core"
 import {
-  pastedFiles,
+  imageFiles,
   pictureProblem,
   pictureWords,
-  uploadImage,
+  uploadBlob,
 } from "@pinetrie/interface"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { useContext, useRef, useState } from "react"
 import { pastedImages } from "./clipboard.ts"
+import { fileDropProps } from "./file-drop.ts"
 import { PictureCrop } from "./picture-crop.tsx"
 import { Pictures } from "./pictures-context.ts"
 import { Initial } from "./presence.tsx"
@@ -50,19 +51,12 @@ export function PictureField({
   }
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: dropping and pasting an image are shortcuts; the button is the way in
     <div
       className="picture-field"
-      onDragOver={e => {
-        // A drag's files are hidden until the drop: its types say it has some.
-        if (e.dataTransfer.types.includes("Files")) e.preventDefault()
-      }}
-      onDrop={e => {
-        const [picked] = pastedFiles(e.dataTransfer)
-        if (picked === undefined) return
-        e.preventDefault()
+      {...fileDropProps(files => {
+        const [picked] = imageFiles({ files })
         void choose(picked)
-      }}
+      })}
       onPaste={e => {
         const [picked] = pastedImages(e)
         if (picked === undefined) return
@@ -116,7 +110,7 @@ export function PictureField({
           onCancel={() => setChosen(null)}
           onUse={async picture => {
             setBusy(true)
-            const upload = await uploadImage(picture)
+            const upload = await uploadBlob(picture)
             if (!upload.ok) setProblem(upload.reason)
             const took = upload.ok && (await send(upload.ref.sha256))
             setBusy(false)

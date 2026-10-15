@@ -127,7 +127,7 @@ const rootRecord: RootRecord = {
   writers: [ADA],
   threads: { [L]: [ADA] },
   mentions: [{ id: E, by: ADA, text: "@bea look", thread: L }],
-  images: [],
+  blobs: [],
 }
 
 const SAMPLES: readonly Sample[] = [

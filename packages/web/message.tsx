@@ -154,7 +154,12 @@ function MessageView(p: MessageProps) {
           />
         ))}
         {showsText(node) && (
-          <MessageText images={node.images} mode="committed" text={node.text} />
+          <MessageText
+            images={node.images}
+            mode="committed"
+            shared={node.shared}
+            text={node.text}
+          />
         )}
         {node.toolCalls?.map(call => (
           <ToolRow

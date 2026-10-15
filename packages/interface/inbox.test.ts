@@ -42,7 +42,7 @@ const record = (
     text,
     thread: threadIdFor(id),
   })),
-  images: [],
+  blobs: [],
 })
 const roots = [
   record("1-r1", "7-d", [

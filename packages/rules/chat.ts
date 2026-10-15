@@ -13,6 +13,7 @@ import {
   type ImageMime,
   type ImageRef,
   type Mention,
+  OPAQUE_MIME,
   type PlanMode,
   type PointId,
   type Position,
@@ -24,8 +25,10 @@ import {
   refused,
   type SendAt,
   type Sha256,
+  type Share,
   sendWaits,
   type TaskId,
+  TEXT_MIME,
   THE_AGENT,
   type ThreadId,
   type ThreadLane,
@@ -48,6 +51,7 @@ import {
   heardLine,
   type RelayMessage,
 } from "./relay.ts"
+import { fittedLine } from "./shares.ts"
 import { decodeStack, type StackMessage, stackLine } from "./stack.ts"
 import { type CarryOnMessage, carryOnLine, decodeCarryOn } from "./stop.ts"
 import { decodeTaskPinned } from "./task-pinned.ts"
@@ -66,6 +70,25 @@ const ImageRefSchema = Type.Object({
   mimeType: Type.Union(IMAGE_MIMES.map(m => Type.Literal(m))),
   width: Type.Integer({ minimum: 1 }),
   height: Type.Integer({ minimum: 1 }),
+})
+
+const NoSize = { width: Type.Null(), height: Type.Null() }
+const ShareSchema = Type.Object({
+  name: Type.String(),
+  original: Type.Union([
+    ImageRefSchema,
+    Type.Object({
+      sha256: ImageRefSchema.properties.sha256,
+      mimeType: Type.Union([
+        Type.Literal(TEXT_MIME),
+        Type.Literal(OPAQUE_MIME),
+      ]),
+      ...NoSize,
+    }),
+  ]),
+  size: Type.Integer({ minimum: 0 }),
+  shown: Type.Union([ImageRefSchema, Type.Null()]),
+  hasLocation: Type.Boolean(),
 })
 
 const DetailsSchema = Type.Object({
@@ -89,8 +112,10 @@ const DetailsSchema = Type.Object({
       expanded: Type.String(),
     }),
   ),
-  /** The images its text shows, by reference. */
+  /** The images the model reads with it, by reference: each share's `shown`. */
   images: Type.Optional(Type.Array(ImageRefSchema)),
+  /** The files its text shares, images among them. */
+  shared: Type.Optional(Type.Array(ShareSchema)),
   /** Other threads' agents it asks, members already. */
   asks: Type.Optional(Type.Array(ThreadIdSchema)),
   /** Other threads' agents it invites: they become members. */
@@ -119,10 +144,12 @@ export interface ChatDetails {
   /** The command it ran; `text` stays as typed. */
   readonly command?: CommandRef
   /**
-   * The `/blob/` images its text shows, in order: the model reads
-   * their bytes after `content`. Absent when it shows none.
+   * The images the model reads after `content`, in order: each image
+   * share's `shown`. Absent when it shares none.
    */
   readonly images?: readonly ImageRef[]
+  /** The files its text shares, in order; absent when none. */
+  readonly shared?: readonly Share[]
   /** Other threads' agents it asks; absent when none. */
   readonly asks?: readonly ThreadId[]
   /** Other threads' agents it invites; absent when none. */
@@ -218,8 +245,18 @@ export function withChatImages<M>(
         text: typeof text === "string" ? text : attributed(chat),
       },
     ]
+    const fittedLines = new Map(
+      (chat.shared ?? []).flatMap(share => {
+        const line = fittedLine(share)
+        return share.shown === null || line === null
+          ? []
+          : [[share.shown.sha256, line] as const]
+      }),
+    )
     for (const image of chat.images) {
       const blob = blobs.get(image.sha256)
+      const line = fittedLines.get(image.sha256)
+      if (line !== undefined) parts.push({ type: "text", text: line })
       parts.push(
         blob === undefined
           ? {
@@ -256,6 +293,20 @@ export const detailsFromStored = (
     ? {}
     : {
         images: d.images.map(i => ({ ...i, sha256: i.sha256 as Sha256 })),
+      }),
+  ...(d.shared === undefined
+    ? {}
+    : {
+        shared: d.shared.map(
+          (s): Share => ({
+            ...s,
+            original: { ...s.original, sha256: s.original.sha256 as Sha256 },
+            shown:
+              s.shown === null
+                ? null
+                : { ...s.shown, sha256: s.shown.sha256 as Sha256 },
+          }),
+        ),
       }),
   ...(d.asks === undefined ? {} : { asks: d.asks }),
   ...(d.invites === undefined ? {} : { invites: d.invites }),
@@ -385,6 +436,7 @@ export function renderableMessage(message: unknown): AgentMessageLike {
           : { contributors: chat.contributors }),
         ...(chat.command === undefined ? {} : { command: chat.command.name }),
         ...(chat.images === undefined ? {} : { images: chat.images }),
+        ...(chat.shared === undefined ? {} : { shared: chat.shared }),
         ...(chat.asks === undefined ? {} : { asks: chat.asks }),
         ...(chat.invites === undefined ? {} : { invites: chat.invites }),
       }
@@ -612,8 +664,11 @@ export function planChat(input: {
   readonly sendId: string
   /** The other people who wrote in its card; empty for a message written alone. */
   readonly contributors: readonly WriterId[]
-  /** The images its text shows, as `planImages` found them in the store. */
-  readonly images: readonly ImageRef[]
+  /** What its text shares, as `planShares` found it in the store. */
+  readonly shares: {
+    readonly images: readonly ImageRef[]
+    readonly shared: readonly Share[]
+  }
   /**
    * Your working copy's root when the thread works, or will work, in its own
    * copy: paths under it are stored as the lane sees them, under `/mnt/host-working-copy`, so
@@ -674,7 +729,12 @@ export function planChat(input: {
       ? {}
       : { contributors: input.contributors }),
     ...(command === null ? {} : { command }),
-    ...(input.images.length === 0 ? {} : { images: input.images }),
+    ...(input.shares.images.length === 0
+      ? {}
+      : { images: input.shares.images }),
+    ...(input.shares.shared.length === 0
+      ? {}
+      : { shared: input.shares.shared }),
     ...(asks.length === 0 ? {} : { asks }),
     ...(invites.length === 0 ? {} : { invites }),
   }

@@ -6,6 +6,30 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a share's chip forgets its location",
+    file: "packages/interface/paste.ts",
+    from: '    location: share.hasLocation ? "holds a location" : null,',
+    to: "    location: null,",
+    command: unit,
+    expect: "a name with no extension is a file; a location is warned of",
+  },
+  {
+    name: "a share into an unfocused box goes where its caret was left",
+    file: "packages/interface/paste.ts",
+    from: "  box.focused ? box.selection : { start: box.length, end: box.length }",
+    to: "  box.selection",
+    command: unit,
+    expect: "shareSelection: the selection while the box has focus",
+  },
+  {
+    name: "a paste's files are only its images",
+    file: "packages/interface/paste.ts",
+    from: "export const pastedFiles = <F>(data: { readonly files: ArrayLike<F> }): F[] =>\n  Array.from(data.files)",
+    to: 'export const pastedFiles = <F>(data: { readonly files: ArrayLike<F> }): F[] =>\n  Array.from(data.files).filter(f => String((f as { type?: string }).type).startsWith("image/"))',
+    command: unit,
+    expect: "pastedFiles: every file in order",
+  },
+  {
     name: "a folder project shows the publish button",
     file: "packages/interface/publish-view.ts",
     from: '  if (record === null || record.kind === "folder") return { kind: "absent" }',

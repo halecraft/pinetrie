@@ -1,7 +1,10 @@
 // e2e/browser/images — an image pasted into the composer, opened in the
-// column's pane, as a table is, and a tool's image, drawn in its row, which
-// opens capped.
+// column's pane, as a table is; a file dropped on a card, shared as a chip;
+// and a tool's image, drawn in its row, which opens capped.
 
+import { mkdtempSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { writerId } from "@pinetrie/core"
 import { UPLOADING } from "@pinetrie/interface"
 import { scriptedModel, sha256Of } from "@pinetrie/pi"
@@ -384,6 +387,71 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           `cell ${shown}, kept ${kept}, previewed ${previewed}`,
         )
         await pp.click("#bottom .inventory-toggle")
+        // A file dropped on the composer's card is shared: its link goes in
+        // the box, and sent, it is a chip naming it. The drop is the
+        // browser's own, through CDP, as one from the desktop is.
+        const notes = Buffer.from("the notes\n")
+        const notesSha = sha256Of(notes)
+        const notesFile = path.join(
+          mkdtempSync(path.join(tmpdir(), "pinetrie-drop-")),
+          "notes.txt",
+        )
+        writeFileSync(notesFile, notes)
+        const at = await pp.locator(box).boundingBox()
+        const cdp = await pp.context().newCDPSession(pp)
+        const drag = { items: [], files: [notesFile], dragOperationsMask: 1 }
+        for (const type of ["dragEnter", "dragOver", "drop"] as const)
+          await cdp.send("Input.dispatchDragEvent", {
+            type,
+            x: (at?.x ?? 0) + 10,
+            y: (at?.y ?? 0) + 10,
+            data: drag,
+          })
+        const dropLinked = await pp
+          .waitForFunction(
+            ([sel, md]) =>
+              (document.querySelector(sel) as HTMLTextAreaElement | null)
+                ?.value === md,
+            [box, `[notes.txt](/blob/${notesSha})`] as const,
+            { timeout: 10_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        if (dropLinked) await pp.click(sendButton)
+        const chip = await pp
+          .waitForSelector(
+            `${col(0)} .msg a.share-chip[data-share="${notesSha}"]`,
+            { timeout: 10_000 },
+          )
+          .then(
+            el => el.textContent(),
+            () => null,
+          )
+        check(
+          "a file dropped on a card is shared: its link goes in the box, and sent it is a chip naming it",
+          dropLinked && chip?.startsWith("notes.txt") === true,
+          `linked ${dropLinked}, chip ${JSON.stringify(chip)}`,
+        )
+        // A file dropped where no card takes it is refused, never opened in
+        // the tab.
+        const refused = await pp.evaluate(() => {
+          const data = new DataTransfer()
+          data.items.add(new File(["x"], "x.txt", { type: "text/plain" }))
+          const drop = new DragEvent("drop", {
+            dataTransfer: data,
+            bubbles: true,
+            cancelable: true,
+          })
+          document.body.dispatchEvent(drop)
+          return drop.defaultPrevented
+        })
+        check(
+          "a file dropped where no card takes it is refused, not opened",
+          refused,
+          `refused ${refused}`,
+        )
         // Pia's picture: chosen on her profile page, cropped to a
         // square in the browser and sent at 256, then drawn in her circle in
         // Quinn's window, where she reads the thread he has open.

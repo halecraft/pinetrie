@@ -877,6 +877,10 @@
       .card-foot:empty { display: none; }
       .card-tools { display: flex; gap: .2rem; }
       .card-tools button { width: 1.6rem; padding: .05rem 0; font-size: .72rem; }
+      .pane-text { margin: 0; white-space: pre-wrap; overflow: auto; font-size: .8rem; }
+      .card-share { display: flex; align-items: center; gap: .3rem; }
+      .card-share .share-file { padding: .05rem .35rem; font-size: .72rem; }
+      .share-status { color: #8b93a1; font-size: .72rem; }
       .card-frame .primary { background: var(--tone); border-color: var(--tone); color: #0d1117; }
       .card-frame .primary:disabled { opacity: .5; }
       /* Closing a new branch that holds text asks first. */
@@ -998,6 +1002,12 @@
       a.address-link { padding: 0 .3rem; border-radius: 3px; background: #23272e;
         color: #d2a8ff; text-decoration: none; }
       a.address-link::before { content: "❝ "; color: #8b93a1; }
+      /* A shared file in a message: a chip naming it, its format and size. */
+      a.share-chip { padding: 0 .3rem; border-radius: 3px; background: #23272e;
+        color: #79c0ff; text-decoration: none; }
+      a.share-chip::before { content: "📎 "; }
+      .share-chip-meta { color: #8b93a1; font-size: .85em; }
+      .share-chip-location { color: #f0b72f; font-size: .85em; }
       .note-column-face { display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem;
         font-size: .72rem; }
       .note-column-face-title { font-weight: 600; }

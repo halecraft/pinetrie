@@ -98,7 +98,6 @@ import {
   PROJECT,
   PROJECT_KEY,
   participants,
-  pastedImages,
   promptAuthor,
   QUEUE_HOLD,
   queuedOn,
@@ -113,6 +112,7 @@ import {
   SHARED_LINEAGE,
   THREAD,
   TRACE,
+  textBlobs,
   threadNameOf,
   VERDICT,
   WORKFLOW,
@@ -810,11 +810,11 @@ export function worksOwn(
 // --- blobs --------------------------------------------------------------------
 
 /**
- * Every blob something still shows: each chat's images, each tool result's,
- * each `/blob/` image in the texts people type, every card's, queued ones
- * among them, and each thread's banner. A card holds what a composer has
- * typed, pasted images included, so the caller passes every text, not only
- * those it has loaded.
+ * Every blob something still shows: each chat's images and shares (an
+ * image's original and its fitted copy), each tool result's, each `/blob/`
+ * that the texts people type name, every card's, queued ones among them,
+ * and each thread's banner. A card holds what a composer has typed, shares
+ * included, so the caller passes every text, not only those it has loaded.
  */
 export function referencedBlobs(facts: {
   readonly messages: Iterable<unknown>
@@ -824,13 +824,17 @@ export function referencedBlobs(facts: {
   const shas = new Set<Sha256>()
   for (const banner of facts.banners) shas.add(banner.sha)
   for (const message of facts.messages) {
-    for (const image of decodeChat(message)?.images ?? [])
-      shas.add(image.sha256)
+    const chat = decodeChat(message)
+    for (const image of chat?.images ?? []) shas.add(image.sha256)
+    for (const share of chat?.shared ?? []) {
+      shas.add(share.original.sha256)
+      if (share.shown !== null) shas.add(share.shown.sha256)
+    }
     for (const image of messageImages(message as AgentMessageLike))
       shas.add(image.sha256)
   }
   for (const text of facts.texts)
-    for (const sha of pastedImages(text)) shas.add(sha)
+    for (const blob of textBlobs(text)) shas.add(blob.sha256)
   return shas
 }
 
@@ -851,7 +855,7 @@ export const readReferencedBlobs = (
     }),
   )
   for (const root of readRoots(session).values())
-    for (const sha of root.images) shas.add(sha)
+    for (const sha of root.blobs) shas.add(sha)
   for (const picture of readRecords(session, PICTURE).values())
     shas.add(picture.sha256)
   return shas
@@ -892,7 +896,7 @@ export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
       ]),
     ),
     mentions: mentions.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
-    images: [
+    blobs: [
       ...referencedBlobs({
         messages: Object.values(readEntries(doc)).map(rowMessage),
         texts: [],

@@ -287,7 +287,9 @@ bytes (`detectSupportedImageMimeType`), then `resizeImage`, in a worker
 thread, to 2000×2000 and 4.5 MB of base64. A type no provider takes inline
 (BMP) is "not an image"; a resize that returns null is "unreadable", since
 pi's null means either undecodable or impossible to fit. After a resize,
-`resized` is pi's note of the original size (`formatDimensionNote`). A
+`resized` is pi's note of the original size (`formatDimensionNote`), and
+`original` is the image as it came, with its own size: the host keeps it,
+and the fitted `image` beside it when they differ (ADR-0151). A
 person's picture is given a smaller box, 512 on its longer side (`ImageFit`,
 ADR-0098).
 
@@ -702,6 +704,15 @@ item 18, and in `lanes.test.ts` against the harness.
   `drawn`, which the tool's answer names. The tool reads its arguments
   (`parseBannerArgs`: an image that names no pasted image is refused, not
   ignored) and hands the ask to the host.
+- **`save_blob`** (`save-blob.ts`, ADR-0151) saves a file shared in the
+  thread into the agent's lane. The host answers which bytes
+  (`LaneHooks.readBlob`: a blob some message on the lane's path showed its
+  model, or why not); the tool writes them itself with its tool context's
+  `env.writeFile`, the path resolved against `toolContext.dir` as `write`'s
+  is. The host must not write instead: its own writes go on a run's input,
+  which the helper never counts as the agent's, so the disk model and a
+  shared directory's lineage would miss the file. `writeFile` carries raw
+  bytes through the channel as base64, 64 MiB in a quarter second (S206).
 - **pine·trie's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`

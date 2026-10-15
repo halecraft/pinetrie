@@ -24,6 +24,11 @@ export type PreparedImage =
       readonly ok: true
       readonly image: StoredImage
       /**
+       * The image as it came, with its own size: the same bytes as `image`
+       * when it fitted already.
+       */
+      readonly original: StoredImage
+      /**
        * pi's note for the model when the image was resized: its original
        * size, and the scale that maps a coordinate back to it.
        */
@@ -64,6 +69,12 @@ export async function prepareImage(
       mimeType,
       width: resized.width,
       height: resized.height,
+    },
+    original: {
+      bytes,
+      mimeType: sniffed,
+      width: resized.originalWidth,
+      height: resized.originalHeight,
     },
     resized: formatDimensionNote(resized),
   }

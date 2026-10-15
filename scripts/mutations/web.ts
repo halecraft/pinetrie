@@ -7,6 +7,30 @@ const tabState = "packages/web/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a fitted image draws its original inline",
+    file: "packages/web/markdown.ts",
+    from: "    img.properties.src = blobUrl(shown.sha256)\n",
+    to: "",
+    command: unit,
+    expect: "a fitted image draws its copy at its size",
+  },
+  {
+    name: "a fitted image's block opens its copy",
+    file: "packages/web/pane.ts",
+    from: '      const src = typeof original === "string" ? original : block.properties.src',
+    to: "      const src = block.properties.src",
+    command: unit,
+    expect: "a fitted image's block opens its original",
+  },
+  {
+    name: "a shared file's link is no chip",
+    file: "packages/web/markdown.ts",
+    from: '      if (child.tagName === "a") markShare(child, blobs)\n',
+    to: "",
+    command: unit,
+    expect: "a link to a shared file is a chip",
+  },
+  {
     name: "a noun has no built-in icon",
     file: "packages/core/thread-names.ts",
     from: '  "fox",\n',
@@ -108,8 +132,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "finish leaves blob images unsized",
     file: "packages/web/markdown.ts",
-    from: '      if (child.tagName === "img") sizeImage(child, images)',
-    to: '      if (child.tagName === "none") sizeImage(child, images)',
+    from: '      if (child.tagName === "img") sizeImage(child, blobs)',
+    to: '      if (child.tagName === "none") sizeImage(child, blobs)',
     command: unit,
     expect: "a /blob/ image the message holds gets its stored size",
   },

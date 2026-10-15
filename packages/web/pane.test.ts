@@ -144,6 +144,46 @@ describe("paneView", () => {
     })
     expect(paneView(image(), facts({ nodes: [] }))?.kind).toBe("image")
   })
+  test("a fitted image's block opens its original; a text share opens as text", () => {
+    const FIT = "b".repeat(64) as Sha256
+    const fitted: SpineNode = {
+      ...node("m1", `![big](/blob/${SHA})`),
+      images: [{ sha256: FIT, mimeType: "image/png", width: 2000, height: 1 }],
+      shared: [
+        {
+          name: "big",
+          original: {
+            sha256: SHA,
+            mimeType: "image/png",
+            width: 4000,
+            height: 2,
+          },
+          size: 9,
+          shown: { sha256: FIT, mimeType: "image/png", width: 2000, height: 1 },
+          hasLocation: false,
+        },
+      ],
+    }
+    const block: PaneSubject = {
+      kind: "block",
+      address: {
+        kind: "block",
+        thread: FIXTURE_THREAD,
+        entry: entryId("m1"),
+        block: { kind: "image", n: 0 },
+      },
+    }
+    expect(paneView(block, facts({ nodes: [fitted] }))).toMatchObject({
+      kind: "image",
+      src: `/blob/${SHA}`,
+    })
+    expect(
+      paneView(
+        { kind: "share", sha256: SHA, name: "n.md", image: false },
+        facts(),
+      ),
+    ).toEqual({ kind: "text", src: `/blob/${SHA}`, title: "n.md" })
+  })
 })
 
 describe("askReviewTarget", () => {

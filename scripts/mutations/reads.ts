@@ -49,10 +49,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "referencedBlobs skips the texts people type",
     file: "packages/reads/index.ts",
-    from: "    for (const sha of pastedImages(text)) shas.add(sha)",
-    to: '    for (const sha of pastedImages("")) shas.add(sha)',
+    from: "    for (const blob of textBlobs(text)) shas.add(blob.sha256)",
+    to: '    for (const blob of textBlobs("")) shas.add(blob.sha256)',
     command: unit,
     expect: "referencedBlobs: chats, tool results",
+  },
+  {
+    name: "referencedBlobs skips a chat's shares",
+    file: "packages/reads/index.ts",
+    from: "    for (const share of chat?.shared ?? []) {",
+    to: "    for (const share of []) {",
+    command: unit,
+    expect: "a chat's shares keep their originals and fitted copies",
   },
   {
     name: "readTreeIndex indexes again on every call",

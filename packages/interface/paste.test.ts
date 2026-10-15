@@ -1,6 +1,12 @@
-import type { ImageRef, Sha256 } from "@pinetrie/core"
+import type { BlobRef, Sha256, Share } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { imageMarkdown, insertAt, pastedFiles } from "./paste.ts"
+import {
+  imageFiles,
+  insertAt,
+  pastedFiles,
+  shareChip,
+  shareSelection,
+} from "./paste.ts"
 
 describe("insertAt: a snippet on lines of its own", () => {
   const S = "![](/blob/x)"
@@ -39,26 +45,61 @@ describe("insertAt: a snippet on lines of its own", () => {
   })
 })
 
-test("pastedFiles: the image files in order; none for text", () => {
+test("pastedFiles: every file in order; imageFiles: the images among them", () => {
   const png = { type: "image/png", name: "a.png" }
   const jpg = { type: "image/jpeg", name: "b.jpg" }
   const txt = { type: "text/plain", name: "c.txt" }
-  expect(pastedFiles({ files: [png, txt, jpg] })).toEqual([png, jpg])
+  const odd = { type: "", name: "d.heic" }
+  expect(pastedFiles({ files: [png, txt, odd, jpg] })).toEqual([
+    png,
+    txt,
+    odd,
+    jpg,
+  ])
+  expect(imageFiles({ files: [png, txt, odd, jpg] })).toEqual([png, jpg])
   expect(pastedFiles({ files: [] })).toEqual([])
 })
 
-test('imageMarkdown: the name as alt text, escaped; "image" when there is none', () => {
-  const ref: ImageRef = {
-    sha256: "e".repeat(64) as Sha256,
-    mimeType: "image/png",
-    width: 1,
-    height: 1,
-  }
-  expect(imageMarkdown("shot.png", ref)).toBe(
-    `![shot.png](/blob/${ref.sha256})`,
+test("shareSelection: the selection while the box has focus, else the end of its text", () => {
+  const selection = { start: 2, end: 4 }
+  expect(shareSelection({ focused: true, selection, length: 9 })).toEqual(
+    selection,
   )
-  expect(imageMarkdown("", ref)).toBe(`![image](/blob/${ref.sha256})`)
-  expect(imageMarkdown("a]b[c\\", ref)).toBe(
-    `![a\\]b\\[c\\\\](/blob/${ref.sha256})`,
-  )
+  expect(
+    shareSelection({
+      focused: false,
+      selection: { start: 0, end: 0 },
+      length: 9,
+    }),
+  ).toEqual({ start: 9, end: 9 })
+})
+
+describe("shareChip", () => {
+  const sha = "f".repeat(64) as Sha256
+  const share = (name: string, mimeType: string, extra = {}): Share => ({
+    name,
+    original: { sha256: sha, mimeType, width: null, height: null } as BlobRef,
+    size: 2 * 1024 * 1024,
+    shown: null,
+    hasLocation: false,
+    ...extra,
+  })
+
+  test("its name, format and size; an opaque file downloads, text opens beside the thread", () => {
+    expect(shareChip(share("report.pdf", "application/octet-stream"))).toEqual({
+      name: "report.pdf",
+      meta: "PDF · 2.0 MB",
+      location: null,
+      opens: "download",
+    })
+    expect(shareChip(share("notes.md", "text/markdown")).opens).toBe("pane")
+  })
+
+  test("a name with no extension is a file; a location is warned of", () => {
+    const chip = shareChip(
+      share("Makefile", "text/markdown", { hasLocation: true, size: 12 }),
+    )
+    expect(chip.meta).toBe("file · 12 B")
+    expect(chip.location).toBe("holds a location")
+  })
 })

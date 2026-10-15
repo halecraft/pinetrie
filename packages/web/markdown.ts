@@ -3,11 +3,15 @@
 import {
   addressOfUrl,
   type BlockRef,
+  blobKind,
   blobOfUrl,
+  blobUrl,
   type ImageRef,
   printAddress,
   type Sha256,
+  type Share,
 } from "@pinetrie/core"
+import { shareChip } from "@pinetrie/interface"
 import {
   BLOCK_PROPERTY,
   type BlockNode,
@@ -48,34 +52,46 @@ const toHast = unified()
   .use(remarkRehype, { allowDangerousHtml: true })
   .freeze()
 
-/** The images a text's `/blob/` sources name, as its message holds them. */
-export type ImageLookup = ReadonlyMap<Sha256, ImageRef>
+/**
+ * What a message holds of the blobs its text names: its images, by hash, and
+ * the files it shares, by their originals' hashes.
+ */
+export interface BlobLookup {
+  readonly images: ReadonlyMap<Sha256, ImageRef>
+  readonly shares: ReadonlyMap<Sha256, Share>
+}
 
-export const NO_IMAGES: ImageLookup = new Map()
+export const NO_BLOBS: BlobLookup = { images: new Map(), shares: new Map() }
 
-/** The images a message holds, by hash. */
-export const imageLookup = (
+/** The blobs a message holds, by hash. */
+export const blobLookup = (
   images: readonly ImageRef[] | undefined,
-): ImageLookup =>
-  images === undefined
-    ? NO_IMAGES
-    : new Map(images.map(image => [image.sha256, image]))
+  shared: readonly Share[] | undefined,
+): BlobLookup =>
+  images === undefined && shared === undefined
+    ? NO_BLOBS
+    : {
+        images: new Map((images ?? []).map(image => [image.sha256, image])),
+        shares: new Map((shared ?? []).map(s => [s.original.sha256, s])),
+      }
 
 /**
- * The tree to draw for a message's text. A `/blob/` image found in `images`
+ * The tree to draw for a message's text. A `/blob/` image found in `blobs`
  * gets its stored size, so its box is laid out before it loads: alignment and
- * following measure a message once. Each block (a table, a code block, an
+ * following measure a message once. A shared image too large to fit draws
+ * its fitted copy, and names its original for the pane; a link to any other
+ * shared file is a chip. Each block (a table, a code block, an
  * image, a paragraph) carries its number (`data-block`, `markBlocks`), so the
  * column's pane and an address can name it.
  */
 export function messageTree(
   source: string,
   mode: TextMode,
-  images: ImageLookup = NO_IMAGES,
+  blobs: BlobLookup = NO_BLOBS,
 ): Root {
   const text = mode === "streaming" ? remend(source, REMEND) : source
   const tree = toHast.runSync(toHast.parse(text))
-  tree.children = finish(tree.children, false, images)
+  tree.children = finish(tree.children, false, blobs)
   return tree
 }
 
@@ -131,7 +147,7 @@ const textOf = (node: ElementContent): string =>
 function finish(
   children: readonly RootContent[],
   inPre: boolean,
-  images: ImageLookup,
+  blobs: BlobLookup,
 ): ElementContent[] {
   const out: ElementContent[] = []
   for (const child of children) {
@@ -140,13 +156,14 @@ function finish(
         const url = child.properties[key]
         if (typeof url === "string") child.properties[key] = safeUrl(url)
       }
-      if (child.tagName === "img") sizeImage(child, images)
+      if (child.tagName === "img") sizeImage(child, blobs)
       if (child.tagName === "a") markAddress(child)
       child.children = finish(
         child.children,
         inPre || child.tagName === "pre",
-        images,
+        blobs,
       )
+      if (child.tagName === "a") markShare(child, blobs)
       out.push(child)
     } else if (child.type === "text" || child.type === "raw") {
       // What to-hast adds between blocks and after a <br> has no position.
@@ -194,6 +211,37 @@ export function safeUrl(url: string): string {
 }
 
 /**
+ * A link to a file its message shares, drawn as a chip: its name, format
+ * and size, and a warning when it holds a location (`shareChip`). Marked
+ * with its blob (`data-share`) for the page's click, and named for a download.
+ */
+function markShare(a: Element, blobs: BlobLookup): void {
+  const href = a.properties.href
+  const sha = typeof href === "string" ? blobOfUrl(href) : null
+  const share = sha === null ? undefined : blobs.shares.get(sha)
+  if (sha === null || share === undefined) return
+  const chip = shareChip(share)
+  a.properties.className = ["share-chip"]
+  a.properties.dataShare = sha
+  a.properties.dataOpens =
+    chip.opens === "download" ? "download" : blobKind(share.original)
+  a.properties.download = chip.name
+  const span = (className: string, value: string): ElementContent => ({
+    type: "element",
+    tagName: "span",
+    properties: { className: [className] },
+    children: [{ type: "text", value }],
+  })
+  a.children = [
+    { type: "text", value: `${chip.name} ` },
+    span("share-chip-meta", chip.meta),
+    ...(chip.location === null
+      ? []
+      : [span("share-chip-location", ` · ${chip.location}`)]),
+  ]
+}
+
+/**
  * A link to an address, `/a/<address>`, drawn as a chip: marked with what it
  * names (`data-address`), which the page's click opens.
  */
@@ -205,11 +253,22 @@ function markAddress(a: Element): void {
   a.properties.className = ["address-link"]
 }
 
-/** A `/blob/` image its message holds: its stored size, and loaded lazily. */
-function sizeImage(img: Element, images: ImageLookup): void {
+/** The property naming a fitted image's original, which the pane opens. */
+export const ORIGINAL_PROPERTY = "dataOriginal"
+
+/**
+ * A `/blob/` image its message holds: its stored size, and loaded lazily. A
+ * shared image is drawn as its `shown` copy, its original named beside it.
+ */
+function sizeImage(img: Element, blobs: BlobLookup): void {
   const src = img.properties.src
   const sha = typeof src === "string" ? blobOfUrl(src) : null
-  const ref = sha === null ? undefined : images.get(sha)
+  const shown = sha === null ? null : (blobs.shares.get(sha)?.shown ?? null)
+  if (sha !== null && shown !== null && shown.sha256 !== sha) {
+    img.properties.src = blobUrl(shown.sha256)
+    img.properties[ORIGINAL_PROPERTY] = blobUrl(sha)
+  }
+  const ref = shown ?? (sha === null ? undefined : blobs.images.get(sha))
   if (ref === undefined) return
   img.properties.width = ref.width
   img.properties.height = ref.height

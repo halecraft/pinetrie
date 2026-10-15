@@ -30,6 +30,7 @@ const input = {
     askSplit: unused,
     ask: unused,
     leave: unused,
+    readBlob: unused,
   },
   blobs: undefined,
   bannerAsks: unused,
@@ -106,6 +107,7 @@ describe("TOOL_IDS", () => {
       "ask",
       "leave",
       "resolve_conflict",
+      "save_blob",
     ])
   })
 })

@@ -108,7 +108,7 @@ describe("readRootRecord", () => {
       newest: "e2",
       writers: [ADA],
       mentions: [{ id: "e2", by: ADA, text: "@bea look" }],
-      images: [SHA],
+      blobs: [SHA],
     })
   })
 
@@ -157,12 +157,12 @@ describe("readRootRecord", () => {
   })
 })
 
-test("readReferencedBlobs: every root's images from its record, without its document", () => {
+test("readReferencedBlobs: every root's blobs from its record, without its document", () => {
   const session = newSessionDoc()
   put(session, "pinetrie.root", ROOT, {
     ...readRootRecord(ROOT, newRootDoc()),
     root: undefined,
-    images: [SHA],
+    blobs: [SHA],
   })
   expect([...readReferencedBlobs(session, [])]).toEqual([SHA])
 })

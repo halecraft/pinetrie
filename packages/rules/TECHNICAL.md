@@ -39,15 +39,15 @@ follow this list. A name only this package uses is imported from its module.
 - `config.ts`: `modelRef`, the parser a model setting's kind wraps; the
   config's files are `@pinetrie/config`'s, and the host declares every
   setting. `request.ts`: what fits a model request's budget.
-- `chat.ts`, `participant.ts`, `images.ts`, `commands.ts`: a person's
-  message, who is in the session, the images a message shows, and `/`
+- `chat.ts`, `participant.ts`, `shares.ts`, `commands.ts`: a person's
+  message, who is in the session, the files a message shares, and `/`
   commands (`pinetrie.commands`).
 - `history.ts`: the history message builder (`historyMessage`), whose spec
   each kind of host message in a thread is (below).
 - `land.ts`, `update.ts`, `stack.ts`, `pinned.ts`: the resolution's prompt,
   the update and stack messages, the pinned cards a run reads.
 - `markdown.ts`: `parseMarkdown`, the one mdast parse every reader of a
-  message's markdown here uses (`images.ts`, `blocks.ts`, `links.ts`).
+  message's markdown here uses (`shares.ts`, `blocks.ts`, `links.ts`).
 - `card-words.ts`: `wordsOf`, what a card says from where its kind keeps
   its words (`textSourceOf`).
 - `fact.ts`, `behind.ts`, `agent-commands.ts`: what a command on an offer
@@ -291,22 +291,42 @@ are the only code that builds or reads the shape.
   into each message, so a rename never rewrites what the agent already read,
   nor invalidates the provider's prompt cache.
 
-# Images (`images.ts`, ADR-0042)
+# Shares (`shares.ts`, ADR-0042, ADR-0151)
 
-- **`imageSources` is which images a text shows**: `image` nodes, and
-  `imageReference` nodes resolved through the text's definitions (the first
-  definition of an identifier wins), in order, each once. It parses with
-  `parseMarkdown` (`markdown.ts`): `mdast-util-from-markdown` and the GFM
-  extensions, the packages under the client's remark-parse and remark-gfm
-  at the same versions (`workspace.test.ts`), so the host and the drawing
-  read one tree. Blocks (`blocks.ts`) and links to addresses (`links.ts`)
-  parse through it too, so every reader counts the same tree. An image in
-  code is text; a link to an image is a link.
-- **`pastedImages`** keeps the sources `blobOfUrl` accepts: exactly
-  `/blob/<64 lower-case hex>`.
-- **`planImages`** turns those hashes and the store's refs into the message's
-  images, or refuses it with `ERR.IMAGE_MISSING`. The host gathers the refs
-  first; the decision is pure.
+- **`textBlobs` is which blobs a text shares**: `image` and `link` nodes,
+  and their reference forms resolved through the text's definitions (the
+  first definition of an identifier wins), whose URL `blobOfUrl` accepts:
+  exactly `/blob/<64 lower-case hex>`. In order, each once, with the name
+  its alt text or link text gives it. It parses with `parseMarkdown`
+  (`markdown.ts`): `mdast-util-from-markdown` and the GFM extensions, the
+  packages under the client's remark-parse and remark-gfm at the same
+  versions (`workspace.test.ts`), so the host and the drawing read one
+  tree. A link in code is text.
+- **`shareMarkdown` is the one writer of a share's link**: `![name](url)`
+  for an image, `[name](url)` for anything else, the name on one line with
+  its brackets and backslashes escaped. A test reads back every written
+  link, for any name.
+- **`planShares`** turns the named blobs and what the store holds of each
+  (`StoredShare`: ref, size, fitted copy, location) into a message's
+  `shared`, and its `images`, each image's `shown`: the original when it
+  fitted, else its copy. A blob not stored refuses the message with
+  `ERR.IMAGE_MISSING`. The host gathers first; the decision is pure.
+- **A text share is quoted or described** (`shareQuote`): quoted whole up
+  to the host's `shares.quoteBytes`, else described by size and lines with
+  a pointer to `save_blob`, as is an opaque one (`shareQuoteMarkdown`). A
+  quote's fence is one backtick longer than the longest run in the file
+  (`fenceFor`), so no file can close it. `withQuotes` heads it `Shared:`.
+- **A fitted image is read with a line before it** (`fittedLine`, in
+  `withChatImages`): the original's size and the scale back to it.
+- **`isUtf8Text` and `hasLocation` read bytes**: text is valid UTF-8 with
+  no NUL, its byte-order mark kept; a location is a GPS latitude in any
+  embedded EXIF TIFF structure, which JPEG, PNG, WebP and HEIC each embed as
+  it is, or XMP's `GPSLatitude` (S213). No `Buffer`: the page imports this.
+- **`readableBlobs` is what a thread's path showed its model**: every
+  `/blob/<sha256>` in its messages' text, read as raw text (a cards entry
+  wraps each card in tags a markdown parser takes for HTML), and every
+  stored image part. `planSaveBlob` saves only what it holds, typed so it
+  cannot be called without it (`ReadableBlobs`).
 
 # Commands (`commands.ts`, ADR-0036)
 

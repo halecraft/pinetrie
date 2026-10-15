@@ -1,8 +1,10 @@
 import {
+  type BlobRef,
   commitId,
   ERR,
   type ErrCode,
   entryId,
+  type ImageRef,
   NOBODY,
   type ProjectRecord,
   parseMentions,
@@ -99,6 +101,7 @@ function setUp(begin: ErrCode | null = null) {
     piSetup: pi.port,
     work: work.port,
     blobs: record<ChatDeps["blobs"]>().port,
+    quoteBytes: 32 * 1024,
     cards: record<ChatDeps["cards"]>({
       blankQueued: NO_BLANK_CARDS.blankQueued,
     }).port,
@@ -227,6 +230,56 @@ describe("sendChat", () => {
   const E1 = entryId("e-1")
   const BEA = writerId("bea@example.com")
   const SHA = "a".repeat(64) as Sha256
+  const BIG = "c".repeat(64) as Sha256
+  const FITTED = "d".repeat(64) as Sha256
+  const NOTES = "e".repeat(64) as Sha256
+  const LOG = "f".repeat(64) as Sha256
+  const ZIP = "9".repeat(64) as Sha256
+  const image = (sha: Sha256, width: number, height: number): ImageRef => ({
+    sha256: sha,
+    mimeType: "image/png",
+    width,
+    height,
+  })
+  const unsized = (
+    sha: Sha256,
+    mimeType: "text/markdown" | "application/octet-stream",
+  ) => ({ sha256: sha, mimeType, width: null, height: null }) as const
+  const STORED = new Map<
+    Sha256,
+    { ref: BlobRef; bytes: Uint8Array; fitted?: ImageRef }
+  >([
+    [SHA, { ref: image(SHA, 2, 3), bytes: new Uint8Array([1]) }],
+    [
+      BIG,
+      {
+        ref: image(BIG, 4000, 2000),
+        bytes: new Uint8Array([2]),
+        fitted: image(FITTED, 2000, 1000),
+      },
+    ],
+    [
+      NOTES,
+      {
+        ref: unsized(NOTES, "text/markdown"),
+        bytes: new TextEncoder().encode("a `note`"),
+      },
+    ],
+    [
+      LOG,
+      {
+        ref: unsized(LOG, "text/markdown"),
+        bytes: new TextEncoder().encode("line one\nline two\nline three"),
+      },
+    ],
+    [
+      ZIP,
+      {
+        ref: unsized(ZIP, "application/octet-stream"),
+        bytes: new Uint8Array([0x50, 0x4b, 3, 4]),
+      },
+    ],
+  ])
   // E1 starts thread LANE: a lane by that name is the thread's.
   const chat = (text: string, asksAgent = false): Send => ({
     kind: "chat",
@@ -280,12 +333,18 @@ describe("sendChat", () => {
         prepareLane: async () => {},
         prepareUpdate,
       }).port,
-      blobs: record<ChatDeps["blobs"]>({
-        ref: sha =>
-          sha === SHA
-            ? { sha256: SHA, mimeType: "image/png", width: 2, height: 3 }
-            : undefined,
-      }).port,
+      blobs: {
+        ref: sha => STORED.get(sha)?.ref,
+        size: sha => STORED.get(sha)?.bytes.byteLength,
+        get: sha => {
+          const held = STORED.get(sha)
+          return held === undefined
+            ? undefined
+            : { bytes: held.bytes, mimeType: held.ref.mimeType }
+        },
+        fitted: sha => STORED.get(sha)?.fitted,
+      },
+      quoteBytes: 16,
       cards: cards.port,
       start: (_lane, s) => {
         if (s.kind === "prompt" && s.message.customType === CHAT_TYPE) {
@@ -463,15 +522,62 @@ describe("sendChat", () => {
     })
   })
 
-  test("a sent message keeps the images its text shows, as references", async () => {
+  test("a sent message keeps the files its text shares, and each image the model reads", async () => {
     const { pi, deps } = setUp()
-    await sendCleared(deps, ALICE, "s-1", chat(`look ![a](/blob/${SHA})`))
+    await sendCleared(
+      deps,
+      ALICE,
+      "s-1",
+      chat(
+        `look ![a](/blob/${SHA}) ![big](/blob/${BIG}) [z.zip](/blob/${ZIP})`,
+      ),
+    )
     const appended = pi.calls.find(c => c.method === "appendToTree")
     expect(appended?.args[0]).toMatchObject({
       details: {
-        images: [{ sha256: SHA, mimeType: "image/png", width: 2, height: 3 }],
+        images: [image(SHA, 2, 3), image(FITTED, 2000, 1000)],
+        shared: [
+          {
+            name: "a",
+            original: image(SHA, 2, 3),
+            size: 1,
+            shown: image(SHA, 2, 3),
+          },
+          {
+            name: "big",
+            original: image(BIG, 4000, 2000),
+            shown: image(FITTED, 2000, 1000),
+          },
+          {
+            name: "z.zip",
+            original: unsized(ZIP, "application/octet-stream"),
+            size: 4,
+            shown: null,
+            hasLocation: false,
+          },
+        ],
       },
     })
+  })
+
+  test("the model reads a small text share quoted, and a larger one or an opaque one described", async () => {
+    const { pi, deps } = setUp()
+    await sendCleared(
+      deps,
+      ALICE,
+      "s-1",
+      chat(
+        `see [n.md](/blob/${NOTES}) [l.log](/blob/${LOG}) [z.zip](/blob/${ZIP})`,
+      ),
+    )
+    const appended = pi.calls.find(c => c.method === "appendToTree")
+    const content = (appended?.args[0] as { content: string }).content
+    expect(content).toContain("Shared: n.md\n> ```\n> a `note`\n> ```")
+    expect(content).toContain(
+      "Shared: l.log\n> text of 28 B, 3 lines, not quoted",
+    )
+    expect(content).toContain(`Shared: z.zip\n> a file of 4 B`)
+    expect(content).toContain(`/blob/${ZIP}`)
   })
 
   test("in a thread that works in its own copy, your working copy's paths are stored as the lane sees them", async () => {

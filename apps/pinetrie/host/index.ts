@@ -144,6 +144,7 @@ import {
 import { createRecords, type Records } from "./records.ts"
 import { createRelays, type Relays } from "./relays.ts"
 import { createRuns, streamInto } from "./runs.ts"
+import { createReadBlob } from "./save-blob.ts"
 import { startSeats } from "./seats.ts"
 import {
   folderReport,
@@ -635,6 +636,7 @@ export async function startHost({
               askSplit,
               ask: (lane, to, text) => relaysNow().ask(lane, to, text),
               leave: (lane, thread) => relaysNow().leave(lane, thread),
+              readBlob: createReadBlob({ basics, blobs }),
               // A turn recorded, then a live digest of the ask `tip` is in,
               // when due.
               turnDone: async (lane, tip) => {
@@ -709,6 +711,7 @@ export async function startHost({
     piSetup,
     work,
     blobs,
+    quoteBytes: settled["shares.quoteBytes"].value,
     fitImage: async (bytes, most) => {
       const fitted = await prepareImage(bytes, {
         maxWidth: most,

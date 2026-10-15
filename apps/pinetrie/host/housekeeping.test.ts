@@ -51,6 +51,39 @@ test("an image only a card's text shows is kept past its grace", async () => {
   expect(kept).not.toContain(orphan.sha256)
 })
 
+test("a draft's file link keeps its file, and an image's original keeps its fitted copy", async () => {
+  const b = basics()
+  const blobs = memoryBlobs(() => 0)
+  const file = blobs.put(storedText("notes"))
+  const original = blobs.put(
+    { bytes: PNG, mimeType: "image/png", width: 4000, height: 10 },
+    {
+      bytes: new Uint8Array([7]),
+      mimeType: "image/png",
+      width: 2000,
+      height: 5,
+    },
+  )
+  const fitted = blobs.fitted(original.sha256)?.sha256
+  await sweepBlobs({
+    basics: b,
+    blobs,
+    grace: 0,
+    texts: async () => [
+      {
+        id: cardIdFor("c1"),
+        text: `[notes.txt](/blob/${file.sha256}) ![big](/blob/${original.sha256})`,
+        clients: [],
+      },
+    ],
+  })
+  const kept = blobs.list().map(x => x.sha256)
+  expect(kept).toContain(file.sha256)
+  expect(kept).toContain(original.sha256)
+  expect(fitted).toBeDefined()
+  expect(kept).toContain(fitted)
+})
+
 test("planCompaction: the roots that ran, and the session, the places and what is streaming; no other root", () => {
   const [a, b] = [rootIdFor("a"), rootIdFor("b")]
   expect(planCompaction(new Set([b, a]))).toEqual([
@@ -92,7 +125,7 @@ test("the image sweep keeps what a root's directory record shows, though no root
     b,
     setRecord(ROOT, {
       ...readRootRecord(rootIdFor("elsewhere"), newRootDoc()),
-      images: [shown.sha256],
+      blobs: [shown.sha256],
     }),
   )
   await sweepBlobs({ basics: b, blobs, grace: 0, texts: async () => [] })

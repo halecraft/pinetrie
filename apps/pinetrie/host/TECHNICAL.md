@@ -289,20 +289,33 @@ until the next compaction (S120), and the host compacts at startup. So
   `0007-thread-origin` (each thread record's `fork` replaced by its
   `origin`, ADR-0117) ran, and were deleted.
 
-## Blobs hold text (`blobs.ts`, ADR-0126)
+## Blobs hold any file (`blobs.ts`, ADR-0126, ADR-0151)
 
-- **A reference's quote is a blob**, `text/markdown`: immutable,
-  deduplicated by its hash, swept by reference as images are. `POST /blob`
-  takes markdown beside images (`planUploadHeaders` answers its type), and
-  keeps it as it is; an image is judged and fitted first.
-- **A text blob has no size**: `TextRef`'s `width` and `height` are null.
-  `pinetrie_blobs`' columns are `NOT NULL` from before, so its row holds 0
-  in each, read as none (`rowRef`). Every reader of images takes images
-  alone (`isImageRef`, `isImageMime`): a chat's, a session's, a picture.
-- **`GET /blob/` serves it as `text/markdown`**, which no browser draws as
-  HTML.
+- **A blob's kind is its bytes'** (`classifyUpload`): an image pi can read
+  and fit, UTF-8 text with no NUL, or opaque. `POST /blob` reads any type,
+  refusing only past `MAX_UPLOAD_BYTES` (`planUploadHeaders` reads the
+  length alone), so the same bytes are the same kind whoever sends them.
+  A reference's quote is a text blob like a shared text file. Every other
+  `put` stores an image `prepareImage` made or text `storedText` made.
+- **An image is kept as it came,** with its fitted copy beside it when that
+  differs, in `pinetrie_blob_fits` (`original`, `shown`); `fitted` reads it,
+  and `delete` forgets a deleted original's row. pi's resize returns an
+  image that fits byte for byte, and a shrunk one without EXIF; a GIF too
+  large becomes one PNG frame (S211).
+- **Text and opaque blobs have no dimensions**: their `width` and `height`
+  are null. `pinetrie_blobs`' columns are `NOT NULL` from before, so their
+  rows hold 0 in each, read as none (`rowRef`); `mime` holds the kind's tag
+  (an image's type, `text/markdown`, `application/octet-stream`). `size`
+  reads a blob's length in the query. Every reader of images takes images
+  alone (`isImageRef`): a chat's, a session's, a picture.
+- **`GET /blob/` serves every blob with `nosniff` and CSP `sandbox`**
+  (`blobResponse`, one entry per kind): text as `text/plain`, never drawn
+  as HTML; an opaque file as an attachment, which the chip's `download`
+  names (S208).
 - **The sweep keeps a reference's quote** (`sweepBlobs`): every card's
-  words that are a blob (`textSourceOf`) count as referenced.
+  words that are a blob (`textSourceOf`) count as referenced. It keeps
+  each referenced original's fitted copy too: a draft names the original,
+  and its message will show the copy.
 - **The sweep reads the host's clock, and so do the blobs** (ADR-0139):
   `startHost`'s `now` is `Basics.now`, and the clock of the blobs it opens
   (`openStore`'s `now`) or keeps in memory. A caller that passes its own
@@ -314,6 +327,18 @@ until the next compaction (S120), and the host compacts at startup. So
   `withQuotes`): `sendChat` gathers each past referent its text links to
   from the root it is in, and the chat's content quotes it under the text,
   frozen as sent.
+- **A message's shares are gathered with it** (`gatherShares`, ADR-0151):
+  each blob its text names (`textBlobs`), its ref, size and fitted copy,
+  whether an image's or an opaque file's bytes hold a location
+  (`hasLocation`; a text file's words may name a place without being one),
+  and a text file's text, which is quoted under the message up to
+  `shares.quoteBytes` (`shareQuote`). `planShares` refuses a send that
+  names a blob no longer stored.
+- **`save_blob`'s hook** (`save-blob.ts`) reads the lane's path to its root
+  (`ancestry` from its tip), and gives the bytes of a blob some message
+  there named (`readableBlobs`, `planSaveBlob`). It never writes: the tool
+  writes through its environment, so the helper counts the write as the
+  agent's (S207).
 
 ## Startup
 

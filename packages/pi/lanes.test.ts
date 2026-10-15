@@ -114,6 +114,9 @@ test("the prompt no longer tells the model to search with bash", () => {
       leave: async () => {
         throw new Error("unused")
       },
+      readBlob: async () => {
+        throw new Error("unused")
+      },
     },
     blobs: undefined,
     bannerAsks: async () => {
@@ -340,6 +343,9 @@ describe("lanes in a harness", () => {
             throw new Error("unused")
           },
           leave: async () => {
+            throw new Error("unused")
+          },
+          readBlob: async () => {
             throw new Error("unused")
           },
         },
@@ -593,6 +599,9 @@ describe("lanes in a harness", () => {
             throw new Error("unused")
           },
           leave: async () => {
+            throw new Error("unused")
+          },
+          readBlob: async () => {
             throw new Error("unused")
           },
         },

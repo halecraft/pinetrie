@@ -23,6 +23,7 @@ import {
   PROJECT_CONFIG_FILE,
   READ_TOOL,
   RESOLVE_TOOL,
+  SAVE_BLOB_TOOL,
   SPLIT_TOOL,
   type ThreadId,
   TOOL_IDS,
@@ -33,6 +34,7 @@ import type { BannerAnswer, BannerAsk } from "@pinetrie/rules"
 import { bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"
+import { saveBlobTool } from "./save-blob.ts"
 import { findTool, grepTool } from "./search.ts"
 import { threadOfContext } from "./thread-context.ts"
 import {
@@ -90,6 +92,8 @@ export const TOOLS: Readonly<
     resolveTool((lane, path, choose) =>
       input.hooks.resolveConflict(lane, path, choose),
     ),
+  [SAVE_BLOB_TOOL]: input =>
+    saveBlobTool((lane, blob) => input.hooks.readBlob(lane, blob)),
 }
 
 type Executes = {

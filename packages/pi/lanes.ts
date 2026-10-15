@@ -24,6 +24,7 @@ import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPrompt } from "./deep.ts"
 import { type LaneChannel, laneEnv, refusingEnv } from "./lane-env.ts"
+import type { BlobAnswer } from "./save-blob.ts"
 import { threadOfContext } from "./thread-context.ts"
 
 type Context = Parameters<typeof threadOfContext>[0]
@@ -176,6 +177,8 @@ export interface LaneHooks {
   ask(lane: ThreadId, to: string, text: string): Promise<ToolAnswer>
   /** `leave` was called: the host's answer. */
   leave(lane: ThreadId, thread: string): Promise<ToolAnswer>
+  /** `save_blob` was called: the bytes of the blob it names, or why not. */
+  readBlob(lane: ThreadId, blob: string): Promise<BlobAnswer>
 }
 
 /**

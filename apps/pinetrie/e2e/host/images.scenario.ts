@@ -70,7 +70,7 @@ async function run(check: Checks["check"]): Promise<void> {
         served.headers.get("content-type") === "image/png" &&
         served.headers.get("x-content-type-options") === "nosniff" &&
         served.headers.get("content-security-policy") ===
-          "default-src 'none'" &&
+          "sandbox; default-src 'none'" &&
         (served.headers.get("cache-control") ?? "").includes("immutable") &&
         servedBytes.equals(RED_PNG),
     )

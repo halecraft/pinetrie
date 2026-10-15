@@ -46,6 +46,49 @@ test("referencedBlobs: chats, tool results, typed texts and banners each keep th
   ])
 })
 
+test("referencedBlobs: a chat's shares keep their originals and fitted copies; a draft keeps its file links", () => {
+  const original = { ...image(sha("a")), width: 4000 }
+  const referenced = referencedBlobs({
+    messages: [
+      encodeChat(
+        {
+          ...details([sha("b")]),
+          shared: [
+            {
+              name: "big.png",
+              original,
+              size: 9,
+              shown: image(sha("b")),
+              hasLocation: false,
+            },
+            {
+              name: "n.txt",
+              original: {
+                sha256: sha("c"),
+                mimeType: "text/markdown",
+                width: null,
+                height: null,
+              },
+              size: 1,
+              shown: null,
+              hasLocation: false,
+            },
+          ],
+        },
+        1,
+      ),
+    ],
+    texts: [`a draft [z.zip](/blob/${sha("d")})`],
+    banners: [],
+  })
+  expect([...referenced].sort()).toEqual([
+    sha("a"),
+    sha("b"),
+    sha("c"),
+    sha("d"),
+  ])
+})
+
 test("planSweep: only the unreferenced and untouched past the grace go", () => {
   const stored = [
     { sha256: sha("a"), touched: 0 },

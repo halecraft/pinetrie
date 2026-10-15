@@ -40,10 +40,13 @@ describe("links to addresses", () => {
   test("the model reads each linked referent quoted under the message", () => {
     expect(
       withQuotes("Ada: look", [
-        { label: "the table", markdown: "| a |\n\n| 1 |" },
-        { label: "gone", markdown: "" },
+        { kind: "link", label: "the table", markdown: "| a |\n\n| 1 |" },
+        { kind: "link", label: "gone", markdown: "" },
+        { kind: "share", label: "n.txt", markdown: "hi" },
       ]),
-    ).toBe("Ada: look\n\nLinked: the table\n> | a |\n>\n> | 1 |")
+    ).toBe(
+      "Ada: look\n\nLinked: the table\n> | a |\n>\n> | 1 |\n\nShared: n.txt\n> hi",
+    )
     expect(withQuotes("Ada: look", [])).toBe("Ada: look")
   })
 })
@@ -58,5 +61,7 @@ test("linkedQuotes: each past referent a message links to, from the message it i
     linkedQuotes(text, a =>
       a.entry === E ? "Here:\n\n| a |\n|---|\n| 1 |" : undefined,
     ),
-  ).toEqual([{ label: "the table", markdown: "| a |\n|---|\n| 1 |" }])
+  ).toEqual([
+    { kind: "link", label: "the table", markdown: "| a |\n|---|\n| 1 |" },
+  ])
 })

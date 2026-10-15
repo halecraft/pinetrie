@@ -16,7 +16,13 @@ import {
 } from "@pinetrie/core"
 import type { ReviewTarget } from "@pinetrie/interface"
 import type { Element, Root } from "hast"
-import { blockAt, imageLookup, messageTree, tableHeads } from "./markdown.ts"
+import {
+  blobLookup,
+  blockAt,
+  messageTree,
+  ORIGINAL_PROPERTY,
+  tableHeads,
+} from "./markdown.ts"
 
 /** A block of a message, by its address. */
 export type BlockAddress = Extract<Address, { readonly kind: "block" }>
@@ -38,6 +44,13 @@ export type PaneSubject =
       readonly alt: string
       readonly title?: string
     }
+  /** A file a message shares by a link, which opens as an image or as text. */
+  | {
+      readonly kind: "share"
+      readonly sha256: Sha256
+      readonly name: string
+      readonly image: boolean
+    }
 
 /**
  * A subject's name as a string: the same exactly when two subjects name the
@@ -53,6 +66,8 @@ export function paneKey(subject: PaneSubject): string {
       return `block:${printAddress(subject.address)}`
     case "image":
       return `image:${subject.sha256}`
+    case "share":
+      return `share:${subject.sha256}`
   }
 }
 
@@ -78,6 +93,8 @@ export type PaneView =
       readonly alt: string
       readonly title: string
     }
+  /** A shared text file, fetched and drawn as text. */
+  | { readonly kind: "text"; readonly src: string; readonly title: string }
 
 export interface PaneFacts {
   /** The strip's review and its line, while the offer has one. */
@@ -115,7 +132,10 @@ export function paneView(
       if (node === undefined) return null
       const block = blockAt(treeOf(node), address.block)
       if (block === null) return null
-      const { src, alt, title } = block.properties
+      const { alt, title } = block.properties
+      // A fitted image opens as its original.
+      const original = block.properties[ORIGINAL_PROPERTY]
+      const src = typeof original === "string" ? original : block.properties.src
       switch (address.block.kind) {
         case "table":
           return {
@@ -149,6 +169,15 @@ export function paneView(
         alt: subject.alt,
         title: imageTitle(subject.alt, subject.title),
       }
+    case "share":
+      return subject.image
+        ? {
+            kind: "image",
+            src: blobUrl(subject.sha256),
+            alt: subject.name,
+            title: subject.name,
+          }
+        : { kind: "text", src: blobUrl(subject.sha256), title: subject.name }
   }
 }
 
@@ -161,7 +190,11 @@ const trees = new WeakMap<SpineNode, Root>()
 function treeOf(node: SpineNode): Root {
   const known = trees.get(node)
   if (known !== undefined) return known
-  const tree = messageTree(node.text, "committed", imageLookup(node.images))
+  const tree = messageTree(
+    node.text,
+    "committed",
+    blobLookup(node.images, node.shared),
+  )
   trees.set(node, tree)
   return tree
 }
@@ -218,6 +251,12 @@ export const ASK_REVIEW_LINE = "what this ask changed"
 
 /** The image pane's link to the image alone. */
 export const OPEN_IN_TAB = "open in a new tab"
+
+/** The text pane's link that saves the file. */
+export const DOWNLOAD = "download"
+
+/** The text pane's body when the host no longer serves the file. */
+export const TEXT_UNREADABLE = "this file is no longer stored"
 
 /** The pane's accessible name, by what it shows. */
 export const paneLabel = (kind: PaneView["kind"]): string =>

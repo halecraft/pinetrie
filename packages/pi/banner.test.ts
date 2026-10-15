@@ -155,6 +155,9 @@ describe("banners in a harness", () => {
                 leave: async () => {
                   throw new Error("unused")
                 },
+                readBlob: async () => {
+                  throw new Error("unused")
+                },
               },
             },
       ...(o.draws === true ? { banner: DEFAULT_ICON_MODEL } : {}),

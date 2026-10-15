@@ -22,7 +22,7 @@ const record = (n: string): RootRecord => ({
   writers: [],
   threads: {},
   mentions: [],
-  images: [],
+  blobs: [],
 })
 const _directory = new Map(
   ["1", "2", "3", "4"].map(n => [rootIdFor(`r${n}`), record(n)] as const),

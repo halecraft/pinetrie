@@ -27,9 +27,11 @@ import {
   moveKey,
   moveWords,
   type Reader,
+  SHARE_FILE,
 } from "@pinetrie/interface"
-import { type ReactNode, useState } from "react"
+import { type ReactNode, useRef, useState } from "react"
 import { CardHistory, MovedBack } from "./card-history.tsx"
+import { fileDropProps } from "./file-drop.ts"
 import { InventoryIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
 
@@ -60,6 +62,12 @@ export function CardFrame(p: {
   onClearCommand: (() => void) | null
   /** The footer, after the tools: its primary action and quiet words. */
   foot: ReactNode
+  /**
+   * Files dropped on the card, or chosen with its button, shared into its
+   * box (`useShareFiles`), and what it says of them; absent for a card
+   * whose box is read-only.
+   */
+  share?: { readonly onFiles: (files: File[]) => void; readonly status: string }
   /** The body: the card's box, and what goes with it. */
   children: ReactNode
 }) {
@@ -110,6 +118,7 @@ export function CardFrame(p: {
       className={`card-frame card-editor ${TONE_CLASS[view.tone]}${p.pinning === true ? " pinning" : ""}`}
       data-queued={view.tone === "queued" ? card?.id : undefined}
       data-tone={view.tone}
+      {...(p.share === undefined ? {} : fileDropProps(p.share.onFiles))}
     >
       <div
         className="card-head"
@@ -201,9 +210,44 @@ export function CardFrame(p: {
             })}
           </span>
         )}
+        {p.share !== undefined && (
+          <ShareFileButton onFiles={p.share.onFiles} status={p.share.status} />
+        )}
         {p.foot}
       </div>
     </div>
+  )
+}
+
+/** "share a file", over a hidden file input, and what the box says of its shares. */
+function ShareFileButton(p: {
+  onFiles: (files: File[]) => void
+  status: string
+}) {
+  const input = useRef<HTMLInputElement>(null)
+  return (
+    <span className="card-share">
+      <button
+        className="share-file"
+        onClick={() => input.current?.click()}
+        type="button"
+      >
+        {SHARE_FILE}
+      </button>
+      <input
+        className="share-file-input"
+        hidden
+        multiple
+        onChange={e => {
+          p.onFiles(Array.from(e.target.files ?? []))
+          // The same file chosen again is a change too.
+          e.target.value = ""
+        }}
+        ref={input}
+        type="file"
+      />
+      {p.status !== "" && <span className="share-status">{p.status}</span>}
+    </span>
   )
 }
 

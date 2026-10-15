@@ -64,6 +64,7 @@ export interface CommandDeps {
   readonly piSetup: ChatDeps["piSetup"]
   readonly work: ChatDeps["work"] & BoardDeps["work"] & LaneDeps["work"]
   readonly blobs: ChatDeps["blobs"] & PictureDeps["blobs"]
+  readonly quoteBytes: ChatDeps["quoteBytes"]
   readonly fitImage: PictureDeps["fitImage"]
   readonly cards: ChatDeps["cards"] &
     CardCommandDeps["cards"] &

@@ -11,19 +11,12 @@ import {
   type WebsocketServerTransport,
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
-import {
-  type BlobStore,
-  errorText,
-  type Sha256,
-  storedText,
-  TEXT_MIME,
-} from "@pinetrie/core"
-import { prepareImage } from "@pinetrie/pi"
+import { type BlobStore, errorText, type Sha256 } from "@pinetrie/core"
 import type { OfferAsk } from "@pinetrie/rules"
 import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
 import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"
-import { MAX_UPLOAD_BYTES, planUploadHeaders } from "./blobs.ts"
+import { classifyUpload, MAX_UPLOAD_BYTES, planUploadHeaders } from "./blobs.ts"
 import { type PageSource, pageDir } from "./page.ts"
 import {
   blobResponse,
@@ -167,16 +160,16 @@ export async function startHttp(input: {
   }
 
   /**
-   * `POST /blob`: the headers decide whether to read; the body is read up to
-   * `MAX_UPLOAD_BYTES`; pi judges and fits the bytes; the store keeps them.
-   * Answers the `ImageRef`, or a status with the reason as text.
+   * `POST /blob`: the declared length decides whether to read; the body is
+   * read up to `MAX_UPLOAD_BYTES`; its bytes say what it is
+   * (`classifyUpload`); the store keeps it, and an image's fitted copy.
+   * Answers the blob's ref as it came, or a status with the reason as text.
    */
   async function receiveBlob(
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
     const headers = planUploadHeaders({
-      contentType: req.headers["content-type"],
       contentLength: req.headers["content-length"],
     })
     if (headers.kind === "refuse") {
@@ -199,19 +192,9 @@ export async function startHttp(input: {
     } catch {
       return
     }
-    const bytes = Buffer.concat(chunks)
-    // A reference's quote is kept as it is; an image is judged and fitted
-    // first.
-    const prepared =
-      headers.mime === TEXT_MIME
-        ? ({ ok: true, image: storedText(bytes.toString("utf8")) } as const)
-        : await prepareImage(bytes)
-    if (!prepared.ok) {
-      send(res, uploadRefusal(415, prepared.reason))
-      return
-    }
+    const upload = await classifyUpload(new Uint8Array(Buffer.concat(chunks)))
     try {
-      send(res, uploaded(blobs.put(prepared.image)))
+      send(res, uploaded(blobs.put(upload.blob, upload.fitted)))
     } catch (error) {
       // The store closes with the host: an upload can outlive it.
       send(res, uploadRefusal(503, errorText(error)))

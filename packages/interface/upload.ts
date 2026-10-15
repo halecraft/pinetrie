@@ -1,36 +1,24 @@
-// interface/upload — a blob kept by the host: a pasted image's bytes, or a
-// reference's quote as markdown, posted to `/blob`.
+// interface/upload — a blob kept by the host: a shared file's bytes, or a
+// reference's quote as markdown, posted to `/blob`. The host reads what it
+// is from the bytes, never from the type sent with them.
 
-import {
-  errorText,
-  type ImageRef,
-  TEXT_MIME,
-  type TextRef,
-} from "@pinetrie/core"
+import { type BlobRef, errorText } from "@pinetrie/core"
 
 /** A blob kept: the host's ref, or its reason. */
-type Kept<R> =
-  | { readonly ok: true; readonly ref: R }
+export type Upload =
+  | { readonly ok: true; readonly ref: BlobRef }
   | { readonly ok: false; readonly reason: string }
 
-export type Upload = Kept<ImageRef>
-
-/** A quote kept: its blob's ref, or the host's reason. */
-export type TextUpload = Kept<TextRef>
-
-/** `POST /blob` with `body` as `type`: the host's ref, or its reason. */
-async function postBlob<R>(
-  type: string,
-  body: Blob | string,
-): Promise<Kept<R>> {
+/** `POST /blob` with `body`: the host's ref, or its reason. */
+export async function uploadBlob(body: Blob | string): Promise<Upload> {
   try {
     const response = await fetch("/blob", {
       method: "POST",
-      headers: { "content-type": type },
+      headers: { "content-type": "application/octet-stream" },
       body,
     })
     if (response.status === 201)
-      return { ok: true, ref: (await response.json()) as R }
+      return { ok: true, ref: (await response.json()) as BlobRef }
     const reason = (await response.text()).trim()
     return {
       ok: false,
@@ -40,11 +28,3 @@ async function postBlob<R>(
     return { ok: false, reason: errorText(error) }
   }
 }
-
-/** `POST /blob` with the file's bytes: the host's ref, or its reason. */
-export const uploadImage = (file: Blob): Promise<Upload> =>
-  postBlob(file.type, file)
-
-/** `POST /blob` with markdown: a reference's quote, kept as a blob. */
-export const uploadText = (markdown: string): Promise<TextUpload> =>
-  postBlob(`${TEXT_MIME}; charset=utf-8`, markdown)

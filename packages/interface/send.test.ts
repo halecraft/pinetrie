@@ -376,7 +376,7 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
       "uploading, whatever it would do",
       sent(AGENT, "queue"),
       { uploading: true, sending: false },
-      "uploading image…",
+      "uploading a file…",
       null,
       true,
     ],

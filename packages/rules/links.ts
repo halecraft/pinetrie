@@ -67,8 +67,12 @@ export function pastMarkdown(
   }
 }
 
-/** A linked referent the model reads: its link's label, and its markdown. */
+/**
+ * What the model reads under a message: a linked referent, or a file it
+ * shares, each named by its link's label, and its markdown.
+ */
 export interface LinkedQuote {
+  readonly kind: "link" | "share"
   readonly label: string
   readonly markdown: string
 }
@@ -87,7 +91,7 @@ export const linkedQuotes = (
     if (!isPastAddress(address)) return []
     const source = messageText(address)
     const markdown = source === undefined ? null : pastMarkdown(address, source)
-    return markdown === null ? [] : [{ label, markdown }]
+    return markdown === null ? [] : [{ kind: "link" as const, label, markdown }]
   })
 
 /** Markdown quoted, each line prefixed `> `. */
@@ -97,11 +101,16 @@ const quoted = (markdown: string): string =>
     .map(line => (line === "" ? ">" : `> ${line}`))
     .join("\n")
 
+const QUOTE_HEADING: Readonly<Record<LinkedQuote["kind"], string>> = {
+  link: "Linked",
+  share: "Shared",
+}
+
 /**
  * What the model reads of a message with links: its content, then each
- * linked referent's markdown quoted under it, named by its link's label.
- * `quotes` are the referents found, in link order; those not found are left
- * out.
+ * linked referent's or shared file's markdown quoted under it, named by its
+ * link's label. `quotes` are those found, in link order; those not found are
+ * left out.
  */
 export function withQuotes(
   content: string,
@@ -112,6 +121,8 @@ export function withQuotes(
     ? content
     : [
         content,
-        ...found.map(q => `Linked: ${q.label}\n${quoted(q.markdown)}`),
+        ...found.map(
+          q => `${QUOTE_HEADING[q.kind]}: ${q.label}\n${quoted(q.markdown)}`,
+        ),
       ].join("\n\n")
 }

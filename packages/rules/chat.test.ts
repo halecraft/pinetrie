@@ -99,7 +99,7 @@ const plan = (over: Partial<PlanInput>) => {
     at: atEntry(E1),
     end: atEntry(E1),
     contributors: [],
-    images: [],
+    shares: { images: [], shared: [] },
     hostWorkingCopy: null,
     command: null,
     race: null,
@@ -450,13 +450,25 @@ test("a chat's images round-trip in its details; one stored without them decodes
   )
 })
 
-test("planChat copies the images it is given into the details, and none as absent", () => {
-  const withImages = plan({ images: [IMG] })
-  assert.ok("details" in withImages)
-  assert.deepEqual(withImages.details.images, [IMG])
+test("planChat copies the shares it is given into the details, and none as absent", () => {
+  const share = {
+    name: "plum.png",
+    original: IMG,
+    size: 3,
+    shown: IMG,
+    hasLocation: true,
+  }
+  const withShares = plan({ shares: { images: [IMG], shared: [share] } })
+  assert.ok("details" in withShares)
+  assert.deepEqual(withShares.details.images, [IMG])
+  assert.deepEqual(withShares.details.shared, [share])
+  assert.deepEqual(decodeChat(encodeChat(withShares.details, 1))?.shared, [
+    share,
+  ])
   const without = plan({})
   assert.ok("details" in without)
   assert.equal(without.details.images, undefined)
+  assert.equal(without.details.shared, undefined)
 })
 
 test("chatImageShas: every chat's images, each once; other messages have none", () => {
@@ -485,6 +497,41 @@ test("withChatImages: a chat's text, then its images in order; a missing one nam
   assert.deepEqual(decodeChat(attached), decodeChat(chat))
   assert.equal(same, plain)
   assert.equal(alsoSame, user)
+})
+
+test("withChatImages: a fitted image's part follows the line that maps it back to its original", () => {
+  const fitted = { ...OTHER, width: 2, height: 1 }
+  const original = { ...IMG, width: 8, height: 4 }
+  const chat = encodeChat(
+    {
+      ...details,
+      images: [fitted],
+      shared: [
+        {
+          name: "big.png",
+          original,
+          size: 9,
+          shown: fitted,
+          hasLocation: false,
+        },
+      ],
+    },
+    1,
+  )
+  const [attached] = withChatImages(
+    [chat],
+    new Map([
+      [fitted.sha256, { data: "AAAA", mimeType: "image/png" as const }],
+    ]),
+  )
+  assert.deepEqual((attached as { content: unknown }).content, [
+    { type: "text", text: "Alice: the plum" },
+    {
+      type: "text",
+      text: "[big.png: original 8x4, shown at 2x1. Multiply coordinates by 4.00 to map to the original.]",
+    },
+    { type: "image", data: "AAAA", mimeType: "image/png" },
+  ])
 })
 
 test("decodeChat is total: a malformed or foreign message is not a chat", () => {

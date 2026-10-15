@@ -19,7 +19,7 @@ import { commentMarkdown } from "./markdown-of.ts"
 import type { PageName } from "./page.ts"
 import type { SearchAct } from "./search.ts"
 import { afterSpinOff } from "./spin-off.ts"
-import type { TextUpload } from "./upload.ts"
+import type { Upload } from "./upload.ts"
 
 export interface AppPorts {
   readonly dispatch: (action: LayoutAction) => void
@@ -83,8 +83,8 @@ export interface AppPorts {
   readonly search: (act: SearchAct) => void
   /** Outline a message briefly once it is drawn (`useReveal`). */
   readonly landed: (entry: EntryId) => void
-  /** Keep markdown as a blob: a reference's quote (`uploadText`). */
-  readonly uploadText: (markdown: string) => Promise<TextUpload>
+  /** Keep markdown as a blob: a reference's quote (`uploadBlob`). */
+  readonly uploadBlob: (markdown: string) => Promise<Upload>
   /** Show `clip` in the clipboard cell: the copy this tab just made. */
   readonly clipboardCell: (clip: Clip) => void
   /** Put text at the caret of the text box that has focus, as typed. */
@@ -148,7 +148,7 @@ function paste(
           quote.entry,
           ports.session.cardText(quote.comment).text(),
         )
-  void ports.uploadText(markdown).then(upload => {
+  void ports.uploadBlob(markdown).then(upload => {
     if (upload.ok) asReference(upload.ref.sha256)
     else
       ports.session.refuse({

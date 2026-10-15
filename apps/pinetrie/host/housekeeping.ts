@@ -12,6 +12,7 @@ import {
   type RevisionRecord,
   type RootId,
   rootDocId,
+  type Sha256,
   textSourceOf,
 } from "@pinetrie/core"
 import {
@@ -81,8 +82,8 @@ export async function compactAfter(
  * Delete the blobs nothing shows or quotes any more: gather every card's text
  * (`CardPort.texts` of the cards `places` holds) and every reference's quote
  * (`textSourceOf`), then the store's list and the session's references
- * (`readReferencedBlobs`: roots' images, banners and people's pictures) with no
- * await between them, `planSweep`, delete.
+ * (`readReferencedBlobs`: roots' blobs, banners and people's pictures), with
+ * each one's fitted copy, with no await between them, `planSweep`, delete.
  */
 export async function sweepBlobs(input: {
   readonly basics: Pick<Basics, "session" | "places" | "log" | "now">
@@ -101,15 +102,24 @@ export async function sweepBlobs(input: {
     const source = textSourceOf(c)
     return source.kind === "blob" ? [source.sha] : []
   })
+  const shown = new Set([...readReferencedBlobs(doc, texts), ...quotes])
+  // A draft names an image's original; its fitted copy is what the message
+  // will show once sent.
+  const referenced = new Set<Sha256>(
+    [...shown].flatMap(sha => {
+      const fitted = blobs.fitted(sha)
+      return fitted === undefined ? [sha] : [sha, fitted.sha256]
+    }),
+  )
   const doomed = planSweep({
     stored: blobs.list(),
-    referenced: new Set([...readReferencedBlobs(doc, texts), ...quotes]),
+    referenced,
     now: input.basics.now(),
     grace: input.grace,
   })
   if (doomed.length === 0) return
   blobs.delete(doomed)
-  log(`[host] deleted ${doomed.length} unreferenced image(s)`)
+  log(`[host] deleted ${doomed.length} unreferenced blob(s)`)
 }
 
 /**

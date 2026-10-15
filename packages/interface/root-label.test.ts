@@ -35,7 +35,7 @@ const record = (
   writers: [writerId("p-ada")],
   threads: {},
   mentions: [],
-  images: [],
+  blobs: [],
 })
 const directory = new Map(
   [

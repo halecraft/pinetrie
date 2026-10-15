@@ -5,6 +5,14 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "save_blob writes the bytes as text",
+    file: "packages/pi/save-blob.ts",
+    from: "      const wrote = await toolContext.env.writeFile(at, answer.bytes, context)",
+    to: "      const wrote = await toolContext.env.writeFile(\n        at,\n        new TextDecoder().decode(answer.bytes),\n        context,\n      )",
+    command: unit,
+    expect: "writes the blob's bytes into the lane, as a tool's write",
+  },
+  {
     name: "ignoreFacts names the last symlink on a path's way",
     file: "packages/pi/lane-helper.ts",
     from: "        out[p] = dir\n        break\n",

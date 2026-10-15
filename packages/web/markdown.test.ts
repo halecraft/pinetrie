@@ -1,8 +1,14 @@
-import type { Sha256 } from "@pinetrie/core"
+import type { ImageRef, Sha256, Share } from "@pinetrie/core"
 import { blocksOf } from "@pinetrie/rules"
 import type { Element, ElementContent, Root } from "hast"
 import { describe, expect, test } from "vitest"
-import { blockAt, messageTree, safeUrl, tableHeads } from "./markdown.ts"
+import {
+  blobLookup,
+  blockAt,
+  messageTree,
+  safeUrl,
+  tableHeads,
+} from "./markdown.ts"
 
 function* walk(node: Root | Element): Generator<ElementContent> {
   for (const child of node.children) {
@@ -112,12 +118,10 @@ describe("streaming", () => {
 
 describe("images", () => {
   const SHA = "c".repeat(64) as Sha256
-  const images = new Map([
-    [
-      SHA,
-      { sha256: SHA, mimeType: "image/png", width: 40, height: 30 } as const,
-    ],
-  ])
+  const images = blobLookup(
+    [{ sha256: SHA, mimeType: "image/png", width: 40, height: 30 }],
+    undefined,
+  )
   const img = (source: string) =>
     elements(messageTree(source, "committed", images), "img")[0]?.properties
 
@@ -143,6 +147,79 @@ describe("images", () => {
       expect(p?.width).toBeUndefined()
       expect(p?.loading).toBeUndefined()
     }
+  })
+})
+
+describe("shares", () => {
+  const BIG = "e".repeat(64) as Sha256
+  const FIT = "f".repeat(64) as Sha256
+  const ZIP = "9".repeat(64) as Sha256
+  const image = (sha: Sha256, width: number, height: number): ImageRef => ({
+    sha256: sha,
+    mimeType: "image/png",
+    width,
+    height,
+  })
+  const shared: Share[] = [
+    {
+      name: "big.png",
+      original: image(BIG, 4000, 2000),
+      size: 9,
+      shown: image(FIT, 2000, 1000),
+      hasLocation: true,
+    },
+    {
+      name: "logs.zip",
+      original: {
+        sha256: ZIP,
+        mimeType: "application/octet-stream",
+        width: null,
+        height: null,
+      },
+      size: 2048,
+      shown: null,
+      hasLocation: false,
+    },
+  ]
+  const tree = (source: string) =>
+    messageTree(
+      source,
+      "committed",
+      blobLookup([image(FIT, 2000, 1000)], shared),
+    )
+
+  test("a fitted image draws its copy at its size, and names its original", () => {
+    expect(
+      elements(tree(`![big](/blob/${BIG})`), "img")[0]?.properties,
+    ).toMatchObject({
+      src: `/blob/${FIT}`,
+      dataOriginal: `/blob/${BIG}`,
+      width: 2000,
+      height: 1000,
+    })
+  })
+
+  test("a link to a shared file is a chip: its name, format and size, named for a download", () => {
+    const md = `see [logs.zip](/blob/${ZIP}) and [big](/blob/${BIG})`
+    const [zip, big] = elements(tree(md), "a")
+    expect(zip?.properties).toMatchObject({
+      className: ["share-chip"],
+      dataShare: ZIP,
+      dataOpens: "download",
+      download: "logs.zip",
+    })
+    expect(
+      shown({ type: "root", children: zip === undefined ? [] : [zip] }),
+    ).toBe("logs.zip ZIP · 2 KB")
+    expect(big?.properties.dataOpens).toBe("image")
+    expect(
+      shown({ type: "root", children: big === undefined ? [] : [big] }),
+    ).toContain("holds a location")
+  })
+
+  test("a link to a blob the message does not share stays a link", () => {
+    const [a] = elements(tree(`[x](/blob/${"1".repeat(64)})`), "a")
+    expect(a?.properties.className).toBeUndefined()
   })
 })
 

@@ -11,7 +11,7 @@
 // A tool's result is its own entry, but it belongs to its call: `projectSpine`
 // pairs it with the call on the same path, and it is never a message itself.
 
-import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
+import { type ImageRef, isImageMime, isSha256, type Share } from "./images.ts"
 import {
   type AnswerDetails,
   atEntry,
@@ -140,6 +140,8 @@ export interface AgentMessageLike {
   readonly command?: string
   /** Role `chat` only: the `/blob/` images its text shows. */
   readonly images?: readonly ImageRef[]
+  /** Role `chat` only: the files its text shares, images among them. */
+  readonly shared?: readonly Share[]
   /** Role `toolResult` only: the call it answers, and whether it failed. */
   readonly toolCallId?: string
   readonly isError?: boolean
@@ -225,6 +227,8 @@ export interface TranscriptMessage {
   readonly command?: string
   /** Role `chat` only: the `/blob/` images its text shows. */
   readonly images?: readonly ImageRef[]
+  /** Role `chat` only: the files its text shares, images among them. */
+  readonly shared?: readonly Share[]
   /** Role `assistant` only: the tools it called, each with its result once known. */
   readonly toolCalls?: readonly ToolCall[]
   /** Roles `update` and `land` only: the states merged into the lane. */
@@ -360,6 +364,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
       ...(entry.message?.images === undefined
         ? {}
         : { images: entry.message.images }),
+      ...(entry.message?.shared === undefined
+        ? {}
+        : { shared: entry.message.shared }),
     }
   }
   // An ask from another thread, and an asked agent's answer, are messages as a

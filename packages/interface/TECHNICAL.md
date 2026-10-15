@@ -1437,22 +1437,28 @@ composer*).
   no card someone types in. `typingDue` writes at most once a second, and
   at once in another card.
 
-## Pasting an image (`paste.ts`, ADR-0042)
+## Sharing a file (`paste.ts`, `upload.ts`, ADR-0042, ADR-0151)
 
-- **A paste with image files is an upload.** `pastedFiles` keeps the
-  `image/*` files; with none, the paste is the browser's own. With some, the
-  composer prevents the default, records the selection, and `POST`s each
-  file to `/blob` (`uploadImage`, `upload.ts`, same origin, so the key
-  cookie goes too; a reference's quote is kept the same way, `uploadText`).
-  When all are answered, `insertAt` puts every accepted one's
-  `![name](/blob/<sha256>)` (`imageMarkdown`) in place of that selection, on
-  lines of their own, at once. A refused one is left out, and the host's
-  reason shown in the status line.
+- **A paste, a drop or a choice of files is a share.** `pastedFiles` keeps
+  every file (`imageFiles`, the images alone, is the picture field's);
+  with none, the paste is the browser's own. Each file is `POST`ed to
+  `/blob` as bytes (`uploadBlob`, same origin, so the key cookie goes too;
+  a reference's quote is kept the same way): the host reads what it is
+  from the bytes. When all are answered, `insertAt` puts every accepted
+  one's link (`shareMarkdown`, `@pinetrie/rules`) in place of where it
+  went, on lines of their own, at once. A refused one is left out, and
+  `shareStatus` words the host's reason.
+- **Where a share goes is decided as it arrives** (`shareSelection`): the
+  box's selection while it has focus, else the end of its text. A box no
+  one is typing in reports its caret at 0.
 - **Sending waits for uploads.** `sendable` is null while one is out, and
   `sendButton` disables the button and labels it `UPLOADING`: a message sent
-  then would lack the image's markdown.
-- **The host decides what a message shows.** The composer shows markdown,
-  not thumbnails. On send, the host reads the `/blob/` images from the text,
+  then would lack the share's link.
+- **A chip's words are `shareChip`'s**: the name, its format (the name's
+  extension, or "file") and size, the location warning, and whether a click
+  opens it beside the thread or downloads it (an opaque file).
+- **The host decides what a message shares.** The composer shows links,
+  not thumbnails. On send, the host reads the `/blob/` links from the text,
   and refuses the send if one is no longer stored (`image_missing`), which
   `settleSend` returns to the box.
 

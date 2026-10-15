@@ -1,5 +1,5 @@
 // web/clipboard — the one file that touches the clipboard: the page's `copy`,
-// `cut` and `paste` events, a pasted image's files, and a button's copy. Each
+// `cut` and `paste` events, a paste's files, and a button's copy. Each
 // handler gathers (focus, the selection, what was pasted), asks a pure planner
 // in `@pinetrie/interface` (`clipOfFocus`, `planCopy`, `readPaste`,
 // `targetOfFocus`), and carries out what it says. It decides nothing.
@@ -19,6 +19,7 @@ import {
   type ClipFacts,
   clipOfFocus,
   type Intent,
+  imageFiles,
   pastedFiles,
   planCopy,
   readPaste,
@@ -137,10 +138,15 @@ function carrierAttribute(html: string): string | null {
   )
 }
 
-/** The image files a paste brings (`pastedFiles`): what a box or a picture field takes. */
-export const pastedImages = (e: {
+/** Every file a paste brings (`pastedFiles`): what a card box shares. */
+export const pastedFilesOf = (e: {
   readonly clipboardData: DataTransfer | null
 }): File[] => (e.clipboardData === null ? [] : pastedFiles(e.clipboardData))
+
+/** The image files a paste brings (`imageFiles`): what a picture field takes. */
+export const pastedImages = (e: {
+  readonly clipboardData: DataTransfer | null
+}): File[] => (e.clipboardData === null ? [] : imageFiles(e.clipboardData))
 
 /**
  * Write `text` from a button (`useCopy`), which has no copy event: the

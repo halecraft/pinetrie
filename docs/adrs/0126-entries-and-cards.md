@@ -32,6 +32,8 @@
     card was seen by there.
   - ADR-0138: `open-thread` also opens a new root's first thread in a task the
     session holds, its card where a drop on the canvas would land.
+  - ADR-0151: the blobs hold any file, sorted by their bytes into images, text
+    and opaque files; a reference's quote is a text blob like any other.
 
 **Context.**
 

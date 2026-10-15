@@ -6,6 +6,7 @@ import type { Element } from "hast"
 import {
   memo,
   type ReactNode,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -15,7 +16,13 @@ import { createPortal } from "react-dom"
 import { BlobImage } from "./blob-image.tsx"
 import { drawTree } from "./message-text.tsx"
 import { useTrackColors } from "./palette-context.ts"
-import { OPEN_IN_TAB, type PaneView, paneLabel } from "./pane.ts"
+import {
+  DOWNLOAD,
+  OPEN_IN_TAB,
+  type PaneView,
+  paneLabel,
+  TEXT_UNREADABLE,
+} from "./pane.ts"
 import { PaneHead } from "./pane-head.tsx"
 import { ReviewPane } from "./review-pane.tsx"
 import { useNarrow } from "./use-narrow.ts"
@@ -48,6 +55,13 @@ export function Pane({
         close={close}
         narrow={narrow}
         table={view.table}
+        title={view.title}
+      />
+    ) : view.kind === "text" ? (
+      <TextPane
+        close={close}
+        narrow={narrow}
+        src={view.src}
         title={view.title}
       />
     ) : (
@@ -192,6 +206,51 @@ const TablePane = memo(function TablePaneView({
     </>
   )
 })
+
+/**
+ * A shared text file, fetched from the host and drawn as text, never as
+ * markup: a file of HTML or markdown shows its source.
+ */
+function TextPane({
+  src,
+  title,
+  narrow,
+  close,
+}: {
+  src: string
+  title: string
+  narrow: boolean
+  close: () => void
+}) {
+  const [text, setText] = useState<string | null>(null)
+  useEffect(() => {
+    let live = true
+    fetch(src)
+      .then(r => (r.ok ? r.text() : Promise.reject(new Error(r.statusText))))
+      .then(
+        t => live && setText(t),
+        () => live && setText(TEXT_UNREADABLE),
+      )
+    return () => {
+      live = false
+    }
+  }, [src])
+  return (
+    <>
+      <PaneHead
+        close={close}
+        extra={
+          <a className="pane-link" download={title} href={src}>
+            {DOWNLOAD}
+          </a>
+        }
+        narrow={narrow}
+        title={title}
+      />
+      <pre className="pane-body pane-text">{text ?? ""}</pre>
+    </>
+  )
+}
 
 /**
  * A stored image, fitted to the pane's width; a click shows it at its own

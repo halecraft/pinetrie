@@ -461,10 +461,16 @@ export {
   trackSlot,
 } from "./palette.ts"
 export {
-  imageMarkdown,
+  imageFiles,
   insertAt,
   pastedFiles,
   type Selection,
+  SHARE_FILE,
+  type ShareChip,
+  shareChip,
+  shareSelection,
+  shareStatus,
+  UPLOADING,
 } from "./paste.ts"
 export {
   type AppPorts,
@@ -613,7 +619,6 @@ export {
   settleSend,
   spent,
   startWords,
-  UPLOADING,
 } from "./send.ts"
 export { type SetupView, setupView } from "./setup-view.ts"
 export {
@@ -732,11 +737,7 @@ export {
   traceGroups,
   tracesAt,
 } from "./traces.ts"
-export {
-  type TextUpload,
-  uploadImage,
-  uploadText,
-} from "./upload.ts"
+export { type Upload, uploadBlob } from "./upload.ts"
 export {
   type Box,
   keepSpot,

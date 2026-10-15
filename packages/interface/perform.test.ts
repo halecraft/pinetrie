@@ -69,7 +69,7 @@ const ports = () => {
     identity: { save: vi.fn(), clear: vi.fn() },
     reload: vi.fn(),
     listWidth: vi.fn(),
-    uploadText: vi.fn(async () => ({
+    uploadBlob: vi.fn(async () => ({
       ok: true as const,
       ref: {
         sha256: SHA,
@@ -392,7 +392,7 @@ test("a comment queued as a reference keeps its text under a link to its entry, 
     ],
     p,
   )
-  expect(p.uploadText).toHaveBeenCalledWith(
+  expect(p.uploadBlob).toHaveBeenCalledWith(
     `A comment on [a message](${addressUrl(entry)}):\n\nlook at this`,
   )
   await vi.waitFor(() =>
@@ -436,7 +436,7 @@ test("a pasted text card is sent with its text, to be written first; a kept quot
     },
     how,
   )
-  expect(p.uploadText).not.toHaveBeenCalled()
+  expect(p.uploadBlob).not.toHaveBeenCalled()
 })
 
 test("a move flies only when its plan says so", () => {

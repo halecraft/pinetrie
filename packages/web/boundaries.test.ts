@@ -16,12 +16,11 @@ const DOORS = [
   },
   {
     // Every drag in the page is the pointer engine's (`use-drag.ts`); only
-    // a file dropped from the desktop onto a picture field comes by the
-    // browser's own drag.
+    // a file dropped from the desktop comes by the browser's own drag.
     what: "HTML drag and drop",
     touches:
       /\bdraggable\b|\bdataTransfer\b|\bonDragStart\b|\bonDrop\b|"dragover"/,
-    allowed: ["picture-field.tsx"],
+    allowed: ["file-drop.ts"],
   },
 ] as const
 

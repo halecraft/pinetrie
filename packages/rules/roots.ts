@@ -32,7 +32,7 @@ const RootRecordSchema = Type.Object({
       thread: ThreadIdSchema,
     }),
   ),
-  images: Type.Array(Type.String()),
+  blobs: Type.Array(Type.String()),
 })
 
 const idOrNull = (id: string | null): EntryId | null =>
@@ -75,6 +75,6 @@ export const ROOT: RecordSpec<RootRecord, RootId, "session"> = {
         text: m.text,
         thread: m.thread,
       })),
-      images: r.images as Sha256[],
+      blobs: r.blobs as Sha256[],
     })),
 }

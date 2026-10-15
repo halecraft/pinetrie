@@ -96,7 +96,11 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   `@pinetrie/interface` words it (ADR-0114). A tool's result is its own entry
   but belongs to its call, never a message. A tool's image is a blob
   (ADR-0051), as a pasted one is, which a message holds by reference
-  (ADR-0042); a reference card's quote is a blob too (ADR-0126).
+  (ADR-0042); a reference card's quote is a blob too (ADR-0126). A blob is
+  an image, text or opaque (`BlobKind`, from its stored tag, `kindOfMime`),
+  and a message's shares (`Share`) name each one's original and the image
+  copy it shows (ADR-0151). `ImageRef` is stored in chats as it is, so a
+  blob's size is the store's `size`, never a field of the ref.
 - `TOOL_IDS` is every lane's tool list, the same in every run, `set_banner`
   included under any icon source (ADR-0143); its order is part of every
   request's prefix, and a changed prefix drops a lane's earlier thinking

@@ -1148,7 +1148,7 @@ describe("a card made a thread, and lifted back", () => {
         writers: [...writers],
         threads: {},
         mentions: [],
-        images: [],
+        blobs: [],
       }),
     ])
     putTask(b, STARTS, SPUN_TASK, THREAD)

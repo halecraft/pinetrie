@@ -577,10 +577,14 @@ set `data-card-drag`.
 - **Escape, `pointercancel`, or a drop where nothing lands** springs
   everything back; with `prefers-reduced-motion` the springs and the ring
   have no duration.
-- **Nothing else in the page uses HTML drag and drop** but
-  `picture-field.tsx`'s file drop, which only the browser's drag can
-  bring from the desktop: `boundaries.test.ts` keeps it so, as it keeps
-  the clipboard in `clipboard.ts`.
+- **Nothing else in the page uses HTML drag and drop** but a file dropped
+  from the desktop, which only the browser's drag can bring: `file-drop.ts`
+  is its one door (`boundaries.test.ts` keeps it so, as it keeps the
+  clipboard in `clipboard.ts`). `fileDropProps` makes an element take
+  dropped files: a card's frame, and the picture field. A drag's files are
+  hidden until the drop, so `dragover` accepts by `dataTransfer.types`.
+  `useFileDropGuard`, mounted once by the page, cancels a file drop nothing
+  took, which the browser would otherwise open in the tab.
 - **The order is never realigned.** A column moved right keeps its scroll,
   though it now starts after its fork point. A column moved first loses its
   spacer (`column.tsx`).
@@ -1009,7 +1013,8 @@ pipeline keeps the tree a pure function, testable without a DOM.
   `defaultUrlTransform`; micromark's `sanitizeUri` HTML-encodes `&`, which a
   React prop would carry literally).
 - **A pasted image is sized in the tree** (ADR-0042). `messageTree` takes the
-  message's images by hash, and `finish` gives a `/blob/` image it finds there
+  message's images and shares (`blobLookup`), and `finish` gives a `/blob/`
+  image it finds there
   its stored `width` and `height`, `loading="lazy"` and `decoding="async"`.
   The box has its final shape before the image loads, so `alignOnOpen`
   measures stable offsets and following sees one size, not two. The CSS caps
@@ -1018,6 +1023,15 @@ pipeline keeps the tree a pure function, testable without a DOM.
   streaming one's) is drawn unsized. A click on a blob image
   (`.blob-image`) opens it in the column's pane, and a Cmd- or Ctrl-click
   in a new tab (`imageClick`).
+- **A shared image too large to fit draws its fitted copy** (ADR-0151):
+  `finish` swaps the image's `src` for its share's `shown` and names the
+  original in `data-original`, which the pane's image opens.
+- **A link to a shared file is a chip** (`markShare`, ADR-0151): its name,
+  format and size and its location warning (`shareChip`), `data-share`, and
+  `download` named for the file. `ShareLink` opens an image or text in the
+  pane (`share` subject; text is fetched and drawn as text, `TextPane`);
+  an opaque file downloads. A link to a blob the message does not share
+  stays a link.
 - **Every block is numbered once** (ADR-0126): each table, code block,
   image and paragraph, the `n`th of its kind in document order, nested ones
   included, by `@pinetrie/rules`' walk over mdast (`markBlocks`), run as a
@@ -1136,7 +1150,7 @@ the session sends moves and draws them until its copy holds them
   `attach`: bound first, the binding would write into a card that does not
   exist yet, and the first run of typing would be lost.
 - **Every write the editor makes itself goes through the element**: a command
-  chosen, an update's intent, a pasted image (`insertAt` decides the text).
+  chosen, an update's intent, a shared file (`insertAt` decides the text).
   Each is `setRangeText` and a dispatched `input` event, so it is typing:
   local, it may create the card; bound, the binding writes it.
 - **The editor's own text** (for the button's words, `sendable` and the rows)
@@ -1418,9 +1432,8 @@ the email is the only thing pine·trie chooses.
   round preview, drawn at twice its CSS size, that a drag moves and a range
   zooms (`moveCrop`, `zoomCrop`). Nothing is uploaded until "use this
   picture", which draws the square at `PICTURE_SIZE` (256) to a canvas,
-  sends the PNG to `POST /blob` (`uploadImage`), then asks for the
-  `picture` command. A drag's files are hidden until the drop, so
-  `dragover` accepts by `dataTransfer.types`.
+  sends the PNG to `POST /blob` (`uploadBlob`), then asks for the
+  `picture` command. A drop reaches it through `fileDropProps`.
 - **A circle draws its person's picture over their initial** (`Initial`,
   `presence.tsx`): an absolutely placed `img` that covers the circle, so the
   initial shows while it loads, and again if it fails (the failed SHA-256
@@ -1487,8 +1500,8 @@ plain `#setup` anchor: `usePage` hears the hash change.
 
 `clipboard.ts` is the one file that touches the clipboard
 (`clipboard-boundary.test.ts` keeps it so): the page's `copy`, `cut` and
-`paste` events, a pasted image's files (`pastedImages`, which the card
-editor and the picture field call), and a button's copy
+`paste` events, a paste's files (`pastedFilesOf`, which the card boxes
+call, and `pastedImages`, the picture field's), and a button's copy
 (`writeTextByButton`, `useCopy`'s). Each handler gathers where focus is
 (`focusFacts`, `focus.ts`, the one gather the keys read too) and what was
 pasted, asks the planners in `@pinetrie/interface` (`clipOfFocus`,
@@ -1516,9 +1529,17 @@ What S151 measured, and these handlers rest on:
   that brings something else replaces it.
 - **The keydown comes before its paste**, so Shift held for Cmd+Shift+V is
   known by then; WebKitGTK fires no paste for Ctrl+Shift+V at all.
-- **A pasted image is the box's own**: the card editor and the picture
+- **A pasted file is the box's own**: the card boxes and the picture
   field handle it on the element, first, and prevent the default; the
   document's handler leaves an event already handled alone.
+- **Every writable card box shares files** (`useShareFiles`, ADR-0151): the
+  composer, a bound card's box and the new note box. Its frame takes a
+  drop and draws "share a file" and the share's status (`CardFrame`'s
+  `share`); a read-only box passes no target, so it has none. A box bound
+  to a card anchors where a share goes as two positions in the card's text
+  (S212): the start after anything typed at it meanwhile, the end before,
+  so a share never replaces text it was not put over. An unbound box holds
+  only its sender's typing, so its offsets stand.
 
 ## Gotchas
 

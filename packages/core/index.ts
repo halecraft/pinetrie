@@ -145,7 +145,7 @@ export const ERR = {
   UNKNOWN_COMMAND: "unknown_command",
   /** A peer whose principal is not an email: nobody the host can name. */
   INVALID_IDENTITY: "invalid_identity",
-  /** A message shows a `/blob/` image the host does not store. */
+  /** A message shares, or a picture names, a `/blob/` the host does not store. */
   IMAGE_MISSING: "image_missing",
   /** A picture pi cannot decode or fit within `PICTURE_MOST`. */
   PICTURE_UNREADABLE: "picture_unreadable",
@@ -662,8 +662,8 @@ export interface RootRecord {
     readonly text: string
     readonly thread: ThreadId
   }[]
-  /** Every image it shows (`referencedBlobs`), for the image sweep. */
-  readonly images: readonly Sha256[]
+  /** Every blob it shows or shares (`referencedBlobs`), for the sweep. */
+  readonly blobs: readonly Sha256[]
 }
 
 // --- marks ------------------------------------------------------------------
