@@ -182,6 +182,19 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   records above an entry (ADR-0032, ADR-0034), with the lanes that recorded
   each (`Above.pointLane`, `snapshotLane`: whose disk a fork clones).
 
+## A folder project's history (`folder.ts`)
+
+- A folder project keeps its history as a graph of states (ADR-0142):
+  `StateRecord` (a snapshot's name, its parents, how it was made) and
+  `ConflictRecord` (a path a merge left conflicted, with its three
+  states). `@pinetrie/folder` decides over them; lanehost carries out what
+  it reads here (`PathFact`, `MergeStep`, `BasePlan`, `LaneStatesOp`),
+  which is why they are core's: lanehost declares only core and channel.
+- A folder state's id can never be a jj commit's (`isFolderStateId`): it
+  holds a dash and is a disk name (`isDiskName`, the one rule for both),
+  and a commit is 40 hex digits. Core mints none: `lineStateId` takes the
+  uuidv7 its caller minted.
+
 ## Streams (`live.ts`, `edits.ts`)
 
 - A running turn streams through the durable document (ADR-0014), in

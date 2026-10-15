@@ -18,13 +18,14 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
 | `once.ts` | one call answered and printed, for the suites |
 | `serving.ts` | a server's arguments (`serverArgs`) and their reading (`servingFrom`) |
 | `client.ts` | the host's side: one channel per role, each call routed and logged |
-| `disks.ts` | subvolumes: each operation planned as `DiskStep`s, then executed |
+| `disks.ts` | subvolumes: each operation planned as `DiskStep`s, then executed; a file read from a snapshot |
+| `folder.ts` | a folder project's merges: path facts, alike content, a merge's steps applied, a lane's states directory |
 | `projects.ts` | a project's root recorded, the listing, a project's removal |
 | `grants.ts` | a project's grant of the Mac's ports in the lane VM's firewall |
 | `diff.ts` | what differs between two snapshots: by `btrfs send`, or by a walk |
 | `send-stream.ts` | btrfs's send stream read as one change per path, pure |
-| `walk.ts` | two trees' entries compared, pure; and the walk that reads them |
-| `lanehost.Containerfile` | a role's image: Alpine, `btrfs-progs`, `iptables` |
+| `walk.ts` | two trees' entries compared, pure; and the walk that reads them; an entry's kind (`kindOf`) |
+| `lanehost.Containerfile` | a role's image: Alpine, `btrfs-progs`, `git`, `iptables` |
 | `observer/` | the observer: its BPF program (`observe.bpf.c`), the kernel's structs it reads (`kernel.h`), the event both sides share (`observe.h`), the loader (`observe.c`), their Containerfile, and the suite's guest (`suite/`) |
 | `observer.ts` | the machine role: the loader's lines and commands, and every decision of the role's, pure |
 | `observer-server.ts` | the machine role's process: the loader held, each host's connection served |
@@ -197,9 +198,13 @@ host, whatever their projects.
   (`projectDisks`). A disk's name is one path segment, never `.` or `..`,
   and never ends in `.tmp`, which a snapshot in the making holds.
 - **A carried path stays inside its disk:** relative, with no `.` or `..`.
-- **A file read from a snapshot is pine·trie's own** (`.pinetrie-lane/<file>`,
-  `readLaneFile`), and its real path must stay inside the snapshot. A
+- **A file is read from a snapshot by its path** (`read`,
+  `readSnapshotFile`): pine·trie's own (`.pinetrie-lane/base.json`, the
+  runtime's `readLaneFile`) or any project file. Its real path must stay
+  inside the snapshot, and it holds at most the call's `limit` bytes. A
   snapshot does not change, so what was checked is what is read.
+- **A disk's name is core's** (`isDiskName`): a folder state's id is a
+  snapshot's name, and core decides which ids may be one.
 
 ## Disks (`disks.ts`)
 
@@ -233,6 +238,51 @@ host, whatever their projects.
   bring one back.
 - **A subvolume is told by its root's inode, 256** (`isSubvolume`):
   `btrfs subvolume show` needs `CAP_SYS_ADMIN` (S125).
+
+## A folder project's merges (`folder.ts`)
+
+`@pinetrie/folder` decides a merge (ADR-0142); the disks role carries it
+out, every call checked and planned into paths first (`planApply`,
+`planStates`), then executed.
+
+- **`pathFacts`** answers what a snapshot holds at each path: absent, a
+  directory, a symlink and its target, a file with its executable bit
+  (the owner's), its size, and whether it is text, no NUL in its first
+  8,000 bytes as git decides (S181); its kind from the `lstat` the walk
+  reads (`kindOf`). A path under a symlink is absent.
+- **`sameContent`** answers where two snapshots hold files of the same
+  bytes: sizes first, then a read of both. Shared extents (FIEMAP) would
+  prove a clone alike without a read (S183), but Node has no ioctl and the
+  call is asked only of the paths both sides changed, so it reads.
+- **`applyMerge`** applies a merge's steps to a disk: a lane's, or a
+  virtual base's scratch disk (the host restores it, merges into it with
+  `markers`, and snapshots it as the virtual base's name).
+  - **A `take` clones** theirs' file by reflink (`COPYFILE_FICLONE_FORCE`),
+    a symlink made again, a directory whole; staged under
+    `.pinetrie-lane/merge/` on the disk, then renamed over what is there,
+    so the disk never holds half a file. The staging directory goes after,
+    and `.pinetrie-lane` too when the merge made it.
+  - **A `text` step runs `git merge-file`** on a staged copy of ours, the
+    base (empty when there is none) and theirs, labelled `ours`, `base`
+    and `theirs`, and answers it clean or conflicted. A conflicted result
+    is kept only with `markers` (a virtual base); otherwise ours stays.
+  - **Nothing is written that the disk holds:** a text result is renamed
+    into place only when its bytes differ from ours, so the disk's diff
+    against ours names exactly what the merge changed (S183).
+  - **Nothing is read or written under a symlink,** on the disk or in a
+    snapshot: a lane controls both, and a symlinked directory could lead
+    out of either. The check is made just before each write.
+- **A lane's states directory,** `<project>/states/<lane>/`, which its
+  container will see read-only (S186): `start`, a read-only snapshot
+  `start-<state>` with a `start` symlink renamed over the last, so a
+  running lane reads one or the other, and the copies it no longer names
+  deleted; each conflict's versions cloned to
+  `conflicts/<path>/{base,ours,theirs}` (an absent one has none);
+  `resolved` removes a path's versions and its emptied directories. A
+  lane's `delete` disk operation drops it, and a project's removal takes
+  its whole directory.
+- **git is in the image** for `git merge-file` (S181), so the image's tag,
+  a hash of its Containerfile, moved with it.
 
 ## Diffs (`diff.ts`)
 
@@ -307,8 +357,13 @@ host, whatever their projects.
 ## Tests
 
 - `server.test.ts`: the names and their refusals, `planDisk`'s steps,
-  `subvolumesDeepestFirst`, the roles, `readLaneFile` against a symlink out
-  of its snapshot.
+  `subvolumesDeepestFirst`, the roles, `readSnapshotFile` against a
+  symlink out of its snapshot and past its limit.
+- `folder.test.ts`: a folder project's merges against real btrfs, as
+  `disks.test.ts` runs: text merges clean, conflicted and with markers, a
+  take, a delete and a mode, and the disk's diff naming exactly those; a
+  virtual base for a criss-cross; path facts; alike content; a lane's
+  states directory; a write through a symlinked directory refused.
 - `disks.test.ts`: the disks role against real btrfs, without privilege,
   a delete of disks holding read-only subvolumes among it. It runs in a
   pine·trie lane, whose `/workspace` is the VM's btrfs, and skips, saying

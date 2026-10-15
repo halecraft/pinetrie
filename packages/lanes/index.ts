@@ -6,6 +6,7 @@
 
 export * from "./base.ts"
 export * from "./execute.ts"
+export * from "./folder-disks-port.ts"
 export * from "./history-port.ts"
 export * from "./host.ts"
 export * from "./image.ts"

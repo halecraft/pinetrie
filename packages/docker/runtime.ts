@@ -8,6 +8,7 @@ import { openChannel } from "@pinetrie/channel"
 import { OBSERVER_SOCKET } from "@pinetrie/core"
 import {
   connectObserver,
+  LANE_FILES,
   LANEHOST_CONTAINERFILE,
   type LanehostChannel,
   lanehostClient,
@@ -24,6 +25,7 @@ import {
   serverArgs,
 } from "@pinetrie/lanehost"
 import {
+  type FolderDisks,
   type LaneRuntime,
   type Mount,
   PINETRIE_MOUNT,
@@ -109,7 +111,12 @@ async function ensureContainer(
     throw new Error(`docker run ${spec.name} failed: ${apiMessage(made)}`)
 }
 
+/** The most a file of pine·trie's own on a disk may hold: `base.json` is a few hundred bytes. */
+const LANE_FILE_LIMIT = 1024 * 1024
+
 export interface DockerRuntime extends LaneRuntime {
+  /** The project's folder merges, on the same lanehost: the folder adapter's alone. */
+  readonly folder: FolderDisks
   /**
    * Where lanehost's server runs from: the mounts every lane gets, whose
    * targets are pine·trie's install and the lane runtime. Until then a disk
@@ -310,7 +317,26 @@ export function dockerRuntime(input: {
       lanehost.call({ kind: "snapshotExists", project: key, snapshot: id }),
     diff: (from, to) => lanehost.call({ kind: "diff", project: key, from, to }),
     readLaneFile: (snapshot, file) =>
-      lanehost.call({ kind: "read", project: key, snapshot, file }),
+      lanehost.call({
+        kind: "read",
+        project: key,
+        snapshot,
+        path: `${LANE_FILES}/${file}`,
+        limit: LANE_FILE_LIMIT,
+      }),
+    folder: {
+      pathFacts: (snapshot, paths) =>
+        lanehost.call({ kind: "pathFacts", project: key, snapshot, paths }),
+      sameContent: (a, b, paths) =>
+        lanehost.call({ kind: "sameContent", project: key, a, b, paths }),
+      applyMerge: merge =>
+        lanehost.call({ kind: "applyMerge", project: key, ...merge }),
+      read: (snapshot, path, limit) =>
+        lanehost.call({ kind: "read", project: key, snapshot, path, limit }),
+      states: async (lane, op) => {
+        await lanehost.call({ kind: "states", project: key, lane, op })
+      },
+    },
     runSpec,
     async run(shape) {
       if (shape.nested)

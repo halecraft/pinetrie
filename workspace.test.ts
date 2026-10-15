@@ -80,6 +80,10 @@ test("rules declares only TypeBox, core, the markdown parser the client's remark
   ])
 })
 
+test("folder declares only core: it decides a folder project's history, and lanehost carries it out", () => {
+  assert.deepEqual(deps(read("packages/folder")), ["@pinetrie/core"])
+})
+
 test("reads declares only core, schema and rules: no pi, no transport", () => {
   // The host and the client decide from these reads, so they must run in both.
   assert.deepEqual(deps(read("packages/reads")).sort(), [

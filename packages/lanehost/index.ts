@@ -13,7 +13,12 @@ export {
 } from "./client.ts"
 export { ROOTLESS_UID } from "./disks.ts"
 export { type Grant, grantChain } from "./grants.ts"
-export { isProjectKey, type ProjectDisks, projectDisks } from "./layout.ts"
+export {
+  isProjectKey,
+  LANE_FILES,
+  type ProjectDisks,
+  projectDisks,
+} from "./layout.ts"
 export {
   decodeLoaderLine,
   encodeLoaderCommand,

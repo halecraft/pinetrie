@@ -17,7 +17,8 @@ export interface Entry {
   readonly ino: number
 }
 
-const kindOf = (s: {
+/** An entry's kind from its `lstat`: lanehost decides it here alone. */
+export const kindOf = (s: {
   isFile(): boolean
   isDirectory(): boolean
   isSymbolicLink(): boolean

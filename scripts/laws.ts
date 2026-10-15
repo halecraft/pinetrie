@@ -1,57 +1,73 @@
-// scripts/laws — the history algebra's laws in `packages/lanes/TECHNICAL.md`
-// and their tests in the port suite, held together: each law has exactly one
-// test titled by it, and each `L<n>:` title names a law. The doc's ids and
-// the titles' prefixes are the format this reads: a law is a bullet opening
-// `**L<n>, …**` in the algebra's section, a test's title opens `L<n>: `.
+// scripts/laws — each set of laws a doc states, held together with the suite
+// that tests it: each law has exactly one test titled by its sentence, and
+// each test titled as a law is one. A law is a bullet in its section opening
+// with its sentence in bold, `- **<sentence>.**`. A test is titled as a law
+// when its title is a sentence, capitalised and ending in a period; every
+// other test title is lowercase, as `AGENTS.md`'s titles are.
 
-/** The doc that states the laws. */
-export const LAWS_DOC = "packages/lanes/TECHNICAL.md"
-/** The suite that tests them. */
-export const LAWS_SUITE = "packages/lanes/testing/history-suite.ts"
+/** Each doc's section of laws, and the suite that tests them. */
+export const LAW_SETS = [
+  {
+    doc: "packages/lanes/TECHNICAL.md",
+    section: "The history algebra",
+    suite: "packages/lanes/testing/history-suite.ts",
+  },
+  {
+    doc: "packages/folder/TECHNICAL.md",
+    section: "The graph's laws",
+    suite: "packages/folder/graph.test.ts",
+  },
+] as const
 
-const SECTION = "## The history algebra"
-/** A law the doc marks as the folder graph's has no test against jj yet. */
-const UNCHECKED = "the folder graph's"
+export type LawSet = (typeof LAW_SETS)[number]
 
 export type LawGap =
   | { readonly kind: "untested"; readonly law: string }
   | { readonly kind: "tested-twice"; readonly law: string }
   | { readonly kind: "no-law"; readonly title: string }
 
-/** Each law in the algebra's section of `doc`: its id, and whether it is checked yet. */
-export function lawsInDoc(
-  doc: string,
-): readonly { readonly id: string; readonly checked: boolean }[] {
-  const start = doc.indexOf(SECTION)
-  if (start === -1) return []
-  const rest = doc.slice(start + SECTION.length)
+/**
+ * Each law in `section` of `doc`, by its sentence. The section is the one
+ * whose `## ` heading opens with its name, up to the next `## `.
+ */
+export function lawsInDoc(doc: string, section: string): readonly string[] {
+  const heading = new RegExp(`^## ${regexpText(section)}`, "m").exec(doc)
+  if (heading === null) return []
+  const rest = doc.slice(heading.index + heading[0].length)
   const end = rest.search(/^## /m)
-  const section = end === -1 ? rest : rest.slice(0, end)
-  return [...section.matchAll(/^- \*\*(L\d+), ([^*]*)\*\*/gm)].map(m => ({
-    id: m[1] ?? "",
-    checked: !(m[2] ?? "").includes(UNCHECKED),
-  }))
+  const body = end === -1 ? rest : rest.slice(0, end)
+  return [...body.matchAll(/^- \*\*([^*]+\.)\*\*/gm)].map(m => m[1] ?? "")
 }
 
-/** Each test title in `suite` that opens with a law's id. */
-export const lawTitles = (suite: string): readonly string[] =>
-  [...suite.matchAll(/["'`](L\d+: [^"'`]*)["'`]/g)].map(m => m[1] ?? "")
+const regexpText = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
-/** Where `doc`'s laws and `suite`'s law tests disagree; none when they agree. */
-export function lawGaps(doc: string, suite: string): readonly LawGap[] {
-  const laws = lawsInDoc(doc)
-  const titles = lawTitles(suite)
-  const testsOf = (id: string) =>
-    titles.filter(t => t.startsWith(`${id}: `)).length
-  const ids = new Set(laws.map(l => l.id))
+/** Each title `suite` gives a test: the first argument of `test`, `it` or `withRig`, quoted. */
+export const testTitles = (suite: string): readonly string[] =>
+  [
+    ...suite.matchAll(
+      /\b(?:test|it|withRig)\(\s*(["'`])((?:(?!\1)[^\\]|\\.)*)\1/g,
+    ),
+  ].map(m => m[2] ?? "")
+
+/** A title written as a law is: a sentence, capitalised, ending in a period. */
+const isLawTitle = (title: string) => /^[A-Z].*\.$/s.test(title)
+
+/** Where a doc's laws and its suite's tests disagree; none when they agree. */
+export function lawGaps(
+  doc: string,
+  section: string,
+  suite: string,
+): readonly LawGap[] {
+  const laws = lawsInDoc(doc, section)
+  const titles = testTitles(suite)
   return [
-    ...laws.flatMap((l): LawGap[] => {
-      const tests = testsOf(l.id)
-      if (tests > 1) return [{ kind: "tested-twice", law: l.id }]
-      return tests === 0 && l.checked ? [{ kind: "untested", law: l.id }] : []
+    ...laws.flatMap((law): LawGap[] => {
+      const tests = titles.filter(t => t === law).length
+      if (tests === 0) return [{ kind: "untested", law }]
+      return tests > 1 ? [{ kind: "tested-twice", law }] : []
     }),
     ...titles
-      .filter(t => !ids.has(t.slice(0, t.indexOf(":"))))
+      .filter(t => isLawTitle(t) && !laws.includes(t))
       .map((title): LawGap => ({ kind: "no-law", title })),
   ]
 }

@@ -367,10 +367,23 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the laws' check skips the doc's laws",
     file: "scripts/laws.ts",
-    from: "  const laws = lawsInDoc(doc)\n",
+    from: "  const laws = lawsInDoc(doc, section)\n",
     to: "  const laws: ReturnType<typeof lawsInDoc> = []\n",
     command: laws,
     expect:
-      "a law with no test, a law with two, and a title naming no law are each a gap",
+      "a law with no test, a law with two, and a law's title naming no law are each a gap",
+  },
+  {
+    name: "the graph's laws go unchecked",
+    file: "scripts/laws.ts",
+    from: `  {
+    doc: "packages/folder/TECHNICAL.md",
+    section: "The graph's laws",
+    suite: "packages/folder/graph.test.ts",
+  },
+`,
+    to: "",
+    command: laws,
+    expect: "every package doc's section of laws is a checked set",
   },
 ]

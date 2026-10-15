@@ -143,6 +143,12 @@ importers:
         specifier: workspace:*
         version: link:../lanes
 
+  packages/folder:
+    dependencies:
+      '@pinetrie/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/interface:
     dependencies:
       '@pinetrie/core':

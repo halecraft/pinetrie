@@ -17,12 +17,8 @@ import {
 } from "node:fs/promises"
 import path from "node:path"
 import { runCommand } from "@pinetrie/channel"
-import {
-  isDiskName,
-  isLaneFile,
-  LANE_FILES,
-  type ProjectDisks,
-} from "./layout.ts"
+import { isDiskName, isPathInside } from "@pinetrie/core"
+import type { ProjectDisks } from "./layout.ts"
 import type { DiskCall } from "./protocol.ts"
 
 /** The rootless user, who owns a nested lane's inner lanes' disk. */
@@ -116,6 +112,7 @@ export function planDisk(
       return [
         { kind: "drop", path: disks.lane(call.lane) },
         { kind: "drop", path: disks.nested(call.lane) },
+        { kind: "drop", path: disks.states(call.lane) },
       ]
     case "deleteSnapshots":
       return call.ids.map(id => ({ kind: "drop", path: disks.snapshot(id) }))
@@ -265,28 +262,33 @@ export async function executeDiskSteps(
 }
 
 /**
- * A file of pine·trie's (`.pinetrie-lane/<file>`) inside a snapshot, or null
+ * A file inside a snapshot, by its path from the snapshot's root, or null
  * when it is not there. Its real path must stay inside the snapshot: a
- * snapshot does not change, so what was checked is what is read.
+ * snapshot does not change, so what was checked is what is read. Refused
+ * when it holds more than `limit` bytes.
  */
-export async function readLaneFile(
+export async function readSnapshotFile(
   disks: ProjectDisks,
   snapshot: string,
   file: string,
+  limit: number,
 ): Promise<string | null> {
   if (!isDiskName(snapshot))
     throw new Error(`not a disk's name: ${JSON.stringify(snapshot)}`)
-  if (!isLaneFile(file))
-    throw new Error(`not a file of pine·trie's: ${JSON.stringify(file)}`)
+  if (!isPathInside(file))
+    throw new Error(`not a path inside a snapshot: ${JSON.stringify(file)}`)
   const root = disks.snapshot(snapshot)
   let real: string
   try {
-    real = await realpath(path.join(root, LANE_FILES, file))
+    real = await realpath(path.join(root, file))
   } catch {
     return null
   }
   const base = await realpath(root)
   if (!real.startsWith(`${base}/`))
     throw new Error(`${file} leaves its snapshot`)
+  const { size } = await stat(real)
+  if (size > limit)
+    throw new Error(`${file} holds ${size} bytes, more than ${limit}`)
   return readFile(real, "utf8")
 }

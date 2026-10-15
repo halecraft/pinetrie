@@ -151,6 +151,14 @@ cannot reach the wrong document and needs no guard at run time.
   `owner`), never a lane's.
 - **`QUEUE_HOLD`** (`queue-hold.ts`, ADR-0048 step 7): a thread's queue
   held, keyed by lane, in the session: who held it and when.
+- **`STATE`** and **`CONFLICT`** (`folder-records.ts`, ADR-0142): a folder
+  project's history, in the session. `STATE` is each state keyed by its
+  snapshot's name, with its parents, how it was made, when and by whom;
+  `@pinetrie/folder` decides which may be recorded, and none is ever
+  deleted, since merge bases walk every state's parents. `CONFLICT` is
+  each path a merge into a lane left conflicted, keyed by its lane and
+  then its path (`conflictKey`; a lane's id holds no `:`, so the first
+  ends it), with the states of its base, ours and theirs.
 - **The archive gate** reads the tasks a command writes in (`writesIn`) and
   looks each up among the archived (`archivedIn`, over `archivedOf`): a
   command carries its tasks, or its places and cards, which the

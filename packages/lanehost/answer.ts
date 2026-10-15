@@ -8,10 +8,22 @@ import {
   isSubvolume,
   planDisk,
   planNestedDisk,
-  readLaneFile,
+  readSnapshotFile,
 } from "./disks.ts"
+import {
+  executeApply,
+  executeStates,
+  pathFacts,
+  planApply,
+  planStates,
+  sameContent,
+} from "./folder.ts"
 import { applyGrant } from "./grants.ts"
-import { isDiskName, isProjectKey, projectDisks } from "./layout.ts"
+import {
+  isProjectKey,
+  checkedDiskName as named,
+  projectDisks,
+} from "./layout.ts"
 import { listProjects, recordProject, removeProject } from "./projects.ts"
 import type { LanehostCall, LanehostResult } from "./protocol.ts"
 import { moduleOf, planRoles, type Role, type RoleFacts } from "./roles.ts"
@@ -27,12 +39,6 @@ const disksOf = (serving: Serving, key: string) => {
   if (!isProjectKey(key))
     throw new Error(`not a project's key: ${JSON.stringify(key)}`)
   return projectDisks(serving.lanesDir, key)
-}
-
-const named = (name: string): string => {
-  if (!isDiskName(name))
-    throw new Error(`not a disk's name: ${JSON.stringify(name)}`)
-  return name
 }
 
 /** Answer `call`, or throw: a call of a module another role serves is refused. */
@@ -69,11 +75,35 @@ async function answerAny(
       )
       return null
     case "read":
-      return readLaneFile(
+      return readSnapshotFile(
         disksOf(serving, call.project),
         call.snapshot,
-        call.file,
+        call.path,
+        call.limit,
       )
+    case "pathFacts":
+      return pathFacts(
+        disksOf(serving, call.project),
+        call.snapshot,
+        call.paths,
+      )
+    case "sameContent":
+      return sameContent(
+        disksOf(serving, call.project),
+        call.a,
+        call.b,
+        call.paths,
+      )
+    case "applyMerge":
+      return executeApply(
+        planApply(call, disksOf(serving, call.project)),
+        call.markers,
+      )
+    case "states":
+      await executeStates(
+        planStates(call.lane, call.op, disksOf(serving, call.project)),
+      )
+      return null
     case "record":
       await recordProject(disksOf(serving, call.project), call.root)
       return null

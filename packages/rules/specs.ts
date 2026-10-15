@@ -11,6 +11,7 @@ import { BUDGET } from "./budget.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"
 import { COMMANDS } from "./commands.ts"
 import { DIGEST } from "./digest.ts"
+import { CONFLICT, STATE } from "./folder-records.ts"
 import { MARK } from "./mark.ts"
 import { NAME } from "./names.ts"
 import { NOTE_COLUMN } from "./note-column.ts"
@@ -40,6 +41,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   BUDGET,
   CARD_HISTORY,
   COMMANDS,
+  CONFLICT,
   ICONS,
   DIGEST,
   FILES_LOST,
@@ -59,6 +61,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   SEAT,
   SETUP,
   SHARED_LINEAGE,
+  STATE,
   TRACE,
   VERDICT,
   WORKFLOW,

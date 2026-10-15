@@ -47,6 +47,13 @@ the helper, S122 to S131 for Docker and the lane VM.
     bytes (`runInImage`), from which the lane runtime is extracted.
 - **Who implements it:** `@pinetrie/docker` (`dockerRuntime`, the Mac's lane
   VM and Linux), the one implementation.
+- **A folder project's merges are a port of their own,** `FolderDisks`
+  (`folder-disks-port.ts`), beside `LaneRuntime`: what a snapshot holds at
+  paths, alike content, a merge's steps applied to a disk, any file of a
+  snapshot read, and a lane's states directory. `@pinetrie/docker` builds
+  one on the same lanehost (`DockerRuntime.folder`), and only the folder
+  adapter is given it, so `LaneRuntime` and every fake runtime carry none
+  of it.
 
 ## The ports (`history-port.ts`, ADR-0142, ADR-0150)
 
@@ -110,27 +117,24 @@ history:
   shared history needs more than an equality test. What a kind does on the
   destination's side (offers, WIPs, stacks) is not part of the algebra.
 
-Its laws, each one test in the port suite titled `L<n>: …`
+jj computes its merge bases inside one command and reports none through
+the port; a folder project's graph states its own laws in
+`packages/folder/TECHNICAL.md`, "The graph's laws".
+
+Its laws, each one test in the port suite titled by the law's sentence
 (`scripts/laws.test.ts` holds each law to exactly one):
 
-- **L1, a merge of what the lane holds merges nothing.** Merging a state
+- **A merge of what the lane holds merges nothing.** Merging a state
   the lane already holds (its own start, or a state it merged before)
   answers `nothing`, and changes no file.
-- **L2, a turn's paths are its diff.** A recorded turn's `paths` equal the
+- **A turn's paths are its diff.** A recorded turn's `paths` equal the
   paths that differ between the lane's newest state before it (`newest`)
   and the turn's state (`committed`), including a turn the agent committed
   itself in several commits.
-- **L3, a clean merge descends from both sides.** A clean merge's result
+- **A clean merge descends from both sides.** A clean merge's result
   has the lane's state before it (`ours`) and the state merged (`from`) as
   ancestors.
-- **L4, merge bases (the folder graph's, not checked against jj).** A state
-  and one of its descendants have that state as their one base; a base set
-  is an antichain; several bases merged first give the right file or a
-  conflict, never a wrong file (S182). It is to be tested against the
-  folder adapter's pure merge-base function, as properties over generated
-  graphs with S182's five flows as fixed cases. jj computes its bases
-  inside one command and reports none through the port.
-- **L5, an accept then a catch-up changes no file.** Once the lane's offer
+- **An accept then a catch-up changes no file.** Once the lane's offer
   is accepted, its catch-up with accepted work changes no file in the
   lane: made at once, and made after the lane edits the accepted lines
   again and records a turn, with no catch-up between and accepted work
@@ -141,8 +145,8 @@ Its laws, each one test in the port suite titled `L<n>: …`
 The rig's hooks (`HistoryRig`'s `isAncestor`, `changedPaths` and
 `accept`, `RigLane`'s `commitAsAgent`) are test-only: a law that needs
 ancestry or a diff reads it through them, so the port never gains either.
-A harness reads its diff independently of the adapter's own, or L2 would
-compare a function with itself.
+A harness reads its diff independently of the adapter's own, or "A turn's
+paths are its diff." would compare a function with itself.
 
 ## Where things are
 
@@ -500,7 +504,7 @@ compare a function with itself.
 - **`lanes.test.ts`**: the executor, the helper's command, config files
   and the handle. A lane's whole life against jj and git, in throwaway
   repos, is `packages/jj/repo.test.ts`, and the port suite against jj is
-  `packages/jj/lane/history.test.ts`: it checks the laws L1, L2, L3 and L5
+  `packages/jj/lane/history.test.ts`: it checks the history algebra's laws
   against jj, through hooks jj's harness supplies, and runs against any
   adapter's harness.
 - **`e2e:lanes`** (`apps/pinetrie/e2e/lanes.ts`): the same in real containers,

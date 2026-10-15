@@ -41,7 +41,8 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `reads` | document reads shared by host and client |
 | `lanes` | what a lane is and what runs in it: its container's shape, mounts, grants, disks, forks and snapshots; it defines the `LaneRuntime` port and a kind of project's ports (`LaneHistory`), implements neither, and runs no jj |
 | `jj` | jj's adapter: your repo as the host reads and writes it (its one owner, offers, accepted work and lanes' refs in it), each lane's own repo as a `LaneHistory`, your repo at startup, and every jj name |
-| `docker` | running lanes on Docker: the `LaneRuntime` over the docker CLI, btrfs disks in a helper container, Docker's startup refusals, lanes inside a lane |
+| `folder` | a folder project's history as values (ADR-0142): its graph of states and their merge bases, the path merge's plan, and the snapshots kept; it declares only `core`, does no I/O, and lanehost carries out what it decides |
+| `docker` | running lanes on Docker: the `LaneRuntime` over the docker CLI, btrfs disks in a helper container, Docker's startup refusals, lanes inside a lane; beside it a folder project's `FolderDisks` |
 | `vm` | a Linux machine on the Mac: the image's build, the launcher, a host's lease on a slot; it knows nothing of lanes |
 | `session` | one client's connection to a host, its own documents and what it has in flight |
 | `shell` | shell source as structure: a command's words by role, and a one-line command laid out to a width; it declares only `unbash` (ADR-0114) |

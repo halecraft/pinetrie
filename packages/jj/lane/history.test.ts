@@ -238,7 +238,8 @@ async function makeRig(): Promise<HistoryRig> {
     },
 
     // Deliberately not jj's `changedPaths`: `recordTurn` computes a turn's
-    // paths with it, so L2 would compare it with itself. `--name-only`
+    // paths with it, so "A turn's paths are its diff." would compare it
+    // with itself. `--name-only`
     // prints a path unquoted, so the suite's paths are plain.
     async changedPaths(lane, from, to) {
       const { jj, commit } = inLane(lane)

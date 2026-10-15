@@ -2,7 +2,13 @@
 // results. Every call names its project by key and its disks by name,
 // never by path: the server builds each path itself (`layout.ts`).
 
-import type { DiskDiff } from "@pinetrie/core"
+import type {
+  DiskDiff,
+  LaneStatesOp,
+  MergeStep,
+  PathFact,
+  TextMerged,
+} from "@pinetrie/core"
 import type { Grant } from "./grants.ts"
 
 /** A disk operation on one project's disks; the shape of lanes' `DiskOp`. */
@@ -38,13 +44,17 @@ export type LanehostCall =
       readonly project: string
       readonly lane: string
     }
-  /** A project's snapshots, each with when it was made. */
-  /** A file of pine·trie's (`.pinetrie-lane/<file>`) inside a snapshot; null when absent. */
+  /**
+   * A file inside a snapshot, by its path from the snapshot's root; null
+   * when absent. Refused when it leaves the snapshot or holds more than
+   * `limit` bytes.
+   */
   | {
       readonly kind: "read"
       readonly project: string
       readonly snapshot: string
-      readonly file: string
+      readonly path: string
+      readonly limit: number
     }
   /** The project's root, kept beside its disks for the sweep. */
   | { readonly kind: "record"; readonly project: string; readonly root: string }
@@ -60,6 +70,44 @@ export type LanehostCall =
       readonly project: string
       readonly from: string
       readonly to: string
+    }
+
+  /** What a snapshot holds at each path, in the order asked (`folder.ts`). */
+  | {
+      readonly kind: "pathFacts"
+      readonly project: string
+      readonly snapshot: string
+      readonly paths: readonly string[]
+    }
+  /** The paths where two snapshots hold files of alike content. */
+  | {
+      readonly kind: "sameContent"
+      readonly project: string
+      readonly a: string
+      readonly b: string
+      readonly paths: readonly string[]
+    }
+  /**
+   * A merge's steps applied to a disk (a lane's, or a virtual base's
+   * scratch disk) over `base` (null: an empty one) from `theirs`; answers
+   * each text step clean or conflicted. With `markers`, a conflicted text
+   * keeps git's markers; else ours.
+   */
+  | {
+      readonly kind: "applyMerge"
+      readonly project: string
+      readonly disk: string
+      readonly base: string | null
+      readonly theirs: string
+      readonly steps: readonly MergeStep[]
+      readonly markers: boolean
+    }
+  /** A change to a lane's states directory (`<project>/states/<lane>`). */
+  | {
+      readonly kind: "states"
+      readonly project: string
+      readonly lane: string
+      readonly op: LaneStatesOp
     }
 
 /** A project in the lanes directory; its root is null when none was recorded. */
@@ -80,6 +128,10 @@ export interface LanehostResults {
   readonly removeProject: null
   readonly grant: null
   readonly diff: DiskDiff
+  readonly pathFacts: readonly PathFact[]
+  readonly sameContent: readonly string[]
+  readonly applyMerge: readonly TextMerged[]
+  readonly states: null
 }
 
 export type LanehostResult<C extends LanehostCall> = LanehostResults[C["kind"]]

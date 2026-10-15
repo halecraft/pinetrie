@@ -7,6 +7,7 @@ import {
   entryId,
   type OfferRecord,
   pointFromCommit,
+  pointId,
   type RootRecord,
   rootIdFor,
   SESSION_TARGET,
@@ -28,6 +29,7 @@ import {
   byTarget,
   CARD_HISTORY,
   COMMANDS,
+  CONFLICT,
   DIGEST,
   deleteRecord,
   ICONS,
@@ -46,6 +48,7 @@ import {
   ROOT,
   recordsOf,
   SEAT,
+  STATE,
   setIfChanged,
   setRecord,
   TRACE,
@@ -297,6 +300,30 @@ const SAMPLES: readonly Sample[] = [
     "id",
   ),
   sample(
+    "state",
+    STATE,
+    {
+      id: pointId("e-2"),
+      parents: [pointId("line-1"), pointId("e-1")],
+      made: { kind: "turn", lane: L, entry: E },
+      at: 1,
+      by: ADA,
+    },
+    "id",
+  ),
+  sample(
+    "conflict",
+    CONFLICT,
+    {
+      lane: L,
+      path: "docs/a:b.md",
+      base: pointId("bases-1"),
+      ours: pointId("e-1"),
+      theirs: pointId("line-2"),
+    },
+    null,
+  ),
+  sample(
     "verdict",
     VERDICT,
     {
@@ -408,8 +435,17 @@ test("each record lives where it is read: across roots in the session, by entry 
     root: "session",
     "card history": "session",
     trace: "session",
+    state: "session",
+    conflict: "session",
     verdict: "session",
   })
+})
+
+test("a conflict does not read at an address with no lane before its path", () => {
+  const value = { base: "a-1", ours: "a-2", theirs: "a-3" }
+  expect(CONFLICT.decode(value, "main:a.txt")).toBeUndefined()
+  expect(CONFLICT.decode(value, `${L}:`)).toBeUndefined()
+  expect(CONFLICT.decode(value, "a.txt")).toBeUndefined()
 })
 
 test("a write goes to the document its home names", () => {

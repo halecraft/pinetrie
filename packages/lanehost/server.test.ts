@@ -1,15 +1,16 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { isDiskName } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
 import {
   planDisk,
   planNestedDisk,
-  readLaneFile,
+  readSnapshotFile,
   subvolumesDeepestFirst,
 } from "./disks.ts"
-import { isDiskName, isProjectKey, projectDisks } from "./layout.ts"
+import { isProjectKey, projectDisks } from "./layout.ts"
 import { planProjectRemoval } from "./projects.ts"
 import { planRoles } from "./roles.ts"
 import { servingFrom } from "./serving.ts"
@@ -87,10 +88,11 @@ describe("planDisk: each disk operation as steps", () => {
       { kind: "create", path: disks.lane("l") },
     ])
   })
-  test("a lane's delete takes its inner lanes' disk; snapshots are deleted by name", () => {
+  test("a lane's delete takes its inner lanes' disk and its states; snapshots are deleted by name", () => {
     expect(planDisk({ kind: "delete", lane: "l" }, disks)).toEqual([
       { kind: "drop", path: disks.lane("l") },
       { kind: "drop", path: disks.nested("l") },
+      { kind: "drop", path: disks.states("l") },
     ])
     expect(
       planDisk({ kind: "deleteSnapshots", ids: ["a", "b"] }, disks),
@@ -165,8 +167,8 @@ describe("roles", () => {
   })
 })
 
-describe("readLaneFile: pine·trie's own file inside a snapshot", () => {
-  test("read when there, null when not, refused when its real path leaves", async () => {
+describe("readSnapshotFile: a file inside a snapshot", () => {
+  test("read when there, null when not, refused when its real path leaves or it is too large", async () => {
     const lanesDir = await mkdtemp(path.join(tmpdir(), "lanehost-read-"))
     try {
       const d = projectDisks(lanesDir, KEY)
@@ -182,14 +184,17 @@ describe("readLaneFile: pine·trie's own file inside a snapshot", () => {
         path.join(lanesDir, "secret"),
         path.join(d.snapshot("s"), ".pinetrie-lane", "leak.json"),
       )
-      expect(await readLaneFile(d, "s", "base.json")).toBe("{}")
-      expect(await readLaneFile(d, "s", "recipes.json")).toBeNull()
-      await expect(readLaneFile(d, "s", "leak.json")).rejects.toThrow(
+      await writeFile(path.join(d.snapshot("s"), "notes.md"), "# notes\n")
+      const read = (p: string, limit = 100) =>
+        readSnapshotFile(d, "s", p, limit)
+      expect(await read(".pinetrie-lane/base.json")).toBe("{}")
+      expect(await read("notes.md")).toBe("# notes\n")
+      expect(await read(".pinetrie-lane/recipes.json")).toBeNull()
+      await expect(read(".pinetrie-lane/leak.json")).rejects.toThrow(
         "leaves its snapshot",
       )
-      await expect(readLaneFile(d, "s", "../x")).rejects.toThrow(
-        "not a file of pine·trie's",
-      )
+      await expect(read("../x")).rejects.toThrow("not a path inside")
+      await expect(read("notes.md", 3)).rejects.toThrow("more than 3")
     } finally {
       await rm(lanesDir, { recursive: true, force: true })
     }

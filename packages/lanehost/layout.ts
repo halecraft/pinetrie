@@ -7,6 +7,10 @@
 //   <lanesDir>/projects/<projectKey>/lanes/<lane>    each lane's subvolume
 //   <lanesDir>/projects/<projectKey>/snapshots/<id>  snapshots, the base too
 //   <lanesDir>/projects/<projectKey>/nested/<lane>   a nested lane's inner lanes
+//   <lanesDir>/projects/<projectKey>/states/<lane>   a folder lane's states, which
+//                                                    its container sees read-only
+
+import { isDiskName } from "@pinetrie/core"
 
 /** Where one project's disks are on Docker's machine. */
 export function projectDisks(lanesDir: string, key: string) {
@@ -17,9 +21,11 @@ export function projectDisks(lanesDir: string, key: string) {
     lanes: `${dir}/lanes`,
     snapshots: `${dir}/snapshots`,
     nestedDir: `${dir}/nested`,
+    statesDir: `${dir}/states`,
     lane: (lane: string) => `${dir}/lanes/${lane}`,
     nested: (lane: string) => `${dir}/nested/${lane}`,
     snapshot: (id: string) => `${dir}/snapshots/${id}`,
+    states: (lane: string) => `${dir}/states/${lane}`,
   }
 }
 export type ProjectDisks = ReturnType<typeof projectDisks>
@@ -27,16 +33,12 @@ export type ProjectDisks = ReturnType<typeof projectDisks>
 /** A project's key: 16 hex digits (`projectKey`, a hash of its root). */
 export const isProjectKey = (key: string): boolean => /^[0-9a-f]{16}$/.test(key)
 
-/**
- * A lane's or a snapshot's name: one path segment, never `.` or `..`, and
- * never ending in `.tmp`, which a snapshot in the making holds.
- */
-export const isDiskName = (name: string): boolean =>
-  /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(name) && !name.endsWith(".tmp")
-
-/** A file pine·trie keeps on a disk, under `.pinetrie-lane/`. */
-export const isLaneFile = (name: string): boolean =>
-  /^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)
+/** `name`, checked to be a disk's (`isDiskName`); throws on any other. */
+export const checkedDiskName = (name: string): string => {
+  if (!isDiskName(name))
+    throw new Error(`not a disk's name: ${JSON.stringify(name)}`)
+  return name
+}
 
 /** The directory on a disk that holds pine·trie's own files. */
 export const LANE_FILES = ".pinetrie-lane"

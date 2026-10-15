@@ -1,5 +1,5 @@
 // lanes/testing/history-suite — the history algebra's laws, each one test
-// titled `L<n>: …` (`packages/lanes/TECHNICAL.md` states them), beside
+// titled by its sentence (`packages/lanes/TECHNICAL.md` states them), beside
 // examples of what any adapter's `LaneHistory` must do. Each runs against a
 // rig the adapter's own tests make: accepted work, lanes started on it, a
 // lane's files to write, and test-only hooks that read what the port never
@@ -59,7 +59,7 @@ export interface HistoryRig {
   /**
    * Test-only: the paths that differ between `from` and `to`, in `lane`'s
    * history, sorted; read independently of the adapter's own diff, which
-   * L2 tests.
+   * "A turn's paths are its diff." tests.
    */
   changedPaths(
     lane: ThreadId,
@@ -139,7 +139,7 @@ export function historySuite(
     },
   )
 
-  withRig("L1: a merge of what the lane holds merges nothing", async rig => {
+  withRig("A merge of what the lane holds merges nothing.", async rig => {
     const lane = await rig.lane()
     const paths = ["a.txt", "b.txt"]
     const start = (await lane.withHistory(h => h.base()))?.start
@@ -159,7 +159,7 @@ export function historySuite(
   // The paths are compared with the rig's own diff alone, never with a
   // list written here: then a bug in the adapter's diff fails this test
   // only while the rig's diff is independent of it.
-  withRig("L2: a turn's paths are its diff", async rig => {
+  withRig("A turn's paths are its diff.", async rig => {
     const lane = await rig.lane()
     const empty = await lane.withHistory(h => h.recordTurn(TURN))
     expect(empty.committed).toBeNull()
@@ -212,7 +212,7 @@ export function historySuite(
     },
   )
 
-  withRig("L3: a clean merge descends from both sides", async rig => {
+  withRig("A clean merge descends from both sides.", async rig => {
     const lane = await rig.lane()
     await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
     await lane.withHistory(h => h.recordTurn(TURN))
@@ -286,7 +286,7 @@ export function historySuite(
     },
   )
 
-  withRig("L5: an accept then a catch-up changes no file", async rig => {
+  withRig("An accept then a catch-up changes no file.", async rig => {
     /** `lane`'s catch-up with `point`: nothing, or clean with no file, its copy unchanged. */
     const changesNoFile = async (lane: RigLane, point: PointId) => {
       const before = await texts(lane, ["a.txt"])

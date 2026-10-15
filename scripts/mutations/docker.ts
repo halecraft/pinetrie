@@ -346,6 +346,23 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a diff between two snapshots of a lane reports a file it deleted, and one it made",
   },
+  // ── a folder project's merges, on btrfs ──
+  {
+    name: "applyMerge writes a text result equal to ours",
+    file: "packages/lanehost/folder.ts",
+    from: "  if ((clean || markers) && !(await isSameBytes(result, files.ours))) {\n",
+    to: "  if (clean || markers) {\n",
+    command: unit("packages/lanehost/folder.test.ts"),
+    expect: "a text merge whose result is ours writes nothing",
+  },
+  {
+    name: "applyMerge writes through a symlinked directory on its disk",
+    file: "packages/lanehost/folder.ts",
+    from: "    if (!(await isUnderDirs(disk, p)))\n",
+    to: "    if (false)\n",
+    command: unit("packages/lanehost/folder.test.ts"),
+    expect: "a take through a symlinked directory on the disk is refused",
+  },
   // ── the network, the contract's checks ──
   {
     name: "(Mac) a lane is on the VM's own network, outside the fence",

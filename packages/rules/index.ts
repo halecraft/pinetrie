@@ -273,6 +273,7 @@ export {
   factLine,
   tokensWords,
 } from "./fact.ts"
+export { CONFLICT, conflictKey, STATE } from "./folder-records.ts"
 export {
   type Cleared,
   type GateFacts,
