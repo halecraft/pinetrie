@@ -132,6 +132,7 @@ import { createMoveHistories } from "./move-history.ts"
 import { createNames } from "./names.ts"
 import type { PageSource } from "./page.ts"
 import { createPinned } from "./pinned.ts"
+import { createPlaces } from "./places.ts"
 import { hostPolicy, resolveDoc, SCHEMA_OF } from "./policy.ts"
 import { projectAdapter } from "./project.ts"
 import { createProvenance } from "./provenance.ts"
@@ -268,7 +269,7 @@ export interface RunningHost {
   readonly presence: PresenceDocHandle
   /**
    * Where every card is, as the host holds it: for the suites to read. Only
-   * `applyPlaceSteps` writes it.
+   * the writer of the places (`places.ts`) writes it.
    */
   readonly places: PlacesDocHandle
   /** A card's text as the host holds it: for the suites. */
@@ -438,6 +439,15 @@ export async function startHost({
 
   // The host writes its own records; every module that writes one takes this.
   const records = createRecords(docs)
+  // Cards' texts, and the one writer of the places: each change records its
+  // cards' history and traces, and destroys the texts of the cards it removed.
+  const cardPort = startCards({ exchange, store, session })
+  const { provenance, hooks } = createProvenance({ basics, presence, records })
+  const placesWriter = createPlaces({
+    basics,
+    provenance: hooks,
+    texts: cardPort,
+  })
 
   // --- pi: the scribe and the model setup --------------------------------
   // A thread's appends go through the scribe, which holds each root's one pi
@@ -553,6 +563,7 @@ export async function startHost({
     basics,
     keeper,
     records,
+    placesWriter,
     limit: settled["agents.budget"].value,
     drain: lane => queueDrainLate(lane),
   })
@@ -585,10 +596,9 @@ export async function startHost({
       banners.due(lane).catch(failed(basics, "banner"))
     },
   })
-  const provenance = createProvenance({ basics, presence, records })
   // `split_offer`: a split card queued on the agent's lane, which its run's end
   // pops.
-  const askSplit = createSplitCall({ basics, keeper, provenance })
+  const askSplit = createSplitCall({ basics, keeper, placesWriter })
 
   // --- where lanes work -----------------------------------------------------
   const work = await startLaneWork({
@@ -662,7 +672,6 @@ export async function startHost({
   provenance.onChanged(change => canvasNews.changed(change))
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
-  const cardPort = startCards({ exchange, store, session })
   const { readPinned } = createPinned({ basics, cards: cardPort })
   const { readTaskContext } = createTaskContext({ basics, cards: cardPort })
   const runs = createRuns({
@@ -684,6 +693,7 @@ export async function startHost({
     budgets,
     piSetup,
     drain: lane => queueDrain(lane),
+    placesWriter,
   })
   relaysLate = relays
   const commands = createCommands({
@@ -708,6 +718,7 @@ export async function startHost({
     titles,
     drain: lane => queueDrain(lane),
     histories,
+    placesWriter,
     provenance,
     keeper,
     relays,
@@ -745,7 +756,7 @@ export async function startHost({
         behind,
         typing,
         blank,
-        provenance,
+        placesWriter,
         relay: (to, relay) => relays.relayCard(to, relay),
         appendLaneless: async (thread, fact) => {
           if (docs.docOfLane(thread) !== null) return false
@@ -786,7 +797,7 @@ export async function startHost({
       })
       await sweepHistories({ basics, store, histories, startup: false })
       await sweepHolds({ basics, records })
-      await sweepTrash({ basics, cards: cardPort, work })
+      await sweepTrash({ basics, placesWriter, work })
       await provenance.sweep()
     },
   })
@@ -833,6 +844,7 @@ export async function startHost({
     start: runs.start,
     settle,
     cards: cardPort,
+    placesWriter,
     provenance,
     ensureNames: names.ensure,
     icons: { source: iconConfig.source },
@@ -855,7 +867,7 @@ export async function startHost({
   )
   await sweepHistories({ basics, store, histories, startup: true })
   await sweepHolds({ basics, records })
-  await sweepTrash({ basics, cards: cardPort, work })
+  await sweepTrash({ basics, placesWriter, work })
   await provenance.sweep()
   const seats = startSeats({ exchange, basics, keeper, records, histories })
   const control = startControl({

@@ -25,10 +25,10 @@ import {
   putTask,
   putValue,
   record,
+  seedPlaces,
   TASK_ID,
   threadRow,
 } from "./fakes.ts"
-import { applyPlaceSteps } from "./places.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
 const OTHER = threadIdFor("fedcba9876543210")
@@ -53,7 +53,7 @@ function setUp() {
     place: { kind: "task-pinned", task: TASK_ID, order: "a" },
     content: { command: null, unsent: null, origin: null },
   }
-  applyPlaceSteps(b.places, [
+  seedPlaces(b.places, [
     {
       kind: "write",
       record: {

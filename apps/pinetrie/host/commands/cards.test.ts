@@ -40,6 +40,7 @@ import {
 import {
   CARD_HISTORY,
   type CopyThread,
+  encodeCard,
   QUEUE_HOLD,
   ROOT as ROOT_RECORD,
   setRecord,
@@ -54,15 +55,16 @@ import {
   applyWrites,
   basics,
   NO_BLANK_CARDS,
+  placesFor,
   putNoteColumn,
   putTask,
   putValue,
   record,
   row,
+  seedChange,
+  seedPlaces,
   threadRow,
 } from "../fakes.ts"
-import { applyPlaceSteps } from "../places.ts"
-import { createProvenance } from "../provenance.ts"
 import { popNextQueuedCard } from "../queued-card-pop.ts"
 import { tasksNow } from "../tasks.ts"
 import { type CardCommandDeps, createCardCommands } from "./cards.ts"
@@ -148,10 +150,9 @@ function setUp() {
     unloadTask: async () => {},
   })
   const presence = newPresenceDoc()
-  const provenance = createProvenance({
-    basics: b,
+  const { placesWriter, provenance } = placesFor(b, {
     presence,
-    records: { writeValues: async writes => applyWrites(b, writes) },
+    texts: cards.port,
   })
   // Each run a take stopped, as the dispatcher stops it (`onTaken`).
   provenance.onTaken(async (threads, by) => {
@@ -163,6 +164,7 @@ function setUp() {
     cards: cards.port,
     drain: lane => void drains.push(lane),
     histories: histories.port,
+    placesWriter,
     provenance,
     records: { writeValues: async writes => applyWrites(b, writes) },
     ensureNames: async () => {},
@@ -198,7 +200,7 @@ function setUp() {
     reverting = revert
   }
   const put = (over: Partial<TextCard> = {}) =>
-    applyPlaceSteps(b.places, [
+    seedPlaces(b.places, [
       {
         kind: "write",
         record: {
@@ -255,7 +257,13 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     const { b, commands, put } = setUp()
     put()
     await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }], null)
-    const top = popNextQueuedCard(b.places, LANE, idle, held)
+    const top = popNextQueuedCard(
+      seedChange(b.places),
+      b.places,
+      LANE,
+      idle,
+      held,
+    )
     expect(top.kind === "popped" ? top.popped.card.id : top.kind).toBe(C1)
     const done = await commands.move(
       ADA,
@@ -279,7 +287,9 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     put()
     await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }], null)
     await commands.move(ADA, [{ card: C1, from: queuedKey, to: atEnd }], null)
-    expect(popNextQueuedCard(b.places, LANE, idle, held).kind).toBe("idle")
+    expect(
+      popNextQueuedCard(seedChange(b.places), b.places, LANE, idle, held).kind,
+    ).toBe("idle")
   })
 
   test("a move someone else made first: answered moved, naming them", async () => {
@@ -521,7 +531,7 @@ describe("a thread's card taken, put and moved", () => {
         },
       },
       () =>
-        applyPlaceSteps(b.places, [
+        seedPlaces(b.places, [
           { kind: "write", record: { ...card, place: bea } },
         ]),
     )
@@ -768,10 +778,21 @@ describe("moves' history", () => {
     const { b, commands, put, histories, undoes } = setUp()
     put()
     const rev = readPlacesRev(b.places)
-    undoes({
-      kind: "undone",
-      step: { parts: [{ docId: PLACES_DOC_ID, footprint: [["cards", C1]] }] },
-    })
+    const was = textsIn(b.places)[0]
+    // Kyneta writes the revert itself, with no `rev`.
+    undoes(
+      {
+        kind: "undone",
+        step: { parts: [{ docId: PLACES_DOC_ID, footprint: [["cards", C1]] }] },
+      },
+      () => {
+        if (was !== undefined)
+          b.places.cards.set(
+            C1,
+            encodeCard({ ...was, place: { ...atEnd, order: "b" } }),
+          )
+      },
+    )
     const done = await commands.undoMove(ADA, TEST_TASK, "undo")
     expect(done).toEqual({
       outcome: { kind: "undone", cards: [{ card: C1, place: noteKey }] },
@@ -809,7 +830,7 @@ describe("reorders and unqueue all", () => {
   test("a reorder writes only the card's order, in the sender's history of its root, with the rev; it drains nothing", async () => {
     const { b, commands, put, recorded, drains } = setUp()
     put({ place: queuedAt("0000000100"), placer: BEA })
-    applyPlaceSteps(b.places, [
+    seedPlaces(b.places, [
       {
         kind: "write",
         record: {
@@ -883,7 +904,7 @@ describe("reorders and unqueue all", () => {
       rev: null,
     })
     put({ place: queuedAt("a") })
-    applyPlaceSteps(b.places, [
+    seedPlaces(b.places, [
       {
         kind: "write",
         record: {
@@ -942,7 +963,7 @@ describe("a chat from a card that found its lane busy", () => {
 test("setCommand: the command set, its place and placer kept", async () => {
   const { b, commands, put } = setUp()
   put({ placer: BEA })
-  const done = await commands.setCommand(C1, "bring-up-to-date")
+  const done = await commands.setCommand(ADA, C1, "bring-up-to-date")
   expect(done).toEqual({ outcome: { kind: "moved" }, rev: 4 })
   expect(textsIn(b.places)[0]).toMatchObject({
     content: { command: "bring-up-to-date" },

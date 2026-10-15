@@ -253,7 +253,7 @@ record of flat string rows (`owner`, `kind`, `root`, `at`, `lane`,
 `holder`, `task`, `width`, "" for none; `task` and `width` from migration
 `0005-tasks`, ADR-0116), decoded in `@pinetrie/rules` (`decodeCard`),
 and `rev`. Its id is `pinetrie:card-places` (`PLACES_DOC_ID`). Only the host
-writes it, through `applyPlaceSteps` (`apps/pinetrie/host/places.ts`).
+writes it, each write one change of its writer (`apps/pinetrie/host/places.ts`).
 
 A card's history and its traces are not here (ADR-0048 step 6): they are
 session records (`pinetrie.card-history`, `pinetrie.trace`). This document

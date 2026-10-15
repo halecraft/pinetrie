@@ -47,9 +47,11 @@ test("a card added to a task's canvas is told to its running threads, as a steer
     place: { kind: "canvas", task: TASK_ID, order: "zzzzzzzzzz", width: 1 },
     content: NO_CONTENT,
   }
+  // It touched the column alone, which it made.
   const change = {
-    before,
-    after: [...before, column],
+    before: [],
+    after: [column],
+    places: [...before, column],
     cause: { kind: "move", by: BEA },
   } as const
   // Idle: told at its next run's start, in the canvas list.

@@ -1702,7 +1702,7 @@ test("planCardSweep: empty cards and documents with no record go; a card with te
     }),
   ).toEqual({
     records: [cardIdFor("c2")],
-    docs: [`card:${cardIdFor("c2")}`, "card:gone"],
+    docs: ["card:gone"],
   })
 })
 

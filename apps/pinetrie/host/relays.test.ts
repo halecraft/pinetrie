@@ -16,6 +16,7 @@ import { describe, expect, test } from "vitest"
 import type { Budgets } from "./budgets.ts"
 import {
   basics,
+  placesFor,
   placeTask,
   putTask,
   putValue,
@@ -94,6 +95,7 @@ function setUp() {
     budgets,
     piSetup: record<Pick<PiSetup, "complete" | "skill">>().port,
     drain: () => {},
+    placesWriter: placesFor(b).placesWriter,
   })
   return { b, relays, opened }
 }

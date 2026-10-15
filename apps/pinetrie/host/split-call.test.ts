@@ -2,12 +2,10 @@ import { entryId, runId, threadIdFor, writerId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { readCardHistories, readPlaces } from "@pinetrie/reads"
 import { OFFER, SPLIT_QUEUED, setRecord, splitRefusal } from "@pinetrie/rules"
-import { newPresenceDoc } from "@pinetrie/schema"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import type { HostKey } from "./basics.ts"
-import { applyWrites, basics, putLane, putValue, row } from "./fakes.ts"
-import { createProvenance } from "./provenance.ts"
+import { basics, placesFor, putLane, putValue, row } from "./fakes.ts"
 import { createSplitCall } from "./split-call.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
@@ -51,11 +49,7 @@ test("split_offer queues a split card by the person behind the run, once", async
   const askSplit = createSplitCall({
     basics: b,
     keeper: { run: f => f() },
-    provenance: createProvenance({
-      basics: b,
-      presence: newPresenceDoc(),
-      records: { writeValues: async w => applyWrites(b, w) },
-    }),
+    placesWriter: placesFor(b).placesWriter,
   })
   expect(await askSplit(LANE)).toEqual({
     text: SPLIT_QUEUED,
@@ -87,11 +81,7 @@ test("a split asked as its run is stopped is popped by the run's end", async () 
   const askSplit = createSplitCall({
     basics: b,
     keeper,
-    provenance: createProvenance({
-      basics: b,
-      presence: newPresenceDoc(),
-      records: { writeValues: async w => applyWrites(b, w) },
-    }),
+    placesWriter: placesFor(b).placesWriter,
   })
   // The tool's call queues its step; a Stop ends the run before it runs,
   // and the run's end queues the lane's drain (`settle.ts`).

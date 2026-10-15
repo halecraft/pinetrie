@@ -19,7 +19,6 @@ import {
   setRecord,
   WORKFLOW,
 } from "@pinetrie/rules"
-import { newPresenceDoc } from "@pinetrie/schema"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import type { HostKey } from "../basics.ts"
@@ -27,17 +26,17 @@ import {
   applyWrites,
   basics,
   NO_BLANK_CARDS,
+  placesFor,
   placeTask,
   putTask,
   putValue,
   ROOT_ID,
   record,
+  seedPlaces,
   TASK_ID,
   threadRow,
   writeDirectory,
 } from "../fakes.ts"
-import { applyPlaceSteps } from "../places.ts"
-import { createProvenance } from "../provenance.ts"
 import type { Destination, OfferActs } from "../work/destination.ts"
 import { type CommandDeps, createCommands, placeOfCommand } from "./index.ts"
 
@@ -119,11 +118,7 @@ function setUp(
       gestureOf: async () => write => write(),
     }).port,
     // Its own writes, so a test counting the agent's sees only the command's.
-    provenance: createProvenance({
-      basics: b,
-      presence: newPresenceDoc(),
-      records: { writeValues: async w => applyWrites(b, w) },
-    }),
+    ...placesFor(b, { texts: cards.port }),
     titles: titles.port,
     keeper,
   })
@@ -251,7 +246,7 @@ test("the command's id is the send's id", async () => {
 test("a chat command spends its card once written, record then text, answering with its rev; a refused one leaves it", async () => {
   const { b, cards, commands, replies, sender, chat } = setUp()
   for (const id of [cardIdFor("cc1"), cardIdFor("cc2")])
-    applyPlaceSteps(b.places, [
+    seedPlaces(b.places, [
       {
         kind: "write",
         record: {
@@ -314,7 +309,7 @@ test("nothing runs in a thread in an inventory", async () => {
   const { b, pi, commands, replies, sender, chat } = setUp()
   const taken = readPlaces(b.places).find(c => c.id === THREAD)
   if (taken?.kind !== "thread") throw new Error("no thread card")
-  applyPlaceSteps(b.places, [
+  seedPlaces(b.places, [
     {
       kind: "write",
       record: { ...taken, place: { kind: "inventory", holder: ALICE } },
@@ -395,7 +390,7 @@ test("nothing runs on a lane of another kind than the project's; a held one is r
   })
   const taken = readPlaces(b.places).find(c => c.id === THREAD)
   if (taken?.kind !== "thread") throw new Error("no thread card")
-  applyPlaceSteps(b.places, [
+  seedPlaces(b.places, [
     {
       kind: "write",
       record: { ...taken, place: { kind: "inventory", holder: ALICE } },

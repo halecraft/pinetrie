@@ -4,12 +4,12 @@
 //
 // Each runs inside one step of the documents' keeper, as every command does, so
 // it is ordered with a queued card's pop and with every other move: gather the places,
-// plan purely, then write through `applyPlaceSteps`. Nothing else writes the
-// places while a step awaits a stack loading, or an undo's write landing.
-// Every answer that wrote the places document, or refused a move, carries
-// its `rev`: a client draws its move until its copy reaches it. Each write
-// that moves a card records the cards' history and traces in the same step
-// (`carry`, and `undoMove` around Kyneta's revert).
+// plan purely, then write in one change under the sender's cause
+// (`Places.change`), whose close records the cards' history and traces and
+// destroys the texts of the cards it removed. Nothing else writes the places
+// while a step awaits a stack loading, or an undo's write landing. Every
+// answer that wrote the places document, or refused a move, carries its
+// `rev`: a client draws its move until its copy reaches it.
 
 import {
   type CardCommand,
@@ -99,7 +99,7 @@ import {
 import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { MoveHistories } from "../move-history.ts"
-import { applyPlaceSteps, type Gesture, raiseRev } from "../places.ts"
+import type { Gesture, OpenChange, Places } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
 import type { Records } from "../records.ts"
 import { tasksNow } from "../tasks.ts"
@@ -134,8 +134,10 @@ export interface CardCommandDeps {
     MoveHistories,
     "gestureOf" | "step" | "top" | "unloadTask"
   >
-  /** Each card's history, and traces. */
-  readonly provenance: Pick<Provenance, "before" | "after" | "seen">
+  /** The writer of the places: every move is a change, under its cause. */
+  readonly placesWriter: Places
+  /** The traces a person has seen. */
+  readonly provenance: Pick<Provenance, "seen">
   /** A queue's hold, written with a card queued. */
   readonly records: Pick<Records, "writeValues">
   /** Name every recorded thread that has none: a copy is named as it is made. */
@@ -176,26 +178,21 @@ export function createCardCommands(deps: CardCommandDeps) {
     )
 
   /**
-   * Carry out steps, as one step of a history of moves when `gesture` is given:
-   * writes, and removals whose texts then go (record first), the cards' history
-   * and traces `cause` calls for (none for a command, which moves no card), and
-   * the drains. A refusal says where the card is now and who put it there.
+   * Carry out steps as one change under `cause`, as one step of a history of
+   * moves when `gesture` is given; then the drains. A refusal says where the
+   * card is now and who put it there.
    */
   async function carry(
     step: MovesStep | MoveStep | ReorderStep,
     drain: readonly ThreadId[],
-    cause: Cause | null,
+    cause: Cause,
     gesture?: Gesture,
   ): Promise<Settled> {
     if (step.kind === "refused") return unmoved(step)
     const steps = step.kind === "steps" ? step.steps : [step]
-    const before = cause === null ? null : deps.provenance.before()
-    const rev = applyPlaceSteps(places, steps, gesture)
-    for (const s of steps)
-      if (s.kind === "remove" && isTextCardId(s.id))
-        await deps.cards.destroy(s.id)
-    if (cause !== null && before !== null)
-      await deps.provenance.after(cause, before)
+    const rev = await deps.placesWriter.change(cause, open =>
+      open.apply(steps, gesture),
+    )
     for (const lane of drain) deps.drain(lane)
     return settled({ kind: "moved" }, rev)
   }
@@ -262,7 +259,11 @@ export function createCardCommands(deps: CardCommandDeps) {
    * still in either, its document, and the task's stacks of moves, which
    * the startup sweep retires.
    */
-  async function deleteRoot(root: RootId, thread: ThreadId): Promise<void> {
+  async function deleteRoot(
+    open: OpenChange,
+    root: RootId,
+    thread: ThreadId,
+  ): Promise<void> {
     const cards = readPlaces(places)
     // Read after the undo wrote: the command's gathered index is older.
     const tasks = tasksNow(deps.basics)
@@ -270,14 +271,8 @@ export function createCardCommands(deps: CardCommandDeps) {
     if (task === undefined) return
     const plan = planRootDelete(root, thread, task, cards, tasks.rootOfThread)
     await deps.records.writeValues(plan.values)
-    if (plan.cards.length > 0) {
-      applyPlaceSteps(places, plan.cards)
-      // Each record first, then its text.
-      const gone = plan.cards.flatMap(s =>
-        s.kind === "remove" && isTextCardId(s.id) ? [s.id] : [],
-      )
-      for (const id of gone) await deps.cards.destroy(id)
-    }
+    // The cards' texts go as the undo's change closes, after their records.
+    open.apply(plan.cards)
     await docs.destroy(root)
     await deps.histories.unloadTask(plan.histories)
   }
@@ -486,23 +481,35 @@ export function createCardCommands(deps: CardCommandDeps) {
       }
       const lift = direction === "undo" ? await liftOf(touched, tasks) : NO_LIFT
       if (lift.kind === "replied") return notLifted(lift.by)
-      // execute
-      const before = deps.provenance.before()
-      const result = await deps.histories.step(writer, scope, direction)
-      const answer = undoAnswer(result, readPlaces(places), PLACES_DOC_ID)
-      switch (answer.kind) {
-        case "nothing":
-          return settled({ kind: "nothing" })
-        case "refused":
-          return unmoved(answer)
-        case "undone": {
-          for (const { root, thread } of lift.delete)
-            await deleteRoot(root, thread)
-          const rev = raiseRev(places)
-          await deps.provenance.after({ kind: direction, by: writer }, before)
-          return settled({ kind: "undone", cards: answer.cards }, rev)
-        }
-      }
+      // execute: Kyneta writes the revert, in one change with the threads
+      // it lifts
+      return deps.placesWriter.change(
+        { kind: direction, by: writer },
+        async open => {
+          const reverted = await open.revert(touched, () =>
+            deps.histories.step(writer, scope, direction),
+          )
+          const answer = undoAnswer(
+            reverted.result,
+            readPlaces(places),
+            PLACES_DOC_ID,
+          )
+          switch (answer.kind) {
+            case "nothing":
+              return settled({ kind: "nothing" })
+            case "refused":
+              return unmoved(answer)
+            case "undone": {
+              for (const { root, thread } of lift.delete)
+                await deleteRoot(open, root, thread)
+              return settled(
+                { kind: "undone", cards: answer.cards },
+                places.rev(),
+              )
+            }
+          }
+        },
+      )
     },
 
     /**
@@ -593,15 +600,17 @@ export function createCardCommands(deps: CardCommandDeps) {
         await deps.records.writeValues(plan.open.records.map(unwritten))
         return settled(sent)
       }
-      await carry({ kind: "steps", steps: plan.open.steps }, [], null)
-      await deps.ensureNames()
-      const moved = await carry(
-        plan.step,
-        [],
+      // The thread's card outside the history, the card's move to the trash
+      // in it: one change, its sender's.
+      const rev = await deps.placesWriter.change(
         { kind: "move", by: writer },
-        gesture,
+        async open => {
+          open.apply(plan.open.steps)
+          await deps.ensureNames()
+          return open.apply([plan.step], gesture)
+        },
       )
-      return settled(sent, moved.rev)
+      return settled(sent, rev)
     },
 
     /**
@@ -785,8 +794,15 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /** Set a card's command, or clear it. */
-    setCommand(card: CardId, command: CardCommand | null): Promise<Settled> {
-      return carry(planSetCommand(readPlaces(places), card, command), [], null)
+    setCommand(
+      writer: WriterId,
+      card: CardId,
+      command: CardCommand | null,
+    ): Promise<Settled> {
+      return carry(planSetCommand(readPlaces(places), card, command), [], {
+        kind: "move",
+        by: writer,
+      })
     },
 
     /** A sent card's record goes, then its text. Its `rev` after. */

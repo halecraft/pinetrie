@@ -27,6 +27,7 @@ import {
 import { failed, type HostKeeper } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
+import type { Places } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
 import type { Records } from "../records.ts"
 import { tasksNow } from "../tasks.ts"
@@ -74,6 +75,8 @@ export interface CommandDeps {
   readonly titles: ChatDeps["titles"] & Pick<Titles, "asked">
   readonly drain: CardCommandDeps["drain"]
   readonly histories: CardCommandDeps["histories"]
+  /** The writer of the places. */
+  readonly placesWriter: Places
   readonly provenance: CardCommandDeps["provenance"] &
     Pick<Provenance, "onTaken">
   /** The documents' keeper: a `documents` command is one step on it. */
@@ -285,7 +288,7 @@ export function createCommands(deps: CommandDeps): Commands {
           tasks,
         )
       case "set-command":
-        return cardCommands.setCommand(intent.card, intent.command)
+        return cardCommands.setCommand(writer, intent.card, intent.command)
       case "traces-seen":
         return cardCommands.tracesSeen(writer, intent.traces)
       case "name":

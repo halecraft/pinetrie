@@ -82,7 +82,7 @@ own runtime made, and only the host writes `places`. Probed:
 - `MoveHistory`, `HistoryStep`, the reverse handoffs and `planUndo` are gone
   from the page; Kyneta's stack is tested on every substrate.
 - `rev` is raised in a batch of its own after every write to `places`
-  (`applyPlaceSteps`).
+  (`apps/pinetrie/host/places.ts`).
 - A keep that closed a new tab cannot be undone: once it closes you are on
   another tab, and that root's history is out of reach. The cards are in
   your inventory, a take away.

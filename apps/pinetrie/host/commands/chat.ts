@@ -61,7 +61,7 @@ import {
 import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { Names } from "../names.ts"
-import { applyPlaceSteps } from "../places.ts"
+import type { Places } from "../places.ts"
 import type { Records } from "../records.ts"
 import { type Relays, readReachableAgents } from "../relays.ts"
 import { type Runs, startRun } from "../runs.ts"
@@ -87,6 +87,8 @@ export interface ChatDeps {
   readonly titles: Pick<Titles, "laneStarted">
   /** A thread's record, written with its first message. */
   readonly records: Pick<Records, "writeValues">
+  /** The writer of the places: a thread's card is its sender's change. */
+  readonly placesWriter: Places
   /** Every thread is named once recorded. */
   readonly names: Pick<Names, "ensure">
   /** A chat that asks or invites other threads' agents is relayed. */
@@ -415,7 +417,9 @@ export async function executeChat(
   const { start } = context
   if (start !== null) {
     await deps.records.writeValues(start.records)
-    applyPlaceSteps(deps.basics.places, start.steps)
+    await deps.placesWriter.change({ kind: "move", by: writer }, open =>
+      open.apply(start.steps),
+    )
     // A conversation's thread is named once its record is; a new lane's is
     // named as its lane is made, which draws its banner.
     if (planned.kind === "appendToTree") void deps.names.ensure()

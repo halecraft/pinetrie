@@ -60,7 +60,6 @@ import {
   planAnswer,
   planAskCard,
   planDelivery,
-  planFactCard,
   planRelay,
   type RelayRefusal,
   reachableAgents,
@@ -75,8 +74,9 @@ import {
 import { readEntryMessage, readLaneTip } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "./basics.ts"
 import type { Budgets } from "./budgets.ts"
+import { queueFact as queueFactIn } from "./facts.ts"
 import { requestOutside } from "./outside.ts"
-import { applyPlaceSteps } from "./places.ts"
+import type { Places } from "./places.ts"
 import type { Runs } from "./runs.ts"
 import { tasksNow } from "./tasks.ts"
 import type { LaneWork } from "./work/index.ts"
@@ -138,6 +138,8 @@ export function createRelays(deps: {
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
   /** Ask for a lane's drain. */
   readonly drain: (lane: ThreadId) => void
+  /** The writer of the places: an ask's card and a fact are the host's changes. */
+  readonly placesWriter: Places
 }): Relays {
   const { basics, budgets } = deps
   const { docs, session, places, live } = basics
@@ -274,7 +276,10 @@ export function createRelays(deps: {
       lane: to,
       relay: planned.relay,
     })
-    if (card !== null) applyPlaceSteps(places, [card])
+    if (card !== null)
+      await deps.placesWriter.change({ kind: "host" }, open =>
+        open.apply([card]),
+      )
     deps.drain(to)
     return {
       kind: "queued",
@@ -283,15 +288,7 @@ export function createRelays(deps: {
   }
 
   /** A fact for `thread`, queued as every fact is, and its drain asked for. */
-  function queueFact(fact: QueuedFact): void {
-    const steps = planFactCard({
-      cards: readPlaces(places),
-      id: cardIdOfKind("fact", basics.newId()),
-      fact,
-    })
-    if (steps !== null) applyPlaceSteps(places, steps)
-    deps.drain(fact.lane)
-  }
+  const queueFact = (fact: QueuedFact): Promise<void> => queueFactIn(deps, fact)
 
   /** The thread named `name`, anywhere in the session, or null. */
   const findAgent = (name: string) => {
@@ -360,7 +357,7 @@ export function createRelays(deps: {
       if (there === null) return said(refusal({ kind: "unknown", name }), true)
       if (!threadMembers(there.index, there.end).includes(lane))
         return said(`You are not a member of ${left.name}.`, true)
-      queueFact({
+      await queueFact({
         kind: "left",
         lane: left.thread,
         member: lane,
@@ -425,7 +422,7 @@ export function createRelays(deps: {
     plan: AnswerPlan,
   ): Promise<void> {
     if (plan.kind === "undelivered") {
-      queueFact({
+      await queueFact({
         kind: "undelivered",
         lane,
         to: relay.from,
@@ -436,7 +433,7 @@ export function createRelays(deps: {
       return
     }
     if (plan.kind === "unanswered") {
-      queueFact({
+      await queueFact({
         kind: "unanswered",
         lane: relay.from,
         member: lane,
@@ -580,7 +577,7 @@ export function createRelays(deps: {
       settle: async reply => {
         const next = roundReplyOf(reply, members)
         if (next.kind === "people")
-          queueFact({
+          await queueFact({
             kind: "round",
             lane: relay.from,
             line: next.line,

@@ -36,7 +36,6 @@ import {
   displayName,
   planAccessAnswer,
   planCarryOn,
-  planFactCard,
   planQueueHold,
   planStop,
   QUEUE_HOLD,
@@ -45,8 +44,8 @@ import {
 import type { RootDocHandle } from "@pinetrie/schema"
 import { type Basics, failed, type HostKeeper } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
-import { applyPlaceSteps } from "../places.ts"
-import type { Provenance } from "../provenance.ts"
+import { queueFact } from "../facts.ts"
+import type { Places } from "../places.ts"
 import type { Records } from "../records.ts"
 import { type Runs, startRun } from "../runs.ts"
 import type { LaneWork } from "../work/index.ts"
@@ -63,8 +62,8 @@ export interface LaneDeps {
   readonly drain: (lane: ThreadId) => void
   /** The documents' keeper: a fact's card is written in a step of its own. */
   readonly keeper: Pick<HostKeeper, "run">
-  /** Each card's history: a fact's card is the host's write. */
-  readonly provenance: Pick<Provenance, "before" | "after">
+  /** The writer of the places: a fact's card is the host's change. */
+  readonly placesWriter: Places
   /** Which queued cards are blank: they leave a lane idle. */
   readonly cards: Pick<CardPort, "blankQueued">
 }
@@ -114,7 +113,7 @@ async function laneAt(
 export async function handleStop(
   deps: Pick<
     LaneDeps,
-    "basics" | "cards" | "agent" | "records" | "cancel" | "provenance"
+    "basics" | "cards" | "agent" | "records" | "cancel" | "placesWriter"
   >,
   lane: ThreadId,
   by: WriterId,
@@ -141,11 +140,10 @@ export async function handleStop(
   if (planned.kind === "abort") {
     if (planned.hold !== null)
       await deps.records.writeValues([setRecord(QUEUE_HOLD, planned.hold)])
-    if (planned.fact.length > 0) {
-      const before = deps.provenance.before()
-      applyPlaceSteps(places, planned.fact)
-      await deps.provenance.after({ kind: "host" }, before)
-    }
+    if (planned.fact.length > 0)
+      await deps.placesWriter.change({ kind: "host" }, open =>
+        open.apply(planned.fact),
+      )
     if (!deps.cancel(lane)) await agent.lane(lane).abort()
   }
   // A run this thread asked for in another thread stops with it.
@@ -270,29 +268,15 @@ export async function actOnOffer(
 /**
  * What a command on an offer did, queued as a card on its thread and the lane's
  * drain asked for: an idle lane pops it at once, a running one when its run
- * ends, in order with the cards already waiting. One step: the card is written
- * against the places as they are, with its history.
+ * ends, in order with the cards already waiting. A lane no root holds gets
+ * none.
  */
 export async function recordFact(
-  deps: Pick<LaneDeps, "basics" | "drain" | "provenance">,
+  deps: Pick<LaneDeps, "basics" | "drain" | "placesWriter">,
   fact: OfferFact,
 ): Promise<void> {
-  const { docs, places, newId, log } = deps.basics
-  if (docs.rootOfLane(fact.lane) === null) return
-  const before = deps.provenance.before()
-  const steps = planFactCard({
-    cards: readPlaces(places),
-    id: cardIdOfKind("fact", newId()),
-    fact,
-  })
-  // The host's own make is refused by no queue: should one be, it is said.
-  if (steps === null) {
-    log(`[host] a fact on ${fact.lane} was not queued: its card was refused`)
-    return
-  }
-  applyPlaceSteps(places, steps)
-  await deps.provenance.after({ kind: "host" }, before)
-  deps.drain(fact.lane)
+  if (deps.basics.docs.rootOfLane(fact.lane) === null) return
+  await queueFact(deps, fact)
 }
 
 /** Why an offer action was refused, worded once. */

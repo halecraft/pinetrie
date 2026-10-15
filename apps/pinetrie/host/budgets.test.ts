@@ -1,7 +1,14 @@
 import { entryId, THE_AGENT, threadIdFor, writerId } from "@pinetrie/core"
-import { encodeAnswer, encodeChat, encodeRelayMessage } from "@pinetrie/rules"
+import { readCardHistories, readPlaces } from "@pinetrie/reads"
+import {
+  encodeAnswer,
+  encodeChat,
+  encodeRelayMessage,
+  newBudget,
+} from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
-import { promptBudget } from "./budgets.ts"
+import { createBudgets, promptBudget } from "./budgets.ts"
+import { applyWrites, basics, placesFor } from "./fakes.ts"
 
 const ada = writerId("ada@example.com")
 const here = threadIdFor("here")
@@ -70,4 +77,34 @@ describe("the budget a run spends is read from its prompt", () => {
       by: ada,
     })
   })
+})
+
+test("a budget gone over queues its fact, with its making in its history", async () => {
+  const b = basics()
+  applyWrites(b, [
+    newBudget({ message: budget, thread: here, by: ada, limit: 10 }),
+  ])
+  const drained: string[] = []
+  const budgets = createBudgets({
+    basics: b,
+    keeper: { run: step => step() },
+    records: { writeValues: async w => applyWrites(b, w) },
+    placesWriter: placesFor(b).placesWriter,
+    limit: 10,
+    drain: lane => void drained.push(lane),
+  })
+  budgets.spendFrom(budget, 20)
+  await new Promise(r => setTimeout(r, 0))
+  const [fact] = readPlaces(b.places)
+  expect(fact).toMatchObject({
+    kind: "fact",
+    place: { kind: "queued", thread: here },
+    content: { fact: { kind: "budget-spent", budget, limit: 10 } },
+  })
+  expect(
+    fact === undefined
+      ? undefined
+      : readCardHistories(b.session).get(fact.id)?.events,
+  ).toMatchObject([{ kind: "created", by: null }])
+  expect(drained).toEqual([here])
 })

@@ -32,15 +32,15 @@ import {
   mayRequest,
   NONE_BLANK,
   newBudget,
-  planFactCard,
   planSpend,
   planStop,
   promptAuthor,
   type RequestTokens,
   setRecord,
 } from "@pinetrie/rules"
-import type { Basics, HostKeeper } from "./basics.ts"
-import { applyPlaceSteps } from "./places.ts"
+import { type Basics, failed, type HostKeeper } from "./basics.ts"
+import { queueFact } from "./facts.ts"
+import type { Places } from "./places.ts"
 import type { Records } from "./records.ts"
 
 /** The budget a run's prompt names, and whether the run spends from it. */
@@ -101,6 +101,8 @@ export function createBudgets(deps: {
   >
   readonly keeper: Pick<HostKeeper, "run">
   readonly records: Pick<Records, "writeValues">
+  /** The writer of the places: a budget's facts are the host's changes. */
+  readonly placesWriter: Places
   /** The settled `agents.budget`. */
   readonly limit: number
   /** Ask for a lane's drain: a fact queued on an idle lane is appended so. */
@@ -141,19 +143,13 @@ export function createBudgets(deps: {
     void deps.keeper
       .run(async () => {
         await deps.records.writeValues([setRecord(BUDGET, over)])
-        const fact = planFactCard({
-          cards: readPlaces(places),
-          id: cardIdOfKind("fact", deps.basics.newId()),
-          fact: {
-            kind: "budget-spent",
-            lane: over.thread,
-            budget: over.message,
-            limit: over.limit,
-            by: over.by,
-          },
+        await queueFact(deps, {
+          kind: "budget-spent",
+          lane: over.thread,
+          budget: over.message,
+          limit: over.limit,
+          by: over.by,
         })
-        if (fact !== null) applyPlaceSteps(places, fact)
-        deps.drain(over.thread)
       })
       .catch(error =>
         deps.basics.log(`[host] a spent budget was not recorded: ${error}`),
@@ -188,8 +184,12 @@ export function createBudgets(deps: {
       id: cardIdOfKind("fact", deps.basics.newId()),
       budget: over.message,
     })
+    // Synchronous, outside any keeper step: the change's body writes before
+    // this returns, and only its close is left to settle.
     if (planned.kind === "abort" && planned.fact.length > 0)
-      applyPlaceSteps(places, planned.fact)
+      deps.placesWriter
+        .change({ kind: "host" }, open => open.apply(planned.fact))
+        .catch(failed(deps.basics, "a spent budget's stop", lane))
   }
 
   function spend(budget: RunBudget, tokens: number) {

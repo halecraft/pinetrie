@@ -31,6 +31,7 @@ import { writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   basics,
+  placesFor,
   putValue,
   ROOT_ID,
   RUNS_ANY,
@@ -93,10 +94,10 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
     stored: async () => [],
     destroyDocs: async () => {},
   }).port,
-  provenance: {
-    before: () => ({ cards: [], ends: new Map() }),
-    sweep: async () => {},
-  },
+  // A writer over documents of its own: a test that sweeps cards gives one
+  // over its own.
+  placesWriter: placesFor(basics()).placesWriter,
+  provenance: { sweep: async () => {} },
   ...over,
 })
 
@@ -332,11 +333,19 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
     ],
     destroyDocs: async () => {},
   })
-  await recover(deps({ basics: b, ...ports(agent), cards: cards.port }))
+  const destroyed: string[] = []
+  const { placesWriter } = placesFor(b, {
+    texts: { destroy: async id => void destroyed.push(id) },
+  })
+  await recover(
+    deps({ basics: b, ...ports(agent), cards: cards.port, placesWriter }),
+  )
   expect(readPlaces(placesDoc).map(c => c.id)).toEqual([cardIdFor("c100")])
   expect(readPlacesRev(placesDoc)).toBe(1)
+  // The swept card's text goes with its record's change; the document no
+  // record names, after it.
+  expect(destroyed).toEqual([cardIdFor("c101")])
   expect(cards.calls.find(c => c.method === "destroyDocs")?.args[0]).toEqual([
-    `card:${cardIdFor("c101")}`,
     `card:${cardIdFor("c103")}`,
   ])
   // Both stale seats in one write, each by its peer.

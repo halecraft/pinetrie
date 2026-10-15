@@ -20,9 +20,8 @@ import { ROOT, setRecord } from "@pinetrie/rules"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
-import { basics, putValue } from "./fakes.ts"
+import { basics, putValue, seedPlaces } from "./fakes.ts"
 import { compactAfter, planCompaction, sweepBlobs } from "./housekeeping.ts"
-import { applyPlaceSteps } from "./places.ts"
 
 // A 1×1 PNG: what the store keeps is only its bytes, type and size.
 const ADA = writerId("ada@x.io")
@@ -106,7 +105,7 @@ test("the blob sweep keeps a reference's quote, and deletes one no card holds", 
   const kept = blobs.put(storedText("| a |"))
   const dropped = blobs.put(storedText("nobody quotes this"))
   const card = cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1")
-  applyPlaceSteps(b.places, [
+  seedPlaces(b.places, [
     {
       kind: "write",
       record: makeCard(

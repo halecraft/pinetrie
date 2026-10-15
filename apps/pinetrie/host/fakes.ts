@@ -57,7 +57,9 @@ import {
   type LiveDocHandle,
   newLiveDoc,
   newPlacesDoc,
+  newPresenceDoc,
   type PlacesDocHandle,
+  type PresenceDocHandle,
   type RecordsDocHandle,
   type RootDocHandle,
   type SessionDocHandle,
@@ -69,8 +71,20 @@ import {
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
 import type { Basics } from "./basics.ts"
+import type { CardPort } from "./cards.ts"
 import type { HostDocuments } from "./docs.ts"
-import { applyPlaceSteps } from "./places.ts"
+import {
+  createPlaces,
+  type Gesture,
+  type OpenChange,
+  type Places,
+} from "./places.ts"
+import {
+  createProvenance,
+  type Provenance,
+  type ProvenanceHooks,
+} from "./provenance.ts"
+import type { Records } from "./records.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export interface Call {
@@ -371,7 +385,7 @@ export function putNoteColumn(
   column: NoteColumnId,
   task: TaskId = TASK_ID,
 ): void {
-  applyPlaceSteps(b.places, [
+  seedPlaces(b.places, [
     {
       kind: "write",
       record: {
@@ -444,7 +458,7 @@ export function placeTask(
   at = 1,
 ): void {
   const steps = taskCardStep(readPlaces(b.places), task, state, by)
-  if (steps.length > 0) applyPlaceSteps(b.places, steps)
+  if (steps.length > 0) seedPlaces(b.places, steps)
   putValue(
     b,
     setRecord(CARD_HISTORY, {
@@ -488,7 +502,7 @@ export function putTask(
   })
   if (opened.kind !== "open") return
   applyWrites(b, opened.records)
-  applyPlaceSteps(b.places, [...made, ...opened.steps])
+  seedPlaces(b.places, [...made, ...opened.steps])
 }
 
 /**
@@ -528,3 +542,71 @@ export function clearedSend(send: Send): Cleared<Send> {
     throw new Error(`a test's send was not cleared: ${plan.kind}`)
   return plan.command
 }
+
+/** Hooks that read no records and record nothing: a test's setup. */
+const NO_HOOKS: ProvenanceHooks = {
+  gather: () => ({ histories: new Map(), traces: [], reading: [] }),
+  write: async () => {},
+  changed: () => {},
+  taken: async () => {},
+}
+
+/**
+ * Write `steps` as a test's setup does: through the real writer, at once
+ * (a change's body runs synchronously), recording no history and destroying
+ * no text.
+ */
+export function seedPlaces(
+  places: PlacesDocHandle,
+  steps: readonly PlaceStep[],
+  gesture?: Gesture,
+): void {
+  void createPlaces({
+    basics: {
+      places,
+      session: newSessionDoc(),
+      docs: { view: () => null },
+      now: () => 0,
+      newId: () => "seed",
+      log: () => {},
+    },
+    provenance: NO_HOOKS,
+    texts: { destroy: async () => {} },
+  }).change({ kind: "host" }, open => open.apply(steps, gesture))
+}
+
+/**
+ * The real writer of the places over `b`, with its provenance: records
+ * written into `b`'s documents unless `records` is given, presence empty
+ * unless given, and texts destroyed by `texts` (none, by default).
+ */
+export function placesFor(
+  b: FakeBasics,
+  input: {
+    readonly presence?: PresenceDocHandle
+    readonly records?: Pick<Records, "writeValues">
+    readonly texts?: Pick<CardPort, "destroy">
+  } = {},
+): { readonly placesWriter: Places; readonly provenance: Provenance } {
+  const { provenance, hooks } = createProvenance({
+    basics: b,
+    presence: input.presence ?? newPresenceDoc(),
+    records: input.records ?? { writeValues: async w => applyWrites(b, w) },
+  })
+  const placesWriter = createPlaces({
+    basics: b,
+    provenance: hooks,
+    texts: input.texts ?? { destroy: async () => {} },
+  })
+  return { placesWriter, provenance }
+}
+
+/** An open change's `apply` that writes as `seedPlaces` does: a test's pop. */
+export const seedChange = (
+  places: PlacesDocHandle,
+): Pick<OpenChange, "apply"> => ({
+  apply: (steps, gesture) => {
+    seedPlaces(places, steps, gesture)
+    return places.rev()
+  },
+})

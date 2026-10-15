@@ -67,7 +67,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a spent budget tells its thread nothing",
     file: "apps/pinetrie/host/budgets.ts",
-    from: "        if (fact !== null) applyPlaceSteps(places, fact)\n",
+    from: '        await queueFact(deps, {\n          kind: "budget-spent",\n          lane: over.thread,\n          budget: over.message,\n          limit: over.limit,\n          by: over.by,\n        })\n',
     to: "",
     suite: "host",
     scenario: "agents",
@@ -232,8 +232,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host reads no presence for traces",
     file: "apps/pinetrie/host/provenance.ts",
-    from: "        reading: readReading(deps.presence),",
-    to: "        reading: [],",
+    from: "      reading: readReading(deps.presence),",
+    to: "      reading: [],",
     suite: "host",
     scenario: "cards",
     expect:
@@ -514,8 +514,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup does not compact",
     file: "apps/pinetrie/host/index.ts",
-    from: "    settle,\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n",
-    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n",
+    from: "    settle,\n    cards: cardPort,\n    placesWriter,\n    provenance,\n    ensureNames: names.ensure,\n",
+    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    placesWriter,\n    provenance,\n    ensureNames: names.ensure,\n",
     suite: "host",
     scenario: "tools",
     expect: "a starting host compacts the session it opened",
@@ -2532,7 +2532,7 @@ export const mutations: readonly Mutation[] = [
     name: "a closed new tab's task leaves outside the close's step",
     file: "apps/pinetrie/host/commands/cards.ts",
     from: '    return carry(step, planned.drain, { kind: "move", by: writer }, gesture)\n',
-    to: '    const out = await carry(planned.step, planned.drain, { kind: "move", by: writer }, gesture)\n    if (step.kind === "steps" && planned.step.kind === "steps")\n      applyPlaceSteps(places, step.steps.slice(planned.step.steps.length))\n    return out\n',
+    to: '    const out = await carry(planned.step, planned.drain, { kind: "move", by: writer }, gesture)\n    if (step.kind === "steps" && planned.step.kind === "steps")\n      await deps.placesWriter.change({ kind: "move", by: writer }, open =>\n        open.apply(step.steps.slice(planned.step.steps.length)),\n      )\n    return out\n',
     suite: "host",
     scenario: "board",
     expect:

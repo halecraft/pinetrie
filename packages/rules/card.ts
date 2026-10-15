@@ -367,7 +367,8 @@ export function yourCard(
  * What a starting host deletes: text cards whose text is empty and that
  * carry no command, and stored `card:` documents with no record. Only a
  * text card's words are a document (`KINDS`' `text`), so no other kind is
- * swept for its lack of one.
+ * swept for its lack of one. A swept card's own document is not among
+ * `docs`: the change that removes its record destroys it.
  */
 export function planCardSweep(input: {
   readonly cards: readonly CardRecord[]
@@ -383,12 +384,10 @@ export function planCardSweep(input: {
       c => c.content.command === null && (input.texts.get(c.id) ?? "") === "",
     )
     .map(c => c.id)
-  const live = new Set<string>(
-    input.cards.map(c => c.id).filter(id => !records.some(r => r === id)),
-  )
+  const held = new Set<string>(input.cards.map(c => c.id))
   const docs = input.stored.filter(docId => {
     const id = input.cardOfDoc(docId)
-    return id !== undefined && !live.has(id)
+    return id !== undefined && !held.has(id)
   })
   return { records, docs }
 }

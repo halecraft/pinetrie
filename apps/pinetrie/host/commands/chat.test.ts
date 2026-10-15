@@ -7,6 +7,7 @@ import {
   type ProjectRecord,
   parseMentions,
   ROOT,
+  ROOT_ORIGIN,
   runId,
   type Send,
   type SentCard,
@@ -29,6 +30,7 @@ import {
   type ChatMessage,
   PARTICIPANT,
   PROJECT,
+  planThreadOpen,
   setRecord,
   THREAD,
   WORKFLOW,
@@ -40,6 +42,7 @@ import {
   clearedSend,
   methods,
   NO_BLANK_CARDS,
+  placesFor,
   putLane,
   putTask,
   putValue,
@@ -51,6 +54,7 @@ import {
   threadRow,
   writeDirectory,
 } from "../fakes.ts"
+import type { PlacesChange } from "../provenance.ts"
 import { type ChatDeps, executeChat, sendChat, spendsCard } from "./chat.ts"
 
 /** A new tab's task: in no store yet. */
@@ -72,6 +76,7 @@ type FakePi = ChatDeps["agent"] & ChatDeps["scribe"] & ChatDeps["piSetup"]
 
 function setUp(begin: ErrCode | null = null) {
   const b = basics()
+  const { placesWriter, provenance } = placesFor(b)
   const pi = record<FakePi>({
     createThreadLane: async () => ({ kind: "created", lane: LANE }),
   })
@@ -88,6 +93,7 @@ function setUp(begin: ErrCode | null = null) {
     relays: { relayChat: async () => {} },
     names: record<ChatDeps["names"]>({ ensure: async () => {} }).port,
     basics: b,
+    placesWriter,
     agent: pi.port,
     scribe: pi.port,
     piSetup: pi.port,
@@ -112,7 +118,7 @@ function setUp(begin: ErrCode | null = null) {
     start: null,
     quotes: [],
   }
-  return { b, pi, work, started, seen, titles, deps, context }
+  return { b, pi, work, started, seen, titles, deps, context, provenance }
 }
 
 describe("executeChat", () => {
@@ -162,6 +168,31 @@ describe("executeChat", () => {
       { ...context, pinned },
     )
     expect(seen).toEqual([pinned, pinned])
+  })
+
+  test("a thread its first send opens is its sender's change to the places", async () => {
+    const { b, deps, context, provenance } = setUp()
+    const heard: PlacesChange[] = []
+    provenance.onChanged(change => heard.push(change))
+    const opened = planThreadOpen({
+      thread: LANE,
+      origin: ROOT_ORIGIN,
+      root: ROOT_ID,
+      by: ALICE,
+      now: 0,
+      placement: { kind: "after", task: TASK_ID, parent: null },
+      opens: null,
+      cards: readPlaces(b.places),
+    })
+    if (opened.kind !== "open") throw new Error("the thread opens")
+    await executeChat(
+      deps,
+      { kind: "run", thread: LANE, details },
+      { ...context, start: opened },
+    )
+    expect(heard.map(h => [h.cause, h.after.map(c => c.id)])).toEqual([
+      [{ kind: "move", by: ALICE }, [LANE]],
+    ])
   })
 
   test("createAndRun from a base that cannot begin refuses, and never creates the lane", async () => {
@@ -238,6 +269,7 @@ describe("sendChat", () => {
     const deps: ChatDeps = {
       relays: { relayChat: async () => {} },
       basics: b,
+      placesWriter: placesFor(b).placesWriter,
       agent: pi.port,
       scribe: pi.port,
       piSetup: pi.port,

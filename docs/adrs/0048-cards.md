@@ -373,6 +373,16 @@ centred by default, and open while you work in them, since nothing pauses.
   the message). Each event says who moved the card, from where to where,
   and when; what the move was called is read from the two places. Typed in
   by is the card's writers, shown beside its history, with no events.
+  *Amended in place (step 6):* every change to the places is one change,
+  opened with its cause, and it records the cards it touched, never the
+  whole document. Every card has its history so, the ones the host makes
+  too (a fact, an ask, a budget's stop), and a thread's card placed by its
+  first send is its sender's change, as an opened or copied thread's is.
+  A change records the cards it touched alone because a change that waits
+  (a queued card's pop, across its send) would otherwise take in what
+  another change wrote meanwhile, under its own cause; and a write made
+  outside the documents' keeper (a budget's stop, from pi's gate before a
+  request) is one.
 - **Who contributed to a card is a projection of its history**: each edit,
   a deletion as much as typing, and each undo and redo, by its author. A
   person contributed while any edit of theirs still stands, so undoing every

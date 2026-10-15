@@ -777,8 +777,12 @@ whole undo of a move (S82).
 
 - **`planProvenance` is the one decision**, from the cards before and after
   a write, the cause, the records, the presence pairs (`reading`) and each
-  shared card's thread end before the write (`ends`). It diffs, so an undo,
-  whose revert Kyneta writes, is read like any other write.
+  shared card's thread end before the write (`ends`). It diffs card by
+  card, so an undo, whose revert Kyneta writes, is read like any other
+  write, and the host gives it only the cards one change touched
+  (`apps/pinetrie/host/places.ts`): what another change wrote meanwhile is
+  not this one's. Every change records it, the host's own too, so every
+  card the host makes (a fact, an ask, a split's card) has its `created`.
   - A card that appeared is `created`; one whose key changed gets `moved`,
     `undone`, `redone` or `unsent` (the host wrote a queued card back below
     the line with `unsent`); one that went has its history deleted. A reorder changes no key, and adds

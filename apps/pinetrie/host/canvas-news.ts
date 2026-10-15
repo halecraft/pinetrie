@@ -61,7 +61,7 @@ export function createCanvasNews(deps: {
         readRunningLanes(basics.session, basics.live).map(r => r.lane),
       )
       if (running.size === 0) return
-      const tasks = indexTasks(change.after, readThreads(basics.session))
+      const tasks = indexTasks(change.places, readThreads(basics.session))
       const steers = planCanvasFacts({
         before: change.before,
         after: change.after,

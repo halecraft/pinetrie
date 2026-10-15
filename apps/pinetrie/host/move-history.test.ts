@@ -17,8 +17,8 @@ import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
 import { PlacesDoc } from "@pinetrie/schema"
 import { expect, test } from "vitest"
+import { seedPlaces } from "./fakes.ts"
 import { createMoveHistories } from "./move-history.ts"
-import { applyPlaceSteps } from "./places.ts"
 
 const TEST_THREAD = threadIdFor("e")
 
@@ -52,7 +52,7 @@ async function setUp() {
   })
   /** The host's own write, outside any history. */
   const seed = (c: CardRecord) =>
-    applyPlaceSteps(places, [{ kind: "write", record: c }])
+    seedPlaces(places, [{ kind: "write", record: c }])
   /** `writer` moves `c` to `place`, as one step of their history in `root`. */
   const move = async (
     writer: typeof ADA,
@@ -60,7 +60,7 @@ async function setUp() {
     c: TextCard,
     place: TextCard["place"],
   ) =>
-    applyPlaceSteps(
+    seedPlaces(
       places,
       [{ kind: "write", record: { ...c, place, placer: writer } }],
       await histories.gestureOf(

@@ -19,8 +19,8 @@ export interface Basics {
   /** Every document, each root's among them (`docs.ts`). */
   readonly docs: HostDocuments
   /**
-   * Where every card is: what is queued for each lane. Written only through
-   * `applyPlaceSteps` (`places.ts`).
+   * Where every card is: what is queued for each lane. Written only in a
+   * change of the writer of the places (`places.ts`).
    */
   readonly places: PlacesDocHandle
   readonly log: (message: string) => void

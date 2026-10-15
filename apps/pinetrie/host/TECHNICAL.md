@@ -18,9 +18,10 @@ wires them.
 | `setup-record.ts` | `planSetupRecord`: the `pinetrie.setup` value, from the config's report and what the model setup loaded |
 | `index.ts` | `startHost`: the store and the check of its schemas (`migrations/`), the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents and the records, then pi's scribe and setup, lane work and the agent, in that order (§ Startup), then the wiring below |
 | `basics.ts` | `Basics` (the session, `pinetrie:live`, the documents, the places, log, ids, clock) and how a failure is logged (`failed`, which words the error with core's `errorText`) |
-| `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`). A removed card's record goes before its text, which its caller destroys after: a client destroys its copy of a text only once it has seen both go (S64) |
+| `places.ts` | the one writer of the places document (ADR-0059, ADR-0048 step 6): `Places.change(cause, body)`, one change under its cause, whose `OpenChange` writes steps in one batch (`apply`, in an undo step when given one) or carries Kyneta's revert (`revert`), each followed by `rev` in a batch of its own; and the change's close as a value (`planClose`), carried out by `executeClose`: the texts of the text cards it removed, after their records (a client destroys its copy of a text only once it has seen both go, S64), then the cards' history and traces, the listeners, and the runs a take stops |
 | `move-history.ts` | each person's history of moves per root (ADR-0066): `MoveHistories`, a shell over Kyneta's undo stacks |
-| `provenance.ts` | each card's history and the traces left where someone else moved your card (ADR-0048 step 6): `before` at a step's start, `after` its places write, `seen` and `sweep` |
+| `provenance.ts` | each card's history and the traces left where someone else moved your card (ADR-0048 step 6): the port (`seen`, `sweep`, `onChanged`, `onTaken`), and the hooks a change's close reads and calls, which only `createPlaces` takes |
+| `facts.ts` | `queueFact`: a fact of the host's queued as a card on its lane, in a change of the host's, then the lane's drain; a refused card is logged. The one way every module queues a fact |
 | `shutdown.ts` | the order a host stops in (`planShutdown`): the agent, then the scribe, among its steps |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`); a run asks base news what it is told first, and its lane's stop has base news forget what was steered |
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5, S92): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
@@ -334,9 +335,11 @@ interrupted lane resumed before anything waiting for it (S36 item 18), the
 project and commands records that changed in one write (`setIfChanged`),
 the sweep of what no one will type in again: empty cards, card documents
 with no record, and seat records no stored text names, all of them in one
-write (`sweepTexts`), then the histories of the cards it swept and traces
-older than 30 days (`provenance.sweep`, which each run's end's settle runs
-too), and last `settle` for the lanes with cards queued:
+write (`sweepTexts`: the cards in one change of the host's, which destroys
+their texts and deletes their histories, then the documents no record
+names), then traces older than 30 days and histories a crash left with no
+card (`provenance.sweep`, which each run's end's settle runs too), and last
+`settle` for the lanes with cards queued:
 its compaction is `later`, so it runs after every write above, and after
 any refresh they queued.
 
@@ -421,13 +424,15 @@ any refresh they queued.
   never a function that returns one:
   1. the documents, then the host's records (`createRecords`, ADR-0095),
      which every module that writes a record takes
-     (`Pick<Records, "writeValues">`), then the scribe;
+     (`Pick<Records, "writeValues">`), then the cards' texts, provenance and
+     the writer of the places (`createPlaces`), which every module that
+     writes a card takes (`placesWriter`), then the scribe;
   2. the project and its lanes' runtime (`findProject`, `work/runtime.ts`,
      before the store opens, so a refusal leaves nothing to close), then
      pi's setup (`loadPiSetup`), which loads from its root and reads no
      document; the title-model and banner logs follow it;
   3. the documents' keeper, the roots `planLoads` names, the directory,
-     banners, digests, titles, names, provenance and the split call, each
+     banners, digests, titles, names and the split call, each
      with the records and the setup;
   4. lane work, with them;
   5. the agent, last, with lane work's `access` and `hooks`, banners'
@@ -556,12 +561,13 @@ rejects `shutdown()`.
   asked thread of another kind, `RelayRefusal`'s `foreign`) and its answer
   (appended, not run, to an asker of another kind), and a crash's resume
   (`planStartup` leaves it interrupted, logged).
-- **A take stops the run in the step that made it**: `provenance.after`,
-  which every person's change to the places goes through, finds the threads
-  it took into an inventory (`takenIn`) and calls the dispatcher's
-  `onTaken`, which stops each running one with `handleStop`, as the taker:
-  the one stop planner, so a take's stop is a fact too. Provenance itself
-  writes no fact. A move, an undo or a redo take alike.
+- **A take stops the run in the step that made it**: the close of the
+  change, which every write to the places is, finds the threads a person's
+  change took into an inventory (`takenIn`, in `planClose`) and calls the
+  dispatcher's `onTaken`, which stops each running one with `handleStop`,
+  as the taker: the one stop planner, so a take's stop is a fact too. A
+  host's change takes nothing. Provenance itself writes no fact. A move, an
+  undo or a redo take alike.
 - **A copy** (`copyThread`, `commands/cards.ts`): `planCopy` over the
   source's record and tree; the copy's `THREAD` record first, then its card,
   then its name (`names.ensure`). Its first send is a branch at its fork:
@@ -599,9 +605,10 @@ rejects `shutdown()`.
   nothing. The dispatcher's `chat` case spends the card when the answer
   takes its text (`spendsCard`: `appended` or `started`): the record goes,
   then the text, and the reply carries the places' `rev`, its trace naming
-  the message the send wrote (found by the send's id). The drain destroys
-  a popped card's text itself, since the pop removed the record. The command's
-  text is what is sent: the text its sender saw.
+  the message the send wrote (found by the send's id). A popped card's
+  text goes as the pop's change closes, since the pop removed its record;
+  one written back keeps it. The command's text is what is sent: the text
+  its sender saw.
 - **A chat carries its sender's pinned versions** (`pinned`, each card
   pinned at the sender's thread end with its text version): `executeChat`
   passes them to `start` for a `run` or `createAndRun`, and the run waits
@@ -613,13 +620,44 @@ rejects `shutdown()`.
   dispatcher queues the card behind the others in the same step
   (`queueBusy`), so no other send gets between. A chat with no card, or one
   whose card the host does not hold, still answers `busy`.
-- **Every write to the places goes through `applyPlaceSteps`** (`places.ts`):
-  every record in one batch, then `rev` raised in a batch of its own. A
-  client draws a move it sent until its copy reaches the `rev` the reply
-  carried (`packages/session/card-moves.ts`), so a write that skipped `rev`
-  would leave a move drawn over a record that had changed. `rev` stays out
-  of the records' batch because that batch may be an undo step, and a value
-  every later write changes would refuse every whole undo of it (S82).
+- **Every write to the places is one change** (`places.ts`), opened with
+  its cause, which is always given: a person's move, undo, redo, spend or
+  busy chat's queue, or `{ kind: "host" }` for the host's own (a pop, an
+  unsent card, a fact, a split's card, a sweep). Only `places.ts` writes
+  the document (`places-boundary.test.ts`), and `createPlaces` alone takes
+  provenance's hooks, so no write skips its history, its texts or its
+  take's stops. Each `apply` writes its records in one batch, then `rev` in
+  a batch of its own. A client draws a move it sent until its copy reaches
+  the `rev` the reply carried (`packages/session/card-moves.ts`), so a
+  write that skipped `rev` would leave a move drawn over a record that had
+  changed. `rev` stays out of the records' batch because that batch may be
+  an undo step, and a value every later write changes would refuse every
+  whole undo of it (S82).
+- **A change records only the cards it touched**: `apply` and `revert`
+  take each card, and its thread end from its loaded root, the first time
+  the change touches it, synchronously, before the write; the close diffs
+  those cards alone. So a change whose body awaits (the drain's, across a
+  send) records nothing another change wrote meanwhile, such as a budget's
+  stop fact written from pi's gate, outside any keeper step. A plan's read
+  and the first `apply` have no `await` between them, so the change finds
+  each card as the plan did. The body is called synchronously: a pop checks
+  and removes with nothing between.
+- **A change's text rule**: a text card whose last `apply` step in the
+  change was a `remove` has its text destroyed at the close. A popped card
+  written back (`busy`, `unsent`) keeps its text; so does a card a revert
+  removes, which a redo brings back. A spend of a card the host no longer
+  holds destroys the text itself, since no change removes a record.
+- **A change opened while another is open is a change of its own**: each
+  records the cards it touched, under its own cause, so a callee of the
+  drain (a relay's ask card, a fact) writes its own change while the pop's
+  waits. A function that must write into the change it is called from takes
+  its `OpenChange` (`deleteRoot`, inside an undo's).
+- **A change's close runs in a `finally`**: the records already say what
+  happened, so their history and texts follow even when the body throws. A
+  close that fails after a failed body is logged, and the body's error is
+  rethrown. A caller that voids a change catches it (`budgets.ts`'s stop,
+  `failed`): a voided async function that rejects ends the process
+  (`packages/keeper/TECHNICAL.md`).
 - **`move` and `set-command` are handoffs** (`commands/cards.ts`): gather
   the places and whether the lane runs, plan (`planMoveCommand` over
   several moves, `planSetCommand`), then write. A discard's history is the
@@ -631,17 +669,20 @@ rejects `shutdown()`.
   and the current `rev`. A move that leaves a card queued on a lane that is
   not running queues the lane's drain, a voided `keeper.once`
   (`drain:<lane>`) behind the move's own step.
-- **Every place-changing command records its provenance in the same step**
-  (`provenance.ts`): `before()` reads the places and each shared card's
-  thread end at the step's start, and `after(cause, before)`, once the
-  places are written, plans the cards' history and the traces
-  (`planProvenance`) and writes them in one `writeValues`. In
-  `commands/cards.ts`, `carry` is the one path for a move, a busy chat's
-  queue and a spend, each with its cause; a command moves no card and has
-  none. `undoMove` calls both itself, since Kyneta writes the revert. The
-  drain does too, around each pop (`queued-card-pop.ts`), with `popNextQueuedCard` still
-  synchronous (S69). The presence it reads is `readReading`'s pairs: a
-  placer with a column open at the card's end saw it go.
+- **Every change records its provenance as it closes** (`planClose`): the
+  cards' history and the traces (`planProvenance` over the touched cards),
+  in one `writeValues`. In `commands/cards.ts`, `carry` is the one path for
+  a move, a busy chat's queue, a spend and a command set on a card (which
+  changes no place, so records nothing), each with its cause. `undoMove`
+  carries Kyneta's revert through `revert`, in one change with the threads
+  it lifts (`deleteRoot`). A spin-off's thread card and its card's move to
+  the trash are one change, its sender's. A thread's card placed by its
+  first send (`executeChat`) is its sender's change, so `canvas-news.ts`
+  tells the task's running threads, as for an opened or copied thread. The
+  drain makes each pop one change of the host's (`queued-card-pop.ts`), with
+  `popNextQueuedCard` still synchronous (S69). The presence the close reads
+  is `readReading`'s pairs: a placer with a column open at the card's end
+  saw it go.
 - **`picture` sets the sender's picture** (`commands/picture.ts`,
   ADR-0098): `planPicture` over the blob's reference, read without its
   bytes. A picture wider or taller than `PICTURE_MOST` is fitted by
@@ -733,8 +774,9 @@ rejects `shutdown()`.
 - **Every undo is `whole`.** Without it a step someone else's move broke is
   skipped and an older one undone out of sight (S82). With it, a card's row
   (its place and its placer) changed by anyone since refuses the undo.
-- **`rev` is raised after an undo too** (`raiseRev`), apart from the
-  revert, which Kyneta writes itself.
+- **`rev` is raised after an undo too** (`OpenChange.revert`), apart from
+  the revert, which Kyneta writes itself, and only when one of the cards it
+  reverts changed.
 - **Retired 7 days after their task is archived** (`planHistorySweep`,
   `ARCHIVED_HISTORY_MS`), at startup and after each run's end; and at
   startup only, those of a task the session does not hold (a new tab's,
@@ -849,8 +891,8 @@ rejects `shutdown()`.
   wire), in no history, as any creation.
 - **Trashed cards are swept** (`sweepTrash`, `housekeeping.ts`): a card past
   its `trashDeadline`, and every card on a surface it owns, loses its
-  record, then its text, at startup and in `settle`'s sweep, before the
-  provenance's sweep deletes its history. A deleted thread's lanes of
+  record, then its text and its history, in one change of the host's, at
+  startup and in `settle`'s sweep. A deleted thread's lanes of
   their own go as an archive's do (`planLanesGone`, through
   `work.teardown`, off the documents' keeper), which withdraws their
   offers; the thread's record stays, since its entries name it.
@@ -862,9 +904,9 @@ rejects `shutdown()`.
   answers `nothing`.
 - **A command on an offer leaves a fact** (ADR-0080): `actOnOffer`
   answers first, then writes the action's fact as a queued fact card in a keeper
-  step of its own (`recordFact`), with its history (`provenance`, cause
-  `host`, as for the split card `split_offer` queues), and asks for the
-  lane's drain. An idle
+  step of its own (`recordFact`, through `queueFact`), with its history
+  (cause `host`, as for every fact and the split card `split_offer`
+  queues), and asks for the lane's drain. An idle
   lane appends it at once; a running one when its run ends, in order with
   the cards already queued. The client draws it as a quiet row, and nobody
   moves it.
@@ -1357,6 +1399,11 @@ adapter's.
   setup and the agent gives one `record` as each of them. `applyWrites`
   applies writes to the test's documents through the real writer, as
   `createRecords` does.
+- **The places are written through the real writer in tests too.**
+  `seedPlaces` writes a test's setup through `createPlaces` with hooks that
+  record nothing, and `seedChange` gives a pop an `apply` that writes so;
+  `placesFor(b)` is the writer over the test's documents with its real
+  provenance. No test support writes the document around it.
 - **Admission is two pure plans**, `planRequest` and `planUpgrade`
   (`routes.ts`): every admission rule is a unit test there, and `http.ts`
   only carries them out.

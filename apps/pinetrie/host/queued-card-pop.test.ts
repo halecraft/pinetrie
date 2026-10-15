@@ -36,14 +36,15 @@ import type { CardPort } from "./cards.ts"
 import {
   applyWrites,
   basics,
+  placesFor,
   putTask,
   putValue,
   ROOT_ID,
   RUNS_ANY,
   record,
+  seedChange,
+  seedPlaces,
 } from "./fakes.ts"
-import { applyPlaceSteps } from "./places.ts"
-import { createProvenance } from "./provenance.ts"
 import {
   chatOfPoppedQueuedCard,
   createWaits,
@@ -117,6 +118,7 @@ describe("popNextQueuedCard", () => {
     queue(cards, cardIdFor("c1"), "a")
     const popped = poppedOf(
       popNextQueuedCard(
+        seedChange(cards),
         cards,
         LANE,
         IDLE,
@@ -132,6 +134,7 @@ describe("popNextQueuedCard", () => {
     const cards = newPlacesDoc()
     queue(cards, cardIdFor("c1"), "a")
     popNextQueuedCard(
+      seedChange(cards),
       cards,
       LANE,
       IDLE,
@@ -145,6 +148,7 @@ describe("popNextQueuedCard", () => {
     queue(cards, cardIdFor("c1"), "a")
     expect(
       popNextQueuedCard(
+        seedChange(cards),
         cards,
         LANE,
         { ...IDLE, running: true },
@@ -156,6 +160,7 @@ describe("popNextQueuedCard", () => {
     expect(readPlaces(cards)).toHaveLength(1)
     expect(
       popNextQueuedCard(
+        seedChange(newPlacesDoc()),
         newPlacesDoc(),
         LANE,
         IDLE,
@@ -178,6 +183,7 @@ describe("popNextQueuedCard", () => {
       })
     expect(
       popNextQueuedCard(
+        seedChange(cards),
         cards,
         LANE,
         IDLE,
@@ -191,6 +197,7 @@ describe("popNextQueuedCard", () => {
     queue(cards, cardIdFor("c1"), "a")
     queue(cards, cardIdFor("c2"), "b")
     const top = popNextQueuedCard(
+      seedChange(cards),
       cards,
       LANE,
       IDLE,
@@ -209,6 +216,7 @@ test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from th
   queue(cards, cardIdFor("c1"), "a")
   const popped = poppedOf(
     popNextQueuedCard(
+      seedChange(cards),
       cards,
       LANE,
       IDLE,
@@ -269,9 +277,6 @@ function setUp(
       },
       textNow: (id: CardId) => texts[id] ?? "",
       holds: id => !behind.includes(id),
-      destroy: async id => {
-        events.push(`destroy ${id}`)
-      },
     }).port,
     work: record<QueuedCardPopDeps["work"]>({
       ...RUNS_ANY,
@@ -310,11 +315,14 @@ function setUp(
     blank: card => {
       events.push(`blank ${card.id}`)
     },
-    provenance: createProvenance({
-      basics: b,
+    placesWriter: placesFor(b, {
       presence,
-      records: { writeValues: async w => applyWrites(b, w) },
-    }),
+      texts: {
+        destroy: async id => {
+          events.push(`destroy ${id}`)
+        },
+      },
+    }).placesWriter,
   }
   return { b, events, deps, appended, presence, blobs }
 }
@@ -519,7 +527,7 @@ describe("drain", () => {
     queue(b.places, cardIdFor("c1"), "a")
     const card = readPlaces(b.places).find(c => c.id === LANE)
     if (card?.kind !== "thread") throw new Error("no thread card")
-    applyPlaceSteps(b.places, [
+    seedPlaces(b.places, [
       {
         kind: "write",
         record: { ...card, place: { kind: "inventory", holder: card.owner } },
@@ -566,7 +574,6 @@ describe("drain", () => {
         },
         textNow: id => deps.texts.textNow(id),
         holds: () => true,
-        destroy: id => deps.texts.destroy(id),
       },
     }
     await drain(late, LANE)
@@ -712,8 +719,9 @@ describe("drain: bring up to date", () => {
     expect(events).toEqual([
       `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
       `update by ${BEA}: keep both`,
-      `destroy ${cardIdFor("c1")}`,
       "start pinetrie.land",
+      // The popped card's text goes as the pop's change closes.
+      `destroy ${cardIdFor("c1")}`,
     ])
     expect(textsIn(b.places).map(c => c.id)).toEqual([cardIdFor("c2")])
   })
@@ -910,8 +918,8 @@ describe("drain: a split", () => {
     expect(events).toEqual([
       `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
       `split by ${BEA}: tests apart`,
-      `destroy ${cardIdFor("c1")}`,
       "start pinetrie.stack",
+      `destroy ${cardIdFor("c1")}`,
     ])
     expect(textsIn(b.places).map(c => c.id)).toEqual([cardIdFor("c2")])
   })

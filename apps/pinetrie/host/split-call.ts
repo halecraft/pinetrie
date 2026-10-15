@@ -25,8 +25,7 @@ import {
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "./basics.ts"
-import { applyPlaceSteps } from "./places.ts"
-import type { Provenance } from "./provenance.ts"
+import type { Places } from "./places.ts"
 
 /** What `split_offer` answers when its call reaches no thread. */
 const NO_THREAD: ToolAnswer = {
@@ -42,8 +41,8 @@ export const createSplitCall =
       "docs" | "session" | "live" | "places" | "newId" | "log"
     >
     readonly keeper: Pick<HostKeeper, "run">
-    /** Each card's history: the split's card is the host's write. */
-    readonly provenance: Pick<Provenance, "before" | "after">
+    /** The writer of the places: the split's card is the host's change. */
+    readonly placesWriter: Places
   }) =>
   (lane: ThreadId): Promise<ToolAnswer> =>
     deps.keeper.run(async () => {
@@ -73,8 +72,8 @@ export const createSplitCall =
         return { text: SPLIT_UNMADE, isError: true, details: null }
       }
       // execute
-      const before = deps.provenance.before()
-      applyPlaceSteps(places, [planned.step])
-      await deps.provenance.after({ kind: "host" }, before)
+      await deps.placesWriter.change({ kind: "host" }, open =>
+        open.apply([planned.step]),
+      )
       return { text: SPLIT_QUEUED, isError: false, details: null }
     })

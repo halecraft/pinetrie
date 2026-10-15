@@ -19,7 +19,6 @@ import {
   queuedOn,
   setRecord,
 } from "@pinetrie/rules"
-import { newPresenceDoc } from "@pinetrie/schema"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
@@ -28,13 +27,13 @@ import {
   fakeLane,
   methods,
   NO_BLANK_CARDS,
+  placesFor,
   putLane,
   putValue,
   RUNS_ANY,
   record,
   row,
 } from "../fakes.ts"
-import { createProvenance } from "../provenance.ts"
 import type { Records } from "../records.ts"
 import type { RunStart } from "../runs.ts"
 import {
@@ -82,11 +81,7 @@ const stopDeps = (
   agent: r.pi.port,
   records: r.pi.port,
   cancel,
-  provenance: createProvenance({
-    basics: r.b,
-    presence: newPresenceDoc(),
-    records: { writeValues: async w => applyWrites(r.b, w) },
-  }),
+  placesWriter: placesFor(r.b).placesWriter,
 })
 
 /** The stop facts queued on `lane`, as the places hold them. */
@@ -265,11 +260,7 @@ test("an offer's fact is queued as a card at the thread's end, and the lane's dr
     {
       basics: b,
       drain: l => drained.push(l),
-      provenance: createProvenance({
-        basics: b,
-        presence: newPresenceDoc(),
-        records: { writeValues: async w => applyWrites(b, w) },
-      }),
+      placesWriter: placesFor(b).placesWriter,
     },
     fact,
   )

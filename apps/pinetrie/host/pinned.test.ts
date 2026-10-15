@@ -18,9 +18,16 @@ import {
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
-import { basics, putLane, putValue, record, row, threadRow } from "./fakes.ts"
+import {
+  basics,
+  putLane,
+  putValue,
+  record,
+  row,
+  seedPlaces,
+  threadRow,
+} from "./fakes.ts"
 import { createPinned, waitFor } from "./pinned.ts"
-import { applyPlaceSteps } from "./places.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
 const ADA = writerId("ada@x.io")
@@ -52,7 +59,7 @@ function setUp(texts: Record<string, string>, port: Partial<CardPort> = {}) {
     ...port,
   })
   const pin = (...cs: CardRecord[]) =>
-    applyPlaceSteps(
+    seedPlaces(
       b.places,
       cs.map(record => ({ kind: "write", record })),
     )

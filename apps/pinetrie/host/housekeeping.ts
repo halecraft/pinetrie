@@ -8,7 +8,6 @@ import {
   type BlobStore,
   type EntryId,
   isTextCard,
-  isTextCardId,
   MOVES_DOC_PREFIX,
   type RevisionRecord,
   type RootId,
@@ -44,7 +43,7 @@ import {
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { MoveHistories } from "./move-history.ts"
-import { applyPlaceSteps } from "./places.ts"
+import type { Places } from "./places.ts"
 import type { Records } from "./records.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -185,12 +184,12 @@ export async function sweepHolds(input: {
  * threads among them, their lanes of their own with their roots' revisions and
  * trees; plan; then delete each record, then its text, then the deleted
  * threads' lanes, as an archive's teardown removes them (`planLanesGone`).
- * Their messages stay in their roots. The histories left with no card go with
- * the provenance's own sweep, which the caller runs after.
+ * Their messages stay in their roots. The records, their texts and their
+ * histories go in one change of the host's.
  */
 export async function sweepTrash(input: {
   readonly basics: Pick<Basics, "session" | "places" | "docs" | "log" | "now">
-  readonly cards: Pick<CardPort, "destroy">
+  readonly placesWriter: Places
   readonly work: Pick<LaneWork, "teardown" | "destination">
 }): Promise<void> {
   const { session, places, docs, log, now } = input.basics
@@ -215,12 +214,9 @@ export async function sweepTrash(input: {
   // plan
   const teardown = planLanesGone(own, revisions, trees)
   // execute
-  applyPlaceSteps(
-    places,
-    swept.cards.map(id => ({ kind: "remove", id })),
+  await input.placesWriter.change({ kind: "host" }, open =>
+    open.apply(swept.cards.map(id => ({ kind: "remove", id }))),
   )
-  for (const id of swept.cards)
-    if (isTextCardId(id)) await input.cards.destroy(id)
   await input.work.teardown(teardown)
   log(`[host] deleted ${swept.cards.length} card(s) trashed over a week ago`)
 }

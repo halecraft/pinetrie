@@ -57,8 +57,7 @@ import {
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
-import { applyPlaceSteps } from "./places.ts"
-import type { Provenance } from "./provenance.ts"
+import type { OpenChange, Places } from "./places.ts"
 import type { Records } from "./records.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
@@ -114,6 +113,7 @@ export type NextQueuedCardPop =
  * quote, read before.
  */
 export function popNextQueuedCard(
+  open: Pick<OpenChange, "apply">,
   places: PlacesDocHandle,
   lane: ThreadId,
   facts: Omit<Parameters<typeof planNextQueuedCardPop>[2], "blank">,
@@ -134,7 +134,7 @@ export function popNextQueuedCard(
     doc: texts.textNow,
     blob: sha => quotes.get(sha) ?? "",
   })
-  applyPlaceSteps(places, [{ kind: "remove", id: card.id }])
+  open.apply([{ kind: "remove", id: card.id }])
   return { kind: "popped", popped: { card, text } }
 }
 
@@ -172,7 +172,7 @@ export interface QueuedCardPopDeps {
   readonly records: Pick<Records, "writeValues">
   /** Who is typing in which card (`typingIn`): the pop waits for them. */
   readonly presence: PresenceDocHandle
-  readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds" | "destroy">
+  readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds">
   /** Where a fact is appended. */
   readonly agent: Pick<Agent, "lane">
   readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit" | "runnable">
@@ -187,8 +187,11 @@ export interface QueuedCardPopDeps {
   readonly typing: (card: QueuedText) => void
   /** Only blank cards are queued: drain the lane again once `card` is written in. */
   readonly blank: (card: QueuedText) => void
-  /** Each card's history. */
-  readonly provenance: Pick<Provenance, "before" | "after">
+  /**
+   * The writer of the places: each pop is one change of the host's, so a
+   * popped card's text goes as it closes unless the card was written back.
+   */
+  readonly placesWriter: Places
   /** Relay a popped ask card's ask: "ran" when its run started. */
   readonly relay: (
     lane: ThreadId,
@@ -233,34 +236,41 @@ export async function drain(
       continue
     }
     const quotes = queuedQuotes(deps.blobs, readPlaces(places), lane)
-    // No await between the check above and the pop.
-    const before = deps.provenance.before()
-    const top = popNextQueuedCard(
-      places,
-      lane,
-      {
-        running: readRunning(deps.basics.live, lane),
-        // A pop runs in its own thread: held, it has no runner, and a lane
-        // of another kind runs nothing. The gate refuses both at its send.
-        away:
-          holdingOf(readPlaces(places), lane).kind !== "free" ||
-          typeof deps.work.runnable(lane) === "object",
-        held: readQueueHolds(deps.basics.session).has(lane),
-        typing: readTypingIn(deps.presence),
-      },
-      deps.texts,
-      quotes,
-    )
+    // No await between the check above and the pop: the change calls its
+    // body at once. Popped, written back or below the line again, it is
+    // the host's own change.
+    const top = await deps.placesWriter.change({ kind: "host" }, async open => {
+      const next = popNextQueuedCard(
+        open,
+        places,
+        lane,
+        {
+          running: readRunning(deps.basics.live, lane),
+          // A pop runs in its own thread: held, it has no runner, and a lane
+          // of another kind runs nothing. The gate refuses both at its send.
+          away:
+            holdingOf(readPlaces(places), lane).kind !== "free" ||
+            typeof deps.work.runnable(lane) === "object",
+          held: readQueueHolds(deps.basics.session).has(lane),
+          typing: readTypingIn(deps.presence),
+        },
+        deps.texts,
+        quotes,
+      )
+      return next.kind === "popped"
+        ? ({
+            kind: "carried",
+            done: await carryOut(deps, open, lane, next.popped),
+          } as const)
+        : next
+    })
     // Nothing to pop, or a held queue: its release drains it again.
     if (top.kind === "idle" || top.kind === "held") return
     // The queue waits for its top card: those behind it keep their turn.
     if (top.kind === "behind") return deps.behind(top.card)
     if (top.kind === "typing") return deps.typing(top.card)
     if (top.kind === "blank") return deps.blank(top.card)
-    const done = await carryOut(deps, lane, top.popped)
-    // Popped, written back or below the line again: the host's own write.
-    await deps.provenance.after({ kind: "host" }, before)
-    if (done === "ran") return
+    if (top.done === "ran") return
   }
 }
 
@@ -288,6 +298,7 @@ function queuedQuotes(
  */
 async function carryOut(
   deps: QueuedCardPopDeps,
+  open: OpenChange,
   lane: ThreadId,
   popped: PoppedQueuedCard,
 ): Promise<"ran" | "next"> {
@@ -298,14 +309,20 @@ async function carryOut(
     case "catch-up":
       return catchUpThenSend(
         deps,
+        open,
         lane,
         { card: plan.card, text: popped.text },
         plan,
       )
     case "split":
-      return splitThen(deps, lane, plan.card, plan.intent)
+      return splitThen(deps, open, lane, plan.card, plan.intent)
     case "send":
-      return sendCard(deps, { card: plan.card, text: popped.text }, plan.card)
+      return sendCard(
+        deps,
+        open,
+        { card: plan.card, text: popped.text },
+        plan.card,
+      )
     case "relay":
       return deps.relay(lane, plan.relay)
     // Its record went with the pop: logged, and the queue goes on.
@@ -352,6 +369,7 @@ async function appendFact(
  */
 async function catchUpThenSend(
   deps: QueuedCardPopDeps,
+  open: OpenChange,
   lane: ThreadId,
   popped: PoppedText,
   plan: Extract<CarryPlan, { readonly kind: "catch-up" }>,
@@ -366,21 +384,20 @@ async function catchUpThenSend(
       "send",
     )
     .catch(async (error: unknown) => {
-      await unsent(deps, card, hostFailedWords(errorText(error)))
+      await unsent(deps, open, card, hostFailedWords(errorText(error)))
       return null
     })
   if (prepared === null) return "next"
   if (prepared.kind === "refused") {
-    await unsent(deps, card, prepared.reason)
+    await unsent(deps, open, card, prepared.reason)
     return "next"
   }
   if (prepared.kind === "conflicted") {
     const runnable = deps.work.runnable(lane)
     if (typeof runnable === "object") {
-      await unsent(deps, card, foreignLaneWords(runnable))
+      await unsent(deps, open, card, foreignLaneWords(runnable))
       return "next"
     }
-    await deps.texts.destroy(card.id)
     deps.start(runnable, {
       kind: "prompt",
       message: prepared.message,
@@ -388,12 +405,9 @@ async function catchUpThenSend(
     })
     return "ran"
   }
-  if (plan.after === "discard") {
-    await deps.texts.destroy(card.id)
-    return "next"
-  }
+  if (plan.after === "discard") return "next"
   // Brought up to date: what is left is a plain message.
-  return sendCard(deps, popped, {
+  return sendCard(deps, open, popped, {
     ...card,
     content: { ...card.content, command: null },
   })
@@ -405,6 +419,7 @@ async function catchUpThenSend(
  */
 async function splitThen(
   deps: QueuedCardPopDeps,
+  open: OpenChange,
   lane: ThreadId,
   card: QueuedText,
   intent: string,
@@ -415,15 +430,14 @@ async function splitThen(
       refused: hostFailedWords(errorText(error)),
     }))
   if ("refused" in message) {
-    await unsent(deps, card, message.refused)
+    await unsent(deps, open, card, message.refused)
     return "next"
   }
   const runnable = deps.work.runnable(lane)
   if (typeof runnable === "object") {
-    await unsent(deps, card, foreignLaneWords(runnable))
+    await unsent(deps, open, card, foreignLaneWords(runnable))
     return "next"
   }
-  await deps.texts.destroy(card.id)
   deps.start(runnable, { kind: "prompt", message, pinnedSeen: [] })
   return "ran"
 }
@@ -431,40 +445,41 @@ async function splitThen(
 /** A popped card's text sent as its queuer's message; `sending` is what goes back if it cannot be. */
 async function sendCard(
   deps: QueuedCardPopDeps,
+  open: OpenChange,
   popped: PoppedMessage,
   sending: QueuedMessage,
 ): Promise<"ran" | "next"> {
-  const { card } = popped
   const sent = await deps.send(popped).catch(async (error: unknown) => {
-    await unsent(deps, sending, hostFailedWords(errorText(error)))
+    await unsent(deps, open, sending, hostFailedWords(errorText(error)))
     return null
   })
   if (sent === null) return "next"
   switch (sent.kind) {
+    // Spent: the change's close destroys a text card's text. A reference has
+    // no text document; its quote's blob is swept.
     case "appended":
     case "started":
-      // A reference has no text document; its quote's blob is swept.
-      if (card.kind === "text") await deps.texts.destroy(card.id)
       return sent.kind === "started" ? "ran" : "next"
     case "busy":
       // A run started under the pop: the card goes back on top, as it was.
-      applyPlaceSteps(deps.basics.places, [{ kind: "write", record: sending }])
+      open.apply([{ kind: "write", record: sending }])
       return "ran"
     case "refused":
-      await unsent(deps, sending, sent.message)
+      await unsent(deps, open, sending, sent.message)
       return "next"
     case "conflict":
       await unsent(
         deps,
+        open,
         sending,
         "two threads end here: send it from one of them",
       )
       return "next"
     case "failed":
-      await unsent(deps, sending, hostFailedWords(sent.message))
+      await unsent(deps, open, sending, hostFailedWords(sent.message))
       return "next"
     default:
-      await unsent(deps, sending, `not sent: ${sent.kind}`)
+      await unsent(deps, open, sending, `not sent: ${sent.kind}`)
       return "next"
   }
 }
@@ -476,6 +491,7 @@ async function sendCard(
  */
 async function unsent(
   deps: QueuedCardPopDeps,
+  open: Pick<OpenChange, "apply">,
   card: QueuedMessage,
   reason: string,
 ): Promise<void> {
@@ -497,7 +513,7 @@ async function unsent(
         held: true,
       }),
     )
-  applyPlaceSteps(places, plan.steps)
+  open.apply(plan.steps)
   log(
     `[host] ${readThreadName(session, card.place.thread)}: a queued card was not sent: ${reason}`,
   )

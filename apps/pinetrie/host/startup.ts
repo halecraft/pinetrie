@@ -57,7 +57,7 @@ import {
 } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
-import { applyPlaceSteps } from "./places.ts"
+import type { Places } from "./places.ts"
 import type { Provenance } from "./provenance.ts"
 import type { Records } from "./records.ts"
 import type { Runs } from "./runs.ts"
@@ -85,8 +85,10 @@ export interface StartupDeps {
   readonly start: Runs["start"]
   readonly settle: (lanes: readonly ThreadId[]) => Promise<void>
   readonly cards: Pick<CardPort, "texts" | "stored" | "destroyDocs">
-  /** Each card's history and traces, swept with the cards. */
-  readonly provenance: Pick<Provenance, "before" | "sweep">
+  /** The writer of the places: the swept cards' records and texts go in a change of the host's. */
+  readonly placesWriter: Places
+  /** Traces too old to keep, swept with the cards. */
+  readonly provenance: Pick<Provenance, "sweep">
 }
 
 /**
@@ -235,16 +237,16 @@ async function sweepTexts(deps: StartupDeps): Promise<void> {
     seats,
     texts.flatMap(t => t.clients),
   )
-  // execute: each record, then the texts
-  applyPlaceSteps(
-    places,
-    swept.records.map(id => ({ kind: "remove", id })),
+  // execute: each record, then its text as the change closes; then the
+  // documents no record names
+  await deps.placesWriter.change({ kind: "host" }, open =>
+    open.apply(swept.records.map(id => ({ kind: "remove", id }))),
   )
   await cards.destroyDocs(swept.docs)
   await deps.records.writeValues(
     staleSeats.map(s => deleteRecord(SEAT, s.peer)),
   )
-  // The swept cards' histories, and traces too old to keep.
+  // Traces too old to keep, and histories a crash left without a card.
   await deps.provenance.sweep()
   if (swept.records.length + swept.docs.length + staleSeats.length > 0)
     log(
