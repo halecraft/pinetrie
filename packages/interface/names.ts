@@ -6,7 +6,7 @@
 // that person is NOW, with the name they sent it under when it differs, so a
 // message sent before someone named themselves does not read as a stranger's.
 
-import type { WriterId } from "@pinetrie/core"
+import { LINE_ROLES, PRODUCT_NAME, type WriterId } from "@pinetrie/core"
 import { displayName } from "@pinetrie/rules"
 
 /**
@@ -26,22 +26,12 @@ export function speakerLabel(
   return now === undefined || now === asSent ? asSent : `${now} (${asSent})`
 }
 
-/** What a message's role is called above it, where it is not its own name. */
-const ROLE_LABEL: Readonly<Record<string, string>> = {
-  assistant: "agent",
-  land: "catching up",
-  update: "caught up",
-  "carry-on": "resumed",
-  fact: "offer",
-  behind: "the base",
-  heard: "heard",
-}
-
 /**
  * Who a message is from, as its column names it: a person by their name now
  * (`speakerLabel`), with those who wrote it with them (`withContributors`);
  * another thread's ask by its asker, and an answer by the thread that
- * answered; any other role by `ROLE_LABEL`, else the role itself.
+ * answered; the agent as "agent"; a line the host wrote (`LINE_ROLES`) as
+ * pine·trie, since its own words say what happened; else the role itself.
  */
 export function speakerWords(
   message: {
@@ -53,14 +43,15 @@ export function speakerWords(
   nameOf: ReadonlyMap<WriterId, string>,
 ): string {
   const role = message.role ?? "unknown"
-  return role === "chat"
-    ? withContributors(
-        speakerLabel(nameOf, message.writer, message.author ?? ""),
-        (message.contributors ?? []).map(w => displayName(w, nameOf.get(w))),
-      )
-    : role === "relay" || role === "answer"
-      ? (message.author ?? role)
-      : (ROLE_LABEL[role] ?? role)
+  if (role === "chat")
+    return withContributors(
+      speakerLabel(nameOf, message.writer, message.author ?? ""),
+      (message.contributors ?? []).map(w => displayName(w, nameOf.get(w))),
+    )
+  if (role === "relay" || role === "answer") return message.author ?? role
+  if (role === "assistant") return "agent"
+  if (LINE_ROLES.has(role)) return PRODUCT_NAME
+  return role
 }
 
 /** "Ada, Bea": each writer by their current name, in the order given. */

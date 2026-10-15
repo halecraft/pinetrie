@@ -6,6 +6,14 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a host's line is labelled by its role, not by pine·trie",
+    file: "packages/interface/names.ts",
+    from: "  if (LINE_ROLES.has(role)) return PRODUCT_NAME\n",
+    to: "",
+    command: unit,
+    expect: "a host's fact, as pine·trie",
+  },
+  {
     name: "a share's chip forgets its location",
     file: "packages/interface/paste.ts",
     from: '    location: share.hasLocation ? "holds a location" : null,',

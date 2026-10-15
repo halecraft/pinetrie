@@ -3,7 +3,12 @@
 // what the reader asks as a `MessageAct`.
 
 import { useSelector } from "@kyneta/react"
-import type { StreamId, ToolCall, TranscriptMessage } from "@pinetrie/core"
+import {
+  LINE_ROLES,
+  type StreamId,
+  type ToolCall,
+  type TranscriptMessage,
+} from "@pinetrie/core"
 import {
   COMMENT,
   callLabel,
@@ -51,6 +56,7 @@ function MessageView(p: MessageProps) {
   const classes = [
     "msg",
     node.role,
+    LINE_ROLES.has(node.role) ? "host" : "",
     node.compelled === true ? "asked" : "",
   ].filter(c => c !== "")
   // What its tables and images name it by, in the column's pane.

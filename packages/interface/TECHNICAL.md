@@ -1938,6 +1938,7 @@ name the message was sent under in parentheses when they differ
 (`speakerLabel`, `names.ts`): "Duane (duane)". Someone who set no name is
 shown by their email's part before the `@`. Each rendered chat carries its
 `writer` for the lookup. `speakerWords` names any message as its column does:
-a person so, with those who wrote it with them, and any other role by its
-label ("agent", "caught up"). A message and a search's match both say it; a
+a person so, with those who wrote it with them, the agent as "agent", and
+a line the host wrote (`LINE_ROLES`) as pine·trie. A label names who wrote
+the message, never what it says happened. A message and a search's match both say it; a
 fork's origin says it for a person, and names the agent by its thread.

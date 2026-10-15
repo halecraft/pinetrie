@@ -407,11 +407,12 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
 }
 
 /**
- * The host's own messages, which a column shows as one line: a resolution's
- * prompt (`land`), an update and a split's prompt (`update`, `stack`), a
- * Resume's carry-on (`carry-on`), and the host's facts, what a command on the
- * offer did (`fact`) and that the base has new work (`behind`), and what an
- * asked agent heard of the thread that asked (`heard`).
+ * The host's own messages, which a column shows as one line, from pine·trie:
+ * a resolution's prompt (`land`), an update and a split's prompt (`update`,
+ * `stack`), a Resume's carry-on (`carry-on`), the host's facts (`fact`: what a
+ * command on the offer did, a stop, a member gone, a budget spent, a canvas
+ * change), that the base has new work (`behind`), and what an asked agent
+ * heard of the thread that asked (`heard`).
  */
 export const LINE_ROLES: ReadonlySet<string> = new Set([
   "land",

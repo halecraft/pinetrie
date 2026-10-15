@@ -862,14 +862,18 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   up", "catch up and send", "split"), its queue place in the title. The card is
   then queued like any other (`planSend`, which carries the command), and
   the host carries the command out when it pops it.
-- **One-line messages** (`LINE_ROLES`, core) show as one line each, their
-  speaker from one table (`ROLE_LABEL`, `message.tsx`): `land` ("catching
-  up"), `update` ("caught up"), `stack`, `carry-on` ("resumed"), and the
-  host's facts, `fact` ("offer": what an acceptance, a squash, a refresh
-  or a description asked for did, ADR-0080) and `behind` ("the base": its
-  new work). Each line is its rule's words function (`updateLine`,
-  `factLine`, `behindLine`, `@pinetrie/rules`); the update's names what it
-  merged by `catchUpName`.
+- **One-line messages** (`LINE_ROLES`, core) show as one line each: `land`,
+  `update`, `stack`, `carry-on`, `heard`, and the host's facts, `fact`
+  (what a command on the offer did, ADR-0080; a stop, a member gone, a
+  budget spent, a canvas change) and `behind` (the base's new work). The
+  host wrote them all, so each one's speaker is pine·trie (`speakerWords`,
+  `@pinetrie/interface`). The speaker label says who wrote a line, as it
+  does for a person or the agent, and never what happened: the line's own
+  words say that. Each row carries `.host` beside its role, so its style
+  follows `LINE_ROLES` rather than a list of roles in the stylesheet. Each
+  line is its rule's words function (`updateLine`,
+  `factLine`, `canvasFactLine`, `behindLine`, `@pinetrie/rules`); the
+  update's names what it merged by `catchUpName`.
 - **A fact waiting for a run's end** is drawn above the line as a quiet row
   (`.queued-fact`, worded by `factLine`), with no controls: nobody moves it
   (ADR-0080).

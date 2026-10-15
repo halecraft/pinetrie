@@ -1,4 +1,4 @@
-import { writerId } from "@pinetrie/core"
+import { PRODUCT_NAME, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { namesOf, speakerLabel, speakerWords } from "./names.ts"
 
@@ -41,7 +41,8 @@ describe("speakerWords: who a message is from, as its column names it", () => {
       "Ada, with bea",
     ],
     ["the agent", { role: "assistant" }, "agent"],
-    ["a host's line", { role: "update" }, "caught up"],
+    ["a host's line, as pine·trie", { role: "update" }, PRODUCT_NAME],
+    ["a host's fact, as pine·trie", { role: "fact" }, PRODUCT_NAME],
     [
       "another thread's ask, by its asker",
       { role: "relay", author: "amber-fox" },
@@ -52,7 +53,7 @@ describe("speakerWords: who a message is from, as its column names it", () => {
       { role: "answer", author: "copper-owl" },
       "copper-owl",
     ],
-    ["a role with no label of its own", { role: "stack" }, "stack"],
+    ["a role it does not know, by the role", { role: "other" }, "other"],
   ])("%s", (_, message, words) => {
     expect(speakerWords(message, nameOf)).toBe(words)
   })
