@@ -4,11 +4,7 @@
 
 import path from "node:path"
 import { PRODUCT_NAME } from "@pinetrie/core"
-import {
-  type ProjectDirRefusal,
-  pinetrieDir,
-  projectDirWords,
-} from "@pinetrie/lanes"
+import { type ProjectDirRefusal, projectDirWords } from "@pinetrie/lanes"
 
 /** Why the host does not start. */
 export type Refusal =
@@ -46,17 +42,20 @@ export function planInvocation(
 /** The session's SQLite file, and what named it. */
 export interface StoreChoice {
   readonly file: string
-  readonly from: "PINETRIE_STORE" | "project"
+  readonly from: "PINETRIE_STORE" | "session"
 }
 
-/** The session's SQLite file: `PINETRIE_STORE` when set, else in the project. */
+/**
+ * The session's SQLite file: `PINETRIE_STORE` when set, else `own`, the one
+ * in the session's data directory (`sessionFiles`).
+ */
 export function storeChoice(
-  root: string,
+  own: string,
   env: Readonly<Record<string, string | undefined>>,
 ): StoreChoice {
   const given = env.PINETRIE_STORE
   return given === undefined
-    ? { file: pinetrieDir(root).store, from: "project" }
+    ? { file: own, from: "session" }
     : { file: given, from: "PINETRIE_STORE" }
 }
 

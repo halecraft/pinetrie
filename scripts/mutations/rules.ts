@@ -7,7 +7,33 @@ const archive = "packages/rules/archive.ts"
 export const mutations: readonly Mutation[] = [
   // ── a turn's disk ──
   {
-    name: "ignoreQuery asks git about the paths beyond a symlink",
+    name: "a deeper negation re-includes a path under an ignored directory",
+    file: "packages/rules/ignores.ts",
+    from: "      p => isDirIgnored(parentOf(p)) || matched(p, input.dirs.has(p)),\n",
+    to: "      p => matched(p, input.dirs.has(p)),\n",
+    command: unit,
+    expect:
+      "a deeper negation does not re-include a path under an ignored directory",
+  },
+  {
+    name: "pine·trie's own patterns outrank a .gitignore",
+    file: "packages/rules/ignores.ts",
+    from: "    return ignored\n  }\n",
+    to: "    return verdict(own, `${p}${slash}`, ignored)\n  }\n",
+    command: unit,
+    expect: "pine·trie's own patterns ignore what no .gitignore re-includes",
+  },
+  {
+    name: "a pattern ending in / matches a file",
+    file: "packages/rules/ignores.ts",
+    from: "      p => isDirIgnored(parentOf(p)) || matched(p, input.dirs.has(p)),\n",
+    to: "      p => isDirIgnored(parentOf(p)) || matched(p, true),\n",
+    command: unit,
+    expect:
+      "a pattern ending in / ignores a directory of that name, not a file",
+  },
+  {
+    name: "ignoreQuery asks about the paths beyond a symlink",
     file: "packages/rules/disk.ts",
     from: "  const askedFor = (p: string) => firstSymlinks[p] ?? p\n",
     to: "  const askedFor = (p: string) => p\n",

@@ -1,6 +1,6 @@
 // jj/startup — your repo as the host finds it at startup, before its owner
-// starts: where the project's root is, and `.pinetrie/` and the shared
-// directories excluded in it.
+// starts: where the project's root is, and the shared directories excluded
+// in it. pine·trie writes nothing else in your repo.
 //
 // Only jj can say where a jj repo is: a secondary workspace's `.jj/repo` is a
 // file, and from a jj workspace nested in another repo, git names the outer
@@ -11,14 +11,8 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
 import {
-  EXCLUDE_LINE,
-  IGNORE_FILE,
-  LANE_GITCONFIG,
-  laneGitConfig,
-  laneIgnores,
   lines,
   type ProjectDir,
-  pinetrieDir,
   planExclude,
   planProjectDir,
   planShared,
@@ -48,53 +42,51 @@ async function gatherRoot(dir: string): Promise<RootFacts> {
 }
 
 /**
- * The project's root from `dir`, with `.pinetrie/` excluded in its repo before
- * anything is written there; or why `dir` cannot be a project. Run again on
- * the same folder, it writes nothing.
+ * The project's root from `dir`, and its kind; or why `dir` cannot be a
+ * project. Writes nothing. A jj repo needs a git directory beside it:
+ * lanes' history is fetched into your repo through git.
  */
 export async function prepareProjectDir(dir: string): Promise<ProjectDir> {
-  const facts = await gatherRoot(dir)
-  const planned = planProjectDir(facts)
-  // A git repo with no jj is a folder, but its store is still in the
-  // project, so it is excluded there as in a jj repo.
-  const inRepo = facts.jjRoot !== null || facts.gitTop !== null
-  if (planned.kind === "refused" || !inRepo) return planned
-  return (await excludeInYours(planned.root, [EXCLUDE_LINE]))
+  const planned = planProjectDir(await gatherRoot(dir))
+  if (planned.kind !== "jj") return planned
+  const git = await run("git", ["rev-parse", "--git-dir"], {
+    cwd: planned.root,
+  })
+  return git.ok
     ? planned
     : {
         kind: "refused",
-        refusal: { kind: "unexcludable", root: planned.root },
+        refusal: { kind: "not-colocated", root: planned.root },
       }
 }
 
 /**
  * Add `lines` to your repo's exclude file, found with
  * `git rev-parse --git-path info/exclude`, so what they name changes no
- * tracked file. False when the repo has no git directory beside it.
+ * tracked file. Nothing without a git directory, which `prepareProjectDir`
+ * refuses a jj project for.
  */
 async function excludeInYours(
   root: string,
   lines: readonly string[],
-): Promise<boolean> {
+): Promise<void> {
   const where = await run("git", ["rev-parse", "--git-path", "info/exclude"], {
     cwd: root,
   })
-  if (!where.ok) return false
+  if (!where.ok) return
   const file = path.resolve(root, where.stdout.trim())
   const next = planExclude(await readFile(file, "utf8").catch(() => ""), lines)
   if (next !== null) {
     await mkdir(path.dirname(file), { recursive: true })
     await writeFile(file, next)
   }
-  return true
 }
 
 /**
  * Gather what `planShared` needs, plan, then execute: create missing
- * directories, add unignored ones to your repo's exclude file, and write the
- * lanes' ignore file (`laneIgnores`) in `pinetrieDir`'s `laneGit`. jj, not git's
- * index, says what is tracked: in a colocated repo the index can lag. Ignore
- * rules are git's, and jj applies them, the global file included.
+ * directories, and add unignored ones to your repo's exclude file. jj, not
+ * git's index, says what is tracked: in a colocated repo the index can lag.
+ * Ignore rules are git's, and jj applies them, the global file included.
  */
 export async function prepareShared(
   root: string,
@@ -140,13 +132,6 @@ export async function prepareShared(
       root,
       planned.exclude.map(p => `/${p}/`),
     )
-  const ignoreDir = pinetrieDir(root).laneGit
-  await mkdir(ignoreDir, { recursive: true })
-  await writeFile(
-    path.join(ignoreDir, IGNORE_FILE),
-    laneIgnores(planned.shared),
-  )
-  await writeFile(path.join(ignoreDir, LANE_GITCONFIG), laneGitConfig())
   return {
     shared: planned.shared.map(p => ({ path: p, source: path.join(root, p) })),
     refused: planned.refused,

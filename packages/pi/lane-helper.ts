@@ -13,7 +13,8 @@
 //   launched, with its command; the write tools' paths, and
 //   the read and write tools' accesses of shared files (`LaneDrain`);
 //   `present`, which paths exist, for the host's fold; `hashes`, cached by
-//   stamp; `checkRecipes`; and `firstSymlinks`, for `git check-ignore`.
+//   stamp; `checkRecipes`; and `ignoreFacts`, what the host's `.gitignore`
+//   matcher reads of the disk.
 // - `observerRelay`: the machine's observer served at `OBSERVER_SOCKET` to a
 //   host inside the lane while the host relays it (`observer.ts`).
 // Calls are handled concurrently: pi runs a turn's tool calls in parallel
@@ -26,7 +27,7 @@
 
 import { createHash } from "node:crypto"
 import { createReadStream, lstatSync, mkdirSync } from "node:fs"
-import { lstat } from "node:fs/promises"
+import { lstat, readFile } from "node:fs/promises"
 import path from "node:path"
 import {
   BACKGROUND_CONTEXT,
@@ -48,9 +49,11 @@ import {
   statStamp,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
-import { checkRecipe } from "@pinetrie/rules"
+import { checkRecipe, ignoreQuery } from "@pinetrie/rules"
+import { ignoreDirs } from "@pinetrie/rules/ignores"
 import {
   type EnvMethod,
+  type IgnoreFacts,
   isEnvMethod,
   type LaneCall,
   type LaneHello,
@@ -106,9 +109,8 @@ const isPresent = (p: string): boolean => {
 
 /**
  * Each of `paths` that runs through a symlink, and the first symlink on its
- * way: `git check-ignore` refuses a whole batch over one path beyond a
- * symlink, and can be asked about the symlink instead. A path that is
- * itself a symlink is left out, and a missing directory ends the search.
+ * way. A path that is itself a symlink is left out, and a missing directory
+ * ends the search.
  */
 async function firstSymlinks(
   paths: readonly string[],
@@ -140,6 +142,38 @@ async function firstSymlinks(
     }
   }
   return out
+}
+
+/**
+ * What the host's matcher needs to say which of `paths` `.gitignore`
+ * ignores (`ignoredPaths`): the first symlink on each path's way, which of
+ * the paths asked about (`ignoreQuery`) are directories, and each
+ * `.gitignore` above them. A `.gitignore` that is not a regular file is
+ * skipped, as git 2.32 and later skip a symlinked one.
+ */
+async function ignoreFacts(paths: readonly string[]): Promise<IgnoreFacts> {
+  const links = await firstSymlinks(paths)
+  const { asked } = ignoreQuery(paths, links)
+  const isDir = (p: string) =>
+    lstat(path.join(cwd, p)).then(
+      st => st.isDirectory(),
+      () => false,
+    )
+  const dirs = (
+    await Promise.all(asked.map(async p => ((await isDir(p)) ? [p] : [])))
+  ).flat()
+  const files = (
+    await Promise.all(
+      ignoreDirs(asked).map(async dir => {
+        const file = path.join(cwd, dir, ".gitignore")
+        const st = await lstat(file).catch(() => null)
+        if (st?.isFile() !== true) return []
+        const text = await readFile(file, "utf8").catch(() => null)
+        return text === null ? [] : [{ dir, text }]
+      }),
+    )
+  ).flat()
+  return { firstSymlinks: links, dirs, files }
 }
 
 /** Everything this helper knows of its runs and tools since the last drain. */
@@ -292,7 +326,7 @@ serve<LaneHello, LaneCall, unknown, unknown>(
     if ("runs" in call) return drain()
     if ("present" in call) return call.present.filter(isPresent)
     if ("hashes" in call) return hashes(call.hashes)
-    if ("firstSymlinks" in call) return firstSymlinks(call.firstSymlinks)
+    if ("ignoreFacts" in call) return ignoreFacts(call.ignoreFacts)
     if ("checkRecipes" in call) return checkRecipes(call.checkRecipes)
     if (!isEnvMethod(call.method))
       throw new Error(`${call.method} does not cross into a lane`)

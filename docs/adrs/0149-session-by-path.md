@@ -11,6 +11,11 @@
     registry, not by the project folder's name.
   - ADR-0142: a folder project's data is in its session's directory,
     `$XDG_DATA_HOME/pinetrie/sessions/<name>/`.
+- **Revised:**
+  - 2026-10-15: the moved-folder hint goes: a session's directory holds its
+    store from its first start (ADR-0150), so a start that printed it had
+    already made a new session. Attach a moved folder with `PINETRIE_SESSION`
+    on its first start in the new place.
 - **Amended by:**
   - ADR-0150: a session's directory holds its store for both kinds, so a
     folder that gains or loses jj keeps its session.
@@ -57,8 +62,8 @@
 - **A folder no entry holds starts a new session,** unless
   `PINETRIE_SESSION` names one: that session is attached to this path, its
   entry's path moved. The host's startup lines say which:
-  `[host] session website (~/work/website)`, or, for a new session whose
-  name another path held before, where that one was and how to attach it.
+  `[host] session website (~/work/website)`, `(attached, was …)` or
+  `(new)`.
 - **Renaming a session** changes its name in the registry and moves its two
   directories, while no host serves it.
 - **`PINETRIE_STORE` still overrides the store** (ADR-0118). A jj project's

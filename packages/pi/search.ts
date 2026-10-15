@@ -60,13 +60,23 @@ export const findLimit = (p: FindParams): number =>
   atLeast(1, p.limit, FIND_LIMIT)
 
 /**
+ * What rg and fd read of ignore files: a disk's `.gitignore` files, as git
+ * reads them, with or without a repo; none above the directory searched.
+ * `.ignore` still counts, which only hides more from search, never less.
+ */
+const IGNORES = ["--no-require-git", "--no-ignore-parent"] as const
+
+/**
  * rg's arguments. No path means the working directory: rg then prints paths
- * without a leading `./`.
+ * without a leading `./`. Neither git's global excludes file nor rg's config
+ * is read.
  */
 export function grepArgs(p: GrepParams): readonly string[] {
   const context = atLeast(0, p.context, 0)
   return [
     "--no-config",
+    ...IGNORES,
+    "--no-ignore-global",
     "-n",
     "--no-heading",
     "--with-filename",
@@ -89,7 +99,9 @@ export function grepArgs(p: GrepParams): readonly string[] {
  * fd's arguments. It is asked for one result more than the limit, so a cut
  * capture means there were more (`searchOutcome`). fd matches a glob against
  * the basename, or with `--full-path` against the absolute path, so a
- * pattern with a `/` needs a leading `**` segment to match anything.
+ * pattern with a `/` needs a leading `**` segment to match anything. fd's own
+ * global ignore file is not read; git's global excludes file is, which fd
+ * has no flag to skip, and in a lane only the lane's home can hold.
  */
 export function findArgs(p: FindParams): readonly string[] {
   const full = p.pattern.includes("/")
@@ -98,6 +110,8 @@ export function findArgs(p: FindParams): readonly string[] {
       ? `**/${p.pattern}`
       : p.pattern
   return [
+    ...IGNORES,
+    "--no-global-ignore-file",
     "--glob",
     "--color=never",
     "--hidden",

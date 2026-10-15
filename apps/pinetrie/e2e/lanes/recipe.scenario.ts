@@ -56,7 +56,7 @@ async function recipeSection(
     "c.txt": "c's source\n",
     "build.sh":
       'mkdir -p .store && touch .store/CACHEDIR.TAG && for p in $(cat pkgs.txt); do echo "$p" > ".store/$p"; mkdir -p "out-$p" && echo built > "out-$p/marker"; done\n',
-    ".gitignore": "out-*/\n.env\n.store/\nlink-*\n",
+    ".gitignore": "out-*/\n.env\n.store/\n",
     "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
   })
   const script = scriptedModel()
@@ -166,25 +166,6 @@ async function recipeSection(
       "a directory a run made from source that .gitignore misses is named in the turn's record",
       wrote.some(r => r.disk?.unignored.includes("dist") === true),
       JSON.stringify(wrote.map(r => r.disk?.unignored)),
-    )
-
-    // A run that writes and looks through a symlink: git refuses a batch
-    // naming a path beyond one, so the turn is classed only if the host
-    // asks about the symlink instead.
-    const beforeLink = recordsOf(first).length
-    await ask(
-      "@agent write through a link",
-      "mkdir -p link-dir && ln -s link-dir link-a && echo x > link-a/through.txt && cat link-a/nope 2>/dev/null; true",
-      at(laneTip(first)),
-      { thread: first },
-    )
-    const linked = recordsOf(first).slice(beforeLink)
-    check(
-      "a turn whose run writes and looks through a symlink is classed",
-      linked.some(
-        r => r.disk?.local.paths.some(p => p.startsWith("link-a")) === true,
-      ),
-      JSON.stringify(linked.map(r => r.disk)),
     )
 
     // Accepted work deletes package c; the lane catches up.

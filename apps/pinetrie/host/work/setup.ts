@@ -3,7 +3,7 @@
 // directories, the images, runtime and grants, and the base snapshot every
 // fork of accepted work starts from.
 
-import { stat } from "node:fs/promises"
+import { mkdir, stat, writeFile } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import path from "node:path"
@@ -20,12 +20,16 @@ import {
   checkImage,
   ensureRuntime,
   gatherLinks,
+  IGNORE_FILE,
+  LANE_GITCONFIG,
+  type LaneFiles,
   type LaneOwner,
   type LaneRuntime,
   type LaneSpec,
+  laneGitConfig,
+  laneIgnores,
   type Mount,
   PINETRIE_INSTALL,
-  pinetrieDir,
   planHostMounts,
   planLinks,
   planMounts,
@@ -139,6 +143,8 @@ export interface Setup {
 export interface OpenedProject {
   readonly found: Found
   readonly root: string
+  /** What the host keeps for the session's lanes (`sessionFiles`). */
+  readonly files: LaneFiles
   readonly opened: OpenProject
   /** Each copy of `pinetrie.json` as a fact of a state, from accepted work's. */
   readonly configs: LaneConfigs
@@ -156,10 +162,12 @@ export async function openProject(input: {
   readonly found: Found | null
   /** The project's adapter, with `found`. */
   readonly adapter: ProjectAdapter | null
+  /** The session's lane files, with `found`. */
+  readonly files: LaneFiles | null
   readonly start: StartLayers<HostSettings>
 }): Promise<OpenedProject | null> {
-  const { basics, found } = input
-  if (found === null || input.adapter === null) return null
+  const { basics, found, files } = input
+  if (found === null || input.adapter === null || files === null) return null
   const { root } = found.project
   // Your repo's names find accepted work, so they come from the working
   // copy's file, read once, at startup.
@@ -171,12 +179,34 @@ export async function openProject(input: {
   // Before anything mounts a shared directory or grants a lane anything.
   const configs = await startLaneConfigs({
     root,
-    project: opened,
+    project: {
+      fileAt: opened.fileAt,
+      // Each time they are prepared, before they are in force: a lane that
+      // mounts one finds it ignored from its container's first moment.
+      prepareShared: async entries => {
+        const prepared = await opened.prepareShared(entries)
+        await writeLaneGit(
+          files.laneGit,
+          prepared.shared.map(d => d.path),
+        )
+        return prepared
+      },
+    },
     start: input.start,
     working,
     log: basics.log,
   })
-  return { found, root, opened, configs }
+  return { found, root, files, opened, configs }
+}
+
+/** The lanes' ignore file (`laneIgnores`) and git's system config, which every lane mounts. */
+async function writeLaneGit(
+  dir: string,
+  shared: readonly string[],
+): Promise<void> {
+  await mkdir(dir, { recursive: true })
+  await writeFile(path.join(dir, IGNORE_FILE), laneIgnores(shared))
+  await writeFile(path.join(dir, LANE_GITCONFIG), laneGitConfig())
 }
 
 export async function startSetup(input: {
@@ -200,7 +230,7 @@ export async function startSetup(input: {
   const { basics, keeper } = input
   const { log } = basics
   if (input.project === null || input.report === null) return null
-  const { found, root, opened, configs } = input.project
+  const { found, root, files, opened, configs } = input.project
   const { runtime, shareAndGrant } = found
   const project: ProjectRecord = {
     root,
@@ -216,7 +246,7 @@ export async function startSetup(input: {
   const ssh = await startLaneSsh({
     basics,
     records: input.records,
-    root,
+    files,
     choice: sshChoice(input.report),
     serviceDir: path.join(input.places.dirs.config, "ssh"),
     laneGrant: lane => configs.laneConfig(lane).grants.ssh,
@@ -244,8 +274,6 @@ export async function startSetup(input: {
     log(`[host] ${r.path} is not readable in lanes: ${r.reason}`)
   const hostPaths = hostMounts.mounts
 
-  // The runtime's and the ignore file's directories are parameters, not
-  // derived from the project root: a project's may lie outside it.
   const mountsFor = (
     r: Ready,
     grants: readonly Mount[],
@@ -256,7 +284,7 @@ export async function startSetup(input: {
       hostWorkingCopy: root,
       pinetrie: PINETRIE_INSTALL,
       runtime: r.runtime,
-      ignoreDir: pinetrieDir(root).laneGit,
+      ignoreDir: files.laneGit,
       links: r.links,
       grants,
       shared,
@@ -340,6 +368,7 @@ export async function startSetup(input: {
   const ready: Promise<Ready> = keeper.track(
     prepare({
       at: root,
+      runtimeDir: files.runtime,
       runtime,
       runtimeReady: found.ready,
       wanted: r => wantedFor(r, configs.accepted()),
@@ -386,6 +415,8 @@ export async function startSetup(input: {
  */
 async function prepare(input: {
   readonly at: string
+  /** Where the lane runtime is extracted, one directory per image tag. */
+  readonly runtimeDir: string
   readonly runtime: LaneRuntime
   readonly runtimeReady: Found["ready"]
   /** Every host path a lane of this host mounts, and the ports it reaches. */
@@ -404,11 +435,7 @@ async function prepare(input: {
   )
   const refused = await checkImage(runtime, lane)
   if (refused !== null) throw new Error(refused)
-  const programs = await ensureRuntime(
-    runtime,
-    pinetrieDir(at).runtime,
-    runtimeFrom,
-  )
+  const programs = await ensureRuntime(runtime, input.runtimeDir, runtimeFrom)
   const result: Ready = {
     image: lane,
     imagePath: await runtime.imagePath(lane),

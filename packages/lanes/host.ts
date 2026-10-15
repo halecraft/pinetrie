@@ -4,7 +4,7 @@
 
 import { readdir, readlink } from "node:fs/promises"
 import path from "node:path"
-import { type Link, PROJECT_DIR } from "./plan.ts"
+import type { Link } from "./plan.ts"
 
 /** Every `node_modules` directory up to three levels down, never inside another. */
 async function findNodeModules(root: string): Promise<string[]> {
@@ -17,7 +17,7 @@ async function findNodeModules(root: string): Promise<string[]> {
       if (!e.isDirectory() || e.name === ".jj" || e.name === ".git") continue
       const child = path.join(rel, e.name)
       if (e.name === "node_modules") out.push(child)
-      else if (depth < 3 && e.name !== PROJECT_DIR) await walk(child, depth + 1)
+      else if (depth < 3) await walk(child, depth + 1)
     }
   }
   await walk("", 1)

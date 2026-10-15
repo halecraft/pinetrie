@@ -516,7 +516,7 @@ item 18, and in `lanes.test.ts` against the harness.
 - **The protocol** (`lane-protocol.ts`) is the calls alone: an environment
   method and its arguments, a `run` (with its input, for the host's own
   commands that take more than a command line holds), a drain of the
-  lane's `runs`, or `hashes`, `present` or `firstSymlinks` of paths. Bytes and errors cross as the
+  lane's `runs`, or `hashes`, `present` or `ignoreFacts` of paths. Bytes and errors cross as the
   channel's wire carries them, at any depth, since `NodeExecutionEnv` never
   throws: its errors are values inside results (S44 item 5).
 - **A lane's runs** (ADR-0135): each `exec` is a run, launched with its
@@ -576,11 +576,14 @@ item 18, and in `lanes.test.ts` against the harness.
   - **`checkRecipes`** answers, per recipe, the first fact of its key that
     changed (`checkRecipe`): an input's hash, a failed lookup now found, a
     shared file's stamp. Its image is the host's to compare.
-  - **`firstSymlinks`** answers, for each path that runs through a
-    symlink, the first symlink on its way, for `git check-ignore`, which
-    refuses a batch over one path beyond a symlink (S179). A path that is
-    itself a symlink is left out, a missing directory ends the search, and
-    each directory is `lstat`ed once per call.
+  - **`ignoreFacts`** answers what the host's `.gitignore` matcher
+    (`@pinetrie/rules`' `ignoredPaths`) needs of the disk, in one round
+    trip: for each path that runs through a symlink, the first symlink on
+    its way (a path that is itself a symlink is left out, a missing
+    directory ends the search, each directory `lstat`ed once per call);
+    which of the paths asked about (`ignoreQuery`) are directories; and
+    each `.gitignore` above them that is a regular file, as git 2.32 and
+    later read no symlinked one.
   - Outside a lane, as in tests on the host, nothing observes: the drain's
     source gives no traces, and no run reports a path.
 - **The observer, relayed to a host inside the lane** (`observer.ts`):
@@ -725,6 +728,13 @@ item 18, and in `lanes.test.ts` against the harness.
 - **Gitignored paths are skipped**, a shared `.plans` included, unless named
   as `path`. With no `path`, neither program is given one, so paths print
   without a leading `./`.
+- **`.gitignore` is read with or without a repo** (S180): both get
+  `--no-require-git`, so a folder project's lane, which has none, skips
+  what git would; and `--no-ignore-parent`, so no file above the directory
+  searched counts. rg reads no global excludes file (`--no-ignore-global`)
+  and fd not its own (`--no-global-ignore-file`); fd has no flag for git's,
+  which in a lane only the lane's home can hold. `.ignore` still counts: it
+  only hides more from search, never less.
 - **The tests** cover the plans and words purely (`search.test.ts`), and a
   stand-in rg run through the real helper (`lanes.test.ts`), which shows the
   head capture and the absolute path crossing the channel. The real programs

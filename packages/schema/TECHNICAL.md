@@ -418,7 +418,7 @@ A session is a document per root, the session's own, and `pinetrie:live`.
 ## Persistence
 
 The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
-over `node:sqlite`, `.pinetrie/pinetrie.db` by default. It holds every document the
+over `node:sqlite`, `pinetrie.db` in the session's data directory by default. It holds every document the
 host serves, one append-only record stream per document: each root's
 `RootDoc`, which is also pi's storage, the session's, `pinetrie:live`, each
 live card's text, the places document, each person's history of moves per

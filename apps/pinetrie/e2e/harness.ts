@@ -395,10 +395,16 @@ export const FIXTURE_PACKAGES: readonly string[] = [
 let suiteDirs: { readonly config: string; readonly data: string } | undefined
 
 /** This process's config and data directories, made once. */
-const suiteDirsNow = () => {
-  suiteDirs ??= {
-    config: mkdtempSync(path.join(tmpdir(), "pinetrie-suite-config-")),
-    data: mkdtempSync(path.join(tmpdir(), "pinetrie-suite-data-")),
+export const suiteDirsNow = () => {
+  if (suiteDirs === undefined) {
+    const data = mkdtempSync(path.join(tmpdir(), "pinetrie-suite-data-"))
+    // A session's lane runtime and ignore file are in it, and a rootless
+    // Docker binds them as another user (`committedProject`).
+    chmodSync(data, 0o755)
+    suiteDirs = {
+      config: mkdtempSync(path.join(tmpdir(), "pinetrie-suite-config-")),
+      data,
+    }
   }
   return suiteDirs
 }

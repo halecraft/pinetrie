@@ -98,6 +98,17 @@ The host watches `main` as it watches accepted work, so moving it in jj updates
 what the publish button says. Moving accepted work or `main` by hand is the same
 act as the host's: `jj bookmark move pinetrie-accepted main --to @-`.
 
+## Files the host writes
+
+None of pine·trie's own: the session's store, and its lanes' runtime,
+ignore file and ssh files, are in the session's data directory,
+`$XDG_DATA_HOME/pinetrie/sessions/<name>/` (ADR-0150), never in your
+project. Nor does it add a line of its own to `.git/info/exclude`: the
+only lines it writes there are shared directories (`lanes.shared`) that
+nothing already ignores, so no commit of yours takes in what lanes write
+to them. A jj repo with no git directory beside it is refused at startup:
+lanes' history reaches your repo through git.
+
 ## Config the host writes
 
 "Set up", the page's button before accepted work exists, writes two settings to the

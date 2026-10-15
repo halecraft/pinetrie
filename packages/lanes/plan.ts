@@ -10,6 +10,7 @@ import { createHash } from "node:crypto"
 import path from "node:path"
 import {
   type ConfigWidening,
+  DISK_OWN_ROOTS,
   HOST_WORKING_COPY,
   hostPathInLane,
   isWithin,
@@ -40,8 +41,6 @@ export const RUNTIME_BIN = `${RUNTIME_MOUNT}/bin`
 /** The lane's own jj config, on its disk so that forks inherit it. */
 export const LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pinetrie-lane`
 export const LANE_JJ_CONFIG = `${LANE_CONFIG_DIR}/jj.toml`
-/** The directory the host keeps in a project's root (`pinetrieDir`). */
-export const PROJECT_DIR = ".pinetrie"
 
 declare const baseLaneBrand: unique symbol
 /**
@@ -342,14 +341,13 @@ export const laneGitConfig = (): string =>
   `[safe]\n\tdirectory = ${HOST_WORKING_COPY}\n\tdirectory = ${HOST_WORKING_COPY}/.git\n`
 
 /**
- * The lane's ignore file: what no repo in a lane may track. pine·trie's own
- * config, the file system's own directory, pnpm's store and each shared
- * directory.
+ * The lane's ignore file: what no repo in a lane may track. The paths a disk
+ * keeps for pine·trie, the repos and the file system, pnpm's store and each
+ * shared directory.
  */
 export const laneIgnores = (shared: readonly string[]): string =>
   [
-    "/.pinetrie-lane/",
-    "/lost+found/",
+    ...DISK_OWN_ROOTS.map(r => `/${r}/`),
     // pnpm keeps its store at the root of the file system it installs on,
     // which in a lane is the disk's: no repo in a lane may track it.
     "/.pnpm-store/",
@@ -495,13 +493,13 @@ export const DEFAULT_VM_SLOTS = 16
 export const MAX_VM_SLOTS = 20
 
 /** Where a shared directory may never be: repos, pine·trie's own, dependencies. */
-const NEVER_SHARED = [".git", ".jj", PROJECT_DIR, "node_modules"]
+const NEVER_SHARED = [".git", ".jj", "node_modules"]
 
 /**
  * Which shared directories apply, and what to do for them on the host, from
  * the settled list (the person's entries first, as the join puts them),
  * normalized and without duplicates. Refused: absolute paths, paths that leave the project, those
- * in `.git`, `.jj`, `.pinetrie` or `node_modules`, and those holding files jj
+ * in `.git`, `.jj` or `node_modules`, and those holding files jj
  * tracks. A missing directory is created; one your repo does not already
  * ignore is added to its exclude file.
  */
@@ -560,37 +558,35 @@ export function sharedCandidates(entries: readonly string[]): {
   return { candidates, refused }
 }
 
-/** The line in your repo's exclude file that keeps `pinetrieDir` out of it. */
-export const EXCLUDE_LINE = `/${PROJECT_DIR}/`
-
-/**
- * What the host keeps in a project, all under `.pinetrie/` at its root, which
- * `EXCLUDE_LINE` keeps out of the project's repo.
- */
-export function pinetrieDir(root: string): {
-  readonly dir: string
-  /** The session's SQLite file, unless `PINETRIE_STORE` names another. */
-  readonly store: string
-  /** `base.json`; Docker keeps lanes' snapshots in its lanes directory. */
-  readonly snapshots: string
+/** What the host keeps for a session's lanes, on the host. */
+export interface LaneFiles {
   /** The lane runtime, one directory per image tag. */
   readonly runtime: string
-  /** The lanes' ignore file's directory (`laneIgnores`). */
+  /** The lanes' ignore file's directory (`laneIgnores`), mounted in every lane. */
   readonly laneGit: string
   /** What every lane's ssh is given, read-only (`@pinetrie/ssh`'s files). */
   readonly laneSsh: string
   /** The secret a lane's ssh token is made under. */
   readonly sshSecret: string
-} {
-  const dir = path.join(root, PROJECT_DIR)
+}
+
+/** Every file the host keeps for a session: none of them in its project. */
+export interface SessionFiles {
+  /** The session's SQLite file, unless `PINETRIE_STORE` names another. */
+  readonly store: string
+  readonly lanes: LaneFiles
+}
+
+/** A session's files, under its data directory (`sessions/<name>/`). */
+export function sessionFiles(sessionData: string): SessionFiles {
   return {
-    dir,
-    store: path.join(dir, "pinetrie.db"),
-    snapshots: path.join(dir, "snapshots"),
-    runtime: path.join(dir, "runtime"),
-    laneGit: path.join(dir, "lane-git"),
-    laneSsh: path.join(dir, "lane-ssh"),
-    sshSecret: path.join(dir, "ssh-secret"),
+    store: path.join(sessionData, "pinetrie.db"),
+    lanes: {
+      runtime: path.join(sessionData, "runtime"),
+      laneGit: path.join(sessionData, "lane-git"),
+      laneSsh: path.join(sessionData, "lane-ssh"),
+      sshSecret: path.join(sessionData, "ssh-secret"),
+    },
   }
 }
 
@@ -819,8 +815,8 @@ export type ProjectDirRefusal =
   | { readonly kind: "missing"; readonly dir: string }
   /** Your home directory or `/`. */
   | { readonly kind: "unsafe"; readonly root: string }
-  /** A jj repo with no git directory beside it to exclude `.pinetrie/` in. */
-  | { readonly kind: "unexcludable"; readonly root: string }
+  /** A jj repo with no git directory beside it, which lanes' history is fetched through. */
+  | { readonly kind: "not-colocated"; readonly root: string }
 
 /** A project's root and its kind, or why the folder cannot be one. */
 export type ProjectDir =
@@ -853,8 +849,8 @@ export function projectDirWords(r: ProjectDirRefusal): string {
       return `${r.dir} is not a directory`
     case "unsafe":
       return `${r.root} is your home directory or the file system's root`
-    case "unexcludable":
-      return `${r.root} has no git directory beside its jj repo to exclude .pinetrie/ in: \`jj git init --colocate\` makes one, or PINETRIE_STORE can name a store elsewhere`
+    case "not-colocated":
+      return `${r.root} has no git directory beside its jj repo, and lanes' work reaches your repo through git: \`jj git init --colocate\` makes one`
   }
 }
 
@@ -864,8 +860,8 @@ export const folderRefusal = (root: string): string =>
 
 /**
  * Your repo's exclude file with each of `lines` in it, appended in order, or
- * null when they are all there already. `/.pinetrie/` holds what `pinetrieDir`
- * lays out; shared directories are added as `/<path>/`.
+ * null when they are all there already. Shared directories are added as
+ * `/<path>/`.
  */
 export function planExclude(
   current: string,

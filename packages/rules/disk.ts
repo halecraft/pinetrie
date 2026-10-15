@@ -99,7 +99,7 @@ function pathsToCheck(input: {
   return [...all].filter(p => !isSkipped(p, input.shared)).sort()
 }
 
-/** What to ask `git check-ignore`, then its answer read back for the paths. */
+/** What to ask whether `.gitignore` ignores, then its answer read back for the paths. */
 export interface IgnoreQuery {
   /** Each path, or the first symlink on its way; no repeats, none beyond a symlink. */
   readonly asked: readonly string[]
@@ -108,9 +108,8 @@ export interface IgnoreQuery {
 }
 
 /**
- * The `.gitignore` question for `paths`. Git refuses a whole batch over one
- * path beyond a symlink, and sees a symlink as one entry: a path through
- * one stands as the first symlink on its way does.
+ * The `.gitignore` question for `paths`. Git sees a symlink as one entry, so
+ * a path through one stands as the first symlink on its way does.
  */
 export function ignoreQuery(
   paths: readonly string[],

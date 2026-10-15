@@ -12,7 +12,7 @@
       "!!**/dist",
       "!!**/.pnpm-store",
       "!!sandbox",
-      "!!.pinetrie",
+      "!!.pinetrie-lane",
       "!!.plans",
       "!!packages/docker/seccomp-*.json"
     ]

@@ -1,4 +1,11 @@
-import { mkdir, mkdtemp, readFile, realpath, rm } from "node:fs/promises"
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { run } from "@pinetrie/lanes"
@@ -6,7 +13,7 @@ import { expect, test } from "vitest"
 import { DEFAULT_REPO, isBookmarkName } from "./lane/names.ts"
 import { prepareProjectDir } from "./startup.ts"
 
-test("prepareProjectDir: .pinetrie/ excluded once, in a git repo too; a non-colocated repo refused; a plain folder untouched", async () => {
+test("prepareProjectDir: a project's root and kind, written nowhere; a non-colocated repo refused", async () => {
   const dir = await realpath(
     await mkdtemp(path.join(tmpdir(), "pinetrie-dir-")),
   )
@@ -24,13 +31,14 @@ test("prepareProjectDir: .pinetrie/ excluded once, in a git repo too; a non-colo
     const found = { kind: "jj", root: colocated }
     expect(await prepareProjectDir(path.join(colocated, "sub"))).toEqual(found)
     expect(await prepareProjectDir(colocated)).toEqual(found)
-    expect(await readFile(exclude, "utf8")).toBe(`${before}/.pinetrie/\n`)
+    expect(await readFile(exclude, "utf8").catch(() => "")).toBe(before)
+    expect((await readdir(colocated)).sort()).toEqual([".git", ".jj", "sub"])
 
     const apart = path.join(dir, "apart")
     await run("jj", ["git", "init", "--no-colocate", apart], { env })
     expect(await prepareProjectDir(apart)).toEqual({
       kind: "refused",
-      refusal: { kind: "unexcludable", root: apart },
+      refusal: { kind: "not-colocated", root: apart },
     })
 
     const gitOnly = path.join(dir, "git-only")
@@ -39,9 +47,7 @@ test("prepareProjectDir: .pinetrie/ excluded once, in a git repo too; a non-colo
       kind: "folder",
       root: gitOnly,
     })
-    expect(
-      await readFile(path.join(gitOnly, ".git", "info", "exclude"), "utf8"),
-    ).toContain("/.pinetrie/\n")
+    expect((await readdir(gitOnly)).sort()).toEqual([".git"])
 
     const plain = path.join(dir, "plain")
     await mkdir(plain)

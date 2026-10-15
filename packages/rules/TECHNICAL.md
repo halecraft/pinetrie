@@ -88,6 +88,9 @@ follow this list. A name only this package uses is imported from its module.
   stores it and as every wording names it.
 - `offer.ts`, `offer-view.ts`, `review.ts`: an offer's record and the
   host's decisions about it, the page's view of it, and the review's wire.
+- `ignores.ts`, its own export (`@pinetrie/rules/ignores`, which the page
+  never imports): whether a project's `.gitignore` files ignore a path,
+  with no repo (`ignoredPaths`, below).
 
 Every module decodes through `decodeWith` (`decode.ts`), which is
 total: a malformed value is dropped, never thrown. `recordsOf` and
@@ -1279,14 +1282,25 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
       paths to hash (new recipes' inputs, new roots' `CACHEDIR.TAG`), and
       its `next` throws on an answer short of one.
     - **A path through a symlink stands as the first symlink on its way**
-      (`ignoreQuery`, S179). `git check-ignore` refuses a whole batch over
-      one path beyond a symlink, and a failed lookup is reported by the
-      name the process gave, which can run through one: pnpm's
+      (`ignoreQuery`, S179). A failed lookup is reported by the name the
+      process gave, which can run through one: pnpm's
       `node_modules/.pnpm/*/node_modules/<dep>` are symlinks. Git sees a
-      symlink as one entry, so what lies beyond it shares its standing. The
-      host gathers the symlinks from the lane (`firstSymlinks`), asks git
-      about `asked`, and `ignored` reads the answer back for the paths, so
-      `classify` is still answered for exactly the paths it named.
+      symlink as one entry, so what lies beyond it shares its standing.
+      The host gathers the symlinks from the lane, asks about `asked`, and
+      `ignored` reads the answer back for the paths, so `classify` is still
+      answered for exactly the paths it named.
+    - **`.gitignore` is read as git reads it, with no repo**
+      (`ignoredPaths`, `ignores.ts`, ADR-0142, S180). One matcher (npm
+      `ignore`) per `.gitignore` above the paths (`ignoreDirs`), walked
+      from the root, the last match deciding; `own`, the lanes' ignore
+      file, is weaker than any `.gitignore`, as git ranks an excludes file.
+      A path under an ignored directory is ignored whatever a deeper
+      negation says, and a pattern ending in `/` matches only a directory,
+      so the lane says which paths asked about are directories. The host
+      gets the symlinks, the directories and the files in one call to the
+      lane (`ignoreFacts`, `@pinetrie/pi`). It agrees with `git
+      check-ignore` by test (`ignores.test.ts`), on S180's hard cases and
+      git itself.
     - **`classifyWrites` classes each path a run or a write tool wrote.** Not
       ignored is source. Ignored and written by a run that read source,
       unless the run read it before writing it (an edit in place), is

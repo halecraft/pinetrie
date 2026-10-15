@@ -35,12 +35,14 @@ test("a flag, or a second folder, is refused", () => {
   )
 })
 
-test("the store is PINETRIE_STORE when set, else .pinetrie/pinetrie.db in the project's root", () => {
-  expect(storeChoice("/p", {})).toEqual({
-    file: "/p/.pinetrie/pinetrie.db",
-    from: "project",
+test("the store is PINETRIE_STORE when set, else the session's own", () => {
+  expect(storeChoice("/d/sessions/p/pinetrie.db", {})).toEqual({
+    file: "/d/sessions/p/pinetrie.db",
+    from: "session",
   })
-  expect(storeChoice("/p", { PINETRIE_STORE: "/tmp/s.db" })).toEqual({
+  expect(
+    storeChoice("/d/sessions/p/pinetrie.db", { PINETRIE_STORE: "/tmp/s.db" }),
+  ).toEqual({
     file: "/tmp/s.db",
     from: "PINETRIE_STORE",
   })

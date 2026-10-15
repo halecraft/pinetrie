@@ -28,6 +28,5 @@ client/dist/
 # The record's index, written by `pnpm run record` (scripts/record.ts)
 docs/record.md
 
-# The session store (host/store.ts)
-.pinetrie/
+# Plans, shared live and never committed
 .plans/

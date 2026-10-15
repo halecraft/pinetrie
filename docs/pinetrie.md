@@ -529,14 +529,16 @@ context.**
 
 - `pnpm dev` starts a host on pine·trie's own repo, its page through
   Vite: loopback, your config's model, the session in
-  `.pinetrie/pinetrie.db`. `pnpm build` then `pnpm serve` runs one that
+  `pinetrie.db` in its data directory,
+  `~/.local/share/pinetrie/sessions/<name>/`. `pnpm build` then `pnpm serve` runs one that
   serves the built page, with no Vite (ADR-0148); `serve` rebuilds a page
   whose code changed since its build, and says so.
   `pnpm dev <folder>` (or `pnpm serve <folder>`) serves another project instead, at that folder's
   jj or git root (ADR-0086). A relative folder is read from pine·trie's root,
-  not the shell's directory. Each project keeps its own session in its
-  root's `.pinetrie/`, which the host adds to the repo's exclude file before
-  writing there; a jj repo with no git directory beside it is refused. The
+  not the shell's directory. Each folder is a session of its own, found by
+  its real path and named for it (ADR-0149); pine·trie keeps the session's
+  files in its data directory and writes nothing in the project
+  (ADR-0150). A jj repo with no git directory beside it is refused. The
   agent has its tools, and each
   thread's agent works in its own Linux container (ADR-0034), on a disk
   cloned from the turn it branched at: a root thread's starts from your
@@ -638,7 +640,7 @@ context.**
   the key. Everyone with the link gets in, and with tools on, can run commands
   on this machine as you. Use a trusted network or a tunnel.
 - `PINETRIE_MODEL` (`provider/id`) overrides the model. A root schema change
-  cannot open an existing store: move the project's `.pinetrie/pinetrie.db` aside.
+  cannot open an existing store: move the session's `pinetrie.db` aside.
 
 ## 7. Working agreements
 

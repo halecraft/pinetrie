@@ -17,6 +17,7 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import { dockerWords } from "@pinetrie/docker"
+import { type SessionFiles, sessionFiles } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import { readLaneRecords, readPlaces } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
@@ -36,6 +37,7 @@ import {
   lanesOf,
   setUpAccepted,
   suiteBinding,
+  suiteDirsNow,
   suitePlaces,
   suiteSshPlaces,
   treeOf,
@@ -114,13 +116,28 @@ export type SectionInput = Partial<
 
 export type SectionHost = Awaited<ReturnType<typeof sectionHost>>
 
+/** A host with tools, as a scenario starts one: its session's files are the suite's to give. */
+export type LaneHostOptions = Omit<StartHostOptions, "binding" | "project"> & {
+  readonly project: { readonly dir: string; readonly tools: true }
+}
+
+/**
+ * The files of the session a suite's host serves `dir` as: in the suite's
+ * data directory, one session per project folder, so hosts running at once
+ * never share an ignore file, and a host started again over a kept project
+ * finds its runtime.
+ */
+export const suiteSessionFiles = (dir: string): SessionFiles =>
+  sessionFiles(path.join(suiteDirsNow().data, "sessions", path.basename(dir)))
+
 /** What a scenario that declares `lanes: true` is given. */
 export interface LaneHosts {
   /**
    * `startHost` with the suite's places and binding unless the scenario
-   * gives its own places; a runtime that cannot run lanes stops it.
+   * gives its own places, and the session's files (`suiteSessionFiles`); a
+   * runtime that cannot run lanes stops it.
    */
-  startHost(options: Omit<StartHostOptions, "binding">): Promise<RunningHost>
+  startHost(options: LaneHostOptions): Promise<RunningHost>
   /** A host of a section's own, with accepted work set up (`sectionHost`). */
   sectionHost(input?: SectionInput): Promise<SectionHost>
 }
@@ -130,15 +147,17 @@ export const laneHosts: LaneHosts = {
   sectionHost: input => sectionHost(input ?? {}),
 }
 
-const startLaneHost = (
-  options: Omit<StartHostOptions, "binding">,
-): Promise<RunningHost> =>
+const startLaneHost = (options: LaneHostOptions): Promise<RunningHost> =>
   startHost({
     places: suitePlaces(),
     ssh: suiteSshPlaces(),
     binding: suiteBinding(),
     env: {},
     ...options,
+    project: {
+      ...options.project,
+      files: suiteSessionFiles(options.project.dir).lanes,
+    },
   })
 
 /**

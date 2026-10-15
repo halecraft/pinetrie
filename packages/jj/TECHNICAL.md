@@ -4,8 +4,8 @@ This package is jj's adapter, whole (ADR-0142): your repo as the host reads
 and writes it (the offers, the accepted work, and lanes' refs in it,
 ADR-0105, ADR-0104, ADR-0061, all through one owner, ADR-0065); each lane's
 own repo, as the `LaneHistory` port `@pinetrie/lanes` defines (A lane's
-repo); your repo at startup (`startup.ts`: finding its root, the exclude
-file, the shared directories, your repo's names); and every jj name
+repo); your repo at startup (`startup.ts`: finding its root, the shared
+directories and their exclude lines, your repo's names); and every jj name
 (`bookmarkName`, `laneTipName`, `offerBookmark`, `DEFAULT_REPO`). It declares
 `@pinetrie/core`, `@pinetrie/keeper` and `@pinetrie/lanes`
 (`workspace.test.ts`); `lanes` never imports it, and runs no jj
@@ -73,16 +73,18 @@ translates to.
 - `file-at.ts`: a file at accepted work, at a lane's tip or at its start
   (`fileAt`), the destination's read of `pinetrie.json`.
 - `startup.ts`: your repo before its owner starts. `prepareProjectDir`
-  gathers the root's facts (`jj root`, else git's top level), plans them
-  (`planProjectDir`, `@pinetrie/lanes`), and adds `/.pinetrie/` to the
-  exclude file of a jj or git repo: the store is in the project whatever
-  its kind, and with tools off too. A non-colocated jj repo lacks the file
-  and is refused (S108). `server.ts` runs it before the store opens, and
-  `startHost` again, which then writes nothing (ADR-0086).
-  `prepareShared` is the shell around `planShared`: jj, not git's index,
-  says what is tracked (in a colocated repo the index can lag), it adds
-  unignored shared directories to the exclude file, and writes the lanes'
-  ignore file. It takes one list, the settled `lanes.shared`. Your repo's
+  gathers the root's facts (`jj root`, else git's top level) and plans them
+  (`planProjectDir`, `@pinetrie/lanes`), and writes nothing: pine·trie
+  keeps its files in the session's directory (ADR-0150). A jj repo with
+  no git directory beside it (`git rev-parse --git-dir` from its root
+  fails) is refused, `not-colocated` (S108), since lanes' history reaches
+  your repo through git. `server.ts` runs it before the session opens, and
+  `startHost` again (ADR-0086). `prepareShared` is the shell around
+  `planShared`: jj, not git's index, says what is tracked (in a colocated
+  repo the index can lag), and it adds unignored shared directories to the
+  exclude file, the only lines pine·trie writes in your repo. The lanes'
+  ignore file is the host's, not this package's. It takes one list, the
+  settled `lanes.shared`. Your repo's
   names (`RepoConfig`, in core, so the host's adapter and this package share
   one shape) are the host's settled values; `isBookmarkName` is
   the parser their kinds wrap. `revisionRead` compares two copies of
@@ -267,7 +269,8 @@ update's merge will change.**
   descendants (S57). That is why every read outside the owner is pinned.
 - **Startup reads your repo before the owner exists** (`startup.ts`):
   `prepareProjectDir` and `prepareShared` read it with `jjIn` and git from
-  its root, and write only its exclude file; nothing else runs yet. The
+  its root, and only `prepareShared` writes, to its exclude file; nothing
+  else runs yet. The
   adapter's `identity` reads your jj config (`user.name`) with `jjIn` too:
   config, not the repo.
 
@@ -797,7 +800,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
 - **`lane/plan.test.ts`, `lane/fetch-plan.test.ts`,
   `lane/revisions.test.ts`, `startup.test.ts`**: a lane's planners, which
   commits a move fetches, a turn's paths and a copy's facts against jj, and
-  the startup's root, exclude file and repo names.
+  the startup's root and kind, and repo names.
 - **`apps/pinetrie/host/jj/offers/refresh.test.ts`** runs the host's own refresh
   (`createRefresh`, a real owner) on the histories S97 found, until a round
   writes nothing: it lives with the host, since this package may not import

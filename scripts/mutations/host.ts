@@ -1667,22 +1667,37 @@ export const mutations: readonly Mutation[] = [
     expect: "a flag, or a second folder, is refused",
   },
   {
+    name: "the ssh secret is made readable by others",
+    file: "apps/pinetrie/host/work/ssh.ts",
+    from: '  await writeFile(file, made, { mode: 0o600, flag: "wx" })\n',
+    to: '  await writeFile(file, made, { mode: 0o644, flag: "wx" })\n',
+    command: unit,
+    expect:
+      "the ssh secret is yours alone in a directory others can read, and kept once made",
+  },
+  {
+    name: "a file that is no ssh secret is written over, keeping its mode",
+    file: "apps/pinetrie/host/work/ssh.ts",
+    from: '  await rm(file, { force: true })\n  await writeFile(file, made, { mode: 0o600, flag: "wx" })\n',
+    to: "  await writeFile(file, made, { mode: 0o600 })\n",
+    command: unit,
+    expect: "a file that is no secret is replaced by one that is yours alone",
+  },
+  {
     name: "PINETRIE_STORE is ignored",
     file: "apps/pinetrie/host/invocation.ts",
     from: "  return given === undefined\n",
     to: "  return true\n",
     command: unit,
-    expect:
-      "the store is PINETRIE_STORE when set, else .pinetrie/pinetrie.db in the project's root",
+    expect: "the store is PINETRIE_STORE when set, else the session's own",
   },
   {
-    name: "a store from PINETRIE_STORE is credited to the project",
+    name: "a store from PINETRIE_STORE is credited to the session",
     file: "apps/pinetrie/host/invocation.ts",
     from: '    : { file: given, from: "PINETRIE_STORE" }',
-    to: '    : { file: given, from: "project" }',
+    to: '    : { file: given, from: "session" }',
     command: unit,
-    expect:
-      "the store is PINETRIE_STORE when set, else .pinetrie/pinetrie.db in the project's root",
+    expect: "the store is PINETRIE_STORE when set, else the session's own",
   },
   // ── what a starting host logs ──
   {

@@ -1,3 +1,4 @@
+import path from "node:path"
 import { BASE_SNAPSHOT, pointId, snapshotId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { forkSetup } from "./history-port.ts"
@@ -33,6 +34,7 @@ import {
   planSnapshot,
   planStartFrom,
   type Step,
+  sessionFiles,
   slotMounts,
   specHash,
   specHashOf,
@@ -42,12 +44,14 @@ const LANE = threadIdFor("1")
 const C1 = pointId("c1")
 const C2 = pointId("c2")
 const HOME = "/Users/ada"
+const SESSION = "/xdg/data/pinetrie/sessions/p"
+const files = sessionFiles(SESSION)
 
 const parts = {
   hostWorkingCopy: "/p",
   pinetrie: "/opt/pinetrie",
-  runtime: "/p/.pinetrie/runtime/abc",
-  ignoreDir: "/p/.pinetrie/lane-git",
+  runtime: `${files.lanes.runtime}/abc`,
+  ignoreDir: files.lanes.laneGit,
   links: [{ source: "/k", target: "/k", readonly: true }],
   grants: [],
   shared: [],
@@ -71,12 +75,12 @@ describe("planMounts: every host path a lane sees, in one list", () => {
       { source: "/p", target: "/mnt/host-working-copy", readonly: true },
       { source: "/opt/pinetrie", target: "/pinetrie", readonly: true },
       {
-        source: "/p/.pinetrie/runtime/abc",
+        source: `${SESSION}/runtime/abc`,
         target: "/pinetrie-runtime",
         readonly: true,
       },
       {
-        source: "/p/.pinetrie/lane-git",
+        source: `${SESSION}/lane-git`,
         target: "/pinetrie-git",
         readonly: true,
       },
@@ -111,6 +115,22 @@ describe("slotMounts: what a host shares into its slot of the lane VM", () => {
     for (const m of [...planMounts({ ...parts, shared }), ...attached])
       expect(sources).toContain(m.source)
   })
+  test("the runtime and the ignore file's directory come from the session's data directory", () => {
+    const slot = slotMounts({
+      base: planMounts(parts),
+      shared: [],
+      attached: [],
+    })
+    const from = (target: string) => slot.find(m => m.target === target)?.source
+    expect(from("/pinetrie-runtime")).toBe(`${SESSION}/runtime/abc`)
+    expect(from("/pinetrie-git")).toBe(`${SESSION}/lane-git`)
+  })
+})
+
+test("sessionFiles: every file of a session under its data directory", () => {
+  const { store, lanes } = sessionFiles(SESSION)
+  for (const f of [store, ...Object.values(lanes)])
+    expect(path.dirname(f)).toBe(SESSION)
 })
 
 describe("planHostMounts: granted host paths, and the ones never mounted", () => {
@@ -186,7 +206,7 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
     )
     // pnpm's store, at the disk's root, is never tracked.
     expect(laneIgnores([".plans", "notes/shared"])).toBe(
-      "/.pinetrie-lane/\n/lost+found/\n/.pnpm-store/\n/.plans/\n/notes/shared/\n",
+      "/.pinetrie-lane/\n/.jj/\n/.git/\n/lost+found/\n/.pnpm-store/\n/.plans/\n/notes/shared/\n",
     )
   })
   test("never your home directory, and no variable no grant names", () => {
@@ -296,7 +316,7 @@ describe("planShared: which shared directories apply, and what the host does for
     expect(planned.create).toEqual(["notes", "shared/data"])
     expect(planned.exclude).toEqual(["notes", "shared/data"])
   })
-  test("refused, with a reason: absolute, leaving the project, in a repo's or pinetrie's own, tracked", () => {
+  test("refused, with a reason: absolute, leaving the project, in a repo or dependencies, tracked", () => {
     const planned = planShared({
       ...facts,
       entries: [
@@ -305,7 +325,6 @@ describe("planShared: which shared directories apply, and what the host does for
         ".",
         ".jj/plans",
         ".git",
-        ".pinetrie/x",
         "node_modules/y",
         "docs",
       ],
@@ -318,7 +337,6 @@ describe("planShared: which shared directories apply, and what the host does for
       ".: it leaves the project",
       ".jj/plans: it is inside .jj",
       ".git: it is inside .git",
-      ".pinetrie/x: it is inside .pinetrie",
       "node_modules/y: it is inside node_modules",
       "docs: it holds files jj tracks",
     ])
@@ -449,14 +467,14 @@ describe("the host: its root", () => {
     })
   })
   test("planExclude: adds each missing line once, on a line of its own", () => {
-    expect(planExclude("", ["/.pinetrie/"])).toBe("/.pinetrie/\n")
-    expect(planExclude("# x", ["/.pinetrie/", "/.plans/"])).toBe(
-      "# x\n/.pinetrie/\n/.plans/\n",
+    expect(planExclude("", ["/.notes/"])).toBe("/.notes/\n")
+    expect(planExclude("# x", ["/.notes/", "/.plans/"])).toBe(
+      "# x\n/.notes/\n/.plans/\n",
     )
-    expect(planExclude("a\n/.pinetrie/\n", ["/.pinetrie/", "/.plans/"])).toBe(
-      "a\n/.pinetrie/\n/.plans/\n",
+    expect(planExclude("a\n/.notes/\n", ["/.notes/", "/.plans/"])).toBe(
+      "a\n/.notes/\n/.plans/\n",
     )
-    expect(planExclude("a\n/.pinetrie/\n", ["/.pinetrie/"])).toBeNull()
+    expect(planExclude("a\n/.notes/\n", ["/.notes/"])).toBeNull()
   })
   test("planContainer: create, recreate from another spec, start, or nothing", () => {
     const decide = (

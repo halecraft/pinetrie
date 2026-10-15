@@ -1,5 +1,5 @@
 // host/work/disk — what a turn wrote, classed: its runs drained, the
-// paths they name checked against `.gitignore` in the lane, the new recipes'
+// paths they name checked against the lane's `.gitignore` files, the new recipes'
 // inputs hashed, and the registry written, all before the turn's snapshot,
 // so the snapshot holds the registry its outputs are kept by. After the
 // snapshot, in the same queued step (the container stops after a run), its
@@ -18,6 +18,7 @@ import {
 import {
   LANE_CONFIG_DIR,
   type LaneHandle,
+  laneIgnores,
   REGISTRY_FILE,
 } from "@pinetrie/lanes"
 import { drainLaneRuns, type LaneChannel } from "@pinetrie/pi"
@@ -31,37 +32,31 @@ import {
   unattributed,
   writesToClass,
 } from "@pinetrie/rules"
+import { ignoredPaths } from "@pinetrie/rules/ignores"
 
 const REGISTRY = `${LANE_CONFIG_DIR}/${REGISTRY_FILE}`
 
 /**
  * Of `paths`, those the lane's `.gitignore` files and its ignore file
- * ignore. A path through a symlink is asked about as the first symlink on
- * its way (`ignoreQuery`): git fails a whole batch over one path beyond a
- * symlink. On `--stdin`: a turn can name more paths than a command line
- * holds.
+ * (`laneIgnores`, with `shared`) ignore, read from the lane in one call. A
+ * path through a symlink is classed as the first symlink on its way
+ * (`ignoreQuery`).
  */
 async function checkIgnored(
   channel: LaneChannel,
   paths: readonly string[],
+  shared: readonly string[],
 ): Promise<ReadonlySet<string>> {
   if (paths.length === 0) return new Set()
-  const query = ignoreQuery(paths, await channel.firstSymlinks(paths))
-  const ran = await channel.run(
-    ["git", "check-ignore", "--no-index", "-z", "--stdin"],
-    false,
-    undefined,
-    `${query.asked.join("\0")}\0`,
-  )
-  // 1: none is ignored.
-  if (ran.code !== 0 && ran.code !== 1)
-    throw new Error(`git check-ignore failed: ${ran.stderr}`)
+  const facts = await channel.ignoreFacts(paths)
+  const query = ignoreQuery(paths, facts.firstSymlinks)
   return query.ignored(
-    new Set(
-      String(ran.stdout)
-        .split("\0")
-        .filter(p => p !== ""),
-    ),
+    ignoredPaths({
+      files: facts.files,
+      own: laneIgnores(shared),
+      paths: query.asked,
+      dirs: new Set(facts.dirs),
+    }),
   )
 }
 
@@ -144,7 +139,9 @@ export async function classifyWritesOnQueue(input: {
     shared,
     changed: input.changed,
   })
-  const writes = toClass.classify(await checkIgnored(channel, toClass.paths))
+  const writes = toClass.classify(
+    await checkIgnored(channel, toClass.paths, shared),
+  )
   if (
     writes.made.length === 0 &&
     writes.roots.size === 0 &&
@@ -181,7 +178,7 @@ export async function diskOfTurn(input: {
       ? []
       : unattributed(input.writes, input.diff, input.shared)
   const { channel } = await input.handle.link()
-  const ignored = await checkIgnored(channel, rest)
+  const ignored = await checkIgnored(channel, rest, input.shared)
   return turnDisk(
     input.writes,
     rest.filter(p => ignored.has(p)),

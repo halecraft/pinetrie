@@ -151,24 +151,35 @@ describe("the helper", () => {
       "h.txt": sha256("two"),
     })
   })
-  test("firstSymlinks names the first symlink on a path's way, and nothing else", async () => {
+  test("ignoreFacts names the first symlink on a path's way, and nothing else", async () => {
     await mkdir(path.join(h.dir, "real/inner"), { recursive: true })
     await symlink("real", path.join(h.dir, "link"))
     await symlink("../real", path.join(h.dir, "real/back"))
-    expect(
-      await h.channel.firstSymlinks([
-        "link/inner/x.json",
-        "link/back/inner/q",
-        "real/back/inner/y",
-        "link",
-        "real/inner/z",
-        "gone/link/w",
-      ]),
-    ).toEqual({
+    const facts = await h.channel.ignoreFacts([
+      "link/inner/x.json",
+      "link/back/inner/q",
+      "real/back/inner/y",
+      "link",
+      "real/inner/z",
+      "gone/link/w",
+    ])
+    expect(facts.firstSymlinks).toEqual({
       "link/inner/x.json": "link",
       "link/back/inner/q": "link",
       "real/back/inner/y": "real/back",
     })
+  })
+  test("ignoreFacts names the directories asked about and each regular .gitignore above them", async () => {
+    await mkdir(path.join(h.dir, "ig/out"), { recursive: true })
+    await mkdir(path.join(h.dir, "ig/sub"), { recursive: true })
+    await writeFile(path.join(h.dir, "ig/.gitignore"), "out/\n")
+    await writeFile(path.join(h.dir, "ig/sub/real-ignore"), "*\n")
+    await symlink("real-ignore", path.join(h.dir, "ig/sub/.gitignore"))
+    const facts = await h.channel.ignoreFacts(["ig/out", "ig/sub/f.txt"])
+    expect(facts.dirs).toEqual(["ig/out"])
+    expect(facts.files.filter(f => f.dir.startsWith("ig"))).toEqual([
+      { dir: "ig", text: "out/\n" },
+    ])
   })
   test("checkRecipes: a recipe holds until an input changes or a lookup is found", async () => {
     await writeFile(path.join(h.dir, "lock"), "one")

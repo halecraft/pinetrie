@@ -13,6 +13,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  rm,
   stat,
   writeFile,
 } from "node:fs/promises"
@@ -29,11 +30,11 @@ import {
 } from "@pinetrie/core"
 import {
   type LaneAttached,
+  type LaneFiles,
   type LaneOwner,
   type Mount,
   NOTHING_ATTACHED,
   PINETRIE_MOUNT,
-  pinetrieDir,
   runtimeNode,
 } from "@pinetrie/lanes"
 import { readRecords } from "@pinetrie/reads"
@@ -172,12 +173,17 @@ async function serviceKeyFiles(dir: string) {
   )
 }
 
-/** The secret every lane's token is made under, made once per project. */
-async function sshSecret(file: string): Promise<Uint8Array> {
+/**
+ * The secret every lane's token is made under, made once per session, and
+ * readable by you alone whatever its directory's mode. A file that is no
+ * secret is removed first: writing over it would keep its mode.
+ */
+export async function sshSecret(file: string): Promise<Uint8Array> {
   const kept = await readFile(file).catch(() => null)
   if (kept !== null && kept.length === 32) return kept
   const made = randomBytes(32)
-  await writeFile(file, made, { mode: 0o600 })
+  await rm(file, { force: true })
+  await writeFile(file, made, { mode: 0o600, flag: "wx" })
   return made
 }
 
@@ -189,7 +195,8 @@ async function sshSecret(file: string): Promise<Uint8Array> {
 export async function startLaneSsh(input: {
   readonly basics: Pick<Basics, "session" | "log" | "now">
   readonly records: Pick<Records, "writeValues">
-  readonly root: string
+  /** Where the lanes' ssh files and the secret are kept (`sessionFiles`). */
+  readonly files: Pick<LaneFiles, "laneSsh" | "sshSecret">
   /** `lanes.ssh`'s settled values, under accepted work's grant (`sshChoice`). */
   readonly choice: Parameters<typeof sshSettings>[0]
   /** The service identities' folder: `ssh/` in pine·trie's config directory. */
@@ -264,7 +271,7 @@ export async function startLaneSsh(input: {
     return NO_SSH
   }
 
-  const { laneSsh, sshSecret: secretFile } = pinetrieDir(input.root)
+  const { laneSsh, sshSecret: secretFile } = input.files
   await mkdir(path.join(laneSsh, "keys"), { recursive: true })
   await writeFile(path.join(laneSsh, "config"), files.config)
   await writeFile(path.join(laneSsh, "known_hosts"), files.knownHosts)

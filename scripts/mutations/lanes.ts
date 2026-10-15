@@ -26,6 +26,15 @@ export const mutations: readonly Mutation[] = [
       "every directory a lane mounts, its shared directories with the base's",
   },
   {
+    name: "the lanes' ignore file leaves out a root pine·trie keeps on a disk",
+    file: plan,
+    from: "    ...DISK_OWN_ROOTS.map(r => `/${r}/`),\n",
+    to: "    ...DISK_OWN_ROOTS.slice(1).map(r => `/${r}/`),\n",
+    command: unit,
+    expect:
+      "every repo in the lane ignores what the ignore file lists, through git's own variables",
+  },
+  {
     name: "a new directory's entries keep its orphan name",
     file: "packages/lanehost/send-stream.ts",
     from: "          moveUnder(path, to)\n",
@@ -147,13 +156,13 @@ export const mutations: readonly Mutation[] = [
       "two lanes write one shared file: the write over the other's is flagged concurrent, the other is not",
   },
   {
-    name: "the host asks git about paths beyond a symlink",
-    file: "apps/pinetrie/host/work/disk.ts",
-    from: "  const query = ignoreQuery(paths, await channel.firstSymlinks(paths))\n",
-    to: "  const query = ignoreQuery(paths, {})\n",
+    name: "the host writes a .pinetrie/ in the project again",
+    file: "packages/jj/startup.ts",
+    from: '  const git = await run("git", ["rev-parse", "--git-dir"], {\n',
+    to: '  const git = await run("sh", ["-c", "mkdir -p .pinetrie && git rev-parse --git-dir"], {\n',
     suite: "lanes",
-    scenario: "recipe",
-    expect: "a turn whose run writes and looks through a symlink is classed",
+    scenario: "main",
+    expect: "nothing of pine·trie's is written in your project",
   },
   {
     name: "a run's ignored writes are all local",

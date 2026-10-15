@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { configPlaces } from "@pinetrie/config"
+import { sessionFiles } from "@pinetrie/lanes"
 import { bindAgentDir, scriptedModel } from "@pinetrie/pi"
 import { afterAll, expect, test } from "vitest"
 import { HostRefused, startHost } from "./index.ts"
@@ -23,7 +24,12 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }))
 test("a host with tools on a folder with no jj repo does not start, and says how to make one", async () => {
   const started = startHost({
     model: { kind: "scripted", script: scriptedModel() },
-    project: { dir, tools: true },
+    project: {
+      dir,
+      tools: true,
+      files: sessionFiles(path.join(places.dirs.data, "sessions", "plain"))
+        .lanes,
+    },
     places,
     binding,
     env: {},
@@ -77,5 +83,8 @@ test("a PINETRIE_SESSION naming another session than the folder's own exits 2 be
   )
   expect(run.status).toBe(2)
   expect(run.stderr).toContain("this folder is session website")
-  expect(existsSync(path.join(site, ".pinetrie"))).toBe(false)
+  for (const name of ["website", "blog"])
+    expect(
+      existsSync(path.join(data, "pinetrie", "sessions", name, "pinetrie.db")),
+    ).toBe(false)
 })

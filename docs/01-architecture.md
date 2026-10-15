@@ -251,10 +251,13 @@ is built too: a lane's history has one kind, on its record, a new lane's
 the kind of the disk it clones; lane work names states by points
 (`PointId`), opaque ids that only a lane proven jj reads as commits; and
 no run starts on a lane of another kind than the project's (`Runs.start`
-takes a proof), each path that would start one refused with words. The
-folder's adapter is not built, nor ADR-0150's move of every session's
-store to its session's directory, nor the sweep of the other kind's
-destination records.
+takes a proof), each path that would start one refused with words.
+Every session keeps pine·trie's own files in its data directory (ADR-0150),
+whatever the project's kind: pine·trie writes nothing in your project, and
+no exclude line for itself. A turn's classes read `.gitignore` with a pure
+matcher (`@pinetrie/rules/ignores`), and the search tools read it with no
+repo too. The folder's adapter is not built, nor the sweep of the other
+kind's destination records.
 
 pine·trie reads only its own config (ADR-0146): five layers (system, user,
 project, local, env), each a `pinetrie.json` but the last, and every setting

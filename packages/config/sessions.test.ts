@@ -153,7 +153,6 @@ describe("planSession", () => {
       kind: "new",
       entry: entry("/w/website", "site", 100),
       write: registry(entry("/w/website", "site", 100)),
-      movedFrom: null,
     })
   })
 
@@ -185,26 +184,17 @@ describe("planSession", () => {
     expect(secondName).not.toBe(firstName)
   })
 
-  test("a new session names the most recent gone one of its base as moved", () => {
-    const older = entry("/x/website", "website", 5)
-    const newer = entry("/y/website", "website-quiet-fox", 9)
-    const elsewhere = entry("/z/blog", "blog", 20)
+  test("a folder beside a gone session of its name is a new session, the gone one kept", () => {
+    const gone = entry("/x/website", "website", 5)
     const plan = planSession(
-      registry(older, newer, elsewhere),
-      facts({
-        path: "/n/website",
-        gone: new Set(["/x/website", "/y/website", "/z/blog"]),
-      }),
+      registry(gone),
+      facts({ path: "/n/website", gone: new Set(["/x/website"]) }),
     )
-    expect(plan.kind === "new" && plan.movedFrom).toEqual(newer)
-  })
-
-  test("a new session names none as moved when every folder of its base exists", () => {
-    const plan = planSession(
-      registry(entry("/x/website", "website")),
-      facts({ path: "/n/website" }),
+    expect(plan.kind).toBe("new")
+    expect(plan.kind === "new" && plan.entry.name).toMatch(
+      /^website-[a-z]+-[a-z]+$/,
     )
-    expect(plan.kind === "new" && plan.movedFrom).toBeNull()
+    expect(plan.kind === "new" && plan.write.entries[0]).toEqual(gone)
   })
 })
 

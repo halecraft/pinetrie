@@ -16,7 +16,8 @@
 //                    folder's, attached to it again (default: the folder's
 //                    own, found by its real path, or a new one)
 //   PINETRIE_STORE     the SQLite file the session and pasted images are kept in
-//                    (default .pinetrie/pinetrie.db in the project's root)
+//                    (default pinetrie.db in the session's data directory,
+//                    $XDG_DATA_HOME/pinetrie/sessions/<name>/)
 //   PINETRIE_MODEL     the model, as provider/id, over every config file's
 //                    `model` (the config's env layer)
 //   XDG_CONFIG_HOME, XDG_DATA_HOME, XDG_CONFIG_DIRS
@@ -35,6 +36,7 @@ import { homedir } from "node:os"
 import path from "node:path"
 import { configPlaces, sessionWords } from "@pinetrie/config"
 import { prepareProjectDir } from "@pinetrie/jj"
+import { sessionFiles } from "@pinetrie/lanes"
 import { bindAgentDir } from "@pinetrie/pi"
 import { HostRefused, startHost } from "./index.ts"
 import {
@@ -88,9 +90,10 @@ export async function runHost(
     console.error(`[host] ${sessionWords(opened.refused)}`)
     process.exit(2)
   }
-  const store = storeChoice(root, env)
+  const files = sessionFiles(opened.dir)
+  const store = storeChoice(files.store, env)
   console.log(projectLine(root))
-  for (const l of sessionLines(opened.plan, home, command)) console.log(l)
+  for (const l of sessionLines(opened.plan, home)) console.log(l)
   console.log(storeLine(store))
   const places = configPlaces(env, home, opened.name)
   const host = await startHost({
@@ -101,7 +104,10 @@ export async function runHost(
     places,
     // Before pi loads anything: an extension finds its own config through it.
     binding: bindAgentDir(places.dirs.config),
-    project: { dir: root, tools: env.PINETRIE_TOOLS !== "0" },
+    project:
+      env.PINETRIE_TOOLS === "0"
+        ? { dir: root, tools: false }
+        : { dir: root, tools: true, files: files.lanes },
     served: { name: opened.name, path: opened.path },
     store: store.file,
     page: await page(),

@@ -258,6 +258,9 @@ importers:
       '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
+      ignore:
+        specifier: 7.0.8
+        version: 7.0.8
       mdast-util-from-markdown:
         specifier: 2.0.3
         version: 2.0.3

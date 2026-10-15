@@ -37,6 +37,16 @@ describe("grepArgs", () => {
   test("no path searches the working directory, so paths have no ./", () => {
     expect(grepArgs({ pattern: "a" }).slice(-2)).toEqual(["--", "a"])
   })
+
+  test("reads .gitignore with no repo, and none above the search or in the person's config", () => {
+    expect(grepArgs({ pattern: "a" })).toEqual(
+      expect.arrayContaining([
+        "--no-require-git",
+        "--no-ignore-parent",
+        "--no-ignore-global",
+      ]),
+    )
+  })
 })
 
 describe("findArgs", () => {
@@ -54,6 +64,16 @@ describe("findArgs", () => {
     ])
     expect(findArgs({ pattern: "**/x/*.ts" }).slice(-1)).toEqual(["**/x/*.ts"])
     expect(findArgs({ pattern: "/abs/*.ts" }).slice(-1)).toEqual(["/abs/*.ts"])
+  })
+
+  test("reads .gitignore with no repo, and none above the search or fd's own global file", () => {
+    expect(findArgs({ pattern: "*" })).toEqual(
+      expect.arrayContaining([
+        "--no-require-git",
+        "--no-ignore-parent",
+        "--no-global-ignore-file",
+      ]),
+    )
   })
 
   test("asks fd for one result more than the limit", () => {

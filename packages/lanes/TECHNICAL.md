@@ -164,8 +164,11 @@ compare a function with itself.
   host chooses the project's adapter (`apps/pinetrie/host/project.ts`).
   `folderRefusal` words why a folder has no lanes yet. `planShared` and `sharedCandidates` decide the shared
   directories, which `@pinetrie/jj`'s `prepareShared` carries out.
-  `pinetrieDir` is the layout of `.pinetrie/`: the store, snapshots, the
-  runtime and `lane-git`.
+  `sessionFiles` is the layout of a session's data directory
+  (`$XDG_DATA_HOME/pinetrie/sessions/<name>/`, ADR-0149, ADR-0150): the
+  store, and the lanes' `runtime`, `lane-git`, `lane-ssh` and ssh secret.
+  The host computes it once and hands each part in; nothing of pine·trie's
+  is written in the project, for any kind (ADR-0142).
 - `image.ts`, `runtime.ts`: the image and the lane runtime. `image.ts`
   gathers what `planImages` needs and builds what it plans.
 - `runtime-port.ts`: `LaneRuntime`, every call the host makes to a
@@ -253,14 +256,15 @@ compare a function with itself.
   and git, `sync` and bundles. It is pi's `openChannel` over the runtime's
   `exec -i` (`helperCommand`), and a call takes 0.3–1 ms. An `exec` per
   call would take 25–70 ms (S39, S43, S128).
-- **The lane runtime is on the host**, in `.pinetrie/runtime/<image tag>/`
+- **The lane runtime is on the host**, in the session's
+  `runtime/<image tag>/` (`sessionFiles`)
   (`ensureRuntime`), extracted as a tar on a throwaway container's stdout
   (`EXTRACT`, `runInImage`): every runtime has that way out, and a slot of
   the lane VM shares it read-only like any other directory.
 - **The helper runs on the lane runtime** (`runtimeNode`):
   `/pinetrie-runtime/node/ld-linux-aarch64.so.1 --library-path … node …`. The
   runtime is copied out of pine·trie's default image into
-  `.pinetrie/runtime/<image tag>/`: Node, the libraries `ldd` lists for it,
+  `runtime/<image tag>/`: Node, the libraries `ldd` lists for it,
   glibc's loader, and in `bin/` static builds of core's `RUNTIME_PROGRAMS`
   (jj, rg, fd, sd). So the helper runs on any image, musl or glibc, with or
   without Node (S44), and every lane has those programs (ADR-0064). Only
@@ -360,7 +364,7 @@ compare a function with itself.
   per lane, A lane's config, below) and your file for the project, in that
   order, each once. `planShared` takes that list and refuses:
   - absolute paths, and paths that leave the project;
-  - anything in `.git`, `.jj`, `.pinetrie` or `node_modules`;
+  - anything in `.git`, `.jj` or `node_modules`;
   - a path holding files the project tracks. jj's adapter gathers it
     (`@pinetrie/jj`'s `prepareShared`, with `jj file list`).
 
@@ -387,8 +391,11 @@ compare a function with itself.
   the lineages and the watcher the host's (`apps/pinetrie/host/TECHNICAL.md`,
   `shared.ts`, `shared-watch.ts`).
 - **No repo may track a shared directory.**
-  - **In a lane,** the host writes `.pinetrie/lane-git/ignore` (`laneIgnores`:
-    `/.pinetrie-lane/`, `/lost+found/`, each shared directory). It mounts its
+  - **In a lane,** the host writes the session's `lane-git/ignore`
+    (`laneIgnores`: each of core's `DISK_OWN_ROOTS`, the one list of the
+    paths pine·trie keeps on a disk; `/.pnpm-store/`; each shared
+    directory), for every kind of project, each time the shared directories
+    are prepared and before they are in force. It mounts its
     directory read-only at `/pinetrie-git`, and names the file as git's
     `core.excludesFile` through `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0` and
     `GIT_CONFIG_VALUE_0`. jj reads it too (S45 item 7), so every repo in the
@@ -399,8 +406,8 @@ compare a function with itself.
     command that ran first tracks the files, and adding accepted work later does
     not untrack them (S45 item 4).
   - **In your repo,** a shared directory nothing already ignores is added to
-    `.git/info/exclude`, as `/.pinetrie/` is. `git check-ignore` decides, so
-    your global git ignore counts.
+    `.git/info/exclude`: the only line pine·trie writes there. `git
+    check-ignore` decides, so your global git ignore counts.
 
 ## What the host attaches (ADR-0140)
 
@@ -416,7 +423,7 @@ compare a function with itself.
   owner's ssh identity (`lanes.ssh.personal: true`). It rides the grants' model
   (`effectiveLaneConfig`): a lane can give it up, and only acceptance
   widens it. What it means is the host's.
-- **`pinetrieDir`'s `laneSsh` and `sshSecret`** are the files every lane
+- **`sessionFiles`' `laneSsh` and `sshSecret`** are the files every lane
   holding an identity mounts at `/pinetrie-ssh`, and the secret its token
   is made under; the app writes both.
 - **`KILL_SSH`** ends every `ssh` process in a lane, by its name in `/proc`,

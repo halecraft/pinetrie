@@ -33,6 +33,7 @@ import {
 } from "@pinetrie/core"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
+import type { LaneFiles } from "@pinetrie/lanes"
 import {
   type AgentDirBinding,
   createAgent,
@@ -191,9 +192,18 @@ export interface StartHostOptions {
    * `tools`, where the agent reads, writes and runs commands, each lane in its
    * own container, on its own disk. Absent or null: no project, and no tools.
    * With tools, a folder with no jj repo, or a runtime that cannot run lanes,
-   * refuses the start (`HostRefused`).
+   * refuses the start (`HostRefused`); and `files` is where the session keeps
+   * its lanes' runtime, ignore file and ssh files (`sessionFiles`), never in
+   * the project.
    */
-  readonly project?: { readonly dir: string; readonly tools: boolean } | null
+  readonly project?:
+    | {
+        readonly dir: string
+        readonly tools: true
+        readonly files: LaneFiles
+      }
+    | { readonly dir: string; readonly tools: false }
+    | null
   /**
    * Where each config layer's file is, and pine·trie's own directories; by
    * default from the XDG variables, with no local layer: only a session
@@ -449,6 +459,7 @@ export async function startHost({
     basics,
     found,
     adapter: chosen?.adapter ?? null,
+    files: project?.tools === true ? project.files : null,
     start,
   })
   const report: HostReport =

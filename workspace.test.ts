@@ -64,12 +64,15 @@ test("the protocol declares only Kyneta and core", () => {
   assert.deepEqual(extra, [])
 })
 
-test("rules declares only TypeBox, core, and the markdown parser the client's remark wraps", () => {
+test("rules declares only TypeBox, core, the markdown parser the client's remark wraps, and a .gitignore matcher", () => {
   // Which images a message shows is read from its markdown on the host, by
   // the parser under the client's remark-parse and remark-gfm, at the same
-  // versions, so both read one tree and the bundle holds one copy.
+  // versions, so both read one tree and the bundle holds one copy. `ignore`
+  // is behind its own export (`@pinetrie/rules/ignores`), which the page
+  // never imports.
   assert.deepEqual(deps(read("packages/rules")).sort(), [
     "@pinetrie/core",
+    "ignore",
     "mdast-util-from-markdown",
     "mdast-util-gfm",
     "micromark-extension-gfm",

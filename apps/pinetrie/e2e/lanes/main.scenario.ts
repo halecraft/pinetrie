@@ -184,6 +184,14 @@ async function mainSection(
           container(two.name) &&
         !existsSync(path.join(project, "who.txt")),
     )
+    const exclude = path.join(project, ".git", "info", "exclude")
+    check(
+      "nothing of pine·trie's is written in your project",
+      !existsSync(path.join(project, ".pinetrie")) &&
+        !(existsSync(exclude) ? readFileSync(exclude, "utf8") : "")
+          .split("\n")
+          .includes("/.pinetrie/"),
+    )
 
     // ── 3. The boundary ────────────────────────────────────────────────────
     script.use([

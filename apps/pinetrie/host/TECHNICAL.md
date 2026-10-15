@@ -10,7 +10,7 @@ wires them.
 
 | module | owns |
 |---|---|
-| `dev.ts`, `serve.ts`, `server.ts`, `invocation.ts` | `pnpm dev [folder]` and `pnpm serve [folder]` (ADR-0086, ADR-0148), each a few lines over `runHost` (`server.ts`): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it; in the project's `.pinetrie/` for a jj project until ADR-0150's move of every store to its session's directory, not yet built), `refusalText` (a refusal's words, with its command's usage). A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm dev:react` serves React's development build, for its warnings and render timeline (S59) |
+| `dev.ts`, `serve.ts`, `server.ts`, `invocation.ts` | `pnpm dev [folder]` and `pnpm serve [folder]` (ADR-0086, ADR-0148), each a few lines over `runHost` (`server.ts`): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it; else the session's own, in its data directory for every kind of project, ADR-0150), `refusalText` (a refusal's words, with its command's usage). A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm dev:react` serves React's development build, for its warnings and render timeline (S59) |
 | `page.ts` | the page a host serves (ADR-0148): Vite under `pnpm dev`, else the built page in the page's `dist/`, which `pnpm serve` rebuilds first when its stamp no longer matches its inputs (`ensurePage`), and whose files it reads once at start (`readBuiltPage`); where the page's package is (`pageDir`) |
 | `sessions.ts` | the session a host serves (`openSession`, ADR-0149): the folder's real path looked up in the registry under its lock, the registry written, the session's data directory made and its `host.pid` taken; and `renameSession`, for `pnpm session rename` (`apps/pinetrie/scripts/session.ts`) |
 | `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the session (`sessionLines`), the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model |
@@ -369,22 +369,35 @@ any refresh they queued.
   recursive delete: when an attach replaces a folder's own empty session,
   a file written since it was found empty refuses the attach, and stays.
 - **A starting host says what it read** (`startup-lines.ts`). `server.ts`
-  logs the project, the session (with, for a new one beside a gone folder
-  of its name, the command that attaches that one) and the store, `startHost` each config file (with
+  logs the project, the session (found, attached and where it was, or
+  new) and the store, `startHost` each config file (with
   `(none)` when missing, `(not read)` when broken) and each refusal, then
   the roots it opened, then `agent ready` with the model and where it came
   from (a file, or `$PINETRIE_MODEL`), or `no model:` and why; and
   `server.ts` the URL and invites, then, with no model, the setup page's
   URL. Every config word is `@pinetrie/interface`'s, which the setup page
   says too.
-- **The project folder is prepared before `startHost`** (`server.ts`):
-  `prepareProjectDir` (`@pinetrie/jj`) finds its root and its kind, and adds
-  `/.pinetrie/` to a jj or git repo's exclude file, so the store, opened
-  first in `startHost`, is never taken into your `@` (S108). A suite skips
-  this: it gives its own store, and `startHost` runs `prepareProjectDir`
-  again with tools on, which writes nothing the second time, and hands the
-  `ProjectDir` to `findProject` and to the adapter's choice
-  (`project.ts`).
+- **The project folder is found before `startHost`** (`server.ts`):
+  `prepareProjectDir` (`@pinetrie/jj`) finds its root and its kind, and
+  writes nothing there. pine·trie's own files for a session are in its
+  data directory (`sessionFiles`, `@pinetrie/lanes`; ADR-0150): its store,
+  and its lanes' runtime, ignore file, ssh files and ssh secret.
+  `server.ts` computes them once, gives the store to `storeChoice` and the
+  rest to `startHost` with the project (`project.files`, only with tools);
+  no other module computes the layout. The ssh secret is 0600 whatever
+  its directory's mode (`sshSecret`, `work/ssh.ts`): a file there that is
+  no secret is removed before one is written, since writing over a file
+  keeps its mode. A suite gives its own store, and each project a session
+  directory of its own under the suite's data directory
+  (`suiteSessionFiles`, `e2e/lane-hosts.ts`), 0755 so a nested rootless
+  Docker can bind the runtime and ignore file as another user. `startHost` runs
+  `prepareProjectDir` again with tools on, and hands the `ProjectDir` to
+  `findProject` and to the adapter's choice (`project.ts`).
+- **The lanes' ignore file is the host's** (`openProject`, `setup.ts`):
+  written into `project.files`' `laneGit` after each preparing of the
+  shared directories, before they are in force, for every kind of
+  project; the adapter's `prepareShared` keeps them out of your repo
+  alone.
 - **The project is apart from tools** (`StartHostOptions.project`). Its
   `AGENTS.md` loads from it with tools off too, on any folder;
   lane work starts only with tools on. `startSetup` returns a whole `Setup`
@@ -1069,16 +1082,18 @@ adapter's.
   is queued and awaited; the rest is one step, not awaited, so the next
   tool call waits for all of it and the next request for none:
   1. the turn's runs drained from the helper, the paths they name checked
-     with `git check-ignore --no-index -z --stdin` in the lane, each path
-     through a symlink asked about as the first symlink on its way
-     (`firstSymlinks`, then `ignoreQuery`): git refuses the whole batch
-     over one path beyond a symlink. Then classed,
+     against the lane's `.gitignore` files and its ignore file on the host
+     (`ignoredPaths`, `@pinetrie/rules/ignores`), from what one call to
+     the helper reads of the disk (`ignoreFacts`): each path through a
+     symlink classed as the first symlink on its way (`ignoreQuery`),
+     which paths are directories, and each `.gitignore` above them. Then
+     classed,
      the new recipes' inputs and roots' `CACHEDIR.TAG` hashed, and the
      registry written (ADR-0135). Each ask is a two-step value from
      `@pinetrie/rules` (`writesToClass`, `registryAfter`): the paths to ask
-     about, then a step that accepts answers for exactly those. The paths
-     and the registry go on the `run`'s input: a turn names more paths than
-     a command line holds, and one shell argument is capped at 128 KB. The
+     about, then a step that accepts answers for exactly those. The
+     registry goes on the `run`'s input: one shell argument is capped at
+     128 KB. The
      host cannot reach the write tools' calls, which the helper records as
      tool writes (`packages/pi/TECHNICAL.md`);
   2. the snapshot, which so holds the registry its outputs are kept by;

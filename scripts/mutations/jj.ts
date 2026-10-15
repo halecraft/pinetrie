@@ -1054,22 +1054,13 @@ export const mutations: readonly Mutation[] = [
     expect: "a WIP's copy fetches only the WIP's commit",
   },
   {
-    name: "a project's repo is not told to ignore .pinetrie/",
+    name: "a jj repo with no git directory beside it is served",
     file: "packages/jj/startup.ts",
-    from: "  return (await excludeInYours(planned.root, [EXCLUDE_LINE]))\n",
-    to: "  return true\n",
+    from: '  if (planned.kind !== "jj") return planned\n',
+    to: "  return planned\n",
     command: unit,
     expect:
-      "prepareProjectDir: .pinetrie/ excluded once, in a git repo too; a non-colocated repo refused; a plain folder untouched",
-  },
-  {
-    name: "a git repo without jj is not told to ignore .pinetrie/",
-    file: "packages/jj/startup.ts",
-    from: "  const inRepo = facts.jjRoot !== null || facts.gitTop !== null\n",
-    to: "  const inRepo = facts.jjRoot !== null\n",
-    command: unit,
-    expect:
-      "prepareProjectDir: .pinetrie/ excluded once, in a git repo too; a non-colocated repo refused; a plain folder untouched",
+      "prepareProjectDir: a project's root and kind, written nowhere; a non-colocated repo refused",
   },
   {
     name: "a move to accepted work is not fetched",

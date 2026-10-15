@@ -58,9 +58,11 @@ XDG spec says.
   rename are checked by.
 - **`PINETRIE_SESSION` attaches a folder to a session by name** only when
   that session's folder is gone. Over the folder's own session it attaches
-  only when that one holds no file (`ownHolds`, gathered): a moved folder
-  started once before it is attached has a session of its own, and the
-  hint its start prints must still work.
+  only when that one holds no file (`ownHolds`, gathered). A session's
+  directory holds its store from its first start (ADR-0150), so a moved
+  folder is attached by `PINETRIE_SESSION` on its first start in its new
+  place; a start without it makes a new session, and says only that it is
+  new: nothing hints at a gone session of the same name.
 - **The plans are pure:** the host gathers the real path, which entries'
   folders are gone (their path no longer its own real path) and what the
   own session holds, then writes the plan's registry

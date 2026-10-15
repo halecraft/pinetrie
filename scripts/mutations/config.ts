@@ -135,15 +135,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a new folder whose name is taken gets a two-word suffix",
   },
   {
-    name: "a session is named as moved though its folder exists",
-    file: sessions,
-    from: "      .filter(e => isOfBase(e.name, base) && facts.gone.has(e.path))\n",
-    to: "      .filter(e => isOfBase(e.name, base))\n",
-    command: unit,
-    expect:
-      "a new session names none as moved when every folder of its base exists",
-  },
-  {
     name: "an attach takes over a folder's own session",
     file: sessions,
     from: '    if (named === undefined || !facts.gone.has(named.path))\n      return {\n        kind: "refused",\n        why: { kind: "has-own", asked, own: own.name },\n      }\n',

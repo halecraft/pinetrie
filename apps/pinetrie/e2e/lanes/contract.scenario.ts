@@ -32,7 +32,6 @@ import {
   type Mount,
   PINETRIE_INSTALL,
   PINETRIE_MOUNT,
-  pinetrieDir,
   planSnapshot,
   prepareImages,
   RUNTIME_MOUNT,
@@ -44,6 +43,7 @@ import { playwrightVersion } from "../../host/work/setup.ts"
 import type { Checks } from "../checks.ts"
 import { CommandFailed } from "../command.ts"
 import { committedProject, filterAsync, waitFor } from "../harness.ts"
+import { suiteSessionFiles } from "../lane-hosts.ts"
 import { ownForInnerLanes } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
 import { cli, dockerDisks, inDisks, ownVm, sh } from "./support.ts"
@@ -218,7 +218,7 @@ async function dockerContract(
       {
         source: await ensureRuntime(
           runtime,
-          pinetrieDir(projA).runtime,
+          suiteSessionFiles(projA).lanes.runtime,
           runtimeFrom,
         ),
         target: RUNTIME_MOUNT,

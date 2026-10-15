@@ -19,23 +19,15 @@ describe("sessionLines", () => {
   test("a session found says its folder, under home as ~", () => {
     const entry = at("/home/ada/work/website", "website")
     expect(
-      sessionLines({ kind: "found", entry, write: registry }, home, "dev"),
+      sessionLines({ kind: "found", entry, write: registry }, home),
     ).toEqual(["[host] session     website (~/work/website)"])
   })
 
-  test("a new session beside a gone one of its name says how to attach that one", () => {
+  test("a new session says only that it is new", () => {
     const entry = at("/home/ada/new/website", "website-quiet-fox")
-    const movedFrom = at("/home/ada/old/website", "website")
-    expect(
-      sessionLines(
-        { kind: "new", entry, write: registry, movedFrom },
-        home,
-        "serve",
-      ),
-    ).toEqual([
-      "[host] session     website-quiet-fox (new)",
-      "[host]   website was at ~/old/website, which is gone: PINETRIE_SESSION=website pnpm serve ~/new/website attaches it",
-    ])
+    expect(sessionLines({ kind: "new", entry, write: registry }, home)).toEqual(
+      ["[host] session     website-quiet-fox (new)"],
+    )
   })
 
   test("an attached session says where it was", () => {
@@ -50,7 +42,6 @@ describe("sessionLines", () => {
           write: registry,
         },
         home,
-        "dev",
       ),
     ).toEqual(["[host] session     website (attached, was ~/old/website)"])
   })
@@ -59,8 +50,8 @@ describe("sessionLines", () => {
 describe("storeLine", () => {
   test.each([
     [
-      { file: "/p/.pinetrie/pinetrie.db", from: "project" },
-      "[host] store       /p/.pinetrie/pinetrie.db",
+      { file: "/d/sessions/p/pinetrie.db", from: "session" },
+      "[host] store       /d/sessions/p/pinetrie.db",
     ],
     [
       { file: "/tmp/s.db", from: "PINETRIE_STORE" },

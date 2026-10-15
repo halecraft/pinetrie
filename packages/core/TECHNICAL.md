@@ -139,9 +139,12 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   else: an ordering, an ancestry or a diff over `PointId` is an adapter's
   computation. The rule binds the type wherever it is used, and is held by
   review: TypeScript cannot forbid ordering a string brand.
-- A turn's classes and its whole-disk diff count none of pine·trie's own
-  paths (`DISK_OWN_ROOTS`, ADR-0135), but the lane's home
-  (`LANE_HOME_PATH`), which tools write as they would any home.
+- `DISK_OWN_ROOTS` is the one list of the paths pine·trie, the repos and
+  the file system keep on a disk (ADR-0135). A turn's classes and its
+  whole-disk diff count none of them but the lane's home
+  (`LANE_HOME_PATH`), which tools write as they would any home; the lanes'
+  ignore file (`@pinetrie/lanes`' `laneIgnores`) lists each at the disk's
+  root, so no repo in a lane tracks one.
 - `NO_EDITOR`: a shell with no terminal would wait on an editor until its
   timeout (S36).
 

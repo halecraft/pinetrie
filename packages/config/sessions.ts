@@ -4,13 +4,7 @@
 // writes what these plans return.
 
 import { basename } from "node:path"
-import {
-  fnv1a,
-  isThreadNameHandle,
-  NAME_PAIRS,
-  namePair,
-  PRODUCT_NAME,
-} from "@pinetrie/core"
+import { fnv1a, NAME_PAIRS, namePair, PRODUCT_NAME } from "@pinetrie/core"
 
 declare const sessionBrand: unique symbol
 
@@ -85,8 +79,6 @@ export type SessionPlan =
       readonly kind: "new"
       readonly entry: SessionEntry
       readonly write: Registry
-      /** An entry of the same base name whose folder is gone: maybe this one, moved. */
-      readonly movedFrom: SessionEntry | null
     }
   | {
       readonly kind: "attached"
@@ -155,7 +147,7 @@ export function planSession(
     return attached(registry, named, path, now, own)
   }
   if (asked !== null) {
-    if (named === undefined) return added(registry, path, asked, now, null)
+    if (named === undefined) return added(registry, path, asked, now)
     if (!facts.gone.has(named.path))
       return {
         kind: "refused",
@@ -165,12 +157,7 @@ export function planSession(
   }
   const base = nameFrom(basename(path))
   const taken = new Set(registry.entries.map(e => e.name))
-  const name = freeName(base, path, taken)
-  const movedFrom =
-    registry.entries
-      .filter(e => isOfBase(e.name, base) && facts.gone.has(e.path))
-      .sort((a, b) => b.servedAt - a.servedAt)[0] ?? null
-  return added(registry, path, name, now, movedFrom)
+  return added(registry, path, freeName(base, path, taken), now)
 }
 
 /** `named` moved to `path`; the folder's own entry, `own`, dropped. */
@@ -201,14 +188,12 @@ function added(
   path: string,
   name: SessionName,
   now: number,
-  movedFrom: SessionEntry | null,
 ): SessionPlan {
   const entry = { path, name, servedAt: now }
   return {
     kind: "new",
     entry,
     write: { version: 1, entries: [...registry.entries, entry] },
-    movedFrom,
   }
 }
 
@@ -232,12 +217,6 @@ function freeName(
   }
   throw new Error(`every suffix of the session name ${base} is taken`)
 }
-
-/** Whether `name` is `base`, or `base` with a two-word suffix. */
-const isOfBase = (name: string, base: string): boolean =>
-  name === base ||
-  (name.startsWith(`${base}-`) &&
-    isThreadNameHandle(name.slice(base.length + 1)))
 
 export type RenameRefusal =
   | { readonly kind: "unknown"; readonly name: string }

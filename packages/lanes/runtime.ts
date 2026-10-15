@@ -56,7 +56,7 @@ export const runtimeComplete = (binEntries: readonly string[]): boolean =>
   RUNTIME_PROGRAMS.every(p => binEntries.includes(p))
 
 /**
- * The runtime for `image` under `dir` (`.pinetrie/runtime/`), copied out of it
+ * The runtime for `image` under `dir` (the session's `runtime/`), copied out of it
  * unless one with every program is there. Its directory is named by the
  * image's tag, so a rebuilt image gets a new runtime, and those of earlier
  * tags are removed. Returns the directory.

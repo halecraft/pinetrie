@@ -61,8 +61,9 @@ export interface OpenProject {
   /** `Destination.fileAt`, before the destination is whole. */
   readonly fileAt: Destination["fileAt"]
   /**
-   * The shared directories that apply, prepared: made where missing, kept out
-   * of what the project tracks, and named in the lanes' ignore file.
+   * The shared directories that apply, prepared: made where missing, and kept
+   * out of what the project tracks. The host names them in the lanes' ignore
+   * file (`openProject`).
    */
   prepareShared(entries: readonly string[]): Promise<SharedPrepared>
   /** The identity lanes commit as: yours, else pine·trie's agent's. */

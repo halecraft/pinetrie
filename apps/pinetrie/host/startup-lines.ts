@@ -25,7 +25,7 @@ import type {
   ServiceKeyRefusal,
   SshSettings,
 } from "@pinetrie/ssh"
-import type { HostCommand, StoreChoice } from "./invocation.ts"
+import type { StoreChoice } from "./invocation.ts"
 import type { OpenedPlan } from "./sessions.ts"
 
 /** `[host] label` padded so the values line up. */
@@ -42,14 +42,10 @@ export const homePath = (file: string, home: string): string =>
       ? `~/${file.slice(home.length + 1)}`
       : file
 
-/**
- * Which session the host serves; for a new one whose base name a gone
- * folder had, where that was and the command that attaches it.
- */
+/** Which session the host serves: found, attached and where it was, or new. */
 export function sessionLines(
   plan: OpenedPlan,
   home: string,
-  command: HostCommand,
 ): readonly string[] {
   const { name, path } = plan.entry
   switch (plan.kind) {
@@ -59,17 +55,8 @@ export function sessionLines(
       return [
         line("session", `${name} (attached, was ${homePath(plan.from, home)})`),
       ]
-    case "new": {
-      const moved = plan.movedFrom
-      return [
-        line("session", `${name} (new)`),
-        ...(moved === null
-          ? []
-          : [
-              `[host]   ${moved.name} was at ${homePath(moved.path, home)}, which is gone: PINETRIE_SESSION=${moved.name} pnpm ${command} ${homePath(path, home)} attaches it`,
-            ]),
-      ]
-    }
+    case "new":
+      return [line("session", `${name} (new)`)]
   }
 }
 

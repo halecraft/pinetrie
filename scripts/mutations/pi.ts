@@ -5,13 +5,22 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "firstSymlinks names the last symlink on a path's way",
+    name: "ignoreFacts names the last symlink on a path's way",
     file: "packages/pi/lane-helper.ts",
     from: "        out[p] = dir\n        break\n",
     to: "        out[p] = dir\n",
     command: unit,
     expect:
-      "firstSymlinks names the first symlink on a path's way, and nothing else",
+      "ignoreFacts names the first symlink on a path's way, and nothing else",
+  },
+  {
+    name: "search reads no .gitignore without a repo",
+    file: "packages/pi/search.ts",
+    from: 'const IGNORES = ["--no-require-git", "--no-ignore-parent"] as const\n',
+    to: 'const IGNORES = ["--no-ignore-parent"] as const\n',
+    command: unit,
+    expect:
+      "reads .gitignore with no repo, and none above the search or in the person's config",
   },
   // ── agents talking ──
   {
