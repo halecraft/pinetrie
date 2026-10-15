@@ -3,13 +3,19 @@
 // first line and opened while it holds the focus. ↑ and ↓ on a note, or
 // Alt+↑/↓ in its box, move it in the column, as a queued card moves in its
 // queue. A drop anywhere on the column makes the card a note at its end;
-// "+ add a note" makes an empty one there. A column of its task's canvas, at
+// so does writing in the box under its notes (`NewNoteBox`), which holds the
+// note it makes until focus leaves it. A column of its task's canvas, at
 // its rank there (`canvasColumns`); its header is a drag handle, as a thread
 // column's is, its ⋯ folds it, and × trashes it with its notes.
 
-import type { CardId, CardWidth, SeatRecord, WriterId } from "@pinetrie/core"
+import type {
+  CardId,
+  CardWidth,
+  SeatRecord,
+  TextCardId,
+  WriterId,
+} from "@pinetrie/core"
 import {
-  ADD_NOTE,
   type ColumnAct,
   dragProps,
   dropProps,
@@ -21,9 +27,9 @@ import {
   type Reader,
   type ReadOnly,
 } from "@pinetrie/interface"
-import { newCardId, type SessionClient } from "@pinetrie/session"
+import type { SessionClient } from "@pinetrie/session"
 import { useEffect, useRef, useState } from "react"
-import { NoteCardEditor } from "./card-editor.tsx"
+import { NewNoteBox, NoteCardEditor } from "./card-editor.tsx"
 import { ColumnHeadEnd } from "./column-menu.tsx"
 import { TitleField } from "./title-field.tsx"
 
@@ -50,7 +56,10 @@ export function NoteColumn(p: {
       act: a,
     })
   const [renaming, setRenaming] = useState(false)
-  // "+ add a note" focuses its card's box once the card is drawn.
+  // The note the new note's box holds, which the list leaves out.
+  const [writing, setWriting] = useState<TextCardId | null>(null)
+  // A note the box handed to the list takes the focus once drawn there, its
+  // caret at its end.
   const notes = useRef<HTMLDivElement>(null)
   const [focusing, setFocusing] = useState<CardId | null>(null)
   useEffect(() => {
@@ -60,13 +69,9 @@ export function NoteColumn(p: {
     )
     if (box == null) return
     box.focus()
+    box.setSelectionRange(box.value.length, box.value.length)
     setFocusing(null)
   })
-  const addNote = () => {
-    const card = newCardId()
-    setFocusing(card)
-    act({ kind: "newNote", card, column })
-  }
   return (
     <section
       className="note-column"
@@ -125,31 +130,35 @@ export function NoteColumn(p: {
         {view.notes.length === 0 && (
           <p className="notes-empty">{NOTES_EMPTY}</p>
         )}
-        {view.notes.map(note => (
-          <div className="note-card" key={note.id}>
-            <NoteCardEditor
-              among={view.notes}
-              card={note}
-              catchUps={null}
-              onAct={act}
-              onTyping={p.onTyping}
-              readOnly={p.readOnly}
-              reader={p.reader}
-              seats={p.seats}
-              session={p.session}
-            />
-          </div>
-        ))}
+        {view.notes
+          .filter(note => note.id !== writing)
+          .map(note => (
+            <div className="note-card" key={note.id}>
+              <NoteCardEditor
+                among={view.notes}
+                card={note}
+                catchUps={null}
+                onAct={act}
+                onTyping={p.onTyping}
+                readOnly={p.readOnly}
+                reader={p.reader}
+                seats={p.seats}
+                session={p.session}
+              />
+            </div>
+          ))}
       </div>
       {p.readOnly === null && (
-        <button
-          className={ADD_NOTE.className}
-          onClick={addNote}
-          title={ADD_NOTE.title}
-          type="button"
-        >
-          {ADD_NOTE.label}
-        </button>
+        <NewNoteBox
+          among={view.notes}
+          column={column}
+          onAct={act}
+          onHandOver={setFocusing}
+          onShows={setWriting}
+          onTyping={p.onTyping}
+          reader={p.reader}
+          session={p.session}
+        />
       )}
     </section>
   )

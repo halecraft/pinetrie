@@ -435,7 +435,8 @@ export {
   queueHeadPlan,
 } from "./next.ts"
 export {
-  ADD_NOTE,
+  NEW_NOTE_PLACEHOLDER,
+  NEW_NOTE_TITLE,
   NOTES_EMPTY,
   type NoteColumnView,
   noteColumnsOf,

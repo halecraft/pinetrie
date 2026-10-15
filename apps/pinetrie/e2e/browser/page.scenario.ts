@@ -4195,22 +4195,12 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       await valueIs(composerBox, "")
       await appears(await openNote(page, noted))
-      // "+ add a note" makes an empty note at the column's end, its box
-      // focused, so you write in it at once; Alt+↑ there moves it up the
-      // column, for everyone.
-      await page.click(".note-column .add-note")
-      const writing = await page
-        .waitForFunction(
-          () =>
-            document.activeElement instanceof HTMLTextAreaElement &&
-            document.activeElement.closest(".note-column") != null,
-          undefined,
-          { timeout: 10_000 },
-        )
-        .then(
-          () => true,
-          () => false,
-        )
+      // Written in the box under the notes, a note is made at the first
+      // keystroke and that same box goes on writing it, so nothing typed is
+      // lost. Alt+↑ there moves it up the column, for everyone, and hands it
+      // to the list, focused there; Alt+↓ in the list moves it back down.
+      const newNote = ".note-column .new-note textarea"
+      await page.click(newNote)
       await page.keyboard.type("jot")
       const jotted = await waitFor(
         () =>
@@ -4219,10 +4209,18 @@ async function run(check: Checks["check"]): Promise<void> {
           ),
         10_000,
       )
+      const inBox = await page
+        .$eval(
+          newNote,
+          el =>
+            el === document.activeElement &&
+            el.getAttribute("data-card") != null,
+        )
+        .catch(() => false)
       check(
-        "+ add a note makes an empty note at its note column's end, ready to write in",
-        writing && jotted >= 0,
-        `writing ${writing}; jotted ${jotted} ms`,
+        "a note written in the box at its note column's end is made at the first keystroke, in that box",
+        jotted >= 0 && inBox,
+        `jotted ${jotted} ms; in its box ${inBox}`,
       )
       const orderOf = (text: string) => {
         const c = readPlaces(host.places).find(
@@ -4235,10 +4233,28 @@ async function run(check: Checks["check"]): Promise<void> {
         () => orderOf("jot") < orderOf("one thought"),
         10_000,
       )
+      const handed = await page
+        .waitForFunction(
+          () =>
+            document.activeElement instanceof HTMLTextAreaElement &&
+            document.activeElement.closest(".note-column-notes") != null &&
+            document.activeElement.value === "jot",
+          undefined,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      await page.keyboard.press("Alt+ArrowDown")
+      const lowered = await waitFor(
+        () => orderOf("jot") > orderOf("one thought"),
+        10_000,
+      )
       check(
-        "Alt+↑ in a note's box moves it up its note column, for everyone",
-        raised >= 0,
-        `jot ${orderOf("jot")}, one thought ${orderOf("one thought")}`,
+        "Alt+↑ in a new note's box moves it up its note column, for everyone, and Alt+↓ in the list moves it back",
+        raised >= 0 && handed && lowered >= 0,
+        `raised ${raised} ms, handed ${handed}, lowered ${lowered} ms; jot ${orderOf("jot")}, one thought ${orderOf("one thought")}`,
       )
       // A card's header takes focus: Cmd+X there cuts the note
       // to your trash, and Cmd+V with another note's header focused moves

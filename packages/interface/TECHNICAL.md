@@ -1865,9 +1865,11 @@ gone.
   `column` intent with a `card` key), so a refusal is said there: ↑ and ↓
   reorder it among the column's notes (`reorderOf`, a `note` key), and its
   ⋯ takes it into your inventory or makes it a thread; a drag takes it
-  anywhere else. "+ add a note" is `newNote`: an empty note at the
+  anywhere else. The box under the notes makes one with `newNote`, at
+  its first input worth keeping and holding that input: a note at the
   column's end, drawn last until the host gives it its order
-  (`LAST_ORDER`), in no history.
+  (`LAST_ORDER`), in no history. The box's steps are `editorState`'s, your
+  message's, with `release` for focus leaving it.
 - **Renaming a note column is `rename` with a `MarkTarget`**: the same
   `TitleField` and `planTitle` as a task's, sent as `mark`.
 - **A card leaving a queue or a pinned strip** is sent to its thread's
@@ -1875,8 +1877,9 @@ gone.
   page draws the move pending in the column the host would choose
   (`drawnPlace`), or where it was while the host would make one.
 - **Selectors for the browser suite:** `.note-column` (`data-column`, its
-  id), `.note-column-title`, `.note-column .open-title-input`, `.add-note`,
-  and each note's `.card-editor.note` with its `textarea[data-card]`.
+  id), `.note-column-title`, `.note-column .open-title-input`, `.new-note
+  textarea` (its `data-card` once it holds a note), and each note's
+  `.card-editor.note` with its `textarea[data-card]`.
 
 ## Other threads' agents (`agents-view.ts`, `send.ts`, ADR-0128)
 

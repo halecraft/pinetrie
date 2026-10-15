@@ -77,6 +77,16 @@ describe("editorState", () => {
     })
   })
 
+  test("a box releasing its card detaches, and one with none stays as it is", () => {
+    expect(step(bound, { kind: "release" })).toEqual({
+      state: local,
+      acts: ["detach"],
+    })
+    expect(step(local, { kind: "release" })).toEqual({ state: local, acts: [] })
+    const sending: EditorState = { kind: "sending", card: C1 }
+    expect(step(sending, { kind: "release" }).state).toBe(sending)
+  })
+
   test("an undo past its creation empties the card but keeps it: typing in the box goes on in the same card", () => {
     // Emptied, the card is still found, and no event detaches the box; only
     // `gone` does, when it is sent or removed.

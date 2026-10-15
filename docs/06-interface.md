@@ -1055,8 +1055,11 @@ The rail is E; the column is T. Seeing both at once is the product.
   its header, for everyone) and its notes one under another, each folded to
   its first line until you click into it, headed "Ada's note · with Bea".
   ↑ and ↓ on a note, or Alt+↑/↓ in its box, move it in the column, as a
-  queued card moves; **+ add a note** makes an empty one at its end, the
-  cursor in it; one left empty is swept when the host next starts. It sits
+  queued card moves. Under the last note is a box, "write a note": the
+  first keystroke worth keeping there makes a note at the column's end,
+  and you go on writing it in that box until you leave it, when it joins
+  the notes above; Alt+↑/↓ there moves it and takes you to it in the
+  list. A note emptied is swept when the host next starts. It sits
   on the canvas in its place, folded until you open it, and moves and
   folds as a thread's column does. ＋ past the last column makes an empty
   one there.

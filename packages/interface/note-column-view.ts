@@ -10,7 +10,6 @@ import {
   type NoteCard,
   notesIn,
 } from "@pinetrie/rules"
-import type { ControlWords } from "./card-words.ts"
 
 /** One note column, as drawn. */
 export interface NoteColumnView {
@@ -43,12 +42,11 @@ export function noteColumnsOf(input: {
   })
 }
 
-/** A note column's "+ add a note". */
-export const ADD_NOTE: ControlWords = {
-  label: "+ add a note",
-  title: "a new note at the column's end, which everyone in the task sees",
-  className: "add-note",
-}
+/** The box at a note column's end, empty: what is typed there is a new note. */
+export const NEW_NOTE_PLACEHOLDER = "write a note"
+/** Its tooltip. */
+export const NEW_NOTE_TITLE =
+  "a new note at the column's end, which everyone in the task sees"
 
 /** A note column's notes: how many there are. */
 export const noteCountWords = (n: number): string =>

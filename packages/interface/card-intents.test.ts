@@ -1087,10 +1087,13 @@ describe("a card made a thread", () => {
 })
 
 describe("a new note", () => {
-  test("+ add a note makes an empty note at the end of its note column, said there", () => {
+  test("a note written at its note column's end is made there with its text, said there", () => {
     expect(
       plan(
-        inColumn({ kind: "newNote", card: C1, column: NOTES }, NOTES_COLUMN),
+        inColumn(
+          { kind: "newNote", card: C1, column: NOTES, text: "j" },
+          NOTES_COLUMN,
+        ),
         state(),
       ),
     ).toEqual([
@@ -1104,7 +1107,7 @@ describe("a new note", () => {
           place: { kind: "note", column: NOTES, order: LAST_ORDER },
           content: { command: null, unsent: null, origin: null },
         },
-        text: "",
+        text: "j",
         how: { actedAt: { kind: "column", key: NOTES }, slot: null },
       },
     ])

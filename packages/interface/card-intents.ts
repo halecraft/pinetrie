@@ -23,7 +23,6 @@ import {
   type MoveTarget,
   moveOf,
   type NoteColumnCard,
-  type NoteColumnId,
   noteOf,
   type PlaceKey,
   type Position,
@@ -71,6 +70,7 @@ import {
   type IntentState,
   planOpenAt,
 } from "./effects.ts"
+import type { ColumnAct } from "./intent.ts"
 import type { MessageAct } from "./message-tools.ts"
 import {
   type CanvasPut,
@@ -830,14 +830,14 @@ export function planToNote(
 }
 
 /**
- * A new, empty note made at the end of note column `column`: a
- * creation, in no history, drawn last until the host gives it its order.
+ * A new note holding its first text, made at the end of its note column:
+ * a creation, in no history, drawn last until the host gives it its order.
  */
 export function planNewNote(
-  card: TextCardId,
-  column: NoteColumnId,
+  act: Extract<ColumnAct, { kind: "newNote" }>,
   state: IntentState,
 ): readonly Effect[] {
+  const { card, column } = act
   return [
     {
       kind: "createCard",
@@ -849,7 +849,7 @@ export function planNewNote(
         place: { kind: "note", column, order: LAST_ORDER },
         content: { command: null, unsent: null, origin: null },
       },
-      text: "",
+      text: act.text,
       how: IN_COLUMN(column),
     },
   ]

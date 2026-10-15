@@ -1613,6 +1613,24 @@ export const mutations: readonly Mutation[] = [
     expect: "a card found attaches; a card gone detaches",
   },
   {
+    name: "a new note is made empty",
+    file: "packages/interface/card-intents.ts",
+    from: "      text: act.text,",
+    to: '      text: "",',
+    command: unit,
+    expect:
+      "a note written at its note column's end is made there with its text, said there",
+  },
+  {
+    name: "editorState keeps a released card",
+    file: "packages/interface/card-state.ts",
+    from: '    case "release":\n',
+    to: "",
+    command: unit,
+    expect:
+      "a box releasing its card detaches, and one with none stays as it is",
+  },
+  {
     name: "newPinAt: + pin stays in the header once a card is pinned",
     file: "packages/interface/column-view.ts",
     from: '  !f.canPin || f.pinning ? null : f.pinned === 0 ? "header" : "strip"',

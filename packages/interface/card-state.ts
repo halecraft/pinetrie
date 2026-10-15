@@ -1,11 +1,13 @@
-// interface/card-state — your message's editor, decided: `editorState`
-// decides each step and names what `card-editor.tsx` must do.
+// interface/card-state — your message's editor, and a note column's box for
+// a new note, decided: `editorState` decides each step and names what
+// `card-editor.tsx` must do.
 //
 // One textarea edits your message at a column's end. Until there is
 // something worth keeping it is local, and takes your message here when it
 // finds one. The input that makes it worth keeping creates the card and binds the same
 // element to it; a send holds it until the host answers. Undo and redo in the
-// box reach only its card.
+// box reach only its card. A note column's box is the same without a send:
+// it releases its note when focus leaves it.
 
 import type { CardRecord, TextCardId } from "@pinetrie/core"
 import type { Pending, Prefill } from "./columns.ts"
@@ -42,6 +44,11 @@ export type EditorEvent =
    * past its creation only empties it, so it is not gone.
    */
   | { readonly kind: "gone" }
+  /**
+   * The box lets its card go, which stays where it is: the note box's,
+   * when focus leaves it, so its note is drawn among the others.
+   */
+  | { readonly kind: "release" }
   | { readonly kind: "send" }
   /** The host answered the send; `spent` is whether it took the card's text. */
   | { readonly kind: "settled"; readonly spent: boolean }
@@ -94,6 +101,7 @@ export function editorState(
         ? step({ kind: "bound", card: event.card }, ["attach"])
         : stay(state)
     case "gone":
+    case "release":
       // While sending, the host spends the card as part of this send: the
       // reply says how it went.
       return state.kind === "bound" ? step(LOCAL, ["detach"]) : stay(state)

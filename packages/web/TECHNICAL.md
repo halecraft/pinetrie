@@ -1076,10 +1076,20 @@ the session sends moves and draws them until its copy holds them
   (`title-field.tsx`), the sidebar's rename field, and sends `rename` with a `MarkTarget`), its notes one under
   another, each a `NoteCardEditor` (`among` its column's notes, so ↑ and ↓
   and Alt+↑/↓ reorder it), folded to one line until it holds the focus, as
-  a queued card in the dock is, and "+ add a note" (`.add-note`), which
-  focuses its card's box once drawn. The whole column is a drop target
+  a queued card in the dock is, and under them the box a new note is
+  written in (`NewNoteBox`, `.new-note`). The whole column is a drop target
   (`data-put-notes`). A note's acts are sent as a `column` intent keyed by
   the note column's card, so its refusals are said there.
+- **A new note is written in one box, as your message is** (`NewNoteBox`,
+  `card-editor.tsx`): local until it holds something worth keeping, then
+  the same element bound to the note it makes, so no keystroke falls
+  between and focus never moves (`editorState`). It holds that note until
+  focus leaves it (`release`), and the column leaves the note out of its
+  list meanwhile: drawn there too, it would be two boxes on one text. A
+  move from the box (Alt+↑/↓) hands the note to the list, where the
+  column focuses it once drawn, its caret at the end. The list is as tall
+  as its notes (`.note-column-notes`), so the box follows the last note
+  and stays in view once they scroll.
 - **`CardGrid`** (`card-grid.tsx`) draws your inventory's `GridView` as
   index cards, each cell a button (the drop target, `dropProps`, and the
   card's drag) holding its `CardFace`. Its keys are `gridKeyAct`'s, on the

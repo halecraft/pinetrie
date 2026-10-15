@@ -1,6 +1,7 @@
 // web/card-editor — one card's editor, in its frame (`card-frame.tsx`): your
 // message in the composer and the box "+ pin" opens, each a `CardEditor`; each
-// note at a thread's end (`NoteCardEditor`), each queued card above the line
+// note at a thread's end (`NoteCardEditor`), a note column's box for a new
+// note (`NewNoteBox`), each queued card above the line
 // (`QueuedCardEditor`), each pinned card and the card selected in your
 // inventory, all a `BoundCardEditor`.
 //
@@ -27,7 +28,12 @@ import type {
   TextPlace,
   ThreadLane,
 } from "@pinetrie/core"
-import { commandOf, type TextCard, type TextCardId } from "@pinetrie/core"
+import {
+  commandOf,
+  type NoteColumnId,
+  type TextCard,
+  type TextCardId,
+} from "@pinetrie/core"
 import {
   baseChoices,
   type CardFrameFacts,
@@ -49,6 +55,8 @@ import {
   type Intent,
   imageMarkdown,
   insertAt,
+  NEW_NOTE_PLACEHOLDER,
+  NEW_NOTE_TITLE,
   NEW_PIN_PLACEHOLDER,
   type Pending,
   type Prefill,
@@ -864,6 +872,148 @@ export function NoteCardEditor(p: {
       session={p.session}
       view={view}
     />
+  )
+}
+
+/**
+ * The box at a note column's end, where a new note is written. Until it
+ * holds something worth keeping it is local; the input that makes it worth
+ * keeping makes the note, with that text, at the column's end, and binds
+ * this same element to it, so no keystroke falls between and focus never
+ * moves. It holds the note until focus leaves it, the column leaving that
+ * note out of its list meanwhile (`onShows`), then empties. Enter is a new
+ * line and Escape leaves; Alt+↑/↓ move the note and hand it to the list,
+ * focused there, and Ctrl+Shift+Backspace discards it.
+ */
+export function NewNoteBox(p: {
+  session: SessionClient
+  column: NoteColumnId
+  /**
+   * Its column's notes, its own among them once drawn: what Alt+↑/↓ move it
+   * among, and where it finds its note gone.
+   */
+  among: readonly CardRecord[]
+  reader: Reader
+  onAct: (act: ColumnAct) => void
+  onTyping: (card: CardId) => void
+  /** Told the note it shows, or null, each time that changes. */
+  onShows: (card: TextCardId | null) => void
+  /** A move handed its note to the list: focus it there. */
+  onHandOver: (card: TextCardId) => void
+}) {
+  const { session } = p
+  const box = useRef<HTMLTextAreaElement>(null)
+  const [state, setState] = useState<EditorState>({ kind: "local" })
+  // The state as the handlers last left it, read synchronously between renders.
+  const current = useRef(state)
+  const detach = useRef<(() => void) | null>(null)
+  const [text, setText] = useState("")
+  const step = (event: EditorEvent) => {
+    const next = editorState(current.current, event, undefined)
+    current.current = next.state
+    setState(next.state)
+    p.onShows(shownBy(next.state))
+    const el = box.current
+    if (el === null) return
+    for (const act of next.acts)
+      switch (act) {
+        case "create":
+          if (next.state.kind === "bound")
+            p.onAct({
+              kind: "newNote",
+              card: next.state.card,
+              column: p.column,
+              text: el.value,
+            })
+          break
+        case "attach":
+          if (next.state.kind === "bound") {
+            const { selectionStart, selectionEnd } = el
+            detach.current = bindText(session, next.state.card, el, setText)
+            el.setSelectionRange(selectionStart, selectionEnd)
+          }
+          break
+        case "detach":
+          detach.current?.()
+          detach.current = null
+          el.value = ""
+          setText("")
+          break
+      }
+  }
+  const shown = shownBy(state)
+  const present = shown !== null && p.among.some(c => c.id === shown)
+  // Gone only once seen: a note just made is not among the notes until they
+  // redraw.
+  const seen = useRef<CardId | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on the note's coming and going
+  useEffect(() => {
+    if (present) seen.current = shown
+    else if (shown !== null && seen.current === shown) step({ kind: "gone" })
+  }, [shown, present])
+  // Unmounted (its column made read-only), it lets its note go to the list.
+  // StrictMode mounts twice, so the handle is cleared too.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on unmounting
+  useEffect(
+    () => () => {
+      detach.current?.()
+      detach.current = null
+      p.onShows(null)
+    },
+    [],
+  )
+  return (
+    <div className="new-note">
+      <CardFrame
+        card={null}
+        catchUps={null}
+        foot={null}
+        onAct={p.onAct}
+        onClearCommand={null}
+        onDiscard={() => {}}
+        reader={p.reader}
+        view={cardFrame(null, "note", { me: session.writer, readOnly: false })}
+      >
+        <textarea
+          autoComplete="off"
+          className="input"
+          data-card={shown ?? undefined}
+          onBlur={() => step({ kind: "release" })}
+          onInput={e => {
+            const value = e.currentTarget.value
+            setText(value)
+            if (free(current.current))
+              step({ kind: "input", text: value, card: newCardId() })
+            const shown = shownBy(current.current)
+            if (shown !== null) p.onTyping(shown)
+          }}
+          onKeyDown={e => {
+            if (e.nativeEvent.isComposing) return
+            if (e.key === "Escape") {
+              e.preventDefault()
+              e.currentTarget.blur()
+              return
+            }
+            const shown = shownBy(current.current)
+            if (shown === null) return
+            const act = cardKeyAct(
+              keyOfBox(e),
+              shown,
+              p.among.map(c => c.id),
+            )
+            if (act === null) return
+            e.preventDefault()
+            p.onAct(act)
+            step({ kind: "release" })
+            if (act.kind === "reorder") p.onHandOver(shown)
+          }}
+          placeholder={NEW_NOTE_PLACEHOLDER}
+          ref={box}
+          title={NEW_NOTE_TITLE}
+          rows={Math.min(8, Math.max(1, text.split("\n").length))}
+        />
+      </CardFrame>
+    </div>
   )
 }
 

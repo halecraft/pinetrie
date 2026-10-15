@@ -2229,8 +2229,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note column draws no notes",
     file: "packages/web/note-column.tsx",
-    from: "        {view.notes.map(note => (",
-    to: "        {view.notes.slice(0, 0).map(note => (",
+    from: "          .filter(note => note.id !== writing)",
+    to: "          .filter(() => false)",
     suite: "browser",
     scenario: "page",
     expect:
@@ -2366,23 +2366,44 @@ export const mutations: readonly Mutation[] = [
       "your message shows only in your window; moved to the notes, it shows in the other's note column",
   },
   {
-    name: "a new note's box is not focused",
-    file: "packages/web/note-column.tsx",
-    from: "    setFocusing(card)\n",
+    name: "a new note's box keeps only its first keystroke",
+    file: "packages/web/card-editor.tsx",
+    from: "            detach.current = bindText(session, next.state.card, el, setText)\n",
     to: "",
     suite: "browser",
     scenario: "page",
     expect:
-      "+ add a note makes an empty note at its note column's end, ready to write in",
+      "a note written in the box at its note column's end is made at the first keystroke, in that box",
+  },
+  {
+    name: "a new note's box moves its note among no notes",
+    file: "packages/web/note-column.tsx",
+    from: "          among={view.notes}\n          column={column}",
+    to: "          among={[]}\n          column={column}",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Alt+↑ in a new note's box moves it up its note column, for everyone, and Alt+↓ in the list moves it back",
+  },
+  {
+    name: "a new note's box hands its note to no one",
+    file: "packages/web/note-column.tsx",
+    from: "          onHandOver={setFocusing}",
+    to: "          onHandOver={() => {}}",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Alt+↑ in a new note's box moves it up its note column, for everyone, and Alt+↓ in the list moves it back",
   },
   {
     name: "a note moves among no notes",
     file: "packages/web/note-column.tsx",
-    from: "              among={view.notes}",
-    to: "              among={[]}",
+    from: "                among={view.notes}",
+    to: "                among={[]}",
     suite: "browser",
     scenario: "page",
-    expect: "Alt+↑ in a note's box moves it up its note column, for everyone",
+    expect:
+      "Alt+↑ in a new note's box moves it up its note column, for everyone, and Alt+↓ in the list moves it back",
   },
   {
     name: "a note column's rename sends nothing",

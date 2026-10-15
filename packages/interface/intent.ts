@@ -160,11 +160,12 @@ export type ColumnAct =
       readonly entry: EntryId
       readonly thread: ThreadId
     }
-  /** A new, empty note at the end of note column `column`. */
+  /** A new note holding `text`, at the end of note column `column`. */
   | {
       readonly kind: "newNote"
       readonly card: TextCardId
       readonly column: NoteColumnId
+      readonly text: string
     }
   /** A card into this column's composer, as your message (`planPut`). */
   | { readonly kind: "toMessage"; readonly card: CardId }
@@ -757,7 +758,7 @@ function planColumn(
     case "toNote":
       return planToNote(act.card, key, state)
     case "newNote":
-      return planNewNote(act.card, act.column, state)
+      return planNewNote(act, state)
     case "comment":
       return planComment(act, state)
     case "queueReference":
