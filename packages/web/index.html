@@ -405,10 +405,15 @@
       body[data-card-drag] .task-pins { outline: 1px dashed #6f7784; outline-offset: 2px; }
       .task-told summary { font-size: .72rem; color: #8b93a1; cursor: pointer; }
       .task-trash summary { font-size: .72rem; color: #8b93a1; cursor: pointer; }
-      .trash-row { display: flex; align-items: baseline; gap: .3rem; font-size: .72rem;
-        padding-left: .6rem; }
+      /* Title and restore on one line, the words under them: each row the
+         same height, every left edge and button lined up. */
+      .trash-row { display: grid; grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: .5rem; align-items: baseline; font-size: .72rem;
+        padding: .2rem 0 .2rem .6rem; }
       .trash-title { color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .trash-restore { margin-left: auto; background: none; border: 0; padding: 0;
+      .trash-why { grid-column: 1 / -1; font-size: .68rem; color: #8b93a1;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .trash-restore { background: none; border: 0; padding: 0;
         font-size: .72rem; color: #8b93a1; cursor: pointer; }
       .trash-restore:hover:not(:disabled) { color: #e6e6e6; }
       .task-told-line, .canvas-read-line { font-size: .72rem; color: #aaa; padding-left: .6rem;

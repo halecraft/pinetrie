@@ -203,7 +203,7 @@ test("canvasTrash: the columns trashed from this canvas, newest first, with who 
   ])
   const reader = { me: ADA, nameOf: new Map([[BEA, "Bea"]]) }
   expect(rows.map(r => trashWords(r, reader))).toEqual([
-    "Bea trashed it · deleted in 6 days",
-    "you trashed it · deleted in 3 days",
+    "Bea · 6 days left",
+    "you · 3 days left",
   ])
 })

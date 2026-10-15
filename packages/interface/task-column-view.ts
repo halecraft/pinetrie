@@ -113,14 +113,17 @@ export function canvasTrash(input: {
     .map(r => r.row)
 }
 
-/** A trash row's words: who trashed it, and when it is deleted. */
+/**
+ * A trash row's words: who trashed it, and how long until it is deleted.
+ * Kept short to fit one line under the title in a narrow column.
+ */
 export const trashWords = (row: TrashRow, reader: Reader): string =>
-  `${who(row.by, reader)} trashed it · deleted ${
+  `${who(row.by, reader)} · ${
     row.deletesInDays === 0
-      ? "today"
+      ? "deleted today"
       : row.deletesInDays === 1
-        ? "in 1 day"
-        : `in ${row.deletesInDays} days`
+        ? "1 day left"
+        : `${row.deletesInDays} days left`
   }`
 
 /** The trash list's heading, with how many it holds. */

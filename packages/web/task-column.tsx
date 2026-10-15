@@ -201,7 +201,6 @@ export function TaskColumn(p: {
             {view.trash.map(row => (
               <div className="trash-row" data-card={row.card} key={row.card}>
                 <span className="trash-title">{row.title}</span>
-                <span className="why"> · {trashWords(row, p.reader)}</span>
                 <button
                   className="trash-restore"
                   disabled={view.readOnly}
@@ -217,6 +216,7 @@ export function TaskColumn(p: {
                 >
                   {RESTORE_WORDS.label}
                 </button>
+                <span className="trash-why">{trashWords(row, p.reader)}</span>
               </div>
             ))}
           </details>

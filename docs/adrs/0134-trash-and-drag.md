@@ -87,7 +87,7 @@
   A note discarded before its note column was trashed is in that column's
   trash, and comes back with it.
 - **The task column lists its canvas's trash**: the columns trashed from
-  it, newest first, each with who trashed it and "deleted in N days".
+  it, newest first, each with who trashed it and "N days left".
   Anyone on the task restores one from there. An archived task's list is
   read only. A trashed card's own trash (a thread's discarded pinned
   cards, a note column's discarded notes) is not listed; the undo key and
