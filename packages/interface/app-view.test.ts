@@ -127,6 +127,7 @@ test("the header's offers are the open ones: a held lane's at its tip, another's
     files = ["a.txt"],
   ) =>
     ({
+      kind: "jj",
       lane,
       acceptedAs,
       files,

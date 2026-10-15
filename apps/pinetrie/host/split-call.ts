@@ -8,6 +8,7 @@
 
 import { type ThreadId, textCardId } from "@pinetrie/core"
 import {
+  readLaneRecords,
   readLatestPrompt,
   readOffers,
   readPlaces,
@@ -56,6 +57,7 @@ export const createSplitCall =
         return NO_THREAD
       // plan
       const planned = planSplitCall({
+        history: readLaneRecords(session).get(lane)?.history ?? null,
         offer: offerStatus(readOffers(session).get(lane)),
         cards: readPlaces(places),
         lane,

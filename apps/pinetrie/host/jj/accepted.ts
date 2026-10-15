@@ -7,7 +7,7 @@
 
 import type {
   AcceptedAction,
-  AcceptedRecord,
+  JjAcceptedRecord,
   PublishDecision,
   RepoConfig,
   ValueWrite,
@@ -38,7 +38,7 @@ export interface AcceptedWork {
   /** Read accepted work and write its record when it changed, as upkeep. */
   refresh(): Promise<void>
   /** Accepted work's record, from the step's shared facts, written when it changed. */
-  record(ops: RepoOps): Promise<AcceptedRecord>
+  record(ops: RepoOps): Promise<JjAcceptedRecord>
   /**
    * A setup or publish; null when carried out, else why not, worded
    * (`acceptedRefusal`) from the record it was decided on.

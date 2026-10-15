@@ -48,7 +48,7 @@ export interface LaneAccess {
 
 /**
  * What a lane of its own is told about itself. The host builds every name in
- * it: `PINETRIE_MOUNT` and `LANE_NOTE` are in `@pinetrie/lanes`, which this
+ * it: `PINETRIE_MOUNT` and `laneNote` are in `@pinetrie/lanes`, which this
  * package does not declare. Nothing here changes while the lane lives: a
  * change would alter every request's prefix, and Anthropic then drops the
  * lane's earlier thinking.

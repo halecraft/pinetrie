@@ -6,7 +6,9 @@
 //
 // A fork's setup and the base's checkout are steps the adapter gives, each
 // in a type of its own: `planFork` takes only a `ForkSetup`, and
-// `refreshBase` only a `BaseCheckout`.
+// `refreshBase` only a `BaseCheckout`. A kind whose forks restore from a
+// state of their own (a folder's) has no base snapshot, and its accepted
+// work no checkout.
 
 import type {
   BaseMerge,
@@ -16,6 +18,7 @@ import type {
   LaneBase,
   PointId,
   ReadyCopy,
+  SnapshotId,
   ThreadId,
 } from "@pinetrie/core"
 import type { LaneStep } from "./plan.ts"
@@ -48,19 +51,29 @@ export type FileAt =
 export interface AcceptedNow {
   /** Accepted work's states: none before it is set up. */
   readonly points: readonly PointId[]
-  /** The checkout of `points`, on a fresh disk or on the base before. */
-  checkout(fresh: boolean): BaseCheckout
+  /**
+   * The checkout of `points`, on a fresh disk or on the base before; null
+   * for a kind with no base snapshot, whose forks restore from `ForkSetup.from`.
+   */
+  readonly checkout: ((fresh: boolean) => BaseCheckout) | null
 }
 
 declare const forkSetupBrand: unique symbol
-/** The lane steps that make a cloned disk a fork, after its disk is restored. */
+/** What makes a cloned disk a fork: the snapshot it is restored from, then lane steps. */
 export interface ForkSetup {
+  /**
+   * The snapshot the fork's disk is restored from; null for the fork
+   * source's own (`ForkSource.snapshot`: a turn's, or the base).
+   */
+  readonly from: SnapshotId | null
   readonly steps: readonly LaneStep[]
   readonly [forkSetupBrand]: true
 }
 /** Only an adapter makes one, from its own fork steps. */
-export const forkSetup = (steps: readonly LaneStep[]): ForkSetup =>
-  ({ steps }) as ForkSetup
+export const forkSetup = (
+  from: SnapshotId | null,
+  steps: readonly LaneStep[],
+): ForkSetup => ({ from, steps }) as ForkSetup
 
 declare const baseCheckoutBrand: unique symbol
 /** The lane steps that check accepted work out on the base's scratch lane. */
@@ -167,6 +180,11 @@ export type MergeDone = Merged & { readonly follow: Follow }
 export interface LaneHistory {
   /** A fork's setup on a disk cloned from its fork point. Pure. */
   forkSteps(start: ForkStart): ForkSetup
+  /**
+   * What the lane records once, after its fork made its disk (`forkSteps`'
+   * setup run), its container running. Unlike `afterRestore`, never again.
+   */
+  begun(start: ForkStart): Promise<void>
   /** What changed in the lane, committed as a turn; nothing when nothing did. */
   commit(edits: Edits): Promise<TurnCommitted>
   /** `commit`, with the revision's paths and conflicts. */
@@ -186,6 +204,9 @@ export interface LaneHistory {
   ): Promise<MergeDone>
   /** The files conflicted in the lane's working copy. */
   conflicts(): Promise<readonly string[]>
-  /** What a disk restored from a snapshot needs before its first command. */
+  /**
+   * What a disk restored from a snapshot needs before its first command:
+   * at each container's start, whatever made its disk.
+   */
   afterRestore(): Promise<void>
 }

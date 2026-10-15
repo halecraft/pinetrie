@@ -9,6 +9,7 @@ import {
   ERR,
   type ErrCode,
   isWipLine,
+  type JjOfferRecord,
   type OfferAcceptanceDecision,
   type OfferAcceptanceFacts,
   type OfferGather,
@@ -27,11 +28,12 @@ import {
   type ThreadId,
   type ThreadName,
 } from "@pinetrie/core"
-import { Type } from "typebox"
-import { CommitSchema, decodeAt, threadKey } from "./decode.ts"
+import { type Static, Type } from "typebox"
+import { CommitSchema, decodeAt, PointSchema, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
-const OfferRecordSchema = Type.Object({
+const JjOfferSchema = Type.Object({
+  kind: Type.Literal("jj"),
   size: Type.Integer({ minimum: 1 }),
   stale: Type.Boolean(),
   files: Type.Array(Type.String()),
@@ -66,51 +68,86 @@ const OfferRecordSchema = Type.Object({
   at: Type.Number(),
 })
 
-/** Each lane's offer in your repo, at the lane. */
+const FolderOfferSchema = Type.Object({
+  kind: Type.Literal("folder"),
+  start: PointSchema,
+  tip: PointSchema,
+  files: Type.Array(Type.String()),
+  conflicts: Type.Array(Type.String()),
+  described: Type.Boolean(),
+  at: Type.Number(),
+})
+
+/**
+ * Each lane's offer, of the project's kind, at the lane. A record written
+ * before records had a kind decodes as none, until the host writes it again.
+ */
 export const OFFER: RecordSpec<OfferRecord, ThreadId, "session"> = {
   namespace: "pinetrie.offer",
   home: "session",
   keyOf: r => r.lane,
-  encode: ({ lane, ...contents }) => ({
-    ...contents,
-    files: [...contents.files],
-    conflicts: [...contents.conflicts],
-    startConflicts: [...contents.startConflicts],
-    yourEdits: [...contents.yourEdits],
-    commits: [...contents.commits],
-    ledger:
-      contents.ledger === null
-        ? null
-        : { source: contents.ledger.source, start: [...contents.ledger.start] },
-  }),
-  // Field by field: an older record has a `host` key, what the host once
-  // kept for itself, which a spread would carry along.
+  encode: ({ lane, ...contents }) =>
+    contents.kind === "folder"
+      ? {
+          ...contents,
+          files: [...contents.files],
+          conflicts: [...contents.conflicts],
+        }
+      : {
+          ...contents,
+          files: [...contents.files],
+          conflicts: [...contents.conflicts],
+          startConflicts: [...contents.startConflicts],
+          yourEdits: [...contents.yourEdits],
+          commits: [...contents.commits],
+          ledger:
+            contents.ledger === null
+              ? null
+              : {
+                  source: contents.ledger.source,
+                  start: [...contents.ledger.start],
+                },
+        },
   decode: (contents, key) =>
-    decodeAt(OfferRecordSchema, contents, threadKey(key), (r, lane) => ({
-      lane,
-      size: r.size,
-      stale: r.stale,
-      files: r.files,
-      conflicts: r.conflicts,
-      startConflicts: r.startConflicts ?? [],
-      yourEdits: r.yourEdits,
-      described: r.described,
-      edited: r.edited,
-      bookmark: r.bookmark,
-      // A record written since the rename says `acceptedAs`, null or not.
-      acceptedAs:
-        r.acceptedAs !== undefined ? r.acceptedAs : (r.integratedAs ?? null),
-      commits: r.commits.map(commitId),
-      ledger:
-        r.ledger === undefined || r.ledger === null
-          ? null
-          : {
-              source: commitId(r.ledger.source),
-              start: r.ledger.start.map(commitId),
-            },
-      at: r.at,
-    })),
+    decodeAt(
+      Type.Union([JjOfferSchema, FolderOfferSchema]),
+      contents,
+      threadKey(key),
+      (r, lane): OfferRecord =>
+        r.kind === "folder" ? { ...r, lane } : decodeJjOffer(r, lane),
+    ),
 }
+
+// Field by field: an older record has a `host` key, what the host once
+// kept for itself, which a spread would carry along.
+const decodeJjOffer = (
+  r: Static<typeof JjOfferSchema>,
+  lane: ThreadId,
+): JjOfferRecord => ({
+  kind: "jj",
+  lane,
+  size: r.size,
+  stale: r.stale,
+  files: r.files,
+  conflicts: r.conflicts,
+  startConflicts: r.startConflicts ?? [],
+  yourEdits: r.yourEdits,
+  described: r.described,
+  edited: r.edited,
+  bookmark: r.bookmark,
+  // A record written since the rename says `acceptedAs`, null or not.
+  acceptedAs:
+    r.acceptedAs !== undefined ? r.acceptedAs : (r.integratedAs ?? null),
+  commits: r.commits.map(commitId),
+  ledger:
+    r.ledger === undefined || r.ledger === null
+      ? null
+      : {
+          source: commitId(r.ledger.source),
+          start: r.ledger.start.map(commitId),
+        },
+  at: r.at,
+})
 
 /**
  * Whether you edited a revision: a version an operation not the host's made
@@ -279,6 +316,8 @@ export type OfferStatus =
 
 export function offerStatus(record: OfferRecord | undefined): OfferStatus {
   if (record === undefined) return { kind: "none" }
+  if (record.kind === "folder")
+    return { kind: record.files.length === 0 ? "held" : "open", record }
   if (record.acceptedAs !== null)
     return { kind: "accepted", as: record.acceptedAs }
   const held = record.files.length === 0 && !record.edited
@@ -311,10 +350,11 @@ export function offerRecord(input: {
   /** Files `@` changes (`SharedFacts.editing`): its files among them are your edits. */
   readonly editing: ReadonlySet<string>
   readonly now: number
-}): OfferRecord {
+}): JjOfferRecord {
   const { offer } = input
   const size = offer.revisions.length
   return {
+    kind: "jj",
     lane: input.lane,
     size,
     stale: size > 1 && offerMoved(offer.ledger, input.place),
@@ -333,17 +373,19 @@ export function offerRecord(input: {
 }
 
 /**
- * Only `@` moved: each record not yet accepted with `yourEdits` its files that `@`
+ * Only `@` moved: each jj record not yet accepted with `yourEdits` its files that `@`
  * changes now. Unchanged ones come back too: the host writes only what
  * changed.
  */
 export const planYourEdits = (
   records: Iterable<OfferRecord>,
   editing: ReadonlySet<string>,
-): OfferRecord[] =>
-  [...records]
-    .filter(r => isNotYetAccepted(offerStatus(r)))
-    .map(r => ({ ...r, yourEdits: r.files.filter(f => editing.has(f)) }))
+): JjOfferRecord[] =>
+  [...records].flatMap(r =>
+    r.kind === "jj" && isNotYetAccepted(offerStatus(r))
+      ? [{ ...r, yourEdits: r.files.filter(f => editing.has(f)) }]
+      : [],
+  )
 
 // ── an acceptance ─────────────────────────────
 

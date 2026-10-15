@@ -8,6 +8,22 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a fork restores from its source though the adapter names a snapshot",
+    file: plan,
+    from: "  ...planDisk({ ...input, from: input.setup.from ?? input.source.snapshot }),",
+    to: "  ...planDisk({ ...input, from: input.source.snapshot }),",
+    command: unit,
+    expect: "planFork restores from the adapter's snapshot when it names one",
+  },
+  {
+    name: "the base is refreshed with no checkout",
+    file: "packages/lanes/base.ts",
+    from: "  if (checkout === null) return false\n",
+    to: "",
+    command: unit,
+    expect: "refreshBase does nothing for accepted work with no checkout",
+  },
+  {
     name: "a link whose helper exited is kept",
     file: "packages/lanes/lane.ts",
     from: "    opening.then(l => l.closed.then(drop), drop)\n",
@@ -346,9 +362,19 @@ export const mutations: readonly Mutation[] = [
     name: "the lane note is not where the prompt says",
     file: "packages/lanes/lane.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane.md`",
+    from: "    ? `${PINETRIE_MOUNT}/packages/pi/lane.md`",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane-notes.md`",
+    to: "    ? `${PINETRIE_MOUNT}/packages/pi/lane-notes.md`",
+    command: unit,
+    expect: "every pinetrie file a lane is pointed at exists",
+  },
+  {
+    name: "the folder's lane note is not where the prompt says",
+    file: "packages/lanes/lane.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    : `${PINETRIE_MOUNT}/packages/pi/lane-folder.md`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "    : `${PINETRIE_MOUNT}/packages/pi/lane-folders.md`",
     command: unit,
     expect: "every pinetrie file a lane is pointed at exists",
   },
@@ -356,9 +382,9 @@ export const mutations: readonly Mutation[] = [
     name: "the lane note is not where the prompt says, in a real lane",
     file: "packages/lanes/lane.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane.md`",
+    from: "    ? `${PINETRIE_MOUNT}/packages/pi/lane.md`",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane-notes.md`",
+    to: "    ? `${PINETRIE_MOUNT}/packages/pi/lane-notes.md`",
     suite: "lanes",
     scenario: "commands",
     expect: "the note the prompt names is a file in the lane",

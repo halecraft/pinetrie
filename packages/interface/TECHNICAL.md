@@ -684,7 +684,7 @@ pending.
   not named yet still counts). Nothing lists the runs.
 - **The publish button and its toast** (`publish-view.ts`, `toast.tsx`,
   ADR-0090, ADR-0099): `publishView` decides the one button: `absent` with
-  no record; `setup`, before setup on any host, whose `Menu` shows what it
+  no record, or a folder project's, which has nothing to set up or publish to; `setup`, before setup on any host, whose `Menu` shows what it
   writes; `hidden` when
   `@pinetrie/rules`' `nothingToPublish` says so, the same function the host
   refuses by; else `publish`, carrying `acceptedActionState`. `publishWords`
@@ -1208,7 +1208,10 @@ composer*).
   `workStrip` hands `offerView` the record decoded (`offerStatus`): a `held`
   offer says "nothing to accept: accepted work already has this thread's
   work",
-  and has no review.
+  and has no review. An open offer's review reads a jj offer's revisions,
+  or a folder offer's `start..tip` range (`offerReview`), as an ask's range
+  is read; a folder offer has no bookmark, no stack and no split, and the
+  composer offers no WIP to start from (`baseChoices`) in a folder project.
 - **What catching up would do** (`catchUpOf`, from `pinetrie.base`'s `start`
   and `catchUp` against `pinetrie.accepted`'s commits, S97): when it `brings`
   files, the strip's line adds "· accepted work has moved on", or is that

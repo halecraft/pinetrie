@@ -66,15 +66,18 @@ async function inScratch<C, T>(
  * Make the base snapshot at `accepted`: the base before it restored (none,
  * or one made another way, gives an empty disk), accepted work checked out
  * on it, its facts written, then snapshotted. Does nothing when the base
- * already holds them.
+ * already holds them, or when accepted work has no checkout: a kind with no
+ * base snapshot.
  */
 export async function refreshBase<C>(
   input: Scratch<C> & {
-    /** Accepted work as the adapter just read it, with its checkout. */
+    /** Accepted work as the adapter just read it, with its checkout, if any. */
     readonly accepted: AcceptedNow
   },
 ): Promise<boolean> {
   const { runtime, accepted } = input
+  const { checkout } = accepted
+  if (checkout === null) return false
   const base = parseBaseFacts(
     await runtime.readLaneFile(BASE_SNAPSHOT, BASE_FILE),
   )
@@ -83,7 +86,7 @@ export async function refreshBase<C>(
   await inScratch(input, from, async runners => {
     await executeOrThrow(
       [
-        ...accepted.checkout(from === null).steps,
+        ...checkout(from === null).steps,
         planBaseFacts(accepted.points),
         ...planSnapshot({ lane: BASE_LANE, snapshot: BASE_SNAPSHOT }),
       ],

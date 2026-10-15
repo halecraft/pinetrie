@@ -9,17 +9,19 @@ import {
   commitId,
   ERR,
   type ErrCode,
+  type JjAcceptedRecord,
   type PublishDecision,
   type PublishFinish,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { CommitSchema, decodeAt, fixedKey } from "./decode.ts"
+import { CommitSchema, decodeAt, fixedKey, PointSchema } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pinetrie.accepted` value's key: a host has one repo. */
 export const ACCEPTED_KEY = "accepted"
 
-const AcceptedRecordSchema = Type.Object({
+const JjAcceptedSchema = Type.Object({
+  kind: Type.Literal("jj"),
   acceptedBookmark: Type.String({ minLength: 1 }),
   wipPrefix: Type.String({ minLength: 1 }),
   publish: Type.String({ minLength: 1 }),
@@ -64,7 +66,16 @@ const AcceptedRecordSchema = Type.Object({
   publishCatchesUp: Type.Boolean(),
 })
 
-/** Accepted work, at its one key. */
+const FolderAcceptedSchema = Type.Object({
+  kind: Type.Literal("folder"),
+  newest: PointSchema,
+  at: Type.Number(),
+})
+
+/**
+ * Accepted work, of the project's kind, at its one key. A record written
+ * before records had a kind decodes as none, until the host writes it again.
+ */
 export const ACCEPTED: RecordSpec<
   AcceptedRecord,
   typeof ACCEPTED_KEY,
@@ -73,42 +84,50 @@ export const ACCEPTED: RecordSpec<
   namespace: "pinetrie.accepted",
   home: "session",
   keyOf: () => ACCEPTED_KEY,
-  encode: r => ({
-    ...r,
-    heads: { ...r.heads },
-    log: { ...r.log },
-    wips: r.wips.map(w => ({ ...w })),
-    published: { ...r.published },
-    yours: {
-      ...r.yours,
-      catchUp:
-        r.yours.catchUp === null
-          ? null
-          : {
-              ...r.yours.catchUp,
-              conflicts: [...r.yours.catchUp.conflicts],
+  encode: r =>
+    r.kind === "folder"
+      ? { ...r }
+      : {
+          ...r,
+          heads: { ...r.heads },
+          log: { ...r.log },
+          wips: r.wips.map(w => ({ ...w })),
+          published: { ...r.published },
+          yours: {
+            ...r.yours,
+            catchUp:
+              r.yours.catchUp === null
+                ? null
+                : {
+                    ...r.yours.catchUp,
+                    conflicts: [...r.yours.catchUp.conflicts],
+                  },
+            conflicts: {
+              ...r.yours.conflicts,
+              files: [...r.yours.conflicts.files],
             },
-      conflicts: {
-        ...r.yours.conflicts,
-        files: [...r.yours.conflicts.files],
-      },
-    },
-  }),
+          },
+        },
   decode: (contents, key) =>
     decodeAt(
-      AcceptedRecordSchema,
+      Type.Union([JjAcceptedSchema, FolderAcceptedSchema]),
       contents,
       fixedKey(ACCEPTED_KEY, key),
-      r => ({
-        ...r,
-        commit: r.commit === null ? null : commitId(r.commit),
-        wips: r.wips.map(w => ({ ...w, commit: commitId(w.commit) })),
-        published: {
-          ...r.published,
-          commit:
-            r.published.commit === null ? null : commitId(r.published.commit),
-        },
-      }),
+      (r): AcceptedRecord =>
+        r.kind === "folder"
+          ? r
+          : {
+              ...r,
+              commit: r.commit === null ? null : commitId(r.commit),
+              wips: r.wips.map(w => ({ ...w, commit: commitId(w.commit) })),
+              published: {
+                ...r.published,
+                commit:
+                  r.published.commit === null
+                    ? null
+                    : commitId(r.published.commit),
+              },
+            },
     ),
 }
 
@@ -128,9 +147,10 @@ export function planAcceptedRecord(input: {
     readonly publishCatchesUp: boolean
   }
   readonly proposed: { readonly heads: string; readonly log: string }
-}): AcceptedRecord {
+}): JjAcceptedRecord {
   const { facts, repoConfig, proposed } = input
   return {
+    kind: "jj",
     acceptedBookmark: repoConfig.acceptedBookmark,
     wipPrefix: repoConfig.wipPrefix,
     publish: repoConfig.publish,
@@ -170,7 +190,7 @@ export interface PublishWork {
  * bookmark alone, so the working copy and your commits count for nothing.
  */
 export function publishWork(
-  record: Pick<AcceptedRecord, "publishCatchesUp" | "published" | "yours">,
+  record: Pick<JjAcceptedRecord, "publishCatchesUp" | "published" | "yours">,
 ): PublishWork {
   const { publishCatchesUp, published, yours } = record
   return {
@@ -195,6 +215,8 @@ export function acceptedActionState(
   action: AcceptedAction,
   record: AcceptedRecord,
 ): AcceptedActionState {
+  // Your folder is accepted work: there is nothing to set up or publish to.
+  if (record.kind === "folder") return refused(ERR.REFUSED)
   if (action === "setup")
     return record.commit === null ? OK : refused(ERR.REFUSED)
   if (record.commit === null) return refused(ERR.NOT_SET_UP)
@@ -221,7 +243,7 @@ export function acceptedActionState(
  */
 export function planAcceptedAction(
   action: AcceptedAction,
-  record: AcceptedRecord,
+  record: JjAcceptedRecord,
 ): AcceptedDecision {
   const state = acceptedActionState(action, record)
   if (state.kind === "refused") return state
@@ -254,7 +276,7 @@ export function planAcceptedAction(
  */
 export function planPublishFinish(input: {
   readonly decision: PublishDecision
-  readonly after: AcceptedRecord
+  readonly after: JjAcceptedRecord
   /** The catch-up's operation; null without a catch-up. */
   readonly op: string | null
 }): PublishFinish {
@@ -288,7 +310,7 @@ const commits = (n: number) => (n === 1 ? "1 commit" : `${n} commits`)
 export function acceptedRefusal(
   action: AcceptedAction,
   code: ErrCode,
-  record: AcceptedRecord,
+  record: JjAcceptedRecord,
 ): string {
   const { publish, published, yours } = record
   switch (code) {
@@ -323,7 +345,7 @@ export function acceptedRefusal(
  */
 export function publishUndone(
   code: Extract<PublishFinish, { readonly kind: "undo" }>["code"],
-  after: AcceptedRecord,
+  after: JjAcceptedRecord,
 ): string {
   if (code !== ERR.YOURS_CONFLICT)
     return acceptedRefusal("publish", code, after)

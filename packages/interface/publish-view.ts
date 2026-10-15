@@ -4,7 +4,7 @@
 // (`publishToast`). Whether a command may run is `@pinetrie/rules`'
 // `acceptedActionState`, the rule the host decides by.
 
-import type { AcceptedRecord } from "@pinetrie/core"
+import type { AcceptedRecord, JjAcceptedRecord } from "@pinetrie/core"
 import {
   type AcceptedActionState,
   acceptedActionState,
@@ -19,7 +19,10 @@ import { outcomeWords } from "./outcome-words.ts"
 
 /** The publish button as the footer shows it. */
 export type PublishView =
-  /** No lanes of their own here. */
+  /**
+   * No lanes of their own here, or a folder project: your folder is
+   * accepted work, with nothing to set up or publish to.
+   */
   | { readonly kind: "absent" }
   /** Set up, with nothing to publish. */
   | { readonly kind: "hidden" }
@@ -32,14 +35,14 @@ export type PublishView =
     }
   | {
       readonly kind: "publish"
-      readonly record: AcceptedRecord
+      readonly record: JjAcceptedRecord
       readonly work: PublishWork
       /** Whether the host would carry it out now, and if not, why. */
       readonly state: AcceptedActionState
     }
 
 export function publishView(record: AcceptedRecord | null): PublishView {
-  if (record === null) return { kind: "absent" }
+  if (record === null || record.kind === "folder") return { kind: "absent" }
   if (record.commit === null)
     return {
       kind: "setup",
@@ -85,7 +88,7 @@ export type PublishWords =
 const commits = (n: number) => count(n, "commit", "commits")
 
 /** What a publish does, in order, and the jj that does it. */
-function publishSays(record: AcceptedRecord, work: PublishWork): string {
+function publishSays(record: JjAcceptedRecord, work: PublishWork): string {
   const { acceptedBookmark, publish } = record
   const steps: string[] = []
   const jj: string[] = []

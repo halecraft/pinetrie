@@ -8,7 +8,9 @@
 
 import {
   type BaseRecord,
+  type CatchUpRead,
   firstPromptOf,
+  type JjBaseRecord,
   type OfferRecord,
   projectTranscript,
   type RepoConfig,
@@ -65,7 +67,7 @@ export interface OfferRecords {
   /** Remove an offer's record, when there is one. */
   remove(lane: ThreadId): Promise<void>
   /** The lane's base record as the repo says it, when it differs from the page's; none for null. */
-  writeBase(next: BaseRecord | null): Promise<void>
+  writeBase(next: JjBaseRecord | null): Promise<void>
   writeValues(writes: readonly ValueWrite[]): Promise<void>
 }
 
@@ -117,7 +119,7 @@ export function createOfferDeps(input: {
       lane,
       name: nameOf(lane),
       repoConfig,
-      known: readBases(doc).get(lane)?.catchUp ?? null,
+      known: jjCatchUp(readBases(doc).get(lane)),
     }),
     tipOf(lane) {
       const root = docs.docOfLane(lane)
@@ -163,3 +165,7 @@ export function createOfferDeps(input: {
     records,
   }
 }
+
+/** A jj lane's base record's read of what catching up changes; none for one of another kind. */
+const jjCatchUp = (base: BaseRecord | undefined): CatchUpRead | null =>
+  base?.kind === "jj" ? base.catchUp : null

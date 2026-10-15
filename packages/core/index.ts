@@ -976,6 +976,16 @@ export const planCopyReady = (copy: CopyFacts): ReadyCopy | CopyRefusal => {
 }
 
 /**
+ * A folder lane's copy, always ready: it has no stack, so nothing moves it
+ * off its line. Only the folder adapter calls it; any caller could make a
+ * `ReadyCopy` with it, the trade-off `planCopyReady` already accepts.
+ */
+export const folderCopyReady = (): ReadyCopy => {
+  const none: CopyFacts = { parents: [], bookmark: null, descends: false }
+  return none as ReadyCopy
+}
+
+/**
  * What a project's folder is to lanes: a jj workspace, whose repo is
  * accepted work, or any other folder (a git repo included).
  */
@@ -1006,6 +1016,13 @@ export interface RepoConfig {
   readonly wipPrefix: string
   readonly publish: string
   readonly publishCatchesUp: boolean
+}
+
+/** Your folder, as the host last read it: its newest state. */
+export interface FolderAcceptedRecord {
+  readonly kind: "folder"
+  readonly newest: PointId
+  readonly at: number
 }
 
 /** A layer's file: read, absent, or refused whole. */
@@ -1375,16 +1392,23 @@ export interface ProjectRecord {
 }
 
 /**
- * A lane's offer: one revision, or a stack, in your repo, holding the lane's
- * work you do not have yet. A host-written `pinetrie.offer` value keyed by
- * lane: the page's cache, written from the repo after each of the host's steps
- * (`offerRecord`, `@pinetrie/rules`). The host never decides from it: it reads
- * the offer from your repo (`OfferInRepo`), so a record lost or stale changes
- * nothing. What accepting it would bring, each revision's description, files
- * and diffs, is not stored: the page reads it by commit when it asks
- * (`RevisionReview`).
+ * A lane's offer: the lane's work you do not have yet. A host-written
+ * `pinetrie.offer` value keyed by lane: the page's cache, of the project's
+ * kind. The host never decides from it, so a record lost or stale changes
+ * nothing; at start it deletes those of the other kind.
  */
-export interface OfferRecord {
+export type OfferRecord = JjOfferRecord | FolderOfferRecord
+
+/**
+ * A jj project's offer: one revision, or a stack, in your repo. Written
+ * from the repo after each of the host's steps (`offerRecord`,
+ * `@pinetrie/rules`); the host reads the offer from your repo
+ * (`OfferInRepo`). What accepting it would bring, each revision's
+ * description, files and diffs, is not stored: the page reads it by commit
+ * when it asks (`RevisionReview`).
+ */
+export interface JjOfferRecord {
+  readonly kind: "jj"
   readonly lane: ThreadId
   /** Its revisions: 1 for a single offer, more for a stack. */
   readonly size: number
@@ -1424,6 +1448,27 @@ export interface OfferRecord {
    * field, until the owner's first observation writes it again.
    */
   readonly ledger: OfferLedger | null
+  readonly at: number
+}
+
+/**
+ * A folder project's offer: the lane's newest state against your folder's
+ * newest, its files those whose content differs. The page reviews it as the
+ * range `start..tip`.
+ */
+export interface FolderOfferRecord {
+  readonly kind: "folder"
+  readonly lane: ThreadId
+  /** Your folder's newest state, which the offer is computed against. */
+  readonly start: PointId
+  /** The lane's newest state. */
+  readonly tip: PointId
+  /** None when your folder already holds its work. */
+  readonly files: readonly string[]
+  /** The lane's open conflicts among them. */
+  readonly conflicts: readonly string[]
+  /** An agent wrote its description. */
+  readonly described: boolean
   readonly at: number
 }
 
@@ -1682,11 +1727,18 @@ export interface AccessRecord {
 export type AccessAnswer = "approve" | "refuse" | "revoke"
 
 /**
- * Accepted work in your repo, as the host last read it: a host-written
- * `pinetrie.accepted` value, a cache the page reads. The repo is the truth; the
- * host rewrites this whenever your repo's operation head moves.
+ * Accepted work as the host last read it: a host-written `pinetrie.accepted`
+ * value of the project's kind, a cache the page reads. At start the host
+ * deletes one of the other kind.
  */
-export interface AcceptedRecord {
+export type AcceptedRecord = JjAcceptedRecord | FolderAcceptedRecord
+
+/**
+ * Accepted work in your repo. The repo is the truth; the host rewrites this
+ * whenever your repo's operation head moves.
+ */
+export interface JjAcceptedRecord {
+  readonly kind: "jj"
   /** Accepted work's bookmark, and the prefix that makes a bookmark a WIP. */
   readonly acceptedBookmark: string
   readonly wipPrefix: string
@@ -1755,12 +1807,18 @@ export interface AcceptedRecord {
 }
 
 /**
- * A thread's base as its lane's history says it: a host-written `pinetrie.base`
- * value keyed by lane, a cache the page reads. `start` is the commit the lane's
- * newest `Pinetrie-Base` trailer names, or accepted commit it forked from when
- * it has none.
+ * A thread's base as its lane's history says it: a host-written
+ * `pinetrie.base` value keyed by lane, of the project's kind, a cache the
+ * page reads. At start the host deletes those of the other kind.
  */
-export interface BaseRecord {
+export type BaseRecord = JjBaseRecord | FolderBaseRecord
+
+/**
+ * A jj lane's base. `start` is the commit the lane's newest `Pinetrie-Base`
+ * trailer names, or accepted commit it forked from when it has none.
+ */
+export interface JjBaseRecord {
+  readonly kind: "jj"
   readonly lane: ThreadId
   readonly base: ThreadBase
   readonly start: CommitId
@@ -1783,6 +1841,26 @@ export interface BaseRecord {
    * untraced start, or one jj could not diff. A thread is told its base has new
    * work only with `some`, and caught up quietly only with `none`.
    */
+  readonly work: WorkChanges
+}
+
+/**
+ * A folder lane's base: your folder's state it began on or last caught up
+ * with. A folder project has no WIP, so its base is always accepted work.
+ */
+export interface FolderBaseRecord {
+  readonly kind: "folder"
+  readonly lane: ThreadId
+  readonly start: PointId
+  /**
+   * What catching up would change, read at the lane's newest state and your
+   * folder's then; null when your folder had not moved.
+   */
+  readonly catchUp: {
+    readonly tip: PointId
+    readonly to: PointId
+    readonly files: readonly string[]
+  } | null
   readonly work: WorkChanges
 }
 

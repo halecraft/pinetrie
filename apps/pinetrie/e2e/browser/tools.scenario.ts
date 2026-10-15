@@ -25,12 +25,7 @@ import {
   workingWords,
 } from "@pinetrie/interface"
 import { type Held, scriptedModel } from "@pinetrie/pi"
-import {
-  readLaneRecords,
-  readNames,
-  readOffers,
-  readPlaces,
-} from "@pinetrie/reads"
+import { readLaneRecords, readNames, readPlaces } from "@pinetrie/reads"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
 import { command } from "../command.ts"
@@ -47,6 +42,7 @@ import {
   idleNow,
   join,
   lanesOf,
+  readJjOffers,
   SUITE_CONFIG,
   setUpAccepted,
   suitePlaces,
@@ -1557,7 +1553,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           // would read the new one mid-check.
           await waitFor(
             () =>
-              [...readOffers(toolHost.session).values()].some(
+              [...readJjOffers(toolHost.session).values()].some(
                 o => o.acceptedAs === null && o.described,
               ),
             15_000,

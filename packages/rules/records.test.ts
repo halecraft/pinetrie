@@ -3,8 +3,10 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 // record reads back whole from what is stored.
 
 import {
+  type BaseRecord,
   commitId,
   entryId,
+  type JjOfferRecord,
   type OfferRecord,
   pointFromCommit,
   pointId,
@@ -13,6 +15,7 @@ import {
   SESSION_TARGET,
   type Sha256,
   snapshotId,
+  type ThreadId,
   type ThreadName,
   taskIdFor,
   threadIdFor,
@@ -40,6 +43,7 @@ import {
   PARTICIPANT,
   PICTURE,
   PROJECT,
+  planKindSweep,
   planUndeclaredSweep,
   QUEUE_HOLD,
   RECORD_SPECS,
@@ -68,7 +72,8 @@ const DIGESTED = {
   final: true,
 }
 
-const offer: OfferRecord = {
+const offer: JjOfferRecord = {
+  kind: "jj",
   lane: L,
   size: 1,
   stale: false,
@@ -188,6 +193,7 @@ const SAMPLES: readonly Sample[] = [
     "line",
     ACCEPTED,
     {
+      kind: "jj",
       acceptedBookmark: "pinetrie-accepted",
       wipPrefix: "wip/",
       publish: "main",
@@ -210,12 +216,50 @@ const SAMPLES: readonly Sample[] = [
     "base",
     BASE,
     {
+      kind: "jj",
       lane: L,
       base: { kind: "accepted" },
       start: C,
       state: "ok",
       catchUp: { tip: C, to: C, files: ["a.txt"] },
       untraced: [C],
+      work: "some",
+    },
+    "lane",
+  ),
+  sample(
+    "a folder's offer",
+    OFFER,
+    {
+      kind: "folder",
+      lane: L,
+      start: pointId("line-0192aaaa"),
+      tip: pointId("turn-0192bbbb"),
+      files: ["a.txt"],
+      conflicts: [],
+      described: false,
+      at: 1,
+    },
+    "lane",
+  ),
+  sample(
+    "your folder",
+    ACCEPTED,
+    { kind: "folder", newest: pointId("line-0192aaaa"), at: 1 },
+    null,
+  ),
+  sample(
+    "a folder lane's base",
+    BASE,
+    {
+      kind: "folder",
+      lane: L,
+      start: pointId("line-0192aaaa"),
+      catchUp: {
+        tip: pointId("turn-0192bbbb"),
+        to: pointId("line-0192cccc"),
+        files: ["a.txt"],
+      },
       work: "some",
     },
     "lane",
@@ -364,6 +408,14 @@ describe.each(SAMPLES)("%s", (_, spec, record, keyField) => {
   })
 })
 
+test("a record stored before records had a kind does not decode", () => {
+  const { kind: _o, ...offerBefore } = OFFER.encode(offer) as Record<
+    string,
+    unknown
+  >
+  expect(OFFER.decode(offerBefore, L)).toBeUndefined()
+})
+
 test("an offer record with no ledger reads back with none, and so does one written before the field", () => {
   const stored = OFFER.encode(offer) as Record<string, unknown>
   expect(OFFER.decode(stored, L)).toEqual(offer)
@@ -424,6 +476,9 @@ test("each record lives where it is read: across roots in the session, by entry 
     offer: "session",
     line: "session",
     base: "session",
+    "a folder's offer": "session",
+    "your folder": "session",
+    "a folder lane's base": "session",
     name: "session",
     banner: "session",
     access: "session",
@@ -469,6 +524,43 @@ test("deleteRecord names the spec's namespace and the key", () => {
   })
 })
 
+test("planKindSweep deletes the offers, accepted work and bases of the other kind, and no other record", () => {
+  const F = threadIdFor("f")
+  const folderOffer = {
+    kind: "folder",
+    lane: F,
+    start: pointId("line-0192aaaa"),
+    tip: pointId("turn-0192bbbb"),
+    files: [],
+    conflicts: [],
+    described: false,
+    at: 1,
+  } as const
+  const folderBase = {
+    kind: "folder",
+    lane: F,
+    start: pointId("line-0192aaaa"),
+    catchUp: null,
+    work: "none",
+  } as const
+  const records = {
+    offers: new Map<ThreadId, OfferRecord>([
+      [L, offer],
+      [F, folderOffer],
+    ]),
+    accepted: { kind: "folder", newest: pointId("line-0192aaaa"), at: 1 },
+    bases: new Map<ThreadId, BaseRecord>([[F, folderBase]]),
+  } as const
+  const swept = (kind: "jj" | "folder") =>
+    planKindSweep(records, kind).map(w => [w.namespace, w.key])
+  expect(swept("jj")).toEqual([
+    ["pinetrie.offer", F],
+    ["pinetrie.accepted", "accepted"],
+    ["pinetrie.base", F],
+  ])
+  expect(swept("folder")).toEqual([["pinetrie.offer", L]])
+})
+
 test("planUndeclaredSweep deletes a record stored outside its spec's home: a root's mark, from before tasks", () => {
   const root = rootIdFor("r-1")
   expect(
@@ -500,7 +592,7 @@ describe("setIfChanged", () => {
   test("the same record with its keys in another order is unchanged", () => {
     const reordered = Object.fromEntries(
       Object.entries(offer).reverse(),
-    ) as unknown as OfferRecord
+    ) as unknown as JjOfferRecord
     expect(setIfChanged(OFFER, offer, reordered)).toEqual([])
   })
 })

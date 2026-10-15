@@ -25,6 +25,11 @@
     folder, which is where publishing would have put the work.
   - ADR-0105: in a folder project, an offer is a pair of states, not a commit.
     It is reviewed as files, and it has no bookmark, no evolog and no stack.
+- **Revised:**
+  - 2026-10-15: `@pinetrie/folder` decides and does no I/O; the host's
+    `apps/pinetrie/host/folder/` is the only code that touches your folder
+    (its scan, its watcher, and the accept's writes), carrying out what the
+    package decides.
 - **Amended by:**
   - ADR-0149: a folder project's data is in its session's directory,
     `$XDG_DATA_HOME/pinetrie/sessions/<name>/`.
@@ -357,10 +362,11 @@ has not seen.*
   | **destination** | read accepted work, accept, watch it move | your repo, through its owner | the folder, through its writer |
   | **review** | files and one file's diff, between two points | `jj diff` by commit | files compared by state |
 
-- **`@pinetrie/folder` is the only code that reads or writes a folder
-  project's folder:** its scan, its staged and checked writes, and its
-  watcher, which the shared directories' watcher becomes a use of. It
-  declares only `@pinetrie/core`. `@pinetrie/repo` stays the only writer
+- **`apps/pinetrie/host/folder/` is the only code that reads or writes a
+  folder project's folder** (revised: this said `@pinetrie/folder`): its
+  scan, its staged and checked writes, and its watcher, which the shared
+  directories' watcher becomes a use of. `@pinetrie/folder` decides for it,
+  with no I/O, and declares only `@pinetrie/core`. `@pinetrie/repo` stays the only writer
   of a jj repo. The jj code in a lane (`revisions.ts`, `merge.ts`,
   `bookmarks.ts`) moves out of `@pinetrie/lanes`, which keeps containers,
   disks, the queue and the ports.

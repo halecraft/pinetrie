@@ -3,13 +3,13 @@
 // `@pinetrie/rules` returns from those facts.
 
 import type {
-  AcceptedRecord,
-  BaseRecord,
   CommitBase,
   CommitId,
   ERR,
   ErrCode,
-  OfferRecord,
+  JjAcceptedRecord,
+  JjBaseRecord,
+  JjOfferRecord,
   ThreadName,
 } from "./index.ts"
 
@@ -179,7 +179,7 @@ export interface OfferGather {
    * change and its untraced accepted-offer commits with it: the host writes it
    * when it differs from the page's.
    */
-  readonly base: BaseRecord
+  readonly base: JjBaseRecord
 }
 
 /** What a refresh decides from (`planRefresh`). */
@@ -275,7 +275,7 @@ export type OfferAcceptanceDecision =
       /** The offer's top's change id. */
       readonly top: string
       /** Its record, marked accepted. */
-      readonly accepted: OfferRecord
+      readonly accepted: JjOfferRecord
     }
   | { readonly kind: "refused"; readonly code: ErrCode }
 
@@ -296,7 +296,7 @@ export interface DescribeDecision {
  * `revsets.log` as jj resolves them (null for jj's own).
  */
 export interface AcceptedFacts
-  extends Pick<AcceptedRecord, "commit" | "wips" | "published" | "yours"> {
+  extends Pick<JjAcceptedRecord, "commit" | "wips" | "published" | "yours"> {
   readonly heads: string | null
   readonly log: string | null
 }

@@ -278,10 +278,11 @@ export interface LabelledButton {
  * range, each a span, and which of their files to flag. `title`
  * heads a review whose spans have no description: an ask's line.
  */
-export type ReviewTarget = Pick<
-  OfferRecord,
-  "lane" | "conflicts" | "yourEdits"
-> & {
+export interface ReviewTarget {
+  readonly lane: ThreadId
+  readonly conflicts: readonly string[]
+  /** Files you are editing in your working copy: a jj offer's alone. */
+  readonly yourEdits: readonly string[]
   readonly spans: readonly DiffSpan[]
   readonly title?: string
 }
@@ -464,7 +465,7 @@ const shownHeadIcon = (
  * WIP is gone; nothing for accepted work, or a WIP that landed on it.
  */
 export function baseWords(base: BaseRecord | undefined): string | null {
-  if (base === undefined || base.base.kind !== "wip") return null
+  if (base?.kind !== "jj" || base.base.kind !== "wip") return null
   switch (base.state) {
     case "ok":
       return `on ${base.base.bookmark}`
@@ -639,18 +640,20 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
   if (record === undefined || record.history === null) return NO_STRIP
   const offer = offerStatus(work.offers.get(lane.name))
   const base = work.bases.get(lane.name) ?? null
+  const jjBase = base?.kind === "jj" ? base : null
+  const accepted = work.accepted?.kind === "jj" ? work.accepted : null
   const view = offerView({
     offer,
     activity: activityOf(f.index, lane),
     asked: conflictAskedAt(f.index, lane.tip),
     base,
-    acceptedBookmark: work.accepted?.acceptedBookmark ?? "",
+    acceptedBookmark: accepted?.acceptedBookmark ?? "",
     wipAhead:
-      work.accepted?.wips.find(
-        w => base?.base.kind === "wip" && w.bookmark === base.base.bookmark,
+      accepted?.wips.find(
+        w => jjBase?.base.kind === "wip" && w.bookmark === jjBase.base.bookmark,
       )?.ahead ?? 0,
     catchUp: catchUpOf(base ?? undefined, work.accepted),
-    untraced: (base?.untraced.length ?? 0) > 0,
+    untraced: (jjBase?.untraced.length ?? 0) > 0,
     queued: f.queued.flatMap(c => {
       const command = commandOf(c)
       return command === null ? [] : [command]
@@ -666,20 +669,25 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
     waiting: f.acting?.kind === "sent",
     bookmark: view.facts.bookmark,
     destinations: view.destinations,
-    review:
-      offer.kind !== "open"
-        ? null
-        : {
-            lane: offer.record.lane,
-            spans: offer.record.commits.map(commit => ({
-              kind: "revision",
-              commit,
-            })),
-            conflicts: offer.record.conflicts,
-            yourEdits: offer.record.yourEdits,
-          },
+    review: offer.kind === "open" ? offerReview(offer.record) : null,
   }
 }
+
+/** What an open offer's review reads: a jj offer's revisions, or a folder offer's range. */
+const offerReview = (record: OfferRecord): ReviewTarget =>
+  record.kind === "folder"
+    ? {
+        lane: record.lane,
+        spans: [{ kind: "range", from: record.start, to: record.tip }],
+        conflicts: record.conflicts,
+        yourEdits: [],
+      }
+    : {
+        lane: record.lane,
+        spans: record.commits.map(commit => ({ kind: "revision", commit })),
+        conflicts: record.conflicts,
+        yourEdits: record.yourEdits,
+      }
 
 /** What a lane runs now, as its offer cares: a turn, a resolution, a split. */
 export function activityOf(

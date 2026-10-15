@@ -30,15 +30,12 @@ export interface RigLane {
   read(path: string): Promise<string | null>
   /** `f` with the lane's history, on its queue. */
   withHistory<T>(f: (h: LaneHistory) => Promise<T>): Promise<T>
-  /** Move the copy off the lane's line, as a split's stack leaves it. */
-  offLine(): Promise<void>
-  /** Each fetch a move's `follow` scheduled, as it was scheduled. */
-  readonly fetched: readonly unknown[]
-  /** Settles when every fetch scheduled so far has. */
+  /** Settles when the work every move's `follow` scheduled so far has. */
   settled(): Promise<void>
   /**
-   * Test-only: commit what the copy holds as the agent's own commit, as
-   * `jj commit` in a tool call does.
+   * Test-only: an agent's own commit of what the copy holds, as `jj commit`
+   * in a tool call makes, where its history has one; nothing where it has
+   * none.
    */
   commitAsAgent(message: string): Promise<void>
 }
@@ -193,25 +190,6 @@ export function historySuite(
     expect((await lane.withHistory(h => h.commit(TURN))).point).toBeNull()
   })
 
-  withRig(
-    "a turn that committed, and a clean merge, each schedule one fetch",
-    async rig => {
-      const lane = await rig.lane()
-      await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
-      const made = await lane.withHistory(h => h.recordTurn(TURN))
-      expect(made.committed === null).toBe(false)
-      made.follow?.()
-      await lane.settled()
-      expect(lane.fetched.length).toBe(1)
-      const accepted = await rig.yoursOnAccepted({ "b.txt": "b\n" })
-      const merged = await catchUp(lane, accepted)
-      expect(merged.kind).toBe("clean")
-      merged.follow?.()
-      await lane.settled()
-      expect(lane.fetched.length).toBe(2)
-    },
-  )
-
   withRig("A clean merge descends from both sides.", async rig => {
     const lane = await rig.lane()
     await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
@@ -250,16 +228,11 @@ export function historySuite(
     },
   )
 
-  withRig(
-    "a copy on its line is ready to merge; one off it is refused",
-    async rig => {
-      const lane = await rig.lane()
-      const ready = await lane.withHistory(h => h.readyToMerge())
-      expect(typeof ready).toBe("object")
-      await lane.offLine()
-      expect(await lane.withHistory(h => h.readyToMerge())).toBe("off-line")
-    },
-  )
+  withRig("a copy on its line is ready to merge", async rig => {
+    const lane = await rig.lane()
+    const ready = await lane.withHistory(h => h.readyToMerge())
+    expect(typeof ready).toBe("object")
+  })
 
   withRig(
     "a file is read at accepted work, at a lane's tip and at its start",

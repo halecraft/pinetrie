@@ -5,6 +5,15 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the other kind's records are kept at start",
+    file: "apps/pinetrie/host/startup.ts",
+    from: "    await keeper.run(() => records.writeValues(otherKind))\n",
+    to: "",
+    command: unit,
+    expect:
+      "recover deletes the offers, accepted work and bases of another kind than the project's",
+  },
+  {
     name: "accepted work's config read again is in force before it is shared",
     file: "apps/pinetrie/host/work/config.ts",
     from: "    readAccepted,\n    takeAccepted(next) {",

@@ -1,8 +1,17 @@
 // specs — every host record's spec, in one list.
 
-import type { HostNamespace, Target, ValueWrite } from "@pinetrie/core"
+import type {
+  AcceptedRecord,
+  BaseRecord,
+  HostNamespace,
+  OfferRecord,
+  ProjectKind,
+  Target,
+  ThreadId,
+  ValueWrite,
+} from "@pinetrie/core"
 
-import { ACCEPTED } from "./accepted.ts"
+import { ACCEPTED, ACCEPTED_KEY } from "./accepted.ts"
 import { ACCESS } from "./access.ts"
 import { BANNER, ICONS } from "./banner.ts"
 import { BASE } from "./base.ts"
@@ -18,7 +27,7 @@ import { NOTE_COLUMN } from "./note-column.ts"
 import { OFFER } from "./offer.ts"
 import { PARTICIPANT, PICTURE } from "./participant.ts"
 import { QUEUE_HOLD } from "./queue-hold.ts"
-import type { RecordSpec } from "./records.ts"
+import { deleteRecord, type RecordSpec } from "./records.ts"
 import { ROOT } from "./roots.ts"
 import { SEAT } from "./seat.ts"
 import { SETUP } from "./setup.ts"
@@ -99,3 +108,28 @@ export const planUndeclaredSweep = (
           })),
     ),
   )
+
+/**
+ * Deletes for every offer, accepted-work and base record of another kind
+ * than the project's: caches of a project that was the other kind before,
+ * which no reader of this one reads. A folder's `STATE` and `CONFLICT`
+ * records are never among them, so your folder's line outlives a jj period.
+ */
+export const planKindSweep = (
+  records: {
+    readonly offers: ReadonlyMap<ThreadId, OfferRecord>
+    readonly accepted: AcceptedRecord | null
+    readonly bases: ReadonlyMap<ThreadId, BaseRecord>
+  },
+  kind: ProjectKind,
+): ValueWrite[] => [
+  ...[...records.offers.values()]
+    .filter(r => r.kind !== kind)
+    .map(r => deleteRecord(OFFER, r.lane)),
+  ...(records.accepted !== null && records.accepted.kind !== kind
+    ? [deleteRecord(ACCEPTED, ACCEPTED_KEY)]
+    : []),
+  ...[...records.bases.values()]
+    .filter(r => r.kind !== kind)
+    .map(r => deleteRecord(BASE, r.lane)),
+]

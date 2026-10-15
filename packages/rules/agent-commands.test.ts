@@ -1,7 +1,7 @@
 import {
   type CardRecord,
   commitId,
-  type OfferRecord,
+  type JjOfferRecord,
   pointFromCommit,
   rootIdFor,
   type ThreadName,
@@ -43,8 +43,8 @@ const [PC, PD] = [pointFromCommit(C), pointFromCommit(D)]
 const MOVE = {
   base: { kind: "accepted" },
   bookmark: "pinetrie-accepted",
-  from: B,
-  to: C,
+  from: pointFromCommit(B),
+  to: pointFromCommit(C),
 } as const
 
 const parent = (over: Partial<ParentNow> = {}): ParentNow => ({
@@ -162,10 +162,11 @@ describe("planSplitCall", () => {
   const _ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
   const open = {
     kind: "open",
-    record: {} as OfferRecord,
+    record: {} as JjOfferRecord,
   } as const
   const split = (over: Partial<Parameters<typeof planSplitCall>[0]> = {}) =>
     planSplitCall({
+      history: "jj",
       offer: open,
       cards: [],
       lane: LANE,
@@ -207,6 +208,7 @@ describe("planSplitCall", () => {
   })
 
   test.each([
+    ["a folder lane, whose offer is files", { history: "folder" }, "folder"],
     ["no open offer", { offer: { kind: "none" } }, "no-offer"],
     ["a split already queued", { cards: [queuedSplit] }, "queued"],
     ["a split running", { prompt: "stack" }, "splitting"],

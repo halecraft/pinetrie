@@ -23,9 +23,7 @@ import { DEFAULT_REPO, laneBase, startOfOffer } from "@pinetrie/jj"
 import { type Runner, run } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import {
-  readAccepted,
   readNames,
-  readOffers,
   readPlaces,
   readProject,
   readRevisions,
@@ -44,6 +42,8 @@ import {
   join,
   lanesOf,
   moveTaskTo,
+  readJjAccepted,
+  readJjOffers,
   rootRecordsOf,
   START_AGENT,
   setUpAccepted,
@@ -504,7 +504,7 @@ async function mainSection(
 
     // ── 6. Offers: the thread's work as one commit you accept ────────────
     const offerOf = () =>
-      two === undefined ? undefined : readOffers(wh.session).get(two.name)
+      two === undefined ? undefined : readJjOffers(wh.session).get(two.name)
     const defaultLog = () =>
       jj(
         project,
@@ -847,11 +847,11 @@ async function mainSection(
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     await jj(project, "commit", "-m", "you add yours.txt")
     const previewed = await waitFor(
-      () => (readAccepted(wh.session)?.yours.catchUp ?? null) !== null,
+      () => (readJjAccepted(wh.session)?.yours.catchUp ?? null) !== null,
       30_000,
     )
-    const preview = readAccepted(wh.session)?.yours.catchUp
-    const unpublished = readAccepted(wh.session)?.published.behind ?? 0
+    const preview = readJjAccepted(wh.session)?.yours.catchUp
+    const unpublished = readJjAccepted(wh.session)?.published.behind ?? 0
     const published = await wu.actOnAccepted("publish")
     /** Who ran the newest rebase in your op log: the catch-up. */
     const caughtUpBy =
@@ -882,7 +882,7 @@ async function mainSection(
       `${JSON.stringify({ preview, published, caughtUpBy })}`,
     )
     const caughtUp = await waitFor(
-      () => readAccepted(wh.session)?.published.behind === 0,
+      () => readJjAccepted(wh.session)?.published.behind === 0,
       30_000,
     )
     check(
@@ -890,7 +890,7 @@ async function mainSection(
       unpublished > 0 &&
         caughtUp >= 0 &&
         (await commitAt("main")) === (await commitAt("pinetrie-accepted")),
-      `${JSON.stringify({ unpublished, line: readAccepted(wh.session)?.published })}`,
+      `${JSON.stringify({ unpublished, line: readJjAccepted(wh.session)?.published })}`,
     )
     script.use([{ text: "it fits" }])
     if (two !== undefined)
@@ -980,12 +980,12 @@ async function mainSection(
     // A new root thread starts at accepted work: what you landed, not what you
     // committed and have not landed, nor your working copy.
     writeFileSync(path.join(project, "unlanded.txt"), "not landed\n")
-    const aheadBefore = readAccepted(wh.session)?.yours.ahead ?? 0
+    const aheadBefore = readJjAccepted(wh.session)?.yours.ahead ?? 0
     await jj(project, "commit", "-m", "you add unlanded.txt")
     // The host has seen your commit (its line record counts it), so its
     // reads, pinned to the head it observed, have it too.
     await waitFor(
-      () => (readAccepted(wh.session)?.yours.ahead ?? 0) > aheadBefore,
+      () => (readJjAccepted(wh.session)?.yours.ahead ?? 0) > aheadBefore,
       10_000,
     )
     writeFileSync(path.join(project, "unsaved.txt"), "not committed\n")
@@ -1023,7 +1023,7 @@ async function mainSection(
     // Accepting the parent's shrinks it to its own, in place; accepting a
     // branch that holds all of its parent's withdraws the parent's.
     const offerFor = (lane: ThreadId | undefined) =>
-      lane === undefined ? undefined : readOffers(wh.session).get(lane)
+      lane === undefined ? undefined : readJjOffers(wh.session).get(lane)
     const filesOf = (lane: ThreadId | undefined) =>
       JSON.stringify(offerFor(lane)?.files)
     const changeOf = (lane: ThreadId | undefined) =>
@@ -1119,7 +1119,7 @@ async function mainSection(
     const before = inRootOne(rootRecordsOf(wh, readRevisions))
     // The root's open offers, by lane: archiving withdraws them, and
     // restoring builds them again.
-    const offeredInRootOne = [...readOffers(wh.session).values()]
+    const offeredInRootOne = [...readJjOffers(wh.session).values()]
       .filter(o => {
         const tip = laneTip(o.lane)
         return (
@@ -1170,7 +1170,7 @@ async function mainSection(
       "archiving a root withdraws its threads' offers: no bookmark in your repo, no record",
       offeredInRootOne.length > 0 &&
         left.length === 0 &&
-        offeredInRootOne.every(lane => !readOffers(wh.session).has(lane)),
+        offeredInRootOne.every(lane => !readJjOffers(wh.session).has(lane)),
       `${JSON.stringify({ offered: offeredInRootOne, left })}`,
     )
     if (rootOne !== null) await moveTaskTo(wu, entryId(rootOne), "open")
@@ -1178,7 +1178,7 @@ async function mainSection(
       async () =>
         offeredInRootOne.length > 0 &&
         (await offerBookmarks()).length === offeredInRootOne.length &&
-        offeredInRootOne.every(lane => readOffers(wh.session).has(lane)),
+        offeredInRootOne.every(lane => readJjOffers(wh.session).has(lane)),
       30_000,
     )
     check(

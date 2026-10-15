@@ -1,5 +1,6 @@
 import {
   commitId,
+  type JjOfferRecord,
   type OfferNow,
   offerMessage,
   type Placed,
@@ -179,7 +180,8 @@ test("rebuildEffects: the old revisions abandoned, then each source on the start
 })
 
 test("offerAcceptanceEffects and describeEffects: the acceptance's bookmark move, and the message with the offer's ledger", () => {
-  const accepted = {
+  const accepted: JjOfferRecord = {
+    kind: "jj",
     lane: LANE,
     size: 1,
     stale: false,

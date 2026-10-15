@@ -72,7 +72,10 @@ export function historyOf(input: {
   }
 
   return {
-    forkSteps: start => forkSetup(planForkSetup(input.lane, start)),
+    forkSteps: start => forkSetup(null, planForkSetup(input.lane, start)),
+
+    // A fork setup's commit records its base: nothing more.
+    begun: async () => {},
 
     commit: async edits => turnFromCommits((await committed(edits)).made),
 

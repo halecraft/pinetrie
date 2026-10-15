@@ -1,9 +1,14 @@
 import {
-  type BaseRecord,
   type CardCommand,
   commitId,
-  type OfferRecord,
+  type FolderAcceptedRecord,
+  type FolderBaseRecord,
+  type FolderOfferRecord,
+  type JjAcceptedRecord,
+  type JjBaseRecord,
+  type JjOfferRecord,
   pointFromCommit,
+  pointId,
   type ThreadName,
   threadIdFor,
 } from "@pinetrie/core"
@@ -24,7 +29,8 @@ const T2 = commitId("t2")
 const BASE = commitId("b0")
 const _COPY = commitId("k1")
 
-const offer: OfferRecord = {
+const offer: JjOfferRecord = {
+  kind: "jj",
   lane: LANE,
   size: 1,
   stale: false,
@@ -55,11 +61,11 @@ describe("offerView: the work strip's states", () => {
   const MOVE = {
     base: { kind: "accepted" },
     bookmark: "pinetrie-accepted",
-    from: commitId("l1"),
-    to: commitId("l2"),
+    from: pointId("l1"),
+    to: pointId("l2"),
   } as const
   const view = (
-    o: OfferRecord | undefined,
+    o: JjOfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" | "split" = "idle",
     asked: number | null = null,
     catching: {
@@ -216,7 +222,11 @@ describe("offerView: the work strip's states", () => {
       offer: offerStatus(undefined),
       activity: "idle",
       asked: null,
-      base: { base: { kind: "wip", bookmark: "wip/a" }, state: "gone" },
+      base: {
+        kind: "jj",
+        base: { kind: "wip", bookmark: "wip/a" },
+        state: "gone",
+      },
       parent: null,
       parentRunning: false,
       acceptedBookmark: "pinetrie-accepted",
@@ -270,7 +280,8 @@ describe("offerView: the work strip's states", () => {
     const line = (
       commit: typeof L1 | null,
       wips = [] as { bookmark: string; commit: typeof L1 }[],
-    ) => ({
+    ): JjAcceptedRecord => ({
+      kind: "jj",
       acceptedBookmark: "pinetrie-accepted",
       wipPrefix: "wip/",
       publish: "main",
@@ -287,7 +298,8 @@ describe("offerView: the work strip's states", () => {
       },
       publishCatchesUp: true,
     })
-    const onAccepted: BaseRecord = {
+    const onAccepted: JjBaseRecord = {
+      kind: "jj",
       lane: LANE,
       base: { kind: "accepted" as const },
       start: L1,
@@ -296,7 +308,8 @@ describe("offerView: the work strip's states", () => {
       untraced: [],
       work: "some",
     }
-    const onWip: BaseRecord = {
+    const onWip: JjBaseRecord = {
+      kind: "jj",
       lane: LANE,
       base: { kind: "wip" as const, bookmark: "wip/a" },
       start: W1,
@@ -332,7 +345,7 @@ describe("offerView: the work strip's states", () => {
       ),
     ).toMatchObject({ move: { bookmark: "wip/a", from: W1, to: "w2" } })
     // The host's read counts only at the commit the base is at now.
-    const read = (to: typeof L1, files: string[]): BaseRecord => ({
+    const read = (to: typeof L1, files: string[]): JjBaseRecord => ({
       ...onAccepted,
       catchUp: { tip: commitId("t"), to, files },
     })
@@ -353,6 +366,72 @@ describe("offerView: the work strip's states", () => {
       kind: "unknown",
     })
   })
+  test("catchUpOf for a folder: from the state a lane last caught up with to your folder's newest", () => {
+    const FIRST = pointId("line-0192aaaa")
+    const SECOND = pointId("line-0192bbbb")
+    const folder = (newest: typeof FIRST): FolderAcceptedRecord => ({
+      kind: "folder",
+      newest,
+      at: 1,
+    })
+    const base = (
+      catchUp: FolderBaseRecord["catchUp"] = null,
+    ): FolderBaseRecord => ({
+      kind: "folder",
+      lane: LANE,
+      start: FIRST,
+      catchUp,
+      work: "some",
+    })
+    const read = (to: typeof FIRST, files: string[]) =>
+      base({ tip: pointId("turn-0192cccc"), to, files })
+    expect(catchUpOf(base(), folder(FIRST))).toEqual({ kind: "current" })
+    expect(catchUpOf(base(), folder(SECOND))).toEqual({ kind: "unknown" })
+    expect(catchUpOf(undefined, folder(SECOND))).toEqual({ kind: "unknown" })
+    expect(catchUpOf(read(SECOND, []), folder(SECOND))).toEqual({
+      kind: "nothing-new",
+    })
+    expect(catchUpOf(read(SECOND, ["a"]), folder(SECOND))).toEqual({
+      kind: "brings",
+      move: {
+        base: { kind: "accepted" },
+        bookmark: null,
+        from: FIRST,
+        to: SECOND,
+      },
+      files: 1,
+    })
+    expect(catchUpOf(read(FIRST, ["a"]), folder(SECOND))).toEqual({
+      kind: "unknown",
+    })
+  })
+  test("a folder offer is accepted or described, never split", () => {
+    const folder: FolderOfferRecord = {
+      kind: "folder",
+      lane: LANE,
+      start: pointId("line-0192aaaa"),
+      tip: pointId("turn-0192bbbb"),
+      files: ["a.txt"],
+      conflicts: [],
+      described: false,
+      at: 10,
+    }
+    const v = offerView({
+      offer: offerStatus(folder),
+      activity: "idle",
+      asked: null,
+      base: { kind: "folder" },
+      parent: null,
+      parentRunning: false,
+      acceptedBookmark: "",
+      wipAhead: 0,
+      catchUp: { kind: "current" },
+      untraced: false,
+      queued: [],
+    })
+    expect(at(v)).toEqual(["ready", ["accept"], ["describe", "update"]])
+    expect([v.facts.size, v.facts.bookmark]).toEqual([1, null])
+  })
   test("an ask about a conflict counts only when newer than the offer", () => {
     expect(view(offer, "idle", 20).state).toBe("needs_you")
     expect(view(offer, "idle", 5).state).toBe("ready")
@@ -371,7 +450,7 @@ describe("a conflict that came with the copy, and the thread it branched from", 
     conflicts: [],
     ...over,
   })
-  const view = (o: OfferRecord, p: ParentNow | null, parentRunning = false) =>
+  const view = (o: JjOfferRecord, p: ParentNow | null, parentRunning = false) =>
     offerView({
       offer: offerStatus(o),
       activity: "idle",

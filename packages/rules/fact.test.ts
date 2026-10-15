@@ -1,6 +1,6 @@
 import {
+  type JjOfferRecord,
   type OfferFact,
-  type OfferRecord,
   type QueuedFact,
   type ThreadName,
   taskIdFor,
@@ -118,7 +118,7 @@ describe("a fact", () => {
       bookmark: "pinetrie-offer/amber-fox",
       destination: "pinetrie-accepted",
       top: "kabcdefghij",
-      accepted: {} as OfferRecord,
+      accepted: {} as JjOfferRecord,
     } as const
     expect(
       acceptedFact({

@@ -11,8 +11,8 @@ import type { Keeper } from "@pinetrie/keeper"
 import {
   executeOrThrow,
   KILL_SSH,
-  LANE_NOTE,
   type LaneHistory,
+  laneNote,
   PINETRIE_MOUNT,
   planContainer,
   planDisk,
@@ -139,7 +139,8 @@ export function createContainers(deps: {
   return {
     access(lane) {
       // A lane with no copy of its own, or no record, gets no tools.
-      if (!registry.isOwn(lane)) return null
+      const history = registry.recordOf(lane)?.history ?? null
+      if (history === null) return null
       const handle = registry.handleOf(lane)
       const { grants } = setup.configs.laneConfig(lane)
       return {
@@ -153,7 +154,7 @@ export function createContainers(deps: {
           },
           defaultImage: setup.defaultImage,
           install: PINETRIE_MOUNT,
-          note: LANE_NOTE,
+          note: laneNote(history),
         },
         hostPaths: setup.hostPaths,
         programs: RUNTIME_BIN,

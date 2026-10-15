@@ -4,7 +4,9 @@ A folder project's history, decided as values (ADR-0142): its graph of
 states and their merge bases (`graph.ts`), the path merge's plan
 (`merge.ts`), and the snapshots kept (`live.ts`). It declares only
 `@pinetrie/core` (`workspace.test.ts`) and does no I/O: lanehost's disks
-role carries out what it decides, through the folder adapter. The stored shapes (`StateRecord`, `ConflictRecord`) and what
+role carries out what it decides, through the folder adapter, and the
+host's `apps/pinetrie/host/folder/` is the only code that touches your
+folder (ADR-0142). The stored shapes (`StateRecord`, `ConflictRecord`) and what
 lanehost reads (`PathFact`, `MergeStep`, `BasePlan`) are core's, since
 lanehost declares only core and channel.
 
@@ -20,9 +22,10 @@ lanehost declares only core and channel.
   - **Every edge stays in one id space:** each parent is a state of this
     graph, recorded before.
   - **A state's id is never a jj commit's** (`isFolderStateId`, core): it
-    holds a dash and is a disk name. A turn's state is its entry's id, a
-    line state `line-<uuidv7>` (`lineStateId`, from an id its caller
-    mints), a virtual base `bases-<hash>`.
+    holds a dash and is a disk name. A turn's state is `turn-<uuidv7>`
+    (`turnStateId`), never its entry's id, which names the entry's own
+    snapshot; a line state `line-<uuidv7>` (`lineStateId`); each from an id
+    its caller mints; a virtual base `bases-<hash>`.
   - **Its parents' number follows how it was made** (`StateMade`): a read
     has one, or none when the graph is empty (your folder's first read); a
     start, a turn and a restore one; a catch-up and an accept two; a merge

@@ -1,13 +1,14 @@
 import {
-  type BaseRecord,
   type CommitId,
   commitId,
   ERR,
+  type JjAcceptedRecord,
+  type JjBaseRecord,
+  type JjOfferRecord,
   type OfferAcceptanceDecision,
   type OfferGather,
   type OfferInRepo,
   type OfferNow,
-  type OfferRecord,
   type OfferSeen,
   type Placed,
   pointFromCommit,
@@ -50,7 +51,8 @@ const T2 = commitId("t2")
 const BASE = commitId("b0")
 const COPY = commitId("k1")
 
-const offer: OfferRecord = {
+const offer: JjOfferRecord = {
+  kind: "jj",
   lane: LANE,
   size: 1,
   stale: false,
@@ -266,6 +268,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
           name: NAME,
           offer,
           base: {
+            kind: "jj",
             lane: LANE,
             base: { kind: "accepted" },
             start: BASE,
@@ -294,7 +297,8 @@ describe("records", () => {
     expect([o.namespace, o.key]).toEqual(["pinetrie.offer", LANE])
     expect(OFFER.decode(structuredClone(o.value), LANE)).toEqual(offer)
     expect(OFFER.decode({ ...offer, size: 0 }, LANE)).toBeUndefined()
-    const line = {
+    const line: JjAcceptedRecord = {
+      kind: "jj",
       acceptedBookmark: "pinetrie-accepted",
       wipPrefix: "wip/",
       publish: "main",
@@ -314,7 +318,8 @@ describe("records", () => {
     const l = setRecord(ACCEPTED, line)
     expect([l.namespace, l.key]).toEqual(["pinetrie.accepted", "accepted"])
     expect(ACCEPTED.decode(structuredClone(l.value), "accepted")).toEqual(line)
-    const base: BaseRecord = {
+    const base: JjBaseRecord = {
+      kind: "jj",
       lane: LANE,
       base: { kind: "wip", bookmark: "wip/x" },
       start: COPY,
@@ -525,7 +530,8 @@ describe("the offer's policy over a gather", () => {
     startConflicts: [],
     ...over,
   })
-  const baseRecord: BaseRecord = {
+  const baseRecord: JjBaseRecord = {
+    kind: "jj",
     lane: LANE,
     base: { kind: "accepted" },
     start: START,
@@ -554,6 +560,7 @@ describe("the offer's policy over a gather", () => {
       })
     test("each revision's commit as it is now, and what the page shows", () => {
       expect(record()).toEqual({
+        kind: "jj",
         lane: LANE,
         size: 1,
         stale: false,

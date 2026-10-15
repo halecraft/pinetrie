@@ -795,7 +795,9 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   throwaway repos on the host, their runners mapping `/workspace` and
   `/mnt/host-working-copy` to directories, your repo beside them, and each
   fetch a real bundle and import. A folder project's adapter runs the same
-  suite. Each of its tests is the `expect` of a mutation in
+  suite, which holds only what both kinds keep; jj's own beside it here: a
+  turn and a clean merge each schedule one fetch, and a copy off its line
+  (a split's stack) is refused a merge. Each of its tests is the `expect` of a mutation in
   `scripts/mutations/jj.ts` or `core.ts` (`portSuite`).
 - **`lane/plan.test.ts`, `lane/fetch-plan.test.ts`,
   `lane/revisions.test.ts`, `startup.test.ts`**: a lane's planners, which

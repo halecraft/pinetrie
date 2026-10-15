@@ -26,6 +26,7 @@ function runningWithOffer() {
   putValue(
     b,
     setRecord(OFFER, {
+      kind: "jj",
       lane: LANE,
       size: 1,
       stale: false,

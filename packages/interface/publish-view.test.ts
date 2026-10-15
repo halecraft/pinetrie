@@ -1,11 +1,17 @@
-import { type AcceptedRecord, commitId, ERR, threadIdFor } from "@pinetrie/core"
+import {
+  commitId,
+  ERR,
+  type JjAcceptedRecord,
+  pointId,
+  threadIdFor,
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { baseWords } from "./column-view.ts"
 import { publishToast, publishView, publishWords } from "./publish-view.ts"
 
 const yours = (
-  over: Partial<AcceptedRecord["yours"]> = {},
-): AcceptedRecord["yours"] => ({
+  over: Partial<JjAcceptedRecord["yours"]> = {},
+): JjAcceptedRecord["yours"] => ({
   behind: 0,
   ahead: 0,
   catchUp: null,
@@ -13,7 +19,8 @@ const yours = (
   ...over,
 })
 
-const record = (over: Partial<AcceptedRecord> = {}): AcceptedRecord => ({
+const record = (over: Partial<JjAcceptedRecord> = {}): JjAcceptedRecord => ({
+  kind: "jj",
   acceptedBookmark: "pinetrie-accepted",
   wipPrefix: "wip/",
   publish: "main",
@@ -32,7 +39,7 @@ const unpublished = (behind: number, ahead = 0) => ({
 })
 
 /** The words of a view that draws a button. */
-const words = (r: AcceptedRecord) => {
+const words = (r: JjAcceptedRecord) => {
   const view = publishView(r)
   if (view.kind === "absent" || view.kind === "hidden")
     throw new Error(`no button: ${view.kind}`)
@@ -42,6 +49,12 @@ const words = (r: AcceptedRecord) => {
 describe("publishView: one button, only with something to do", () => {
   test("no record: absent", () => {
     expect(publishView(null).kind).toBe("absent")
+  })
+  test("a folder project: absent, with nothing to set up or publish to", () => {
+    expect(
+      publishView({ kind: "folder", newest: pointId("line-0192aaaa"), at: 1 })
+        .kind,
+    ).toBe("absent")
   })
   test("no line yet: set up at your @-, showing the heads it writes", () => {
     const w = words(record({ commit: null }))
@@ -79,7 +92,7 @@ describe("publishWords: what the button says it will do", () => {
     )
   })
   test("with publish.catchUp off, the title says the working copy does not move, naming the setting", () => {
-    const off = (y: Partial<AcceptedRecord["yours"]>) =>
+    const off = (y: Partial<JjAcceptedRecord["yours"]>) =>
       words(
         record({ ...unpublished(2), publishCatchesUp: false, yours: yours(y) }),
       ).title
@@ -168,6 +181,7 @@ describe("the thread's base in its header, and the bases a new lane may start fr
   const lane = threadIdFor("1")
   const base = (state: "ok" | "landed" | "gone") =>
     ({
+      kind: "jj",
       lane,
       base: { kind: "wip", bookmark: "wip/search" },
       start: commitId("c"),

@@ -17,6 +17,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import {
   type CommitId,
+  entryId,
   HOST_WORKING_COPY,
   NO_EDITOR,
   type PointId,
@@ -37,7 +38,11 @@ import {
   lines,
   run,
 } from "@pinetrie/lanes"
-import { type HistoryRig, historySuite } from "@pinetrie/lanes/testing"
+import {
+  type HistoryRig,
+  historySuite,
+  type RigLane,
+} from "@pinetrie/lanes/testing"
 import { afterAll, beforeAll, expect, test } from "vitest"
 import { fileAt } from "../file-at.ts"
 import {
@@ -92,7 +97,17 @@ const onHost = (
 
 let rigs = 0
 
-async function makeRig(): Promise<HistoryRig> {
+/** A lane of jj's rig: what only jj's history has besides the suite's. */
+interface JjRigLane extends RigLane {
+  /** Move the copy off the lane's line, as a split's stack leaves it. */
+  offLine(): Promise<void>
+  /** Each fetch a move's `follow` scheduled, as it was scheduled. */
+  readonly fetched: readonly unknown[]
+}
+
+async function makeRig(): Promise<
+  Omit<HistoryRig, "lane"> & { lane(): Promise<JjRigLane> }
+> {
   const dir = path.join(top, `rig-${rigs++}`)
   const yoursDir = path.join(dir, "yours")
   await mkdir(yoursDir, { recursive: true })
@@ -279,3 +294,53 @@ async function makeRig(): Promise<HistoryRig> {
 }
 
 historySuite({ test, expect }, makeRig)
+
+/** `body` with jj's rig, accepted work holding `a.txt`, closed after. */
+const withJjRig = (
+  name: string,
+  body: (rig: Awaited<ReturnType<typeof makeRig>>) => Promise<void>,
+) =>
+  test(name, async () => {
+    const rig = await makeRig()
+    try {
+      await rig.yoursOnAccepted({ "a.txt": "one\ntwo\nthree\n" })
+      await body(rig)
+    } finally {
+      await rig.close()
+    }
+  }, 60_000)
+
+const TURN = { title: "a turn", entry: entryId("e-1") }
+
+withJjRig(
+  "a turn that committed, and a clean merge, each schedule one fetch",
+  async rig => {
+    const lane = await rig.lane()
+    await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
+    const made = await lane.withHistory(h => h.recordTurn(TURN))
+    expect(made.committed === null).toBe(false)
+    made.follow?.()
+    await lane.settled()
+    expect(lane.fetched.length).toBe(1)
+    const accepted = await rig.yoursOnAccepted({ "b.txt": "b\n" })
+    const merged = await lane.withHistory(async h => {
+      const ready = await h.readyToMerge()
+      if (typeof ready === "string") throw new Error(ready)
+      return h.merge(
+        ready,
+        { kind: "accepted", point: accepted, mark: false },
+        null,
+      )
+    })
+    expect(merged.kind).toBe("clean")
+    merged.follow?.()
+    await lane.settled()
+    expect(lane.fetched.length).toBe(2)
+  },
+)
+
+withJjRig("a copy off its line is refused a merge", async rig => {
+  const lane = await rig.lane()
+  await lane.offLine()
+  expect(await lane.withHistory(h => h.readyToMerge())).toBe("off-line")
+})

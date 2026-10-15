@@ -1,11 +1,11 @@
 import {
   ACCEPTED_ACTIONS,
-  type AcceptedRecord,
   commitId,
   type EntryLike,
   ERR,
   entryId,
   indexTree,
+  type JjAcceptedRecord,
   type LaneBase,
   type PointId,
   pointFromCommit,
@@ -32,6 +32,22 @@ import {
   publishWork,
 } from "./index.ts"
 
+test("a folder project's accepted work refuses a setup and a publish", () => {
+  const folder = {
+    kind: "folder",
+    newest: pointId("line-0192aaaa"),
+    at: 1,
+  } as const
+  expect(acceptedActionState("setup", folder)).toEqual({
+    kind: "refused",
+    code: ERR.REFUSED,
+  })
+  expect(acceptedActionState("publish", folder)).toEqual({
+    kind: "refused",
+    code: ERR.REFUSED,
+  })
+})
+
 describe("accepted work", () => {
   const facts = {
     commit: null,
@@ -50,7 +66,7 @@ describe("accepted work", () => {
     heads: "trunk() | present(pinetrie-accepted)",
     log: "logged",
   }
-  const record = (over: Partial<AcceptedRecord> = {}): AcceptedRecord => ({
+  const record = (over: Partial<JjAcceptedRecord> = {}): JjAcceptedRecord => ({
     ...planAcceptedRecord({
       facts,
       repoConfig: {
@@ -99,8 +115,8 @@ describe("accepted work", () => {
   describe("publish", () => {
     const main = commitId("m1")
     const yours = (
-      over: Partial<AcceptedRecord["yours"]> = {},
-    ): AcceptedRecord["yours"] => ({
+      over: Partial<JjAcceptedRecord["yours"]> = {},
+    ): JjAcceptedRecord["yours"] => ({
       behind: 0,
       ahead: 0,
       catchUp: null,
@@ -108,13 +124,13 @@ describe("accepted work", () => {
       ...over,
     })
     const at = (
-      published: AcceptedRecord["published"],
-      over: Partial<AcceptedRecord> = {},
+      published: JjAcceptedRecord["published"],
+      over: Partial<JjAcceptedRecord> = {},
     ) => record({ commit: commitId("c1"), published, ...over })
     const unpublished = { commit: main, behind: 2, ahead: 0 }
     const published = { commit: main, behind: 0, ahead: 0 }
     const preview = { changes: 4, conflicts: [], heads: 1 }
-    const code = (r: AcceptedRecord) => {
+    const code = (r: JjAcceptedRecord) => {
       const s = acceptedActionState("publish", r)
       return s.kind === "refused" ? s.code : null
     }
@@ -242,8 +258,10 @@ describe("accepted work", () => {
         catchUp: true,
         accept: false,
       } as const
-      const after = (over: Partial<AcceptedRecord["yours"]> = {}, ahead = 0) =>
-        at({ commit: main, behind: 2, ahead }, { yours: yours(over) })
+      const after = (
+        over: Partial<JjAcceptedRecord["yours"]> = {},
+        ahead = 0,
+      ) => at({ commit: main, behind: 2, ahead }, { yours: yours(over) })
       test.each([
         [
           "without a catch-up: the move as decided",

@@ -8,7 +8,6 @@ import {
   CATCH_UP_TOOL,
   type OfferRecord,
   type PointId,
-  pointFromCommit,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { catchUpOf } from "./base.ts"
@@ -99,14 +98,16 @@ export function planBaseNews(input: {
   readonly told: PointId | null
 }): BaseNews {
   const { base } = input
-  if (!input.own || base === undefined || base.state === "gone")
+  if (
+    !input.own ||
+    base === undefined ||
+    (base.kind === "jj" && base.state === "gone")
+  )
     return { kind: "nothing" }
   const now = catchUpOf(base, input.accepted)
   if (now.kind !== "brings") return { kind: "nothing" }
   if (base.work === "none") return { kind: "catch-up" }
-  // The base records are jj's alone; what the thread was told is a state
-  // of the shared history, so the base's commit crosses as its point.
-  const to = pointFromCommit(now.move.to)
+  const { to } = now.move
   if (
     base.work !== "some" ||
     input.known?.includes(to) === true ||

@@ -701,8 +701,8 @@ export const planDisk = (input: {
  */
 export const OLD_LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pineta-lane`
 /**
- * A fork: its disk cloned from its source's snapshot, then the adapter's
- * setup (`ForkSetup`).
+ * A fork: its disk cloned from the adapter's snapshot (`ForkSetup.from`),
+ * else its source's, then the adapter's setup steps.
  */
 export const planFork = (input: {
   readonly source: { readonly snapshot: SnapshotId }
@@ -710,7 +710,7 @@ export const planFork = (input: {
   readonly env: Readonly<Record<string, string | undefined>>
   readonly setup: ForkSetup
 }): Step[] => [
-  ...planDisk({ ...input, from: input.source.snapshot }),
+  ...planDisk({ ...input, from: input.setup.from ?? input.source.snapshot }),
   // pre-rename: before any command of the adapter's, which could snapshot
   // it into the working copy the clone carries (`OLD_LANE_CONFIG_DIR`).
   laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),

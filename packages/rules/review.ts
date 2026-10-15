@@ -4,6 +4,7 @@
 import {
   type DiffSpan,
   type EntryId,
+  isFolderStateId,
   type OfferRecord,
   type RevisionRecord,
   type RevisionReview,
@@ -91,13 +92,18 @@ export const diffUrl = (span: DiffSpan, path: string): string =>
 
 const HEX = /^[0-9a-f]+$/
 
-/** `spanKey`'s string back as a span, or null. */
+/** A point as a URL names it: a jj commit's hex, or a folder state's id. */
+const isPointText = (text: string): boolean =>
+  HEX.test(text) || isFolderStateId(text)
+
+/** `spanKey`'s string back as a span, or null. A revision is a commit's alone. */
 function parseSpan(text: string | undefined): AskedSpan | null {
   if (text === undefined) return null
   const [from, to, ...more] = text.split("..")
-  if (from === undefined || !HEX.test(from) || more.length > 0) return null
-  if (to === undefined) return { kind: "revision", commit: from }
-  return HEX.test(to) ? { kind: "range", from, to } : null
+  if (from === undefined || !isPointText(from) || more.length > 0) return null
+  if (to === undefined)
+    return HEX.test(from) ? { kind: "revision", commit: from } : null
+  return isPointText(to) ? { kind: "range", from, to } : null
 }
 
 /**
@@ -125,7 +131,8 @@ export const MAX_DIFF_BYTES = 1024 * 1024
 
 /**
  * A span found in a record: an offer's revision, or a range one lane's turns
- * recorded, naming that lane, whose points only it can read.
+ * recorded or a folder offer holds, naming that lane, whose points only it
+ * can read.
  */
 export type RecordedSpan =
   | Extract<DiffSpan, { readonly kind: "revision" }>
@@ -152,9 +159,10 @@ const CONTROL = /[\u0000-\u001f\u007f]/
 
 /**
  * What a request may read, so it reaches nothing of your repo but what a thread
- * made: a revision an open offer holds now (what accepting it would bring), or
- * a range between two states one lane's turns recorded (an ask's work), with
- * that lane. The ids read are the records', never the request's strings.
+ * made: a revision an open offer holds now (what accepting it would bring), a
+ * range between two states one lane's turns recorded (an ask's work), or an
+ * open folder offer's `start..tip`, with that lane. The ids read are the
+ * records', never the request's strings.
  */
 export function planOfferRead(
   facts: {
@@ -185,10 +193,20 @@ function recordedSpan(
 ): RecordedSpan | null {
   if (asked.kind === "revision") {
     const commit = [...facts.offers.values()]
-      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))
+      .flatMap(o =>
+        o.kind === "jj" && offerStatus(o).kind === "open" ? o.commits : [],
+      )
       .find(c => c === asked.commit)
     return commit === undefined ? null : { kind: "revision", commit }
   }
+  for (const o of facts.offers.values())
+    if (
+      o.kind === "folder" &&
+      offerStatus(o).kind === "open" &&
+      o.start === asked.from &&
+      o.tip === asked.to
+    )
+      return { kind: "range", from: o.start, to: o.tip, lane: o.lane }
   const named = (p: string) =>
     [...facts.revisions.values()].filter(r => r.point === p)
   for (const f of named(asked.from))

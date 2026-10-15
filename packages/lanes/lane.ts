@@ -15,7 +15,7 @@
 // one and wraps it as runners.
 
 import path from "node:path"
-import type { RunSource } from "@pinetrie/core"
+import type { ProjectKind, RunSource } from "@pinetrie/core"
 import type { Runners } from "./execute.ts"
 import { type LaneOwner, laneContainer, PINETRIE_MOUNT } from "./plan.ts"
 import type { BytesRunner, Runner } from "./run.ts"
@@ -28,8 +28,11 @@ export const PINETRIE_INSTALL = path.resolve(import.meta.dirname, "../..")
 /** The helper's own path, inside every lane. */
 export const HELPER = `${PINETRIE_MOUNT}/packages/pi/lane-helper.ts`
 
-/** The note a lane's agent is pointed at, inside every lane. */
-export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane.md`
+/** The note a lane's agent is pointed at, inside the lane: its history's kind's own. */
+export const laneNote = (kind: ProjectKind): string =>
+  kind === "jj"
+    ? `${PINETRIE_MOUNT}/packages/pi/lane.md`
+    : `${PINETRIE_MOUNT}/packages/pi/lane-folder.md`
 
 /** The command that opens a lane's channel: the helper on the runtime's Node. */
 export const helperCommand = (

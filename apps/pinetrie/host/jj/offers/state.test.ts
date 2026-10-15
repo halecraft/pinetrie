@@ -1,7 +1,7 @@
 import {
-  type BaseRecord,
   commitId,
-  type OfferRecord,
+  type JjBaseRecord,
+  type JjOfferRecord,
   threadIdFor,
 } from "@pinetrie/core"
 import type { RepoOwner } from "@pinetrie/jj"
@@ -14,7 +14,8 @@ import type { Records } from "../../records.ts"
 import { createOfferDeps } from "./state.ts"
 
 const LANE = threadIdFor("1")
-const BASE: BaseRecord = {
+const BASE: JjBaseRecord = {
+  kind: "jj",
   lane: LANE,
   base: { kind: "accepted" },
   start: commitId("s1"),
@@ -23,7 +24,8 @@ const BASE: BaseRecord = {
   untraced: [],
   work: "some",
 }
-const OFFER: OfferRecord = {
+const OFFER: JjOfferRecord = {
+  kind: "jj",
   lane: LANE,
   size: 1,
   stale: false,
@@ -68,7 +70,7 @@ test("the records the host writes from your repo: only what changed, and only a 
   expect(changed).toEqual([LANE])
   // An accepted offer's record is written whatever is there.
   await records.writeAcceptedOffer({ ...OFFER, acceptedAs: "kt" })
-  expect(readOffers(b.session).get(LANE)?.acceptedAs).toBe("kt")
+  expect(readOffers(b.session).get(LANE)).toMatchObject({ acceptedAs: "kt" })
   await records.remove(LANE)
   expect(readOffers(b.session).has(LANE)).toBe(false)
   expect(scribe.calls).toHaveLength(4)

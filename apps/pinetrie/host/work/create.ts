@@ -175,7 +175,8 @@ export function createNewLanes(deps: {
                 await deps.records.writeValues([
                   setRecord(FILES_LOST, { lane, snapshot: source.lost }),
                 ])
-              if (source.snapshot === BASE_SNAPSHOT)
+              const forkSetup = h.forkSteps(source.start)
+              if (forkSetup.from === null && source.snapshot === BASE_SNAPSHOT)
                 await setup.baseAtAccepted()
               await removeLane(runtime, lane)
               await executeOrThrow(
@@ -183,10 +184,11 @@ export function createNewLanes(deps: {
                   source,
                   spec: setup.specOf(lane, r),
                   env: process.env,
-                  setup: h.forkSteps(source.start),
+                  setup: forkSetup,
                 }),
                 handle.runners,
               )
+              await h.begun(source.start)
               // The fork's `run` made it, and started it.
               await handle.start("running")
             },

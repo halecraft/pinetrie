@@ -1,6 +1,7 @@
 import {
   entryId,
   type ProjectRecord,
+  pointId,
   rootIdFor,
   runId,
   SESSION_TARGET,
@@ -14,6 +15,7 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 import { createKeeper } from "@pinetrie/keeper"
 import { readPlaces, readPlacesRev } from "@pinetrie/reads"
 import {
+  ACCEPTED,
   deleteRecord,
   encodeCard,
   ICONS,
@@ -198,6 +200,37 @@ test("recover deletes the records of a type no spec declares, in the session and
   ])
   expect(b.lines.filter(l => l.includes("no longer kept"))).toEqual([
     "[host] deleting 2 stored records of types no longer kept: pinetrie.line, pinetrie.gone",
+  ])
+})
+
+test("recover deletes the offers, accepted work and bases of another kind than the project's", async () => {
+  const b = basics()
+  putValue(
+    b,
+    setRecord(ACCEPTED, {
+      kind: "folder",
+      newest: pointId("line-0192aaaa"),
+      at: 1,
+    }),
+  )
+  const agent = fakePi()
+  await recover(
+    deps({
+      basics: b,
+      ...ports(agent),
+      work: record<StartupDeps["work"]>({
+        ...RUNS_ANY,
+        project: { root: "/repo", kind: "jj", owner: null },
+      }).port,
+    }),
+  )
+  expect(writesOf(agent.calls).filter(w => w.kind === "delete")).toEqual([
+    {
+      kind: "delete",
+      target: SESSION_TARGET,
+      namespace: "pinetrie.accepted",
+      key: "accepted",
+    },
   ])
 })
 

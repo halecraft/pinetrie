@@ -5,6 +5,56 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── records of the project's kind ──
+  {
+    name: "the other kind's offers are kept at start",
+    file: "packages/rules/specs.ts",
+    from: "    .filter(r => r.kind !== kind)\n    .map(r => deleteRecord(OFFER, r.lane)),",
+    to: "    .filter(() => false)\n    .map(r => deleteRecord(OFFER, r.lane)),",
+    command: unit,
+    expect:
+      "planKindSweep deletes the offers, accepted work and bases of the other kind",
+  },
+  {
+    name: "a folder lane caught up with your folder's newest reads as behind",
+    file: "packages/rules/base.ts",
+    from: '    if (base.start === accepted.newest) return { kind: "current" }\n',
+    to: "",
+    command: unit,
+    expect: "catchUpOf for a folder",
+  },
+  {
+    name: "a folder offer is split like a jj one",
+    file: "packages/rules/offer-view.ts",
+    from: '  if (record.kind === "folder")\n    return view("ready", ["accept"], ["describe", "update"])\n',
+    to: "",
+    command: unit,
+    expect: "a folder offer is accepted or described, never split",
+  },
+  {
+    name: "a held folder offer's range is read",
+    file: "packages/rules/review.ts",
+    from: '      o.kind === "folder" &&\n      offerStatus(o).kind === "open" &&',
+    to: '      o.kind === "folder" &&',
+    command: unit,
+    expect: "planOfferRead: an open folder offer's range, with its lane",
+  },
+  {
+    name: "a folder state is read as a revision",
+    file: "packages/rules/review.ts",
+    from: '    return HEX.test(from) ? { kind: "revision", commit: from } : null',
+    to: '    return { kind: "revision", commit: from }',
+    command: unit,
+    expect: "the wire: every URL parses back to what built it",
+  },
+  {
+    name: "your folder may be set up",
+    file: "packages/rules/accepted.ts",
+    from: '  if (record.kind === "folder") return refused(ERR.REFUSED)\n',
+    to: "",
+    command: unit,
+    expect: "a folder project's accepted work refuses a setup and a publish",
+  },
   // ── a turn's disk ──
   {
     name: "a deeper negation re-includes a path under an ignored directory",
@@ -910,6 +960,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a split, its text the brief",
   },
   {
+    name: "a folder lane's offer is split",
+    file: "packages/rules/agent-commands.ts",
+    from: '  if (input.history === "folder") return { kind: "refused", why: "folder" }\n',
+    to: "",
+    command: unit,
+    expect: "refused: a folder lane, whose offer is files",
+  },
+  {
     name: "a second split is queued",
     file: "packages/rules/agent-commands.ts",
     from: '  if (queued.some(c => commandOf(c) === "split"))',
@@ -1080,8 +1138,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane the host has not read is caught up",
     file: "packages/rules/base.ts",
-    from: '  if (base === undefined) return { kind: "unknown" }',
-    to: '  if (base === undefined) return { kind: "current" }',
+    from: '  if (base?.kind !== "jj") return { kind: "unknown" }',
+    to: '  if (base?.kind !== "jj") return { kind: "current" }',
     command: unit,
     expect:
       "catchUpOf: from the commit a lane last caught up with to the base's now",
@@ -1160,8 +1218,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an offer record written before the rename forgets its acceptance",
     file: "packages/rules/offer.ts",
-    from: "        r.acceptedAs !== undefined ? r.acceptedAs : (r.integratedAs ?? null),",
-    to: "        r.acceptedAs !== undefined ? r.acceptedAs : null,",
+    from: "    r.acceptedAs !== undefined ? r.acceptedAs : (r.integratedAs ?? null),",
+    to: "    r.acceptedAs !== undefined ? r.acceptedAs : null,",
     command: unit,
     expect:
       "an offer record written before the rename reads its `integratedAs` as `acceptedAs`",
@@ -1169,8 +1227,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an old `integratedAs` overrides an offer record's own null",
     file: "packages/rules/offer.ts",
-    from: "        r.acceptedAs !== undefined ? r.acceptedAs : (r.integratedAs ?? null),",
-    to: "        r.acceptedAs ?? r.integratedAs ?? null,",
+    from: "    r.acceptedAs !== undefined ? r.acceptedAs : (r.integratedAs ?? null),",
+    to: "    r.acceptedAs ?? r.integratedAs ?? null,",
     command: unit,
     expect:
       "an offer record written before the rename reads its `integratedAs` as `acceptedAs`",
@@ -1283,8 +1341,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a landed WIP's thread stays on the WIP",
     file: "packages/rules/base.ts",
-    from: '    : effectiveBase({ base: base?.base ?? { kind: "accepted" }, state })',
-    to: '    : effectiveBase({ base: base?.base ?? { kind: "accepted" }, state: "ok" })',
+    from: '        base: base?.base ?? { kind: "accepted" },\n        state,\n      })',
+    to: '        base: base?.base ?? { kind: "accepted" },\n        state: "ok",\n      })',
     command: unit,
     expect:
       "a thread on accepted work, a lane with no base, and a landed WIP merge accepted work",
@@ -1605,7 +1663,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the bookmark is left out",
     file: "packages/rules/offer-view.ts",
-    from: "    bookmark: notYetAccepted?.bookmark ?? null,",
+    from: '    bookmark: notYetAccepted?.kind === "jj" ? notYetAccepted.bookmark : null,',
     to: "    bookmark: null,",
     command: unit,
     expect: "the facts",
@@ -1669,16 +1727,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an accepted offer's commit is read",
     file: "packages/rules/review.ts",
-    from: '      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))',
-    to: "      .flatMap(o => o.commits)",
+    from: '        o.kind === "jj" && offerStatus(o).kind === "open" ? o.commits : [],',
+    to: '        o.kind === "jj" ? o.commits : [],',
     command: unit,
     expect: "planOfferRead: only a commit an open offer holds now",
   },
   {
     name: "a held offer's commit is read",
     file: "packages/rules/review.ts",
-    from: '      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))',
-    to: "      .flatMap(o => (o.acceptedAs === null ? o.commits : []))",
+    from: '        o.kind === "jj" && offerStatus(o).kind === "open" ? o.commits : [],',
+    to: '        o.kind === "jj" && o.acceptedAs === null ? o.commits : [],',
     command: unit,
     expect: "planOfferRead: only a commit an open offer holds now",
   },
@@ -2270,7 +2328,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an offer record's ledger is dropped as it is read",
     file: "packages/rules/offer.ts",
-    from: "        r.ledger === undefined || r.ledger === null",
+    from: "    r.ledger === undefined || r.ledger === null",
     to: "        true",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
     expect: "reads back whole from what is stored",
@@ -2675,16 +2733,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every file of an offer not yet accepted is your edit when @ moves",
     file: "packages/rules/offer.ts",
-    from: "    .map(r => ({ ...r, yourEdits: r.files.filter(f => editing.has(f)) }))",
-    to: "    .map(r => ({ ...r, yourEdits: r.files }))",
+    from: "      ? [{ ...r, yourEdits: r.files.filter(f => editing.has(f)) }]",
+    to: "      ? [{ ...r, yourEdits: r.files }]",
     command: unit,
     expect: "planYourEdits",
   },
   {
     name: "an accepted offer's record is rewritten when @ moves",
     file: "packages/rules/offer.ts",
-    from: "    .filter(r => isNotYetAccepted(offerStatus(r)))\n",
-    to: "",
+    from: '    r.kind === "jj" && isNotYetAccepted(offerStatus(r))',
+    to: '    r.kind === "jj"',
     command: unit,
     expect: "planYourEdits",
   },
@@ -3937,8 +3995,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "base news compares what the thread was told with no base state",
     file: "packages/rules/behind.ts",
-    from: "  const to = pointFromCommit(now.move.to)\n",
-    to: "  const to = pointFromCommit(now.move.from)\n",
+    from: "  const { to } = now.move\n",
+    to: "  const { from: to } = now.move\n",
     command: unit,
     expect: "nothing: a commit it was told of",
   },

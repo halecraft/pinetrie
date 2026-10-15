@@ -4,10 +4,10 @@
 // gather the separate reads: `repo.test.ts` holds them to the same values.
 
 import type {
-  BaseRecord,
   CatchUpRead,
   CommitBase,
   CommitId,
+  JjBaseRecord,
   OfferAcceptanceFacts,
   OfferGather,
   OfferInRepo,
@@ -60,12 +60,12 @@ export type RefreshGather =
   /** No name yet, a lane not placed here: nothing moves. */
   | { readonly kind: "none" }
   /** A WIP gone without landing: nothing moves, and the page is told. */
-  | { readonly kind: "gone"; readonly base: BaseRecord }
+  | { readonly kind: "gone"; readonly base: JjBaseRecord }
   | {
       readonly kind: "plan"
       readonly name: ThreadName
       /** Null for an archived thread, whose lane's history left your repo. */
-      readonly base: BaseRecord | null
+      readonly base: JjBaseRecord | null
       readonly facts: RefreshFacts
     }
 
@@ -74,12 +74,13 @@ const baseRecord = (
   lane: ThreadId,
   input: {
     readonly base: CommitBase
-    readonly state: BaseRecord["state"]
+    readonly state: JjBaseRecord["state"]
     readonly start: StartRead
     readonly catchUp: CatchUpRead | null
     readonly work: WorkChanges
   },
-): BaseRecord => ({
+): JjBaseRecord => ({
+  kind: "jj",
   lane,
   base: input.base.base,
   start: input.base.start,
@@ -111,7 +112,7 @@ const sited = (input: {
 const placeFrom = (input: {
   readonly tip: CommitId
   readonly base: CommitBase
-  readonly state: BaseRecord["state"]
+  readonly state: JjBaseRecord["state"]
   readonly target: CommitId | null
   readonly start: StartRead
 }): OfferPlace => {
@@ -141,7 +142,7 @@ async function placeOf(
   input: OfferInput,
 ): Promise<{
   readonly place: OfferPlace
-  readonly base: BaseRecord
+  readonly base: JjBaseRecord
   readonly work: WorkChanges
 } | null> {
   const { repoConfig, lane } = input

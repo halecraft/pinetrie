@@ -74,8 +74,11 @@ the helper, S122 to S131 for Docker and the lane VM.
   `LaneBaseOf<P>`), the port's the `PointId` form.
 - **A lane's history is reached only on its queue.** `LaneHistory` is what
   a lane's copy records and merges: a turn (`commit`, `recordTurn`), its
-  base (`base`), a catch-up (`readyToMerge`, `merge`), its conflicts, and
-  what a restored disk needs (`afterRestore`). The host hands it out only
+  base (`base`), a catch-up (`readyToMerge`, `merge`), its conflicts, what
+  it records once its fork made its disk (`begun`: a folder lane's start
+  state; nothing for jj, whose fork setup's commit records its base), and
+  what a disk restored from a snapshot needs at each container's start
+  (`afterRestore`). The host hands it out only
   through its registry's `withHistory`, which queues the caller's function
   on the lane's queue (The queue): no module holds one outside a queued
   step, so every change to a lane's history runs there by construction. A
@@ -86,7 +89,12 @@ the helper, S122 to S131 for Docker and the lane VM.
 - **A fork and the base are planned with the adapter's steps.** `planFork`
   takes a `ForkSetup` and `refreshBase` a `BaseCheckout`, each a branded
   wrapper of `LaneStep`s that only its own maker wraps
-  (`history-port.test.ts` holds that neither takes the other).
+  (`history-port.test.ts` holds that neither takes the other). A
+  `ForkSetup` also names the snapshot the fork restores (`from`): null for
+  the fork source's own, as jj's; a folder lane's from your folder names
+  your folder's newest state. A kind whose forks name their own has no
+  base snapshot: its `AcceptedNow.checkout` is null, and `refreshBase`
+  then does nothing.
 - **What follows a move is the adapter's, fired by the caller**
   (`Follow`): `recordTurn` and `merge` hand it back, and the caller fires it
   after the snapshot step it queues next, so its work (for jj, the fetch
@@ -233,9 +241,11 @@ paths are its diff." would compare a function with itself.
 
 ## Forks
 
-- **A fork is its disk cloned from its source's snapshot, then the
-  adapter's setup** (`planFork`, from `forkSource`): the steps a `ForkSetup` holds, which only
-  the adapter's `LaneHistory.forkSteps` makes. Between them, one step
+- **A fork is its disk cloned from its source's snapshot, or the one its
+  setup names, then the adapter's setup** (`planFork`, from `forkSource`):
+  the steps a `ForkSetup` holds, which only the adapter's
+  `LaneHistory.forkSteps` makes. Once they ran, the fork calls the
+  history's `begun`, on the lane's queue. Between them, one step
   removes `/workspace/.pineta-lane` (`OLD_LANE_CONFIG_DIR`, tagged
   `pre-rename:`): a snapshot of a lane made before the rename holds that
   folder, `laneIgnores` does not list it, and the adapter's first command
@@ -498,7 +508,7 @@ paths are its diff." would compare a function with itself.
   `ReadyCopy`, `planFork` only a `ForkSetup`, `refreshBase` only a
   `BaseCheckout`.
 - **`lane.test.ts`**: the queue, and that each file a lane is pointed at
-  inside pine·trie's mount (`HELPER`, `LANE_NOTE`) exists in the install.
+  inside pine·trie's mount (`HELPER`, each kind's `laneNote`) exists in the install.
 - **`runtime.test.ts`**: `runtimeComplete`, and that `EXTRACT` copies every
   program in `RUNTIME_PROGRAMS`.
 - **`lanes.test.ts`**: the executor, the helper's command, config files

@@ -6,6 +6,22 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a folder project shows the publish button",
+    file: "packages/interface/publish-view.ts",
+    from: '  if (record === null || record.kind === "folder") return { kind: "absent" }',
+    to: '  if (record === null) return { kind: "absent" }',
+    command: unit,
+    expect: "a folder project: absent, with nothing to set up or publish to",
+  },
+  {
+    name: "a folder project offers WIPs to start from",
+    file: "packages/interface/send.ts",
+    from: '    accepted.kind === "folder" ||\n',
+    to: "",
+    command: unit,
+    expect: "baseChoices: none in a folder project, which has no WIP",
+  },
+  {
     name: "a turn's local files go unsaid",
     file: "packages/interface/ask-words.ts",
     from: '    stats.local > 0 ? plural(stats.local, "local file") : "",\n',
@@ -1879,8 +1895,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a held offer reviews nothing, but the strip offers it",
     file: "packages/interface/column-view.ts",
-    from: '      offer.kind !== "open"\n        ? null',
-    to: '      offer.kind === "none" || offer.kind === "accepted"\n        ? null',
+    from: '    review: offer.kind === "open" ? offerReview(offer.record) : null,',
+    to: '    review: offer.kind === "open" || offer.kind === "held" ? offerReview(offer.record) : null,',
     command: unit,
     expect:
       "an open offer with files can be reviewed, in every state; an accepted or empty one cannot",

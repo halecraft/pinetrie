@@ -18,6 +18,7 @@ function behind(to = "l2") {
   putValue(
     b,
     setRecord(BASE, {
+      kind: "jj",
       lane: LANE,
       base: { kind: "accepted" },
       start: commitId("l1"),
@@ -30,6 +31,7 @@ function behind(to = "l2") {
   putValue(
     b,
     setRecord(ACCEPTED, {
+      kind: "jj",
       acceptedBookmark: "pinetrie-accepted",
       wipPrefix: "wip/",
       publish: "main",

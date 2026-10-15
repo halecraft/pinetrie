@@ -59,14 +59,18 @@ export const isDiskName = (name: string): boolean =>
 
 /**
  * A folder state's id: a disk name holding a dash, so never a jj commit's
- * (40 hex digits). A turn's state is its entry's id, a uuidv7; your folder's
- * line's is `line-<uuidv7>`; a virtual base's is `bases-<hash>`.
+ * (40 hex digits). A turn's state is `turn-<uuidv7>`, never its entry's id,
+ * which names the entry's own snapshot; your folder's line's is
+ * `line-<uuidv7>`; a virtual base's is `bases-<hash>`.
  */
 export const isFolderStateId = (id: string): boolean =>
   id.includes("-") && isDiskName(id) && !/^[0-9a-f]{40}$/.test(id)
 
 /** A state of your folder's line, from a uuidv7 its caller mints. */
 export const lineStateId = (uuid: string): PointId => `line-${uuid}` as PointId
+
+/** A turn's state in a folder lane, from a uuidv7 its caller mints. */
+export const turnStateId = (uuid: string): PointId => `turn-${uuid}` as PointId
 
 /** What a side holds at a path. */
 export type PathFact =

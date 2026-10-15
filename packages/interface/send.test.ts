@@ -1,9 +1,10 @@
 import {
-  type AcceptedRecord,
   commitId,
   ERR,
   entryId,
+  type JjAcceptedRecord,
   NOBODY,
+  pointId,
   type Recipients,
   runId,
   THE_AGENT,
@@ -503,9 +504,10 @@ describe("what a new lane starts from: its line", () => {
   })
   /** Accepted work, set up, with `wips` above it. */
   const accepted = (
-    wips: AcceptedRecord["wips"] = [],
-    commit: AcceptedRecord["commit"] = commitId("c1"),
-  ): AcceptedRecord => ({
+    wips: JjAcceptedRecord["wips"] = [],
+    commit: JjAcceptedRecord["commit"] = commitId("c1"),
+  ): JjAcceptedRecord => ({
+    kind: "jj",
     acceptedBookmark: "pinetrie-accepted",
     wipPrefix: "wip/",
     publish: "main",
@@ -540,6 +542,14 @@ describe("what a new lane starts from: its line", () => {
     expect(baseChoices(accepted(), null)).toEqual([])
     expect(baseChoices(accepted([], null), null)).toEqual([])
     expect(baseChoices(null, null)).toEqual([])
+  })
+  test("baseChoices: none in a folder project, which has no WIP", () => {
+    expect(
+      baseChoices(
+        { kind: "folder", newest: pointId("line-0192aaaa"), at: 1 },
+        null,
+      ),
+    ).toEqual([])
   })
   test("startWords: accepted work, or the WIP chosen", () => {
     expect(startWords(null)).toBe("starts from accepted work")

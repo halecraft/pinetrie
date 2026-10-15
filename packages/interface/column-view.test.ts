@@ -1,15 +1,15 @@
 import {
-  type AcceptedRecord,
   type AgentMessageLike,
-  type BaseRecord,
   type CardCommand,
   commitId,
   type EntryId,
   entryId,
   indexAsks,
+  type JjAcceptedRecord,
+  type JjBaseRecord,
+  type JjOfferRecord,
   type LaneRecord,
   type LaneView,
-  type OfferRecord,
   type PinnedView,
   type ProjectRecord,
   pointId,
@@ -195,6 +195,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
 })
 /** Accepted work, one commit past the lane's base: `base` read what catching up brings. */
 const ACCEPTED = {
+  kind: "jj",
   acceptedBookmark: "pinetrie-accepted",
   wipPrefix: "wip/",
   publish: "main",
@@ -210,8 +211,9 @@ const ACCEPTED = {
     conflicts: { commits: 0, files: [] },
   },
   publishCatchesUp: true,
-} satisfies AcceptedRecord
-const BASE: BaseRecord = {
+} satisfies JjAcceptedRecord
+const BASE: JjBaseRecord = {
+  kind: "jj",
   lane: threadIdFor("1"),
   base: { kind: "accepted" as const },
   start: commitId("aaaaaaaaaaaa"),
@@ -656,7 +658,8 @@ describe("columnView: the work strip", () => {
     ).toMatchObject({ waiting: false, words: { note: "not done: no" } })
   })
   test("an open offer with files can be reviewed, in every state; an accepted or empty one cannot", () => {
-    const open: OfferRecord = {
+    const open: JjOfferRecord = {
+      kind: "jj",
       lane: B,
       size: 1,
       stale: false,
@@ -672,7 +675,7 @@ describe("columnView: the work strip", () => {
       ledger: null,
       at: 1,
     }
-    const strip = (offer: OfferRecord, running = false) =>
+    const strip = (offer: JjOfferRecord, running = false) =>
       columnView(
         own({
           lane: onLane(laneView(B, "b2", running)),
@@ -728,7 +731,8 @@ describe("workingWords", () => {
 })
 
 describe("offerWords", () => {
-  const offer: OfferRecord = {
+  const offer: JjOfferRecord = {
+    kind: "jj",
     lane: A,
     size: 1,
     stale: false,
@@ -744,9 +748,13 @@ describe("offerWords", () => {
     ledger: null,
     at: 10,
   }
-  const ACCEPTED_BASE = { base: { kind: "accepted" }, state: "ok" } as const
+  const ACCEPTED_BASE = {
+    kind: "jj",
+    base: { kind: "accepted" },
+    state: "ok",
+  } as const
   const words = (
-    o: OfferRecord | undefined,
+    o: JjOfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" = "idle",
     base: Parameters<typeof offerView>[0]["base"] = ACCEPTED_BASE,
     catching: {
@@ -775,6 +783,7 @@ describe("offerWords", () => {
       acting,
     )
   const WIP_BASE = {
+    kind: "jj",
     base: { kind: "wip", bookmark: "wip/search" },
     state: "ok",
   } as const
@@ -834,7 +843,7 @@ describe("offerWords", () => {
   })
   test("the labels follow the state, and name where an acceptance adds the work", () => {
     const labels = (
-      o: OfferRecord,
+      o: JjOfferRecord,
       base = ACCEPTED_BASE as Parameters<typeof words>[2],
     ) => words(o, "idle", base).buttons.map(b => b.label)
     expect(labels(offer)).toEqual(["accept", "split into a stack"])
@@ -865,8 +874,8 @@ describe("offerWords", () => {
   const MOVE = {
     base: { kind: "accepted" },
     bookmark: "pinetrie-accepted",
-    from: commitId("a"),
-    to: commitId("b"),
+    from: pointId("a"),
+    to: pointId("b"),
   } as const
   test("the jj facts are titles: which bookmark an acceptance moves, and what catching up merges", () => {
     const w = words(offer, "idle", ACCEPTED_BASE, {

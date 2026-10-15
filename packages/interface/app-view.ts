@@ -148,8 +148,9 @@ export interface OpenOffer {
   readonly root: EntryId
   readonly end: EntryId
   /**
-   * The lane tip it holds (`ledger.source`): "not needed" holds until new
-   * work moves it. Null for an offer whose message carries none.
+   * The lane tip it holds (a jj offer's `ledger.source`, a folder offer's
+   * `tip`): "not needed" holds until new work moves it. Null for a jj offer
+   * whose message carries none.
    */
   readonly source: string | null
 }
@@ -221,7 +222,7 @@ const openOffers = (input: AppViewInput): readonly OpenOffer[] =>
   [...input.offers.values()].flatMap(o => {
     const root = input.laneRoots.get(o.lane)
     if (offerStatus(o).kind !== "open" || root === undefined) return []
-    const source = o.ledger?.source ?? null
+    const source = o.kind === "jj" ? (o.ledger?.source ?? null) : o.tip
     const held = input.lanes.find(l => l.name === o.lane)
     if (held === undefined) return [{ lane: o.lane, root, end: root, source }]
     return held.tip === null

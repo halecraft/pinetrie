@@ -73,6 +73,7 @@ export {
   type CatchUpNow,
   catchUpOf,
   effectiveBase,
+  type FollowedBase,
   type ForkBegin,
   type ParentNow,
   parentNow,
@@ -545,6 +546,7 @@ export {
 } from "./shared.ts"
 export {
   type AnyRecordSpec,
+  planKindSweep,
   planUndeclaredSweep,
   RECORD_SPECS,
   type StoredRecords,

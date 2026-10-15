@@ -4,13 +4,13 @@ import { describe, expect, test } from "vitest"
 import {
   createQueue,
   HELPER,
-  LANE_NOTE,
+  laneNote,
   PINETRIE_INSTALL,
   PINETRIE_MOUNT,
 } from "./index.ts"
 
 test("every pinetrie file a lane is pointed at exists", () => {
-  for (const inLane of [HELPER, LANE_NOTE]) {
+  for (const inLane of [HELPER, laneNote("jj"), laneNote("folder")]) {
     expect(inLane.startsWith(`${PINETRIE_MOUNT}/`)).toBe(true)
     const onHost = path.join(
       PINETRIE_INSTALL,

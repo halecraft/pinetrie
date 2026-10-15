@@ -375,7 +375,7 @@ test("planFork: the restore, the container, the old config folder gone, then the
     source: { snapshot: snapshotId("e1") },
     spec,
     env: {},
-    setup: forkSetup([{ in: "lane", argv: ["setup"] }]),
+    setup: forkSetup(null, [{ in: "lane", argv: ["setup"] }]),
   })
   expect(argvs(steps)).toEqual([
     `runtime: ${JSON.stringify({ kind: "restore", lane: LANE, from: "e1" })}`,
@@ -383,6 +383,19 @@ test("planFork: the restore, the container, the old config folder gone, then the
     "lane: sh -c rm -rf /workspace/.pineta-lane",
     "lane: setup",
   ])
+})
+
+test("planFork restores from the adapter's snapshot when it names one", () => {
+  const steps = planFork({
+    source: { snapshot: snapshotId("e1") },
+    spec,
+    env: {},
+    setup: forkSetup(snapshotId("line-1"), []),
+  })
+  expect(steps[0]).toEqual({
+    in: "runtime",
+    op: { kind: "restore", lane: LANE, from: "line-1" },
+  })
 })
 
 test("planDisk: a new disk, or one restored from a snapshot; then the container, from the spec's shape", () => {
@@ -559,7 +572,7 @@ test("the base's scratch lane is no thread's: nothing that takes a thread takes 
     // @ts-expect-error: a fork is a thread's lane's
     spec: { ...spec, lane: BASE_LANE },
     env: {},
-    setup: forkSetup([]),
+    setup: forkSetup(null, []),
   })
   expect([laneContainer(BASE_LANE), setup.length]).toEqual([
     "pinetrie-base-scratch",

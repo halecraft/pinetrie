@@ -4,10 +4,10 @@
 
 import {
   type AcceptedFacts,
-  type BaseRecord,
   type CommitBase,
   type CommitId,
   commitId,
+  type JjBaseRecord,
   type RepoConfig,
 } from "@pinetrie/core"
 import { lines, type Runner } from "@pinetrie/lanes"
@@ -245,7 +245,7 @@ export function wipState(
     /** The commit `Pinetrie-Base` names, or its change, is in accepted work's history. */
     readonly sourceInAccepted: boolean
   } | null,
-): BaseRecord["state"] {
+): JjBaseRecord["state"] {
   if (facts === null) return "ok"
   if (facts.bookmark !== null) return facts.bookmarkInAccepted ? "landed" : "ok"
   return facts.sourceInAccepted ? "landed" : "gone"
@@ -256,5 +256,5 @@ export const readWipState = async (
   jj: Runner,
   repoConfig: RepoConfig,
   base: CommitBase | null,
-): Promise<BaseRecord["state"]> =>
+): Promise<JjBaseRecord["state"]> =>
   wipState(await wipFacts(jj, repoConfig, base))

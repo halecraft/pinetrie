@@ -321,7 +321,11 @@ each run's end, in `settle`'s sweep.
 stream survives a process), a new store's default workflow
 (`planWorkflowSeed`), the deletion of the records of a type no spec
 declares, in the session and the roots opened (`planUndeclaredSweep`,
-ADR-0100, so a renamed record leaves nothing behind), a
+ADR-0100, so a renamed record leaves nothing behind), the deletion of
+the offer, accepted-work and base records of another kind than the
+project's (`planKindSweep`, ADR-0150: caches of the project as it was
+before; a folder's `STATE` and `CONFLICT` records are kept whatever the
+kind), a
 log of the stored lane names, in the roots opened, that fail `isThreadId`
 (`readStoredLanes`: no reader is given them, so the log is where one shows;
 it never throws, and nothing is deleted), `ensureNames` (ADR-0039),

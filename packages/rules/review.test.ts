@@ -2,7 +2,8 @@ import {
   commitId,
   type EntryId,
   entryId,
-  type OfferRecord,
+  type FolderOfferRecord,
+  type JjOfferRecord,
   pointId,
   type RevisionRecord,
   type ThreadId,
@@ -27,7 +28,8 @@ const _T2 = commitId("t2")
 const _BASE = commitId("b0")
 const _COPY = commitId("k1")
 
-const offer: OfferRecord = {
+const offer: JjOfferRecord = {
+  kind: "jj",
   lane: LANE,
   size: 1,
   stale: false,
@@ -47,10 +49,10 @@ const offer: OfferRecord = {
 describe("the review", () => {
   const C1 = commitId("c1")
   const C2 = commitId("c2")
-  const open: OfferRecord = { ...offer, commits: [C1, C2] }
+  const open: JjOfferRecord = { ...offer, commits: [C1, C2] }
   const offers = new Map([[LANE, open]])
   const facts = (
-    o: ReadonlyMap<ThreadId, OfferRecord>,
+    o: ReadonlyMap<ThreadId, JjOfferRecord>,
     revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(),
   ) => ({ offers: o, revisions })
   const rev = (c: string) => ({ kind: "revision", commit: c }) as const
@@ -68,7 +70,10 @@ describe("the review", () => {
         path: "a b.txt",
       }),
     ).toEqual({ kind: "diff", span: rev(C1), path: "a b.txt" })
-    const status = (o: ReadonlyMap<ThreadId, OfferRecord>, commit: string) => {
+    const status = (
+      o: ReadonlyMap<ThreadId, JjOfferRecord>,
+      commit: string,
+    ) => {
       const read = planOfferRead(facts(o), {
         kind: "review",
         span: rev(commit),
@@ -92,6 +97,39 @@ describe("the review", () => {
       return read.kind === "refused" ? read.status : read.kind
     }
     expect([path(""), path("a\nb"), path("a\u007f")]).toEqual([400, 400, 400])
+  })
+  test("planOfferRead: an open folder offer's range, with its lane", () => {
+    const folder: FolderOfferRecord = {
+      kind: "folder",
+      lane: LANE,
+      start: pointId("line-0192aaaa"),
+      tip: pointId("turn-0192bbbb"),
+      files: ["a.txt"],
+      conflicts: [],
+      described: false,
+      at: 10,
+    }
+    const read = (o: FolderOfferRecord, from: string, to: string) =>
+      planOfferRead(
+        { offers: new Map([[LANE, o]]), revisions: new Map() },
+        { kind: "review", span: { kind: "range", from, to } },
+      ).kind
+    expect(
+      planOfferRead(
+        { offers: new Map([[LANE, folder]]), revisions: new Map() },
+        {
+          kind: "review",
+          span: { kind: "range", from: folder.start, to: folder.tip },
+        },
+      ),
+    ).toEqual({
+      kind: "review",
+      span: { kind: "range", from: folder.start, to: folder.tip, lane: LANE },
+    })
+    expect(read(folder, folder.tip, folder.start)).toBe("refused")
+    expect(read({ ...folder, files: [] }, folder.start, folder.tip)).toBe(
+      "refused",
+    )
   })
   test("planOfferRead: a range only between two commits one lane's turns recorded", () => {
     const OTHER = threadIdFor("other")
@@ -170,7 +208,12 @@ describe("the review", () => {
       from: pointId("0123abcd"),
       to: pointId("4567ef"),
     } as const
-    for (const span of [c, r]) {
+    const folder = {
+      kind: "range",
+      from: pointId("line-0192aaaa"),
+      to: pointId("turn-0192bbbb"),
+    } as const
+    for (const span of [c, r, folder]) {
       expect(at(reviewUrl(span))).toEqual({ kind: "review", span })
       for (const path of ["a b.txt", 'we"ird', "q?x&y#z", "dir/é.md"])
         expect(at(diffUrl(span, path))).toEqual({ kind: "diff", span, path })
@@ -180,7 +223,9 @@ describe("the review", () => {
     ).toBe("bad")
     expect(at(`/offer/${OFFER_WIRE}/diff/${c.commit}`)).toBe("bad")
     expect(at(`/offer/${OFFER_WIRE}/review/not-hex`)).toBe("bad")
-    expect(at(`/offer/${OFFER_WIRE}/review/0123..not-hex`)).toBe("bad")
+    expect(at(`/offer/${OFFER_WIRE}/review/0123..not_hex`)).toBe("bad")
+    // A folder state is a point of a range, never a revision.
+    expect(at(`/offer/${OFFER_WIRE}/review/${folder.from}`)).toBe("bad")
     expect(at(`/offer/${OFFER_WIRE}/review/01..23..45`)).toBe("bad")
     expect(at(`${reviewUrl(c)}/more`)).toBe("bad")
     expect(at("/offer/anything")).toBe("bad")

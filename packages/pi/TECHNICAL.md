@@ -617,8 +617,12 @@ item 18, and in `lanes.test.ts` against the harness.
     Guidelines are rendered in `<rules>`.
   - pi drops a guideline equal to an earlier one, so no two lines of the
     block may be equal. A unit test checks it.
-  - **The note** the block points at is `lane.md`, in this package, read in
-    the lane through pine·trie's own mount (`LANE_NOTE` in `@pinetrie/lanes`).
+  - **The note** the block points at is the lane's history's kind's, in
+    this package: `lane.md` for jj, `lane-folder.md` for a folder (no jj;
+    `/pinetrie-states/start`, `diff -r`; search skipping `.ignore` too),
+    read in the lane through pine·trie's own mount (`laneNote` in
+    `@pinetrie/lanes`). Each fact in either names its source, which a unit
+    test checks still exists.
     Each fact in it names its source as `<!-- <path> <symbol> -->`, and
     `lanes.test.ts` fails when a named file or symbol is gone. A change that
     makes a line of the block or the note false must change it.

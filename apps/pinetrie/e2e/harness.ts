@@ -22,6 +22,8 @@ import {
   type ChatMode,
   type EntryId,
   entryId,
+  type JjAcceptedRecord,
+  type JjOfferRecord,
   type LaneView,
   moveOf,
   noteOf,
@@ -42,6 +44,7 @@ import {
   readHeld,
   readHeldIndex,
   readLanes,
+  readOffers,
   readPlaces,
   readQueueHolds,
   readRoots,
@@ -347,6 +350,24 @@ export const lateFor = (docId: string, ms: number): typeof WebSocket => {
   }
 }
 
+/** Accepted work's record, when it is a jj project's: every suite project but a folder's. */
+export const readJjAccepted = (
+  doc: Parameters<typeof readAccepted>[0],
+): JjAcceptedRecord | null => {
+  const record = readAccepted(doc)
+  return record?.kind === "jj" ? record : null
+}
+
+/** Each lane's offer record of a jj project's. */
+export const readJjOffers = (
+  doc: Parameters<typeof readOffers>[0],
+): ReadonlyMap<ThreadId, JjOfferRecord> =>
+  new Map(
+    [...readOffers(doc)].flatMap(([lane, o]) =>
+      o.kind === "jj" ? [[lane, o] as const] : [],
+    ),
+  )
+
 /**
  * Set up accepted work at your `@-`, as the footer's set up button does:
  * a new thread with no history of its own starts there. Waits for
@@ -356,12 +377,12 @@ export async function setUpAccepted(
   doc: Parameters<typeof readAccepted>[0],
   user: Pick<SessionClient, "actOnAccepted">,
 ): Promise<void> {
-  await waitFor(() => readAccepted(doc) !== null, 60_000)
-  if (readAccepted(doc)?.commit !== null) return
+  await waitFor(() => readJjAccepted(doc) !== null, 60_000)
+  if (readJjAccepted(doc)?.commit !== null) return
   const done = await user.actOnAccepted("setup")
   if (done.kind !== "accepted-moved")
     throw new Error(`accepted work was not set up: ${JSON.stringify(done)}`)
-  await waitFor(() => readAccepted(doc)?.commit !== null, 30_000)
+  await waitFor(() => readJjAccepted(doc)?.commit !== null, 30_000)
 }
 
 /** What the suites' agent says when nothing is scripted. */

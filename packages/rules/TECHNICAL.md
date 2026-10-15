@@ -1663,6 +1663,22 @@ commit-message request `request.ts` (`describeRequest`).
   to do", which the page's hidden button reads too. `acceptedRefusal` words
   each refusal once, naming files with `named`, for the host's answer and
   the button's title.
+- **`pinetrie.offer`, `pinetrie.accepted` and `pinetrie.base` are unions on
+  the project's kind** (`kind`: `jj` or `folder`, ADR-0150), each decoded by
+  its `kind`; one stored before records had a kind does not decode, and
+  reads as unknown until the host writes it again. A folder's hold only
+  their own fields: an offer its `start` and `tip` states, files,
+  conflicts and whether it is described; accepted work your folder's
+  `newest` state; a base its `start` state and what catching up would
+  change. Every reader switches on `kind`: a folder offer is never a stack
+  and never split (`offerView`), starts on no conflict (`conflictCause`),
+  and is reviewed as its `start..tip` range (`planOfferRead`, whose
+  `parseSpan` takes a folder state's id in a range, never as a revision);
+  your folder has nothing to set up or publish to (`acceptedActionState`
+  refuses both); `catchUpOf` compares a folder base's `start` with your
+  folder's `newest`. At start the host deletes those of the other kind
+  (`planKindSweep`, `specs.ts`); a folder's `STATE` and `CONFLICT` records
+  are never among them.
 - **`pinetrie.accepted` and `pinetrie.base` are caches** (ADR-0104): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
   A `pinetrie.accepted` from before `publish` and `published` (ADR-0076), or
@@ -1815,10 +1831,11 @@ reads, `details` what pine·trie reads back.
   bare string, so a message stored before points decodes unchanged.
   `update`'s `merged`, `land`'s `yours`, `behind`'s `to` and a
   `catch_up`'s `merged` are points; offers, WIPs, accepted work's and a
-  base's records (`OfferRecord`, `AcceptedRecord`, `BaseRecord`,
-  `CatchUpRead`) and the stack's message are jj's, and commits. Where a
+  base's jj records (`JjOfferRecord`, `JjAcceptedRecord`, `JjBaseRecord`,
+  `CatchUpRead`) and the stack's message are jj's, and commits; a base's
+  move (`BaseMove`) is points. Where a
   jj-only fact meets the shared history, the rule converts it at that
-  site with `pointFromCommit` (`planUpdateFrom`'s WIP, `planBaseNews`'s
+  site with `pointFromCommit` (`planUpdateFrom`'s WIP, `catchUpOf`'s
   base move), so each crossing is visible; nothing here turns a point back
   into a commit, or tests one for more than equality (core's rule).
 - **The schema is the type.** Ids are branded schemas (`decode.ts`:
@@ -1882,7 +1899,7 @@ the tip it must match, and the bookmark to leave on it.
   says what to do (`catchUpRefusal`); `catchUpAnswer` is the tool's result,
   whose `details.merged` the turn's record reads.
 - **`planSplitCall`** queues a split card, made through `planMake`, or
-  refuses: no offer open, a split running (the lane's latest prompt is a
+  refuses: a folder lane, whose offer is its files, never a stack; no offer open, a split running (the lane's latest prompt is a
   stack message), or one already queued. The tool answers `SPLIT_QUEUED`,
   or the refusal (`splitRefusal`); a refusal of its card's make (`unmade`,
   which none is) is logged and answered `SPLIT_UNMADE`.

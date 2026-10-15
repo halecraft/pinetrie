@@ -2,7 +2,6 @@
 // are the client's (`offerWords`).
 
 import {
-  type BaseRecord,
   type CardCommand,
   type ConflictCause,
   isCatchUp,
@@ -14,6 +13,7 @@ import {
 import {
   type CatchUpNow,
   effectiveBase,
+  type FollowedBase,
   type ParentNow,
   parentAhead,
 } from "./base.ts"
@@ -118,11 +118,11 @@ interface OfferFacts {
 /**
  * Where an offer's conflict comes from: `start` when it conflicts, and every
  * file it conflicts in was already conflicted where it starts, so the
- * conflict came with the lane's copy; else `work`.
+ * conflict came with the lane's copy; else `work`. A folder offer starts on
+ * your folder, which holds no conflict.
  */
-export function conflictCause(
-  record: Pick<OfferRecord, "conflicts" | "startConflicts">,
-): ConflictCause {
+export function conflictCause(record: OfferRecord): ConflictCause {
+  if (record.kind === "folder") return "work"
   const at = new Set(record.startConflicts)
   return record.conflicts.length > 0 && record.conflicts.every(f => at.has(f))
     ? "start"
@@ -141,7 +141,7 @@ export function offerView(input: {
   readonly offer: OfferStatus
   readonly activity: Exclude<OfferActivity, "catch-up">
   readonly asked: number | null
-  readonly base: Pick<BaseRecord, "base" | "state"> | null
+  readonly base: FollowedBase | null
   readonly acceptedBookmark: string
   readonly wipAhead: number
   /** What catching up would do (`catchUpOf`). */
@@ -166,6 +166,8 @@ export function offerView(input: {
   const notYetAccepted =
     offer.kind === "open" || offer.kind === "held" ? offer.record : undefined
   const open = offer.kind === "open" ? offer.record : undefined
+  const jjOpen = open?.kind === "jj" ? open : undefined
+  const jjBase = input.base?.kind === "jj" ? input.base : null
   const ahead =
     input.parent !== null && parentAhead(input.parent) ? input.parent : null
   const cause: ConflictCause = open === undefined ? "work" : conflictCause(open)
@@ -175,10 +177,11 @@ export function offerView(input: {
   const facts: OfferFacts = {
     activity,
     files: open?.files.length ?? 0,
-    size: open?.size ?? 0,
+    // A folder offer is one change: never a stack.
+    size: open === undefined ? 0 : (jjOpen?.size ?? 1),
     conflicts: open?.conflicts.length ?? 0,
-    touchesYourEdits: (open?.yourEdits.length ?? 0) > 0,
-    bookmark: notYetAccepted?.bookmark ?? null,
+    touchesYourEdits: (jjOpen?.yourEdits.length ?? 0) > 0,
+    bookmark: notYetAccepted?.kind === "jj" ? notYetAccepted.bookmark : null,
     held: offer.kind === "held",
     acceptedAs: offer.kind === "accepted" ? offer.as : null,
     base: effectiveBase(input.base),
@@ -193,13 +196,13 @@ export function offerView(input: {
     open === undefined
       ? []
       : offerAcceptanceDestinations({
-          base: input.base?.base ?? { kind: "accepted" },
-          state: input.base?.state ?? "ok",
+          base: jjBase?.base ?? { kind: "accepted" },
+          state: jjBase?.state ?? "ok",
           acceptedBookmark: input.acceptedBookmark,
           conflicted: open.conflicts.length > 0,
           wipAhead: input.wipAhead,
         })
-  const gone = input.base?.state === "gone"
+  const gone = jjBase?.state === "gone"
   const integrable = (
     buttons: readonly OfferButton[],
   ): readonly OfferButton[] =>
@@ -265,7 +268,8 @@ export function offerView(input: {
   if (asked !== null && asked > record.at)
     return view("needs_you", ["accept"], ["update"])
   if (offer.kind === "held") return view("nothing", [], ["update"])
-  if (record.edited) return view("edited", ["accept", "refresh"], ["update"])
+  if (record.kind === "jj" && record.edited)
+    return view("edited", ["accept", "refresh"], ["update"])
   // A conflict that came with the lane's copy, which the parent has since
   // resolved, is settled by catching up with the parent; any other by
   // catching up with the base and resolving.
@@ -277,6 +281,9 @@ export function offerView(input: {
         : ["update", "accept"],
       [],
     )
+  // A folder offer is its files: never split, never a stack.
+  if (record.kind === "folder")
+    return view("ready", ["accept"], ["describe", "update"])
   if (record.size > 1)
     return record.stale
       ? view("stale", ["split", "accept"], ["update"])
@@ -290,6 +297,6 @@ export function offerView(input: {
  * offer.
  */
 export const offerSeen = (record: OfferRecord | undefined): OfferSeen => ({
-  ledger: record?.ledger ?? null,
+  ledger: record?.kind === "jj" ? record.ledger : null,
   conflicted: (record?.conflicts.length ?? 0) > 0,
 })

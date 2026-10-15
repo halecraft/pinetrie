@@ -10,6 +10,7 @@ import {
   type MoveRefusal,
   makeCard,
   type PointId,
+  type ProjectKind,
   type TextCardId,
   type ThreadId,
   type WriterId,
@@ -144,11 +145,13 @@ export const refusedAnswer = (why: CatchUpRefusal): ToolAnswer => ({
 })
 
 /** Why `split_offer` queued nothing. */
-export type SplitRefusal = "no-offer" | "queued" | "splitting"
+export type SplitRefusal = "folder" | "no-offer" | "queued" | "splitting"
 
 /** `split_offer`'s refusals, worded once. */
 export function splitRefusal(code: SplitRefusal): string {
   switch (code) {
+    case "folder":
+      return "A folder project's offer is its files, never a stack of revisions: there is nothing to split."
     case "no-offer":
       return "This thread has no offer to split: nothing of its work is offered."
     case "queued":
@@ -167,13 +170,16 @@ export const SPLIT_QUEUED =
   "Queued: the split runs when this run ends, as a run of its own."
 
 /**
- * Whether `split_offer` queues a split, from any run: an open
- * offer to split, none queued, and no split running. A card waits for the
+ * Whether `split_offer` queues a split, from any run: a lane whose history
+ * has revisions (a folder lane's offer is files), an open offer to split,
+ * none queued, and no split running. A card waits for the
  * run's end, so queueing one touches nothing in the run. The card carries
  * the `split` command and no text, queued after the lane's last card by the
  * person behind the run (`promptAuthor`).
  */
 export function planSplitCall(input: {
+  /** The lane's history's kind; null for a lane with no copy of its own. */
+  readonly history: ProjectKind | null
   readonly offer: OfferStatus
   readonly cards: readonly CardRecord[]
   readonly lane: ThreadId
@@ -187,6 +193,7 @@ export function planSplitCall(input: {
   | { readonly kind: "refused"; readonly why: SplitRefusal }
   /** The host's own make of the card was refused, which none is: its shell logs it. */
   | { readonly kind: "unmade"; readonly code: MoveRefusal } {
+  if (input.history === "folder") return { kind: "refused", why: "folder" }
   if (input.offer.kind !== "open") return { kind: "refused", why: "no-offer" }
   if (input.running && input.prompt === "stack")
     return { kind: "refused", why: "splitting" }

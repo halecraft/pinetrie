@@ -1,9 +1,16 @@
 import { describe, expect, test } from "vitest"
-import { isDiskName, isFolderStateId, lineStateId } from "./index.ts"
+import {
+  isDiskName,
+  isFolderStateId,
+  lineStateId,
+  turnStateId,
+} from "./index.ts"
 
 describe("folder state ids", () => {
-  test("a turn's entry id, a line state and a virtual base are state ids", () => {
-    expect(isFolderStateId("01a14df0-0000-7000-8000-000000000001")).toBe(true)
+  test("a turn's state, a line state and a virtual base are state ids", () => {
+    expect(
+      isFolderStateId(turnStateId("01a14df0-0000-7000-8000-000000000001")),
+    ).toBe(true)
     expect(
       isFolderStateId(lineStateId("01a14df0-0000-7000-8000-00000000000a")),
     ).toBe(true)

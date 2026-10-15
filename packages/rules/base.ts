@@ -12,9 +12,12 @@ import {
   type EntryId,
   ERR,
   type ErrCode,
+  type FolderBaseRecord,
   type ForkStart,
   firstPromptOf,
   forkParent,
+  type JjAcceptedRecord,
+  type JjBaseRecord,
   type LaneBase,
   nearestRevision,
   type ParentThread,
@@ -27,10 +30,17 @@ import {
   type TreeIndex,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { CommitSchema, decodeAt, threadKey } from "./decode.ts"
+import { CommitSchema, decodeAt, PointSchema, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
-const BaseRecordSchema = Type.Object({
+const WorkSchema = Type.Union([
+  Type.Literal("none"),
+  Type.Literal("some"),
+  Type.Literal("unknown"),
+])
+
+const JjBaseSchema = Type.Object({
+  kind: Type.Literal("jj"),
   base: Type.Union([
     Type.Object({ kind: Type.Literal("accepted") }),
     Type.Object({
@@ -53,45 +63,78 @@ const BaseRecordSchema = Type.Object({
     Type.Null(),
   ]),
   untraced: Type.Array(CommitSchema),
-  work: Type.Union([
-    Type.Literal("none"),
-    Type.Literal("some"),
-    Type.Literal("unknown"),
-  ]),
+  work: WorkSchema,
 })
 
-/** Each lane's base, as its history says it, at the lane. */
+const FolderBaseSchema = Type.Object({
+  kind: Type.Literal("folder"),
+  start: PointSchema,
+  catchUp: Type.Union([
+    Type.Object({
+      tip: PointSchema,
+      to: PointSchema,
+      files: Type.Array(Type.String()),
+    }),
+    Type.Null(),
+  ]),
+  work: WorkSchema,
+})
+
+/**
+ * Each lane's base, as its history says it, of the project's kind, at the
+ * lane. A record written before records had a kind decodes as none, until
+ * the host writes it again.
+ */
 export const BASE: RecordSpec<BaseRecord, ThreadId, "session"> = {
   namespace: "pinetrie.base",
   home: "session",
   keyOf: r => r.lane,
-  encode: ({ lane, ...contents }) => ({
-    ...contents,
-    base: { ...contents.base },
-    catchUp:
+  encode: ({ lane, ...contents }) => {
+    const catchUp =
       contents.catchUp === null
         ? null
-        : { ...contents.catchUp, files: [...contents.catchUp.files] },
-    untraced: [...contents.untraced],
-  }),
+        : { ...contents.catchUp, files: [...contents.catchUp.files] }
+    return contents.kind === "folder"
+      ? { ...contents, catchUp }
+      : {
+          ...contents,
+          catchUp,
+          base: { ...contents.base },
+          untraced: [...contents.untraced],
+        }
+  },
   decode: (contents, key) =>
-    decodeAt(BaseRecordSchema, contents, threadKey(key), (r, lane) => ({
-      lane,
-      base: r.base,
-      start: commitId(r.start),
-      state: r.state,
-      catchUp:
-        r.catchUp === null
-          ? null
+    decodeAt(
+      Type.Union([JjBaseSchema, FolderBaseSchema]),
+      contents,
+      threadKey(key),
+      (r, lane): BaseRecord =>
+        r.kind === "folder"
+          ? { ...r, lane }
           : {
-              tip: commitId(r.catchUp.tip),
-              to: commitId(r.catchUp.to),
-              files: r.catchUp.files,
+              kind: "jj",
+              lane,
+              base: r.base,
+              start: commitId(r.start),
+              state: r.state,
+              catchUp:
+                r.catchUp === null
+                  ? null
+                  : {
+                      tip: commitId(r.catchUp.tip),
+                      to: commitId(r.catchUp.to),
+                      files: r.catchUp.files,
+                    },
+              untraced: r.untraced.map(commitId),
+              work: r.work,
             },
-      untraced: r.untraced.map(commitId),
-      work: r.work,
-    })),
+    ),
 }
+
+/** What of a lane's base record says which base it follows. */
+export type FollowedBase =
+  | Pick<JjBaseRecord, "kind" | "base" | "state">
+  | Pick<FolderBaseRecord, "kind">
 
 /**
  * The base a thread is brought up to date with and accepted into: its
@@ -99,21 +142,19 @@ export const BASE: RecordSpec<BaseRecord, ThreadId, "session"> = {
  * landed, and one gone (which only "continue on accepted work" moves). Null, the
  * lane's base not yet read, is accepted work.
  */
-export const effectiveBase = (
-  base: Pick<BaseRecord, "base" | "state"> | null,
-): ThreadBase =>
-  base?.base.kind === "wip" && base.state === "ok"
+export const effectiveBase = (base: FollowedBase | null): ThreadBase =>
+  base?.kind === "jj" && base.base.kind === "wip" && base.state === "ok"
     ? base.base
     : { kind: "accepted" }
 
 /** Where a thread's base moved since its lane last caught up with it (`baseMoved`). */
 interface BaseMove {
   readonly base: ThreadBase
-  /** The base's bookmark: accepted work's, or the WIP's. */
-  readonly bookmark: string
-  /** The commit the lane's newest `Pinetrie-Base` names, and the base's now. */
-  readonly from: CommitId
-  readonly to: CommitId
+  /** The base's bookmark: accepted work's, or the WIP's; null for your folder. */
+  readonly bookmark: string | null
+  /** The state the lane last began on or caught up with, and the base's now. */
+  readonly from: PointId
+  readonly to: PointId
 }
 
 /**
@@ -125,8 +166,8 @@ interface BaseMove {
  * also decides what a missing record or line means.
  */
 function baseMoved(
-  base: BaseRecord,
-  accepted: AcceptedRecord,
+  base: JjBaseRecord,
+  accepted: JjAcceptedRecord,
   commit: CommitId,
 ): BaseMove | null {
   if (base.state === "gone") return null
@@ -137,7 +178,12 @@ function baseMoved(
       : accepted.wips.find(w => w.bookmark === thread.bookmark)
   return now === undefined || now.commit === base.start
     ? null
-    : { base: thread, bookmark: now.bookmark, from: base.start, to: now.commit }
+    : {
+        base: thread,
+        bookmark: now.bookmark,
+        from: pointFromCommit(base.start),
+        to: pointFromCommit(now.commit),
+      }
 }
 
 /**
@@ -163,21 +209,48 @@ export type CatchUpNow =
     }
 
 /**
- * `CatchUpNow` from the lane's base record and accepted work's. With no line set
- * up there is nothing to catch up with. With no record, the host has not read
- * the lane, so nothing is claimed. The host's read (`BaseRecord.catchUp`)
- * counts only when it was made at the commit the base is at now; else what
- * it would change is unknown.
+ * `CatchUpNow` from the lane's base record and accepted work's, of one
+ * kind. With no line set up there is nothing to catch up with. With no
+ * record, or one of another kind (swept at start), the host has not read
+ * the lane, so nothing is claimed. The host's read (`catchUp`) counts only
+ * when it was made at the state the base is at now; else what it would
+ * change is unknown.
  */
 export function catchUpOf(
   base: BaseRecord | undefined,
   accepted: AcceptedRecord | null,
 ): CatchUpNow {
-  if (accepted === null || accepted.commit === null) return { kind: "current" }
-  if (base === undefined) return { kind: "unknown" }
+  if (accepted === null) return { kind: "current" }
+  if (accepted.kind === "folder") {
+    if (base?.kind !== "folder") return { kind: "unknown" }
+    if (base.start === accepted.newest) return { kind: "current" }
+    return catchUpRead(base.catchUp, {
+      base: { kind: "accepted" },
+      bookmark: null,
+      from: base.start,
+      to: accepted.newest,
+    })
+  }
+  if (accepted.commit === null) return { kind: "current" }
+  if (base?.kind !== "jj") return { kind: "unknown" }
   const move = baseMoved(base, accepted, accepted.commit)
   if (move === null) return { kind: "current" }
-  const read = base.catchUp
+  return catchUpRead(
+    base.catchUp === null
+      ? null
+      : { to: pointFromCommit(base.catchUp.to), files: base.catchUp.files },
+    move,
+  )
+}
+
+/** A moved base's `CatchUpNow`, from the host's read of what catching up changes. */
+const catchUpRead = (
+  read: {
+    readonly to: PointId
+    readonly files: readonly string[]
+  } | null,
+  move: BaseMove,
+): CatchUpNow => {
   if (read === null || read.to !== move.to) return { kind: "unknown" }
   return read.files.length === 0
     ? { kind: "nothing-new" }
@@ -247,7 +320,7 @@ export function planUpdateFrom(input: {
   /** The lane's base, from its own history; null for a lane with none, on accepted work. */
   readonly base: LaneBase | null
   /** `wipState` of a WIP base (`@pinetrie/jj`); "ok" for accepted work. */
-  readonly state: BaseRecord["state"]
+  readonly state: JjBaseRecord["state"]
   /** "continue on accepted work": the thread moves to accepted work, whatever its base. */
   readonly toAccepted: boolean
   /** Accepted work's state; null before it is set up. */
@@ -263,7 +336,11 @@ export function planUpdateFrom(input: {
   if (!input.toAccepted && state === "gone") return ERR.BASE_GONE
   const followed: ThreadBase = input.toAccepted
     ? { kind: "accepted" }
-    : effectiveBase({ base: base?.base ?? { kind: "accepted" }, state })
+    : effectiveBase({
+        kind: "jj",
+        base: base?.base ?? { kind: "accepted" },
+        state,
+      })
   if (followed.kind === "accepted")
     return {
       kind: "accepted",

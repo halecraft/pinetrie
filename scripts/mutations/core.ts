@@ -1201,7 +1201,7 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
   {
-    name: "a copy off its line is ready (port suite)",
+    name: "a copy off its line is ready",
     file: core,
     from: '    ? (copy as ReadyCopy)\n    : "off-line"\n',
     to: "    ? (copy as ReadyCopy)\n    : (copy as ReadyCopy)\n",
@@ -1212,7 +1212,7 @@ export const mutations: readonly Mutation[] = [
       "run",
       "packages/jj/lane/history.test.ts",
     ],
-    expect: "a copy on its line is ready to merge; one off it is refused",
+    expect: "a copy off its line is refused a merge",
   },
   {
     name: "laneFits lets every lane fit",

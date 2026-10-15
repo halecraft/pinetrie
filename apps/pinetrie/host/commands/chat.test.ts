@@ -461,6 +461,7 @@ describe("sendChat", () => {
       putValue(
         b,
         setRecord(BASE, {
+          kind: "jj",
           lane: LANE,
           base: { kind: "accepted" },
           start: commitId("l1"),
@@ -473,6 +474,7 @@ describe("sendChat", () => {
       putValue(
         b,
         setRecord(ACCEPTED, {
+          kind: "jj",
           acceptedBookmark: "pinetrie-accepted",
           wipPrefix: "wip/",
           publish: "main",

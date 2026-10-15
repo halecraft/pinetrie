@@ -1,9 +1,9 @@
 import {
-  type AcceptedRecord,
-  type BaseRecord,
   type BehindView,
   commitId,
-  type OfferRecord,
+  type JjAcceptedRecord,
+  type JjBaseRecord,
+  type JjOfferRecord,
   pointFromCommit,
   pointId,
   threadIdFor,
@@ -23,7 +23,8 @@ const [L1, L2] = [commitId("l1"), commitId("l2")]
 /** `L2` as the state a thread was told of, or merged. */
 const P2 = pointFromCommit(L2)
 
-const line = (commit = L2): AcceptedRecord => ({
+const line = (commit = L2): JjAcceptedRecord => ({
+  kind: "jj",
   acceptedBookmark: "pinetrie-accepted",
   wipPrefix: "wip/",
   publish: "main",
@@ -42,7 +43,8 @@ const line = (commit = L2): AcceptedRecord => ({
 })
 
 /** A lane on accepted work from L1, whose catch-up to L2 brings `files`. */
-const base = (over: Partial<BaseRecord> = {}): BaseRecord => ({
+const base = (over: Partial<JjBaseRecord> = {}): JjBaseRecord => ({
+  kind: "jj",
   lane: LANE,
   base: { kind: "accepted" },
   start: L1,
@@ -56,7 +58,7 @@ const base = (over: Partial<BaseRecord> = {}): BaseRecord => ({
 const offer = {
   files: ["a.ts", "c.ts"],
   conflicts: ["a.ts"],
-} as unknown as OfferRecord
+} as unknown as JjOfferRecord
 
 const VIEW: BehindView = {
   from: { kind: "accepted" },

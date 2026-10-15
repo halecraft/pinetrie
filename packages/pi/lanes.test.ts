@@ -239,9 +239,12 @@ describe("laneGuidelines", () => {
       )
   })
 
-  test("every source lane.md names is a file that still has its symbol", () => {
+  test.each([
+    "lane.md",
+    "lane-folder.md",
+  ])("every source %s names is a file that still has its symbol", name => {
     const repo = path.join(import.meta.dirname, "../..")
-    const note = readFileSync(path.join(import.meta.dirname, "lane.md"), "utf8")
+    const note = readFileSync(path.join(import.meta.dirname, name), "utf8")
     const sources = [...note.matchAll(/<!-- (\S+) (\S+) -->/g)]
     expect(sources.length).toBeGreaterThan(20)
     const missing = sources.flatMap(([, file = "", symbol = ""]) => {

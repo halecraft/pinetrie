@@ -11,7 +11,10 @@ import {
 import type { Keeper } from "@pinetrie/keeper"
 import type { Agent, PiSetup } from "@pinetrie/pi"
 import {
+  readAccepted,
+  readBases,
   readIcons,
+  readOffers,
   readPlaces,
   readProject,
   readRecords,
@@ -32,6 +35,7 @@ import {
   planAccessRecovery,
   planCardSweep,
   planClear,
+  planKindSweep,
   planSeatSweep,
   planStartup,
   planUndeclaredSweep,
@@ -88,7 +92,9 @@ export interface StartupDeps {
 /**
  * In order: no stream survives a process, so clear them; give a new store the
  * default workflow (`planWorkflowSeed`); delete the records of a type no spec
- * declares, in the session and the roots opened (`planUndeclaredSweep`); log
+ * declares, in the session and the roots opened (`planUndeclaredSweep`), and
+ * the offers, accepted work and bases of another kind than the project's
+ * (`planKindSweep`); log
  * the stored lane names that are not a thread's, which no reader is given; name
  * every lane that has none; resume each lane a crash interrupted, in its own
  * directory (`planStartup`); write what the host found, the commands its pi
@@ -125,6 +131,23 @@ export async function recover(deps: StartupDeps): Promise<void> {
       `[host] deleting ${undeclared.length} stored records of types no longer kept: ${[...new Set(undeclared.map(w => w.namespace))].join(", ")}`,
     )
     await keeper.run(() => records.writeValues(undeclared))
+  }
+  const otherKind =
+    work.project === null
+      ? []
+      : planKindSweep(
+          {
+            offers: readOffers(doc),
+            accepted: readAccepted(doc),
+            bases: readBases(doc),
+          },
+          work.project.kind,
+        )
+  if (otherKind.length > 0) {
+    log(
+      `[host] deleting ${otherKind.length} stored records of a project of another kind`,
+    )
+    await keeper.run(() => records.writeValues(otherKind))
   }
   if (malformed.length > 0)
     log(

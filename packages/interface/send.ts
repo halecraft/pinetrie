@@ -469,8 +469,8 @@ export interface BaseChoice {
 /**
  * The bases a new lane may start from: accepted work, then each WIP bookmark
  * above it, with how far it is behind accepted work. None with no line yet,
- * nor with no WIP: accepted work is then the only start, and needs no
- * choosing.
+ * nor with no WIP, nor in a folder project, which has none: accepted work is
+ * then the only start, and needs no choosing.
  */
 export function baseChoices(
   accepted: AcceptedRecord | null,
@@ -478,6 +478,7 @@ export function baseChoices(
 ): readonly BaseChoice[] {
   if (
     accepted === null ||
+    accepted.kind === "folder" ||
     accepted.commit === null ||
     accepted.wips.length === 0
   )

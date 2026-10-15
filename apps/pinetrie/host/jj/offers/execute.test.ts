@@ -1,6 +1,6 @@
 import {
-  type BaseRecord,
   commitId,
+  type JjBaseRecord,
   type OfferNow,
   type Placed,
   type ThreadName,
@@ -44,7 +44,8 @@ const PLACE: Placed = {
   target: commitId("33333333"),
   start: [TIP],
 }
-const BASE: BaseRecord = {
+const BASE: JjBaseRecord = {
+  kind: "jj",
   lane: LANE,
   base: { kind: "accepted" },
   start: TIP,

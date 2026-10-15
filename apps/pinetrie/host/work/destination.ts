@@ -5,9 +5,9 @@
 
 import type {
   AcceptedAction,
-  BaseRecord,
   CommitId,
   ErrCode,
+  JjBaseRecord,
   LaneBase,
   LaneRecord,
   OfferFact,
@@ -27,7 +27,7 @@ import type {
 /** What a catch-up decides its base's update from (`planUpdateFrom`). */
 export interface BaseNow {
   /** What became of a WIP base; "ok" for accepted work. */
-  readonly state: BaseRecord["state"]
+  readonly state: JjBaseRecord["state"]
   /** Accepted work's state; null before it is set up. */
   readonly acceptedPoint: PointId | null
   /** For a WIP base: its commit now, and accepted work's commit under it. */

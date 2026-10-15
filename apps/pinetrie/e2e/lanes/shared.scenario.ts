@@ -13,14 +13,11 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { atEntry, entryId, ROOT } from "@pinetrie/core"
-import {
-  readAccepted,
-  readRevisions,
-  readSharedLineages,
-} from "@pinetrie/reads"
+import { readRevisions, readSharedLineages } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
 import {
   BRANCH,
+  readJjAccepted,
   rootRecordsOf,
   START_AGENT,
   SUITE_CONFIG,
@@ -231,7 +228,7 @@ async function sharedSection(
     await jj(dir, "commit", "-m", "you share notes")
     // Published once accepted work's record has seen your commit.
     await waitFor(
-      () => (readAccepted(h.host.session)?.yours.catchUp ?? null) !== null,
+      () => (readJjAccepted(h.host.session)?.yours.catchUp ?? null) !== null,
       30_000,
     )
     await h.user.actOnAccepted("publish")
