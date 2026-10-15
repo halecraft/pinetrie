@@ -182,15 +182,19 @@ that `client` declares no server package, that `session` declares no React,
 that nothing depends on an app. It also re-measures the resolution claim
 itself in a child process. Each rule has been shown to fail when violated.
 
+Node builtins always resolve, so resolution cannot keep them out of the
+page, and Vite's build only warns, stubbing one with code that throws when
+called. Biome's `noNodejsModules` does it instead: an error, tests aside,
+in `web` and every `@pinetrie/*` package it reaches. `workspace.test.ts`
+holds that list to the manifests' closure, so a package the page comes to
+depend on fails until the rule covers it. The page's build-time files,
+`vite.config.ts` and `stamp.ts`, are exempt.
+
 **Residue, stated rather than hidden.** None of these is structural:
 
 - Every package can reach the root's development tooling (Biome, TypeScript,
   Vitest, Playwright). The test holds that list to an exact allowlist.
 - `client` can reach `vite`, its own devDependency for the build.
-- Nothing stops the client or the session importing `node:*`; builtins
-  always resolve. The browser build and `e2e:browser` catch it. For the
-  session only they do: the host and lanes suites run it in Node, where such
-  an import works.
 - **Under Vitest, anything resolves.** It runs under a pnpm shim that sets
   `NODE_PATH` to pnpm's hidden hoist, so a unit test could import an
   undeclared package and still run. `typecheck`, which is in `verify`, still

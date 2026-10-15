@@ -16,6 +16,15 @@ as `layout.ts` or `viewport.ts`, is the interface's.
 The page is served through Vite by `pnpm dev`, and as Vite's build by
 `pnpm serve` (ADR-0148).
 
+- **No Node builtin in what the page bundles.** Vite stubs one with a
+  warning, and the build goes on, so the page throws only when the code
+  that uses it runs. `biome.json` makes `noNodejsModules` an error in this
+  package and every `@pinetrie/*` package it reaches, tests aside, and
+  `workspace.test.ts` holds that list to the manifests' closure. Here
+  `vite.config.ts` and `stamp.ts` are exempt: they run in Node at build
+  time, and the host reads `stamp.ts` (`@pinetrie/web/stamp`). The page
+  must never import it.
+
 - **React and React DOM are deduplicated** (`resolve.dedupe`). The linked
   Kyneta checkout resolves its own React, a different version: without
   this the build bundles two, and the page fails on its first hook, after

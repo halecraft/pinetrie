@@ -1293,6 +1293,11 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     paths (`workStats`), so it is what its review lists.
   - **A lane's runs are folded on the host** (`runs.ts`, ADR-0135), from
     core's `RunEvent`s, whatever observes the lane:
+    - **A path is made relative to the lane by `pathUnder`, not
+      `node:path`:** this package is in the page's bundle, where a
+      builtin is a stub that throws when called. The observer sends a
+      missing path as the call named it, so `..` reaches the fold, and a
+      path that climbs out of the lane is dropped.
     - **An event is an attempt:** whether a path is there is read at each
       drain (`present`, from the lane), never inferred, so a temporary file
       renamed away, or a call that failed, reports nothing.

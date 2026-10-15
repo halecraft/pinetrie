@@ -872,6 +872,24 @@ export const mutations: readonly Mutation[] = [
       "isWithin: the path itself and what is under it, never a sibling with the same prefix",
   },
   {
+    name: "pathUnder keeps `..` as a name",
+    file: "packages/core/paths.ts",
+    from: '    if (s === "..") names.pop()',
+    to: '    if (s === "..") names.push(s)',
+    command: unit,
+    expect:
+      "pathUnder: `.`, `..` and a doubled slash resolved before comparing",
+  },
+  {
+    name: "pathUnder takes a path outside the root",
+    file: "packages/core/paths.ts",
+    from: "  return under.every((s, i) => names[i] === s)",
+    to: "  return true",
+    command: unit,
+    expect:
+      "pathUnder: null for a path that leaves the root, or a relative one",
+  },
+  {
     name: "sendWaits ignores the hold",
     file: tree,
     from: "  isBusy(lane) || lane.heldBy !== null",

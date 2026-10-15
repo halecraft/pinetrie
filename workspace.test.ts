@@ -241,6 +241,33 @@ test("the page declares no server package and no app", () => {
   }
 })
 
+/** Every package the page bundles: the page and its `@pinetrie/*` dependencies, through each one's. */
+const pageBundled = (): readonly string[] => {
+  const dirs = new Map(WORKSPACE.map(dir => [read(dir).name, dir]))
+  const seen = new Set(["packages/web"])
+  for (const dir of seen)
+    for (const d of deps(read(dir))) {
+      const found = dirs.get(d)
+      if (found !== undefined) seen.add(found)
+    }
+  return [...seen].sort()
+}
+
+test("Biome refuses Node builtins in every package the page bundles", () => {
+  // A builtin resolves in Node whatever a manifest declares, and Vite stubs
+  // it in the page with a warning, so only the lint rule stands between a
+  // `node:` import and a page that throws when it calls one.
+  const biome = JSON.parse(readFileSync(path.join(ROOT, "biome.json"), "utf8"))
+  const refusing: readonly string[] = biome.overrides
+    .filter(
+      (o: any) => o.linter?.rules?.correctness?.noNodejsModules === "error",
+    )
+    .flatMap((o: any) => o.includes as string[])
+    .filter((g: string) => /^packages\/[^/]+\/\*\*$/.test(g))
+    .map((g: string) => g.slice(0, -"/**".length))
+  assert.deepEqual([...refusing].sort(), pageBundled())
+})
+
 test("nothing depends on an app: apps are run, never imported", () => {
   const apps = new Set(dirsIn("apps").map(dir => read(dir).name))
   for (const dir of WORKSPACE) {

@@ -8,15 +8,16 @@
 // temporary file made and renamed away, or a call that failed, then
 // reports nothing.
 
-import path from "node:path"
 import {
   type FileHashes,
   type FoldNotices,
+  isUnderAny,
   type LaneDrain,
   type LaneRuns,
   OPEN_FLAGS,
   type PathKind,
   type PathTrace,
+  pathUnder,
   type Recipe,
   type RecipeCheck,
   type ReleaseStamp,
@@ -68,18 +69,9 @@ const FIRST: Omit<PathTrace, "before"> = {
 
 /** `p` relative to `root`, or null outside it (and for `root` itself). */
 const inside = (root: string, p: string): string | null => {
-  if (p === "") return null
-  const rel = path.posix.relative(root, path.posix.normalize(p))
-  return rel === "" ||
-    rel === ".." ||
-    rel.startsWith("../") ||
-    path.posix.isAbsolute(rel)
-    ? null
-    : rel
+  const rel = pathUnder(root, p)
+  return rel === "" ? null : rel
 }
-
-const isUnder = (p: string, roots: readonly string[]): boolean =>
-  roots.some(r => p === r || p.startsWith(`${r}/`))
 
 /**
  * `trace` with `events` folded in. Copies the trace's maps once per call,
@@ -131,7 +123,7 @@ export function foldRunEvents(
     const p2 = inside(lane.root, e.path2)
     if (
       p !== null &&
-      isUnder(p, lane.shared) &&
+      isUnderAny(p, lane.shared) &&
       (e.op === "open" || e.op === "release")
     ) {
       const fields = {

@@ -128,6 +128,30 @@
       }
     },
     {
+      "includes": [
+        "packages/core/**",
+        "packages/interface/**",
+        "packages/protocol/**",
+        "packages/reads/**",
+        "packages/rules/**",
+        "packages/schema/**",
+        "packages/session/**",
+        "packages/shell/**",
+        "packages/web/**",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!packages/web/vite.config.ts",
+        "!packages/web/stamp.ts"
+      ],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "error"
+          }
+        }
+      }
+    },
+    {
       "includes": ["apps/pinetrie/e2e/**", "!**/*.test.ts"],
       "linter": {
         "rules": {

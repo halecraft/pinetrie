@@ -4,7 +4,8 @@ Core is the vocabulary every package shares (ids, intents, every record's
 type) and the reads of the tree. It does no I/O, and imports nothing but its
 own modules: no pi (ADR-0003), no Kyneta, no Node builtin, since the client
 loads it in the browser (`paths.ts` compares paths as strings for that
-reason). Everything here is a *plan* in gather, plan, execute: a decision is
+reason). Biome enforces the last: `noNodejsModules` is an error, tests
+aside, in every package the page bundles. Everything here is a *plan* in gather, plan, execute: a decision is
 a value, and the host performs it, as pi's own lane loop does.
 
 The rule core, `@pinetrie/rules` and `@pinetrie/jj` keep: a format or type
@@ -14,6 +15,16 @@ changes it, is `@pinetrie/rules`', whoever reads it. Core also holds the few
 pure helpers several packages share (`paths.ts`, `errorText`), since every
 package that uses one already depends on core. `index.ts` re-exports every
 module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
+
+## Paths as strings (`paths.ts`)
+
+- **`isWithin` resolves nothing:** its arguments must be normalized
+  already, or a `..` passes as a name.
+- **A path that may hold `.`, `..` or a doubled `/` goes through
+  `pathUnder`,** which resolves them in both paths before it compares, as
+  POSIX does: a `..` at `/` stays at `/`. It reads strings, so a symbolic
+  link is not followed. A relative path is null: there is no working
+  directory in the browser to resolve it against.
 
 ## Ids (`ids.ts`, `kinds.ts`)
 

@@ -256,8 +256,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a path climbing out of the lane is reported",
     file: "packages/rules/runs.ts",
-    from: '    rel === ".." ||\n    rel.startsWith("../") ||\n',
-    to: "",
+    from: "  const rel = pathUnder(root, p)",
+    to: "  const rel = p.slice(root.length + 1)",
     command: unit,
     expect: "paths outside the lane's directory are not reported",
   },

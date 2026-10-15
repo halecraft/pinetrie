@@ -83,6 +83,22 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "biome", "lint", "apps/pinetrie/e2e"],
   },
   {
+    name: "a package the page bundles imports a Node builtin",
+    file: "packages/rules/runs.ts",
+    from: "import {\n  type FileHashes,",
+    to: 'export { sep } from "node:path"\nimport {\n  type FileHashes,',
+    // As above: with lint clean, any error is the mutant's.
+    command: ["pnpm", "exec", "biome", "lint", "packages/rules"],
+  },
+  {
+    name: "Biome lets one package the page bundles import a Node builtin",
+    file: "biome.json",
+    from: '        "packages/shell/**",\n',
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
+    expect: "Biome refuses Node builtins in every package the page bundles",
+  },
+  {
     name: "a client names an entry's root without waiting for its copy to have it",
     file: "apps/pinetrie/e2e/harness.ts",
     from: "  await waitFor(() => client.rootOf(entry) !== undefined, timeoutMs)\n",
