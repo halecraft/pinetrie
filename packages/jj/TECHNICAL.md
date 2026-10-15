@@ -476,7 +476,10 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
 
 - **A point becomes a commit only in a lane proven jj** (`lane/points.ts`,
   ADR-0150). `proveJjLane` is the one maker of a `JjLane` (its brand is
-  unexported); `commitFromPoint` takes one, so a point from a port or from
+  unexported). It answers tagged, the lane under `kind: "jj"` beside a
+  `ForeignLane` or a `NoCopy`, never told apart by a missing field: a
+  record that gained `kind` would otherwise read as proven, unseen by the
+  compiler. `commitFromPoint` takes a `JjLane`, so a point from a port or from
   storage is read as a commit only where the lane it belongs to keeps a jj
   history. A commit becomes a point freely (`pointFromCommit`, core).
   `historyOf` takes a `JjLane`, proved once by the host's adapter when the

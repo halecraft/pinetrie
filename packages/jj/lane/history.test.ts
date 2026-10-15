@@ -1,7 +1,9 @@
 // The port suite against jj's adapter: lanes as throwaway repos on the host,
 // with your repo beside them, and the host's runner standing in for a lane's
 // channel. A lane's `/workspace` and `/mnt/host-working-copy` are directories
-// here.
+// here. The harness supplies the rig's test-only hooks with jj run in the
+// lane's own repo, and accepts an offer by the steps `repo.test.ts` uses
+// (`fixtures.ts`).
 
 import {
   mkdir,
@@ -17,29 +19,41 @@ import {
   type CommitId,
   HOST_WORKING_COPY,
   NO_EDITOR,
+  type PointId,
   pointFromCommit,
+  type ThreadId,
+  type ThreadName,
   threadIdFor,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
 import {
+  describeFailure,
   executeOrThrow,
   hostBytesRunner,
   LANE_JJ_CONFIG,
   type LaneRunners,
   type LaneStep,
   laneIgnores,
+  lines,
   run,
 } from "@pinetrie/lanes"
 import { type HistoryRig, historySuite } from "@pinetrie/lanes/testing"
 import { afterAll, beforeAll, expect, test } from "vitest"
 import { fileAt } from "../file-at.ts"
-import { jjLaneFor } from "../fixtures.ts"
-import { planImport } from "../plan.ts"
-import { executeRepo, hostJj } from "../run.ts"
+import {
+  acceptedIn,
+  acceptOffer,
+  fetchLane,
+  jjLaneFor,
+  offerTip,
+} from "../fixtures.ts"
+import { hostJj } from "../run.ts"
 import { historyOf } from "./history.ts"
-import { bookmarkName, DEFAULT_REPO } from "./names.ts"
-import { planBaseCheckout, planBundle, planForkSetup } from "./plan.ts"
-import { commitsOf } from "./revisions.ts"
+import { DEFAULT_REPO } from "./names.ts"
+import { planBaseCheckout, planForkSetup } from "./plan.ts"
+import { commitFromPoint } from "./points.ts"
+import { commitsOf, isAncestor } from "./revisions.ts"
+import { laneJj } from "./run.ts"
 
 let top = ""
 beforeAll(async () => {
@@ -85,6 +99,21 @@ async function makeRig(): Promise<HistoryRig> {
   await run("jj", ["git", "init", "--colocate", yoursDir])
   const yours = hostJj(yoursDir)
   let lanes = 0
+  /** Each lane's runners, by its id: the hooks run in the lane's own repo. */
+  const runnersOf = new Map<ThreadId, LaneRunners>()
+  const runnersFor = (lane: ThreadId): LaneRunners => {
+    const runners = runnersOf.get(lane)
+    if (runners === undefined) throw new Error(`no lane ${lane}`)
+    return runners
+  }
+  /** `lane`'s jj, and its points read as commits. */
+  const inLane = (lane: ThreadId) => {
+    const proven = jjLaneFor(lane)
+    return {
+      jj: laneJj(runnersFor(lane).lane),
+      commit: (p: PointId) => commitFromPoint(proven, p),
+    }
+  }
 
   /** A lane's runners at `laneDir`, as its container's would run there. */
   const runnersAt = (laneDir: string): LaneRunners => {
@@ -106,7 +135,7 @@ async function makeRig(): Promise<HistoryRig> {
   }
 
   return {
-    async accept(files) {
+    async yoursOnAccepted(files) {
       for (const [file, text] of Object.entries(files)) {
         await mkdir(path.dirname(path.join(yoursDir, file)), {
           recursive: true,
@@ -132,11 +161,8 @@ async function makeRig(): Promise<HistoryRig> {
       const laneDir = path.join(dir, `lane-${lane}`)
       await mkdir(laneDir, { recursive: true })
       const runners = runnersAt(laneDir)
-      const [accepted] = await commitsOf(
-        yours,
-        `present(${JSON.stringify(DEFAULT_REPO.acceptedBookmark)})`,
-      )
-      if (accepted === undefined) throw new Error("no accepted work")
+      runnersOf.set(lane, runners)
+      const accepted = await acceptedIn(yours, DEFAULT_REPO)
       const steps: LaneStep[] = [
         ...planBaseCheckout({ yours: [accepted], fresh: true }),
         ...planForkSetup(jjLaneFor(lane), {
@@ -164,20 +190,7 @@ async function makeRig(): Promise<HistoryRig> {
                 ).ok
               )
                 held.push(c)
-            await executeOrThrow(
-              [
-                planBundle({
-                  bookmark: bookmarkName(lane),
-                  have: held,
-                  to: bundle,
-                }),
-              ],
-              runners,
-            )
-            await executeRepo(
-              yoursDir,
-              planImport({ lane, bundle, stack: false }),
-            )
+            await fetchLane(runners, yoursDir, { lane, have: held, bundle })
           })(),
         )
       }
@@ -204,16 +217,61 @@ async function makeRig(): Promise<HistoryRig> {
           return next
         },
         async offLine() {
-          await runners.lane(["jj", "-R", WORKSPACE_ROOT, "new", "root()"])
+          await laneJj(runners.lane)(["new", "root()"])
         },
         fetched,
         async settled() {
           await Promise.all(pending)
         },
+        async commitAsAgent(message) {
+          const ran = await laneJj(runners.lane)(["commit", "-m", message])
+          if (!ran.ok) throw new Error(describeFailure("jj commit", ran))
+        },
       }
     },
 
     fileAt: (point, file) => fileAt(yours, DEFAULT_REPO, point, file),
+
+    isAncestor(lane, a, b) {
+      const { jj, commit } = inLane(lane)
+      return isAncestor(jj, commit(a), commit(b))
+    },
+
+    // Deliberately not jj's `changedPaths`: `recordTurn` computes a turn's
+    // paths with it, so L2 would compare it with itself. `--name-only`
+    // prints a path unquoted, so the suite's paths are plain.
+    async changedPaths(lane, from, to) {
+      const { jj, commit } = inLane(lane)
+      const ran = await jj([
+        "diff",
+        "--ignore-working-copy",
+        "--from",
+        commit(from),
+        "--to",
+        commit(to),
+        "--name-only",
+      ])
+      if (!ran.ok) throw new Error(describeFailure("jj diff", ran))
+      return lines(ran.stdout).sort()
+    },
+
+    async accept({ lane }) {
+      const name = `rig-lane-${lane}` as ThreadName
+      await fetchLane(runnersFor(lane), yoursDir, {
+        lane,
+        have: [],
+        bundle: path.join(dir, `${lane}-offer.bundle`),
+      })
+      const built = await offerTip(yoursDir, {
+        lane,
+        name,
+        repoConfig: DEFAULT_REPO,
+      })
+      const [top] = built.changes
+      if (top === undefined) throw new Error("no offer")
+      await acceptOffer(yoursDir, { name, top, repoConfig: DEFAULT_REPO })
+      return pointFromCommit(await acceptedIn(yours, DEFAULT_REPO))
+    },
 
     close: () => rm(dir, { recursive: true, force: true }),
   }

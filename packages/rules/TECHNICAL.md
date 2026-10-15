@@ -1371,8 +1371,9 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 - **`forkSource`** is where a new lane of its own starts: the nearest snapshot
   above it, else the base snapshot; and the nearest state, else the
   thread's base (`planBegin`): accepted work's state, or a WIP's copy on accepted work
-  commit under it. It refuses a disk of another kind than the new lane's
-  record (`ForeignLane`). The start is always named: a cloned disk carries its
+  commit under it. It answers a `ForkSource` tagged `kind: "source"`, or
+  refuses a disk of another kind than the new lane's record
+  (`ForeignLane`), never told apart by a missing field. The start is always named: a cloned disk carries its
   parent's working-copy change, and the fork must leave it (S42). A snapshot
   that is gone (`kept` false, which the host asks the runtime) is read as
   missing: the fork starts from its base, and names the snapshot `lost`;
@@ -1765,7 +1766,7 @@ reads, `details` what pine·trie reads back.
   jj-only fact meets the shared history, the rule converts it at that
   site with `pointFromCommit` (`planUpdateFrom`'s WIP, `planBaseNews`'s
   base move), so each crossing is visible; nothing here turns a point back
-  into a commit.
+  into a commit, or tests one for more than equality (core's rule).
 - **The schema is the type.** Ids are branded schemas (`decode.ts`:
   `ThreadIdSchema`, `WriterIdSchema`, `CommitSchema`, `PointSchema`,
   `ThreadNameSchema`, `CardIdSchema`), whose `Static` is the brand, and `List` an array whose

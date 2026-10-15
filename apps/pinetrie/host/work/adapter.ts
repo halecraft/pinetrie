@@ -104,13 +104,15 @@ export interface Splits {
   splitEnded(lane: ThreadId, prompt: EntryId): Promise<string | null>
 }
 
+/** A lane's history, or why its history is not the adapter's kind. */
+export type HistoryAnswer =
+  | { readonly kind: "history"; readonly history: LaneHistory }
+  | ForeignLane
+
 /** The adapter, started. */
 export interface StartedProject {
   readonly destination: Destination
-  /**
-   * `lane`'s history over its runners, or why its history is not this
-   * kind's; only `withHistory` asks for one.
-   */
-  history(lane: OwnLane, runners: LaneRunners): LaneHistory | ForeignLane
+  /** `lane`'s history over its runners, or why not; only `withHistory` asks for one. */
+  history(lane: OwnLane, runners: LaneRunners): HistoryAnswer
   readonly splits: Splits
 }

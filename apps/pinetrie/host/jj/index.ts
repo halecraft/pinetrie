@@ -197,15 +197,18 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
           return {
             destination,
             history(record, runners) {
-              const lane = proveJjLane(record)
-              return "kind" in lane
-                ? lane
-                : historyOf({
-                    lane,
-                    runners,
-                    repoConfig: names,
-                    fetch: have => void fetches.fetchLane(lane.lane, have),
-                  })
+              const proved = proveJjLane(record)
+              if (proved.kind !== "jj") return proved
+              const { lane } = proved
+              return {
+                kind: "history",
+                history: historyOf({
+                  lane,
+                  runners,
+                  repoConfig: names,
+                  fetch: have => void fetches.fetchLane(lane.lane, have),
+                }),
+              }
             },
             splits,
           }

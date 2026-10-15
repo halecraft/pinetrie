@@ -3,7 +3,6 @@
 // its queue (`withHistory`). Only this module touches the handles.
 
 import {
-  type ForeignLane,
   type LaneRecord,
   type OwnLane,
   ownLane,
@@ -28,6 +27,7 @@ import {
 import { readLaneRecords, readThreadName } from "@pinetrie/reads"
 import { foreignLaneWords, laneFold } from "@pinetrie/rules"
 import type { SessionDocHandle } from "@pinetrie/schema"
+import type { HistoryAnswer } from "./adapter.ts"
 
 /**
  * A lane's channel: pi's helper in its container, over the runtime's `exec
@@ -102,11 +102,8 @@ export function createRegistry(input: {
   readonly session: SessionDocHandle
   /** What lanes run on. */
   readonly runtime: LaneRuntime
-  /** The adapter's history of a lane, over its runners, or why it keeps none. */
-  readonly history: (
-    lane: OwnLane,
-    runners: LaneRunners,
-  ) => LaneHistory | ForeignLane
+  /** The adapter's history of a lane, over its runners, or why it is not the adapter's kind. */
+  readonly history: (lane: OwnLane, runners: LaneRunners) => HistoryAnswer
 }): LaneRegistry {
   const { runtime } = input
   const handles = new Map<ThreadId, LaneHandle<LaneChannel>>()
@@ -138,9 +135,10 @@ export function createRegistry(input: {
         )
       }
       const handle = handleOf(lane)
-      const history = input.history(own, handle.runners)
-      if ("kind" in history)
-        return Promise.reject(new Error(foreignLaneWords(history)))
+      const answer = input.history(own, handle.runners)
+      if (answer.kind === "foreign")
+        return Promise.reject(new Error(foreignLaneWords(answer)))
+      const { history } = answer
       return handle.queue.enqueue(() => f(history, handle, own), options)
     },
     recordOf,

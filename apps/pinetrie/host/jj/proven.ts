@@ -10,20 +10,22 @@ import { foreignLaneWords } from "@pinetrie/rules"
 /** `record` proven jj; thrown, with why, when it is not. */
 export function requireJjLane(record: LaneRecord): JjLane {
   const proved = proveJjLane(record)
-  if (!("kind" in proved)) return proved
-  throw new Error(
-    proved.kind === "foreign"
-      ? foreignLaneWords(proved)
-      : `${record.lane} has no copy of its own`,
-  )
+  switch (proved.kind) {
+    case "jj":
+      return proved.lane
+    case "foreign":
+      throw new Error(foreignLaneWords(proved))
+    case "no-copy":
+      throw new Error(`${record.lane} has no copy of its own`)
+  }
 }
 
-/** `lane`'s record among `records`, proven jj; null with no record, or one jj cannot read. */
+/** `lane`'s record among `records`, proven jj; null with no record, or one `proveJjLane` refuses. */
 export function recordedJjLane(
   records: ReadonlyMap<ThreadId, LaneRecord>,
   lane: ThreadId,
 ): JjLane | null {
   const record = records.get(lane)
   const proved = record === undefined ? null : proveJjLane(record)
-  return proved === null || "kind" in proved ? null : proved
+  return proved?.kind === "jj" ? proved.lane : null
 }

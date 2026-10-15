@@ -71,8 +71,8 @@ export function parseAcceptedOfferCommits(
   })
 }
 
-/** Whether `ancestor` is `commit` or one of its ancestors. */
-const isAncestor = async (
+/** Whether `ancestor` is `commit` or one of its ancestors, in the repo `jj` runs in. */
+export const isAncestor = async (
   jj: Runner,
   ancestor: CommitId,
   commit: CommitId,

@@ -26,6 +26,7 @@ const proofs = [
 ]
 const numbering = ["pnpm", "exec", "vitest", "run", "scripts/numbering.test.ts"]
 const record = ["pnpm", "exec", "vitest", "run", "scripts/record.test.ts"]
+const laws = ["pnpm", "exec", "vitest", "run", "scripts/laws.test.ts"]
 const gate = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/e2e/gate.test.ts"]
 const scenarios = [
   "pnpm",
@@ -362,5 +363,14 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: record,
     expect: "a rejected ADR amends and supersedes nothing",
+  },
+  {
+    name: "the laws' check skips the doc's laws",
+    file: "scripts/laws.ts",
+    from: "  const laws = lawsInDoc(doc)\n",
+    to: "  const laws: ReturnType<typeof lawsInDoc> = []\n",
+    command: laws,
+    expect:
+      "a law with no test, a law with two, and a title naming no law are each a gap",
   },
 ]

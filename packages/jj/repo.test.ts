@@ -13,7 +13,6 @@ import path from "node:path"
 import {
   baseMessage,
   type CatchUpRead,
-  type CommitBase,
   type CommitId,
   commitId,
   type EntryId,
@@ -24,7 +23,6 @@ import {
   NO_EDITOR,
   type OfferSource,
   pointFromCommit,
-  type RepoConfig,
   type ThreadId,
   type ThreadName,
   threadIdFor,
@@ -37,7 +35,6 @@ import {
   hostRunner,
   LANE_JJ_CONFIG,
   type LaneAuthority,
-  type LaneRunners,
   type LaneStep,
   laneIgnores,
   laneShell,
@@ -51,7 +48,15 @@ import {
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { acceptedFacts } from "./accepted.ts"
 import { catchUpFiles, readCatchUp } from "./catch-up.ts"
-import { jjLaneFor } from "./fixtures.ts"
+import {
+  acceptedIn,
+  acceptOffer,
+  buildOffer,
+  fetchLane,
+  jjLaneFor,
+  knownStart as knownStartOf,
+  offerTip,
+} from "./fixtures.ts"
 import { laneBase } from "./lane/base.ts"
 import { bookmarkOf } from "./lane/bookmarks.ts"
 import {
@@ -73,7 +78,6 @@ import {
 import {
   fetchById,
   planBaseCheckout,
-  planBundle,
   planForkSetup,
   planMerge,
   planOldNamesOnDisk,
@@ -115,7 +119,6 @@ import {
   planAbandonOffer,
   planCatchUpUndo,
   planDescribe,
-  planImport,
   planOffer,
   planOfferAcceptanceSteps,
   planPublishCatchUp,
@@ -134,18 +137,10 @@ const ROOT = threadIdFor("3")
 const TURN = { lane: LANE, title: "a turn" }
 
 /** Where `LANE`'s offer starts, as commits: a test of an untraced start reads `startOfOffer` itself. */
-const knownStart = async (
+const knownStart = (
   jj: Runner,
-  input: {
-    readonly tip: CommitId
-    readonly base: CommitBase
-    readonly repoConfig: RepoConfig
-  },
-): Promise<readonly CommitId[]> => {
-  const read = await startOfOffer(jj, { ...input, lane: LANE })
-  if (read.kind !== "known") throw new Error("an untraced start")
-  return read.start
-}
+  input: Omit<Parameters<typeof knownStartOf>[1], "lane">,
+) => knownStartOf(jj, { ...input, lane: LANE })
 
 /** `commitTurn` with the lane's bookmark read first, as the host reads it. */
 const turnOn = async (
@@ -174,35 +169,6 @@ const defaultLog = async (jj: Runner): Promise<string> =>
       'description.first_line() ++ "\n"',
     ])
   ).stdout
-
-/**
- * A lane's commits into your repo, as after a turn: bundled in the lane
- * (`planBundle`), then imported by the host (`planImport`).
- */
-const fetchLane = async (
-  runners: LaneRunners,
-  yours: string,
-  input: {
-    readonly lane: ThreadId
-    readonly have: readonly CommitId[]
-    readonly bundle: string
-  },
-) => {
-  await executeOrThrow(
-    [
-      planBundle({
-        bookmark: bookmarkName(input.lane),
-        have: input.have,
-        to: input.bundle,
-      }),
-    ],
-    runners,
-  )
-  await executeRepo(
-    yours,
-    planImport({ lane: input.lane, bundle: input.bundle, stack: false }),
-  )
-}
 
 // ── against jj and git themselves, in throwaway repos ──────────────────────
 
@@ -1015,7 +981,9 @@ describe("a lane's repo, with jj", () => {
 
   /**
    * Your repo and one lane's, in `top/<tag>-…`, with the lane's steps run on
-   * the host, and an offer built as the host builds it, on accepted work.
+   * the host. Its offers are built and accepted by the steps the port
+   * suite's harness shares (`fixtures.ts`); `offer` and `accept` check
+   * after each that the batched read agrees (`agrees`).
    */
   const offerRig = async (tag: string) => {
     const yoursDir = path.join(top, `${tag}-yours`)
@@ -1049,14 +1017,7 @@ describe("a lane's repo, with jj", () => {
     const edit = async (dir: string, file: string, text: string) =>
       writeFile(path.join(dir, file), text)
     /** Accepted work's commit now. */
-    const acceptedNow = async (): Promise<CommitId> => {
-      const [c] = await commitsOf(
-        ops,
-        `present(${revsetName(line.acceptedBookmark)})`,
-      )
-      if (c === undefined) throw new Error("no line")
-      return c
-    }
+    const acceptedNow = () => acceptedIn(ops, line)
     /** Set accepted work up at your `@-`, as the host does on your command. */
     const setUpAccepted = () =>
       executeRepo(
@@ -1067,34 +1028,8 @@ describe("a lane's repo, with jj", () => {
           log: logRevset(null),
         }),
       )
-    const build = async (
-      sources: readonly OfferSource[],
-      name: ThreadName = NAME,
-    ) => {
-      const tip = await laneTipIn(ops, LANE)
-      if (tip === null) throw new Error("no tip")
-      const base = await laneBase(ops, tip, line)
-      if (base === null) throw new Error("no base")
-      const start = await knownStart(ops, { tip, base, repoConfig: line })
-      await executeRepo(
-        yoursDir,
-        planOffer({
-          name,
-          start,
-          sources,
-          target: await acceptedNow(),
-          nonce: `n-${Math.random().toString(36).slice(2)}`,
-        }),
-      )
-      // Found in your repo as the host finds it, with nothing kept.
-      const read = await readOffer(ops, { name, target: await acceptedNow() })
-      if (read?.kind !== "offer") throw new Error("no offer read")
-      return {
-        read,
-        commits: read.revisions.map(r => r.commit),
-        changes: read.revisions.map(r => r.change),
-      }
-    }
+    const build = (sources: readonly OfferSource[], name: ThreadName = NAME) =>
+      buildOffer(yoursDir, { lane: LANE, name, sources, repoConfig: line })
     let entry = 0
     const turn = async () => {
       const t = await turnOn(laneJj, {
@@ -1191,11 +1126,11 @@ describe("a lane's repo, with jj", () => {
     /** An offer of the lane's tip, fetched from `from`, its ledger naming the tip. */
     const offer = async (from: readonly CommitId[]) => {
       await fetch(from)
-      const tip = await laneTipIn(ops, LANE)
-      if (tip === null) throw new Error("no tip")
-      const built = await build([
-        { commit: tip, description: `WIP\n\nPinetrie-Source: ${tip}\n` },
-      ])
+      const built = await offerTip(yoursDir, {
+        lane: LANE,
+        name: NAME,
+        repoConfig: line,
+      })
       const [commit] = built.commits
       if (commit === undefined) throw new Error("no offer")
       await agrees()
@@ -1212,14 +1147,7 @@ describe("a lane's repo, with jj", () => {
     }) => {
       const [change] = offered.built.changes
       if (change === undefined) throw new Error("no offer")
-      await executeRepo(
-        yoursDir,
-        planOfferAcceptanceSteps({
-          bookmark: offerBookmark(NAME),
-          top: change,
-          destination: line.acceptedBookmark,
-        }),
-      )
+      await acceptOffer(yoursDir, { name: NAME, top: change, repoConfig: line })
       await agrees()
     }
     return {

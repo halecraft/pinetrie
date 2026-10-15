@@ -244,6 +244,7 @@ export function sourceHistory(input: {
 
 /** Where a fork starts: the snapshot it clones and the state it starts on. */
 export interface ForkSource {
+  readonly kind: "source"
   readonly snapshot: SnapshotId
   readonly start: ForkStart
   /** The snapshot it should have cloned and could not: gone. Null when its files were kept. */
@@ -257,9 +258,9 @@ export interface ForkSource {
  * snapshot, which is accepted work's, and `begin`: accepted work, or a WIP's
  * copy. Either way the fork starts on a commit of its own, because a cloned
  * disk carries its parent's working-copy change, which the fork must leave.
- * Refused when the disk it would clone is not of `lane`'s kind
- * (`sourceHistory`), as when the records above moved since `lane`'s record
- * was written: a lane never holds a disk of another kind.
+ * Refused (`ForeignLane`) when the disk it would clone is not of `lane`'s
+ * kind (`sourceHistory`), as when the records above moved since `lane`'s
+ * record was written: a lane never holds a disk of another kind.
  */
 export function forkSource(input: {
   readonly above: Above
@@ -280,14 +281,21 @@ export function forkSource(input: {
   if (history !== input.lane.history)
     return { kind: "foreign", lane: input.lane.lane, history }
   if (above.snapshot !== null && !input.kept)
-    return { snapshot: BASE_SNAPSHOT, start: input.begin, lost: above.snapshot }
+    return {
+      kind: "source",
+      snapshot: BASE_SNAPSHOT,
+      start: input.begin,
+      lost: above.snapshot,
+    }
   return above.point === null
     ? {
+        kind: "source",
         snapshot: above.snapshot ?? BASE_SNAPSHOT,
         start: input.begin,
         lost: null,
       }
     : {
+        kind: "source",
         snapshot: above.snapshot ?? BASE_SNAPSHOT,
         start: { kind: "recorded", points: [above.point] },
         lost: null,

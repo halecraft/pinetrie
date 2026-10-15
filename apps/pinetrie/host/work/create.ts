@@ -168,7 +168,8 @@ export function createNewLanes(deps: {
                 lanes: readLaneRecords(basics.session),
                 kind,
               })
-              if ("kind" in source) throw new Error(foreignLaneWords(source))
+              if (source.kind === "foreign")
+                throw new Error(foreignLaneWords(source))
               // Its fork row says it began from its base.
               if (source.lost !== null)
                 await deps.records.writeValues([

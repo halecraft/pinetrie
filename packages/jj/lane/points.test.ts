@@ -26,7 +26,7 @@ const lane = (history: LaneRecord["history"]): LaneRecord => ({
 
 describe("proveJjLane: a lane's record proven jj, or why not", () => {
   test("a jj lane's record is proven; a folder lane's is foreign; one with no copy has none", () => {
-    expect(proveJjLane(lane("jj"))).toEqual(lane("jj"))
+    expect(proveJjLane(lane("jj"))).toEqual({ kind: "jj", lane: lane("jj") })
     expect(proveJjLane(lane("folder"))).toEqual({
       kind: "foreign",
       lane: LANE,
@@ -37,9 +37,9 @@ describe("proveJjLane: a lane's record proven jj, or why not", () => {
 
   test("a point read in a proven lane is the commit it names", () => {
     const proved = proveJjLane(lane("jj"))
-    if ("kind" in proved) throw new Error("a jj lane is proven")
+    if (proved.kind !== "jj") throw new Error("a jj lane is proven")
     const c = commitId("c".repeat(40))
-    expect(commitFromPoint(proved, pointFromCommit(c))).toBe(c)
+    expect(commitFromPoint(proved.lane, pointFromCommit(c))).toBe(c)
   })
 
   test("a point and a commit are each other's only by their conversions, and a lane's record is no proof", () => {

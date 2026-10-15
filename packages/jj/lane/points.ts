@@ -26,19 +26,33 @@ export type JjLane = OwnLane & {
   readonly [jjLaneBrand]: true
 }
 
+/** A lane's record, proven to keep a jj history: `proveJjLane`'s answer. */
+export interface ProvenJjLane {
+  readonly kind: "jj"
+  readonly lane: JjLane
+}
+
 /** A lane with no copy of its own: no history to read. */
 export interface NoCopy {
   readonly kind: "no-copy"
   readonly lane: ThreadId
 }
 
-/** The record as a `JjLane`, or why not: no copy of its own, or another kind. */
-export function proveJjLane(record: OwnLane): JjLane | ForeignLane
-export function proveJjLane(record: LaneRecord): JjLane | ForeignLane | NoCopy
-export function proveJjLane(record: LaneRecord): JjLane | ForeignLane | NoCopy {
+/**
+ * The record proven jj, or why not: no copy of its own, or another kind.
+ * Each answer is tagged: a refusal is never told from the proof by a field
+ * the record lacks, which a record that gained it would flip unseen.
+ */
+export function proveJjLane(record: OwnLane): ProvenJjLane | ForeignLane
+export function proveJjLane(
+  record: LaneRecord,
+): ProvenJjLane | ForeignLane | NoCopy
+export function proveJjLane(
+  record: LaneRecord,
+): ProvenJjLane | ForeignLane | NoCopy {
   const own = ownLane(record)
   if (own === null) return { kind: "no-copy", lane: record.lane }
-  return laneFits(own, "jj") ?? (own as JjLane)
+  return laneFits(own, "jj") ?? { kind: "jj", lane: own as JjLane }
 }
 
 /** A point of the history `lane` reads, as the commit it is. */

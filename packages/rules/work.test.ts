@@ -258,6 +258,7 @@ describe("forkSource: a snapshot to clone, and what to start on", () => {
         kept: true,
       }),
     ).toEqual({
+      kind: "source",
       snapshot: S,
       start: { kind: "recorded", points: [C2] },
       lost: null,
@@ -276,7 +277,12 @@ describe("forkSource: a snapshot to clone, and what to start on", () => {
         begin,
         kept: false,
       }),
-    ).toEqual({ snapshot: BASE_SNAPSHOT, start: begin, lost: S })
+    ).toEqual({
+      kind: "source",
+      snapshot: BASE_SNAPSHOT,
+      start: begin,
+      lost: S,
+    })
   })
   test("from a lane before lane containers: the base snapshot at its commit", () => {
     expect(
@@ -292,6 +298,7 @@ describe("forkSource: a snapshot to clone, and what to start on", () => {
         kept: true,
       }),
     ).toEqual({
+      kind: "source",
       snapshot: BASE_SNAPSHOT,
       start: { kind: "recorded", points: [C2] },
       lost: null,
@@ -310,7 +317,12 @@ describe("forkSource: a snapshot to clone, and what to start on", () => {
         begin,
         kept: true,
       }),
-    ).toEqual({ snapshot: BASE_SNAPSHOT, start: begin, lost: null })
+    ).toEqual({
+      kind: "source",
+      snapshot: BASE_SNAPSHOT,
+      start: begin,
+      lost: null,
+    })
   })
   test("a disk of another kind than the new lane's record is refused", () => {
     const folder = new Map([[LANE, record(LANE, "folder")]])

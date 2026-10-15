@@ -135,7 +135,10 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   point back, in a lane proven jj. A lane's base is `LaneBaseOf<P>`: the
   ports carry `LaneBase` (points), jj's reads `CommitBase`. A review's
   range is a lane's points; one revision is an offer's commit
-  (`DiffSpan`).
+  (`DiffSpan`). Rules and the ports test points for equality and nothing
+  else: an ordering, an ancestry or a diff over `PointId` is an adapter's
+  computation. The rule binds the type wherever it is used, and is held by
+  review: TypeScript cannot forbid ordering a string brand.
 - A turn's classes and its whole-disk diff count none of pine·trie's own
   paths (`DISK_OWN_ROOTS`, ADR-0135), but the lane's home
   (`LANE_HOME_PATH`), which tools write as they would any home.

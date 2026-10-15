@@ -1102,8 +1102,7 @@ export const mutations: readonly Mutation[] = [
     from: "      if (edits !== null) await committed(edits)\n",
     to: "",
     command: portSuite,
-    expect:
-      "a catch-up with accepted work on other files merges clean, and the lane holds both",
+    expect: "L3: a clean merge descends from both sides",
   },
   {
     name: "a lane's working copy reads as holding no conflict",
@@ -1136,8 +1135,7 @@ export const mutations: readonly Mutation[] = [
     from: '  const atEmpty = empty === "true"',
     to: '  const atEmpty = empty === "never"',
     command: portSuite,
-    expect:
-      "a turn that writes two files records both; one that writes nothing records none",
+    expect: "L2: a turn's paths are its diff",
   },
   {
     name: "an update's merge is left uncommitted (port suite)",
@@ -1147,11 +1145,78 @@ export const mutations: readonly Mutation[] = [
     command: portSuite,
     expect: "a turn that committed, and a clean merge, each schedule one fetch",
   },
+  // ── the port suite's laws ──
+  {
+    name: "a merge of a state the lane holds is made (port suite, L1)",
+    file: "packages/jj/lane/merge.ts",
+    from: "  if (missing.length === 0) return { ours, merge: null, joined: [] }\n",
+    to: "",
+    command: portSuite,
+    expect: "L1: a merge of what the lane holds merges nothing",
+  },
+  {
+    name: "an update's merge is left uncommitted (port suite, L1)",
+    file: "packages/jj/lane/merge.ts",
+    from: "  return commitToBookmark(jj, lane, message)",
+    to: '  return (await commitsOf(jj, "@"))[0] as CommitId',
+    command: portSuite,
+    expect: "L1: a merge of what the lane holds merges nothing",
+  },
+  {
+    name: "an agent's own commit is not adopted (port suite, L2)",
+    file: "packages/jj/lane/plan.ts",
+    from: '  return facts.parentDescends\n    ? { kind: "adopt", commit: parent }\n    : { kind: "none" }',
+    to: '  return { kind: "none" }',
+    command: portSuite,
+    expect: "L2: a turn's paths are its diff",
+  },
+  {
+    name: "an adopted turn's paths are its last commit's alone (port suite, L2)",
+    file: "packages/jj/lane/history.ts",
+    from: "made.point === null ? [] : await changedPaths(jj, before, made.point)",
+    to: "made.point === null ? [] : await changedPaths(jj, null, made.point)",
+    command: portSuite,
+    expect: "L2: a turn's paths are its diff",
+  },
+  // Killed only while L2 reads a diff of its own: were the rig's diff jj's
+  // `changedPaths`, both sides would drop the path and this would survive.
+  {
+    name: "jj's changedPaths drops a path (port suite, L2)",
+    file: "packages/jj/lane/revisions.ts",
+    from: "  return lines(ran.stdout).map(line => String(JSON.parse(line)))\n",
+    to: "  return lines(ran.stdout)\n    .map(line => String(JSON.parse(line)))\n    .slice(0, -1)\n",
+    command: portSuite,
+    expect: "L2: a turn's paths are its diff",
+  },
+  {
+    name: "a merge drops what it merged as a parent (port suite, L3)",
+    file: "packages/jj/lane/merge.ts",
+    from: "  const parents = [ours, ...(last === null ? [] : [last]), from]",
+    to: "  const parents = [ours, ...(last === null ? [] : [last])]",
+    command: portSuite,
+    expect: "L3: a clean merge descends from both sides",
+  },
+  {
+    name: "an update merges without the joins (port suite, L5)",
+    file: "packages/jj/lane/merge.ts",
+    from: "  const parents = [ours, ...(last === null ? [] : [last]), from]",
+    to: "  const parents = [ours, from]",
+    command: portSuite,
+    expect: "L5: an accept then a catch-up changes no file",
+  },
+  {
+    name: "no accepted-offer commit is joined (port suite, L5)",
+    file: "packages/jj/lane/merge.ts",
+    from: "  const joins = planJoins(accepted, held)\n",
+    to: "  const joins: ReturnType<typeof planJoins> = []\n",
+    command: portSuite,
+    expect: "L5: an accept then a catch-up changes no file",
+  },
   {
     name: "proveJjLane proves any lane with a copy",
     file: "packages/jj/lane/points.ts",
-    from: '  return laneFits(own, "jj") ?? (own as JjLane)\n',
-    to: "  return own as JjLane\n",
+    from: '  return laneFits(own, "jj") ?? { kind: "jj", lane: own as JjLane }\n',
+    to: '  return { kind: "jj", lane: own as JjLane }\n',
     command: [
       "pnpm",
       "exec",
