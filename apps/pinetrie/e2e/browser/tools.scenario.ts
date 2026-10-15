@@ -4,7 +4,6 @@
 // header's work, and the rail's capsules; first, each ask's work folded
 // and opened from the rail, on a host of its own.
 
-import { execFileSync } from "node:child_process"
 import { existsSync, rmSync } from "node:fs"
 import path from "node:path"
 import {
@@ -34,6 +33,7 @@ import {
 } from "@pinetrie/reads"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
+import { command } from "../command.ts"
 import {
   type Gate,
   gateClose,
@@ -88,7 +88,7 @@ export const scenario: Scenario = {
 /** Run a gate's script in the lane of the thread `page` draws first. */
 async function inThreadLane(page: Page, script: string): Promise<void> {
   const card = await page.getAttribute(col(0), "data-card")
-  if (card !== null && isThreadId(card)) inLaneQuiet(card, script)
+  if (card !== null && isThreadId(card)) await inLaneQuiet(card, script)
 }
 
 async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
@@ -511,7 +511,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     }
 
     {
-      const work = committedProject("pinetrie-browser-tools-", {
+      const work = await committedProject("pinetrie-browser-tools-", {
         "notes.txt": "the secret word is MANGO\n",
       })
       // Slow enough that a reply is seen while it is still being written.
@@ -560,14 +560,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               .catch(() => "")) ?? ""
           ).trim()
         const inWork = (...args: string[]) =>
-          execFileSync("jj", ["--no-pager", "-R", work, ...args], {
-            stdio: "pipe",
-          })
+          command("jj", ["--no-pager", "-R", work, ...args])
         await tp.fill(`${col(0)} .composer .input`, "what is in notes?")
         {
           const noLine = (await tp.$(startLine)) === null
-          inWork("new", "--no-edit", "pinetrie-accepted", "-m", "wip e2e")
-          inWork(
+          await inWork("new", "--no-edit", "pinetrie-accepted", "-m", "wip e2e")
+          await inWork(
             "bookmark",
             "create",
             "wip/e2e",
@@ -589,8 +587,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           if (offered)
             await chooseFromMenu(tp, trigger, '.start-base[data-base=""]')
           const back = await startSaid()
-          inWork("abandon", "wip/e2e")
-          inWork("bookmark", "delete", "wip/e2e")
+          await inWork("abandon", "wip/e2e")
+          await inWork("bookmark", "delete", "wip/e2e")
           const gone =
             (await tp
               .waitForSelector(startLine, {
@@ -1656,25 +1654,19 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const closed = await appears(`${col(0)}:not(:has(.review))`, 5_000)
           if (acceptShown) await tp.click(`${col(0)} .work .offer-accept`)
           // The acceptance moves accepted work forward to the offer.
-          const onAccepted = () => {
-            try {
-              return execFileSync(
-                "jj",
-                [
-                  "-R",
-                  work,
-                  "file",
-                  "list",
-                  "-r",
-                  "pinetrie-accepted",
-                  'root:"from-lane.txt"',
-                ],
-                { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
-              ).includes("from-lane.txt")
-            } catch {
-              return false
-            }
-          }
+          const onAccepted = () =>
+            command("jj", [
+              "-R",
+              work,
+              "file",
+              "list",
+              "-r",
+              "pinetrie-accepted",
+              'root:"from-lane.txt"',
+            ]).then(
+              out => out.includes("from-lane.txt"),
+              () => false,
+            )
           const accepted =
             (await waitFor(onAccepted, 10_000)) >= 0 &&
             !existsSync(path.join(work, "from-lane.txt"))
@@ -2160,7 +2152,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         await toolHost.shutdown().catch(() => {})
         // Its threads' agents worked in containers: remove them, and their disks.
         for (const lane of readLaneRecords(toolHost.session).keys())
-          removeLane(work, lane)
+          await removeLane(work, lane)
         rmSync(work, { recursive: true, force: true })
       }
     }

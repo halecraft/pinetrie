@@ -2,7 +2,6 @@
 // commands queued in a thread, a snapshot's listing, and an image's host. A
 // host with lanes, and a lane's shell, are `lane-hosts.ts`'s.
 
-import { execFileSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, realpathSync, symlinkSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
@@ -52,17 +51,13 @@ export async function queueCommand(
 
 console.log(`=== ${PRODUCT_NAME} — lanes of their own, in containers ===\n`)
 
-/** A shell command's output on the host; throws on failure. */
-export const sh = (command: string, cwd?: string): string =>
-  execFileSync("sh", ["-c", command], {
-    stdio: "pipe",
-    ...(cwd === undefined ? {} : { cwd }),
-  }).toString()
-export const jj = (dir: string, ...args: string[]): string =>
-  execFileSync("jj", ["--no-pager", "-R", dir, ...args], {
-    stdio: "pipe",
-  }).toString()
+/** A shell command's output on the host; rejects on failure. */
+export const sh = (script: string, cwd?: string): Promise<string> =>
+  command("sh", ["-c", script], cwd === undefined ? {} : { cwd })
+export const jj = (dir: string, ...args: string[]): Promise<string> =>
+  command("jj", ["--no-pager", "-R", dir, ...args])
 
+import { CommandFailed, command } from "../command.ts"
 import { dockerDisks, inDisks } from "../lane-runtime.ts"
 
 export {
@@ -83,19 +78,22 @@ export function snapshotListing(
   root: string,
   id: SnapshotId,
   dir: string,
-): string {
+): Promise<string> {
   return inDisks(root, 'ls -a "$1"', `${dockerDisks(root).snapshot(id)}/${dir}`)
 }
 
 /** Why jj refused a command in `dir`: its stderr, or null when it ran. */
-export const jjRefusal = (dir: string, ...args: string[]): string | null => {
-  try {
-    jj(dir, ...args)
-    return null
-  } catch (error) {
-    return (error as { stderr?: Buffer }).stderr?.toString() ?? ""
-  }
-}
+export const jjRefusal = (
+  dir: string,
+  ...args: string[]
+): Promise<string | null> =>
+  jj(dir, ...args).then(
+    () => null,
+    (error: unknown) => {
+      if (error instanceof CommandFailed) return error.stderr
+      throw error
+    },
+  )
 
 /** A section host whose project builds its image from `containerfile`. */
 export const imageHost = (lanes: LaneHosts, containerfile: string) =>

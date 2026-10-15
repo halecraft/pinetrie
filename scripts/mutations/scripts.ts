@@ -63,6 +63,25 @@ export const mutations: readonly Mutation[] = [
       "a gate prints only what it is fed, each line as written, and ends when closed",
   },
   {
+    name: "a gate's feed writes a file where its FIFO never came",
+    file: "apps/pinetrie/e2e/gate.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "done; [ -p ${f} ] && printf",
+    to: "done; printf",
+    command: gate,
+    expect:
+      "a feed whose gate never made its FIFO fails, and leaves no file there",
+  },
+  {
+    name: "a suite runs a command synchronously",
+    file: "apps/pinetrie/e2e/lane-runtime.ts",
+    from: 'import { command, commandOutput } from "./command.ts"',
+    to: 'import { execFileSync as command } from "node:child_process"\nimport { commandOutput } from "./command.ts"',
+    // Biome names the restricted import; with lint clean, any error is the
+    // mutant's.
+    command: ["pnpm", "exec", "biome", "lint", "apps/pinetrie/e2e"],
+  },
+  {
     name: "a client names an entry's root without waiting for its copy to have it",
     file: "apps/pinetrie/e2e/harness.ts",
     from: "  await waitFor(() => client.rootOf(entry) !== undefined, timeoutMs)\n",

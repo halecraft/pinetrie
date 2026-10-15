@@ -2,7 +2,7 @@
 // service identity and the owner's, the owner's approval, a forged token,
 // the broker, and a revoke.
 
-import { spawn, spawnSync } from "node:child_process"
+import { spawn } from "node:child_process"
 import {
   chmodSync,
   mkdirSync,
@@ -19,6 +19,7 @@ import { runtimeNode } from "@pinetrie/lanes"
 import { readAccess } from "@pinetrie/reads"
 import { HOP_IN_LANE } from "../../host/work/ssh.ts"
 import type { Checks } from "../checks.ts"
+import { command, commandOutput } from "../command.ts"
 import {
   join,
   START_AGENT,
@@ -62,8 +63,8 @@ function inLaneLater(lane: ThreadId, script: string): Promise<string> {
 }
 
 /** A throwaway key pair, as `ssh-keygen` makes one. */
-function keyPair(file: string, comment: string): string {
-  spawnSync("ssh-keygen", [
+async function keyPair(file: string, comment: string): Promise<string> {
+  await command("ssh-keygen", [
     "-q",
     "-t",
     "ed25519",
@@ -84,7 +85,7 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
   const conf = mkdtempSync(path.join(tmpdir(), "pinetrie-ssh-conf-"))
   const serviceDir = path.join(conf, "ssh")
   mkdirSync(serviceDir)
-  const servicePub = keyPair(path.join(serviceDir, "deploy"), "deploy")
+  const servicePub = await keyPair(path.join(serviceDir, "deploy"), "deploy")
   const connections: net.Socket[] = []
   const banner = net.createServer({ allowHalfOpen: true }, c => {
     connections.push(c)
@@ -110,16 +111,20 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
   // The person's own: an empty ~/.ssh, and an agent of the scenario's with one key.
   const home = mkdtempSync(path.join(tmpdir(), "pinetrie-ssh-home-"))
   mkdirSync(path.join(home, ".ssh"))
-  const personalPub = keyPair(path.join(home, "me"), "me")
+  const personalPub = await keyPair(path.join(home, "me"), "me")
   const agentSocket = path.join(home, "agent.sock")
   const agent = spawn("ssh-agent", ["-D", "-a", agentSocket], {
     stdio: "ignore",
   })
   await waitFor(
-    () => spawnSync("test", ["-S", agentSocket]).status === 0,
+    () =>
+      command("test", ["-S", agentSocket]).then(
+        () => true,
+        () => false,
+      ),
     10_000,
   )
-  spawnSync("ssh-add", ["-q", path.join(home, "me")], {
+  await commandOutput("ssh-add", ["-q", path.join(home, "me")], {
     env: { ...process.env, SSH_AUTH_SOCK: agentSocket },
   })
 
@@ -135,7 +140,7 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
     await h.idle()
     const lane = h.laneWith("made")?.name
     if (lane === undefined) throw new Error("no lane was made")
-    cli(["start", container(lane)])
+    await cli(["start", container(lane)])
     // The hop starts with the container: ready once `ssh-add` reaches an
     // agent (exit 2 is "cannot connect"). A socket file proves nothing, since
     // one an earlier start left outlives the stop.

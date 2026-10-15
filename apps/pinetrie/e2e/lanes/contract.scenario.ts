@@ -42,7 +42,8 @@ import { GVPROXY_HOST_ADDRESS } from "@pinetrie/vm"
 import { findProject } from "../../host/work/runtime.ts"
 import { playwrightVersion } from "../../host/work/setup.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, waitFor } from "../harness.ts"
+import { CommandFailed } from "../command.ts"
+import { committedProject, filterAsync, waitFor } from "../harness.ts"
 import { ownForInnerLanes } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
 import { cli, dockerDisks, inDisks, ownVm, sh } from "./support.ts"
@@ -113,15 +114,19 @@ async function dockerContract(
     if (process.env.PINETRIE_E2E_LOG === "1") console.log(l)
   }
   const slots = 16
-  const projA = committedProject("pinetrie-contract-a-", { "README.md": "a\n" })
-  const projB = committedProject("pinetrie-contract-b-", { "README.md": "b\n" })
+  const projA = await committedProject("pinetrie-contract-a-", {
+    "README.md": "a\n",
+  })
+  const projB = await committedProject("pinetrie-contract-b-", {
+    "README.md": "b\n",
+  })
   mkdirSync(path.join(projA, ".plans"))
   const probe = realpathSync(
     mkdtempSync(path.join(tmpdir(), "pinetrie-probe-")),
   )
   writeFileSync(path.join(probe, "writer.js"), WRITER)
-  ownForInnerLanes(probe)
-  ownForInnerLanes(path.join(projA, ".plans"))
+  await ownForInnerLanes(probe)
+  await ownForInnerLanes(path.join(projA, ".plans"))
   const a = await findProject({
     root: projA,
     slots,
@@ -190,7 +195,10 @@ async function dockerContract(
     // (the slot's fill sweeps through lanehost's held exec), so a broken
     // bridge fails here and not in a check after it. Only API calls come
     // before it: Docker's version, the slot's sweep, the pull. ──
-    const echoed = quietCli(["run", "--rm", "-i", ALPINE_IMAGE, "cat"], "hi\n")
+    const echoed = await quietCli(
+      ["run", "--rm", "-i", ALPINE_IMAGE, "cat"],
+      "hi\n",
+    )
     check(
       "echo hi | docker run -i … cat returns hi: stdin's end reaches the lane, and its output comes back",
       echoed.trim() === "hi",
@@ -226,22 +234,24 @@ async function dockerContract(
       await runtime.runInImage(image, ["true"])
 
     // ── lanehost's privileged role: the host's grant made it ──
-    const privileged = quietCli([
-      "ps",
-      "--filter",
-      `label=pinetrie.project=${projectKey(projA)}`,
-      "--filter",
-      `label=${LANEHOST_LABEL}=privileged`,
-      "--format",
-      "{{.Names}}",
-    ]).trim()
+    const privileged = (
+      await quietCli([
+        "ps",
+        "--filter",
+        `label=pinetrie.project=${projectKey(projA)}`,
+        "--filter",
+        `label=${LANEHOST_LABEL}=privileged`,
+        "--format",
+        "{{.Names}}",
+      ])
+    ).trim()
     if (privileged === "")
       skip(
         "lanehost's privileged role cannot write the lanes directory",
         "nothing here needs the privileged role: no grant of the host's ports, and no diff by send under rootless Docker",
       )
     else {
-      const wrote = quietCli([
+      const wrote = await quietCli([
         "exec",
         privileged,
         "touch",
@@ -310,8 +320,8 @@ async function dockerContract(
     writeFileSync(path.join(probe, "stop"), "")
     await writing
     const disks = dockerDisks(projA)
-    const holding = promised.filter(([id, count]) => {
-      const out = inDisks(
+    const holding = await filterAsync(promised, async ([id, count]) => {
+      const out = await inDisks(
         projA,
         'head -n "$2" "$1/log.bin" | awk \'!/^rec [0-9]{8} x{40}$/ { b++ } END { print b + 0 }\'; wc -l < "$1/log.bin"',
         disks.snapshot(id),
@@ -361,13 +371,15 @@ async function dockerContract(
     let capped = "not on the Mac"
     if (process.platform === "darwin") {
       // The working copy's source in the VM, as the lane binds it.
-      const source = cli([
-        "inspect",
-        "-f",
-        '{{range .Mounts}}{{if eq .Destination "/mnt/host-working-copy"}}{{.Source}}{{end}}{{end}}',
-        laneContainer(writerLane),
-      ]).trim()
-      capped = quietCli([
+      const source = (
+        await cli([
+          "inspect",
+          "-f",
+          '{{range .Mounts}}{{if eq .Destination "/mnt/host-working-copy"}}{{.Source}}{{end}}{{end}}',
+          laneContainer(writerLane),
+        ])
+      ).trim()
+      capped = await quietCli([
         "run",
         "--rm",
         "--cap-add",
@@ -482,15 +494,19 @@ async function dockerContract(
     // A first boot formats the data disk: not the cold start lanes see.
     const formatted =
       own !== null &&
-      quietSh(
-        `grep -c 'data disk formatted' '${path.join(own.state, "pinetrie", "vm", "console.log")}' || true`,
+      (
+        await quietSh(
+          `grep -c 'data disk formatted' '${path.join(own.state, "pinetrie", "vm", "console.log")}' || true`,
+        )
       ).trim() !== "0"
     const coldMs = cold === undefined || formatted ? null : Number(cold)
     const files =
       own === null
         ? "n/a"
-        : quietSh(
-            `lsof -p "$(pgrep -f 'launcher-.* ${own.state}' | head -1)" 2>/dev/null | wc -l`,
+        : (
+            await quietSh(
+              `lsof -p "$(pgrep -f 'launcher-.* ${own.state}' | head -1)" 2>/dev/null | wc -l`,
+            )
           ).trim()
     check(
       "a lane's docker run -d takes under 150 ms, a snapshot under 50 ms, and a cold VM answers in under 2 s",
@@ -501,7 +517,7 @@ async function dockerContract(
     // ── the VM stops under a running host: it leases again ──
     if (own !== null) {
       const before = logs.length
-      quietSh(`pkill -TERM -f 'launcher-.* ${own.state}' || true`)
+      await quietSh(`pkill -TERM -f 'launcher-.* ${own.state}' || true`)
       const again = await waitFor(
         () =>
           logs.slice(before).some(l => l.includes("leased the lane VM again")),
@@ -542,7 +558,8 @@ async function dockerContract(
     if (own !== null) {
       // The contract's VM stops once its last lease ends.
       await waitFor(
-        () => quietSh(`pgrep -f '${own.state}' || true`).trim() === "",
+        async () =>
+          (await quietSh(`pgrep -f '${own.state}' || true`)).trim() === "",
         60_000,
       ).catch(() => {})
       own.restore()
@@ -558,19 +575,11 @@ const PYTHON_IMAGE = "docker.io/library/python:3-alpine"
 const ALPINE_IMAGE = "docker.io/library/alpine:3.23"
 
 /** The runtime's CLI with a failure as its output. */
-function quietCli(args: readonly string[], input?: string): string {
-  try {
-    return cli(args, input)
-  } catch (error) {
-    const e = error as { stdout?: Buffer; stderr?: Buffer }
-    return `${e.stdout?.toString() ?? ""}${e.stderr?.toString() ?? ""}`
-  }
-}
+const quietCli = (args: readonly string[], input?: string): Promise<string> =>
+  cli(args, input).catch((error: unknown) =>
+    error instanceof CommandFailed
+      ? `${error.stdout}${error.stderr}`
+      : Promise.reject(error),
+  )
 
-function quietSh(command: string): string {
-  try {
-    return sh(command)
-  } catch {
-    return ""
-  }
-}
+const quietSh = (script: string): Promise<string> => sh(script).catch(() => "")

@@ -3,7 +3,6 @@
 // does. The lane VM's Docker on the Mac, the host's on Linux, and
 // a nested lane's rootless one inside a lane.
 
-import { execFileSync } from "node:child_process"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
@@ -19,6 +18,7 @@ import { type LanehostCall, ONCE, serverArgs } from "@pinetrie/lanehost"
 import { PINETRIE_MOUNT, runtimeNode } from "@pinetrie/lanes"
 import { vmStateDir } from "@pinetrie/vm"
 import { planRuntime } from "../host/work/runtime.ts"
+import { command, commandOutput } from "./command.ts"
 
 export const container = (lane: ThreadId) => `pinetrie-${lane}`
 
@@ -31,30 +31,30 @@ export function runtimeCli(): readonly string[] {
   return ["docker", "-H", host]
 }
 
-/** The runtime's CLI with `args`; throws on failure. */
-export function cli(args: readonly string[], input?: string): string {
+/** The runtime's CLI with `args`; rejects on failure (`CommandFailed`). */
+export function cli(args: readonly string[], input?: string): Promise<string> {
   const [program = "docker", ...rest] = runtimeCli()
-  return execFileSync(program, [...rest, ...args], {
-    stdio: "pipe",
-    ...(input === undefined ? {} : { input }),
-  }).toString()
+  return command(
+    program,
+    [...rest, ...args],
+    input === undefined ? {} : { input },
+  )
 }
 
-/** `cli`, with a failure as its output. */
-function quietly(args: readonly string[]): string {
-  try {
-    return cli(args)
-  } catch (error) {
-    const e = error as { stdout?: Buffer; stderr?: Buffer }
-    return `${e.stdout?.toString() ?? ""}${e.stderr?.toString() ?? ""}`
-  }
+/** `cli`, with a failure's output as its answer. */
+function quietly(args: readonly string[]): Promise<string> {
+  const [program = "docker", ...rest] = runtimeCli()
+  return commandOutput(program, [...rest, ...args])
 }
 
-export const isRunning = (name: string): boolean =>
-  quietly(["inspect", "-f", "{{.State.Running}}", name]).trim() === "true"
+export const isRunning = async (name: string): Promise<boolean> =>
+  (await quietly(["inspect", "-f", "{{.State.Running}}", name])).trim() ===
+  "true"
 
-export const containerExists = (name: string): boolean =>
-  /^[0-9a-f]{12,}$/.test(quietly(["inspect", "-f", "{{.Id}}", name]).trim())
+export const containerExists = async (name: string): Promise<boolean> =>
+  /^[0-9a-f]{12,}$/.test(
+    (await quietly(["inspect", "-f", "{{.Id}}", name])).trim(),
+  )
 
 /** The lanes directory, as a host here keeps it. */
 const lanesDir = () =>
@@ -70,16 +70,18 @@ export const dockerDisks = (root: string) =>
   projectDisks(lanesDir(), projectKey(root))
 
 /** The project's lanehost `disks` container, which its host made; throws when there is none. */
-function disksContainer(root: string): string {
-  const [name] = cli([
-    "ps",
-    "--filter",
-    `label=pinetrie.project=${projectKey(root)}`,
-    "--filter",
-    `label=${LANEHOST_LABEL}=disks`,
-    "--format",
-    "{{.Names}}",
-  ])
+async function disksContainer(root: string): Promise<string> {
+  const [name] = (
+    await cli([
+      "ps",
+      "--filter",
+      `label=pinetrie.project=${projectKey(root)}`,
+      "--filter",
+      `label=${LANEHOST_LABEL}=disks`,
+      "--format",
+      "{{.Names}}",
+    ])
+  )
     .split("\n")
     .filter(l => l.trim() !== "")
   if (name === undefined)
@@ -90,10 +92,13 @@ function disksContainer(root: string): string {
 }
 
 /** One call to lanehost, as the host makes it, through its one-shot command. */
-function lanehostOnce(root: string, call: LanehostCall): unknown {
-  const out = cli([
+async function lanehostOnce(
+  root: string,
+  call: LanehostCall,
+): Promise<unknown> {
+  const out = await cli([
     "exec",
-    disksContainer(root),
+    await disksContainer(root),
     ...runtimeNode(`${PINETRIE_MOUNT}/${ONCE}`),
     ...serverArgs("disks", lanesDir(), { rootless: existsSync(NESTED_MOUNT) }),
     JSON.stringify(call),
@@ -105,23 +110,37 @@ function lanehostOnce(root: string, call: LanehostCall): unknown {
  * A script in the project's lanehost `disks` container, with `args`: for a
  * check that reads what a snapshot holds. Its output, or a failure's.
  */
-export const inDisks = (
+export const inDisks = async (
   root: string,
   script: string,
   ...args: string[]
-): string =>
-  quietly(["exec", disksContainer(root), "sh", "-c", script, "sh", ...args])
+): Promise<string> =>
+  quietly([
+    "exec",
+    await disksContainer(root),
+    "sh",
+    "-c",
+    script,
+    "sh",
+    ...args,
+  ])
 
 /** Whether snapshot `id` of the project at `root` is there. */
-export const snapshotExists = (root: string, id: SnapshotId): boolean =>
-  lanehostOnce(root, {
+export const snapshotExists = async (
+  root: string,
+  id: SnapshotId,
+): Promise<boolean> =>
+  (await lanehostOnce(root, {
     kind: "snapshotExists",
     project: projectKey(root),
     snapshot: id,
-  }) === true
+  })) === true
 
-export function deleteSnapshot(root: string, id: SnapshotId): void {
-  lanehostOnce(root, {
+export async function deleteSnapshot(
+  root: string,
+  id: SnapshotId,
+): Promise<void> {
+  await lanehostOnce(root, {
     kind: "disk",
     project: projectKey(root),
     op: { kind: "deleteSnapshots", ids: [id] },
@@ -129,10 +148,10 @@ export function deleteSnapshot(root: string, id: SnapshotId): void {
 }
 
 /** Remove a lane's container and its disk. */
-export function removeLane(root: string, lane: ThreadId): void {
-  quietly(["rm", "-f", container(lane)])
+export async function removeLane(root: string, lane: ThreadId): Promise<void> {
+  await quietly(["rm", "-f", container(lane)])
   try {
-    lanehostOnce(root, {
+    await lanehostOnce(root, {
       kind: "disk",
       project: projectKey(root),
       op: { kind: "delete", lane },
@@ -156,7 +175,7 @@ export const lanesWriteAs = (): number | undefined =>
  * theirs. Never a repository: git refuses one another user owns, and the
  * host, root, runs jj and git in it. Elsewhere, nothing.
  */
-export function ownForInnerLanes(dir: string): void {
+export async function ownForInnerLanes(dir: string): Promise<void> {
   if (existsSync(NESTED_MOUNT))
-    execFileSync("chown", ["-R", `${ROOTLESS_UID}:${ROOTLESS_UID}`, dir])
+    await command("chown", ["-R", `${ROOTLESS_UID}:${ROOTLESS_UID}`, dir])
 }

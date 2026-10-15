@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from "node:child_process"
+import { existsSync } from "node:fs"
 import { expect, test } from "vitest"
 import { gateClose, gateCommand, gateFeed, newGate } from "./gate.ts"
 
@@ -29,6 +30,12 @@ test("a gate prints only what it is fed, each line as written, and ends when clo
   expect(await command.ended).toBe(0)
   expect(command.printed()).toBe(`one\n${awkward.join("\n")}\n`)
   run(`rm -f '${gate.fifo}'`)
+})
+
+test("a feed whose gate never made its FIFO fails, and leaves no file there", () => {
+  const gate = newGate("never")
+  expect(() => run(gateFeed(gate, ["lost"], 2))).toThrow()
+  expect(existsSync(gate.fifo)).toBe(false)
 })
 
 test("two gates never share a FIFO", () => {

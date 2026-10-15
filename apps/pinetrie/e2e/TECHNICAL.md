@@ -275,10 +275,21 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
   feed never blocks, and prints each line it reads until `gateClose`'s end
   line. A gate is a value with a FIFO of its own (`newGate`), so no feed
   meets a stale one; `gateFeed` waits in the lane for the FIFO, and is run
-  with `inLaneQuiet`. Each feed is a `docker exec`: feed together the lines
-  a step does not read between. A gated row is found by its gate's label,
-  which its command shows (`pinetrie-gate-<label>`). Stop kills a gate's
-  command as it kills any.
+  with `inLaneQuiet`. With no FIFO by its last try, a feed fails and writes
+  nothing: a file left at the FIFO's path would make the command's
+  `mkfifo` fail, and nothing it was fed would stream. Each feed is a
+  `docker exec`: feed together the lines a step does not read between. A
+  gated row is found by its gate's label, which its command shows
+  (`pinetrie-gate-<label>`). Stop kills a gate's command as it kills any.
+- **A suite's host runs in the suite's own process, so nothing in the
+  suites runs a child process synchronously** (`command.ts`; `biome.json`
+  refuses `node:child_process`'s synchronous calls in `apps/pinetrie/e2e`,
+  its unit tests aside). A synchronous call stops the host for as long as
+  the command runs, and a command that waits on that host never ends: a
+  gate's feed, run with a synchronous `docker exec`, held Node while it
+  waited for its FIFO, the host could not start the run that makes it, and
+  the feed timed out. `cli`, `inLane`, `inLaneQuiet`, the lanehost reads,
+  and the suites' `jj` and `sh` all return promises.
 - **A suite's clock and its blob store's are one** (`clockedStore`,
   `host/support.ts`). A store left on the real clock behind a host moved
   ahead stamps every blob a day old, and the sweep deletes it, a fresh

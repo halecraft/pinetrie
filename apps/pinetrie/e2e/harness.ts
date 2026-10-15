@@ -7,7 +7,6 @@
 // Deliberately not in core/: core is pure domain logic and imports nothing.
 // A test harness is neither.
 
-import { execFileSync } from "node:child_process"
 import { chmodSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -76,6 +75,7 @@ import {
   type StartHostOptions,
   startHost,
 } from "../host/index.ts"
+import { command } from "./command.ts"
 
 /** A message's position, or the root's for null. */
 export const at = (id: string | null): Position =>
@@ -151,6 +151,15 @@ export function refusedWrite(write: () => void): boolean {
   }
 }
 
+/** The elements of `xs` whose `keep` holds, in order: `filter` for an async test. */
+export async function filterAsync<T>(
+  xs: readonly T[],
+  keep: (x: T) => Promise<boolean>,
+): Promise<T[]> {
+  const kept = await Promise.all(xs.map(keep))
+  return xs.filter((_, i) => kept[i])
+}
+
 export async function waitFor(
   pred: () => boolean | Promise<boolean>,
   timeoutMs = 60_000,
@@ -202,22 +211,22 @@ export const idleNow = (host: Pick<RunningHost, "live" | "places">): boolean =>
  * real one (on macOS a temporary directory is behind a symlink), as jj names
  * it.
  */
-export function committedProject(
+export async function committedProject(
   prefix: string,
   files: Readonly<Record<string, string | Uint8Array>>,
-): string {
+): Promise<string> {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), prefix)))
   // mkdtemp makes it 0700. A rootless Docker, in a lane granted lanes of
   // its own, runs as another user, and must look inside to bind its paths.
   chmodSync(dir, 0o755)
   const jj = (...args: string[]) =>
-    execFileSync("jj", ["--no-pager", ...args], { cwd: dir, stdio: "pipe" })
-  jj("git", "init", "--colocate")
-  jj("config", "set", "--repo", "user.name", "pinetrie e2e")
-  jj("config", "set", "--repo", "user.email", "e2e@pinetrie.invalid")
+    command("jj", ["--no-pager", ...args], { cwd: dir })
+  await jj("git", "init", "--colocate")
+  await jj("config", "set", "--repo", "user.name", "pinetrie e2e")
+  await jj("config", "set", "--repo", "user.email", "e2e@pinetrie.invalid")
   for (const [name, text] of Object.entries(files))
     writeFileSync(path.join(dir, name), text)
-  jj("commit", "-m", "the project")
+  await jj("commit", "-m", "the project")
   return dir
 }
 

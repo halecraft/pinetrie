@@ -150,7 +150,7 @@ async function imagesSection(
       await Promise.all([made(pinetrie, "first"), made(other, "second")])
       // Each turn's record is written once its host is idle.
       await Promise.all([pinetrie.idle(), other.idle()])
-      const observers = cli(["ps", "--format", "{{.Names}}"])
+      const observers = (await cli(["ps", "--format", "{{.Names}}"]))
         .split("\n")
         .filter(n => n.startsWith("pinetrie-observer-"))
       const attributed = (host: SectionHost, dir: string) =>

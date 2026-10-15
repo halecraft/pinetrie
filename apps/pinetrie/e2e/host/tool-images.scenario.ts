@@ -33,7 +33,7 @@ export const scenario: Scenario = {
 
 async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   {
-    const work = committedProject("pinetrie-tool-images-", {
+    const work = await committedProject("pinetrie-tool-images-", {
       "shot.png": RED_PNG,
     })
     const dbFile = path.join(

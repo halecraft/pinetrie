@@ -186,7 +186,7 @@ async function sharedSection(
     const inSnapshot =
       newest?.snapshot === null || newest === undefined
         ? ""
-        : snapshotListing(dir, newest.snapshot, ".plans")
+        : await snapshotListing(dir, newest.snapshot, ".plans")
     // A branch at that turn: its .plans is the live mount, not the snapshot's.
     writeFileSync(path.join(dir, ".plans", "later.md"), "after the fork\n")
     h.script.use([
@@ -202,9 +202,9 @@ async function sharedSection(
       "a shared directory is never in a lane's commit, your @ or a snapshot, and a branch sees it live",
       writer !== undefined &&
         newest !== undefined &&
-        files(`tip@pinetrie-${writer.name}`).includes("shared.txt") &&
-        !files(`tip@pinetrie-${writer.name}`).includes(".plans") &&
-        !files("@").includes(".plans") &&
+        (await files(`tip@pinetrie-${writer.name}`)).includes("shared.txt") &&
+        !(await files(`tip@pinetrie-${writer.name}`)).includes(".plans") &&
+        !(await files("@")).includes(".plans") &&
         !inSnapshot.includes("a.md") &&
         (await h.results("@agent look from a branch"))
           .at(-1)
@@ -213,7 +213,7 @@ async function sharedSection(
 
     // 3. The project shares one more, published to accepted work: after a
     // restart, the existing lane has it, though its own copy predates it.
-    jj(
+    await jj(
       dir,
       "bookmark",
       "create",
@@ -228,7 +228,7 @@ async function sharedSection(
         publish: { catchUp: true },
       }),
     )
-    jj(dir, "commit", "-m", "you share notes")
+    await jj(dir, "commit", "-m", "you share notes")
     // Published once accepted work's record has seen your commit.
     await waitFor(
       () => (readAccepted(h.host.session)?.yours.catchUp ?? null) !== null,

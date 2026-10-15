@@ -58,7 +58,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   // A second host with a scripted model, tools in a temporary directory, and its
   // session in a SQLite file, so every step is repeatable and spends nothing.
   {
-    const work = committedProject("pinetrie-tools-", {
+    const work = await committedProject("pinetrie-tools-", {
       "notes.txt": "the secret word is MANGO\n",
     })
     const dbFile = path.join(
@@ -115,7 +115,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     await tidle()
     // In its lane's own copy: the project is the person's working copy,
     // which no lane writes.
-    const inItsLane = lane === undefined ? "" : inLane(lane.name, "cat new.txt")
+    const inItsLane =
+      lane === undefined ? "" : await inLane(lane.name, "cat new.txt")
     check(
       "the agent wrote a file, then edited it, in its lane, leaving the project as it was",
       inItsLane === "beta\n" && !existsSync(path.join(work, "new.txt")),
@@ -145,13 +146,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     if (l3 !== undefined)
       for (let at = 0; at < fed.length; at += 80) {
         const batch = fed.slice(at, at + 80)
-        inLaneQuiet(l3.name, gateFeed(long, batch))
+        await inLaneQuiet(l3.name, gateFeed(long, batch))
         await waitFor(
           () => (liveTexts().at(-1) ?? "").includes(batch.at(-1) ?? ""),
           10_000,
         )
       }
-    if (l3 !== undefined) inLaneQuiet(l3.name, gateClose(long))
+    if (l3 !== undefined) await inLaneQuiet(l3.name, gateClose(long))
     await tidle()
     const resultText = () =>
       projectSpine(ttree(), tlane()?.tip ?? null)
@@ -389,6 +390,6 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     await u2.close()
     // The host's Exchange closes its stores when it shuts down, this one too.
     await th.shutdown()
-    cleanUp(th.session, work)
+    await cleanUp(th.session, work)
   }
 }

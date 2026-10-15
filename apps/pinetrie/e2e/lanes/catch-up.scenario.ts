@@ -44,7 +44,7 @@ async function catchUpSection(
   check: Checks["check"],
   lanes: LaneHosts,
 ): Promise<void> {
-  const project = committedProject("pinetrie-catch-up-", {
+  const project = await committedProject("pinetrie-catch-up-", {
     "a.txt": "a\n",
     ".gitignore": "node_modules/\n.vite/\n",
     // A publish here accepts your commit.
@@ -105,9 +105,9 @@ async function catchUpSection(
 
     // Accepted work moves on: your commit, published, which accepts it and
     // moves main.
-    jj(project, "bookmark", "create", "main", "-r", "pinetrie-accepted")
+    await jj(project, "bookmark", "create", "main", "-r", "pinetrie-accepted")
     writeFileSync(path.join(project, "landed.txt"), "landed\n")
-    jj(project, "commit", "-m", "you land landed.txt")
+    await jj(project, "commit", "-m", "you land landed.txt")
     await wu.actOnAccepted("publish")
     await wh.quiet()
 
@@ -172,6 +172,6 @@ async function catchUpSection(
   } finally {
     await wu.close().catch(() => {})
     await wh.shutdown().catch(() => {})
-    cleanUp(wh.session, project)
+    await cleanUp(wh.session, project)
   }
 }

@@ -126,6 +126,26 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/pinetrie/e2e/**", "!**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "node:child_process": {
+                    "importNames": ["execFileSync", "execSync", "spawnSync"],
+                    "message": "A suite's host runs in this process: a synchronous command stops it, and a command that waits on it never ends. Use `command` (apps/pinetrie/e2e/command.ts)."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

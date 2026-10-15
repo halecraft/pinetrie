@@ -75,7 +75,9 @@ async function commandsSection(
       "the note the prompt names is a file in the lane",
       note !== "" &&
         lane !== undefined &&
-        inLane(lane, `test -f ${note} && echo present`).includes("present"),
+        (await inLane(lane, `test -f ${note} && echo present`)).includes(
+          "present",
+        ),
       `${note}`,
     )
     h.script.use([

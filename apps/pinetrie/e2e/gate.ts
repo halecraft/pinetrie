@@ -37,10 +37,18 @@ export function gateCommand(gate: Gate): string {
   return `mkfifo ${f} && exec 3<>${f} && while IFS= read -r l <&3; do [ "$l" = ${quoted(END)} ] && break; printf '%s\\n' "$l"; done`
 }
 
-/** The script that prints `lines` from the gate's command, once it has made its FIFO. */
-export function gateFeed(gate: Gate, lines: readonly string[]): string {
+/**
+ * The script that prints `lines` from the gate's command, once it has made
+ * its FIFO. With no FIFO by its last try it fails, and writes nothing: a
+ * file left at the FIFO's path would make the command's `mkfifo` fail.
+ */
+export function gateFeed(
+  gate: Gate,
+  lines: readonly string[],
+  tries = FIFO_TRIES,
+): string {
   const f = quoted(gate.fifo)
-  return `i=0; while [ ! -p ${f} ] && [ $i -lt ${FIFO_TRIES} ]; do sleep 0.05; i=$((i+1)); done; printf '%s\\n' ${lines.map(quoted).join(" ")} > ${f}`
+  return `i=0; while [ ! -p ${f} ] && [ $i -lt ${tries} ]; do sleep 0.05; i=$((i+1)); done; [ -p ${f} ] && printf '%s\\n' ${lines.map(quoted).join(" ")} > ${f}`
 }
 
 /** The script that ends the gate's command. */

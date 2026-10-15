@@ -51,7 +51,7 @@ async function recipeSection(
   check: Checks["check"],
   lanes: LaneHosts,
 ): Promise<void> {
-  const project = committedProject("pinetrie-recipe-", {
+  const project = await committedProject("pinetrie-recipe-", {
     "pkgs.txt": "a\nb\nc\n",
     "c.txt": "c's source\n",
     "build.sh":
@@ -188,10 +188,10 @@ async function recipeSection(
     )
 
     // Accepted work deletes package c; the lane catches up.
-    jj(project, "bookmark", "create", "main", "-r", "pinetrie-accepted")
+    await jj(project, "bookmark", "create", "main", "-r", "pinetrie-accepted")
     writeFileSync(path.join(project, "pkgs.txt"), "a\nb\n")
     rmSync(path.join(project, "c.txt"))
-    jj(project, "commit", "-m", "you delete package c")
+    await jj(project, "commit", "-m", "you delete package c")
     await wu.actOnAccepted("publish")
     await wh.quiet()
     script.use([
@@ -232,6 +232,6 @@ async function recipeSection(
   } finally {
     await wu.close().catch(() => {})
     await wh.shutdown().catch(() => {})
-    cleanUp(wh.session, project)
+    await cleanUp(wh.session, project)
   }
 }

@@ -4,7 +4,6 @@
 // guest's `/init` do it. Its own state directory starts with no image, and
 // shares only the person's binaries and the pinned downloads.
 
-import { execFileSync } from "node:child_process"
 import { rmSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -17,6 +16,7 @@ import {
   vmWords,
 } from "@pinetrie/vm"
 import type { Checks } from "../checks.ts"
+import { command } from "../command.ts"
 import { waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import { ownVm } from "./support.ts"
@@ -67,16 +67,14 @@ async function run(check: Checks["check"]): Promise<void> {
       log: l => lines.push(l),
     }).then(
       async lease => {
-        const os = execFileSync(
-          "docker",
-          [
+        const os = (
+          await command("docker", [
             "-H",
             `unix://${lease.docker}`,
             "version",
             "--format",
             "{{.Server.Os}}",
-          ],
-          { encoding: "utf8" },
+          ])
         ).trim()
         const image = lease.identity.image
         await lease.close()
@@ -91,15 +89,15 @@ async function run(check: Checks["check"]): Promise<void> {
   } finally {
     // A lease that failed may leave its launcher holding the connection, so
     // it is stopped rather than left to idle out.
-    execFileSync("sh", [
+    await command("sh", [
       "-c",
       `pkill -TERM -f 'launcher-.* ${own.state}' || true`,
     ])
     await waitFor(
-      () =>
-        execFileSync("sh", ["-c", `pgrep -f '${own.state}' || true`], {
-          encoding: "utf8",
-        }).trim() === "",
+      async () =>
+        (
+          await command("sh", ["-c", `pgrep -f '${own.state}' || true`])
+        ).trim() === "",
       30_000,
     ).catch(() => {})
     own.restore()

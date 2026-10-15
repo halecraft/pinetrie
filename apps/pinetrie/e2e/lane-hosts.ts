@@ -6,7 +6,6 @@
 // a scenario that declares `lanes: true` (`scenario.ts`), and skips it where
 // `runtimeProblem` gives a reason.
 
-import { execFileSync } from "node:child_process"
 import { rmSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
@@ -28,6 +27,7 @@ import {
   startHost,
 } from "../host/index.ts"
 import { findProject } from "../host/work/runtime.ts"
+import { CommandFailed, command } from "./command.ts"
 import {
   committedProject,
   entriesOf,
@@ -58,7 +58,9 @@ import {
  */
 export async function runtimeProblem(): Promise<string | null> {
   if (process.platform === "darwin") return macDockerProblem()
-  const dir = committedProject("pinetrie-runtime-", { "README.md": "probe\n" })
+  const dir = await committedProject("pinetrie-runtime-", {
+    "README.md": "probe\n",
+  })
   try {
     const found = await findProject({
       root: dir,
@@ -80,19 +82,18 @@ export async function runtimeProblem(): Promise<string | null> {
 async function macDockerProblem(): Promise<string | null> {
   const vm = await vmProblem(vmStateDir(process.env, homedir()))
   if (vm !== null) return vm
-  const answers = (args: readonly string[]) => {
-    try {
-      execFileSync("docker", [...args], { stdio: "pipe" })
-      return null
-    } catch (error) {
-      const e = error as { stderr?: Buffer }
-      return e.stderr?.toString().trim().split("\n")[0] ?? ""
-    }
-  }
-  const cli = answers(["--version"])
+  const answers = (args: readonly string[]) =>
+    command("docker", args).then(
+      () => null,
+      (error: unknown) =>
+        error instanceof CommandFailed
+          ? (error.stderr.trim().split("\n")[0] ?? "")
+          : String(error),
+    )
+  const cli = await answers(["--version"])
   if (cli !== null)
     return dockerWords({ kind: "no-docker", platform: "darwin", said: cli })
-  const buildx = answers(["buildx", "version"])
+  const buildx = await answers(["buildx", "version"])
   return buildx === null
     ? null
     : dockerWords({ kind: "no-buildx", platform: "darwin", said: buildx })
@@ -148,7 +149,8 @@ const startLaneHost = (
  */
 async function sectionHost(input: SectionInput) {
   const { files, dir: given, logs, ...options } = input
-  const dir = given ?? committedProject("pinetrie-section-", files ?? {})
+  const dir =
+    given ?? (await committedProject("pinetrie-section-", files ?? {}))
   const script = scriptedModel()
   const seen: string[] = []
   const host = await startLaneHost({
@@ -164,7 +166,7 @@ async function sectionHost(input: SectionInput) {
   // After the host made the shared directories it was given, as it logged.
   for (const l of seen) {
     const m = /\[host\] (.+)\/ is shared read-write with every lane/.exec(l)
-    if (m?.[1] !== undefined) ownForInnerLanes(path.join(dir, m[1]))
+    if (m?.[1] !== undefined) await ownForInnerLanes(path.join(dir, m[1]))
   }
   const user = await join(
     host,
@@ -203,45 +205,56 @@ async function sectionHost(input: SectionInput) {
     await user.close().catch(() => {})
     await host.shutdown().catch(() => {})
     // Kept for a restart: the lanes' containers too, as a host leaves them.
-    if (!keep) cleanUp(host.session, dir)
+    if (!keep) await cleanUp(host.session, dir)
   }
   return { dir, script, host, user, idle, laneWith, results, close }
 }
 
 /** Remove every container and disk of a host's lanes, then its project. */
-export function cleanUp(
+export async function cleanUp(
   doc: Parameters<typeof readLaneRecords>[0],
   dir: string,
-): void {
-  for (const lane of readLaneRecords(doc).keys()) removeLane(dir, lane)
+): Promise<void> {
+  for (const lane of readLaneRecords(doc).keys()) await removeLane(dir, lane)
   rmSync(dir, { recursive: true, force: true })
 }
 
 /**
  * `script` run in a lane's container, as root, between runs: the container
- * is started for it and stopped after, as the host would.
+ * is started for it and stopped after, as the host would. The host may stop
+ * the container as a run ends, between the start and the exec: the exec is
+ * then tried again, on a container started again.
  */
-export function inLane(lane: ThreadId, script: string): string {
+export async function inLane(lane: ThreadId, script: string): Promise<string> {
   const name = container(lane)
-  const wasRunning = isRunning(name)
+  const wasRunning = await isRunning(name)
   try {
-    if (!wasRunning) cli(["start", name])
-    return cli(["exec", name, "sh", "-c", `cd /workspace && ${script}`])
+    for (let tries = 1; ; tries++) {
+      await cli(["start", name])
+      try {
+        return await cli([
+          "exec",
+          name,
+          "sh",
+          "-c",
+          `cd /workspace && ${script}`,
+        ])
+      } catch (error) {
+        const stopped =
+          error instanceof CommandFailed && /is not running/.test(error.stderr)
+        if (!stopped || tries === 3) throw error
+      }
+    }
   } catch (error) {
     // A command that fails, or a lane that does not start, is a check's to
     // judge, from what it printed.
-    const e = error as { stdout?: Buffer; stderr?: Buffer }
-    return `${e.stdout?.toString() ?? ""}${e.stderr?.toString() ?? ""}`
+    if (error instanceof CommandFailed) return `${error.stdout}${error.stderr}`
+    throw error
   } finally {
-    if (!wasRunning && isRunning(name)) cli(["stop", name])
+    if (!wasRunning && (await isRunning(name))) await cli(["stop", name])
   }
 }
 
-/** `inLane` for a lane that is running now; empty if it is not. */
-export function inLaneQuiet(lane: ThreadId, script: string): string {
-  try {
-    return cli(["exec", container(lane), "sh", "-c", script])
-  } catch {
-    return ""
-  }
-}
+/** `inLane` for a lane that is running now; empty if it is not, or if `script` fails. */
+export const inLaneQuiet = (lane: ThreadId, script: string): Promise<string> =>
+  cli(["exec", container(lane), "sh", "-c", script]).catch(() => "")

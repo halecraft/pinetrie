@@ -4,7 +4,7 @@
 // Containerfile in the suites' Docker. QEMU emulates (a lane has no KVM),
 // so its timings mean nothing.
 
-import { execFile, execFileSync } from "node:child_process"
+import { execFile } from "node:child_process"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import {
@@ -13,6 +13,7 @@ import {
   OBSERVER_CONTAINERFILE,
 } from "@pinetrie/lanehost"
 import { pinnedKernel, readBuilderPins } from "@pinetrie/vm"
+import { command, commandBytes } from "../command.ts"
 import { cli, runtimeCli } from "../lane-runtime.ts"
 
 const QEMU = "qemu-system-aarch64"
@@ -27,13 +28,13 @@ const CACHE = path.join(
 /** Why the guest cannot boot here, or null. */
 export async function guestProblem(): Promise<string | null> {
   try {
-    execFileSync(QEMU, ["--version"], { stdio: "pipe" })
+    await command(QEMU, ["--version"])
   } catch {
     return `${QEMU} is not on PATH (apt-get install qemu-system-arm; brew install qemu)`
   }
   let arch: string
   try {
-    arch = cli(["info", "--format", "{{.Architecture}}"]).trim()
+    arch = (await cli(["info", "--format", "{{.Architecture}}"])).trim()
   } catch (error) {
     return `the suites' Docker does not answer: ${String(error).split("\n")[0]}`
   }
@@ -72,7 +73,7 @@ export async function bootGuest(log: (line: string) => void): Promise<Guest> {
   await mkdir(CACHE, { recursive: true })
   const tag = "pinetrie-observer-suite:local"
   log("building the observer's suite image")
-  cli([
+  await cli([
     "buildx",
     "build",
     "-q",
@@ -89,13 +90,14 @@ export async function bootGuest(log: (line: string) => void): Promise<Guest> {
   const [program = "docker", ...rest] = runtimeCli()
   await writeFile(
     initramfs,
-    execFileSync(
-      program,
-      [...rest, "run", "--rm", tag, "cat", "/initramfs.cpio.gz"],
-      {
-        maxBuffer: 256 << 20,
-      },
-    ),
+    await commandBytes(program, [
+      ...rest,
+      "run",
+      "--rm",
+      tag,
+      "cat",
+      "/initramfs.cpio.gz",
+    ]),
   )
   const kernel = await pinnedKernel(CACHE, (await readBuilderPins()).kernel)
   const out = path.join(CACHE, "console.txt")
