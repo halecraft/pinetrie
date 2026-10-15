@@ -1,10 +1,11 @@
 import {
   type CardRecord,
   entryId,
-  type Intent,
+  type Gated,
   livePlaceOf,
   NO_CONTENT,
   rootIdFor,
+  type SendAt,
   snapshotId,
   taskIdFor,
   threadIdFor,
@@ -34,7 +35,7 @@ const T = threadIdFor("t")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const BEA = writerId("bea@x.io")
-const chat = (at: Extract<Intent, { kind: "chat" }>["at"]): Intent => ({
+const chat = (at: SendAt): Gated => ({
   kind: "chat",
   text: "x",
   root: ROOT,
@@ -90,13 +91,13 @@ describe("runsIn: what each command runs or writes a message in", () => {
       [],
     ],
     [
-      "a pop: its thread",
-      { kind: "pop", thread: T },
+      "a popped send: its thread",
+      chat({ kind: "queue", thread: T }),
       [{ kind: "thread", thread: T }],
     ],
     ["a stop: nothing", { kind: "stop", lane: T }, []],
   ] as const)("%s", (_, command, at) => {
-    expect(runsIn(command as Intent)).toEqual(at)
+    expect(runsIn(command as Gated)).toEqual(at)
   })
 
   test("heldIn: the first thread among them someone holds, an entry's by its tree", () => {

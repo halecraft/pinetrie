@@ -218,6 +218,7 @@ test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from th
   expect(
     popped === null ? null : chatOfPoppedQueuedCard(popped, ROOT_ID),
   ).toMatchObject({
+    kind: "chat",
     root: ROOT_ID,
     text: "@agent go",
     at: { kind: "queue", thread: LANE },

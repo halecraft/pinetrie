@@ -32,6 +32,7 @@ import {
   type QueueMove,
   type Reorder,
   type RootId,
+  type Send,
   type SentCard,
   type TaskId,
   type TextCardId,
@@ -102,7 +103,7 @@ import { applyPlaceSteps, type Gesture, raiseRev } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
 import type { Records } from "../records.ts"
 import { tasksNow } from "../tasks.ts"
-import { type Chat, spendsCard } from "./chat.ts"
+import { spendsCard } from "./chat.ts"
 
 /**
  * A command's outcome, and the places document's `rev` after its step when the
@@ -286,7 +287,7 @@ export function createCardCommands(deps: CardCommandDeps) {
    */
   async function sentMessage(sent: {
     readonly sendId: string
-    readonly chat: Chat
+    readonly chat: Send
   }): Promise<EntryId | null> {
     const index = readTreeIndex(await docs.root(sent.chat.root))
     return index.bySend.get(sent.sendId) ?? null
@@ -507,15 +508,15 @@ export function createCardCommands(deps: CardCommandDeps) {
     /**
      * A text card made a thread, in one step of the keeper: planned
      * (`planSpinOff`), then the thread's records (its own, spun from the card,
-     * and its new task's), its first message, the card's text, sent by `start`,
-     * then its card on its task's canvas and the card's move to the trash, in
-     * its history's step. A send that took nothing deletes the records again.
+     * and its new task's), its first message, the card's text, sent by `start`
+     * (through the gate, as every send is), then its card on its task's
+     * canvas and the card's move to the trash, in its history's step. A send that took nothing deletes the records again.
      * The answer is the thread's start, its first message's id among it.
      */
     async spinOff(
       writer: WriterId,
       request: SpinOff,
-      start: (chat: Chat) => Promise<Outcome>,
+      start: (chat: Send) => Promise<Outcome>,
       tasks: TaskIndex,
     ): Promise<Settled> {
       const { move } = request
@@ -572,6 +573,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       // the card's move; a send that took nothing takes its records back
       await deps.records.writeValues(plan.open.records)
       const sent = await start({
+        kind: "chat",
         text: plan.text,
         root: plan.root,
         at: {
@@ -791,7 +793,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     async spend(
       writer: WriterId,
       card: TextCardId,
-      sent: { readonly sendId: string; readonly chat: Chat },
+      sent: { readonly sendId: string; readonly chat: Send },
     ): Promise<number> {
       const message = await sentMessage(sent)
       const held = readPlaces(places).some(c => c.id === card)
@@ -815,7 +817,7 @@ export function createCardCommands(deps: CardCommandDeps) {
      */
     async queueBusy(
       writer: WriterId,
-      chat: Chat & { card: SentCard },
+      chat: Send & { card: SentCard },
     ): Promise<Settled | null> {
       const doc = await docs.root(chat.root)
       const index = readTreeIndex(doc)

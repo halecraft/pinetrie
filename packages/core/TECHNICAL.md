@@ -94,6 +94,11 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
 
 ## Records (`index.ts`)
 
+- A `Send` is a chat the host sends: a `chat` intent's, or a popped
+  queued card's (`SendAt`'s `queue`). `Gated`, an intent or a send, is
+  what the host's gate decides on (`planGate`, `@pinetrie/rules`); it is
+  core's so that `runsIn` and `writesIn` take it without importing the
+  gate, which imports them.
 - Each host record is one spec, and pi only carries its writes (ADR-0062);
   a record lives in the session's document or a root's (ADR-0063).
 - The board's workflow states and the archive (ADR-0122, ADR-0029); a

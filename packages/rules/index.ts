@@ -51,7 +51,6 @@ export {
   planArchive,
   planLanesGone,
   TASK_BUSY_REASON,
-  writesIn,
 } from "./archive.ts"
 export {
   answerOf,
@@ -275,20 +274,22 @@ export {
   tokensWords,
 } from "./fact.ts"
 export {
+  type Cleared,
+  type GateFacts,
+  type GateRoot,
+  gateRefusal,
+  planGate,
+} from "./gate.ts"
+export {
   foreignIn,
   foreignLaneWords,
   foreignRefusal,
   HELD_WORDS,
-  heldIn,
   holdingOf,
-  holdingWords,
-  type QueuePop,
   type RunAt,
-  runsIn,
   type ThreadHolding,
   TRASHED_WORDS,
   takenIn,
-  threadsOf,
 } from "./held.ts"
 export { pastedImages, planImages } from "./images.ts"
 export {

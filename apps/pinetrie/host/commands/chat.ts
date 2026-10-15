@@ -9,12 +9,11 @@ import {
   baseKnown,
   ERR,
   forkEntry,
-  type Intent,
   isImageRef,
   messageText,
   planModeOf,
   ROOT_ORIGIN,
-  type SendAt,
+  type Send,
   type SentCard,
   type ThreadId,
   threadAt,
@@ -45,6 +44,7 @@ import {
 import {
   type ChatDecision,
   type ChatDetails,
+  type Cleared,
   displayName,
   encodeChat,
   type LinkedQuote,
@@ -67,11 +67,6 @@ import { type Relays, readReachableAgents } from "../relays.ts"
 import { type Runs, startRun } from "../runs.ts"
 import type { Titles } from "../titles.ts"
 import type { LaneWork } from "../work/index.ts"
-
-/** A chat to send: a `chat` command's, or a popped queued card's, in mode `queue`. */
-export type Chat = Omit<Extract<Intent, { kind: "chat" }>, "kind" | "at"> & {
-  readonly at: SendAt
-}
 
 export interface ChatDeps {
   readonly basics: Basics
@@ -128,13 +123,15 @@ export const spendsCard = (sent: Outcome): boolean =>
 /**
  * Gather, `threadOfSend` and `planChat`, then `executeChat`. A message sent from
  * a card carries its other writers as contributors ("Ada, with Bea"). It
- * spends nothing: whether the card goes is the caller's (`spendsCard`).
+ * spends nothing: whether the card goes is the caller's (`spendsCard`). It
+ * takes only a send the gate cleared (`planGate`), so it checks no archive,
+ * hold or lane kind of its own.
  */
 export async function sendChat(
   deps: ChatDeps,
   writer: WriterId,
   sendId: string,
-  chat: Chat,
+  chat: Cleared<Send>,
   /** This send has caught its lane up already (`catch-up-first`). */
   caughtUp = false,
 ): Promise<Outcome> {
@@ -373,7 +370,7 @@ async function catchUpFirst(
   deps: ChatDeps,
   writer: WriterId,
   sendId: string,
-  chat: Chat,
+  chat: Cleared<Send>,
   lane: ThreadId,
 ): Promise<Outcome> {
   const prepared = await deps.work.prepareUpdate(

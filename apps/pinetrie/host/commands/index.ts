@@ -1,19 +1,14 @@
-// host/commands — one command from one writer: decoded, checked against the
-// archive, and routed to its module, in the place it runs (`placeOfCommand`): a
-// step on the documents' keeper, straight through to the owner of your repo, or
-// a board move's three parts.
+// host/commands — one command from one writer: decoded, cleared through the
+// gate (`gate.ts`), and routed to its module, in the place it runs
+// (`placeOfCommand`): a step on the documents' keeper, straight through to the
+// owner of your repo, or a board move's three parts.
 
 import {
-  atEntry,
   ERR,
   errorText,
   historyScope,
   type Intent,
-  nearestRevision,
-  type RootId,
-  type TaskId,
-  type TreeIndex,
-  threadAt,
+  type Send,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -22,30 +17,14 @@ import {
   type Outcome,
   type WireCommand,
 } from "@pinetrie/protocol/codec"
+import { readRunning } from "@pinetrie/reads"
 import {
-  readArchived,
-  readLaneRecords,
-  readParticipantNames,
-  readPlaces,
-  readRevisions,
-  readRunning,
-  readTreeIndex,
-} from "@pinetrie/reads"
-import {
-  archivedIn,
-  displayName,
-  foreignIn,
-  foreignRefusal,
-  heldIn,
-  holdingWords,
+  type Cleared,
   PARTICIPANT,
-  type QueuePop,
-  runsIn,
   setRecord,
-  threadsOf,
-  writesIn,
+  type TaskIndex,
 } from "@pinetrie/rules"
-import { type Basics, failed, type HostKeeper } from "../basics.ts"
+import { failed, type HostKeeper } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
 import type { Provenance } from "../provenance.ts"
@@ -59,7 +38,8 @@ import {
   type Settled,
   settled,
 } from "./cards.ts"
-import { type Chat, type ChatDeps, sendChat, spendsCard } from "./chat.ts"
+import { type ChatDeps, sendChat, spendsCard } from "./chat.ts"
+import { clear } from "./gate.ts"
 import {
   actOnAccepted,
   actOnOffer,
@@ -101,24 +81,48 @@ export interface CommandDeps {
   readonly relays: ChatDeps["relays"]
 }
 
+/** Where a command runs: a step on the documents' keeper, your repo's owner, or a board move's three parts. */
+type CommandPlace = "documents" | "repo" | "board"
+
 /**
- * Where a command runs. An offer action and a setup or publish act on your repo
- * only: they go straight to its owner, and hold no other command. A move on the
- * board is up to three parts (`handleTaskMove`). Everything else is one step on
- * the documents' keeper.
+ * Where each kind of command runs. An offer action and a setup or publish act
+ * on your repo only: they go straight to its owner, and hold no other
+ * command. A move on the board is up to three parts (`handleTaskMove`).
+ * Everything else is one step on the documents' keeper. A kind with no place
+ * does not compile.
  */
-export function placeOfCommand(intent: Intent): "documents" | "repo" | "board" {
-  switch (intent.kind) {
-    case "offer":
-    case "setup":
-    case "publish":
-      return "repo"
-    case "move-task":
-      return "board"
-    default:
-      return "documents"
-  }
-}
+const COMMAND_PLACE = {
+  chat: "documents",
+  reserve: "documents",
+  name: "documents",
+  picture: "documents",
+  stop: "documents",
+  "carry-on": "documents",
+  "ssh-access": "documents",
+  "queue-hold": "documents",
+  "queue-card": "documents",
+  "unqueue-all": "documents",
+  move: "documents",
+  "copy-thread": "documents",
+  "open-thread": "documents",
+  paste: "documents",
+  "spin-off": "documents",
+  reorder: "documents",
+  "card-width": "documents",
+  "undo-move": "documents",
+  "set-command": "documents",
+  "traces-seen": "documents",
+  workflow: "documents",
+  mark: "documents",
+  retitle: "documents",
+  offer: "repo",
+  setup: "repo",
+  publish: "repo",
+  "move-task": "board",
+} as const satisfies Record<Intent["kind"], CommandPlace>
+
+export const placeOfCommand = (intent: Intent): CommandPlace =>
+  COMMAND_PLACE[intent.kind]
 
 export interface Commands {
   /**
@@ -134,13 +138,13 @@ export interface Commands {
     wire: WireCommand,
   ): Promise<void>
   /**
-   * A queued card the host popped, sent as its queuer's message: the archive
-   * gate, then `sendChat`, as a `chat` command goes.
+   * A queued card the host popped, sent as its queuer's message: cleared
+   * through the gate, then `sendChat`, as a `chat` command goes.
    */
   sendPoppedQueuedCard(
     writer: WriterId,
     sendId: string,
-    chat: Chat,
+    chat: Send,
   ): Promise<Outcome>
 }
 
@@ -192,29 +196,35 @@ export function createCommands(deps: CommandDeps): Commands {
     if (intent.kind === "refused") return settled(intent)
     switch (placeOfCommand(intent)) {
       case "documents":
-        return deps.keeper.run(() => carry(writer, intent, id))
+        return deps.keeper.run(() => clearAndCarry(writer, intent, id))
       case "repo":
       case "board":
-        // The archive gate is a synchronous read, so it needs no keeper.
-        return carry(writer, intent, id)
+        // The gate opens no root for these kinds (`runsIn` names no entry),
+        // so it needs no keeper.
+        return clearAndCarry(writer, intent, id)
     }
   }
 
-  /** Check one decoded command against the archive, and carry it out. */
-  async function carry(
+  /** Clear one decoded command through the gate, and carry it out. */
+  async function clearAndCarry(
     writer: WriterId,
     intent: Intent,
     id: string,
   ): Promise<Settled> {
     // gather: the task index once, for the gate and every card command
     const tasks = tasksNow(deps.basics)
-    const archived = refuseInArchive(
-      deps.basics,
-      writesIn(intent, tasks, readPlaces(deps.basics.places)),
-    )
-    if (archived !== null) return settled(archived)
-    const where = await refuseWhereRuns(deps, intent)
-    if (where !== null) return settled(where)
+    const gate = await clear(deps, intent, tasks)
+    if (gate.kind !== "cleared") return settled(gate)
+    return carry(writer, gate.command, id, tasks)
+  }
+
+  /** Carry out one command the gate cleared. */
+  async function carry(
+    writer: WriterId,
+    intent: Cleared<Intent>,
+    id: string,
+    tasks: TaskIndex,
+  ): Promise<Settled> {
     switch (intent.kind) {
       case "chat": {
         // The command's id is the send's id: its column finds its message by it.
@@ -246,7 +256,7 @@ export function createCommands(deps: CommandDeps): Commands {
         return cardCommands.spinOff(
           writer,
           intent,
-          chat => sendChat(deps, writer, newId(), chat),
+          chat => send(writer, newId(), chat),
           tasks,
         )
       case "queue-card":
@@ -317,112 +327,17 @@ export function createCommands(deps: CommandDeps): Commands {
     }
   }
 
-  return {
-    handle,
-    async sendPoppedQueuedCard(writer, sendId, chat) {
-      return (
-        refuseInArchive(
-          deps.basics,
-          chat.at.kind === "queue"
-            ? [tasksNow(deps.basics).taskOfThread.get(chat.at.thread)].filter(
-                (t): t is TaskId => t !== undefined,
-              )
-            : [],
-        ) ??
-        (chat.at.kind === "queue"
-          ? await refuseWhereRuns(deps, {
-              kind: "pop",
-              thread: chat.at.thread,
-            })
-          : null) ??
-        (await sendChat(deps, writer, sendId, chat))
-      )
-    },
+  /** A send made for `writer`, cleared through the gate, then sent. */
+  async function send(
+    writer: WriterId,
+    sendId: string,
+    chat: Send,
+  ): Promise<Outcome> {
+    const gate = await clear(deps, chat, tasksNow(deps.basics))
+    return gate.kind === "cleared"
+      ? sendChat(deps, writer, sendId, gate.command)
+      : gate
   }
-}
 
-/**
- * Where a command would run, or write a message, refused before anything
- * runs: `runsIn` says where each kind of command runs, and a branch's fork
- * is read from its root's tree. Refused, first, in a thread someone holds
- * in their inventory, or one trashed (a person's own hold is the nearer
- * reason); then where a run would start on a lane of another kind than the
- * project's (`foreignIn`). Null when the command may go on.
- */
-async function refuseWhereRuns(
-  deps: Pick<CommandDeps, "basics" | "work">,
-  command: Intent | QueuePop,
-): Promise<Outcome | null> {
-  const { basics } = deps
-  const at = runsIn(command)
-  if (at.length === 0) return null
-  // gather: the trees and records of the roots a branch forks in
-  const roots = new Map<
-    RootId,
-    {
-      readonly index: TreeIndex
-      readonly revisions: ReturnType<typeof readRevisions>
-    }
-  >()
-  for (const a of at)
-    if (a.kind === "entry" && !roots.has(a.root)) {
-      const doc = await basics.docs.root(a.root)
-      roots.set(a.root, {
-        index: readTreeIndex(doc),
-        revisions: readRevisions(doc),
-      })
-    }
-  // plan
-  const held = heldIn(
-    threadsOf(
-      at,
-      (root, entry) => {
-        const read = roots.get(root)
-        return read === undefined ? null : threadAt(read.index, entry)
-      },
-      tasksNow(basics).forkOf,
-    ),
-    readPlaces(basics.places),
-  )
-  if (held !== null)
-    return {
-      kind: "refused",
-      code: ERR.REFUSED,
-      message: holdingWords(held.holding),
-    }
-  const foreign = foreignIn(at, {
-    lanes: readLaneRecords(basics.session),
-    kind: deps.work.project?.kind ?? null,
-    aboveAt: (root, entry) => {
-      const read = roots.get(root)
-      return read === undefined
-        ? null
-        : nearestRevision(read.index, read.revisions, atEntry(entry))
-    },
-  })
-  return foreign === null ? null : foreignRefusal(foreign)
-}
-
-/**
- * A command that would write in an archived task, or move a card out of one, is
- * refused, naming who archived it. `sendChat`'s only callers are this
- * dispatcher and `sendPoppedQueuedCard`, both behind it, so it needs no check
- * of its own. `tasks` is the tasks the command writes in (`writesIn`), so no
- * root's document is opened to check. Null when the command may go on.
- */
-function refuseInArchive(
-  basics: Pick<Basics, "session" | "places">,
-  tasks: readonly TaskId[],
-): Outcome | null {
-  const { session, places } = basics
-  const archived = readArchived(session, places)
-  if (archived.size === 0) return null
-  const record = archivedIn(tasks, archived)
-  if (record === null) return null
-  const names = readParticipantNames(session)
-  return {
-    kind: "refused",
-    code: ERR.TASK_ARCHIVED,
-    message: `archived by ${displayName(record.by, names.get(record.by))}: restore the task first`,
-  }
+  return { handle, sendPoppedQueuedCard: send }
 }

@@ -1,6 +1,6 @@
 // host/tasks — the task index as the host reads it now: from the places, where
 // each thread's card is, and the threads' records, each one's root. The gate
-// (`writesIn`), a move's history (`historyOf`), archiving and what a starting
+// (`planGate`), a move's history (`historyOf`), archiving and what a starting
 // host loads all read this; the page reads the same index (`tasksOf`,
 // `@pinetrie/interface`).
 

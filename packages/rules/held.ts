@@ -7,7 +7,7 @@ import {
   type EntryId,
   ERR,
   type ForeignLane,
-  type Intent,
+  type Gated,
   type LaneRecord,
   type ProjectKind,
   proveRunnable,
@@ -67,12 +67,6 @@ export const foreignLaneWords = (lane: ForeignLane): string =>
 export const foreignRefusal = (lane: ForeignLane): Refusal =>
   refused(ERR.FOREIGN_LANE, foreignLaneWords(lane))
 
-/** A queued card's pop: the drain's, which runs its thread's next send. */
-export interface QueuePop {
-  readonly kind: "pop"
-  readonly thread: ThreadId
-}
-
 /**
  * Where a command would run, or write a message: a thread, or an entry,
  * whose thread its root's tree says (a branch's fork).
@@ -88,19 +82,18 @@ export type RunAt =
     }
 
 /**
- * What a command runs or writes a message in, every kind said:
+ * What a command or a send runs or writes a message in, every kind said:
  * a new kind of command does not compile until it is. A send at a thread's
- * end, a carry-on, an offer action that may ask the agent, and a pop run in
- * their thread; a branch in the thread its fork is in, which stays its
- * holder's; a new root in none. A stop, an unqueue or a hold runs nothing.
+ * end or popped from its queue, a carry-on, and an offer action that may ask
+ * the agent run in their thread; a branch in the thread its fork is in,
+ * which stays its holder's; a new root in none. A stop, an unqueue or a
+ * hold runs nothing.
  */
-export function runsIn(command: Intent | QueuePop): readonly RunAt[] {
+export function runsIn(command: Gated): readonly RunAt[] {
   const thread = (t: ThreadId): RunAt => ({ kind: "thread", thread: t })
   switch (command.kind) {
-    case "pop":
-      return [thread(command.thread)]
     case "chat":
-      return command.at.kind === "end"
+      return command.at.kind !== "branch"
         ? [thread(command.at.thread)]
         : command.at.at === null
           ? []

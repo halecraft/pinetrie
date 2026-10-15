@@ -291,6 +291,14 @@ export type SendAt =
   | ChatAt
   | { readonly kind: "queue"; readonly thread: ThreadId }
 
+/** A chat the host sends: a `chat` command's, or a popped queued card's. */
+export type Send = Omit<Extract<Intent, { readonly kind: "chat" }>, "at"> & {
+  readonly at: SendAt
+}
+
+/** What the command gate decides on: a person's command, or a send made for one. */
+export type Gated = Intent | Send
+
 /** How the host plans a send, from where it goes. */
 export const planModeOf = (at: SendAt): PlanMode =>
   at.kind === "queue" ? "queue" : modeOf(at)

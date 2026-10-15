@@ -662,9 +662,9 @@ export const mutations: readonly Mutation[] = [
 
   {
     name: "the dispatcher skips the archive gate",
-    file: "apps/pinetrie/host/commands/index.ts",
-    from: "  if (archived.size === 0) return null",
-    to: "  if (archived.size >= 0) return null",
+    file: "apps/pinetrie/host/commands/gate.ts",
+    from: "    archived: readArchived(session, places),",
+    to: "    archived: new Map(),",
     command: unit,
     expect: "a chat in an archived root is refused",
   },
@@ -727,14 +727,6 @@ export const mutations: readonly Mutation[] = [
     to: '    case "refused":\n    case "conflict":\n      return planned\n    case "busy":\n      return { kind: "appended", id: "e-busy" as never }',
     command: unit,
     expect: "busy writes nothing and answers busy",
-  },
-  {
-    name: "the host skips the archive gate for chat",
-    file: "apps/pinetrie/host/commands/index.ts",
-    from: "    if (archived !== null) return settled(archived)",
-    to: '    if (archived !== null && intent.kind !== "chat") return settled(archived)',
-    command: unit,
-    expect: "a chat in an archived root is refused",
   },
   {
     name: "the host ignores a Start Agent column",
@@ -1151,10 +1143,10 @@ export const mutations: readonly Mutation[] = [
     expect: "spendsCard: written or running takes the card",
   },
   {
-    name: "a popped queued card skips the archive gate",
+    name: "a popped queued card skips the gate",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: '          chat.at.kind === "queue"\n            ? [tasksNow(deps.basics)',
-    to: '          chat.at.kind === ("never" as string)\n            ? [tasksNow(deps.basics)',
+    from: "    const gate = await clear(deps, chat, tasksNow(deps.basics))\n",
+    to: '    const gate = { kind: "cleared", command: chat } as never\n',
     command: unit,
     expect: "a popped queued card in an archived root is refused",
   },
@@ -1449,8 +1441,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance holds the documents' keeper",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: '    case "offer":\n    case "setup":\n    case "publish":\n      return "repo"',
-    to: '    case "setup":\n    case "publish":\n      return "repo"',
+    from: '  offer: "repo",',
+    to: '  offer: "documents",',
     command: unit,
     expect:
       "a chat completes while an acceptance is held open on your repo's owner",
@@ -2007,17 +1999,17 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the dispatcher lets a command run in a held thread",
-    file: "apps/pinetrie/host/commands/index.ts",
-    from: "    const where = await refuseWhereRuns(deps, intent)\n    if (where !== null) return settled(where)\n",
-    to: "",
+    file: "apps/pinetrie/host/commands/gate.ts",
+    from: "    cards: readPlaces(places),",
+    to: "    cards: [],",
     command: unit,
     expect: "nothing runs in a thread in an inventory",
   },
   {
     name: "the drain pops a held thread's card",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "        away:\n          heldIn(",
-    to: "        away:\n          false &&\n          heldIn(",
+    from: "        away:\n          holdingOf(",
+    to: "        away:\n          false &&\n          holdingOf(",
     command: unit,
     expect:
       "pops nothing while its thread is in an inventory: its cards stay queued",
@@ -2294,9 +2286,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the gate lets a run start on a lane of another kind",
-    file: "apps/pinetrie/host/commands/index.ts",
-    from: "  return foreign === null ? null : foreignRefusal(foreign)\n",
-    to: "  return null\n",
+    file: "apps/pinetrie/host/commands/gate.ts",
+    from: "    lanes: readLaneRecords(session),",
+    to: "    lanes: new Map(),",
     command: unit,
     expect:
       "nothing runs on a lane of another kind than the project's; a held one is refused as held",
@@ -2309,5 +2301,21 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "pops nothing while its lane keeps a history of another kind: its cards stay queued",
+  },
+  // tsc names no failing check (`failingChecks`): with typecheck clean, any
+  // error is the mutant's.
+  {
+    name: "sendChat takes any send",
+    file: "apps/pinetrie/host/commands/chat.ts",
+    from: "  chat: Cleared<Send>,\n  /** This send has caught its lane up already",
+    to: "  chat: Send,\n  /** This send has caught its lane up already",
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "a command kind has no place",
+    file: "apps/pinetrie/host/commands/index.ts",
+    from: '  "traces-seen": "documents",\n',
+    to: "",
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
 ]

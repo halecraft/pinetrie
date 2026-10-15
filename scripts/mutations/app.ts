@@ -2405,8 +2405,8 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a send runs in a thread in an inventory",
-    file: "apps/pinetrie/host/commands/index.ts",
-    from: "    const where = await refuseWhereRuns(deps, intent)\n    if (where !== null) return settled(where)\n",
+    file: "packages/rules/gate.ts",
+    from: '  if (held !== null) return { kind: "held", ...held }\n',
     to: "",
     suite: "host",
     scenario: "cards",

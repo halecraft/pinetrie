@@ -5,13 +5,14 @@ import {
   type EntryLike,
   ERR,
   entryId,
-  type Intent,
+  type Gated,
   indexTree,
   type LaneView,
   NO_CONTENT,
   pointId,
   type RevisionRecord,
   rootIdFor,
+  type Send,
   snapshotId,
   type TaskId,
   taskIdFor,
@@ -220,8 +221,8 @@ describe("writesIn: the tasks a command writes in", () => {
     },
   ]
   const tasks = indexTasks(cards, new Map())
-  const at = (intent: Intent) => writesIn(intent, tasks, cards)
-  const chat = (p: Intent & { kind: "chat" }) => p
+  const at = (intent: Gated) => writesIn(intent, tasks, cards)
+  const chat = (p: Send) => p
   const atB = {
     kind: "composing",
     thread: T_B,
@@ -263,6 +264,22 @@ describe("writesIn: the tasks a command writes in", () => {
         state: null,
       }),
       [OTHER_TASK],
+    ],
+    [
+      "a popped send: its thread's task",
+      chat({
+        kind: "chat",
+        text: "x",
+        root: TEST_ROOT,
+        at: { kind: "queue", thread: T_B },
+        asksAgent: false,
+        mentions: [],
+        card: null,
+        pinned: [],
+        base: null,
+        state: null,
+      }),
+      [TASK],
     ],
     ["a name", { kind: "name", name: "Ada" }, []],
     ["a stop", { kind: "stop", lane: LANE_X }, []],
@@ -397,11 +414,7 @@ describe("writesIn: the tasks a command writes in", () => {
       { kind: "undo-move", task: OTHER_TASK, direction: "undo" },
       [OTHER_TASK],
     ],
-  ] satisfies [
-    string,
-    Intent,
-    readonly TaskId[],
-  ][])("%s", (_, intent, want) => {
+  ] satisfies [string, Gated, readonly TaskId[]][])("%s", (_, intent, want) => {
     expect(at(intent)).toEqual(want)
   })
 })

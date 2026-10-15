@@ -176,8 +176,9 @@ export function planNextQueuedCardPop(
   facts: {
     readonly running: boolean
     /**
-     * Its thread is in someone's inventory (`heldIn`), or its lane keeps a
-     * history of another kind (`proveRunnable`): nothing runs there.
+     * Its thread is in someone's inventory or a trash (`holdingOf`), or its
+     * lane keeps a history of another kind (`proveRunnable`): nothing runs
+     * there.
      */
     readonly away: boolean
     readonly held: boolean

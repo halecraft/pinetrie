@@ -20,6 +20,7 @@ import {
   type QueuedFact,
   type RelayDetails,
   type RootId,
+  type Send,
   type Sha256,
   type TextCardId,
   type ThreadId,
@@ -41,7 +42,7 @@ import {
   displayName,
   encodeFact,
   foreignLaneWords,
-  heldIn,
+  holdingOf,
   isQueuedText,
   planCarry,
   planNextQueuedCardPop,
@@ -56,7 +57,6 @@ import {
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
-import type { Chat } from "./commands/chat.ts"
 import { applyPlaceSteps } from "./places.ts"
 import type { Provenance } from "./provenance.ts"
 import type { Records } from "./records.ts"
@@ -145,7 +145,8 @@ export function popNextQueuedCard(
 export const chatOfPoppedQueuedCard = (
   popped: PoppedMessage,
   root: RootId,
-): Chat => ({
+): Send => ({
+  kind: "chat",
   text: popped.text,
   root,
   at: { kind: "queue", thread: popped.card.place.thread },
@@ -176,7 +177,7 @@ export interface QueuedCardPopDeps {
   readonly agent: Pick<Agent, "lane">
   readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit" | "runnable">
   readonly start: Runs["start"]
-  /** Send a popped card's text as its queuer's message, through `sendChat`. */
+  /** Send a popped card's text as its queuer's message, through the gate and `sendChat`. */
   readonly send: (popped: PoppedMessage) => Promise<Outcome>
   /** Where a queued reference's quote is read. */
   readonly blobs: Pick<BlobStore, "get">
@@ -240,9 +241,9 @@ export async function drain(
       {
         running: readRunning(deps.basics.live, lane),
         // A pop runs in its own thread: held, it has no runner, and a lane
-        // of another kind runs nothing. The dispatcher's gate refuses both.
+        // of another kind runs nothing. The gate refuses both at its send.
         away:
-          heldIn([lane], readPlaces(places)) !== null ||
+          holdingOf(readPlaces(places), lane).kind !== "free" ||
           typeof deps.work.runnable(lane) === "object",
         held: readQueueHolds(deps.basics.session).has(lane),
         typing: readTypingIn(deps.presence),

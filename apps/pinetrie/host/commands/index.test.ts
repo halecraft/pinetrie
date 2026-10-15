@@ -295,6 +295,7 @@ test("a popped queued card in an archived root is refused, and the agent is neve
   const { b, pi, commands } = setUp()
   placeRoot(b, DONE)
   const out = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
+    kind: "chat",
     text: "from the queue",
     root: ROOT_ID,
     at: { kind: "queue", thread: THREAD },
@@ -341,6 +342,7 @@ test("nothing runs in a thread in an inventory", async () => {
     Array(4).fill(["refused", HELD_WORDS]),
   )
   const popped = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
+    kind: "chat",
     text: "from the queue",
     root: ROOT_ID,
     at: { kind: "queue", thread: THREAD },
@@ -380,6 +382,7 @@ test("nothing runs on a lane of another kind than the project's; a held one is r
   })
   await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
   const popped = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
+    kind: "chat",
     text: "from the queue",
     root: ROOT_ID,
     at: { kind: "queue", thread: THREAD },

@@ -65,8 +65,11 @@ follow this list. A name only this package uses is imported from its module.
   carries; handoffs and their targets; reorders, a card's width and its
   command; each sender's history of moves and its undo.
 - `rank.ts`: a rank on a canvas, a drop's, and where a branch lands.
-- `held.ts`, `copy.ts`: a thread in an inventory (the gate, who holds it,
-  what a change takes) and a thread copied (ADR-0117, ADR-0124).
+- `held.ts`, `copy.ts`: a thread in an inventory (where a command runs,
+  who holds it, what a change takes) and a thread copied (ADR-0117,
+  ADR-0124).
+- `gate.ts`: the gate: what a command, or a send made for one, may do
+  now, and its one pass (`Cleared`).
 - `queue-hold.ts`, `seat.ts`, `startup.ts`: a held queue, who wrote in a
   text, what a starting host resumes.
 - `board.ts`, `archive.ts`, `order.ts`: the board's workflow states and
@@ -889,10 +892,10 @@ trash, have no agent and no runner. Where its card leaves it is
 `holdingOf`: `free` on a canvas, `held` by an inventory's holder, or
 `trashed`, held by nobody.
 
-- **One gate, per command kind** (`runsIn`, beside `writesIn`): what each
-  `Intent`, or a queue's pop, runs or writes a message in: a send at a
-  thread's end, a carry-on, an offer action that may ask the agent (all but
-  an acceptance) and a pop run in their thread; a branch in the thread its
+- **Where each command runs** (`runsIn`, beside `writesIn`): what each
+  command or send (`Gated`) runs or writes a message in: a send at a
+  thread's end or popped from its queue, a carry-on, and an offer action
+  that may ask the agent (all but an acceptance) run in their thread; a branch in the thread its
   fork is in, read from its root's tree; a new root in none. Exhaustive, so
   a new kind of command does not compile until it says. `threadsOf` turns
   each into its thread, and `heldIn` finds the first of those held or
@@ -901,11 +904,12 @@ trash, have no agent and no runner. Where its card leaves it is
   would start on a lane of another kind than the project's: a thread's own
   lane (`proveRunnable`), or for a send at an entry the lane whose disk it
   would clone (`sourceHistory`, its snapshot taken as kept), so a copy's
-  first send is checked against the lane it copies. The host refuses
-  before every command and popped card (`refuseWhereRuns`: held first, a
+  first send is checked against the lane it copies. The gate refuses
+  every command and send by them (`planGate`, below: held first, a
   person's own hold being the nearer reason, then foreign, worded by
   `foreignLaneWords`), and the drain asks before it pops
-  (`planNextQueuedCardPop`'s `away`), so its messages wait. A
+  (`planNextQueuedCardPop`'s `away`: its own thread's `holdingOf`, and the
+  lane's kind), so its messages wait. A
   fact on top is popped there all the same: it starts no run, and a take's
   stop must be in the thread for its face to say so (ADR-0126). Refused
   with `HELD_WORDS`, "put it on a canvas first", or for a trashed thread
@@ -930,8 +934,36 @@ trash, have no agent and no runner. Where its card leaves it is
   `refuseInto`'s refusals (a place its kind is never in, another's
   inventory, a full one). It lands on a canvas by **`rankOnCanvas`**, as a
   move's drop does. No entry is written: its first send is a branch at its
-  fork, which `sendChat` lets through for the thread whose record names
-  that fork (`forkEntry`), and writes no second record or card.
+  fork, which the gate lets through by the copy's own holding
+  (`threadsOf`'s fork rule) and `sendChat` writes in the thread whose
+  record names that fork (`forkEntry`), with no second record or card.
+
+# The gate (`gate.ts`)
+
+What a person's command, or a send the host makes for one (a popped
+queued card's, a spin-off's first message), may do now. Agents' relays are
+not gated here: they ask `threadReach` (`reach.ts`).
+
+- **One pass, one maker.** `planGate` is the only maker of a
+  `Cleared<C>`, as `planCopyReady` is of core's `ReadyCopy`; the host's
+  `sendChat` takes only a `Cleared<Send>`, and its dispatcher carries out
+  only a `Cleared<Intent>`. What the gate decides on is core's `Gated`, a
+  command or a `Send`.
+- **The order is the plan's.** The archive first (`writesIn`,
+  `archivedIn`), which needs no root, so a command it refuses opens none;
+  then the roots a branch forks in, which it asks for as `read` until
+  `GateFacts.roots` holds them, so no caller can pass a branch it never
+  read (`threadsOf` reads a missing tree as no thread); then a thread held
+  or trashed (`threadsOf`, `heldIn`); then a lane of another kind
+  (`foreignIn`).
+- **Its words are its own** (`gateRefusal`): `task_archived` naming the
+  archiver through a `nameOf`, as `reachWords` takes one; `holdingWords`;
+  `foreignRefusal`. The host words none.
+- **A pass proves the check ran, nothing more.** It does not say the facts
+  it was planned from still hold: the host clears and sends in one keeper
+  step. And a spread of a cleared value keeps the brand
+  (`{ ...cleared, at }` compiles), so a cleared value is passed on as it
+  is, never rebuilt.
 
 # The board (`board.ts`, ADR-0122)
 
@@ -1017,9 +1049,9 @@ and made read-only, never removed.
   a reservation, a command on a card, traces seen), so an archived task can
   always be restored, and nothing moves out of one (`task_archived`,
   "restore the task first"). `archivedIn` finds an archived one by its
-  `TaskId`. One rule, applied by the host before dispatch
-  (`apps/pinetrie/host/commands/index.ts`); the pop's own gate stops a
-  queued card whose thread's task is archived.
+  `TaskId`. One rule, the gate's first (`planGate`), for every command and
+  every send, a popped queued card's among them (its thread's task),
+  worded by `gateRefusal`.
 - **Yjs writes are not refused for archiving.** A card's text in an archived
   task stays writable to the host's policy (a refused write cannot be
   recovered from, S28); the composer there is read-only.

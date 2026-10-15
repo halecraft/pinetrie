@@ -1,5 +1,5 @@
-// archive — what crossing the archive's edge does, and the gate that keeps an
-// archived task read-only.
+// archive — what crossing the archive's edge does, and the tasks a command
+// writes in, which the gate (`gate.ts`) keeps out of an archived task.
 
 import {
   type ArchivedTask,
@@ -8,7 +8,7 @@ import {
   type CardRecord,
   type EntryId,
   ERR,
-  type Intent,
+  type Gated,
   type LaneView,
   type MoveTarget,
   nearestRevision,
@@ -161,17 +161,18 @@ export function planLanesGone(
 }
 
 /**
- * The tasks a command writes in, none for a name, a
+ * The tasks a command or a send writes in, none for a name, a
  * picture, a stop, a move on the board or a change to its states, a
- * reservation, a card's command, or traces seen. A send at a thread's end
- * writes in the thread's task, a branch in the task it lands in; an offer,
+ * reservation, a card's command, or traces seen. A send at a thread's end,
+ * or popped from its queue, writes in the thread's task, a branch in the
+ * task it lands in; an offer,
  * a carry-on and a queue's hold in their lane's thread's; a card's move in
  * the task each card leaves as well as the one it goes to, so nothing moves
  * out of an archived task; an undo of moves, a mark and a retitle in their
  * own.
  */
 export function writesIn(
-  intent: Intent,
+  intent: Gated,
   tasks: TaskIndex,
   cards: readonly CardRecord[],
 ): readonly TaskId[] {
@@ -185,9 +186,9 @@ export function writesIn(
   switch (intent.kind) {
     case "chat":
       return only(
-        intent.at.kind === "end"
-          ? tasksOf.thread(intent.at.thread)
-          : intent.at.task,
+        intent.at.kind === "branch"
+          ? intent.at.task
+          : tasksOf.thread(intent.at.thread),
       )
     // An offer acts at its lane's tip: an archived task's lanes offer no
     // work out. A carry-on writes its message there.
@@ -251,7 +252,7 @@ export function writesIn(
     // Accepted work is your repo's, in no task.
     case "setup":
     case "publish":
-    // A command acts only when its card is popped, behind the pop's own check.
+    // A command acts only when its card is popped, its send cleared then.
     case "set-command":
     // Traces are the session's, in no task.
     case "traces-seen":

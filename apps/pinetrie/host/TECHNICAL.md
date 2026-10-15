@@ -39,7 +39,7 @@ wires them.
 | `seats.ts` | each connected seat's person (ADR-0037), written once as a `pinetrie.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat (ADR-0007), and who its writer is: the principal its connection named, an email, so no command field can claim to be someone else (ADR-0037). The host is no writer: writers are the connected clients, and own no lanes, which belong to threads (ADR-0120) |
-| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0122), `mark` (ADR-0045, ADR-0116), `lane` (stop, carry on, hold or release a queue, offer: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent, a paste, a thread's copy: ADR-0059, ADR-0066, ADR-0132); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
+| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0122), `mark` (ADR-0045, ADR-0116), `lane` (stop, carry on, hold or release a queue, offer: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent, a paste, a thread's copy: ADR-0059, ADR-0066, ADR-0132); `index.ts` decodes, decides where it runs (`placeOfCommand`), clears it through the gate, and routes; every send, a `chat` command's, a popped queued card's (`sendPoppedQueuedCard`) or a spin-off's, is cleared too. `gate.ts`: `clear`, the gate's shell over `planGate` (`@pinetrie/rules`) |
 | `http.ts` | the HTTP server: admission, the page (Vite or the built one), the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -60,9 +60,11 @@ wires them.
 - **Every command but your repo's is a step on one keeper**, and so is every
   drain (`@pinetrie/keeper`, `packages/keeper/TECHNICAL.md`, keyed by
   `HostKey` in `basics.ts`). Where a command runs is decided, pure, by
-  `placeOfCommand` (`commands/index.ts`, ADR-0065): an offer action but a
+  `placeOfCommand` (`commands/index.ts`, ADR-0065), which reads a table
+  of every kind (`COMMAND_PLACE`), so a kind with no place does not
+  compile: an offer action but a
   split, and a setup or publish, go straight to the owner of your repo after
-  the archive gate (a synchronous read), and hold no other command; a move
+  the gate, which opens no root for these kinds, and hold no other command; a move
   on the board is up to three parts (`commands/board.ts`): its place on the
   keeper, and, when it crosses the archive's edge, its teardown
   (containers, refs through the owner, snapshots) off it, tracked, and, for
@@ -217,7 +219,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   holds either already; a branch elsewhere names a task the session holds.
   The host's `TaskIndex` is `tasksNow(basics)` (`tasks.ts`), from the
   places and the threads' records, built once per command by the
-  dispatcher (`commands/index.ts`), which hands it to the archive gate and
+  dispatcher (`commands/index.ts`), which hands it to the gate and
   every card command; a drain, a title and an offer each build their own,
   once a step. Only an undo reads it again, after its revert wrote.
 
@@ -519,20 +521,28 @@ rejects `shutdown()`.
   written part of it. The seat's loop goes on to its next command.
 - **A command's id is its send's id.** The column that sent a chat finds its
   message by it (`TreeIndex.bySend`).
-- **The archive gate is in the dispatcher** (`refuseInArchive`, ADR-0029),
-  over `readArchived` and `writesIn`: a task in the archive. Only the `chat`
-  command and `sendPoppedQueuedCard` call `sendChat`, both behind the
-  gate, so `sendChat` has no gate of its own.
-- **So is the gate where a command runs** (`refuseWhereRuns`, ADR-0124,
-  ADR-0150): `runsIn` says where each command, or a popped card, runs or
-  writes a message; a branch's fork and the records above it are read from
-  its root. `heldIn` finds a thread in someone's inventory, refused "put it
-  on a canvas first"; then `foreignIn` finds a run that would start on a
-  lane of another kind than the project's (`ERR.FOREIGN_LANE`,
-  `foreignLaneWords`). The drain asks both before it pops (`away`: held,
-  or `LaneWork.runnable` refusing), so their messages wait; a fact on top
-  is popped all the same (it starts no run), so a take's stop is in the
-  thread, and its face says it was stopped.
+- **Every command, and every send made for one, is cleared by one gate**
+  (`commands/gate.ts`'s `clear`, over `planGate`, `@pinetrie/rules`:
+  ADR-0029, ADR-0124, ADR-0150). It gathers the places, the archive, the
+  lane records and the project's kind, and plans: a task the command
+  writes in archived (`writesIn`); then, read only when the plan asks for
+  them (`read`), the roots a branch forks in, so a command the archive
+  refuses opens none; then a thread someone holds or trashed, "put it on
+  a canvas first"; then a run that would start on a lane of another kind
+  than the project's (`ERR.FOREIGN_LANE`). The refusal is worded in rules
+  (`gateRefusal`). The dispatcher clears each decoded command once and
+  carries out the `Cleared<Intent>`; a popped queued card and a spin-off's
+  first message are cleared as `Send`s (`send`). `sendChat` takes only a
+  `Cleared<Send>`, so a send nobody cleared does not compile
+  (`commands/types.test.ts`). The drain asks the hold and the lane's kind
+  before it pops (`away`: held, or `LaneWork.runnable` refusing), so their
+  messages wait; a fact on top is popped all the same (it starts no run),
+  so a take's stop is in the thread, and its face says it was stopped.
+- **A pass is not a promise.** `Cleared` proves the gate ran, not that its
+  facts still hold: the dispatcher, the drain and a spin-off each clear and
+  send in one keeper step, with nothing between that could change them,
+  and must keep doing so. A spread of a cleared value keeps the brand, so
+  a cleared send is passed on as it is, never rebuilt.
 - **No run starts on a lane of another kind, whatever path asks**:
   `Runs.start` takes a `RunnableLane`, which only `proveRunnable` makes,
   through `LaneWork.runnable` (the lane's record and the adapter's kind).
@@ -659,8 +669,8 @@ rejects `shutdown()`.
   `planSpinOff` (refused for a blank card, a root or thread id in use, or
   as `planMove` refuses the move), then the thread's records (its own,
   spun from the card, and its new task's), a chat at the root of the new
-  root its tab minted (`sendChat`, never asking the agent, the card's
-  writers its contributors), then, once the chat took the card's text, the
+  root its tab minted (`sendChat`, cleared as every send is, never asking
+  the agent, the card's writers its contributors), then, once the chat took the card's text, the
   thread's card on its task's canvas and the card's move to its sender's
   trash, in the history of the task it leaves, or from an inventory the
   new task's; a chat that took nothing deletes the records again. The
@@ -762,7 +772,7 @@ rejects `shutdown()`.
   clean, the update is written, then the text, if any, is sent;
   conflicted, the resolution run carries the text; nothing new, the text
   alone; refused, the card goes back. The text is sent through
-  `sendPoppedQueuedCard` in mode `queue`, as its queuer (`by`), with the card's other
+  `sendPoppedQueuedCard` in mode `queue`, cleared by the gate, as its queuer (`by`), with the card's other
   writers as contributors. A card with no text starts no run.
 - **A card the host could not send goes back below the line, whole**
   (`planUnsent`): a note in the note column nearest its thread, made in the

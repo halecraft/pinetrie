@@ -7,6 +7,7 @@ import {
   type CardId,
   type CardRecord,
   type EntryId,
+  indexTree,
   makeCard,
   NO_CONTENT,
   NOBODY,
@@ -16,6 +17,7 @@ import {
   type RootId,
   type RunnableLane,
   rootIdFor,
+  type Send,
   type Target,
   type TaskId,
   type ThreadId,
@@ -37,12 +39,15 @@ import {
 import {
   byTarget,
   CARD_HISTORY,
+  type Cleared,
   canvasOf,
   encodeChat,
+  indexTasks,
   isBoardCard,
   LANE,
   orderAfter,
   type PlaceStep,
+  planGate,
   planThreadOpen,
   ROOT,
   setRecord,
@@ -500,4 +505,26 @@ export function runnableFor(lane: ThreadId): RunnableLane {
 /** Lane work whose every lane may run (`runnableFor`). */
 export const RUNS_ANY: Pick<LaneWork, "runnable"> = {
   runnable: lane => runnableFor(lane),
+}
+
+/**
+ * `send` cleared through the real gate (`planGate`), over a session with no
+ * cards, no archive and no lane records, and an empty tree for the root a
+ * branch reads (its own): for tests of what happens after the gate. Throws
+ * for a send it refuses.
+ */
+export function clearedSend(send: Send): Cleared<Send> {
+  const plan = planGate(send, {
+    tasks: indexTasks([], new Map()),
+    cards: [],
+    archived: new Map(),
+    lanes: new Map(),
+    kind: null,
+    roots: new Map([
+      [send.root, { index: indexTree({}), revisions: new Map() }],
+    ]),
+  })
+  if (plan.kind !== "cleared")
+    throw new Error(`a test's send was not cleared: ${plan.kind}`)
+  return plan.command
 }

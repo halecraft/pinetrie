@@ -905,6 +905,7 @@ describe("reorders and unqueue all", () => {
 
 describe("a chat from a card that found its lane busy", () => {
   const chat = {
+    kind: "chat",
     text: "@bob look",
     root: TEST_ROOT,
     at: { kind: "end", thread: LANE, seen: E1 },
@@ -951,6 +952,7 @@ test("setCommand: the command set, its place and placer kept", async () => {
 })
 
 const sentChat = {
+  kind: "chat",
   text: "hi",
   root: TEST_ROOT,
   at: { kind: "end", thread: LANE, seen: E1 },
