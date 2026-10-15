@@ -23,6 +23,9 @@
     layer: a project grants with `lanes.ssh.personal: true`.
   - ADR-0071: digests are a setting in any layer's `pinetrie.json`, on unless
     the most specific layer that sets it turns it off.
+- **Amended by:**
+  - ADR-0149: the local layer is keyed by the session's name from the
+    registry, not by the project folder's name.
 
 **Context.**
 

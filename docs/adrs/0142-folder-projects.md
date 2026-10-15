@@ -25,6 +25,9 @@
     folder, which is where publishing would have put the work.
   - ADR-0105: in a folder project, an offer is a pair of states, not a commit.
     It is reviewed as files, and it has no bookmark, no evolog and no stack.
+- **Amended by:**
+  - ADR-0149: a folder project's data is in its session's directory,
+    `$XDG_DATA_HOME/pinetrie/sessions/<name>/`.
 
 **Context.**
 

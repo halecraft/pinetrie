@@ -30,7 +30,9 @@ XDG spec says.
 - **The local layer is keyed by the session,** which is the project
   folder's name until sessions get names of their own. Two projects whose
   folders share a name share a local file, and a renamed folder loses its
-  own.
+  own. ADR-0149, accepted and not yet built, finds a session by its
+  folder's real path in a registry, and keys the local layer by the
+  session's own name.
 - **A project layer is named with its copy:** `{ project: "accepted" }`,
   `"working"` or `"lane"`. A copy cannot be declared without the project
   layer. `settle` takes each decoded copy under its name, and

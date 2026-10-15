@@ -21,6 +21,10 @@
   - ADR-0142: a folder no repo tracks may be branched too, as a folder
     project. Live and read-only remain the modes for a folder that is not the
     project.
+  - ADR-0149: a session's directory is
+    `$XDG_DATA_HOME/pinetrie/sessions/<name>/`, and its name comes from the
+    registry, found by the folder's real path. `PINETRIE_SESSION` attaches a
+    folder to a session by name.
 
 **Context.**
 
