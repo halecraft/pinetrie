@@ -14,12 +14,46 @@ const names = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
 export const listOf = (items: readonly string[]): string => names.format(items)
 
 /** How long ago `ms` was, roughly: "just now", "5 min ago", "3 h ago", "2 d ago". */
-export function ago(ms: number, now: number): string {
-  const s = Math.max(0, Math.round((now - ms) / 1000))
-  if (s < 60) return "just now"
-  if (s < 3600) return `${Math.round(s / 60)} min ago`
-  if (s < 86_400) return `${Math.round(s / 3600)} h ago`
-  return `${Math.round(s / 86_400)} d ago`
+export const ago = (ms: number, now: number): string => agoWords(now - ms)
+
+/** Something `ageMs` old, roughly: "just now", "5 min ago", "3 h ago", "2 d ago". */
+export const agoWords = (ageMs: number): string => {
+  const span = roughSpan(ageMs)
+  return span === null ? "just now" : `${span} ago`
+}
+
+/** How long until something `ms` away, roughly: "soon", "in 5 min", "in 3 h", "in 2 d". */
+export const until = (ms: number): string => {
+  const span = roughSpan(ms)
+  return span === null ? "soon" : `in ${span}`
+}
+
+/** A span to the nearest unit, "5 min", "3 h", "2 d"; null under a minute. */
+const roughSpan = (ms: number): string | null => {
+  const s = Math.max(0, Math.round(ms / 1000))
+  if (s < 60) return null
+  if (s < 3600) return `${Math.round(s / 60)} min`
+  if (s < 86_400) return `${Math.round(s / 3600)} h`
+  return `${Math.round(s / 86_400)} d`
+}
+
+const MINUTE = { ms: 60_000, one: "a minute", many: "minutes" } as const
+const SPAN_UNITS = [
+  { ms: 7 * 86_400_000, one: "a week", many: "weeks" },
+  { ms: 86_400_000, one: "a day", many: "days" },
+  { ms: 3_600_000, one: "an hour", many: "hours" },
+  MINUTE,
+] as const
+
+/**
+ * A length of time, exactly, in the largest unit it is a whole number of:
+ * "a week", "10 days", "36 hours"; past a minute's precision, rounded to
+ * minutes.
+ */
+export const spanWords = (ms: number): string => {
+  const unit = SPAN_UNITS.find(u => ms >= u.ms && ms % u.ms === 0) ?? MINUTE
+  const n = Math.max(1, Math.round(ms / unit.ms))
+  return n === 1 ? unit.one : `${n} ${unit.many}`
 }
 
 /** How long something has run, to the second: "0s", "59s", "1m 05s", "1h 02m". */

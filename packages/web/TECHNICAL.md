@@ -433,7 +433,10 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   Alt+←/→ (`Focus.inColumn`), and is scrolled into view when it moves with
   focus inside it.
 - **The task column lists its canvas's trash** (`.task-trash`, a row per
-  column, `.trash-row[data-card]`, its `.trash-restore`).
+  column, `.trash-row[data-card]`, its `.trash-restore`; `data-soon` on a
+  row whose deletion is close, in the warning colour), under a line saying
+  how long a column is kept (`.trash-keep`). `App` passes the keep
+  (`TRASH_KEEP_MS`) to `canvasTrash`, whose value carries it with its rows.
 
 ## Folding in motion (`use-fold-motion.ts`, `motion.ts`, ADR-0137, S164–S167)
 

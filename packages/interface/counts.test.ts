@@ -1,5 +1,5 @@
 import { expect, test } from "vitest"
-import { ago, elapsed, listOf, plural } from "./counts.ts"
+import { ago, elapsed, listOf, plural, spanWords, until } from "./counts.ts"
 
 test("plural: one is singular, anything else takes an s", () => {
   expect([0, 1, 2].map(n => plural(n, "card"))).toEqual([
@@ -39,4 +39,27 @@ test.each([
   [-5_000, "0s"],
 ])("elapsed(%d) is %s", (ms, words) => {
   expect(elapsed(ms)).toBe(words)
+})
+
+test.each([
+  [0, "soon"],
+  [59_000, "soon"],
+  [5 * 60_000, "in 5 min"],
+  [3 * 3_600_000, "in 3 h"],
+  [2 * 86_400_000, "in 2 d"],
+])("until(%d) is %s", (ms, words) => {
+  expect(until(ms)).toBe(words)
+})
+
+test.each([
+  [7 * 86_400_000, "a week"],
+  [14 * 86_400_000, "2 weeks"],
+  [10 * 86_400_000, "10 days"],
+  [86_400_000, "a day"],
+  [36 * 3_600_000, "36 hours"],
+  [3_600_000, "an hour"],
+  [30 * 60_000, "30 minutes"],
+  [90_500, "2 minutes"],
+])("spanWords(%d) is %s, in the largest unit it is a whole number of", (ms, words) => {
+  expect(spanWords(ms)).toBe(words)
 })

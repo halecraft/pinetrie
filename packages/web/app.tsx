@@ -154,6 +154,7 @@ import {
   canvasLines,
   canvasList,
   reachableAgents,
+  TRASH_KEEP_MS,
   taskPinnedOf,
   unstartedThreads,
 } from "@pinetrie/rules"
@@ -1122,6 +1123,7 @@ export function App({
               histories,
               task: strip[0].task,
               now: Date.now(),
+              keepMs: TRASH_KEEP_MS,
               names: workFacts.names,
               noteTitles,
             }),

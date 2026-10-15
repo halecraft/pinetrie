@@ -424,21 +424,40 @@ export function planProvenance(input: {
   return { histories, traces }
 }
 
-/** How long a trashed card is kept for a restore or the undo key to bring back. */
+/**
+ * How long a trashed card is kept for a restore or the undo key to bring
+ * back. Read only where the sweep and the page are wired: everything else
+ * takes the keep as an input, and words it from its value, so a keep set
+ * otherwise changes no rule and no word.
+ */
 export const TRASH_KEEP_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
- * When a trashed card is deleted: its newest history event (its discard, or
- * what came after) plus `TRASH_KEEP_MS`; `now` for one with no history to
- * tell. The sweep and the task column's list of its trash both read it.
+ * When a trashed card was trashed: its newest history event (its discard, or
+ * what came after); `now` for one with no history to tell.
+ */
+export function trashedAt(
+  card: CardId,
+  histories: ReadonlyMap<CardId, CardHistoryRecord>,
+  now: number,
+): number {
+  return histories.get(card)?.events.at(-1)?.at ?? now
+}
+
+/**
+ * When a trashed card is deleted: `keepMs` after it was trashed, or `now`
+ * for one with no history to tell. The sweep and the task column's list of
+ * its trash both read it.
  */
 export function trashDeadline(
   card: CardId,
   histories: ReadonlyMap<CardId, CardHistoryRecord>,
   now: number,
+  keepMs: number,
 ): number {
-  const last = histories.get(card)?.events.at(-1)
-  return last === undefined ? now : last.at + TRASH_KEEP_MS
+  return histories.get(card) === undefined
+    ? now
+    : trashedAt(card, histories, now) + keepMs
 }
 
 /** What the trash sweep deletes: the cards, and among them the threads, whose lanes go too. */
@@ -457,13 +476,16 @@ export function planTrashSweep(input: {
   readonly cards: readonly CardRecord[]
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
   readonly now: number
+  /** How long a trashed card is kept (`TRASH_KEEP_MS`). */
+  readonly keepMs: number
 }): TrashSweep {
   const doomed = new Set<CardId>(
     input.cards
       .filter(
         c =>
           c.place.kind === "trash" &&
-          trashDeadline(c.id, input.histories, input.now) <= input.now,
+          trashDeadline(c.id, input.histories, input.now, input.keepMs) <=
+            input.now,
       )
       .map(c => c.id),
   )

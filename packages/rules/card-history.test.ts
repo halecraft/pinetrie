@@ -471,12 +471,41 @@ test("planTrashSweep: a card discarded a week ago or more, or with no history to
         [C1, { card: C1, events: [event(0)] }],
       ]),
       now,
+      keepMs: TRASH_KEEP_MS,
     }),
   ).toEqual({ cards: [old, silent], threads: [] })
   expect(
-    trashDeadline(old, new Map([[old, { card: old, events: [event(50)] }]]), 1),
+    trashDeadline(
+      old,
+      new Map([[old, { card: old, events: [event(50)] }]]),
+      1,
+      TRASH_KEEP_MS,
+    ),
   ).toBe(50 + TRASH_KEEP_MS)
-  expect(trashDeadline(silent, new Map(), 7)).toBe(7)
+  expect(trashDeadline(silent, new Map(), 7, TRASH_KEEP_MS)).toBe(7)
+})
+
+test("planTrashSweep: a card is kept as long as it is told, whatever that is", () => {
+  const discarded = { kind: "trash", left: DRAFTING } as const
+  const at = (when: number) => ({
+    kind: "moved" as const,
+    by: ADA,
+    from: keyOf(DRAFTING),
+    to: keyOf(discarded),
+    at: when,
+  })
+  const hour = 60 * 60 * 1000
+  const card1 = cardIdFor("c110")
+  const histories = new Map([[card1, { card: card1, events: [at(0)] }]])
+  const sweep = (now: number) =>
+    planTrashSweep({
+      cards: [{ ...card(discarded), id: card1 }],
+      histories,
+      now,
+      keepMs: 2 * hour,
+    }).cards
+  expect(sweep(2 * hour - 1)).toEqual([])
+  expect(sweep(2 * hour)).toEqual([card1])
 })
 
 test("planTrashSweep: a card on a surface a deleted card owns goes with it, trashed or not, and so on down", () => {
@@ -528,6 +557,7 @@ test("planTrashSweep: a card on a surface a deleted card owns goes with it, tras
       cards: [trashedColumn, trashedThread, note, other, message],
       histories: new Map(),
       now: 1,
+      keepMs: TRASH_KEEP_MS,
     }),
   ).toEqual({
     cards: [column, thread, note.id, message.id],

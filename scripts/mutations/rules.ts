@@ -840,11 +840,20 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a discarded card is kept for good",
     file: "packages/rules/card-history.ts",
-    from: "          trashDeadline(c.id, input.histories, input.now) <= input.now,",
+    from: "          trashDeadline(c.id, input.histories, input.now, input.keepMs) <=\n            input.now,",
     to: "          false,",
     command: unit,
     expect:
       "planTrashSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere",
+  },
+  {
+    name: "the sweep keeps a trashed card a week, whatever it is told",
+    file: "packages/rules/card-history.ts",
+    from: "    : trashedAt(card, histories, now) + keepMs",
+    to: "    : trashedAt(card, histories, now) + 7 * 24 * 60 * 60 * 1000",
+    command: unit,
+    expect:
+      "planTrashSweep: a card is kept as long as it is told, whatever that is",
   },
   // ── card history and traces ──
   {

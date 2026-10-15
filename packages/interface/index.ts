@@ -661,6 +661,7 @@ export {
 } from "./start-button.ts"
 export {
   boardStateWords,
+  type CanvasTrash,
   canvasTrash,
   FOLD_TASK,
   pinnedCountWords,
@@ -673,6 +674,7 @@ export {
   type TrashRow,
   taskColumnView,
   trashHeading,
+  trashKeepWords,
   trashWords,
   UNFOLD_TASK,
 } from "./task-column-view.ts"

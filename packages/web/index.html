@@ -413,6 +413,9 @@
       .trash-title { color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .trash-why { grid-column: 1 / -1; font-size: .68rem; color: #8b93a1;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      /* A row whose deletion is close says so in the warning colour. */
+      .trash-row[data-soon] .trash-why { color: #e8c07a; }
+      .trash-keep { margin: .2rem 0 .1rem .6rem; font-size: .68rem; color: #6f7784; }
       .trash-restore { background: none; border: 0; padding: 0;
         font-size: .72rem; color: #8b93a1; cursor: pointer; }
       .trash-restore:hover:not(:disabled) { color: #e6e6e6; }

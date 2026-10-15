@@ -19,8 +19,9 @@ import type {
   Workflow,
   WriterId,
 } from "@pinetrie/core"
-import { NEW_NOTES_TITLE, trashDeadline } from "@pinetrie/rules"
+import { NEW_NOTES_TITLE, trashDeadline, trashedAt } from "@pinetrie/rules"
 import { type ControlWords, who } from "./card-words.ts"
+import { agoWords, spanWords, until } from "./counts.ts"
 import { UNNAMED_THREAD } from "./folded-column-view.ts"
 import { NO_TEXT, type TaskSummary } from "./root-label.ts"
 import type { Reader } from "./send.ts"
@@ -42,8 +43,16 @@ export interface TaskColumnView {
   readonly moves: readonly ThreadMove[]
   /** Nothing may be changed here: an archived task's column. */
   readonly readOnly: boolean
-  /** The columns trashed from its canvas, newest first (`canvasTrash`). */
-  readonly trash: readonly TrashRow[]
+  /** Its canvas's trash (`canvasTrash`). */
+  readonly trash: CanvasTrash
+}
+
+/** A task's canvas's trash, as its list draws it. */
+export interface CanvasTrash {
+  /** The columns trashed from the canvas, newest first. */
+  readonly rows: readonly TrashRow[]
+  /** How long a trashed column is kept before it is deleted. */
+  readonly keepMs: number
 }
 
 /** A column in the trash of a task's canvas, as its list draws it. */
@@ -53,11 +62,24 @@ export interface TrashRow {
   readonly title: string
   /** Who trashed it: its placer. */
   readonly by: WriterId
-  /** Whole days until the sweep deletes it (`trashDeadline`), at least 0. */
-  readonly deletesInDays: number
+  /** How long ago it was trashed (`trashedAt`). */
+  readonly ageMs: number
+  /**
+   * How long until the sweep deletes it (`trashDeadline`), at least 0, once
+   * that is close enough to warn of (`trashWarnMs`); null before.
+   */
+  readonly deletesInMs: number | null
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * How close a trashed column's deletion is before its row warns of it: its
+ * last day, or the last quarter of a keep shorter than four days, so a short
+ * keep does not warn from the start.
+ */
+export const trashWarnMs = (keepMs: number): number =>
+  Math.min(DAY_MS, keepMs / 4)
 
 /**
  * The columns trashed from `task`'s canvas: each thread or note column in a
@@ -68,9 +90,11 @@ export function canvasTrash(input: {
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
   readonly task: TaskId
   readonly now: number
+  /** How long a trashed card is kept (`TRASH_KEEP_MS`). */
+  readonly keepMs: number
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   readonly noteTitles: ReadonlyMap<NoteColumnId, NoteColumnRecord>
-}): readonly TrashRow[] {
+}): CanvasTrash {
   const rows = input.cards.flatMap(c => {
     if (
       c.place.kind !== "trash" ||
@@ -78,7 +102,9 @@ export function canvasTrash(input: {
       c.place.left.task !== input.task
     )
       return []
-    const deadline = trashDeadline(c.id, input.histories, input.now)
+    const { now, keepMs } = input
+    const deadline = trashDeadline(c.id, input.histories, now, keepMs)
+    const left = Math.max(0, deadline - now)
     const row = (card: ThreadId | NoteColumnId, title: string) => [
       {
         deadline,
@@ -86,10 +112,8 @@ export function canvasTrash(input: {
           card,
           title,
           by: c.placer,
-          deletesInDays: Math.max(
-            0,
-            Math.ceil((deadline - input.now) / DAY_MS),
-          ),
+          ageMs: now - trashedAt(c.id, input.histories, now),
+          deletesInMs: left <= trashWarnMs(keepMs) ? left : null,
         },
       },
     ]
@@ -102,7 +126,7 @@ export function canvasTrash(input: {
         return []
     }
   })
-  return rows
+  const sorted = rows
     .sort((a, b) =>
       b.deadline !== a.deadline
         ? b.deadline - a.deadline
@@ -111,23 +135,27 @@ export function canvasTrash(input: {
           : 1,
     )
     .map(r => r.row)
+  return { rows: sorted, keepMs: input.keepMs }
 }
 
 /**
- * A trash row's words: who trashed it, and how long until it is deleted.
- * Kept short to fit one line under the title in a narrow column.
+ * A trash row's words: who trashed it and when, or, once its deletion is
+ * close, when it is deleted. Kept short to fit one line under the title in a
+ * narrow column.
  */
 export const trashWords = (row: TrashRow, reader: Reader): string =>
   `${who(row.by, reader)} · ${
-    row.deletesInDays === 0
-      ? "deleted today"
-      : row.deletesInDays === 1
-        ? "1 day left"
-        : `${row.deletesInDays} days left`
+    row.deletesInMs === null
+      ? agoWords(row.ageMs)
+      : `deleted ${until(row.deletesInMs)}`
   }`
 
 /** The trash list's heading, with how many it holds. */
 export const trashHeading = (n: number): string => `trash · ${n}`
+
+/** Under the heading: how long a trashed column is kept, from the keep itself. */
+export const trashKeepWords = (keepMs: number): string =>
+  `kept for ${spanWords(keepMs)} after it is trashed, then deleted`
 
 /** A trash row's button, and what it does. */
 export const RESTORE_WORDS = {
@@ -145,7 +173,7 @@ export function taskColumnView(input: {
   readonly workflow: Workflow | null
   readonly archived: boolean
   /** Its canvas's trash (`canvasTrash`). */
-  readonly trash: readonly TrashRow[]
+  readonly trash: CanvasTrash
 }): TaskColumnView {
   const { head, workflow } = input
   const state =

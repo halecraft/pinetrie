@@ -183,6 +183,7 @@ export {
   type TrashSweep,
   traceEnd,
   trashDeadline,
+  trashedAt,
   type Verb,
   verbOf,
 } from "./card-history.ts"

@@ -87,7 +87,13 @@
   A note discarded before its note column was trashed is in that column's
   trash, and comes back with it.
 - **The task column lists its canvas's trash**: the columns trashed from
-  it, newest first, each with who trashed it and "N days left".
+  it, newest first, each with who trashed it and when. *Amended:* this
+  said "N days left", a countdown to a limit nobody had been told of. A
+  row now says when the column was trashed; one line under the heading
+  says how long a column is kept; and only a row close to its deletion
+  says when it goes. The keep is an input to the rules and the view, and
+  every word about it is worded from its value, so a keep made
+  configurable changes no word by hand.
   Anyone on the task restores one from there. An archived task's list is
   read only. A trashed card's own trash (a thread's discarded pinned
   cards, a note column's discarded notes) is not listed; the undo key and

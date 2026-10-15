@@ -4235,13 +4235,49 @@ export const mutations: readonly Mutation[] = [
       "Alt+→ and Alt+← move the column focus is in one place, never past an end, nor in a text box or the panel",
   },
   {
+    name: "the trash's line says a week, whatever the keep",
+    file: "packages/interface/task-column-view.ts",
+    from: "  `kept for ${spanWords(keepMs)} after it is trashed, then deleted`",
+    to: "  `kept for a week after it is trashed, then deleted`",
+    command: unit,
+    expect:
+      "the trash's line says how long a column is kept, from the keep itself",
+  },
+  {
+    name: "a trash row warns from its last day, whatever the keep",
+    file: "packages/interface/task-column-view.ts",
+    from: "  Math.min(DAY_MS, keepMs / 4)",
+    to: "  DAY_MS",
+    command: unit,
+    expect:
+      "canvasTrash: a column whose deletion is close says when, by the keep it is given",
+  },
+  {
+    name: "a trash row never warns",
+    file: "packages/interface/task-column-view.ts",
+    from: "          deletesInMs: left <= trashWarnMs(keepMs) ? left : null,",
+    to: "          deletesInMs: null,",
+    command: unit,
+    expect:
+      "canvasTrash: a column whose deletion is close says when, by the keep it is given",
+  },
+  {
+    name: "a span is always in minutes",
+    file: "packages/interface/counts.ts",
+    from: "  const unit = SPAN_UNITS.find(u => ms >= u.ms && ms % u.ms === 0) ?? MINUTE",
+    to: "  const unit = MINUTE",
+    command: unit,
+    expect:
+      "spanWords(604800000) is a week, in the largest unit it is a whole number of",
+  },
+  {
     name: "the canvas's trash lists another task's columns",
     file: "packages/interface/task-column-view.ts",
     from: "      c.place.left.task !== input.task\n",
     to: "      false\n",
     command: unit,
     expect:
-      "canvasTrash: the columns trashed from this canvas, newest first, with who trashed them and the days left",
+      "canvasTrash: the columns trashed from this canvas, newest first, with who trashed them and when",
   },
   {
     name: "a trashed thread's link opens nothing",

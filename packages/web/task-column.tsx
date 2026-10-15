@@ -31,6 +31,7 @@ import {
   TASK_PINS_HEADING,
   type TaskColumnView,
   trashHeading,
+  trashKeepWords,
   trashWords,
   UNFOLD_TASK,
 } from "@pinetrie/interface"
@@ -195,11 +196,17 @@ export function TaskColumn(p: {
             </div>
           ))}
         </details>
-        {view.trash.length > 0 && (
+        {view.trash.rows.length > 0 && (
           <details className="task-trash">
-            <summary>{trashHeading(view.trash.length)}</summary>
-            {view.trash.map(row => (
-              <div className="trash-row" data-card={row.card} key={row.card}>
+            <summary>{trashHeading(view.trash.rows.length)}</summary>
+            <p className="trash-keep">{trashKeepWords(view.trash.keepMs)}</p>
+            {view.trash.rows.map(row => (
+              <div
+                className="trash-row"
+                data-card={row.card}
+                data-soon={row.deletesInMs === null ? undefined : ""}
+                key={row.card}
+              >
                 <span className="trash-title">{row.title}</span>
                 <button
                   className="trash-restore"

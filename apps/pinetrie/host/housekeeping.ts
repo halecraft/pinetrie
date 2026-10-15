@@ -40,6 +40,7 @@ import {
   planLanesGone,
   planTrashSweep,
   QUEUE_HOLD,
+  TRASH_KEEP_MS,
 } from "@pinetrie/rules"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
@@ -206,7 +207,12 @@ export async function sweepTrash(input: {
   // gather
   const cards = readPlaces(places)
   const histories = readCardHistories(session)
-  const swept = planTrashSweep({ cards, histories, now: now() })
+  const swept = planTrashSweep({
+    cards,
+    histories,
+    now: now(),
+    keepMs: TRASH_KEEP_MS,
+  })
   if (swept.cards.length === 0) return
   const records = readLaneRecords(session)
   const own =

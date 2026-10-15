@@ -22,9 +22,14 @@ import {
   canvasTrash,
   pinnedCountWords,
   taskColumnView,
+  trashKeepWords,
   trashWords,
 } from "./task-column-view.ts"
 import { threadCardHead } from "./thread-card.ts"
+
+const HOUR = 60 * 60 * 1000
+const DAY = 24 * HOUR
+const WEEK = 7 * DAY
 
 const ADA = writerId("ada@x.io")
 const K = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -64,7 +69,7 @@ describe("taskColumnView", () => {
       },
       workflow: WORKFLOW,
       archived: false,
-      trash: [],
+      trash: { rows: [], keepMs: WEEK },
     })
     expect(view).toMatchObject({
       label: "Fix the sync bug",
@@ -86,7 +91,7 @@ describe("taskColumnView", () => {
       summary: undefined,
       workflow: null,
       archived: true,
-      trash: [],
+      trash: { rows: [], keepMs: WEEK },
     })
     expect(view).toMatchObject({
       folded: true,
@@ -107,7 +112,7 @@ describe("taskColumnView", () => {
         summary: undefined,
         workflow: WORKFLOW,
         archived: true,
-        trash: [],
+        trash: { rows: [], keepMs: WEEK },
       }).moves,
     ).toEqual([])
   })
@@ -136,8 +141,7 @@ test("a strip's task column is first, folded by default, and no card's column", 
   expect([cardFirst, taskAmong]).toHaveLength(2)
 })
 
-test("canvasTrash: the columns trashed from this canvas, newest first, with who trashed them and the days left", () => {
-  const DAY = 24 * 60 * 60 * 1000
+test("canvasTrash: the columns trashed from this canvas, newest first, with who trashed them and when", () => {
   const BEA = writerId("bea@x.io")
   const other = taskIdFor("01a0ffd2-0000-7000-8000-0000000000dd")
   const T1 = threadIdFor("old")
@@ -186,7 +190,7 @@ test("canvasTrash: the columns trashed from this canvas, newest first, with who 
     to: { kind: "trash" as const },
     at,
   })
-  const rows = canvasTrash({
+  const { rows } = canvasTrash({
     cards,
     histories: new Map([
       [T1, { card: T1, events: [event(0)] }],
@@ -194,16 +198,79 @@ test("canvasTrash: the columns trashed from this canvas, newest first, with who 
     ]),
     task: K,
     now: 4 * DAY,
+    keepMs: WEEK,
     names: new Map([[T2, "amber-fox" as never]]),
     noteTitles: new Map(),
   })
   expect(rows).toEqual([
-    { card: T2, title: "amber-fox", by: BEA, deletesInDays: 6 },
-    { card: T1, title: "a thread", by: ADA, deletesInDays: 3 },
+    { card: T2, title: "amber-fox", by: BEA, ageMs: DAY, deletesInMs: null },
+    { card: T1, title: "a thread", by: ADA, ageMs: 4 * DAY, deletesInMs: null },
   ])
   const reader = { me: ADA, nameOf: new Map([[BEA, "Bea"]]) }
   expect(rows.map(r => trashWords(r, reader))).toEqual([
-    "Bea · 6 days left",
-    "you · 3 days left",
+    "Bea · 1 d ago",
+    "you · 4 d ago",
   ])
+})
+
+test("canvasTrash: a column whose deletion is close says when, by the keep it is given", () => {
+  const T1 = threadIdFor("close")
+  const cards: CardRecord[] = [
+    {
+      kind: "thread",
+      id: T1,
+      owner: ADA,
+      placer: ADA,
+      place: {
+        kind: "trash",
+        left: { kind: "canvas", task: K, order: "a", width: 1 },
+      },
+      content: NO_CONTENT,
+    },
+  ]
+  const histories = new Map([
+    [
+      T1,
+      {
+        card: T1,
+        events: [
+          {
+            kind: "moved" as const,
+            by: ADA,
+            from: null,
+            to: { kind: "trash" as const },
+            at: 0,
+          },
+        ],
+      },
+    ],
+  ])
+  const rowAt = (now: number, keepMs: number) =>
+    canvasTrash({
+      cards,
+      histories,
+      task: K,
+      now,
+      keepMs,
+      names: new Map(),
+      noteTitles: new Map(),
+    }).rows[0]
+  const reader = { me: ADA, nameOf: new Map() }
+  // A week's keep warns in its last day, and not before.
+  expect(rowAt(6 * DAY - 1, WEEK)?.deletesInMs).toBeNull()
+  const lastDay = rowAt(WEEK - 3 * HOUR, WEEK)
+  expect(lastDay?.deletesInMs).toBe(3 * HOUR)
+  expect(lastDay && trashWords(lastDay, reader)).toBe("you · deleted in 3 h")
+  // A keep of eight hours warns in its last two, not from the start.
+  expect(rowAt(5 * HOUR, 8 * HOUR)?.deletesInMs).toBeNull()
+  expect(rowAt(7 * HOUR, 8 * HOUR)?.deletesInMs).toBe(HOUR)
+})
+
+test("the trash's line says how long a column is kept, from the keep itself", () => {
+  expect(trashKeepWords(WEEK)).toBe(
+    "kept for a week after it is trashed, then deleted",
+  )
+  expect(trashKeepWords(30 * DAY)).toBe(
+    "kept for 30 days after it is trashed, then deleted",
+  )
 })

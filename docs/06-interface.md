@@ -496,7 +496,11 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   task out of your sidebar too. The undo key brings any of it back.
 - **A task's trash is the task's**: the task column lists the columns
   trashed from its canvas, newest first, each its title over who trashed
-  it and "N days left"; anyone on the task **restore**s one, back where it
+  it and when ("Bea · 2 d ago"). One quiet line under the heading says how
+  long they are kept ("kept for a week after it is trashed, then
+  deleted"); a row says nothing of deletion until its last day, when it
+  reads "deleted in 5 h" in the warning colour. Anyone on the task
+  **restore**s one, back where it
   was, at its rank. An archived task's list is read only. A restore whose
   place is gone (a note whose column was trashed after it) or taken (your
   message where you have written a newer one) is refused, saying so.

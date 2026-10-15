@@ -528,9 +528,13 @@ which are swept.
   card in a trash is held by nobody (`holdingOf`: `trashed`), but its run
   stops (`takenIn`) and its queue waits. `planTrashSweep`
   (`card-history.ts`) deletes it once `trashDeadline` (its newest history
-  event plus `TRASH_KEEP_MS`, 7 days) has passed, and with it every card
+  event, `trashedAt`, plus the keep it is given) has passed, and with it every card
   on a surface it owns, down the owners: a thread's message, pinned,
-  queued and margin cards, a note column's notes. The host's sweep removes
+  queued and margin cards, a note column's notes. The keep is a
+  parameter of `trashDeadline` and `planTrashSweep`: `TRASH_KEEP_MS` (7
+  days) is read only where the host's sweep and the page are wired
+  (`housekeeping.ts`, `App`), so they cannot disagree, and a keep from
+  configuration replaces it in those two places alone. The host's sweep removes
   a deleted thread's lanes as an archive's teardown does
   (`planLanesGone`). Queueing puts it after the lane's
   last card, queued by the sender, and clears why it was not sent before;

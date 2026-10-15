@@ -449,8 +449,15 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
 - **The task column lists its canvas's trash** (`canvasTrash`,
   `task-column-view.ts`): each thread or note column in a trash whose
   `left` is this task's canvas, the newest discard first, with who trashed
-  it (its placer) and the days until the sweep (`trashDeadline`, the
-  sweep's own). Its **restore** is `planRestore`, a move to `BACK`.
+  it (its placer) and how long ago (`trashedAt`); a row whose deletion is
+  close (`trashWarnMs`: its last day, or the last quarter of a shorter
+  keep) says when it is deleted instead (`trashDeadline`, the sweep's
+  own). One line under the heading says how long a column is kept
+  (`trashKeepWords`). **The keep is an input, never a constant read
+  here**: `canvasTrash` takes it and returns it with its rows (`CanvasTrash`), and every word about
+  it is worded from its value (`spanWords`, `until`), so a keep set
+  otherwise changes no word by hand. Its **restore** is `planRestore`, a
+  move to `BACK`.
 - **A branch is a card from the moment it opens** (ADR-0126): `→` asks the
   host to open its thread (`open-thread` starting `branch`,
   `planOpenBranch`), whose card lands just after the thread its fork is in
