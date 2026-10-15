@@ -19,6 +19,7 @@ import {
   startStateId,
   turnStateId,
   type ValueWrite,
+  WORKSPACE_ROOT,
 } from "@pinetrie/core"
 import {
   folderStateHeld,
@@ -39,6 +40,7 @@ import {
   type LaneRunners,
   type LaneRuntime,
   planSnapshot,
+  STATES_MOUNT,
   type TurnCommitted,
 } from "@pinetrie/lanes"
 import {
@@ -50,7 +52,6 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { sourceChanges } from "./changes.ts"
-import { conflictVersions, planConflicts } from "./conflicts.ts"
 import { conflictedPaths, mergeInto } from "./merge.ts"
 import type { FolderLane } from "./proven.ts"
 import { baseState } from "./virtual-base.ts"
@@ -233,7 +234,7 @@ export function folderHistory(
       const state = catchUpStateId(input.newId())
       await snapshot(state)
       const paths = conflictedPaths(merged)
-      const conflicts = planConflicts({ lane, paths, base, ours, theirs })
+      const conflicts = paths.map(path => ({ lane, path, base, ours, theirs }))
       const record: StateRecord = {
         id: state,
         parents: [ours, theirs],
@@ -249,10 +250,16 @@ export function folderHistory(
       await store.write([
         ...baseRecord,
         ...stateWrite(g, record),
-        ...conflicts.records.map(c => setRecord(CONFLICT, c)),
+        ...conflicts.map(c => setRecord(CONFLICT, c)),
       ])
       const after = graph()
-      for (const op of [...startOp(after, state), ...conflicts.ops])
+      for (const op of [
+        ...startOp(after, state),
+        ...conflicts.map(({ lane: _, ...c }) => ({
+          kind: "conflict" as const,
+          ...c,
+        })),
+      ])
         await disks.states(lane, op)
       if (paths.length > 0)
         return {
@@ -260,7 +267,7 @@ export function folderHistory(
           from: theirs,
           contents: paths.map(path => ({
             path,
-            content: `Your version stays in /workspace/${path}. The three versions are at ${conflictVersions(path)}.`,
+            content: `Your version stays in ${WORKSPACE_ROOT}/${path}. The three versions are at ${STATES_MOUNT}/conflicts/${path}/{base,ours,theirs}.`,
           })),
           ours: [],
           theirs: [],

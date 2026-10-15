@@ -1186,7 +1186,7 @@ adapter's.
 
 | module | owns |
 |---|---|
-| `adapter.ts` | `ProjectAdapter`, which carries its `kind`: opened by setup where it reads your repo's names, before anything else reads the project (`OpenProject`: `kind`, `fileAt`, `prepareShared`, `identity`, `acceptedNow`, whose checkout is bound to its read), then started once lane work has its registry (`StartedProject`: the `Destination`, each lane's `history` from its record, refused for a lane of another kind, and `Splits`). The registry and the containers it is started with are bound late: neither is asked for before startup ends |
+| `adapter.ts` | `ProjectAdapter`, which carries its `kind`: opened by setup where it reads your repo's names, with the runtime, a folder project's `FolderDisks`, the session's lane files and the records, before anything else reads the project (`OpenProject`: `kind`, `fileAt`, `prepareShared`, `identity`, `acceptedNow`, whose checkout is bound to its read, or none for a folder), then started once lane work has its registry, with `ready` (asked, never held: a read waits on it for lanehost) and `keepStates` (`StartedProject`: the `Destination`, each lane's `history` from its record, refused for a lane of another kind, and `Splits`). The registry and the containers it is started with are bound late: neither is asked for before startup ends |
 | `destination.ts` | `Destination`: accepted work and offers as any kind has them: a file at a point (`fileAt`), where a new lane begins (`begin`), what a catch-up's base is now (`baseNow`), an archive's lanes moved (`lanesMoved`), the offers' acts (`OfferActs`), setup and publish (`AcceptedActs`), `quiet` and `close` |
 | `setup.ts` | `openProject`: the project opened through its adapter, with your repo's names settled from your files and the working copy's `pinetrie.json`, before anything else reads it, and its lane configs, before pi's setup. `Setup`, all of it or none: the opened project, the lanes' ssh, the shared directories, the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, none inside the project and none holding pine·trie's own directories, ADR-0036), and the base snapshot's refreshes |
 | `config.ts` | `pinetrie.json` as a fact of a state (ADR-0135, ADR-0146): accepted work's copy read at accepted work (`Destination.fileAt`) at startup and when the base moves (`readAccepted`), decoded by the host's table and settled with the start layers, its shared directories (the settled `lanes.shared`) prepared again, and put in force (`takeAccepted`, `onTaken`) once what it names is shared; a lane's own copy and the copy it started on, read at its tip and its start before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook): what it changes, and each key not taken. A lane with no commit in your repo yet runs with accepted work's |
@@ -1380,8 +1380,8 @@ adapter's.
   first; two parents). What differs between two states is `changes.ts`'s
   one answer: the disk's diff, made or gone directories read as their
   files, files rewritten alike dropped, source paths alone. A conflict is a
-  `CONFLICT` record and its three versions in the lane's states directory
-  (`conflicts.ts`); `resolve` writes the version chosen and closes it.
+  `CONFLICT` record and its three versions in the lane's states directory;
+  `resolve` writes the version chosen and closes it.
   `follow` is always null: nothing is fetched.
 - **The destination** (`index.ts`): `begin` and `baseNow` read your folder
   first, so a catch-up merges its newest state; a WIP is refused. Each run's

@@ -17,12 +17,15 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import type { FileAt, ReadSite } from "@pinetrie/lanes"
+import { readOffers, readRevisions } from "@pinetrie/reads"
 import type {
   ArchiveTeardown,
   ForkBegin,
   OfferAnswer,
   OfferAsk,
+  planOfferRead,
 } from "@pinetrie/rules"
+import type { Basics } from "../basics.ts"
 
 /** What a catch-up decides its base's update from (`planUpdateFrom`). */
 export interface BaseNow {
@@ -90,3 +93,20 @@ export interface Destination {
   /** Shutdown: nothing more is queued. */
   close(): void
 }
+
+/**
+ * What a review may read is found in (`planOfferRead`): every offer, and
+ * every held root's revisions, since a range is named by two states of one
+ * lane.
+ */
+export const offerReadFacts = (
+  basics: Pick<Basics, "session" | "docs">,
+): Parameters<typeof planOfferRead>[0] => ({
+  offers: readOffers(basics.session),
+  revisions: new Map(
+    basics.docs.loaded().flatMap(root => {
+      const view = basics.docs.view(root)
+      return view === null ? [] : [...readRevisions(view.doc)]
+    }),
+  ),
+})

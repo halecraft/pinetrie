@@ -9,14 +9,11 @@
 import { lstat, readdir, readFile, readlink } from "node:fs/promises"
 import path from "node:path"
 import type { FolderStamp } from "@pinetrie/core"
-import { type IgnoreFile, ignoredPaths } from "@pinetrie/rules/ignores"
-
-/** `rel`'s directory and every one above it, root (`""`) first. */
-const dirsOf = (rel: string): readonly string[] => {
-  if (rel === "") return [""]
-  const parts = rel.split("/")
-  return ["", ...parts.map((_, i) => parts.slice(0, i + 1).join("/"))]
-}
+import {
+  type IgnoreFile,
+  ignoreDirs,
+  ignoredPaths,
+} from "@pinetrie/rules/ignores"
 
 /** A stamp of what `lstat` and `readlink` say; null for a directory or anything else. */
 async function stampOf(at: string): Promise<FolderStamp | null> {
@@ -56,7 +53,7 @@ export async function scanFolder(input: {
       entries.filter(e => e.isDirectory()).map(e => under(e.name)),
     )
     const ignored = ignoredPaths({
-      files: dirsOf(dir).flatMap(d => {
+      files: ignoreDirs(paths).flatMap(d => {
         const f = ignores.get(d)
         return f === undefined ? [] : [f]
       }),

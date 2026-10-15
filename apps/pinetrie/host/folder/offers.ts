@@ -22,7 +22,7 @@ import {
 } from "@pinetrie/folder"
 import type { Keeper } from "@pinetrie/keeper"
 import type { FolderDisks } from "@pinetrie/lanes"
-import { readLaneRecords, readOffers, readRevisions } from "@pinetrie/reads"
+import { readLaneRecords, readOffers } from "@pinetrie/reads"
 import {
   answerDiff,
   BASE,
@@ -36,7 +36,7 @@ import {
 import { type Basics, failed } from "../basics.ts"
 import type { Describe } from "../describe.ts"
 import type { Records } from "../records.ts"
-import type { OfferActs } from "../work/destination.ts"
+import { type OfferActs, offerReadFacts } from "../work/destination.ts"
 import { type StateReader, sourceChanges } from "./changes.ts"
 
 /** The most of an offer's diff a description reads. */
@@ -236,18 +236,7 @@ export function startFolderOffers(deps: {
       }
     },
     async read(ask): Promise<OfferAnswer> {
-      const read = planOfferRead(
-        {
-          offers: readOffers(basics.session),
-          revisions: new Map(
-            basics.docs.loaded().flatMap(root => {
-              const view = basics.docs.view(root)
-              return view === null ? [] : [...readRevisions(view.doc)]
-            }),
-          ),
-        },
-        ask,
-      )
+      const read = planOfferRead(offerReadFacts(basics), ask)
       if (read.kind === "refused") return read
       if (read.span.kind !== "range")
         return {

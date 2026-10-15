@@ -32,12 +32,7 @@ import {
   revisionRead,
 } from "@pinetrie/jj"
 import type { PiSetup } from "@pinetrie/pi"
-import {
-  readLaneRecords,
-  readNames,
-  readOffers,
-  readRevisions,
-} from "@pinetrie/reads"
+import { readLaneRecords, readNames, readOffers } from "@pinetrie/reads"
 import {
   answerDiff,
   answerReview,
@@ -53,6 +48,7 @@ import { type Basics, failed } from "../../basics.ts"
 import { createDescriber } from "../../describe.ts"
 import type { Records } from "../../records.ts"
 import { decodeAuthority } from "../../settings.ts"
+import { offerReadFacts } from "../../work/destination.ts"
 import type { AcceptedWork } from "../accepted.ts"
 import { recordedJjLane } from "../proven.ts"
 import { act } from "./act.ts"
@@ -229,19 +225,7 @@ export function startOffers(input: {
               to: commitFromPoint(lane, span.to),
             }
       }
-      const read = planOfferRead(
-        {
-          offers: readOffers(basics.session),
-          // Every held root's: a range is named by two states, in one lane.
-          revisions: new Map(
-            basics.docs.loaded().flatMap(root => {
-              const view = basics.docs.view(root)
-              return view === null ? [] : [...readRevisions(view.doc)]
-            }),
-          ),
-        },
-        ask,
-      )
+      const read = planOfferRead(offerReadFacts(basics), ask)
       if (read.kind === "refused") return read
       // A range names its lane's points: read only in that lane, proven jj.
       const span = spanInCommits(read.span)

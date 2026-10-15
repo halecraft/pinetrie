@@ -142,8 +142,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a conflict's versions are not shown in its lane",
     file: "apps/pinetrie/host/folder/history.ts",
-    from: "      for (const op of [...startOp(after, state), ...conflicts.ops])",
-    to: "      for (const op of startOp(after, state))",
+    from: "        ...conflicts.map(({ lane: _, ...c }) => ({\n",
+    to: "        ...[].map(({ lane: _, ...c }) => ({\n",
     suite: "lanes",
     scenario: "folder",
     expect:
