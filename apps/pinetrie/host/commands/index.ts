@@ -81,6 +81,8 @@ export interface CommandDeps {
     Pick<Provenance, "onTaken">
   /** The documents' keeper: a `documents` command is one step on it. */
   readonly keeper: Pick<HostKeeper, "run" | "track">
+  /** An offer action's fact is a late write. */
+  readonly later: LaneDeps["later"]
   readonly relays: ChatDeps["relays"]
 }
 

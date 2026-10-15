@@ -28,6 +28,7 @@ import {
   firstLineOf,
   type IconsRecord,
   indexTree,
+  isRootId,
   isTaskId,
   isThreadId,
   type LaneRecord,
@@ -409,6 +410,15 @@ export function readRecords<R, K extends string, H extends Home>(
 export const readRoots = (
   doc: SessionDocHandle,
 ): ReadonlyMap<RootId, RootRecord> => readRecords(doc, ROOT)
+
+/**
+ * The roots the directory names, with a record that decodes or not: a root
+ * whose record is in an older shape is started all the same, and a reader
+ * that took `readRoots`' keys would leave it out until the directory
+ * rewrote it.
+ */
+export const readStartedRoots = (doc: SessionDocHandle): ReadonlySet<RootId> =>
+  new Set(Object.keys(readNamespace(doc, ROOT.namespace)).filter(isRootId))
 
 /** Every lane the agent is replying on, in any root, and the root it is in. */
 export function readRunningLanes(

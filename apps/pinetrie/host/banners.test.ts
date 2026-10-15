@@ -11,9 +11,11 @@ import {
   basics,
   deferred,
   methods,
+  placesFor,
   putValue,
   record,
 } from "./fakes.ts"
+import { createLater } from "./later.ts"
 import type { Records } from "./records.ts"
 
 const LANE = threadIdFor("1")
@@ -46,11 +48,17 @@ function setUp(pi: Partial<FakePi> = {}, named = true, drawing = true) {
     writeValues: async writes => applyWrites(b, writes),
     ...pi,
   })
-  const banners = createBanners({
+  const later = createLater({
     basics: b,
     keeper,
-    blobs,
     records: fake.port,
+    placesWriter: placesFor(b).placesWriter,
+    drain: () => {},
+  })
+  const banners = createBanners({
+    basics: b,
+    later,
+    blobs,
     piSetup: fake.port,
     draws: drawing,
   })

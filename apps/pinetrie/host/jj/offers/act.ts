@@ -51,7 +51,7 @@ export async function act(
   const { owner, repoConfig, basics, docs } = deps
   const done = await owner.command(ops => carry(ops))
   // After the command, so the description reads what it wrote. Tracked, and
-  // logged on failure, by `requestOutside`.
+  // logged on failure, by `describe`.
   if (done.describe !== null) void describe(deps, refresh, lane, done.describe)
   return done.fact === null
     ? { kind: "refused", code: done.code ?? ERR.REFUSED }

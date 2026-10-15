@@ -12,7 +12,6 @@ import { readTreeIndex } from "@pinetrie/reads"
 import { describeRequest, transcriptLines } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import { type Basics, failed } from "./basics.ts"
-import { requestOutside } from "./outside.ts"
 
 /** A description request's size: the skill, recent messages, the thread, the diff. */
 const DESCRIBE_BUDGET = 24_000
@@ -53,34 +52,32 @@ export function createDescriber(deps: {
     return input.keeper.track(
       input
         .gather()
-        .then(asked => {
+        .then(async asked => {
           if (asked === null) return
           const doc = deps.basics.docs.docOfLane(lane)
           const tip = doc === null ? null : readLaneTip(doc, lane)
-          return requestOutside({
-            keeper: input.keeper,
-            failed: fail,
-            request: async () => {
-              const messages = transcriptLines(
-                doc === null ? [] : projectTranscript(readTreeIndex(doc), tip),
-              )
-              const skill = await deps.piSetup.skill(
-                "pinetrie:skill:commit-message",
-              )
-              const { text } = await deps.piSetup.complete(
-                describeRequest({
-                  skill:
-                    skill?.content ?? "Write a commit message for this change.",
-                  diff: asked.diff,
-                  messages,
-                  recent: asked.recent,
-                  budget: DESCRIBE_BUDGET,
-                }),
-              )
-              return text
-            },
-            settle: text => input.settle(asked.gathered, text, tip),
-          })
+          // Asked outside the keeper, which tracks it, then settled in a step
+          // of the keeper's. Not a late write of the documents' (`later.ts`):
+          // each adapter's settle writes only while its offer is the one
+          // asked about, and an archive withdraws its threads' offers.
+          const messages = transcriptLines(
+            doc === null ? [] : projectTranscript(readTreeIndex(doc), tip),
+          )
+          const skill = await deps.piSetup.skill(
+            "pinetrie:skill:commit-message",
+          )
+          const { text } = await deps.piSetup.complete(
+            describeRequest({
+              skill:
+                skill?.content ?? "Write a commit message for this change.",
+              diff: asked.diff,
+              messages,
+              recent: asked.recent,
+              budget: DESCRIBE_BUDGET,
+            }),
+          )
+          if (text === null) return
+          await input.keeper.run(() => input.settle(asked.gathered, text, tip))
         })
         .catch(fail)
         .finally(() => describing.delete(lane)),

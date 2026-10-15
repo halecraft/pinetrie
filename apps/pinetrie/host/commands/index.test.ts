@@ -121,6 +121,7 @@ function setUp(
     ...placesFor(b, { texts: cards.port }),
     titles: titles.port,
     keeper,
+    later: { step: async () => {} },
   })
   const replies: Reply[] = []
   const sender = { send: (r: Reply) => void replies.push(r) }

@@ -35,6 +35,7 @@ import {
   readPlaces,
   readRootRecord,
   readRoots,
+  readWorkflow,
 } from "@pinetrie/reads"
 import {
   byTarget,
@@ -51,6 +52,7 @@ import {
   planThreadOpen,
   ROOT,
   setRecord,
+  WORKFLOW,
 } from "@pinetrie/rules"
 import {
   applyRecordWrites,
@@ -472,6 +474,32 @@ export function placeTask(
 
 /** The board state `putTask` puts a task's card in, by default. */
 export const TASK_STATE = workflowStateIdFor("open")
+
+/** The archive's state in the workflow `archiveTask` writes. */
+export const ARCHIVE_STATE = workflowStateIdFor("done")
+
+/** Who archives a task in `archiveTask`, unless a test names another. */
+export const ARCHIVER = writerId("archiver@example.com")
+
+/**
+ * `task` moved into the archive by `by`: the workflow of `TASK_STATE` and
+ * `ARCHIVE_STATE` written first when the session has none.
+ */
+export function archiveTask(
+  b: WriteDocs & Pick<FakeBasics, "places">,
+  task: TaskId = TASK_ID,
+  by: WriterId = ARCHIVER,
+): void {
+  if (readWorkflow(b.session) === null)
+    putValue(
+      b,
+      setRecord(WORKFLOW, {
+        open: [{ id: TASK_STATE, name: "Doing" }],
+        archive: { id: ARCHIVE_STATE, name: "Done" },
+      }),
+    )
+  placeTask(b, task, ARCHIVE_STATE, by, 2)
+}
 
 /**
  * A task as a thread's opening makes one (`planThreadOpen`): its card on

@@ -1,84 +1,48 @@
-// host/relays — another thread's agent asked, and its answer.
+// host/relays — another thread's agent asked.
 //
 // An ask, a person's (`relayChat`) or an agent's (`ask`, its tool's hook),
 // is relayed into the asked thread: what it has not heard of the asking
 // thread first, then the ask as its run's prompt; a busy agent gets an ask
-// card instead, which its drain relays (`relayCard`). A relayed run's end
-// sends its last message back as the answer (`ended`): run in the asker's
-// lane when an agent asked and it is idle, steered into it while it runs,
-// else appended. When every member a person's message asked has answered,
-// one request decides what comes next (the round). Each step gathers, plans
-// with `@pinetrie/rules` (`planRelay`, `planAnswer`, `planDelivery`,
-// `roundReplyOf`) and then writes, in one keeper step. Where both threads
-// are (`threadReach`) is gathered first, from the session and the places,
-// and a thread out of reach is refused before any root is opened.
+// card instead, which its drain relays (`relayCard`). What the relayed run
+// sends back is `answers.ts`'. Each step gathers, plans with
+// `@pinetrie/rules` (`planRelay`, `planDelivery`) and then writes, in one
+// keeper step. Where both threads are (`threadReach`) is gathered first,
+// from the session and the places, and a thread out of reach is refused
+// before any root is opened.
 
 import {
-  askOutcome,
   cardIdOfKind,
   type EntryId,
-  indexAsks,
-  isRoundAnswered,
-  laneOf,
   lastHeardEntry,
   lastInvitation,
-  lastWord,
-  messageAt,
   messageText,
   projectTranscript,
   type QueuedFact,
-  type Reach,
   type RelayDetails,
   type ThreadId,
-  type ThreadLane,
   type ThreadName,
-  type TreeIndex,
-  threadEnd,
   threadMembers,
-  type WriterId,
 } from "@pinetrie/core"
-import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
+import { readArchived, readNames, readPlaces } from "@pinetrie/reads"
 import {
-  readArchived,
-  readLanes,
-  readNames,
-  readParticipantNames,
-  readPlaces,
-  readQueueHolds,
-  readThreads,
-  readTreeIndex,
-} from "@pinetrie/reads"
-import {
-  type AnswerMessage,
-  type AnswerPlan,
-  decodeRelay,
-  displayName,
-  encodeAnswer,
   encodeHeard,
   encodeRelayMessage,
-  NONE_BLANK,
-  planAnswer,
   planAskCard,
   planDelivery,
   planRelay,
   type RelayRefusal,
   reachableAgents,
   relayRefusalText,
-  roundReplyOf,
-  roundRequest,
   type ToolAnswer,
-  threadReach,
-  transcriptLines,
   unreachableRefusal,
 } from "@pinetrie/rules"
-import { readEntryMessage, readLaneTip } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "./basics.ts"
 import type { Budgets } from "./budgets.ts"
 import { queueFact as queueFactIn } from "./facts.ts"
-import { requestOutside } from "./outside.ts"
 import type { Places } from "./places.ts"
 import type { Runs } from "./runs.ts"
 import { tasksNow } from "./tasks.ts"
+import { threadsNow } from "./threads-now.ts"
 import type { LaneWork } from "./work/index.ts"
 
 /** A tool's answer that is no merge: text alone. */
@@ -111,17 +75,25 @@ export interface Relays {
   relayChat(thread: ThreadId, sendId: string): Promise<void>
   /** An ask card popped on `lane`: relay it now. */
   relayCard(lane: ThreadId, relay: RelayDetails): Promise<"ran" | "next">
-  /** `lane`'s run ended with `prompt`: an answer, when it was a relay. */
-  ended(lane: ThreadId, prompt: EntryId | null): Promise<void>
+  /**
+   * Relay into `to`, from `from`, inside a keeper step: refused for a thread
+   * out of reach before either root is opened, else run there or queued as
+   * an ask card. `end` is where the asking thread's path ends, when not at
+   * its end now.
+   */
+  deliver(
+    from: ThreadId,
+    to: ThreadId,
+    relay: Omit<RelayDetails, "from" | "fromName">,
+    end?: EntryId,
+  ): Promise<Delivered>
 }
 
-/** What a thread is, read now: its root's index, its end, and its lane. */
-interface ThreadNow {
-  readonly thread: ThreadId
-  readonly index: TreeIndex
-  readonly end: EntryId | null
-  readonly lane: ThreadLane
-}
+/** What a relay came to. */
+export type Delivered =
+  | { readonly kind: "ran" }
+  | { readonly kind: "queued"; readonly held: boolean }
+  | { readonly kind: "refused"; readonly why: RelayRefusal }
 
 export function createRelays(deps: {
   readonly basics: Pick<
@@ -129,65 +101,26 @@ export function createRelays(deps: {
     "docs" | "session" | "places" | "live" | "now" | "newId" | "log"
   >
   readonly keeper: Pick<HostKeeper, "run" | "track">
-  readonly agent: Pick<Agent, "lane">
-  readonly scribe: Pick<Scribe, "appendToTree">
   readonly start: Runs["start"]
   /** Whether a run may start on a lane (`LaneWork.runnable`). */
   readonly runnable: LaneWork["runnable"]
   readonly budgets: Budgets
-  readonly piSetup: Pick<PiSetup, "complete" | "skill">
   /** Ask for a lane's drain. */
   readonly drain: (lane: ThreadId) => void
   /** The writer of the places: an ask's card and a fact are the host's changes. */
   readonly placesWriter: Places
 }): Relays {
   const { basics, budgets } = deps
-  const { docs, session, places, live } = basics
-  // Answers that wake nobody, for a lane that was running when they came:
-  // appended when its run ends, never steered into it, so its agent does
-  // not take them as something to answer. Held in memory: a restart drops
-  // them, as it drops the run they waited behind.
-  const pending = new Map<ThreadId, AnswerMessage[]>()
-
-  const nameOf = (thread: ThreadId): string =>
-    readNames(session).get(thread) ?? thread.slice(-8)
-  const personName = (w: WriterId): string =>
-    displayName(w, readParticipantNames(session).get(w))
-
-  /** `thread` as it is now; null for a thread no root holds. */
-  async function threadNow(thread: ThreadId): Promise<ThreadNow | null> {
-    const root = readThreads(session).get(thread)?.root
-    if (root === undefined) return null
-    const doc = await docs.root(root)
-    const index = readTreeIndex(doc)
-    const lanes = readLanes(
-      { doc, live },
-      index,
-      readPlaces(places),
-      readQueueHolds(session),
-      NONE_BLANK,
-    )
-    const lane = laneOf(lanes, thread)
-    const end =
-      lane.kind === "lane"
-        ? (readLaneTip(doc, thread) ?? null)
-        : threadEnd(index, thread)
-    return { thread, index, end, lane }
-  }
-
-  /** Where `thread` is now, from the session and the places: no root is opened. */
-  const reachNow = (thread: ThreadId): Reach =>
-    threadReach(thread, {
-      cards: readPlaces(places),
-      archived: readArchived(session, places),
-    })
+  const { session, places } = basics
+  const threads = threadsNow(basics)
+  const { nameOf, personName } = threads
 
   /** Both threads of an ask, named, and where each is: gathered once, before any root is opened. */
   const bothReaches = (from: ThreadId, to: ThreadId) => ({
     fromName: nameOf(from),
-    fromReach: reachNow(from),
+    fromReach: threads.reach(from),
     toName: nameOf(to),
-    toReach: reachNow(to),
+    toReach: threads.reach(to),
   })
 
   /**
@@ -203,25 +136,21 @@ export function createRelays(deps: {
     to: ThreadId,
     relay: Omit<RelayDetails, "from" | "fromName">,
     end?: EntryId,
-  ): Promise<
-    | { readonly kind: "ran" }
-    | { readonly kind: "queued"; readonly held: boolean }
-    | { readonly kind: "refused"; readonly why: RelayRefusal }
-  > {
+  ): Promise<Delivered> {
     const reaches = bothReaches(fromThread, to)
     const away = unreachableRefusal(reaches)
     if (away !== null) return { kind: "refused", why: away }
-    const now = await threadNow(fromThread)
+    const now = await threads.thread(fromThread)
     if (now === null)
       return {
         kind: "refused",
         why: { kind: "unknown", name: nameOf(fromThread) },
       }
-    const from: ThreadNow = end === undefined ? now : { ...now, end }
+    const from = end === undefined ? now : { ...now, end }
     // Proven once: the plan refuses a lane of another kind, and a run
     // starts only with the proof.
     const runnable = deps.runnable(to)
-    const target = await threadNow(to)
+    const target = await threads.thread(to)
     const planned = planRelay({
       ...reaches,
       from: from.thread,
@@ -308,7 +237,7 @@ export function createRelays(deps: {
     text: string,
   ): Promise<ToolAnswer> {
     return deps.keeper.run(async () => {
-      const from = await threadNow(lane)
+      const from = await threads.thread(lane)
       const target = findAgent(to)
       const budget = budgets.runBudget(lane)
       if (from === null || budget === null)
@@ -353,7 +282,7 @@ export function createRelays(deps: {
       // A thread out of reach is told nothing, and its root is not opened.
       const away = unreachableRefusal(bothReaches(lane, left.thread))
       if (away !== null) return said(refusal(away), true)
-      const there = await threadNow(left.thread)
+      const there = await threads.thread(left.thread)
       if (there === null) return said(refusal({ kind: "unknown", name }), true)
       if (!threadMembers(there.index, there.end).includes(lane))
         return said(`You are not a member of ${left.name}.`, true)
@@ -369,7 +298,7 @@ export function createRelays(deps: {
 
   async function relayChat(thread: ThreadId, sendId: string): Promise<void> {
     await deps.keeper.run(async () => {
-      const from = await threadNow(thread)
+      const from = await threads.thread(thread)
       if (from === null) return
       const source = from.index.bySend.get(sendId)
       const chat =
@@ -415,189 +344,5 @@ export function createRelays(deps: {
     return delivered.kind === "ran" ? "ran" : "next"
   }
 
-  /** `relay`'s run on `lane` ended with `plan`: sent back to where it was asked. */
-  async function sendAnswer(
-    lane: ThreadId,
-    relay: RelayDetails,
-    plan: AnswerPlan,
-  ): Promise<void> {
-    if (plan.kind === "undelivered") {
-      await queueFact({
-        kind: "undelivered",
-        lane,
-        to: relay.from,
-        toName: nameOf(relay.from),
-        why: plan.reach,
-        by: relay.by,
-      })
-      return
-    }
-    if (plan.kind === "unanswered") {
-      await queueFact({
-        kind: "unanswered",
-        lane: relay.from,
-        member: lane,
-        why: plan.why,
-        by: relay.by,
-      })
-      return
-    }
-    const from = await threadNow(relay.from)
-    if (from === null) return
-    const message = encodeAnswer(plan.answer, basics.now())
-    const to = planDelivery({
-      lane: from.lane,
-      compelled: plan.answer.wakes,
-      mode: "queue",
-      race: null,
-      steers: plan.answer.wakes,
-    })
-    switch (to.kind) {
-      case "run": {
-        // An asker of another kind runs nothing: the answer waits in its
-        // thread, as one that wakes nobody does.
-        const runnable = deps.runnable(to.thread)
-        if (typeof runnable === "object")
-          await deps.agent.lane(to.thread).append(message)
-        else
-          deps.start(runnable, {
-            kind: "prompt",
-            message,
-            pinnedSeen: [],
-            heard: null,
-          })
-        return
-      }
-      case "steer":
-        await deps.agent.lane(to.thread).steer(message)
-        return
-      case "appendToLane":
-        await deps.agent.lane(to.thread).append(message)
-        return
-      case "appendToTree": {
-        const root = readThreads(session).get(relay.from)?.root
-        if (root !== undefined && from.end !== null)
-          await deps.scribe.appendToTree(
-            message,
-            { root, at: { kind: "entry", id: from.end } },
-            relay.from,
-          )
-        return
-      }
-      case "busy":
-        // It wakes nobody: it waits for the run to end.
-        pending.set(relay.from, [...(pending.get(relay.from) ?? []), message])
-        return
-      case "createAndRun":
-      case "conflict":
-        // An answer never creates a lane, nor races anyone.
-        return
-    }
-  }
-
-  async function ended(lane: ThreadId, prompt: EntryId | null): Promise<void> {
-    // Queued now, before the run's end drains the lane: what waited for the
-    // run is appended before anything the drain starts.
-    const waiting = pending.get(lane) ?? []
-    pending.delete(lane)
-    if (waiting.length > 0)
-      await deps.keeper.run(async () => {
-        for (const message of waiting)
-          await deps.agent.lane(lane).append(message)
-      })
-    if (prompt === null) return
-    await budgets.runEnded(prompt)
-    const doc = docs.docOfLane(lane)
-    if (doc === null) return
-    const stored = readEntryMessage(doc, prompt)
-    const relay = stored.present ? decodeRelay(stored.message) : undefined
-    if (relay === undefined) return
-    await deps.keeper.run(async () => {
-      const index = readTreeIndex(doc)
-      const asks = indexAsks(index)
-      const outcome = askOutcome(index, asks, prompt, { running: false })
-      const word = lastWord(index, asks, prompt)
-      const text = word === null ? "" : (messageAt(index, word)?.text ?? "")
-      const planned = planAnswer({
-        relay,
-        relayEntry: prompt,
-        thread: lane,
-        name: nameOf(lane),
-        end:
-          outcome.kind === "stopped"
-            ? { kind: "stopped" }
-            : outcome.kind === "failed" || text === ""
-              ? { kind: "failed" }
-              : { kind: "answered", text },
-        spent: budgets.spent(relay.budget),
-        fromReach: reachNow(relay.from),
-      })
-      await sendAnswer(lane, relay, planned)
-    })
-    if (relay.asker.kind === "person") await round(relay)
-  }
-
-  /**
-   * After every member a person's message asked has answered: when it asked two
-   * or more, one request decides what comes next.
-   */
-  async function round(relay: RelayDetails): Promise<void> {
-    if (reachNow(relay.from).kind !== "open") return
-    const from = await threadNow(relay.from)
-    if (from === null) return
-    const asked = from.index.entries[relay.source]?.message?.asks ?? []
-    if (
-      asked.length < 2 ||
-      !isRoundAnswered(from.index, from.end, relay.source)
-    )
-      return
-    if (budgets.spent(relay.budget)) return
-    const skill = await deps.piSetup.skill("pinetrie:skill:agents-round")
-    if (skill === null) {
-      basics.log("[host] no agents-round skill")
-      return
-    }
-    const members = new Map(
-      threadMembers(from.index, from.end).map(t => [nameOf(t), t] as const),
-    )
-    const request = roundRequest({
-      skill: skill.content,
-      members: [...members.keys()],
-      lines: transcriptLines(projectTranscript(from.index, from.end)),
-    })
-    await requestOutside({
-      keeper: deps.keeper,
-      failed: error =>
-        basics.log(`[host] the round's request failed: ${error}`),
-      request: async () => {
-        const { text, tokens } = await deps.piSetup.complete(request)
-        budgets.spendFrom(relay.budget, tokens)
-        return text
-      },
-      settle: async reply => {
-        const next = roundReplyOf(reply, members)
-        if (next.kind === "people")
-          await queueFact({
-            kind: "round",
-            lane: relay.from,
-            line: next.line,
-            by: relay.by,
-          })
-        if (next.kind === "ask") {
-          const now = await threadNow(relay.from)
-          if (now === null) return
-          await deliverRelay(relay.from, next.thread, {
-            source: now.end ?? relay.source,
-            asker: { kind: "person", writer: relay.by },
-            askerName: personName(relay.by),
-            text: next.text,
-            budget: relay.budget,
-            by: relay.by,
-          })
-        }
-      },
-    })
-  }
-
-  return { ask, leave, relayChat, relayCard, ended }
+  return { ask, leave, relayChat, relayCard, deliver: deliverRelay }
 }

@@ -1,0 +1,172 @@
+import {
+  type QueuedFact,
+  type TaskId,
+  taskIdFor,
+  threadIdFor,
+  workflowStateIdFor,
+  writerId,
+} from "@pinetrie/core"
+import { createKeeper } from "@pinetrie/keeper"
+import { readPlaces } from "@pinetrie/reads"
+import {
+  MARK,
+  PARTICIPANT,
+  queuedOn,
+  setRecord,
+  WORKFLOW,
+} from "@pinetrie/rules"
+import { describe, expect, test } from "vitest"
+import {
+  applyWrites,
+  basics,
+  placesFor,
+  placeTask,
+  putTask,
+  putValue,
+  TASK_ID,
+} from "./fakes.ts"
+import { createLater } from "./later.ts"
+
+const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
+const ADA = writerId("ada@example.com")
+const HERE = threadIdFor("01a00000-0000-7000-8000-0000000000a1")
+const AWAY = threadIdFor("01a00000-0000-7000-8000-0000000000b2")
+const SHUT: TaskId = taskIdFor("01a00000-0000-7000-8000-0000000000d4")
+
+/** HERE on an open task; AWAY on one Ada archived. */
+function setUp() {
+  const b = basics()
+  putTask(b, HERE)
+  putTask(b, AWAY, SHUT)
+  putValue(
+    b,
+    setRecord(WORKFLOW, {
+      open: [{ id: DOING, name: "Doing" }],
+      archive: { id: DONE, name: "Done" },
+    }),
+  )
+  placeTask(b, TASK_ID, DOING, ADA)
+  placeTask(b, SHUT, DONE, ADA)
+  putValue(b, setRecord(PARTICIPANT, { writer: ADA, name: "Ada" }))
+  const keeper = createKeeper()
+  const written: unknown[] = []
+  const drained: string[] = []
+  const later = createLater({
+    basics: b,
+    keeper,
+    records: {
+      writeValues: async writes => {
+        written.push(...writes)
+        applyWrites(b, writes)
+      },
+    },
+    placesWriter: placesFor(b).placesWriter,
+    drain: lane => drained.push(lane),
+  })
+  return { b, keeper, later, written, drained }
+}
+
+const round = (lane: typeof HERE): QueuedFact => ({
+  kind: "round",
+  lane,
+  line: "over to you",
+  by: ADA,
+})
+
+const facts = (b: ReturnType<typeof basics>, lane: typeof HERE) =>
+  queuedOn(readPlaces(b.places), lane).map(c => c.kind)
+
+describe("a late write of the host's", () => {
+  test("in an archived task writes nothing, plans nothing, and says why", async () => {
+    const { b, later, written } = setUp()
+    let planned = false
+    await later.step({ kind: "thread", thread: AWAY }, "a digest", () => {
+      planned = true
+      return { facts: [round(AWAY)] }
+    })
+    expect([planned, written, facts(b, AWAY)]).toEqual([false, [], []])
+    expect(b.lines).toEqual([
+      expect.stringContaining("a digest not written: archived by Ada"),
+    ])
+  })
+
+  test("queues each fact on its lane, and asks for the lane's drain", async () => {
+    const { b, later, drained } = setUp()
+    await later.step({ kind: "thread", thread: HERE }, "a round", () => ({
+      facts: [round(HERE)],
+    }))
+    expect([facts(b, HERE), drained]).toEqual([["fact"], [HERE]])
+  })
+
+  test("drops a fact for a lane out of reach, and writes the rest", async () => {
+    const { b, later } = setUp()
+    await later.step({ kind: "thread", thread: HERE }, "answers", () => ({
+      facts: [round(AWAY), round(HERE)],
+    }))
+    expect([facts(b, AWAY), facts(b, HERE)]).toEqual([[], ["fact"]])
+    expect(b.lines).toEqual([
+      expect.stringContaining("a round fact not written: archived by Ada"),
+    ])
+  })
+
+  test("to an archived task, a title's, writes nothing", async () => {
+    const { later, written } = setUp()
+    await later.step({ kind: "task", task: SHUT }, "a title", () => ({
+      records: [setRecord(MARK, { task: SHUT, title: "x", by: ADA, at: 1 })],
+    }))
+    expect(written).toEqual([])
+  })
+
+  test("is queued before `step` returns, ahead of a step queued after it", async () => {
+    const { keeper, later } = setUp()
+    const order: string[] = []
+    const late = later.step({ kind: "thread", thread: HERE }, "a step", () => {
+      order.push("late")
+      return null
+    })
+    const next = keeper.run(async () => {
+      order.push("next")
+    })
+    await Promise.all([late, next])
+    expect(order).toEqual(["late", "next"])
+  })
+
+  test("asked outside the keeper is gated where its thread is when it answers", async () => {
+    const { b, later } = setUp()
+    const answer = Promise.withResolvers<string>()
+    const held = new Set<string>()
+    const done = later.outside({
+      scope: { kind: "thread", thread: HERE },
+      what: "a round",
+      request: () => answer.promise,
+      plan: () => ({ facts: [round(HERE)] }),
+      failed: error => {
+        throw error
+      },
+      held: { set: held, key: "a" },
+    })
+    expect(held.has("a")).toBe(true)
+    // Its task is archived while the model writes.
+    placeTask(b, TASK_ID, DONE, ADA, 2)
+    answer.resolve("people: over to you")
+    await done
+    expect([facts(b, HERE), held.size]).toEqual([[], 0])
+  })
+
+  test("asked outside the keeper, a failure goes to `failed` and frees its key", async () => {
+    const { later } = setUp()
+    const failures: unknown[] = []
+    const held = new Set<string>()
+    await later.outside({
+      scope: { kind: "thread", thread: HERE },
+      what: "a round",
+      request: async () => {
+        throw new Error("no key")
+      },
+      plan: () => null,
+      failed: error => failures.push(error),
+      held: { set: held, key: "a" },
+    })
+    expect([failures.length, held.size]).toEqual([1, 0])
+  })
+})

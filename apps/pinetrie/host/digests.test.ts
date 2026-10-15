@@ -17,16 +17,20 @@ import {
 import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
-import { createDigests } from "./digests.ts"
+import { createDigests, writePendingVerdict } from "./digests.ts"
 import {
+  archiveTask,
   basics,
   methods,
+  placesFor,
+  putTask,
   putValue,
   ROOT_ID,
   record,
   row,
   writesOf,
 } from "./fakes.ts"
+import { createLater } from "./later.ts"
 import type { Records } from "./records.ts"
 import { endRun } from "./runs.ts"
 
@@ -76,30 +80,39 @@ function running(
     complete: async () => ({ text: await answer, tokens: 0 }),
     writeValues: async () => {},
   })
+  // The thread on an open task's canvas, so its late writes land.
+  putTask(b, lane)
   const keeper = createKeeper()
-  const digests = createDigests({
+  const later = createLater({
     basics: b,
     keeper,
-    presence,
     records: pi.port,
+    placesWriter: placesFor(b).placesWriter,
+    drain: () => {},
+  })
+  const digests = createDigests({
+    basics: b,
+    later,
+    presence,
     piSetup: pi.port,
     enabled,
   })
+  const pending = writePendingVerdict({ basics: b, records: pi.port })
   const read = () =>
     presence.reading.set(
       readingKey(seatKey(writerId("ada@example.com"), "s1"), "c1"),
       "e-2",
     )
-  return { b, pi, keeper, digests, read }
+  return { b, pi, keeper, digests, pending, read }
 }
 
 test("a live digest waits for someone to read the thread", async () => {
   const { pi, keeper, digests, read } = running()
-  await digests.step(ROOT_ID, entryId("e-2"), failed)
+  await digests.step(lane, entryId("e-2"), failed)
   await keeper.idle()
   expect(methods(pi.calls)).toEqual([])
   read()
-  await digests.step(ROOT_ID, entryId("e-2"), failed)
+  await digests.step(lane, entryId("e-2"), failed)
   await keeper.idle()
   expect(methods(pi.calls)).toEqual(["skill", "complete", "writeValues"])
   expect(writesOf(pi.calls)).toEqual([
@@ -135,7 +148,7 @@ test("a live digest that comes back after the final one is dropped", async () =>
   const late = Promise.withResolvers<string | null>()
   const { b, pi, keeper, digests, read } = running(late.promise)
   read()
-  await digests.step(ROOT_ID, entryId("e-2"), failed)
+  await digests.step(lane, entryId("e-2"), failed)
   // The final one is written while the live one is out.
   putValue(
     b,
@@ -199,7 +212,7 @@ test("a reply in another shape is logged, and a live one writes nothing", async 
     "Fixing the rail.\nIt is going well.",
   )
   read()
-  await digests.step(ROOT_ID, entryId("e-2"), failed)
+  await digests.step(lane, entryId("e-2"), failed)
   await keeper.idle()
   expect(methods(pi.calls)).toEqual(["skill", "complete"])
   expect(
@@ -270,7 +283,7 @@ async function stopping(
   enabled = true,
 ) {
   const set = running(answer, enabled)
-  await set.digests.pending(lane, entryId("e-1"))
+  await set.pending(lane, entryId("e-1"))
   putValue(set.b, writesOf(set.pi.calls)[0] as Parameters<typeof putValue>[1])
   endRun(set.b.live, lane, runId("r-1"))
   return set
@@ -322,7 +335,7 @@ test("with digests off, a run's end asks for its verdict alone, and no live dige
   const { pi, keeper, digests, read } = await stopping("done", false)
   read()
   const before = pi.calls.length
-  await digests.step(ROOT_ID, entryId("e-2"), failed)
+  await digests.step(lane, entryId("e-2"), failed)
   await keeper.idle()
   expect(pi.calls.length).toBe(before)
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
@@ -370,7 +383,7 @@ test("a failed run's verdict is its error, and no verdict is asked for", async (
     }),
   )
   writeLaneTip(set.b.root, lane, entryId("e-5"))
-  await set.digests.pending(lane, entryId("e-1"))
+  await set.pending(lane, entryId("e-1"))
   putValue(set.b, writesOf(set.pi.calls)[0] as Parameters<typeof putValue>[1])
   await set.digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await set.keeper.idle()
@@ -395,4 +408,22 @@ test("the scripted model answers a run's end with a verdict and a digest, so the
     verdict: { said: "done", reason: null },
     digest: { headline: SCRIPTED_DESCRIPTION, points: [] },
   })
+})
+
+test("a run's end answered after its task was archived writes nothing and opens no root", async () => {
+  const answer = Promise.withResolvers<string | null>()
+  const { b, pi, keeper, digests } = await stopping(answer.promise)
+  const opened: unknown[] = []
+  const root = b.docs.root.bind(b.docs)
+  b.docs.root = async id => {
+    opened.push(id)
+    return root(id)
+  }
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+  const written = writesOf(pi.calls).length
+  // Its task is archived while the model writes.
+  archiveTask(b)
+  answer.resolve("done\nFixed the rail.\n- `rail.tsx` draws it")
+  await keeper.idle()
+  expect([writesOf(pi.calls).length, opened]).toEqual([written, []])
 })

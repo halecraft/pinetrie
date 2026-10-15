@@ -10,7 +10,6 @@ import {
   type Intent,
   indexAsks,
   type LaneView,
-  type OfferFact,
   type RootId,
   type ThreadId,
   type TreeIndex,
@@ -42,9 +41,9 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import type { RootDocHandle } from "@pinetrie/schema"
-import { type Basics, failed, type HostKeeper } from "../basics.ts"
+import { type Basics, failed } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
-import { queueFact } from "../facts.ts"
+import type { Later } from "../later.ts"
 import type { Places } from "../places.ts"
 import type { Records } from "../records.ts"
 import { type Runs, startRun } from "../runs.ts"
@@ -60,8 +59,8 @@ export interface LaneDeps {
   readonly cancel: Runs["cancel"]
   /** Drain a lane whose queue a card joined, unless it runs (`queueDrain`). */
   readonly drain: (lane: ThreadId) => void
-  /** The documents' keeper: a fact's card is written in a step of its own. */
-  readonly keeper: Pick<HostKeeper, "run">
+  /** An offer action's fact, written after the reply, in a late step of its own. */
+  readonly later: Pick<Later, "step">
   /** The writer of the places: a fact's card is the host's change. */
   readonly placesWriter: Places
   /** Which queued cards are blank: they leave a lane idle. */
@@ -258,25 +257,15 @@ export async function actOnOffer(
       code: done.code,
       message: offerRefusal(done.code),
     }
-  // Off the command's reply: the fact is written in a keeper step of its own.
-  void deps.keeper
-    .run(() => recordFact(deps, done.fact))
+  // Off the command's reply, in a late step: what the command did, queued as
+  // a card on its thread, which an idle lane pops at once and a running one
+  // when its run ends. A thread its task's archive took since gets none.
+  void deps.later
+    .step({ kind: "thread", thread: lane }, "an offer's fact", () => ({
+      facts: [done.fact],
+    }))
     .catch(failed(deps.basics, "an offer's fact", lane))
   return action === "accept" ? { kind: "accepted" } : { kind: "offered" }
-}
-
-/**
- * What a command on an offer did, queued as a card on its thread and the lane's
- * drain asked for: an idle lane pops it at once, a running one when its run
- * ends, in order with the cards already waiting. A lane no root holds gets
- * none.
- */
-export async function recordFact(
-  deps: Pick<LaneDeps, "basics" | "drain" | "placesWriter">,
-  fact: OfferFact,
-): Promise<void> {
-  if (deps.basics.docs.rootOfLane(fact.lane) === null) return
-  await queueFact(deps, fact)
 }
 
 /** Why an offer action was refused, worded once. */

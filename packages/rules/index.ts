@@ -467,6 +467,8 @@ export {
 export { branchAfter, rankAfter, rankOfDrop } from "./rank.ts"
 export {
   awayWords,
+  type LateScope,
+  lateAway,
   reachableAgents,
   reachWords,
   threadReach,
@@ -584,6 +586,7 @@ export {
   canvasOf,
   indexTasks,
   isCanvasCard,
+  isLivePlace,
   isOnCanvas,
   NO_TASK_INDEX,
   planTaskOpening,

@@ -49,7 +49,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a relayed run's end sends no answer",
     file: "apps/pinetrie/host/index.ts",
-    from: '    void relays.ended(lane, prompt).catch(failed(basics, "an answer"))\n',
+    from: '    void answers.ended(lane, prompt).catch(failed(basics, "an answer"))\n',
     to: "",
     suite: "host",
     scenario: "agents",
@@ -67,8 +67,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a spent budget tells its thread nothing",
     file: "apps/pinetrie/host/budgets.ts",
-    from: '        await queueFact(deps, {\n          kind: "budget-spent",\n          lane: over.thread,\n          budget: over.message,\n          limit: over.limit,\n          by: over.by,\n        })\n',
-    to: "",
+    from: '        facts: [\n          {\n            kind: "budget-spent",',
+    to: '        facts: [] || [\n          {\n            kind: "budget-spent",',
     suite: "host",
     scenario: "agents",
     expect:
@@ -222,8 +222,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance's fact is never written",
     file: "apps/pinetrie/host/commands/lane.ts",
-    from: "    .run(() => recordFact(deps, done.fact))",
-    to: "    .run(async () => {})",
+    from: "      facts: [done.fact],",
+    to: "      facts: [],",
     suite: "lanes",
     scenario: "catch-up",
     expect: "an acceptance leaves a fact the thread shows",
@@ -1640,8 +1640,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root moved out of Done keeps its place there",
     file: "apps/pinetrie/host/commands/board.ts",
-    from: "    outcome: await deps.moves.placeTask(writer, moved),\n    teardown:",
-    to: '    outcome:\n      moved.transition === "archive"\n        ? await deps.moves.placeTask(writer, moved)\n        : settled({ kind: "moved" }),\n    teardown:',
+    from: "  const outcome = await deps.moves.placeTask(writer, moved)\n",
+    to: '  const outcome =\n    moved.transition === "archive"\n      ? await deps.moves.placeTask(writer, moved)\n      : settled({ kind: "moved" })\n',
     suite: "host",
     scenario: "board",
     expect:

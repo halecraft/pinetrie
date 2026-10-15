@@ -11,7 +11,7 @@ import type {
   ThreadName,
   WriterId,
 } from "@pinetrie/core"
-import type { CanvasCard } from "./task.ts"
+import { type CanvasCard, isLivePlace } from "./task.ts"
 
 /** `thread`'s reach now, from its card's place and the archive. */
 export function threadReach(
@@ -30,6 +30,44 @@ export function threadReach(
   return record === undefined
     ? { kind: "open", task: place.task }
     : { kind: "archived", task: place.task, record }
+}
+
+/** Where a late write of the host's goes: a thread, or a task (a title's). */
+export type LateScope =
+  | { readonly kind: "thread"; readonly thread: ThreadId }
+  | { readonly kind: "task"; readonly task: TaskId }
+
+/**
+ * Why a write the host decided before a gap may not land now, or null when
+ * it may. A thread takes it when its card is at a live place
+ * (`isLivePlace`), the rule its root is held by, so a write let through
+ * finds its root loaded; otherwise its `threadReach` says why. That is not
+ * `threadReach`'s own answer: it calls a thread trashed in an archived task
+ * `trashed`, and one trashed from an inventory `gone`. A thread not opened
+ * yet (named for a column before its first message) is in no task and has
+ * no root, so it takes one too: its banner, drawn as it is named. A task
+ * takes it unless it is archived.
+ */
+export function lateAway(
+  scope: LateScope,
+  facts: {
+    readonly cards: readonly CardRecord[]
+    readonly archived: ReadonlyMap<TaskId, ArchivedTask>
+    /** The threads opened: each with its record (`THREAD`). */
+    readonly opened: { readonly has: (thread: ThreadId) => boolean }
+  },
+): Away | null {
+  if (scope.kind === "task") {
+    const record = facts.archived.get(scope.task)
+    return record === undefined
+      ? null
+      : { kind: "archived", task: scope.task, record }
+  }
+  const card = facts.cards.find(c => c.id === scope.thread)
+  if (card === undefined && !facts.opened.has(scope.thread)) return null
+  if (card !== undefined && isLivePlace(card.place, facts.archived)) return null
+  const reach = threadReach(scope.thread, facts)
+  return reach.kind === "open" ? null : reach
 }
 
 /**

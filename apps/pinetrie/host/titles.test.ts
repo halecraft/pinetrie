@@ -4,20 +4,20 @@ import {
   THE_AGENT,
   taskIdFor,
   threadIdFor,
-  workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import type { PiSetup } from "@pinetrie/pi"
 import { readMarks } from "@pinetrie/reads"
-import { MARK, setRecord, WORKFLOW } from "@pinetrie/rules"
+import { MARK, setRecord } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   applyWrites,
+  archiveTask,
   basics,
   deferred,
-  placeTask,
+  placesFor,
   putLane,
   putTask,
   putValue,
@@ -27,6 +27,7 @@ import {
   TASK_ID,
   writeDirectory,
 } from "./fakes.ts"
+import { createLater } from "./later.ts"
 import type { Records } from "./records.ts"
 import { createTitles } from "./titles.ts"
 
@@ -60,11 +61,17 @@ function setUp(
     writeValues: async w => applyWrites(b, w),
   })
   const keeper = createKeeper()
-  const titles = createTitles({
+  const later = createLater({
     basics: b,
     keeper,
-    enabled: over.enabled ?? true,
     records: pi.port,
+    placesWriter: placesFor(b).placesWriter,
+    drain: () => {},
+  })
+  const titles = createTitles({
+    basics: b,
+    later,
+    enabled: over.enabled ?? true,
     piSetup: pi.port,
   })
   const title = () => readMarks(b.session).get(TASK_ID)
@@ -128,8 +135,6 @@ test("asked, with no message yet: refused, and nothing asked", async () => {
   expect(pi.calls).toEqual([])
 })
 
-const DONE = workflowStateIdFor("x")
-
 test("a reply that is not a title, or a root archived meanwhile, writes nothing", async () => {
   const wordy = setUp({ reply: "Here is a title for the thread: Rail" })
   writeEntry(wordy.b.root, row(E1, null))
@@ -142,14 +147,7 @@ test("a reply that is not a title, or a root archived meanwhile, writes nothing"
   writeEntry(archived.b.root, row(E1, null))
   writeDirectory(archived.b)
   await archived.keeper.run(() => archived.titles.asked(TASK_ID, ADA))
-  placeTask(archived.b, TASK_ID, DONE, ADA)
-  putValue(
-    archived.b,
-    setRecord(WORKFLOW, {
-      open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
-      archive: { id: DONE, name: "Done" },
-    }),
-  )
+  archiveTask(archived.b)
   archived.reply.resolve("Rail layout")
   await archived.keeper.idle()
   expect(archived.title()).toBeUndefined()

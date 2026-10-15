@@ -3,8 +3,8 @@
 // `titleStillWanted` decide; this carries them out.
 //
 // Both are called inside a command's step on the documents' keeper, so they
-// gather and plan there, and only the request goes outside it
-// (`requestOutside`). The mark is written in a step of its own.
+// gather and plan there, and only the request goes outside it. The mark is a
+// late write (`later.ts`), so none lands in a task archived meanwhile.
 
 import {
   ERR,
@@ -15,18 +15,15 @@ import {
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
-import type { Keeper } from "@pinetrie/keeper"
 import type { PiSetup } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
-  readArchived,
   readLaneRecords,
   readMarks,
   readTasks,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
-  archivedIn,
   planMark,
   planTitling,
   type TitleTrigger,
@@ -35,8 +32,7 @@ import {
   titleStillWanted,
 } from "@pinetrie/rules"
 import { type Basics, failed } from "./basics.ts"
-import { requestOutside } from "./outside.ts"
-import type { Records } from "./records.ts"
+import type { Later } from "./later.ts"
 import { tasksNow } from "./tasks.ts"
 
 /** A title request's size: the skill aside, the first message and the newest. */
@@ -60,14 +56,13 @@ export interface Titles {
 
 export function createTitles(deps: {
   readonly basics: Pick<Basics, "session" | "places" | "docs" | "log" | "now">
-  readonly keeper: Pick<Keeper, "run" | "track">
+  readonly later: Pick<Later, "outside">
   /** The settled `titles.enabled`: whether a task is titled unasked. */
   readonly enabled: boolean
-  readonly records: Pick<Records, "writeValues">
   /** The title model, and its skill. */
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
 }): Titles {
-  const { basics, keeper } = deps
+  const { basics, later } = deps
   const { session, places, log } = basics
   // Tasks an unasked title is being asked for.
   const asking = new Set<TaskId>()
@@ -95,8 +90,9 @@ export function createTitles(deps: {
     if (plan.kind === "refused") return plan
     if (plan.kind === "skip") return null
     const { by } = plan
-    void requestOutside({
-      keeper,
+    void later.outside({
+      scope: { kind: "task", task },
+      what: "a title",
       ...(trigger.kind === "lane" ? { held: { set: asking, key: task } } : {}),
       failed: failed(basics, "titling a thread"),
       request: async () => {
@@ -121,11 +117,9 @@ export function createTitles(deps: {
         }
         return title
       },
-      settle: async title => {
-        // An archived task takes no writes.
-        if (archivedIn([task], readArchived(session, places)) !== null) return
+      plan: title => {
         const marks = readMarks(session)
-        if (!titleStillWanted(marks.get(task), by)) return
+        if (!titleStillWanted(marks.get(task), by)) return null
         const planned = planMark({
           of: { kind: "task", task },
           title,
@@ -136,8 +130,7 @@ export function createTitles(deps: {
           columns: new Set(),
           columnTitles: new Map(),
         })
-        if (planned.kind === "writes")
-          await deps.records.writeValues(planned.writes)
+        return planned.kind === "writes" ? { records: planned.writes } : null
       },
     })
     return null

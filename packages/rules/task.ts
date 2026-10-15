@@ -421,12 +421,29 @@ export function unstartedThreads(
 }
 
 /**
- * The roots something still holds: those with a thread whose
- * card is on the canvas of a task outside `archived`, or in an inventory.
- * What a starting host loads (`planLoads`), and what archiving keeps. A
- * root gets its document with its first entry, so one the
- * directory does not name (`started`) is not held: an unstarted new tab's
- * thread names a root with nothing to load.
+ * Whether a thread card at `place` keeps its root held: in an inventory, or
+ * on the canvas of a task outside `archived`. A trashed card is asked of the
+ * place it left, so a restore, or a link to it, finds its messages until the
+ * sweep deletes it. The host's late writes ask the same (`lateAway`,
+ * `reach.ts`), so a write it lets through finds its root loaded.
+ */
+export function isLivePlace(
+  place: CardPlace,
+  archived: { readonly has: (task: TaskId) => boolean },
+): boolean {
+  const left = livePlaceOf(place)
+  return (
+    left.kind === "inventory" ||
+    (left.kind === "canvas" && !archived.has(left.task))
+  )
+}
+
+/**
+ * The roots something still holds: those with a thread whose card is at a
+ * live place (`isLivePlace`). What a starting host loads (`planLoads`), and
+ * what archiving keeps. A root gets its document with its first entry, so
+ * one the directory does not name (`started`) is not held: an unstarted new
+ * tab's thread names a root with nothing to load.
  */
 export function rootsHeld(
   cards: readonly CardRecord[],
@@ -437,14 +454,13 @@ export function rootsHeld(
   const held = new Set<RootId>()
   for (const c of cards) {
     if (c.kind !== "thread") continue
-    // A trashed thread's root is held until the sweep deletes it, so a
-    // restore, or a link to it, finds its messages.
-    const place = livePlaceOf(c.place)
-    const live =
-      place.kind === "inventory" ||
-      (place.kind === "canvas" && !archived.has(place.task))
     const root = threads.get(c.id)?.root
-    if (live && root !== undefined && started.has(root)) held.add(root)
+    if (
+      isLivePlace(c.place, archived) &&
+      root !== undefined &&
+      started.has(root)
+    )
+      held.add(root)
   }
   return held
 }

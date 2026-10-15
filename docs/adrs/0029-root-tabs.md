@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
-- **Evidence:** S9, S28, S30, S31
+- **Evidence:** S9, S28, S30, S31, S198, S199
 - **Amends:**
   - ADR-0021: Start Chat and Start Agent become the add tab.
   - ADR-0024: only the columns of the root tab you are on report.
@@ -11,6 +11,13 @@
   - ADR-0028: marks stay inside a root, and focus, its breadcrumb and the
     whole-session rail sections are withdrawn, along with this ADR's change to
     ADR-0027.
+- **Revised:**
+  - 2026-10-15 (S198, S199): an archived root takes no write the host decided
+    before it was archived either: a model request's answer, a step a run's
+    end queued, an offer action's fact. Each lands only in a thread whose card
+    is at a live place, the rule its root is held by, and an archive writes
+    its threads' pending verdicts `unclassified`, since the run's end that
+    would have written each is refused.
 - **Amended by:**
   - ADR-0030: the tab bar is each person's, and a tab closes for you.
   - ADR-0045: a root's label is its mark's title, else its first message's

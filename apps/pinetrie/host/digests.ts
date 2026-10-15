@@ -3,8 +3,9 @@
 // unless the config turns digests off. At a run's end one request asks for
 // the verdict and the final digest together, digests on or off. `planDigest`,
 // `planRunEnded`, `digestToWrite` and `runEndedToWrite` decide, and `digestOf`
-// and `endReplyOf` read the reply; this carries them out, outside the queue
-// (`requestOutside`).
+// and `endReplyOf` read the reply; this carries them out, each step and each
+// answer a late write (`later.ts`), so none lands in a thread archived or
+// gone meanwhile.
 //
 // Each event names an entry, and the ask is `promptOf` that entry. An entry
 // is written once, so its ask never changes; a lane's tip moves with every
@@ -19,7 +20,6 @@ import {
   type RootId,
   type ThreadId,
 } from "@pinetrie/core"
-import type { Keeper } from "@pinetrie/keeper"
 import type { PiSetup } from "@pinetrie/pi"
 import {
   readDigests,
@@ -48,7 +48,7 @@ import {
 } from "@pinetrie/rules"
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
-import { requestOutside } from "./outside.ts"
+import type { Later } from "./later.ts"
 import type { Records } from "./records.ts"
 
 /**
@@ -62,14 +62,8 @@ type Failed = (error: unknown) => void
 
 /** A failure goes to `failed`, never to the caller. */
 export interface Digests {
-  /** A turn is done at `at`, in `root`: a live digest of its ask, when due. */
-  step(root: RootId, at: EntryId, failed: Failed): Promise<void>
-  /**
-   * `lane`'s run that `prompt` started is stopping: its verdict is pending.
-   * Written before the run's end closes it (`planRunEnd`), so no reader sees
-   * the lane stopped beside the last run's verdict.
-   */
-  pending(lane: ThreadId, prompt: EntryId): Promise<void>
+  /** A turn of `lane`'s is done at `at`: a live digest of its ask, when due. */
+  step(lane: ThreadId, at: EntryId, failed: Failed): Promise<void>
   /** That run, in `root`, has ended: its verdict and its ask's final digest. */
   ended(
     root: RootId,
@@ -79,12 +73,31 @@ export interface Digests {
   ): Promise<void>
 }
 
+/**
+ * `lane`'s run that `prompt` started is stopping: its verdict is pending.
+ * Written before the run's end closes it (`planRunEnd`), so no reader sees
+ * the lane stopped beside the last run's verdict. Not a late write: the lane
+ * still runs, so its task cannot be archived.
+ */
+export const writePendingVerdict =
+  (deps: {
+    readonly basics: Pick<Basics, "docs">
+    readonly records: Pick<Records, "writeValues">
+  }) =>
+  async (lane: ThreadId, prompt: EntryId): Promise<void> => {
+    const doc = deps.basics.docs.docOfLane(lane)
+    if (doc === null) return
+    const end = indexAsks(readTreeIndex(doc)).last.get(prompt) ?? prompt
+    await deps.records.writeValues([
+      setRecord(VERDICT, pendingVerdict(lane, prompt, end)),
+    ])
+  }
+
 export function createDigests(deps: {
   readonly basics: Pick<Basics, "session" | "docs" | "places" | "log" | "now">
-  readonly keeper: Keeper
+  readonly later: Later
   /** Who is reading which thread: a live digest waits for a reader. */
   readonly presence: PresenceDocHandle
-  readonly records: Pick<Records, "writeValues">
   /** The model a digest is asked of, and its skill. */
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
   /** The settled `digests.enabled`: off, a run's end asks for its verdict alone. */
@@ -95,7 +108,8 @@ export function createDigests(deps: {
    */
   readonly spent?: (ask: EntryId, tokens: number) => void
 }): Digests {
-  const { basics, keeper, presence, enabled } = deps
+  const { basics, later, presence, enabled } = deps
+  const { docs } = basics
   // Asks a request is out for.
   const asking = new Set<EntryId>()
 
@@ -132,14 +146,15 @@ export function createDigests(deps: {
   }
 
   /** One step: gather, decide with `planDigest`, and ask outside the queue. */
-  const live = (root: RootId, at: EntryId, failed: Failed) =>
-    keeper
-      .run(async () => {
-        if (!enabled) return
-        const doc = await basics.docs.root(root)
+  const live = (lane: ThreadId, at: EntryId, failed: Failed) =>
+    later
+      .step({ kind: "thread", thread: lane }, "a digest", () => {
+        const root = docs.rootOfLane(lane)
+        const doc = root === null ? undefined : docs.view(root)?.doc
+        if (!enabled || root === null || doc === undefined) return null
         const index = readTreeIndex(doc)
         const ask = promptOf(index, at)
-        if (ask === null) return
+        if (ask === null) return null
         const asks = indexAsks(index)
         const plan = planDigest({
           index,
@@ -156,9 +171,10 @@ export function createDigests(deps: {
           ),
           now: basics.now(),
         })
-        if (plan === null) return
-        void requestOutside({
-          keeper,
+        if (plan === null) return null
+        void later.outside({
+          scope: { kind: "thread", thread: lane },
+          what: "a digest",
           held: { set: asking, key: ask },
           failed,
           request: async () => {
@@ -171,18 +187,22 @@ export function createDigests(deps: {
             })
             return read === null ? null : { body: read.digest }
           },
-          settle: async ({ body }) => {
+          plan: ({ body }) => {
+            const now = docs.view(root)?.doc
+            if (now === undefined) return null
             const record = digestToWrite({
-              stored: readDigests(doc).get(ask),
+              stored: readDigests(now).get(ask),
               asked: { final: false },
               body,
               prompt: ask,
               at: basics.now(),
             })
-            if (record !== null)
-              await deps.records.writeValues([setRecord(DIGEST, record, root)])
+            return record === null
+              ? null
+              : { records: [setRecord(DIGEST, record, root)] }
           },
         })
+        return null
       })
       .catch(failed)
 
@@ -197,9 +217,10 @@ export function createDigests(deps: {
     prompt: EntryId,
     failed: Failed,
   ) =>
-    keeper
-      .run(async () => {
-        const doc = await basics.docs.root(root)
+    later
+      .step({ kind: "thread", thread: lane }, "a run's verdict", () => {
+        const doc = docs.view(root)?.doc
+        if (doc === undefined) return null
         const index = readTreeIndex(doc)
         const asks = indexAsks(index)
         const end = asks.last.get(prompt) ?? prompt
@@ -227,66 +248,63 @@ export function createDigests(deps: {
               })
             : null,
         })
-        if (plan.verdict !== null)
-          await deps.records.writeValues([
-            setRecord(VERDICT, {
-              lane,
-              ask: prompt,
-              end,
-              verdict: plan.verdict,
-            }),
-          ])
         const { request } = plan
-        if (request === null) return
-        const answer: Answer = request.answer
-        void requestOutside({
-          keeper,
-          held: { set: asking, key: prompt },
-          failed,
-          request: async () => {
-            const reply = await askModel(prompt, {
-              answer,
-              ask: request.lines.said,
-              work: request.lines.work,
-              shown: request.lines.shown,
-              previous: request.previous,
-            }).catch((error: unknown) => {
-              failed(error)
-              return null
-            })
-            // Never null, so the settle runs for a failed request too.
-            return { reply }
-          },
-          settle: async ({ reply }) => {
-            const writes = runEndedToWrite({
-              root,
-              lane,
-              ask: prompt,
-              end,
-              answer,
-              stored: {
-                verdict: readVerdicts(basics.session).get(lane),
-                digest: readDigests(doc).get(prompt),
-              },
-              reply,
-              at: basics.now(),
-            })
-            if (writes.length > 0) await deps.records.writeValues(writes)
-          },
-        })
+        if (request !== null) {
+          const answer: Answer = request.answer
+          void later.outside({
+            scope: { kind: "thread", thread: lane },
+            what: "a run's verdict",
+            held: { set: asking, key: prompt },
+            failed,
+            request: async () => {
+              const reply = await askModel(prompt, {
+                answer,
+                ask: request.lines.said,
+                work: request.lines.work,
+                shown: request.lines.shown,
+                previous: request.previous,
+              }).catch((error: unknown) => {
+                failed(error)
+                return null
+              })
+              // Never null, so the settle runs for a failed request too.
+              return { reply }
+            },
+            plan: ({ reply }) => {
+              const now = docs.view(root)?.doc
+              if (now === undefined) return null
+              return {
+                records: runEndedToWrite({
+                  root,
+                  lane,
+                  ask: prompt,
+                  end,
+                  answer,
+                  stored: {
+                    verdict: readVerdicts(basics.session).get(lane),
+                    digest: readDigests(now).get(prompt),
+                  },
+                  reply,
+                  at: basics.now(),
+                }),
+              }
+            },
+          })
+        }
+        return plan.verdict === null
+          ? null
+          : {
+              records: [
+                setRecord(VERDICT, {
+                  lane,
+                  ask: prompt,
+                  end,
+                  verdict: plan.verdict,
+                }),
+              ],
+            }
       })
       .catch(failed)
 
-  return {
-    step: live,
-    async pending(lane, prompt) {
-      const doc = basics.docs.docOfLane(lane)
-      if (doc === null) return
-      const end = indexAsks(readTreeIndex(doc)).last.get(prompt) ?? prompt
-      await deps.records.writeValues([
-        setRecord(VERDICT, pendingVerdict(lane, prompt, end)),
-      ])
-    },
-    ended,
-  }
+  return { step: live, ended }
 }

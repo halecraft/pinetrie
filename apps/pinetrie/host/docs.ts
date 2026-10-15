@@ -10,7 +10,15 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import type { RootView } from "@pinetrie/reads"
-import { readLaneRecords, readRoots } from "@pinetrie/reads"
+import {
+  readArchived,
+  readLaneRecords,
+  readPlaces,
+  readRoots,
+  readStartedRoots,
+  readThreads,
+} from "@pinetrie/reads"
+import { rootsHeld } from "@pinetrie/rules"
 import {
   type LiveDocHandle,
   type PlacesDocHandle,
@@ -79,12 +87,27 @@ export const rootsOpenedWords = (counts: {
  * The roots a starting host opens: every root with a thread in a task outside
  * the archive, or in an inventory (`rootsHeld`), from the threads' records,
  * whatever the directory holds: a root whose directory record is stale is
- * opened all the same, and the directory rebuilds it. A busy task cannot be
+ * opened all the same, and the directory rewrites it as it starts to follow
+ * the root. A busy task cannot be
  * archived (`planArchive`), so these hold every lane a crash could have
  * interrupted. In order, by id.
  */
 export const planLoads = (held: ReadonlySet<RootId>): readonly RootId[] =>
   [...held].sort()
+
+/** The roots a starting host opens (`planLoads`), read from the session and the places. */
+export const startingLoads = (docs: {
+  readonly session: SessionDocHandle
+  readonly places: PlacesDocHandle
+}): readonly RootId[] =>
+  planLoads(
+    rootsHeld(
+      readPlaces(docs.places),
+      readThreads(docs.session),
+      new Set(readArchived(docs.session, docs.places).keys()),
+      readStartedRoots(docs.session),
+    ),
+  )
 
 export function hostDocuments(input: {
   readonly exchange: Exchange

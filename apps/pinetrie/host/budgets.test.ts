@@ -1,6 +1,14 @@
-import { entryId, THE_AGENT, threadIdFor, writerId } from "@pinetrie/core"
-import { readCardHistories, readPlaces } from "@pinetrie/reads"
 import {
+  entryId,
+  THE_AGENT,
+  threadIdFor,
+  type ValueWrite,
+  writerId,
+} from "@pinetrie/core"
+import { createKeeper } from "@pinetrie/keeper"
+import { readCardHistories, readPlaces, readRecords } from "@pinetrie/reads"
+import {
+  BUDGET,
   encodeAnswer,
   encodeChat,
   encodeRelayMessage,
@@ -8,7 +16,14 @@ import {
 } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { createBudgets, promptBudget } from "./budgets.ts"
-import { applyWrites, basics, placesFor } from "./fakes.ts"
+import {
+  applyWrites,
+  archiveTask,
+  basics,
+  placesFor,
+  putTask,
+} from "./fakes.ts"
+import { createLater } from "./later.ts"
 
 const ada = writerId("ada@example.com")
 const here = threadIdFor("here")
@@ -79,23 +94,41 @@ describe("the budget a run spends is read from its prompt", () => {
   })
 })
 
-test("a budget gone over queues its fact, with its making in its history", async () => {
+/** Ada's budget on `here`'s thread, on an open task, through a real late writer. */
+function overBudget() {
   const b = basics()
+  putTask(b, here)
   applyWrites(b, [
     newBudget({ message: budget, thread: here, by: ada, limit: 10 }),
   ])
   const drained: string[] = []
+  const keeper = createKeeper()
+  const records = {
+    writeValues: async (w: readonly ValueWrite[]) => applyWrites(b, w),
+  }
+  const { placesWriter } = placesFor(b)
   const budgets = createBudgets({
     basics: b,
-    keeper: { run: step => step() },
-    records: { writeValues: async w => applyWrites(b, w) },
-    placesWriter: placesFor(b).placesWriter,
+    keeper,
+    records,
+    placesWriter,
     limit: 10,
-    drain: lane => void drained.push(lane),
+    later: createLater({
+      basics: b,
+      keeper,
+      records,
+      placesWriter,
+      drain: lane => void drained.push(lane),
+    }),
   })
+  return { b, keeper, budgets, drained }
+}
+
+test("a budget gone over queues its fact, with its making in its history", async () => {
+  const { b, keeper, budgets, drained } = overBudget()
   budgets.spendFrom(budget, 20)
-  await new Promise(r => setTimeout(r, 0))
-  const [fact] = readPlaces(b.places)
+  await keeper.idle()
+  const [fact] = readPlaces(b.places).filter(c => c.kind === "fact")
   expect(fact).toMatchObject({
     kind: "fact",
     place: { kind: "queued", thread: here },
@@ -107,4 +140,13 @@ test("a budget gone over queues its fact, with its making in its history", async
       : readCardHistories(b.session).get(fact.id)?.events,
   ).toMatchObject([{ kind: "created", by: null }])
   expect(drained).toEqual([here])
+})
+
+test("a budget gone over after its thread's task was archived records the budget, and tells nobody", async () => {
+  const { b, keeper, budgets } = overBudget()
+  archiveTask(b)
+  budgets.spendFrom(budget, 20)
+  await keeper.idle()
+  expect(readPlaces(b.places).filter(c => c.kind === "fact")).toEqual([])
+  expect(readRecords(b.session, BUDGET).get(budget)?.over).toBe(true)
 })

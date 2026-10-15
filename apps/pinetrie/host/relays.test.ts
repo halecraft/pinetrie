@@ -10,7 +10,6 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
 import { NAME, PARTICIPANT, setRecord, WORKFLOW } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Budgets } from "./budgets.ts"
@@ -86,14 +85,11 @@ function setUp() {
   const relays = createRelays({
     basics: b,
     keeper: { run: step => step(), track: work => work },
-    agent: record<Pick<Agent, "lane">>().port,
-    scribe: record<Pick<Scribe, "appendToTree">>().port,
     start: () => {
       throw new Error("no run starts")
     },
     runnable: RUNS_ANY.runnable,
     budgets,
-    piSetup: record<Pick<PiSetup, "complete" | "skill">>().port,
     drain: () => {},
     placesWriter: placesFor(b).placesWriter,
   })

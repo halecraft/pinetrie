@@ -618,8 +618,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a starting host loads an unstarted new tab's root",
     file: "packages/rules/task.ts",
-    from: "    if (live && root !== undefined && started.has(root)) held.add(root)\n",
-    to: "    if (live && root !== undefined) held.add(root)\n",
+    from: "      root !== undefined &&\n      started.has(root)\n",
+    to: "      root !== undefined\n",
     command: unit,
     expect:
       "rootsHeld: a root with a thread on an open canvas or in an inventory",
@@ -2801,8 +2801,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup leaves a verdict pending",
     file: "packages/rules/startup.ts",
-    from: '    .filter(v => v.verdict.kind === "pending" && !resumed.has(v.lane))',
-    to: "    .filter(() => false)",
+    from: "    lane => !resumed.has(lane),\n",
+    to: "    () => false,\n",
     command: unit,
     expect: "a pending verdict is unclassified, unless its lane is resumed",
   },
@@ -3933,8 +3933,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a trashed thread's root is let go",
     file: "packages/rules/task.ts",
-    from: "    const place = livePlaceOf(c.place)\n",
-    to: "    const place = c.place\n",
+    from: "  const left = livePlaceOf(place)\n",
+    to: "  const left = place\n",
     command: unit,
     expect: "its root stays held until it is deleted",
   },
@@ -4043,5 +4043,49 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a kept snapshot's lane's; the base's, or a lost snapshot's, the project's",
+  },
+  // ── late writes ──
+  {
+    name: "a late write lands in a thread with no card",
+    file: "packages/rules/reach.ts",
+    from: '  return reach.kind === "open" ? null : reach\n',
+    to: '  return reach.kind === "open" || reach.kind === "gone" ? null : reach\n',
+    command: unit,
+    expect:
+      "is refused in a thread on an archived canvas, trashed from one, or with no card",
+  },
+  {
+    name: "a late write is gated by where relays reach",
+    file: "packages/rules/reach.ts",
+    from: "  if (card !== undefined && isLivePlace(card.place, facts.archived)) return null\n",
+    to: "",
+    command: unit,
+    expect:
+      "lands in a thread on an open canvas, in an inventory, or trashed from either",
+  },
+  {
+    name: "a late write lands in an archived task",
+    file: "packages/rules/reach.ts",
+    from: '    return record === undefined\n      ? null\n      : { kind: "archived", task: scope.task, record }\n',
+    to: "    return null\n",
+    command: unit,
+    expect: "to an archived task is refused, with who archived it",
+  },
+  {
+    name: "a late write lands in a thread not opened yet",
+    file: "packages/rules/reach.ts",
+    from: "  if (card === undefined && !facts.opened.has(scope.thread)) return null\n",
+    to: "",
+    command: unit,
+    expect: "lands in a thread not opened yet, which is in no task",
+  },
+  {
+    name: "an archive leaves its threads' verdicts pending",
+    file: archive,
+    from: '    verdicts:\n      crossing === "archive"\n',
+    to: "    verdicts:\n      false\n",
+    command: unit,
+    expect:
+      "archiving settles its threads' pending verdicts as unclassified; another task's stay pending",
   },
 ]

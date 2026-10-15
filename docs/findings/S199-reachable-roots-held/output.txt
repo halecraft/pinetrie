@@ -1,0 +1,9 @@
+P1 {"place":"canvas, open task","reach":"open","rootHeld":true}
+P1 {"place":"canvas, archived task","reach":"archived","rootHeld":false}
+P1 {"place":"inventory","reach":"held","rootHeld":true}
+P1 {"place":"trash, from an open canvas","reach":"trashed","rootHeld":true}
+P1 {"place":"trash, from an archived canvas","reach":"trashed","rootHeld":false}
+P1 {"place":"trash, from an inventory","reach":"gone","rootHeld":true}
+P1 {"place":"no card","reach":"gone","rootHeld":false}
+P2 {"stale":false,"reach":"open","startedHasRoot":true,"loads":["r-01a0ffd2-0000-7000-8000-00000000000a"],"loadedAfterLoads":["r-01a0ffd2-0000-7000-8000-00000000000a"],"rebuilds":[],"rootRecordNow":1,"loadedAfterDirectory":["r-01a0ffd2-0000-7000-8000-00000000000a"],"viewNow":"held","docOfLaneNow":"null","entry":"e-1"}
+P2 {"stale":true,"reach":"open","startedHasRoot":false,"loads":[],"loadedAfterLoads":[],"rebuilds":["r-01a0ffd2-0000-7000-8000-00000000000a"],"rootRecordNow":1,"loadedAfterDirectory":[],"viewNow":"null","docOfLaneNow":"null","entry":"e-1"}

@@ -24,8 +24,10 @@ import {
   type TreeIndex,
   threadEnd,
   threadsWork,
+  type VerdictRecord,
 } from "@pinetrie/core"
 import { type TaskIndex, taskOfCard, taskOfTarget } from "./task.ts"
+import { unclassifiedPending } from "./verdict.ts"
 import { planRetention } from "./work.ts"
 
 /** Into the archive, or out of it: `transitionOf`'s crossings. */
@@ -54,6 +56,12 @@ type ArchivePlan =
       readonly teardown: ArchiveTeardown
       /** On the keeper again, after the teardown: the roots to let go of. */
       readonly unload: readonly RootId[]
+      /**
+       * With the place, on archiving: each of the task's threads' verdicts
+       * still pending, `unclassified`. Its run's end, a late write, is
+       * refused from now on, and would have been the one to write it.
+       */
+      readonly verdicts: readonly VerdictRecord[]
     }
 
 /** Why a task cannot be archived now, as the board and the host both say it. */
@@ -92,6 +100,8 @@ export function planArchive(input: {
   readonly roots: readonly RootId[]
   /** The roots a thread outside this task, in no archived task, is in. */
   readonly stillHeld: ReadonlySet<RootId>
+  /** Every thread's verdict, by its lane. */
+  readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
 }): ArchivePlan {
   const { crossing } = input
   const busy = threadsWork(input.lanes, new Set(input.threads))
@@ -103,6 +113,12 @@ export function planArchive(input: {
     unload:
       crossing === "archive"
         ? input.roots.filter(r => !input.stillHeld.has(r))
+        : [],
+    verdicts:
+      crossing === "archive"
+        ? unclassifiedPending(input.verdicts.values(), lane =>
+            input.threads.includes(lane),
+          )
         : [],
   }
 }

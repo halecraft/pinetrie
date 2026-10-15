@@ -887,10 +887,16 @@ width, so a card has one place by construction.
   its column ends: no entry of it in the tree, and either its fork in the
   tree (its root held here), or its root one the directory does not name
   yet (a new tab's, or a new root's in a task already held). The page draws its card's column from it.
-- **`rootsHeld`**: the roots with a thread on the canvas of a task outside
-  the archive, or in an inventory: what a starting host loads, and what
-  archiving keeps. A root the directory does not name has no document
-  yet (an unstarted new tab's, ADR-0063) and is not held.
+- **`rootsHeld`**: the roots with a thread at a live place
+  (`isLivePlace`: the card, unwrapped from the trash, on the canvas of a
+  task outside the archive, or in an inventory): what a starting host
+  loads, and what archiving keeps. A root the directory does not name has
+  no document yet (an unstarted new tab's, ADR-0063) and is not held. The
+  directory names a root by any record of it, one that decodes in this
+  build's shape or not (`readStartedRoots`, `@pinetrie/reads`): `ROOT` is
+  derived and changes shape with no migration, and a stale record read as
+  none left an open task's root unloaded after startup, and the lanes a
+  crash interrupted in it unresumed (S199).
 - **`forkOf`**: each forked thread's fork (`ThreadFork`), a branch's or a
   copy's, from its record's `origin`: where its column ends before its
   first send, and whether its fork row says "copied from".
@@ -1052,6 +1058,11 @@ and made read-only, never removed.
   inventory, still holds a thread of (`stillHeld`). The host passes its
   lanes of their own (`own`, each with its root's index) and the revision
   records, so no part decides anything when it runs.
+- **An archive settles its threads' pending verdicts** (`verdicts`,
+  `unclassifiedPending`, `verdict.ts`): the run's end that would write one
+  is a late write, which an archived task refuses, so the archive writes
+  `unclassified` with its place, as a starting host does for a request it
+  lost (`planStartup`).
 - **The gate keys on the tasks a command writes in** (ADR-0063). `writesIn`
   names them for every intent (a chat's thread's task or a branch's, a
   mark's, a retitle's, an undo of moves', an offer's lane's, a queue hold's
@@ -2012,6 +2023,23 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
   `unanswered`, `round` (what the round told the people) and
   `budget-spent`; a stop the budget made names it (`StopFact.budget`) and
   holds no queue (`planStop`).
+- **A late write's gate** (`reach.ts`, `lateAway`): what the host decided
+  before a gap lands only in a thread at a live place (`isLivePlace`,
+  `task.ts`), the rule a root is held by, so a write let through finds its
+  root loaded; a thread not opened yet (named for a column before its
+  first message) is in no task and takes one; a task scope (a title's)
+  takes one unless it is archived. A refusal is an `Away`, worded by
+  `awayWords`. Three readings of whether a thread can take work, each for
+  its own question: `holdingOf` (`held.ts`), whether a person's command or
+  send may run or write a message there, which decides `planGate`'s held
+  step and the drain's `away` (held and trashed refuse); `isLivePlace`,
+  whether the host may write there late (held and trashed take it, a trash
+  from an archived canvas does not); `threadReach`, whether another
+  thread's agent may reach it, and how a refusal is worded (only `open`
+  takes one). They differ on two trash places (S199): `threadReach` calls
+  a thread trashed from an archived canvas `trashed`, and one trashed from
+  an inventory `gone`, since `Reach.trashed` names a task. One reader the
+  three derive from is not built.
 - **Reach** (`reach.ts`): `threadReach` is the one reader of where a
   thread is (open, archived with its record, held by whom, gone), and
   `reachableAgents` every named thread on an open task's canvas.

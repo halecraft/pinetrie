@@ -76,6 +76,7 @@ const plan = (
     trees: [],
     roots: [TEST_ROOT, OTHER_ROOT],
     stillHeld: new Set([OTHER_ROOT]),
+    verdicts: new Map(),
     ...over,
   })
 
@@ -85,6 +86,27 @@ describe("planArchive", () => {
       kind: "cross",
       teardown: { forget: [], refs: [], snapshots: [] },
       unload: [TEST_ROOT],
+      verdicts: [],
+    })
+  })
+  test("archiving settles its threads' pending verdicts as unclassified; another task's stay pending", () => {
+    const verdict = (name: string, kind: "pending" | "unclassified") => ({
+      lane: threadIdFor(name),
+      ask: entryId("a"),
+      end: entryId("b"),
+      verdict: { kind },
+    })
+    const verdicts = new Map(
+      [verdict("mine", "pending"), verdict("theirs", "pending")].map(v => [
+        v.lane,
+        v,
+      ]),
+    )
+    expect(plan({ verdicts })).toMatchObject({
+      verdicts: [verdict("mine", "unclassified")],
+    })
+    expect(plan({ verdicts, crossing: "restore" })).toMatchObject({
+      verdicts: [],
     })
   })
   test("refuses while an agent of its threads works, or cards wait there, held or not", () => {

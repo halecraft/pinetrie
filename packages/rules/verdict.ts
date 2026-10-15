@@ -69,6 +69,19 @@ export const VERDICT: RecordSpec<VerdictRecord, ThreadId, "session"> = {
     })),
 }
 
+/**
+ * Each of `verdicts` still pending for a lane `settles` names, as
+ * `unclassified`: its request is gone, with a host that stopped or a task
+ * archived since, so nothing will write the run's verdict.
+ */
+export const unclassifiedPending = (
+  verdicts: Iterable<VerdictRecord>,
+  settles: (lane: ThreadId) => boolean,
+): readonly VerdictRecord[] =>
+  [...verdicts]
+    .filter(v => v.verdict.kind === "pending" && settles(v.lane))
+    .map(v => ({ ...v, verdict: { kind: "unclassified" } }))
+
 // ── the reply ─────────────────────────────────────────────────────────────
 
 /** The most words a reason may have. */

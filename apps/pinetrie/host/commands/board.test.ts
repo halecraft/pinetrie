@@ -9,7 +9,7 @@ import {
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { readPlaces } from "@pinetrie/reads"
-import { setRecord, WORKFLOW } from "@pinetrie/rules"
+import { pendingVerdict, setRecord, VERDICT, WORKFLOW } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
@@ -110,6 +110,16 @@ test("an idle task moved to Done: its card's move written, then torn down and un
     },
   ])
   expect(methods(work.calls)).toEqual(["teardown"])
+})
+
+test("an idle task moved to Done with its last run's verdict pending leaves it unclassified", async () => {
+  const { b, records, deps } = setUp()
+  const pending = pendingVerdict(THREAD_1, entryId("e-1"), entryId("e-1"))
+  putValue(b, setRecord(VERDICT, pending))
+  await handleTaskMove(deps, ADA, toDone)
+  expect(writesOf(records.calls)).toEqual([
+    setRecord(VERDICT, { ...pending, verdict: { kind: "unclassified" } }),
+  ])
 })
 
 test("a move from a state the task has left is refused `moved`, saying where it is and who put it there", async () => {

@@ -54,9 +54,7 @@ import {
 } from "@pinetrie/protocol/messages"
 import { writersPolicy } from "@pinetrie/protocol/writers"
 import {
-  readArchived,
   readParticipantNames,
-  readPlaces,
   readRoots,
   readRunning,
   readSetup,
@@ -68,7 +66,6 @@ import {
   displayName,
   encodeFact,
   type QueuedText,
-  rootsHeld,
   SETUP,
   setIfChanged,
 } from "@pinetrie/rules"
@@ -88,6 +85,7 @@ import {
 } from "@pinetrie/schema"
 import { hostSocketIn } from "@pinetrie/ssh"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
+import { createAnswers } from "./answers.ts"
 import { createBanners } from "./banners.ts"
 import { createBaseNews } from "./base-news.ts"
 import {
@@ -104,13 +102,13 @@ import { createCanvasNews } from "./canvas-news.ts"
 import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
-import { createDigests } from "./digests.ts"
+import { createDigests, writePendingVerdict } from "./digests.ts"
 import { startDirectory } from "./directory.ts"
 import {
   type HostDocuments,
   hostDocuments,
-  planLoads,
   rootsOpenedWords,
+  startingLoads,
 } from "./docs.ts"
 import {
   compactAfter,
@@ -120,6 +118,7 @@ import {
   sweepTrash,
 } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
+import { createLater } from "./later.ts"
 import { lineDocPrefix } from "./lines.ts"
 import {
   migrate,
@@ -532,14 +531,7 @@ export async function startHost({
   // The roots that are not archived, opened before anything reads one: every
   // lane that could be running is in one of them (`planLoads`).
   const threadsNow = readThreads(session)
-  const roots = planLoads(
-    rootsHeld(
-      readPlaces(places),
-      threadsNow,
-      new Set(readArchived(session, places).keys()),
-      new Set(readRoots(session).keys()),
-    ),
-  )
+  const roots = startingLoads({ session, places })
   for (const root of roots) await docs.root(root)
   const total = new Set([...threadsNow.values()].map(t => t.root)).size
   log(`[host] ${rootsOpenedWords({ opened: roots.length, total })}`)
@@ -548,31 +540,38 @@ export async function startHost({
   startDirectory({ basics, keeper, records })
   // Each thread's banner: a pasted one under any icon source, a drawn one only
   // under `drawn`.
-  const banners = createBanners({
+  // Every write the host decides before a gap and makes after it. Its
+  // drain is bound late, as the budgets' is.
+  let queueDrainLate: (lane: ThreadId) => void = () => {}
+  const later = createLater({
     basics,
     keeper,
-    blobs,
     records,
+    placesWriter,
+    drain: lane => queueDrainLate(lane),
+  })
+  const banners = createBanners({
+    basics,
+    later,
+    blobs,
     piSetup,
     draws,
   })
   // Each run's verdict, and each ask's digest unless the config turns
   // digests off. What agents talking spend. Its drain and the relays are made
   // after the agent, whose hooks call them: bound late.
-  let queueDrainLate: (lane: ThreadId) => void = () => {}
   const budgets = createBudgets({
     basics,
     keeper,
     records,
     placesWriter,
     limit: settled["agents.budget"].value,
-    drain: lane => queueDrainLate(lane),
+    later,
   })
   const digests = createDigests({
     basics,
-    keeper,
+    later,
     presence,
-    records,
     piSetup,
     enabled: settled["digests.enabled"].value,
     spent: (ask, tokens) => budgets.spendFor(ask, tokens),
@@ -583,9 +582,8 @@ export async function startHost({
   // turns that off, or when a person asks.
   const titles = createTitles({
     basics,
-    keeper,
+    later,
     enabled: titleConfig.enabled,
-    records,
     piSetup,
   })
   // Every thread's name. A drawn banner is drawn from its name, so it starts
@@ -641,9 +639,7 @@ export async function startHost({
               // when due.
               turnDone: async (lane, tip) => {
                 await work.hooks.turnDone(lane, tip)
-                const root = docs.rootOfLane(lane)
-                if (root !== null)
-                  void digests.step(root, tip, digestFailed(lane))
+                void digests.step(lane, tip, digestFailed(lane))
               },
             },
           },
@@ -682,21 +678,29 @@ export async function startHost({
     readPinned,
     readTaskContext,
     baseNews,
-    pending: digests.pending,
+    pending: writePendingVerdict({ basics, records }),
   })
   const relays = createRelays({
     basics,
     keeper,
+    start: runs.start,
+    runnable: lane => work.runnable(lane),
+    budgets,
+    drain: lane => queueDrain(lane),
+    placesWriter,
+  })
+  relaysLate = relays
+  const answers = createAnswers({
+    basics,
+    later,
+    relays,
     agent,
     scribe,
     start: runs.start,
     runnable: lane => work.runnable(lane),
     budgets,
     piSetup,
-    drain: lane => queueDrain(lane),
-    placesWriter,
   })
-  relaysLate = relays
   const commands = createCommands({
     basics,
     agent,
@@ -722,6 +726,7 @@ export async function startHost({
     placesWriter,
     provenance,
     keeper,
+    later,
     relays,
   })
   // The drain's waits for its top card: its text, someone's typing in it to
@@ -806,7 +811,7 @@ export async function startHost({
   // final digest is for the run's prompt: the drain queued before it may
   // append to the lane or start its next run.
   runs.onEnded((lane, prompt) => {
-    void relays.ended(lane, prompt).catch(failed(basics, "an answer"))
+    void answers.ended(lane, prompt).catch(failed(basics, "an answer"))
     void settle([lane])
     banners.due(lane).catch(failed(basics, "banner"))
     const root = docs.rootOfLane(lane)

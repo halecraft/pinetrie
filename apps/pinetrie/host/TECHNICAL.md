@@ -51,11 +51,13 @@ wires them.
 | `watch-dir.ts` | one directory watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), its events handed on after a quiet window (`quietWindow`; 0 for the shared directories, 10 s for your folder), a dropped-events error at once |
 | `jj/` | jj's adapter (`startJjProject`, § jj's adapter): each lane's offer in your repo (ADR-0105), on the owner of your repo (§ Offers), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands (`jj/accepted.ts`); each lane's fetch into your repo (`jj/fetch.ts`); splits (`jj/split.ts`) |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
-| `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
-| `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024) |
-| `relays.ts` | another thread's agent asked, and its answer (ADR-0128): `ask` and `leave` (the tools' hooks), `relayChat` (a person's chat that asks or invites), `relayCard` (an ask card popped), `ended` (a relayed run's answer, then the round) |
+| `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner`; every step a late one |
+| `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024); every step a late one, and `writePendingVerdict`, the verdict a stopping run writes before its end |
+| `relays.ts` | another thread's agent asked (ADR-0128): `ask` and `leave` (the tools' hooks), `relayChat` (a person's chat that asks or invites), `relayCard` (an ask card popped), `deliver` (a relay into a thread, for these and the round) |
+| `answers.ts` | what a relayed run sends back once it has ended (ADR-0128): its answer, the answers held for a busy asker, and the round, each a late step (`Answers.ended`, from `runs.onEnded`) |
+| `threads-now.ts` | a thread as it is now, for the relays, the answers and the late steps: its reach, its tree, end and lane (`thread`, which opens only a live thread's root), and the names a message uses |
 | `budgets.ts` | what agents talking spend (ADR-0128): the budget a run spends, read from its prompt (`promptBudget`), counted per request, written when it goes over and at a run's end, and the gate before each request |
-| `outside.ts` | `requestOutside`: a model request outside a keeper, its answer written in a step of its own |
+| `later.ts` | `Later`: every write the host decides before a gap and makes after it (§ Late writes), its gate (`lateAway`), and a model request outside the keeper (`outside`) |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names, through the real `applyRecordWrites`), `writesOf`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
 
 ## The documents' keeper
@@ -154,7 +156,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   steered into the lane, so the next run plans from the tree alone. `ended`
   drains the lane; a drain that ran before
   `endRun` could start the next run with the last one's reply still open.
-- **The verdict is pending before `endRun`** (ADR-0077, `Digests.pending`):
+- **The verdict is pending before `endRun`** (ADR-0077, `writePendingVerdict`):
   written after, a page would see the lane stopped beside the last run's
   verdict, and draw its arrival. Its `end` is the run's last entry from its
   asks, as at `ended`.
@@ -905,8 +907,8 @@ rejects `shutdown()`.
   `move`, so it is one step one undo reverses; with nothing queued it
   answers `nothing`.
 - **A command on an offer leaves a fact** (ADR-0080): `actOnOffer`
-  answers first, then writes the action's fact as a queued fact card in a keeper
-  step of its own (`recordFact`, through `queueFact`), with its history
+  answers first, then writes the action's fact as a queued fact card in a late
+  step of its own (`Later.step`, through `queueFact`), with its history
   (cause `host`, as for every fact and the split card `split_offer`
   queues), and asks for the lane's drain. An idle
   lane appends it at once; a running one when its run ends, in order with
@@ -921,15 +923,86 @@ rejects `shutdown()`.
   one step on the documents' keeper, as a split is, so a second press finds
   the lane busy and is refused.
 
-## Requests outside the queue (`outside.ts`)
+## Late writes (`later.ts`)
 
-A model request takes seconds, and no command may wait on it. Banners,
-commit messages, digests, verdicts and titles ask with `requestOutside`: the request runs
-outside the documents' keeper, tracked so `quiet` waits for it, and its
-answer is written in a step of its own (a keeper step, or for a commit
-message an owner command), after that step decides it is still wanted (`bannerStillWanted`, the offer's checks, `digestToWrite`, `runEndedToWrite`, `titleStillWanted`). A
-failure is logged, never thrown. With `held`, a key is in a set while the
-request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
+An archived task is read-only, and a command is refused there by the gate
+(`planGate`). The host's own writes that it decides before a gap and makes
+after it are refused by `Later`'s: a model request's answer, a step a run's
+end queues, an offer action's fact, a budget a round's request spent. A
+root record written through `Records` after an archive let its root go
+opened it again for good, and one written after `docs.destroy` made the
+document again (S198); a fact queued in an archived task left it holding
+queued cards, which `planArchive` refuses.
+
+- **`Later.step(scope, what, plan)` is the one way to write late.** Its
+  step gathers the places and the archive, asks `lateAway` of the thread or
+  the task (a title's) it writes into, and on a refusal logs `[host]
+  <thread>: <what> not written: <why>` (`awayWords`) and stops. Else
+  `plan` reads the documents as they are now and returns a `LateWrite`,
+  which `Later` carries out: its records (`Records`), then each fact,
+  gated again on its own lane and queued by `queueFact` (`facts.ts`), each
+  a host change of its own with its history and its lane's drain, then
+  `after`, a write whose own rule gates it in the same step (a relay,
+  behind `unreachableRefusal`; an answer's delivery, behind `planAnswer`'s
+  reach). Not `then`: a plan is async, and a value with a `then` method is
+  awaited as a promise.
+- **A late step is queued synchronously**: `step` calls `keeper.run` before
+  anything is awaited, so a caller that orders its step ahead of another's
+  by queueing first keeps that order (`answers.ended`'s held answers ahead
+  of the run's end's drain).
+- **A plan never reads through `docs.root` or a handle from before the
+  gap.** It reads `docs.view` or `docOfLane`, or `threadsNow`'s `thread`,
+  which opens a root only for a live thread. A thread `lateAway` lets
+  through is live, and a live thread's root is held once it is started
+  (S199), so a late step opens no archived root and makes no destroyed one
+  again.
+- **`Later.outside`** asks a model outside the keeper, tracked so `quiet`
+  waits for it, then plans its answer as a `step`; a null answer writes
+  nothing. With `held`, a key is in a set while the request is out, for the
+  caller's plan to read (`bannerDue`, `planDigest`'s `inFlight`). A failure
+  goes to `failed`, never to the caller.
+- **The modules whose work is late hold no write port and no keeper**:
+  `digests.ts`, `titles.ts`, `banners.ts` and `answers.ts` take `Later`,
+  and no `Records`, places writer or keeper, so every step they take is a
+  late one. `answers.ts` keeps pi's ports for an answer's delivery, which
+  it makes only in an `after`; that much is held by its tests. `budgets.ts`
+  keeps its keeper, `Records` and places writer for what is exempt below,
+  and its `budget-spent` fact is a `Later.step`.
+- **Exempt, each with its reason** (the list is closed):
+  - commands, and the sends made for one: `planGate`, through `clear`;
+  - the archive's own steps (`commands/board.ts`): they write about the
+    archived task on purpose, its pending verdicts among them (below);
+  - upkeep: the directory's refresh and rebuild, the sweeps
+    (`housekeeping.ts`, the trash, holds, histories, provenance), names,
+    seats, the compaction, startup;
+  - what happens inside a running lane, whose task cannot be archived
+    (`planArchive` refuses `running`): `budgets`' `stopNow` in pi's gate,
+    `split-call.ts`, `canvas-news.ts`, `base-news.ts`,
+    `writePendingVerdict`, `runs.ts`;
+  - a budget's own record (`BUDGET`), written when it goes over whatever
+    became of its thread, so a restored task's agents cannot spend it
+    again;
+  - the drain: a popped card's send is cleared by `planGate` (`writesIn`'s
+    `queue` case), its `away` is `holdingOf`, and no fact is queued in an
+    archived task;
+  - `relays.ts`' `ask`, `leave`, `relayChat`, `relayCard` and `deliver`:
+    each reads both threads' reach and refuses with `unreachableRefusal`
+    in the step that writes;
+  - an offer's description (`describe.ts`, for either kind of project):
+    each adapter's settle writes only while its offer is the one asked
+    about (`planDescribeSettle`, or a folder offer's start and tip), and an
+    archive's teardown withdraws its threads' offers;
+  - a turn's tail (`work/turns.ts`): its revision, fetch and snapshot after
+    a run ends. Dropping it would lose a revision a restore needs; whether
+    an archive must wait for it (`pendingRecords`, as a fork does) is not
+    decided.
+
+  Every places write, exempt or not, goes through `Places.change`.
+- **An archive settles what it cuts off.** A run's end the gate refuses
+  would leave its verdict `pending` in the archive for good, so the
+  archive's record step writes `unclassified` over each pending verdict of
+  the task's threads (`planArchive`'s `verdicts`, `unclassifiedPending`),
+  as a starting host does.
 
 ## Digests and verdicts (`digests.ts`, ADR-0106, ADR-0077)
 
@@ -948,7 +1021,9 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   request writes no digest, as before.
 - **The lane keys the verdict and nothing else.** `ended` takes it from
   `runs.onEnded`, and reads the run's last entry from its asks: the lane's
-  tip may already be past the run (below).
+  tip may already be past the run (below). It is also the scope of every
+  late step `digests.ts` takes, a live digest's (`step(lane, at)`) and a
+  run's end's, so none lands in a thread archived meanwhile.
 - **A starting host** writes `unclassified` over each verdict still pending
   (`planStartup`), unless its lane is resumed.
 - **Asked on events, each naming an entry**: the tip the lane's `turnDone`
@@ -968,14 +1043,14 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   digest. No agent reads the answer.
 - **The reply is read in `request`, as a title's is** (`titles.ts`):
   `endReplyOf` there, and each refused half logged ("the model's digest is
-  not one", "the model's verdict is not one"). `settle` gets the parsed
-  reply, never raw model text. A live digest writes what `digestToWrite`
+  not one", "the model's verdict is not one"). The answer's `plan` gets
+  the parsed reply, never raw model text. A live digest writes what `digestToWrite`
   returns; a run's end, what `runEndedToWrite` returns.
 - A missing `ask-digest` skill is logged, and settles as a failed request.
 
-## Agents talking (`relays.ts`, `budgets.ts`, ADR-0128)
+## Agents talking (`relays.ts`, `answers.ts`, `budgets.ts`, ADR-0128)
 
-- **A relay is a run in the asked thread.** `deliverRelay` gathers both
+- **A relay is a run in the asked thread.** `deliver` gathers both
   threads as they are now, plans with `planRelay` and `planDelivery`, and
   starts the run with the heard entry first (`RunStart.heard`), or makes an
   ask card on a busy lane and asks for its drain. Every step is one keeper
@@ -985,19 +1060,27 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   a branch's first message, whose thread has no card yet, names them too.
 - **Reach is read before any root is opened.** Each step gathers both
   threads' `threadReach` from the session and the places, and refuses one
-  out of reach (`unreachableRefusal`) before `threadNow`: `docs.root`
-  would load an archived task's unloaded root, and hold it until restart.
+  out of reach (`unreachableRefusal`) before `threadNow`, which opens a
+  root only for a live thread (`threads-now.ts`): an archived task's root
+  stays let go.
   `planRelay` and `planAnswer` take the reaches too, so an ask card whose
   asker was archived since is refused, and an answer for it becomes an
   `undelivered` fact in the answering thread.
 - **A person's chat is relayed after it is written** (`relayChat`, queued
   by `sendChat`, not awaited inside its step): it finds the chat by its
   send's id, sets its budget, and relays each member it asks.
-- **The run's end sends the answer** (`ended`, from `runs.onEnded`, before
-  the settle): the answer runs an idle asker it wakes, is steered into a
+- **The run's end sends the answer** (`answers.ts`' `ended`, from
+  `runs.onEnded`, before the settle), each a late step on the answering
+  thread: the answer runs an idle asker it wakes, is steered into a
   running one, and is appended otherwise; one that wakes nobody waits, in
   memory, for the asker's run to end, so its agent does not take it as
-  something to answer. A restart drops what waited.
+  something to answer. At that end it is appended if the asker is still
+  in reach, and is the answering thread's `undelivered` fact if not. A
+  restart drops what waited.
+- **The round is a late write too**: gathered first (an asker out of reach
+  asks nothing), asked outside the keeper (`Later.outside`), and its
+  answer, a round fact or a relay (`Relays.deliver`, in an `after`),
+  planned when it comes, behind the asking thread's gate.
 - **A thread with no lane** is told its facts at its end through the
   scribe (`appendLaneless`, the drain's), since only a lane appends; a
   person's message to one is written through the scribe too (S21).
@@ -1027,11 +1110,14 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   `pinetrie.icons` value beside `pinetrie.commands`, only when it changed,
   before commands are taken, so the page never decides a thread's icon on a
   stale source. The page shows a built-in icon only under `built-in`.
-- **A decision is one keeper step**: gather the lane's banner, whether one
-  is being made and whether a blob is stored; `bannerDue` or `planAsk`;
-  write a pasted image. A new image is a `keeper.track`ed task: the image takes seconds,
-  outside the queue, then the write is a step of its own, only while
-  `bannerStillWanted`. A missing `column-banner` skill is logged.
+- **A decision is one late step** (`Later.step`): gather the lane's
+  banner, whether one is being made and whether a blob is stored;
+  `bannerDue` or `planAsk`; write a pasted image. A new image is asked
+  outside the queue (`Later.outside`), then planned in a step of its own,
+  only while `bannerStillWanted`. A thread its gate refuses gets none
+  (`set_banner` answers `no_thread`). A thread named for a column before
+  its first message is opened in no task, and takes one. A missing
+  `column-banner` skill is logged.
 - **A thread is due one as it is named for its lane** (`createNames`'
   `onNamed`): as a column about to create its lane asks for its name
   (ADR-0057), or as a lane is created. A conversation's thread is named and
@@ -1058,9 +1144,9 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   returns, so `laneStarted` takes its author and text from the chat's
   details. The title is settled as the task's mark (ADR-0116), keyed by
   the task, so nothing waits for the root's first entry.
-- **The settle checks again**: an archived task takes nothing, and an
-  unasked title gives way to any mark written meanwhile
-  (`titleStillWanted`). `planMark` writes it, so an unchanged title writes
+- **The answer is planned again**: it is a late write on the task, so an
+  archived task takes nothing, and an unasked title gives way to any mark
+  written meanwhile (`titleStillWanted`). `planMark` writes it, so an unchanged title writes
   nothing.
 - **Only an unasked request is `held`**: a person's Auto-update goes out
   even while an unasked one is out for the same task.

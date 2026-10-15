@@ -6,6 +6,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
+import { createKeeper } from "@pinetrie/keeper"
 import type { Agent } from "@pinetrie/pi"
 import { readCardHistories, readPlaces, readRecords } from "@pinetrie/reads"
 import {
@@ -29,19 +30,22 @@ import {
   NO_BLANK_CARDS,
   placesFor,
   putLane,
+  putTask,
   putValue,
   RUNS_ANY,
   record,
   row,
 } from "../fakes.ts"
+import { createLater } from "../later.ts"
 import type { Records } from "../records.ts"
 import type { RunStart } from "../runs.ts"
 import {
+  actOnOffer,
   handleCarryOn,
   handleQueueHold,
   handleSshAccess,
   handleStop,
-  recordFact,
+  type LaneDeps,
 } from "./lane.ts"
 
 const ada = writerId("ada@example.com")
@@ -241,9 +245,10 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
   })
 })
 
-test("an offer's fact is queued as a card at the thread's end, and the lane's drain asked for", async () => {
+test("an offer's fact is queued after the reply, as a card at the thread's end, and the lane's drain asked for", async () => {
   const b = basics()
   const lane = threadIdFor("0123456789abcdef")
+  putTask(b, lane)
   putLane(b, lane, entryId("e-2"))
   writeEntry(b.root, row(entryId("e-2"), null))
   writeLaneTip(b.root, lane, entryId("e-2"))
@@ -256,29 +261,40 @@ test("an offer's fact is queued as a card at the thread's end, and the lane's dr
     bookmark: "pinetrie-accepted",
     to: { kind: "accepted" },
   } as const
-  await recordFact(
-    {
-      basics: b,
-      drain: l => drained.push(l),
-      placesWriter: placesFor(b).placesWriter,
-    },
-    fact,
-  )
-  expect(readPlaces(b.places)).toMatchObject([
-    {
-      kind: "fact" as const,
-      owner: ada,
-      placer: ada,
-      place: {
-        kind: "queued",
-        thread: lane,
-        by: ada,
-        seen: "",
+  const keeper = createKeeper()
+  const { placesWriter } = placesFor(b)
+  const later = createLater({
+    basics: b,
+    keeper,
+    records: { writeValues: async w => applyWrites(b, w) },
+    placesWriter,
+    drain: l => void drained.push(l),
+  })
+  const deps = {
+    basics: b,
+    later,
+    work: {
+      destination: {
+        offers: { act: async () => ({ kind: "done", fact }) },
       },
-      content: { fact },
     },
-  ])
-  const [card] = readPlaces(b.places)
+  } as unknown as LaneDeps
+  expect(
+    await actOnOffer(
+      deps,
+      { kind: "offer", lane, action: "accept", to: null, seen: null } as never,
+      ada,
+    ),
+  ).toEqual({ kind: "accepted" })
+  await keeper.idle()
+  const card = readPlaces(b.places).find(c => c.kind === "fact")
+  expect(card).toMatchObject({
+    kind: "fact",
+    owner: ada,
+    placer: ada,
+    place: { kind: "queued", thread: lane, by: ada, seen: "" },
+    content: { fact },
+  })
   expect(
     card === undefined
       ? undefined

@@ -399,7 +399,7 @@ export const mutations: readonly Mutation[] = [
     from: "  deps.drain(fact.lane)\n",
     to: "",
     command: unit,
-    expect: "an offer's fact is queued as a card",
+    expect: "an offer's fact is queued after the reply, as a card",
   },
   {
     name: "a root's new entry leaves its record behind",
@@ -1035,17 +1035,17 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a request outside the queue is untracked",
-    file: "apps/pinetrie/host/outside.ts",
-    from: "  return keeper.track(\n",
-    to: "  return Promise.resolve(\n",
+    file: "apps/pinetrie/host/later.ts",
+    from: "      return keeper.track(\n",
+    to: "      return Promise.resolve(\n",
     command: unit,
     expect: "a thread with none gets one",
   },
   {
     name: "a due banner overwrites the person's",
     file: "apps/pinetrie/host/banners.ts",
-    from: "        if (!bannerStillWanted(asked, readBanners(doc).get(lane))) return\n",
-    to: "",
+    from: "        bannerStillWanted(asked, readBanners(doc).get(lane))\n",
+    to: "        true\n",
     command: unit,
     expect: "a banner the person set meanwhile is kept",
   },
@@ -1078,8 +1078,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "two runs' ends make two banners",
     file: "apps/pinetrie/host/banners.ts",
-    from: "          generating.has(lane),\n          draws,\n",
-    to: "          false,\n          draws,\n",
+    from: "bannerDue(readBanners(doc).get(lane), generating.has(lane), draws)",
+    to: "bannerDue(readBanners(doc).get(lane), false, draws)",
     command: unit,
     expect: "or one being made, gets no other",
   },
@@ -1167,7 +1167,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a late live digest overwrites the final one",
     file: "apps/pinetrie/host/digests.ts",
-    from: "              stored: readDigests(doc).get(ask),\n",
+    from: "              stored: readDigests(now).get(ask),\n",
     to: "              stored: undefined,\n",
     command: unit,
     expect: "a live digest that comes back after the final one is dropped",
@@ -1182,11 +1182,11 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a request out of the queue keeps its key after it is answered",
-    file: "apps/pinetrie/host/outside.ts",
-    from: "        held?.set.delete(held.key)\n",
+    file: "apps/pinetrie/host/later.ts",
+    from: "            held?.set.delete(held.key)\n",
     to: "",
     command: unit,
-    expect: "holds its key while out",
+    expect: "asked outside the keeper is gated where its thread is when it answers",
   },
   {
     name: "a run's end names no prompt",
@@ -1571,19 +1571,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an unasked title is written over a mark written meanwhile",
     file: "apps/pinetrie/host/titles.ts",
-    from: "        if (!titleStillWanted(marks.get(task), by)) return\n",
+    from: "        if (!titleStillWanted(marks.get(task), by)) return null\n",
     to: "",
     command: unit,
     expect: "a mark written while the title was asked wins over it",
-  },
-  {
-    name: "an archived task takes a title",
-    file: "apps/pinetrie/host/titles.ts",
-    from: "        if (archivedIn([task], readArchived(session, places)) !== null) return",
-    to: "        if (false) return",
-    command: unit,
-    expect:
-      "a reply that is not a title, or a root archived meanwhile, writes nothing",
   },
   {
     name: "a title is asked of the describe model",
@@ -2482,9 +2473,61 @@ export const mutations: readonly Mutation[] = [
   {
     name: "another module writes the places",
     file: "apps/pinetrie/host/budgets.ts",
-    from: 'import { queueFact } from "./facts.ts"\n',
-    to: 'import { batch } from "@kyneta/schema"\nimport { queueFact } from "./facts.ts"\n',
+    from: 'import type { Later } from "./later.ts"\n',
+    to: 'import { batch } from "@kyneta/schema"\nimport type { Later } from "./later.ts"\n',
     command: unit,
     expect: "no file of the shell but places.ts writes the places",
+  },
+  // ── late writes ──
+  {
+    name: "a late step skips its gate",
+    file: "apps/pinetrie/host/later.ts",
+    from: "      if (refused !== null) {\n        log(refused)\n        return\n      }\n",
+    to: "",
+    command: unit,
+    expect: "in an archived task writes nothing, plans nothing, and says why",
+  },
+  {
+    name: "a late step is queued after an await",
+    file: "apps/pinetrie/host/later.ts",
+    from: "  const step: Later[\"step\"] = (scope, what, plan) =>\n    keeper.run(",
+    to: "  const step: Later[\"step\"] = (scope, what, plan) =>\n    (async f => {\n      await null\n      return keeper.run(f)\n    })(",
+    command: unit,
+    expect: "is queued before `step` returns, ahead of a step queued after it",
+  },
+  {
+    name: "a late fact for a lane out of reach is queued",
+    file: "apps/pinetrie/host/later.ts",
+    from: "      if (refused === null) await queueFact(deps, fact)\n      else log(refused)\n",
+    to: "      await queueFact(deps, fact)\n",
+    command: unit,
+    expect: "drops a fact for a lane out of reach, and writes the rest",
+  },
+  {
+    name: "a started root is one whose record decodes",
+    file: "packages/reads/index.ts",
+    from: "  new Set(Object.keys(readNamespace(doc, ROOT.namespace)).filter(isRootId))\n",
+    to: "  new Set(readRoots(doc).keys())\n",
+    command: unit,
+    expect:
+      "a starting host opens an open task's root whose directory record is in an older shape, and keeps it open",
+  },
+  {
+    name: "an archive leaves its pending verdicts pending",
+    file: "apps/pinetrie/host/commands/board.ts",
+    from: "  if (crossed.verdicts.length > 0)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "an idle task moved to Done with its last run's verdict pending leaves it unclassified",
+  },
+  {
+    name: "an answer for an asker out of reach is appended",
+    file: "apps/pinetrie/host/answers.ts",
+    from: "          return reach.kind === \"open\"\n",
+    to: "          return true\n",
+    command: unit,
+    expect:
+      "an answer held for an asker archived meanwhile is the answering thread's undelivered fact",
   },
 ]

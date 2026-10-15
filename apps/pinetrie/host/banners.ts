@@ -1,7 +1,8 @@
 // host/banners — each thread's banner: drawn as the thread is named, and again
 // at a run's end if that failed, while the config's icons are `drawn`;
 // or set when the person asks through `set_banner`. `bannerDue` and `planAsk`
-// decide; this carries them out.
+// decide; this carries them out, each write a late one (`later.ts`), so none
+// lands in a thread archived or gone meanwhile.
 
 import {
   type BlobStore,
@@ -10,7 +11,6 @@ import {
   type StoredImage,
   type ThreadId,
 } from "@pinetrie/core"
-import type { Keeper } from "@pinetrie/keeper"
 import type { PiSetup } from "@pinetrie/pi"
 import { readBanners, readNames } from "@pinetrie/reads"
 import {
@@ -26,8 +26,7 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import type { Basics } from "./basics.ts"
-import { requestOutside } from "./outside.ts"
-import type { Records } from "./records.ts"
+import type { Later } from "./later.ts"
 
 export interface Banners {
   /** A lane was named, or its run ended: make its banner if it has none. */
@@ -38,41 +37,41 @@ export interface Banners {
 
 export function createBanners(deps: {
   readonly basics: Pick<Basics, "session" | "log" | "now">
-  readonly keeper: Keeper
+  readonly later: Later
   readonly blobs: Pick<BlobStore, "put" | "ref">
-  readonly records: Pick<Records, "writeValues">
   /** The image model, and the banner's skill. */
   readonly piSetup: Pick<PiSetup, "canDrawBanners" | "drawBanner" | "skill">
   /** Whether icons are drawn: the settled `icons.source` is `drawn`. */
   readonly draws: boolean
 }): Banners {
-  const { basics, keeper, blobs, draws } = deps
+  const { basics, later, blobs, draws } = deps
   const { session: doc, log } = basics
   // Lanes whose banner is being made: a run's end does not start a second.
   const generating = new Set<ThreadId>()
 
-  const write = (lane: ThreadId, sha: Sha256) =>
-    deps.records.writeValues([
-      setRecord(BANNER, { lane, sha, at: basics.now() }),
-    ])
+  const banner = (lane: ThreadId, sha: Sha256) => ({
+    records: [setRecord(BANNER, { lane, sha, at: basics.now() })],
+  })
+  const scope = (lane: ThreadId) => ({ kind: "thread", thread: lane }) as const
 
   const failedFor = (lane: ThreadId) => (why: string) =>
     log(`[host] no banner for ${readNames(doc).get(lane) ?? lane}: ${why}`)
 
   /**
    * A new image, outside the keeper (it takes seconds); then, inside it, the
-   * write, only if still wanted (`requestOutside`). A failure is logged, and
-   * the thread's next run's end tries again.
+   * write, only if still wanted. A failure is logged, and the thread's next
+   * run's end tries again.
    */
   const start = (lane: ThreadId, direction: string | null, asked: boolean) =>
-    void requestOutside({
-      keeper,
+    void later.outside({
+      scope: scope(lane),
+      what: "a banner",
       held: { set: generating, key: lane },
       request: () => generate(lane, direction),
-      settle: async image => {
-        if (!bannerStillWanted(asked, readBanners(doc).get(lane))) return
-        await write(lane, blobs.put(image).sha256)
-      },
+      plan: image =>
+        bannerStillWanted(asked, readBanners(doc).get(lane))
+          ? banner(lane, blobs.put(image).sha256)
+          : null,
       failed: error => failedFor(lane)(errorText(error)),
     })
 
@@ -113,20 +112,21 @@ export function createBanners(deps: {
 
   return {
     due: lane =>
-      keeper.run(async () => {
-        const due = bannerDue(
-          readBanners(doc).get(lane),
-          generating.has(lane),
-          draws,
-        )
-        if (due) start(lane, null, false)
+      later.step(scope(lane), "a banner", () => {
+        if (bannerDue(readBanners(doc).get(lane), generating.has(lane), draws))
+          start(lane, null, false)
+        return null
       }),
-    request: (lane, ask) =>
-      keeper.run(async () => {
+    async request(lane, ask) {
+      // A thread its gate refuses gets no banner, as one with no thread.
+      let answer: BannerAnswer = { kind: "refused", reason: "no_thread" }
+      await later.step(scope(lane), "a banner", () => {
         const plan = planAsk(ask, sha => blobs.ref(sha) !== undefined, draws)
-        if (plan.kind === "write") await write(lane, plan.sha)
+        answer = answerOf(plan)
         if (plan.kind === "generate") start(lane, plan.direction, true)
-        return answerOf(plan)
-      }),
+        return plan.kind === "write" ? banner(lane, plan.sha) : null
+      })
+      return answer
+    },
   }
 }

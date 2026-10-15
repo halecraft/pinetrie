@@ -39,7 +39,7 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
-import { queueFact } from "./facts.ts"
+import type { Later } from "./later.ts"
 import type { Places } from "./places.ts"
 import type { Records } from "./records.ts"
 
@@ -101,12 +101,12 @@ export function createBudgets(deps: {
   >
   readonly keeper: Pick<HostKeeper, "run">
   readonly records: Pick<Records, "writeValues">
-  /** The writer of the places: a budget's facts are the host's changes. */
+  /** The writer of the places: a budget's stop is the host's change. */
   readonly placesWriter: Places
+  /** A spent budget's fact is a late write. */
+  readonly later: Pick<Later, "step">
   /** The settled `agents.budget`. */
   readonly limit: number
-  /** Ask for a lane's drain: a fact queued on an idle lane is appended so. */
-  readonly drain: (lane: ThreadId) => void
 }): Budgets {
   const { docs, session, places } = deps.basics
   // The live count of each budget spent from since the host started.
@@ -138,22 +138,31 @@ export function createBudgets(deps: {
   const runBudget = (lane: ThreadId): RunBudget | null =>
     runOf(lane)?.budget ?? null
 
-  /** The record crossed its limit: written, and its thread told. */
+  /**
+   * The record crossed its limit: written, and its thread told. The record is
+   * the budget's own count, written whatever became of its thread, so a
+   * restored task's agents cannot spend it again; telling the thread is a
+   * late write, since a round's request can cross it after its run ended.
+   */
   function wentOver(over: BudgetRecord): void {
+    const failed = (error: unknown) =>
+      deps.basics.log(`[host] a spent budget was not recorded: ${error}`)
     void deps.keeper
-      .run(async () => {
-        await deps.records.writeValues([setRecord(BUDGET, over)])
-        await queueFact(deps, {
-          kind: "budget-spent",
-          lane: over.thread,
-          budget: over.message,
-          limit: over.limit,
-          by: over.by,
-        })
-      })
-      .catch(error =>
-        deps.basics.log(`[host] a spent budget was not recorded: ${error}`),
-      )
+      .run(() => deps.records.writeValues([setRecord(BUDGET, over)]))
+      .catch(failed)
+    void deps.later
+      .step({ kind: "thread", thread: over.thread }, "a spent budget", () => ({
+        facts: [
+          {
+            kind: "budget-spent",
+            lane: over.thread,
+            budget: over.message,
+            limit: over.limit,
+            by: over.by,
+          },
+        ],
+      }))
+      .catch(failed)
   }
 
   /**

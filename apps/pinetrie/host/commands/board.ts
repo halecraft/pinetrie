@@ -30,9 +30,10 @@ import {
   readPlaces,
   readQueueHolds,
   readRevisions,
-  readRoots,
+  readStartedRoots,
   readThreads,
   readTreeIndex,
+  readVerdicts,
   readWorkflow,
 } from "@pinetrie/reads"
 import {
@@ -44,6 +45,7 @@ import {
   planWorkflowEdit,
   rootsHeld,
   setRecord,
+  VERDICT,
   WORKFLOW,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
@@ -137,9 +139,14 @@ async function record(
   const crossed = await planCrossing(deps, intent.task, moved.transition)
   if (crossed.kind === "refused") return done(crossed)
   // execute
+  const outcome = await deps.moves.placeTask(writer, moved)
+  if (crossed.verdicts.length > 0)
+    await deps.records.writeValues(
+      crossed.verdicts.map(v => setRecord(VERDICT, v)),
+    )
   return {
     kind: "follow",
-    outcome: await deps.moves.placeTask(writer, moved),
+    outcome,
     teardown: crossed.teardown,
     unload: crossed.unload,
   }
@@ -196,8 +203,9 @@ async function planCrossing(
       cards,
       readThreads(session),
       archived,
-      new Set(readRoots(session).keys()),
+      readStartedRoots(session),
     ),
+    verdicts: readVerdicts(session),
   })
 }
 

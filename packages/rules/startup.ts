@@ -8,6 +8,7 @@ import type {
   VerdictRecord,
 } from "@pinetrie/core"
 import { queuedOn } from "./queue.ts"
+import { unclassifiedPending } from "./verdict.ts"
 
 /**
  * What a starting host runs. A lane a crash interrupted holds its operation
@@ -46,8 +47,9 @@ export function planStartup(input: {
   const drain = [...lanes]
     .filter(lane => queuedOn(input.cards, lane).length > 0)
     .filter(lane => !resumed.has(lane))
-  const unclassified = input.verdicts
-    .filter(v => v.verdict.kind === "pending" && !resumed.has(v.lane))
-    .map(v => ({ ...v, verdict: { kind: "unclassified" } as const }))
+  const unclassified = unclassifiedPending(
+    input.verdicts,
+    lane => !resumed.has(lane),
+  )
   return { resume, kept, drain, unclassified }
 }
