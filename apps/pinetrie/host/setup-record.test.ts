@@ -25,6 +25,7 @@ test("the setup record carries every refusal, and every setting with its origin"
     model: { kind: "model", label: "a/b" },
     origins: report.settled.model.origins,
     setup: NOTHING,
+    session: null,
   })
   expect(record.refusals.map(r => r.key)).toEqual(["zz"])
   expect(record.settings.map(s => s.key)).toEqual(Object.keys(SETTINGS))
@@ -46,6 +47,7 @@ test("a host with no model says why in its setup record", () => {
       model: { kind: "none", why: "no-credential", named: "a/b" },
       origins: null,
       setup: NOTHING,
+      session: null,
     }).model,
   ).toEqual({ kind: "none", why: "no-credential", named: "a/b" })
 })

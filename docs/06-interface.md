@@ -269,7 +269,8 @@ nothing; Ctrl+Shift+L still folds the sidebar.
   - **Sign in**: each provider with a credential and where it is
     ("signed in (auth.json)", "from an environment variable"), never the
     credential, and the `pnpm sign-in <provider>` line.
-  - **Config files**: each layer's file, "(none)" when it is missing, and
+  - **Config files**: each layer's file, "(none)" when it is missing, the
+    local one named with its session and that session's folder, and
     what it refused, in amber: a key no setting has, a key that layer may
     not set, a value that is not taken.
   - **Settings**: every setting with its value and where it came from;

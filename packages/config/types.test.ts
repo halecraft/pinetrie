@@ -4,6 +4,7 @@
 import { expect, test } from "vitest"
 import {
   choice,
+  configPlaces,
   decodeLayer,
   decodeProject,
   defineTable,
@@ -84,4 +85,11 @@ test("one layer's values handed in as another's do not compile", () => {
     // @ts-expect-error: the working copy is not accepted work's
     settle(TABLE, { ...none, user: null, project: { accepted: working } }),
   ]).not.toThrow()
+})
+
+test("a folder's name handed in as a session's does not compile", () => {
+  expect(
+    // @ts-expect-error: only the registry's plans make a session's name
+    configPlaces({}, "/home/ada", "website").local,
+  ).toBe("/home/ada/.config/pinetrie/sessions/website/pinetrie.json")
 })

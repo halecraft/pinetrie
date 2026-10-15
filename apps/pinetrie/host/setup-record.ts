@@ -8,6 +8,7 @@ import type {
   ModelLine,
   SetupModel,
   SetupRecord,
+  SetupSession,
 } from "@pinetrie/core"
 import type { PiSetup } from "@pinetrie/pi"
 import { type HostReport, SETTINGS } from "./settings.ts"
@@ -24,6 +25,7 @@ export function planSetupRecord(input: {
     PiSetup,
     "credentials" | "refusedPackages" | "contextFiles"
   >
+  readonly session: SetupSession | null
 }): SetupRecord {
   const { report, model, setup } = input
   const setupModel: SetupModel =
@@ -50,5 +52,6 @@ export function planSetupRecord(input: {
     }),
     refusedPackages: setup.refusedPackages,
     contextFiles: setup.contextFiles,
+    session: input.session,
   }
 }

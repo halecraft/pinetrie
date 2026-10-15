@@ -6,7 +6,6 @@
 // Providers come from pi and from the packages pine·trie's config lists.
 
 import { homedir } from "node:os"
-import path from "node:path"
 import { createInterface } from "node:readline/promises"
 import { Writable } from "node:stream"
 import { configPlaces, readStartLayers } from "@pinetrie/config"
@@ -19,6 +18,7 @@ import {
   signInNoticeLines,
 } from "@pinetrie/pi"
 import { SETTINGS, settleHost } from "../host/settings.ts"
+import { homePath } from "../host/startup-lines.ts"
 
 const [verb, ...args] = process.argv.slice(2)
 const env = process.env
@@ -79,12 +79,6 @@ const interaction: SignInInteraction = {
   },
 }
 
-/** A path under the home directory, as `~/…`. */
-const shown = (file: string): string =>
-  file.startsWith(`${homedir()}/`)
-    ? `~/${path.relative(homedir(), file)}`
-    : file
-
 const listed = (providers: readonly SignInProvider[]) => {
   for (const p of providers.filter(p => p.methods.length > 0))
     console.log(
@@ -130,7 +124,7 @@ try {
               : "oauth"
         await auth.signIn(planned.provider.id, method, interaction)
         console.log(
-          `Signed in to ${planned.provider.name}. The credential is in ${shown(places.credentials)}.`,
+          `Signed in to ${planned.provider.name}. The credential is in ${homePath(places.credentials, homedir())}.`,
         )
         break
       }

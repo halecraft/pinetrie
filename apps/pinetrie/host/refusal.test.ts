@@ -1,4 +1,12 @@
-import { mkdtempSync, realpathSync, rmSync } from "node:fs"
+import { spawnSync } from "node:child_process"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { configPlaces } from "@pinetrie/config"
@@ -37,4 +45,37 @@ test("a host without tools starts on a folder with no repo", async () => {
     log: () => {},
   })
   await host.shutdown()
+})
+
+test("a PINETRIE_SESSION naming another session than the folder's own exits 2 before the store opens", () => {
+  const site = path.join(dir, "website")
+  const blog = path.join(dir, "blog")
+  const data = path.join(dir, "data")
+  for (const d of [site, blog, path.join(data, "pinetrie")])
+    mkdirSync(d, { recursive: true })
+  const entries = [
+    { path: site, name: "website", servedAt: 1 },
+    { path: blog, name: "blog", servedAt: 1 },
+  ]
+  writeFileSync(
+    path.join(data, "pinetrie", "sessions.json"),
+    JSON.stringify({ version: 1, entries }),
+  )
+  const run = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dirname, "serve.ts"), site],
+    {
+      env: {
+        PATH: process.env.PATH,
+        PINETRIE_SESSION: "blog",
+        XDG_DATA_HOME: data,
+        XDG_CONFIG_HOME: path.join(dir, "config"),
+      },
+      encoding: "utf8",
+      timeout: 60_000,
+    },
+  )
+  expect(run.status).toBe(2)
+  expect(run.stderr).toContain("this folder is session website")
+  expect(existsSync(path.join(site, ".pinetrie"))).toBe(false)
 })

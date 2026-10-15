@@ -1,5 +1,60 @@
+import { sessionNameFor } from "@pinetrie/config/testing"
 import { describe, expect, test } from "vitest"
-import { agentReadyLine, reportLines, storeLine } from "./startup-lines.ts"
+import {
+  agentReadyLine,
+  reportLines,
+  sessionLines,
+  storeLine,
+} from "./startup-lines.ts"
+
+describe("sessionLines", () => {
+  const home = "/home/ada"
+  const at = (path: string, name: string) => ({
+    path,
+    name: sessionNameFor(name),
+    servedAt: 1,
+  })
+  const registry = { version: 1, entries: [] } as const
+
+  test("a session found says its folder, under home as ~", () => {
+    const entry = at("/home/ada/work/website", "website")
+    expect(
+      sessionLines({ kind: "found", entry, write: registry }, home, "dev"),
+    ).toEqual(["[host] session     website (~/work/website)"])
+  })
+
+  test("a new session beside a gone one of its name says how to attach that one", () => {
+    const entry = at("/home/ada/new/website", "website-quiet-fox")
+    const movedFrom = at("/home/ada/old/website", "website")
+    expect(
+      sessionLines(
+        { kind: "new", entry, write: registry, movedFrom },
+        home,
+        "serve",
+      ),
+    ).toEqual([
+      "[host] session     website-quiet-fox (new)",
+      "[host]   website was at ~/old/website, which is gone: PINETRIE_SESSION=website pnpm serve ~/new/website attaches it",
+    ])
+  })
+
+  test("an attached session says where it was", () => {
+    const entry = at("/srv/website", "website")
+    expect(
+      sessionLines(
+        {
+          kind: "attached",
+          entry,
+          from: "/home/ada/old/website",
+          dropped: null,
+          write: registry,
+        },
+        home,
+        "dev",
+      ),
+    ).toEqual(["[host] session     website (attached, was ~/old/website)"])
+  })
+})
 
 describe("storeLine", () => {
   test.each([

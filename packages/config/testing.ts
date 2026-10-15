@@ -12,6 +12,7 @@ import {
   type Refusal,
 } from "./decode.ts"
 import { isPlainObject, type Kind } from "./kinds.ts"
+import { nameFrom, type SessionName } from "./sessions.ts"
 import {
   type AnySetting,
   admits,
@@ -266,4 +267,14 @@ export function configText(values: Readonly<Record<string, unknown>>): string {
     if (last !== undefined) at[last] = value
   }
   return JSON.stringify(root)
+}
+
+/**
+ * `text` as a session's name, for a test. Throws on text `nameFrom` would
+ * change: a test cannot make a name the registry could not hold.
+ */
+export function sessionNameFor(text: string): SessionName {
+  if (nameFrom(text) !== text)
+    throw new Error(`${text} is not a session's name`)
+  return text as SessionName
 }

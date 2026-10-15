@@ -1,7 +1,8 @@
-// thread-names — the words a thread's name is made of: two lists, here because
-// a person's name may not take a thread's shape (`normalizeName`), and core
-// cannot import `@pinetrie/rules`, which names threads from them
-// (`threadNameFor`).
+// thread-names — the words a thread's name is made of: two lists, and the
+// hash that picks a pair of them. Here because a person's name may not take a
+// thread's shape (`normalizeName`), and both `@pinetrie/rules`, which names
+// threads, and `@pinetrie/config`, which suffixes a session's name, take
+// pairs from them, and neither may import the other.
 
 /**
  * 256 adjectives and 256 nouns: lowercase, 3 to 7 letters, common, concrete,
@@ -529,6 +530,23 @@ export const NOUNS = [
 export type Adjective = (typeof ADJECTIVES)[number]
 /** One of the 256 nouns a thread's name ends with: the key of its built-in icon. */
 export type Noun = (typeof NOUNS)[number]
+
+/** How many adjective-noun pairs there are: 65,536. */
+export const NAME_PAIRS = ADJECTIVES.length * NOUNS.length
+
+/** FNV-1a, 32 bits: spreads ids that differ only near their end. */
+export function fnv1a(text: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h
+}
+
+/** The pair at `index`, from 0 to `NAME_PAIRS - 1`, as `adjective-noun`. */
+export const namePair = (index: number): string =>
+  `${ADJECTIVES[(index >>> 8) & 255]}-${NOUNS[index & 255]}`
 
 const ADJECTIVE_SET: ReadonlySet<string> = new Set(ADJECTIVES)
 const NOUN_SET: ReadonlySet<string> = new Set(NOUNS)

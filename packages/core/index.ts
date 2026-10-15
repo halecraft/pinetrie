@@ -1544,6 +1544,14 @@ export interface SetupRecord {
   /** Listed packages that are not folders, never loaded. */
   readonly refusedPackages: readonly string[]
   readonly contextFiles: readonly string[]
+  /** The session served, found by its folder's real path; null with no project. */
+  readonly session: SetupSession | null
+}
+
+/** A session as the setup page names it: its name, and its folder's real path. */
+export interface SetupSession {
+  readonly name: string
+  readonly path: string
 }
 
 /**

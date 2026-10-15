@@ -9,6 +9,7 @@ import type {
   ConfigOrigin,
   ConfigRefusal,
   NoModel,
+  SetupSession,
 } from "@pinetrie/core"
 
 const LAYER_NAMES: Readonly<Record<ConfigLayer, string>> = {
@@ -21,6 +22,10 @@ const LAYER_NAMES: Readonly<Record<ConfigLayer, string>> = {
 
 /** What a layer is, for a person: "your file", "the machine's file". */
 export const layerWords = (layer: ConfigLayer): string => LAYER_NAMES[layer]
+
+/** The local layer, named with the session it belongs to. */
+export const localLayerWords = (session: SetupSession): string =>
+  `your file for session ${session.name} (${session.path})`
 
 /** A layer's file and whether it was read. */
 export function fileStateWords(file: string, state: ConfigFileState): string {

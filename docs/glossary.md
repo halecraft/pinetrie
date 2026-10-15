@@ -191,6 +191,12 @@ word alone.)
 - **fold**: hiding something on screen (a column, an ask's work, the
   sidebar to icons), and the context merge of `docs/00-vision.md`, a
   branch folded back into its parent (ADR-0010).
+- **session**: the folder a host serves, as the startup lines and the
+  setup page name it: found by its folder's real path, named for people
+  (`website`, `website-quiet-fox`), with its own local config and data
+  directory (ADR-0149; `SessionName`, `openSession`). In code it is also
+  the host's session document (`SessionDocHandle`, its records) and pi's
+  session, one per root; neither is what a person reads as a session.
 - **accept** in plain English: the host accepts a command or a write
   (`acceptsWrite`, a move `accepted`). Only an offer is *accepted* into
   accepted work.

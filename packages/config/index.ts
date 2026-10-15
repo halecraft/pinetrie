@@ -31,5 +31,19 @@ export {
   readStartLayers,
   type StartLayers,
 } from "./read.ts"
+export {
+  decodeSessions,
+  EMPTY_REGISTRY,
+  encodeSessions,
+  planRename,
+  planSession,
+  type Registry,
+  type RegistryProblem,
+  type RenamePlan,
+  type SessionName,
+  type SessionPlan,
+  type SessionRefusal,
+  sessionWords,
+} from "./sessions.ts"
 export { defineTable, join, limited, pick } from "./setting.ts"
 export { type ConfigReport, type Settled, settle } from "./settle.ts"

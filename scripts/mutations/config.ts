@@ -6,6 +6,7 @@ const settle = "packages/config/settle.ts"
 const decode = "packages/config/decode.ts"
 const setting = "packages/config/setting.ts"
 const kinds = "packages/config/kinds.ts"
+const sessions = "packages/config/sessions.ts"
 
 export const mutations: readonly Mutation[] = [
   // ── settling ──
@@ -123,5 +124,47 @@ export const mutations: readonly Mutation[] = [
     to: "    return true\n",
     command: unit,
     expect: "readConfigFile",
+  },
+  // ── sessions ──
+  {
+    name: "a session's name that is taken is reused, with no suffix",
+    file: sessions,
+    from: "  if (!taken.has(plain)) return plain\n",
+    to: "  return plain\n",
+    command: unit,
+    expect: "a new folder whose name is taken gets a two-word suffix",
+  },
+  {
+    name: "a session is named as moved though its folder exists",
+    file: sessions,
+    from: "      .filter(e => isOfBase(e.name, base) && facts.gone.has(e.path))\n",
+    to: "      .filter(e => isOfBase(e.name, base))\n",
+    command: unit,
+    expect:
+      "a new session names none as moved when every folder of its base exists",
+  },
+  {
+    name: "an attach takes over a folder's own session",
+    file: sessions,
+    from: '    if (named === undefined || !facts.gone.has(named.path))\n      return {\n        kind: "refused",\n        why: { kind: "has-own", asked, own: own.name },\n      }\n',
+    to: "",
+    command: unit,
+    expect: "a folder with a session of its own is not attached to another",
+  },
+  {
+    name: "an attach replaces a folder's own session that holds a file",
+    file: sessions,
+    from: "    if (facts.ownHolds !== null)\n",
+    to: "    if (false)\n",
+    command: unit,
+    expect: "a folder's own session that holds a file is not replaced",
+  },
+  {
+    name: "a session's name is any string",
+    file: sessions,
+    from: "export type SessionName = string & { readonly [sessionBrand]: true }",
+    to: "export type SessionName = string",
+    // tsc names no failing check: with typecheck clean, any error is the mutant's.
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
 ]

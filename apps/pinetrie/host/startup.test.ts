@@ -68,6 +68,7 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
     model: { kind: "none", why: "unset", named: null },
     credentials: [],
     settings: [],
+    session: null,
     refusedPackages: [],
     contextFiles: [],
   },

@@ -20,7 +20,7 @@ import {
   text,
 } from "./index.ts"
 import type { AnySetting } from "./setting.ts"
-import { configText, tableProblems } from "./testing.ts"
+import { configText, sessionNameFor, tableProblems } from "./testing.ts"
 
 const absolute = text(
   s => (s.startsWith("/") ? s : null),
@@ -302,7 +302,7 @@ describe("settling", () => {
 
 describe("places", () => {
   test("each place defaults under the home directory", () => {
-    expect(configPlaces({}, "/home/ada", "proj")).toEqual({
+    expect(configPlaces({}, "/home/ada", sessionNameFor("proj"))).toEqual({
       dirs: {
         config: "/home/ada/.config/pinetrie",
         data: "/home/ada/.local/share/pinetrie",

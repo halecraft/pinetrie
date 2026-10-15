@@ -1,5 +1,5 @@
 // host/startup-lines — the words of the lines a starting host logs about what
-// it serves and what it read: the project, the store, each config file and
+// it serves and what it read: the project, the session, the store, each config file and
 // what it refused, the model, and where to open the host. Config words are
 // `@pinetrie/interface`'s, shared with the setup page.
 // A line about the session's state stays beside what computes it, such as
@@ -25,13 +25,53 @@ import type {
   ServiceKeyRefusal,
   SshSettings,
 } from "@pinetrie/ssh"
-import type { StoreChoice } from "./invocation.ts"
+import type { HostCommand, StoreChoice } from "./invocation.ts"
+import type { OpenedPlan } from "./sessions.ts"
 
 /** `[host] label` padded so the values line up. */
 const line = (label: string, value: string): string =>
   `[host] ${label.padEnd(11)} ${value}`
 
 export const projectLine = (root: string): string => line("project", root)
+
+/** `file` under `home` as `~/…`; anywhere else, as it is. */
+export const homePath = (file: string, home: string): string =>
+  file === home
+    ? "~"
+    : file.startsWith(`${home}/`)
+      ? `~/${file.slice(home.length + 1)}`
+      : file
+
+/**
+ * Which session the host serves; for a new one whose base name a gone
+ * folder had, where that was and the command that attaches it.
+ */
+export function sessionLines(
+  plan: OpenedPlan,
+  home: string,
+  command: HostCommand,
+): readonly string[] {
+  const { name, path } = plan.entry
+  switch (plan.kind) {
+    case "found":
+      return [line("session", `${name} (${homePath(path, home)})`)]
+    case "attached":
+      return [
+        line("session", `${name} (attached, was ${homePath(plan.from, home)})`),
+      ]
+    case "new": {
+      const moved = plan.movedFrom
+      return [
+        line("session", `${name} (new)`),
+        ...(moved === null
+          ? []
+          : [
+              `[host]   ${moved.name} was at ${homePath(moved.path, home)}, which is gone: PINETRIE_SESSION=${moved.name} pnpm ${command} ${homePath(path, home)} attaches it`,
+            ]),
+      ]
+    }
+  }
+}
 
 export const storeLine = (store: StoreChoice): string =>
   line(

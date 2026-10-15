@@ -14,6 +14,7 @@
     "e2e:lanes": "node e2e/lanes.ts",
     "e2e:observer": "node e2e/observer.ts",
     "vm:build": "node scripts/vm-build.ts",
+    "session": "node scripts/session.ts",
     "sign-in": "node scripts/sign-in.ts in",
     "sign-out": "node scripts/sign-in.ts out"
   },

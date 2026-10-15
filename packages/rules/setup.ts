@@ -73,6 +73,10 @@ const SetupRecordSchema = Type.Object({
   ),
   refusedPackages: Type.Array(Type.String()),
   contextFiles: Type.Array(Type.String()),
+  session: Type.Union([
+    Type.Object({ name: Type.String(), path: Type.String() }),
+    Type.Null(),
+  ]),
 })
 
 /** What the host read of its config, at its one key, for the setup page. */

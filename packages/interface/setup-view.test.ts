@@ -32,6 +32,7 @@ const RECORD: SetupRecord = {
   ],
   refusedPackages: ["/gone"],
   contextFiles: ["/p/AGENTS.md"],
+  session: null,
 }
 
 describe("setupView", () => {
@@ -73,6 +74,16 @@ describe("setupView", () => {
       "/c/pinetrie.json: lanes.vm.slots is not a whole number from 1 to 20, and is not taken",
     ])
     expect(view?.credentials).toEqual(["anthropic: signed in (auth.json)"])
+  })
+
+  test("the local file is named with the session it belongs to", () => {
+    const view = setupView(
+      { ...RECORD, session: { name: "website", path: "/w/website" } },
+      [],
+    )
+    expect(view?.files[1]?.layer).toBe(
+      "your file for session website (/w/website)",
+    )
   })
 
   test("every setting in the record is listed, with where its value came from", () => {

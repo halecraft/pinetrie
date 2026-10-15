@@ -27,6 +27,7 @@ import {
   type CardId,
   isTextCardId,
   type ModelLine,
+  type SetupSession,
   type ThreadId,
   threadEnd,
 } from "@pinetrie/core"
@@ -195,10 +196,13 @@ export interface StartHostOptions {
   readonly project?: { readonly dir: string; readonly tools: boolean } | null
   /**
    * Where each config layer's file is, and pine·trie's own directories; by
-   * default from the XDG variables. A suite passes its own rather than move
+   * default from the XDG variables, with no local layer: only a session
+   * opened by `server.ts` has one. A suite passes its own rather than move
    * `XDG_CONFIG_HOME`, which git and jj read too.
    */
   readonly places?: ConfigPlaces
+  /** The session served (`openSession`), which the setup page names; none by default. */
+  readonly served?: SetupSession | null
   /** The variables the config's `env` layer reads; by default the process's. */
   readonly env?: Readonly<Record<string, string | undefined>>
   /** pi's agent directory, bound to `places`' config directory for this process (`bindAgentDir`). */
@@ -287,11 +291,8 @@ export async function startHost({
   model,
   project = null,
   env = process.env,
-  places: where = configPlaces(
-    env,
-    homedir(),
-    project === null ? null : path.basename(project.dir),
-  ),
+  places: where = configPlaces(env, homedir(), null),
+  served = null,
   binding,
   ssh = {
     dir: path.join(homedir(), ".ssh"),
@@ -491,6 +492,7 @@ export async function startHost({
       model: piSetup.model,
       origins: model.kind === "configured" ? r.settled.model.origins : null,
       setup: piSetup,
+      session: served,
     })
   if (titleConfig.model !== null && !piSetup.titleModelFound)
     log(

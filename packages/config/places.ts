@@ -3,6 +3,7 @@
 // candidate exists is the reader's question (`read.ts`).
 
 import path from "node:path"
+import type { SessionName } from "./sessions.ts"
 
 /** The name every layer's file has. */
 export const CONFIG_FILE = "pinetrie.json"
@@ -21,7 +22,7 @@ export interface ConfigPlaces {
   /** Each `$XDG_CONFIG_DIRS` entry's (by default `/etc/xdg`) `pinetrie/pinetrie.json`; the first that exists is read. */
   readonly systemCandidates: readonly string[]
   readonly user: string
-  /** The person's file for this project; null with no project. */
+  /** The person's file for the session served; null with none. */
   readonly local: string | null
   /** Written only by pine·trie's sign-in. */
   readonly credentials: string
@@ -29,15 +30,11 @@ export interface ConfigPlaces {
   readonly models: string
 }
 
-/**
- * The places for `env` and `home`. `session` names the project's local file:
- * the project folder's name, until sessions get names of their own, so
- * two projects whose folders share a name share it.
- */
+/** The places for `env` and `home`, with `session`'s local file. */
 export function configPlaces(
   env: Readonly<Record<string, string | undefined>>,
   home: string,
-  session: string | null,
+  session: SessionName | null,
 ): ConfigPlaces {
   const set = (name: string) => {
     const v = env[name]

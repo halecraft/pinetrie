@@ -259,7 +259,10 @@ refusal reaches both the startup lines and the setup page. Nothing of
 `~/.pi` or a project's `.pi/` is read: pi's own code loads the model setup
 from pine·trie's config, with pi's agent directory bound to pine·trie's.
 Credentials are state, in `$XDG_DATA_HOME/pinetrie/auth.json`, written only
-by `pnpm sign-in`.
+by `pnpm sign-in`. The local layer is the served session's
+(ADR-0149): a session is found by its folder's real path in one registry,
+`$XDG_DATA_HOME/pinetrie/sessions.json`, and named for people, and its
+local file and data directory are named by that name.
 
 Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`
 stands for "absent"; the codec decodes commands into an `Intent` union and

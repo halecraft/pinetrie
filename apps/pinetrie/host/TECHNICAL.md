@@ -10,9 +10,10 @@ wires them.
 
 | module | owns |
 |---|---|
-| `dev.ts`, `serve.ts`, `server.ts`, `invocation.ts` | `pnpm dev [folder]` and `pnpm serve [folder]` (ADR-0086, ADR-0148), each a few lines over `runHost` (`server.ts`): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it; ADR-0149, accepted and not yet built, finds a session by its folder's real path and names it), `refusalText` (a refusal's words, with its command's usage). A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm dev:react` serves React's development build, for its warnings and render timeline (S59) |
+| `dev.ts`, `serve.ts`, `server.ts`, `invocation.ts` | `pnpm dev [folder]` and `pnpm serve [folder]` (ADR-0086, ADR-0148), each a few lines over `runHost` (`server.ts`): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it), `refusalText` (a refusal's words, with its command's usage). A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm dev:react` serves React's development build, for its warnings and render timeline (S59) |
 | `page.ts` | the page a host serves (ADR-0148): Vite under `pnpm dev`, else the built page in the page's `dist/`, which `pnpm serve` rebuilds first when its stamp no longer matches its inputs (`ensurePage`), and whose files it reads once at start (`readBuiltPage`); where the page's package is (`pageDir`) |
-| `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model |
+| `sessions.ts` | the session a host serves (`openSession`, ADR-0149): the folder's real path looked up in the registry under its lock, the registry written, the session's data directory made and its `host.pid` taken; and `renameSession`, for `pnpm session rename` (`apps/pinetrie/scripts/session.ts`) |
+| `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the session (`sessionLines`), the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model |
 | `settings.ts` | every setting the host reads, declared once (`SETTINGS`, ADR-0146) with the layers that may set it and how they combine; the project's copies as values (`laneAuthority`, `decodeAuthority`, `laneCopy`), `settleHost`, `folderReport` for a host without lane work, and the settled values as the deciding packages take them (`repoNames`, `iconSettings`, `titleSettings`, `sshChoice`, `listedFolders`) |
 | `setup-record.ts` | `planSetupRecord`: the `pinetrie.setup` value, from the config's report and what the model setup loaded |
 | `index.ts` | `startHost`: the store and the check of its schemas (`migrations/`), the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents and the records, then pi's scribe and setup, lane work and the agent, in that order (§ Startup), then the wiring below |
@@ -341,8 +342,26 @@ any refresh they queued.
   (`folderReport`). A later acceptance that changes `model`, `skills` or
   `prompts` takes effect at the next start; grants follow accepted work as
   ever.
+- **The session is opened after the project folder, before the store**
+  (`server.ts`, `sessions.ts`). A refusal (`PINETRIE_SESSION` that is no
+  name, names a session whose folder exists, or would replace the
+  folder's own; a registry that is not one; a lock held for 5 s) prints
+  `sessionWords` and exits 2, with nothing opened. Its name keys the
+  local layer (`configPlaces`); `startHost` names it on the setup page
+  (`served`), and with none given has no local layer, as every suite.
+- **The registry is written whole, under its lock** (`sessions.ts`):
+  `sessions.json.lock` holds the writer's pid, linked into place so it is
+  never seen empty; the write is `sessions.json.tmp` renamed over the
+  registry. A served session holds `host.pid` in its data directory,
+  which only a rename reads. A host that dies leaves both; each is taken
+  over once its pid names no process (`ESRCH`; `EPERM` is alive). Two
+  processes taking over one dead lock at once can both hold it.
+- **A session's directories are removed with `rmdir`,** never a
+  recursive delete: when an attach replaces a folder's own empty session,
+  a file written since it was found empty refuses the attach, and stays.
 - **A starting host says what it read** (`startup-lines.ts`). `server.ts`
-  logs the project and the store, `startHost` each config file (with
+  logs the project, the session (with, for a new one beside a gone folder
+  of its name, the command that attaches that one) and the store, `startHost` each config file (with
   `(none)` when missing, `(not read)` when broken) and each refusal, then
   the roots it opened, then `agent ready` with the model and where it came
   from (a file, or `$PINETRIE_MODEL`), or `no model:` and why; and
@@ -455,6 +474,8 @@ rejects `shutdown()`.
   page retries Vite's socket once a second, and once Vite's `upgrade`
   listener is gone, the `"vite"` route leaves that socket open. A host
   serving the built page has no Vite to close.
+- **`host.pid` goes after `shutdown()`** (`server.ts`): the session's
+  `release`, also when lanes refuse to start.
 - **Only the first signal shuts down** (`server.ts`). It takes the SIGINT
   and SIGTERM listeners off, so a second Ctrl-C gets Node's default action
   and ends the process, even while `shutdown()` hangs.

@@ -7,6 +7,7 @@ import {
   credentialWords,
   fileStateWords,
   layerWords,
+  localLayerWords,
   noModelWords,
   originWords,
   refusalWords,
@@ -56,7 +57,10 @@ export function setupView(
       c => `${c.provider}: ${credentialWords(c.source)}`,
     ),
     files: record.files.map(f => ({
-      layer: layerWords(f.layer),
+      layer:
+        f.layer === "local" && record.session !== null
+          ? localLayerWords(record.session)
+          : layerWords(f.layer),
       file: fileStateWords(f.file, f.state),
     })),
     refusals: record.refusals.map(refusalWords),

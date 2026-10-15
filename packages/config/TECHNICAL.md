@@ -14,8 +14,9 @@ typed, and export the value parsers the table's kinds wrap.
 | `decode.ts` | a layer's file decoded (`decodeLayer`, `decodeProject`, `decodeEnv`), and its refusals |
 | `settle.ts` | `settle`: every setting's value, its origins and its limits, with every refusal, in one report |
 | `places.ts` | where each layer's file is, from the XDG variables (`configPlaces`); `ownDirs` |
+| `sessions.ts` | a session found by its folder's real path and named for people: the registry's shape, the plans that find a session (`planSession`) and rename one (`planRename`), and the words of their refusals (`sessionWords`) |
 | `read.ts` | the package's only I/O: `readConfigFile`, `readStartLayers` |
-| `testing.ts` | `@pinetrie/config/testing`: `tableProblems`, the checks every table must pass; `configText` |
+| `testing.ts` | `@pinetrie/config/testing`: `tableProblems`, the checks every table must pass; `configText`; `sessionNameFor`, a test's session name |
 
 ## The layers
 
@@ -27,12 +28,10 @@ From the broadest to the most specific: `system` (the first
 (a variable a setting names). A relative XDG variable is ignored, as the
 XDG spec says.
 
-- **The local layer is keyed by the session,** which is the project
-  folder's name until sessions get names of their own. Two projects whose
-  folders share a name share a local file, and a renamed folder loses its
-  own. ADR-0149, accepted and not yet built, finds a session by its
-  folder's real path in a registry, and keys the local layer by the
-  session's own name.
+- **The local layer is keyed by the session's name** (ADR-0149), a
+  `SessionName`: branded, made only by the registry's plans and its
+  decoder, so `configPlaces` cannot be handed a folder's name. Two folders
+  with one name are two sessions, each with its own local file.
 - **A project layer is named with its copy:** `{ project: "accepted" }`,
   `"working"` or `"lane"`. A copy cannot be declared without the project
   layer. `settle` takes each decoded copy under its name, and
@@ -43,6 +42,29 @@ XDG spec says.
   pine·trie's own directories, and the lanes' mount guard refuses all of
   them (`ownDirs`): a directory added to `dirs` is guarded with no other
   change.
+
+## Sessions (`sessions.ts`, ADR-0149)
+
+- **A session is found by its folder's real path,** in one registry,
+  `$XDG_DATA_HOME/pinetrie/sessions.json`: each entry a real path, a name,
+  and when a host last served it. A path and a name are each in at most
+  one entry; a registry that breaks either, is not JSON, or has another
+  `version` does not decode, and is never overwritten.
+- **A name is the folder's** (`nameFrom`: NFC, lowercase, each run of
+  what is not a letter or digit one `-`), or, when another session holds
+  it, that name with a two-word suffix: the pair the path hashes to, or
+  the next free one, from core's thread-name words. A name is valid when
+  `nameFrom` leaves it as it is, which is what `PINETRIE_SESSION` and a
+  rename are checked by.
+- **`PINETRIE_SESSION` attaches a folder to a session by name** only when
+  that session's folder is gone. Over the folder's own session it attaches
+  only when that one holds no file (`ownHolds`, gathered): a moved folder
+  started once before it is attached has a session of its own, and the
+  hint its start prints must still work.
+- **The plans are pure:** the host gathers the real path, which entries'
+  folders are gone (their path no longer its own real path) and what the
+  own session holds, then writes the plan's registry
+  (`apps/pinetrie/host/sessions.ts`).
 
 ## The rules
 

@@ -3,30 +3,16 @@
 // thread.
 
 import {
-  ADJECTIVES,
+  fnv1a,
+  NAME_PAIRS,
   type NameRecord,
-  NOUNS,
+  namePair,
   type ThreadId,
   type ThreadName,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
-
-const PAIRS = ADJECTIVES.length * NOUNS.length
-
-/** FNV-1a, 32 bits: spreads ids that differ only near their end. */
-function fnv1a(text: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < text.length; i += 1) {
-    h ^= text.charCodeAt(i)
-    h = Math.imul(h, 0x01000193) >>> 0
-  }
-  return h
-}
-
-const pairAt = (index: number): string =>
-  `${ADJECTIVES[(index >>> 8) & 255]}-${NOUNS[index & 255]}`
 
 /**
  * A lane's name: the pair its id hashes to, or the next free one after it,
@@ -36,9 +22,9 @@ export function threadNameFor(
   lane: ThreadId,
   inUse: ReadonlySet<string>,
 ): ThreadName {
-  const first = fnv1a(lane) % PAIRS
-  for (let step = 0; step < PAIRS; step += 1) {
-    const name = pairAt((first + step) % PAIRS)
+  const first = fnv1a(lane) % NAME_PAIRS
+  for (let step = 0; step < NAME_PAIRS; step += 1) {
+    const name = namePair((first + step) % NAME_PAIRS)
     if (!inUse.has(name)) return name as ThreadName
   }
   throw new Error("every thread name is in use")
