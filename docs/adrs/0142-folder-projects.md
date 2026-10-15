@@ -28,6 +28,9 @@
 - **Amended by:**
   - ADR-0149: a folder project's data is in its session's directory,
     `$XDG_DATA_HOME/pinetrie/sessions/<name>/`.
+  - ADR-0150: a lane's history has one kind, on its record, and a project's
+    change of kind refuses the lanes of the other kind, as whole lanes, until
+    a conversion that is still left open.
 
 **Context.**
 

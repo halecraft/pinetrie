@@ -25,6 +25,8 @@
     `$XDG_DATA_HOME/pinetrie/sessions/<name>/`, and its name comes from the
     registry, found by the folder's real path. `PINETRIE_SESSION` attaches a
     folder to a session by name.
+  - ADR-0150: its move of the session out of the project is built for every
+    project, before folder projects are served.
 
 **Context.**
 

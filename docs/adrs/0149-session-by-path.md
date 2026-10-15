@@ -11,6 +11,9 @@
     registry, not by the project folder's name.
   - ADR-0142: a folder project's data is in its session's directory,
     `$XDG_DATA_HOME/pinetrie/sessions/<name>/`.
+- **Amended by:**
+  - ADR-0150: a session's directory holds its store for both kinds, so a
+    folder that gains or loses jj keeps its session.
 
 **Context.**
 

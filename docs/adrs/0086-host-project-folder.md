@@ -16,6 +16,8 @@
     is written into the folder.
   - ADR-0148: the command that serves a project is `pnpm dev [folder]` or
     `pnpm serve [folder]`, not `pnpm host [folder]`.
+  - ADR-0150: a jj project's session is no longer kept in its `.pinetrie/`:
+    every project's store is in its session's directory.
 
 **Context.** `pnpm host` served pine·trie's own repo, found from where
 `server.ts` sits, and kept its session in that repo's `.pinetrie/pinetrie.db`.
