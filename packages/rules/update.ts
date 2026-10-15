@@ -40,6 +40,15 @@ export const updateLine = (d: UpdateDetails): string =>
   `↓ caught up with ${catchUpName(d.from)}: ${d.files.length === 0 ? "no file" : plural(d.files.length, "file", "files")} changed`
 
 /**
+ * What came in to a folder lane, as a catch-up's titles: a folder project's
+ * history has no commit messages, so it is named by where it came from.
+ */
+export const folderIncoming = (from: "folder" | "parent"): string =>
+  from === "folder"
+    ? "your folder, as it was last read"
+    : "the newest work of the thread this one branched from"
+
+/**
  * The update message, for the model: what came in, and which of this
  * thread's files changed, or that none did. The commits are empty when all
  * that came in was accepted offers of work the copy holds, which a catch-up

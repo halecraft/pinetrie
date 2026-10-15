@@ -2,6 +2,7 @@
 // role that serves it. The server and the one-shot command (`once.ts`) both
 // answer through here.
 
+import { mkdir } from "node:fs/promises"
 import { diffBySend, diffByWalk } from "./diff.ts"
 import {
   executeDiskSteps,
@@ -11,10 +12,15 @@ import {
   readSnapshotFile,
 } from "./disks.ts"
 import {
+  diffStats,
   executeApply,
+  executeReadIn,
   executeStates,
+  fileDiff,
+  filesUnder,
   pathFacts,
   planApply,
+  planReadIn,
   planStates,
   sameContent,
 } from "./folder.ts"
@@ -33,6 +39,8 @@ export interface Serving {
   readonly role: Role
   readonly lanesDir: string
   readonly facts: RoleFacts
+  /** Where the project's root is mounted read-only: `FOLDER_MOUNT` in a role's container. */
+  readonly folder: string
 }
 
 const disksOf = (serving: Serving, key: string) => {
@@ -69,6 +77,11 @@ async function answerAny(
       return isSubvolume(
         disksOf(serving, call.project).snapshot(named(call.snapshot)),
       )
+    case "statesDir":
+      await mkdir(disksOf(serving, call.project).states(named(call.lane)), {
+        recursive: true,
+      })
+      return null
     case "nestedDisk":
       await executeDiskSteps(
         planNestedDisk(call.lane, disksOf(serving, call.project)),
@@ -87,6 +100,27 @@ async function answerAny(
         call.snapshot,
         call.paths,
       )
+    case "fileDiff":
+      return fileDiff(
+        disksOf(serving, call.project),
+        call.a,
+        call.b,
+        call.path,
+        call.limit,
+      )
+    case "diffStats":
+      return diffStats(
+        disksOf(serving, call.project),
+        call.a,
+        call.b,
+        call.paths,
+      )
+    case "filesUnder":
+      return filesUnder(
+        disksOf(serving, call.project),
+        call.snapshot,
+        call.paths,
+      )
     case "sameContent":
       return sameContent(
         disksOf(serving, call.project),
@@ -98,6 +132,10 @@ async function answerAny(
       return executeApply(
         planApply(call, disksOf(serving, call.project)),
         call.markers,
+      )
+    case "readIn":
+      return executeReadIn(
+        planReadIn(call, serving.folder, disksOf(serving, call.project)),
       )
     case "states":
       await executeStates(

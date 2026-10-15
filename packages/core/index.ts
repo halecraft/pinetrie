@@ -137,6 +137,10 @@ export const ERR = {
   NOT_OWN_COPY: "not_own_copy",
   /** An offer action on a lane with no offer in your repo. */
   NO_OFFER: "no_offer",
+  /** Accepting a folder project's offer, which the host cannot do yet. */
+  FOLDER_ACCEPT_LATER: "folder_accept_later",
+  /** Squashing a folder project's offer, which is its files, never a stack. */
+  NOT_A_STACK: "not_a_stack",
   /** A `/package:name` command that names no command there is. */
   UNKNOWN_COMMAND: "unknown_command",
   /** A peer whose principal is not an email: nobody the host can name. */
@@ -1467,8 +1471,8 @@ export interface FolderOfferRecord {
   readonly files: readonly string[]
   /** The lane's open conflicts among them. */
   readonly conflicts: readonly string[]
-  /** An agent wrote its description. */
-  readonly described: boolean
+  /** An agent's description of it; null until one is written. */
+  readonly description: string | null
   readonly at: number
 }
 

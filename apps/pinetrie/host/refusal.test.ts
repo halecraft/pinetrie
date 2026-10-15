@@ -21,11 +21,13 @@ const places = configPlaces({}, path.join(dir, "home"), null)
 const binding = bindAgentDir(places.dirs.config)
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-test("a host with tools on a folder with no jj repo does not start, and says how to make one", async () => {
+test("a host with tools on a folder lanes cannot serve does not start, and says why", async () => {
+  const notADirectory = path.join(dir, "a-file")
+  writeFileSync(notADirectory, "")
   const started = startHost({
     model: { kind: "scripted", script: scriptedModel() },
     project: {
-      dir,
+      dir: notADirectory,
       tools: true,
       files: sessionFiles(path.join(places.dirs.data, "sessions", "plain"))
         .lanes,
@@ -36,9 +38,7 @@ test("a host with tools on a folder with no jj repo does not start, and says how
     log: () => {},
   })
   await expect(started).rejects.toBeInstanceOf(HostRefused)
-  await expect(started).rejects.toThrow(
-    `${dir} has no jj repo: \`jj git init --colocate\` makes one`,
-  )
+  await expect(started).rejects.toThrow(`${notADirectory} is not a directory`)
 })
 
 test("a host without tools starts on a folder with no repo", async () => {

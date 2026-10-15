@@ -68,6 +68,18 @@ flows, merged by `git merge-file` as lanehost merges.
   fourth, F, whose two sides resolved one conflict two ways, conflicts,
   where either base alone takes one side's resolution silently.
 
+- **Your folder's newest state** (`folderNewest`) is the one line state (a
+  read, an accept or a restore) no other has as its first parent: your
+  folder's line is made one state at a time, so it has one head.
+
+## A read of your folder (`read.ts`)
+
+- **A read copies what moved since the last one** (`planRead`): the paths
+  whose stamp (kind, size, ctime, executable bit, a link's target) differs
+  from the last read's, and those gone; nothing when nothing did, and then
+  no state is made. The host walks your folder (`apps/pinetrie/host/folder/`)
+  and keeps the stamps only once the state they made is recorded.
+
 ## The path merge (`merge.ts`)
 
 - **The receiving disk holds `ours`;** `theirs` is merged in. A path only

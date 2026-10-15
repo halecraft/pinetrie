@@ -1,7 +1,7 @@
 // lanehost/folder — a folder project's merges on its disks, as
 // `@pinetrie/folder` plans them: what a snapshot holds at a path, whether two
-// hold alike content, a merge's steps applied to a disk, and a lane's states
-// directory. Every call is checked and planned into absolute paths first
+// hold alike content, a merge's steps applied to a disk, a lane's states
+// directory, and a read of your folder into its line. Every call is checked and planned into absolute paths first
 // (`layout.ts`), then carried out.
 
 import { constants } from "node:fs"
@@ -22,19 +22,23 @@ import {
 import path from "node:path"
 import { runCommand } from "@pinetrie/channel"
 import {
+  type DiffStat,
   isPathInside,
   type LaneStatesOp,
   type MergeStep,
   type PathFact,
+  type ReadInAnswer,
+  type ReadPath,
   type TextMerged,
 } from "@pinetrie/core"
-import { executeDiskSteps } from "./disks.ts"
+import { type DiskStep, executeDiskSteps, planDisk } from "./disks.ts"
 import {
+  FOLDER_LINE,
   LANE_FILES,
   checkedDiskName as named,
   type ProjectDisks,
 } from "./layout.ts"
-import { kindOf } from "./walk.ts"
+import { kindOf, walkTree } from "./walk.ts"
 
 /** How much of a file is read to tell text: git's own window. */
 const TEXT_WINDOW = 8000
@@ -106,6 +110,32 @@ export async function pathFacts(
   const out: PathFact[] = []
   for (const p of paths) out.push(await factAt(root, inside(p)))
   return out
+}
+
+/**
+ * The files and symlinks a snapshot holds at or under each of `paths`,
+ * sorted: a diff names a directory renamed or made by its path alone. Never
+ * through a symlink.
+ */
+export async function filesUnder(
+  disks: ProjectDisks,
+  snapshot: string,
+  paths: readonly string[],
+): Promise<readonly string[]> {
+  const root = disks.snapshot(named(snapshot))
+  const out = new Set<string>()
+  for (const p of paths.map(inside)) {
+    if (!(await isUnderDirs(root, p))) continue
+    const s = await lstatOrNull(path.join(root, p))
+    if (s === null) continue
+    if (!s.isDirectory()) {
+      if (kindOf(s) !== "other") out.add(p)
+      continue
+    }
+    for (const [rel, e] of await walkTree(path.join(root, p)))
+      if (e.kind === "file" || e.kind === "symlink") out.add(`${p}/${rel}`)
+  }
+  return [...out].sort()
 }
 
 /** Whether two files hold the same bytes, read a chunk at a time. */
@@ -432,4 +462,208 @@ export async function executeStates(planned: StatesPlanned): Promise<void> {
       return
     }
   }
+}
+
+/** A read of your folder into its line, checked and planned into absolute paths. */
+export interface ReadInPlanned {
+  /** Your folder, as the disks role sees it, read-only. */
+  readonly folder: string
+  /** The line's disk, made from `from` (null: empty) and dropped after. */
+  readonly disk: readonly DiskStep[]
+  readonly diskPath: string
+  readonly snapshot: readonly DiskStep[]
+  readonly drop: readonly DiskStep[]
+  readonly paths: readonly ReadPath[]
+  readonly deleted: readonly string[]
+}
+
+/** `readIn` as steps and paths; throws on a name that is no disk's or a path that leaves one. */
+export function planReadIn(
+  call: {
+    readonly from: string | null
+    readonly state: string
+    readonly paths: readonly ReadPath[]
+    readonly deleted: readonly string[]
+  },
+  folder: string,
+  disks: ProjectDisks,
+): ReadInPlanned {
+  const lane = FOLDER_LINE
+  const drop = planDisk({ kind: "delete", lane }, disks)
+  return {
+    folder,
+    disk: [
+      ...drop,
+      ...planDisk(
+        call.from === null
+          ? { kind: "create", lane }
+          : { kind: "restore", lane, from: named(call.from) },
+        disks,
+      ),
+    ],
+    diskPath: disks.lane(lane),
+    snapshot: planDisk(
+      { kind: "snapshot", lane, snapshot: named(call.state) },
+      disks,
+    ),
+    drop,
+    paths: call.paths.map(p => ({ ...p, path: inside(p.path) })),
+    deleted: call.deleted.map(inside),
+  }
+}
+
+/** Whether `at` holds what `stamp` says: its size and ctime, read without following a link. */
+async function holdsStamp(
+  at: string,
+  stamp: ReadPath["stamp"],
+): Promise<boolean> {
+  const s = await lstat(at, { bigint: true }).catch(() => null)
+  return (
+    s !== null &&
+    (s.isFile() || s.isSymbolicLink()) &&
+    s.size === BigInt(stamp.size) &&
+    s.ctimeNs === BigInt(stamp.ctimeNs)
+  )
+}
+
+/** Make every directory above `p` on `root`, replacing a file or a link where one stands. */
+async function makeParents(root: string, p: string): Promise<void> {
+  const parts = p.split("/")
+  for (let i = 1; i < parts.length; i++) {
+    const at = path.join(root, ...parts.slice(0, i))
+    const s = await lstatOrNull(at)
+    if (s?.isDirectory()) continue
+    if (s !== null) await rm(at, { force: true })
+    await mkdir(at)
+  }
+}
+
+/** Remove `p`'s directories on `root` that a delete left empty, deepest first. */
+async function pruneEmpty(root: string, p: string): Promise<void> {
+  for (let at = path.dirname(p); at !== "."; at = path.dirname(at))
+    if (
+      !(await rmdir(path.join(root, at)).then(
+        () => true,
+        () => false,
+      ))
+    )
+      return
+}
+
+/**
+ * Carry out a read: the line's disk made from its newest state, the deleted
+ * paths removed, each path copied from your folder with its stamp checked
+ * before and after (a read that saw no stamp move held one version whole),
+ * then the disk snapshotted as the new state. A path whose stamp moved, or
+ * that is under a symlink in your folder now, makes no state: the host
+ * reads again. A symlink is made again; the disk is dropped either way.
+ */
+export async function executeReadIn(
+  planned: ReadInPlanned,
+): Promise<ReadInAnswer> {
+  const { folder, diskPath: disk } = planned
+  await executeDiskSteps(planned.disk)
+  try {
+    for (const p of planned.deleted) {
+      if (!(await isUnderDirs(disk, p))) continue
+      await rm(path.join(disk, p), { recursive: true, force: true })
+      await pruneEmpty(disk, p)
+    }
+    const moved: string[] = []
+    for (const { path: p, stamp } of planned.paths) {
+      const from = path.join(folder, p)
+      if (!(await isUnderDirs(folder, p)) || !(await holdsStamp(from, stamp))) {
+        moved.push(p)
+        continue
+      }
+      await makeParents(disk, p)
+      const to = path.join(disk, p)
+      await rm(to, { recursive: true, force: true })
+      const s = await lstat(from)
+      // `copyFile` keeps the file's mode, its executable bits with it.
+      if (s.isSymbolicLink()) await symlink(await readlink(from), to)
+      else await copyFile(from, to)
+      if (!(await holdsStamp(from, stamp))) moved.push(p)
+    }
+    if (moved.length > 0) return { kind: "moved", paths: moved }
+    await executeDiskSteps(planned.snapshot)
+    return { kind: "made" }
+  } finally {
+    await executeDiskSteps(planned.drop)
+  }
+}
+
+/** `git diff --no-index` of `p` between two snapshots, from the snapshots' directory; `/dev/null` for a side without it. */
+async function gitDiffOf(
+  disks: ProjectDisks,
+  a: string,
+  b: string,
+  p: string,
+  flags: readonly string[],
+): Promise<string> {
+  const side = async (name: string) => {
+    const root = disks.snapshot(named(name))
+    return (await isUnderDirs(root, p)) &&
+      (await lstatOrNull(path.join(root, p))) !== null
+      ? `${name}/${p}`
+      : "/dev/null"
+  }
+  const ran = await runCommand(
+    [
+      "git",
+      "diff",
+      "--no-index",
+      "--no-color",
+      "--no-ext-diff",
+      ...flags,
+      "--",
+      await side(a),
+      await side(b),
+    ],
+    {
+      cwd: disks.snapshots,
+      bytes: false,
+      signal: new AbortController().signal,
+    },
+  )
+  // 1 is "they differ"; anything else is git's failure.
+  if (ran.code !== 0 && ran.code !== 1)
+    throw new Error(`git diff ${p}: ${String(ran.stderr).trim()}`)
+  return String(ran.stdout)
+}
+
+/**
+ * One file's unified diff between snapshots `a` and `b`, its paths from the
+ * disk's root as jj's `--git` prints them; cut one byte past `limit`, so
+ * its reader can tell it was too large.
+ */
+export async function fileDiff(
+  disks: ProjectDisks,
+  a: string,
+  b: string,
+  p: string,
+  limit: number,
+): Promise<string> {
+  const text = (await gitDiffOf(disks, a, b, inside(p), []))
+    .replaceAll(`a/${a}/`, "a/")
+    .replaceAll(`b/${b}/`, "b/")
+  return text.length > limit ? text.slice(0, limit + 1) : text
+}
+
+/** Lines added and removed in each of `paths` between snapshots `a` and `b`; 0 and 0 for a binary file. */
+export async function diffStats(
+  disks: ProjectDisks,
+  a: string,
+  b: string,
+  paths: readonly string[],
+): Promise<readonly DiffStat[]> {
+  const out: DiffStat[] = []
+  for (const p of paths.map(inside)) {
+    const [added = "0", removed = "0"] = (
+      await gitDiffOf(disks, a, b, p, ["--numstat"])
+    ).split("\t")
+    const n = (s: string) => (/^\d+$/.test(s) ? Number(s) : 0)
+    out.push({ path: p, added: n(added), removed: n(removed) })
+  }
+  return out
 }

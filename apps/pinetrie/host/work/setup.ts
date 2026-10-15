@@ -164,6 +164,7 @@ export async function openProject(input: {
   readonly adapter: ProjectAdapter | null
   /** The session's lane files, with `found`. */
   readonly files: LaneFiles | null
+  readonly records: Pick<Records, "writeValues">
   readonly start: StartLayers<HostSettings>
 }): Promise<OpenedProject | null> {
   const { basics, found, files } = input
@@ -175,7 +176,13 @@ export async function openProject(input: {
   const names = repoNames(settleHost(input.start, { working }).settled)
   // Before anything else reads the project: the reads below, lane work's
   // and the offers'.
-  const opened = await input.adapter.open({ names, basics })
+  const opened = await input.adapter.open({
+    names,
+    basics,
+    found,
+    files,
+    records: input.records,
+  })
   // Before anything mounts a shared directory or grants a lane anything.
   const configs = await startLaneConfigs({
     root,
@@ -330,21 +337,35 @@ export async function startSetup(input: {
       attached: ssh.attachedFor(lane),
       identity: r.identity,
       memory: LANE_MEMORY,
+      // A lane runs only on its project's kind of history.
+      states: own !== null && opened.kind === "folder",
     }
   }
+
+  /** Accepted work's states when its config was last read, for a kind with no base snapshot. */
+  let configsAt: string | null = null
 
   /**
    * The base snapshot at accepted work's commit: every lane starts from
    * accepted work, or from a WIP's copy on it. Nothing to do before accepted
-   * work is set up.
+   * work is set up. A kind with no base snapshot (a folder's) reads its
+   * config again each time accepted work's states move.
    */
   async function refreshBaseNow(r: Ready) {
     const accepted = await opened.acceptedNow()
     const [point] = accepted.points
     if (point === undefined) return
-    const made = await refreshBase({ ...scratchOf(r), accepted })
+    const at = accepted.points.join(" ")
+    const made =
+      accepted.checkout === null
+        ? configsAt !== at
+        : await refreshBase({ ...scratchOf(r), accepted })
+    configsAt = at
     if (made) {
-      log(`[host] the base snapshot is at accepted work (${point.slice(0, 8)})`)
+      if (accepted.checkout !== null)
+        log(
+          `[host] the base snapshot is at accepted work (${point.slice(0, 8)})`,
+        )
       // Accepted work moved: what it grants may have. Shared before it is in
       // force, so no lane names a directory no slot holds; a failed share is
       // said, and lanes naming what it lacks say why they cannot start.

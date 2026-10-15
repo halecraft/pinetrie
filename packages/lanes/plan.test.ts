@@ -67,6 +67,7 @@ const spec: LaneSpec = {
   attached: NOTHING_ATTACHED,
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "2G",
+  states: false,
 }
 
 describe("planMounts: every host path a lane sees, in one list", () => {

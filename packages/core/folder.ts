@@ -59,9 +59,10 @@ export const isDiskName = (name: string): boolean =>
 
 /**
  * A folder state's id: a disk name holding a dash, so never a jj commit's
- * (40 hex digits). A turn's state is `turn-<uuidv7>`, never its entry's id,
- * which names the entry's own snapshot; your folder's line's is
- * `line-<uuidv7>`; a virtual base's is `bases-<hash>`.
+ * (40 hex digits). A lane's states are `start-`, `turn-` and
+ * `catch-up-<uuidv7>`, never its entry's id, which names the entry's own
+ * snapshot; your folder's line's are `line-<uuidv7>`; a virtual base's is
+ * `bases-<hash>`.
  */
 export const isFolderStateId = (id: string): boolean =>
   id.includes("-") && isDiskName(id) && !/^[0-9a-f]{40}$/.test(id)
@@ -71,6 +72,14 @@ export const lineStateId = (uuid: string): PointId => `line-${uuid}` as PointId
 
 /** A turn's state in a folder lane, from a uuidv7 its caller mints. */
 export const turnStateId = (uuid: string): PointId => `turn-${uuid}` as PointId
+
+/** A folder lane's start state, from a uuidv7 its caller mints. */
+export const startStateId = (uuid: string): PointId =>
+  `start-${uuid}` as PointId
+
+/** A folder lane's catch-up state, from a uuidv7 its caller mints. */
+export const catchUpStateId = (uuid: string): PointId =>
+  `catch-up-${uuid}` as PointId
 
 /** What a side holds at a path. */
 export type PathFact =
@@ -143,3 +152,40 @@ export type LaneStatesOp =
     }
   /** A path's versions gone, once it is resolved. */
   | { readonly kind: "resolved"; readonly path: string }
+
+/**
+ * A source path of your folder as a read stamps it, by `lstat`: a file or a
+ * symlink, never a directory (a directory is the paths under it). Size and
+ * ctime are what the lane VM reads alike, so a stamp the host read
+ * is the one the disks role checks.
+ */
+export interface FolderStamp {
+  readonly kind: "file" | "symlink"
+  readonly size: number
+  /** The ctime in ns, as a decimal string: a bigint, past a safe integer. */
+  readonly ctimeNs: string
+  readonly exec: boolean
+  /** A symlink's target. */
+  readonly target?: string
+}
+
+/** A file's lines added and removed between two states; 0 and 0 for a binary file. */
+export interface DiffStat {
+  readonly path: string
+  readonly added: number
+  readonly removed: number
+}
+
+/** A path a read copies into your folder's line, with the stamp the host read. */
+export interface ReadPath {
+  readonly path: string
+  readonly stamp: Pick<FolderStamp, "size" | "ctimeNs">
+}
+
+/**
+ * What a read into your folder's line answered: its state made, or the
+ * paths whose stamp moved during their copy, and no state.
+ */
+export type ReadInAnswer =
+  | { readonly kind: "made" }
+  | { readonly kind: "moved"; readonly paths: readonly string[] }

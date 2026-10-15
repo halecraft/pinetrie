@@ -19,7 +19,11 @@ import {
   sweepSlot,
 } from "@pinetrie/docker"
 import { planObserver } from "@pinetrie/lanehost"
-import { createQueue, type LaneRuntime } from "@pinetrie/lanes"
+import {
+  createQueue,
+  type FolderDisks,
+  type LaneRuntime,
+} from "@pinetrie/lanes"
 import {
   GVPROXY_HOST_ADDRESS,
   keepLease,
@@ -43,6 +47,8 @@ export interface Found {
   /** Where the project is; setup adds the rest of its record. */
   readonly project: Pick<ProjectRecord, "root">
   readonly runtime: LaneRuntime
+  /** A folder project's calls of its disks, beside `runtime`: its adapter's alone. */
+  readonly folder: FolderDisks
   /**
    * Called once by setup, before any lane starts: pine·trie's default image,
    * and what lanes may mount and reach, shared and granted as
@@ -194,6 +200,7 @@ async function hostDockerFound(
     kind: "found",
     project,
     runtime,
+    folder: runtime.folder,
     ready: async ({ mounts, hostPorts }) => {
       runtime.serveFrom(mounts)
       sweptLog(await runtime.sweepProjects(), log)
@@ -285,6 +292,7 @@ async function vmFound(
     kind: "found",
     project,
     runtime,
+    folder: runtime.folder,
     async ready(wanted) {
       runtime.serveFrom(wanted.mounts)
       await held.share(wanted)

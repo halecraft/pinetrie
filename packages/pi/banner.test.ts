@@ -143,6 +143,9 @@ describe("banners in a harness", () => {
                 catchUp: async () => {
                   throw new Error("no catch_up here")
                 },
+                resolveConflict: async () => {
+                  throw new Error("no conflict here")
+                },
                 askSplit: async () => {
                   throw new Error("no split_offer here")
                 },

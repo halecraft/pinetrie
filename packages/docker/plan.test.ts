@@ -49,6 +49,7 @@ const spec: LaneSpec = {
   attached: NOTHING_ATTACHED,
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "4G",
+  states: false,
 }
 const key = projectKey("/Users/ada/p")
 const disks = projectDisks("/var/lib/lanehost", key)
@@ -188,6 +189,17 @@ describe("renderRun: a lane's shape as a container", () => {
       "(pinetrie-inner-docker &); exec sleep infinity",
     ])
   })
+  test("a folder lane sees its states directory, read-only; a jj lane's spec has no such mount", () => {
+    const folder = render(planShape({ ...spec, states: true }, {}))
+    expect(folder.mounts).toContainEqual({
+      source: disks.states(LANE),
+      target: "/pinetrie-states",
+      readonly: true,
+    })
+    expect(
+      render(shapes[0] as ContainerShape).mounts.map(m => m.target),
+    ).not.toContain("/pinetrie-states")
+  })
   test("on Linux, paths as they are", () => {
     const linux: DockerTarget = {
       socket: "/var/run/docker.sock",
@@ -220,6 +232,7 @@ describe("renderHelper: a lanehost role's container", () => {
     project: key,
     image: "pinetrie-lanehost:abc",
     lanesDir: "/var/lib/lanehost",
+    root: "/Users/ada/p",
     install: "/opt/pinetrie",
     runtime: "/Users/ada/p/.pinetrie/runtime/abc",
   }
@@ -249,8 +262,9 @@ describe("renderHelper: a lanehost role's container", () => {
       "host",
     ])
     expect(made.mounts[0]?.readonly).toBe(true)
+    expect(made.mounts.map(m => m.target)).not.toContain("/pinetrie-folder")
   })
-  test("the install and the runtime, read-only where a lane has them, through the slot", () => {
+  test("the install and the runtime, read-only where a lane has them, and the disks role's project root, through the slot", () => {
     const made = renderHelper({ ...shape, role: "disks" }, mac)
     expect(made.mounts.slice(1)).toEqual([
       {
@@ -261,6 +275,11 @@ describe("renderHelper: a lanehost role's container", () => {
       {
         source: mac.pathOf(shape.runtime),
         target: "/pinetrie-runtime",
+        readonly: true,
+      },
+      {
+        source: mac.pathOf("/Users/ada/p"),
+        target: "/pinetrie-folder",
         readonly: true,
       },
     ])

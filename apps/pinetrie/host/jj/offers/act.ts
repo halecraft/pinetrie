@@ -27,6 +27,7 @@ import {
   planOfferAcceptance,
   planRebuild,
 } from "@pinetrie/rules"
+import type { Describe } from "../../describe.ts"
 import { describe } from "./describe.ts"
 import { executeOffer } from "./execute.ts"
 import type { Refresh } from "./refresh.ts"
@@ -36,7 +37,7 @@ export async function act(
   deps: Pick<
     OfferDeps,
     "owner" | "repoConfig" | "basics" | "docs" | "piSetup" | "running"
-  > & { readonly describing: Set<ThreadId> },
+  > & { readonly describer: Describe },
   refresh: Pick<Refresh, "rebuild" | "ports">,
   lane: ThreadId,
   action: "accept" | "squash" | "describe" | "refresh",

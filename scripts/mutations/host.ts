@@ -5,6 +5,114 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the sweep deletes a lane's tip",
+    file: "packages/folder/live.ts",
+    from: "    live.add(lane.tip).add(lane.start)\n",
+    to: "    live.add(lane.start)\n",
+    command: unit,
+    expect:
+      "planSweep: a lane's tip and start, and your folder's newest states kept; older ones and a lane's past turns swept",
+  },
+  // ── a folder lane's history ──
+  {
+    name: "sourceChanges keeps an ignored path",
+    file: "apps/pinetrie/host/folder/changes.ts",
+    from: "    ...present.filter(p => !ignoredB.has(p)),",
+    to: "    ...present,",
+    command: unit,
+    expect:
+      "sourceChanges: an ignored path and pine·trie's own are dropped; a directory made or gone is its files",
+  },
+  {
+    name: "sourceChanges keeps a file whose bytes are equal",
+    file: "apps/pinetrie/host/folder/changes.ts",
+    from: "  const present = [...inB].filter(p => !same.has(p))",
+    to: "  const present = [...inB]",
+    command: unit,
+    expect:
+      "sourceChanges: a file rewritten as it was is dropped; one whose mode changed is kept",
+  },
+  {
+    name: "resolve_conflict closes a path with no open conflict",
+    file: "apps/pinetrie/host/folder/history.ts",
+    from: '      if (open === undefined) return { kind: "refused", why: "no-conflict" }\n',
+    to: "",
+    command: unit,
+    expect:
+      "a conflicted catch-up shows three versions; resolve_conflict writes the one chosen and closes it",
+  },
+  {
+    name: "a folder lane's fork restores from its source's snapshot",
+    file: "apps/pinetrie/host/folder/history.ts",
+    from: '      forkSetup(start.kind === "accepted" ? snapshotId(start.point) : null, []),',
+    to: "      forkSetup(null, []),",
+    command: unit,
+    expect:
+      "a folder lane's fork restores from your folder's state, or from its source's snapshot when branched",
+  },
+  {
+    name: "a folder turn's state is kept with nothing changed",
+    file: "apps/pinetrie/host/folder/history.ts",
+    from: "    if (paths.length === 0) {",
+    to: "    if (false) {",
+    command: unit,
+    expect: "a commit with nothing changed commits nothing",
+  },
+  // ── your folder's reads ──
+  {
+    name: "the scan stamps what a .gitignore ignores",
+    file: "apps/pinetrie/host/folder/scan.ts",
+    from: "      if (ignored.has(p)) continue\n",
+    to: "",
+    command: unit,
+    expect:
+      "scanFolder stamps every source path, a .gitignore's ignored ones and pine·trie's own left out",
+  },
+  {
+    name: "a read with its stamps lost keeps what was deleted since",
+    file: "apps/pinetrie/host/folder/line.ts",
+    from: "      from: last === null ? null : newest,",
+    to: "      from: newest,",
+    command: unit,
+    expect:
+      "with the last read's stamps lost, a read copies everything into an empty disk, on your folder's line",
+  },
+  {
+    name: "a read's stamps are kept before its state is recorded",
+    file: "apps/pinetrie/host/folder/line.ts",
+    from: "      await deps.writeState(planned.record)\n      await writeStamps(planned.stamps)\n",
+    to: "      await writeStamps(planned.stamps)\n      await deps.writeState(planned.record)\n",
+    command: unit,
+    expect:
+      "a read whose paths moved is read again; its stamps are kept only once its state is recorded",
+  },
+  {
+    name: "a read whose paths moved is recorded",
+    file: "apps/pinetrie/host/folder/line.ts",
+    from: '      if (answer.kind === "moved") {',
+    to: '      if (answer.kind === "moved" && false) {',
+    command: unit,
+    expect:
+      "a read whose paths moved is read again; its stamps are kept only once its state is recorded",
+  },
+  {
+    name: "a change only ignored paths saw reads your folder",
+    file: "apps/pinetrie/host/folder/watch.ts",
+    from: "  ignoredPaths({ ...input, dirs: new Set() }).size < input.paths.length",
+    to: "  input.paths.length > 0",
+    command: unit,
+    expect:
+      "isSourceChange: a source path changed; only ignored ones, or pine·trie's own, did not",
+  },
+  {
+    name: "the quiet window hands on each event at once",
+    file: "apps/pinetrie/host/watch-dir.ts",
+    from: "      if (ms === 0) return flush()\n",
+    to: "      return flush()\n",
+    command: unit,
+    expect: "quietWindow hands on a burst of events once, after it went quiet",
+  },
+  {
     name: "the other kind's records are kept at start",
     file: "apps/pinetrie/host/startup.ts",
     from: "    await keeper.run(() => records.writeValues(otherKind))\n",
@@ -134,13 +242,13 @@ export const mutations: readonly Mutation[] = [
   },
 
   {
-    name: "a host whose lanes cannot run starts anyway",
+    name: "a host on a folder lanes cannot serve starts anyway",
     file: "apps/pinetrie/host/index.ts",
-    from: "    throw new HostRefused(found.words)\n",
+    from: "    throw new HostRefused(chosen.refused)\n",
     to: "",
     command: unit,
     expect:
-      "a host with tools on a folder with no jj repo does not start, and says how to make one",
+      "a host with tools on a folder lanes cannot serve does not start, and says why",
   },
   {
     name: "a move jj refuses after a publish's catch-up leaves it",
@@ -2149,13 +2257,13 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
   {
-    name: "a folder with no jj repo is given lanes",
+    name: "a folder with no jj repo is given jj's adapter",
     file: "apps/pinetrie/host/project.ts",
-    from: '    case "folder":\n      return { refused: folderRefusal(dir.root) }\n',
-    to: '    case "folder":\n      return { adapter: startJjProject(dir as never), root: dir.root }\n',
+    from: "      return { adapter: startFolderProject(dir), root: dir.root }\n",
+    to: "      return { adapter: startJjProject(dir as never), root: dir.root }\n",
     command: unit,
     expect:
-      "a folder project is refused, with how to make it a jj one; a jj project gets jj's adapter",
+      "each project gets its kind's adapter; a folder lanes cannot serve is refused",
   },
   {
     name: "recover never writes the setup record",

@@ -14,6 +14,7 @@ import {
   GREP_TOOL,
   LEAVE_TOOL,
   READ_TOOL,
+  RESOLVE_TOOL,
   SPLIT_TOOL,
   type ToolCall,
   type ToolId,
@@ -35,6 +36,7 @@ const TOOL_WORDS: Readonly<Record<ToolId, string>> = {
   [BANNER_TOOL]: "banner",
   [ASK_TOOL]: "asked",
   [LEAVE_TOOL]: "left",
+  [RESOLVE_TOOL]: "resolve",
 }
 
 /** A tool's word; a tool pine·trie does not register goes by its own name. */

@@ -22,7 +22,10 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   ancestors,
+  folderNewest,
+  folderStateHeld,
   isAncestor,
+  laneNewest,
   mergeBases,
   planBase,
   planState,
@@ -79,7 +82,10 @@ function random(seed: number) {
  * lanes begun on it, their turns, catch-ups and accepts as merges, and now
  * and then an accept of a lane's older state, which makes a criss-cross.
  */
-function walkedGraph(seed: number, steps: number): StateGraph {
+function walked(
+  seed: number,
+  steps: number,
+): { readonly graph: StateGraph; readonly folder: PointId } {
   const pick = random(seed)
   const g = new Growing()
   let folder = g.add("line-0", { kind: "read" })
@@ -114,10 +120,11 @@ function walkedGraph(seed: number, steps: number): StateGraph {
         )
     }
   }
-  return g.graph
+  return { graph: g.graph, folder }
 }
 
-const GRAPHS = [1, 2, 3, 5, 8, 13, 21, 34].map(seed => walkedGraph(seed, 40))
+const SEEDS = [1, 2, 3, 5, 8, 13, 21, 34]
+const GRAPHS = SEEDS.map(seed => walked(seed, 40).graph)
 
 /** Every ordered pair of a graph's states. */
 function* pairs(g: StateGraph) {
@@ -437,6 +444,42 @@ function flows(): readonly Flow[] {
   flow("F", j2, ja, "conflict")
   return out
 }
+
+test("folderNewest: your folder's newest state, along its line, whatever lanes did", () => {
+  for (const seed of SEEDS) {
+    const { graph, folder } = walked(seed, 40)
+    expect(folderNewest(graph)).toBe(folder)
+  }
+  expect(folderNewest(stateGraph([]))).toBeNull()
+})
+
+test("laneNewest and folderStateHeld: a lane's newest state, and the state of your folder its line holds", () => {
+  const OTHER = threadIdFor("2")
+  const g = new Growing()
+  const l0 = g.add("line-0", { kind: "read" })
+  const s = g.add("start-1", { kind: "start", lane: LANE }, l0)
+  const t = g.add(
+    "turn-1",
+    { kind: "turn", lane: LANE, entry: entryId("e") },
+    s,
+  )
+  const l1 = g.add("line-1", { kind: "read" }, l0)
+  const c = g.add("catch-up-1", { kind: "catch-up", lane: LANE }, t, l1)
+  const t2 = g.add(
+    "turn-2",
+    { kind: "turn", lane: LANE, entry: entryId("f") },
+    c,
+  )
+  // A lane branched at the first lane's turn walks on into it.
+  const b = g.add("start-2", { kind: "start", lane: OTHER }, t)
+  expect(laneNewest(g.graph, LANE)).toBe(t2)
+  expect(laneNewest(g.graph, OTHER)).toBe(b)
+  expect(laneNewest(g.graph, threadIdFor("3"))).toBeNull()
+  expect(folderStateHeld(g.graph, t2)).toBe(l1)
+  expect(folderStateHeld(g.graph, t)).toBe(l0)
+  expect(folderStateHeld(g.graph, b)).toBe(l0)
+  expect(folderStateHeld(g.graph, l1)).toBe(l1)
+})
 
 describe("the flows of catch-ups and accepts", () => {
   test("A to D give one base, and the graph's base merges each right", () => {

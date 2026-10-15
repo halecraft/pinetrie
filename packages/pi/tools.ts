@@ -22,6 +22,7 @@ import {
   LEAVE_TOOL,
   PROJECT_CONFIG_FILE,
   READ_TOOL,
+  RESOLVE_TOOL,
   SPLIT_TOOL,
   type ThreadId,
   TOOL_IDS,
@@ -34,7 +35,13 @@ import { readImageProcessor } from "./images.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"
 import { findTool, grepTool } from "./search.ts"
 import { threadOfContext } from "./thread-context.ts"
-import { askTool, catchUpTool, leaveTool, splitTool } from "./thread-tools.ts"
+import {
+  askTool,
+  catchUpTool,
+  leaveTool,
+  resolveTool,
+  splitTool,
+} from "./thread-tools.ts"
 
 export interface ToolsInput {
   readonly hooks: LaneHooks
@@ -79,6 +86,10 @@ export const TOOLS: Readonly<
     askTool((lane, to, text) => input.hooks.ask(lane, to, text)),
   [LEAVE_TOOL]: input =>
     leaveTool((lane, thread) => input.hooks.leave(lane, thread)),
+  [RESOLVE_TOOL]: input =>
+    resolveTool((lane, path, choose) =>
+      input.hooks.resolveConflict(lane, path, choose),
+    ),
 }
 
 type Executes = {

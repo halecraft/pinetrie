@@ -552,6 +552,13 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   that never asked and used no service identity has no row. A lane
   waiting for you is also in your inbox ("wants your ssh for pop"),
   whether or not you follow it; answering clears it.
+- **In a folder project** (ADR-0142), the strip's offer is the files the
+  thread's newest state changes against your folder's newest, reviewed as
+  files, each with its line counts and its unified diff; it has no bookmark,
+  no stack and no split. **accept** answers "not done: accepting into your
+  folder comes in the next step". The footer shows no publish or set up
+  button, and the composer no WIP to start from: your folder is accepted
+  work.
 - **A row of the column's header, the work strip, says what became of the
   agent's files** (ADR-0040, ADR-0113): an agent on its own copy shows its offer in plain words ("2
   files ready"), with **accept** and its bookmark, which a press copies. The

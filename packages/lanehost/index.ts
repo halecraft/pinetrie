@@ -14,6 +14,7 @@ export {
 export { ROOTLESS_UID } from "./disks.ts"
 export { type Grant, grantChain } from "./grants.ts"
 export {
+  FOLDER_MOUNT,
   isProjectKey,
   LANE_FILES,
   type ProjectDisks,

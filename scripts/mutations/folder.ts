@@ -7,6 +7,23 @@ const merge = "packages/folder/merge.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "planRead misses a deletion",
+    file: "packages/folder/read.ts",
+    from: "  const deleted = [...last.keys()].filter(p => !scan.has(p)).sort()",
+    to: "  const deleted: string[] = []",
+    command: unit,
+    expect:
+      "planRead: a new path, and one whose stamp moved, are changed; one gone is deleted",
+  },
+  {
+    name: "planRead ignores a mode's change",
+    file: "packages/folder/read.ts",
+    from: "  a.exec === b.exec &&\n",
+    to: "",
+    command: unit,
+    expect: "planRead: a mode or a link's target moving is a change",
+  },
+  {
     name: "mergeBases keeps a base below another",
     file: graph,
     from: "  return common.filter(s => !below.has(s)).sort(byId)\n",

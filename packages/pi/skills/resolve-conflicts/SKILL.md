@@ -23,6 +23,17 @@ Someone's work was merged into this thread's own copy. Where both sides changed 
 
 pine·trie decides the outcome from the repository, not from your summary. The update counts as resolved only when jj finds no conflicts left and you did not ask about a conflict.
 
+## In a project without jj
+
+In a folder that is no jj repo, there are no markers: each conflicted path keeps this thread's version in `/workspace/<path>`, and its three versions are at `/pinetrie-states/conflicts/<path>/` (`base`, `ours`, `theirs`; one the merge had no file for is absent). The message names each path. The steps above apply, with these in place of jj's:
+
+1. The paths still conflicted are the directories under `/pinetrie-states/conflicts/`.
+2. Compare the versions with `diff` (`diff base ours`, `diff base theirs`) to see what each side changed.
+3. To keep both intents, edit `/workspace/<path>`, then call `resolve_conflict` with `choose: ours`: it keeps the file as you left it. To take one side whole, call it with `theirs` or `base`, which writes that version over the file.
+4. Where the two intents differ, leave the path unresolved, and call `ask_about_conflict`, as in step 4.
+
+The update counts as resolved when no path is left under `/pinetrie-states/conflicts/` and you did not ask about a conflict.
+
 ## In the person's own files
 
 When the person updated their files from the project and asks you to resolve what conflicts, no files are shown below: you work in their working copy, and read the conflicts there.

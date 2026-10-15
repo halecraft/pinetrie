@@ -122,7 +122,15 @@ export interface LaneSpec<L extends LaneOwner = ThreadId> {
   readonly attached: LaneAttached
   readonly identity: { readonly name: string; readonly email: string }
   readonly memory: string
+  /** Whether it sees its states directory at `STATES_MOUNT`: a folder lane's. */
+  readonly states: boolean
 }
+
+/**
+ * Where a folder lane sees its states directory, read-only: `start`, the
+ * state its offer is computed against, and each open conflict's versions.
+ */
+export const STATES_MOUNT = "/pinetrie-states"
 
 /**
  * Every mount a lane gets, in one list:
@@ -259,6 +267,8 @@ export interface ContainerShape {
   readonly nested: boolean
   /** Ports of the Mac's loopback it may reach (`LaneGrants.hostPorts`). */
   readonly hostPorts: readonly number[]
+  /** Its states directory, read-only at `STATES_MOUNT`: a folder lane's alone. */
+  readonly states: boolean
 }
 
 /**
@@ -286,6 +296,7 @@ export function planShape(
     starts: spec.attached.starts,
     nested: spec.grants.nested,
     hostPorts: spec.grants.hostPorts,
+    states: spec.states,
     env: Object.fromEntries([
       ...passed,
       ...Object.entries(spec.attached.env),
@@ -568,6 +579,11 @@ export interface LaneFiles {
   readonly laneSsh: string
   /** The secret a lane's ssh token is made under. */
   readonly sshSecret: string
+  /**
+   * A folder project's stamps of its last read, which the next read is
+   * planned from (`planRead`): written once that read's state is recorded.
+   */
+  readonly folderStamps: string
 }
 
 /** Every file the host keeps for a session: none of them in its project. */
@@ -586,6 +602,7 @@ export function sessionFiles(sessionData: string): SessionFiles {
       laneGit: path.join(sessionData, "lane-git"),
       laneSsh: path.join(sessionData, "lane-ssh"),
       sshSecret: path.join(sessionData, "ssh-secret"),
+      folderStamps: path.join(sessionData, "folder-stamps.json"),
     },
   }
 }
@@ -853,10 +870,6 @@ export function projectDirWords(r: ProjectDirRefusal): string {
       return `${r.root} has no git directory beside its jj repo, and lanes' work reaches your repo through git: \`jj git init --colocate\` makes one`
   }
 }
-
-/** Why a folder project cannot have lanes yet, with how to make it a jj one. */
-export const folderRefusal = (root: string): string =>
-  `${root} has no jj repo: \`jj git init --colocate\` makes one, and gives its threads' agents their lanes`
 
 /**
  * Your repo's exclude file with each of `lines` in it, appended in order, or

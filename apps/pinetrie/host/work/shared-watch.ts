@@ -1,8 +1,7 @@
 // host/work/shared-watch — your writes to the shared directories, seen as
-// they are made. Each directory is watched on the host (`@parcel/watcher`:
-// FSEvents on the Mac, inotify on Linux), and each file an event names is
-// stat'ed into a stamp, which a lane reads alike (`stampTimeUs`): a version
-// on its lineage, yours until a lane's turn reports the same stamp
+// they are made. Each directory is watched on the host (`watch-dir.ts`, with
+// no quiet window), and each file an event names is stat'ed into a stamp,
+// which a lane reads alike (`stampTimeUs`): a version on its lineage, yours until a lane's turn reports the same stamp
 // (`planSharedLineages`). Lanes' writes come by here too, through virtiofs or
 // a bind mount; they are claimed when their turns are recorded. A dropped
 // events error, and the start, scan each directory instead: what changed
@@ -10,10 +9,10 @@
 
 import { lstat, readdir } from "node:fs/promises"
 import path from "node:path"
-import watcher from "@parcel/watcher"
 import { type Stamp, statStamp } from "@pinetrie/core"
 import type { SharedDir } from "@pinetrie/lanes"
 import type { SharedRead } from "@pinetrie/rules"
+import { watchDir } from "../watch-dir.ts"
 import type { SharedLineages } from "./shared.ts"
 
 /** `file`'s path from the disk's root, under the shared directory holding it; null outside them. */
@@ -84,15 +83,18 @@ export function startSharedWatch(deps: {
         }
       for (const d of next) {
         if (watching.has(d.source)) continue
-        const sub = await watcher.subscribe(d.source, (error, events) => {
-          if (error !== null) {
-            // Events were dropped: what changed is found by a scan.
-            void scan(d)
-            return
-          }
-          void seenFiles(
-            events.filter(e => e.type !== "delete").map(e => e.path),
-          ).catch(deps.failed(`watching ${d.path}/`))
+        const sub = await watchDir({
+          dir: d.source,
+          quietMs: 0,
+          onChange: change => {
+            if (change.kind === "dropped") {
+              void scan(d)
+              return
+            }
+            void seenFiles(
+              change.events.filter(e => e.type !== "delete").map(e => e.path),
+            ).catch(deps.failed(`watching ${d.path}/`))
+          },
         })
         watching.set(d.source, sub)
         void scan(d)

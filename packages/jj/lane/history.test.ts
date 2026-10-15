@@ -344,3 +344,14 @@ withJjRig("a copy off its line is refused a merge", async rig => {
   await lane.offLine()
   expect(await lane.withHistory(h => h.readyToMerge())).toBe("off-line")
 })
+
+withJjRig(
+  "resolve refuses: a jj lane's conflicts are markers in the file",
+  async rig => {
+    const lane = await rig.lane()
+    expect(await lane.withHistory(h => h.resolve("a.txt", "theirs"))).toEqual({
+      kind: "refused",
+      why: "markers",
+    })
+  },
+)

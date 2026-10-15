@@ -34,13 +34,18 @@ export async function listProjects(
   return out
 }
 
-/** Each disk a project holds, as one drop each: its lanes, snapshots and inner lanes. */
+/**
+ * Each disk a project holds, as one drop each: its lanes, snapshots, inner
+ * lanes and folder lanes' states directories, whose read-only copies a
+ * plain removal cannot delete.
+ */
 export function planProjectRemoval(
   disks: ProjectDisks,
   held: {
     readonly lanes: readonly string[]
     readonly snapshots: readonly string[]
     readonly nested: readonly string[]
+    readonly states: readonly string[]
   },
 ): readonly DiskStep[] {
   return [
@@ -56,6 +61,10 @@ export function planProjectRemoval(
       kind: "drop" as const,
       path: `${disks.nestedDir}/${n}`,
     })),
+    ...held.states.map(n => ({
+      kind: "drop" as const,
+      path: `${disks.statesDir}/${n}`,
+    })),
   ]
 }
 
@@ -67,6 +76,7 @@ export async function removeProject(disks: ProjectDisks): Promise<void> {
       lanes: await list(disks.lanes),
       snapshots: await list(disks.snapshots),
       nested: await list(disks.nestedDir),
+      states: await list(disks.statesDir),
     }),
   )
   await rm(disks.dir, { recursive: true, force: true })

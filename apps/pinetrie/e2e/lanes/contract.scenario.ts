@@ -175,6 +175,7 @@ async function dockerContract(
       starts: [],
       nested: false,
       hostPorts: [],
+      states: false,
     })
     runMs.push(Date.now() - started)
     return name

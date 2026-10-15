@@ -2,14 +2,11 @@
 // place that chooses it, and the one that refuses a project lanes cannot
 // serve. Lane work takes the adapter as a value (`work/adapter.ts`), which
 // carries its kind: what each new lane's history is, and what a lane must
-// keep to run. A folder is refused: serving one is its adapter's to come.
+// keep to run.
 
 import { assertNever } from "@pinetrie/core"
-import {
-  folderRefusal,
-  type ProjectDir,
-  projectDirWords,
-} from "@pinetrie/lanes"
+import { type ProjectDir, projectDirWords } from "@pinetrie/lanes"
+import { startFolderProject } from "./folder/index.ts"
 import { startJjProject } from "./jj/index.ts"
 import type { ProjectAdapter } from "./work/adapter.ts"
 
@@ -23,7 +20,7 @@ export function projectAdapter(
     case "jj":
       return { adapter: startJjProject(dir), root: dir.root }
     case "folder":
-      return { refused: folderRefusal(dir.root) }
+      return { adapter: startFolderProject(dir), root: dir.root }
     case "refused":
       return { refused: projectDirWords(dir.refusal) }
     default:

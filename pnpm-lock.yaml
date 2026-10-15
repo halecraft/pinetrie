@@ -62,6 +62,9 @@ importers:
       '@pinetrie/docker':
         specifier: workspace:*
         version: link:../../packages/docker
+      '@pinetrie/folder':
+        specifier: workspace:*
+        version: link:../../packages/folder
       '@pinetrie/interface':
         specifier: workspace:*
         version: link:../../packages/interface

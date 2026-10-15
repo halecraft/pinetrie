@@ -50,6 +50,7 @@ import {
   type RecordedSpan,
 } from "@pinetrie/rules"
 import { type Basics, failed } from "../../basics.ts"
+import { createDescriber } from "../../describe.ts"
 import type { Records } from "../../records.ts"
 import { decodeAuthority } from "../../settings.ts"
 import type { AcceptedWork } from "../accepted.ts"
@@ -129,7 +130,13 @@ export function startOffers(input: {
   /** Accepted work's record and commands (`host/jj/accepted.ts`): its record is rewritten when the owner observes accepted work or your `@` move. */
   readonly acceptedWork: AcceptedWork
 }): Offers {
-  const deps = { ...createOfferDeps(input), describing: new Set<ThreadId>() }
+  const deps = {
+    ...createOfferDeps(input),
+    describer: createDescriber({
+      basics: input.basics,
+      piSetup: input.piSetup,
+    }),
+  }
   const { owner, basics, records } = deps
   const refresh = createRefresh(deps)
 

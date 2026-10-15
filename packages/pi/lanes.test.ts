@@ -102,6 +102,9 @@ test("the prompt no longer tells the model to search with bash", () => {
       catchUp: async () => {
         throw new Error("no catch_up here")
       },
+      resolveConflict: async () => {
+        throw new Error("no conflict here")
+      },
       askSplit: async () => {
         throw new Error("no split_offer here")
       },
@@ -326,6 +329,9 @@ describe("lanes in a harness", () => {
           configWritten: async () => null,
           catchUp: async () => {
             throw new Error("no catch_up here")
+          },
+          resolveConflict: async () => {
+            throw new Error("no conflict here")
           },
           askSplit: async () => {
             throw new Error("no split_offer here")
@@ -576,6 +582,9 @@ describe("lanes in a harness", () => {
           configWritten: async () => null,
           catchUp: async () => {
             throw new Error("no catch_up here")
+          },
+          resolveConflict: async () => {
+            throw new Error("no conflict here")
           },
           askSplit: async () => {
             throw new Error("no split_offer here")

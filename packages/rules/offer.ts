@@ -74,7 +74,7 @@ const FolderOfferSchema = Type.Object({
   tip: PointSchema,
   files: Type.Array(Type.String()),
   conflicts: Type.Array(Type.String()),
-  described: Type.Boolean(),
+  description: Type.Union([Type.String(), Type.Null()]),
   at: Type.Number(),
 })
 

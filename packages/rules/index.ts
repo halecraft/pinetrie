@@ -38,6 +38,7 @@ export {
   planCatchUpCall,
   planSplitCall,
   refusedAnswer,
+  resolveAnswer,
   SPLIT_QUEUED,
   SPLIT_UNMADE,
   type SplitRefusal,
@@ -274,7 +275,13 @@ export {
   factLine,
   tokensWords,
 } from "./fact.ts"
-export { CONFLICT, conflictKey, STATE } from "./folder-records.ts"
+export {
+  CONFLICT,
+  conflictKey,
+  decodeFolderStamps,
+  encodeFolderStamps,
+  STATE,
+} from "./folder-records.ts"
 export {
   type Cleared,
   type GateFacts,
@@ -506,6 +513,7 @@ export {
   answerReview,
   decodeRevisionReview,
   diffUrl,
+  MAX_DIFF_BYTES,
   type OfferAnswer,
   type OfferAsk,
   parseOfferPath,
@@ -610,7 +618,11 @@ export {
   titleRequest,
   titleStillWanted,
 } from "./title.ts"
-export { encodeUpdate, type UpdateMessage } from "./update.ts"
+export {
+  encodeUpdate,
+  folderIncoming,
+  type UpdateMessage,
+} from "./update.ts"
 export {
   type EndReply,
   endReplyOf,

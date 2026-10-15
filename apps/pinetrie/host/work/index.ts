@@ -21,7 +21,7 @@ import {
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
-import { refusedAnswer } from "@pinetrie/rules"
+import { refusedAnswer, resolveAnswer } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { HostReport } from "../settings.ts"
@@ -147,6 +147,9 @@ export async function startLaneWork(input: {
     startContainer: (lane, h) => containers.startContainer(lane, h),
     beforeRun: lane => containers.beforeRun(lane),
     acceptedMoved: () => setup.refreshBaseSoon(),
+    ready: () => setup.ready.then(() => {}),
+    keepStates: () =>
+      setup.configs.accepted().report.settled["folder.history.states"].value,
     baseChanged: lane => {
       for (const listener of baseListeners) listener(lane)
     },
@@ -218,6 +221,14 @@ export async function startLaneWork(input: {
       turnDone: turns.turnDone,
       askedAboutConflict: updates.askedAboutConflict,
       catchUp: updates.catchUpInRun,
+      async resolveConflict(lane, path, choose) {
+        if (!registry.isOwn(lane))
+          return resolveAnswer(path, { kind: "refused", why: "no-copy" })
+        return resolveAnswer(
+          path,
+          await registry.withHistory(lane, h => h.resolve(path, choose)),
+        )
+      },
       async configWritten(lane) {
         const { channel } = await registry.handleOf(lane).link()
         const read = await channel.run(
@@ -265,6 +276,8 @@ const NO_LANES: LaneWork = {
     turnDone: async () => {},
     askedAboutConflict: async () => false,
     catchUp: async () => refusedAnswer("no-copy"),
+    resolveConflict: async path =>
+      resolveAnswer(path, { kind: "refused", why: "no-copy" }),
     configWritten: async () => null,
   },
   checkBegin: async () => null,

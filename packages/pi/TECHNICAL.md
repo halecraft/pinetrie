@@ -687,6 +687,13 @@ item 18, and in `lanes.test.ts` against the harness.
   pi's harness reads only the run's `toolExecution`, never a tool's
   `executionMode`, so `catch_up` cannot ask to run alone; the host refuses a
   call with a sibling instead.
+- **`resolve_conflict`** (`thread-tools.ts`) is in every lane's list, so a
+  run's tools never change (S85): `{ path, choose }`, `choose` read by
+  `parseResolveChoice` (`ours`, `theirs` or `base`), handed to the host
+  (`LaneHooks.resolveConflict`), which closes a folder lane's conflict on
+  its queue and refuses in a jj lane, whose conflicts are markers in the
+  file. The `resolve-conflicts` skill says the folder's way: the three
+  versions under `/pinetrie-states/conflicts/`, `diff`, then the tool.
 - **`set_banner`** (`banner.ts`, ADR-0050, ADR-0143) is registered and
   active whenever the host has tools: `bannerAsks` is part of
   `CreateAgentOptions.tools`, so an agent with tools always has it. The host

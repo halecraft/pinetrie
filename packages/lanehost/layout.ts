@@ -4,7 +4,8 @@
 // project.
 //
 //   <lanesDir>/projects/<projectKey>/root            the project's root path
-//   <lanesDir>/projects/<projectKey>/lanes/<lane>    each lane's subvolume
+//   <lanesDir>/projects/<projectKey>/lanes/<lane>    each lane's subvolume, and
+//                                                    `folder-line` while a read makes a state
 //   <lanesDir>/projects/<projectKey>/snapshots/<id>  snapshots, the base too
 //   <lanesDir>/projects/<projectKey>/nested/<lane>   a nested lane's inner lanes
 //   <lanesDir>/projects/<projectKey>/states/<lane>   a folder lane's states, which
@@ -39,6 +40,16 @@ export const checkedDiskName = (name: string): string => {
     throw new Error(`not a disk's name: ${JSON.stringify(name)}`)
   return name
 }
+
+/**
+ * The disk a read of your folder is made on (`readIn`): restored from your
+ * folder's newest state, then dropped once snapshotted. No thread's id is a
+ * disk name with this shape.
+ */
+export const FOLDER_LINE = "folder-line"
+
+/** Where the disks role sees the project's root, read-only. */
+export const FOLDER_MOUNT = "/pinetrie-folder"
 
 /** The directory on a disk that holds pine·trie's own files. */
 export const LANE_FILES = ".pinetrie-lane"

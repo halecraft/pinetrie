@@ -3,10 +3,13 @@
 // never by path: the server builds each path itself (`layout.ts`).
 
 import type {
+  DiffStat,
   DiskDiff,
   LaneStatesOp,
   MergeStep,
   PathFact,
+  ReadInAnswer,
+  ReadPath,
   TextMerged,
 } from "@pinetrie/core"
 import type { Grant } from "./grants.ts"
@@ -37,6 +40,12 @@ export type LanehostCall =
       readonly kind: "snapshotExists"
       readonly project: string
       readonly snapshot: string
+    }
+  /** A folder lane's states directory, made if missing, for its container to mount. */
+  | {
+      readonly kind: "statesDir"
+      readonly project: string
+      readonly lane: string
     }
   /** A nested lane's inner lanes' subvolume, made if missing, the rootless user's. */
   | {
@@ -79,6 +88,30 @@ export type LanehostCall =
       readonly snapshot: string
       readonly paths: readonly string[]
     }
+  /** The files and symlinks a snapshot holds at or under each path. */
+  | {
+      readonly kind: "filesUnder"
+      readonly project: string
+      readonly snapshot: string
+      readonly paths: readonly string[]
+    }
+  /** One file's unified diff between two snapshots, cut past `limit` bytes. */
+  | {
+      readonly kind: "fileDiff"
+      readonly project: string
+      readonly a: string
+      readonly b: string
+      readonly path: string
+      readonly limit: number
+    }
+  /** Lines added and removed in each path between two snapshots. */
+  | {
+      readonly kind: "diffStats"
+      readonly project: string
+      readonly a: string
+      readonly b: string
+      readonly paths: readonly string[]
+    }
   /** The paths where two snapshots hold files of alike content. */
   | {
       readonly kind: "sameContent"
@@ -102,6 +135,19 @@ export type LanehostCall =
       readonly steps: readonly MergeStep[]
       readonly markers: boolean
     }
+  /**
+   * Your folder's paths read into a new state of its line (`folder.ts`):
+   * made from `from` (null: empty), `deleted` removed, `paths` copied from
+   * the folder's mount, each checked against its stamp.
+   */
+  | {
+      readonly kind: "readIn"
+      readonly project: string
+      readonly from: string | null
+      readonly state: string
+      readonly paths: readonly ReadPath[]
+      readonly deleted: readonly string[]
+    }
   /** A change to a lane's states directory (`<project>/states/<lane>`). */
   | {
       readonly kind: "states"
@@ -122,6 +168,7 @@ export interface LanehostResults {
   readonly diskExists: boolean
   readonly snapshotExists: boolean
   readonly nestedDisk: null
+  readonly statesDir: null
   readonly read: string | null
   readonly record: null
   readonly projects: readonly ProjectListed[]
@@ -130,8 +177,12 @@ export interface LanehostResults {
   readonly diff: DiskDiff
   readonly pathFacts: readonly PathFact[]
   readonly sameContent: readonly string[]
+  readonly filesUnder: readonly string[]
+  readonly fileDiff: string
+  readonly diffStats: readonly DiffStat[]
   readonly applyMerge: readonly TextMerged[]
   readonly states: null
+  readonly readIn: ReadInAnswer
 }
 
 export type LanehostResult<C extends LanehostCall> = LanehostResults[C["kind"]]

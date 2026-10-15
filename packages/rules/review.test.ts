@@ -106,7 +106,7 @@ describe("the review", () => {
       tip: pointId("turn-0192bbbb"),
       files: ["a.txt"],
       conflicts: [],
-      described: false,
+      description: null,
       at: 10,
     }
     const read = (o: FolderOfferRecord, from: string, to: string) =>

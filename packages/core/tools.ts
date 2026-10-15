@@ -20,6 +20,8 @@ export const CONFLICT_TOOL = "ask_about_conflict"
 export const CATCH_UP_TOOL = "catch_up"
 /** Queue a split of the thread's offer, run when the thread is free. */
 export const SPLIT_TOOL = "split_offer"
+/** Close a folder lane's conflicted path, with the version chosen. */
+export const RESOLVE_TOOL = "resolve_conflict"
 /** Set the image in a thread's column header. */
 export const BANNER_TOOL = "set_banner"
 /** Ask another thread's agent, a member of this thread, without waiting. */
@@ -50,6 +52,7 @@ export const TOOL_IDS = [
   BANNER_TOOL,
   ASK_TOOL,
   LEAVE_TOOL,
+  RESOLVE_TOOL,
 ] as const
 
 export type ToolId = (typeof TOOL_IDS)[number]
@@ -96,11 +99,12 @@ const SUBJECTS: Readonly<
   [BANNER_TOOL]: undefined,
   [ASK_TOOL]: args => field(args, "to"),
   [LEAVE_TOOL]: args => field(args, "thread"),
+  [RESOLVE_TOOL]: path,
 }
 
 /**
- * What a call touches, whole: `bash`'s command, the path of `read`, `write`
- * and `edit`, the pattern of `grep` and `find` and the path they search,
+ * What a call touches, whole: `bash`'s command, the path of `read`, `write`,
+ * `edit` and `resolve_conflict`, the pattern of `grep` and `find` and the path they search,
  * what `catch_up` merges from, or the thread `ask` asks and `leave` leaves.
  * Undefined for any other tool.
  */

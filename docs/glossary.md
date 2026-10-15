@@ -25,6 +25,16 @@ words they were written with.
 | **catch up** | Bring the working copy, or a thread's copy, up to date with what it is based on. Its commit is titled `catch up: accepted work`, `catch up: <thread>`, or `copy of <wip>`. | `catchUp`, `CatchUpFrom`, `catchUpName` | update, follow, bring up to date |
 | **lane** | A thread's own copy of your repo, in a container of its own (ADR-0034), named by its thread's id (ADR-0117). | `lane`, `ThreadId`, `laneOf` | |
 
+## A folder project
+
+| word | what it is | in code | retired |
+|---|---|---|---|
+| **folder project** | A project whose folder is no jj repo: pine·trie keeps its history itself, as states (ADR-0142). | `ProjectKind` `"folder"`, `startFolderProject` | |
+| **your folder** | A folder project's accepted work: the folder itself, read into states on its line. | `FolderAcceptedRecord`, `folderNewest` | |
+| **state** | A snapshot of a folder project's disk, recorded with its parents: a read of your folder, a lane's start, turn or catch-up. | `StateRecord`, `PointId` | |
+| **conflict** | A path a catch-up left conflicted in a folder lane: a record of its three versions' states, shown under `/pinetrie-states/conflicts/`. | `ConflictRecord` | |
+| **resolve** | Close a conflict with the version chosen: the lane's own (`ours`), `theirs` or `base`. | `resolve_conflict`, `LaneHistory.resolve` | |
+
 ## A lane's disk
 
 | word | what it is | in code | retired |

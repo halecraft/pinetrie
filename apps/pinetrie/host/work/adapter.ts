@@ -20,6 +20,7 @@ import type {
 import type { Keeper } from "@pinetrie/keeper"
 import type {
   AcceptedNow,
+  LaneFiles,
   LaneHistory,
   LaneRunners,
   SharedDir,
@@ -30,6 +31,7 @@ import type { Basics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { Destination } from "./destination.ts"
 import type { LaneRegistry } from "./registry.ts"
+import type { Found } from "./runtime.ts"
 
 /** A kind of project's adapter, before startup opens it. */
 export interface ProjectAdapter {
@@ -42,6 +44,11 @@ export interface ProjectAdapter {
   open(input: {
     readonly names: RepoConfig
     readonly basics: Basics
+    /** Where lanes run, and a folder project's calls of its disks. */
+    readonly found: Pick<Found, "runtime" | "folder">
+    /** The session's files for its lanes. */
+    readonly files: LaneFiles
+    readonly records: Pick<Records, "writeValues">
   }): Promise<OpenProject>
 }
 
@@ -88,6 +95,14 @@ export interface ProjectParts {
   readonly beforeRun: (lane: ThreadId) => void
   /** Accepted work moved: the base snapshot follows. */
   readonly acceptedMoved: () => void
+  /**
+   * Settles once lanes can run: lanehost, and so a disk, answers only then.
+   * Asked, never held: a setup that fails rejects it, and only an asker
+   * handles that.
+   */
+  readonly ready: () => Promise<void>
+  /** How many of your folder's states a folder project keeps (`folder.history.states`). */
+  readonly keepStates: () => number
   /** A lane's base record changed. */
   readonly baseChanged: (lane: ThreadId) => void
 }

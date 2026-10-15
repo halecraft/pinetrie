@@ -286,6 +286,10 @@ export function offerRefusal(code: ErrCode): string {
       return "the offer cannot be added there now: a conflicted offer goes only into a WIP, and the destination must sit below it"
     case ERR.OFFER_CHANGED:
       return "the offer changed since you looked at it: review it again"
+    case ERR.FOLDER_ACCEPT_LATER:
+      return "accepting into your folder comes in the next step"
+    case ERR.NOT_A_STACK:
+      return "a folder project's offer is its files, never a stack"
     default:
       return "this thread has no offer in your repo"
   }

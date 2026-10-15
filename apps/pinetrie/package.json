@@ -28,6 +28,7 @@
     "@pinetrie/config": "workspace:*",
     "@pinetrie/core": "workspace:*",
     "@pinetrie/docker": "workspace:*",
+    "@pinetrie/folder": "workspace:*",
     "@pinetrie/interface": "workspace:*",
     "@pinetrie/jj": "workspace:*",
     "@pinetrie/keeper": "workspace:*",

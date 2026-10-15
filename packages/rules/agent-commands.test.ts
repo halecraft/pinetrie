@@ -20,6 +20,7 @@ import {
   planResolution,
   planSplitCall,
   resolutionFloor,
+  resolveAnswer,
   splitRefusal,
 } from "./index.ts"
 
@@ -156,6 +157,15 @@ describe("catchUpAnswer", () => {
       details: null,
     })
   })
+})
+
+test("resolveAnswer: a path closed, or why not, each worded", () => {
+  expect(resolveAnswer("a.txt", { kind: "resolved" }).isError).toBe(false)
+  for (const why of ["no-copy", "no-conflict", "markers"] as const) {
+    const answer = resolveAnswer("a.txt", { kind: "refused", why })
+    expect(answer.isError).toBe(true)
+    expect(answer.text).not.toBe("")
+  }
 })
 
 describe("planSplitCall", () => {

@@ -3,6 +3,7 @@
 
 import {
   type ConflictRecord,
+  type FolderStamp,
   isThreadId,
   type StateRecord,
   type ThreadId,
@@ -10,6 +11,7 @@ import {
 import { Type } from "typebox"
 import {
   decodeAt,
+  decodeWith,
   EntryIdSchema,
   List,
   PointSchema,
@@ -97,4 +99,39 @@ export const CONFLICT: RecordSpec<ConflictRecord, string, "session"> = {
       ours: r.ours,
       theirs: r.theirs,
     })),
+}
+
+const FolderStampsSchema = Type.Record(
+  Type.String({ minLength: 1 }),
+  Type.Object({
+    kind: Type.Union([Type.Literal("file"), Type.Literal("symlink")]),
+    size: Type.Integer({ minimum: 0 }),
+    ctimeNs: Type.String({ pattern: "^[0-9]+$" }),
+    exec: Type.Boolean(),
+    target: Type.Optional(Type.String()),
+  }),
+)
+
+/** Your folder's stamps of its last read as the session's file stores them. */
+export const encodeFolderStamps = (
+  stamps: ReadonlyMap<string, FolderStamp>,
+): string => JSON.stringify(Object.fromEntries(stamps))
+
+/** The stored stamps back; null for a file that is not one, which a read then treats as none. */
+export const decodeFolderStamps = (
+  text: string,
+): ReadonlyMap<string, FolderStamp> | null => {
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    return null
+  }
+  return (
+    decodeWith(
+      FolderStampsSchema,
+      value,
+      r => new Map(Object.entries(r)) as ReadonlyMap<string, FolderStamp>,
+    ) ?? null
+  )
 }

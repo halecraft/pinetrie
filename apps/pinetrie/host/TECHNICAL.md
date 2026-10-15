@@ -46,7 +46,9 @@ wires them.
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47) |
 | `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034), through the project's adapter, whose kind it never names (ADR-0142) |
-| `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default); a folder is refused (`folderRefusal`), before any runtime is asked |
+| `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default): jj's for a jj workspace, the folder's for any other folder; a folder lanes cannot serve (`projectDirWords`) is refused before any runtime is asked |
+| `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): your folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), the only code that touches your folder (ADR-0142) |
+| `watch-dir.ts` | one directory watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), its events handed on after a quiet window (`quietWindow`; 0 for the shared directories, 10 s for your folder), a dropped-events error at once |
 | `jj/` | jj's adapter (`startJjProject`, § jj's adapter): each lane's offer in your repo (ADR-0105), on the owner of your repo (§ Offers), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands (`jj/accepted.ts`); each lane's fetch into your repo (`jj/fetch.ts`); splits (`jj/split.ts`) |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
@@ -1103,7 +1105,7 @@ adapter's.
 | `setup.ts` | `openProject`: the project opened through its adapter, with your repo's names settled from your files and the working copy's `pinetrie.json`, before anything else reads it, and its lane configs, before pi's setup. `Setup`, all of it or none: the opened project, the lanes' ssh, the shared directories, the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, none inside the project and none holding pine·trie's own directories, ADR-0036), and the base snapshot's refreshes |
 | `config.ts` | `pinetrie.json` as a fact of a state (ADR-0135, ADR-0146): accepted work's copy read at accepted work (`Destination.fileAt`) at startup and when the base moves (`readAccepted`), decoded by the host's table and settled with the start layers, its shared directories (the settled `lanes.shared`) prepared again, and put in force (`takeAccepted`, `onTaken`) once what it names is shared; a lane's own copy and the copy it started on, read at its tip and its start before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook): what it changes, and each key not taken. A lane with no commit in your repo yet runs with accepted work's |
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
-| `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
+| `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched (`watch-dir.ts`, with no quiet window), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history, the handle and the lane's record; refused, with nothing queued, for a lane with no record, no copy of its own, or a history the adapter does not keep |
 | `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
 | `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
@@ -1260,6 +1262,53 @@ adapter's.
 - **A split's prompt, and its end** (`jj/split.ts`, `finishSplit`, which
   moves the lane back to its tip even when a step before it throws: left on
   the stack, the lane refuses every catch-up).
+
+## A folder project's adapter (`folder/`)
+
+- **Only `folder/` touches your folder** (ADR-0142); `@pinetrie/folder`
+  decides for it, and lanehost's disks role does the copying.
+- **A read** (`line.ts`, one at a time on its own queue): gather (the last
+  read's stamps, from the session's `folder-stamps.json`; the scan,
+  `scan.ts`), plan (`planLineRead`), execute (lanehost's `readIn` into a
+  new state, `line-<uuidv7>`, its parent your folder's newest). A read
+  whose paths moved during their copy is read again, five times at most;
+  nothing changed makes no state, but your folder's first read makes one
+  even of an empty folder. With no stamps kept, a read copies every path
+  into an empty disk, so nothing deleted since lingers. The stamps are
+  written only once the state's record is, so a lost write costs one
+  whole read, never a wrong one.
+- **The scan** (`scan.ts`) walks by `lstat`, reads each directory's
+  `.gitignore` as it enters it, and never enters an ignored directory: what
+  is source is the lanes' own rule (`ignoredPaths` with `laneIgnores`).
+  Symlinks are stamped by their target, never followed.
+- **The watcher** (`watch.ts`) reads your folder once it has been quiet for
+  10 s after a change to a source path (`isSourceChange`); a change only
+  ignored paths saw reads nothing, and a dropped-events error reads at once.
+  Every read waits for lanehost (`ProjectParts.ready`): the watcher's go
+  through `acceptedMoved`, which setup runs once lanes can.
+- **A lane's history** (`history.ts`) is states of the graph: its start
+  (`begun`, its parent the state its disk was restored from), each turn
+  (snapshotted after the lane's `sync`, then diffed against the lane's
+  newest: no state when no source path changed), each catch-up (the path
+  merge, `merge.ts`, on the graph's base, `virtual-base.ts` merging several
+  first; two parents). What differs between two states is `changes.ts`'s
+  one answer: the disk's diff, made or gone directories read as their
+  files, files rewritten alike dropped, source paths alone. A conflict is a
+  `CONFLICT` record and its three versions in the lane's states directory
+  (`conflicts.ts`); `resolve` writes the version chosen and closes it.
+  `follow` is always null: nothing is fetched.
+- **The destination** (`index.ts`): `begin` and `baseNow` read your folder
+  first, so a catch-up merges its newest state; a WIP is refused. Each run's
+  end builds the lane's offer and base records (`offers.ts`) and describes
+  the offer with the host's describer (`describe.ts`, jj's too); your
+  folder moving rebuilds every folder lane's. An accept is refused
+  (`folder_accept_later`), a squash too (`not_a_stack`), a setup and a
+  publish with why. A review reads an open folder offer's `start..tip`:
+  its files with their line counts (`diffStats`), and one file's diff
+  (`fileDiff`), both lanehost's.
+- **The sweep** (`sweep.ts`), at start and after each run's end, deletes the
+  snapshots of the states `liveStates` keeps not, `folder.history.states`
+  of your folder's line among them; every `STATE` record stays.
 
 ## Offers (`jj/offers/`)
 

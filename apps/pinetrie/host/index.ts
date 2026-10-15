@@ -470,6 +470,7 @@ export async function startHost({
     found,
     adapter: chosen?.adapter ?? null,
     files: project?.tools === true ? project.files : null,
+    records,
     start,
   })
   const report: HostReport =

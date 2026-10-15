@@ -16,6 +16,33 @@ const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a jj lane mounts a states directory",
+    file: plan,
+    from: "      ...(shape.states\n",
+    to: "      ...(true\n",
+    command: unit("packages/docker"),
+    expect:
+      "a folder lane sees its states directory, read-only; a jj lane's spec has no such mount",
+  },
+  {
+    name: "readIn makes a state with a moved stamp",
+    file: "packages/lanehost/folder.ts",
+    from: '    if (moved.length > 0) return { kind: "moved", paths: moved }\n',
+    to: "",
+    command: unit("packages/lanehost"),
+    expect:
+      "a path whose stamp moved since the host read it makes no state, and is answered",
+  },
+  {
+    name: "the disks role cannot see your folder",
+    file: plan,
+    from: '      ...(shape.role === "disks"',
+    to: '      ...(shape.role === "privileged"',
+    command: unit("packages/docker"),
+    expect:
+      "the install and the runtime, read-only where a lane has them, and the disks role's project root, through the slot",
+  },
+  {
     name: "a lane shares the machine's PID namespace",
     file: "packages/docker/plan.ts",
     from: '    devices: nested ? ["/dev/net/tun"] : [],\n    machine: null,\n',

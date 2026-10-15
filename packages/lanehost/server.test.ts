@@ -129,11 +129,13 @@ describe("planDisk: each disk operation as steps", () => {
         lanes: ["a"],
         snapshots: ["s"],
         nested: ["a"],
+        states: ["a"],
       }),
     ).toEqual([
       { kind: "drop", path: `${disks.lanes}/a` },
       { kind: "drop", path: `${disks.snapshots}/s` },
       { kind: "drop", path: `${disks.nestedDir}/a` },
+      { kind: "drop", path: `${disks.statesDir}/a` },
     ])
   })
 })

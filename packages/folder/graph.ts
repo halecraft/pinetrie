@@ -11,6 +11,7 @@ import {
   type PointId,
   type StateMade,
   type StateRecord,
+  type ThreadId,
 } from "@pinetrie/core"
 
 export interface StateGraph {
@@ -39,6 +40,73 @@ export const isAncestor = (g: StateGraph, a: PointId, b: PointId): boolean =>
   ancestors(g, b).has(a)
 
 const byId = (x: PointId, y: PointId) => (x < y ? -1 : x > y ? 1 : 0)
+
+/** Whether a state is one of your folder's line's: a read, an accept or a restore. */
+const isLineState = (r: StateRecord): boolean =>
+  r.made.kind === "read" ||
+  r.made.kind === "accept" ||
+  r.made.kind === "restore"
+
+/** The lane a state of a lane's own (a start, a turn, a catch-up) was made in; null for any other. */
+const laneOf = (r: StateRecord): ThreadId | null =>
+  r.made.kind === "start" ||
+  r.made.kind === "turn" ||
+  r.made.kind === "catch-up"
+    ? r.made.lane
+    : null
+
+/**
+ * `lane`'s newest state: the one of its own no other of its own has as its
+ * first parent; null before its start. A lane's states are made one at a
+ * time, on its queue.
+ */
+export function laneNewest(g: StateGraph, lane: ThreadId): PointId | null {
+  const own = [...g.states.values()].filter(r => laneOf(r) === lane)
+  const followed = new Set(own.flatMap(r => r.parents.slice(0, 1)))
+  const heads = own.filter(r => !followed.has(r.id))
+  if (heads.length > 1)
+    throw new Error(
+      `${lane} has ${heads.length} newest states: ${heads.map(r => r.id).join(", ")}`,
+    )
+  return heads[0]?.id ?? null
+}
+
+/**
+ * The newest state of your folder's line that `of` holds by its own line:
+ * walking first parents from `of`, the line state a start was restored
+ * from, or a catch-up merged in. A lane branched from another's turn walks
+ * on into that lane. Null when its line reaches none.
+ */
+export function folderStateHeld(g: StateGraph, of: PointId): PointId | null {
+  const isLine = (p: PointId | undefined) => {
+    const r = p === undefined ? undefined : g.states.get(p)
+    return r !== undefined && isLineState(r)
+  }
+  for (let at = g.states.get(of); at !== undefined; ) {
+    if (isLineState(at)) return at.id
+    const [first, merged] = at.parents
+    if (at.made.kind === "catch-up" && isLine(merged)) return merged ?? null
+    if (isLine(first)) return first ?? null
+    at = first === undefined ? undefined : g.states.get(first)
+  }
+  return null
+}
+
+/**
+ * Your folder's newest state: the line state no other line state has as its
+ * first parent, the line's states being made one at a time; null before
+ * your folder's first read.
+ */
+export function folderNewest(g: StateGraph): PointId | null {
+  const line = [...g.states.values()].filter(isLineState)
+  const followed = new Set(line.flatMap(r => r.parents.slice(0, 1)))
+  const heads = line.filter(r => !followed.has(r.id))
+  if (heads.length > 1)
+    throw new Error(
+      `your folder's line has ${heads.length} newest states: ${heads.map(r => r.id).join(", ")}`,
+    )
+  return heads[0]?.id ?? null
+}
 
 /**
  * The lowest common ancestors of `a` and `b`, sorted: none below another,

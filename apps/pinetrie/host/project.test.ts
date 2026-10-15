@@ -3,11 +3,9 @@ import { expect, test } from "vitest"
 import { startJjProject } from "./jj/index.ts"
 import { projectAdapter } from "./project.ts"
 
-test("a folder project is refused, with how to make it a jj one; a jj project gets jj's adapter", () => {
-  expect(projectAdapter({ kind: "folder", root: "/p" })).toEqual({
-    refused:
-      "/p has no jj repo: `jj git init --colocate` makes one, and gives its threads' agents their lanes",
-  })
+test("each project gets its kind's adapter; a folder lanes cannot serve is refused", () => {
+  const folder = projectAdapter({ kind: "folder", root: "/p" })
+  expect("adapter" in folder ? folder.adapter.kind : folder).toBe("folder")
   expect(
     projectAdapter({
       kind: "refused",

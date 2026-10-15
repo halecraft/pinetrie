@@ -4,3 +4,4 @@
 export * from "./graph.ts"
 export * from "./live.ts"
 export * from "./merge.ts"
+export * from "./read.ts"

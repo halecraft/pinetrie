@@ -34,7 +34,9 @@ import {
   COMMANDS,
   CONFLICT,
   DIGEST,
+  decodeFolderStamps,
   deleteRecord,
+  encodeFolderStamps,
   ICONS,
   LANE,
   MARK,
@@ -237,7 +239,7 @@ const SAMPLES: readonly Sample[] = [
       tip: pointId("turn-0192bbbb"),
       files: ["a.txt"],
       conflicts: [],
-      described: false,
+      description: null,
       at: 1,
     },
     "lane",
@@ -533,7 +535,7 @@ test("planKindSweep deletes the offers, accepted work and bases of the other kin
     tip: pointId("turn-0192bbbb"),
     files: [],
     conflicts: [],
-    described: false,
+    description: null,
     at: 1,
   } as const
   const folderBase = {
@@ -672,4 +674,17 @@ describe("every spec, and writes by document", () => {
       [{ kind: "session" }, [name]],
     ])
   })
+})
+
+test("your folder's stamps read back whole; a file that is not them reads as none", () => {
+  const stamps = new Map([
+    [
+      "a.txt",
+      { kind: "file", size: 1, ctimeNs: "1700000000123456789", exec: true },
+    ],
+    ["l", { kind: "symlink", size: 1, ctimeNs: "2", exec: false, target: "a" }],
+  ] as const)
+  expect(decodeFolderStamps(encodeFolderStamps(stamps))).toEqual(stamps)
+  expect(decodeFolderStamps("not json")).toBeNull()
+  expect(decodeFolderStamps('{"a":{"kind":"dir"}}')).toBeNull()
 })

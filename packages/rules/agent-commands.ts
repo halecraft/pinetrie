@@ -144,6 +144,35 @@ export const refusedAnswer = (why: CatchUpRefusal): ToolAnswer => ({
   details: null,
 })
 
+/**
+ * What `resolve_conflict` answers, worded once: the path closed, or why
+ * not: no lane of its own, no open conflict there, or a jj lane, whose
+ * conflicts are markers in the file.
+ */
+export function resolveAnswer(
+  path: string,
+  done:
+    | { readonly kind: "resolved" }
+    | {
+        readonly kind: "refused"
+        readonly why: "no-copy" | "no-conflict" | "markers"
+      },
+): ToolAnswer {
+  if (done.kind === "resolved")
+    return {
+      text: `${path} is resolved, and its versions are gone.`,
+      isError: false,
+      details: null,
+    }
+  const text =
+    done.why === "no-copy"
+      ? "This thread has no copy of its own: it has no conflicts."
+      : done.why === "no-conflict"
+        ? `${path} has no open conflict.`
+        : "This thread's conflicts are jj's markers in each file: edit them out of the file instead."
+  return { text, isError: true, details: null }
+}
+
 /** Why `split_offer` queued nothing. */
 export type SplitRefusal = "folder" | "no-offer" | "queued" | "splitting"
 

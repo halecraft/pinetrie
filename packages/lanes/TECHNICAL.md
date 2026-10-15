@@ -27,9 +27,12 @@ the helper, S122 to S131 for Docker and the lane VM.
 - **A lane's container is decided once, as a value** (`planShape`): a
   `ContainerShape` holds its name, its lane (its disk, at `/workspace`), the
   image, memory, mounts (`planMounts`), environment, what is attached
-  (`hostSocket`, `starts`) and `nested`, and no
-  runtime's flags. A runtime renders it (`runSpec`); the hash of that value
-  is its spec label (`specHashOf`).
+  (`hostSocket`, `starts`), `nested` and `states` (a folder lane's states
+  directory, read-only at `STATES_MOUNT`, `/pinetrie-states`: its offer's
+  `start` and each open conflict's versions), and no runtime's flags. A
+  runtime renders it (`runSpec`); the hash of that value is its spec label
+  (`specHashOf`), and a jj lane's renders no states mount, so its hash did
+  not move.
 - **Planners return values; a runtime turns them into commands.** A plan is a
   list of `Step`s: a `LaneStep` (a command in the lane, through its channel)
   or a `RuntimeOp` (a `DiskOp`, or a container made from a shape), carried
@@ -74,7 +77,9 @@ the helper, S122 to S131 for Docker and the lane VM.
   `LaneBaseOf<P>`), the port's the `PointId` form.
 - **A lane's history is reached only on its queue.** `LaneHistory` is what
   a lane's copy records and merges: a turn (`commit`, `recordTurn`), its
-  base (`base`), a catch-up (`readyToMerge`, `merge`), its conflicts, what
+  base (`base`), a catch-up (`readyToMerge`, `merge`), its conflicts and
+  their resolution (`resolve`: a folder lane's; jj's refuses, its conflicts
+  being markers in the file), what
   it records once its fork made its disk (`begun`: a folder lane's start
   state; nothing for jj, whose fork setup's commit records its base), and
   what a disk restored from a snapshot needs at each container's start

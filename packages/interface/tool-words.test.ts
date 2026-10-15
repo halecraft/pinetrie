@@ -16,6 +16,7 @@ describe("toolWord", () => {
     set_banner: "banner",
     ask: "asked",
     leave: "left",
+    resolve_conflict: "resolve",
   }
   test.each(TOOL_IDS)("%s reads as its word", id => {
     expect(toolWord(id)).toBe(WORDS[id])

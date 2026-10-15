@@ -538,7 +538,10 @@ context.**
   not the shell's directory. Each folder is a session of its own, found by
   its real path and named for it (ADR-0149); pine·trie keeps the session's
   files in its data directory and writes nothing in the project
-  (ADR-0150). A jj repo with no git directory beside it is refused. The
+  (ADR-0150). A jj repo with no git directory beside it is refused. A
+  folder with no jj repo is served as a folder project (ADR-0142): your
+  folder is accepted work, a thread starts from it as it is, and its offer is
+  reviewed as files; accepting one into your folder is not built yet. The
   agent has its tools, and each
   thread's agent works in its own Linux container (ADR-0034), on a disk
   cloned from the turn it branched at: a root thread's starts from your
@@ -546,8 +549,8 @@ context.**
   dependencies: it does, as you would after a clone. It sees its own directory at `/workspace` and your working copy at
   `/mnt/host-working-copy`, read-only, and nothing else of your machine unless
   accepted work's `pinetrie.json` grants it: a grant you add applies once you
-  commit and publish it, and a thread's own copy can only give grants up. Your working copy is yours, so hot reload stays on. It needs a
-  jj repo and Docker (ADR-0102, ADR-0130): the lane VM on the Mac, on Linux
+  commit and publish it, and a thread's own copy can only give grants up. Your working copy is yours, so hot reload stays on. It needs
+  Docker (ADR-0102, ADR-0130): the lane VM on the Mac, on Linux
   Docker with a btrfs lanes directory; without them the host says what is
   missing and does not start. On the Mac the host builds the lane VM's
   image when it has none, in a VM of its own: about 20 s, and 43 MB

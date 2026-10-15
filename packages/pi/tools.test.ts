@@ -26,6 +26,7 @@ const input = {
     askedAboutConflict: unused,
     configWritten: async () => null,
     catchUp: unused,
+    resolveConflict: unused,
     askSplit: unused,
     ask: unused,
     leave: unused,
@@ -104,6 +105,7 @@ describe("TOOL_IDS", () => {
       BANNER_TOOL,
       "ask",
       "leave",
+      "resolve_conflict",
     ])
   })
 })

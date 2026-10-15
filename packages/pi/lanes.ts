@@ -164,6 +164,12 @@ export interface LaneHooks {
   configWritten(lane: ThreadId): Promise<string | null>
   /** `catch_up` was called: the host's answer. */
   catchUp(lane: ThreadId, from: "base" | "parent"): Promise<ToolAnswer>
+  /** `resolve_conflict` was called: the host's answer. */
+  resolveConflict(
+    lane: ThreadId,
+    path: string,
+    choose: "ours" | "theirs" | "base",
+  ): Promise<ToolAnswer>
   /** `split_offer` was called: the host's answer. */
   askSplit(lane: ThreadId): Promise<ToolAnswer>
   /** `ask` was called: the host relays it, and answers at once. */

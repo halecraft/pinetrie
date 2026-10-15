@@ -213,6 +213,7 @@ export function dockerRuntime(input: {
       project: key,
       image: await lanehostImage(),
       lanesDir,
+      root,
       ...serving,
     }
     await ensureContainer(target, renderHelper(shape, target))
@@ -327,12 +328,19 @@ export function dockerRuntime(input: {
     folder: {
       pathFacts: (snapshot, paths) =>
         lanehost.call({ kind: "pathFacts", project: key, snapshot, paths }),
+      fileDiff: (a, b, path, limit) =>
+        lanehost.call({ kind: "fileDiff", project: key, a, b, path, limit }),
+      diffStats: (a, b, paths) =>
+        lanehost.call({ kind: "diffStats", project: key, a, b, paths }),
+      filesUnder: (snapshot, paths) =>
+        lanehost.call({ kind: "filesUnder", project: key, snapshot, paths }),
       sameContent: (a, b, paths) =>
         lanehost.call({ kind: "sameContent", project: key, a, b, paths }),
       applyMerge: merge =>
         lanehost.call({ kind: "applyMerge", project: key, ...merge }),
       read: (snapshot, path, limit) =>
         lanehost.call({ kind: "read", project: key, snapshot, path, limit }),
+      readIn: read => lanehost.call({ kind: "readIn", project: key, ...read }),
       states: async (lane, op) => {
         await lanehost.call({ kind: "states", project: key, lane, op })
       },
@@ -342,6 +350,13 @@ export function dockerRuntime(input: {
       if (shape.nested)
         await lanehost.call({
           kind: "nestedDisk",
+          project: key,
+          lane: shape.lane,
+        })
+      // A bind mount's source must be there before the container is made.
+      if (shape.states)
+        await lanehost.call({
+          kind: "statesDir",
           project: key,
           lane: shape.lane,
         })

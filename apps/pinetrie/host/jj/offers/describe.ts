@@ -1,109 +1,62 @@
-// host/jj/offers/describe — an agent's commit message for a single offer: a
-// one-shot model request outside the thread.
+// host/jj/offers/describe — an agent's commit message for a single offer,
+// by the host's describer (`host/describe.ts`): jj's gather and its settle.
 
-import { projectTranscript, type ThreadId } from "@pinetrie/core"
+import type { ThreadId } from "@pinetrie/core"
 import { describeEffects, gatherDescribe, gatherOffer } from "@pinetrie/jj"
-import { readTreeIndex } from "@pinetrie/reads"
-import {
-  describeRequest,
-  planDescribeAsk,
-  planDescribeSettle,
-  transcriptLines,
-} from "@pinetrie/rules"
-import { readLaneTip } from "@pinetrie/schema"
-import { failed } from "../../basics.ts"
-import { requestOutside } from "../../outside.ts"
+import { planDescribeAsk, planDescribeSettle } from "@pinetrie/rules"
+import type { Describe } from "../../describe.ts"
 import { executeOffer } from "./execute.ts"
 import type { Refresh } from "./refresh.ts"
 import type { OfferDeps } from "./state.ts"
 
-/** A commit message request's size: the skill, recent messages, the thread, the diff. */
-const DESCRIBE_BUDGET = 24_000
-
 /**
  * Gathered by a pinned read, which writes nothing: the offer, its diff and your
- * recent messages (`planDescribeAsk`, `gatherDescribe`). Asked outside the
- * owner (a model request takes seconds), and written as an owner command, only
- * while the offer is still the one asked about (`planDescribeSettle`). One
- * request per lane at a time (`describing`), so two settles of one lane never
- * meet. `force` asks again for an offer already described. A failure is logged.
+ * recent messages (`planDescribeAsk`, `gatherDescribe`). Written as an owner
+ * command, only while the offer is still the one asked about
+ * (`planDescribeSettle`). `force` asks again for an offer already described.
  */
 export function describe(
-  deps: Pick<OfferDeps, "owner" | "basics" | "docs" | "piSetup"> & {
-    readonly describing: Set<ThreadId>
-  },
+  deps: Pick<OfferDeps, "owner" | "docs"> & { readonly describer: Describe },
   refresh: Pick<Refresh, "ports">,
   lane: ThreadId,
   force: boolean,
 ): Promise<void> {
-  const { owner, describing, docs } = deps
-  const fail = failed(deps.basics, "describing its offer", lane)
-  if (describing.has(lane)) return Promise.resolve()
-  describing.add(lane)
-  return owner.track(
-    owner
-      .read(async reads => {
-        // gather
+  const { owner, docs } = deps
+  return deps.describer({
+    lane,
+    // The owner keeps the request in `idle`; its settle is a command.
+    keeper: { run: step => step(), track: work => owner.track(work) },
+    gather: () =>
+      owner.read(async reads => {
         const asked = planDescribeAsk(
           await gatherOffer(reads, docs.input(lane)),
           force,
         )
         if (asked === null) return null
-        return { commit: asked, ...(await gatherDescribe(reads, asked)) }
-      })
-      .then(gathered => {
-        if (gathered === null) return
-        const doc = deps.basics.docs.docOfLane(lane)
-        const tip = doc === null ? null : readLaneTip(doc, lane)
-        return requestOutside({
-          // The owner keeps the request in `idle`; its settle is a command.
-          keeper: { run: step => step(), track: work => owner.track(work) },
-          failed: fail,
-          request: async () => {
-            const messages = transcriptLines(
-              doc === null ? [] : projectTranscript(readTreeIndex(doc), tip),
-            )
-            const skill = await deps.piSetup.skill(
-              "pinetrie:skill:commit-message",
-            )
-            const { text } = await deps.piSetup.complete(
-              describeRequest({
-                skill:
-                  skill?.content ?? "Write a commit message for this change.",
-                diff: gathered.diff,
-                messages,
-                recent: gathered.recent,
-                budget: DESCRIBE_BUDGET,
-              }),
-            )
-            return text
-          },
-          settle: text =>
-            owner.command(async ops => {
-              // The offer was rebuilt from its lane, or you edited it, while
-              // the model wrote: the message describes what it held then.
-              const planned = planDescribeSettle({
-                gathered: await gatherOffer(ops, docs.input(lane)),
-                asked: gathered.commit,
-                force,
-              })
-              if (planned === null) return
-              await executeOffer(
-                refresh.ports(ops, lane, planned.name),
-                {
-                  base: null,
-                  effects: describeEffects(planned, text, {
-                    lane,
-                    name: planned.name,
-                    entry: tip ?? "",
-                  }),
-                },
-                null,
-              )
-            }),
+        return { gathered: asked, ...(await gatherDescribe(reads, asked)) }
+      }),
+    settle: (asked, text, tip) =>
+      owner.command(async ops => {
+        // The offer was rebuilt from its lane, or you edited it, while the
+        // model wrote: the message describes what it held then.
+        const planned = planDescribeSettle({
+          gathered: await gatherOffer(ops, docs.input(lane)),
+          asked,
+          force,
         })
-      })
-      .catch(fail)
-      .finally(() => describing.delete(lane)),
-  )
+        if (planned === null) return
+        await executeOffer(
+          refresh.ports(ops, lane, planned.name),
+          {
+            base: null,
+            effects: describeEffects(planned, text, {
+              lane,
+              name: planned.name,
+              entry: tip ?? "",
+            }),
+          },
+          null,
+        )
+      }),
+  })
 }

@@ -8,6 +8,7 @@
 import { createHash } from "node:crypto"
 import { WORKSPACE_ROOT } from "@pinetrie/core"
 import {
+  FOLDER_MOUNT,
   MACHINE_SOCKET,
   OBSERVER_LOADER,
   OBSERVER_SERVER,
@@ -23,6 +24,7 @@ import {
   RUNTIME_MOUNT,
   runtimeNode,
   SPEC_LABEL,
+  STATES_MOUNT,
 } from "@pinetrie/lanes"
 import type { DockerTarget } from "./target.ts"
 
@@ -179,6 +181,15 @@ export function renderRun(
             },
           ]
         : []),
+      ...(shape.states
+        ? [
+            {
+              source: disks.states(shape.lane),
+              target: STATES_MOUNT,
+              readonly: true,
+            },
+          ]
+        : []),
     ],
     network: projectNetwork(input.project),
     memory: shape.memory,
@@ -219,6 +230,8 @@ export interface HelperShape {
   readonly project: string
   readonly image: string
   readonly lanesDir: string
+  /** The project's root on the host: the disks role reads your folder from it. */
+  readonly root: string
   /** pine·trie's install and the lane runtime, on the host: the server runs from them. */
   readonly install: string
   readonly runtime: string
@@ -227,7 +240,8 @@ export interface HelperShape {
 /**
  * A lanehost role's container, without its spec label: its grant (`ROLES`),
  * the lanes directory at its own path, and the install and the runtime
- * read-only where a lane has them. It only waits: the host starts the
+ * read-only where a lane has them; the disks role, the project's root
+ * read-only at `FOLDER_MOUNT`, which a read of your folder copies from. It only waits: the host starts the
  * server in it with `exec -i`.
  */
 export function renderHelper(
@@ -259,6 +273,14 @@ export function renderHelper(
         { source: shape.runtime, target: RUNTIME_MOUNT, readonly: true },
         target.pathOf,
       ),
+      ...(shape.role === "disks"
+        ? [
+            bind(
+              { source: shape.root, target: FOLDER_MOUNT, readonly: true },
+              target.pathOf,
+            ),
+          ]
+        : []),
     ],
     network: spec.network,
     memory: spec.memory,

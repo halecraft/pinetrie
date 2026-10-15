@@ -130,6 +130,9 @@ export function historyOf(input: {
 
     conflicts: () => conflictsIn(jj),
 
+    // jj's conflicts are markers in the file: resolved by editing it.
+    resolve: async () => ({ kind: "refused", why: "markers" }),
+
     // pre-rename: a snapshot of a lane made before the rename holds the old
     // names. A volume needs no such step: the one-off migration renamed
     // those.

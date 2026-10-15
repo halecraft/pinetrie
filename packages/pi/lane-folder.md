@@ -23,7 +23,7 @@ changes pine·trie can keep this note true. You can skip them.
   as this thread's work is offered against, so `diff -r
   /pinetrie-states/start /workspace` shows all of your work.
   `conflicts/<path>/{base,ours,theirs}` holds a conflicted path's three
-  versions while it is open.
+  versions while it is open. <!-- packages/lanes/plan.ts STATES_MOUNT -->
 - A shared directory, such as `/workspace/.plans` when the person shares
   it, is their own directory mounted read-write. Your edits there are
   visible to them and to every other thread at once, and are never part
@@ -45,6 +45,7 @@ changes pine·trie can keep this note true. You can skip them.
 - After each of your messages whose tool calls changed files, pine·trie
   records `/workspace` as a state: the files `.gitignore` does not ignore,
   as they are then. You need not save or commit anything.
+  <!-- apps/pinetrie/host/folder/history.ts folderHistory -->
 - Ignored files, such as `node_modules` and build output, stay on the disk,
   and a branch gets them. The person's copy of your work never includes them.
 - Nothing installs the project's dependencies or builds it for you: run
@@ -157,6 +158,7 @@ changes pine·trie can keep this note true. You can skip them.
   `/workspace/<path>` what it should be and call `resolve_conflict` with
   `ours`, or take one version whole with `theirs` or `base`. Use
   `ask_about_conflict` when the two sides meant different things.
+  <!-- packages/core/tools.ts RESOLVE_TOOL -->
   <!-- packages/core/tools.ts CONFLICT_TOOL -->
 
 ## This thread's base

@@ -1,6 +1,7 @@
 // pi/thread-tools — the tools an agent acts on its own thread with:
 // `catch_up`, which merges its base's or its parent's new work into its copy
-// during the run, and `split_offer`, which queues its offer's split; and the
+// during the run, `resolve_conflict`, which closes a folder lane's conflicted
+// path, and `split_offer`, which queues its offer's split; and the
 // tools it talks to other threads' agents with: `ask`, which
 // relays an ask to a member without waiting, and `leave`. The host
 // decides and carries them out (`LaneHooks`); this only reads the call and
@@ -11,6 +12,7 @@ import {
   CATCH_UP_TOOL,
   LEAVE_TOOL,
   type PointId,
+  RESOLVE_TOOL,
   SPLIT_TOOL,
   type ThreadId,
 } from "@pinetrie/core"
@@ -76,6 +78,63 @@ export function catchUpTool(
         lane === undefined
           ? NO_LANE
           : await catchUp(lane, parseCatchUpArgs(params))
+      return resultOf(answer)
+    },
+  }
+}
+
+/** `resolve_conflict`'s `choose` as the agent passed it; null for anything else. */
+export const parseResolveChoice = (
+  choose: string,
+): "ours" | "theirs" | "base" | null =>
+  choose === "ours" || choose === "theirs" || choose === "base" ? choose : null
+
+/**
+ * `resolve_conflict`: the host writes the chosen version into a folder
+ * lane, closes the path's conflict and removes its versions. Every lane has
+ * it, so a lane's tool list never changes; a jj lane's answers why not.
+ */
+export function resolveTool(
+  resolve: (
+    lane: ThreadId,
+    path: string,
+    choose: "ours" | "theirs" | "base",
+  ) => Promise<ToolAnswer>,
+) {
+  return {
+    name: RESOLVE_TOOL,
+    label: "resolve a conflict",
+    description:
+      "Close a conflicted path of this thread's copy, in a project without jj: ours keeps /workspace/<path> as you left it, theirs or base writes that version (from /pinetrie-states/conflicts/<path>/) over it. In a jj lane, edit the markers out of the file instead.",
+    parameters: Type.Object({
+      path: Type.String({
+        description: "The conflicted path, from /workspace",
+      }),
+      choose: Type.Union(
+        [Type.Literal("ours"), Type.Literal("theirs"), Type.Literal("base")],
+        { description: "ours, theirs or base" },
+      ),
+    }),
+    async execute(
+      _id: string,
+      params: { path: string; choose: string },
+      _onUpdate: unknown,
+      _toolContext: unknown,
+      _invocation: unknown,
+      context: Context,
+    ) {
+      const lane = threadOfContext(context)
+      const choose = parseResolveChoice(params.choose)
+      const answer =
+        lane === undefined
+          ? NO_LANE
+          : choose === null
+            ? {
+                text: "choose is ours, theirs or base.",
+                isError: true,
+                details: null,
+              }
+            : await resolve(lane, params.path, choose)
       return resultOf(answer)
     },
   }
