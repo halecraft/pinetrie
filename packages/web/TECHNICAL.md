@@ -1289,6 +1289,14 @@ stays in view; the strip scrolls past 30vh.
   (ADR-0109), and sit in the footer's strip while the board is open; ▦
   carries ⌕ while a filter is on and the board is closed, so a kept filter
   is not missed (ADR-0115, `board.tsx`).
+- **A board column's head stays in view as its cards scroll.** It is
+  `position: sticky` in `.board-states`, which is a one-row grid so that
+  every column is as tall as the tallest and a short column's head holds
+  too. As a flex row with `align-items: stretch`, the columns would stretch
+  only to the board's visible height, and the heads would leave with them.
+  Chromium sticks a head inside the scroller's padding, where scrolled
+  cards would show above it, so the head reaches up over that padding
+  (`index.html`).
 - **The publish button** (`footer.tsx`) says set up before accepted work
   exists, then publish while there is something to publish (ADR-0090).
   Whether a publish catches your files up or moves `main` alone is the
