@@ -67,7 +67,6 @@ export function Composer(p: {
   readOnly: ReadOnly | null
   /** What a card's command catches up with: the thread's base, or the thread it branched from. */
   catchUps: CatchUps
-  takeFocus: () => boolean
   /** The column's key when a card may be dropped here (`put-target.ts`). */
   putColumn: string | null
 }) {
@@ -96,7 +95,6 @@ export function Composer(p: {
         onBranchInstead={p.onBranchInstead}
         onAct={p.onAct}
         onCreatesLane={p.onCreatesLane}
-        onShows={undefined}
         onIntent={p.onIntent}
         catchUps={p.catchUps}
         onSend={p.onSend}
@@ -109,8 +107,6 @@ export function Composer(p: {
         readOnly={p.readOnly}
         reader={p.reader}
         session={p.session}
-        takeFocus={p.takeFocus}
-        onLeave={undefined}
         where={p.where}
       />
     </form>

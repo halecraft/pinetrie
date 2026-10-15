@@ -124,9 +124,6 @@ export interface BoardView {
 /** How many of the archive's roots it shows with no words to search. */
 export const ARCHIVE_RECENT = 8
 
-/** The board's search field, as the key `armFocus` arms when you open the board. */
-export const BOARD_SEARCH = "board-search"
-
 export interface BoardViewInput {
   readonly workflow: Workflow
   /** Every card: the board's are each task's. */

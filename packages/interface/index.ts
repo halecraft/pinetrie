@@ -80,7 +80,6 @@ export {
 } from "./attention.ts"
 export {
   addStateIntent,
-  BOARD_SEARCH,
   type BoardKey,
   type BoardSearch,
   type BoardShown,
@@ -133,7 +132,7 @@ export {
   type PutSource,
   putLanding,
 } from "./card-intents.ts"
-export { cardKeyAct } from "./card-keys.ts"
+export { cardKeyAct, newCardKeys } from "./card-keys.ts"
 export {
   type EditorEvent,
   type EditorState,
@@ -158,8 +157,9 @@ export {
   KEEP_TITLE,
   movedBackWords,
   NEW_PIN,
-  NEW_PIN_PLACEHOLDER,
   NEW_PIN_TITLE,
+  type NewCardBoxView,
+  newCardBox,
   noticeKey,
   noticeWords,
   PINNED_EMPTY,
@@ -297,6 +297,7 @@ export {
   textFaceWords,
 } from "./face.ts"
 export type { Focus } from "./focus.ts"
+export { claimFocus, type FocusKey } from "./focus-claim.ts"
 export {
   type ColumnMotion,
   type FoldMotion,
@@ -373,7 +374,6 @@ export {
 } from "./inbox-view.ts"
 export {
   type ColumnAct,
-  claimFocus,
   type Intent,
   nameEffects,
   planIntent,
@@ -435,8 +435,6 @@ export {
   queueHeadPlan,
 } from "./next.ts"
 export {
-  NEW_NOTE_PLACEHOLDER,
-  NEW_NOTE_TITLE,
   NOTES_EMPTY,
   type NoteColumnView,
   noteColumnsOf,

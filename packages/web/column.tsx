@@ -9,7 +9,6 @@ import {
   agentCandidates,
   atEntry,
   type CardId,
-  type CardPlace,
   type CardRecord,
   type CardWidth,
   conflictsAt,
@@ -21,13 +20,12 @@ import {
   type Position,
   pinnedInView,
   pinnedOf,
-  placeOfKind,
   promptOf,
   ROOT,
   type SeatRecord,
   type StreamRecord,
   type TaskId,
-  type TextPlace,
+  type TextCardId,
   type ThreadId,
   type ThreadLane,
   type ThreadName,
@@ -60,7 +58,6 @@ import {
   densityWords,
   detailsTitle,
   dragProps,
-  type EditorState,
   earlierWords,
   type FoldMemory,
   gridKeyAct,
@@ -90,7 +87,6 @@ import {
   type SpotStore,
   START_WORDS,
   seenBatches,
-  shownBy,
   spotOf,
   startedWords,
   type ThreadDetails,
@@ -119,7 +115,7 @@ import {
 } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
 import type { AccessActing, AttentionStore } from "@pinetrie/session"
-import { drawnPlace, newCardId, type SessionClient } from "@pinetrie/session"
+import { newCardId, type SessionClient } from "@pinetrie/session"
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
@@ -130,7 +126,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
-import { CardEditor } from "./card-editor.tsx"
+import { NewCardBox } from "./card-editor.tsx"
 import { ColumnHeadEnd } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
@@ -223,11 +219,6 @@ export interface ColumnProps {
   /** Nothing may be written here: no composer, no tools that write. */
   readOnly: ReadOnly | null
   /**
-   * Whether the column keyed `key` was just opened, so its composer takes
-   * focus. True once per opening.
-   */
-  takeFocus: (key: string) => boolean
-  /**
    * What each column knew of its end when last unmounted, by its key
    * (`follow.ts`).
    */
@@ -263,10 +254,6 @@ export interface ColumnProps {
    */
   matches: ColumnMatches | null
 }
-
-/** A place a text card may be in; undefined for any other. */
-const textPlaceOf = (place: CardPlace | undefined): TextPlace | undefined =>
-  place === undefined ? undefined : placeOfKind("text", place)
 
 export function Column(p: ColumnProps) {
   const { index } = p
@@ -326,11 +313,8 @@ export function Column(p: ColumnProps) {
   // handler every message shares, so none of them redraws when this column
   // does.
   const act = useStable((act: ColumnAct) => {
-    // A comment opens its entry's margin, its box taking focus once drawn.
-    if (act.kind === "comment") {
-      setOpenMargin(act.entry)
-      setCommenting(act.card)
-    }
+    // A comment opens its entry's margin, where its box is drawn.
+    if (act.kind === "comment") setOpenMargin(act.entry)
     p.onIntent({ kind: "column", column: p.columnKey, act })
   })
 
@@ -342,7 +326,6 @@ export function Column(p: ColumnProps) {
   // Margins: the comments beside each entry, one open at a time,
   // and the entry the keys select.
   const [openMargin, setOpenMargin] = useState<EntryId | null>(null)
-  const [commenting, setCommenting] = useState<CardId | null>(null)
   const [selected, setSelected] = useState<EntryId | null>(null)
   const margins = useMemo(() => marginCounts(p.cards), [p.cards])
   const openComments = useMemo(
@@ -387,15 +370,6 @@ export function Column(p: ColumnProps) {
       p.session,
     ],
   )
-  useEffect(() => {
-    if (commenting === null) return
-    const box = content.current?.querySelector<HTMLTextAreaElement>(
-      `.margin textarea[data-card="${commenting}"]`,
-    )
-    if (box == null) return
-    box.focus()
-    setCommenting(null)
-  })
   // The selected entry is marked where it is drawn, again as the messages
   // are drawn anew; the selection's change alone brings it into view, so the
   // reader's own scrolling is left alone.
@@ -868,17 +842,13 @@ export function Column(p: ColumnProps) {
   // open, the strip leaves out the card it shows, as the column leaves out
   // the composer's. It closes when focus leaves it.
   const [pinning, setPinning] = useState(false)
-  const [pinBox, setPinBox] = useState<EditorState | undefined>(undefined)
-  const pinShown = pinning && pinBox !== undefined ? shownBy(pinBox) : null
+  const [pinShown, setPinShown] = useState<TextCardId | null>(null)
   const newPin = newPinAt({
     canPin: pinKey !== null && !unstarted && threadEnd !== null,
     pinning,
     pinned: pinned.length,
   })
-  const openPin = () => {
-    setPinBox(undefined)
-    setPinning(true)
-  }
+  const openPin = () => setPinning(true)
   // Your traces where your cards were at this thread's end, when someone
   // else moved them while you were away. Drawn in a page you can
   // see, a trace is seen: the host deletes it, and this column keeps drawing
@@ -1058,35 +1028,16 @@ export function Column(p: ColumnProps) {
                 <PinnedStrip
                   box={
                     pinning && pinKey !== null ? (
-                      <CardEditor
-                        at={at}
-                        card={pinned.find(c => c.id === pinShown)}
-                        catchUps={catchUps}
-                        commands={[]}
-                        noModel={noModelLine(p.work.setup)}
-                        unstarted={false}
-                        how={how}
-                        lane={lane}
+                      <NewCardBox
+                        among={pinned}
+                        focusOnMount
                         onAct={act}
-                        onBranchInstead={branchInstead}
-                        onCreatesLane={undefined}
-                        onIntent={p.onIntent}
                         onLeave={() => setPinning(false)}
-                        onSend={onSend}
-                        onShows={setPinBox}
+                        onShows={setPinShown}
                         onTyping={p.onTyping}
-                        participants={p.participants}
-                        agents={agents}
-                        pending={undefined}
-                        place={textPlaceOf(
-                          drawnPlace(pinKey, p.session.writer, p.cards),
-                        )}
-                        prefill={undefined}
-                        readOnly={p.readOnly}
                         reader={reader}
                         session={p.session}
-                        takeFocus={() => true}
-                        where={undefined}
+                        to={pinKey}
                       />
                     ) : null
                   }
@@ -1278,7 +1229,6 @@ export function Column(p: ColumnProps) {
                   onCreatesLane={setCreatesLane}
                   onIntent={p.onIntent}
                   onTyping={p.onTyping}
-                  takeFocus={() => p.takeFocus(p.column.key)}
                   catchUps={catchUps}
                   putColumn={putColumn}
                   participants={p.participants}

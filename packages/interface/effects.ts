@@ -40,6 +40,7 @@ import type { Raised } from "./attention.ts"
 import { heldByOthers } from "./canvas-columns.ts"
 import type { Quote } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
+import type { FocusKey } from "./focus-claim.ts"
 import type { Identity } from "./identity.ts"
 import {
   type Here,
@@ -206,8 +207,8 @@ export type Effect =
   | { readonly kind: "revealCard"; readonly card: CardId }
   /** Open ask `ask`'s fold, so what is revealed in it is drawn. */
   | { readonly kind: "openFold"; readonly ask: EntryId }
-  /** The column keyed `key` takes focus when it mounts (`claimFocus`). */
-  | { readonly kind: "armFocus"; readonly key: string }
+  /** What `key` names takes focus when it mounts (`claimFocus`). */
+  | { readonly kind: "armFocus"; readonly key: FocusKey }
   | { readonly kind: "storeIdentity"; readonly identity: Identity }
   | { readonly kind: "forgetIdentity" }
   | { readonly kind: "reload" }

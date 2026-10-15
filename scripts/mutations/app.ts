@@ -272,8 +272,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column you open does not take focus",
     file: "packages/web/card-editor.tsx",
-    from: "    if (p.takeFocus?.() === true) box.current?.focus()",
-    to: "    p.takeFocus?.()",
+    from: '    if (claim({ kind: "column", key: p.how.column })) box.current?.focus()',
+    to: '    claim({ kind: "column", key: p.how.column })',
     suite: "browser",
     scenario: "page",
     expect:
@@ -756,8 +756,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the board's search takes no focus when you open the board",
     file: "packages/web/board.tsx",
-    from: "    if (takeFocus()) searchRef.current?.focus()",
-    to: "    if (takeFocus() && false) searchRef.current?.focus()",
+    from: '    if (claim({ kind: "board" })) searchRef.current?.focus()',
+    to: '    if (claim({ kind: "board" }) && false) searchRef.current?.focus()',
     suite: "browser",
     scenario: "page",
     expect:
@@ -989,8 +989,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the stage is mounted afresh under a page",
     file: "packages/web/app.tsx",
-    from: '          id="stage"\n          inert={page !== null}',
-    to: '          id="stage"\n          key={page ?? "stage"}\n          inert={page !== null}',
+    from: '            id="stage"\n            inert={page !== null}',
+    to: '            id="stage"\n            key={page ?? "stage"}\n            inert={page !== null}',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1027,8 +1027,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new column's header ignores its composer",
     file: "packages/web/card-editor.tsx",
-    from: "    () => onCreatesLane?.(plan.createsLane),",
-    to: "    () => onCreatesLane?.(false),",
+    from: "    () => onCreatesLane(plan.createsLane),",
+    to: "    () => onCreatesLane(false),",
     suite: "browser",
     scenario: "page",
     expect:
@@ -2257,7 +2257,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a composer keeps showing the card a drop swapped away",
-    file: "packages/web/card-editor.tsx",
+    file: "packages/web/card-box.ts",
     from: '      } else if (now.kind === "bound") {',
     to: "      } else if (false) {",
     suite: "browser",
@@ -2266,8 +2266,8 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an unbound box keeps the readOnly Kyneta put back",
-    file: "packages/web/card-editor.tsx",
-    from: '      el.readOnly = p.readOnly !== null || current.current.kind === "sending"\n',
+    file: "packages/web/card-box.ts",
+    from: '      el.readOnly = p.readOnly || current.current.kind === "sending"\n',
     to: "",
     suite: "browser",
     scenario: "page",
@@ -2284,14 +2284,14 @@ export const mutations: readonly Mutation[] = [
       "a card selected in the inventory opens in place, and Escape folds it",
   },
   {
-    name: "Enter in a + pin box sends",
-    file: "packages/web/card-editor.tsx",
-    from: '            if (e.key !== "Escape") return\n',
-    to: '            if (e.key === "Enter") return void submit()\n            if (e.key !== "Escape") return\n',
+    name: "the pin box stays open once you leave it",
+    file: "packages/web/column.tsx",
+    from: "                        onLeave={() => setPinning(false)}",
+    to: "                        onLeave={() => {}}",
     suite: "browser",
     scenario: "page",
     expect:
-      '"+ pin" in a header opens a box in the strip where Enter is a new line, and the card it makes stays pinned',
+      '"+ pin" in a header opens a box in the strip where Enter is a new line; Alt+↑ there hands the card it makes to the strip, focused, and it stays pinned',
   },
   {
     name: "a run's prompt draws no marker of the pinned cards it read",
@@ -2385,9 +2385,19 @@ export const mutations: readonly Mutation[] = [
       "your message shows only in your window; moved to the notes, it shows in the other's note column",
   },
   {
-    name: "a new note's box keeps only its first keystroke",
+    name: "a card's box takes no focus armed for it",
     file: "packages/web/card-editor.tsx",
-    from: "            detach.current = bindText(session, next.state.card, el, setText)\n",
+    from: '    if (claim({ kind: "card", card: card.id })) {',
+    to: '    if (claim({ kind: "card", card: card.id }) && false) {',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a comment is a note in its message's margin, written where it opens; shut, the message shows how many it holds",
+  },
+  {
+    name: "a new note's box keeps only its first keystroke",
+    file: "packages/web/card-box.ts",
+    from: "    detach.current = bindText(session, id, el, setText)\n",
     to: "",
     suite: "browser",
     scenario: "page",
@@ -2397,18 +2407,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new note's box moves its note among no notes",
     file: "packages/web/note-column.tsx",
-    from: "          among={view.notes}\n          column={column}",
-    to: "          among={[]}\n          column={column}",
+    from: "          among={view.notes}\n          focusOnMount={false}",
+    to: "          among={[]}\n          focusOnMount={false}",
     suite: "browser",
     scenario: "page",
     expect:
       "Alt+↑ in a new note's box moves it up its note column, for everyone, and Alt+↓ in the list moves it back",
   },
   {
-    name: "a new note's box hands its note to no one",
-    file: "packages/web/note-column.tsx",
-    from: "          onHandOver={setFocusing}",
-    to: "          onHandOver={() => {}}",
+    name: "a new card's box carries out none of its keys",
+    file: "packages/web/card-editor.tsx",
+    from: "            for (const act of keys.acts) p.onAct(act)",
+    to: "            void keys.acts",
     suite: "browser",
     scenario: "page",
     expect:

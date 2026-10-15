@@ -1054,8 +1054,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   card in a new branch to your inventory. Each is the move a drag makes there, and the
   undo key outside a box undoes it. A card in your inventory has none
   there: put, × and a drag move it.
-- **Before your composer's first keystroke**, and in the box "+ pin" opens,
-  the frame says only where the card will be.
+- **Before your composer's first keystroke**, and in the box a new note or
+  pinned card is written in, the frame says only where the card will be.
+  That box offers no ⋯ even once its card exists: the card's moves are
+  offered once it joins its list.
 
 ### Your message and notes (ADR-0048, ADR-0113)
 
@@ -1169,7 +1171,10 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **"+ pin" writes a new pinned card**: in the column's header while the
   thread has none, at the end of the strip once it has one. The box it
   opens pins what you type from the first keystroke; Enter is a new line,
-  and Escape or clicking away closes it.
+  and Escape or clicking away closes it. Alt+↑ or Alt+↓ there moves the
+  card among the pinned cards and takes you to it in the strip. It takes no
+  pasted image, as no card that exists does: paste one into your message,
+  then **Pin** it.
 - **↑ and ↓ on a pinned card, or Alt+↑ and Alt+↓ in its box, move it among
   the thread's pinned cards**: the agent reads them in that order.
 - **Anyone here can edit a pinned card**, as a queued one. Each is headed

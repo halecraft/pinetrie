@@ -55,6 +55,7 @@ import { TASK_BUSY_REASON } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
 import { type RefObject, useEffect, useRef, useState } from "react"
 import { AddButton } from "./add-button.tsx"
+import { useFocusClaim } from "./focus-claim.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { ReaderMenus, Readers, type ReadersProps } from "./root-signals.tsx"
 import { SignalMark } from "./signal-mark.tsx"
@@ -80,7 +81,6 @@ export function BoardStrip({
   mine,
   onMine,
   searchRef,
-  takeFocus,
 }: {
   view: BoardView | null
   open: boolean
@@ -99,8 +99,6 @@ export function BoardStrip({
   onMine: (mine: boolean) => void
   /** The search field, which `Board` focuses on `/`. */
   searchRef: RefObject<HTMLInputElement | null>
-  /** Whether the search takes focus as it mounts: armed when a person opens the board (`claimFocus`). */
-  takeFocus: () => boolean
 }) {
   const shown = view?.shown ?? null
   const filter = shown?.kind === "filtered" ? shown.search : null
@@ -154,7 +152,6 @@ export function BoardStrip({
           placeholder={searchWords(shown?.total ?? 0)}
           query={query}
           searchRef={searchRef}
-          takeFocus={takeFocus}
         />
       ) : (
         view?.strip.map(s => (
@@ -182,7 +179,6 @@ function StripSearch({
   filtered,
   placeholder,
   searchRef,
-  takeFocus,
 }: {
   query: string
   onQuery: (query: string) => void
@@ -192,11 +188,12 @@ function StripSearch({
   filtered: boolean
   placeholder: string
   searchRef: RefObject<HTMLInputElement | null>
-  takeFocus: () => boolean
 }) {
+  const claim = useFocusClaim()
+  // Claimed as it mounts: armed when a person opens the board.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the board opens
   useEffect(() => {
-    if (takeFocus()) searchRef.current?.focus()
+    if (claim({ kind: "board" })) searchRef.current?.focus()
   }, [])
   return (
     <>

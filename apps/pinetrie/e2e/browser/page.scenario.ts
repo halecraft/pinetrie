@@ -4199,7 +4199,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // keystroke and that same box goes on writing it, so nothing typed is
       // lost. Alt+↑ there moves it up the column, for everyone, and hands it
       // to the list, focused there; Alt+↓ in the list moves it back down.
-      const newNote = ".note-column .new-note textarea"
+      const newNote = ".note-column .new-card textarea"
       await page.click(newNote)
       await page.keyboard.type("jot")
       const jotted = await waitFor(
@@ -4319,10 +4319,12 @@ async function run(check: Checks["check"]): Promise<void> {
 
       // "+ pin", in the conversation below, which has no pinned
       // card: the header offers it, and the box it opens in the strip makes a
-      // pinned card. Enter there is a new line; Escape closes the box, the
-      // card stays pinned, and "+ pin" moves into the strip.
+      // pinned card. Enter there is a new line; Alt+↑ hands the card to the
+      // strip, focused there, and closes the box; the card stays pinned, and
+      // "+ pin" moves into the strip. It is the strip's only card, so
+      // nothing moves.
       await page.click(`${col(1)} .column-head .new-pin`)
-      const pinningBox = `${col(1)} .pinned-strip .pinning .input`
+      const pinningBox = `${col(1)} .pinned-strip .new-card .input`
       const pinFocused = await page
         .waitForFunction(
           s => document.querySelector(s) === document.activeElement,
@@ -4338,23 +4340,32 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.keyboard.type("line two")
       const twoLines = await valueIs(pinningBox, "line one\nline two")
       const newPinned = (await page.getAttribute(pinningBox, "data-card")) ?? ""
-      await page.keyboard.press("Escape")
-      const drawnPinned = await valueIs(
-        `${col(1)} .pinned-strip .card-editor.pinned:not(.pinning) textarea[data-card="${newPinned}"]`,
-        "line one\nline two",
-      )
+      await page.keyboard.press("Alt+ArrowUp")
+      const pinnedBox = `${col(1)} .pinned-strip > .card-editor.pinned textarea[data-card="${newPinned}"]`
+      const drawnPinned = await valueIs(pinnedBox, "line one\nline two")
+      const pinHanded = await page
+        .waitForFunction(
+          s => document.querySelector(s) === document.activeElement,
+          pinnedBox,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
       await waitFor(() => placeOf(newPinned)?.kind === "pinned", 5_000)
       const pinMoved =
         (await page.locator(`${col(1)} .column-head .new-pin`).count()) === 0 &&
         (await page.locator(`${col(1)} .pinned-strip .new-pin`).count()) === 1
       check(
-        '"+ pin" in a header opens a box in the strip where Enter is a new line, and the card it makes stays pinned',
+        '"+ pin" in a header opens a box in the strip where Enter is a new line; Alt+↑ there hands the card it makes to the strip, focused, and it stays pinned',
         pinFocused &&
           twoLines &&
           drawnPinned &&
+          pinHanded &&
           placeOf(newPinned)?.kind === "pinned" &&
           pinMoved,
-        `focused ${pinFocused}, lines ${twoLines}, drawn ${drawnPinned}, ${placeOf(newPinned)?.kind}, moved ${pinMoved}`,
+        `focused ${pinFocused}, lines ${twoLines}, drawn ${drawnPinned}, handed ${pinHanded}, ${placeOf(newPinned)?.kind}, moved ${pinMoved}`,
       )
 
       // A trace: Ada pins her card in the conversation

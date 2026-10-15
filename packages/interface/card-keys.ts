@@ -1,10 +1,10 @@
 // interface/card-keys — the keys a card's own box takes for what the card
-// does in its place: Alt+↑ and Alt+↓ move a queued or pinned card one place
-// up or down, and Ctrl+Shift+Backspace discards a card.
+// does in its place: Alt+↑ and Alt+↓ move a card in a list one place up or
+// down, and Ctrl+Shift+Backspace discards a card.
 //
-// Only queued and pinned boxes take Alt+↑/↓. On a Mac, Option+↑/↓ moves a
-// textarea's caret to its paragraph's start or end; those boxes lose that,
-// and the composer and notes keep it. Ctrl, not Cmd, as take
+// Only boxes of a card in a list (queued, pinned, a note, a new card's box)
+// take Alt+↑/↓. On a Mac, Option+↑/↓ moves a textarea's caret to its
+// paragraph's start or end; those boxes lose that, and the composer keeps it. Ctrl, not Cmd, as take
 // (Ctrl+Shift+I) and put (Ctrl+Shift+O) are: Cmd+Backspace deletes the line.
 
 import type { CardId } from "@pinetrie/core"
@@ -29,4 +29,22 @@ export function cardKeyAct(
   if (event.key === "ArrowDown")
     return { kind: "reorder", card, among, step: 1 }
   return null
+}
+
+/**
+ * What a key in the box a new card is written in asks for: the column acts,
+ * in order, and whether the box then lets its card go to its list. A move
+ * hands the card to the list, armed to take focus there.
+ */
+export function newCardKeys(
+  event: KeyLike & { readonly isComposing: boolean },
+  card: CardId,
+  among: readonly CardId[],
+): { readonly acts: readonly ColumnAct[]; readonly release: boolean } {
+  const act = cardKeyAct(event, card, among)
+  if (act === null) return { acts: [], release: false }
+  return {
+    acts: act.kind === "reorder" ? [act, { kind: "focusCard", card }] : [act],
+    release: true,
+  }
 }

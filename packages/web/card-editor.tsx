@@ -1,21 +1,19 @@
 // web/card-editor — one card's editor, in its frame (`card-frame.tsx`): your
-// message in the composer and the box "+ pin" opens, each a `CardEditor`; each
-// note at a thread's end (`NoteCardEditor`), a note column's box for a new
-// note (`NewNoteBox`), each queued card above the line
-// (`QueuedCardEditor`), each pinned card and the card selected in your
-// inventory, all a `BoundCardEditor`.
+// message in the composer (`CardEditor`); the box a new note or pinned card
+// is written in (`NewCardBox`); and each card that exists, a
+// `BoundCardEditor`: a note (`NoteCardEditor`), a queued card
+// (`QueuedCardEditor`), a pinned card, and the card selected in your
+// inventory.
 //
 // One uncontrolled textarea for the editor's whole life. Until there is
 // something worth keeping it is local; the input that makes it worth keeping
 // creates the card and binds this same element to the card's text, in one
 // handler, so no keystroke falls between the card existing and the element
 // being bound, and focus and the caret never move. `editorState` decides each
-// step; this component carries it out. Every write the editor makes itself
-// (a command chosen, a pasted image) goes through the element, so no path
-// asks whether a card exists yet.
+// step; `useCardBox` (`card-box.ts`) carries it out. Every write your
+// message's editor makes itself (a command chosen, a pasted image) goes
+// through the element, so no path asks whether a card exists yet.
 
-import { attach } from "@kyneta/react"
-import { subscribe } from "@kyneta/schema"
 import type {
   AcceptedRecord,
   AgentCandidate,
@@ -30,7 +28,7 @@ import type {
 } from "@pinetrie/core"
 import {
   commandOf,
-  type NoteColumnId,
+  type ListKey,
   type TextCard,
   type TextCardId,
 } from "@pinetrie/core"
@@ -46,16 +44,11 @@ import {
   cardFrame,
   cardKeyAct,
   completion,
-  type EditorEvent,
-  type EditorState,
-  type EditorStep,
-  editorState,
   forkWords,
   free,
   type Intent,
-  NEW_NOTE_PLACEHOLDER,
-  NEW_NOTE_TITLE,
-  NEW_PIN_PLACEHOLDER,
+  newCardBox,
+  newCardKeys,
   type Pending,
   type Prefill,
   pinnedStatus,
@@ -91,33 +84,14 @@ import {
   useRef,
   useState,
 } from "react"
+import { bindText, useCardBox } from "./card-box.ts"
 import { CardFrame } from "./card-frame.tsx"
 import { pastedFilesOf } from "./clipboard.ts"
+import { useFocusClaim } from "./focus-claim.ts"
 import { Menu } from "./menu.tsx"
 import { useThreadStates } from "./thread-states.ts"
 import { useShareFiles } from "./use-share-files.ts"
 import { useStable } from "./use-stable.ts"
-
-/**
- * Bind a box to a card's text, its undo reaching only that card's steps, and
- * tell `onText` the text now and at every change, others' edits included.
- * Returns the unbinding.
- */
-function bindText(
-  session: SessionClient,
-  id: TextCardId,
-  el: HTMLTextAreaElement,
-  onText: (text: string) => void,
-): () => void {
-  const doc = session.cardText(id)
-  const off = attach(el, doc.text, { undo: session.undoFor(id) })
-  onText(doc.text())
-  const stop = subscribe(doc, () => onText(doc.text()))
-  return () => {
-    off()
-    stop()
-  }
-}
 
 /** What a lane this editor's send creates would start from. */
 export interface Where {
@@ -141,11 +115,6 @@ export interface Where {
  * nothing was taken away. A send to a busy lane, or of a card with a command,
  * queues the card instead: this client asks the host to, and the host pops it
  * in turn.
- *
- * A box whose `place` is pinned is the one "+ pin" opens: it makes a pinned
- * card at the first keystroke worth keeping and goes on editing it, the same
- * element, so nothing typed is lost. It never sends: Enter is a new line,
- * and Escape or leaving it closes it (`onLeave`).
  */
 export function CardEditor(p: {
   session: SessionClient
@@ -178,8 +147,8 @@ export function CardEditor(p: {
   prefill: Prefill | undefined
   /** A first message to send at once: this column was opened to send it. */
   pending: Pending | undefined
-  /** Where a lane the send creates works; absent for the "+ pin" box. */
-  where: Where | undefined
+  /** Where a lane the send creates works. */
+  where: Where
   readOnly: ReadOnly | null
   /** A unstarted column's send id, recorded before its message is sent. */
   onSend: () => string | undefined
@@ -191,52 +160,42 @@ export function CardEditor(p: {
    */
   onTyping: (card: CardId | null) => void
   /** Told whether the next send would create a lane, each time that changes. */
-  onCreatesLane: ((createsLane: boolean) => void) | undefined
-  /**
-   * Told the box's state each time it changes: the "+ pin" box's, so the
-   * strip leaves out the card it shows.
-   */
-  onShows: ((state: EditorState) => void) | undefined
+  onCreatesLane: (createsLane: boolean) => void
   /** Where a read-only action goes (`ReadOnly.action.intent`). */
   onIntent: (intent: Intent) => void
   /** The column's acts: queueing a card, clearing its command. */
   onAct: (act: ColumnAct) => void
   /** What a card's command catches up with: the thread's base, or the thread it branched from. */
   catchUps: CatchUps
-  /** Whether this column asked for focus, just opened. Asked on mounting. */
-  takeFocus: (() => boolean) | undefined
-  /** A pinning box's focus left it: the column closes it. */
-  onLeave: (() => void) | undefined
 }) {
   const { session, prefill, pending } = p
   const threadIn = useThreadStates()
-  const pins = p.place?.kind === "pinned"
-  const box = useRef<HTMLTextAreaElement>(null)
-  const [state, setState] = useState<EditorState>(() =>
-    p.card === undefined
-      ? { kind: "local" }
-      : { kind: "bound", card: p.card.id },
-  )
+  const { box, state, current, text, setText, boundTo, step } = useCardBox({
+    session,
+    start: p.card?.id,
+    startText: startText({ pending, card: p.card, prefill }),
+    prefill,
+    found: () => p.card?.id,
+    readOnly: p.readOnly !== null,
+    make: (id, text) => {
+      if (p.place === undefined) return false
+      session.createCard(
+        {
+          id,
+          place: p.place,
+          content: { command: null, unsent: null, origin: null },
+        },
+        text,
+        IN_COLUMN(p.how.column),
+      )
+      return true
+    },
+  })
   // The card the box shows: `p.card` once the state holds it.
   const card = p.card?.id === shownBy(state) ? p.card : undefined
-  // The state as the handlers last left it, read synchronously between renders.
-  const current = useRef(state)
-  // The box's text, as shown: the element's while local, the card's while bound.
-  const [text, setText] = useState(() =>
-    startText({ pending, card: p.card, prefill }),
-  )
-  const detach = useRef<(() => void) | null>(null)
   const [status, setStatus] = useState("")
-  // A box is bound to its card while `detach` is set.
   const shares = useShareFiles(
-    p.readOnly === null
-      ? {
-          box,
-          session,
-          boundTo: () =>
-            detach.current === null ? null : shownBy(current.current),
-        }
-      : null,
+    p.readOnly === null ? { box, session, boundTo } : null,
   )
   const [conflict, setConflict] = useState<{
     text: string
@@ -266,7 +225,7 @@ export function CardEditor(p: {
   // Where the caret is while the box has focus; null while it has none.
   const [caret, setCaret] = useState<number | null>(null)
   const list =
-    pins || hidden === text
+    hidden === text
       ? null
       : completion({
           text,
@@ -278,112 +237,10 @@ export function CardEditor(p: {
         })
   const options = list?.options ?? []
   const highlighted = options[Math.min(picked, options.length - 1)]
-  const { onCreatesLane, onShows } = p
+  const { onCreatesLane } = p
   useEffect(
-    () => onCreatesLane?.(plan.createsLane),
+    () => onCreatesLane(plan.createsLane),
     [plan.createsLane, onCreatesLane],
-  )
-  useEffect(() => onShows?.(state), [state, onShows])
-
-  /** Bind the box to a card's text, keeping the caret where it is. */
-  const bind = (id: TextCardId) => {
-    const el = box.current
-    if (el === null) return
-    detach.current?.()
-    const { selectionStart, selectionEnd } = el
-    detach.current = bindText(session, id, el, setText)
-    el.setSelectionRange(selectionStart, selectionEnd)
-  }
-  /**
-   * Unbind the box, and empty it. Kyneta's detach puts back the `readOnly`
-   * the box had when it was bound, which React then no longer knows of: a
-   * box bound while its column was read-only would stay so. So it is set
-   * again from what the box is now.
-   */
-  const unbind = () => {
-    detach.current?.()
-    detach.current = null
-    const el = box.current
-    if (el !== null) {
-      el.value = ""
-      el.readOnly = p.readOnly !== null || current.current.kind === "sending"
-    }
-    setText("")
-  }
-  /**
-   * One step of `editorState`, its acts carried out in its order. A card
-   * that cannot be created ends the step: nothing is bound to it.
-   */
-  const step = (event: EditorEvent): EditorStep => {
-    const next = editorState(current.current, event, prefill)
-    current.current = next.state
-    setState(next.state)
-    for (const act of next.acts)
-      switch (act) {
-        case "create": {
-          const el = box.current
-          if (
-            el === null ||
-            p.place === undefined ||
-            next.state.kind !== "bound"
-          )
-            return next
-          session.createCard(
-            {
-              id: next.state.card,
-              place: p.place,
-              content: { command: null, unsent: null, origin: null },
-            },
-            el.value,
-            IN_COLUMN(p.how.column),
-          )
-          break
-        }
-        case "attach":
-          if (next.state.kind === "bound") bind(next.state.card)
-          break
-        case "detach":
-          unbind()
-          break
-      }
-    return next
-  }
-
-  // The card as the column finds it: found, or gone. Gone only once it was
-  // seen: a card just created is not in the records until they redraw. A box
-  // left empty by a send finds the card the column gives it then: one put
-  // here while this one was being written.
-  const seen = useRef<CardId | null>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on the card's coming and going, and the box coming free
-  useEffect(() => {
-    const now = current.current
-    const card = p.card
-    if (card !== undefined) {
-      if (now.kind === "bound" && now.card === card.id) {
-        seen.current = card.id
-        if (detach.current === null) bind(card.id)
-      } else if (now.kind === "bound") {
-        // Another card took its place: a card dropped here, whose swap
-        // took the one it showed away (`planPut`).
-        step({ kind: "gone" })
-        seen.current = card.id
-        step({ kind: "found", card: card.id })
-      } else if (now.kind === "local") {
-        seen.current = card.id
-        step({ kind: "found", card: card.id })
-      }
-    } else if (now.kind === "bound" && seen.current === now.card) {
-      step({ kind: "gone" })
-    }
-  }, [p.card?.id, state.kind === "local"])
-  // Unbound on unmount. StrictMode mounts twice, so the handle is cleared
-  // too: the second mount binds again.
-  useEffect(
-    () => () => {
-      detach.current?.()
-      detach.current = null
-    },
-    [],
   )
 
   /**
@@ -452,9 +309,10 @@ export function CardEditor(p: {
   // A column you just opened is for typing in: focus lands after its
   // prefill (`onFocus`). After the strip's alignment, which is a layout
   // effect; the focus scrolls a column opened past the strip's edge into view.
+  const claim = useFocusClaim()
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, on opening
   useEffect(() => {
-    if (p.takeFocus?.() === true) box.current?.focus()
+    if (claim({ kind: "column", key: p.how.column })) box.current?.focus()
   }, [])
 
   /**
@@ -483,7 +341,7 @@ export function CardEditor(p: {
   }
 
   const { readOnly } = p
-  const frame = cardFrame(card ?? null, pins ? "pinned" : "composing", {
+  const frame = cardFrame(card ?? null, "composing", {
     me: session.writer,
     queueOn:
       p.lane.kind === "lane" && p.at.kind === "entry"
@@ -497,7 +355,6 @@ export function CardEditor(p: {
     <CardFrame
       card={card ?? null}
       catchUps={p.catchUps}
-      pinning={pins}
       {...shareProps(shares)}
       foot={
         frame.primary !== "send" ? null : (
@@ -520,7 +377,7 @@ export function CardEditor(p: {
               </div>
             ) : (
               <div className="compose-row">
-                {plan.createsLane && p.where !== undefined && (
+                {plan.createsLane && (
                   <StartLine
                     accepted={p.where.accepted}
                     base={base}
@@ -620,19 +477,15 @@ export function CardEditor(p: {
           ))}
         </div>
       )}
-      {/* Enter sends; Shift+Enter is a new line; in a pinning box, Enter is
-          a new line. It grows with what is typed, up to a limit, then
-          scrolls. Uncontrolled: while bound, the card's binding owns its
+      {/* Enter sends; Shift+Enter is a new line. It grows with what is
+          typed, up to a limit, then scrolls. Uncontrolled: while bound, the card's binding owns its
           value. */}
       <textarea
         autoComplete="off"
         className="input"
         data-card={card?.id}
         defaultValue={text}
-        onBlur={() => {
-          setCaret(null)
-          if (pins) p.onLeave?.()
-        }}
+        onBlur={() => setCaret(null)}
         onFocus={e => {
           // Focused while it holds only what it started with: type after it.
           if (prefill === undefined || e.currentTarget.value !== prefill.text)
@@ -684,17 +537,11 @@ export function CardEditor(p: {
               return
             }
           }
-          if (pins) {
-            if (e.key !== "Escape") return
-            e.preventDefault()
-            e.currentTarget.blur()
-            return
-          }
           if (e.key !== "Enter" || e.shiftKey) return
           e.preventDefault()
           void submit()
         }}
-        placeholder={pins ? NEW_PIN_PLACEHOLDER : placeholderWords(plan)}
+        placeholder={placeholderWords(plan)}
         readOnly={p.readOnly !== null || state.kind === "sending"}
         ref={box}
         rows={Math.min(8, Math.max(2, text.split("\n").length))}
@@ -743,10 +590,20 @@ export function BoundCardEditor(p: {
     setText(t)
     p.onText?.(t)
   })
+  const claim = useFocusClaim()
+  // A card a plan armed (a new comment, "+ add to queue", a new note handed
+  // to its list) takes focus here, after its text is bound: claimed before,
+  // the caret would land at the end of an empty box.
   useEffect(() => {
     const el = box.current
-    return el === null ? undefined : bindText(session, card.id, el, told)
-  }, [session, card.id, told])
+    if (el === null) return undefined
+    const unbind = bindText(session, card.id, el, told)
+    if (claim({ kind: "card", card: card.id })) {
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    }
+    return unbind
+  }, [session, card.id, told, claim])
   const shares = useShareFiles(
     p.readOnly ? null : { box, session, boundTo: () => card.id },
   )
@@ -870,100 +727,66 @@ export function NoteCardEditor(p: {
 }
 
 /**
- * The box at a note column's end, where a new note is written. Until it
- * holds something worth keeping it is local; the input that makes it worth
- * keeping makes the note, with that text, at the column's end, and binds
- * this same element to it, so no keystroke falls between and focus never
- * moves. It holds the note until focus leaves it, the column leaving that
- * note out of its list meanwhile (`onShows`), then empties. Enter is a new
- * line and Escape leaves; Alt+↑/↓ move the note and hand it to the list,
- * focused there, and Ctrl+Shift+Backspace discards it.
+ * The box at a list's end where a new card is written: a note column's, and
+ * the one "+ pin" opens. Until it holds something worth keeping it is local;
+ * the input that makes it worth keeping makes the card, with that text, at
+ * the list's end, and binds this same element to it (`useCardBox`). It holds
+ * the card until focus leaves it, its list leaving that card out meanwhile
+ * (`onShows`), then empties. Enter is a new line and Escape leaves; its
+ * other keys are `newCardKeys`'.
  */
-export function NewNoteBox(p: {
+export function NewCardBox(p: {
   session: SessionClient
-  column: NoteColumnId
+  /** The list its card is made at the end of. */
+  to: ListKey
   /**
-   * Its column's notes, its own among them once drawn: what Alt+↑/↓ move it
-   * among, and where it finds its note gone.
+   * Its list's cards, its own among them once drawn: what Alt+↑/↓ move it
+   * among, and where it finds it gone.
    */
   among: readonly CardRecord[]
   reader: Reader
+  /** It takes focus as it mounts: a box opened only to be typed in. */
+  focusOnMount: boolean
   onAct: (act: ColumnAct) => void
   onTyping: (card: CardId) => void
-  /** Told the note it shows, or null, each time that changes. */
+  /** Told the card it shows, or null, each time that changes. */
   onShows: (card: TextCardId | null) => void
-  /** A move handed its note to the list: focus it there. */
-  onHandOver: (card: TextCardId) => void
+  /** Focus left it, once it let its card go. */
+  onLeave?: () => void
 }) {
   const { session } = p
-  const box = useRef<HTMLTextAreaElement>(null)
-  const [state, setState] = useState<EditorState>({ kind: "local" })
-  // The state as the handlers last left it, read synchronously between renders.
-  const current = useRef(state)
-  const detach = useRef<(() => void) | null>(null)
-  const [text, setText] = useState("")
-  // A box is bound to its note while `detach` is set.
-  const shares = useShareFiles({
-    box,
+  const view = newCardBox(p.to)
+  const { box, state, current, text, setText, boundTo, step } = useCardBox({
     session,
-    boundTo: () => (detach.current === null ? null : shownBy(current.current)),
-  })
-  const step = (event: EditorEvent) => {
-    const next = editorState(current.current, event, undefined)
-    current.current = next.state
-    setState(next.state)
-    p.onShows(shownBy(next.state))
-    const el = box.current
-    if (el === null) return
-    for (const act of next.acts)
-      switch (act) {
-        case "create":
-          if (next.state.kind === "bound")
-            p.onAct({
-              kind: "newNote",
-              card: next.state.card,
-              column: p.column,
-              text: el.value,
-            })
-          break
-        case "attach":
-          if (next.state.kind === "bound") {
-            const { selectionStart, selectionEnd } = el
-            detach.current = bindText(session, next.state.card, el, setText)
-            el.setSelectionRange(selectionStart, selectionEnd)
-          }
-          break
-        case "detach":
-          detach.current?.()
-          detach.current = null
-          el.value = ""
-          setText("")
-          break
-      }
-  }
-  const shown = shownBy(state)
-  const present = shown !== null && p.among.some(c => c.id === shown)
-  // Gone only once seen: a note just made is not among the notes until they
-  // redraw.
-  const seen = useRef<CardId | null>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on the note's coming and going
-  useEffect(() => {
-    if (present) seen.current = shown
-    else if (shown !== null && seen.current === shown) step({ kind: "gone" })
-  }, [shown, present])
-  // Unmounted (its column made read-only), it lets its note go to the list.
-  // StrictMode mounts twice, so the handle is cleared too.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on unmounting
-  useEffect(
-    () => () => {
-      detach.current?.()
-      detach.current = null
-      p.onShows(null)
+    start: undefined,
+    startText: "",
+    prefill: undefined,
+    found: now => {
+      const shown = shownBy(now)
+      return shown !== null && p.among.some(c => c.id === shown)
+        ? shown
+        : undefined
     },
-    [],
-  )
+    readOnly: false,
+    make: (card, text) => {
+      p.onAct({ kind: "newCard", card, to: p.to, text })
+      return true
+    },
+  })
+  const shares = useShareFiles({ box, session, boundTo })
+  const shown = shownBy(state)
+  const { onShows } = p
+  useEffect(() => onShows(shown), [shown, onShows])
+  // Unmounted (its column made read-only, or the pin box closed), it lets
+  // its card go to the list.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on unmounting
+  useEffect(() => () => onShows(null), [])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, on opening
+  useEffect(() => {
+    if (p.focusOnMount) box.current?.focus()
+  }, [])
   return (
-    <div className="new-note">
+    <div className="new-card">
       <CardFrame
         {...shareProps(shares)}
         card={null}
@@ -973,21 +796,27 @@ export function NewNoteBox(p: {
         onClearCommand={null}
         onDiscard={() => {}}
         reader={p.reader}
-        view={cardFrame(null, "note", { me: session.writer, readOnly: false })}
+        view={cardFrame(null, view.tone, {
+          me: session.writer,
+          readOnly: false,
+        })}
       >
         <textarea
           autoComplete="off"
           className="input"
           data-card={shown ?? undefined}
-          onBlur={() => step({ kind: "release" })}
+          onBlur={() => {
+            step({ kind: "release" })
+            p.onLeave?.()
+          }}
           onPaste={e => sharePasted(e, shares.share)}
           onInput={e => {
             const value = e.currentTarget.value
             setText(value)
             if (free(current.current))
               step({ kind: "input", text: value, card: newCardId() })
-            const shown = shownBy(current.current)
-            if (shown !== null) p.onTyping(shown)
+            const now = shownBy(current.current)
+            if (now !== null) p.onTyping(now)
           }}
           onKeyDown={e => {
             if (e.nativeEvent.isComposing) return
@@ -996,23 +825,22 @@ export function NewNoteBox(p: {
               e.currentTarget.blur()
               return
             }
-            const shown = shownBy(current.current)
-            if (shown === null) return
-            const act = cardKeyAct(
+            const now = shownBy(current.current)
+            if (now === null) return
+            const keys = newCardKeys(
               keyOfBox(e),
-              shown,
+              now,
               p.among.map(c => c.id),
             )
-            if (act === null) return
+            if (keys.acts.length === 0) return
             e.preventDefault()
-            p.onAct(act)
-            step({ kind: "release" })
-            if (act.kind === "reorder") p.onHandOver(shown)
+            for (const act of keys.acts) p.onAct(act)
+            if (keys.release) step({ kind: "release" })
           }}
-          placeholder={NEW_NOTE_PLACEHOLDER}
+          placeholder={view.placeholder}
           ref={box}
-          title={NEW_NOTE_TITLE}
           rows={Math.min(8, Math.max(1, text.split("\n").length))}
+          title={view.title}
         />
       </CardFrame>
     </div>

@@ -36,7 +36,7 @@ import {
 import { readTypingIn } from "@pinetrie/reads"
 import type { QueuedCard } from "@pinetrie/rules"
 import { newCardId, type SessionClient } from "@pinetrie/session"
-import { type ReactNode, useEffect, useRef, useState } from "react"
+import type { ReactNode } from "react"
 import { QueuedCardEditor } from "./card-editor.tsx"
 import { CardFrame } from "./card-frame.tsx"
 import { Menu } from "./menu.tsx"
@@ -118,26 +118,12 @@ export function Dock(p: {
           asks: p.asks,
         })
   const plan = head === null ? null : queueHeadPlan(head)
-  // "+ add to queue" focuses its card's box once the card is drawn.
-  const dock = useRef<HTMLDivElement>(null)
-  const [focusing, setFocusing] = useState<CardId | null>(null)
-  useEffect(() => {
-    if (focusing === null) return
-    const box = dock.current?.querySelector<HTMLTextAreaElement>(
-      `textarea[data-card="${focusing}"]`,
-    )
-    if (box == null) return
-    box.focus()
-    setFocusing(null)
-  })
   const mark = plan?.mark
   const addToQueue = () => {
     if (lane === null || p.queueAt === null) return
-    const card = newCardId()
-    setFocusing(card)
     p.onAct({
       kind: "queueNew",
-      card,
+      card: newCardId(),
       lane: lane.name,
       at: p.queueAt.at,
       command: null,
@@ -148,7 +134,6 @@ export function Dock(p: {
     <div
       className="dock"
       data-next={mark?.kind === "message" ? "message" : undefined}
-      ref={dock}
     >
       {head !== null && plan !== null && (
         <div className="queue-head" data-next={mark?.kind}>

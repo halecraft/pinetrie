@@ -11,10 +11,10 @@ import {
   type CardWidth,
   type EntryId,
   hasPlaceKind,
+  type ListKey,
   type MarkTarget,
   type MoveDirection,
   moveOf,
-  type NoteColumnId,
   noteOf,
   type OfferAction,
   type Position,
@@ -40,7 +40,6 @@ import {
 } from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
-import { BOARD_SEARCH } from "./board-view.ts"
 import {
   afterUndo,
   canvasSpot,
@@ -52,7 +51,7 @@ import {
   planComment,
   planDiscard,
   planEditAsText,
-  planNewNote,
+  planNewCard,
   planOpenTrace,
   planPin,
   planPinToTask,
@@ -150,6 +149,8 @@ export type ColumnAct =
   | { readonly kind: "pinToTask"; readonly card: CardId }
   /** Your message to the note column nearest its thread. */
   | { readonly kind: "toNote"; readonly card: CardId }
+  /** Card `card`'s box takes focus once drawn: a new card handed to its list. */
+  | { readonly kind: "focusCard"; readonly card: CardId }
   /**
    * A reference to the comment `card` on `entry`, queued on `thread`: the
    * agent reads it; the comment stays.
@@ -160,11 +161,11 @@ export type ColumnAct =
       readonly entry: EntryId
       readonly thread: ThreadId
     }
-  /** A new note holding `text`, at the end of note column `column`. */
+  /** A new card holding `text`, at the end of the list `to`. */
   | {
-      readonly kind: "newNote"
+      readonly kind: "newCard"
       readonly card: TextCardId
-      readonly column: NoteColumnId
+      readonly to: ListKey
       readonly text: string
     }
   /** A card into this column's composer, as your message (`planPut`). */
@@ -564,7 +565,7 @@ function planOf(
     case "board":
       return [
         ...(intent.open && intent.focus
-          ? [{ kind: "armFocus", key: BOARD_SEARCH } as const]
+          ? [{ kind: "armFocus", key: { kind: "board" } } as const]
           : []),
         layout({ kind: "board", open: intent.open }),
       ]
@@ -757,8 +758,10 @@ function planColumn(
       return planPinToTask(act.card, key, state)
     case "toNote":
       return planToNote(act.card, key, state)
-    case "newNote":
-      return planNewNote(act, state)
+    case "newCard":
+      return planNewCard(act, key, state)
+    case "focusCard":
+      return [{ kind: "armFocus", key: { kind: "card", card: act.card } }]
     case "comment":
       return planComment(act, state)
     case "queueReference":
@@ -794,6 +797,15 @@ function planColumn(
           command: act.command,
           how: IN_COLUMN(key),
         },
+        // A card with no command is one to type in.
+        ...(act.command === null
+          ? [
+              {
+                kind: "armFocus",
+                key: { kind: "card", card: act.card },
+              } as const,
+            ]
+          : []),
       ]
     case "offer":
       return [{ kind: "offer", lane: act.lane, action: act.action, to: act.to }]
@@ -1013,7 +1025,7 @@ function openThreadColumn(
   state: IntentState,
 ): readonly Effect[] {
   return [
-    { kind: "armFocus", key: thread },
+    { kind: "armFocus", key: { kind: "column", key: thread } },
     {
       kind: "request",
       intent: { kind: "open-thread", thread, root, task, start },
@@ -1065,16 +1077,4 @@ export function nameEffects(step: NameStep | null): readonly Effect[] {
     case "store":
       return [{ kind: "storeIdentity", identity: step.identity }]
   }
-}
-
-/**
- * Whether the column keyed `key` takes focus as it mounts, and what stays
- * armed: the column you just opened does, once. A column restored, or shown
- * again with its tab, leaves focus where it is.
- */
-export function claimFocus(
-  armed: string | null,
-  key: string,
-): { readonly focus: boolean; readonly armed: string | null } {
-  return armed === key ? { focus: true, armed: null } : { focus: false, armed }
 }

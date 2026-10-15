@@ -1,6 +1,6 @@
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
-import { cardKeyAct } from "./card-keys.ts"
+import { cardKeyAct, newCardKeys } from "./card-keys.ts"
 
 const key = (
   k: string,
@@ -43,4 +43,25 @@ test("Ctrl+Shift+Backspace discards any card; a card with no place in line takes
   expect(cardKeyAct({ ...discard, metaKey: true }, C, null)).toBeNull()
   expect(cardKeyAct({ ...discard, shiftKey: false }, C, null)).toBeNull()
   expect(cardKeyAct(key("ArrowUp"), C, null)).toBeNull()
+})
+
+test("in a new card's box, a move hands the card to its list, focused; a discard lets it go; any other key keeps it", () => {
+  expect(newCardKeys(key("ArrowUp"), C, among)).toEqual({
+    acts: [
+      { kind: "reorder", card: C, among, step: -1 },
+      { kind: "focusCard", card: C },
+    ],
+    release: true,
+  })
+  expect(
+    newCardKeys(
+      key("Backspace", { altKey: false, ctrlKey: true, shiftKey: true }),
+      C,
+      among,
+    ),
+  ).toEqual({ acts: [{ kind: "discard", card: C }], release: true })
+  expect(newCardKeys(key("a", { altKey: false }), C, among)).toEqual({
+    acts: [],
+    release: false,
+  })
 })

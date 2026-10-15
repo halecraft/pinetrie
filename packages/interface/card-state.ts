@@ -1,13 +1,14 @@
-// interface/card-state — your message's editor, and a note column's box for
-// a new note, decided: `editorState` decides each step and names what
-// `card-editor.tsx` must do.
+// interface/card-state — the editor of a box that makes its card at the
+// first input worth keeping, decided: your message's, and the box a new note
+// or pinned card is written in. `editorState` decides each step and names
+// what `useCardBox` (`packages/web/card-box.ts`) must do.
 //
-// One textarea edits your message at a column's end. Until there is
-// something worth keeping it is local, and takes your message here when it
-// finds one. The input that makes it worth keeping creates the card and binds the same
-// element to it; a send holds it until the host answers. Undo and redo in the
-// box reach only its card. A note column's box is the same without a send:
-// it releases its note when focus leaves it.
+// One textarea edits the card. Until there is something worth keeping it is
+// local, and takes your message here when it finds one. The input that makes
+// it worth keeping creates the card and binds the same element to it; a send
+// holds it until the host answers. Undo and redo in the box reach only its
+// card. A new card's box has no send: it releases its card when focus leaves
+// it.
 
 import type { CardRecord, TextCardId } from "@pinetrie/core"
 import type { Pending, Prefill } from "./columns.ts"

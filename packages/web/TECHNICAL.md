@@ -229,7 +229,11 @@ error.
 ## Revealing a picked message (`use-reveal.ts`, S33)
 
 `useReveal(container)` returns `reveal(id)`, which `openAt` calls for a pick
-that scrolls and for one that opens a column.
+that scrolls and for one that opens a column. It, `useLanding` and
+`useRevealCard` are one hook each over `useWhenDrawn`, which acts on an
+element now if it is drawn, else after each render until it is; they differ
+only in what they do to it. Focus is not done this way: a box about to
+mount claims it (*A card's focus*, below).
 
 - **It tries at once.** Picking a message a column on the tab you are on
   already draws changes no layout state: `show` for the same tab returns the
@@ -773,8 +777,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     (`.card-editor.queued:not(:focus-within)`). A component that swapped a
     face for the editor would remount the box and lose the caret, which
     Alt+↑ must keep.
-  - **"+ add to queue"** is the `queueNew` act with `hold-if-idle`; the dock
-    focuses the new card's box once it is drawn.
+  - **"+ add to queue"** is the `queueNew` act with `hold-if-idle`, which
+    arms the new card's focus; its box claims it once drawn (*A card's
+    focus*).
   - **A queued card revealed** (an undo, a trace) is scrolled to in its
     dock (`revealCard`, `useRevealCard`), apart from the thread's scroll.
 - **What the agent is doing shows in three places, none taking layout**
@@ -1100,19 +1105,23 @@ the session sends moves and draws them until its copy holds them
   another, each a `NoteCardEditor` (`among` its column's notes, so ↑ and ↓
   and Alt+↑/↓ reorder it), folded to one line until it holds the focus, as
   a queued card in the dock is, and under them the box a new note is
-  written in (`NewNoteBox`, `.new-note`). The whole column is a drop target
+  written in (`NewCardBox`, `.new-card`). The whole column is a drop target
   (`data-put-notes`). A note's acts are sent as a `column` intent keyed by
   the note column's card, so its refusals are said there.
-- **A new note is written in one box, as your message is** (`NewNoteBox`,
-  `card-editor.tsx`): local until it holds something worth keeping, then
-  the same element bound to the note it makes, so no keystroke falls
-  between and focus never moves (`editorState`). It holds that note until
-  focus leaves it (`release`), and the column leaves the note out of its
-  list meanwhile: drawn there too, it would be two boxes on one text. A
-  move from the box (Alt+↑/↓) hands the note to the list, where the
-  column focuses it once drawn, its caret at the end. The list is as tall
-  as its notes (`.note-column-notes`), so the box follows the last note
-  and stays in view once they scroll.
+- **A new note or pinned card is written in one box, as your message is**
+  (`NewCardBox`, `card-editor.tsx`, over `useCardBox`): local until it holds
+  something worth keeping, then the same element bound to the card it
+  makes (`newCard`), so no keystroke falls between and focus never moves.
+  It holds that card until focus leaves it (`release`), and its list leaves
+  the card out meanwhile (`onShows`): drawn there too, it would be two boxes
+  on one text. Its tone and words follow from its list (`newCardBox`), and
+  its keys are `newCardKeys`': a move (Alt+↑/↓) hands the card to the
+  list, armed to take focus there. Its frame never has a card, so no ⋯ is
+  offered on a card still being written: a click there would take focus
+  from the box and close the pin box under it. It takes no pasted image,
+  as no card that exists does. The note column's list is as tall as its
+  notes (`.note-column-notes`), so the box follows the last note and stays
+  in view once they scroll.
 - **`CardGrid`** (`card-grid.tsx`) draws your inventory's `GridView` as
   index cards, each cell a button (the drop target, `dropProps`, and the
   card's drag) holding its `CardFace`. Its keys are `gridKeyAct`'s, on the
@@ -1123,8 +1132,9 @@ the session sends moves and draws them until its copy holds them
   face's owner is an `Initial`, not an `Avatar`: the suites count people by
   `.avatar`. A cell's text comes from `useCardTexts`.
 - **One editor for every card: `card-editor.tsx`, in one frame:
-  `card-frame.tsx`** (ADR-0111). `CardEditor` is your composer's and the
-  "+ pin" box's; every other card is a `BoundCardEditor`, a note named in
+  `card-frame.tsx`** (ADR-0111). `CardEditor` is your composer's alone; a
+  new note or pinned card is written in a `NewCardBox`, and every card that
+  exists is a `BoundCardEditor`, a note named in
   its header with who else wrote in it. The frame's header is the card's drag handle (`draggable`,
   `data-card`, so Ctrl+Shift+I finds the card from it and `NOT_A_HANDLE`
   keeps a column's drag off it); a press on its ⋯ or × starts no drag. Its
@@ -1145,10 +1155,24 @@ the session sends moves and draws them until its copy holds them
   Kyneta's `attach`, in that one handler: no keystroke falls between them,
   and focus and the caret stay where they are. A card that already exists is
   attached on mount. `editorState` (`card-state.ts`, pure) decides every step
-  and names its acts in order (`create`, `attach`, `detach`); the
-  component carries them out in turn. A new card is `create` then
-  `attach`: bound first, the binding would write into a card that does not
-  exist yet, and the first run of typing would be lost.
+  and names its acts in order (`create`, `attach`, `detach`); `useCardBox`
+  (`card-box.ts`) carries them out in turn, for your message's box and a
+  new card's alike, and is where this rule lives: the binding, the found
+  and gone rules, and the `readOnly` Kyneta's detach puts back. A new card
+  is `create` then `attach`: bound first, the binding would write into a
+  card that does not exist yet, and the first run of typing would be lost.
+- **A card's focus is armed by a plan and claimed by its box** (`FocusKey`,
+  `claimFocus`, `@pinetrie/interface`): a new comment, "+ add to queue" and
+  a new card handed to its list arm the card; `BoundCardEditor` claims it
+  in the effect that binds its text, right after binding, and puts the
+  caret at the end. Claimed before the binding, the caret would land at the
+  end of an empty box. A column's composer and the board's search claim
+  their own keys the same way, as they mount. Who may claim is a context,
+  `FocusClaim` (`focus-claim.ts`), which `App` provides as one function of
+  fixed identity: a new one each render would draw every claimer again on
+  every `App` render. One key is armed at a time, so the newest arm wins.
+  The "+ pin" box is the one box that focuses itself as it mounts: a click
+  in its column opens it, not a plan.
 - **Every write the editor makes itself goes through the element**: a command
   chosen, an update's intent, a shared file (`insertAt` decides the text).
   Each is `setRangeText` and a dispatched `input` event, so it is typing:
@@ -1216,13 +1240,14 @@ stays in view; the strip scrolls past 30vh.
   comparison the host plans a run's entry from, so the strip and the run
   agree on what the agent read. A card with no text yet has none.
 - **"+ pin" opens a box at the strip's end** that makes a pinned card. It
-  is a `CardEditor` whose `place` is pinned (`drawnPlace(pinnedOf(…))`, `@pinetrie/session`):
+  is a `NewCardBox` whose list is the thread's pinned cards (`pinnedOf`):
   the composer's create-on-first-keystroke rule, and the same element goes
   on editing the card, so nothing typed between the create and the binding
   is lost, which a hand-over to a `PinnedCardEditor` would. It never sends:
   Enter is a new line, it offers no commands, and Escape or blur closes
-  it. While it is open, the strip leaves out the card it shows, as the
-  column does for the composer's. `newPinAt` puts "+ pin" in the header
+  it; Alt+↑/↓ hands the card to the strip, focused there. While it is open,
+  the strip leaves out the card it shows, as the column does for the
+  composer's. `newPinAt` puts "+ pin" in the header
   while the thread has no pinned card, in the strip after, and nowhere while
   the box is open.
 - **The empty strip shows only while a card is dragged.** The drag engine

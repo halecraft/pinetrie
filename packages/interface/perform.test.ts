@@ -175,7 +175,11 @@ test.each<Row>([
     port: p => p.session.openThreads.close,
     args: [TEST_TASK],
   },
-  { effect: { kind: "armFocus", key: "k" }, port: p => p.arm, args: ["k"] },
+  {
+    effect: { kind: "armFocus", key: { kind: "board" } },
+    port: p => p.arm,
+    args: [{ kind: "board" }],
+  },
   {
     effect: { kind: "storeIdentity", identity },
     port: p => p.identity.save,

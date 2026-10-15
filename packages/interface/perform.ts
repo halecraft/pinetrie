@@ -10,6 +10,7 @@ import {
 import { afterKeep } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
 import type { Effect } from "./effects.ts"
+import type { FocusKey } from "./focus-claim.ts"
 import { type ColumnMotion, foldOf } from "./fold-motion.ts"
 import type { Identity } from "./identity.ts"
 import { afterTaskMove, type Intent } from "./intent.ts"
@@ -68,8 +69,8 @@ export interface AppPorts {
   readonly revealCard: (card: CardId) => void
   /** Open an ask's fold (`FoldMemory`). */
   readonly openFold: (ask: string) => void
-  /** The column keyed `key` takes focus when it mounts. */
-  readonly arm: (key: string) => void
+  /** What `key` names takes focus when it mounts. */
+  readonly arm: (key: FocusKey) => void
   readonly identity: {
     readonly save: (identity: Identity) => void
     readonly clear: () => void

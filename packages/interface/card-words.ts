@@ -7,6 +7,7 @@ import type {
   CardEvent,
   CatchUpCommand,
   CatchUpFrom,
+  ListKey,
   ParentThread,
   ThreadBase,
   WriterId,
@@ -19,6 +20,7 @@ import {
   verbOf,
 } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
+import type { CardTone } from "./card-frame.ts"
 import type { PinnedMarker } from "./column-view.ts"
 import type { Reader } from "./send.ts"
 import type { TraceGroup } from "./traces.ts"
@@ -200,9 +202,43 @@ export const noticeKey = (notice: CardNotice): string =>
 export const NEW_PIN = "+ pin"
 export const NEW_PIN_TITLE =
   "write a new card pinned to the top of the column: the agent reads it on every run"
-/** That box, empty. */
-export const NEW_PIN_PLACEHOLDER =
-  "what the agent should keep in mind on every run"
+
+/** The box a new card is written in, at its list's end. */
+export interface NewCardBoxView {
+  /** Its frame's tone: the list's. */
+  readonly tone: CardTone
+  /** What it says while empty. */
+  readonly placeholder: string
+  readonly title: string
+}
+
+/** The box a new card at the end of `to` is written in. */
+export function newCardBox(to: ListKey): NewCardBoxView {
+  switch (to.kind) {
+    case "note":
+      return {
+        tone: "note",
+        placeholder: "write a note",
+        title:
+          "a new note at the column's end, which everyone in the task sees",
+      }
+    case "pinned":
+      return {
+        tone: "pinned",
+        placeholder: "what the agent should keep in mind on every run",
+        title:
+          "a new card pinned to this thread: the agent reads it on every run",
+      }
+    case "margin":
+      return {
+        tone: "note",
+        placeholder: "write a comment",
+        title:
+          "a comment on this message, which everyone in the task sees and no agent reads",
+      }
+  }
+}
+
 /** The pinned strip with no cards: where a drop pins one. */
 export const PINNED_EMPTY = "drop a card here to pin it for the agent"
 

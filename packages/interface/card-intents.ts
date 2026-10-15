@@ -19,6 +19,7 @@ import {
   isTargetOf,
   KINDS,
   keyOf,
+  type ListKey,
   type MoveDirection,
   type MoveTarget,
   moveOf,
@@ -29,6 +30,7 @@ import {
   parseCardId,
   parseTextCardId,
   pinnedOf,
+  placeOfKind,
   type QueueMove,
   type ReferenceCardId,
   type Reorder,
@@ -51,9 +53,9 @@ import {
   AT_INVENTORY,
   atColumn,
   type CardNotice,
+  drawnPlace,
   firstEmpty,
   IN_COLUMN,
-  LAST_ORDER,
   type MoveAnswer,
   type MoveHow,
   type Slots,
@@ -830,60 +832,56 @@ export function planToNote(
 }
 
 /**
- * A new note holding its first text, made at the end of its note column:
- * a creation, in no history, drawn last until the host gives it its order.
+ * A text card of yours holding `text`, made at the end of the list `to`, in
+ * no history: drawn last until the host gives it its order.
  */
-export function planNewNote(
-  act: Extract<ColumnAct, { kind: "newNote" }>,
+export function newCardEffects(
+  card: TextCardId,
+  to: ListKey,
+  text: string,
+  how: MoveHow,
   state: IntentState,
 ): readonly Effect[] {
-  const { card, column } = act
+  const drawn = drawnPlace(to, state.cards.me, state.cards.cards)
+  const place = drawn === undefined ? undefined : placeOfKind("text", drawn)
+  if (place === undefined) return []
+  const me = state.cards.me
+  const content = { command: null, unsent: null, origin: null }
   return [
     {
       kind: "createCard",
-      card: {
-        kind: "text",
-        id: card,
-        owner: state.cards.me,
-        placer: state.cards.me,
-        place: { kind: "note", column, order: LAST_ORDER },
-        content: { command: null, unsent: null, origin: null },
-      },
-      text: act.text,
-      how: IN_COLUMN(column),
+      card: { kind: "text", id: card, owner: me, placer: me, place, content },
+      text,
+      how,
     },
   ]
 }
 
+/** A new card holding its first text, at the end of its list, said in the column keyed `key`. */
+export const planNewCard = (
+  act: Extract<ColumnAct, { kind: "newCard" }>,
+  key: string,
+  state: IntentState,
+): readonly Effect[] =>
+  newCardEffects(act.card, act.to, act.text, IN_COLUMN(key), state)
+
 /**
- * A comment on an entry: a new, empty note in its margin, made
- * by you, which the host places at the margin's end.
+ * A comment on an entry: a new, empty note at its margin's end, whose box
+ * takes focus once drawn.
  */
-export function planComment(
+export const planComment = (
   act: Extract<MessageAct, { kind: "comment" }>,
   state: IntentState,
-): readonly Effect[] {
-  return [
-    {
-      kind: "createCard",
-      card: {
-        kind: "text",
-        id: act.card,
-        owner: state.cards.me,
-        placer: state.cards.me,
-        place: {
-          kind: "margin",
-          entry: act.entry,
-          thread: act.thread,
-          order: LAST_ORDER,
-        },
-        content: { command: null, unsent: null, origin: null },
-      },
-      text: "",
-      how: IN_COLUMN(act.thread),
-    },
-  ]
-}
+): readonly Effect[] => [
+  ...newCardEffects(
+    act.card,
+    { kind: "margin", entry: act.entry, thread: act.thread },
+    "",
+    IN_COLUMN(act.thread),
+    state,
+  ),
+  { kind: "armFocus", key: { kind: "card", card: act.card } },
+]
 
 /**
  * Edit a reference as text: a paste of its quote as a text card

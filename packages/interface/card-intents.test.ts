@@ -28,8 +28,8 @@ import { LAST_ORDER } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import { afterKeep, type Landing, planPut, putLanding } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
-import type { ColumnKey } from "./columns.ts"
-import type { CardFacts, IntentState } from "./effects.ts"
+import { type ColumnKey, keyText } from "./columns.ts"
+import type { CardFacts, Effect, IntentState } from "./effects.ts"
 import {
   NEW_NOTE_COLUMN,
   NEW_ROOT,
@@ -344,36 +344,8 @@ describe("a queued reference", () => {
 })
 
 describe("comments", () => {
-  test("a comment is a new note at its margin's end; a reference to it is queued on its thread", () => {
+  test("a reference to a comment is queued on its thread", () => {
     const card = textCardId("01a0ffd2-0000-7000-8000-0000000000d1")
-    expect(
-      plan(
-        inColumn(
-          { kind: "comment", card, entry: A, thread: TEST_THREAD },
-          { kind: "card", card: TEST_THREAD },
-        ),
-        state(),
-      ),
-    ).toEqual([
-      {
-        kind: "createCard",
-        card: {
-          kind: "text",
-          id: card,
-          owner: ADA,
-          placer: ADA,
-          place: {
-            kind: "margin",
-            entry: A,
-            thread: TEST_THREAD,
-            order: LAST_ORDER,
-          },
-          content: { command: null, unsent: null, origin: null },
-        },
-        text: "",
-        how: { actedAt: { kind: "column", key: TEST_THREAD }, slot: null },
-      },
-    ])
     expect(
       plan(
         inColumn(
@@ -1086,30 +1058,62 @@ describe("a card made a thread", () => {
   })
 })
 
-describe("a new note", () => {
-  test("a note written at its note column's end is made there with its text, said there", () => {
+describe("a new card", () => {
+  const content = { command: null, unsent: null, origin: null }
+  const made = (
+    place: TextCard["place"],
+    text: string,
+    key: string,
+  ): Effect => ({
+    kind: "createCard",
+    card: { kind: "text", id: C1, owner: ADA, placer: ADA, place, content },
+    text,
+    how: { actedAt: { kind: "column", key }, slot: null },
+  })
+  test.each([
+    [
+      "a note",
+      { kind: "note", column: NOTES },
+      NOTES_COLUMN,
+      { kind: "note", column: NOTES, order: LAST_ORDER },
+    ],
+    [
+      "a pinned card",
+      { kind: "pinned", thread: TEST_THREAD },
+      { kind: "card", card: TEST_THREAD },
+      { kind: "pinned", thread: TEST_THREAD, order: LAST_ORDER },
+    ],
+    [
+      "a comment",
+      { kind: "margin", entry: A, thread: TEST_THREAD },
+      { kind: "card", card: TEST_THREAD },
+      { kind: "margin", entry: A, thread: TEST_THREAD, order: LAST_ORDER },
+    ],
+  ] as const)("%s is made at its list's end with its text, said in its column", (_, to, column, place) => {
+    expect(
+      plan(
+        inColumn({ kind: "newCard", card: C1, to, text: "j" }, column),
+        state(),
+      ),
+    ).toEqual([made(place, "j", keyText(column))])
+  })
+
+  test("a comment is an empty note at its margin's end, its box armed to take focus", () => {
     expect(
       plan(
         inColumn(
-          { kind: "newNote", card: C1, column: NOTES, text: "j" },
-          NOTES_COLUMN,
+          { kind: "comment", card: C1, entry: A, thread: TEST_THREAD },
+          { kind: "card", card: TEST_THREAD },
         ),
         state(),
       ),
     ).toEqual([
-      {
-        kind: "createCard",
-        card: {
-          kind: "text" as const,
-          id: C1,
-          owner: ADA,
-          placer: ADA,
-          place: { kind: "note", column: NOTES, order: LAST_ORDER },
-          content: { command: null, unsent: null, origin: null },
-        },
-        text: "j",
-        how: { actedAt: { kind: "column", key: NOTES }, slot: null },
-      },
+      made(
+        { kind: "margin", entry: A, thread: TEST_THREAD, order: LAST_ORDER },
+        "",
+        TEST_THREAD,
+      ),
+      { kind: "armFocus", key: { kind: "card", card: C1 } },
     ])
   })
 })

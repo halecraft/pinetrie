@@ -24,7 +24,6 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import { BOARD_SEARCH } from "./board-view.ts"
 import type { ColumnKey } from "./columns.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"
 import {
@@ -40,7 +39,6 @@ import {
 } from "./fixtures.ts"
 import {
   afterTaskMove,
-  claimFocus,
   type Intent,
   nameEffects,
   planIntent,
@@ -285,7 +283,7 @@ describe("planIntent", () => {
 
   test("a person's open of the board arms its search's focus first; the board's own open arms nothing", () => {
     expect(plan({ kind: "board", open: true, focus: true })).toEqual([
-      { kind: "armFocus", key: BOARD_SEARCH },
+      { kind: "armFocus", key: { kind: "board" } },
       { kind: "layout", moves: false, action: { kind: "board", open: true } },
     ])
   })
@@ -324,7 +322,7 @@ describe("planIntent", () => {
     expect(
       plan({ kind: "newTab", asksAgent: true, state: workflowStateIdFor("d") }),
     ).toEqual([
-      { kind: "armFocus", key: NEW_THREAD },
+      { kind: "armFocus", key: { kind: "column", key: NEW_THREAD } },
       {
         kind: "request",
         intent: {
@@ -367,7 +365,7 @@ describe("planIntent", () => {
         ),
       ),
     ).toEqual([
-      { kind: "armFocus", key: NEW_THREAD },
+      { kind: "armFocus", key: { kind: "column", key: NEW_THREAD } },
       {
         kind: "request",
         intent: {
@@ -527,7 +525,7 @@ describe("planIntent", () => {
     const made = (asksAgent: boolean) =>
       plan({ kind: "addColumn", make: { kind: "thread", asksAgent }, at })
     expect(made(true)).toEqual([
-      { kind: "armFocus", key: NEW_THREAD },
+      { kind: "armFocus", key: { kind: "column", key: NEW_THREAD } },
       {
         kind: "request",
         intent: {
@@ -944,6 +942,38 @@ describe("planIntent", () => {
         },
       ])
     })
+    test("a card handed to its list is armed to take focus there", () => {
+      expect(plan(column({ kind: "focusCard", card: yours.id }))).toEqual([
+        { kind: "armFocus", key: { kind: "card", card: yours.id } },
+      ])
+    })
+    test("+ add to queue makes its card held in the queue, its box armed to take focus", () => {
+      expect(
+        plan(
+          column({
+            kind: "queueNew",
+            card: yours.id,
+            command: null,
+            hold: "hold-if-idle",
+            lane,
+            at: where,
+          }),
+        ),
+      ).toEqual([
+        {
+          kind: "queueCard",
+          move: {
+            card: yours.id,
+            from: null,
+            to: { kind: "queued", thread: lane, seen: "" },
+          },
+          hold: "hold-if-idle",
+          command: null,
+          how: inColumn,
+        },
+        { kind: "armFocus", key: { kind: "card", card: yours.id } },
+      ])
+    })
     test("an offer's other buttons are one command each", () => {
       expect(
         plan(column({ kind: "offer", lane, action: "squash", to: null })),
@@ -1036,12 +1066,6 @@ test("reconcileName's step: the session learns a name, or this device does", () 
     { kind: "storeIdentity", identity },
   ])
   expect(nameEffects(null)).toEqual([])
-})
-
-test("the column you opened takes focus once; no other column does", () => {
-  expect(claimFocus("k", "k")).toEqual({ focus: true, armed: null })
-  expect(claimFocus("k", "other")).toEqual({ focus: false, armed: "k" })
-  expect(claimFocus(null, "k")).toEqual({ focus: false, armed: null })
 })
 
 test("foldList asks for the width the sidebar does not show", () => {

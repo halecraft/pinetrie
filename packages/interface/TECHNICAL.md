@@ -597,19 +597,23 @@ density?, details?, mode }`, `mode` `bound` or `unstarted`
   an edit's text, which sent unchanged is a retry. A new tab can carry one
   too (an edit of a root's first message). The prefill is stored with the
   layout; `pending` is not, since it is sent on opening.
-- **A column you open takes focus, once.** `→`, "Branch here" and ＋ open
-  their column with a fresh key that `planIntent` arms (`armFocus`), and its
-  composer focuses its box when it mounts (`takeFocus`, which `claimFocus`
-  decides: the armed key focuses once, and nothing else does); `onFocus`
-  puts the caret after the prefill. The key lives in a ref, never in the
-  layout: a column restored on reload,
-  or mounted again when its tab is shown, leaves focus where it is. The focus
-  runs in an effect, after the strip's alignment, and scrolls a column opened
-  past the strip's edge into view. The board's search is armed the same way,
-  with `BOARD_SEARCH`, by a `board` intent a person sent (▦, a state's
-  button: `focus: true`), and claimed as the field mounts in the strip. The
-  board opening by itself with nothing to show (`pruneLayout`) sends no
-  intent, so it takes no focus.
+- **What you open or make takes focus, once** (`focus-claim.ts`). A plan
+  arms one `FocusKey` (`armFocus`): a column's (`→`, "Branch here" and ＋
+  open their column with a fresh key), the board's search's, or a card's.
+  The element it names claims it as it mounts (`claimFocus`: the armed key
+  focuses once, and nothing else does); a column's composer then puts the
+  caret after the prefill (`onFocus`). The key lives in a ref, never in the
+  layout: a column restored on reload, or mounted again when its tab is
+  shown, leaves focus where it is. The focus runs in an effect, after the
+  strip's alignment, and scrolls a column opened past the strip's edge into
+  view. The board's search is armed by a `board` intent a person sent (▦, a
+  state's button: `focus: true`), and claimed as the field mounts in the
+  strip; the board opening by itself with nothing to show (`pruneLayout`)
+  sends no intent, so it takes no focus. A card is armed by the plan that
+  makes or hands it over: a comment (`planComment`), "+ add to queue"
+  (`queueNew` with no command; a command's card is never typed in, so it
+  takes none), and `focusCard`, a new card's box handing its card to its
+  list. One key is armed at a time: the newest arm wins.
   Exact: no other message at the same point, the lane's own next append
   included, can be mistaken for it. "branch here" opens one holding the text
   (`pending`), and that column's composer sends it, so a refusal shows where
@@ -1079,8 +1083,8 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
 
 - **A message's *comment*** (`messageTools`' `comment`, where the column
   can be written) is the `comment` act: `planComment` makes an empty note
-  at the margin's end, and the column opens that margin and focuses the
-  new box once it is drawn.
+  at the margin's end (`newCardEffects`) and arms its box's focus, and the
+  column opens that margin, where the box claims it once drawn.
 - **Shut, a margin is a face**: its count under the entry
   (`marginFaceWords`, `MarginFace`), from `marginCounts` over the cards.
   Open (one per column, the column's state), its comments are drawn normal
@@ -1874,10 +1878,17 @@ gone.
   `column` intent with a `card` key), so a refusal is said there: ↑ and ↓
   reorder it among the column's notes (`reorderOf`, a `note` key), and its
   ⋯ takes it into your inventory or makes it a thread; a drag takes it
-  anywhere else. The box under the notes makes one with `newNote`, at
-  its first input worth keeping and holding that input: a note at the
-  column's end, drawn last until the host gives it its order
-  (`LAST_ORDER`), in no history. The box's steps are `editorState`'s, your
+  anywhere else. The box under the notes makes one with `newCard`, at
+  its first input worth keeping and holding that input.
+- **A new card at a list's end is one rule, `newCardEffects`**
+  (`card-intents.ts`): a text card of yours at `drawnPlace(to)`, drawn last
+  until the host gives it its order (`LAST_ORDER`), in no history. `to` is
+  a `ListKey`, a note column, a thread's pinned cards or an entry's margin;
+  `newCard` (a new note or pinned card, with its first text) and a comment
+  (empty) both make theirs with it. The box they are written in is drawn
+  as its list is (`newCardBox`: its tone and words), and its keys are
+  `newCardKeys` (`card-keys.ts`): the acts a key asks for, in order, and
+  whether the box lets its card go. Its steps are `editorState`'s, your
   message's, with `release` for focus leaving it.
 - **Renaming a note column is `rename` with a `MarkTarget`**: the same
   `TitleField` and `planTitle` as a task's, sent as `mark`.
@@ -1886,9 +1897,10 @@ gone.
   page draws the move pending in the column the host would choose
   (`drawnPlace`), or where it was while the host would make one.
 - **Selectors for the browser suite:** `.note-column` (`data-column`, its
-  id), `.note-column-title`, `.note-column .open-title-input`, `.new-note
-  textarea` (its `data-card` once it holds a note), and each note's
-  `.card-editor.note` with its `textarea[data-card]`.
+  id), `.note-column-title`, `.note-column .open-title-input`, `.new-card
+  textarea` (its `data-card` once it holds a card; the "+ pin" box's in
+  `.pinned-strip` too), and each note's `.card-editor.note` with its
+  `textarea[data-card]`.
 
 ## Other threads' agents (`agents-view.ts`, `send.ts`, ADR-0128)
 

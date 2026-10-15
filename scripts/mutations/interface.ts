@@ -1653,13 +1653,102 @@ export const mutations: readonly Mutation[] = [
     expect: "a card found attaches; a card gone detaches",
   },
   {
-    name: "a new note is made empty",
-    file: "packages/interface/card-intents.ts",
-    from: "      text: act.text,",
-    to: '      text: "",',
+    name: "+ add to queue arms nothing",
+    file: "packages/interface/intent.ts",
+    from: "        ...(act.command === null\n",
+    to: "        ...(act.command === null && false\n",
     command: unit,
     expect:
-      "a note written at its note column's end is made there with its text, said there",
+      "+ add to queue makes its card held in the queue, its box armed to take focus",
+  },
+  {
+    name: "a command's queued card is armed too",
+    file: "packages/interface/intent.ts",
+    from: "        ...(act.command === null\n",
+    to: "        ...(true\n",
+    command: unit,
+    expect:
+      "catching up makes its card in the queue, with the command and no text, never drawn as a note; nothing takes focus",
+  },
+  {
+    name: "a card handed to its list is not armed",
+    file: "packages/interface/intent.ts",
+    from: '    case "focusCard":\n      return [{ kind: "armFocus", key: { kind: "card", card: act.card } }]',
+    to: '    case "focusCard":\n      return []',
+    command: unit,
+    expect: "a card handed to its list is armed to take focus there",
+  },
+  {
+    name: "a moved new card is not handed over",
+    file: "packages/interface/card-keys.ts",
+    from: '    acts: act.kind === "reorder" ? [act, { kind: "focusCard", card }] : [act],',
+    to: "    acts: [act],",
+    command: unit,
+    expect:
+      "in a new card's box, a move hands the card to its list, focused; a discard lets it go; any other key keeps it",
+  },
+  {
+    name: "a new card's box keeps its card after a move",
+    file: "packages/interface/card-keys.ts",
+    from: "    release: true,\n  }",
+    to: '    release: act.kind !== "reorder",\n  }',
+    command: unit,
+    expect:
+      "in a new card's box, a move hands the card to its list, focused; a discard lets it go; any other key keeps it",
+  },
+  {
+    name: "a new card's box lets its card go on any key",
+    file: "packages/interface/card-keys.ts",
+    from: "  if (act === null) return { acts: [], release: false }",
+    to: "  if (act === null) return { acts: [], release: true }",
+    command: unit,
+    expect:
+      "in a new card's box, a move hands the card to its list, focused; a discard lets it go; any other key keeps it",
+  },
+  {
+    name: "a pinned card's box is drawn as a note",
+    file: "packages/interface/card-words.ts",
+    from: '        tone: "pinned",\n        placeholder:',
+    to: '        tone: "note",\n        placeholder:',
+    command: unit,
+    expect:
+      "a new card's box is drawn as its list is: a note's and a comment's as notes, a pinned card's pinned",
+  },
+  {
+    name: "a new card is made empty",
+    file: "packages/interface/card-intents.ts",
+    from: "      text,\n      how,\n    },\n  ]\n}",
+    to: '      text: "",\n      how,\n    },\n  ]\n}',
+    command: unit,
+    expect:
+      "a note is made at its list's end with its text, said in its column",
+  },
+  {
+    name: "a new card is made at its list's start",
+    file: "packages/interface/card-intents.ts",
+    from: '  const place = drawn === undefined ? undefined : placeOfKind("text", drawn)',
+    to: '  const place =\n    drawn === undefined\n      ? undefined\n      : placeOfKind("text", { ...drawn, order: "" } as typeof drawn)',
+    command: unit,
+    expect:
+      "a pinned card is made at its list's end with its text, said in its column",
+  },
+  {
+    name: "a comment is made pinned",
+    file: "packages/interface/card-intents.ts",
+    from: '    { kind: "margin", entry: act.entry, thread: act.thread },',
+    to: '    { kind: "pinned", thread: act.thread },',
+    command: unit,
+    expect:
+      "a comment is an empty note at its margin's end, its box armed to take focus",
+  },
+  {
+    name: "a comment's box is not armed",
+    file: "packages/interface/card-intents.ts",
+    from: '  { kind: "armFocus", key: { kind: "card", card: act.card } },\n]',
+    to: "]",
+    command: unit,
+    expect:
+      "a comment is an empty note at its margin's end, its box armed to take focus",
   },
   {
     name: "editorState keeps a released card",
@@ -1876,12 +1965,36 @@ export const mutations: readonly Mutation[] = [
     expect: "× on any column trashes its card alone",
   },
   {
-    name: "every column takes focus when it mounts",
-    file: "packages/interface/intent.ts",
-    from: "  return armed === key",
-    to: '  return key !== ""',
+    name: "everything takes focus when it mounts",
+    file: "packages/interface/focus-claim.ts",
+    from: "  return armed !== null && sameFocus(armed, key)",
+    to: "  return true",
     command: unit,
-    expect: "the column you opened takes focus once",
+    expect: "what you opened or made takes focus once; nothing else does",
+  },
+  {
+    name: "a claim leaves its key armed",
+    file: "packages/interface/focus-claim.ts",
+    from: "    ? { focus: true, armed: null }",
+    to: "    ? { focus: true, armed }",
+    command: unit,
+    expect: "what you opened or made takes focus once; nothing else does",
+  },
+  {
+    name: "any card claims a card's key",
+    file: "packages/interface/focus-claim.ts",
+    from: '      return b.kind === "card" && a.card === b.card',
+    to: '      return b.kind === "card"',
+    command: unit,
+    expect: "what you opened or made takes focus once; nothing else does",
+  },
+  {
+    name: "any column claims a column's key",
+    file: "packages/interface/focus-claim.ts",
+    from: '      return b.kind === "column" && a.key === b.key',
+    to: '      return b.kind === "column"',
+    command: unit,
+    expect: "what you opened or made takes focus once; nothing else does",
   },
   {
     name: "the session's name is never stored on this device",
@@ -3509,8 +3622,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a branch's column is keyed apart from its thread",
     file: "packages/interface/intent.ts",
-    from: '    { kind: "armFocus", key: thread },\n',
-    to: '    { kind: "armFocus", key: "k" },\n',
+    from: '    { kind: "armFocus", key: { kind: "column", key: thread } },\n',
+    to: '    { kind: "armFocus", key: { kind: "column", key: "k" } },\n',
     command: unit,
     expect: "a branch is opened on the host, just after its thread",
   },
@@ -3850,15 +3963,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a comment: a reference queued on its thread, which leaves it where it is; your inventory",
-  },
-  {
-    name: "a comment is made as a note",
-    file: "packages/interface/card-intents.ts",
-    from: '          kind: "margin",\n          entry: act.entry,',
-    to: '          kind: "composing",\n          entry: act.entry,',
-    command: unit,
-    expect:
-      "a comment is a new note at its margin's end; a reference to it is queued on its thread",
   },
   {
     name: "a queued comment's quote names no entry",

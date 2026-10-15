@@ -217,6 +217,12 @@ export type PlaceKey =
    */
   | { readonly kind: "trash" }
 
+/** A place key that is a list a new card is written at the end of. */
+export type ListKey = Extract<
+  PlaceKey,
+  { readonly kind: "note" | "pinned" | "margin" }
+>
+
 /**
  * A move's target alone, never where a card is: the note column nearest
  * `thread`'s card in its task, or nearest `task`'s own column, which stands

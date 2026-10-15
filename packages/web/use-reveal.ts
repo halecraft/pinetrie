@@ -39,36 +39,44 @@ function showCard(container: HTMLElement, card: string): boolean {
 }
 
 /**
- * Bring entry `id` into view in `container`: now, if it is drawn, or once it
- * is. Picking a message a column already draws changes no state, so no render
- * follows; a message in a column that is opening, or in another root, is drawn
- * by the render the pick causes. A newer pick replaces one still waiting.
+ * Do `act` to the element `id` names in `container`: now, if `act` finds it
+ * drawn, or after each render until it does. A newer call replaces one still
+ * waiting. With `afterRender`, it waits for the render the call causes even
+ * when the element is drawn.
  *
- * With `afterRender`, it waits for the render a pick causes even when the
- * message is drawn: a fold opening above it moves it (an ask's last word is
- * drawn while its fold is closed).
- *
- * Call it after any layout effect that places columns: layout effects run in
- * the order they are declared, so the pick's scroll comes last.
+ * Call each hook over it after any layout effect that places columns: layout
+ * effects run in the order they are declared, so `act` comes last.
  */
-export function useReveal(
+function useWhenDrawn(
   container: RefObject<HTMLElement | null>,
+  act: (container: HTMLElement, id: string) => boolean,
 ): (id: string, afterRender?: boolean) => void {
   const pending = useRef<string | null>(null)
   useLayoutEffect(() => {
     const id = pending.current
     const el = container.current
     if (id === null || el === null) return
-    if (show(el, id)) pending.current = null
+    if (act(el, id)) pending.current = null
   })
   return useCallback(
     (id: string, afterRender = false) => {
       const el = container.current
-      pending.current = !afterRender && el !== null && show(el, id) ? null : id
+      pending.current = !afterRender && el !== null && act(el, id) ? null : id
     },
-    [container],
+    [container, act],
   )
 }
+
+/**
+ * Bring entry `id` into view in `container`: now, if it is drawn, or once it
+ * is. Picking a message a column already draws changes no state, so no render
+ * follows; a message in a column that is opening, or in another root, is drawn
+ * by the render the pick causes. With `afterRender`, it waits for the render a
+ * pick causes even when the message is drawn: a fold opening above it moves it
+ * (an ask's last word is drawn while its fold is closed).
+ */
+export const useReveal = (container: RefObject<HTMLElement | null>) =>
+  useWhenDrawn(container, show)
 
 /** Set `data-landed` on `.msg[data-entry=id]` until its animation ends. False when it is not drawn. */
 function land(container: HTMLElement, id: string): boolean {
@@ -88,48 +96,13 @@ function land(container: HTMLElement, id: string): boolean {
 }
 
 /**
- * Outline entry `id` in `container` briefly, where leaving a search landed:
- * now, if it is drawn, or once it is, as `useReveal` waits. CSS draws and fades
- * the outline (`.msg[data-landed]`).
+ * Outline entry `id` in `container`, where leaving a search landed: now, if
+ * it is drawn, or once it is. CSS draws and fades the outline
+ * (`.msg[data-landed]`).
  */
-export function useLanding(
-  container: RefObject<HTMLElement | null>,
-): (id: string) => void {
-  const pending = useRef<string | null>(null)
-  useLayoutEffect(() => {
-    const id = pending.current
-    const el = container.current
-    if (id === null || el === null) return
-    if (land(el, id)) pending.current = null
-  })
-  return useCallback(
-    (id: string) => {
-      const el = container.current
-      pending.current = el !== null && land(el, id) ? null : id
-    },
-    [container],
-  )
-}
+export const useLanding = (container: RefObject<HTMLElement | null>) =>
+  useWhenDrawn(container, land)
 
-/**
- * Bring the queued card `card` into view in its dock: now, if it is drawn,
- * or once it is, as `useReveal` waits for an entry.
- */
-export function useRevealCard(
-  container: RefObject<HTMLElement | null>,
-): (card: string) => void {
-  const pending = useRef<string | null>(null)
-  useLayoutEffect(() => {
-    const card = pending.current
-    const el = container.current
-    if (card === null || el === null) return
-    if (showCard(el, card)) pending.current = null
-  })
-  return useCallback(
-    (card: string) => {
-      const el = container.current
-      pending.current = el !== null && showCard(el, card) ? null : card
-    },
-    [container],
-  )
-}
+/** Bring the queued card `card` into view in its dock: now, if it is drawn, or once it is. */
+export const useRevealCard = (container: RefObject<HTMLElement | null>) =>
+  useWhenDrawn(container, showCard)

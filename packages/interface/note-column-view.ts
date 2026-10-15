@@ -42,12 +42,6 @@ export function noteColumnsOf(input: {
   })
 }
 
-/** The box at a note column's end, empty: what is typed there is a new note. */
-export const NEW_NOTE_PLACEHOLDER = "write a note"
-/** Its tooltip. */
-export const NEW_NOTE_TITLE =
-  "a new note at the column's end, which everyone in the task sees"
-
 /** A note column's notes: how many there are. */
 export const noteCountWords = (n: number): string =>
   n === 0 ? "no notes" : n === 1 ? "1 note" : `${n} notes`

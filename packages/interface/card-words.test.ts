@@ -1,6 +1,7 @@
 import {
   type CardEvent,
   cardIdOfKind,
+  entryId,
   type PlaceKey,
   rootIdFor,
   type ThreadName,
@@ -16,6 +17,7 @@ import {
   commandWords,
   historyWords,
   movedBackWords,
+  newCardBox,
   noticeWords,
   pinnedMarkerWords,
   pinnedStatusWords,
@@ -252,4 +254,27 @@ describe("history and traces", () => {
     expect(writtenWords([ME, BEA], READER)).toBe("written by you, Bea")
     expect(writtenWords([], READER)).toBeNull()
   })
+})
+
+test("a new card's box is drawn as its list is: a note's and a comment's as notes, a pinned card's pinned", () => {
+  const thread = threadIdFor("1-r1")
+  expect(
+    newCardBox({
+      kind: "note",
+      column: cardIdOfKind(
+        "note-column",
+        "01a0ffd2-0000-7000-8000-0000000000c1",
+      ),
+    }),
+  ).toMatchObject({
+    tone: "note",
+    placeholder: "write a note",
+  })
+  expect(newCardBox({ kind: "pinned", thread })).toMatchObject({
+    tone: "pinned",
+    placeholder: "what the agent should keep in mind on every run",
+  })
+  expect(
+    newCardBox({ kind: "margin", entry: entryId("2-a"), thread }),
+  ).toMatchObject({ tone: "note", placeholder: "write a comment" })
 })

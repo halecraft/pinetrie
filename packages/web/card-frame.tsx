@@ -48,8 +48,6 @@ export function CardFrame(p: {
   view: CardFrameView
   /** The card it frames; null before the composer's or "+ pin" box's exists. */
   card: DrawnCard | null
-  /** The box "+ pin" opens: a pinned frame that is still being written. */
-  pinning?: boolean
   reader: Reader
   /** What a command catches up with at its thread; null in your inventory. */
   catchUps: CatchUps | null
@@ -115,7 +113,7 @@ export function CardFrame(p: {
     <div
       // The browser suite reads `.card-editor.queued`, `.pinned` and a queued
       // card's `data-queued`.
-      className={`card-frame card-editor ${TONE_CLASS[view.tone]}${p.pinning === true ? " pinning" : ""}`}
+      className={`card-frame card-editor ${TONE_CLASS[view.tone]}`}
       data-queued={view.tone === "queued" ? card?.id : undefined}
       data-tone={view.tone}
       {...(p.share === undefined ? {} : fileDropProps(p.share.onFiles))}

@@ -41,7 +41,6 @@ import {
 import {
   type AppPorts,
   appView,
-  BOARD_SEARCH,
   boardView,
   branchColors,
   type Clip,
@@ -57,6 +56,7 @@ import {
   type Dock,
   type Effect,
   type Focus,
+  type FocusKey,
   foldMemory,
   type HeldView,
   heldByOthers,
@@ -185,6 +185,7 @@ import { CardHistories } from "./card-history.tsx"
 import { useClipboard } from "./clipboard.ts"
 import { useFileDropGuard } from "./file-drop.ts"
 import { type FocusContext, focusFacts } from "./focus.ts"
+import { FocusClaim } from "./focus-claim.ts"
 import { Footer } from "./footer.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
@@ -705,12 +706,12 @@ export function App({
   // The column you just opened, whose composer takes focus once when it
   // mounts (`claimFocus`). Never stored: a column restored, or shown again
   // with its tab, leaves focus where it is.
-  const armed = useRef<string | null>(null)
-  const takeFocus = (key: string) => {
+  const armed = useRef<FocusKey | null>(null)
+  const takeFocus = useStable((key: FocusKey) => {
     const claim = claimFocus(armed.current, key)
     armed.current = claim.armed
     return claim.focus
-  }
+  })
 
   const views = useMemo(
     () =>
@@ -1586,7 +1587,6 @@ export function App({
     rows,
     seats,
     session,
-    takeFocus,
     traces,
     work: columnWork,
   }
@@ -1622,237 +1622,247 @@ export function App({
     return at === null ? null : thread(end, end, linkOf(at))
   }
   return (
-    <Pictures value={pictures}>
-      <CardHistories value={historyFacts}>
-        {listView !== null && stage.kind !== "connecting" ? (
-          <Sidebar
-            colorOf={colorOf}
-            dragOf={dragOf}
-            index={index}
-            nameOf={nameOf}
-            onIntent={onIntent}
-            order={order}
-            session={session}
-            taskOfThread={taskOfThread}
-            view={listView}
-            width={listWidth}
-          />
-        ) : (
-          <nav aria-label="your threads" id="sidebar" />
-        )}
-        {inventoryOpen && (
-          <InventoryPanel
-            colorOf={colorOf}
-            column={lastColumnKey}
-            dock={dock}
-            held={held}
-            intents={intents}
-            onDock={d => setDock(stores.dock.save(d))}
-            onIntent={onIntent}
-            openRequest={openSlot}
-            previewOf={thread =>
-              threadPreview(thread, index, forkOf.get(thread)?.at ?? null)
-            }
-            notes={noteViews}
-            threadNames={workFacts.names}
-            threads={threadFaces}
-            cell={clipboardCellView(cell, slots)}
-            reader={{ me: session.writer, nameOf }}
-            notices={moves.notices.filter(r => r.actedAt.kind === "inventory")}
-            selected={selected}
-            session={session}
-            slots={slots}
-          />
-        )}
-        {/* Under a page the stage stays mounted and laid out, only inert.
+    <FocusClaim value={takeFocus}>
+      <Pictures value={pictures}>
+        <CardHistories value={historyFacts}>
+          {listView !== null && stage.kind !== "connecting" ? (
+            <Sidebar
+              colorOf={colorOf}
+              dragOf={dragOf}
+              index={index}
+              nameOf={nameOf}
+              onIntent={onIntent}
+              order={order}
+              session={session}
+              taskOfThread={taskOfThread}
+              view={listView}
+              width={listWidth}
+            />
+          ) : (
+            <nav aria-label="your threads" id="sidebar" />
+          )}
+          {inventoryOpen && (
+            <InventoryPanel
+              colorOf={colorOf}
+              column={lastColumnKey}
+              dock={dock}
+              held={held}
+              intents={intents}
+              onDock={d => setDock(stores.dock.save(d))}
+              onIntent={onIntent}
+              openRequest={openSlot}
+              previewOf={thread =>
+                threadPreview(thread, index, forkOf.get(thread)?.at ?? null)
+              }
+              notes={noteViews}
+              threadNames={workFacts.names}
+              threads={threadFaces}
+              cell={clipboardCellView(cell, slots)}
+              reader={{ me: session.writer, nameOf }}
+              notices={moves.notices.filter(
+                r => r.actedAt.kind === "inventory",
+              )}
+              selected={selected}
+              session={session}
+              slots={slots}
+            />
+          )}
+          {/* Under a page the stage stays mounted and laid out, only inert.
           Remounted, its columns would lose their scroll; with
           `display: none`, `useStripNarrow` would measure the strip at 0 and
           turn an open pane into a modal dialog over the page. */}
-        <main
-          aria-hidden={page !== null || undefined}
-          id="stage"
-          inert={page !== null}
-        >
-          {/* What the stage's columns draw by: the
+          <main
+            aria-hidden={page !== null || undefined}
+            id="stage"
+            inert={page !== null}
+          >
+            {/* What the stage's columns draw by: the
             root's colours, whether the pane covers the page, how you read a
             review. Each changes rarely, and only its readers redraw. */}
-          <TrackSeed value={seed}>
-            <ThreadStates value={workflow?.open ?? NO_STATES}>
-              <NarrowContext value={narrow}>
-                <ReviewPrefsContext value={reviewReach}>
-                  {listView === null || stage.kind === "connecting" ? (
-                    <p className="connecting">connecting…</p>
-                  ) : stage.kind === "nothing" ? (
-                    <p className="nothing-here">
-                      Open a thread from the board, or start one with ＋.
-                    </p>
-                  ) : (
-                    <>
-                      {search !== null && (
-                        <SearchBar
-                          field={searchField}
-                          line={searchWords}
-                          onIntent={onIntent}
-                          query={search.query}
-                        />
-                      )}
-                      <div className="stage-row">
-                        <div className="rail-side">
-                          {stage.kind === "task" && search === null && (
-                            <div className="search-lead">
-                              <SearchToggle
-                                onIntent={onIntent}
-                                open={false}
-                                toggle={searchToggle}
-                              />
-                            </div>
-                          )}
-                          {/* A task whose threads have no message yet, a new
+            <TrackSeed value={seed}>
+              <ThreadStates value={workflow?.open ?? NO_STATES}>
+                <NarrowContext value={narrow}>
+                  <ReviewPrefsContext value={reviewReach}>
+                    {listView === null || stage.kind === "connecting" ? (
+                      <p className="connecting">connecting…</p>
+                    ) : stage.kind === "nothing" ? (
+                      <p className="nothing-here">
+                        Open a thread from the board, or start one with ＋.
+                      </p>
+                    ) : (
+                      <>
+                        {search !== null && (
+                          <SearchBar
+                            field={searchField}
+                            line={searchWords}
+                            onIntent={onIntent}
+                            query={search.query}
+                          />
+                        )}
+                        <div className="stage-row">
+                          <div className="rail-side">
+                            {stage.kind === "task" && search === null && (
+                              <div className="search-lead">
+                                <SearchToggle
+                                  onIntent={onIntent}
+                                  open={false}
+                                  toggle={searchToggle}
+                                />
+                              </div>
+                            )}
+                            {/* A task whose threads have no message yet, a new
                             tab's, draws a hollow dot where its
                             first message will be. */}
-                          {rail.length > 0 ? (
-                            <LiveRail
-                              activity={activity}
-                              asks={asks}
-                              digests={digests}
-                              revisions={workFacts.revisions}
-                              colorOf={colorOf}
-                              ends={ends}
-                              index={index}
-                              names={nameOf}
-                              onPick={openAt}
-                              open={shown}
-                              matches={searchResult}
-                              rows={rail}
-                              session={session}
-                              stubs={drawnStubs}
-                              onLink={(link, at) =>
-                                onIntent({ kind: "openLink", link, entry: at })
-                              }
-                              viewports={viewports}
-                              yours={yours}
-                            />
-                          ) : (
-                            <EmptyRail />
-                          )}
+                            {rail.length > 0 ? (
+                              <LiveRail
+                                activity={activity}
+                                asks={asks}
+                                digests={digests}
+                                revisions={workFacts.revisions}
+                                colorOf={colorOf}
+                                ends={ends}
+                                index={index}
+                                names={nameOf}
+                                onPick={openAt}
+                                open={shown}
+                                matches={searchResult}
+                                rows={rail}
+                                session={session}
+                                stubs={drawnStubs}
+                                onLink={(link, at) =>
+                                  onIntent({
+                                    kind: "openLink",
+                                    link,
+                                    entry: at,
+                                  })
+                                }
+                                viewports={viewports}
+                                yours={yours}
+                              />
+                            ) : (
+                              <EmptyRail />
+                            )}
+                          </div>
+                          <Strip
+                            canvas={canvas}
+                            noteViews={noteViews}
+                            threadFaceOf={threadFaceOf}
+                            threadTrackOf={threadTrackOf}
+                            onIntent={onIntent}
+                            projected={projected}
+                            reader={historyFacts.reader}
+                            readers={readers}
+                            shared={{
+                              ...shared,
+                              landmarks,
+                              seenEnd: seenEnds,
+                              forks,
+                              onIntent,
+                              shown,
+                            }}
+                            strip={strip}
+                            stripRef={stripEl}
+                            taskColumn={taskColumn}
+                            taskPins={taskPins}
+                            taskPinsInView={taskPinsInView}
+                            told={told}
+                            thread={readerRow}
+                            typing={typing}
+                            stage={stage}
+                          />
                         </div>
-                        <Strip
-                          canvas={canvas}
-                          noteViews={noteViews}
-                          threadFaceOf={threadFaceOf}
-                          threadTrackOf={threadTrackOf}
-                          onIntent={onIntent}
-                          projected={projected}
-                          reader={historyFacts.reader}
-                          readers={readers}
-                          shared={{
-                            ...shared,
-                            landmarks,
-                            seenEnd: seenEnds,
-                            forks,
-                            onIntent,
-                            shown,
-                          }}
-                          strip={strip}
-                          stripRef={stripEl}
-                          taskColumn={taskColumn}
-                          taskPins={taskPins}
-                          taskPinsInView={taskPinsInView}
-                          told={told}
-                          thread={readerRow}
-                          typing={typing}
-                          stage={stage}
-                        />
-                      </div>
-                    </>
-                  )}
-                  {layout.board && boardShown !== null && (
-                    <Board
-                      notices={moves.notices.filter(
-                        r => r.actedAt.kind === "board",
-                      )}
-                      reader={historyFacts.reader}
-                      onClearFilter={clearBoardFilter}
-                      onIntent={onIntent}
-                      pip={pip}
-                      readers={readers}
-                      searchRef={boardSearchField}
-                      thread={readerRow}
-                      view={boardShown}
-                    />
-                  )}
-                </ReviewPrefsContext>
-              </NarrowContext>
-            </ThreadStates>
-          </TrackSeed>
-        </main>
-        {page !== null && (
-          <Page onBack={() => onIntent({ kind: "page", to: null })} page={page}>
-            {page === "profile" && (
-              <ProfilePage
-                email={session.principal}
-                nameOf={nameOf}
-                colorOf={colorOf}
-                rename={name => session.request({ kind: "name", name })}
-                setPicture={sha256 =>
-                  session.request({ kind: "picture", sha256 })
-                }
-                writer={session.writer}
+                      </>
+                    )}
+                    {layout.board && boardShown !== null && (
+                      <Board
+                        notices={moves.notices.filter(
+                          r => r.actedAt.kind === "board",
+                        )}
+                        reader={historyFacts.reader}
+                        onClearFilter={clearBoardFilter}
+                        onIntent={onIntent}
+                        pip={pip}
+                        readers={readers}
+                        searchRef={boardSearchField}
+                        thread={readerRow}
+                        view={boardShown}
+                      />
+                    )}
+                  </ReviewPrefsContext>
+                </NarrowContext>
+              </ThreadStates>
+            </TrackSeed>
+          </main>
+          {page !== null && (
+            <Page
+              onBack={() => onIntent({ kind: "page", to: null })}
+              page={page}
+            >
+              {page === "profile" && (
+                <ProfilePage
+                  email={session.principal}
+                  nameOf={nameOf}
+                  colorOf={colorOf}
+                  rename={name => session.request({ kind: "name", name })}
+                  setPicture={sha256 =>
+                    session.request({ kind: "picture", sha256 })
+                  }
+                  writer={session.writer}
+                />
+              )}
+              {page === "setup" && (
+                <SetupPage
+                  view={setupView(workFacts.setup, workFacts.commands)}
+                />
+              )}
+            </Page>
+          )}
+          <Footer
+            syncing={status === "pending"}
+            strip={
+              <BoardStrip
+                count={count}
+                elsewhere={attention.elsewhere}
+                mine={boardMine}
+                onIntent={onIntent}
+                onMine={setBoardMine}
+                onQuery={setBoardQuery}
+                open={layout.board}
+                pip={unsent.elsewhere ? pip : null}
+                query={boardQuery}
+                readers={readers}
+                searchRef={boardSearchField}
+                view={boardShown}
               />
-            )}
-            {page === "setup" && (
-              <SetupPage
-                view={setupView(workFacts.setup, workFacts.commands)}
-              />
-            )}
-          </Page>
-        )}
-        <Footer
-          syncing={status === "pending"}
-          strip={
-            <BoardStrip
-              count={count}
-              elsewhere={attention.elsewhere}
-              mine={boardMine}
-              onIntent={onIntent}
-              onMine={setBoardMine}
-              onQuery={setBoardQuery}
-              open={layout.board}
-              pip={unsent.elsewhere ? pip : null}
-              query={boardQuery}
-              readers={readers}
-              searchRef={boardSearchField}
-              takeFocus={() => takeFocus(BOARD_SEARCH)}
-              view={boardShown}
-            />
-          }
-          colorOf={colorOf}
-          nameOf={nameOf}
-          inbox={{
-            attention: attention.items,
-            count: needsYou,
-            mentions,
-            inbox,
-            thread,
-            names: workFacts.names,
-            linkOf,
-            labelOf,
-            reader,
-            onOpen: openLink,
-            onIntent,
-          }}
-          accepted={workFacts.accepted}
-          onIntent={onIntent}
-          me={{ writer: session.writer, email: session.principal }}
-          session={session}
-          inventory={{
-            open: inventoryOpen,
-            count: held.length,
-            onToggle: () => setInventoryOpen(open => !open),
-          }}
-          folded={listWidth === "icons"}
-        />
-      </CardHistories>
-    </Pictures>
+            }
+            colorOf={colorOf}
+            nameOf={nameOf}
+            inbox={{
+              attention: attention.items,
+              count: needsYou,
+              mentions,
+              inbox,
+              thread,
+              names: workFacts.names,
+              linkOf,
+              labelOf,
+              reader,
+              onOpen: openLink,
+              onIntent,
+            }}
+            accepted={workFacts.accepted}
+            onIntent={onIntent}
+            me={{ writer: session.writer, email: session.principal }}
+            session={session}
+            inventory={{
+              open: inventoryOpen,
+              count: held.length,
+              onToggle: () => setInventoryOpen(open => !open),
+            }}
+            folded={listWidth === "icons"}
+          />
+        </CardHistories>
+      </Pictures>
+    </FocusClaim>
   )
 }
